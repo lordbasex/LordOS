@@ -1,4 +1,5 @@
 // @lordos/sdk — everything a LordOS theme or app needs.
+export { standaloneDesktop } from './platform.js';
 import { createElement, cloneElement, Fragment } from 'react';
 import { render, onScreenChange, addListener } from '@lordos/runtime';
 import { settings } from './settings.js';

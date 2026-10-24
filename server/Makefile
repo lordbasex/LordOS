@@ -1,6 +1,22 @@
 # lord-server — libc + kernel headers + libxkbcommon + libwayland-server + vendored QuickJS and stb.
 # No libdrm, libinput, X11 or WebKit; the Wayland compositor (src/wl) and the terminal (src/term) are our own.
 CC      ?= cc
+PROFILE ?= desktop
+ifneq ($(filter $(PROFILE),desktop os),$(PROFILE))
+$(error PROFILE must be desktop or os)
+endif
+ifeq ($(PROFILE),desktop)
+CPPFLAGS += -DLORD_STANDALONE
+SESSIOND := 0
+BPF := 0
+SEAT ?= 1
+else
+SEAT ?= 0
+endif
+ifeq ($(SEAT),1)
+CPPFLAGS += -DLORD_LIBSEAT $(shell pkg-config --cflags libseat)
+LDLIBS += $(shell pkg-config --libs libseat)
+endif
 CFLAGS  ?= -O2 -g
 WARN    := -Wall -Wextra
 CPPFLAGS += -D_GNU_SOURCE -Isrc -Ibuild/gen -isystem ../third_party/quickjs -isystem ../third_party/stb
@@ -19,7 +35,7 @@ endif
 endif
 
 # Wayland protocols: wayland-scanner generates the code from the wayland-protocols XML files.
-WLPROTO := /usr/share/wayland-protocols
+WLPROTO ?= $(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_XML  := $(WLPROTO)/stable/xdg-shell/xdg-shell.xml $(WLPROTO)/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml
 WL_GEN  := build/gen/xdg-shell-protocol.h build/gen/xdg-decoration-unstable-v1-protocol.h
 WL_OBJ  := build/gen/xdg-shell-protocol.o build/gen/xdg-decoration-unstable-v1-protocol.o
@@ -72,7 +88,7 @@ SRC += $(DOC_SRC)
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/ui/js_fw.c
 SRC += $(FW_SRC)
 OBJ := $(SRC:src/%.c=build/obj/%.o)
-HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
+HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/platform/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
 # Touchpad and touchscreens: our own driver (src/tp, no libinput), gestures and touches for the
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
@@ -126,10 +142,30 @@ build/imager-test: tests/imager_test.c src/imager/imgverify.c src/imager/imgveri
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/imager_test.c src/imager/imgverify.c src/pkg/crypto.c
 	./$@ || { rm -f $@; exit 1; }
+ifeq ($(PROFILE),desktop)
+# Distribution administration lives in the legacy OS profile. crypto.c and xz.c
+# are shared primitives used by the vault, signatures, journal and map reader.
+SRC := $(filter-out src/admin.c src/install/%.c src/imager/%.c src/ui/js_imager.c src/ui/js_pkg.c \
+       src/pkg/deb.c src/pkg/idx.c src/pkg/status.c src/pkg/resolve.c src/pkg/http.c src/pkg/pkg.c src/pkg/pgp.c \
+       src/net/crypto.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c \
+       src/net/vpn.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/remote/remote_admin.c src/remote/ssh_admin.c src/users/users_admin.c \
+       src/disk/disk_admin.c src/disk/smartctl_admin.c src/logs/logs_admin.c src/monitor/proc_admin.c,$(SRC))
+SRC += src/platform/admin.c src/platform/net.c
+endif
+SRC += src/platform/seat.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR += $(wildcard src/tp/*.h)
 
-.PHONY: all clean test test-full
+.PHONY: all clean test test-full test-platform
+test-platform: build/seat-test build/platform-admin-test
+	./build/seat-test
+	./build/platform-admin-test
+build/seat-test: tests/seat_test.c src/platform/seat.c src/platform/seat.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -D_GNU_SOURCE -DLORD_LIBSEAT $(shell pkg-config --cflags libseat) -Isrc -o $@ tests/seat_test.c src/platform/seat.c
+build/platform-admin-test: tests/platform_admin_test.c src/platform/admin.c src/admin.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -D_GNU_SOURCE -Isrc -o $@ tests/platform_admin_test.c src/platform/admin.c
 # lord-sessiond: sessions, login screen and remote desktop (docs/SESSIONS.md). It's the
 # only one that links OpenSSL (TLS), and with it libsrtp2 and usrsctp (the remote desktop's WebRTC);
 # without libssl-dev, only lord-server is built.
@@ -158,7 +194,9 @@ endif
 BPF ?= $(shell command -v clang >/dev/null 2>&1 && echo 1 || echo 0)
 NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c \
           src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+ifeq ($(PROFILE),os)
 ALL += build/lord-netperm
+endif
 ifeq ($(BPF),1)
 NP_GEN := build/gen/np_bpf.h
 NP_CPP := -DNP_HAVE_BPF
@@ -192,7 +230,9 @@ build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm
 # only; it executes nothing and has no network. tests/fan_test.c: curves, fan.json, requests and a
 # fake sysfs (run by tests/run_suites.sh).
 FAN_SRC := src/fan/fancurve.c src/fan/fanhw.c src/sec/json.c
+ifeq ($(PROFILE),os)
 ALL += build/lord-fand
+endif
 build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC)
@@ -536,6 +576,13 @@ build/obj/%.o: src/%.c $(HDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
 
+# Switching profiles must rebuild objects even without `make clean`.
+build/gen/profile.h: FORCE
+	@mkdir -p build/gen
+	@printf '/* profile=%s seat=%s gpu=%s */\n' '$(PROFILE)' '$(SEAT)' '$(GPU)' > $@.new
+	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
+$(OBJ): build/gen/profile.h
+
 # Third-party code: compiled as is, without our warnings.
 build/obj/ui/stb.o: src/ui/stb.c
 	@mkdir -p $(dir $@)
@@ -575,7 +622,9 @@ include $(sort $(wildcard mk/*.mk))
 
 # lord-netd (docs/NETWORK.md, "The network belongs to the system"): admin.c with LORD_NETD (net-* actions
 # only) plus networking and the package engine (net-vpn-enable). libc only; lord-sessiond runs it.
+ifeq ($(PROFILE),os)
 all: build/lord-netd
+endif
 NETD_OBJ := build/obj/netd/admin.o build/obj/netd/netd.o $(NET_SRC:src/%.c=build/obj/%.o) $(PKG_SRC:src/%.c=build/obj/%.o) build/obj/ui/stb.o
 build/obj/netd/admin.o: src/admin.c $(HDR)
 	@mkdir -p $(dir $@)

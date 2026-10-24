@@ -466,8 +466,8 @@ static void read_vars(JSContext *c, JSValue o, const char *path) {
 static void apply_locale_conf(void) {
     char path[PATH_MAX + 32];
     locale_conf(path, sizeof path);
-    const char *files[2] = { "/etc/default/locale", path };
-    for (int k = 0; k < 2; k++) {
+    const char *files[3] = { "/etc/default/locale", "/etc/locale.conf", path };
+    for (int k = 0; k < 3; k++) {
         char *txt = read_small(files[k], 8192, NULL);
         for (char *line = txt ? strtok(txt, "\n") : NULL; line; line = strtok(NULL, "\n")) {
             char *eq = strchr(line, '=');
@@ -489,6 +489,7 @@ static JSValue f_locale_get(JSContext *c, JSValueConst this_val, int argc, JSVal
     locale_conf(path, sizeof path);
     read_vars(c, u, path);
     read_vars(c, sys, "/etc/default/locale");
+    read_vars(c, sys, "/etc/locale.conf");
     JS_SetPropertyStr(c, o, "user", u);
     JS_SetPropertyStr(c, o, "system", sys);
     return o;
@@ -528,11 +529,18 @@ static JSValue f_locale_available(JSContext *c, JSValueConst this_val, int argc,
     (void)this_val; (void)argc; (void)argv;
     JSValue arr = JS_NewArray(c);
     FILE *f = fopen("/usr/share/i18n/SUPPORTED", "r");
+    /* Fedora ships the locale archive without Debian's SUPPORTED catalog.
+     * Enumerate installed locales with a fixed, unprivileged command there. */
+    int installed_only = f == NULL;
+    if (installed_only) f = popen("/usr/bin/locale -a", "re");
     char line[256];
     uint32_t i = 0;
     while (f && fgets(line, sizeof line, f)) {
         char loc[128], cs[64];
-        if (sscanf(line, "%127s %63s", loc, cs) != 2 || strcmp(cs, "UTF-8")) continue;
+        if (installed_only) {
+            if (sscanf(line, "%127s", loc) != 1) continue;
+            if (!strcasestr(loc, "utf8") && !strcasestr(loc, "utf-8")) continue;
+        } else if (sscanf(line, "%127s %63s", loc, cs) != 2 || strcmp(cs, "UTF-8")) continue;
         locale_t l = newlocale(LC_ALL_MASK, loc, (locale_t)0);
         if (l) freelocale(l);
         JSValue o = JS_NewObject(c);
@@ -540,7 +548,7 @@ static JSValue f_locale_available(JSContext *c, JSValueConst this_val, int argc,
         JS_SetPropertyStr(c, o, "generated", JS_NewBool(c, l != 0));
         JS_SetPropertyUint32(c, arr, i++, o);
     }
-    if (f) fclose(f);
+    if (f) { if (installed_only) pclose(f); else fclose(f); }
     return arr;
 }
 

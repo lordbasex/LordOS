@@ -1,4 +1,7 @@
 {
+  "host.title": "Aplicaciones del sistema",
+  "host.description": "Instala y actualiza las aplicaciones del sistema con el gestor de software de tu distribución. Las aplicaciones nativas .lpk se gestionan aquí.",
+  "host.open": "Abrir gestor de software",
   "back": "Volver",
   "cancel": "Cancelar",
   "cat.AudioVideo": "Audio y video",

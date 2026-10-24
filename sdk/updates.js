@@ -7,6 +7,7 @@
 // The packages come from the signed LordOS repository on lordos.org (and Debian's), through our own
 // package engine (lord.pkg, admin.run('pkg-update' | 'pkg-install' | 'pkg-upgrade')). The optional
 // daily check only downloads the signed lists and notifies; it never installs anything.
+import { standaloneDesktop } from './platform.js';
 import { settings } from './settings.js';
 import { admin } from './admin.js';
 import { notify } from './notify.js';
@@ -14,7 +15,7 @@ import { t } from './i18n.js';
 import { wm } from './windows.js';
 import { lordosVersion } from './system.js';
 
-const has = () => typeof lord !== 'undefined' && !!lord.pkg && typeof lord.pkg.rebootRequired === 'function';
+const has = () => !standaloneDesktop && typeof lord !== 'undefined' && !!lord.pkg && typeof lord.pkg.rebootRequired === 'function';
 
 export const UPDATE_DEFAULTS = { autoCheck: true, notified: '' };
 export const updatePrefs = (s = settings.get()) => ({ ...UPDATE_DEFAULTS, ...(s.updates || {}) });

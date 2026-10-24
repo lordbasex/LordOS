@@ -1,5 +1,6 @@
 /* input.c — evdev device detection and event reading. */
 #include "input.h"
+#include "platform/seat.h"
 #include "tp/tp.h"
 
 #include <errno.h>
@@ -7,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/inotify.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define LONG_BITS (8 * sizeof(long))
@@ -25,7 +28,7 @@ static void add_device(Input *in, int fd, const char *path) {
     int keyboard = HAS(ev, EV_KEY) && HAS(keys, KEY_A) && HAS(keys, KEY_ENTER);
     int mouse    = HAS(ev, EV_REL) && HAS(keys, BTN_LEFT);
     int tablet   = HAS(ev, EV_ABS) && HAS(abs, ABS_X) && HAS(abs, ABS_Y);
-    if ((!keyboard && !mouse && !tablet) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
+    if ((!keyboard && !mouse && !tablet) || in->count >= INPUT_MAX_DEVICES) { seat_device_close(fd); return; }
 
     InputDevice *d = &in->dev[in->count++];
     memset(d, 0, sizeof *d);                /* the slot may have belonged to one that was unplugged */
@@ -51,15 +54,44 @@ static void add_device(Input *in, int fd, const char *path) {
             : mouse ? " [mouse]" : (tablet ? " [tablet]" : ""));
 }
 
-int input_open(Input *in) {
-    memset(in, 0, sizeof *in);
+static void scan_devices(Input *in) {
     for (int i = 0; i < 64 && in->count < INPUT_MAX_DEVICES; i++) {
         char path[32];
         snprintf(path, sizeof path, "/dev/input/event%d", i);
-        int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        struct stat st, existing;
+        if (stat(path, &st)) continue;
+        int found = 0;
+        for (int k = 0; k < in->count; k++)
+            if (!fstat(in->dev[k].fd, &existing) && existing.st_rdev == st.st_rdev && existing.st_ino == st.st_ino) { found = 1; break; }
+        if (found) continue;
+        int fd = seat_device_open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         if (fd >= 0) add_device(in, fd, path);
     }
+}
+
+int input_open(Input *in) {
+    memset(in, 0, sizeof *in);
+    scan_devices(in);
     return in->count > 0 ? 0 : -1;
+}
+
+/* lord-sessiond used to forward new devices. An independent session observes
+ * /dev/input itself; all access still goes through the seat provider. */
+static int watch = -1;
+int input_watch_fd(void) {
+    if (watch >= 0) return watch;
+    watch = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
+    if (watch >= 0 && inotify_add_watch(watch, "/dev/input", IN_CREATE | IN_MOVED_TO) < 0) {
+        close(watch); watch = -1;
+    }
+    return watch;
+}
+int input_watch_dispatch(Input *in, int active) {
+    char events[4096];
+    while (read(watch, events, sizeof events) > 0) { }
+    int before = in->count;
+    if (active) scan_devices(in);
+    return before != in->count;
 }
 
 int input_open_fds(Input *in, const int *fds, int n) {
@@ -84,7 +116,7 @@ void input_remove(Input *in, int idx) {
     if (idx < 0 || idx >= in->count) return;
     InputDevice *d = &in->dev[idx];
     fprintf(stderr, "input: %s is gone; closing it\n", d->name);
-    close(d->fd);
+    seat_device_close(d->fd);
     tp_free(d->tp);
     memmove(&in->dev[idx], &in->dev[idx + 1], sizeof in->dev[0] * (size_t)(in->count - idx - 1));
     in->count--;
@@ -93,7 +125,7 @@ void input_remove(Input *in, int idx) {
 void input_close(Input *in) {
     for (int i = 0; i < in->count; i++) {
         ioctl(in->dev[i].fd, EVIOCGRAB, 0);
-        close(in->dev[i].fd);
+        seat_device_close(in->dev[i].fd);
         tp_free(in->dev[i].tp);
         in->dev[i].tp = NULL;
     }

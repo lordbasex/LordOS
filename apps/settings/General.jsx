@@ -1,7 +1,7 @@
 // Settings → General (machine and software details) and Updates (Debian and LordOS).
 import {
   View, Text, Button, useTheme, useLocale, useSystemInfo, useServerStats, lordosVersion, screen, formatBytes, formatDuration, formatNumber,
-  admin, wm, LordOSLogo, LordOSWordmark, spacing, typeScale,
+  admin, wm, LordOSLogo, LordOSWordmark, spacing, typeScale, standaloneDesktop,
 } from '@lordos/sdk';
 import { useState, version as reactVersion } from 'react';
 import { Stack, Section, ValueRow, Note, Message, Actions } from './ui.jsx';
@@ -58,6 +58,12 @@ export function Updates() {
   const pkg = typeof lord.pkg !== 'undefined' && lord.pkg.available();
   const ups = pkg ? lord.pkg.upgrades() : [];
   const at = pkg ? lord.pkg.lastUpdate() : 0;
+  if (standaloneDesktop) return (
+    <Stack>
+      <Note>{tr('store.host.description')}</Note>
+      <Actions><Button primary label={tr('settings.updates.open')} onClick={() => wm.open('store', { args: { page: 'updates' } })} /></Actions>
+    </Stack>
+  );
   const check = () => {
     setBusy(true);
     admin.run('pkg-update').then(() => setMsg({ ok: true, text: tr('settings.updates.checked') }), (e) => setMsg({ ok: false, text: e.message }))
@@ -74,7 +80,7 @@ export function Updates() {
         <Button primary label={tr('settings.updates.open')} onClick={() => wm.open('store', { args: { page: 'updates' } })} />
       </Actions>
       <Message msg={msg} />
-      {!admin.available() && <Note tone="warn">{tr('settings.admin.unavailable')}</Note>}
+      {!admin.available() && <Note tone="warn">{tr(standaloneDesktop ? 'settings.host.adminUnavailable' : 'settings.admin.unavailable')}</Note>}
     </Stack>
   );
 }

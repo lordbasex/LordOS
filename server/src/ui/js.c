@@ -410,7 +410,9 @@ static void session_context(void) {
     js_sys_init();
     js_sys_register(ctx, lord);
     js_term_register(ctx, lord);
+#ifndef LORD_STANDALONE
     js_pkg_register(ctx, lord);
+#endif
     js_sound_register(ctx, lord);
     js_wasm_register(ctx, g);           /* the WebAssembly global (our own interpreter, src/wasm) */
     js_net_register(ctx, lord);
@@ -425,7 +427,9 @@ static void session_context(void) {
     js_input_register(ctx, lord);      /* lord.input: touchpads and touchscreens (tp/) */
     js_fw_register(ctx, lord);         /* lord.fw: per-app network permissions (lord-netperm, docs/FIREWALL.md) */
     js_disk_register(ctx, lord);       /* lord.disks: disks and partitions (Disks app) */
+#ifndef LORD_STANDALONE
     js_imager_register(ctx, lord);     /* lord.imager: LordOS Imager (docs/IMAGER.md) */
+#endif
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
