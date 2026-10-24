@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+if [ "$(id -u)" = 0 ]; then
+    echo 'Start Lord DE as your normal session user, without sudo.' >&2
+    exit 1
+fi
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=lord-de
+export XDG_CURRENT_DESKTOP=LordOS
+export DESKTOP_SESSION=lord-de
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    echo 'A login session with XDG_RUNTIME_DIR is required (logind or seatd).' >&2
+    exit 1
+fi
+cd '@ROOT@/bin'
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    exec dbus-run-session -- ./lord-server "$@"
+fi
+exec ./lord-server "$@"

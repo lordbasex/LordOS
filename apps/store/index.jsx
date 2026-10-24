@@ -3,7 +3,7 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  suggestions, unseenSuggestions, refreshSuggestions,
+  suggestions, unseenSuggestions, refreshSuggestions, standaloneDesktop,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { debian, useDebian } from './debian.js';
@@ -129,7 +129,7 @@ function findPackageFiles() {
   for (const dir of ['', 'Descargas', 'Downloads', 'Escritorio', 'Desktop']) {
     let list = [];
     try { list = fs.list(dir || '.'); } catch (e) { continue; }
-    for (const e of list) if (!e.dir && /\.(lpk|deb)$/i.test(e.name)) out.push({ path: `${fs.home()}/${dir ? `${dir}/` : ''}${e.name}`, name: e.name, size: e.size });
+    for (const e of list) if (!e.dir && (standaloneDesktop ? /\.lpk$/i : /\.(lpk|deb)$/i).test(e.name)) out.push({ path: `${fs.home()}/${dir ? `${dir}/` : ''}${e.name}`, name: e.name, size: e.size });
   }
   return out;
 }
@@ -144,6 +144,7 @@ function InstallFile({ path, onDone }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setMsg(null);
+    if (standaloneDesktop && isDeb) { setInfo(null); setMsg({ ok: false, text: tr('store.host.description') }); return; }
     if (isDeb) { setInfo(null); return; }
     try { setInfo(packages.inspect(path)); } catch (e) { setInfo(null); setMsg({ ok: false, text: tr('store.lordos.invalid', { error: e.message }) }); }
   }, [path]);
@@ -152,7 +153,7 @@ function InstallFile({ path, onDone }) {
   const loc = (v) => (v && typeof v === 'object' ? v[lang] || v[lang.split('-')[0]] || v.en || Object.values(v)[0] : v) || '';
   const installed = m && packageList.get().find((p) => p.id === m.id);
   const install = () => {
-    if (isDeb) {
+    if (isDeb && !standaloneDesktop) {
       setBusy(true);
       debian.installFile(path).then(() => { setMsg({ ok: true, text: tr('store.done.installed') }); onDone?.(); },
         (e) => setMsg({ ok: false, text: e.message })).finally(() => setBusy(false));
@@ -185,11 +186,11 @@ function InstallFile({ path, onDone }) {
           </View>
         </View>
       )}
-      {isDeb && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
+      {isDeb && !standaloneDesktop && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
       <Message msg={msg} />
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
-        {(m || isDeb) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
+        {(m || (isDeb && !standaloneDesktop)) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
       </View>
     </View>
   );

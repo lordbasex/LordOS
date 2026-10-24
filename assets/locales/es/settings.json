@@ -1,4 +1,5 @@
 {
+  "host.adminUnavailable": "Tu distribución gestiona la configuración del sistema.",
   "admin.langpack": "Instalando paquetes",
   "admin.locale-gen": "Generando región",
   "admin.running": "{action}: {arg}…",

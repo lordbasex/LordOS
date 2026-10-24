@@ -16,6 +16,7 @@
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
 #include "admin.h"
+#include "platform/seat.h"
 #include "keylag.h"
 #include "net/net.h"
 #include "disk/disk.h"
@@ -727,7 +728,7 @@ static void outputs_apply(Server *s) {
 /* lord-sessiond: a keyboard, mouse or touchpad plugged in while the session is on the monitor */
 static void remote_input_add(const int *fds, int n) {
     Server *s = remote_server;
-    if (s->headless) { for (int i = 0; i < n; i++) close(fds[i]); return; }
+    if (s->headless) { for (int i = 0; i < n; i++) seat_device_close(fds[i]); return; }
     if (input_add_fds(&s->input, fds, n)) wl_input_devices_changed();
 }
 
@@ -738,7 +739,7 @@ static void remote_input_add(const int *fds, int n) {
 static int parked_fd[PARK_MAX], parked_n, parked_flags;
 static unsigned parked_seq;
 static void parked_drop(void) {
-    for (int i = 0; i < parked_n; i++) close(parked_fd[i]);
+    for (int i = 0; i < parked_n; i++) seat_device_close(parked_fd[i]);
     parked_n = 0;
 }
 
@@ -746,10 +747,12 @@ static void parked_drop(void) {
  * the first frame is on the screen (docs/SESSIONS.md, "Boot splash"). */
 static int splash_wait;
 
+static char local_card[PATH_MAX];
+
 static void display_attach(const int *fds, int n, int flags) {
     Server *s = remote_server;
     parked_drop();                      /* a new RP_DISPLAY replaces what was waiting */
-    if (!s->headless || n < 1) { for (int i = 0; i < n; i++) close(fds[i]); return; }
+    if (!s->headless || n < 1) { for (int i = 0; i < n; i++) seat_device_close(fds[i]); return; }
     Out *o0 = &s->out[0];
     out_free(o0);
     memset(o0, 0, sizeof *o0);
@@ -768,7 +771,7 @@ static void display_attach(const int *fds, int n, int flags) {
         } else {
             fprintf(stderr, "monitor: could not use the card\n");
             if (card >= 0) close(card);
-            for (int i = 1; i < n; i++) close(fds[i]);
+            for (int i = 1; i < n; i++) seat_device_close(fds[i]);
         }
         set_size(s, s->W, s->H);            /* back to the frame in memory */
         return;
@@ -831,6 +834,22 @@ static void display_detach(void) {
     fprintf(stderr, "monitor: the session leaves the screen\n");
 }
 
+/* Reuse the compositor's existing display hand-off on logind/seatd switches. */
+static void local_enable(void) {
+    int fds[65], n = 0;
+    int card = seat_device_open(local_card, O_RDWR | O_CLOEXEC);
+    if (card < 0) { perror("lord-de: reopening DRM"); return; }
+    fds[n++] = card;
+    for (int i = 0; i < 64; i++) {
+        char path[64];
+        snprintf(path, sizeof path, "/dev/input/event%d", i);
+        if (access(path, F_OK)) continue;
+        int fd = seat_device_open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (fd >= 0) fds[n++] = fd;
+    }
+    display_attach(fds, n, 0);
+}
+
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
     if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_activity(now_ms());
@@ -876,6 +895,10 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->value == 1 && ev->code < BTN_MISC) tp_key_activity(ev->code, now_ms());   /* ignorar el touchpad al escribir */
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
+        if (ev->value == 1 && s->ctrl && s->alt && ev->code >= KEY_F1 && ev->code <= KEY_F10 && seat_managed()) {
+            seat_switch(ev->code - KEY_F1 + 1);
+            break;
+        }
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) s->quit = 1;
         /* Botones con la numeración del DOM: 0 izquierdo, 1 medio, 2 derecho. */
         int button = ev->code == BTN_LEFT ? 0 : ev->code == BTN_MIDDLE ? 1 : ev->code == BTN_RIGHT ? 2 : -1;
@@ -1560,6 +1583,12 @@ int main(int argc, char **argv) {
         }
         return app_main(argv[2], host, fonts);
     }
+#ifdef LORD_STANDALONE
+    if (geteuid() == 0) {
+        fprintf(stderr, "lord-de: start the desktop as your normal session user, without sudo\n");
+        return 1;
+    }
+#endif
     const char *card = NULL;               /* sin --card: la que tiene pantalla (drmcard.h) */
     const char *theme = "../themes/default/theme.bundle.js";
     const char *fonts = "../assets/fonts";
@@ -1607,10 +1636,12 @@ int main(int argc, char **argv) {
         set_size(&s, w, h);                 /* out[0] = the frame in memory */
     }
     else {
+        if (seat_start()) return 1;
         char picked[64];
         if (!card) { drm_pick_card(picked, sizeof picked); card = picked; }
         kms_set_picker(display_pick);       /* the display saved in Settings (displays.json) */
-        if (kms_open(K0(&s), card)) return 1;
+        snprintf(local_card, sizeof local_card, "%s", card);
+        if (kms_open(K0(&s), card)) { seat_stop(); return 1; }
         /* one display until the plan (after dropping root: displays.json is the user's) opens the others */
         s.W = (int)K0(&s)->width;
         s.H = (int)K0(&s)->height;
@@ -1628,18 +1659,21 @@ int main(int argc, char **argv) {
     if (!s.headless) {
         if (input_open(&s.input)) fprintf(stderr, "input: no devices (permissions?)\n");
         /* The text console stops drawing over us. */
-        vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+        if (!seat_managed()) vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
         if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
     }
 
     /* Privileged helper (a closed set of actions: region, time zone, language packs). The
      * login screen has none: what needs root is done by lord-sessiond. */
     const char *session_user = s.greeter ? NULL : user ? user : getenv("SUDO_USER");
+#ifndef LORD_STANDALONE
     if (session_user && admin_start(session_user)) fprintf(stderr, "lord-server: no administration helper\n");
     /* LordOS networking: with lord-sessiond the network belongs to the system (lord-netd brings it
      * up at boot) and net-restore only confirms; without it (a standalone lord-server) this
      * session's helper brings it up (see net_act_restore and docs/NETWORK.md) */
     else if (session_user) admin_send("net-restore", "", 0);
+#endif
+    if (!session_user && !s.greeter) session_user = getenv("USER");
     int ok = drop_privileges(user) == 0;
     if (ok && s.headless && getenv("HOME")) {
         /* no terminal: the session log goes to the home folder */
@@ -1691,6 +1725,7 @@ int main(int argc, char **argv) {
         input_close(&s.input);
         if (!s.headless) kms_close(K0(&s));
         if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
+        seat_stop();
         return 1;
     }
 
@@ -1703,6 +1738,7 @@ int main(int argc, char **argv) {
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
 
     double start = now_ms();
+    seat_callbacks(local_enable, display_detach);
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
             char next[sizeof current];
@@ -1778,6 +1814,10 @@ int main(int argc, char **argv) {
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
         pfd[n++] = (struct pollfd){ sfd, POLLIN, 0 };
         for (int i = 0; i < s.input.count; i++) pfd[n++] = (struct pollfd){ s.input.dev[i].fd, POLLIN, 0 };
+        int seatbase = seat_fd() >= 0 ? n : -1;
+        if (seatbase >= 0) pfd[n++] = (struct pollfd){ seat_fd(), POLLIN, 0 };
+        int inputbase = seat_managed() && input_watch_fd() >= 0 ? n : -1;
+        if (inputbase >= 0) pfd[n++] = (struct pollfd){ input_watch_fd(), POLLIN, 0 };
         int tbase = n, nterm = term_pollfds(pfd + n, TERM_MAX, term_ids);
         n += nterm;
         int abase = admin_fd() >= 0 ? n : -1;
@@ -1848,6 +1888,9 @@ int main(int argc, char **argv) {
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
         if (nhw) hw_dispatch(pfd + hwbase, nhw);
+        /* Dispatch after input: a seat switch can replace the entire device list. */
+        if (seatbase >= 0 && pfd[seatbase].revents && seat_dispatch() < 0) break;
+        if (inputbase >= 0 && pfd[inputbase].revents && input_watch_dispatch(&s.input, !s.headless)) wl_input_devices_changed();
         if (parked_n && s.headless && display_hotplug_seq() != parked_seq) {   /* a monitor may have appeared */
             int f[PARK_MAX], fn = parked_n;
             memcpy(f, parked_fd, sizeof(int) * (size_t)fn);
@@ -1871,6 +1914,7 @@ int main(int argc, char **argv) {
     if (s.renders)
         fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);
+    seat_callbacks(NULL, NULL);
     input_close(&s.input);
     mirror_stop();
     gpu_tex_free(s.cursor_tex);
@@ -1886,5 +1930,6 @@ int main(int argc, char **argv) {
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);
     out_free(&s.cap);
+    seat_stop();
     return 0;
 }

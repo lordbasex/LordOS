@@ -1,4 +1,7 @@
 {
+  "host.title": "System applications",
+  "host.description": "Install and update system applications with your distribution’s software manager. Native .lpk applications can be managed here.",
+  "host.open": "Open software manager",
   "back": "Back",
   "cancel": "Cancel",
   "cat.AudioVideo": "Audio & video",

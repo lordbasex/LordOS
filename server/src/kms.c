@@ -1,5 +1,6 @@
 /* kms.c — modesetting with kernel ioctls: connector, CRTC, dumb buffers, page flip. */
 #include "kms.h"
+#include "platform/seat.h"
 
 #include <errno.h>
 #include <drm/drm_fourcc.h>
@@ -354,9 +355,9 @@ int kms_head_open(Kms *k, int fd, uint32_t conn_id, const struct drm_mode_modein
 
 int kms_open(Kms *k, const char *path) {
     memset(k, 0, sizeof *k);
-    k->fd = open(path, O_RDWR | O_CLOEXEC);
+    k->fd = seat_device_open(path, O_RDWR | O_CLOEXEC);
     if (k->fd < 0) { perror(path); return -1; }
-    if (xioctl(k->fd, DRM_IOCTL_SET_MASTER, NULL))
+    if (!seat_managed() && xioctl(k->fd, DRM_IOCTL_SET_MASTER, NULL))
         fprintf(stderr, "kms: warning, we are not DRM master (%s)\n", strerror(errno));
     if (kms_setup(k, 0)) { kms_close(k); return -1; }
     return 0;
@@ -396,8 +397,8 @@ void kms_close(Kms *k) {
     destroy_buffer(k, &k->buf[0]);
     destroy_buffer(k, &k->buf[1]);
     if (k->shared) { k->fd = -1; return; }     /* the fd belongs to the main head */
-    if (!k->borrowed) xioctl(k->fd, DRM_IOCTL_DROP_MASTER, NULL);
-    close(k->fd);
+    if (!k->borrowed && !seat_managed()) xioctl(k->fd, DRM_IOCTL_DROP_MASTER, NULL);
+    seat_device_close(k->fd);
     k->fd = -1;
 }
 

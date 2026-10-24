@@ -3,7 +3,7 @@
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
 import {
-  View, Text, Image, useTheme, useSettings, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  standaloneDesktop, View, Text, Image, useTheme, useSettings, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm,
 } from '@lordos/sdk';
@@ -349,7 +349,7 @@ function LanguageRegion() {
         </SettingRow>
         <PackImport onDone={(text) => { reloadCatalogs(); setMsg({ ok: true, text }); }} />
       </Section>
-      {!isAdmin && <Note tone="warn">{tr('settings.admin.unavailable')}</Note>}
+      {!isAdmin && <Note tone="warn">{tr(standaloneDesktop ? 'settings.host.adminUnavailable' : 'settings.admin.unavailable')}</Note>}
       <AdminLog />
       <Message msg={msg} />
     </Stack>
@@ -528,7 +528,7 @@ const GROUPS = [
 ];
 const SECTIONS = GROUPS.flat();
 // Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor)
-const sectionShown = (id, hasPad) => id !== 'trackpad' || hasPad;
+const sectionShown = (id, hasPad) => (id !== 'trackpad' || hasPad) && (!standaloneDesktop || !['sharing', 'users', 'cooling'].includes(id));
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -575,7 +575,10 @@ export default function Settings() {
   const { args } = useAppWindow();
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
-  const setSection = (s) => { lastSection = s; setSectionState(s); };
+  const setSection = (s) => {
+    if (standaloneDesktop && ['sharing', 'users', 'cooling'].includes(s)) s = 'general';
+    lastSection = s; setSectionState(s);
+  };
   useEffect(() => { if (args?.section && SECTIONS.some(([id]) => id === args.section)) setSection(args.section); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
   const q = query.trim().toLowerCase();

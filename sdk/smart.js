@@ -13,6 +13,7 @@
 // All of it runs as the root helper's closed smart-* actions: fixed /usr/sbin/smartctl, a validated
 // whole disk, JSON back in LOG lines. Without smartmontools the summary comes from LordOS's own
 // reader (disk-smart), only for disks that will not be woken up by it.
+import { standaloneDesktop } from './platform.js';
 import { admin } from './admin.js';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
@@ -42,6 +43,7 @@ export const smart = {
   smartable,
   installed: () => { try { return hasLord() && !!lord.disks.tools().smartctl; } catch (e) { return false; } },
   install(onLog) {
+    if (standaloneDesktop) return Promise.reject(codeError('admin.unavailable'));
     const go = () => admin.run('pkg-install', SMART_PACKAGE, onLog);
     return go().catch((e) => {
       if (e.code !== 'pkg.noIndex') throw e;    // no package lists yet (fresh install): fetch them once

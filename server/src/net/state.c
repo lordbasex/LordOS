@@ -258,6 +258,9 @@ char *net_interfaces_json(void) {
         char conf[128];
         snprintf(conf, sizeof conf, NET_IF_DIR "/%s.conf", k->name);
         const char *managed = managed_by_system(k->name) ? "system" : access(conf, F_OK) == 0 ? "lordos" : "none";
+#ifdef LORD_STANDALONE
+        managed = "system";
+#endif
         if (!strcmp(type, "wireguard") || !strcmp(type, "tun")) {
             /* those of LordOS's VPNs */
             char meta[128];

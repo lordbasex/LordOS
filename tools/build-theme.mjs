@@ -8,6 +8,30 @@ import path from 'node:path';
 import { writeManifest } from './code-manifest.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const profile = process.env.LORD_PROFILE || 'desktop';
+if (!['desktop', 'os'].includes(profile)) throw new Error('LORD_PROFILE must be desktop or os');
+const standalone = profile === 'desktop';
+const profileFile = path.join(root, 'build-profile.json');
+const previous = fs.existsSync(profileFile) ? JSON.parse(fs.readFileSync(profileFile, 'utf8')) : null;
+if (previous !== profile) {
+  // A bundle from another profile must never leak into the new code manifest.
+  for (const name of fs.readdirSync(path.join(root, 'themes'))) {
+    if (!fs.statSync(path.join(root, 'themes', name)).isDirectory()) continue;
+    fs.rmSync(path.join(root, 'themes', name, 'theme.bundle.js'), { force: true });
+  }
+  fs.rmSync(path.join(root, 'assets', 'sysapps'), { recursive: true, force: true });
+  fs.rmSync(path.join(root, 'assets', 'app-host.bundle.js'), { force: true });
+}
+const defines = { 'process.env.NODE_ENV': '"production"', __LORD_STANDALONE__: String(standalone) };
+const includeApp = (id) => !standalone || !['imager', 'installer'].includes(id);
+const hostStorePlugin = {
+  name: 'lord-de-host-store',
+  setup(b) {
+    if (standalone) b.onResolve({ filter: /^\.\/debian\.js$/ }, (a) =>
+      a.importer === path.join(root, 'apps/store/index.jsx')
+        ? { path: path.join(root, 'apps/store/host.jsx') } : null);
+  },
+};
 
 // Virtual module '@lordos/apps': one entry per apps/<id>/manifest.json.
 const appsPlugin = {
@@ -16,7 +40,7 @@ const appsPlugin = {
     b.onResolve({ filter: /^@lordos\/apps$/ }, () => ({ path: 'apps', namespace: 'lordos-apps' }));
     b.onLoad({ filter: /.*/, namespace: 'lordos-apps' }, () => {
       const dir = path.join(root, 'apps');
-      const ids = fs.readdirSync(dir).filter((d) => fs.existsSync(path.join(dir, d, 'manifest.json'))).sort();
+      const ids = fs.readdirSync(dir).filter((d) => includeApp(d) && fs.existsSync(path.join(dir, d, 'manifest.json'))).sort();
       const lines = ids.map((id, i) => {
         const base = path.join(dir, id);
         return `import * as A${i} from ${JSON.stringify(path.join(base, 'index.jsx'))};\n` +
@@ -51,8 +75,8 @@ async function buildTheme(name) {
       '@lordos/runtime': path.join(root, 'runtime', 'index.js'),
       '@lordos/sdk': path.join(root, 'sdk', 'index.js'),
     },
-    plugins: [appsPlugin],
-    define: { 'process.env.NODE_ENV': '"production"' },
+    plugins: [hostStorePlugin, appsPlugin],
+    define: defines,
     metafile: true,
     logLevel: 'warning',
   });
@@ -70,7 +94,7 @@ async function buildAppHost() {
     outfile: path.join(root, 'assets', 'app-host.bundle.js'),
     bundle: true, format: 'iife', target: 'es2020', minify: true, jsx: 'automatic',
     alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
-    define: { 'process.env.NODE_ENV': '"production"' }, metafile: true, logLevel: 'warning',
+    define: defines, metafile: true, logLevel: 'warning',
   });
   const bytes = Object.values(result.metafile.outputs)[0].bytes;
   console.log(`app-host: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
@@ -91,6 +115,7 @@ async function buildSysApps() {
     },
   };
   for (const id of fs.readdirSync(dir).sort()) {
+    if (!includeApp(id)) continue;
     const mf = path.join(dir, id, 'manifest.json');
     if (!fs.existsSync(mf)) continue;
     const manifest = JSON.parse(fs.readFileSync(mf, 'utf8'));
@@ -101,7 +126,7 @@ async function buildSysApps() {
     const result = await build({
       entryPoints: [path.join(dir, id, 'index.jsx')],
       bundle: true, write: false, format: 'iife', globalName: '__lordosApp', target: 'es2020', minify: true,
-      jsx: 'automatic', plugins: [sharedPlugin], define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
+      jsx: 'automatic', plugins: [sharedPlugin], define: defines, logLevel: 'warning',
     });
     fs.writeFileSync(path.join(out, 'app.js'), result.outputFiles[0].contents);
     fs.writeFileSync(path.join(out, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -117,11 +142,12 @@ async function buildSysApps() {
 }
 
 const all = fs.readdirSync(path.join(root, 'themes'))
-  .filter((d) => fs.existsSync(path.join(root, 'themes', d, 'index.jsx')));
+  .filter((d) => (!standalone || d !== 'greeter') && fs.existsSync(path.join(root, 'themes', d, 'index.jsx')));
 for (const name of (names.length ? names : all).filter((n) => n !== 'app-host' && n !== 'sysapps')) await buildTheme(name);
 if (!names.length || names.includes('app-host')) await buildAppHost();
 if (!names.length || names.includes('sysapps')) await buildSysApps();
 // the verified-code manifest of what was just built (unsigned: a development build until
 // tools/release/sign-code.sh signs it on the maintainer's machine)
 const cm = writeManifest(root);
+fs.writeFileSync(profileFile, `${JSON.stringify(profile)}\n`);
 console.log(`code-manifest.json: ${cm.files} files${cm.changed ? '' : ' (unchanged)'}`);

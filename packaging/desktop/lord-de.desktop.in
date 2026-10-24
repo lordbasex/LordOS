@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Lord DE (experimental)
+Comment=Independent Wayland desktop derived from LordOS
+Exec=@BINDIR@/lord-de-session
+TryExec=@BINDIR@/lord-de-session
+Type=Application

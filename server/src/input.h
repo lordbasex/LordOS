@@ -23,6 +23,8 @@ typedef struct {
 typedef void (*InputHandler)(void *ud, const InputDevice *dev, const struct input_event *ev);
 
 int  input_open(Input *in);     /* opens and grabs (EVIOCGRAB) the useful devices */
+int  input_watch_fd(void);      /* inotify: standalone session hotplug */
+int  input_watch_dispatch(Input *in, int active);
 /* Same, with fds already opened and passed by lord-sessiond (useless ones are closed). */
 int  input_open_fds(Input *in, const int *fds, int n);
 void input_close(Input *in);

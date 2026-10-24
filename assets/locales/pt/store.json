@@ -1,4 +1,7 @@
 {
+  "host.title": "Aplicativos do sistema",
+  "host.description": "Instale e atualize os aplicativos do sistema pelo gerenciador de software da sua distribuição. Aplicativos nativos .lpk podem ser gerenciados aqui.",
+  "host.open": "Abrir gerenciador de software",
   "back": "Voltar",
   "cancel": "Cancelar",
   "cat.AudioVideo": "Áudio e vídeo",

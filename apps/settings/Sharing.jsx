@@ -1,3 +1,4 @@
+import { standaloneDesktop } from '@lordos/sdk';
 // Settings → Sharing: remote desktop (lord-sessiond, docs/REMOTE.md) and remote login (SSH).
 // Both are off by default; turning them on, choosing who can log in and viewing or cutting
 // connections goes through the administration helper (remote-* and ssh-* actions). The SSH
@@ -300,7 +301,7 @@ export function SharingSettings() {
             options={[['all', tr('settings.sharing.allUsers')], ['group', tr('settings.sharing.onlyGroup')]]} />
         </SettingRow>
       </Section>
-      {!isAdmin && <Note tone="warn">{tr('settings.admin.unavailable')}</Note>}
+      {!isAdmin && <Note tone="warn">{tr(standaloneDesktop ? 'settings.host.adminUnavailable' : 'settings.admin.unavailable')}</Note>}
       {!st.installed && <Note tone="warn">{tr('settings.sharing.notInstalled')}</Note>}
       <Message msg={msg} />
       <AccessSection st={st} isAdmin={isAdmin} busy={busy} act={act} />

@@ -1,10 +1,10 @@
 {
-  "name": "lordos",
+  "name": "lord-de",
   "private": true,
   "version": "0.8.3",
-  "description": "LordOS — React themes and apps for lord-server",
+  "description": "Lord DE — independent Wayland desktop derived from LordOS",
   "lordos": {
-    "channel": "beta"
+    "channel": "dev"
   },
   "scripts": {
     "build": "node tools/build-theme.mjs",
