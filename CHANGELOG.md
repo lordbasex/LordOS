@@ -226,7 +226,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - **Less work in a dragged window's frame, same pixels** (in development for 0.8.6; the first steps of making a
   drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
-  paths (VM 116, x86_64); the time saved has not been measured yet.
+  paths (VM 116, x86_64) through these steps; the one approved pixel change, and the golden hashes written again for
+  it, is the next entry. The time saved has not been measured yet.
   - **No clear under the copy of what is below the window:** `paint_root_clear` (`ui/paint.c`) replaces
     `canvas_clear` + `paint_root` in `main.c`, `app/appclient.c` and `engine-test`, and skips the clear when the drag
     layer's copy of what is below (`below_copy`) is about to write every pixel of the same rectangle. That copy was
@@ -313,6 +314,80 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the props' object instead of a copy 3 of 3. The Performance view rendered with a scripted run (waiting, three
     steps, a mode change, cancelled) gives the same native call log with 001633b's view and this one, with 146
     instead of 356 `applyProps` calls. No C code changed; the golden hashes and `engine-test` pass as before.
+  - **What is below the dragged window is painted again only where it changed, and copied where the old rule
+    painted everything** (`below_ready` in `ui/paint.c`; step 11, after the corner change in the next entry). The
+    copy of what is below the window was built whole on any change outside the window, and two changes within 8
+    frames stopped it for the rest of the drag, so a progress bar below or the menu bar's clock made every frame
+    paint the whole damaged box again (LordBench's Performance view polls every 500 ms; each render commits twice).
+    That rule is kept as a shadow, and on top of it:
+    - `damage_walk` knows the paint order around the window (`below_order`: the children of each of its ancestors,
+      stable by `zIndex`; anything unknown counts as before it), so a change painted after the window no longer
+      touches the copy. A change painted before it, and any damage from outside the tree, mark their boxes stale
+      (`DamageList`, built as up to four rectangles), and only those are painted again (`below_update`), each one
+      grown first to the whole reach of a backdrop blur it touches (the blur reads twice its radius around its box
+      and starts its grid at the clip) and to the whole image of a turned or scaled node (`canvas_blit_affine` steps
+      its rows from the first painted pixel), with the blurs and images the last build met; after the build the same
+      check runs with the ones it met now, and the copy is built whole if a part was not closed. The copy is built
+      whole when the order around the window changes (a signature of those children), the display's view or size
+      changes, or the stale part is more than half the screen.
+    - A frame where the old rule painted everything uses the copy anyway (`below_switch`, `paint_below_switch`)
+      when that gives the same pixels: the canvas was to be cleared to black; no blurred node before the window meets
+      the frame's box; no turned or scaled node before it meets the box with its image starting left of it; no
+      border strip or rounded-corner square of one of the window's ancestors meets it (those are painted after the
+      window, so over the copy they would be painted twice); the last build reached the window; and the stale part
+      costs less than the box.
+    - The old rule decides when the copy is rebuilt, so the pixels are the same as before (step 9's corners aside):
+      damage from outside the tree inside the window's boxes (a Linux app under the window's shadow) still keeps the
+      old copy until the old rule rebuilds it, and is repainted then. A frame uses the copy only when the window is
+      drawn and untransformed (no transform, every ancestor shown and visible), the copy's builds walk every node
+      (`LORD_DAMAGE=multi`'s cull is off for them), and a hidden window's copy is always built whole.
+    - `main.c`'s `drag: …` line ends with `below: … built whole, … in part, … frames switched to it (not: …
+      ancestor, … blur, … transform, … unreached, … cost)`, and LordBench's scripted move writes the layer's counters
+      and the same text in a `drag (scripted): …` line when it ends, for the Pi's session log.
+    - Checked on VM 116 (x86_64): `test_drag_exact` has nine more runs, 1,500 frames per path (a progress bar in the
+      window below changing width every 3 frames and its title every 30, with an app window and a blinking terminal
+      in it; the menu bar's text every 2 frames; a square turning on the desktop and one turned and still; a blurred
+      panel whose clock changes every 40 frames; the window below raised above the dragged one and back; all of
+      them at 100 % and at 200 %; both windows inside a rounded container with a border; a dot changing color on
+      the still square), whose hashes were written from e24af69 plus the corner change, with the GPU path's list of
+      app windows hashed with the pixels (the test's `wl_paint` now keeps that list as `wl.c` does and opens the
+      holes); the earlier 908 hashes per path are unchanged. All 2,417 frames per path match. 591 frames per path
+      use the copy where the old rule painted everything (refused: 30 for an ancestor, 358 for a blur, 153 for a
+      transform), and each of them is painted the old way on a copy of the canvas too (`paint_below_verify`):
+      0 pixels differ. The copy is built 19 times whole and 206 times in part, where the old code built it whole 32
+      times; with the switch off (`LORD_BELOW_SWITCH=0`), 17 whole and 20 in part, and the same hashes. Breaking it
+      on purpose fails the test (goldens and self-check): without the ancestor check, the transform check, the
+      growth of a part, the paint order (the nodes before the window counted as after it) or the outside damage. Without
+      the blur check nothing fails in these scenes (the blur would only read differently where the menu bar or the
+      Dock lies in its reach outside the box), so it stays as the safe side. The differential harnesses against
+      001633b's six files (3,390, 3,874 and 5,084 frame hashes) are identical. `make -C server test`: 23 passed.
+    - Not done: skipping the copy under the window's opaque middle (it would have to know, before the layer is
+      painted this frame, that the layer stays opaque there and that no ancestor's rounded corner reads it). The time
+      saved has not been measured yet.
+  - **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every
+    `setStyle` call: a style an animation sends every frame wrote a line to the session log every frame (as
+    `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
+    different keys are remembered; the 65th is logged with `(further unknown style keys are not logged)` and later
+    ones are not. Nothing else changes: the key is still ignored the same way (`docs/THEMES-GUIDE.md`).
+- **The corners of rounded windows below a dragged window now match a full repaint** (in development for 0.8.6; the
+  one pixel change of the drag-frame work, approved by the maintainer on 2026-10-28; `ui/paint.c`). A drag frame
+  copies what is below the window and then walks the tree to the window, painting nothing before it; that walk still
+  saved and restored the corners of every rounded `overflow: hidden` node on the way, and the restore blended each
+  saved pixel over the same pixel, which leaves it one level darker where the corner's coverage is partial. Now
+  `paint_root` stamps the ancestors of the node the frame starts from (`skip_stamp`, up to 64 levels; deeper, every
+  node is walked as before), and a node before it that isn't one of them returns at once: no corner save or restore,
+  no walk of its children. The ancestors keep theirs, since the window is clipped by them. Checked on VM 116 before
+  the golden hashes were written again: every frame of `test_drag_exact` (1,816 on both paths) was compared pixel by
+  pixel with the frame of the code before (whose hashes equal 001633b's): 178,634 pixels in 1,686 frames differ, all
+  by exactly one level in one or more channels, 155,462 of them inside the corner squares of a rounded
+  `overflow: hidden` node (n = ceil(r) + 1 px, the square `canvas_corners_save` keeps) and 23,172 inside the Dock's
+  or the menu bar's backdrop blur, within the blur's reach of such a square. On the frames that are also compared
+  with a full repaint, none of the 9,619 differing pixels moved away from it and 9,132 now equal it. The pixels that
+  differ from a full repaint go down from 2,265 to 2,217 (CPU path) and from 70,940 to 70,882 (GPU path) in the long
+  run. `tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt` were then written again by `make drag-golden`, and the
+  same hashes came out of 001633b's code with only this change (and the test's entry points) added. The
+  differential harnesses against 001633b's `paint.c` (5,324 frame outputs in the largest) are still identical: their
+  scenes have no rounded `overflow: hidden` node below the window.
 
 ### Fixed
 

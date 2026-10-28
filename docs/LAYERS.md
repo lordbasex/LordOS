@@ -119,6 +119,12 @@ repaint). The cost: a repaint that touches the Dock or the menu bar also repaint
 the blur radius around it (about 41 px for a 20 px blur; the screen edges cut it). On VM 116 with
 Monitor's moving map, with and without a blurred Terminal over it, layout and paint per frame stayed
 the same within 0.1 ms (MONITOR.md, "The 0.8.2 integration test, repeated").
+The copy of what is below a dragged window (`paint.c`, [WINDOWS.md](WINDOWS.md)) follows the same
+rule: since 0.8.6 (in development) it is painted again only where it changed, and a part that touches a
+blurred surface below the window grows to everything that surface's blur reads. A frame that the
+old rule paints whole (what is below changed twice within 8 frames) may use the copy instead, but not
+when its damaged box meets a blurred surface below the window: painted whole, that blur reads the last
+frame outside the box, and the copy would not give the same pixels.
 
 | | |
 |---|---|

@@ -97,8 +97,33 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   2. the layer goes on top;
   3. what is above (menu bar, Dock) is painted normally, because its blur depends on what lies
      beneath it.
+
+  The walk to the window paints nothing before it. Only the window's ancestors are walked
+  (`skip_stamp` in `paint_root` notes them), because they clip it and restore their corners around it;
+  any other node before the window returns at once (0.8.6, in development). Before, those nodes still
+  saved and restored their rounded corners over the copy, which left those corners one level darker
+  than a full repaint: the one pixel change of the drag-frame work, approved on 2026-10-28.
 - **If something below changes** (a clock, a video), the below part is rebuilt. If it changes very
-  often, it stops being used.
+  often, it stops being used. Since 0.8.6 (in development) both of those go further, with the same
+  pixels (`below_ready` in `ui/paint.c`, "The copy of what is below the dragged window"):
+  - **Only what changed is painted again** (`below_update`): the boxes of the nodes painted before the
+    window that changed, and damage from outside the tree (a terminal, an app window), as up to four
+    rectangles. `damage_walk` knows the paint order around the window (`below_order`: its ancestors'
+    children, stable by `zIndex`), so a change painted after it (the menu bar's clock, the Dock) no
+    longer touches the copy; when that order changes (a window raised), the copy is built whole. A
+    rectangle grows to the whole reach of a backdrop blur it touches (the blur reads around its box
+    and starts its grid at the clip) and to the whole image of a turned or scaled node (its rows step
+    their source position from the first painted pixel), so a part gives what a whole build gives.
+  - **The copy is used where the old rule painted everything**: when a frame's box meets no
+    blurred node painted before the window, no turned or scaled node before it whose image starts left
+    of the box, and no border or rounded-corner square of one of the window's ancestors (painted after
+    the window, over the copy they would be painted twice), the last build reached the window, and the
+    stale part is smaller than the frame's box. Otherwise the frame is painted whole, as before.
+    `paint_below_switch = 0` turns this off.
+  - The old rule still decides, as a shadow, when the copy is rebuilt, so the pixels are the same as
+    before: outside damage inside the window's boxes (a Linux app under the window's shadow) keeps the
+    old copy until that rule rebuilds it. The copy is used only while the window is drawn without a
+    transform, its builds walk every node, and a hidden window's copy is built whole.
 - **When resizing** the window is repainted every frame (its content reflows), but what's below is
   still saved.
 - **The damage** is the window's old region plus its new one.
@@ -127,14 +152,30 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   200 %; the last three with boxes and text at half pixels), on the CPU path and on the GPU path's
   canvas. Every frame's hash must match
   `server/tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt`, written from the code before any change
-  to this path: a faster frame has to give exactly the same pixels. The hashes are per architecture
-  (x86_64 so far); `make -C server drag-golden` writes them, only on the reference code. A run added
+  to this path and written again at the corner change above (from 001633b plus that change alone): a
+  faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
+  by pixel with the earlier code's: 178,634 pixels in 1,686 of 1,816 frames differed, all by one
+  level, inside a rounded `overflow: hidden` node's corner squares (`ceil(r) + 1` px) or within the
+  Dock's and menu bar's backdrop blur reach of one, and none moved away from a full repaint. The hashes
+  are per architecture (x86_64 so far); `make -C server drag-golden` writes them, only on the reference
+  code. A run added
   later gets its hashes the same way: the new test built against 001633b's code (with the few test entry
   points it lacks added beside it, which must leave the earlier runs' hashes identical), never against
   the code being checked.
+- **The copy of what is below** has nine more runs (1,500 frames): a progress bar in the window below
+  that changes width every 3 frames (as LordBench's Performance view does) with its title every 30,
+  an app window and a blinking terminal in it; the menu bar's text every 2 frames; a square turning on
+  the desktop and one turned and still; a blurred panel whose text changes every 40 frames; the
+  window below raised above the dragged one and back; all of them at 100 % and at 200 %; the windows
+  inside a rounded container with a border; and a dot changing color on the still square. Their
+  hashes come from the code before this part (e24af69 plus the corner change), and the GPU path's
+  list of app windows is hashed with each frame. Every frame that uses the copy where the old rule
+  painted everything is painted that old way too, on a copy of the canvas (`paint_below_verify`), and
+  the test fails if one pixel differs. `LORD_BELOW_SWITCH=0 build/engine-test` runs it without that.
 - **Against a full repaint** the test prints a second number, which may only go down: today a drag
-  frame differs from a full repaint in at most 2,265 pixels on the CPU path (black pixels at the dragged
-  window's rounded top corners) and 70,940 on the GPU path (one level darker in its shadow).
+  frame differs from a full repaint in at most 2,217 pixels on the CPU path (black pixels at the dragged
+  window's rounded top corners) and 70,882 on the GPU path (one level darker in its shadow); before the
+  corner change, 2,265 and 70,940.
 - **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
   display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
   the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where
@@ -199,7 +240,11 @@ JS 0.20, layout 0.56, paint 11.43, present 0.61), max gap 36.9 ms; layer: 1023 p
 ```
 
 "work" is what lord-server spends per frame: the pointer and timer JS, layout, painting
-("paint") and presentation ("present").
+("paint") and presentation ("present"). Since 0.8.6 (in development) the line ends with what the copy
+of what is below did during the drag: `below: B built whole, P in part, S frames switched to it (not:
+… ancestor, … blur, … transform, … unreached, … cost)`, the last part counting the frames where the old
+rule painted everything and the copy could not be used, by reason. LordBench's scripted move (no
+button held) writes the layer's counters and the same text in a `drag (scripted): …` line when it ends.
 
 | Path | Window | Before | After |
 |---|---|---|---|

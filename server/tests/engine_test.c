@@ -34,15 +34,34 @@ void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op)
     float lx = (x - paint_view.dx) / k + paint_view.x, ly = (y - paint_view.dy) / k + paint_view.y;
     term_at = (Box){ lx, ly, lx + w / k, ly + h / k };
 }
-void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
-void wl_paint_holes(int on) { (void)on; }
-void wl_paint_kept(void) {}
-void wl_paint_keep(void) {}
-void wl_paint_begin(void) {}
+static int test_gpu;                    /* test_drag_exact: paint.c's GPU path on the same canvas */
+/* An app window (test_drag_exact's runs with one below the dragged window), as wl.c: on the GPU path
+ * it is noted in the frame's list of windows (what is below a dragged window keeps its own,
+ * wl_paint_keep/wl_paint_kept) and opens a hole (alpha 0) in the UI unless wl_paint_holes(0); on the
+ * CPU path its content is painted. The list is hashed with the frame's pixels. */
+typedef struct { int id, node; float x, y, w, h, op; } WDraw;
+enum { WDRAW_MAX = 128 };
+static WDraw wdraw[WDRAW_MAX], wkept[WDRAW_MAX], wsaved[WDRAW_MAX];
+static int nwdraw, nwkept, nwsaved, wholes_off;
+void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) {
+    const float k = paint_view.k;
+    Rect old = canvas_push_clip(c, (x - paint_view.x) * k + paint_view.dx, (y - paint_view.y) * k + paint_view.dy, w * k, h * k);
+    if (!test_gpu) canvas_clear(c, 0xff406080u + (uint32_t)id);
+    else {
+        if (nwdraw < WDRAW_MAX) wdraw[nwdraw++] = (WDraw){ id, node, x, y, w, h, op };
+        if (!wholes_off) canvas_clear(c, 0);
+    }
+    canvas_set_clip(c, old);
+}
+void wl_paint_holes(int on) { wholes_off = !on; }
+void wl_paint_kept(void) { for (int i = 0; i < nwkept && nwdraw < WDRAW_MAX; i++) wdraw[nwdraw++] = wkept[i]; }
+void wl_paint_keep(void) { nwkept = nwdraw; memcpy(wkept, wdraw, sizeof *wdraw * (size_t)nwdraw); }
+void wl_paint_begin(void) { nwdraw = 0; }
+void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
+void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
-static int test_gpu;                    /* test_drag_exact: paint.c's GPU path on the same canvas */
 int gpu_active(void) { return test_gpu; }
 void lbf_input(uint64_t ev_ns) { (void)ev_ns; }   /* bench/lbinput.c: only lbi_path is used */
 
@@ -1445,19 +1464,34 @@ static void test_overlay_scrollbar(void) {
  * (node_restyled with 'rotate', as scene.jsx sends it), and painted as main.c paints a frame
  * (paint_ui, then paint_out on one display).
  * Every frame's pixels are hashed (FNV-1a over the 32-bit pixels) and compared with
- * tests/drag_golden_cpu.txt and tests/drag_golden_gpu.txt, written from the code before the drag-frame
- * optimizations (001633b): those must give exactly the same pixels. "gpu" is the same run with
+ * tests/drag_golden_cpu.txt and tests/drag_golden_gpu.txt: those must give exactly the same pixels.
+ * They were written from the code before the drag-frame optimizations (001633b) and written again at
+ * step 9, the one approved pixel change (2026-10-28), from 001633b plus that step: a node the drag
+ * frame skips (before the dragged window, not one of its ancestors) no longer has its corners saved
+ * and restored, a restore that blended each pixel over itself and left the corners of rounded
+ * windows below one level darker than a full repaint. Before the rewrite every frame was compared
+ * pixel by pixel with 001633b's: 178,634 pixels in 1,686 of 1,816 frames differed, by 1 level at
+ * most, all in those corner squares (n = ceil(r) + 1) or in the Dock's and the menu bar's backdrop
+ * blur within its reach of one, none further from a full repaint. "gpu" is the same run with
  * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
  * same CPU canvas the GPU uploads. Shorter runs cover what makes the layer paint again: a text
  * that changes a child's size, a child moving inside the window, a terminal whose cursor blinks
  * (damage from outside the tree), a square turning across the window's edge, the window crossing
  * x = 0 and y = 0 while the square turns, a child removed after frames that only copy the layer and
- * then the square turning again, and the whole drag on a display at 200 %.
+ * then the square turning again, and the whole drag on a display at 200 %. The runs after those change
+ * what is below the window or above it (the copy of what is below, below_ready; see their list below);
+ * their hashes come from e24af69 plus step 9 (the code before the copy was built in parts and used
+ * where 001633b's rule painted everything), with the earlier runs' hashes unchanged. In them the GPU
+ * path's list of app windows is hashed with the pixels. Every frame that uses the copy where
+ * 001633b's rule painted everything is also painted that old way on a copy of the canvas
+ * (paint_below_verify), and not one pixel may differ; LORD_BELOW_SWITCH=0 runs the test without it.
  * The pixels that differ from a full repaint (paint_root_full, as LORD_PAINT_VERIFY) are printed as a
- * second number, which may only go down (today: black pixels at the dragged window's own rounded top
- * corners on the CPU path, its shadow one level darker on the GPU path).
+ * second number, which may only go down (step 9 took the long run from 2,265 to 2,217 on the CPU
+ * path and from 70,940 to 70,882 on the GPU path; what is left: black pixels at the dragged window's
+ * own rounded top corners on the CPU path, its shadow one level darker on the GPU path).
  *   build/engine-test                 checks the hashes (skipped without hashes for this architecture)
- *   make drag-golden                  writes this architecture's hashes: only on the reference code */
+ *   make drag-golden                  writes this architecture's hashes: only on the reference code
+ *                                     (001633b plus step 9), never to make a changed frame pass */
 #if defined(__x86_64__)
 #define GOLD_ARCH "x86_64"
 #elif defined(__aarch64__)
@@ -1467,14 +1501,38 @@ static void test_overlay_scrollbar(void) {
 #endif
 
 enum { DW = 1024, DH = 640, DRAG_FRAMES = 480, CASE_FRAMES = 60, FULL_EVERY = 16 };
-enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_NEG, DC_REMOVE, DC_K2, DC_N };
-static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge", "neg", "remove", "k2" };
+/* The runs after k2 change what is below the dragged window, or above it, while it moves (the copy of
+ * what is below, below_ready): "below" a progress bar in the window below that changes width every 3
+ * frames, its title every 30, an app window and a terminal whose cursor blinks in it; "after" the
+ * menu bar's text every 2 frames; "belowtf" a square turning on the desktop under the drag's path and
+ * one turned but still, which the window's left edge crosses; "blur" a blurred panel on the desktop
+ * whose text changes every 40 frames; "zraise" the bar, and the window below raised above the dragged
+ * one and lowered again; "mix" and "k2mix" (200 %) the bar, the menu bar, the squares and the panel;
+ * "anc" the bar and the panel, with both windows in a rounded container that clips them and has a
+ * border (an ancestor painted around the dragged window); "tfgrow" the still square, and a dot on it
+ * that changes color every 20 frames (a part of the copy that cuts the square's image). */
+enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_NEG, DC_REMOVE, DC_K2,
+       DC_BELOW, DC_AFTER, DC_BELOWTF, DC_BLUR, DC_ZRAISE, DC_MIX, DC_K2MIX, DC_ANC, DC_TFGROW, DC_N };
+static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge", "neg", "remove", "k2",
+                                           "below", "after", "belowtf", "blur", "zraise", "mix", "k2mix", "anc", "tfgrow" };
 static const int dc_frames[DC_N] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
-                                     CASE_FRAMES, CASE_FRAMES, CASE_FRAMES };
-#define DC_HASHES (DRAG_FRAMES + (DC_N - 1) * CASE_FRAMES + DC_N)  /* each run: its frames and the one after the drag */
+                                     CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
+                                     180, 120, 180, 180, 120, 240, 120, 180, 180 };
+enum { DF_BAR = 1, DF_MENU = 2, DF_SQUARE = 4, DF_PANEL = 8, DF_RAISE = 16, DF_ANC = 32, DF_SMALL = 64, DF_TERM = 128, DF_DOT = 256 };
+static const int dc_feat[DC_N] = { 0, 0, 0, 0, 0, 0, 0, 0,
+                                   DF_BAR | DF_TERM, DF_MENU, DF_SQUARE | DF_SMALL, DF_PANEL | DF_SMALL, DF_BAR | DF_RAISE,
+                                   DF_BAR | DF_MENU | DF_SQUARE | DF_PANEL | DF_SMALL,
+                                   DF_BAR | DF_MENU | DF_SQUARE | DF_PANEL | DF_SMALL, DF_BAR | DF_ANC | DF_PANEL | DF_SMALL,
+                                   DF_DOT | DF_SMALL };
+static int dc_k2(int dc) { return dc == DC_K2 || dc == DC_K2MIX; }
+static int dc_hashes(void) {                        /* each run: its frames and the one after the drag */
+    int n = 0;
+    for (int dc = 0; dc < DC_N; dc++) n += dc_frames[dc] + 1;
+    return n;
+}
 
 typedef struct { OutView v; Canvas c, ref; uint32_t *px, *rpx; } DOut;
-typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption; } DScene;
+typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption, *below, *btitle, *fill, *mtext, *square, *ptext, *dot; } DScene;
 
 static uint64_t frame_hash(const Canvas *c) {
     uint64_t h = 1469598103934665603ull;
@@ -1482,6 +1540,9 @@ static uint64_t frame_hash(const Canvas *c) {
         const uint32_t *row = c->px + (size_t)y * c->stride;
         for (int x = 0; x < c->w; x++) { h ^= row[x]; h *= 1099511628211ull; }
     }
+    /* the GPU path's list of app windows (none in the runs before "below": their hashes stay) */
+    const unsigned char *b = (const unsigned char *)wdraw;
+    for (size_t i = 0; i < sizeof *wdraw * (size_t)nwdraw; i++) { h ^= b[i]; h *= 1099511628211ull; }
     return h;
 }
 
@@ -1575,13 +1636,23 @@ static DScene drag_scene(int dc, float x, float y) {
         sn(l, "left", 16); sn(l, "top", 118 + i * 100); sn(l, "width", 80);
         ss(l, "textAlign", "center");
     }
+    int feat = dc_feat[dc];
+    Node *wins = s.root;                                /* the windows' parent */
+    if (feat & DF_ANC) {
+        wins = box_in(s.root, 0, 0, DW, DH, 0);
+        ss(wins, "overflow", "hidden");
+        sn(wins, "borderRadius", 24);
+        sn(wins, "borderWidth", 3);
+        sn(wins, "borderColor", 0x80ffffff);
+    }
     /* a window below: rounded, overflow hidden, with a shadow (its corners are restored around the drag) */
-    Node *below = box_in(s.root, 110, 330, 520, 280, 0xff1e1e20);
+    Node *below = box_in(wins, 110, 330, 520, 280, 0xff1e1e20);
     ss(below, "overflow", "hidden");
     sn(below, "borderRadius", 12);
     dshadow(below, 0x66000000, 16, 40);
     Node *bt = dview(below, 0, 28, 0xff3a3a3c, 0);
-    dtext(bt, "Files", 13, 600, 0xffe0e0e0);
+    s.btitle = dtext(bt, "Files", 13, 600, 0xffe0e0e0);
+    s.below = below;
     for (int i = 0; i < 8; i++) {
         Node *row = dview(below, 0, 30, i & 1 ? 0xff252528 : 0, 0);
         ss(row, "flexDirection", "row"); ss(row, "alignItems", "center");
@@ -1589,13 +1660,55 @@ static DScene drag_scene(int dc, float x, float y) {
         dview(row, 16, 16, 0xff5b8def, 3);
         dtext(row, "Quarterly report, final version.pdf", 13, 0, 0xffd0d0d0);
     }
+    if (feat & DF_BAR) {
+        /* performance.jsx's bar: a rounded track that clips its fill, and an app window */
+        Node *track = box_in(below, 200, 262, 300, 6, 0xff3a3a3c);
+        ss(track, "overflow", "hidden");
+        sn(track, "borderRadius", 3);
+        s.fill = box_in(track, 0, 0, 120, 6, 0xff0a84ff);
+        Node *surf = node_new(NODE_SURFACE);
+        surf->term = 7;
+        node_append(below, surf);
+        ss(surf, "position", "absolute");
+        sn(surf, "left", 340); sn(surf, "top", 120); sn(surf, "width", 150); sn(surf, "height", 90);
+    }
+    if (feat & DF_TERM) {                               /* a terminal in the window below */
+        s.term = node_new(NODE_TERM);
+        s.term->term = 2;
+        node_append(below, s.term);
+        ss(s.term, "position", "absolute");
+        sn(s.term, "left", 20); sn(s.term, "top", 200); sn(s.term, "width", 160); sn(s.term, "height", 40);
+    }
+    if (feat & DF_PANEL) {                              /* a blurred widget on the desktop, with a clock */
+        Node *panel = box_in(s.root, 6, 290, 90, 110, 0x40ffffff);      /* the window leaves it at times */
+        sn(panel, "borderRadius", 16);
+        sn(panel, "backdropBlur", 16);
+        ss(panel, "alignItems", "center"); ss(panel, "justifyContent", "center");
+        s.ptext = dtext(panel, "12:00", 24, 600, 0xffffffff);
+    }
+    if (feat & DF_SQUARE) {                             /* a square turning on the desktop */
+        s.square = box_in(s.root, 100, 240, 56, 56, 0xff30d158);
+        sn(s.square, "borderRadius", 10);
+    }
+    if (feat & (DF_SQUARE | DF_DOT)) {
+        Node *still = box_in(s.root, 60, 420, 50, 50, 0xffff9f0a);   /* the window's left edge crosses it */
+        sn(still, "borderRadius", 8);
+        js_set(still, "rotate", 30);
+    }
+    if (feat & DF_DOT) {
+        s.dot = box_in(s.root, 104, 428, 14, 14, 0xffff453a);
+        sn(s.dot, "borderRadius", 7);
+    }
     /* the scene window: the theme's frame (title bar) and scene.jsx's content */
-    s.win = box_in(s.root, x, y, 760, 480, 0xff2c2c2e);
+    /* DF_SMALL: smaller, with a smaller shadow and lower (drag_run), so that its frames' box mostly
+     * keeps away from what the menu bar's and the Dock's blur read */
+    s.win = box_in(wins, x, y, feat & DF_SMALL ? 480 : 760, feat & DF_SMALL ? 300 : 480, 0xff2c2c2e);
     ss(s.win, "overflow", "hidden");
     sn(s.win, "borderRadius", 12);
     sn(s.win, "borderWidth", 1);
     sn(s.win, "borderColor", 0x30ffffff);
-    dshadow(s.win, 0x73000000, 24, 56);
+    if (feat & DF_SMALL) dshadow(s.win, 0x73000000, 12, 24);
+    else dshadow(s.win, 0x73000000, 24, 56);
     Node *title = dview(s.win, 0, 28, 0xff3a3a3c, 0);
     ss(title, "alignItems", "center"); ss(title, "justifyContent", "center");
     dtext(title, "System Information", 13, 600, 0xffe0e0e0);
@@ -1665,18 +1778,19 @@ static DScene drag_scene(int dc, float x, float y) {
     sn(bar, "paddingLeft", 14); sn(bar, "gap", 18);
     dtext(bar, "LordOS", 13, 700, 0xffffffff);
     dtext(bar, "File", 13, 0, 0xffffffff);
-    dtext(bar, "Edit", 13, 0, 0xffffffff);
+    s.mtext = dtext(bar, "Edit", 13, 0, 0xffffffff);
     return s;
 }
 
 /* One run: case dc's scene, the drag (n frames), then the frame after it ends, on o (a display at
- * 100 %, or at 200 % for DC_K2). hash gets n + 1 values; the largest count of pixels that differed
+ * 100 %, or at 200 % for k2 and k2mix). hash gets n + 1 values; the largest count of pixels that differed
  * from a full repaint goes to *full, the largest difference of a channel to *worst. */
 static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
     const int n = dc_frames[dc];
     float x0 = (DW - 760) / 2, y0 = 28 + (DH - 28 - 480) / 2;             /* scenePath: centered in the work area */
     const float rx = (DW - 760) / 2 - 20, ry = (DH - 28 - 480) - 40;
     if (dc == DC_NEG) { x0 = -200; y0 = -120; }        /* partly off the display's top-left corner */
+    if (dc_feat[dc] & DF_SMALL) y0 += 54;
     DScene s = drag_scene(dc, x0, y0);
     term_cursor = 1;
     term_at = (Box){ 0, 0, 0, 0 };
@@ -1702,7 +1816,21 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
             ui.dirty = 1;
         }
         rot = fmodf(rot + 6, 360);                      /* scene.jsx's square, every 16 ms */
-        if (dc == DC_DRAG || dc == DC_NEG || dc == DC_K2) js_set(s.spin, "rotate", rot);  /* the others: their own */
+        if (dc == DC_DRAG || dc == DC_NEG || dc == DC_K2 || dc >= DC_BELOW) js_set(s.spin, "rotate", rot);  /* the others: their own */
+        int feat = dc_feat[dc];
+        if ((feat & DF_BAR) && f % 3 == 1) js_set(s.fill, "width", 40 + (f * 37) % 260);
+        if ((feat & DF_BAR) && f % 30 == 15) node_set_text(s.btitle->first, (f / 30) & 1 ? "Files" : "Files, 3 items selected");
+        if ((feat & DF_MENU) && f % 2 == 0) node_set_text(s.mtext->first, (f / 2) & 1 ? "Edit" : "Edit 12:04");
+        if (feat & DF_SQUARE) js_set(s.square, "rotate", fmodf(rot * 0.5f, 360));
+        if ((feat & DF_PANEL) && f % 40 == 20) node_set_text(s.ptext->first, (f / 40) & 1 ? "12:00" : "12:01");
+        if ((feat & DF_RAISE) && f == 40) js_set(s.below, "zIndex", 5);
+        if ((feat & DF_RAISE) && f == 80) js_set(s.below, "zIndex", 0);
+        if ((feat & DF_DOT) && f % 20 == 10) js_set(s.dot, "backgroundColor", (f / 20) & 1 ? 0xffff453a : 0xff64d2ff);
+        if ((feat & DF_TERM) && f % 10 == 5 && term_at.x1 > term_at.x0) {
+            term_cursor = !term_cursor;                 /* the terminal below: outside damage */
+            damage_add((Box){ floorf(term_at.x0), floorf(term_at.y0 + 8 - 2), ceilf(term_at.x1), ceilf(term_at.y0 + 24 + 2) });
+            ui.dirty = 1;
+        }
         if (dc == DC_REMOVE && f % 10 == 0) js_set(s.spin, "rotate", rot);  /* frames between only copy the layer */
         if (dc == DC_REMOVE && f == 35) node_detach(s.child);
         if (dc == DC_EDGE) js_set(s.edge, "rotate", rot);
@@ -1763,8 +1891,9 @@ static int gold_write(const char *path, const char *variant, const uint64_t *has
     if (!f) { free(old); return -1; }
     if (!old || !*old)
         fprintf(f, "# engine-test test_drag_exact, %s path: FNV-1a hash of every frame of the dragged window.\n"
-                   "# Written by `make drag-golden` on the code before the drag-frame optimizations\n"
-                   "# (001633b); later code must give the same pixels. Lines: architecture, run, frame, hash.\n", variant);
+                   "# Written by `make drag-golden` from 001633b plus step 9 (the one approved pixel change, 2026-10-28:\n"
+                   "# the corners of rounded windows below the dragged one, 1 level, towards a full repaint); later\n"
+                   "# code must give the same pixels. Lines: architecture, run, frame, hash.\n", variant);
     size_t al = strlen(GOLD_ARCH);
     for (const char *p = old; p && *p; ) {
         const char *e = strchr(p, '\n');
@@ -1789,7 +1918,7 @@ static void test_drag_exact(int write) {
     o.rpx = calloc((size_t)DW * DH, 4);
     o2.px = calloc((size_t)4 * DW * DH, 4);
     o2.rpx = calloc((size_t)4 * DW * DH, 4);
-    uint64_t *hash = malloc(sizeof *hash * DC_HASHES);
+    uint64_t *hash = malloc(sizeof *hash * (size_t)dc_hashes());
     if (!o.px || !o.rpx || !o2.px || !o2.rpx || !hash) {
         CHECK(0, "drag-exact: out of memory");
         free(o.px); free(o.rpx); free(o2.px); free(o2.rpx); free(hash);
@@ -1809,14 +1938,27 @@ static void test_drag_exact(int write) {
         int k = 0;
         paint_layer_parts();
         paint_layer_stats(&renders, &blits);
+        BelowStats bs;
+        paint_below_stats(&bs);
+        paint_below_bad = paint_below_checked = 0;
+        paint_below_verify = 1;
+        if (getenv("LORD_BELOW_SWITCH")) paint_below_switch = atoi(getenv("LORD_BELOW_SWITCH"));
         for (int dc = 0; dc < DC_N; dc++) {
-            drag_run(dc, dc == DC_K2 ? &o2 : &o, hash + k, &fullw[dc], &worst[dc]);
+            drag_run(dc, dc_k2(dc) ? &o2 : &o, hash + k, &fullw[dc], &worst[dc]);
             k += dc_frames[dc] + 1;
         }
         parts = paint_layer_parts();
         paint_layer_stats(&renders, &blits);
         printf("drag-exact %s: %d frames; layer: %ld renders (%ld of them parts, %ld rebuilds of what is below), %ld copies\n",
                variant[g], k, renders % 1000, parts, renders / 1000, blits);
+        paint_below_stats(&bs);
+        paint_below_verify = 0;
+        printf("drag-exact %s: what is below: %ld built whole, %ld in part; %ld frames switched to it (not: %ld ancestor, "
+               "%ld blur, %ld transform, %ld unreached, %ld cost), %ld pixels differ in %ld of them painted the old way\n",
+               variant[g], bs.full, bs.part, bs.switched, bs.refused[BR_ANCESTOR], bs.refused[BR_BLUR], bs.refused[BR_TRANSFORM],
+               bs.refused[BR_UNREACHED], bs.refused[BR_COST], paint_below_bad, paint_below_checked);
+        CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
+              "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
         printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
         for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
         printf("\n");

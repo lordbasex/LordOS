@@ -381,7 +381,9 @@ Linux apps. A slow theme makes the whole desktop slow.
 - **Don't poll** when a store exists (sound, battery, Bluetooth and displays arrive as events). Lord
   Classic's network glyph polls every 5 s; that is the upper bound to aim for.
 - The style subset has no CSS animations, dashed borders, skew or 3D (`themes/README.md`). An
-  unknown style key is logged as `js: unsupported style '<key>'`.
+  unknown style key is logged as `js: unsupported style '<key>'`, once per key per process (an
+  animation that sends it every frame writes one line). After 64 different keys, one more line ends
+  with `(further unknown style keys are not logged)` and no others are logged.
 
 ### Images, fonts and other files
 

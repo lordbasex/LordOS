@@ -105,6 +105,28 @@ static JSValue f_set_text(JSContext *c, JSValueConst this_val, int argc, JSValue
     return JS_UNDEFINED;
 }
 
+/* "js: unsupported style '<key>'" is logged once per key: a style sent every frame (an animation) would otherwise
+ * write a line per frame. The first STYLE_WARN_MAX keys are remembered (compared on their first
+ * STYLE_WARN_KEY - 1 bytes); the next new one is logged with a note that further unknown keys are not, and
+ * nothing after it. Main thread only (setStyle runs there). */
+#define STYLE_WARN_MAX 64
+#define STYLE_WARN_KEY 48
+
+static void style_warn(const char *key) {
+    static char seen[STYLE_WARN_MAX][STYLE_WARN_KEY];
+    static int nseen;                   /* STYLE_WARN_MAX + 1 once the last line was written */
+    for (int i = 0; i < nseen && i < STYLE_WARN_MAX; i++)
+        if (!strncmp(seen[i], key, STYLE_WARN_KEY - 1)) return;
+    if (nseen > STYLE_WARN_MAX) return;
+    if (nseen == STYLE_WARN_MAX) {
+        fprintf(stderr, "js: unsupported style '%s' (further unknown style keys are not logged)\n", key);
+        nseen++;
+        return;
+    }
+    snprintf(seen[nseen++], STYLE_WARN_KEY, "%s", key);
+    fprintf(stderr, "js: unsupported style '%s'\n", key);
+}
+
 static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Node *n = arg_node(c, argv[0]);
@@ -139,7 +161,7 @@ static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValu
         err = s ? style_set_string(&n->s, key, s) : -1;
         if (s) JS_FreeCString(c, s);
     }
-    if (err) fprintf(stderr, "js: unsupported style '%s'\n", key);
+    if (err) style_warn(key);
     JS_FreeCString(c, key);
     node_restyled(n, &before, before.ext ? &ext_before : NULL);     /* node.c (engine-test does the same) */
     return JS_UNDEFINED;

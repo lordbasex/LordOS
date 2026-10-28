@@ -40,12 +40,20 @@ static uint32_t with_opacity(uint32_t argb, float op) {
 /* Cuadro de video que tapa todo lo que cambió (media_cover_node): lo anterior a ese nodo en el
  * orden de pintado no se ve, así que no se pinta (solo se recorre, por los recortes). */
 static int skip_until, skip_reached;
+/* skip_until's ancestors (paint_root stamps them): the only nodes before it that are still walked */
+enum { SKIP_PATH_MAX = 64 };
+static const Node *skip_path[SKIP_PATH_MAX];
+static int skip_depth, skip_path_ok;
 static int paint_cull;                  /* paint_node may skip clipped subtrees outside the clip (CPU path) */
 
 static int layer_paint(Canvas *c, Node *n, float opacity);
 static int tf_paint(Canvas *c, Node *n, float opacity);
 static int tf_self, tf_unit;    /* the transformed node being rasterized; the one painted at opacity 1 */
 int paint_tf_nocache;           /* tests: transformed subtrees rasterized again, the cache untouched */
+static int tf_nest;             /* > 0: painting into a transformed node's raster, not the canvas */
+static void below_note_blur(float x, float y, float w, float h, int radius);
+static void below_note_affine(const float fwd[6], int sw, int sh);
+static int below_collect;       /* building the copy of what is below the dragged window (below_build) */
 
 static float max4(const float r[4]) { return fmaxf(fmaxf(r[0], r[1]), fmaxf(r[2], r[3])); }
 
@@ -57,6 +65,25 @@ static int text_max_lines(const Node *n, float box_h) {
     float lh = text_line_height(s->font_size, s->line_height);
     int fit = lh > 0 ? (int)floorf((box_h + 0.5f) / lh) : 0;
     return fit < 1 ? 1 : fit;
+}
+
+/* Stamps skip_until's ancestors. A chain deeper than skip_path keeps every node walked, as before. */
+static void skip_stamp(void) {
+    skip_depth = 0;
+    skip_path_ok = 0;
+    const Node *n = skip_until ? node_get(skip_until) : NULL;
+    if (!n) return;
+    for (n = n->parent; n; n = n->parent) {
+        if (skip_depth == SKIP_PATH_MAX) return;
+        skip_path[skip_depth++] = n;
+    }
+    skip_path_ok = 1;
+}
+
+static int skip_ancestor(const Node *n) {
+    if (!skip_path_ok) return 1;
+    for (int i = 0; i < skip_depth; i++) if (skip_path[i] == n) return 1;
+    return 0;
 }
 
 static void paint_node(Canvas *c, Node *n, float opacity) {
@@ -91,6 +118,12 @@ static void paint_node(Canvas *c, Node *n, float opacity) {
     }
     if (skip_until && n->id == skip_until) skip_reached = 1;
     int own = !skip_until || skip_reached;     /* ¿se pinta este nodo (o solo sus hijos)? */
+    /* A node before skip_until that isn't one of its ancestors: nothing of it or of its subtree is
+     * painted, and its corners aren't saved and restored either. That restore blended each saved
+     * pixel over the same pixel (the copy of what is below already has it), one level darker than a
+     * full repaint at the corners of rounded windows below the dragged one (step 9, approved
+     * 2026-10-28: the only pixel change of the drag-frame work, towards what a full repaint gives). */
+    if (!own && !skip_ancestor(n)) return;
 
     if (own && (s->shadow_color >> 24) && (s->shadow_blur > 0 || s->shadow_x || s->shadow_y))
         PROF(0, canvas_shadow(c, x, y, w, h, rad, s->shadow_x * k, s->shadow_y * k, s->shadow_blur * k,
@@ -103,7 +136,10 @@ static void paint_node(Canvas *c, Node *n, float opacity) {
         else canvas_corners_save(c, &corners, x, y, w, h, rad);
     }
 
-    if (own && s->backdrop_blur >= 1) PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
+    if (own && s->backdrop_blur >= 1) {
+        if (below_collect && !tf_nest) below_note_blur(x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
+        PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
+    }
     if (own && s->bg >> 24) {
         if (corners_differ) PROF(2, canvas_rrect4(c, x, y, w, h, r4, with_opacity(s->bg, op)));
         else PROF(2, canvas_rrect(c, x, y, w, h, rad, with_opacity(s->bg, op)));
@@ -344,7 +380,9 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
         skip_until = 0;
         tf_self = tf_unit = n->id;
         depth++;
+        tf_nest++;
         paint_node(&rc, n, 1);
+        tf_nest--;
         depth--;
         skip_until = ks; tf_self = kr_self; tf_unit = ku;
         paint_view = keep;
@@ -360,6 +398,7 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     Affine fwd = affine_mul(v, affine_mul(n->tf->own, ri)), inv;
     if (!affine_invert(fwd, &inv)) return 1;
     float f6[6] = { fwd.a, fwd.b, fwd.c, fwd.d, fwd.e, fwd.f }, i6[6] = { inv.a, inv.b, inv.c, inv.d, inv.e, inv.f };
+    if (below_collect && !tf_nest) below_note_affine(f6, e->w, e->h);
     canvas_blit_affine(c, e->px, e->w, e->h, i6, f6, opacity * n->s.opacity);
     tf_composites++;
     return 1;
@@ -439,7 +478,7 @@ static void tf_gc(void) {
  * Lo de abajo (todo lo que se pinta antes que la ventana: fondo, escritorio, las otras ventanas)
  * también se guarda una vez («below»): por cuadro se copia la región que cambió, encima va la capa
  * y después se pinta normal solo lo que está por encima (barra de menú, Dock). Si algo de abajo
- * cambia, se vuelve a armar. */
+ * cambia, se vuelve a armar: only what changed (below_update), see "The copy of what is below". */
 static struct {
     int node, want, valid, rendering;
     uint32_t *px;
@@ -453,8 +492,17 @@ static struct {
     Box at;                     /* dónde estaba en pantalla al pintarla */
     /* lo de abajo */
     uint32_t *below;
-    int bw, bh, below_valid, stop, stopped;
+    int bw, bh, stop, stopped;
     int since, no_below;        /* cuadros desde que se armó; si cambia seguido (un video), no se usa */
+    /* 001633b's rule for the copy, kept as a shadow (below_ready): whether it held its copy valid, had
+     * built one, and for which canvas size */
+    int lg_valid, lg_has, lg_bw, lg_bh;
+    DamageList bdmg;            /* what of the copy is stale (logical px) */
+    int bdmg_full;              /* all of it */
+    uint64_t osig, bsig;        /* the paint order around the window (below_order): now, and at the last whole build */
+    PaintView bview;            /* the view the copy was built for */
+    int reached;                /* the last build reached the window (it stopped there) */
+    int switched;               /* this frame copies it where 001633b's rule painted everything (below_switch) */
     Box part;                   /* parte de la capa a repintar (coordenadas de la capa), p. ej. el cursor de la terminal */
     int resize;                 /* cambiando el tamaño: sin capa, solo lo de abajo */
     uint8_t *hole;              /* camino GPU: dónde la capa tiene el hueco de una app (alfa 0 de verdad) */
@@ -475,7 +523,8 @@ void paint_layer_begin(int node, int resize) {
     layer.want = 1;
     layer.resize = resize;
     layer.valid = 0;
-    layer.below_valid = 0;
+    layer.lg_valid = 0;
+    layer.bdmg_full = 1;
 }
 
 void paint_layer_end(void) {
@@ -498,10 +547,16 @@ void paint_layer_view(int index) {
     if (layer.view == index) return;
     layer.view = index;
     layer.valid = 0;
-    layer.below_valid = 0;
+    layer.lg_valid = 0;
+    layer.bdmg_full = 1;
 }
 
 static long layer_renders, layer_blits, below_renders, layer_parts;
+static BelowStats bstat;
+void paint_below_stats(BelowStats *out) {
+    *out = bstat;
+    memset(&bstat, 0, sizeof bstat);
+}
 void paint_layer_stats(long *renders, long *blits) {
     *renders = layer_renders + 1000 * below_renders;
     *blits = layer_blits;
@@ -782,32 +837,289 @@ static int layer_paint(Canvas *c, Node *n, float opacity) {
     return 1;
 }
 
-/* Lo de abajo de la ventana, en pantalla completa: se pinta el árbol hasta llegar a ella. En el camino
- * GPU sus ventanas de apps (huecos en la UI) se guardan y se vuelven a anotar en cada cuadro. */
-static int below_ready(const Canvas *c, Node *root) {
+/* ---- The copy of what is below the dragged window (layer.below) ----
+ * Lo de abajo de la ventana, en pantalla completa: se pinta el árbol hasta llegar a ella. En el camino
+ * GPU sus ventanas de apps (huecos en la UI) se guardan y se vuelven a anotar en cada cuadro.
+ *
+ * Which frames use it is still decided by 001633b's rule, kept as a shadow (lg_*, since, no_below):
+ * any change outside the window made it stale, and two within 8 frames stopped it for the rest of the
+ * drag (no_below). On top of that rule (0.8.6, in development):
+ *   - Only what changed is painted again (below_update): the boxes of the nodes painted before the
+ *     window that changed (damage_walk knows the paint order, below_order) and outside damage, grown
+ *     for what makes a primitive depend on where the clip starts: a backdrop blur reads around its box
+ *     and starts its grid at the clip, a turned or scaled node's image steps from its first painted
+ *     pixel (canvas_blit_affine). Every other primitive gives the same pixel whatever the clip, so the
+ *     copy is the same as painting it whole. A change painted after the window (the menu bar's clock)
+ *     no longer touches it.
+ *   - Where the rule painted everything, a frame copies it anyway when that gives the same pixels
+ *     (below_switch, paint_below_switch): no blurred or transformed node before the window where
+ *     those would differ (with the damaged box as the clip instead of the whole canvas), no ancestor of
+ *     the window that paints after its children there (a border, the restore of rounded corners: over
+ *     the copy they would be painted twice), the window reached, and less to paint than the frame's box.
+ * paint_below_verify (tests) paints every such frame again the old way and counts differing pixels. */
+#define BELOW_LIST_MAX 64
+static Rect bl_blur[BELOW_LIST_MAX], bl_near[BELOW_LIST_MAX], bl_tf[BELOW_LIST_MAX];
+static int nbl_blur, nbl_tf, bl_over;          /* bl_over: more than the lists hold */
+int paint_below_switch = 1, paint_below_verify;
+long paint_below_bad, paint_below_checked;
+
+static int rect_meets(Rect a, Rect b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1; }
+static int rect_inside(Rect a, Rect b) { return a.x0 >= b.x0 && a.y0 >= b.y0 && a.x1 <= b.x1 && a.y1 <= b.y1; }
+static Rect rect_join(Rect a, Rect b) {
+    return (Rect){ a.x0 < b.x0 ? a.x0 : b.x0, a.y0 < b.y0 ? a.y0 : b.y0, a.x1 > b.x1 ? a.x1 : b.x1, a.y1 > b.y1 ? a.y1 : b.y1 };
+}
+static Rect rect_clamp(Rect a, int w, int h) {
+    Rect r = { a.x0 < 0 ? 0 : a.x0, a.y0 < 0 ? 0 : a.y0, a.x1 > w ? w : a.x1, a.y1 > h ? h : a.y1 };
+    if (r.x1 < r.x0) r.x1 = r.x0;
+    if (r.y1 < r.y0) r.y1 = r.y0;
+    return r;
+}
+static long rect_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 - r.x0) * (r.y1 - r.y0) : 0; }
+
+/* During a build: a backdrop blur (its box and, with what it reads around it, its reach) */
+static void below_note_blur(float x, float y, float w, float h, int radius) {
+    if (nbl_blur == BELOW_LIST_MAX) { bl_over = 1; return; }
+    Rect b = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
+    int m = 2 * radius + 2;                     /* canvas_backdrop_blur reads 2 * radius around it */
+    bl_blur[nbl_blur] = b;
+    bl_near[nbl_blur++] = (Rect){ b.x0 - m, b.y0 - m, b.x1 + m, b.y1 + m };
+}
+
+/* and a transformed node's image: canvas_blit_affine's bounds (the same float operations), one more
+ * pixel on each side */
+static void below_note_affine(const float fwd[6], int sw, int sh) {
+    if (nbl_tf == BELOW_LIST_MAX) { bl_over = 1; return; }
+    float bx0 = 1e30f, by0 = 1e30f, bx1 = -1e30f, by1 = -1e30f;
+    const float cs[4][2] = { {0, 0}, {(float)sw, 0}, {(float)sw, (float)sh}, {0, (float)sh} };
+    for (int q = 0; q < 4; q++) {
+        float px = fwd[0] * cs[q][0] + fwd[2] * cs[q][1] + fwd[4], py = fwd[1] * cs[q][0] + fwd[3] * cs[q][1] + fwd[5];
+        bx0 = fminf(bx0, px); by0 = fminf(by0, py); bx1 = fmaxf(bx1, px); by1 = fmaxf(by1, py);
+    }
+    bl_tf[nbl_tf++] = (Rect){ (int)floorf(bx0 - 1) - 1, (int)floorf(by0 - 1) - 1, (int)ceilf(bx1 + 1) + 1, (int)ceilf(by1 + 1) + 1 };
+}
+
+static void below_damage(Box b) { dlist_add(&layer.bdmg, b); }
+
+/* A node painted before the window changed: where it was and where it is, with the reach of its blur
+ * (blur_walk's margin) or of its image's bounds (a transform) */
+static void below_damage_node(const Node *n, Box cur) {
+    float m = 0;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->own_tf && m < 4) m = 4;
+    Box p = n->prev_box;
+    if (p.x1 > p.x0 && p.y1 > p.y0) below_damage((Box){ p.x0 - m, p.y0 - m, p.x1 + m, p.y1 + m });
+    if (cur.x1 > cur.x0 && cur.y1 > cur.y0) below_damage((Box){ cur.x0 - m, cur.y0 - m, cur.x1 + m, cur.y1 + m });
+}
+
+static int view_eq(PaintView a, PaintView b) { return a.x == b.x && a.y == b.y && a.k == b.k && a.dx == b.dx && a.dy == b.dy; }
+
+/* The copy's buffer for this canvas (0: out of memory) */
+static int below_alloc(const Canvas *c) {
+    if (layer.below && layer.bw == c->w && layer.bh == c->h) return 1;
+    free(layer.below);
+    layer.below = malloc((size_t)c->w * c->h * 4);
+    layer.bw = layer.below ? c->w : 0;
+    layer.bh = layer.below ? c->h : 0;
+    layer.bdmg_full = 1;
+    return layer.below != NULL;
+}
+
+/* What of the copy has to be painted again, in the canvas's pixels: 0 nothing, 1 the rectangles r
+ * (*n of them, at most BELOW_RECTS, apart), 2 all of it. Each one grows for the blurs and transformed
+ * images the last build met until none of those reaches into it from outside, so a build of only
+ * those rectangles reads nothing outside them: each one is exact on its own. */
+#define BELOW_RECTS 4
+static int below_stale(const Canvas *c, Rect *r, int *n) {
+    *n = 0;
+    if (layer.bdmg_full || !view_eq(paint_view, layer.bview)) return 2;
+    Rect q[DAMAGE_MAX];
+    int k = 0;
+    for (int i = 0; i < layer.bdmg.n; i++) {
+        Box b = layer.bdmg.r[i];
+        Rect e = rect_clamp((Rect){ (int)floorf(VX(b.x0)) - 1, (int)floorf(VY(b.y0)) - 1, (int)ceilf(VX(b.x1)) + 1, (int)ceilf(VY(b.y1)) + 1 }, c->w, c->h);
+        if (rect_area(e)) q[k++] = e;
+    }
+    if (!k) { layer.bdmg.n = 0; return 0; }     /* not on this display */
+    if (bl_over) return 2;
+    int changed = 1;
+    for (int pass = 0; changed && pass < 16; pass++) {
+        changed = 0;
+        for (int i = 0; i < k; i++)                     /* the reach of a blur or an image */
+            for (int j = 0; j < nbl_blur + nbl_tf; j++) {
+                Rect e = rect_clamp(j < nbl_blur ? bl_near[j] : bl_tf[j - nbl_blur], c->w, c->h);
+                if (rect_area(e) && rect_meets(q[i], e) && !rect_inside(e, q[i])) { q[i] = rect_join(q[i], e); changed = 1; }
+            }
+        for (int i = 0; i < k; i++)                     /* rectangles that overlap: one */
+            for (int j = i + 1; j < k; j++)
+                if (rect_meets(q[i], q[j])) { q[i] = rect_join(q[i], q[j]); q[j--] = q[--k]; changed = 1; }
+        if (k > BELOW_RECTS) {                          /* too many walks: the two that waste least */
+            int bi = 0, bj = 1;
+            long best = -1;
+            for (int i = 0; i < k; i++)
+                for (int j = i + 1; j < k; j++) {
+                    long w = rect_area(rect_join(q[i], q[j])) - rect_area(q[i]) - rect_area(q[j]);
+                    if (best < 0 || w < best) { best = w; bi = i; bj = j; }
+                }
+            q[bi] = rect_join(q[bi], q[bj]);
+            q[bj] = q[--k];
+            changed = 1;
+        }
+    }
+    long area = 0;
+    for (int i = 0; i < k; i++) area += rect_area(q[i]);
+    if (changed || area * 2 > (long)c->w * c->h) return 2;
+    for (int i = 0; i < k; i++) r[i] = q[i];
+    *n = k;
+    return 1;
+}
+
+/* After a build of only r: whether that was exact with what it met now (else it is built whole) */
+static int below_part_ok(const Rect *r, int n, int w, int h) {
+    if (bl_over) return 0;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < nbl_blur + nbl_tf; j++) {
+            Rect e = rect_clamp(j < nbl_blur ? bl_near[j] : bl_tf[j - nbl_blur], w, h);
+            if (rect_area(e) && rect_meets(r[i], e) && !rect_inside(e, r[i])) return 0;
+        }
+    return 1;
+}
+
+/* Paints the copy up to the window, all of it or only the n rectangles r (a walk of the tree each;
+ * the first one notes the blurs and images). Its app windows (GPU path) are kept for wl_paint_kept
+ * and left out of the frame's list. */
+static void below_build(const Canvas *c, Node *root, const Rect *r, int n) {
+    int whole = !n, cull = paint_cull;
+    paint_cull = 0;                     /* every node noted, the window always reached */
+    nbl_blur = nbl_tf = bl_over = 0;
+    for (int i = 0; i < (whole ? 1 : n); i++) {
+        Canvas bc;
+        canvas_init(&bc, layer.below, c->w, c->h, c->w);
+        if (!whole) canvas_set_clip(&bc, r[i]);
+        canvas_clear(&bc, 0x000000);
+        below_collect = !i;
+        layer.stop = layer.node;
+        layer.stopped = 0;
+        wl_paint_save();
+        paint_node(&bc, root, 1);
+        wl_paint_keep();                /* las ventanas de apps de abajo (camino GPU) */
+        wl_paint_restore();
+        layer.reached = layer.stopped;
+        layer.stop = layer.stopped = 0;
+        below_collect = 0;
+    }
+    if (whole) {
+        layer.bsig = layer.osig;
+        layer.bview = paint_view;
+        bstat.full++;
+    } else bstat.part++;
+    paint_cull = cull;
+    layer.bdmg.n = 0;
+    layer.bdmg_full = 0;
+    below_renders++;
+}
+
+/* Brings the copy up to date: the stale part, or all of it */
+static void below_update(const Canvas *c, Node *root) {
+    Rect r[BELOW_RECTS];
+    int n, st = below_stale(c, r, &n);
+    if (!st) return;
+    /* the window (or an ancestor) not drawn: a part built now would hold what is above it only in
+     * that part, so build it whole, as 001633b did */
+    const Node *w = node_get(layer.node);
+    for (const Node *a = w; a && st == 1; a = a->parent) if (a->type == NODE_RAW || a->s.display_none) st = 2;
+    if (!w) st = 2;
+    below_build(c, root, r, st == 2 ? 0 : n);
+    if (st == 1 && !below_part_ok(r, n, c->w, c->h)) below_build(c, root, r, 0);
+}
+
+/* An ancestor of the window paints its border and restores its rounded corners after its children,
+ * the window included. The copy already has that once; a frame that copies it and paints from the
+ * window has it twice. 1 if no such pixel of an ancestor lies in d. */
+static int below_ancestors_ok(const Node *w, Rect d) {
+    const float k = paint_view.k;
+    int depth = 0;
+    for (const Node *a = w->parent; a; a = a->parent) {
+        if (++depth >= SKIP_PATH_MAX) return 0;         /* skip_stamp would walk every node */
+        const Style *s = &a->s;
+        int plain = node_edges_plain(a);
+        float rad = (plain ? s->radius : max4(s->ext->r.rad)) * k;
+        int x0 = (int)floorf(VX(a->ax)) - 1, y0 = (int)floorf(VY(a->ay)) - 1;
+        int x1 = (int)ceilf(VX(a->ax + a->w)) + 1, y1 = (int)ceilf(VY(a->ay + a->h)) + 1;
+        float bw = fmaxf(fmaxf(node_border(a, EDGE_L), node_border(a, EDGE_T)), fmaxf(node_border(a, EDGE_R), node_border(a, EDGE_B)));
+        if (bw > 0) {                                   /* the border: four strips along the edges */
+            int b = (int)ceilf(bw * k) + 2;
+            Rect q[4] = { { x0, y0, x0 + b, y1 }, { x1 - b, y0, x1, y1 }, { x0, y0, x1, y0 + b }, { x0, y1 - b, x1, y1 } };
+            for (int i = 0; i < 4; i++) if (rect_meets(q[i], d)) return 0;
+        }
+        if ((s->overflow_hidden || bw > 0) && rad > 0) {
+            /* canvas_corners_save's squares (ceil(r) + 1), where a rounded border curves too */
+            int n = (int)ceilf(rad + bw * k) + 2;
+            Rect q[4] = { { x0, y0, x0 + n, y0 + n }, { x1 - n, y0, x1, y0 + n }, { x0, y1 - n, x0 + n, y1 }, { x1 - n, y1 - n, x1, y1 } };
+            for (int i = 0; i < 4; i++) if (rect_meets(q[i], d)) return 0;
+        }
+    }
+    return 1;
+}
+
+/* Whether copying gives what painting everything clipped to d gives (0), or why not */
+static int below_exact(Rect d) {
+    const Node *w = node_get(layer.node);
+    if (!w || !layer.reached) return BR_UNREACHED;
+    /* the frame must reach the window and paint it through its layer, as it does painting everything */
+    if (w->has_tf) return BR_TRANSFORM;
+    float op = 1;
+    for (const Node *a = w; a; a = a->parent) if (a->type == NODE_RAW || a->s.display_none) return BR_UNREACHED;
+    for (const Node *a = w->parent; a; a = a->parent) op *= a->s.opacity;
+    if (op < 0.004f) return BR_UNREACHED;
+    if (!below_ancestors_ok(w, d)) return BR_ANCESTOR;
+    if (bl_over) return BR_BLUR;
+    for (int i = 0; i < nbl_blur; i++) if (rect_meets(bl_blur[i], d)) return BR_BLUR;
+    /* an image's rows start at the clip's left edge if it cuts it there */
+    for (int i = 0; i < nbl_tf; i++) if (rect_meets(bl_tf[i], d) && (bl_tf[i].x0 > 0 ? bl_tf[i].x0 : 0) < d.x0) return BR_TRANSFORM;
+    return 0;
+}
+
+/* A frame where 001633b's rule paints everything: the copy instead, if exact and cheaper */
+static int below_switch(const Canvas *c, Node *root, int may) {
+    Rect d = c->clip;
+    if (!paint_below_switch || !may || !rect_area(d) || !below_alloc(c)) return 0;
+    Rect r[BELOW_RECTS];
+    int n, st = below_stale(c, r, &n);
+    long cost = st == 2 ? (long)c->w * c->h : 0;
+    for (int i = 0; st == 1 && i < n; i++) cost += rect_area(r[i]);
+    if (cost > rect_area(d)) { bstat.refused[BR_COST]++; return 0; }
+    int why = below_exact(d);
+    if (!why && st) {
+        below_build(c, root, r, st == 2 ? 0 : n);
+        if (st == 1 && !below_part_ok(r, n, c->w, c->h)) { layer.bdmg_full = 1; why = BR_COST; }
+        else why = below_exact(d);
+    }
+    if (why) { bstat.refused[why]++; return 0; }
+    wl_paint_kept();
+    layer.switched = 1;
+    bstat.switched++;
+    return 1;
+}
+
+/* may: the canvas was to be cleared to black, as the copy is (a frame that switches must equal one
+ * that paints everything) */
+static int below_ready(const Canvas *c, Node *root, int may) {
     if (!layer.want || layer.rendering || paint_capture_mode || paint_view.index != layer.view) return 0;
     layer.since++;
-    if (layer.no_below) return 0;
-    if (layer.below_valid && layer.bw == c->w && layer.bh == c->h) { wl_paint_kept(); return 1; }
-    if (layer.below && layer.since < 8) { layer.no_below = 1; return 0; }   /* lo de abajo cambia a cada rato */
-    layer.since = 0;
-    if (!layer.below || layer.bw != c->w || layer.bh != c->h) {
-        free(layer.below);
-        layer.below = malloc((size_t)c->w * c->h * 4);
-        if (!layer.below) return 0;
-        layer.bw = c->w;
-        layer.bh = c->h;
+    int lg;                         /* 001633b: 0 no copy, 1 its copy as it is, 2 built again */
+    if (layer.no_below) lg = 0;
+    else if (layer.lg_valid && layer.lg_bw == c->w && layer.lg_bh == c->h) lg = 1;
+    else if (layer.lg_has && layer.since < 8) { layer.no_below = 1; lg = 0; }   /* lo de abajo cambia a cada rato */
+    else { layer.since = 0; lg = 2; }
+    if (!lg) return below_switch(c, root, may);
+    if (!below_alloc(c)) { layer.lg_has = layer.lg_valid = 0; return 0; }
+    if (lg == 2) {
+        layer.lg_has = layer.lg_valid = 1;
+        layer.lg_bw = c->w;
+        layer.lg_bh = c->h;
     }
-    Canvas bc;
-    canvas_init(&bc, layer.below, c->w, c->h, c->w);
-    canvas_clear(&bc, 0x000000);
-    layer.stop = layer.node;
-    layer.stopped = 0;
-    paint_node(&bc, root, 1);
-    layer.stop = layer.stopped = 0;
-    wl_paint_keep();                /* las ventanas de apps de abajo (camino GPU) */
-    layer.below_valid = 1;
-    below_renders++;
+    if (lg == 2) below_update(c, root);     /* lg 1: 001633b's copy as it was (outside damage inside the window's boxes waits in bdmg) */
+    wl_paint_kept();
     return 1;
 }
 
@@ -857,7 +1169,42 @@ static int layer_tree_part(Box cur, Box moved) {
     return 1;
 }
 
-static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip) {
+/* Paint order around the dragged window (below_order): its ancestors, and for each child of one of
+ * them whether it is painted before or after the window. Anything not known is "before". */
+enum { ORD_BEFORE, ORD_AFTER, ORD_PATH };
+#define ORD_MAX 64
+static Node *ord_anc[ORD_MAX];          /* the window, its parent, … the root */
+static int ord_n;
+
+static void sig_u64(uint64_t *h, const void *p, size_t len) {
+    const unsigned char *b = p;
+    for (size_t i = 0; i < len; i++) { *h ^= b[i]; *h *= 1099511628211ull; }
+}
+
+/* The window's ancestors and the order's signature: their children (ids and zIndex, which decide the
+ * paint order with node_children_ordered). The copy is built again whole when it changed. Returns the
+ * root's order. */
+static int below_order(Node *root) {
+    ord_n = 0;
+    if (!layer.want || !root) return ORD_BEFORE;
+    uint64_t h = 1469598103934665603ull;
+    for (Node *a = node_get(layer.node); a && ord_n < ORD_MAX; a = a->parent) ord_anc[ord_n++] = a;
+    if (!ord_n || ord_anc[ord_n - 1] != root) ord_n = 0;
+    sig_u64(&h, &ord_n, sizeof ord_n);
+    for (int i = 0; i < ord_n; i++) {
+        sig_u64(&h, &ord_anc[i]->id, sizeof ord_anc[i]->id);
+        if (i) for (const Node *c = ord_anc[i]->first; c; c = c->next) {
+            sig_u64(&h, &c->id, sizeof c->id);
+            sig_u64(&h, &c->s.z_index, sizeof c->s.z_index);
+        }
+    }
+    layer.osig = h;
+    if (h != layer.bsig) layer.bdmg_full = 1;
+    return ord_n ? ORD_PATH : ORD_BEFORE;
+}
+
+/* ord: ORD_PATH for the window's ancestors, else whether the node is painted before or after it */
+static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip, int ord) {
     if (n->type == NODE_RAW) {
         if (walk_sig && visible) sig_mix(walk_sig, &n->gen, sizeof n->gen);   /* the text, for a cached raster */
         n->paint_dirty = 0;
@@ -892,7 +1239,10 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         Box moved = { n->prev_box.x0 + layer.gdx, n->prev_box.y0 + layer.gdy, n->prev_box.x1 + layer.gdx, n->prev_box.y1 + layer.gdy };
         /* the window itself (its style, its size): the whole layer; a node inside: its part */
         if (in_layer && (dirty || !box_eq(cur, moved)) && (n->id == layer.node || !layer_tree_part(cur, moved))) layer.valid = 0;
-        if (!in_layer) layer.below_valid = 0;
+        if (!in_layer) {
+            layer.lg_valid = 0;
+            if (layer.want && ord != ORD_AFTER) below_damage_node(n, cur);  /* in the copy of what is below */
+        }
     }
     n->prev_box = cur;
     n->paint_dirty = 0;
@@ -905,7 +1255,20 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         }
         inner = box_and(clip, own_box);
     }
-    for (Node *c = n->first; c; c = c->next) damage_walk(c, dirty, vis, in_layer, inner);
+    /* an ancestor's children: after the one on the way to the window in paint order (stable by zIndex) */
+    const Node *p = NULL;
+    if (ord == ORD_PATH && !in_layer)
+        for (int i = 1; i < ord_n; i++) if (ord_anc[i] == n) { p = ord_anc[i - 1]; break; }
+    int seen = 0;
+    for (Node *c = n->first; c; c = c->next) {
+        int co = ord;
+        if (ord == ORD_PATH) {
+            if (!p) co = ORD_BEFORE;
+            else if (c == p) seen = 1;
+            else co = c->s.z_index > p->s.z_index || (c->s.z_index == p->s.z_index && seen) ? ORD_AFTER : ORD_BEFORE;
+        }
+        damage_walk(c, dirty, vis, in_layer, inner, co);
+    }
     if (walk_sig == &sig) {
         tf_check(n, &sig);
         /* The raster's kind changed (a blur, a terminal or an app window came into the subtree or
@@ -1139,9 +1502,13 @@ int paint_damage(Node *root) {
             else { p->x0 = fminf(p->x0, q.x0); p->y0 = fminf(p->y0, q.y0); p->x1 = fmaxf(p->x1, q.x1); p->y1 = fmaxf(p->y1, q.y1); }
             layer.ext_part = 1;
         } else if (box_meets(ext, layer.at) || box_meets(ext, now)) layer.valid = 0;
-        if (!box_inside(ext, layer.at) && !box_inside(ext, now)) layer.below_valid = 0;
+        if (!box_inside(ext, layer.at) && !box_inside(ext, now)) layer.lg_valid = 0;
+        /* the copy: noted always, but rebuilt only when the old rule rebuilds it (below_ready), so
+         * damage inside the window's boxes keeps 001633b's copy until then, as it did */
+        below_damage(ext);
     }
-    if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f });
+    int ord = below_order(root);
+    if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, ord);
     ndrects = 0;
     if (multi_rects(root)) return 1;
     /* the damage is one box: growing it for a blurred node can reach another one (the bar and a menu) */
@@ -1192,6 +1559,38 @@ static int opaque_cover_node(Node *root) {
     return found == root->id ? 0 : found;
 }
 
+/* paint_below_verify: the canvas before a frame that switched to the copy (below_switch) */
+static uint32_t *below_snapshot(const Canvas *c) {
+    uint32_t *p = malloc((size_t)c->w * c->h * 4);
+    if (p) for (int y = 0; y < c->h; y++) memcpy(p + (size_t)y * c->w, c->px + (size_t)y * c->stride, (size_t)c->w * 4);
+    return p;
+}
+
+/* and the same frame painted as 001633b's rule did (clear the clip, paint everything in it) on that
+ * snapshot: the pixels that differ go to paint_below_bad. The frame's list of app windows and the
+ * counters stay as they were. */
+static void below_verify(const Canvas *c, Node *root, uint32_t *pre) {
+    Canvas sc;
+    canvas_init(&sc, pre, c->w, c->h, c->w);
+    canvas_set_clip(&sc, c->clip);
+    canvas_clear(&sc, 0x000000);
+    long lb = layer_blits, lr = layer_renders, tr = tf_renders, tc = tf_composites;
+    int su = skip_until;
+    skip_until = skip_reached = 0;
+    wl_paint_save();
+    paint_node(&sc, root, 1);
+    wl_paint_restore();
+    skip_until = su;
+    skip_reached = 1;
+    layer_blits = lb; layer_renders = lr; tf_renders = tr; tf_composites = tc;
+    for (int y = 0; y < c->h; y++) {
+        const uint32_t *a = c->px + (size_t)y * c->stride, *b = pre + (size_t)y * c->w;
+        for (int x = 0; x < c->w; x++) paint_below_bad += a[x] != b[x];
+    }
+    paint_below_checked++;
+    free(pre);
+}
+
 /* clear: fill the clip with rgb first, unless the copy of what is below the dragged window is
  * about to write every pixel of that same clip (below_copy), which makes the fill wasted work */
 static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
@@ -1204,14 +1603,19 @@ static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
     skip_reached = 0;
     paint_cull = !gpu_active() && paint_multi_damage;
     /* una ventana que se mueve: lo de abajo se copia y se pinta desde ella (capa del arrastre) */
-    int below = !skip_until && below_ready(c, root);      /* once per call: it counts layer.since */
+    layer.switched = 0;
+    /* once per call: it counts layer.since */
+    int below = !skip_until && below_ready(c, root, clear && rgb == 0x000000);
+    uint32_t *pre = below && layer.switched && paint_below_verify ? below_snapshot(c) : NULL;
     if (below) {
         below_copy(c);
         skip_until = layer.node;
     } else if (clear) {
         canvas_clear(c, rgb);
     }
+    skip_stamp();
     paint_node(c, root, 1);
+    if (pre) below_verify(c, root, pre);
     skip_until = 0;
     paint_cull = 0;
     tf_gc();

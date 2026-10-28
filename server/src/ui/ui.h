@@ -298,6 +298,18 @@ extern int paint_tf_nocache;        /* tests: a reference paint that neither rea
 void  paint_root(Canvas *c, Node *root);
 void  paint_root_clear(Canvas *c, Node *root, uint32_t rgb);   /* canvas_clear + paint_root */
 void  paint_root_full(Canvas *c, Node *root);  /* everything, no drag layer or skipped nodes (checks only) */
+/* The copy of what is below a dragged window (paint.c, docs/WINDOWS.md). paint_below_switch (1 by
+ * default): a frame may use it where 001633b's rule painted everything, when that gives the same
+ * pixels. paint_below_verify (tests): each such frame is painted again the old way and the pixels that
+ * differ are added to paint_below_bad (paint_below_checked counts the frames). */
+extern int  paint_below_switch, paint_below_verify;
+extern long paint_below_bad, paint_below_checked;
+/* why a frame did not switch: an ancestor of the window paints over it (border, rounded corners), a
+ * blurred or a transformed node before it meets the frame's box, the last build didn't reach the
+ * window, or more to build than to paint */
+enum { BR_OK, BR_ANCESTOR, BR_BLUR, BR_TRANSFORM, BR_UNREACHED, BR_COST, BR_N };
+typedef struct { long full, part, switched, refused[BR_N]; } BelowStats;
+void  paint_below_stats(BelowStats *s);    /* builds (whole, part) and switched frames since the last call */
 Node *hit_test(Node *root, float x, float y);
 /* Capture mode (media/capture.c): protected nodes are painted black and app windows
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */

@@ -97,6 +97,17 @@ typedef struct {
 } DragStats;
 static DragStats dstat;
 
+/* The copy of what is below the dragged window during the drag (paint.c, docs/WINDOWS.md): built
+ * whole, built in part, frames that used it where 001633b's rule painted everything, and why others
+ * didn't. Appended to the "drag: …" line, and written on its own when LordBench's scripted move ends. */
+static void below_stats_text(char *buf, size_t len) {
+    BelowStats b;
+    paint_below_stats(&b);
+    snprintf(buf, len, "below: %ld built whole, %ld in part, %ld frames switched to it (not: %ld ancestor, %ld blur, "
+                       "%ld transform, %ld unreached, %ld cost)", b.full, b.part, b.switched, b.refused[BR_ANCESTOR],
+             b.refused[BR_BLUR], b.refused[BR_TRANSFORM], b.refused[BR_UNREACHED], b.refused[BR_COST]);
+}
+
 /* One display (docs/DISPLAYS.md): its KMS head, where it sits in the global logical space, and the
  * frame the UI paints for it at its own resolution. out[0]'s head owns the card's fd; the main display
  * (menu bar, Dock) is s->main_out. Without a monitor (headless) out[0] is a frame in memory. */
@@ -384,12 +395,14 @@ static void dispatch_pointer(Server *s) {
             double span = dstat.last - dstat.t0;
             long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
+            char bs[192];
+            below_stats_text(bs, sizeof bs);
             fprintf(stderr, "drag: %ld frames in %.0f ms = %.1f FPS (%ld moves); per frame: work %.2f ms "
                             "(max %.2f; JS %.2f, layout %.2f, paint %.2f, present %.2f), max gap %.1f ms; "
-                            "layer: %ld painted (%ld of them a part), %ld copied (%s)\n",
+                            "layer: %ld painted (%ld of them a part), %ld copied (%s); %s\n",
                     dstat.frames, span, 1000.0 * dstat.frames / span, dstat.moves, dstat.work / dstat.frames, dstat.work_max,
                     dstat.js / dstat.frames, dstat.layout / dstat.frames, (dstat.paint - dstat.layout) / dstat.frames,
-                    dstat.present / dstat.frames, dstat.gap_max, lr, lp, lb, gpu_active() ? "GPU" : "CPU");
+                    dstat.present / dstat.frames, dstat.gap_max, lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs);
         }
         dstat = (DragStats){ 0 };
     }
@@ -1855,6 +1868,23 @@ int main(int argc, char **argv) {
         }
         /* LordBench's scene moves its window one step per frame, as a drag does (ui/grab.c) */
         if (grab_scripted() && !any_flip_pending(&s)) grab_script_tick(now_ms());
+        static int scripted;                    /* its end: the layer's counters, as a drag's line has them */
+        if (scripted && !grab_scripted()) {
+            long lr = 0, lb = 0, lp = paint_layer_parts();
+            paint_layer_stats(&lr, &lb);
+            char bs[192];
+            below_stats_text(bs, sizeof bs);
+            fprintf(stderr, "drag (scripted): layer: %ld painted (%ld of them a part), %ld copied (%s); %s\n",
+                    lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs);
+        }
+        if (!scripted && grab_scripted()) {     /* its start: what came before is not counted */
+            long lr, lb;
+            BelowStats b;
+            paint_layer_stats(&lr, &lb);
+            paint_layer_parts();
+            paint_below_stats(&b);
+        }
+        scripted = grab_scripted();
         /* Timers del tema (React agenda su trabajo con setTimeout/setImmediate). */
         double delay = -1, tick0 = now_ms();
         for (int i = 0; i < 64; i++) {
