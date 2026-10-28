@@ -599,6 +599,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   to 11 rectangles and this one gives one is not investigated.
   LordBench's desktop mode in the headless harness (three runs each): 58.9-60.0 fps, build p50 1.25-1.26 ms and p99
   5.9-7.6 ms before; 60.0 fps, p50 1.24-1.27 ms and p99 5.95-6.32 ms after.
+- **No black squares at the corners of a dragged window** (0.8.6, in development). While any window was dragged, the
+  area just outside its rounded corners showed opaque black squares, on the CPU and the GPU path (seen on VM 116 with
+  Calculator; still windows were fine). The drag layer paints the window on a transparent canvas, and a rounded
+  `overflow: hidden` window saves its corner squares before its children paint and restores them afterwards
+  (`canvas_corners_restore`/`canvas_corners_restore4` in `server/src/canvas.c`). The restore mixed the saved pixel in
+  with `blend()`, which takes its source as opaque: the alpha came out as `over(a, dst)`, so the window's shadow
+  saved over transparency (or the GPU path's sentinel) came back opaque, its premultiplied colour near black, and
+  the layer was blitted over the desktop with those squares. The restore now mixes both premultiplied pixels in
+  every channel, alpha included (`mix_px`); where both are opaque, as on the screen's canvas, it gives `blend()`'s
+  pixel exactly, so still windows and everything else on an opaque canvas are unchanged. On the GPU path this also
+  gives transparent corners where a rounded window sits over a Linux app's hole (alpha 0), which were black before.
+  New `engine-test` check `test_drag_corners`: a rounded window with a shadow, a title bar and a status bar over a
+  light box, dragged three frames (one renders the layer, two copy it), on both paths, with one radius and with
+  per-corner radii; each corner square must equal a full repaint within 2 levels (before: 217 to 221 levels, all 12
+  corner pixels dark). The golden hashes of `test_drag_exact` were written again after a pixel-by-pixel comparison
+  of every frame with the code before: on the CPU path 498,743 pixels in the dragged window's corner squares and
+  445,199 inside the Dock's or the menu bar's backdrop blur, with such a square within the blur's reach, differed in
+  2,386 of 2,417 frames (GPU path: 498,692 and 431,316 in 2,387), none anywhere else. The pixels that differ from a
+  full repaint in the long run go down from 2,217 to 248 (CPU path) and from 70,882 to 70,864 (GPU path).
+
 - **A rotated or scaled node now repaints when its own style changes** (approved by the maintainer on 2026-10-28).
   A node with its own `rotate`/`scaleX`/`scaleY` is painted into a cached raster (`tfl[]` in `server/src/ui/paint.c`).
   `damage_walk` cleared the node's `paint_dirty` before its children, and `tf_check`, which runs after them, tested

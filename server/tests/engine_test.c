@@ -1505,7 +1505,13 @@ static void test_overlay_scrollbar(void) {
  * windows below one level darker than a full repaint. Before the rewrite every frame was compared
  * pixel by pixel with 001633b's: 178,634 pixels in 1,686 of 1,816 frames differed, by 1 level at
  * most, all in those corner squares (n = ceil(r) + 1) or in the Dock's and the menu bar's backdrop
- * blur within its reach of one, none further from a full repaint. "gpu" is the same run with
+ * blur within its reach of one, none further from a full repaint. They were written a third time
+ * (0.8.6, in development) for the restore of rounded corners on the drag layer (canvas.c, mix_px): it
+ * made the pixels outside a dragged window's rounded corners opaque, black squares where a full repaint
+ * shows what is below. Every frame was compared pixel by pixel with the code before: on the CPU path
+ * 498,743 pixels in the dragged window's corner squares and 445,199 in the Dock's and the menu bar's
+ * backdrop blur with one of those squares within its reach differed, in 2,386 of 2,417 frames (GPU
+ * path: 498,692 and 431,316 in 2,387), none anywhere else. "gpu" is the same run with
  * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
  * same CPU canvas the GPU uploads. "g0" is the GPU path with G0 (paint_root_g0, docs/GPU.md): a stub GPU
  * keeps the UI texture (what was uploaded of the canvas) and the layer's and the copy's textures (only
@@ -1523,11 +1529,13 @@ static void test_overlay_scrollbar(void) {
  * (paint_below_verify), and not one pixel may differ; LORD_BELOW_SWITCH=0 runs the test without it.
  * The pixels that differ from a full repaint (paint_root_full, as LORD_PAINT_VERIFY) are printed as a
  * second number, which may only go down (step 9 took the long run from 2,265 to 2,217 on the CPU
- * path and from 70,940 to 70,882 on the GPU path; what is left: black pixels at the dragged window's
- * own rounded top corners on the CPU path, its shadow one level darker on the GPU path).
+ * path and from 70,940 to 70,882 on the GPU path; the corners' restore took them to 248 and 70,864;
+ * what is left: the largest at the Dock's rounded corners, under its backdrop blur, while the window
+ * is near it, and on the GPU path the dragged window's shadow one level darker).
  *   build/engine-test                 checks the hashes (skipped without hashes for this architecture)
  *   make drag-golden                  writes this architecture's hashes: only on the reference code
- *                                     (001633b plus step 9), never to make a changed frame pass */
+ *                                     (001633b plus step 9 and the corners' restore), never to make a
+ *                                     changed frame pass */
 #if defined(__x86_64__)
 #define GOLD_ARCH "x86_64"
 #elif defined(__aarch64__)
@@ -2093,9 +2101,10 @@ static int gold_write(const char *path, const char *variant, const uint64_t *has
     if (!f) { free(old); return -1; }
     if (!old || !*old)
         fprintf(f, "# engine-test test_drag_exact, %s path: FNV-1a hash of every frame of the dragged window.\n"
-                   "# Written by `make drag-golden` from 001633b plus step 9 (the one approved pixel change, 2026-10-28:\n"
-                   "# the corners of rounded windows below the dragged one, 1 level, towards a full repaint); later\n"
-                   "# code must give the same pixels. Lines: architecture, run, frame, hash.\n", variant);
+                   "# Written by `make drag-golden` from 001633b plus step 9 (2026-10-28: the corners of rounded windows\n"
+                   "# below the dragged one, 1 level, towards a full repaint) and the corners' restore on the drag layer\n"
+                   "# (no black squares outside the dragged window's rounded corners); later code must give the same\n"
+                   "# pixels. Lines: architecture, run, frame, hash.\n", variant);
     size_t al = strlen(GOLD_ARCH);
     for (const char *p = old; p && *p; ) {
         const char *e = strchr(p, '\n');
@@ -2262,6 +2271,87 @@ static void test_drag_exact(int write) {
     dout_free(&o2);
     free(hash);
     if (!write) test_g0_extra();
+}
+
+/* ---- The corners of a dragged window ----
+ * The drag layer is painted on a transparent canvas, and a rounded window that clips its children
+ * restores its corners (canvas_corners_restore) from what was there before its title bar filled them:
+ * its shadow over transparency. The restore used to make those pixels opaque (it blended as if the
+ * saved pixel were opaque), so a dragged window showed black squares outside its rounded corners. A
+ * drag frame must show there what a full repaint shows: the light box below and the shadow. Both the
+ * CPU and the GPU path, with one radius and with per-corner radii (canvas_corners_restore4). */
+static void test_drag_corners(void) {
+    DOut o;
+    if (!dout_init(&o, out_view(0, 0, DW, DH, 100))) { CHECK(0, "drag-corners: out of memory"); dout_free(&o); return; }
+    DOut *const os[1] = { &o };
+    for (int v = 0; v < 4; v++) {
+        test_gpu = v & 1;
+        int per = v >> 1;
+        const char *what = test_gpu ? (per ? "gpu per-corner" : "gpu") : (per ? "cpu per-corner" : "cpu");
+        const float r4[4] = { 12, per ? 16 : 12, per ? 10 : 12, per ? 14 : 12 };
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff2b3a4f);
+        box_in(root, 150, 100, 500, 360, 0xffd8e4f0);  /* light, so a dark corner shows */
+        Node *win = box_in(root, 260, 200, 300, 180, 0xff2c2c2e);
+        ss(win, "overflow", "hidden");
+        if (per) {
+            sn(win, "borderTopLeftRadius", r4[0]); sn(win, "borderTopRightRadius", r4[1]);
+            sn(win, "borderBottomRightRadius", r4[2]); sn(win, "borderBottomLeftRadius", r4[3]);
+        } else sn(win, "borderRadius", r4[0]);
+        sn(win, "borderWidth", 1);
+        sn(win, "borderColor", 0x30ffffff);
+        dshadow(win, 0x73000000, 8, 24);
+        dview(win, 0, 28, 0xff3a3a3c, 0);              /* the title bar fills the top corners' squares */
+        sn(view(win), "flexGrow", 1);
+        dview(win, 0, 24, 0xff252528, 0);              /* and a status bar the bottom ones */
+        canvas_set_clip(&o.c, (Rect){ 0, 0, o.c.w, o.c.h });
+        canvas_clear(&o.c, 0x000000);
+        damage_add((Box){ 0, 0, DW, DH });
+        ui.dirty = 1;
+        drag_paint_n(root, os, 1);
+        paint_layer_begin(win->id, 0);
+        long renders = 0, blits = 0;
+        paint_layer_stats(&renders, &blits);
+        int worst = 0, dark = 0;
+        for (int f = 1; f <= 3; f++) {                  /* the first frame renders the layer, the others copy it */
+            int x = 260 + 7 * f, y = 200 + 5 * f;
+            win->s.pos[EDGE_L] = (Dim){ (float)x, UNIT_PX };
+            win->s.pos[EDGE_T] = (Dim){ (float)y, UNIT_PX };
+            node_moved(win);
+            ui.dirty = 1;
+            drag_paint_n(root, os, 1);
+            canvas_clear(&o.ref, 0x000000);
+            paint_root_full(&o.ref, root);
+            /* each corner's square (canvas_corners_save's, n = ceil(r) + 1) and one pixel around it */
+            for (int q = 0; q < 4; q++) {
+                int n = (int)ceilf(r4[q]) + 1;
+                int qx = q == 0 || q == 3 ? x - 1 : x + 300 - n - 1;
+                int qy = q < 2 ? y - 1 : y + 180 - n - 1;
+                for (int j = qy; j < qy + n + 2; j++)
+                    for (int i = qx; i < qx + n + 2; i++) {
+                        uint32_t a = o.px[(size_t)j * o.c.w + i], b = o.rpx[(size_t)j * o.c.w + i];
+                        for (int sh = 0; sh < 32; sh += 8) {
+                            int d = abs((int)(a >> sh & 255) - (int)(b >> sh & 255));
+                            if (d > worst) worst = d;
+                        }
+                    }
+                /* the corner pixel itself, outside the curve: the light box under the shadow, not black */
+                int cx = q == 0 || q == 3 ? x : x + 299, cy = q < 2 ? y : y + 179;
+                if ((o.px[(size_t)cy * o.c.w + cx] & 0xff) < 0x60) dark++;
+            }
+        }
+        paint_layer_stats(&renders, &blits);
+        CHECK(renders % 1000 >= 1 && blits >= 3, "drag-corners %s: the frames did not use the layer (%ld renders, %ld copies)",
+              what, renders % 1000, blits);
+        /* rounding: the shadow is blended over the light box in another order (a level or two) */
+        CHECK(worst <= 2 && !dark, "drag-corners %s: the dragged window's corners differ from a full repaint by %d levels "
+              "(%d of 12 corner pixels dark)", what, worst, dark);
+        paint_layer_end();
+    }
+    test_gpu = 0;
+    dout_free(&o);
 }
 
 /* ---- A setStyle that only turns or scales a node (node_restyled's transform-only path) ----
@@ -2586,6 +2676,7 @@ int main(int argc, char **argv) {
 #else
     if (argc > 1 && !strcmp(argv[1], "drag-golden")) { test_drag_exact(1); return fails ? 1 : 0; }
     test_drag_exact(0);                     /* first: the transform cache is keyed by node id */
+    test_drag_corners();
     test_ellipsis();
     test_borders();
     test_logical();

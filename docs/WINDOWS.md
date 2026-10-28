@@ -182,9 +182,11 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   painted everything is painted that old way too, on a copy of the canvas (`paint_below_verify`), and
   the test fails if one pixel differs. `LORD_BELOW_SWITCH=0 build/engine-test` runs it without that.
 - **Against a full repaint** the test prints a second number, which may only go down: today a drag
-  frame differs from a full repaint in at most 2,217 pixels on the CPU path (black pixels at the dragged
-  window's rounded top corners) and 70,882 on the GPU path (one level darker in its shadow); before the
-  corner change, 2,265 and 70,940.
+  frame differs from a full repaint in at most 248 pixels on the CPU path (the largest at the Dock's
+  rounded corners, under its backdrop blur, while the window is near it) and 70,864 on the GPU path
+  (one level darker in its shadow); before the corners' restore on the drag layer was fixed (black
+  squares outside the dragged window's rounded corners), 2,217 and 70,882; before the corner change,
+  2,265 and 70,940.
 - **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
   display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
   the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where

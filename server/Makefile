@@ -407,7 +407,8 @@ build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbi
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # test_drag_exact's golden hashes for this architecture: only on the reference code (001633b plus
-# step 9), never to make a changed frame pass (tests/engine_test.c, "The dragged window, pixel for pixel")
+# step 9 and the corners' restore on the drag layer), never to make a changed frame pass
+# (tests/engine_test.c, "The dragged window, pixel for pixel")
 drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./build/engine-golden drag-golden

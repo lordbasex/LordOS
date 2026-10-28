@@ -19,6 +19,17 @@ static inline uint32_t blend(uint32_t dst, uint32_t src, uint32_t a) {
     return over_alpha(a, dst >> 24) << 24 | rb | g;
 }
 
+/* The corners' restore: a weight a of the saved pixel src and 255 - a of dst, both premultiplied, in
+ * every channel. blend() takes src as opaque (alpha a + dst's under it), which made what was saved
+ * over transparency opaque: on the drag layer, a window's shadow outside its rounded corners came back
+ * as black squares. Where both are opaque (the screen) this gives blend()'s pixel exactly. */
+static inline uint32_t mix_px(uint32_t dst, uint32_t src, uint32_t a) {
+    uint32_t ia = 255 - a;
+    uint32_t rb = (((src & 0xff00ff) * a + (dst & 0xff00ff) * ia) >> 8) & 0xff00ff;
+    uint32_t g  = (((src & 0x00ff00) * a + (dst & 0x00ff00) * ia) >> 8) & 0x00ff00;
+    return ((src >> 24) * a + (dst >> 24) * ia + 127) / 255 << 24 | rb | g;
+}
+
 static inline void put(uint32_t *p, uint32_t argb, uint32_t a) {
     if (a >= 255) *p = argb | 0xff000000u;
     else if (a) *p = blend(*p, argb, a);
@@ -734,7 +745,7 @@ void canvas_corners_restore(Canvas *c, Corners *k, float x, float y, float w, fl
                 float cov = cov_of(rr_sdf(px + 0.5f, py + 0.5f, cx, cy, hw, hh, r));
                 if (cov >= 1) continue;
                 uint32_t *d = &c->px[(size_t)py * c->stride + px];
-                *d = blend(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
+                *d = mix_px(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
             }
     free(k->buf);
     k->buf = NULL;
@@ -1037,7 +1048,7 @@ void canvas_corners_restore4(Canvas *c, Corners *k, float x, float y, float w, f
                 float cov = cov_of(rr4_sdf(px + 0.5f, py + 0.5f, cx, cy, hw, hh, r));
                 if (cov >= 1) continue;
                 uint32_t *d = &c->px[(size_t)py * c->stride + px];
-                *d = blend(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
+                *d = mix_px(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
             }
     free(k->buf);
     k->buf = NULL;
