@@ -129,7 +129,7 @@ build/imager-test: tests/imager_test.c src/imager/imgverify.c src/imager/imgveri
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR += $(wildcard src/tp/*.h)
 
-.PHONY: all clean test test-full
+.PHONY: all clean test test-full drag-golden
 # lord-sessiond: sessions, login screen and remote desktop (docs/SESSIONS.md). It's the
 # only one that links OpenSSL (TLS), and with it libsrtp2 and usrsctp (the remote desktop's WebRTC);
 # without libssl-dev, only lord-server is built.
@@ -390,15 +390,21 @@ build/nethist-test: tests/nethist_test.c src/monitor/nethist.c src/monitor/nethi
 	./$@ || { rm -f $@; exit 1; }
 # canvas.c rows: SIMD (NEON on aarch64) against C, bit for bit, and how long each one takes
 # UI engine (docs/DESIGN.md "Engine notes"): ellipsis in LTR/RTL/Arabic/Thai/emoji, per-side borders,
-# per-corner radii, logical edges, transforms and hit testing; `build/engine-test bench` times a 2000-row
+# per-corner radii, logical edges, transforms and hit testing, and the dragged window's frames against
+# the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench` times a 2000-row
 # list and a window drag on one and two displays
 ENGINE_SRC := src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/image.c \
               src/ui/paint.c src/ui/otf.c src/ui/fonts.c src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c \
               src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/canvas.c
 test: build/engine-test
-build/engine-test: tests/engine_test.c $(ENGINE_SRC) build/obj/ui/stb.o $(HDR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) build/obj/ui/stb.o -lm
+build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# test_drag_exact's golden hashes for this architecture: only on the reference code, never to make a
+# changed frame pass (tests/engine_test.c, "The dragged window, pixel for pixel")
+drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
+	./build/engine-golden drag-golden
 build/canvas-test: tests/canvas_test.c src/canvas.c src/canvas.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DLORD_CANVAS_TEST -o $@ tests/canvas_test.c src/canvas.c -lm

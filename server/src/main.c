@@ -382,14 +382,14 @@ static void dispatch_pointer(Server *s) {
     if (!dstat.held) {
         if (dstat.active && dstat.frames > 1 && dstat.last > dstat.t0) {
             double span = dstat.last - dstat.t0;
-            long lr = 0, lb = 0;
+            long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
             fprintf(stderr, "drag: %ld frames in %.0f ms = %.1f FPS (%ld moves); per frame: work %.2f ms "
                             "(max %.2f; JS %.2f, layout %.2f, paint %.2f, present %.2f), max gap %.1f ms; "
-                            "layer: %ld painted, %ld copied (%s)\n",
+                            "layer: %ld painted (%ld of them a part), %ld copied (%s)\n",
                     dstat.frames, span, 1000.0 * dstat.frames / span, dstat.moves, dstat.work / dstat.frames, dstat.work_max,
                     dstat.js / dstat.frames, dstat.layout / dstat.frames, (dstat.paint - dstat.layout) / dstat.frames,
-                    dstat.present / dstat.frames, dstat.gap_max, lr, lb, gpu_active() ? "GPU" : "CPU");
+                    dstat.present / dstat.frames, dstat.gap_max, lr, lp, lb, gpu_active() ? "GPU" : "CPU");
         }
         dstat = (DragStats){ 0 };
     }
@@ -1013,6 +1013,55 @@ static Box paint_ui(Server *s) {
     return d;
 }
 
+/* LORD_PAINT_VERIFY=N (checking the partial repaints, docs/LAYERS.md): every N-th frame painted on a
+ * display, the whole tree is painted again into a scratch canvas with nothing kept from earlier frames
+ * (paint_root_full: no drag layer, no copy of what is below it, no skipped node) and the pixels that
+ * differ from the display's frame are counted on stderr. Off by default; it only reads the frame. The
+ * terminals and Linux apps note where they were painted, so with N = 1 a terminal's change during a
+ * drag always repaints the whole layer: use N > 1 to check the layer's partial repaints. */
+static void paint_verify(Out *o, int index) {
+    static int every = -1;
+    static long frames[OUT_MAX];
+    static uint32_t *px;
+    static size_t cap;
+    if (every < 0) {
+        const char *e = getenv("LORD_PAINT_VERIFY");
+        every = e ? atoi(e) : 0;
+        if (every < 0) every = 0;
+    }
+    if (!every || index < 0 || index >= OUT_MAX || ++frames[index] % every) return;
+    size_t n = (size_t)o->scene.w * o->scene.h;
+    if (n > cap) {
+        free(px);
+        px = malloc(n * 4);
+        cap = px ? n : 0;
+        if (!px) return;
+    }
+    Canvas c;
+    canvas_init(&c, px, o->scene.w, o->scene.h, o->scene.w);
+    canvas_clear(&c, 0x000000);
+    view_of(o, index);
+    wl_paint_save();
+    paint_root_full(&c, ui.root);
+    wl_paint_restore();
+    view_reset();
+    long diff = 0;
+    int worst = 0;
+    for (int y = 0; y < o->scene.h; y++) {
+        const uint32_t *a = o->scene.px + (size_t)y * o->scene.stride, *b = px + (size_t)y * o->scene.w;
+        for (int x = 0; x < o->scene.w; x++) {
+            if (a[x] == b[x]) continue;
+            diff++;
+            for (int sh = 0; sh < 32; sh += 8) {
+                int d = abs((int)((a[x] >> sh) & 255) - (int)((b[x] >> sh) & 255));
+                if (d > worst) worst = d;
+            }
+        }
+    }
+    fprintf(stderr, "paint-verify: display %d frame %ld: %ld pixels differ from a full repaint (worst %d)%s\n",
+            index, frames[index], diff, worst, paint_layer_node() ? ", drag layer" : "");
+}
+
 /* Paints a display's pending damage into its frame at its scale. Returns the physical rect painted. */
 static Rect paint_out(Server *s, Out *o, int index, int feed) {
     Rect r = { 0, 0, 0, 0 };
@@ -1055,8 +1104,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
         ui.damage = (Box){ lx0, ly0, lx1, ly1 };      /* paint_root skips what this region does not need */
         canvas_set_clip(&o->scene, pr);
-        canvas_clear(&o->scene, 0x000000);
-        paint_root(&o->scene, ui.root);
+        paint_root_clear(&o->scene, ui.root, 0x000000);
         if (feed) media_scene_painted(&o->scene);     /* recording/remote desktop with protected windows */
         r = rect_join(r, pr);
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
@@ -1073,6 +1121,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     if (s->debug || paint_profile)
         fprintf(stderr, "render %ld: display %d, layout %.2f ms, paint %.2f ms, repainted %.1f%% in %d rect%s\n", s->renders, index, ui.layout_ms, ms,
                 100.0 * px / ((double)o->scene.w * o->scene.h), nparts, nparts == 1 ? "" : "s");
+    paint_verify(o, index);
     return r;
 }
 

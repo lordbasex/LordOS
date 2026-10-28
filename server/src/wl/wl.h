@@ -58,6 +58,8 @@ void wl_set_pointer_scale(int pct);         /* the display under the pointer: cu
 void wl_paint_begin(void);
 void wl_paint_keep(void);                /* saves the windows noted so far (paint.c, «what is below») */
 void wl_paint_kept(void);                /* and notes them again in another frame */
+void wl_paint_save(void);                /* keeps the frame's list of windows (LORD_PAINT_VERIFY) */
+void wl_paint_restore(void);             /* and puts it back */
 void wl_paint_holes(int on);             /* 0: wl_paint only notes the window, without opening the hole */
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op);
 void wl_paint_popups(Canvas *c);

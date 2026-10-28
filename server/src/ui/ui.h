@@ -161,6 +161,9 @@ void  node_detach(Node *c);
 void  node_set_text(Node *n, const char *s);
 void  node_invalidate(Node *n);
 void  node_moved(Node *n);          /* only left/top changed (window drag): no repaint of its content */
+/* after a style change (lord.setStyle): before = the style, ext_before = its StyleExt values (NULL
+ * if it had none) before the change; places, remeasures or repaints only what the change needs */
+void  node_restyled(Node *n, const Style *before, const StyleExt *ext_before);
 int   node_gather_text(const Node *n, char *buf, int size);
 int   node_children_ordered(Node *n, Node **out, int max);
 void  damage_add(Box b);
@@ -207,6 +210,7 @@ typedef struct {
 /* The pointer is valid until the next call (the cache may grow). */
 const Glyph *text_glyph(uint32_t cp, int font, float size);
 int   text_font_add(const char *path);
+int   text_drew_inexact(void);                    /* text drawn since the last call may not move exactly; resets */
 int   text_font_load(const char *path, int index);
 int   text_font_has(int font, uint32_t cp);
 uint32_t text_font_glyph(int font, uint32_t cp);          /* glyph index, 0 = doesn't have it */
@@ -292,6 +296,8 @@ extern int paint_multi_damage;      /* 1: several rectangles (LORD_DAMAGE=multi,
 extern int paint_tf_nocache;        /* tests: a reference paint that neither reads nor fills the
                                      * transformed subtrees' raster cache (engine-test) */
 void  paint_root(Canvas *c, Node *root);
+void  paint_root_clear(Canvas *c, Node *root, uint32_t rgb);   /* canvas_clear + paint_root */
+void  paint_root_full(Canvas *c, Node *root);  /* everything, no drag layer or skipped nodes (checks only) */
 Node *hit_test(Node *root, float x, float y);
 /* Capture mode (media/capture.c): protected nodes are painted black and app windows
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */

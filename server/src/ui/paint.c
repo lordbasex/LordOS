@@ -431,8 +431,9 @@ static void tf_gc(void) {
 /* ---- capa de la ventana que se mueve (grab.h) ----
  * Al empezar a mover una ventana su árbol se pinta una vez en un búfer aparte (con su sombra) y
  * en cada cuadro solo se copia en la posición nueva: no se vuelve a pintar texto, terminal ni
- * sombra. Si algo de adentro cambia (estilo, texto, la terminal, una app Linux) la capa se
- * vuelve a pintar. Sin capa (se pinta como siempre): con desenfoque de fondo adentro (necesita
+ * sombra. If something inside changes (a style, a text, the terminal, a Linux app), the layer is
+ * painted again: only the part that changed when that gives the same pixels (layer_tree_part,
+ * layer_part_exact), otherwise all of it. Sin capa (se pinta como siempre): con desenfoque de fondo adentro (necesita
  * lo de abajo) y, en el camino GPU, si adentro hay una ventana de app (va como textura aparte).
  *
  * Lo de abajo (todo lo que se pinta antes que la ventana: fondo, escritorio, las otras ventanas)
@@ -458,6 +459,14 @@ static struct {
     int resize;                 /* cambiando el tamaño: sin capa, solo lo de abajo */
     uint8_t *hole;              /* camino GPU: dónde la capa tiene el hueco de una app (alfa 0 de verdad) */
     int painted;                /* la capa se pintó en este cuadro (las apps ya quedaron anotadas) */
+    /* a node inside the window changed: layer.part also holds its boxes (layer_tree_part) */
+    int tree_part;
+    int inexact;                /* something in the window may not paint the same when moved (layer_note_exact) */
+    float rx, ry;               /* where the window was (physical px) when the layer was last painted whole */
+    int in_range;               /* and the layer lay within [0, LAYER_EXACT_MAX) px (rounding is not
+                                 * shift-exact across 0: roundf, (int) truncation, canvas_corners_save) */
+    int ext_part;               /* outside damage went into layer.part through layer.at since then */
+    int odd_text;               /* text in it took a path that may not move exactly (text_drew_inexact) */
 } layer;
 
 void paint_layer_begin(int node, int resize) {
@@ -491,11 +500,18 @@ void paint_layer_view(int index) {
     layer.below_valid = 0;
 }
 
-static long layer_renders, layer_blits, below_renders;
+static long layer_renders, layer_blits, below_renders, layer_parts;
 void paint_layer_stats(long *renders, long *blits) {
     *renders = layer_renders + 1000 * below_renders;
     *blits = layer_blits;
     layer_renders = layer_blits = below_renders = 0;
+}
+
+/* How many of those renders were only layer.part (layer_render_part), since the last call. */
+long paint_layer_parts(void) {
+    long n = layer_parts;
+    layer_parts = 0;
+    return n;
 }
 
 static void subtree_box(Node *n, Box *b, int *ok) {
@@ -567,14 +583,63 @@ static void layer_register(Canvas *c, Node *n, float op) {
     if (n->type != NODE_TEXT) for (Node *k = n->first; k; k = k->next) layer_register(c, k, op);
 }
 
-static int layer_render(Node *n, float opacity) {
-    Box b = visual_box(n);
+/* The layer's box: the window's and its subtree's (logical px) in *b, its pixels on the view's
+ * physical ones. 0: no layer (a blur, a transformed window, too big). */
+static int layer_box(Node *n, Box *b, int *x0, int *y0, int *w, int *h) {
+    *b = visual_box(n);
     int ok = !n->has_tf;                /* a transformed window is painted as usual */
-    subtree_box(n, &b, &ok);
-    /* the layer's pixels are the view's physical ones */
-    int x0 = (int)floorf(VX(b.x0)), y0 = (int)floorf(VY(b.y0));
-    int w = (int)ceilf(VX(b.x1)) - x0, h = (int)ceilf(VY(b.y1)) - y0;
-    if (!ok || w <= 0 || h <= 0 || (size_t)w * h > 4096u * 4096u) { layer.want = 0; return 0; }
+    subtree_box(n, b, &ok);
+    *x0 = (int)floorf(VX(b->x0));
+    *y0 = (int)floorf(VY(b->y0));
+    *w = (int)ceilf(VX(b->x1)) - *x0;
+    *h = (int)ceilf(VY(b->y1)) - *y0;
+    return ok && *w > 0 && *h > 0 && (size_t)*w * *h <= 4096u * 4096u;
+}
+
+/* Painting part of the layer again gives what painting it all at the window's new place would only
+ * if every pixel outside that part comes out the same when moved there. That holds when the window
+ * moved by whole physical pixels and every coordinate the paint computes from a position is a
+ * binary fraction small enough for a float to hold exactly at both places: positions and sizes in
+ * sixteenths of a logical pixel within ±LAYER_EXACT_MAX, a whole display scale, whole font sizes
+ * and text drawn by text.c's own path in a font with a power-of-two em (text_drew_inexact). A transformed node composites through its
+ * matrix, which is not exact when moved, so it must be inside the part (changed this frame). App
+ * windows and videos are left out (painting them registers them). */
+#define LAYER_EXACT_MAX 4096
+static int fine(float v) { float s = v * 16; return s == floorf(s) && fabsf(v) < LAYER_EXACT_MAX; }
+
+static void layer_note_exact(const Node *n, int dirty) {
+    const Style *s = &n->s;
+    const float *pd = node_padding(n);
+    int ok = fine(n->ax) && fine(n->ay) && fine(n->w) && fine(n->h);
+    for (int e = EDGE_L; e <= EDGE_B && ok; e++) ok = fine(pd[e]) && fine(node_border(n, e));
+    if (n->own_tf && !dirty) ok = 0;
+    if (n->type == NODE_SURFACE || n->type == NODE_MEDIA) ok = 0;
+    if (n->type == NODE_TEXT && (s->font_size != floorf(s->font_size) || !fine(s->line_height))) ok = 0;
+    if (!ok) layer.inexact = 1;
+}
+
+/* Whether the layer, kept and painted again only in layer.part, gives the pixels and the layer
+ * state of layer_render at the window's place now: the same box, offsets and scale. *bp: that box. */
+static int layer_part_exact(Node *n, Box *bp) {
+    const float k = paint_view.k;
+    if (layer.inexact || layer.odd_text || !layer.in_range || k != layer.k || k < 1 || k != floorf(k)) return 0;
+    if (!fine(paint_view.x) || !fine(paint_view.y) || !fine(paint_view.dx) || !fine(paint_view.dy)) return 0;
+    float sx = VX(n->ax) - layer.rx, sy = VY(n->ay) - layer.ry;
+    if (sx != floorf(sx) || sy != floorf(sy)) return 0;
+    Box b;
+    int x0, y0, w, h;
+    if (!layer_box(n, &b, &x0, &y0, &w, &h) || w != layer.w || h != layer.h) return 0;
+    if (x0 != (int)lroundf(VX(n->ax) + layer.pox) || y0 != (int)lroundf(VY(n->ay) + layer.poy)) return 0;
+    if (b.x0 - n->ax != layer.ox || b.y0 - n->ay != layer.oy || x0 - VX(n->ax) != layer.pox || y0 - VY(n->ay) != layer.poy) return 0;
+    if (x0 < 0 || y0 < 0 || x0 + w >= LAYER_EXACT_MAX || y0 + h >= LAYER_EXACT_MAX) return 0;
+    *bp = b;
+    return 1;
+}
+
+static int layer_render(Node *n, float opacity) {
+    Box b;
+    int x0, y0, w, h;
+    if (!layer_box(n, &b, &x0, &y0, &w, &h)) { layer.want = 0; return 0; }
     if ((size_t)w * h > (size_t)layer.cap) {
         uint32_t *px = realloc(layer.px, (size_t)w * h * 4);
         uint8_t *hole = realloc(layer.hole, (size_t)w * h);
@@ -594,6 +659,10 @@ static int layer_render(Node *n, float opacity) {
     layer.op = opacity;
     layer.at = b;
     layer.part = (Box){ 0, 0, 0, 0 };
+    layer.tree_part = layer.inexact = layer.ext_part = 0;
+    layer.rx = VX(n->ax);
+    layer.ry = VY(n->ay);
+    layer.in_range = x0 >= 0 && y0 >= 0 && x0 + w < LAYER_EXACT_MAX && y0 + h < LAYER_EXACT_MAX;
     /* canvas con el origen corrido: el árbol se pinta en sus coordenadas de pantalla (así la terminal
      * y las apps Linux siguen anotando dónde están), pero cae en el búfer de la capa */
     Canvas lc;
@@ -602,7 +671,9 @@ static int layer_render(Node *n, float opacity) {
     int skip = skip_until;
     skip_until = 0;
     layer.rendering = 1;
+    text_drew_inexact();
     paint_node(&lc, n, opacity);
+    layer.odd_text = text_drew_inexact();
     layer.rendering = 0;
     skip_until = skip;
     nlsurf = lsurf_all = 0;
@@ -614,14 +685,18 @@ static int layer_render(Node *n, float opacity) {
     return 1;
 }
 
-/* Repinta solo layer.part (lo que cambió adentro: una línea de la terminal, el cursor que parpadea). */
-static void layer_render_part(Node *n, float opacity) {
+/* Repinta solo layer.part (lo que cambió adentro: una línea de la terminal, el cursor que parpadea).
+ * 0: a part with a node's change (layer.tree_part) cut a transformed node's image on its left edge,
+ * which a full paint would not have cut (canvas_affine_watch): the caller paints the layer whole. */
+static int layer_render_part(Node *n, float opacity) {
     int x0 = (int)lroundf(VX(n->ax) + layer.pox), y0 = (int)lroundf(VY(n->ay) + layer.poy);
     Box p = layer.part;
+    int tree = layer.tree_part;
     layer.part = (Box){ 0, 0, 0, 0 };
+    layer.tree_part = 0;
     int px0 = (int)fmaxf(0, floorf(p.x0)), py0 = (int)fmaxf(0, floorf(p.y0));
     int px1 = (int)fminf((float)layer.w, ceilf(p.x1)), py1 = (int)fminf((float)layer.h, ceilf(p.y1));
-    if (px0 >= px1 || py0 >= py1) return;
+    if (px0 >= px1 || py0 >= py1) return 1;
     layer_fill(px0, py0, px1, py1);
     Canvas lc;
     canvas_init(&lc, layer.px - ((ptrdiff_t)y0 * layer.w + x0), x0 + layer.w, y0 + layer.h, layer.w);
@@ -629,9 +704,14 @@ static void layer_render_part(Node *n, float opacity) {
     int skip = skip_until;
     skip_until = 0;
     layer.rendering = 1;
+    if (tree) canvas_affine_watch(&lc, x0 + px0);
+    text_drew_inexact();
     paint_node(&lc, n, opacity);
+    layer.odd_text |= text_drew_inexact();
+    int cut = tree && canvas_affine_cut();
     layer.rendering = 0;
     skip_until = skip;
+    if (cut) return 0;
     nlsurf = lsurf_all = 0;
     layer_surfaces(n, x0, y0);
     layer_holes(px0, py0, px1, py1);
@@ -639,6 +719,8 @@ static void layer_render_part(Node *n, float opacity) {
     float k = paint_view.k, lx = (x0 - paint_view.dx) / k + paint_view.x, ly = (y0 - paint_view.dy) / k + paint_view.y;
     layer.at = (Box){ lx, ly, lx + layer.w / k, ly + layer.h / k };
     layer_renders++;
+    layer_parts++;
+    return 1;
 }
 
 static int layer_paint(Canvas *c, Node *n, float opacity) {
@@ -646,8 +728,15 @@ static int layer_paint(Canvas *c, Node *n, float opacity) {
     if (layer.stopped) return 1;
     if (!layer.want || layer.rendering || n->id != layer.node || paint_capture_mode || layer.resize || paint_view.index != layer.view) return 0;
     if (skip_until && !skip_reached && skip_until != layer.node) return 0;   /* lo tapa un video */
+    /* a node inside changed: only its part, when that paints what a full render would */
+    Box b = layer.at;
+    if (layer.valid && layer.tree_part && layer.op == opacity && !layer_part_exact(n, &b)) layer.valid = 0;
     if ((!layer.valid || layer.op != opacity) && !layer_render(n, opacity)) return 0;
-    if (layer.part.x1 > layer.part.x0) layer_render_part(n, opacity);
+    if (layer.part.x1 > layer.part.x0) {
+        int tree = layer.tree_part;
+        if (layer_render_part(n, opacity)) { if (tree) layer.at = b; }     /* layer_render's box */
+        else if (!layer_render(n, opacity)) return 0;
+    }
     if (skip_until == layer.node) skip_reached = 1;
     int bx = (int)lroundf(VX(n->ax) + layer.pox), by = (int)lroundf(VY(n->ay) + layer.poy);
     canvas_blit(c, layer.px, layer.w, layer.h, bx, by, 0, 1, 0);
@@ -722,6 +811,30 @@ static Box box_or(Box a, Box b) {
     return (Box){ fminf(a.x0, b.x0), fminf(a.y0, b.y0), fmaxf(a.x1, b.x1), fmaxf(a.y1, b.y1) };
 }
 
+/* A node inside the dragged window changed or moved inside it: its old box (moved with the window)
+ * and its new one go into layer.part, in layer pixels from the window's place now, with a margin
+ * for the rounding of both (4 px: a transformed node's image reaches up to 3 px past its box).
+ * 0: the layer is painted whole (outside the layer, more than half of it, already invalid). */
+static int layer_tree_part(Box cur, Box moved) {
+    Node *w = node_get(layer.node);
+    int hc = cur.x1 > cur.x0 && cur.y1 > cur.y0, hm = moved.x1 > moved.x0 && moved.y1 > moved.y0;
+    /* outside damage mapped through layer.at, which may be stale (a node removed after copies only):
+     * until a full render, a node's change repaints the layer whole, as it always did */
+    if (!layer.valid || layer.ext_part || !w || (!hc && !hm)) return 0;
+    Box u = !hm ? cur : !hc ? moved : (Box){ fminf(cur.x0, moved.x0), fminf(cur.y0, moved.y0), fmaxf(cur.x1, moved.x1), fmaxf(cur.y1, moved.y1) };
+    float k = layer.k > 0 ? layer.k : 1, ox = roundf(w->ax + layer.ox), oy = roundf(w->ay + layer.oy);
+    Box q = { floorf((u.x0 - ox) * k), floorf((u.y0 - oy) * k), ceilf((u.x1 - ox) * k), ceilf((u.y1 - oy) * k) };
+    if (q.x0 < 0 || q.y0 < 0 || q.x1 > layer.w || q.y1 > layer.h) return 0;
+    q = (Box){ q.x0 - 4, q.y0 - 4, q.x1 + 4, q.y1 + 4 };
+    Box *p = &layer.part;
+    if (p->x1 <= p->x0) *p = q;
+    else { p->x0 = fminf(p->x0, q.x0); p->y0 = fminf(p->y0, q.y0); p->x1 = fmaxf(p->x1, q.x1); p->y1 = fmaxf(p->y1, q.y1); }
+    float aw = fminf(p->x1, (float)layer.w) - fmaxf(p->x0, 0), ah = fminf(p->y1, (float)layer.h) - fmaxf(p->y0, 0);
+    if (aw * ah * 2 > (float)layer.w * layer.h) return 0;
+    layer.tree_part = 1;
+    return 1;
+}
+
 static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip) {
     if (n->type == NODE_RAW) {
         if (walk_sig && visible) sig_mix(walk_sig, &n->gen, sizeof n->gen);   /* the text, for a cached raster */
@@ -750,11 +863,13 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         layer.gdx = cur.x0 - n->prev_box.x0;
         layer.gdy = cur.y0 - n->prev_box.y0;
     }
+    if (in_layer && vis) layer_note_exact(n, dirty);
     if (dirty || !box_eq(cur, n->prev_box)) {
         damage_add(n->prev_box);
         damage_add(cur);
         Box moved = { n->prev_box.x0 + layer.gdx, n->prev_box.y0 + layer.gdy, n->prev_box.x1 + layer.gdx, n->prev_box.y1 + layer.gdy };
-        if (in_layer && (dirty || !box_eq(cur, moved))) layer.valid = 0;
+        /* the window itself (its style, its size): the whole layer; a node inside: its part */
+        if (in_layer && (dirty || !box_eq(cur, moved)) && (n->id == layer.node || !layer_tree_part(cur, moved))) layer.valid = 0;
         if (!in_layer) layer.below_valid = 0;
     }
     n->prev_box = cur;
@@ -989,6 +1104,7 @@ int paint_damage(Node *root) {
     /* lo que llegó de afuera desde el cuadro anterior (terminal, apps Linux, video): si toca la
      * ventana, se vuelve a pintar su capa; si cae afuera, lo de abajo */
     Box ext = ui.damage;
+    if (!layer.tree_part) layer.inexact = 0;        /* layer_note_exact, for the part still to paint */
     if (layer.want && ext.x1 > ext.x0 && ext.y1 > ext.y0) {
         Node *n = node_get(layer.node);
         Box now = n ? n->prev_box : layer.at;
@@ -999,6 +1115,7 @@ int paint_damage(Node *root) {
             Box *p = &layer.part;
             if (p->x1 <= p->x0) *p = q;
             else { p->x0 = fminf(p->x0, q.x0); p->y0 = fminf(p->y0, q.y0); p->x1 = fmaxf(p->x1, q.x1); p->y1 = fmaxf(p->y1, q.y1); }
+            layer.ext_part = 1;
         } else if (box_meets(ext, layer.at) || box_meets(ext, now)) layer.valid = 0;
         if (!box_inside(ext, layer.at) && !box_inside(ext, now)) layer.below_valid = 0;
     }
@@ -1007,7 +1124,9 @@ int paint_damage(Node *root) {
     if (multi_rects(root)) return 1;
     /* the damage is one box: growing it for a blurred node can reach another one (the bar and a menu) */
     for (int pass = 0, grew = 1; root && grew && pass < 4 && ui.damage.x1 > ui.damage.x0; pass++) { grew = 0; blur_walk(root, &grew); }
-    if (layer.want && layer.valid && layer.part.x1 > layer.part.x0) {     /* esa parte, donde está ahora la ventana */
+    /* esa parte, donde está ahora la ventana; not with a node's change, where the whole layer used to be
+     * painted again and nodes' own boxes are the damage */
+    if (layer.want && layer.valid && !layer.tree_part && layer.part.x1 > layer.part.x0) {
         Node *n = node_get(layer.node);
         if (n) {
             float x0 = roundf(n->ax + layer.ox), y0 = roundf(n->ay + layer.oy), k = layer.k > 0 ? layer.k : 1;
@@ -1051,8 +1170,10 @@ static int opaque_cover_node(Node *root) {
     return found == root->id ? 0 : found;
 }
 
-void paint_root(Canvas *c, Node *root) {
-    if (!root) return;
+/* clear: fill the clip with rgb first, unless the copy of what is below the dragged window is
+ * about to write every pixel of that same clip (below_copy), which makes the fill wasted work */
+static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
+    if (!root) { if (clear) canvas_clear(c, rgb); return; }
     wl_paint_begin();
     /* solo cambió un cuadro de video que tapa esa región: se pinta desde ese nodo (no en el camino
      * GPU, que arma acá la lista de ventanas de las apps) */
@@ -1061,9 +1182,12 @@ void paint_root(Canvas *c, Node *root) {
     skip_reached = 0;
     paint_cull = !gpu_active() && paint_multi_damage;
     /* una ventana que se mueve: lo de abajo se copia y se pinta desde ella (capa del arrastre) */
-    if (!skip_until && below_ready(c, root)) {
+    int below = !skip_until && below_ready(c, root);      /* once per call: it counts layer.since */
+    if (below) {
         below_copy(c);
         skip_until = layer.node;
+    } else if (clear) {
+        canvas_clear(c, rgb);
     }
     paint_node(c, root, 1);
     skip_until = 0;
@@ -1075,6 +1199,31 @@ void paint_root(Canvas *c, Node *root) {
         for (int i = 0; i < 6; i++) { fprintf(stderr, " %s %.2f", prof_name[i], prof[i]); prof[i] = 0; }
         fprintf(stderr, " ms\n");
     }
+}
+
+void paint_root(Canvas *c, Node *root) {
+    paint_root_body(c, root, 0, 0);
+}
+
+/* canvas_clear(c, rgb) followed by paint_root(c, root), with the same pixels */
+void paint_root_clear(Canvas *c, Node *root, uint32_t rgb) {
+    paint_root_body(c, root, 1, rgb);
+}
+
+/* The whole tree painted again with nothing kept from earlier frames: no drag layer, no copy of what
+ * is below it, no node skipped (LORD_PAINT_VERIFY in main.c and engine-test compare it with the
+ * frame). Like paint_root it starts a new list of app windows on the GPU path: the caller keeps the
+ * frame's (wl_paint_save/wl_paint_restore). The canvas must be cleared first. */
+void paint_root_full(Canvas *c, Node *root) {
+    if (!root) return;
+    wl_paint_begin();
+    int want = layer.want;
+    layer.want = 0;
+    skip_until = skip_reached = 0;
+    paint_cull = 0;
+    paint_node(c, root, 1);
+    layer.want = want;
+    wl_paint_popups(c);
 }
 
 int paint_capture_mode;

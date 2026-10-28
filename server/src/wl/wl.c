@@ -2132,6 +2132,18 @@ void wl_paint_kept(void) {
     for (int i = 0; i < nkept && ndraws[0] < 128; i++) draws[0][ndraws[0]++] = kept[i];
 }
 
+/* LORD_PAINT_VERIFY (main.c): its check repaint notes the app windows again; the frame keeps its list. */
+static Draw verify_draws[2][128];
+static int verify_n[2];
+void wl_paint_save(void) {
+    memcpy(verify_draws, draws, sizeof verify_draws);
+    memcpy(verify_n, ndraws, sizeof verify_n);
+}
+void wl_paint_restore(void) {
+    memcpy(draws, verify_draws, sizeof draws);
+    memcpy(ndraws, verify_n, sizeof ndraws);
+}
+
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) {
     Surf *s = find(id);
     if (!s || s->role != R_TOPLEVEL) return;

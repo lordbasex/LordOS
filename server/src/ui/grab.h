@@ -49,5 +49,6 @@ void paint_layer_end(void);
 void paint_layer_external_damage(void);     /* something changed inside (terminal, Linux app, video) */
 /* For drag measurements: times the layer was painted and times it was only copied (and resets to 0). */
 void paint_layer_stats(long *renders, long *blits);
+long paint_layer_parts(void);               /* of those renders, the ones of only a part (layer.part) */
 
 #endif

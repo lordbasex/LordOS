@@ -188,6 +188,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   firewall and restrictions see it as itself, `flatpak run` arguments built in C, per-user installs through a closed
   set of commands in their own network scope with Flathub's key pinned, and the exceptions to `AGENTS.md` the
   maintainer has to approve before any code.
+- **A pixel-exact check for the dragged window's frames** (in development for 0.8.6, the groundwork for making a drag
+  frame cheaper on the Raspberry Pi; `docs/WINDOWS.md`, "Checking it"). Tests and debugging only: no frame changes.
+  - **`test_drag_exact`** in `build/engine-test` (`make -C server test`): LordBench's desktop scene (a 760×480 rounded
+    window with a shadow, a turning 72 px square and six cards with shadows and text, a rounded window below, a menu
+    bar and a Dock with backdrop blur, on a 1024×640 display) dragged along LordBench's figure of eight
+    (`lbi_path`) for 480 frames, painted as `main.c` paints a frame, plus four 60-frame runs for what makes the layer
+    paint again (a text that changes a child's size, a child moving inside the window, a terminal's blinking cursor,
+    a square turning across the window's edge). Each of the 725 frames is hashed (FNV-1a over the pixels) on the
+    CPU path and on the GPU path's canvas (`gpu_active()` on), and compared with `tests/drag_golden_cpu.txt` and
+    `tests/drag_golden_gpu.txt`, written from the current code (x86_64; `make drag-golden` writes another
+    architecture's): any change to a frame fails. The test also prints how many pixels differ from a full repaint:
+    today at most 2,265 per frame on the CPU path, with black pixels at the dragged window's rounded top corners, and
+    70,940 on the GPU path, one level darker in the window's shadow. About 11 s on VM 116.
+  - **`LORD_PAINT_VERIFY=N`** (lord-server's environment): every N-th frame of each display is compared with a full
+    repaint of the tree into a scratch canvas (`paint_root_full`: no drag layer, no copy of what is below it, no
+    skipped node; the GPU path's list of app windows is kept), and the count of differing pixels goes to stderr.
+    Off by default.
+  - The drag line in `session.log` now says how many of the layer's renders were only a part of it
+    (`paint_layer_parts`). `lord.setStyle`'s decision of what to place or repaint moved to `node_restyled`
+    (`ui/node.c`), unchanged, so the test drives the same C path.
+
+### Changed
+
+- **Less work in a dragged window's frame, same pixels** (in development for 0.8.6; the first two steps of making a
+  drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
+  paths (VM 116, x86_64); the time saved has not been measured yet.
+  - **No clear under the copy of what is below the window:** `paint_root_clear` (`ui/paint.c`) replaces
+    `canvas_clear` + `paint_root` in `main.c`, `app/appclient.c` and `engine-test`, and skips the clear when the drag
+    layer's copy of what is below (`below_copy`) is about to write every pixel of the same rectangle. That copy was
+    itself cleared to the same black before it was painted, so the GPU path's app-window holes stay the same.
+  - **`lord.stats()` no longer walks every JavaScript object:** `jsKB` comes from `JS_GetMallocSize`, a local
+    QuickJS addition (`THIRD_PARTY.md`) that returns the same `malloc_size` `JS_ComputeMemoryUsage` reported (checked
+    equal on a runtime with 100,000 objects, a 50,000-entry Map and after GC). About, Settings → General and System
+    Information poll it while they are open.
+  - **Only the changed part of the dragged window's layer is painted again:** a node inside the window that changes
+    (a style, a text, a transform such as LordBench's turning square, a child moving inside) now repaints only its old
+    and new boxes in the layer, with a 4 px margin (`layer_tree_part` in `ui/paint.c`), instead of the whole window
+    and its shadow. The layer is still painted whole for the window's own style or size, a part outside the layer or
+    bigger than half of it, and whenever the result can't be shown to be the same: the window moved by a fraction of
+    a physical pixel, the layer's box would change, a fractional display scale, positions or sizes that aren't
+    sixteenths of a pixel within ±4096 px, fractional font sizes, text drawn through `textlayout.c` or in a font
+    whose em isn't a power of two of at most 2048 units, as Inter's is (`text_drew_inexact`), an unchanged transformed node, an app window or a video inside
+    (`layer_part_exact`, `layer_note_exact`). A transformed node's image steps its bilinear weights from the first
+    pixel of each row, so a part cutting it on the left would change them; `canvas_affine_watch`/`canvas_affine_cut`
+    (`canvas.c`) report that and the layer is painted whole. In `test_drag_exact` 606 of the 611 layer renders are now
+    parts (before: 6, the terminal's); the other 5 are each run's first. Every golden hash is unchanged on both paths.
+    With neither the margin nor the watch, 160 frames per path fail; with the watch but no margin, they all pass.
 
 ### Fixed
 

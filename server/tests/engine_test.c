@@ -5,6 +5,7 @@
  * media and GPU hooks of paint.c are stubbed out.
  *   build/engine-test            runs the tests
  *   build/engine-test bench      times layout and paint of a 2000-row list and a window drag
+ *   make drag-golden             writes test_drag_exact's golden hashes (only on the reference code)
  * Fallback fonts are looked up as in LordOS (DejaVu Sans covers Arabic and Hebrew in the build
  * container); the checks don't depend on which font draws a script. */
 #include <math.h>
@@ -13,12 +14,26 @@
 #include <string.h>
 #include <time.h>
 
+#include "bench/lbinput.h"
+#include "outputs.h"
 #include "ui/fonts.h"
 #include "ui/ui.h"
 #include "ui/unicode.h"
 
 /* ---- stubs for what paint.c reaches outside the UI engine ---- */
-void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)x; (void)y; (void)w; (void)h; (void)op; }
+/* the terminal (test_drag_exact): a dark box with a cursor block; where it was painted is noted in
+ * logical px, as term_paint.c notes s->gx… for term_damage */
+static int term_cursor;
+static Box term_at;
+void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op) {
+    (void)id;
+    const float k = paint_view.k;
+    uint32_t a = (uint32_t)(op * 255 + 0.5f) << 24;
+    canvas_rrect(c, x, y, w, h, 0, a | 0x101014);
+    if (term_cursor) canvas_rrect(c, x + 8 * k, y + 8 * k, 9 * k, 16 * k, 0, a | 0xd0d0d0);
+    float lx = (x - paint_view.dx) / k + paint_view.x, ly = (y - paint_view.dy) / k + paint_view.y;
+    term_at = (Box){ lx, ly, lx + w / k, ly + h / k };
+}
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
 void wl_paint_holes(int on) { (void)on; }
 void wl_paint_kept(void) {}
@@ -27,11 +42,14 @@ void wl_paint_begin(void) {}
 void wl_paint_popups(Canvas *c) { (void)c; }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
-int gpu_active(void) { return 0; }
+static int test_gpu;                    /* test_drag_exact: paint.c's GPU path on the same canvas */
+int gpu_active(void) { return test_gpu; }
+void lbf_input(uint64_t ev_ns) { (void)ev_ns; }   /* bench/lbinput.c: only lbi_path is used */
 
 void paint_layer_begin(int node, int resize);
 void paint_layer_end(void);
 void paint_layer_stats(long *renders, long *blits);
+long paint_layer_parts(void);
 void paint_tf_stats(long *renders, long *composites);
 int text_layout_visual(const char *s, int font, float size, int *cps, int max);
 
@@ -220,8 +238,7 @@ static void render(Node *root, int w, int h) {
     layout_root(root, (float)w, (float)h);
     paint_damage(root);
     ui.damage = (Box){ 0, 0, (float)w, (float)h };
-    canvas_clear(&frame, 0);
-    paint_root(&frame, root);
+    paint_root_clear(&frame, root, 0);
     ui.damage = (Box){ 0, 0, 0, 0 };
 }
 static uint32_t pix(int x, int y) { return fb[y * FW + x] & 0xffffff; }
@@ -425,8 +442,7 @@ static void test_backdrop_band(void) {
     ui.damage = d;
     Rect r = { (int)fmaxf(0, floorf(d.x0)), (int)fmaxf(0, floorf(d.y0)), (int)fminf(160, ceilf(d.x1)), (int)fminf(100, ceilf(d.y1)) };
     canvas_set_clip(&frame, r);
-    canvas_clear(&frame, 0);
-    paint_root(&frame, root);
+    paint_root_clear(&frame, root, 0);
     canvas_set_clip(&frame, (Rect){ 0, 0, 160, 100 });
     ui.damage = (Box){ 0, 0, 0, 0 };
     uint32_t *partial = malloc(160 * 28 * 4);
@@ -467,8 +483,7 @@ static int paint_partial(Node *root, int w, int h, int *nrects, float *area) {
         *area += (float)(r.x1 - r.x0) * (r.y1 - r.y0);
         ui.damage = (Box){ (float)r.x0, (float)r.y0, (float)r.x1, (float)r.y1 };
         canvas_set_clip(&frame, r);
-        canvas_clear(&frame, 0);
-        paint_root(&frame, root);
+        paint_root_clear(&frame, root, 0);
     }
     canvas_set_clip(&frame, (Rect){ 0, 0, w, h });
     ui.damage = (Box){ 0, 0, 0, 0 };
@@ -483,8 +498,7 @@ static int full_differs(Node *root, int w, int h, int *where) {
     Canvas rc;
     canvas_init(&rc, ref, w, h, w);
     ui.damage = (Box){ 0, 0, (float)w, (float)h };
-    canvas_clear(&rc, 0);
-    paint_root(&rc, root);
+    paint_root_clear(&rc, root, 0);
     ui.damage = (Box){ 0, 0, 0, 0 };
     int worst = 0;
     for (int i = 0; i < w * h; i++)
@@ -1324,8 +1338,7 @@ static void test_transform_paint_hit(void) {
     layout_root(root, 160, 100);
     paint_damage(root);
     ui.damage = (Box){ 0, 0, 160, 100 };
-    canvas_clear(&frame, 0);
-    paint_root(&frame, root);
+    paint_root_clear(&frame, root, 0);
     paint_view = keep;
     /* b: 60×10 at (70,45) scaled 2 around (100,50) → x 40..160, y 40..60 logical → 60..240, 60..90 physical */
     int soft = 0;
@@ -1424,6 +1437,390 @@ static void test_overlay_scrollbar(void) {
     CHECK(pix((int)(sv->ax + 200 - 5), ty) != 0x808080, "RTL thumb still on the right");
 }
 
+/* ---- The dragged window, pixel for pixel (test_drag_exact) ----
+ * LordBench's desktop scene (apps/sysinfo/scene.jsx: a 760×480 window, a 72 px square turning inside
+ * it, six cards with shadows and text; a rounded window below; a menu bar and a Dock with backdrop
+ * blur) moved along LordBench's figure of eight (lbi_path, one step a frame as grab_script_tick does
+ * by the clock) for 480 frames, the square turning 6° a frame through lord.setStyle's C path
+ * (node_restyled; with 'rotate', what runtime/style.js makes of a transform: scene.jsx's own
+ * setStyle(n, 'transform', …) is not a key lord.setStyle takes), and painted as main.c paints a frame
+ * (paint_ui, then paint_out on one display).
+ * Every frame's pixels are hashed (FNV-1a over the 32-bit pixels) and compared with
+ * tests/drag_golden_cpu.txt and tests/drag_golden_gpu.txt, written from the code before the drag-frame
+ * optimizations (001633b): those must give exactly the same pixels. "gpu" is the same run with
+ * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
+ * same CPU canvas the GPU uploads. Four shorter runs cover what makes the layer paint again: a text
+ * that changes a child's size, a child moving inside the window, a terminal whose cursor blinks
+ * (damage from outside the tree) and a square turning across the window's edge.
+ * The pixels that differ from a full repaint (paint_root_full, as LORD_PAINT_VERIFY) are printed as a
+ * second number, which may only go down (today: black pixels at the dragged window's own rounded top
+ * corners on the CPU path, its shadow one level darker on the GPU path).
+ *   build/engine-test                 checks the hashes (skipped without hashes for this architecture)
+ *   make drag-golden                  writes this architecture's hashes: only on the reference code */
+#if defined(__x86_64__)
+#define GOLD_ARCH "x86_64"
+#elif defined(__aarch64__)
+#define GOLD_ARCH "aarch64"
+#else
+#define GOLD_ARCH "other"
+#endif
+
+enum { DW = 1024, DH = 640, DRAG_FRAMES = 480, CASE_FRAMES = 60, FULL_EVERY = 16 };
+enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_N };
+static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge" };
+static const int dc_frames[DC_N] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES };
+#define DC_HASHES (DRAG_FRAMES + 4 * CASE_FRAMES + DC_N)    /* each run: its frames and the one after the drag */
+
+typedef struct { OutView v; Canvas c, ref; uint32_t *px, *rpx; } DOut;
+typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption; } DScene;
+
+static uint64_t frame_hash(const Canvas *c) {
+    uint64_t h = 1469598103934665603ull;
+    for (int y = 0; y < c->h; y++) {
+        const uint32_t *row = c->px + (size_t)y * c->stride;
+        for (int x = 0; x < c->w; x++) { h ^= row[x]; h *= 1099511628211ull; }
+    }
+    return h;
+}
+
+/* lord.setStyle with a number (js.c): set, then node_restyled decides what to place or repaint */
+static void js_set(Node *n, const char *k, double v) {
+    Style before = n->s;
+    StyleExt xb;
+    if (n->s.ext) memcpy(&xb, n->s.ext, STYLE_EXT_VALUES);
+    if (style_set_number(&n->s, k, v)) { printf("unknown style %s\n", k); fails++; }
+    node_restyled(n, &before, before.ext ? &xb : NULL);
+}
+
+/* main.c's frame on one display: paint_ui (layout, damage, the layer's display), then paint_out (the
+ * damaged box in physical px, cleared and painted with paint_root_clear) */
+static void drag_paint(Node *root, DOut *o) {
+    if (!ui.dirty) return;
+    ui.dirty = 0;
+    layout_root(root, DW, DH);
+    Box d = { 0, 0, 0, 0 };
+    if (paint_damage(root)) d = ui.damage;
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    if (paint_layer_node()) paint_layer_view(0);
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return;
+    Rect pr = out_phys_rect(&o->v, d.x0, d.y0, d.x1, d.y1);
+    if (pr.x1 <= pr.x0 || pr.y1 <= pr.y0) return;
+    float lx0, ly0, lx1, ly1;
+    out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
+    paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, 0 };
+    ui.damage = (Box){ lx0, ly0, lx1, ly1 };
+    canvas_set_clip(&o->c, pr);
+    paint_root_clear(&o->c, root, 0x000000);
+    canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+}
+
+/* Pixels of the frame that differ from a full repaint of the tree (paint_root_full); *worst: the
+ * largest difference of a channel seen so far. */
+static long drag_full_diff(Node *root, DOut *o, int *worst) {
+    Box keep = term_at;                     /* the terminal notes where it was painted: not this check */
+    canvas_clear(&o->ref, 0x000000);
+    paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, 0 };
+    paint_root_full(&o->ref, root);
+    paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+    term_at = keep;
+    long n = 0;
+    for (size_t i = 0; i < (size_t)o->c.w * o->c.h; i++) {
+        if (o->px[i] == o->rpx[i]) continue;
+        n++;
+        for (int sh = 0; sh < 32; sh += 8) {
+            int d = abs((int)((o->px[i] >> sh) & 255) - (int)((o->rpx[i] >> sh) & 255));
+            if (d > *worst) *worst = d;
+        }
+    }
+    return n;
+}
+
+static Node *dview(Node *parent, float w, float h, uint32_t bg, float radius) {
+    Node *n = view(parent);
+    if (w > 0) sn(n, "width", w);
+    if (h > 0) sn(n, "height", h);
+    if (bg) sn(n, "backgroundColor", bg);
+    if (radius > 0) sn(n, "borderRadius", radius);
+    return n;
+}
+static Node *dtext(Node *parent, const char *s, float size, float weight, uint32_t color) {
+    Node *t = text(parent, s, size);
+    sn(t, "color", color);
+    if (weight > 0) sn(t, "fontWeight", weight);
+    return t;
+}
+static void dshadow(Node *n, uint32_t color, float y, float blur) {
+    sn(n, "shadowColor", color);
+    sn(n, "shadowOffsetY", y);
+    sn(n, "shadowBlur", blur);
+}
+
+/* The desktop and LordBench's scene window at (x, y), with what case dc adds to it. */
+static DScene drag_scene(int dc, float x, float y) {
+    static const uint32_t accents[6] = { 0xff0a84ff, 0xff30d158, 0xffff9f0a, 0xffbf5af2, 0xffff453a, 0xff64d2ff };
+    DScene s = { 0 };
+    ui_reset();
+    s.root = view(NULL);
+    ui.root = s.root;
+    sn(s.root, "backgroundColor", 0xff2b3a4f);
+    for (int i = 0; i < 5; i++) {                       /* desktop icons with their names */
+        Node *ic = box_in(s.root, 24, 50 + i * 100, 64, 64, accents[i]);
+        sn(ic, "borderRadius", 14);
+        Node *l = dtext(s.root, "Documents", 12, 0, 0xffffffff);
+        ss(l, "position", "absolute");
+        sn(l, "left", 16); sn(l, "top", 118 + i * 100); sn(l, "width", 80);
+        ss(l, "textAlign", "center");
+    }
+    /* a window below: rounded, overflow hidden, with a shadow (its corners are restored around the drag) */
+    Node *below = box_in(s.root, 110, 330, 520, 280, 0xff1e1e20);
+    ss(below, "overflow", "hidden");
+    sn(below, "borderRadius", 12);
+    dshadow(below, 0x66000000, 16, 40);
+    Node *bt = dview(below, 0, 28, 0xff3a3a3c, 0);
+    dtext(bt, "Files", 13, 600, 0xffe0e0e0);
+    for (int i = 0; i < 8; i++) {
+        Node *row = dview(below, 0, 30, i & 1 ? 0xff252528 : 0, 0);
+        ss(row, "flexDirection", "row"); ss(row, "alignItems", "center");
+        sn(row, "paddingLeft", 12); sn(row, "gap", 8);
+        dview(row, 16, 16, 0xff5b8def, 3);
+        dtext(row, "Quarterly report, final version.pdf", 13, 0, 0xffd0d0d0);
+    }
+    /* the scene window: the theme's frame (title bar) and scene.jsx's content */
+    s.win = box_in(s.root, x, y, 760, 480, 0xff2c2c2e);
+    ss(s.win, "overflow", "hidden");
+    sn(s.win, "borderRadius", 12);
+    sn(s.win, "borderWidth", 1);
+    sn(s.win, "borderColor", 0x30ffffff);
+    dshadow(s.win, 0x73000000, 24, 56);
+    Node *title = dview(s.win, 0, 28, 0xff3a3a3c, 0);
+    ss(title, "alignItems", "center"); ss(title, "justifyContent", "center");
+    dtext(title, "System Information", 13, 600, 0xffe0e0e0);
+    Node *body = view(s.win);
+    sn(body, "flexGrow", 1);
+    sn(body, "paddingLeft", 20); sn(body, "paddingRight", 20); sn(body, "paddingTop", 20); sn(body, "paddingBottom", 20);
+    sn(body, "gap", 12);
+    ss(body, "alignItems", "center"); ss(body, "justifyContent", "center");
+    s.spin = dview(body, 72, 72, 0xff0a84ff, 16);
+    ss(s.spin, "alignItems", "center"); ss(s.spin, "justifyContent", "center");
+    dview(s.spin, 24, 24, 0xffffffff, 12);
+    Node *cards = view(body);
+    ss(cards, "flexDirection", "row"); ss(cards, "flexWrap", "wrap"); ss(cards, "justifyContent", "center");
+    sn(cards, "gap", 12);
+    for (int i = 0; i < 6; i++) {
+        Node *c = dview(cards, 180, 96, 0x14ffffff, 12);
+        sn(c, "paddingLeft", 12); sn(c, "paddingRight", 12); sn(c, "paddingTop", 12); sn(c, "paddingBottom", 12);
+        sn(c, "gap", 4);
+        dshadow(c, 0x40000000, 2, 8);
+        dview(c, 28, 28, accents[i], 8);
+        dtext(c, "Desktop impact", 15, 600, 0xffffffff);
+        char label[32];
+        snprintf(label, sizeof label, "Card %d", i + 1);
+        Node *cap = dtext(c, label, 12, 0, 0x99ffffff);
+        if (!i) s.caption = cap;
+    }
+    if (dc == DC_CHILD) {                               /* a badge that slides inside the window */
+        s.child = box_in(s.win, 40, 44, 14, 14, 0xffff453a);
+        sn(s.child, "borderRadius", 7);
+    }
+    if (dc == DC_TERM) {                                /* a terminal, its cursor blinking */
+        s.term = node_new(NODE_TERM);
+        s.term->term = 1;
+        node_append(s.win, s.term);
+        ss(s.term, "position", "absolute");
+        sn(s.term, "left", 16); sn(s.term, "top", 412); sn(s.term, "width", 320); sn(s.term, "height", 52);
+    }
+    if (dc == DC_EDGE) {                                /* a turning square across the window's right edge */
+        s.edge = box_in(s.win, 732, 120, 40, 40, 0xffbf5af2);
+        sn(s.edge, "borderRadius", 6);
+    }
+    /* the Dock and the menu bar: shell layers above the windows, with backdrop blur */
+    Node *dockl = layer_node(s.root, 10, DW, DH);
+    Node *dock = box_in(dockl, (DW - 600) / 2, DH - 72, 600, 64, 0x80303034);
+    sn(dock, "borderRadius", 16);
+    sn(dock, "backdropBlur", 20);
+    for (int i = 0; i < 6; i++) dview(dock, 48, 48, accents[i], 12);
+    ss(dock, "flexDirection", "row"); ss(dock, "alignItems", "center"); ss(dock, "justifyContent", "center");
+    sn(dock, "gap", 12);
+    Node *barl = layer_node(s.root, 20, DW, DH);
+    Node *bar = box_in(barl, 0, 0, DW, 28, 0x99202024);
+    sn(bar, "backdropBlur", 20);
+    ss(bar, "flexDirection", "row"); ss(bar, "alignItems", "center");
+    sn(bar, "paddingLeft", 14); sn(bar, "gap", 18);
+    dtext(bar, "LordOS", 13, 700, 0xffffffff);
+    dtext(bar, "File", 13, 0, 0xffffffff);
+    dtext(bar, "Edit", 13, 0, 0xffffffff);
+    return s;
+}
+
+/* One run: case dc's scene, the drag (n frames), then the frame after it ends. hash gets n + 1
+ * values; the largest count of pixels that differed from a full repaint goes to *full, the largest
+ * difference of a channel to *worst. */
+static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
+    const int n = dc_frames[dc];
+    const float x0 = (DW - 760) / 2, y0 = 28 + (DH - 28 - 480) / 2;       /* scenePath: centered in the work area */
+    const float rx = (DW - 760) / 2 - 20, ry = (DH - 28 - 480) - 40;
+    DScene s = drag_scene(dc, x0, y0);
+    term_cursor = 1;
+    term_at = (Box){ 0, 0, 0, 0 };
+    canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
+    canvas_clear(&o->c, 0x000000);
+    damage_add((Box){ 0, 0, DW, DH });
+    ui.dirty = 1;
+    drag_paint(s.root, o);
+    paint_layer_begin(s.win->id, 0);                    /* grab.c's setup */
+    float gx = x0, gy = y0, rot = 0;
+    *full = 0;
+    *worst = 0;
+    for (int f = 0; f < n; f++) {
+        float dx, dy;
+        lbi_path(rx, ry, 6000, f * (1000.0 / 60), &dx, &dy);
+        float x = x0 + roundf(dx), y = y0 + roundf(dy);  /* grab_motion */
+        if (x != gx || y != gy) {
+            gx = x; gy = y;
+            s.win->s.pos[EDGE_L] = (Dim){ x, UNIT_PX };
+            s.win->s.pos[EDGE_T] = (Dim){ y, UNIT_PX };
+            node_moved(s.win);
+            ui.dirty = 1;
+        }
+        rot = fmodf(rot + 6, 360);                      /* scene.jsx's square, every 16 ms */
+        if (dc == DC_DRAG) js_set(s.spin, "rotate", rot);   /* the others: only their own change */
+        if (dc == DC_EDGE) js_set(s.edge, "rotate", rot);
+        if (dc == DC_CHILD) js_set(s.child, "left", 40 + (f * 5) % 640);
+        if (dc == DC_TEXT && f % 15 == 7)               /* lord.setText on the caption: one line or two */
+            node_set_text(s.caption->first, (f / 15) & 1 ? "Card 1" : "Card 1, measured while a busy app runs");
+        if (dc == DC_TERM && f % 10 == 5 && term_at.x1 > term_at.x0) {
+            term_cursor = !term_cursor;                 /* term_damage: the cursor's row, where it was painted */
+            damage_add((Box){ floorf(term_at.x0), floorf(term_at.y0 + 8 - 2), ceilf(term_at.x1), ceilf(term_at.y0 + 24 + 2) });
+            ui.dirty = 1;
+        }
+        drag_paint(s.root, o);
+        hash[f] = frame_hash(&o->c);
+        if (f % FULL_EVERY == FULL_EVERY - 1) { long d = drag_full_diff(s.root, o, worst); if (d > *full) *full = d; }
+    }
+    paint_layer_end();                                  /* grab_finish */
+    ui.dirty = 1;
+    drag_paint(s.root, o);
+    hash[n] = frame_hash(&o->c);
+    long d = drag_full_diff(s.root, o, worst);
+    if (d > *full) *full = d;
+}
+
+/* The golden file: lines "<architecture> <run> <frame> <hash>"; # starts a comment. */
+static char *read_file(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *b = len >= 0 ? malloc((size_t)len + 1) : NULL;
+    if (b && fread(b, 1, (size_t)len, f) != (size_t)len) { free(b); b = NULL; }
+    if (b) b[len] = 0;
+    fclose(f);
+    return b;
+}
+
+static int gold_find(const char *file, const char *run, int frame, uint64_t *h) {
+    char key[64];
+    int kl = snprintf(key, sizeof key, "%s %s %d ", GOLD_ARCH, run, frame);
+    for (const char *p = file; p && *p; ) {
+        if (!strncmp(p, key, (size_t)kl)) {
+            unsigned long long v;
+            if (sscanf(p + kl, "%llx", &v) == 1) { *h = v; return 1; }
+        }
+        p = strchr(p, '\n');
+        if (p) p++;
+    }
+    return 0;
+}
+
+/* Writes this architecture's lines, keeping the other architectures' and the comments. */
+static int gold_write(const char *path, const char *variant, const uint64_t *hash) {
+    char *old = read_file(path);
+    char tmp[256];
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    FILE *f = fopen(tmp, "w");
+    if (!f) { free(old); return -1; }
+    if (!old || !*old)
+        fprintf(f, "# engine-test test_drag_exact, %s path: FNV-1a hash of every frame of the dragged window.\n"
+                   "# Written by `make drag-golden` on the code before the drag-frame optimizations\n"
+                   "# (001633b); later code must give the same pixels. Lines: architecture, run, frame, hash.\n", variant);
+    size_t al = strlen(GOLD_ARCH);
+    for (const char *p = old; p && *p; ) {
+        const char *e = strchr(p, '\n');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        if (len && !(len > al && !strncmp(p, GOLD_ARCH, al) && p[al] == ' ')) fprintf(f, "%.*s\n", (int)len, p);
+        p = e ? e + 1 : NULL;
+    }
+    int k = 0;
+    for (int dc = 0; dc < DC_N; dc++)
+        for (int fr = 0; fr <= dc_frames[dc]; fr++) fprintf(f, "%s %s %d %016llx\n", GOLD_ARCH, dc_name[dc], fr, (unsigned long long)hash[k++]);
+    free(old);
+    if (fclose(f) || rename(tmp, path)) return -1;
+    return 0;
+}
+
+static void test_drag_exact(int write) {
+    static const char *const variant[2] = { "cpu", "gpu" };
+    DOut o = { 0 };
+    o.v = out_view(0, 0, DW, DH, 100);
+    o.px = calloc((size_t)DW * DH, 4);
+    o.rpx = calloc((size_t)DW * DH, 4);
+    uint64_t *hash = malloc(sizeof *hash * DC_HASHES);
+    if (!o.px || !o.rpx || !hash) { CHECK(0, "drag-exact: out of memory"); free(o.px); free(o.rpx); free(hash); return; }
+    canvas_init(&o.c, o.px, DW, DH, DW);
+    canvas_init(&o.ref, o.rpx, DW, DH, DW);
+    for (int g = 0; g < 2; g++) {
+        test_gpu = g;
+        char path[64];
+        snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g]);
+        long fullw[DC_N];
+        int worst[DC_N];
+        long parts = 0, renders = 0, blits = 0;
+        int k = 0;
+        paint_layer_parts();
+        paint_layer_stats(&renders, &blits);
+        for (int dc = 0; dc < DC_N; dc++) {
+            drag_run(dc, &o, hash + k, &fullw[dc], &worst[dc]);
+            k += dc_frames[dc] + 1;
+        }
+        parts = paint_layer_parts();
+        paint_layer_stats(&renders, &blits);
+        printf("drag-exact %s: %d frames; layer: %ld renders (%ld of them parts, %ld rebuilds of what is below), %ld copies\n",
+               variant[g], k, renders % 1000, parts, renders / 1000, blits);
+        printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
+        for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
+        printf("\n");
+        if (write) {
+            CHECK(!gold_write(path, variant[g], hash), "drag-exact: can't write %s", path);
+            printf("drag-exact %s: wrote %d hashes for %s to %s\n", variant[g], k, GOLD_ARCH, path);
+            continue;
+        }
+        char *file = read_file(path);
+        uint64_t h;
+        if (!file || !gold_find(file, dc_name[0], 0, &h)) {
+            printf("drag-exact %s: skipped: needs golden hashes for %s in %s (make drag-golden on the reference code)\n",
+                   variant[g], GOLD_ARCH, path);
+            free(file);
+            continue;
+        }
+        k = 0;
+        for (int dc = 0; dc < DC_N; dc++) {
+            int bad = 0, first = -1;
+            for (int fr = 0; fr <= dc_frames[dc]; fr++, k++)
+                if (!gold_find(file, dc_name[dc], fr, &h) || h != hash[k]) { if (first < 0) first = fr; bad++; }
+            CHECK(!bad, "drag-exact %s, run %s: %d of %d frames differ from %s (the first: frame %d)",
+                  variant[g], dc_name[dc], bad, dc_frames[dc] + 1, path, first);
+        }
+        free(file);
+    }
+    test_gpu = 0;
+    free(o.px);
+    free(o.rpx);
+    free(hash);
+}
+
 #endif
 
 /* ---- benchmark: a Files-like list and a window drag (docs/DESIGN.md, Engine notes) ---- */
@@ -1469,8 +1866,7 @@ static void frame_paint(Node *root, Disp *d, int nd) {
         if (r.y1 > d[i].h) r.y1 = d[i].h;
         ui.damage = b;
         canvas_set_clip(&d[i].c, r);
-        canvas_clear(&d[i].c, 0);
-        paint_root(&d[i].c, root);
+        paint_root_clear(&d[i].c, root, 0);
         canvas_set_clip(&d[i].c, (Rect){ 0, 0, d[i].w, d[i].h });
     }
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
@@ -1557,8 +1953,7 @@ static void bench(void) {
     for (int i = 0; i < N; i++) {
         ui.damage = (Box){ 0, 0, 1280, 800 };
         double a = now_ms();
-        canvas_clear(&d[0].c, 0);
-        paint_root(&d[0].c, root);
+        paint_root_clear(&d[0].c, root, 0);
         v[i] = now_ms() - a;
     }
     printf("list: 2000 rows; layout cold %.2f ms, warm %.2f ms; full paint %.2f ms\n", cold, warm, median(v, N));
@@ -1615,6 +2010,8 @@ int main(int argc, char **argv) {
 #ifdef ENGINE_BEFORE
     return 0;
 #else
+    if (argc > 1 && !strcmp(argv[1], "drag-golden")) { test_drag_exact(1); return fails ? 1 : 0; }
+    test_drag_exact(0);                     /* first: the transform cache is keyed by node id */
     test_ellipsis();
     test_borders();
     test_logical();

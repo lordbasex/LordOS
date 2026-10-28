@@ -70,7 +70,27 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   - It is painted in its screen coordinates (a canvas with a shifted origin). That way the terminal
     and Linux apps keep recording where they are.
 - **If something inside changes,** like a terminal line or the blinking cursor, only that part of
-  the layer is repainted. If a style inside changes, the whole layer is repainted.
+  the layer is repainted.
+- **If a node inside changes** (a style, a text, a transform such as LordBench's turning square, or a
+  child moving inside the window), only its old box (moved with the window) and its new one are
+  repainted in the layer, with a 4 px margin (`layer_tree_part`; 0.8.6, in development). The window's
+  own style or size, a part outside the layer or bigger than half of it still repaint the whole layer.
+  That gives the same pixels as repainting it whole, and the layer is repainted whole whenever that
+  can't be shown (`layer_part_exact`, `layer_note_exact`):
+  - the window moved by whole physical pixels since the layer was painted whole, the layer's box and
+    offsets are the ones a full render would give, the display scale is whole, and positions, sizes,
+    paddings and borders are in sixteenths of a pixel within ±4096 px, so every coordinate the paint
+    derives from them is exact at both places;
+  - text uses whole font sizes and was drawn by `text.c`'s own path in a font whose em is a power of
+    two of at most 2048 units, as Inter's is (`text_drew_inexact`): glyph advances and kerning are then
+    exact too. Text through `textlayout.c` (shaping, other scripts' fonts) or in another font (Plus
+    Jakarta Sans and JetBrains Mono have 1000-unit ems) repaints the layer whole;
+  - a transformed node that didn't change, an app window or a video inside makes it repaint whole (a
+    transform composites through its matrix, which rounds differently at another place; painting an
+    app window registers it);
+  - a transformed node's image steps its bilinear weights along each row from its first pixel, so a
+    part whose left edge cuts that image would change them: `canvas_affine_watch` reports it and the
+    layer is painted whole instead (the margin keeps that from happening in LordBench's scene).
 - **What's below** (everything painted before the window: background, desktop, the other windows)
   is also saved once. Per frame:
   1. the region that changed is copied;
@@ -91,6 +111,23 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   path.
 - **A `canvas_blit` detail:** opaque pixels are copied directly (same result as blending, without
   the math).
+
+### Checking it (0.8.6, in development)
+
+- **`test_drag_exact`** (`server/tests/engine_test.c`, run by `make -C server test`) drags LordBench's
+  desktop scene along its figure of eight for 480 frames, plus four short runs (a text that resizes a
+  child, a child moving inside the window, a terminal's blinking cursor, a square turning across the
+  window's edge), on the CPU path and on the GPU path's canvas. Every frame's hash must match
+  `server/tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt`, written from the code before any change
+  to this path: a faster frame has to give exactly the same pixels. The hashes are per architecture
+  (x86_64 so far); `make -C server drag-golden` writes them, only on the reference code.
+- **Against a full repaint** the test prints a second number, which may only go down: today a drag
+  frame differs from a full repaint in at most 2,265 pixels on the CPU path (black pixels at the dragged
+  window's rounded top corners) and 70,940 on the GPU path (one level darker in its shadow).
+- **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
+  display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
+  the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where
+  the terminals are, so on the next frame a terminal's change repaints the whole layer.
 
 ### Resize edges (`sdk/windowshell.jsx`)
 

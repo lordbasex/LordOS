@@ -24,6 +24,13 @@ the components below, each under its own license.
 | JetBrains Mono (`assets/fonts/JetBrainsMono-*.ttf`) | terminal and code text | SIL OFL 1.1 (`assets/fonts/JetBrainsMono-LICENSE.txt`) |
 | Noto Sans Arabic, Devanagari, Thai and CJK SC, subset (`server/src/bench/fonts/`) | built into `lord-bench` for LordBench's shaping workload (subset by `tools/gen-lbfonts.py`) | SIL OFL 1.1 (`server/src/bench/fonts/OFL.txt`) |
 
+### Local changes to bundled components
+
+- **QuickJS** (`third_party/quickjs`, version in `VERSION`): adds `size_t JS_GetMallocSize(JSRuntime *rt)`
+  (`quickjs.c`, next to `JS_ComputeMemoryUsage`, and its prototype in `quickjs.h`). It returns the
+  same `malloc_size` that `JS_ComputeMemoryUsage` reports, without walking every object, so
+  `lord.stats()` (`server/src/ui/js.c`) costs O(1). Re-apply it when QuickJS is updated.
+
 ## npm packages (bundled into the theme JavaScript at build time)
 
 | Package | License |

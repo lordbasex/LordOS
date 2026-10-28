@@ -1029,6 +1029,16 @@ static inline uint32_t texel(const uint32_t *src, int sw, int sh, int x, int y) 
     return x < 0 || y < 0 || x >= sw || y >= sh ? 0 : src[(size_t)y * sw + x];
 }
 
+/* A row of canvas_blit_affine steps its source coordinates from the first pixel it paints, so where
+ * the clip cuts the image on the left changes the bilinear weights by a rounding. A partial repaint
+ * (paint.c's drag layer) watches its canvas: if an image there starts left of the repaint's own left
+ * edge x, the row began at x, where a wider clip would not have begun it, and the caller paints it
+ * all instead. */
+static const Canvas *affine_watch;
+static int affine_watch_x, affine_cut;
+void canvas_affine_watch(const Canvas *c, int x) { affine_watch = c; affine_watch_x = x; affine_cut = 0; }
+int canvas_affine_cut(void) { affine_watch = NULL; return affine_cut; }
+
 void canvas_blit_affine(Canvas *c, const uint32_t *src, int sw, int sh, const float inv[6], const float fwd[6], float opacity) {
     if (sw <= 0 || sh <= 0) return;
     /* destination bounds: the four transformed corners */
@@ -1042,6 +1052,7 @@ void canvas_blit_affine(Canvas *c, const uint32_t *src, int sw, int sh, const fl
     if (!bounds(c, bx0 - 1, by0 - 1, bx1 - bx0 + 2, by1 - by0 + 2, &x0, &y0, &x1, &y1)) return;
     uint32_t k_op = (uint32_t)(opacity * 256 + 0.5f);
     if (!k_op) return;
+    if (c == affine_watch && x0 == affine_watch_x && (int)floorf(bx0 - 1) < x0) affine_cut = 1;
     for (int j = y0; j < y1; j++) {
         uint32_t *row = c->px + (size_t)j * c->stride;
         float dy = j + 0.5f;
