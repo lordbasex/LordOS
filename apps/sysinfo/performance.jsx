@@ -27,6 +27,14 @@ function fmt(v) {
   return formatNumber(v, v >= 100 ? 0 : v >= 10 ? 1 : 2);
 }
 
+// A poll that shows nothing new: the same keys with the same primitive values (state, mode, step,
+// progress; a result or a start error always counts as new). Most 500 ms polls are this while a
+// step runs, and keeping the old state then spares a render of the whole view.
+function samePoll(a, b) {
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k] && (a[k] === null || typeof a[k] !== 'object'));
+}
+
 function useBench() {
   const [st, setSt] = useState(() => {
     let p = null;
@@ -36,7 +44,7 @@ function useBench() {
   const running = st.state === 'waiting' || st.state === 'running';
   useEffect(() => {
     if (!running) return undefined;
-    const id = setInterval(() => { try { const p = bench().poll(); if (p) setSt(p); } catch (e) { /* keep the last */ } }, 500);
+    const id = setInterval(() => { try { const p = bench().poll(); if (p) setSt((x) => (samePoll(x, p) ? x : p)); } catch (e) { /* keep the last */ } }, 500);
     return () => clearInterval(id);
   }, [running]);
   const start = (mode) => {

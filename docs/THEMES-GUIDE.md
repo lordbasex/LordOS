@@ -366,10 +366,11 @@ Everything runs on `lord-server`'s main thread, which also composites the screen
 Linux apps. A slow theme makes the whole desktop slow.
 
 - **No React render per frame.** Moving and resizing windows is already in C. To animate, change one
-  style with **`lord.setStyle(ref.current.id, 'opacity' | 'transform' | …, value)`** from a timer or
+  style with **`lord.setStyle(ref.current.id, 'opacity' | 'rotate' | 'scaleX' | …, value)`** from a timer or
   `requestAnimationFrame` (the `ScrollView` thumb fade in `sdk/components.jsx`, the fans in
   `sdk/cooling.jsx`); stop the loop when the animation ends or the surface is hidden, and don't start
-  it with reduce motion.
+  it with reduce motion. `lord.setStyle` takes the engine's own keys (`rotate` in degrees, `scaleX`,
+  `scaleY`), not a CSS `transform` string: an unknown key changes nothing and is logged once.
 - **`transform` scale and rotate are cheap**: the subtree is painted once into a cached raster and
   composited (Lord Flow's minimize effect scales a whole window).
 - **Blur costs**: `backdropFilter: blur(r)` reads a margin of 2×r around the surface, and any change
@@ -500,7 +501,7 @@ Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 - Sessions started by `lord-sessiond` write their log to **`~/.cache/lordos/session.log`** (the login
   screen to `greeter.log`); a standalone `lord-server` writes to the terminal it was started from.
 - `console.log`, `.info`, `.debug` → `js: …` lines; `console.warn` → `js: [warn] …`;
-  `console.error` → `js: [error] …` (the prelude in `server/src/ui/js.c`). Exceptions in timers
+  `console.error` → `js: [error] …` (the prelude in `server/src/ui/js_prelude.h`). Exceptions in timers
   and animation frames are logged as `js: [error] timer: …` / `raf: …`.
 - Useful lines: `js: theme <path> loaded in N ms (K KB)`, `code: …` (the verified-code state and each
   check or refusal), `lord-server: cambiando a tema <path>` (a switch), `js: unsupported style '<key>'`.

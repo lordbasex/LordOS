@@ -180,6 +180,10 @@ EOF
     # (0.8.5) Settings → Displays' arrangement (sdk/displaylayout.js): numbers, magnetic snap, valid drops
     if have node; then run "display-layout-test (sdk/displaylayout.js)" node tests/display_layout_test.mjs
     else skip "display-layout-test" "node"; fi
+    # (0.8.6) runtime/index.js's skip of unchanged styles sends the same lord.* calls as without it
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "runtime-props-test (runtime/index.js)" node tests/runtime_props_test.mjs
+    else skip "runtime-props-test" "node and the repository's node_modules (npm install)"; fi
 }
 
 full() {

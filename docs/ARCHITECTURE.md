@@ -74,6 +74,12 @@ like React Native but on top of our display server.
 
 1. An event arrives (evdev) → `hit_test` finds the node under the cursor → `__lordEvent` in JS.
 2. React updates state → the reconciler calls `lord.setStyle/appendChild/...` → nodes are marked.
+   Only the style properties that changed are sent (`applyStyle` in `runtime/style.js`). Since 0.8.6
+   (in development) `applyProps` in `runtime/index.js` also skips converting a node's style when its
+   flattened style has the same keys, in the same order, with the same primitive values as last time
+   (kept as a copy, so a style object changed in place is still seen; not when a converted value is
+   NaN, which `applyStyle` re-sends every time). The calls are exactly the ones it sent before:
+   `server/tests/runtime_props_test.mjs` checks it against the runtime with the skip turned off.
 3. `lord-server` recomputes the layout, computes the damaged region and repaints only that region.
 4. It copies the scene to the back buffer, draws the cursor, and page-flips on the next vblank.
 

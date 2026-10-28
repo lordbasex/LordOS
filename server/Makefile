@@ -254,6 +254,12 @@ build/xwm-test: tests/xwm_test.c src/wl/x11wire.c src/wl/x11wire.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xwm_test.c src/wl/x11wire.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/timer_order_test.c: the JS timers (src/ui/js_prelude.h) against the prelude they replaced
+test: build/timer-order-test
+build/timer-order-test: tests/timer_order_test.c src/ui/js_prelude.h $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/timer_order_test.c $(QJS_OBJ) -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
 test: build/tzif-test
 build/tzif-test: tests/tzif_test.c src/ui/tzif.c src/ui/tzif.h
 	@mkdir -p build

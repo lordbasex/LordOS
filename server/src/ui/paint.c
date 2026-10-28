@@ -458,6 +458,7 @@ static struct {
     Box part;                   /* parte de la capa a repintar (coordenadas de la capa), p. ej. el cursor de la terminal */
     int resize;                 /* cambiando el tamaño: sin capa, solo lo de abajo */
     uint8_t *hole;              /* camino GPU: dónde la capa tiene el hueco de una app (alfa 0 de verdad) */
+    int has_holes;              /* 0: every byte of hole is 0 (no app surface in the window) */
     int painted;                /* la capa se pintó en este cuadro (las apps ya quedaron anotadas) */
     /* a node inside the window changed: layer.part also holds its boxes (layer_tree_part) */
     int tree_part;
@@ -530,12 +531,15 @@ static void subtree_box(Node *n, Box *b, int *ok) {
  * hueco de una app (canvas_clear deja 0) de lo que quedó vacío o las esquinas redondeadas. */
 #define SENTINEL 0x01000000u
 static void layer_fill(int x0, int y0, int x1, int y1) {
-    uint32_t v = gpu_active() ? SENTINEL : 0;
-    for (int y = y0; y < y1; y++) {
-        uint32_t *row = layer.px + (size_t)y * layer.w;
-        if (!v) memset(row + x0, 0, (size_t)(x1 - x0) * 4);
-        else for (int x = x0; x < x1; x++) row[x] = v;
+    if (x0 >= x1 || y0 >= y1) return;
+    size_t bytes = (size_t)(x1 - x0) * 4;
+    uint32_t *first = layer.px + (size_t)y0 * layer.w + x0;
+    if (!gpu_active()) {
+        for (int y = y0; y < y1; y++) memset(layer.px + (size_t)y * layer.w + x0, 0, bytes);
+        return;
     }
+    for (int x = 0; x < x1 - x0; x++) first[x] = SENTINEL;      /* one row, then copied */
+    for (int y = y0 + 1; y < y1; y++) memcpy(layer.px + (size_t)y * layer.w + x0, first, bytes);
 }
 /* Where the window's app surfaces are, in layer pixels: only there can a 0 pixel be an app's hole.
  * Elsewhere a 0 is what a rounded clip left outside its corner, and taking it for a hole made the
@@ -558,16 +562,33 @@ static int in_surface(int x, int y) {
     for (int i = 0; i < nlsurf; i++) if (x >= lsurf[i].x0 && x < lsurf[i].x1 && y >= lsurf[i].y0 && y < lsurf[i].y1) return 1;
     return 0;
 }
+/* layer.has_holes == 0 stands for a map of zeros, which is what the loop below writes for a window
+ * with no app surfaces: then it neither writes the map nor does layer_paint walk it. The bytes it
+ * left are made zeros only when a part brings a hole into a map that had none. */
 static void layer_holes(int x0, int y0, int x1, int y1) {
     if (!gpu_active() || !layer.hole) return;
+    int any = nlsurf || lsurf_all;
+    if (!any && !layer.has_holes) {
+        for (int y = y0; y < y1; y++) {
+            uint32_t *row = layer.px + (size_t)y * layer.w;
+            for (int x = x0; x < x1; x++) if (row[x] == SENTINEL) row[x] = 0;
+        }
+        return;
+    }
+    int whole = x0 == 0 && y0 == 0 && x1 == layer.w && y1 == layer.h;
+    if (!layer.has_holes && !whole) memset(layer.hole, 0, (size_t)layer.w * layer.h);   /* what it stood for */
+    uint8_t set = 0;
     for (int y = y0; y < y1; y++) {
         uint32_t *row = layer.px + (size_t)y * layer.w;
         uint8_t *m = layer.hole + (size_t)y * layer.w;
         for (int x = x0; x < x1; x++) {
-            m[x] = row[x] == 0 && (nlsurf || lsurf_all) && in_surface(x, y);
+            m[x] = row[x] == 0 && any && in_surface(x, y);
+            set |= m[x];
             if (row[x] == SENTINEL) row[x] = 0;
         }
     }
+    if (whole) layer.has_holes = set;
+    else layer.has_holes |= set;
 }
 
 /* Vuelve a anotar las ventanas de apps de la capa (camino GPU) en su lugar de ahora, sin tocar el canvas. */
@@ -744,6 +765,7 @@ static int layer_paint(Canvas *c, Node *n, float opacity) {
         /* los huecos de las apps: alfa 0 de verdad (la mezcla no los abre) y la app anotada donde está ahora */
         Rect r = c->clip;
         int x0 = bx > r.x0 ? bx : r.x0, x1 = bx + layer.w < r.x1 ? bx + layer.w : r.x1;
+        if (layer.has_holes)                                    /* else the map is all 0 */
         for (int y = by > r.y0 ? by : r.y0; y < by + layer.h && y < r.y1; y++) {
             const uint8_t *m = layer.hole + (size_t)(y - by) * layer.w - bx;
             uint32_t *row = c->px + (size_t)y * c->stride;

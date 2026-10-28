@@ -126,6 +126,36 @@ void node_invalidate(Node *n) {
     invalidate_measure(n);
 }
 
+/* Whether laying n out again would give what it already has: no text (its measure is cached within
+ * half a pixel of the width asked for) and no image (its size comes from the decoded file) in its
+ * subtree; everything else is computed from styles and sizes, which a change would have marked. */
+static int layout_pure(const Node *n, int *budget) {
+    if (n->type == NODE_TEXT || n->type == NODE_IMAGE || --*budget < 0) return 0;
+    for (const Node *c = n->first; c; c = c->next) if (!layout_pure(c, budget)) return 0;
+    return 1;
+}
+
+/* Only rotate, scaleX/Y or transformOrigin changed (what runtime/style.js makes of a transform: a
+ * spinner turning). Layout never reads them and place() computes every node's matrix on each
+ * layout_root, so node_invalidate's work that this skips gives the same results: the measure flag
+ * is read only by text nodes (none on the way up) and n's own layout pass is a pure one (layout_pure). */
+static int transform_only(const Node *n, const Style *before, const StyleExt *xb) {
+    if (!xb || !n->s.ext || n->type == NODE_RAW || n->type == NODE_TEXT) return 0;
+    if (memcmp(before, &n->s, sizeof *before)) return 0;        /* the same StyleExt, too */
+    StyleExt x;
+    const StyleExt *now = n->s.ext;
+    memcpy(&x, now, STYLE_EXT_VALUES);
+    memcpy(&x.scale_x, &xb->scale_x, sizeof x.scale_x);
+    memcpy(&x.scale_y, &xb->scale_y, sizeof x.scale_y);
+    memcpy(&x.rotate, &xb->rotate, sizeof x.rotate);
+    memcpy(&x.origin_x, &xb->origin_x, sizeof x.origin_x);
+    memcpy(&x.origin_y, &xb->origin_y, sizeof x.origin_y);
+    if (memcmp(&x, xb, STYLE_EXT_VALUES)) return 0;
+    for (const Node *p = n->parent; p; p = p->parent) if (p->type == NODE_TEXT) return 0;
+    int budget = 256;
+    return layout_pure(n, &budget);
+}
+
 void node_restyled(Node *n, const Style *before, const StyleExt *ext_before) {
     /* the same value (e.g. React confirms the position left by a drag in C): nothing to repaint */
     int ext_changed = n->s.ext && (!before->ext || memcmp(ext_before, n->s.ext, STYLE_EXT_VALUES));
@@ -137,7 +167,12 @@ void node_restyled(Node *n, const Style *before, const StyleExt *ext_before) {
         Style moved = *before;
         memcpy(moved.pos, n->s.pos, sizeof moved.pos);
         if (!ext_changed && n->s.absolute && before->absolute && !memcmp(&moved, &n->s, sizeof moved)) node_moved(n);
-        else node_invalidate(n);
+        else if (transform_only(n, before, ext_before)) {
+            /* repainted, placed again by its parent; its own layout and every measure are kept */
+            n->paint_dirty = 1;
+            n->s.ext->r.ok = 0;
+            node_moved(n);
+        } else node_invalidate(n);
     }
 }
 

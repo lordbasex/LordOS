@@ -3,7 +3,7 @@
 import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
-import { normalize, applyStyle } from './style.js';
+import { flatten, normalize, applyStyle } from './style.js';
 import { register, unregister, currentPriority, addListener } from './events.js';
 
 export { addListener };
@@ -66,10 +66,46 @@ globalThis.__lordScreen = () => {
   for (const fn of screenListeners) { try { fn(screen, old); } catch (e) { console.error('pantalla:', e?.message || e); } }
 };
 
+// For each instance, a copy of the flattened style that produced inst.style, as [key, value, key,
+// value, …] in its own order (a WeakMap, so the instance a ref sees is unchanged). It is kept only
+// when every value is a primitive and nothing in inst.style is NaN (null otherwise). A render whose
+// flattened style has the same keys, in the same order, with the same values (Object.is) then skips
+// normalize and sends nothing: normalize is pure, so it would give a style equal to inst.style and
+// applyStyle would send no call. It is a copy, not the props' object, so a style object changed in
+// place is still seen; the NaN rule keeps the calls applyStyle repeats because NaN !== NaN (a bad
+// '#zz' color).
+function flatCopy(flat, style) {
+  const out = [];
+  for (const k in flat) {
+    const v = flat[k];
+    if (v !== null && (typeof v === 'object' || typeof v === 'function')) return null;
+    out.push(k, v);
+  }
+  for (const k in style) {
+    const v = style[k];
+    if (v !== v || (Array.isArray(v) && v.some((x) => x !== x))) return null;
+  }
+  return out;
+}
+const flats = new WeakMap();
+function sameFlat(copy, flat) {
+  if (!copy) return false;
+  let i = 0;
+  for (const k in flat) {
+    if (i >= copy.length || copy[i] !== k || !Object.is(copy[i + 1], flat[k])) return false;
+    i += 2;
+  }
+  return i === copy.length;
+}
+
 function applyProps(inst, prev, next) {
-  const style = normalize(next.style);
-  applyStyle(inst.id, inst.style, style);
-  inst.style = style;
+  const flat = flatten(next.style);
+  if (!sameFlat(flats.get(inst), flat)) {
+    const style = normalize(flat);
+    applyStyle(inst.id, inst.style, style);
+    inst.style = style;
+    flats.set(inst, flatCopy(flat, style));
+  }
   if (prev.src !== next.src) lord.setProp(inst.id, 'src', next.src ?? null);
   if (prev.session !== next.session) lord.setProp(inst.id, 'session', next.session ?? 0);
   if (prev.surface !== next.surface) lord.setProp(inst.id, 'surface', next.surface ?? 0);

@@ -107,6 +107,11 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   - the layer remembers where the app holes are: exact alpha 0, distinguished from an empty
     background thanks to a sentinel value. They are reopened over the blend and the app is recorded
     at its new place (`wl_paint_holes(0)`).
+  - a window with no app surface skips that work (0.8.6, in development): `layer.has_holes` is 0
+    only while the hole map stands for all zeros, so `layer_holes` just turns the sentinel back into
+    0 and `layer_paint` doesn't walk the map. A part that brings the first hole into such a map zeroes
+    the rest of it first, so what is read is always what the full walk would have written. The
+    sentinel fill writes one row and copies it.
 - **There's no layer** if there is a backdrop blur inside (`backdropFilter`), or a video on the GPU
   path.
 - **A `canvas_blit` detail:** opaque pixels are copied directly (same result as blending, without
@@ -115,12 +120,18 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 ### Checking it (0.8.6, in development)
 
 - **`test_drag_exact`** (`server/tests/engine_test.c`, run by `make -C server test`) drags LordBench's
-  desktop scene along its figure of eight for 480 frames, plus four short runs (a text that resizes a
+  desktop scene along its figure of eight for 480 frames, plus seven short runs (a text that resizes a
   child, a child moving inside the window, a terminal's blinking cursor, a square turning across the
-  window's edge), on the CPU path and on the GPU path's canvas. Every frame's hash must match
+  window's edge, the window crossing x = 0 and y = 0 while the square turns, a child removed after
+  frames that only copy the layer and then the square turning again, and the drag on a display at
+  200 %; the last three with boxes and text at half pixels), on the CPU path and on the GPU path's
+  canvas. Every frame's hash must match
   `server/tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt`, written from the code before any change
   to this path: a faster frame has to give exactly the same pixels. The hashes are per architecture
-  (x86_64 so far); `make -C server drag-golden` writes them, only on the reference code.
+  (x86_64 so far); `make -C server drag-golden` writes them, only on the reference code. A run added
+  later gets its hashes the same way: the new test built against 001633b's code (with the few test entry
+  points it lacks added beside it, which must leave the earlier runs' hashes identical), never against
+  the code being checked.
 - **Against a full repaint** the test prints a second number, which may only go down: today a drag
   frame differs from a full repaint in at most 2,265 pixels on the CPU path (black pixels at the dragged
   window's rounded top corners) and 70,940 on the GPU path (one level darker in its shadow).
@@ -232,6 +243,23 @@ was checked against this path:
   clears `layout_ok` up to the root) and that gets the same box keeps its children's layout. Moving a
   window only changes its `left`/`top` (`grab.c` calls `node_moved`), so a frame of a drag lays out the
   desktop's top level and places the rest (`place()`), instead of laying out every window.
+- **A transform-only setStyle keeps the node's layout** (0.8.6, in development; `node_restyled` in
+  `ui/node.c`). A change of only `rotate`, `scaleX`, `scaleY` or `transformOriginX/Y` on a node that
+  already has its `StyleExt`, with no text node above it and no text or image in its subtree, marks
+  it for repaint and has its parent place it again (`node_moved`) instead of `node_invalidate`.
+  Layout never reads the transform and `place()` recomputes every matrix, so the result is the same;
+  only that node's own layout pass is saved (its ancestors are laid out as before).
+  `test_transform_restyle` compares every node's layout and every pixel with the `node_invalidate`
+  path. `'transform'` itself is not a key `lord.setStyle` takes and changes nothing.
+- **A main-loop pass with no timer due doesn't walk the timers** (0.8.6, in development;
+  `ui/js_prelude.h`). `__lordTick` keeps the earliest deadline and returns at once when it hasn't
+  come; when it has, one pass fires the due timers by deadline, then by id, as before. Clearing the
+  earliest timer marks that deadline stale and it is computed again before use, so the wait returned
+  to the main loop is the same number as before. lord-server makes the atoms of the three globals it
+  calls on every pass once per runtime. `build/timer-order-test` runs 400 random timer scripts on this
+  prelude and on the one before it and requires the same trace (callbacks, order, arguments, every
+  returned wait, logs). A tick with 200 timers pending and none due went from 158.75 µs to 0.30 µs
+  (VM 116).
 - **Text outside the clip is not laid out** (a list row scrolled away), and a cut "…" is remembered
   like a measurement.
 - **The node stays small:** the rare styles (per-side edges, per-corner radii, scale/rotate,

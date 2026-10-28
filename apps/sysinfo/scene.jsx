@@ -41,7 +41,7 @@ export function Scene() {
     const step = () => {
       a = (a + 6) % 360;
       const n = spin.current && spin.current.id;
-      if (n != null) try { lord.setStyle(n, 'transform', `rotate(${a}deg)`); } catch (e) { /* gone */ }
+      if (n != null) try { lord.setStyle(n, 'rotate', a); } catch (e) { /* gone */ }
       tm = setTimeout(step, TICK_MS);
     };
     tm = setTimeout(step, TICK_MS);

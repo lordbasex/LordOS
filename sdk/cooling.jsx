@@ -102,7 +102,7 @@ function useSpin(pct) {
       s.v += (target - s.v) * 0.12;
       if (target === 0 && s.v < 0.01) { s.v = 0; return; }
       s.a = (s.a + s.v * 360 / FPS) % 360;
-      for (const [node, k] of s.rotors) call(() => lord.setStyle(node, 'transform', `rotate(${(s.a * k).toFixed(1)}deg)`));
+      for (const [node, k] of s.rotors) call(() => lord.setStyle(node, 'rotate', +(s.a * k).toFixed(1)));
       tm = setTimeout(step, 1000 / FPS);
     };
     tm = setTimeout(step, 1000 / FPS);

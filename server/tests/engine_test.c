@@ -1442,16 +1442,17 @@ static void test_overlay_scrollbar(void) {
  * it, six cards with shadows and text; a rounded window below; a menu bar and a Dock with backdrop
  * blur) moved along LordBench's figure of eight (lbi_path, one step a frame as grab_script_tick does
  * by the clock) for 480 frames, the square turning 6° a frame through lord.setStyle's C path
- * (node_restyled; with 'rotate', what runtime/style.js makes of a transform: scene.jsx's own
- * setStyle(n, 'transform', …) is not a key lord.setStyle takes), and painted as main.c paints a frame
+ * (node_restyled with 'rotate', as scene.jsx sends it), and painted as main.c paints a frame
  * (paint_ui, then paint_out on one display).
  * Every frame's pixels are hashed (FNV-1a over the 32-bit pixels) and compared with
  * tests/drag_golden_cpu.txt and tests/drag_golden_gpu.txt, written from the code before the drag-frame
  * optimizations (001633b): those must give exactly the same pixels. "gpu" is the same run with
  * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
- * same CPU canvas the GPU uploads. Four shorter runs cover what makes the layer paint again: a text
+ * same CPU canvas the GPU uploads. Shorter runs cover what makes the layer paint again: a text
  * that changes a child's size, a child moving inside the window, a terminal whose cursor blinks
- * (damage from outside the tree) and a square turning across the window's edge.
+ * (damage from outside the tree), a square turning across the window's edge, the window crossing
+ * x = 0 and y = 0 while the square turns, a child removed after frames that only copy the layer and
+ * then the square turning again, and the whole drag on a display at 200 %.
  * The pixels that differ from a full repaint (paint_root_full, as LORD_PAINT_VERIFY) are printed as a
  * second number, which may only go down (today: black pixels at the dragged window's own rounded top
  * corners on the CPU path, its shadow one level darker on the GPU path).
@@ -1466,10 +1467,11 @@ static void test_overlay_scrollbar(void) {
 #endif
 
 enum { DW = 1024, DH = 640, DRAG_FRAMES = 480, CASE_FRAMES = 60, FULL_EVERY = 16 };
-enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_N };
-static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge" };
-static const int dc_frames[DC_N] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES };
-#define DC_HASHES (DRAG_FRAMES + 4 * CASE_FRAMES + DC_N)    /* each run: its frames and the one after the drag */
+enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_NEG, DC_REMOVE, DC_K2, DC_N };
+static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge", "neg", "remove", "k2" };
+static const int dc_frames[DC_N] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
+                                     CASE_FRAMES, CASE_FRAMES, CASE_FRAMES };
+#define DC_HASHES (DRAG_FRAMES + (DC_N - 1) * CASE_FRAMES + DC_N)  /* each run: its frames and the one after the drag */
 
 typedef struct { OutView v; Canvas c, ref; uint32_t *px, *rpx; } DOut;
 typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption; } DScene;
@@ -1620,9 +1622,22 @@ static DScene drag_scene(int dc, float x, float y) {
         Node *cap = dtext(c, label, 12, 0, 0x99ffffff);
         if (!i) s.caption = cap;
     }
-    if (dc == DC_CHILD) {                               /* a badge that slides inside the window */
+    if (dc == DC_CHILD || dc == DC_REMOVE) {            /* a badge that slides inside the window, or is removed */
         s.child = box_in(s.win, 40, 44, 14, 14, 0xffff453a);
         sn(s.child, "borderRadius", 7);
+    }
+    if (dc == DC_NEG || dc == DC_REMOVE || dc == DC_K2) {
+        /* odd widths centered in a column: boxes, shadows and text at half pixels, which a move by
+         * whole pixels must not round differently (across x = 0, at 200 %) */
+        Node *col = box_in(s.win, 24, 40, 210, 200, 0);
+        ss(col, "alignItems", "center");
+        sn(col, "gap", 7);
+        for (int i = 0; i < 4; i++) {
+            Node *c = dview(col, 101 + 2 * i, 31, 0x22ffffff, 6);
+            ss(c, "alignItems", "center"); ss(c, "justifyContent", "center");
+            dshadow(c, 0x50000000, 2, 7);
+            dtext(c, i & 1 ? "fig iq Wj 1.5" : "Half pixel label", 13, 0, 0xffffffff);
+        }
     }
     if (dc == DC_TERM) {                                /* a terminal, its cursor blinking */
         s.term = node_new(NODE_TERM);
@@ -1654,13 +1669,14 @@ static DScene drag_scene(int dc, float x, float y) {
     return s;
 }
 
-/* One run: case dc's scene, the drag (n frames), then the frame after it ends. hash gets n + 1
- * values; the largest count of pixels that differed from a full repaint goes to *full, the largest
- * difference of a channel to *worst. */
+/* One run: case dc's scene, the drag (n frames), then the frame after it ends, on o (a display at
+ * 100 %, or at 200 % for DC_K2). hash gets n + 1 values; the largest count of pixels that differed
+ * from a full repaint goes to *full, the largest difference of a channel to *worst. */
 static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
     const int n = dc_frames[dc];
-    const float x0 = (DW - 760) / 2, y0 = 28 + (DH - 28 - 480) / 2;       /* scenePath: centered in the work area */
+    float x0 = (DW - 760) / 2, y0 = 28 + (DH - 28 - 480) / 2;             /* scenePath: centered in the work area */
     const float rx = (DW - 760) / 2 - 20, ry = (DH - 28 - 480) - 40;
+    if (dc == DC_NEG) { x0 = -200; y0 = -120; }        /* partly off the display's top-left corner */
     DScene s = drag_scene(dc, x0, y0);
     term_cursor = 1;
     term_at = (Box){ 0, 0, 0, 0 };
@@ -1676,6 +1692,7 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
     for (int f = 0; f < n; f++) {
         float dx, dy;
         lbi_path(rx, ry, 6000, f * (1000.0 / 60), &dx, &dy);
+        if (dc == DC_NEG) { dx = 6 * f; dy = 4 * f; }   /* its left edge crosses x = 0, its top y = 0 */
         float x = x0 + roundf(dx), y = y0 + roundf(dy);  /* grab_motion */
         if (x != gx || y != gy) {
             gx = x; gy = y;
@@ -1685,7 +1702,9 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
             ui.dirty = 1;
         }
         rot = fmodf(rot + 6, 360);                      /* scene.jsx's square, every 16 ms */
-        if (dc == DC_DRAG) js_set(s.spin, "rotate", rot);   /* the others: only their own change */
+        if (dc == DC_DRAG || dc == DC_NEG || dc == DC_K2) js_set(s.spin, "rotate", rot);  /* the others: their own */
+        if (dc == DC_REMOVE && f % 10 == 0) js_set(s.spin, "rotate", rot);  /* frames between only copy the layer */
+        if (dc == DC_REMOVE && f == 35) node_detach(s.child);
         if (dc == DC_EDGE) js_set(s.edge, "rotate", rot);
         if (dc == DC_CHILD) js_set(s.child, "left", 40 + (f * 5) % 640);
         if (dc == DC_TEXT && f % 15 == 7)               /* lord.setText on the caption: one line or two */
@@ -1763,14 +1782,23 @@ static int gold_write(const char *path, const char *variant, const uint64_t *has
 
 static void test_drag_exact(int write) {
     static const char *const variant[2] = { "cpu", "gpu" };
-    DOut o = { 0 };
+    DOut o = { 0 }, o2 = { 0 };                        /* the display at 100 %, and at 200 % (DC_K2) */
     o.v = out_view(0, 0, DW, DH, 100);
+    o2.v = out_view(0, 0, 2 * DW, 2 * DH, 200);
     o.px = calloc((size_t)DW * DH, 4);
     o.rpx = calloc((size_t)DW * DH, 4);
+    o2.px = calloc((size_t)4 * DW * DH, 4);
+    o2.rpx = calloc((size_t)4 * DW * DH, 4);
     uint64_t *hash = malloc(sizeof *hash * DC_HASHES);
-    if (!o.px || !o.rpx || !hash) { CHECK(0, "drag-exact: out of memory"); free(o.px); free(o.rpx); free(hash); return; }
+    if (!o.px || !o.rpx || !o2.px || !o2.rpx || !hash) {
+        CHECK(0, "drag-exact: out of memory");
+        free(o.px); free(o.rpx); free(o2.px); free(o2.rpx); free(hash);
+        return;
+    }
     canvas_init(&o.c, o.px, DW, DH, DW);
     canvas_init(&o.ref, o.rpx, DW, DH, DW);
+    canvas_init(&o2.c, o2.px, 2 * DW, 2 * DH, 2 * DW);
+    canvas_init(&o2.ref, o2.rpx, 2 * DW, 2 * DH, 2 * DW);
     for (int g = 0; g < 2; g++) {
         test_gpu = g;
         char path[64];
@@ -1782,7 +1810,7 @@ static void test_drag_exact(int write) {
         paint_layer_parts();
         paint_layer_stats(&renders, &blits);
         for (int dc = 0; dc < DC_N; dc++) {
-            drag_run(dc, &o, hash + k, &fullw[dc], &worst[dc]);
+            drag_run(dc, dc == DC_K2 ? &o2 : &o, hash + k, &fullw[dc], &worst[dc]);
             k += dc_frames[dc] + 1;
         }
         parts = paint_layer_parts();
@@ -1818,7 +1846,140 @@ static void test_drag_exact(int write) {
     test_gpu = 0;
     free(o.px);
     free(o.rpx);
+    free(o2.px);
+    free(o2.rpx);
     free(hash);
+}
+
+/* ---- A setStyle that only turns or scales a node (node_restyled's transform-only path) ----
+ * Two copies of one tree: A takes rotate/scaleX/scaleY/transformOriginX through node_restyled (which
+ * keeps the node's own layout and every measure when that gives the same results), B through what
+ * node_restyled did before (node_invalidate on any change). Between the turns, both get the same
+ * other changes (a width that moves by fractions of a pixel, a font size, the root's size), so text
+ * measured within its half-pixel cache is in play. Every node must lay out exactly the same (box,
+ * absolute position, matrices, text measure) and both trees must paint the same pixels. 'transform'
+ * itself (apps/sysinfo/scene.jsx, sdk/cooling.jsx) is no key lord.setStyle takes: it changes nothing. */
+typedef struct { Node *root, *col, *label, *spin[5]; } TScene;
+
+static TScene tr_scene(void) {
+    TScene t;
+    t.root = view(NULL);
+    sn(t.root, "backgroundColor", 0xfff2f2f7);
+    ss(t.root, "flexDirection", "row"); ss(t.root, "flexWrap", "wrap");
+    t.col = dview(t.root, 180, 0, 0xffffffff, 8);
+    t.label = dtext(t.col, "A label that wraps over more than one line of this column", 13, 0, 0xff202020);
+    t.spin[0] = dview(t.col, 40, 40, 0xff0a84ff, 10);                  /* a leaf */
+    t.spin[1] = dview(t.root, 72, 72, 0xff34c759, 16);                  /* with a box inside */
+    ss(t.spin[1], "alignItems", "center"); ss(t.spin[1], "justifyContent", "center");
+    dview(t.spin[1], 24, 24, 0xffffffff, 12);
+    Node *abs = dview(t.spin[1], 10, 10, 0xffff9500, 0);
+    ss(abs, "position", "absolute"); sn(abs, "left", 2); sn(abs, "top", 3);
+    t.spin[2] = dview(t.root, 0, 0, 0xffff3b30, 6);                     /* with text inside: invalidated */
+    sn(t.spin[2], "paddingLeft", 4); sn(t.spin[2], "paddingRight", 4); sn(t.spin[2], "paddingTop", 2);
+    dtext(t.spin[2], "Turning words", 12, 600, 0xffffffff);
+    Node *tt = dtext(t.root, "Text around ", 14, 0, 0xff000000);       /* a box under a text node */
+    t.spin[3] = dview(tt, 12, 12, 0xff5856d6, 0);
+    t.spin[4] = dview(t.root, 0, 30, 0xffaf52de, 4);                    /* sized by flex */
+    sn(t.spin[4], "flexGrow", 1);
+    return t;
+}
+
+static int tr_same(const Node *a, const Node *b, int *bad) {
+    int n = 1;
+    if (a->type != b->type || a->x != b->x || a->y != b->y || a->w != b->w || a->h != b->h || a->ax != b->ax ||
+        a->ay != b->ay || a->own_tf != b->own_tf || a->has_tf != b->has_tf ||
+        (a->type == NODE_TEXT && (a->measure_w != b->measure_w || a->measure_h != b->measure_h)) ||
+        (a->has_tf && (memcmp(&a->tf->own, &b->tf->own, sizeof a->tf->own) || memcmp(&a->tf->world, &b->tf->world, sizeof a->tf->world) ||
+                       memcmp(&a->tf->inv, &b->tf->inv, sizeof a->tf->inv)))) (*bad)++;
+    const Node *ca = a->first, *cb = b->first;
+    for (; ca && cb; ca = ca->next, cb = cb->next) n += tr_same(ca, cb, bad);
+    if (ca || cb) (*bad)++;
+    return n;
+}
+
+/* what node_restyled did with a changed transform before the fast path */
+static void tr_set_old(Node *n, const char *k, double v) {
+    Style before = n->s;
+    StyleExt xb;
+    if (n->s.ext) memcpy(&xb, n->s.ext, STYLE_EXT_VALUES);
+    style_set_number(&n->s, k, v);
+    if (memcmp(&before, &n->s, sizeof before) || !before.ext || memcmp(&xb, n->s.ext, STYLE_EXT_VALUES)) node_invalidate(n);
+}
+
+static void test_transform_restyle(void) {
+    ui_reset();
+    TScene a = tr_scene(), b = tr_scene();
+    enum { TW = 420, TH = 300 };
+    uint32_t *pa = calloc((size_t)TW * TH, 4), *pb = calloc((size_t)TW * TH, 4);
+    Canvas ca, cb;
+    canvas_init(&ca, pa, TW, TH, TW);
+    canvas_init(&cb, pb, TW, TH, TW);
+    long bad = 0, nodes = 0, pxbad = 0;
+    int fast = 0, slow = 0;
+    const char *const key[] = { "rotate", "scaleX", "scaleY", "transformOriginX", "transformOriginY" };
+    for (int f = 0; f < 120; f++) {
+        if (f % 7 == 3) { sn(a.col, "width", 180 + (f % 5) * 0.3); sn(b.col, "width", 180 + (f % 5) * 0.3); }
+        if (f % 11 == 5) { sn(a.label, "fontSize", 13 + (f % 3)); sn(b.label, "fontSize", 13 + (f % 3)); }
+        for (int i = 0; i < 5; i++) {
+            const char *k = key[f % 9 < 5 ? 0 : (f % 9 - 4)];
+            double v = k == key[0] ? f * 7 + i * 13 : k == key[3] || k == key[4] ? 4 + (f % 5) * 2.5 : 0.55 + (f % 4) * 0.125;
+            Node *n = a.spin[i];
+            int had = n->s.ext != NULL, lok = n->layout_ok;
+            ui.dirty = 0;
+            js_set(n, k, v);
+            tr_set_old(b.spin[i], k, v);
+            if (had && lok && i != 2 && i != 3) {
+                fast += n->layout_ok;
+                CHECK(ui.dirty && n->paint_dirty && !n->parent->layout_ok, "transform-only change not repainted or placed");
+            }
+            if (i == 2 || i == 3) { slow++; CHECK(!n->layout_ok, "node %d: laid out from its cache with text in the way", i); }
+        }
+        float w = TW - (f % 4) * 0.2f, h = TH;
+        layout_root(a.root, w, h);
+        layout_root(b.root, w, h);
+        int nb = 0;
+        nodes += tr_same(a.root, b.root, &nb);
+        bad += nb;
+        paint_damage(a.root);
+        paint_damage(b.root);
+        ui.damage = (Box){ 0, 0, 0, 0 };
+        canvas_clear(&ca, 0);
+        canvas_clear(&cb, 0);
+        paint_root_full(&ca, a.root);
+        paint_root_full(&cb, b.root);
+        for (size_t i = 0; i < (size_t)TW * TH; i++) pxbad += pa[i] != pb[i];
+    }
+    CHECK(bad == 0, "transform-only setStyle: %ld of %ld node layouts differ", bad, nodes);
+    CHECK(pxbad == 0, "transform-only setStyle: %ld pixels differ", pxbad);
+    CHECK(fast > 300, "the transform-only path was not taken (%d)", fast);
+    CHECK(slow == 240, "text cases: %d", slow);
+
+    /* 'transform' (not a key): nothing set, nothing marked */
+    Node *n = a.spin[0];
+    layout_root(a.root, TW, TH);
+    paint_damage(a.root);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    ui.dirty = 0;
+    Style before = n->s;
+    StyleExt xb;
+    memcpy(&xb, n->s.ext, STYLE_EXT_VALUES);
+    int lok = n->layout_ok, plok = n->parent->layout_ok;
+    CHECK(style_set_string(&n->s, "transform", "rotate(30deg)") != 0, "'transform' became a style key");
+    node_restyled(n, &before, &xb);
+    CHECK(!ui.dirty && !n->paint_dirty && n->layout_ok == lok && n->parent->layout_ok == plok &&
+          !memcmp(&before, &n->s, sizeof before) && !memcmp(&xb, n->s.ext, STYLE_EXT_VALUES),
+          "setStyle 'transform' changed something");
+    Node *bare = dview(a.root, 10, 10, 0xff000000, 0);                   /* no StyleExt yet */
+    layout_root(a.root, TW, TH);
+    paint_damage(a.root);
+    ui.dirty = 0;
+    before = bare->s;
+    style_set_string(&bare->s, "transform", "scale(2)");
+    node_restyled(bare, &before, NULL);
+    CHECK(!ui.dirty && !bare->paint_dirty && !bare->s.ext, "setStyle 'transform' on a plain node changed something");
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    free(pa);
+    free(pb);
 }
 
 #endif
@@ -2025,6 +2186,7 @@ int main(int argc, char **argv) {
     test_damage_fuzz();
     test_grow_wrap_height();
     test_overlay_scrollbar();
+    test_transform_restyle();
     printf("engine-test: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 #endif

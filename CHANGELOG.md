@@ -201,6 +201,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     architecture's): any change to a frame fails. The test also prints how many pixels differ from a full repaint:
     today at most 2,265 per frame on the CPU path, with black pixels at the dragged window's rounded top corners, and
     70,940 on the GPU path, one level darker in the window's shadow. About 11 s on VM 116.
+  - **Three more runs** (the test's cases a reviewer found missing): `neg`, the window starting at (−200, −120) and
+    moving 6 px right and 4 px down a frame, so its left edge crosses x = 0 and its top y = 0 while the square turns;
+    `remove`, a badge inside the window removed (`node_detach`) at frame 35, after frames that only copy the layer
+    (the square turns every 10th frame), then the square turning again at frame 40; and `k2`, the whole drag on a
+    2048×1280 display at 200 %. These three add a column of boxes with odd widths, shadows and text centered at half
+    pixels. Their 183 hashes per path were written by `make drag-golden` on 001633b's code (the four functions the
+    test calls that 001633b lacks, `node_restyled`, `paint_root_clear`, `paint_root_full` and `paint_layer_parts`,
+    added beside it unchanged or as a no-op count; the first five runs' 725 hashes came out identical to the
+    committed ones, which checks that), and the current code passes all 908 on both paths. Each run catches a change
+    the first five miss (checked by breaking the code on purpose): partial repaints across x = 0 (`neg`, 42 of 61
+    frames), a node's part trusted after outside damage mapped through a stale `layer.at` (`remove`, 20 frames from
+    frame 40) and a part's box computed without the display scale (`k2`, 59 frames). The whole of `engine-test` takes
+    about 15 s on VM 116 (11 s before).
   - **`LORD_PAINT_VERIFY=N`** (lord-server's environment): every N-th frame of each display is compared with a full
     repaint of the tree into a scratch canvas (`paint_root_full`: no drag layer, no copy of what is below it, no
     skipped node; the GPU path's list of app windows is kept), and the count of differing pixels goes to stderr.
@@ -211,7 +224,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
-- **Less work in a dragged window's frame, same pixels** (in development for 0.8.6; the first two steps of making a
+- **Less work in a dragged window's frame, same pixels** (in development for 0.8.6; the first steps of making a
   drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
   paths (VM 116, x86_64); the time saved has not been measured yet.
   - **No clear under the copy of what is below the window:** `paint_root_clear` (`ui/paint.c`) replaces
@@ -232,9 +245,74 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     whose em isn't a power of two of at most 2048 units, as Inter's is (`text_drew_inexact`), an unchanged transformed node, an app window or a video inside
     (`layer_part_exact`, `layer_note_exact`). A transformed node's image steps its bilinear weights from the first
     pixel of each row, so a part cutting it on the left would change them; `canvas_affine_watch`/`canvas_affine_cut`
-    (`canvas.c`) report that and the layer is painted whole. In `test_drag_exact` 606 of the 611 layer renders are now
-    parts (before: 6, the terminal's); the other 5 are each run's first. Every golden hash is unchanged on both paths.
+    (`canvas.c`) report that and the layer is painted whole. In `test_drag_exact`'s first five runs 366 of the 611
+    layer renders are now parts (before: 6, the terminal's), and 438 of 738 with the three runs added later. Every golden hash is unchanged on both paths.
     With neither the margin nor the watch, 160 frames per path fail; with the watch but no margin, they all pass.
+  - **GPU path: no app-hole walk for a window without app windows, and a faster sentinel fill** (`ui/paint.c`). The
+    layer's hole map now carries a flag, `layer.has_holes`, that is 0 only while the map stands for all zeros; then
+    `layer_holes` only turns the sentinel back into 0 (it no longer writes zeros over zeros) and `layer_paint` skips
+    the per-pixel walk that reopens app holes over the blit, which for a window with no app surface never wrote
+    anything. The flag is recomputed from what a whole-map pass wrote, a part pass can only raise it, and a part that
+    brings the first hole into a map that had none zeroes the rest of the map first, so the map is byte for byte what
+    the old code would have read. `layer_fill` fills one row with the sentinel and copies it to the others. Checked:
+    the golden hashes (GPU path), and a differential run of the frame against 001633b's `paint.c` with an app window
+    inside the dragged window (half of it an alpha-0 hole), present from the start and removed at frame 60, or
+    appended at frame 40, identical on both paths over 3,874 frame hashes; with the walk always skipped, 139 of them
+    differ.
+  - **A setStyle that only turns or scales a node no longer lays that node out again** (`node_restyled` in
+    `ui/node.c`). When the only change is `rotate`, `scaleX`, `scaleY` or `transformOriginX/Y` (what
+    `runtime/style.js` makes of a `transform`), the node already had its `StyleExt`, it isn't a text node and has no
+    text node above it, and its subtree has no text or image (at most 256 nodes), the node is marked for repaint and
+    placed again by its parent (`node_moved`) instead of `node_invalidate`: its own layout pass and the measure flags
+    are kept. That gives the same layout by construction: layout never reads the transform, `place()` computes every
+    node's matrix on each `layout_root`, the measure flag is read only by text nodes, and a subtree without text or
+    images lays out from styles and sizes alone. Its ancestors are still laid out again, as before, so the saving is
+    only that node's own pass (small: LordBench's square has one child). `setStyle(n, 'transform', …)` is
+    still not a key `lord.setStyle` takes and still changes and marks nothing. Checked by `test_transform_restyle` (`engine-test`): two copies of a tree, one through `node_restyled`
+    and one through `node_invalidate`, 120 frames of turns and scales on five nodes (a leaf, one with boxes inside,
+    one with text inside, one under a text node, one sized by flex) mixed with a column width moving by 0.3 px, a font
+    size and a root width moving by 0.2 px: every node's box, absolute position, matrices and text measure, and
+    every pixel, are equal; the 'transform' key changes nothing. The golden hashes are unchanged (the drag's square
+    now takes this path) and the frame against 001633b's `f_set_style` logic is identical in the differential run.
+  - **The JS timers no longer look at every pending timer on each pass of the main loop** (`ui/js_prelude.h`, the
+    polyfills moved out of `ui/js.c` unchanged otherwise). `__lordTick` keeps the earliest deadline (`minAt`, lowered
+    by every `setTimeout`/`setInterval`/`setImmediate`) and returns at once when nothing is due; when something is,
+    one pass collects the due timers without building an `[id, timer]` pair per timer and computes the next deadline.
+    Due timers still run by deadline, then by id, each at most once per tick, a timer set during the tick waits for
+    the next one, and one cleared before its turn doesn't run. Clearing the earliest timer marks `minAt` stale and it
+    is computed again before it is used, so the wait the tick returns to the main loop is the same number, not only
+    the same order. lord-server also makes the atoms of `__lordTick`, `__lordWantsFrame` and `__lordFrame` once per
+    runtime (`call_hot`) instead of on every call; the function is still looked up each time, so the recovery
+    screen's replacements are the ones run. Checked by `build/timer-order-test` (`make -C server test`): 400 seeded
+    random scripts run on this prelude and on 001633b's, in QuickJS, with timeouts, intervals and immediates at
+    equal, zero, negative, fractional, NaN and string delays, clears of pending, due, fired, unknown and string ids,
+    timers set and cleared from inside callbacks, callbacks that throw, and ticks whose `now` is behind the clock
+    `lord.now()` reads (a clock that moves on every read, so both must also read it the same number of times):
+    427,538 callbacks and 21.6 MB of trace (what runs, in which order, with which arguments, every value the tick
+    returns as `%.17g`, and what is logged) are identical. Breaking the code on purpose fails it: firing by id alone,
+    400 of 400 scripts differ; not recomputing after the earliest timer is cleared, 397. A tick with 200 timers
+    pending and none due: 158.75 µs before, 0.30 µs now (`build/timer-order-test bench`, VM 116, x86_64).
+  - **Fewer React renders and style conversions that change nothing** (`runtime/index.js`,
+    `apps/sysinfo/performance.jsx`). `applyProps` keeps, per node (a `WeakMap`, so the instance a ref sees is
+    unchanged), a copy of the flattened style it last converted, as keys and values in their order, and only when
+    every value is a primitive and no converted value is NaN. A render whose flattened style has the same keys in the
+    same order with the same values (`Object.is`) skips `normalize` and `applyStyle`: `normalize` is pure (no
+    direction, theme or state), so it would give an equal style and `applyStyle` would send no call. A style object
+    changed in place is still seen (the copy is compared, not the object), a different key order is not skipped
+    (later keys override earlier ones: `margin` then `marginTop`), and a NaN (a bad `#zz` color, a gradient without
+    an angle) keeps the old behaviour of re-sending that property on every render. Object values (a `transform`
+    list) are never skipped. LordBench's Performance view no longer re-renders on a 500 ms poll that brings the same
+    state, mode, step and progress as the last one (a result or a start error always counts as new). Checked by
+    `tests/runtime_props_test.mjs` (`make -C server test`; needs node and `node_modules`, so it is skipped on VM 116,
+    which has no node): fuzzed trees of 24 nodes (views, texts, images, an `Activity` that hides and shows half of
+    them, reorders and removals) over 8 seeds × 300 renders, with styles kept as the same object, copied, changed in
+    place, reordered, partly undefined, as arrays, with NaN, −0, overrides and transforms. The bundle with the skip and
+    the same bundle with it turned off send identical `lord.*` call sequences and end with identical styles (72,322
+    lines; 31,498 of 53,311 `applyProps` calls skipped; on the Mac). Breaking the skip on purpose fails it: without
+    the NaN rule all 8 seeds differ; in scratch runs, comparing keys without their order 6 of 6 seeds and comparing
+    the props' object instead of a copy 3 of 3. The Performance view rendered with a scripted run (waiting, three
+    steps, a mode change, cancelled) gives the same native call log with 001633b's view and this one, with 146
+    instead of 356 `applyProps` calls. No C code changed; the golden hashes and `engine-test` pass as before.
 
 ### Fixed
 
@@ -333,6 +411,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   to 11 rectangles and this one gives one is not investigated.
   LordBench's desktop mode in the headless harness (three runs each): 58.9-60.0 fps, build p50 1.25-1.26 ms and p99
   5.9-7.6 ms before; 60.0 fps, p50 1.24-1.27 ms and p99 5.95-6.32 ms after.
+- **LordBench's turning square and the Cooling page's fans now turn** (approved by the maintainer on 2026-10-28).
+  `apps/sysinfo/scene.jsx` and `sdk/cooling.jsx` called `lord.setStyle(n, 'transform', 'rotate(…deg)')`, and
+  `transform` is not a key the engine takes (it only logged `js: unsupported style 'transform'`), so the desktop
+  test's square never turned and the fans only jumped when React rendered them. They now send the engine's own
+  `rotate` key in degrees (the fans keep `toFixed(1)`, the same angle React sends). The desktop test's window is no
+  longer static: its layer is repainted (in part, where exact) every frame, so desktop-test numbers from before this
+  change measured a lighter scene and aren't comparable.
+
 - **The desktop under load** (found by LordBench's desktop test; `docs/BENCHMARK.md`, "The desktop under load"): the
   compositor's cgroup (`server`) had the same `cpu.weight` as every app scope, and nice values don't count between
   cgroups, so an app keeping every core busy took half of the compositor's CPU even at nice 19. On a Raspberry Pi 5

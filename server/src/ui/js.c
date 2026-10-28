@@ -47,43 +47,7 @@ static JSRuntime *rt;
 static JSContext *ctx;
 static void set_screen_displays(JSValue screen);
 
-/* Minimal polyfills: the real event loop is lord-server's (main.c). */
-static const char prelude[] =
-    "(function(){\n"
-    "const g = globalThis;\n"
-    "const fmt = v => typeof v === 'string' ? v : v instanceof Error ? (v.message + '\\n' + (v.stack || '')) :\n"
-    "  (() => { try { return JSON.stringify(v); } catch (e) { return String(v); } })();\n"
-    "const out = p => (...a) => lord.log(p + a.map(fmt).join(' '));\n"
-    "g.console = { log: out(''), info: out(''), debug: out(''), warn: out('[warn] '), error: out('[error] ') };\n"
-    "g.performance = { now: () => lord.now() };\n"
-    "let nextId = 1; const timers = new Map();\n"
-    "const add = (fn, ms, args, repeat) => { const id = nextId++; ms = Math.max(0, +ms || 0);\n"
-    "  timers.set(id, { fn, args, at: lord.now() + ms, ms, repeat }); return id; };\n"
-    "g.setTimeout = (fn, ms, ...a) => add(fn, ms, a, false);\n"
-    "g.setInterval = (fn, ms, ...a) => add(fn, ms, a, true);\n"
-    "g.setImmediate = (fn, ...a) => add(fn, 0, a, false);\n"
-    "g.clearTimeout = g.clearInterval = g.clearImmediate = id => { timers.delete(id); };\n"
-    "g.queueMicrotask = fn => { Promise.resolve().then(fn); };\n"
-    "let frames = new Map(), frameId = 1;\n"
-    "g.requestAnimationFrame = fn => { const id = frameId++; frames.set(id, fn); return id; };\n"
-    "g.cancelAnimationFrame = id => { frames.delete(id); };\n"
-    "g.__lordTick = now => {\n"
-    "  const due = [];\n"
-    "  for (const [id, t] of timers) if (t.at <= now) due.push([id, t]);\n"
-    "  due.sort((a, b) => a[1].at - b[1].at || a[0] - b[0]);\n"
-    "  for (const [id, t] of due) {\n"
-    "    if (!timers.has(id)) continue;\n"
-    "    if (t.repeat) t.at = now + Math.max(t.ms, 1); else timers.delete(id);\n"
-    "    try { t.fn(...t.args); } catch (e) { console.error('timer:', e); }\n"
-    "  }\n"
-    "  now = lord.now(); let next = -1;\n"
-    "  for (const t of timers.values()) { const d = Math.max(0, t.at - now); if (next < 0 || d < next) next = d; }\n"
-    "  return next;\n"
-    "};\n"
-    "g.__lordWantsFrame = () => frames.size > 0;\n"
-    "g.__lordFrame = now => { const f = frames; frames = new Map();\n"
-    "  for (const fn of f.values()) { try { fn(now); } catch (e) { console.error('raf:', e); } } };\n"
-    "})();\n";
+#include "js_prelude.h"         /* the polyfills: console, timers, animation frames */
 
 static double now_ms(void) {
     struct timespec t;
@@ -353,8 +317,8 @@ static int eval(const char *src, size_t len, const char *name) {
     return ok ? 0 : -1;
 }
 
-static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
-    JSValue g = JS_GetGlobalObject(ctx), f = JS_GetPropertyStr(ctx, g, name), r = JS_UNDEFINED;
+static JSValue call_global_atom(JSAtom name, int argc, JSValueConst *argv) {
+    JSValue g = JS_GetGlobalObject(ctx), f = JS_GetProperty(ctx, g, name), r = JS_UNDEFINED;
     if (JS_IsFunction(ctx, f)) {
         r = JS_Call(ctx, f, g, argc, argv);
         if (JS_IsException(r)) { dump_exception(ctx); r = JS_UNDEFINED; }
@@ -362,6 +326,28 @@ static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
     JS_FreeValue(ctx, f);
     JS_FreeValue(ctx, g);
     return r;
+}
+
+static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
+    JSAtom a = JS_NewAtom(ctx, name);
+    JSValue r = call_global_atom(a, argc, argv);
+    JS_FreeAtom(ctx, a);
+    return r;
+}
+
+/* The globals called on every pass of the main loop: their atoms are made once per runtime (the
+ * function is still looked up on each call, so the recovery screen's replacements are the ones run) */
+enum { HOT_TICK, HOT_WANTS_FRAME, HOT_FRAME, HOT_N };
+static const char *const hot_name[HOT_N] = { "__lordTick", "__lordWantsFrame", "__lordFrame" };
+static JSAtom hot_atom[HOT_N];
+static JSRuntime *hot_rt;
+
+static JSValue call_hot(int which, int argc, JSValueConst *argv) {
+    if (hot_rt != rt) {
+        for (int i = 0; i < HOT_N; i++) hot_atom[i] = JS_NewAtom(ctx, hot_name[i]);
+        hot_rt = rt;
+    }
+    return call_global_atom(hot_atom[which], argc, argv);
 }
 
 /* Reads a bundle of LordOS's own code through the verified-code check (sec/codesig.c): the bytes
@@ -594,6 +580,8 @@ int js_app_recovery(void) {
 void js_shutdown(void) {
     media_shutdown();                   /* the lord-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
+    if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
+    hot_rt = NULL;
     if (ctx) JS_FreeContext(ctx);
     if (rt) JS_FreeRuntime(rt);
     ctx = NULL;
@@ -602,7 +590,7 @@ void js_shutdown(void) {
 
 double js_tick(double now) {
     JSValue arg = JS_NewFloat64(ctx, now);
-    JSValue r = call_global("__lordTick", 1, &arg);
+    JSValue r = call_hot(HOT_TICK, 1, &arg);
     double next = -1;
     JS_ToFloat64(ctx, &next, r);
     JS_FreeValue(ctx, r);
@@ -611,7 +599,7 @@ double js_tick(double now) {
 }
 
 int js_wants_frame(void) {
-    JSValue r = call_global("__lordWantsFrame", 0, NULL);
+    JSValue r = call_hot(HOT_WANTS_FRAME, 0, NULL);
     int w = JS_ToBool(ctx, r);
     JS_FreeValue(ctx, r);
     return w;
@@ -619,7 +607,7 @@ int js_wants_frame(void) {
 
 void js_frame(double now) {
     JSValue arg = JS_NewFloat64(ctx, now);
-    JS_FreeValue(ctx, call_global("__lordFrame", 1, &arg));
+    JS_FreeValue(ctx, call_hot(HOT_FRAME, 1, &arg));
     drain_jobs();
 }
 
