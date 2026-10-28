@@ -61,6 +61,7 @@ void wl_paint_kept(void);                /* and notes them again in another fram
 void wl_paint_save(void);                /* keeps the frame's list of windows (LORD_PAINT_VERIFY) */
 void wl_paint_restore(void);             /* and puts it back */
 void wl_paint_holes(int on);             /* 0: wl_paint only notes the window, without opening the hole */
+int  wl_draws_meet(Rect r);              /* GPU path: an app window noted below the UI (layer 0) meets r (physical px of the view being painted) */
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op);
 void wl_paint_popups(Canvas *c);
 

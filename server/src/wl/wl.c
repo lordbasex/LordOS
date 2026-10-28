@@ -2144,6 +2144,21 @@ void wl_paint_restore(void) {
     memcpy(ndraws, verify_n, sizeof ndraws);
 }
 
+/* G0 (ui/paint.c): whether an app window noted so far for layer 0 is drawn into r (physical px of the
+ * display being painted): its box as draw_surface gives it, one pixel more on each side for the
+ * filtering, cut by its clip. A window that is gone is not drawn. */
+int wl_draws_meet(Rect r) {
+    for (int i = 0; i < ndraws[0]; i++) {
+        const Draw *d = &draws[0][i];
+        const Surf *s = find(d->sid);
+        if (!s) continue;
+        Rect b = rect_and(phys_rect(d->clip), (Rect){ (int)floorf(PVX(d->x)) - 1, (int)floorf(PVY(d->y)) - 1,
+                                                      (int)ceilf(PVX(d->x + s->lw)) + 1, (int)ceilf(PVY(d->y + s->lh)) + 1 });
+        if (b.x0 < r.x1 && r.x0 < b.x1 && b.y0 < r.y1 && r.y0 < b.y1) return 1;
+    }
+    return 0;
+}
+
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) {
     Surf *s = find(id);
     if (!s || s->role != R_TOPLEVEL) return;

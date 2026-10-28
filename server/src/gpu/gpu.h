@@ -66,6 +66,41 @@ int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h);
  * draw_layer(0) = app windows (below the UI), draw_layer(1) = app menus and
  * fullscreen (on top). */
 int  gpu_frame(int out, const Canvas *scene, Rect damage, void (*draw_layer)(int layer));
+
+/* G0: the dragged window composited on the GPU with the CPU's own arithmetic (docs/GPU.md, "The
+ * dragged window on the GPU"). paint_root_g0 (ui/paint.c) leaves the window's rectangle w out of the
+ * scene and fills this; one shader then writes, inside w, the layer (lpx) over the copy of what is
+ * below (bpx) exactly as canvas_blit's blit_row does. The two are textures of their own, uploaded
+ * only where they changed (ldirty, bdirty; *full: all of it). */
+#define G0_DIRTY 8
+typedef struct GpuG0 {
+    Rect w;                             /* where the shader writes (the output's physical px, top-down) */
+    const uint32_t *lpx;                /* the layer: lw × lh, its pixel (0, 0) at (lx, ly) */
+    int lw, lh, lx, ly;
+    const uint32_t *bpx;                /* the copy of what is below: bw × bh, the scene's size */
+    int bw, bh;
+    Rect ldirty[G0_DIRTY], bdirty[G0_DIRTY];    /* in the layer's and the copy's pixels */
+    int nl, nb, lfull, bfull;
+    Rect strip[4];                      /* what the CPU painted around w this frame (uploaded to the UI texture) */
+    int nstrip;
+    const uint32_t *ref;                /* LORD_GPU_VERIFY: the CPU's pixels for w (w's width a row), or NULL */
+    long frame;                         /* its number, for the log */
+} GpuG0;
+/* 1 if G0 may be used on that output: the shader has 24-bit floats, LORD_G0 is not 0, the self-test
+ * (every valid premultiplied combination, and a placement pass at least as large as the output, drawn
+ * into a framebuffer and read back) gave the CPU's pixels. gpu_init runs that test, once per GL renderer
+ * and version. */
+int  gpu_g0_ready(int out);
+/* gpu_frame with several UI rectangles to upload and, with g0, the window composited over w (g0
+ * without dirty rectangles redraws the last one: a frame with no UI damage while the scene's w is
+ * stale). Returns -1 like gpu_frame; *g0_drawn says whether the G0 quad was drawn. -2: g0 was given but
+ * its quad could not be drawn (G0 turned off, or its textures are not that output's): nothing was
+ * shown, and the caller paints w on the CPU in its next frame. */
+int  gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuG0 *g0, int *g0_drawn,
+                  void (*draw_layer)(int layer));
+int  gpu_g0_holds(int out);             /* the G0 textures hold that output's last upload, in this context */
+/* uploaded pixels of the copy of what is below and of the layer, and G0 quads drawn, since the last call */
+void gpu_g0_stats(long *below_px, long *layer_px, long *quads);
 /* Another display (docs/DISPLAYS.md): its own GBM/EGL surface on the same context; gpu_init made
  * output 0. Returns the output index for gpu_frame, or -1 (then that display goes by the CPU). */
 int  gpu_add_output(Kms *k);

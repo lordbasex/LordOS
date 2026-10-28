@@ -516,7 +516,28 @@ static struct {
                                  * shift-exact across 0: roundf, (int) truncation, canvas_corners_save) */
     int ext_part;               /* outside damage went into layer.part through layer.at since then */
     int odd_text;               /* text in it took a path that may not move exactly (text_drew_inexact) */
+    int premul_bad;             /* GPU path: a pixel of it has a colour above its alpha (layer_holes; G0 needs none) */
 } layer;
+
+/* ---- G0: the dragged window composited on the GPU (paint_root_g0, docs/GPU.md) ----
+ * What of the layer and of the copy of what is below changed since the GPU last got them: the
+ * rectangles (in their own pixels) or all of it. They add up over frames that don't use G0 and are
+ * consumed only when one does (paint_g0_done). */
+typedef struct { Rect r[G0_DIRTY]; int n, full; } G0Dirty;
+static G0Dirty g0_ld, g0_bd;
+static G0Stats g0stat;
+static void g0_dirty(G0Dirty *d, Rect r) {
+    if (d->full || r.x1 <= r.x0 || r.y1 <= r.y0) return;
+    if (d->n < G0_DIRTY) { d->r[d->n++] = r; return; }
+    Rect *l = &d->r[G0_DIRTY - 1];              /* no room: the last one grows */
+    *l = (Rect){ l->x0 < r.x0 ? l->x0 : r.x0, l->y0 < r.y0 ? l->y0 : r.y0, l->x1 > r.x1 ? l->x1 : r.x1, l->y1 > r.y1 ? l->y1 : r.y1 };
+}
+static void g0_dirty_all(void) { g0_ld = (G0Dirty){ .full = 1 }; g0_bd = (G0Dirty){ .full = 1 }; }
+void paint_g0_done(void) { g0_ld = (G0Dirty){ 0 }; g0_bd = (G0Dirty){ 0 }; }
+void paint_g0_stats(G0Stats *out) {
+    *out = g0stat;
+    memset(&g0stat, 0, sizeof g0stat);
+}
 
 void paint_layer_begin(int node, int resize) {
     layer.node = node;
@@ -525,6 +546,7 @@ void paint_layer_begin(int node, int resize) {
     layer.valid = 0;
     layer.lg_valid = 0;
     layer.bdmg_full = 1;
+    g0_dirty_all();
 }
 
 void paint_layer_end(void) {
@@ -535,6 +557,7 @@ void paint_layer_end(void) {
     free(layer.below);
     free(layer.hole);
     memset(&layer, 0, sizeof layer);
+    g0_dirty_all();
 }
 
 void paint_layer_external_damage(void) { layer.valid = 0; }
@@ -620,14 +643,25 @@ static int in_surface(int x, int y) {
 /* layer.has_holes == 0 stands for a map of zeros, which is what the loop below writes for a window
  * with no app surfaces: then it neither writes the map nor does layer_paint walk it. The bytes it
  * left are made zeros only when a part brings a hole into a map that had none. */
+/* A valid premultiplied pixel has no colour above its alpha; with one that does, blit_row's sum
+ * carries into the next channel (C) or wraps (NEON), and G0 would not match: noted, G0 refuses. */
+static inline int premul_bad(uint32_t p) {
+    uint32_t a = p >> 24;
+    return (p >> 16 & 255) > a || (p >> 8 & 255) > a || (p & 255) > a;
+}
 static void layer_holes(int x0, int y0, int x1, int y1) {
-    if (!gpu_active() || !layer.hole) return;
-    int any = nlsurf || lsurf_all;
+    /* no map (the CPU path): the pixels are not checked either, so G0 must not trust them */
+    if (!gpu_active() || !layer.hole) { layer.premul_bad = 1; return; }
+    int any = nlsurf || lsurf_all, bad = 0;
     if (!any && !layer.has_holes) {
         for (int y = y0; y < y1; y++) {
             uint32_t *row = layer.px + (size_t)y * layer.w;
-            for (int x = x0; x < x1; x++) if (row[x] == SENTINEL) row[x] = 0;
+            for (int x = x0; x < x1; x++) {
+                if (row[x] == SENTINEL) row[x] = 0;
+                bad |= premul_bad(row[x]);
+            }
         }
+        layer.premul_bad |= bad;
         return;
     }
     int whole = x0 == 0 && y0 == 0 && x1 == layer.w && y1 == layer.h;
@@ -640,8 +674,10 @@ static void layer_holes(int x0, int y0, int x1, int y1) {
             m[x] = row[x] == 0 && any && in_surface(x, y);
             set |= m[x];
             if (row[x] == SENTINEL) row[x] = 0;
+            bad |= premul_bad(row[x]);
         }
     }
+    layer.premul_bad |= bad;
     if (whole) layer.has_holes = set;
     else layer.has_holes |= set;
 }
@@ -754,7 +790,9 @@ static int layer_render(Node *n, float opacity) {
     skip_until = skip;
     nlsurf = lsurf_all = 0;
     layer_surfaces(n, x0, y0);
+    layer.premul_bad = 0;
     layer_holes(0, 0, w, h);
+    g0_ld = (G0Dirty){ .full = 1 };
     layer.valid = 1;
     layer.painted = 1;
     layer_renders++;
@@ -791,6 +829,7 @@ static int layer_render_part(Node *n, float opacity) {
     nlsurf = lsurf_all = 0;
     layer_surfaces(n, x0, y0);
     layer_holes(px0, py0, px1, py1);
+    g0_dirty(&g0_ld, (Rect){ px0, py0, px1, py1 });
     layer.painted = 1;
     float k = paint_view.k, lx = (x0 - paint_view.dx) / k + paint_view.x, ly = (y0 - paint_view.dy) / k + paint_view.y;
     layer.at = (Box){ lx, ly, lx + layer.w / k, ly + layer.h / k };
@@ -921,6 +960,7 @@ static int below_alloc(const Canvas *c) {
     layer.bw = layer.below ? c->w : 0;
     layer.bh = layer.below ? c->h : 0;
     layer.bdmg_full = 1;
+    g0_bd = (G0Dirty){ .full = 1 };
     return layer.below != NULL;
 }
 
@@ -1011,7 +1051,11 @@ static void below_build(const Canvas *c, Node *root, const Rect *r, int n) {
         layer.bsig = layer.osig;
         layer.bview = paint_view;
         bstat.full++;
-    } else bstat.part++;
+        g0_bd = (G0Dirty){ .full = 1 };
+    } else {
+        bstat.part++;
+        for (int i = 0; i < n; i++) g0_dirty(&g0_bd, r[i]);
+    }
     paint_cull = cull;
     layer.bdmg.n = 0;
     layer.bdmg_full = 0;
@@ -1203,6 +1247,43 @@ static int below_order(Node *root) {
     return ord_n ? ORD_PATH : ORD_BEFORE;
 }
 
+/* G0: the nodes painted after the window that paint something (their box on screen, grown by what a
+ * backdrop blur reads around it or a turned image's bilinear edge, logical px). A frame G0 composes
+ * must have none of them in its damaged box (paint_root_g0). */
+#define G0_AFTER_MAX 65536                      /* the menu bar and the Dock alone are a few hundred */
+static Box *g0_after;
+static int ng0_after, g0_after_cap, g0_after_over;
+static int node_paints(const Node *n) {
+    const Style *s = &n->s;
+    if (n->type != NODE_VIEW) return 1;             /* text, image, terminal, app window, video */
+    if ((s->bg >> 24) || s->has_gradient || (s->shadow_color >> 24) || s->backdrop_blur >= 1 || n->own_tf) return 1;
+    for (int e = EDGE_L; e <= EDGE_B; e++) if (node_border(n, e) > 0) return 1;
+    /* rounded and clipping: its corners are saved and restored around its children (paint_node), which
+     * changes what is below them even when it paints nothing itself */
+    if (s->overflow_hidden && (node_edges_plain(n) ? s->radius : max4(s->ext->r.rad)) > 0) return 1;
+    return 0;
+}
+static void g0_note_after(const Node *n, Box cur) {
+    if (cur.x1 <= cur.x0 || cur.y1 <= cur.y0 || !node_paints(n)) return;
+    if (g0_after_over) return;
+    float m = 0;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->has_tf && m < 4) m = 4;
+    Box b = { cur.x0 - m, cur.y0 - m, cur.x1 + m, cur.y1 + m };
+    if (ng0_after) {                /* inside the box noted last (a child in its bar): meets D only if that one does */
+        const Box *p = &g0_after[ng0_after - 1];
+        if (b.x0 >= p->x0 && b.y0 >= p->y0 && b.x1 <= p->x1 && b.y1 <= p->y1) return;
+    }
+    if (ng0_after == g0_after_cap) {
+        int cap = g0_after_cap ? g0_after_cap * 2 : 256;
+        Box *nb = cap <= G0_AFTER_MAX ? realloc(g0_after, (size_t)cap * sizeof *nb) : NULL;
+        if (!nb) { g0_after_over = 1; return; }
+        g0_after = nb;
+        g0_after_cap = cap;
+    }
+    g0_after[ng0_after++] = b;
+}
+
 /* ord: ORD_PATH for the window's ancestors, else whether the node is painted before or after it */
 static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip, int ord) {
     if (n->type == NODE_RAW) {
@@ -1233,6 +1314,7 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         layer.gdy = cur.y0 - n->prev_box.y0;
     }
     if (in_layer && vis) layer_note_exact(n, dirty);
+    if (ord == ORD_AFTER && vis) g0_note_after(n, cur);
     if (dirty || !box_eq(cur, n->prev_box)) {
         damage_add(n->prev_box);
         damage_add(cur);
@@ -1508,6 +1590,7 @@ int paint_damage(Node *root) {
         below_damage(ext);
     }
     int ord = below_order(root);
+    ng0_after = g0_after_over = 0;
     if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, ord);
     ndrects = 0;
     if (multi_rects(root)) return 1;
@@ -1591,10 +1674,164 @@ static void below_verify(const Canvas *c, Node *root, uint32_t *pre) {
     free(pre);
 }
 
+/* ---- G0: the dragged window composited on the GPU (docs/GPU.md, "The dragged window on the GPU") ----
+ * On a frame that uses the copy of what is below (below_ready), the CPU's pixels inside the window's
+ * rectangle W are the layer blitted over that copy (canvas_blit, k = 256: blit_row) and nothing else,
+ * when: the layer is painted as it is (valid, the same opacity, no full render pending, no app window
+ * or invalid premultiplied pixel in it), no ancestor paints over W afterwards (border, rounded
+ * corners), no app window is drawn under W (the GPU draws those below the UI) and no node painted
+ * after the window meets the frame's box at all (a blurred one would read the stale W; one turned or
+ * blurred paints differently when the box is cut into strips). Then only the strips around W are
+ * painted, each a walk clipped to it (every primitive left gives the same pixel whatever the clip),
+ * and the GPU writes W from two textures with the same arithmetic (gpu.c, checked against blit_row
+ * once by a self-test). Anything that changes while painting the strips (the layer painted again
+ * elsewhere, an app window) sends W back to the CPU in the same frame. */
+static Rect rect_and(Rect a, Rect b) {
+    Rect r = { a.x0 > b.x0 ? a.x0 : b.x0, a.y0 > b.y0 ? a.y0 : b.y0, a.x1 < b.x1 ? a.x1 : b.x1, a.y1 < b.y1 ? a.y1 : b.y1 };
+    if (r.x1 < r.x0) r.x1 = r.x0;
+    if (r.y1 < r.y0) r.y1 = r.y0;
+    return r;
+}
+static int rect_eq(Rect a, Rect b) { return a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1; }
+static int g0_bx, g0_by;                /* where the layer's pixel (0, 0) lands (layer_paint's bx, by) */
+
+/* W for this frame (-1), or why there is none (G0R_*): where layer_paint's blit lands, cut by the
+ * ancestors' clips and by c->clip, the frame's box (inside the canvas). */
+static int g0_gate(const Canvas *c, Node *root, Rect *wout) {
+    Node *w = node_get(layer.node);
+    if (!w || !layer.want || !layer.valid || layer.resize || layer.rendering || paint_capture_mode ||
+        paint_view.index != layer.view || w->has_tf || w->type == NODE_RAW || w->s.display_none)
+        return G0R_LAYER;
+    if (layer.has_holes || nlsurf || lsurf_all || layer.premul_bad || !layer.px || !layer.below) return G0R_LAYER;
+    const Node *anc[SKIP_PATH_MAX];
+    int na = 0;
+    for (const Node *a = w->parent; a; a = a->parent) {
+        if (na == SKIP_PATH_MAX) return G0R_ANCESTOR;
+        if (a->type == NODE_RAW || a->s.display_none) return G0R_LAYER;
+        anc[na++] = a;
+    }
+    if (!na || anc[na - 1] != root) return G0R_LAYER;
+    const float k = paint_view.k;
+    int bx = (int)lroundf(VX(w->ax) + layer.pox), by = (int)lroundf(VY(w->ay) + layer.poy);
+    Rect r = { bx, by, bx + layer.w, by + layer.h };
+    /* the opacity layer_paint gets (paint_node's product, root first) and the ancestors' clips */
+    float op = 1;
+    for (int i = na - 1; i >= 0; i--) {
+        const Node *a = anc[i];
+        op = op * a->s.opacity;
+        if (op < 0.004f) return G0R_LAYER;
+        if (a->s.overflow_hidden) {
+            float x = VX(a->ax), y = VY(a->ay), aw = a->w * k, ah = a->h * k;
+            r = rect_and(r, (Rect){ (int)floorf(x), (int)floorf(y), (int)ceilf(x + aw), (int)ceilf(y + ah) });
+        }
+    }
+    if (op != layer.op) return G0R_LAYER;
+    Box pb;
+    if (layer.tree_part && !layer_part_exact(w, &pb)) return G0R_LAYER;     /* it would be painted whole */
+    r = rect_and(r, c->clip);                   /* the blit is clipped to the frame's box too */
+    if (!rect_area(r)) return G0R_CLIP;
+    if (!below_ancestors_ok(w, r)) return G0R_ANCESTOR;
+    if (wl_draws_meet(r)) return G0R_APP;
+    if (!ord_n || g0_after_over) return G0R_AFTER;
+    for (int i = 0; i < ng0_after; i++) {
+        Box b = g0_after[i];
+        Rect q = { (int)floorf(VX(b.x0)) - 1, (int)floorf(VY(b.y0)) - 1, (int)ceilf(VX(b.x1)) + 1, (int)ceilf(VY(b.y1)) + 1 };
+        if (rect_meets(q, c->clip)) return G0R_AFTER;
+    }
+    g0_bx = bx;
+    g0_by = by;
+    *wout = r;
+    return -1;
+}
+
+/* One walk of a frame that uses the copy, clipped to c->clip: the copy, then from the window on */
+static void g0_walk(Canvas *c, Node *root) {
+    wl_paint_begin();
+    wl_paint_kept();
+    below_copy(c);
+    skip_until = layer.node;
+    skip_reached = 0;
+    skip_stamp();
+    paint_node(c, root, 1);
+}
+
+/* LORD_GPU_VERIFY=N: every N-th G0 frame, W painted by the CPU (a walk clipped to W on a scratch
+ * canvas the scene's size: the save of an ancestor's rounded corners reads outside the clip), leaving
+ * the frame's list of app windows and the counters as they were. W's rows are returned packed (W's
+ * width a row). */
+static const uint32_t *g0_reference(const Canvas *c, Node *root, Rect w) {
+    static uint32_t *buf;
+    static size_t cap;
+    size_t n = (size_t)c->w * c->h;
+    if (n > cap) {
+        free(buf);
+        buf = calloc(n, 4);
+        cap = buf ? n : 0;
+        if (!buf) return NULL;
+    }
+    Canvas rc;
+    canvas_init(&rc, buf, c->w, c->h, c->w);
+    canvas_set_clip(&rc, w);
+    long lb = layer_blits, lr = layer_renders, tr = tf_renders, tc = tf_composites;
+    wl_paint_save();
+    g0_walk(&rc, root);
+    wl_paint_restore();
+    layer_blits = lb; layer_renders = lr; tf_renders = tr; tf_composites = tc;
+    int ww = w.x1 - w.x0;
+    for (int y = w.y0; y < w.y1; y++)           /* forwards: a row never lands past where it is read */
+        memmove(buf + (size_t)(y - w.y0) * ww, buf + (size_t)y * c->w + w.x0, (size_t)ww * 4);
+    return buf;
+}
+
+/* The strips around w, then the post-check. 1: g is filled and w is left to the GPU; 0: w was painted
+ * too (the frame is the same as without G0). */
+static int g0_paint(Canvas *c, Node *root, Rect w, GpuG0 *g) {
+    static int every = -1;
+    static long frames;
+    if (every < 0) {
+        const char *e = getenv("LORD_GPU_VERIFY");
+        every = e ? atoi(e) : 0;
+        if (every < 0) every = 0;
+    }
+    Rect d = c->clip, st[4];
+    int ns = 0;
+    if (w.y0 > d.y0) st[ns++] = (Rect){ d.x0, d.y0, d.x1, w.y0 };
+    if (w.y1 < d.y1) st[ns++] = (Rect){ d.x0, w.y1, d.x1, d.y1 };
+    if (w.x0 > d.x0) st[ns++] = (Rect){ d.x0, w.y0, w.x0, w.y1 };
+    if (w.x1 < d.x1) st[ns++] = (Rect){ w.x1, w.y0, d.x1, w.y1 };
+    long lb = layer_blits;
+    for (int i = 0; i < (ns ? ns : 1); i++) {
+        /* no strip: one walk with nothing to paint (the layer's part is rendered, app windows noted) */
+        canvas_set_clip(c, ns ? st[i] : (Rect){ w.x0, w.y0, w.x0, w.y0 });
+        g0_walk(c, root);
+    }
+    layer_blits = lb + 1;
+    canvas_set_clip(c, d);
+    Rect w2;
+    if (g0_gate(c, root, &w2) >= 0 || !rect_eq(w, w2)) {
+        canvas_set_clip(c, w);
+        g0_walk(c, root);
+        canvas_set_clip(c, d);
+        return 0;
+    }
+    *g = (GpuG0){ .w = w, .lpx = layer.px, .lw = layer.w, .lh = layer.h, .lx = g0_bx, .ly = g0_by,
+                  .bpx = layer.below, .bw = layer.bw, .bh = layer.bh, .nl = g0_ld.n, .nb = g0_bd.n,
+                  .lfull = g0_ld.full, .bfull = g0_bd.full, .nstrip = ns };
+    memcpy(g->ldirty, g0_ld.r, sizeof g0_ld.r);
+    memcpy(g->bdirty, g0_bd.r, sizeof g0_bd.r);
+    memcpy(g->strip, st, sizeof st);
+    g->frame = ++frames;
+    g->ref = every && frames % every == 0 ? g0_reference(c, root, w) : NULL;
+    g0stat.frames++;
+    for (int i = 0; i < ns; i++) g0stat.strip_px += rect_area(st[i]);
+    return 1;
+}
+
 /* clear: fill the clip with rgb first, unless the copy of what is below the dragged window is
- * about to write every pixel of that same clip (below_copy), which makes the fill wasted work */
-static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
-    if (!root) { if (clear) canvas_clear(c, rgb); return; }
+ * about to write every pixel of that same clip (below_copy), which makes the fill wasted work.
+ * g (G0, paint_root_g0): the window's rectangle may be left to the GPU; 1 if it was. */
+static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuG0 *g) {
+    if (!root) { if (clear) canvas_clear(c, rgb); return 0; }
     wl_paint_begin();
     /* solo cambió un cuadro de video que tapa esa región: se pinta desde ese nodo (no en el camino
      * GPU, que arma acá la lista de ventanas de las apps) */
@@ -1607,15 +1844,30 @@ static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
     /* once per call: it counts layer.since */
     int below = !skip_until && below_ready(c, root, clear && rgb == 0x000000);
     uint32_t *pre = below && layer.switched && paint_below_verify ? below_snapshot(c) : NULL;
-    if (below) {
-        below_copy(c);
-        skip_until = layer.node;
-    } else if (clear) {
-        canvas_clear(c, rgb);
+    int done = 0, taken = 0;
+    if (below && g && gpu_active()) {           /* G0: only after below_ready, so its decisions are the same */
+        Rect w;
+        int why = g0_gate(c, root, &w);
+        g0stat.tried++;
+        if (why < 0) {
+            done = 1;
+            taken = g0_paint(c, root, w, g);
+            if (!taken) why = G0R_POST;
+        }
+        if (!taken) g0stat.refused[why]++;
     }
-    skip_stamp();
-    paint_node(c, root, 1);
-    if (pre) below_verify(c, root, pre);
+    if (!done) {
+        if (below) {
+            below_copy(c);
+            skip_until = layer.node;
+        } else if (clear) {
+            canvas_clear(c, rgb);
+        }
+        skip_stamp();
+        paint_node(c, root, 1);
+    }
+    if (pre && taken) free(pre);                /* W is the GPU's: the old way is compared there by LORD_GPU_VERIFY */
+    else if (pre) below_verify(c, root, pre);
     skip_until = 0;
     paint_cull = 0;
     tf_gc();
@@ -1625,15 +1877,21 @@ static void paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb) {
         for (int i = 0; i < 6; i++) { fprintf(stderr, " %s %.2f", prof_name[i], prof[i]); prof[i] = 0; }
         fprintf(stderr, " ms\n");
     }
+    return taken;
 }
 
 void paint_root(Canvas *c, Node *root) {
-    paint_root_body(c, root, 0, 0);
+    paint_root_body(c, root, 0, 0, NULL);
 }
 
 /* canvas_clear(c, rgb) followed by paint_root(c, root), with the same pixels */
 void paint_root_clear(Canvas *c, Node *root, uint32_t rgb) {
-    paint_root_body(c, root, 1, rgb);
+    paint_root_body(c, root, 1, rgb, NULL);
+}
+
+/* paint_root_clear(c, root, 0) with the dragged window's rectangle left to the GPU when exact (G0, above) */
+int paint_root_g0(Canvas *c, Node *root, GpuG0 *g) {
+    return paint_root_body(c, root, 1, 0x000000, g);
 }
 
 /* The whole tree painted again with nothing kept from earlier frames: no drag layer, no copy of what

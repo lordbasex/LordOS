@@ -310,6 +310,23 @@ extern long paint_below_bad, paint_below_checked;
 enum { BR_OK, BR_ANCESTOR, BR_BLUR, BR_TRANSFORM, BR_UNREACHED, BR_COST, BR_N };
 typedef struct { long full, part, switched, refused[BR_N]; } BelowStats;
 void  paint_below_stats(BelowStats *s);    /* builds (whole, part) and switched frames since the last call */
+/* G0 (docs/GPU.md, "The dragged window on the GPU"): paint_root_clear's frame, except that where
+ * the dragged window lands (g->w) nothing is painted: the GPU composites the layer over the copy of what
+ * is below there, with the CPU's arithmetic. Only on frames that use that copy and only when nothing
+ * else would paint there (see paint.c); 1 if it was taken (the scene's g->w is then stale and only
+ * g->strip were painted), 0 if the whole clip was painted as paint_root_clear(c, root, 0) does.
+ * paint_g0_done: the GPU got g's textures (the dirty rectangles start again). LORD_GPU_VERIFY=N: every
+ * N-th taken frame also paints g->w on the CPU into g->ref, for the GPU to compare. */
+struct GpuG0;
+int   paint_root_g0(Canvas *c, Node *root, struct GpuG0 *g);
+void  paint_g0_done(void);
+/* why a frame that used the copy was not composited on the GPU: the layer (invalid, re-rendered, app
+ * windows or invalid pixels in it, other opacity, a transform), its rectangle not inside the damage,
+ * an ancestor painting over it, an app window under it, a node painted after the window in the
+ * damage, or something changed while painting (post) */
+enum { G0R_LAYER, G0R_CLIP, G0R_ANCESTOR, G0R_APP, G0R_AFTER, G0R_POST, G0R_N };
+typedef struct { long frames, strip_px, tried, refused[G0R_N]; } G0Stats;
+void  paint_g0_stats(G0Stats *s);          /* since the last call */
 Node *hit_test(Node *root, float x, float y);
 /* Capture mode (media/capture.c): protected nodes are painted black and app windows
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */

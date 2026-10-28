@@ -115,6 +115,24 @@ static void mask_row_neon(uint32_t *row, const uint8_t *m, int n, uint32_t argb,
 #  define CANVAS_SIMD "C"
 #endif
 
+/* G0's shader (gpu/gpu.c, fs_g0) in C, with the same float operations in the same order: a texel read
+ * back as c/255 and rounded, then the layer over the copy of what is below with integers held in
+ * floats. tests/canvas_test.c checks it against blit_row_c (and blit_row_neon) over every valid
+ * premultiplied combination; engine-test composes with it where the GPU would. */
+static float g0_fetch(uint32_t v) { return floorf((float)v / 255.0f * 255.0f + 0.5f); }
+uint32_t canvas_g0_model(uint32_t s, uint32_t d) {
+    float sc[4], dc[4], o[4];
+    for (int i = 0; i < 4; i++) { sc[i] = g0_fetch(s >> (8 * i) & 255); dc[i] = g0_fetch(d >> (8 * i) & 255); o[i] = dc[i]; }
+    if (sc[3] > 0.0f) {                         /* [3]: alpha, [0..2]: blue, green, red */
+        float ia = 255.0f - sc[3];
+        for (int i = 0; i < 3; i++) o[i] = sc[i] + floorf(dc[i] * ia * 0.00390625f);
+        o[3] = sc[3] + floorf((dc[3] * ia + 128.0f) * 257.0f * 0.0000152587890625f);
+    }
+    uint32_t r = 0;
+    for (int i = 0; i < 4; i++) r |= (uint32_t)floorf(o[i] / 255.0f * 255.0f + 0.5f) << (8 * i);
+    return r;
+}
+
 #ifdef LORD_CANVAS_TEST
 const char *canvas_test_simd(void) { return CANVAS_SIMD; }
 void canvas_test_blit_row(int simd, uint32_t *row, const uint32_t *s, int n, uint32_t k) {

@@ -108,6 +108,20 @@ static void below_stats_text(char *buf, size_t len) {
              b.refused[BR_BLUR], b.refused[BR_TRANSFORM], b.refused[BR_UNREACHED], b.refused[BR_COST]);
 }
 
+/* G0, the dragged window composited on the GPU (docs/GPU.md): frames, the strips the CPU painted
+ * around it, what was uploaded of the copy of what is below and of the layer, and why other frames that
+ * used the copy were painted by the CPU. Appended to the "drag: …" lines. */
+static void g0_stats_text(char *buf, size_t len) {
+    G0Stats g;
+    long bpx, lpx, quads;
+    paint_g0_stats(&g);
+    gpu_g0_stats(&bpx, &lpx, &quads);
+    snprintf(buf, len, "G0: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
+                       "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post)",
+             g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[G0R_LAYER], g.refused[G0R_CLIP],
+             g.refused[G0R_ANCESTOR], g.refused[G0R_APP], g.refused[G0R_AFTER], g.refused[G0R_POST]);
+}
+
 /* One display (docs/DISPLAYS.md): its KMS head, where it sits in the global logical space, and the
  * frame the UI paints for it at its own resolution. out[0]'s head owns the card's fd; the main display
  * (menu bar, Dock) is s->main_out. Without a monitor (headless) out[0] is a frame in memory. */
@@ -134,6 +148,13 @@ typedef struct {
     int full_copy, was_fs;
     int gpu;                    /* its GPU output (gpu_frame), -1 = composed by the CPU */
     int wl_new;                 /* GPU path: a Linux app's window has new content not presented here yet */
+    /* G0 (paint_root_g0, docs/GPU.md): this frame left the dragged window's rectangle to the GPU
+     * (g0taken, g0); the last frame shown has it there, so the scene and the UI texture are stale in g0w
+     * (g0on) until a frame paints it on the CPU; g0cpu: the GPU could not draw it, the next frame paints
+     * it on the CPU without trying G0 */
+    int g0taken, g0on, g0cpu;
+    Rect g0w;
+    GpuG0 g0;
 } Out;
 
 typedef struct {
@@ -181,6 +202,15 @@ static Box box_join(Box a, Box b) {
     return (Box){ fminf(a.x0, b.x0), fminf(a.y0, b.y0), fmaxf(a.x1, b.x1), fmaxf(a.y1, b.y1) };
 }
 static int box_empty(Box b) { return b.x1 <= b.x0 || b.y1 <= b.y0; }
+
+/* The scene's G0 rectangle (still the GPU's) is painted again on the CPU in the next frame of the display */
+static void g0_stale(Out *o) {
+    float x0, y0, x1, y1;
+    out_logical_box(&o->v, o->g0w, &x0, &y0, &x1, &y1);
+    if (box_empty(o->pend)) o->pl.n = 0;
+    o->pend = box_join(o->pend, (Box){ x0, y0, x1, y1 });
+    o->g0on = 0;
+}
 
 /* ---- the displays ---- */
 
@@ -395,14 +425,15 @@ static void dispatch_pointer(Server *s) {
             double span = dstat.last - dstat.t0;
             long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
-            char bs[192];
+            char bs[192], gs[256];
             below_stats_text(bs, sizeof bs);
+            g0_stats_text(gs, sizeof gs);
             fprintf(stderr, "drag: %ld frames in %.0f ms = %.1f FPS (%ld moves); per frame: work %.2f ms "
                             "(max %.2f; JS %.2f, layout %.2f, paint %.2f, present %.2f), max gap %.1f ms; "
-                            "layer: %ld painted (%ld of them a part), %ld copied (%s); %s\n",
+                            "layer: %ld painted (%ld of them a part), %ld copied (%s); %s; %s\n",
                     dstat.frames, span, 1000.0 * dstat.frames / span, dstat.moves, dstat.work / dstat.frames, dstat.work_max,
                     dstat.js / dstat.frames, dstat.layout / dstat.frames, (dstat.paint - dstat.layout) / dstat.frames,
-                    dstat.present / dstat.frames, dstat.gap_max, lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs);
+                    dstat.present / dstat.frames, dstat.gap_max, lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs, gs);
         }
         dstat = (DragStats){ 0 };
     }
@@ -583,6 +614,8 @@ static void cpu_takeover(Server *s) {
         o->gpu = -1;
         o->full_copy = 2;
         o->wl_new = 0;
+        if (o->g0on) o->full = 1;               /* the scene's G0 rectangle is stale */
+        o->g0on = o->g0taken = 0;
     }
     s->hw_cursor = 0;
 }
@@ -1031,8 +1064,10 @@ static Box paint_ui(Server *s) {
  * (paint_root_full: no drag layer, no copy of what is below it, no skipped node) and the pixels that
  * differ from the display's frame are counted on stderr. Off by default; it only reads the frame. The
  * terminals and Linux apps note where they were painted, so with N = 1 a terminal's change during a
- * drag always repaints the whole layer: use N > 1 to check the layer's partial repaints. */
-static void paint_verify(Out *o, int index) {
+ * drag always repaints the whole layer: use N > 1 to check the layer's partial repaints. On a frame
+ * whose dragged window the GPU composites (G0, skip) the scene is stale there and skip is left out:
+ * LORD_GPU_VERIFY checks those pixels against the CPU's. */
+static void paint_verify(Out *o, int index, Rect skip) {
     static int every = -1;
     static long frames[OUT_MAX];
     static uint32_t *px;
@@ -1063,7 +1098,7 @@ static void paint_verify(Out *o, int index) {
     for (int y = 0; y < o->scene.h; y++) {
         const uint32_t *a = o->scene.px + (size_t)y * o->scene.stride, *b = px + (size_t)y * o->scene.w;
         for (int x = 0; x < o->scene.w; x++) {
-            if (a[x] == b[x]) continue;
+            if (a[x] == b[x] || (x >= skip.x0 && x < skip.x1 && y >= skip.y0 && y < skip.y1)) continue;
             diff++;
             for (int sh = 0; sh < 32; sh += 8) {
                 int d = abs((int)((a[x] >> sh) & 255) - (int)((b[x] >> sh) & 255));
@@ -1071,8 +1106,9 @@ static void paint_verify(Out *o, int index) {
             }
         }
     }
-    fprintf(stderr, "paint-verify: display %d frame %ld: %ld pixels differ from a full repaint (worst %d)%s\n",
-            index, frames[index], diff, worst, paint_layer_node() ? ", drag layer" : "");
+    fprintf(stderr, "paint-verify: display %d frame %ld: %ld pixels differ from a full repaint (worst %d)%s%s\n",
+            index, frames[index], diff, worst, paint_layer_node() ? ", drag layer" : "",
+            skip.x1 > skip.x0 ? ", the GPU's window rectangle left out" : "");
 }
 
 /* Paints a display's pending damage into its frame at its scale. Returns the physical rect painted. */
@@ -1084,7 +1120,14 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     int whole = o->full;
     o->full = 0;
     o->pend = (Box){ 0, 0, 0, 0 };
+    o->g0taken = 0;
     if (box_empty(b) || !o->scene.px) return r;
+    /* G0: the rectangle the GPU composed last frame is stale in the scene: painted again with this damage */
+    if (o->g0on && !whole) {
+        float gx0, gy0, gx1, gy1;
+        out_logical_box(&o->v, o->g0w, &gx0, &gy0, &gx1, &gy1);
+        b = box_join(b, (Box){ gx0, gy0, gx1, gy1 });
+    }
     /* several damaged rectangles (paint.c, "Several damaged rectangles"): each one painted on its
      * own; r, what is presented, is the box around them (the scene keeps the pixels in between) */
     Box lb = o->pl.n ? o->pl.r[0] : (Box){ 0, 0, 0, 0 };
@@ -1102,6 +1145,10 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     }
     multi = !whole && !gpu_active() && l.n > 1;
     int nparts = multi ? l.n : 1;
+    /* G0 (paint_root_g0): one box on a GPU display while a window is dragged */
+    int g0 = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
+             !wl_fullscreen_active() && !o->g0cpu && paint_layer_node() && gpu_g0_ready(o->gpu);
+    o->g0cpu = 0;
     Box parts[DAMAGE_MAX];
     if (multi) memcpy(parts, l.r, sizeof(Box) * (size_t)nparts);
     else parts[0] = b;
@@ -1117,9 +1164,18 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
         ui.damage = (Box){ lx0, ly0, lx1, ly1 };      /* paint_root skips what this region does not need */
         canvas_set_clip(&o->scene, pr);
-        paint_root_clear(&o->scene, ui.root, 0x000000);
+        if (g0) o->g0taken = paint_root_g0(&o->scene, ui.root, &o->g0);
+        else paint_root_clear(&o->scene, ui.root, 0x000000);
         if (feed) media_scene_painted(&o->scene);     /* recording/remote desktop with protected windows */
         r = rect_join(r, pr);
+        if (o->g0taken) {                             /* only the strips around the window were painted */
+            for (int i = 0; i < o->g0.nstrip; i++) {
+                Rect q = o->g0.strip[i];
+                o->painted[o->npainted++] = (Box){ (float)q.x0, (float)q.y0, (float)q.x1, (float)q.y1 };
+                px += (double)(q.x1 - q.x0) * (q.y1 - q.y0);
+            }
+            continue;
+        }
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
@@ -1134,7 +1190,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     if (s->debug || paint_profile)
         fprintf(stderr, "render %ld: display %d, layout %.2f ms, paint %.2f ms, repainted %.1f%% in %d rect%s\n", s->renders, index, ui.layout_ms, ms,
                 100.0 * px / ((double)o->scene.w * o->scene.h), nparts, nparts == 1 ? "" : "s");
-    paint_verify(o, index);
+    paint_verify(o, index, o->g0taken ? o->g0.w : (Rect){ 0, 0, 0, 0 });
     return r;
 }
 
@@ -1460,6 +1516,9 @@ static void render_frame(Server *s) {
             Out *o = &s->out[i];
             /* a fullscreen app's new frame (render runs when something wants a frame) goes to every display */
             if (!o->on || o->kms.flip_pending || !(out_needs(s, o) || wl_fullscreen_active())) continue;
+            /* G0 with no UI damage: the GPU draws the window again from its textures, if they are still
+             * this display's; otherwise its rectangle is painted by the CPU now */
+            if (o->g0on && box_empty(o->pend) && !o->full && !gpu_g0_holds(o->gpu)) g0_stale(o);
             Rect r = paint_out(s, o, i, o == feed);
             if (gpu_active() && o->gpu >= 0) {      /* (the loop above skips what has nothing new) */
                 update_cursor(s);
@@ -1478,8 +1537,43 @@ static void render_frame(Server *s) {
                 }
                 /* compatible fullscreen (one display): straight to the card; otherwise composed (always
                  * composed while the remote desktop reads it back) */
-                int failed = !(!readback && out_count(s) == 1 && wl_try_scanout(s->hw_cursor || s->cursor_mode == 2)) && gpu_frame(o->gpu, &o->scene, r, gpu_layer);
-                if (readback && !failed && gpu_read_done()) {
+                /* G0: the strips around the window, and the window from its textures (gpu_frame_ex); a frame
+                 * with nothing painted while the last one had it draws it again (its rectangle is stale) */
+                Rect up[4] = { r };
+                int nup = 1, g0drawn = 0;
+                GpuG0 again;
+                const GpuG0 *g0 = NULL;
+                if (o->g0taken) {
+                    g0 = &o->g0;
+                    nup = o->g0.nstrip;
+                    memcpy(up, o->g0.strip, sizeof up);
+                } else if (o->g0on && r.x1 <= r.x0) {
+                    again = o->g0;
+                    again.lpx = again.bpx = NULL;
+                    again.nl = again.nb = again.lfull = again.bfull = 0;
+                    again.ref = NULL;
+                    g0 = &again;
+                }
+                int scanned = !readback && out_count(s) == 1 && wl_try_scanout(s->hw_cursor || s->cursor_mode == 2);
+                int res = scanned ? 0 : gpu_frame_ex(o->gpu, &o->scene, up, nup, g0, &g0drawn, gpu_layer);
+                int failed = res == -1, unshown = res == -2;
+                if (o->g0taken && g0drawn) paint_g0_done();    /* the textures have what paint.c had */
+                if (unshown) {
+                    /* the quad could not be drawn: nothing was shown (the display keeps the frame before,
+                     * which was right); W joins the damage and the next frame paints it on the CPU */
+                    o->g0w = g0->w;
+                    g0_stale(o);
+                    o->g0cpu = 1;
+                } else if (g0 && !g0drawn && !failed) {
+                    /* shown without the quad (direct scanout, or G0 turned off): painted next frame */
+                    o->g0w = g0->w;
+                    g0_stale(o);
+                } else {
+                    o->g0on = g0drawn;
+                    if (g0drawn) o->g0w = g0->w;
+                }
+                o->g0taken = 0;
+                if (readback && !res && gpu_read_done()) {
                     static int said;
                     if (!said++) fprintf(stderr, "remote: composing on the GPU; frames read back for the remote desktop\n");
                     Cur k;
@@ -1492,8 +1586,10 @@ static void render_frame(Server *s) {
                 }
                 view_reset();
                 gpu_out = NULL;
-                o->cdirty = 0;
-                o->wl_new = 0;
+                if (!unshown) {                        /* else they are presented with the next frame */
+                    o->cdirty = 0;
+                    o->wl_new = 0;
+                }
                 if (failed) {
                     fprintf(stderr, "gpu: a frame failed; going on by CPU\n");
                     gpu_shutdown();
@@ -1872,17 +1968,22 @@ int main(int argc, char **argv) {
         if (scripted && !grab_scripted()) {
             long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
-            char bs[192];
+            char bs[192], gs[256];
             below_stats_text(bs, sizeof bs);
-            fprintf(stderr, "drag (scripted): layer: %ld painted (%ld of them a part), %ld copied (%s); %s\n",
-                    lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs);
+            g0_stats_text(gs, sizeof gs);
+            fprintf(stderr, "drag (scripted): layer: %ld painted (%ld of them a part), %ld copied (%s); %s; %s\n",
+                    lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs, gs);
         }
         if (!scripted && grab_scripted()) {     /* its start: what came before is not counted */
             long lr, lb;
             BelowStats b;
+            G0Stats g;
             paint_layer_stats(&lr, &lb);
             paint_layer_parts();
             paint_below_stats(&b);
+            paint_g0_stats(&g);
+            long q[3];
+            gpu_g0_stats(&q[0], &q[1], &q[2]);
         }
         scripted = grab_scripted();
         /* Timers del tema (React agenda su trabajo con setTimeout/setImmediate). */

@@ -364,6 +364,119 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     - Not done: skipping the copy under the window's opaque middle (it would have to know, before the layer is
       painted this frame, that the layer stays opaque there and that no ancestor's rounded corner reads it). The time
       saved has not been measured yet.
+  - **The dragged window composited on the GPU, with the CPU's pixels ("G0", step 10, approved by the maintainer on
+    2026-10-28; `ui/paint.c`, `gpu/gpu.c`, `main.c`; `docs/GPU.md`, "The dragged window on the GPU").** On the GPU
+    path a frame that uses the copy of what is below the window paints only the strips of its damaged box around
+    the window's rectangle W; the GPU writes W itself, from two textures of its own (the layer and the copy of what
+    is below), with one shader that does `blit_row`'s integer arithmetic (k = 256, `over_alpha`) in 24-bit floats,
+    where every value is an integer below 2^24 and every scaling a power of two, so the pixels are the CPU's bit for
+    bit. The textures get only what changed since the GPU last had them (the layer's part, the copy's partial
+    rebuilds), so the per-frame upload of the old and new window box (2.2–2.6 MB on the Pi) becomes the strips and
+    the layer's part.
+    - **When:** only after `below_ready` decided to use the copy (its decisions are unchanged), on the display that
+      owns the layer, one damaged box, no rotation and no fullscreen app; the layer valid and painted as it is (the
+      same opacity, no full render pending, no app window in it, no pixel with a colour above its alpha:
+      `layer.premul_bad`, checked where `layer_holes` already walks it); W is the blit cut by the ancestors' clips
+      and the box; no ancestor paints over W afterwards (`below_ancestors_ok`); no app window of layer 0 is drawn
+      into W (`wl_draws_meet`); the paint order around the window is known and no node painted after it that paints
+      anything meets the box (`damage_walk` notes them, grown by a backdrop blur's reach and a transform's edge).
+      Anything that changes while the strips are painted (the layer rendered again elsewhere, an app window) paints
+      W on the CPU in the same frame. Otherwise the frame is painted as before.
+    - **The GPU side** is off unless it proves itself: a `highp` fragment shader with at least 24-bit floats
+      (`glGetShaderPrecisionFormat`), then a self-test in `gpu_init` that draws every valid premultiplied (alpha,
+      colour ≤ alpha) over every destination value, and every source alpha over every destination alpha, into a
+      framebuffer (3,145,728 pixels in three 1024 × 1024 tiles), then a placement pass (below), and compares each
+      pixel with `canvas_blit` on the CPU (NEON on the Pi). One differing pixel turns G0 off. `LORD_G0=0` turns it
+      off. `LORD_GPU_VERIFY=N` paints W on the CPU too every N-th G0 frame
+      and compares it with the framebuffer read back (`gpu-verify: frame N W=wxh differ=K worst=D`).
+    - **`main.c`** keeps, per display, that the scene and the UI texture are stale in W (`g0on`, `g0w`): W joins the
+      next frame's damage; a frame with no UI damage (the cursor, an app's new frame) draws the window again from the
+      textures if they are still that display's, else paints W on the CPU; direct scanout, a failed frame or the GPU
+      going away paint it again. A frame whose quad cannot be drawn (a failed upload, G0 turned off) is not shown
+      at all (`gpu_frame_ex` returns -2): the display keeps the frame before and the next one paints W on the CPU. `LORD_PAINT_VERIFY` leaves W out on G0 frames (`LORD_GPU_VERIFY` checks it). The
+      `drag: …` and `drag (scripted): …` lines end with `G0: N of M frames (Q quads), strips … Mpx, uploaded below …
+      Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post)`.
+    - Checked on VM 116 (x86_64): `canvas-test` compares G0's shader written in C (`canvas_g0_model`) with
+      `blit_row_c` and the SIMD row over all 8,421,376 valid (alpha, colour, destination) combinations, every alpha
+      pair, and 200,000 random pixels: 0 differ (NEON not run: no ARM machine was used). `engine-test` has a third
+      path, `g0`: the GPU path with G0 and a stub GPU that keeps the UI texture, the two textures (only their dirty
+      rectangles) and `main.c`'s bookkeeping, and writes W with `canvas_g0_model`; all 2,417 frames equal
+      `drag_golden_gpu.txt`, 250 of the 1,856 frames that use the copy are composited this way (refused: 436 layer,
+      287 app, 883 after: the big scene's window is mostly near the menu bar or the Dock). Four runs without goldens
+      are compared frame by frame with the GPU path: a 30-frame pause with no damage (54 of 61 G0), two displays side
+      by side (150 of 240), the window over an app window below (5 of 180), and the window against a rounded,
+      bordered container's corner (15 of 90; 44 refused for the ancestor); the single-display ones as the GPU shows
+      them (the app windows under the UI texture, W written over both). Taking out the after-node, app-window or
+      ancestor check fails the test; the layer's own checks (app holes, invalid pixels) are not reached by these
+      scenes. `make test`: 23 passed, 0 failed, 13 skipped; `engine-test`: 3,688 checks, 0 failures. With GPU=0 the
+      build has no warnings.
+    - On VM 116 at runtime (llvmpipe forced with `LORD_GPU=1`, an isolated session lent the card by
+      `tests/seat_cycle.c`, a test scene moved by `lord.wm.script`): the self-test of that time (tiles only, in the
+      first drag frame) passes (75–113 ms); with
+      `LORD_GPU_VERIFY=1`, 1,481 of 1,483 frames were G0 and 0 pixels differed in any; across 4 GPU context
+      re-creations during the move, 1,328 G0 frames, 0 differ; with `LORD_PAINT_VERIFY=16`, 0 pixels differ from a
+      full repaint outside W in 92 checks. Layout and paint of a drag frame: 0.29–0.35 ms with G0, 0.92 ms without
+      (llvmpipe's own composition dominates the rest, so this says nothing yet about the Pi). `tests/gpu_cycle.sh` 10
+      cycles: 38 fds and 226.6–227.6 MB throughout. A real screenshot of G0 frames was taken (seat-cycle's snapshot).
+      Not measured yet: the Pi 5 (V3D), where the self-test and `LORD_GPU_VERIFY` must pass before the gain is
+      claimed.
+    - **With the real desktop G0 never composed a frame, fixed:** the list of nodes painted after the window
+      held 128 boxes and refused every frame once it was full, and LordOS's menu bar and Dock alone fill it
+      (`drag: … G0: 0 of 250 frames … 248 after`). The list now grows as needed (up to 65,536 boxes, then the
+      frame is refused as before) and skips a box inside the one noted just before it (an icon inside its bar:
+      it meets the damaged box only if the bar does), so the menu bar and the Dock are 2 boxes. The decision is
+      the same for every frame that fit before. `engine-test`'s `pause` run now has 300 more nodes painted after
+      the window, each in its own box: with the old 128-box list it fails (`G0 composed 0 of 61`), with this one
+      54 of 61 frames, the same as the GPU path frame by frame.
+    - Checked again on VM 116 with the default theme (an isolated 1280 × 800 session lent the card by
+      `seat-cycle`, llvmpipe, driven over the remote desktop socket; real screenshots with QMP `screendump`):
+      the self-test of that time (tiles only) passes (3,145,728 pixels, 127–146 ms). Calculator dragged sideways in the band the menu bar
+      and the Dock leave free: 152 of 153 frames G0, and along a figure of eight that reaches them, 7 of 153;
+      `LORD_GPU_VERIFY=1` compared 160 G0 frames with the CPU (W up to 462 × 592), 0 pixels differ in any.
+      LordBench's Desktop impact gets 1 G0 frame of 2,024 at 1280 × 800: its window, with its shadow, always
+      reaches the Dock's or the menu bar's blurred backdrop (1,377 refused for that) and its turning square
+      makes the layer be painted whole (646); result with G0 on: 72.3 fps alone (p50 12.0 ms, p99 16.7 ms),
+      63.8 fps under load (p50 14.4, p99 27.8 ms, 10.8 % late); `LORD_G0=0`: 73.9 fps, 12.0 / 16.7 ms alone,
+      62.0 fps, 14.8 / 26.3 ms, 15.6 % late under load (the same within llvmpipe's noise). `LORD_GPU=0` (CPU
+      composition): the same drags paint as before (no G0 tried) and LordBench gives 75.0 fps alone and under load
+      (p50 5.1 / 5.7 ms). After the runs the VM's normal session (`lordos.service`) was started again.
+    - **Fixed after an adversarial review of step 10** (on VM 116; the runtime runs above came before these fixes
+      and were not repeated, the VM's own session was left alone):
+      - *Wrong pixels under a rounded clipping box painted after the window.* A view with `overflow: hidden` and
+        rounded corners that paints nothing itself still saves and restores its corners around its children, which
+        darkens what is below them by about 1 level; `node_paints` did not count it, so G0 left it out inside W. It
+        now counts (`ui/paint.c`). New `engine-test` run `corner` (such a 200 × 150 box, radius 60, over the
+        window's path), compared frame by frame with the GPU path: without the fix 59 of its 91 frames differ; with
+        it 0 differ (its box is in every frame's damage: of 90 frames that use the copy, 89 are refused as `after`,
+        1 for the layer).
+      - *The pixel position no longer comes from `gl_FragCoord`*, which GLSL ES 1.00 makes `mediump`: with 16-bit
+        floats it cannot tell x or y from the next pixel past 1024. G0 has its own vertex shader that passes a
+        `highp` varying in pixels (`v_px`, the quad's corners on pixel edges) and the shader uses `floor(v_px)`. The
+        self-test gained a placement pass: a framebuffer as large as the largest output and at least 4096 × 2048
+        (else the largest the GPU allows, and the log says so), a copy of what is below that size and a layer at an
+        odd offset (37, 21) reaching its far edges, every pixel a different random value, compared with the CPU. A
+        layer or output past what it covered turns G0 off (`gpu_g0_ready(out)` refuses such an output up front).
+        Checked headless on VM 116 (a test driver that includes `gpu.c`, a surfaceless GLES2 context on llvmpipe):
+        the full self-test passes (11,373,321 pixels at 1920 × 1080, 17,678,025 for a 5120 × 2880 output); with the
+        same shader rounding `v_px` as 16-bit floats would, the tiles pass and the placement pass fails from x = 1024
+        on (6,207,545 pixels differ), so the old test alone would have passed it.
+      - *A failed G0 upload no longer shows a frame with a stale W:* when the quad cannot be drawn `gpu_frame_ex`
+        returns -2 before presenting, and `main.c` joins W to the damage and paints it on the CPU in the next frame
+        without trying G0 (`g0cpu`), keeping the GPU on. Headless, with a layer larger than the self-test covered:
+        -2, nothing presented, G0 off; again with G0 off: -2. A real failed upload was not provoked, and `main.c`'s
+        side has only been built, not run.
+      - *`layer.premul_bad` on a layer rendered on the CPU path* (no hole map) was never computed: it is now set,
+        so G0 never trusts such a layer after the GPU comes back.
+      - `LORD_GPU_VERIFY`'s CPU reference walk paints on a scratch canvas of the scene's size (an ancestor's rounded
+        corner above or left of W read before its old W-sized buffer).
+      - The self-test runs in `gpu_init`, not in the first drag frame, and its outcome is kept per GL renderer and
+        version across contexts (a GPU restart does not run it again): 311–406 ms on llvmpipe the first time
+        (it was 75–146 ms without the placement pass), about 1 ms after. Stale GL errors are drained before it,
+        dithering is off for the quad, the error drain before an upload is bounded, and G0's program and textures
+        are freed when it does not turn on.
+      - `make -j8` (GPU=1) and lord-server with GPU=0: no warnings; `make test`: 23 passed, 0 failed, 13 skipped;
+        `engine-test`: 3,690 checks, 0 failures, `drag_golden_{cpu,gpu}.txt` unchanged (250 of 1,856 frames that
+        use the copy still G0); `canvas-test`: 8,621,376 cases, 0 differ.
   - **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every
     `setStyle` call: a style an animation sends every frame wrote a line to the session log every frame (as
     `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
@@ -486,6 +599,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   to 11 rectangles and this one gives one is not investigated.
   LordBench's desktop mode in the headless harness (three runs each): 58.9-60.0 fps, build p50 1.25-1.26 ms and p99
   5.9-7.6 ms before; 60.0 fps, p50 1.24-1.27 ms and p99 5.95-6.32 ms after.
+- **A rotated or scaled node now repaints when its own style changes** (approved by the maintainer on 2026-10-28).
+  A node with its own `rotate`/`scaleX`/`scaleY` is painted into a cached raster (`tfl[]` in `server/src/ui/paint.c`).
+  `damage_walk` cleared the node's `paint_dirty` before its children, and `tf_check`, which runs after them, tested
+  that flag, so a change to the node's own background, border, radius or gradient (`lord.setStyle` or a React
+  render) kept the raster and the old look stayed on screen until something else re-rasterized it. `damage_walk`
+  now keeps the node's own flag and passes it to `tf_check`. A change of the transform alone still reuses the raster
+  (the compared style leaves the transform out). New `engine-test` check `test_transform_self_restyle` (a 40 × 40 box
+  rotated 15°, its background changed from red to blue, the centre pixel must be blue): it fails without the fix
+  (`ff0000`) and passes with it. The drag goldens (`server/tests/drag_golden_{cpu,gpu}.txt`) are unchanged: 2417
+  frames per path, the same per-frame hashes, 0 pixels differ in the 591 frames switched to the copy of what is
+  below; `make test` on VM 116: 23 passed, 0 failed, 13 skipped; `engine-test`: 3662 checks, 0 failures.
+- **GPU composition without `GL_EXT_unpack_subimage`** (approved by the maintainer on 2026-10-28;
+  `server/src/gpu/gpu.c`). The UI's damage was always uploaded with `GL_UNPACK_ROW_LENGTH_EXT`; a GLES2 driver
+  without that extension ignores it (`GL_INVALID_ENUM`) and reads each damaged rectangle narrower than the screen
+  with the wrong row length, so the uploaded pixels came out sheared. The log line also said "the whole canvas is
+  uploaded", which was not true. Now the extension is read from the GL extension list; without it the damage is
+  uploaded as whole rows in one call when the scene's rows are contiguous (they are: the scene is created with
+  `stride == width`), or one row at a time otherwise, and the log says so. With the extension (every Mesa driver,
+  so every machine LordOS has been tested on) nothing changes. Built with `GPU=1` and `GPU=0` on VM 116 with no
+  warnings; the fallback itself has not run on a driver that lacks the extension.
+
 - **LordBench's turning square and the Cooling page's fans now turn** (approved by the maintainer on 2026-10-28).
   `apps/sysinfo/scene.jsx` and `sdk/cooling.jsx` called `lord.setStyle(n, 'transform', 'rotate(…deg)')`, and
   `transform` is not a key the engine takes (it only logged `js: unsupported style 'transform'`), so the desktop

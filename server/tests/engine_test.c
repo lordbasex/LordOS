@@ -15,6 +15,7 @@
 #include <time.h>
 
 #include "bench/lbinput.h"
+#include "gpu/gpu.h"
 #include "outputs.h"
 #include "ui/fonts.h"
 #include "ui/ui.h"
@@ -60,6 +61,17 @@ void wl_paint_begin(void) { nwdraw = 0; }
 void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
 void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
+/* G0 (paint_root_g0): an app window in the list is drawn below the UI where its box is, as wl.c's */
+int wl_draws_meet(Rect r) {
+    const float k = paint_view.k;
+    for (int i = 0; i < nwdraw; i++) {
+        const WDraw *d = &wdraw[i];
+        Rect b = { (int)floorf((d->x - paint_view.x) * k + paint_view.dx) - 1, (int)floorf((d->y - paint_view.y) * k + paint_view.dy) - 1,
+                   (int)ceilf((d->x + d->w - paint_view.x) * k + paint_view.dx) + 1, (int)ceilf((d->y + d->h - paint_view.y) * k + paint_view.dy) + 1 };
+        if (b.x0 < r.x1 && r.x0 < b.x1 && b.y0 < r.y1 && r.y0 < b.y1) return 1;
+    }
+    return 0;
+}
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
@@ -1379,6 +1391,27 @@ static void test_transform_paint_hit(void) {
     CHECK(pix(35, 35) == 0xff0000, "the scaled box with a blurred child: %06x", pix(35, 35));
 }
 
+/* A node with its own transform whose own style changes (here its background) is rasterized again:
+ * damage_walk keeps the node's paint_dirty for tf_check, which runs after the children (before,
+ * it had been cleared and the cached raster kept the old colour). */
+static void test_transform_self_restyle(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *a = view(root);                               /* 40×40 red, rotated 15° */
+    ss(a, "position", "absolute");
+    sn(a, "left", 30); sn(a, "top", 30); sn(a, "width", 40); sn(a, "height", 40);
+    sn(a, "backgroundColor", 0xffff0000);
+    sn(a, "rotate", 15);
+    render(root, 100, 100);
+    CHECK(pix(50, 50) == 0xff0000, "rotated box: %06x", pix(50, 50));
+    sn(a, "backgroundColor", 0xff0000ff);
+    node_invalidate(a);
+    render(root, 100, 100);
+    CHECK(pix(50, 50) == 0x0000ff, "rotated box kept its old background: %06x", pix(50, 50));
+}
+
 /* The overlay scroll bar as ScrollView (sdk/components.jsx, sdk/scrollbar.js) builds it: an
  * overflow-hidden view, the content translated inside it with its normal end padding, and over it a
  * 14 px hit strip at the end edge holding the 6 px thumb 2 px from the edge. The bar is painted
@@ -1474,7 +1507,10 @@ static void test_overlay_scrollbar(void) {
  * most, all in those corner squares (n = ceil(r) + 1) or in the Dock's and the menu bar's backdrop
  * blur within its reach of one, none further from a full repaint. "gpu" is the same run with
  * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
- * same CPU canvas the GPU uploads. Shorter runs cover what makes the layer paint again: a text
+ * same CPU canvas the GPU uploads. "g0" is the GPU path with G0 (paint_root_g0, docs/GPU.md): a stub GPU
+ * keeps the UI texture (what was uploaded of the canvas) and the layer's and the copy's textures (only
+ * their dirty rectangles), and writes the window's rectangle with canvas_g0_model (gpu.c's shader in C);
+ * what it shows must hash as drag_golden_gpu.txt. Shorter runs cover what makes the layer paint again: a text
  * that changes a child's size, a child moving inside the window, a terminal whose cursor blinks
  * (damage from outside the tree), a square turning across the window's edge, the window crossing
  * x = 0 and y = 0 while the square turns, a child removed after frames that only copy the layer and
@@ -1511,19 +1547,29 @@ enum { DW = 1024, DH = 640, DRAG_FRAMES = 480, CASE_FRAMES = 60, FULL_EVERY = 16
  * "anc" the bar and the panel, with both windows in a rounded container that clips them and has a
  * border (an ancestor painted around the dragged window); "tfgrow" the still square, and a dot on it
  * that changes color every 20 frames (a part of the copy that cuts the square's image). */
+/* The runs after DC_N have no golden hashes: G0 (paint_root_g0) is compared with the GPU path itself
+ * in them (test_g0_extra): "pause" stops the drag for 30 frames with nothing changing (frames with no UI
+ * damage, which only draw the window again on the GPU), "two" is the drag on two displays side by side
+ * (the window crosses from one to the other: the layer, the copy and G0 follow the one with most of it),
+ * "app" drags over the window below with its app window, "ancedge" slowly away from the rounded,
+ * bordered container's top-left corner, "corner" over a rounded overflow:hidden box painted after the
+ * window that paints nothing itself (its corners' save and restore still change the pixels below). Their frames are compared as the GPU shows them: the app
+ * windows below the UI texture, the UI blended over them, G0's rectangle written over both. */
 enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_NEG, DC_REMOVE, DC_K2,
-       DC_BELOW, DC_AFTER, DC_BELOWTF, DC_BLUR, DC_ZRAISE, DC_MIX, DC_K2MIX, DC_ANC, DC_TFGROW, DC_N };
-static const char *const dc_name[DC_N] = { "drag", "text", "child", "term", "edge", "neg", "remove", "k2",
-                                           "below", "after", "belowtf", "blur", "zraise", "mix", "k2mix", "anc", "tfgrow" };
-static const int dc_frames[DC_N] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
-                                     CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
-                                     180, 120, 180, 180, 120, 240, 120, 180, 180 };
+       DC_BELOW, DC_AFTER, DC_BELOWTF, DC_BLUR, DC_ZRAISE, DC_MIX, DC_K2MIX, DC_ANC, DC_TFGROW, DC_N,
+       DC_PAUSE = DC_N, DC_TWO, DC_APP, DC_ANCEDGE, DC_CORNER, DC_ALL };
+static const char *const dc_name[DC_ALL] = { "drag", "text", "child", "term", "edge", "neg", "remove", "k2",
+                                             "below", "after", "belowtf", "blur", "zraise", "mix", "k2mix", "anc", "tfgrow",
+                                             "pause", "two", "app", "ancedge", "corner" };
+static const int dc_frames[DC_ALL] = { DRAG_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
+                                       CASE_FRAMES, CASE_FRAMES, CASE_FRAMES,
+                                       180, 120, 180, 180, 120, 240, 120, 180, 180, 90, 240, 180, 90, 90 };
 enum { DF_BAR = 1, DF_MENU = 2, DF_SQUARE = 4, DF_PANEL = 8, DF_RAISE = 16, DF_ANC = 32, DF_SMALL = 64, DF_TERM = 128, DF_DOT = 256 };
-static const int dc_feat[DC_N] = { 0, 0, 0, 0, 0, 0, 0, 0,
+static const int dc_feat[DC_ALL] = { 0, 0, 0, 0, 0, 0, 0, 0,
                                    DF_BAR | DF_TERM, DF_MENU, DF_SQUARE | DF_SMALL, DF_PANEL | DF_SMALL, DF_BAR | DF_RAISE,
                                    DF_BAR | DF_MENU | DF_SQUARE | DF_PANEL | DF_SMALL,
                                    DF_BAR | DF_MENU | DF_SQUARE | DF_PANEL | DF_SMALL, DF_BAR | DF_ANC | DF_PANEL | DF_SMALL,
-                                   DF_DOT | DF_SMALL };
+                                   DF_DOT | DF_SMALL, DF_TERM | DF_SMALL, DF_SMALL, DF_BAR | DF_SMALL, DF_ANC | DF_SMALL, DF_SMALL };
 static int dc_k2(int dc) { return dc == DC_K2 || dc == DC_K2MIX; }
 static int dc_hashes(void) {                        /* each run: its frames and the one after the drag */
     int n = 0;
@@ -1531,7 +1577,21 @@ static int dc_hashes(void) {                        /* each run: its frames and 
     return n;
 }
 
-typedef struct { OutView v; Canvas c, ref; uint32_t *px, *rpx; } DOut;
+/* G0 (test_g0): the frame as the GPU shows it. tex is the GPU's UI texture (what was uploaded of the
+ * scene c), fb the composed frame: tex with the window's rectangle written by canvas_g0_model (gpu.c's
+ * shader in C) from two textures that get only paint.c's dirty rectangles, as gpu.c's. g0on, g0w:
+ * main.c's bookkeeping of the scene's stale rectangle. */
+typedef struct {
+    OutView v;
+    Canvas c, ref, fbc;
+    uint32_t *px, *rpx, *tex, *fb, *cmp;
+    int g0on;
+    Rect g0w;
+    GpuG0 g;
+} DOut;
+static int test_g0;
+static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner; } g0tex;   /* the stub GPU's G0 textures */
+static long g0_quads;
 typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption, *below, *btitle, *fill, *mtext, *square, *ptext, *dot; } DScene;
 
 static uint64_t frame_hash(const Canvas *c) {
@@ -1555,28 +1615,106 @@ static void js_set(Node *n, const char *k, double v) {
     node_restyled(n, &before, before.ext ? &xb : NULL);
 }
 
-/* main.c's frame on one display: paint_ui (layout, damage, the layer's display), then paint_out (the
- * damaged box in physical px, cleared and painted with paint_root_clear) */
-static void drag_paint(Node *root, DOut *o) {
+static void copy_rect(uint32_t *dst, int dstride, const uint32_t *src, int sstride, Rect r) {
+    for (int y = r.y0; y < r.y1; y++)
+        memcpy(dst + (size_t)y * dstride + r.x0, src + (size_t)y * sstride + r.x0, (size_t)(r.x1 - r.x0) * 4);
+}
+
+/* The stub GPU's texture t (*tw × *th): all of px if its size changed, it was another display's or
+ * full, else the dirty rectangles (gpu.c's g0_upload). */
+static void g0_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
+    if (*tw != w || *th != h) {
+        free(*t);
+        *t = malloc((size_t)w * h * 4);
+        *tw = w;
+        *th = h;
+        full = 1;
+    }
+    if (!*t) return;
+    if (full) { memcpy(*t, px, (size_t)w * h * 4); return; }
+    for (int i = 0; i < n; i++) {
+        Rect q = { r[i].x0 < 0 ? 0 : r[i].x0, r[i].y0 < 0 ? 0 : r[i].y0, r[i].x1 > w ? w : r[i].x1, r[i].y1 > h ? h : r[i].y1 };
+        if (q.x1 > q.x0 && q.y1 > q.y0) copy_rect(*t, w, px, w, q);
+    }
+}
+
+/* main.c's presentation on the GPU (render_frame, gpu_frame_ex): the painted rectangles (pr, or the
+ * strips) go to the UI texture; with G0 the two textures get their dirty rectangles and the window is
+ * written over the texture's stale rectangle in the composed frame. */
+static void g0_present(DOut *o, int index, Rect pr, int taken) {
+    int W = o->c.w, H = o->c.h;
+    if (!taken) copy_rect(o->tex, W, o->c.px, o->c.stride, pr);
+    else {
+        const GpuG0 *g = &o->g;
+        for (int i = 0; i < g->nstrip; i++) copy_rect(o->tex, W, o->c.px, o->c.stride, g->strip[i]);
+        int other = g0tex.owner != index;
+        g0_tex_up(&g0tex.b, &g0tex.bw, &g0tex.bh, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || other);
+        g0_tex_up(&g0tex.l, &g0tex.lw, &g0tex.lh, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || other);
+        g0tex.owner = index;
+        paint_g0_done();
+        g0_quads++;
+    }
+    memcpy(o->fb, o->tex, (size_t)W * H * 4);
+    if (taken) {
+        const GpuG0 *g = &o->g;
+        for (int y = g->w.y0; y < g->w.y1; y++)
+            for (int x = g->w.x0; x < g->w.x1; x++)
+                o->fb[(size_t)y * W + x] = canvas_g0_model(g0tex.l[(size_t)(y - g->ly) * g0tex.lw + (x - g->lx)],
+                                                           g0tex.b[(size_t)y * g0tex.bw + x]);
+        o->g0w = g->w;
+    }
+    o->g0on = taken;
+}
+
+/* One display's paint_out (the damaged box in physical px, cleared and painted with paint_root_clear;
+ * with G0, main.c's paint_out and render_frame: the stale rectangle joins the damage, a display with no
+ * damage keeps its frame, unless the G0 textures are another display's) */
+static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
+    int empty = d.x1 <= d.x0 || d.y1 <= d.y0;
+    if (test_g0 && o->g0on) {
+        float gx0, gy0, gx1, gy1;
+        out_logical_box(&o->v, o->g0w, &gx0, &gy0, &gx1, &gy1);
+        if (!empty) d = (Box){ fminf(d.x0, gx0), fminf(d.y0, gy0), fmaxf(d.x1, gx1), fmaxf(d.y1, gy1) };
+        else if (g0tex.owner != index) { d = (Box){ gx0, gy0, gx1, gy1 }; o->g0on = 0; }   /* g0_stale */
+        /* else: drawn again from the textures, the frame stays as it is */
+    }
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return;
+    Rect pr = out_phys_rect(&o->v, d.x0, d.y0, d.x1, d.y1);
+    if (pr.x1 <= pr.x0 || pr.y1 <= pr.y0) return;
+    float lx0, ly0, lx1, ly1;
+    out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
+    paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, index };
+    ui.damage = (Box){ lx0, ly0, lx1, ly1 };
+    canvas_set_clip(&o->c, pr);
+    int taken = 0;
+    if (test_g0) taken = paint_root_g0(&o->c, root, &o->g);
+    else paint_root_clear(&o->c, root, 0x000000);
+    canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+    if (test_g0) g0_present(o, index, pr, taken);
+}
+
+/* main.c's frame: paint_ui (layout, damage, the layer's display: the one with most of the window), then
+ * paint_out on each display */
+static void drag_paint_n(Node *root, DOut *const *os, int n) {
     if (!ui.dirty) return;
     ui.dirty = 0;
     layout_root(root, DW, DH);
     Box d = { 0, 0, 0, 0 };
     if (paint_damage(root)) d = ui.damage;
     ui.damage = (Box){ 0, 0, 0, 0 };
-    if (paint_layer_node()) paint_layer_view(0);
-    if (d.x1 <= d.x0 || d.y1 <= d.y0) return;
-    Rect pr = out_phys_rect(&o->v, d.x0, d.y0, d.x1, d.y1);
-    if (pr.x1 <= pr.x0 || pr.y1 <= pr.y0) return;
-    float lx0, ly0, lx1, ly1;
-    out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
-    paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, 0 };
-    ui.damage = (Box){ lx0, ly0, lx1, ly1 };
-    canvas_set_clip(&o->c, pr);
-    paint_root_clear(&o->c, root, 0x000000);
-    canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
-    ui.damage = (Box){ 0, 0, 0, 0 };
-    paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+    if (paint_layer_node()) {
+        int b = 0;
+        Node *w = node_get(paint_layer_node());
+        if (n > 1 && w) {
+            ORect r[4];
+            for (int i = 0; i < n && i < 4; i++) r[i] = (ORect){ os[i]->v.x, os[i]->v.y, os[i]->v.w, os[i]->v.h };
+            b = out_best(r, n < 4 ? n : 4, w->prev_box.x0, w->prev_box.y0, w->prev_box.x1, w->prev_box.y1);
+        }
+        paint_layer_view(b >= 0 ? b : 0);
+    }
+    for (int i = 0; i < n; i++) drag_paint_out(root, os[i], i, d);
 }
 
 /* Pixels of the frame that differ from a full repaint of the tree (paint_root_full); *worst: the
@@ -1589,11 +1727,12 @@ static long drag_full_diff(Node *root, DOut *o, int *worst) {
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
     term_at = keep;
     long n = 0;
+    const uint32_t *px = test_g0 ? o->fb : o->px;          /* G0: the frame as shown */
     for (size_t i = 0; i < (size_t)o->c.w * o->c.h; i++) {
-        if (o->px[i] == o->rpx[i]) continue;
+        if (px[i] == o->rpx[i]) continue;
         n++;
         for (int sh = 0; sh < 32; sh += 8) {
-            int d = abs((int)((o->px[i] >> sh) & 255) - (int)((o->rpx[i] >> sh) & 255));
+            int d = abs((int)((px[i] >> sh) & 255) - (int)((o->rpx[i] >> sh) & 255));
             if (d > *worst) *worst = d;
         }
     }
@@ -1641,7 +1780,7 @@ static DScene drag_scene(int dc, float x, float y) {
     if (feat & DF_ANC) {
         wins = box_in(s.root, 0, 0, DW, DH, 0);
         ss(wins, "overflow", "hidden");
-        sn(wins, "borderRadius", 24);
+        sn(wins, "borderRadius", dc == DC_ANCEDGE ? 96 : 24);    /* ancedge: its corner reaches the window */
         sn(wins, "borderWidth", 3);
         sn(wins, "borderColor", 0x80ffffff);
     }
@@ -1763,12 +1902,22 @@ static DScene drag_scene(int dc, float x, float y) {
         s.edge = box_in(s.win, 732, 120, 40, 40, 0xffbf5af2);
         sn(s.edge, "borderRadius", 6);
     }
-    /* the Dock and the menu bar: shell layers above the windows, with backdrop blur */
+    if (dc == DC_CORNER) {                              /* after the window, no colour: only its corners */
+        Node *clip = box_in(s.root, x + 120, y + 80, 200, 150, 0);
+        ss(clip, "overflow", "hidden");
+        sn(clip, "borderRadius", 60);
+    }
+    /* the Dock and the menu bar: shell layers above the windows, with backdrop blur (not in ancedge:
+     * nothing painted after the window near the corner it hugs) */
+    if (dc == DC_ANCEDGE) return s;
     Node *dockl = layer_node(s.root, 10, DW, DH);
     Node *dock = box_in(dockl, (DW - 600) / 2, DH - 72, 600, 64, 0x80303034);
     sn(dock, "borderRadius", 16);
     sn(dock, "backdropBlur", 20);
     for (int i = 0; i < 6; i++) dview(dock, 48, 48, accents[i], 12);
+    /* pause: 300 more nodes painted after the window, each in its own box below the Dock (LordOS's real
+     * menu bar and Dock are a few hundred; G0's list of them once held 128 and refused every frame) */
+    if (dc == DC_PAUSE) for (int i = 0; i < 300; i++) box_in(dockl, 12 + 3 * i, DH - 6, 2, 2, accents[i % 6]);
     ss(dock, "flexDirection", "row"); ss(dock, "alignItems", "center"); ss(dock, "justifyContent", "center");
     sn(dock, "gap", 12);
     Node *barl = layer_node(s.root, 20, DW, DH);
@@ -1782,31 +1931,81 @@ static DScene drag_scene(int dc, float x, float y) {
     return s;
 }
 
-/* One run: case dc's scene, the drag (n frames), then the frame after it ends, on o (a display at
- * 100 %, or at 200 % for k2 and k2mix). hash gets n + 1 values; the largest count of pixels that differed
- * from a full repaint goes to *full, the largest difference of a channel to *worst. */
-static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
+/* What the GPU shows (test_compose): the app windows of the list (a solid colour each) below the UI
+ * texture, the texture blended over them (ONE, ONE_MINUS_SRC_ALPHA, rounded), and with G0 the window's
+ * rectangle written over both (blending off: its colour, opaque). */
+static int test_compose;
+static uint64_t composed_hash(DOut *o) {
+    int W = o->c.w, H = o->c.h;
+    const uint32_t *t = test_g0 ? o->tex : o->c.px;    /* without G0 every painted pixel was uploaded */
+    uint32_t *f = o->cmp;
+    memset(f, 0, (size_t)W * H * 4);
+    const float k = (float)o->v.k;
+    for (int i = 0; i < nwdraw; i++) {
+        const WDraw *d = &wdraw[i];
+        int x0 = (int)floorf((d->x - o->v.x) * k), y0 = (int)floorf((d->y - o->v.y) * k);
+        int x1 = (int)ceilf((d->x + d->w - o->v.x) * k), y1 = (int)ceilf((d->y + d->h - o->v.y) * k);
+        for (int y = y0 < 0 ? 0 : y0; y < y1 && y < H; y++)
+            for (int x = x0 < 0 ? 0 : x0; x < x1 && x < W; x++) f[(size_t)y * W + x] = 0xff000000u | (0x406080u + 0x111111u * (uint32_t)d->id);
+    }
+    for (size_t i = 0; i < (size_t)W * H; i++) {
+        uint32_t s = t[i], d = f[i], ia = 255 - (s >> 24), o2 = 0xff000000u;
+        for (int sh = 0; sh < 24; sh += 8) {
+            uint32_t v = (s >> sh & 255) + ((d >> sh & 255) * ia + 127) / 255;
+            o2 |= (v > 255 ? 255 : v) << sh;
+        }
+        f[i] = o2;
+    }
+    if (test_g0 && o->g0on)
+        for (int y = o->g0w.y0; y < o->g0w.y1; y++)
+            for (int x = o->g0w.x0; x < o->g0w.x1; x++) f[(size_t)y * W + x] = 0xff000000u | (o->fb[(size_t)y * W + x] & 0xffffff);
+    Canvas c;
+    canvas_init(&c, f, W, H, W);
+    return frame_hash(&c);
+}
+
+/* The hash of what the displays show (with G0, the composed frames) */
+static uint64_t outs_hash(DOut *const *os, int nos) {
+    uint64_t h = 0;
+    for (int i = 0; i < nos; i++)
+        h = h * 1099511628211ull ^ (test_compose ? composed_hash(os[i]) : frame_hash(test_g0 ? &os[i]->fbc : &os[i]->c));
+    return h;
+}
+
+/* One run: case dc's scene, the drag (n frames), then the frame after it ends, on the displays os (one
+ * at 100 %, at 200 % for k2 and k2mix, two side by side for "two"). hash gets n + 1 values; the largest
+ * count of pixels that differed from a full repaint (the first display) goes to *full, the largest
+ * difference of a channel to *worst. */
+static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *full, int *worst) {
     const int n = dc_frames[dc];
+    DOut *o = os[0];
     float x0 = (DW - 760) / 2, y0 = 28 + (DH - 28 - 480) / 2;             /* scenePath: centered in the work area */
     const float rx = (DW - 760) / 2 - 20, ry = (DH - 28 - 480) - 40;
     if (dc == DC_NEG) { x0 = -200; y0 = -120; }        /* partly off the display's top-left corner */
     if (dc_feat[dc] & DF_SMALL) y0 += 54;
+    if (dc == DC_ANCEDGE) x0 = y0 = 26;                 /* its shadow over the container's rounded corner */
     DScene s = drag_scene(dc, x0, y0);
     term_cursor = 1;
     term_at = (Box){ 0, 0, 0, 0 };
-    canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
-    canvas_clear(&o->c, 0x000000);
+    for (int i = 0; i < nos; i++) {
+        canvas_set_clip(&os[i]->c, (Rect){ 0, 0, os[i]->c.w, os[i]->c.h });
+        canvas_clear(&os[i]->c, 0x000000);
+        os[i]->g0on = 0;
+    }
+    g0tex.owner = -1;
     damage_add((Box){ 0, 0, DW, DH });
     ui.dirty = 1;
-    drag_paint(s.root, o);
+    drag_paint_n(s.root, os, nos);
     paint_layer_begin(s.win->id, 0);                    /* grab.c's setup */
     float gx = x0, gy = y0, rot = 0;
     *full = 0;
     *worst = 0;
     for (int f = 0; f < n; f++) {
         float dx, dy;
-        lbi_path(rx, ry, 6000, f * (1000.0 / 60), &dx, &dy);
+        int paused = dc == DC_PAUSE && f >= 30 && f < 60;   /* nothing changes: no UI damage */
+        lbi_path(rx, ry, 6000, (paused ? 30 : f) * (1000.0 / 60), &dx, &dy);
         if (dc == DC_NEG) { dx = 6 * f; dy = 4 * f; }   /* its left edge crosses x = 0, its top y = 0 */
+        if (dc == DC_ANCEDGE) { dx = 0.5f * f; dy = 0.25f * f; }
         float x = x0 + roundf(dx), y = y0 + roundf(dy);  /* grab_motion */
         if (x != gx || y != gy) {
             gx = x; gy = y;
@@ -1815,8 +2014,8 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
             node_moved(s.win);
             ui.dirty = 1;
         }
-        rot = fmodf(rot + 6, 360);                      /* scene.jsx's square, every 16 ms */
-        if (dc == DC_DRAG || dc == DC_NEG || dc == DC_K2 || dc >= DC_BELOW) js_set(s.spin, "rotate", rot);  /* the others: their own */
+        if (!paused) rot = fmodf(rot + 6, 360);         /* scene.jsx's square, every 16 ms */
+        if ((dc == DC_DRAG || dc == DC_NEG || dc == DC_K2 || dc >= DC_BELOW) && !paused) js_set(s.spin, "rotate", rot);  /* the others: their own */
         int feat = dc_feat[dc];
         if ((feat & DF_BAR) && f % 3 == 1) js_set(s.fill, "width", 40 + (f * 37) % 260);
         if ((feat & DF_BAR) && f % 30 == 15) node_set_text(s.btitle->first, (f / 30) & 1 ? "Files" : "Files, 3 items selected");
@@ -1826,7 +2025,7 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
         if ((feat & DF_RAISE) && f == 40) js_set(s.below, "zIndex", 5);
         if ((feat & DF_RAISE) && f == 80) js_set(s.below, "zIndex", 0);
         if ((feat & DF_DOT) && f % 20 == 10) js_set(s.dot, "backgroundColor", (f / 20) & 1 ? 0xffff453a : 0xff64d2ff);
-        if ((feat & DF_TERM) && f % 10 == 5 && term_at.x1 > term_at.x0) {
+        if ((feat & DF_TERM) && f % 10 == 5 && term_at.x1 > term_at.x0 && !paused) {
             term_cursor = !term_cursor;                 /* the terminal below: outside damage */
             damage_add((Box){ floorf(term_at.x0), floorf(term_at.y0 + 8 - 2), ceilf(term_at.x1), ceilf(term_at.y0 + 24 + 2) });
             ui.dirty = 1;
@@ -1842,17 +2041,20 @@ static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) {
             damage_add((Box){ floorf(term_at.x0), floorf(term_at.y0 + 8 - 2), ceilf(term_at.x1), ceilf(term_at.y0 + 24 + 2) });
             ui.dirty = 1;
         }
-        drag_paint(s.root, o);
-        hash[f] = frame_hash(&o->c);
-        if (f % FULL_EVERY == FULL_EVERY - 1) { long d = drag_full_diff(s.root, o, worst); if (d > *full) *full = d; }
+        drag_paint_n(s.root, os, nos);
+        hash[f] = outs_hash(os, nos);
+        if (nos == 1 && f % FULL_EVERY == FULL_EVERY - 1) { long d = drag_full_diff(s.root, o, worst); if (d > *full) *full = d; }
     }
     paint_layer_end();                                  /* grab_finish */
     ui.dirty = 1;
-    drag_paint(s.root, o);
-    hash[n] = frame_hash(&o->c);
-    long d = drag_full_diff(s.root, o, worst);
-    if (d > *full) *full = d;
+    drag_paint_n(s.root, os, nos);
+    hash[n] = outs_hash(os, nos);
+    if (nos == 1) {
+        long d = drag_full_diff(s.root, o, worst);
+        if (d > *full) *full = d;
+    }
 }
+static void drag_run(int dc, DOut *o, uint64_t *hash, long *full, int *worst) { drag_run_n(dc, &o, 1, hash, full, worst); }
 
 /* The golden file: lines "<architecture> <run> <frame> <hash>"; # starts a comment. */
 static char *read_file(const char *path) {
@@ -1909,29 +2111,94 @@ static int gold_write(const char *path, const char *variant, const uint64_t *has
     return 0;
 }
 
+/* A display of pw × ph physical px for the drag runs (0: out of memory) */
+static int dout_init(DOut *o, OutView v) {
+    memset(o, 0, sizeof *o);
+    o->v = v;
+    size_t n = (size_t)v.pw * v.ph;
+    o->px = calloc(n, 4);
+    o->rpx = calloc(n, 4);
+    o->tex = calloc(n, 4);
+    o->fb = calloc(n, 4);
+    o->cmp = calloc(n, 4);
+    if (!o->px || !o->rpx || !o->tex || !o->fb || !o->cmp) return 0;
+    canvas_init(&o->c, o->px, v.pw, v.ph, v.pw);
+    canvas_init(&o->ref, o->rpx, v.pw, v.ph, v.pw);
+    canvas_init(&o->fbc, o->fb, v.pw, v.ph, v.pw);
+    return 1;
+}
+static void dout_free(DOut *o) { free(o->px); free(o->rpx); free(o->tex); free(o->fb); free(o->cmp); }
+
+/* G0's frames counted since the last call, printed for a run (some_g0: at least one is expected) */
+static void g0_report(const char *what, int some_g0) {
+    G0Stats g;
+    paint_g0_stats(&g);
+    printf("drag-exact %s: G0 composed %ld of %ld frames that used the copy (%ld presented), strips %ld px "
+           "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post)\n", what, g.frames, g.tried, g0_quads,
+           g.strip_px, g.refused[G0R_LAYER], g.refused[G0R_CLIP], g.refused[G0R_ANCESTOR], g.refused[G0R_APP],
+           g.refused[G0R_AFTER], g.refused[G0R_POST]);
+    CHECK((g.frames > 0 || !some_g0) && g.frames == g0_quads, "drag-exact %s: G0 frames %ld, presented %ld", what, g.frames,
+          g0_quads);
+    g0_quads = 0;
+}
+
+/* The runs without golden hashes (pause, two displays): G0 must show what the GPU path shows, frame by
+ * frame (that path is the one the golden hashes check in the other runs). */
+static void test_g0_extra(void) {
+    DOut a, b, c;
+    int ok = dout_init(&a, out_view(0, 0, DW, DH, 100)) && dout_init(&b, out_view(0, 0, DW / 2, DH, 100)) &&
+             dout_init(&c, out_view(DW / 2, 0, DW / 2, DH, 100));
+    uint64_t *h0 = malloc(sizeof *h0 * 1024), *h1 = malloc(sizeof *h1 * 1024);
+    if (!ok || !h0 || !h1) { CHECK(0, "g0-extra: out of memory"); goto done; }
+    for (int dc = DC_N; dc < DC_ALL; dc++) {
+        DOut *two[2] = { &b, &c }, *one[1] = { &a };
+        DOut *const *os = dc == DC_TWO ? two : one;
+        int nos = dc == DC_TWO ? 2 : 1;
+        long full;
+        int worst;
+        test_gpu = 1;
+        test_g0 = 0;
+        test_compose = nos == 1;
+        drag_run_n(dc, os, nos, h0, &full, &worst);
+        test_g0 = 1;
+        G0Stats st;
+        paint_g0_stats(&st);
+        g0_quads = 0;
+        drag_run_n(dc, os, nos, h1, &full, &worst);
+        test_g0 = test_compose = 0;
+        int bad = 0, first = -1;
+        for (int f = 0; f <= dc_frames[dc]; f++) if (h0[f] != h1[f]) { if (first < 0) first = f; bad++; }
+        char what[32];
+        snprintf(what, sizeof what, "g0 %s", dc_name[dc]);
+        /* corner: the box is in every frame's damage, so G0 refuses them all (without that refusal the
+         * frames differ from the GPU path) */
+        g0_report(what, dc != DC_CORNER);
+        CHECK(!bad, "drag-exact g0, run %s: %d of %d frames differ from the GPU path (the first: frame %d)", dc_name[dc], bad,
+              dc_frames[dc] + 1, first);
+    }
+done:
+    test_gpu = 0;
+    dout_free(&a); dout_free(&b); dout_free(&c);
+    free(h0); free(h1);
+}
+
 static void test_drag_exact(int write) {
-    static const char *const variant[2] = { "cpu", "gpu" };
-    DOut o = { 0 }, o2 = { 0 };                        /* the display at 100 %, and at 200 % (DC_K2) */
-    o.v = out_view(0, 0, DW, DH, 100);
-    o2.v = out_view(0, 0, 2 * DW, 2 * DH, 200);
-    o.px = calloc((size_t)DW * DH, 4);
-    o.rpx = calloc((size_t)DW * DH, 4);
-    o2.px = calloc((size_t)4 * DW * DH, 4);
-    o2.rpx = calloc((size_t)4 * DW * DH, 4);
+    static const char *const variant[3] = { "cpu", "gpu", "g0" };
+    DOut o, o2;                                         /* the display at 100 %, and at 200 % (DC_K2) */
+    int ok = dout_init(&o, out_view(0, 0, DW, DH, 100));
+    ok = dout_init(&o2, out_view(0, 0, 2 * DW, 2 * DH, 200)) && ok;
     uint64_t *hash = malloc(sizeof *hash * (size_t)dc_hashes());
-    if (!o.px || !o.rpx || !o2.px || !o2.rpx || !hash) {
+    if (!ok || !hash) {
         CHECK(0, "drag-exact: out of memory");
-        free(o.px); free(o.rpx); free(o2.px); free(o2.rpx); free(hash);
+        dout_free(&o); dout_free(&o2); free(hash);
         return;
     }
-    canvas_init(&o.c, o.px, DW, DH, DW);
-    canvas_init(&o.ref, o.rpx, DW, DH, DW);
-    canvas_init(&o2.c, o2.px, 2 * DW, 2 * DH, 2 * DW);
-    canvas_init(&o2.ref, o2.rpx, 2 * DW, 2 * DH, 2 * DW);
-    for (int g = 0; g < 2; g++) {
-        test_gpu = g;
+    /* g0: the GPU path with G0 (the window composited by canvas_g0_model), against the GPU's hashes */
+    for (int g = 0; g < (write ? 2 : 3); g++) {
+        test_gpu = g > 0;
+        test_g0 = g == 2;
         char path[64];
-        snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g]);
+        snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g == 2 ? 1 : g]);
         long fullw[DC_N];
         int worst[DC_N];
         long parts = 0, renders = 0, blits = 0;
@@ -1941,7 +2208,10 @@ static void test_drag_exact(int write) {
         BelowStats bs;
         paint_below_stats(&bs);
         paint_below_bad = paint_below_checked = 0;
-        paint_below_verify = 1;
+        paint_below_verify = !test_g0;                  /* G0's frames leave the window to the GPU: the hashes check them */
+        G0Stats g0s;
+        paint_g0_stats(&g0s);
+        g0_quads = 0;
         if (getenv("LORD_BELOW_SWITCH")) paint_below_switch = atoi(getenv("LORD_BELOW_SWITCH"));
         for (int dc = 0; dc < DC_N; dc++) {
             drag_run(dc, dc_k2(dc) ? &o2 : &o, hash + k, &fullw[dc], &worst[dc]);
@@ -1957,8 +2227,10 @@ static void test_drag_exact(int write) {
                "%ld blur, %ld transform, %ld unreached, %ld cost), %ld pixels differ in %ld of them painted the old way\n",
                variant[g], bs.full, bs.part, bs.switched, bs.refused[BR_ANCESTOR], bs.refused[BR_BLUR], bs.refused[BR_TRANSFORM],
                bs.refused[BR_UNREACHED], bs.refused[BR_COST], paint_below_bad, paint_below_checked);
-        CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
-              "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
+        if (!test_g0)
+            CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
+                  "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
+        else g0_report("g0", 1);
         printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
         for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
         printf("\n");
@@ -1985,12 +2257,11 @@ static void test_drag_exact(int write) {
         }
         free(file);
     }
-    test_gpu = 0;
-    free(o.px);
-    free(o.rpx);
-    free(o2.px);
-    free(o2.rpx);
+    test_gpu = test_g0 = 0;
+    dout_free(&o);
+    dout_free(&o2);
     free(hash);
+    if (!write) test_g0_extra();
 }
 
 /* ---- A setStyle that only turns or scales a node (node_restyled's transform-only path) ----
@@ -2320,6 +2591,7 @@ int main(int argc, char **argv) {
     test_logical();
     test_transform_math();
     test_transform_paint_hit();
+    test_transform_self_restyle();
     test_layers();
     test_backdrop_band();
     test_multi_damage();

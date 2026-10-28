@@ -137,6 +137,15 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
     0 and `layer_paint` doesn't walk the map. A part that brings the first hole into such a map zeroes
     the rest of it first, so what is read is always what the full walk would have written. The
     sentinel fill writes one row and copies it.
+  - **the GPU composites the window itself** (G0, 0.8.6, in development; `docs/GPU.md`, "The dragged
+    window on the GPU"): on a frame that uses the copy of what is below, the CPU paints only the strips
+    of the damaged box around the window's rectangle, and the GPU writes the rectangle from the layer
+    and the copy (two textures uploaded only where they changed) with `blit_row`'s own arithmetic, so
+    the pixels are the same. Not when an ancestor paints over the window, an app window is under it,
+    a node painted after it (the menu bar, the Dock) meets the box, or the layer has an app window or
+    would be painted whole; then the frame is painted as before. `LORD_G0=0` turns it off,
+    `LORD_GPU_VERIFY=N` compares it with the CPU every N-th frame. `engine-test`'s `g0` path checks it
+    against the GPU path's golden hashes.
 - **There's no layer** if there is a backdrop blur inside (`backdropFilter`), or a video on the GPU
   path.
 - **A `canvas_blit` detail:** opaque pixels are copied directly (same result as blending, without
@@ -312,7 +321,10 @@ was checked against this path:
   memory as before (a node 240 bytes larger made the benchmark's drag about 40 % slower).
 - **Transforms:** a scaled or rotated subtree is painted into its own raster and composited; inside
   a dragged window it goes into the drag layer like anything else. A transformed window is not put in
-  the drag layer.
+  the drag layer. The raster is kept while only the transform changes, and painted again when a node
+  inside it, or the transformed node's own style (background, border, radius, gradient), changes:
+  `damage_walk` keeps the node's own `paint_dirty` for `tf_check`, which runs after the children
+  (`engine-test`'s `test_transform_self_restyle`).
 
 `build/engine-test bench` (`server/tests/engine_test.c`, in the `debian:trixie` build container, i9-10900,
 medians of 3 interleaved runs; "before" is the same benchmark built against the tree of checkpoint

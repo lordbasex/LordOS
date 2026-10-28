@@ -68,7 +68,10 @@ milliseconds no longer turns 60 frames a second into 57.
 ## How it composites
 
 - **The UI** (React → CPU canvas) is a fullscreen texture. Per frame only what changed (the
-  damage) is uploaded, with `GL_EXT_unpack_subimage`.
+  damage) is uploaded, with `GL_EXT_unpack_subimage` (`GL_UNPACK_ROW_LENGTH_EXT` = the scene's
+  stride). Without that extension (Mesa lists it for every GLES2 driver; it could be missing on a
+  vendor's own GLES stack) the damage goes up as whole rows, in one call while the scene's rows are
+  contiguous, or one row at a time otherwise; the log says `damage is uploaded as whole rows`.
 - **App windows** don't go through the canvas. Wherever a window goes, the UI leaves a
   **transparent hole** (alpha 0) and the surface is recorded. When presenting:
   1. the window textures (layer 0);
@@ -101,6 +104,127 @@ milliseconds no longer turns 60 frames a second into 57.
 - **Cursor:** on the GPU path it goes through the KMS cursor plane (`DRM_IOCTL_MODE_CURSOR2`), so
   moving the mouse composites nothing. If the driver has no cursor plane, it's drawn as a quad
   (`LORD_SW_CURSOR=1` forces it).
+
+## The dragged window on the GPU ("G0", 0.8.6, in development)
+
+While a window is dragged its pixels are a cached layer blitted over a copy of what is below it
+(`docs/WINDOWS.md`, "The moving window is a layer"). On the GPU path, a frame that uses that copy no
+longer paints and uploads the window's rectangle: the GPU writes it, with exactly the pixels the CPU would
+have written. Approved by the maintainer on 2026-10-28 (step 10 of the drag-frame work).
+
+**What the frame does** (`paint_root_g0` in `ui/paint.c`, `gpu_frame_ex` in `gpu/gpu.c`):
+
+1. `below_ready` decides, as before, whether the frame uses the copy. G0 only acts on those frames.
+2. W is where `layer_paint` would blit the layer, cut by the window's ancestors' clips and by the
+   frame's damaged box D. The CPU paints only D minus W (up to four strips), each a walk of the tree
+   clipped to the strip (the copy, then from the window on); the scene keeps its stale W.
+3. The GPU gets the strips (the UI texture), the layer and the copy of what is below as two textures of
+   their own, each uploaded only where it changed since the GPU last had it (the layer's repainted part,
+   the copy's partial rebuilds; all of it after a full render, a new size, another display or a new
+   context), and draws one quad over W, after the UI texture and before the menus and the cursor
+   (layer 1), with blending off.
+4. The shader (`fs_g0`) does `blit_row`'s arithmetic at k = 256 (`canvas.c`): where the layer's alpha
+   is 0 the copy's pixel; else `s + floor(d·(255−a)/256)` per colour and `a + floor(((d_a·(255−a) +
+   128)·257) / 65536)` for alpha, with integers held in `highp` floats. Every intermediate value is an
+   integer below 2^24 (the largest is 16,744,321) and every scaling is by 2^-8 or 2^-16, so a 24-bit
+   float holds it exactly; texels are read back to integers with `floor(c·255 + 0.5)` (exact even
+   through 16-bit floats) and the output c/255 is converted to c by the framebuffer as the UI
+   texture's own pixels are. Over a framebuffer that is black under W (no app window is drawn there),
+   writing the result is what blending the UI texture gave. The pixel it works on comes from `v_px`, a
+   `highp` varying in pixels that G0's own vertex shader (`vs_g0`) passes from the quad's corners, not
+   from `gl_FragCoord`: GLSL ES 1.00 makes that `mediump`, and with 16-bit floats it cannot tell x or y
+   from the next pixel past 1024. Dithering is off for the quad.
+
+**When it is not used** (the frame is painted as before; the reasons are counted in the `drag` lines):
+the layer is not valid or would be painted whole this frame, has another opacity, has an app window in it,
+or has a pixel with a colour above its alpha (`layer.premul_bad`: there `blit_row`'s C and NEON versions
+differ from each other); W is empty; an ancestor of the window paints over W after it (a border, the
+restore of rounded corners); an app window of layer 0 is drawn into W (`wl_draws_meet`); the paint order
+around the window is unknown, or a node painted after the window that paints anything meets D (a view
+with `overflow: hidden` and rounded corners counts even when it has no colour: the save and restore of its
+corners around its children change what is below them; with a backdrop blur's reach: it would read the stale W, and a blur or a turned image paints differently when
+D is cut into strips); or something changed while the strips were painted, and then W is painted by the
+CPU in the same frame (post). Also not with several damaged rectangles, a rotated display, a fullscreen
+app, or on another display than the one that owns the layer.
+
+**The stale rectangle** (`main.c`, `g0on`/`g0w` per display): the next frame that paints the display
+joins W to its damage; a frame with no UI damage (the cursor, an app's new frame) draws the window again
+from the textures while they are still that display's, else paints W on the CPU; direct scanout, a
+failed frame and the GPU going away (`cpu_takeover`) paint it again; the frame after the drag ends
+(`paint_layer_end` damages the window's box) paints it on the CPU. When the quad cannot be drawn (an
+upload failed, or the layer or output is larger than the self-test covered: G0 turns off) `gpu_frame_ex`
+returns -2 before presenting: no frame is shown with a stale W, the display keeps the one before, and
+`main.c` paints W on the CPU in the next frame without trying G0 (`g0cpu`). `LORD_PAINT_VERIFY` leaves W
+out of its count on G0 frames.
+
+**Off unless it proves itself:** `gpu_init` sets G0 up. It needs a fragment shader with at least 24-bit
+`highp` floats (`glGetShaderPrecisionFormat`) and then a self-test, drawn into a framebuffer, read back
+and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
+- arithmetic: every valid premultiplied (alpha, colour ≤ alpha) over every destination value (three of
+  them a pixel, the destination alpha varying), every source alpha over every destination alpha, and
+  random valid pixels, 3,145,728 pixels in three 1024 × 1024 tiles;
+- placement: a framebuffer as large as the largest output and at least 4096 × 2048 (else the largest
+  the GPU allows, and the log says `placement in WxH, the largest framebuffer the GPU allows`), a copy
+  of what is below of that size and a layer at an odd offset (37, 21) that reaches its far edges, every
+  pixel a different random value, so a texel read from the wrong place shows. An output larger than
+  that is refused (`gpu_g0_ready(out)`), and a layer larger than it turns G0 off.
+
+One differing pixel turns it off. The outcome is kept per GL renderer and version across contexts, so a
+GPU restart doesn't run it again. The log says `gpu: G0 on: … self-test: N pixels, every valid
+premultiplied combination and a WxH placement pass, the same as the CPU's, T ms` or `gpu: G0 off: …`
+with the reason.
+
+| Switch | Effect |
+|---|---|
+| `LORD_G0=0` | G0 off: the dragged window is painted by the CPU as before |
+| `LORD_GPU_VERIFY=N` | every N-th G0 frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
+
+The `drag: …` and `drag (scripted): …` lines end with `G0: N of M frames (Q quads), strips … Mpx,
+uploaded below … Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post)`: frames
+composited, of those that used the copy; quads drawn; what the CPU painted around W; what went up to the
+two textures; and why the others were not.
+
+**Checked** (VM 116, x86_64):
+- `canvas-test`: the shader written in C with the same float operations (`canvas_g0_model`) against
+  `blit_row_c` and the SIMD row: all 8,421,376 valid (alpha, colour, destination) combinations, every
+  alpha pair, and 200,000 random pixels, 0 differ. The NEON row was not run (no ARM machine was used).
+- `engine-test`'s `g0` path: `test_drag_exact` with G0 and a stub GPU (the UI texture, the two textures
+  with only their dirty rectangles, `main.c`'s bookkeeping, W written by `canvas_g0_model`) gives every
+  one of the 2,417 frames of `drag_golden_gpu.txt`; 250 of 1,856 frames that use the copy are G0 frames
+  there. Five more runs are compared frame by frame with the GPU path: a pause with no damage, two
+  displays side by side, the window over an app window below, the window against a rounded,
+  bordered container's corner, and (`corner`) a rounded `overflow: hidden` box with no colour painted
+  after the window. Taking out the after-node, app-window or ancestor check fails it; without counting
+  the rounded clipping box as painting, 59 of `corner`'s 91 frames differ.
+- The self-test headless (a test driver that includes `gpu.c`, a surfaceless GLES2 context on llvmpipe,
+  VM 116): it passes, 11,373,321 pixels with a 4096 × 2048 placement pass for a 1920 × 1080 output in
+  311–406 ms, 17,678,025 pixels (5120 × 2880) for a 5K output in 520 ms, about 1 ms when kept from an
+  earlier context. With the shader changed to round `v_px` as 16-bit floats would, the tiles pass and the
+  placement pass fails from x = 1024 on (6,207,545 pixels differ): the tiles alone would not catch it.
+  With a layer larger than the placement covered, `gpu_frame_ex` returns -2, presents nothing and turns
+  G0 off. `main.c`'s side of -2 has been built, not run.
+- At runtime with llvmpipe (`LORD_GPU=1`; an isolated session lent the card by `tests/seat_cycle.c`, a
+  scene moved by `lord.wm.script`; before the fixes above, with the self-test of that time: tiles only,
+  run in the first drag frame): the self-test passes in 75–113 ms; with `LORD_GPU_VERIFY=1`, 1,481
+  G0 frames of 1,483 and 0 pixels differ; across 4 context re-creations during the move, 1,328 G0 frames,
+  0 differ; `tests/gpu_cycle.sh` (10 cycles) keeps 38 fds and the same memory. Layout and paint of a
+  drag frame: 0.29–0.35 ms with G0, 0.92 ms without (llvmpipe's composition is most of the frame, so
+  this is no measure of the gain on a real GPU).
+- With the default theme (the same kind of session, Calculator dragged over the remote desktop socket,
+  real screenshots with QMP `screendump`): 152 of 153 frames G0 while the window stays in the band the
+  menu bar and the Dock leave free, 7 of 153 along a figure of eight that reaches them; `LORD_GPU_VERIFY=1`
+  over 160 G0 frames (W up to 462 × 592): 0 pixels differ. The nodes painted after the window are kept
+  as a list that grows as needed (up to 65,536 boxes; a box inside the one noted before it is skipped, so
+  the menu bar and the Dock are 2 boxes): a fixed list of 128 was full with LordOS's own shell and G0
+  refused every frame. LordBench's Desktop impact at 1280 × 800 gets 1 G0 frame of 2,024: its window,
+  with its shadow, always reaches the Dock's or the menu bar's blurred backdrop, and its turning square
+  makes the layer be painted whole. Its numbers with G0 on and with `LORD_G0=0` are the same within
+  llvmpipe's noise.
+
+**Not checked yet:** the Raspberry Pi 5 (V3D), the machine this is for: its self-test, `LORD_GPU_VERIFY=1`
+over full LordBench desktop runs alone and under load, a perf run, a real screenshot and one run with
+`LORD_SW_CURSOR=1`. Until then no gain is claimed. Near the menu bar or the Dock the frame is still
+painted by the CPU.
 
 ## The CPU path on several threads (0.8.5)
 
