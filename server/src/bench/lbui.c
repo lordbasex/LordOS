@@ -24,6 +24,9 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
 void wl_paint_holes(int on) { (void)on; }
 void wl_paint_kept(void) {}
 void wl_paint_keep(void) {}
+void wl_paint_save(void) {}
+void wl_paint_restore(void) {}
+int  wl_draws_meet(Rect r) { (void)r; return 0; }
 void wl_paint_begin(void) {}
 void wl_paint_popups(Canvas *c) { (void)c; }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
