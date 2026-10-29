@@ -46,6 +46,13 @@ int  gpu_frame_ex(int out, const Canvas *s, const Rect *d, int n, const GpuG0 *g
 }
 int  gpu_g0_holds(int out) { (void)out; return 0; }
 void gpu_g0_stats(long *b, long *l, long *q) { *b = *l = *q = 0; }
+int  gpu_g0_feed(int out, int which, const uint32_t *px, int w, int h, Rect r) {
+    (void)out; (void)which; (void)px; (void)w; (void)h; (void)r;
+    return -1;
+}
+void gpu_frame_times(int out, GpuFrameTimes *t) { (void)out; *t = (GpuFrameTimes){ 0 }; }
+void gpu_fence_on(int on) { (void)on; }
+int  gpu_fence_time(int out, uint64_t *ns) { (void)out; *ns = 0; return 0; }
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect c, float o) {
     (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)c; (void)o;
 }
@@ -72,6 +79,7 @@ int  gpu_read_done(void) { return 0; }
 #include <GLES2/gl2ext.h>
 #include <drm/drm_fourcc.h>
 #include <drm/virtgpu_drm.h>
+#include <linux/sync_file.h>
 #include <sys/ioctl.h>
 
 /* Does the card have 3D acceleration? The kernel is asked before loading Mesa, so a machine
@@ -121,6 +129,8 @@ typedef struct {
     EGLSurface surf;
     GpuTex canvas;
     Shown front, pending;
+    GpuFrameTimes times;                /* the last frame's (gpu_frame_times) */
+    int fence;                          /* its native fence's fd + 1 (a sync file), 0 none (so a wiped GOut has none) */
 } GOut;
 
 static struct {
@@ -146,12 +156,19 @@ static struct {
     char render_node[64];               /* where Mesa renders (on the Pi 5: v3d, not vc4) */
     unsigned gen;                       /* this context's generation (0 = none) */
     /* G0, the dragged window composited here (gpu_g0_ready): 0 off, 1 on (g0_setup, at gpu_init) */
-    int g0, g0out;                      /* g0out: the output whose upload the textures hold (-1: none) */
+    int g0;
+    int g0tout[2];                      /* the output whose pixels each texture holds (-1: none); what it
+                                         * still lacks is paint.c's dirty rectangles */
     GLuint g0prog, g0tex[2];            /* 0: the copy of what is below, 1: the layer */
     int g0tw[2], g0th[2];               /* their sizes (0: nothing uploaded) */
     int g0lw, g0lh;                     /* the largest output the self-test's placement covered */
     GLint gu_below, gu_layer, gu_bsize, gu_lrect, gu_swap;
+    /* EGL_ANDROID_native_fence_sync: when the GPU finished a frame (gpu_fence_on) */
+    PFNEGLCREATESYNCKHRPROC create_sync;
+    PFNEGLDESTROYSYNCKHRPROC destroy_sync;
+    PFNEGLDUPNATIVEFENCEFDANDROIDPROC dup_fence;
 } G;
+static int fence_wanted;                /* gpu_fence_on (outlives the context) */
 
 /* These outlive the context (G is wiped by gpu_shutdown). */
 static unsigned last_gen;
@@ -164,6 +181,13 @@ static void (*hook_lost)(void), (*hook_changed)(void);
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { hook_lost = lost; hook_changed = changed; }
 unsigned gpu_generation(void) { return G.on ? G.gen : 0; }
 int gpu_tex_current(const GpuTex *t) { return t && G.on && t->gen == G.gen; }
+
+static double mono_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
+}
+static void take_fence(GOut *o);
 
 static void dbg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void dbg(const char *fmt, ...) {
@@ -407,6 +431,7 @@ static void out_texture(GOut *o) {
 
 static void out_teardown(GOut *o) {
     if (!o->used) return;
+    if (o->fence > 0) close(o->fence - 1);
     release(o, &o->pending);
     release(o, &o->front);
     if (o->surf && eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) glDeleteTextures(1, &o->canvas.id);
@@ -504,12 +529,20 @@ int gpu_init(Kms *k) {
         G.query_modifiers = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC)eglGetProcAddress("eglQueryDmaBufModifiersEXT");
     }
 
+    if (has_ext(exts, "EGL_ANDROID_native_fence_sync") && has_ext(exts, "EGL_KHR_fence_sync")) {
+        G.create_sync = (PFNEGLCREATESYNCKHRPROC)eglGetProcAddress("eglCreateSyncKHR");
+        G.destroy_sync = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress("eglDestroySyncKHR");
+        G.dup_fence = (PFNEGLDUPNATIVEFENCEFDANDROIDPROC)eglGetProcAddress("eglDupNativeFenceFDANDROID");
+        if (!G.create_sync || !G.destroy_sync || !G.dup_fence) G.create_sync = NULL;
+    }
+    dbg("native fences (frame phases): %s", G.create_sync ? "yes" : "no");
+
     out_texture(&G.out[0]);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     G.on = 1;
-    G.g0out = -1;
+    G.g0tout[0] = G.g0tout[1] = -1;
     last_why = "on";
     if (G.debug) {
         GpuFormat f[64];
@@ -835,10 +868,13 @@ static GLuint g0_texture(void) {
     return t;
 }
 
-/* Texture i gets px (w × h, stride w): all of it if its size changed or full, else the n rectangles. */
-static long g0_upload(int i, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
+/* Texture i gets output out's px (w × h, stride w): all of it if its size changed, it held another
+ * output's (or nothing) or full, else the n rectangles. */
+static long g0_upload(int i, int out, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
     glBindTexture(GL_TEXTURE_2D, G.g0tex[i]);
-    if (full || G.g0tw[i] != w || G.g0th[i] != h) {
+    int other = G.g0tout[i] != out;
+    G.g0tout[i] = out;
+    if (full || other || G.g0tw[i] != w || G.g0th[i] != h) {
         GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
         if (G.g0tw[i] != w || G.g0th[i] != h) glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, px);
         else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, fmt, GL_UNSIGNED_BYTE, px);
@@ -933,8 +969,8 @@ static long g0_pass(int fw, int fh, const uint32_t *bel, const uint32_t *lay, in
     for (int y = 0; y < fh; y++)
         for (int x = 0; x < fw; x++)
             if (x < w.x0 || x >= w.x1 || y < w.y0 || y >= w.y1) ref[(size_t)y * fw + x] = 0;
-    g0_upload(0, bel, fw, fh, NULL, 0, 1);
-    g0_upload(1, lay, lw, lh, NULL, 0, 1);
+    g0_upload(0, -1, bel, fw, fh, NULL, 0, 1);
+    g0_upload(1, -1, lay, lw, lh, NULL, 0, 1);
     glViewport(0, 0, fw, fh);
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -1011,6 +1047,7 @@ static int g0_selftest(int fw, int fh, long *cases, long *differ) {
     if (fbo) glDeleteFramebuffers(1, &fbo);
     if (ft) glDeleteTextures(1, &ft);
     G.g0tw[0] = G.g0tw[1] = G.g0th[0] = G.g0th[1] = 0;    /* hold nothing of an output */
+    G.g0tout[0] = G.g0tout[1] = -1;
     glDeleteTextures(2, G.g0tex);
     G.g0tex[0] = g0_texture();
     G.g0tex[1] = g0_texture();
@@ -1061,7 +1098,7 @@ static int g0_setup(void) {
     G.gu_swap = glGetUniformLocation(G.g0prog, "u_swap");
     G.g0tex[0] = g0_texture();
     G.g0tex[1] = g0_texture();
-    G.g0out = -1;
+    G.g0tout[0] = G.g0tout[1] = -1;
     /* the placement part's size: the largest output now, at least 4096 × 2048, within the GPU's limits */
     GLint maxtex = 0, vp[2] = { 0, 0 };
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxtex);
@@ -1123,7 +1160,7 @@ int gpu_g0_ready(int out) {
            G.out[out].H <= G.g0lh;
 }
 
-int gpu_g0_holds(int out) { return G.on && G.g0 == 1 && G.g0out == out && out >= 0; }
+int gpu_g0_holds(int out) { return G.on && G.g0 == 1 && out >= 0 && G.g0tout[0] == out && G.g0tout[1] == out; }
 
 void gpu_g0_stats(long *below_px, long *layer_px, long *quads) {
     *below_px = g0_bpx;
@@ -1161,7 +1198,7 @@ static void g0_verify(GOut *o, const GpuG0 *g) {
 
 /* G0 off for this context, for a reason that would come back every frame */
 static int g0_off(const char *why) {
-    G.g0out = -1;
+    G.g0tout[0] = G.g0tout[1] = -1;
     G.g0 = 0;
     fprintf(stderr, "gpu: G0 off: %s\n", why);
     return 0;
@@ -1174,17 +1211,24 @@ static int g0_frame(GOut *o, int out, const GpuG0 *g) {
     /* coordinates past what the self-test's placement covered are not trusted */
     int tested = o->W <= G.g0lw && o->H <= G.g0lh && g->lw <= G.g0lw - G0_LX && g->lh <= G.g0lh - G0_LY &&
                  g->bw <= G.g0lw && g->bh <= G.g0lh;
-    int other = G.g0out != out;             /* another output's (or nothing yet): all of both */
     if (g->lpx && g->bpx) {
         if (!sane) return g0_off("a window rectangle outside the output");
         if (!tested) return g0_off("a layer or output larger than its self-test covered");
         for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) {}
-        g0_bpx += g0_upload(0, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || other);
-        g0_lpx += g0_upload(1, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || other);
+        double t0 = mono_ms();
+        /* another output's texture (or nothing yet), or full: all of it (paint.c sends what the textures
+         * lack between frames first, so this is rare) */
+        o->times.g0_full = g->bfull || g->lfull || G.g0tout[0] != out || G.g0tout[1] != out || G.g0tw[0] != g->bw ||
+                           G.g0th[0] != g->bh || G.g0tw[1] != g->lw || G.g0th[1] != g->lh;
+        long b = g0_upload(0, out, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull);
+        long l = g0_upload(1, out, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull);
+        g0_bpx += b;
+        g0_lpx += l;
+        o->times.g0_px = b + l;
+        o->times.g0_ms = mono_ms() - t0;
         if (glGetError() != GL_NO_ERROR) return g0_off("an upload failed");
-        G.g0out = out;
-    } else if (!sane || !tested || other || G.g0tw[1] != g->lw || G.g0th[1] != g->lh || G.g0tw[0] != g->bw ||
-               G.g0th[0] != g->bh)
+    } else if (!sane || !tested || !gpu_g0_holds(out) || G.g0tw[1] != g->lw || G.g0th[1] != g->lh ||
+               G.g0tw[0] != g->bw || G.g0th[0] != g->bh)
         return 0;
     g0_draw(o->W, o->H, g->w, (float)g->lx, (float)g->ly, (float)g->lw, (float)g->lh, (float)g->bw, (float)g->bh);
     g0_quads++;
@@ -1197,12 +1241,15 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     if (g0_drawn) *g0_drawn = 0;
     if (!G.on || out < 0 || out >= OUT_MAX || !G.out[out].used) return -1;
     GOut *o = &G.out[out];
+    o->times = (GpuFrameTimes){ 0 };
     if (!eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) { fprintf(stderr, "gpu: eglMakeCurrent failed\n"); return -1; }
     G.cur = o;
     glViewport(0, 0, o->W, o->H);
     /* what changed in the UI */
+    double t0 = mono_ms();
     glBindTexture(GL_TEXTURE_2D, o->canvas.id);
-    for (int i = 0; i < n; i++) upload_rect(scene->px, scene->stride, scene->w, o->W, dmg[i]);
+    for (int i = 0; i < n; i++) o->times.up_px += upload_rect(scene->px, scene->stride, scene->w, o->W, dmg[i]);
+    o->times.up_ms = mono_ms() - t0;
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     Rect all = { 0, 0, o->W, o->H };
@@ -1222,13 +1269,96 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
         if (rb.w == o->W && rb.h == o->H) read_back(o->W, o->H);
         rb.px = NULL;
     }
+    double t1 = mono_ms();
     if (!eglSwapBuffers(G.dpy, o->surf)) { fprintf(stderr, "gpu: eglSwapBuffers failed\n"); return -1; }
+    double t2 = mono_ms();
+    o->times.swap_ms = t2 - t1;
+    take_fence(o);
     struct gbm_bo *bo = gbm_surface_lock_front_buffer(o->gs);
     if (!bo) { fprintf(stderr, "gpu: no GBM buffer\n"); return -1; }
     uint32_t fb = fb_for_bo(bo);
     if (!fb) { gbm_surface_release_buffer(o->gs, bo); return -1; }
     G.frames++;
-    return present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
+    int r = present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
+    o->times.submit_ms = mono_ms() - t2;
+    return r;
+}
+
+void gpu_frame_times(int out, GpuFrameTimes *t) {
+    *t = G.on && out >= 0 && out < OUT_MAX && G.out[out].used ? G.out[out].times : (GpuFrameTimes){ 0 };
+}
+
+/* ---- G0's textures between frames (paint_g0_feed) ---- */
+
+int gpu_g0_feed(int out, int which, const uint32_t *px, int w, int h, Rect r) {
+    if (!G.on || G.g0 != 1 || out < 0 || out >= OUT_MAX || !G.out[out].used || which < 0 || which > 1) return -1;
+    GOut *o = &G.out[out];
+    /* a texture upload needs the context, not a given surface (G.cur is not updated by every
+     * eglMakeCurrent, so the context actually current is asked) */
+    if (eglGetCurrentContext() != G.ctx) {
+        if (!eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) return -1;
+        G.cur = o;
+    }
+    /* errors left by earlier calls (an import, the cursor) are not this upload's: without this one
+     * of them would turn G0 off below */
+    for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) {}
+    glBindTexture(GL_TEXTURE_2D, G.g0tex[which]);
+    if (G.g0tout[which] != out || G.g0tw[which] != w || G.g0th[which] != h) {
+        if (G.g0tw[which] != w || G.g0th[which] != h) {     /* its storage, filled by the slices that follow */
+            GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
+            glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, NULL);
+            G.g0tw[which] = w;
+            G.g0th[which] = h;
+        }
+        G.g0tout[which] = out;
+        if (glGetError() != GL_NO_ERROR) { g0_off("a texture could not be made"); return -1; }
+        return 1;
+    }
+    Rect q = { r.x0 < 0 ? 0 : r.x0, r.y0 < 0 ? 0 : r.y0, r.x1 > w ? w : r.x1, r.y1 > h ? h : r.y1 };
+    long sent = upload_rect(px, w, w, w, q);
+    if (which) g0_lpx += sent;
+    else g0_bpx += sent;
+    if (sent && glGetError() != GL_NO_ERROR) { g0_off("an upload failed"); return -1; }
+    return 0;
+}
+
+/* ---- when the GPU finished a frame (LordBench's frame phases) ---- */
+
+void gpu_fence_on(int on) { fence_wanted = on != 0; }
+
+/* after eglSwapBuffers: a native fence that signals when everything submitted so far (the frame) is done */
+static void take_fence(GOut *o) {
+    if (o->fence > 0) { close(o->fence - 1); o->fence = 0; }
+    if (!fence_wanted || !G.create_sync) return;
+    EGLSyncKHR sy = G.create_sync(G.dpy, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
+    if (sy == EGL_NO_SYNC_KHR) return;
+    glFlush();                              /* the fence's fd exists once it is flushed */
+    int fd = G.dup_fence(G.dpy, sy);
+    G.destroy_sync(G.dpy, sy);
+    o->fence = fd >= 0 ? fd + 1 : 0;
+}
+
+int gpu_fence_time(int out, uint64_t *ns) {
+    *ns = 0;
+    if (!G.on || out < 0 || out >= OUT_MAX || !G.out[out].used || G.out[out].fence <= 0) return 0;
+    GOut *o = &G.out[out];
+    struct sync_fence_info fi[4];
+    struct sync_file_info info;
+    memset(&info, 0, sizeof info);
+    memset(fi, 0, sizeof fi);
+    int ok = 0;
+    int fd = o->fence - 1;
+    if (!ioctl(fd, SYNC_IOC_FILE_INFO, &info) && info.num_fences > 0 && info.num_fences <= 4) {
+        info.sync_fence_info = (uint64_t)(uintptr_t)fi;
+        if (!ioctl(fd, SYNC_IOC_FILE_INFO, &info) && info.status == 1) {
+            for (uint32_t i = 0; i < info.num_fences; i++)       /* the last of its fences to signal */
+                if (fi[i].timestamp_ns > *ns) *ns = fi[i].timestamp_ns;
+            ok = *ns != 0;
+        }
+    }
+    close(fd);
+    o->fence = 0;
+    return ok;
 }
 
 int gpu_frame(int out, const Canvas *scene, Rect dmg, void (*draw_layer)(int layer)) {

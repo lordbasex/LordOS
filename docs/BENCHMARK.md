@@ -563,6 +563,66 @@ matrix products, and the CPU and the GPU share the Pi's memory, but that has not
 **What remains.** Under load a frame takes about twice as long to build on the Pi (15–16 ms instead of 7 ms), for
 a cause not measured yet, which no priority fixes; the Pi kernel at `CONFIG_HZ=1000` (`tools/rpi/build-kernel.sh`, a rebuild) is not built.
 
+#### Frame phases (0.8.6, in development)
+
+A frame is started only after the last flip completed (one frame in flight), so any frame whose whole chain (the
+work before `render()`, the build, the GPU's own part, the flip) takes more than one period is shown a vblank late,
+and the rate locks at half the refresh. The build time alone (`desk.p50`/`p99`) can't tell which part was too long.
+So lord-server also records, for every frame the main display shows, while LordBench records or while a scripted
+move runs (`bench/lbframes.c`: `lbf_phase_built` when `render()` ends, `lbf_phase_shown` at that frame's flip; all
+of it measured by lord-server itself, never by a helper):
+
+| Phase (JSON key, `[p50, p99]` ms) | From → to |
+|---|---|
+| `wakeMs` | the flip's kernel timestamp → `poll()` returned with it (frames started by a flip) |
+| `beforeRenderMs` | that wake → `render()`: pointer motion, LordBench's scripted step, the JS timers |
+| `renderMs` | `render()` itself (the same as the build time) |
+| `paintMs` | its layout and paint |
+| `uploadMs`, `g0UploadMs` | the UI texture's upload; G0's texture uploads in a G0 frame (`docs/GPU.md`) |
+| `swapMs`, `flipIoctlMs` | `eglSwapBuffers`; the front buffer, its framebuffer and the page flip ioctl |
+| `gpuMs` | the flip queued → the GPU finished the frame (below) |
+| `vblankWaitMs` | the later of those two → the flip |
+| `wakeToFlipMs` | the wake → the flip |
+| `catchUpMs` | G0's textures catching up after the flip was queued (`docs/GPU.md`, "Uploads without a stall") |
+
+The GPU's finish time comes from a native fence taken right after `eglSwapBuffers`
+(`EGL_ANDROID_native_fence_sync`, `gpu.c`) and read once at the frame's flip with `SYNC_IOC_FILE_INFO`: the
+kernel's signal time of the sync file, one ioctl a frame, no wait. Fences are taken only while recording. Without
+the extension `gpuKnown` stays 0. Each frame is also put in one class against the first vblank after it started
+(the vblanks fall on the previous flip plus whole periods):
+
+- `onTime`: shown within half a period of that vblank;
+- `cpuLate`: late, and its flip was queued after that vblank;
+- `gpuLate`: queued before it, but the GPU finished after it;
+- `otherLate`: late with both before it, or with the GPU time unknown.
+
+And counted per frame: `paintThreads` (the pool was on), `unshown` (`gpu_frame_ex` returned -2), `uploadMpx`,
+`g0UploadMpx` and `catchUpMpx` (pixels per frame, average), and `g0`: `tried`, `taken`, `refused` by reason
+(`layer`, `clip`, `ancestor`, `app`, `after`, `post`, `feed`), `layer` refusals by cause (`invalid`, `rendering`,
+`holes`, `surfaces`, `premul`, `opacity`, `part`…), `wholeUploads` and `wholeMpx`. The result's `frames` object has
+`phases.alone` and `phases.load`; the session log gets `lordbench: desktop alone: phases, N frames (ms p50/p99): …`
+and `… under load: …`, and the `drag (scripted): …` line ends with the same text for the whole move. Without a
+monitor a frame is "shown" when it ends (on the pacing grid), so `gpuMs` and the wait are 0. System Information does
+not show these yet; results keep comparing as before (no new result ids, LordBench 1).
+
+**Checked** on VM 116: `lordbench-test` feeds known frames (one on time, one queued after its vblank, one whose GPU
+finished after it, one not shown) and checks each class, percentile, count and the text. A desktop run of the
+worktree's lord-server in an isolated headless session (a test theme moving one window with `lord.wm.script` over
+40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601 frames, all on time,
+render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three runs). Those are a check
+that it works, not a measurement (a small scene, no GPU). The GPU fields were not exercised: VM 116 sessions are
+headless, so the fence, the uploads' times and G0's counts have been built, not run.
+
+**What to run on the Pi 5 next** (the package from this work installed, the monitor on, logged in):
+1. LordBench → Desktop impact, twice with G0 (default) and twice with `LORD_G0=0` in the session's environment.
+2. From `~/.cache/lordos/session.log`: the `lordbench: desktop … phases` lines and the `drag (scripted):` line, and
+   from `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
+3. Read under load: if most frames are `cpuLate`, the build is too long (`paintMs`, `uploadMs`, `beforeRenderMs`
+   say which part, and `paintThreads` whether the pool helped); if `gpuLate`, the GPU's own work (`gpuMs`) is; if
+   `onTime` is high and the rate still 30, the classification is wrong and the flip times must be looked at.
+   With G0, `g0.refused`/`g0.layer` say what keeps it off and `catchUpMpx` what the slices cost.
+4. `LORD_GPU_VERIFY=1` once with G0 over a Desktop impact run: `gpu-verify: … differ=0` on every line.
+
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
 systemd-analyze gives 2.1 s kernel + 4.2 s userspace). Boots where the monitor was connected late took 61 and
 103 s, which is the wait for the monitor, not the boot. The N-boot test was checked by its unit tests

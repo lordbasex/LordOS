@@ -1598,7 +1598,9 @@ typedef struct {
     GpuG0 g;
 } DOut;
 static int test_g0;
-static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner; } g0tex;   /* the stub GPU's G0 textures */
+static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner[2]; } g0tex;   /* the stub GPU's G0 textures (owner: 0 the copy, 1 the layer) */
+static long g0_fed;                                 /* pixels sent between frames (paint_g0_feed) */
+static long g0_whole;                               /* G0 frames that had to send a texture whole */
 static long g0_quads;
 typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption, *below, *btitle, *fill, *mtext, *square, *ptext, *dot; } DScene;
 
@@ -1630,6 +1632,7 @@ static void copy_rect(uint32_t *dst, int dstride, const uint32_t *src, int sstri
 
 /* The stub GPU's texture t (*tw × *th): all of px if its size changed, it was another display's or
  * full, else the dirty rectangles (gpu.c's g0_upload). */
+static long g0_frame_px, g0_frame_max;              /* pixels the G0 frames sent: this one, the most one did */
 static void g0_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
     if (*tw != w || *th != h) {
         free(*t);
@@ -1639,26 +1642,65 @@ static void g0_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w,
         full = 1;
     }
     if (!*t) return;
-    if (full) { memcpy(*t, px, (size_t)w * h * 4); return; }
+    if (full) { memcpy(*t, px, (size_t)w * h * 4); g0_frame_px += (long)w * h; return; }
     for (int i = 0; i < n; i++) {
         Rect q = { r[i].x0 < 0 ? 0 : r[i].x0, r[i].y0 < 0 ? 0 : r[i].y0, r[i].x1 > w ? w : r[i].x1, r[i].y1 > h ? h : r[i].y1 };
-        if (q.x1 > q.x0 && q.y1 > q.y0) copy_rect(*t, w, px, w, q);
+        if (q.x1 > q.x0 && q.y1 > q.y0) { copy_rect(*t, w, px, w, q); g0_frame_px += (long)(q.x1 - q.x0) * (q.y1 - q.y0); }
     }
+}
+
+/* gpu.c's gpu_g0_feed on the stub GPU (ctx: the display's index): a texture that is not this display's
+ * at this size is made again, filled with a pattern no frame has (so a pixel the feed missed shows) */
+static int g0_tex_feed(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
+    int index = *(const int *)ctx;
+    uint32_t **t = which ? &g0tex.l : &g0tex.b;
+    int *tw = which ? &g0tex.lw : &g0tex.bw, *th = which ? &g0tex.lh : &g0tex.bh;
+    if (g0tex.owner[which] != index || *tw != w || *th != h) {
+        if (*tw != w || *th != h) {
+            free(*t);
+            *t = malloc((size_t)w * h * 4);
+            *tw = *t ? w : 0;
+            *th = *t ? h : 0;
+            if (!*t) return -1;
+            for (size_t i = 0; i < (size_t)w * h; i++) (*t)[i] = 0x7f13ff13u;
+        }
+        g0tex.owner[which] = index;
+        return 1;
+    }
+    Rect q = { r.x0 < 0 ? 0 : r.x0, r.y0 < 0 ? 0 : r.y0, r.x1 > w ? w : r.x1, r.y1 > h ? h : r.y1 };
+    if (q.x1 > q.x0 && q.y1 > q.y0) {
+        copy_rect(*t, w, px, w, q);
+        g0_fed += (long)(q.x1 - q.x0) * (q.y1 - q.y0);
+    }
+    return 0;
 }
 
 /* main.c's presentation on the GPU (render_frame, gpu_frame_ex): the painted rectangles (pr, or the
  * strips) go to the UI texture; with G0 the two textures get their dirty rectangles and the window is
- * written over the texture's stale rectangle in the composed frame. */
+ * written over the texture's stale rectangle in the composed frame. A frame refused only for what the
+ * textures lack (G0R_FEED) then sends a slice of it (paint_g0_feed), as main.c does after queueing the flip. */
 static void g0_present(DOut *o, int index, Rect pr, int taken) {
     int W = o->c.w, H = o->c.h;
-    if (!taken) copy_rect(o->tex, W, o->c.px, o->c.stride, pr);
-    else {
+    if (!taken) {
+        copy_rect(o->tex, W, o->c.px, o->c.stride, pr);
+        int why, sub;
+        if (paint_g0_last(&why, &sub) == 0 && why == G0R_FEED && paint_g0_backlog(index) > 0)
+            paint_g0_feed(index, G0_FEED_PX, g0_tex_feed, &index);
+    } else {
         const GpuG0 *g = &o->g;
         for (int i = 0; i < g->nstrip; i++) copy_rect(o->tex, W, o->c.px, o->c.stride, g->strip[i]);
-        int other = g0tex.owner != index;
-        g0_tex_up(&g0tex.b, &g0tex.bw, &g0tex.bh, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || other);
-        g0_tex_up(&g0tex.l, &g0tex.lw, &g0tex.lh, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || other);
-        g0tex.owner = index;
+        /* paint.c sent the rest first: a G0 frame never has more than G0_FEED_PX left */
+        long left = 0;
+        if (g->bfull) left += (long)g->bw * g->bh;
+        else for (int i = 0; i < g->nb; i++) left += (long)(g->bdirty[i].x1 - g->bdirty[i].x0) * (g->bdirty[i].y1 - g->bdirty[i].y0);
+        CHECK(left <= G0_FEED_PX, "a G0 frame with %ld px of the copy left to send", left);
+        int bother = g0tex.owner[0] != index, lother = g0tex.owner[1] != index;
+        if (bother || lother || g->bfull || g->lfull) g0_whole++;
+        g0_tex_up(&g0tex.b, &g0tex.bw, &g0tex.bh, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || bother);
+        g0_tex_up(&g0tex.l, &g0tex.lw, &g0tex.lh, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || lother);
+        g0tex.owner[0] = g0tex.owner[1] = index;
+        if (g0_frame_px > g0_frame_max) g0_frame_max = g0_frame_px;
+        g0_frame_px = 0;
         paint_g0_done();
         g0_quads++;
     }
@@ -1683,7 +1725,7 @@ static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
         float gx0, gy0, gx1, gy1;
         out_logical_box(&o->v, o->g0w, &gx0, &gy0, &gx1, &gy1);
         if (!empty) d = (Box){ fminf(d.x0, gx0), fminf(d.y0, gy0), fmaxf(d.x1, gx1), fmaxf(d.y1, gy1) };
-        else if (g0tex.owner != index) { d = (Box){ gx0, gy0, gx1, gy1 }; o->g0on = 0; }   /* g0_stale */
+        else if (g0tex.owner[0] != index || g0tex.owner[1] != index) { d = (Box){ gx0, gy0, gx1, gy1 }; o->g0on = 0; }   /* g0_stale */
         /* else: drawn again from the textures, the frame stays as it is */
     }
     if (d.x1 <= d.x0 || d.y1 <= d.y0) return;
@@ -2000,7 +2042,7 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
         canvas_clear(&os[i]->c, 0x000000);
         os[i]->g0on = 0;
     }
-    g0tex.owner = -1;
+    g0tex.owner[0] = g0tex.owner[1] = -1;
     damage_add((Box){ 0, 0, DW, DH });
     ui.dirty = 1;
     drag_paint_n(s.root, os, nos);
@@ -2143,12 +2185,13 @@ static void g0_report(const char *what, int some_g0) {
     G0Stats g;
     paint_g0_stats(&g);
     printf("drag-exact %s: G0 composed %ld of %ld frames that used the copy (%ld presented), strips %ld px "
-           "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post)\n", what, g.frames, g.tried, g0_quads,
+           "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up); %ld px sent between "
+           "frames, %ld G0 frames sent a texture whole, the most one G0 frame sent %ld px\n", what, g.frames, g.tried, g0_quads,
            g.strip_px, g.refused[G0R_LAYER], g.refused[G0R_CLIP], g.refused[G0R_ANCESTOR], g.refused[G0R_APP],
-           g.refused[G0R_AFTER], g.refused[G0R_POST]);
+           g.refused[G0R_AFTER], g.refused[G0R_POST], g.refused[G0R_FEED], g0_fed, g0_whole, g0_frame_max);
     CHECK((g.frames > 0 || !some_g0) && g.frames == g0_quads, "drag-exact %s: G0 frames %ld, presented %ld", what, g.frames,
           g0_quads);
-    g0_quads = 0;
+    g0_quads = g0_fed = g0_whole = g0_frame_max = 0;
 }
 
 /* The runs without golden hashes (pause, two displays): G0 must show what the GPU path shows, frame by

@@ -169,6 +169,89 @@ int main(void) {
     lbf_presented(6000, 0);
     CHECK(lbf_end(&fs) == 0 && fs.inputs == 0, "no negative latency");
 
+    /* ---- frame phases: what each part of a frame took, and why it was late ---- */
+    {
+    LbPhaseStats ps;
+    const uint64_t P = 16666667, F0 = 1000000000ull;    /* the vblanks: F0 + k P */
+    lbf_phase_built(&(LbPhase){ .submit = 1 });         /* not recording: ignored */
+    lbf_phase_shown(F0, 0);
+    CHECK(!lbf_recording(), "not recording");
+    lbf_drag_begin();
+    CHECK(lbf_recording(), "the drag records");
+    /* on time: woke 0.1 ms after a flip, render 0.5 ms later for 9 ms, queued at 10 ms, GPU done at 12, shown at the next vblank */
+    LbPhase a = { .prev_flip = F0, .wake = F0 + 100000, .from_flip = 1, .render0 = F0 + 600000, .built = F0 + 9600000,
+                  .paint_ms = 6, .up_ms = 2, .swap_ms = 0.1, .submit_ms = 0.2, .up_px = 1000, .submit = F0 + 10000000,
+                  .period = (uint32_t)P, .par = 1, .g0 = 1 };
+    lbf_phase_built(&a);
+    lbf_phase_shown(F0 + P, F0 + 12000000);
+    /* CPU-late: queued 18 ms after that flip, past the next vblank */
+    LbPhase b = a;
+    b.prev_flip = F0 + P;
+    b.wake = F0 + P + 100000;
+    b.render0 = b.wake + 500000;
+    b.built = b.wake + 17000000;
+    b.submit = b.wake + 18000000;
+    b.par = 0;
+    b.g0 = 0;
+    b.g0_why = 0;                                       /* G0R_LAYER, G0L_INVALID */
+    b.g0_sub = 1;
+    lbf_phase_built(&b);
+    lbf_phase_shown(F0 + 3 * P, b.submit + 2000000);
+    /* GPU-late: queued at 12 ms, the GPU finished at 17, past the vblank at 16.7 */
+    LbPhase c = a;
+    c.prev_flip = F0 + 3 * P;
+    c.wake = c.prev_flip + 100000;
+    c.render0 = c.wake + 500000;
+    c.built = c.wake + 11000000;
+    c.submit = c.prev_flip + 12000000;
+    c.g0 = 0;
+    c.g0_why = 6;                                       /* G0R_FEED */
+    c.g0_sub = -1;
+    c.unshown = 0;
+    c.feed_ms = 1.5;
+    c.feed_px = 262144;
+    lbf_phase_built(&c);
+    lbf_phase_shown(F0 + 5 * P, c.prev_flip + 17000000);
+    /* unshown: no flip queued, no presentation */
+    LbPhase d = a;
+    d.submit = 0;
+    d.unshown = 1;
+    d.g0 = -1;
+    lbf_phase_built(&d);
+    lbf_phase_shown(F0 + 6 * P, 0);                     /* a flip of something else: nothing waits for it */
+    lbf_drag_end(&ps);
+    CHECK(!lbf_recording(), "the drag stopped");
+    CHECK(ps.n == 3 && ps.on_time == 1 && ps.cpu_late == 1 && ps.gpu_late == 1 && ps.other_late == 0 && ps.gpu_known == 3,
+          "classes: %d frames, %d on time, %d CPU-late, %d GPU-late, %d other, %d known", ps.n, ps.on_time, ps.cpu_late,
+          ps.gpu_late, ps.other_late, ps.gpu_known);
+    CHECK(fabs(ps.wake.p50 - 0.1) < 1e-6 && fabs(ps.pre.p50 - 0.5) < 1e-6 && fabs(ps.paint.p50 - 6) < 1e-6, "wake %f, before %f, paint %f",
+          ps.wake.p50, ps.pre.p50, ps.paint.p50);
+    CHECK(fabs(ps.build.p50 - 10.5) < 1e-3 && fabs(ps.build.p99 - 16.5) < 1e-3, "render %f/%f", ps.build.p50, ps.build.p99);
+    CHECK(fabs(ps.gpu.p50 - 2) < 1e-3 && fabs(ps.gpu.p99 - 5) < 1e-3, "GPU %f/%f", ps.gpu.p50, ps.gpu.p99);
+    CHECK(fabs(ps.wait.p50 - 13.233333) < 1e-3 && fabs(ps.wait.p99 - 16.333333) < 1e-3, "to the vblank %f/%f", ps.wait.p50, ps.wait.p99);
+    CHECK(ps.par == 3 && ps.g0_tried == 3 && ps.g0_taken == 1 && ps.g0_refused[0] == 1 && ps.g0_layer[1] == 1 &&
+          ps.g0_refused[6] == 1 && ps.unshown == 1, "counts: par %d, G0 %d of %d, refused %d %d (%d), unshown %d", ps.par,
+          ps.g0_taken, ps.g0_tried, ps.g0_refused[0], ps.g0_refused[6], ps.g0_layer[1], ps.unshown);
+    CHECK(fabs(ps.feed_mpx - 262144 / 4.0 / 1e6) < 1e-9 && fabs(ps.feed.p99 - 1.5) < 1e-6, "catch-up %f Mpx %f ms", ps.feed_mpx, ps.feed.p99);
+    char pt[1024];
+    lbf_phases_text(&ps, pt, sizeof pt);
+    CHECK(strstr(pt, "CPU-late 1") && strstr(pt, "not layer 1 [invalid 1]") && strstr(pt, "not feed 1") && strstr(pt, "unshown 1"),
+          "phases text: %s", pt);
+    CHECK(!strcmp(lbf_g0r_name(6), "feed") && !lbf_g0r_name(7) && !lbf_g0r_name(-1) && !strcmp(lbf_g0l_name(14), "part") &&
+          !lbf_g0l_name(15), "G0 names");
+    char small[16];
+    lbf_phases_text(&ps, small, sizeof small);
+    CHECK(strlen(small) == 15, "a short buffer is cut, terminated");
+    lbf_begin();                                        /* LordBench's recorder: its own, read after lbf_end */
+    lbf_phase_built(&a);
+    lbf_phase_shown(F0 + P, 0);
+    lbf_end(&fs);
+    lbf_phase_built(&a);                                /* stopped: ignored */
+    lbf_phase_shown(F0 + P, 0);
+    lbf_phases(&ps);
+    CHECK(ps.n == 1 && ps.on_time == 1 && ps.gpu_known == 0 && ps.gpu.p50 == 0, "LordBench's phases: %d frames", ps.n);
+    }
+
     /* ---- the synthetic pointer: its path, and the thread's events through the eventfd ---- */
     float dx, dy;
     lbi_path(200, 100, 4000, 1000, &dx, &dy);           /* a quarter turn: x = rx, y = ry sin(π) / 2 = 0 */

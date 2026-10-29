@@ -108,6 +108,8 @@ typedef struct {
     double throttle_at, throttle_temp;
     LbRpiWatch rpi;                     /* the Pi firmware's under-voltage and throttling during the run */
     double budget_ms, gap_max;          /* desktop: the refresh period and the longest wait between frames */
+    LbPhaseStats phases[2];             /* desktop: where the frames' time went, alone and under the load */
+    int have_phases[2];
     int sbx_have[LB_SBX_COUNT], sbx_refused[LB_SBX_COUNT], sbx_errno[LB_SBX_COUNT];    /* the helper-sandbox self-test */
 } Res;
 
@@ -133,6 +135,28 @@ static void cond_json(HBuf *b, const LbCond *c) {
     hb_printf(b, "\"power\":\"%s\"", c->on_battery < 0 ? "unknown" : c->on_battery ? "battery" : "mains");
     if (c->battery_pct >= 0) hb_printf(b, ",\"batteryPct\":%d", c->battery_pct);
     hb_printf(b, "}");
+}
+
+/* the frame phases lord-server recorded itself (bench/lbframes.h): [p50, p99] in ms, and counts */
+static void phases_json(HBuf *b, const LbPhaseStats *p) {
+    const struct { const char *k; LbPct v; } t[] = {
+        { "wakeMs", p->wake }, { "beforeRenderMs", p->pre }, { "renderMs", p->build }, { "paintMs", p->paint },
+        { "uploadMs", p->up }, { "g0UploadMs", p->g0up }, { "swapMs", p->swap }, { "flipIoctlMs", p->submit_call },
+        { "gpuMs", p->gpu }, { "vblankWaitMs", p->wait }, { "wakeToFlipMs", p->chain }, { "catchUpMs", p->feed },
+    };
+    hb_printf(b, "{\"frames\":%d", p->n);
+    for (size_t i = 0; i < sizeof t / sizeof *t; i++) hb_printf(b, ",\"%s\":[%.3f,%.3f]", t[i].k, t[i].v.p50, t[i].v.p99);
+    hb_printf(b, ",\"uploadMpx\":%.4f,\"g0UploadMpx\":%.4f,\"catchUpMpx\":%.4f,\"onTime\":%d,\"cpuLate\":%d,\"gpuLate\":%d,"
+                 "\"otherLate\":%d,\"gpuKnown\":%d,\"paintThreads\":%d,\"unshown\":%d,\"g0\":{\"tried\":%d,\"taken\":%d,"
+                 "\"wholeUploads\":%d,\"wholeMpx\":%.3f,\"refused\":{",
+              p->up_mpx, p->g0_mpx, p->feed_mpx, p->on_time, p->cpu_late, p->gpu_late, p->other_late, p->gpu_known, p->par,
+              p->unshown, p->g0_tried, p->g0_taken, p->g0_full, p->g0_full_px / 1e6);
+    for (int i = 0, k = 0; i < LBF_G0R; i++)
+        if (p->g0_refused[i] && lbf_g0r_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_g0r_name(i), p->g0_refused[i]);
+    hb_printf(b, "},\"layer\":{");
+    for (int i = 0, k = 0; i < LBF_G0L; i++)
+        if (p->g0_layer[i] && lbf_g0l_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_g0l_name(i), p->g0_layer[i]);
+    hb_printf(b, "}}}");
 }
 
 static char *build_result(const Job *j, int st, const char *why, const Res *r, const LbCond *c0, const LbCond *c1,
@@ -190,7 +214,18 @@ static char *build_result(const Job *j, int st, const char *why, const Res *r, c
         first = 0;
     }
     hb_printf(&b, "}");
-    if (r->budget_ms > 0) hb_printf(&b, ",\"frames\":{\"budgetMs\":%.3f,\"gapMaxMs\":%.1f}", r->budget_ms, r->gap_max);
+    if (r->budget_ms > 0) {
+        hb_printf(&b, ",\"frames\":{\"budgetMs\":%.3f,\"gapMaxMs\":%.1f", r->budget_ms, r->gap_max);
+        if (r->have_phases[0] || r->have_phases[1]) {
+            hb_printf(&b, ",\"phases\":{");
+            for (int i = 0, k = 0; i < 2; i++) if (r->have_phases[i]) {
+                hb_printf(&b, "%s\"%s\":", k++ ? "," : "", i ? "load" : "alone");
+                phases_json(&b, &r->phases[i]);
+            }
+            hb_printf(&b, "}");
+        }
+        hb_printf(&b, "}");
+    }
     if (r->nsamples) {
         hb_printf(&b, ",\"sustained\":{\"samples\":[");
         for (int i = 0; i < r->nsamples; i++)
@@ -369,10 +404,19 @@ static int put_frames(Res *r, int first) {
         put_result(r, first + 4, fs.in_p50, 0);
         put_result(r, first + 5, fs.in_p99, 0);
     } else for (int i = 4; i < 6; i++) put_skip(r, first + i, LB_SKIP_FAILED);
+    LbPhaseStats ph;
+    lbf_phases(&ph);
     pthread_mutex_lock(&mu);
     r->budget_ms = fs.budget_ms;
     if (fs.gap_max > r->gap_max) r->gap_max = fs.gap_max;
+    int k = first == LB_DESK_FPS;
+    if (ph.n) { r->phases[k] = ph; r->have_phases[k] = 1; }
     pthread_mutex_unlock(&mu);
+    if (ph.n) {                             /* also in the session's log, as the drag's line has them */
+        char t[1024];
+        lbf_phases_text(&ph, t, sizeof t);
+        fprintf(stderr, "lordbench: desktop %s: %s\n", k ? "under load" : "alone", t);
+    }
     return 0;
 }
 

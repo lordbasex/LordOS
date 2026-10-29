@@ -526,17 +526,41 @@ static struct {
 typedef struct { Rect r[G0_DIRTY]; int n, full; } G0Dirty;
 static G0Dirty g0_ld, g0_bd;
 static G0Stats g0stat;
+static Rect g0_join(Rect a, Rect b) {
+    return (Rect){ a.x0 < b.x0 ? a.x0 : b.x0, a.y0 < b.y0 ? a.y0 : b.y0, a.x1 > b.x1 ? a.x1 : b.x1, a.y1 > b.y1 ? a.y1 : b.y1 };
+}
+static long g0_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 - r.x0) * (r.y1 - r.y0) : 0; }
 static void g0_dirty(G0Dirty *d, Rect r) {
     if (d->full || r.x1 <= r.x0 || r.y1 <= r.y0) return;
+    for (int i = 0; i < d->n; i++)              /* already inside one */
+        if (r.x0 >= d->r[i].x0 && r.y0 >= d->r[i].y0 && r.x1 <= d->r[i].x1 && r.y1 <= d->r[i].y1) return;
     if (d->n < G0_DIRTY) { d->r[d->n++] = r; return; }
-    Rect *l = &d->r[G0_DIRTY - 1];              /* no room: the last one grows */
-    *l = (Rect){ l->x0 < r.x0 ? l->x0 : r.x0, l->y0 < r.y0 ? l->y0 : r.y0, l->x1 > r.x1 ? l->x1 : r.x1, l->y1 > r.y1 ? l->y1 : r.y1 };
+    /* no room: of the rectangles and r, the two whose box adds the fewest pixels become that box (the
+     * last one growing, as before, could turn a few small changes into most of the screen) */
+    int bi = 0, bj = G0_DIRTY;                  /* bj == G0_DIRTY: r itself */
+    long best = -1;
+    for (int i = 0; i < G0_DIRTY; i++)
+        for (int j = i + 1; j <= G0_DIRTY; j++) {
+            Rect b = j < G0_DIRTY ? d->r[j] : r;
+            long w = g0_area(g0_join(d->r[i], b)) - g0_area(d->r[i]) - g0_area(b);
+            if (best < 0 || w < best) { best = w; bi = i; bj = j; }
+        }
+    if (bj == G0_DIRTY) { d->r[bi] = g0_join(d->r[bi], r); return; }
+    d->r[bi] = g0_join(d->r[bi], d->r[bj]);
+    d->r[bj] = r;
 }
 static void g0_dirty_all(void) { g0_ld = (G0Dirty){ .full = 1 }; g0_bd = (G0Dirty){ .full = 1 }; }
 void paint_g0_done(void) { g0_ld = (G0Dirty){ 0 }; g0_bd = (G0Dirty){ 0 }; }
 void paint_g0_stats(G0Stats *out) {
     *out = g0stat;
     memset(&g0stat, 0, sizeof g0stat);
+}
+typedef struct { int taken, why, sub; } G0Last;
+static G0Last g0_last = { -1, -1, -1 };
+int paint_g0_last(int *why, int *sub) {
+    *why = g0_last.why;
+    *sub = g0_last.sub;
+    return g0_last.taken;
 }
 
 void paint_layer_begin(int node, int resize) {
@@ -565,6 +589,7 @@ void paint_layer_external_damage(void) { layer.valid = 0; }
 /* Several displays: only the one with most of the window uses the layer and the copy of what is
  * below; the others paint the window as usual. Moving to another display rebuilds both. */
 int paint_layer_node(void) { return layer.want ? layer.node : 0; }
+
 
 void paint_layer_view(int index) {
     if (layer.view == index) return;
@@ -797,6 +822,67 @@ static int layer_render(Node *n, float opacity) {
     layer.painted = 1;
     layer_renders++;
     return 1;
+}
+
+/* ---- G0's textures catching up between frames (docs/GPU.md, "Uploads without a stall") ----
+ * A whole copy of what is below (a drag's start, a copy built again whole) is a screen of pixels: sent in
+ * one frame it took that frame past its vblank. Now a frame that uses G0 sends at most G0_FEED_PX
+ * (g0_backlog_now; else the CPU paints it, the same pixels), and what is left is sent after a frame's
+ * flip is queued, a slice a frame (paint_g0_feed), while the CPU waits for the vblank anyway. */
+static long g0_backlog_one(const G0Dirty *d, int w, int h) {
+    if (d->full) return (long)w * h;
+    long a = 0;
+    for (int i = 0; i < d->n; i++) {
+        Rect q = d->r[i];
+        a += g0_area((Rect){ q.x0 < 0 ? 0 : q.x0, q.y0 < 0 ? 0 : q.y0, q.x1 > w ? w : q.x1, q.y1 > h ? h : q.y1 });
+    }
+    return a;
+}
+static long g0_backlog_now(void) {
+    return g0_backlog_one(&g0_bd, layer.bw, layer.bh) + (layer.px ? g0_backlog_one(&g0_ld, layer.w, layer.h) : 0);
+}
+/* whether G0 could use the layer on display view soon: else sending it is wasted work */
+static int g0_feedable(int view) {
+    return gpu_active() && layer.want && layer.node && layer.view == view && !layer.resize && !layer.rendering &&
+           layer.below && !layer.bdmg_full && !layer.has_holes && !layer.premul_bad && !nlsurf && !lsurf_all;
+}
+long paint_g0_backlog(int view) { return g0_feedable(view) ? g0_backlog_now() : 0; }
+
+long paint_g0_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
+                   void *ctx) {
+    if (!g0_feedable(view)) return 0;
+    long sent = 0;
+    for (int which = 0; which < 2 && sent < budget; which++) {
+        G0Dirty *d = which ? &g0_ld : &g0_bd;
+        const uint32_t *px = which ? layer.px : layer.below;
+        int w = which ? layer.w : layer.bw, h = which ? layer.h : layer.bh;
+        if (!px || w <= 0 || h <= 0 || (which && !layer.valid)) continue;
+        /* an empty rectangle first: does the texture hold this at all? */
+        int k = up(ctx, which, px, w, h, (Rect){ 0, 0, 0, 0 });
+        if (k < 0) return sent;
+        if (k > 0) *d = (G0Dirty){ .full = 1 };
+        while (d->full || d->n) {
+            if (d->full) *d = (G0Dirty){ .r = { { 0, 0, w, h } }, .n = 1 };
+            Rect *l = &d->r[d->n - 1];
+            Rect q = { l->x0 < 0 ? 0 : l->x0, l->y0 < 0 ? 0 : l->y0, l->x1 > w ? w : l->x1, l->y1 > h ? h : l->y1 };
+            long a = g0_area(q), room = budget - sent;
+            if (!a) { d->n--; continue; }
+            if (room <= 0) break;
+            Rect part = q;
+            if (a > room) {                         /* its top rows, as many as fit */
+                int rows = (int)(room / (q.x1 - q.x0));
+                if (rows < 1) break;
+                part.y1 = q.y0 + rows;
+            }
+            k = up(ctx, which, px, w, h, part);
+            if (k < 0) return sent;
+            if (k > 0) { *d = (G0Dirty){ .full = 1 }; break; }     /* lost meanwhile: all again, next time */
+            sent += g0_area(part);
+            if (part.y1 >= q.y1) d->n--;
+            else *l = (Rect){ q.x0, part.y1, q.x1, q.y1 };
+        }
+    }
+    return sent;
 }
 
 /* Repinta solo layer.part (lo que cambió adentro: una línea de la terminal, el cursor que parpadea).
@@ -1697,20 +1783,31 @@ static int g0_bx, g0_by;                /* where the layer's pixel (0, 0) lands 
 
 /* W for this frame (-1), or why there is none (G0R_*): where layer_paint's blit lands, cut by the
  * ancestors' clips and by c->clip, the frame's box (inside the canvas). */
+static int g0_sub;                      /* the G0L_* of g0_gate's last G0R_LAYER */
+#define G0_NO_LAYER(why) do { g0_sub = (why); return G0R_LAYER; } while (0)
 static int g0_gate(const Canvas *c, Node *root, Rect *wout) {
     Node *w = node_get(layer.node);
-    if (!w || !layer.want || !layer.valid || layer.resize || layer.rendering || paint_capture_mode ||
-        paint_view.index != layer.view || w->has_tf || w->type == NODE_RAW || w->s.display_none)
-        return G0R_LAYER;
-    if (layer.has_holes || nlsurf || lsurf_all || layer.premul_bad || !layer.px || !layer.below) return G0R_LAYER;
+    g0_sub = -1;
+    if (!w || !layer.want) G0_NO_LAYER(G0L_GONE);
+    if (!layer.valid) G0_NO_LAYER(G0L_INVALID);
+    if (layer.resize) G0_NO_LAYER(G0L_RESIZE);
+    if (layer.rendering) G0_NO_LAYER(G0L_RENDERING);
+    if (paint_capture_mode) G0_NO_LAYER(G0L_CAPTURE);
+    if (paint_view.index != layer.view) G0_NO_LAYER(G0L_VIEW);
+    if (w->has_tf) G0_NO_LAYER(G0L_TRANSFORM);
+    if (w->type == NODE_RAW || w->s.display_none) G0_NO_LAYER(G0L_RAW);
+    if (layer.has_holes) G0_NO_LAYER(G0L_HOLES);
+    if (nlsurf || lsurf_all) G0_NO_LAYER(G0L_SURFACES);
+    if (layer.premul_bad) G0_NO_LAYER(G0L_PREMUL);
+    if (!layer.px || !layer.below) G0_NO_LAYER(G0L_NOBUF);
     const Node *anc[SKIP_PATH_MAX];
     int na = 0;
     for (const Node *a = w->parent; a; a = a->parent) {
         if (na == SKIP_PATH_MAX) return G0R_ANCESTOR;
-        if (a->type == NODE_RAW || a->s.display_none) return G0R_LAYER;
+        if (a->type == NODE_RAW || a->s.display_none) G0_NO_LAYER(G0L_RAW);
         anc[na++] = a;
     }
-    if (!na || anc[na - 1] != root) return G0R_LAYER;
+    if (!na || anc[na - 1] != root) G0_NO_LAYER(G0L_TREE);
     const float k = paint_view.k;
     int bx = (int)lroundf(VX(w->ax) + layer.pox), by = (int)lroundf(VY(w->ay) + layer.poy);
     Rect r = { bx, by, bx + layer.w, by + layer.h };
@@ -1719,15 +1816,15 @@ static int g0_gate(const Canvas *c, Node *root, Rect *wout) {
     for (int i = na - 1; i >= 0; i--) {
         const Node *a = anc[i];
         op = op * a->s.opacity;
-        if (op < 0.004f) return G0R_LAYER;
+        if (op < 0.004f) G0_NO_LAYER(G0L_OPACITY);
         if (a->s.overflow_hidden) {
             float x = VX(a->ax), y = VY(a->ay), aw = a->w * k, ah = a->h * k;
             r = rect_and(r, (Rect){ (int)floorf(x), (int)floorf(y), (int)ceilf(x + aw), (int)ceilf(y + ah) });
         }
     }
-    if (op != layer.op) return G0R_LAYER;
+    if (op != layer.op) G0_NO_LAYER(G0L_OPACITY);
     Box pb;
-    if (layer.tree_part && !layer_part_exact(w, &pb)) return G0R_LAYER;     /* it would be painted whole */
+    if (layer.tree_part && !layer_part_exact(w, &pb)) G0_NO_LAYER(G0L_PART);    /* it would be painted whole */
     r = rect_and(r, c->clip);                   /* the blit is clipped to the frame's box too */
     if (!rect_area(r)) return G0R_CLIP;
     if (!below_ancestors_ok(w, r)) return G0R_ANCESTOR;
@@ -1845,16 +1942,24 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuG0
     int below = !skip_until && below_ready(c, root, clear && rgb == 0x000000);
     uint32_t *pre = below && layer.switched && paint_below_verify ? below_snapshot(c) : NULL;
     int done = 0, taken = 0;
+    g0_last = (G0Last){ -1, -1, -1 };
     if (below && g && gpu_active()) {           /* G0: only after below_ready, so its decisions are the same */
         Rect w;
         int why = g0_gate(c, root, &w);
+        /* what the textures still lack goes first, a slice a frame after the flip (paint_g0_feed): a
+         * frame that would have to send more is painted here, the same pixels */
+        if (why < 0 && g0_backlog_now() > G0_FEED_PX) why = G0R_FEED;
         g0stat.tried++;
         if (why < 0) {
             done = 1;
             taken = g0_paint(c, root, w, g);
             if (!taken) why = G0R_POST;
         }
-        if (!taken) g0stat.refused[why]++;
+        if (!taken) {
+            g0stat.refused[why]++;
+            if (why == G0R_LAYER && g0_sub >= 0) g0stat.layer[g0_sub]++;
+        }
+        g0_last = (G0Last){ taken, taken ? -1 : why, !taken && why == G0R_LAYER ? g0_sub : -1 };
     }
     if (!done) {
         if (below) {

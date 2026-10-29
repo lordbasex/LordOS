@@ -72,7 +72,11 @@ int  gpu_frame(int out, const Canvas *scene, Rect damage, void (*draw_layer)(int
  * scene and fills this; one shader then writes, inside w, the layer (lpx) over the copy of what is
  * below (bpx) exactly as canvas_blit's blit_row does. The two are textures of their own, uploaded
  * only where they changed (ldirty, bdirty; *full: all of it). */
-#define G0_DIRTY 8
+#define G0_DIRTY 16
+/* At most this many pixels of the two textures are sent in one frame: a frame that would need more is
+ * painted by the CPU, and the rest is sent after its flip is queued (paint_g0_feed, gpu_g0_feed), a slice
+ * a frame, so no frame uploads a whole screen (docs/GPU.md, "Uploads without a stall"). 1 MB. */
+#define G0_FEED_PX 262144L
 typedef struct GpuG0 {
     Rect w;                             /* where the shader writes (the output's physical px, top-down) */
     const uint32_t *lpx;                /* the layer: lw × lh, its pixel (0, 0) at (lx, ly) */
@@ -99,6 +103,26 @@ int  gpu_g0_ready(int out);
 int  gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuG0 *g0, int *g0_drawn,
                   void (*draw_layer)(int layer));
 int  gpu_g0_holds(int out);             /* the G0 textures hold that output's last upload, in this context */
+/* Texture which (0 the copy of what is below, 1 the layer) of output out gets r of px (w × h, stride w),
+ * between frames (paint_g0_feed's up). 1: it held nothing of that output at that size: it is now that
+ * output's, and the caller sends all of it again; 0 sent; -1 failed (G0 is then off). */
+int  gpu_g0_feed(int out, int which, const uint32_t *px, int w, int h, Rect r);
+/* Where the last gpu_frame_ex of an output spent its time (LordBench's frame phases, bench/lbframes.h) */
+typedef struct {
+    double up_ms;                       /* the UI texture's rectangles */
+    long up_px;
+    double g0_ms;                       /* the G0 textures' uploads for the quad */
+    long g0_px;
+    int g0_full;                        /* one of them was sent whole */
+    double swap_ms;                     /* eglSwapBuffers */
+    double submit_ms;                   /* the front buffer, its framebuffer and the page flip */
+} GpuFrameTimes;
+void gpu_frame_times(int out, GpuFrameTimes *t);
+/* While on, each frame takes a native fence after eglSwapBuffers (EGL_ANDROID_native_fence_sync); at
+ * the frame's flip gpu_fence_time gives when the GPU finished it (the sync file's signal time): 1 known,
+ * 0 unknown (no fence, or not signalled yet). Each fence is read once and closed. Off: nothing is taken. */
+void gpu_fence_on(int on);
+int  gpu_fence_time(int out, uint64_t *ns);
 /* uploaded pixels of the copy of what is below and of the layer, and G0 quads drawn, since the last call */
 void gpu_g0_stats(long *below_px, long *layer_px, long *quads);
 /* Another display (docs/DISPLAYS.md): its own GBM/EGL surface on the same context; gpu_init made

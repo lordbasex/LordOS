@@ -116,11 +116,20 @@ static void g0_stats_text(char *buf, size_t len) {
     long bpx, lpx, quads;
     paint_g0_stats(&g);
     gpu_g0_stats(&bpx, &lpx, &quads);
-    snprintf(buf, len, "G0: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
-                       "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post)",
-             g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[G0R_LAYER], g.refused[G0R_CLIP],
-             g.refused[G0R_ANCESTOR], g.refused[G0R_APP], g.refused[G0R_AFTER], g.refused[G0R_POST]);
+    int k = snprintf(buf, len, "G0: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
+                               "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up",
+                     g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[G0R_LAYER], g.refused[G0R_CLIP],
+                     g.refused[G0R_ANCESTOR], g.refused[G0R_APP], g.refused[G0R_AFTER], g.refused[G0R_POST], g.refused[G0R_FEED]);
+    /* the layer's refusals by cause (G0L_*) */
+    for (int i = 0, first = 1; i < G0L_N && k > 0 && (size_t)k < len; i++)
+        if (g.layer[i]) {
+            int w = snprintf(buf + k, len - (size_t)k, "%s%s %ld", first ? "; layer: " : ", ", lbf_g0l_name(i), g.layer[i]);
+            if (w > 0) k += w;
+            first = 0;
+        }
+    if (k > 0 && (size_t)k < len) snprintf(buf + k, len - (size_t)k, ")");
 }
+_Static_assert(G0R_N <= LBF_G0R && G0L_N <= LBF_G0L, "lbframes.c names every G0R_* and G0L_*");
 
 /* One display (docs/DISPLAYS.md): its KMS head, where it sits in the global logical space, and the
  * frame the UI paints for it at its own resolution. out[0]'s head owns the card's fd; the main display
@@ -425,7 +434,7 @@ static void dispatch_pointer(Server *s) {
             double span = dstat.last - dstat.t0;
             long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
-            char bs[192], gs[256];
+            char bs[192], gs[512];
             below_stats_text(bs, sizeof bs);
             g0_stats_text(gs, sizeof gs);
             fprintf(stderr, "drag: %ld frames in %.0f ms = %.1f FPS (%ld moves); per frame: work %.2f ms "
@@ -1274,13 +1283,42 @@ static void gpu_layer(int layer) {
     }
 }
 
+static uint64_t mono_ns(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
+}
+/* LordBench's frame phases (bench/lbframes.h): the poll() return before this frame and whether it handled
+ * the main display's flip; render_frame fills the main display's part of fph */
+static uint64_t loop_wake;
+static int loop_wake_flip;
+static LbPhase fph;
+static int fph_main;
+
 static void render_frame(Server *s);
+static void g0_feed_now(Server *s);
 static void render(Server *s) {
+    int phases = lbf_recording();
+    gpu_fence_on(phases);                       /* the GPU's finish time of each frame, only while recording */
+    uint64_t r0 = phases ? mono_ns() : 0;
     double t0 = now_ms();
+    fph = (LbPhase){ .g0 = -1, .g0_why = -1, .g0_sub = -1 };
+    fph_main = 0;
     render_frame(s);
-    lbf_frame(now_ms() - t0);                   /* LordBench's compositor measurement (bench/lbframes.c) */
+    double t1 = now_ms();
+    uint64_t r1 = phases ? mono_ns() : 0;
+    lbf_frame(t1 - t0);                         /* LordBench's compositor measurement (bench/lbframes.c) */
+    g0_feed_now(s);                             /* after the frame's time: its flip is queued already */
+    if (phases && fph_main) {
+        fph.wake = loop_wake;
+        fph.from_flip = loop_wake_flip;
+        fph.render0 = r0;
+        fph.built = r1;
+        lbf_phase_built(&fph);
+        if (s->headless) lbf_phase_shown(fph.submit, 0);
+    }
     if (dstat.active) {
-        double t1 = now_ms(), js = dstat.js - dstat.work_js;
+        double js = dstat.js - dstat.work_js;
         double work = (t1 - t0) + js;
         dstat.work_js = dstat.js;
         dstat.frames++;
@@ -1476,6 +1514,24 @@ static int outs_have_work(const Server *s) {
     return 0;
 }
 
+/* paint_g0_feed's way to the GPU: ctx is the display's GPU output */
+static int g0_feed_up(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
+    return gpu_g0_feed(*(const int *)ctx, which, px, w, h, r);
+}
+/* the displays whose G0 textures catch up after this frame: after its flips are queued and its time is
+ * taken, while the CPU would wait for the vblank anyway (docs/GPU.md, "Uploads without a stall") */
+static int feed_idx[OUT_MAX], nfeed;
+static void g0_feed_now(Server *s) {
+    for (int k = 0; k < nfeed; k++) {
+        Out *o = &s->out[feed_idx[k]];
+        if (!o->on || o->gpu < 0 || !gpu_g0_ready(o->gpu) || paint_g0_backlog(feed_idx[k]) <= 0) continue;
+        double f0 = now_ms();
+        long sent = paint_g0_feed(feed_idx[k], G0_FEED_PX, g0_feed_up, &o->gpu);
+        if (o == main_out(s)) { fph.feed_ms = now_ms() - f0; fph.feed_px = sent; }
+    }
+    nfeed = 0;
+}
+
 static void render_frame(Server *s) {
     double t0 = now_ms();
     ui.layout_ms = ui.paint_ms = 0;
@@ -1510,7 +1566,9 @@ static void render_frame(Server *s) {
     if (s->headless) {
         Out *o = &s->out[0];
         Rect drawn = paint_out(s, o, 0, 1);
+        if (drawn.x1 > drawn.x0) fph.g0 = paint_g0_last(&fph.g0_why, &fph.g0_sub);
         present_memory(s, o, 0, 1, drawn);
+        fph_main = 1;                           /* presented at the end of this frame (below) */
     } else {
         for (int i = 0; i < OUT_MAX; i++) {
             Out *o = &s->out[i];
@@ -1520,6 +1578,8 @@ static void render_frame(Server *s) {
              * this display's; otherwise its rectangle is painted by the CPU now */
             if (o->g0on && box_empty(o->pend) && !o->full && !gpu_g0_holds(o->gpu)) g0_stale(o);
             Rect r = paint_out(s, o, i, o == feed);
+            int g0why = -1, g0sub = -1, g0last = r.x1 > r.x0 ? paint_g0_last(&g0why, &g0sub) : -1;
+            if (o == mo) { fph.g0 = g0last; fph.g0_why = g0why; fph.g0_sub = g0sub; }
             if (gpu_active() && o->gpu >= 0) {      /* (the loop above skips what has nothing new) */
                 update_cursor(s);
                 gpu_server = s;
@@ -1558,6 +1618,25 @@ static void render_frame(Server *s) {
                 int res = scanned ? 0 : gpu_frame_ex(o->gpu, &o->scene, up, nup, g0, &g0drawn, gpu_layer);
                 int failed = res == -1, unshown = res == -2;
                 if (o->g0taken && g0drawn) paint_g0_done();    /* the textures have what paint.c had */
+                if (o == mo) {
+                    /* a frame scanned out straight has no times of its own (gpu_frame_times keeps the last
+                     * composed frame's) and no fence (one left from before would give an old GPU time) */
+                    GpuFrameTimes ft = { 0 };
+                    if (!scanned) gpu_frame_times(o->gpu, &ft);
+                    else if (lbf_recording()) { uint64_t old; gpu_fence_time(o->gpu, &old); }
+                    fph.up_ms = ft.up_ms;
+                    fph.up_px = ft.up_px;
+                    fph.g0_ms = ft.g0_ms;
+                    fph.g0_px = ft.g0_px;
+                    fph.g0_full = ft.g0_full;
+                    fph.swap_ms = ft.swap_ms;
+                    fph.submit_ms = ft.submit_ms;
+                    fph.unshown = unshown;
+                }
+                /* G0's textures catch up after the frame (render, g0_feed_now): only when this frame
+                 * would have been G0's but for what they lack (paint.c, paint_g0_feed); sent while G0 is
+                 * refused for another reason, most of it would be sent again before it is used */
+                if (!failed && !g0drawn && g0last == 0 && g0why == G0R_FEED && nfeed < OUT_MAX) feed_idx[nfeed++] = i;
                 if (unshown) {
                     /* the quad could not be drawn: nothing was shown (the display keeps the frame before,
                      * which was right); W joins the damage and the next frame paints it on the CPU */
@@ -1598,6 +1677,12 @@ static void render_frame(Server *s) {
                 }
             } else present_cpu(s, o, i, r, o == feed);
             if (o == mo) main_shown = 1;
+            if (o == mo) {
+                fph_main = 1;
+                fph.prev_flip = o->kms.flip_ns;
+                fph.submit = o->kms.flip_pending ? o->kms.flip_submit_ns : 0;
+                fph.period = o->kms.mode.vrefresh ? 1000000000u / o->kms.mode.vrefresh : 16666667u;
+            }
         }
         /* every display in one frame for the remote desktop and recording (capture view) */
         Out *c = &s->cap;
@@ -1625,16 +1710,30 @@ static void render_frame(Server *s) {
     Out *pm = main_out(s);
     int hz = s->headless ? (mirror_fps() > 60 ? mirror_fps() : 60) : pm && pm->kms.mode.vrefresh ? (int)pm->kms.mode.vrefresh : 60;
     double frame_ms = 1000.0 / hz;
-    if (!par_on && ui.paint_ms > frame_ms * 0.7 && par_threads() > 1) { par_on = 1; light = 0; canvas_parallel(par_rows); }
+    fph.paint_ms = ui.layout_ms + ui.paint_ms;
+    fph.par = par_on;
+    /* (0.8.6) The whole frame counts too, not only its paint: what has to fit before the vblank is the
+     * frame (layout, paint, the upload, the GPU's own part), and on the Pi 5 under an all-core load the
+     * paint alone (about 7.5 ms) stayed under 70 % while the frame (about 13 ms) missed every vblank. On
+     * when the frame takes more than 60 % of the period; light only with both paint and frame short. */
+    double built = now_ms() - t0;
+    if (!par_on && (ui.paint_ms > frame_ms * 0.7 || built > frame_ms * 0.6) && par_threads() > 1) { par_on = 1; light = 0; canvas_parallel(par_rows); }
     else if (par_on) {
-        light = ui.paint_ms < frame_ms * 0.25 ? light + 1 : 0;
+        light = ui.paint_ms < frame_ms * 0.25 && built < frame_ms * 0.45 ? light + 1 : 0;
         if (light >= 60) { par_on = 0; canvas_parallel(NULL); }
     }
     wl_frame_done((unsigned)now_ms());
     if (s->headless) {                          /* no flip without a monitor: the frame is out now */
         struct timespec t;
         clock_gettime(CLOCK_MONOTONIC, &t);
-        lbf_presented((uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec, (uint32_t)(1000000000u / (unsigned)hz));
+        uint64_t ns = (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
+        lbf_presented(ns, (uint32_t)(1000000000u / (unsigned)hz));
+        /* its phases: "queued" and "shown" now, the vblanks on the pacing grid of 1000/hz ms (render) */
+        static uint64_t headless_prev;
+        fph.prev_flip = headless_prev;
+        fph.submit = ns;
+        fph.period = (uint32_t)(1000000000u / (unsigned)hz);
+        headless_prev = ns;
     }
     /* No flip event will come (a modeset instead of a page flip: the first frame, or a driver
      * without page flip): the frame is on screen already, so its presentation feedback goes now.
@@ -1968,11 +2067,14 @@ int main(int argc, char **argv) {
         if (scripted && !grab_scripted()) {
             long lr = 0, lb = 0, lp = paint_layer_parts();
             paint_layer_stats(&lr, &lb);
-            char bs[192], gs[256];
+            char bs[192], gs[512], ps[1024];
             below_stats_text(bs, sizeof bs);
             g0_stats_text(gs, sizeof gs);
-            fprintf(stderr, "drag (scripted): layer: %ld painted (%ld of them a part), %ld copied (%s); %s; %s\n",
-                    lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs, gs);
+            LbPhaseStats ph;
+            lbf_drag_end(&ph);
+            lbf_phases_text(&ph, ps, sizeof ps);
+            fprintf(stderr, "drag (scripted): layer: %ld painted (%ld of them a part), %ld copied (%s); %s; %s; %s\n",
+                    lr, lp, lb, gpu_active() ? "GPU" : "CPU", bs, gs, ps);
         }
         if (!scripted && grab_scripted()) {     /* its start: what came before is not counted */
             long lr, lb;
@@ -1984,6 +2086,7 @@ int main(int argc, char **argv) {
             paint_g0_stats(&g);
             long q[3];
             gpu_g0_stats(&q[0], &q[1], &q[2]);
+            lbf_drag_begin();                   /* its frames' phases (bench/lbframes.h) */
         }
         scripted = grab_scripted();
         /* Timers del tema (React agenda su trabajo con setTimeout/setImmediate). */
@@ -2096,6 +2199,8 @@ int main(int argc, char **argv) {
         int hwbase = n, nhw = hw_pollfds(pfd + n, 4);            /* uevents and the system bus (src/hw) */
         n += nhw;
         if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
+        loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */
+        loop_wake_flip = 0;
         if (pfd[0].revents & POLLIN) {
             Kms *heads[OUT_MAX], *mk = &main_out(&s)->kms;
             int nh = 0, was = mk->flip_pending;
@@ -2114,6 +2219,12 @@ int main(int argc, char **argv) {
                 wl_presented(mk->flip_ns, mk->flip_seq, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 lbf_presented(mk->flip_ns, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 if (keylag_enabled) keylag_presented(mk->flip_ns);
+                if (lbf_recording()) {
+                    uint64_t done = 0;
+                    if (gpu_active() && main_out(&s)->gpu >= 0) gpu_fence_time(main_out(&s)->gpu, &done);
+                    lbf_phase_shown(mk->flip_ns, done);
+                    loop_wake_flip = 1;
+                }
             }
         }
         if (pfd[1].revents & POLLIN) break;

@@ -157,6 +157,31 @@ returns -2 before presenting: no frame is shown with a stale W, the display keep
 `main.c` paints W on the CPU in the next frame without trying G0 (`g0cpu`). `LORD_PAINT_VERIFY` leaves W
 out of its count on G0 frames.
 
+**Uploads without a stall (0.8.6, in development).** The two textures get only what changed (paint.c's dirty
+rectangles, in their own pixels). A drag's start, or the copy of what is below built again whole, changes all of the
+copy: a screen of pixels (8.3 MB at 1920 × 1080), and on V3D `glTexSubImage2D` converts it to the GPU's tiled layout
+on the CPU inside the call, so the first G0 frame after such a change missed its vblank. Now:
+
+- `paint_root_body` refuses a frame G0 would compose when the textures still lack more than `G0_FEED_PX` pixels
+  (262,144, 1 MB; both textures counted) as `G0R_FEED` ("catching up"): the CPU paints W, the same pixels.
+- After such a frame's flip is queued (`main.c`, after `gpu_frame_ex`), while the CPU waits for the vblank anyway,
+  `paint_g0_feed` sends up to `G0_FEED_PX` pixels of what is missing through `gpu_g0_feed`: the copy first, then the
+  layer, rectangles cut by rows, each sent rectangle (or part) dropped from the dirty list. Each texture is asked
+  first with an empty rectangle whether it holds that display's pixels at that size; if not, it is allocated
+  (`glTexImage2D` with no data), marked as that display's, and all of it is sent in slices. Only frames refused for
+  `G0R_FEED` send slices: sent while G0 is refused for another reason (the menu bar or the Dock in the damage),
+  most of it would change again before it is used (`engine-test`: 162.8 million pixels against 2.4 million).
+- Each texture knows whose pixels it holds (`g0tout[2]`); a G0 frame that would find another display's or the
+  wrong size still sends all of it (correct, and rare now). The dirty list keeps `G0_DIRTY` (16) rectangles and,
+  when full, merges the two whose box adds the fewest pixels (it used to grow the last one).
+- Frames don't overlap (a frame starts after the last flip), so the job that read the textures has finished when
+  they are written: no second copy of them is needed. If frames are ever built while a flip is pending, each
+  texture needs a pair, each with its own dirty list. GLES3 pixel buffers (the GPU doing the tiling) are not used.
+
+`engine-test`'s stub GPU does the same as `main.c` and `gpu.c` (a texture made again is filled with a pattern no
+frame has, so a pixel the slices missed shows): every frame matches, and it checks that no G0 frame has more than
+`G0_FEED_PX` of the copy left to send.
+
 **Off unless it proves itself:** `gpu_init` sets G0 up. It needs a fragment shader with at least 24-bit
 `highp` floats (`glGetShaderPrecisionFormat`) and then a self-test, drawn into a framebuffer, read back
 and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
@@ -180,9 +205,12 @@ with the reason.
 | `LORD_GPU_VERIFY=N` | every N-th G0 frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
 
 The `drag: …` and `drag (scripted): …` lines end with `G0: N of M frames (Q quads), strips … Mpx,
-uploaded below … Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post)`: frames
-composited, of those that used the copy; quads drawn; what the CPU painted around W; what went up to the
-two textures; and why the others were not.
+uploaded below … Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post, … catching up;
+layer: invalid …, holes …, …)`: frames composited, of those that used the copy; quads drawn; what the CPU painted
+around W; what went up to the two textures (in G0 frames and in slices between frames); why the others were not;
+and the `layer` refusals by cause (`G0L_*` in `ui/ui.h`: `gone`, `invalid`, `resize`, `rendering`, `capture`,
+`view`, `transform`, `raw`, `holes`, `surfaces`, `premul`, `nobuf`, `tree`, `opacity`, `part`). The
+`drag (scripted): …` line then ends with the frames' phases (`docs/BENCHMARK.md`, "Frame phases").
 
 **Checked** (VM 116, x86_64):
 - `canvas-test`: the shader written in C with the same float operations (`canvas_g0_model`) against
@@ -191,7 +219,8 @@ two textures; and why the others were not.
 - `engine-test`'s `g0` path: `test_drag_exact` with G0 and a stub GPU (the UI texture, the two textures
   with only their dirty rectangles, `main.c`'s bookkeeping, W written by `canvas_g0_model`) gives every
   one of the 2,417 frames of `drag_golden_gpu.txt`; 250 of 1,856 frames that use the copy are G0 frames
-  there. Five more runs are compared frame by frame with the GPU path: a pause with no damage, two
+  there (241 with the uploads in slices: 9 frames catch up; no G0 frame sends a texture whole, and the most one
+  sends fell from 934,022 to 170,330 pixels). Five more runs are compared frame by frame with the GPU path: a pause with no damage, two
   displays side by side, the window over an app window below, the window against a rounded,
   bordered container's corner, and (`corner`) a rounded `overflow: hidden` box with no colour painted
   after the window. Taking out the after-node, app-window or ancestor check fails it; without counting
@@ -238,7 +267,10 @@ pixels are the same as on one thread (`blurbench`/`rrbench` compare them byte fo
 
 Waking the pool costs CPU, so it is used only while frames are heavy: it turns on when painting takes
 more than 70 % of a frame at the target rate (the monitor's refresh, or the fastest remote viewer's
-screen without a monitor) and off after 60 light frames in a row. On VM 116 (8 cores, Xeon 1.8 GHz), a
+screen without a monitor), or (0.8.6, in development) when the whole frame (layout, paint, upload and submit)
+takes more than 60 % of it, and off after 60 frames in a row with painting under 25 % and the frame under 45 %.
+The second rule is for the GPU path under load: on the Pi 5 painting took about 7.5 ms there while the frame took
+about 13 ms and missed the vblank, and the pool stayed off. Its gain there is not measured yet. On VM 116 (8 cores, Xeon 1.8 GHz), a
 1920×1080 session with a 60 fps video under blurred windows: 45 frames a second on one thread, 55–58
 with the pool. `canvas.c` builds at -O3 (its loops vectorize); the blur itself went from 28 ms to
 2.7 ms over the day's work.

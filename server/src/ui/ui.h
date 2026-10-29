@@ -324,9 +324,30 @@ void  paint_g0_done(void);
  * windows or invalid pixels in it, other opacity, a transform), its rectangle not inside the damage,
  * an ancestor painting over it, an app window under it, a node painted after the window in the
  * damage, or something changed while painting (post) */
-enum { G0R_LAYER, G0R_CLIP, G0R_ANCESTOR, G0R_APP, G0R_AFTER, G0R_POST, G0R_N };
-typedef struct { long frames, strip_px, tried, refused[G0R_N]; } G0Stats;
+enum { G0R_LAYER, G0R_CLIP, G0R_ANCESTOR, G0R_APP, G0R_AFTER, G0R_POST,
+       G0R_FEED,                            /* the textures still lack more than G0_FEED_PX (paint_g0_feed) */
+       G0R_N };
+/* G0R_LAYER split by its cause, in g0_gate's order: no window or not wanted, not valid (painted whole
+ * next), being resized, being rendered, capture mode, another display's, transformed, the window or an
+ * ancestor raw or hidden, app holes in it, app surfaces in it, a colour above its alpha, no buffer, not
+ * under the root, another opacity, a part that would make it paint whole */
+enum { G0L_GONE, G0L_INVALID, G0L_RESIZE, G0L_RENDERING, G0L_CAPTURE, G0L_VIEW, G0L_TRANSFORM, G0L_RAW,
+       G0L_HOLES, G0L_SURFACES, G0L_PREMUL, G0L_NOBUF, G0L_TREE, G0L_OPACITY, G0L_PART, G0L_N };
+typedef struct { long frames, strip_px, tried, refused[G0R_N], layer[G0L_N]; } G0Stats;
 void  paint_g0_stats(G0Stats *s);          /* since the last call */
+/* The last paint_root_* call: -1 G0 not tried (no copy used, or not a G0 call), 1 taken, 0 refused
+ * (*why a G0R_*, *sub a G0L_* when it is G0R_LAYER, else -1) */
+int   paint_g0_last(int *why, int *sub);
+/* G0's textures catching up (docs/GPU.md, "Uploads without a stall"): what of the layer and of the copy
+ * of what is below the GPU still lacks, in pixels (both; 0 nothing, or no layer on display view) */
+long  paint_g0_backlog(int view);
+/* Sends at most budget pixels of it, rectangles cut by rows, through up(ctx, which, px, w, h, r) (which:
+ * 0 the copy, 1 the layer; px w × h, stride w), and forgets what was sent. Each texture is asked first
+ * with an empty r. up returns 0 sent, 1 its texture held nothing of this (now it is ready for it: all of
+ * it is needed again), -1 failed (stop). Only the display that has the layer (view), and only while G0
+ * could use it. Returns the pixels sent. */
+long  paint_g0_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
+                    void *ctx);
 Node *hit_test(Node *root, float x, float y);
 /* Capture mode (media/capture.c): protected nodes are painted black and app windows
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */

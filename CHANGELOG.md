@@ -477,6 +477,64 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       - `make -j8` (GPU=1) and lord-server with GPU=0: no warnings; `make test`: 23 passed, 0 failed, 13 skipped;
         `engine-test`: 3,690 checks, 0 failures, `drag_golden_{cpu,gpu}.txt` unchanged (250 of 1,856 frames that
         use the copy still G0); `canvas-test`: 8,621,376 cases, 0 differ.
+  - **Where a frame's time goes, measured per frame** (0.8.6, in development; `docs/BENCHMARK.md`, "Frame phases").
+    On the Pi 5 with its monitor a loaded frame is built in about 13 ms and still the monitor shows 30 frames a
+    second, 98 % of them late: the time outside the "build" number (JS before the frame, the GPU's own work, the wait
+    for the vblank) was not measured. lord-server now records, for every frame the main display shows, while
+    LordBench records or a scripted move runs (`bench/lbframes.c`, filled only by `main.c` and `gpu.c`; nothing comes
+    from a helper, and `lb_msg_valid` is unchanged since no new result id exists):
+    - the flip event to lord-server running (`wake`), that wake to `render()` (input, LordBench's scripted step, JS),
+      `render()` itself, its layout and paint, the UI texture's upload (time and pixels), G0's texture uploads (time,
+      pixels, whether one was whole), `eglSwapBuffers`, the framebuffer and page flip ioctl, the GPU's finish time
+      after the flip was queued, the wait to the vblank, and wake to flip;
+    - the GPU's finish time is a native fence taken after `eglSwapBuffers` (`EGL_ANDROID_native_fence_sync`) and read
+      once at the frame's flip with `SYNC_IOC_FILE_INFO` (the sync file's signal time): one ioctl a frame, no wait, no
+      polling, and nothing at all while not recording; without the extension it is "unknown"; a frame scanned out
+      straight (a fullscreen app's buffer) has no upload, swap or GPU time of its own, so it records none and drops a
+      fence left from before instead of reporting the last composed frame's;
+    - each frame against the first vblank after it started: on time (shown within half a period of it), CPU-late
+      (the flip was queued after that vblank), GPU-late (queued before it, the GPU finished after it) or other;
+    - per frame whether the paint threads were on, whether G0 composed it or why not (each refusal and, for `layer`,
+      its cause: `invalid`, `rendering`, `holes`, `surfaces`, `premul`, `opacity`, `part` and the rest, `G0L_*` in
+      `ui/ui.h`), G0's whole uploads and their pixels, and frames not shown (`gpu_frame_ex`'s -2).
+    LordBench's desktop result has them as `frames.phases.alone` and `frames.phases.load` (p50 and p99 in ms, and
+    counts), and the session log gets `lordbench: desktop alone|under load: phases, …`; the `drag (scripted): …` line
+    ends with the same text, and its G0 part now lists `… catching up` and the layer's causes. Without a monitor the
+    frame's end is its presentation, on the pacing grid. The System Information page is unchanged (it does not show
+    them). Checked on VM 116: `lordbench-test` (1,192 ok) feeds known frames and checks each class, percentile and
+    count, the text and a short buffer; and a desktop run in an isolated headless session of the worktree's
+    lord-server (a test theme moving one window with `lord.wm.script`, CPU composition, one viewer on its
+    `remote.sock`) wrote both phase objects in three runs (alone 601 frames, all on time; under load 720–721, 715–721 on time) and
+    the drag line. The
+    GPU fields (uploads, swap, fence) were 0 there: that path was built, not run.
+  - **G0's textures catch up between frames instead of inside one** (0.8.6, in development; `docs/GPU.md`, "Uploads without a
+    stall"). A drag's start, or a copy of what is below built again whole, made the first G0 frame send the whole
+    copy (a screen, 8.3 MB at 1920 × 1080) and the layer; on V3D `glTexSubImage2D` converts to the GPU's tiled layout
+    on the CPU, inside the frame. Now a frame G0 would compose but whose textures lack more than 262,144 pixels
+    (`G0_FEED_PX`, 1 MB) is painted by the CPU (`G0R_FEED`, "catching up"; the same pixels), and after its flip is
+    queued, while the CPU waits for the vblank, a slice of up to that many pixels goes up (`paint_g0_feed`,
+    `gpu_g0_feed`: rectangles cut by rows; each texture is asked first whether it holds that display's pixels at that
+    size, else it is allocated and all of it is sent in slices; GL errors left by earlier calls are cleared first, so
+    they cannot turn G0 off there). Only frames refused for that reason send slices. A G0 frame can still send a
+    texture whole when it finds one that is another display's or the wrong size (after the GPU context is made
+    again, or the layer's first frame within the budget), as before.
+    Each texture now knows whose pixels it holds; the dirty list keeps 16 rectangles and, when full, merges the two
+    whose box adds the fewest pixels (the last one used to grow, which could make a few small changes most of the
+    screen). Frames don't overlap (the next starts after the flip), so the textures need no second copy. Checked on
+    VM 116: `engine-test`'s stub GPU does the same (a texture made again is filled with a pattern no frame has); all
+    2,417 frames of `drag_golden_gpu.txt` match and the five extra runs match the GPU path frame by frame; no G0
+    frame sent a texture whole, and the most one G0 frame sent fell from 934,022 to 170,330 pixels in the long run
+    (1024 × 640); 241 of 1,856 frames that use the copy are G0 (250 before: 9 catch up), 2,358,312 pixels went up
+    between frames; `pause` 45 of 61 (54), `two` 148 of 240 (150), `app` 2 of 180 (5), `ancedge` 12 of 90 (15),
+    `corner` 0 of 90. Not run on a GPU yet.
+  - **The paint threads turn on by the whole frame too** (0.8.6, in development): on when the frame (`render_frame`:
+    layout, paint, upload, submit) takes more than 60 % of a period, or painting more than 70 % as before; off after
+    60 frames in a row with painting under 25 % and the frame under 45 %. On the Pi 5 under load painting took about
+    7.5 ms (under 70 %) while the frame took about 13 ms, so the threads, which run at real-time priority, stayed off.
+    The pixels are the same (the pool's bands are exact). On VM 116 headless under load they were on for 0, 10 and 91
+    of 720–721 frames in three runs; the gain on the Pi is not measured yet.
+  - `make -j8` and lord-server with `GPU=0` (no EGL, GBM or GLES linked): no warnings; `make test`: 23 passed, 0
+    failed, 13 skipped, every suite's checks passing; `engine-test`: 4,146 checks, 0 failures.
   - **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every
     `setStyle` call: a style an animation sends every frame wrote a line to the session log every frame (as
     `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
