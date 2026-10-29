@@ -20,6 +20,7 @@
  * folder it was opened with. A restriction set while the app runs applies at its next launch. */
 #include "apps.h"
 #include "hw/defaults.h"
+#include "hw/mimeapps.h"
 #include "fsops.h"
 #include "sec/cgroup.h"
 #include "sec/restrict.h"
@@ -304,10 +305,10 @@ static void find_icon(const char *name, char *out, size_t n) {
  * ("app-lordos-<id>.scope", cgroup_scope_name_ok: no '+', at most 62 characters, no "..") and
  * never one that reads as a .lpk package's scope ("lpk-...": that would be lpk:<rest>'s identity,
  * rules and restrictions). */
-#define DESKTOP_ID_MAX 62
+#define APP_ID_MAX 62
 static int valid_id(const char *id) {
     size_t n = strlen(id);
-    if (!n || n >= sizeof apps[0].id || n > DESKTOP_ID_MAX) return 0;
+    if (!n || n >= sizeof apps[0].id || n > APP_ID_MAX) return 0;
     for (const char *p = id; *p; p++) if (!isalnum((unsigned char)*p) && !strchr("._-", *p)) return 0;
     return id[0] != '.' && id[0] != '-' && !strstr(id, "..") && strncmp(id, "lpk-", 4);
 }
@@ -315,7 +316,7 @@ static int valid_id(const char *id) {
 static void app_dirs(char dirs[2][PATH_MAX]) {
     const char *home = getenv("HOME");
     snprintf(dirs[0], PATH_MAX, "%s/.local/share/applications", home ? home : "/nonexistent");
-    snprintf(dirs[1], PATH_MAX, "/usr/share/applications");
+    snprintf(dirs[1], PATH_MAX, "%s/usr/share/applications", defaults_root());   /* root: "" outside tests */
 }
 
 static int cmp_name(const void *a, const void *b) {
@@ -734,11 +735,97 @@ int apps_launch_with(const char *id, const char *path) {
     char real[PATH_MAX];
     struct stat st;
     if (!path || !realpath(path, real) || !fsops_allowed(real) || stat(real, &st) || !(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))) return -1;
-    /* id "" = the default app for the file's type (Settings → Default Apps, ~/.config/mimeapps.list);
+    /* id "" = the default app for the file's type (apps_default_for: the user's choice in Settings →
+     * Default Apps, else the system's default, else the first installed app that declares the type);
      * -1 if that is one of LordOS's own apps (the theme opens those) or there is none */
-    char def[160];
-    if (id && !id[0]) { if (defaults_app_for(real, def, sizeof def)) return -1; id = def; }
+    char mime[MIME_MAX], def[DESKTOP_ID_MAX];
+    if (id && !id[0]) {
+        if (defaults_guess(real, mime, sizeof mime) || apps_default_for(mime, def, sizeof def) <= 0) return -1;
+        if (!strncmp(def, "lordos-", 7)) return -1;     /* one of ours: the theme opens it */
+        def[strlen(def) - 8] = 0;                       /* without ".desktop" */
+        id = def;
+    }
     return launch(id, real, NULL);
+}
+
+/* ---- the default app for a MIME type ---- */
+
+/* Can the listed app with that desktop id ("x.desktop") open a file? The launcher's own rules: it
+ * is listed (Type=Application, not Hidden/NoDisplay/terminal, TryExec found, OnlyShowIn/NotShowIn),
+ * it declares MimeType (and this type when `declared`), and its Exec line takes a file (%f %F %u
+ * %U) and names a program that exists. */
+static int opens_files(const char *desktop_id, const char *mime, int declared) {
+    size_t l = strlen(desktop_id);
+    char id[160];
+    if (!desktop_id_valid(desktop_id) || l - 8 >= sizeof id) return 0;
+    memcpy(id, desktop_id, l - 8);
+    id[l - 8] = 0;
+    const DesktopApp *a = find_app(id);
+    if (!a || !a->mime[0] || (declared && !list_has(a->mime, mime))) return 0;
+    Entry *e = malloc(sizeof *e);
+    char *buf = malloc(4096);
+    char *argv[MAX_ARGS], prog[PATH_MAX];
+    int used = 0;
+    int ok = e && buf && !parse_desktop(a->file, cached_lang[0] ? cached_lang : "en", e) && e->is_app && !e->terminal &&
+             !e->hidden && split_exec(e->exec, e, argv, buf, 4096, "/", &used) > 0 && used &&
+             !find_program(argv[0], a->user, prog, sizeof prog);
+    free(e);
+    free(buf);
+    return ok;
+}
+
+static int by_id(const void *a, const void *b) { return strcmp((const char *)a, (const char *)b); }
+
+int apps_default_for(const char *mime, char *out, size_t n) {
+    if (!mime_valid(mime) || n < DESKTOP_ID_MAX) return -1;
+    DefaultsFiles f;
+    defaults_load(&f);
+    char id[DESKTOP_ID_MAX];
+    int r = 0;
+    /* 1. [Default Applications], file by file: the first entry that is installed (the user's own
+     *    files first; LordOS's own "lordos-<app>.desktop" counts only there, the theme opens it) */
+    for (int i = 0; i < f.n && !r; i++)
+        for (int k = 0; !r && mimeapps_entry(f.text[i], "Default Applications", mime, k, id, sizeof id) == 0; k++) {
+            if (defaults_removed(&f, i, mime, id)) continue;
+            if (f.user[i] && !strncmp(id, "lordos-", 7)) r = APPS_DEFAULT_USER;
+            else if (opens_files(id, mime, 0)) r = f.user[i] ? APPS_DEFAULT_USER : APPS_DEFAULT_LISTED;
+        }
+    /* 2. [Added Associations], in the same file order */
+    for (int i = 0; i < f.n && !r; i++)
+        for (int k = 0; !r && mimeapps_entry(f.text[i], "Added Associations", mime, k, id, sizeof id) == 0; k++)
+            if (!defaults_removed(&f, i, mime, id) && opens_files(id, mime, 0)) r = APPS_DEFAULT_LISTED;
+    /* 3. the installed apps that declare the type: mimeinfo.cache order (the user's folder, then the
+     *    system's), then the rest sorted by desktop id */
+    const char *dirs[2] = { NULL, NULL };
+    char cache[2][PATH_MAX];
+    const char *h = getenv("HOME");
+    if (h && h[0] == '/') { snprintf(cache[0], PATH_MAX, "%s/.local/share/applications/mimeinfo.cache", h); dirs[0] = cache[0]; }
+    snprintf(cache[1], PATH_MAX, "%s/usr/share/applications/mimeinfo.cache", defaults_root());
+    dirs[1] = cache[1];
+    for (int d = 0; d < 2 && !r; d++) {
+        char *t = dirs[d] ? defaults_read(dirs[d]) : NULL;
+        for (int k = 0; t && !r && mimeapps_entry(t, "MIME Cache", mime, k, id, sizeof id) == 0; k++)
+            if (!defaults_removed(&f, f.n - 1, mime, id) && opens_files(id, mime, 1)) r = APPS_DEFAULT_DECLARED;
+        free(t);
+    }
+    if (!r) {
+        const DesktopApp *list;
+        int na = apps_list(cached_lang[0] ? cached_lang : "en", &list);
+        /* copies: opens_files() may reread the list and free this one */
+        char (*ids)[sizeof list[0].id] = na > 0 ? malloc((size_t)na * sizeof *ids) : NULL;
+        int m = 0;
+        for (int i = 0; ids && i < na; i++) if (list_has(list[i].mime, mime)) memcpy(ids[m++], list[i].id, sizeof ids[0]);
+        if (m) qsort(ids, (size_t)m, sizeof *ids, by_id);
+        for (int i = 0; i < m && !r; i++) {
+            snprintf(id, sizeof id, "%s.desktop", ids[i]);
+            if (!defaults_removed(&f, f.n - 1, mime, id) && opens_files(id, mime, 1)) r = APPS_DEFAULT_DECLARED;
+        }
+        free(ids);
+    }
+    defaults_free(&f);
+    if (!r) return 0;
+    snprintf(out, n, "%s", id);
+    return r;
 }
 
 /* action: the name of one of the entry's desktop actions (apps_launch_action), whose Exec line

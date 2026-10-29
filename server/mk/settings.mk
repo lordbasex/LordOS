@@ -5,7 +5,7 @@ HW_SRC := src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/p
           src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/hwscan.c src/hw/brframe.c src/ui/js_hw.c \
           src/sysreport/sysreport.c src/sysreport/sysreport_out.c src/sysreport/ids.c src/sysreport/smbios.c src/sysreport/facts.c src/hw/rpifw.c \
           src/ui/js_fan.c src/fan/fancurve.c
-HW_HDR := $(wildcard src/hw/*.h) $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
+HW_HDR := $(wildcard src/hw/*.h) src/apps.h $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
 HW_OBJ := $(HW_SRC:src/%.c=build/obj/%.o)
 $(HW_OBJ): $(HW_HDR)
 build/lord-server: $(HW_OBJ)

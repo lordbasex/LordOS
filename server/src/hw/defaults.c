@@ -37,29 +37,71 @@ static int write_atomic(const char *path, const char *text) {
     return 0;
 }
 
+/* For tests only: a folder that stands for "/" when the system files are read (the fake XDG trees of
+ * tests/defaults_test.c). Empty in lord-server: nothing else sets it. */
+static char sysroot[256];
+void defaults_set_root(const char *root) { snprintf(sysroot, sizeof sysroot, "%s", root && root[0] == '/' ? root : ""); }
+const char *defaults_root(void) { return sysroot; }
+
+char *defaults_read(const char *path) { return slurp(path); }
+
+/* The mimeapps.list files in the specification's order ("MIME Applications Associations", "File
+ * name and location"): the user's ($XDG_CONFIG_HOME, or ~/.config), the system configuration
+ * (/etc/xdg), the user's data folder (~/.local/share/applications), then the system data folders
+ * (/usr/local/share, /usr/share) and the deprecated /usr/share/applications/defaults.list. */
+void defaults_load(DefaultsFiles *f) {
+    memset(f, 0, sizeof *f);
+    char paths[DEFAULTS_NFILES][PATH_MAX];
+    int user[DEFAULTS_NFILES] = { 0 }, np = 0;
+    const char *h = home(), *xdg = getenv("XDG_CONFIG_HOME");
+    if (xdg && xdg[0] == '/') { user[np] = 1; snprintf(paths[np++], PATH_MAX, "%s/mimeapps.list", xdg); }
+    else if (h) { user[np] = 1; snprintf(paths[np++], PATH_MAX, "%s/.config/mimeapps.list", h); }
+    snprintf(paths[np++], PATH_MAX, "%s/etc/xdg/mimeapps.list", sysroot);
+    if (h) { user[np] = 1; snprintf(paths[np++], PATH_MAX, "%s/.local/share/applications/mimeapps.list", h); }
+    snprintf(paths[np++], PATH_MAX, "%s/usr/local/share/applications/mimeapps.list", sysroot);
+    snprintf(paths[np++], PATH_MAX, "%s/usr/share/applications/mimeapps.list", sysroot);
+    snprintf(paths[np++], PATH_MAX, "%s/usr/share/applications/defaults.list", sysroot);
+    for (int i = 0; i < np; i++) {
+        f->text[i] = slurp(paths[i]);
+        f->user[i] = user[i];
+    }
+    f->n = np;
+}
+
+void defaults_free(DefaultsFiles *f) {
+    for (int i = 0; i < f->n; i++) free(f->text[i]);
+    memset(f, 0, sizeof *f);
+}
+
+int defaults_removed(const DefaultsFiles *f, int upto, const char *mime, const char *id) {
+    for (int i = 0; i <= upto && i < f->n; i++) if (mimeapps_removed(f->text[i], mime, id)) return 1;
+    return 0;
+}
+
 int defaults_lookup(const char *mime, char *id, size_t n) {
     if (!mime_valid(mime)) return -1;
-    char paths[6][PATH_MAX];
-    int np = 0;
-    const char *h = home(), *xdg = getenv("XDG_CONFIG_HOME");
-    if (xdg && xdg[0] == '/') snprintf(paths[np++], PATH_MAX, "%s/mimeapps.list", xdg);
-    else if (h) snprintf(paths[np++], PATH_MAX, "%s/.config/mimeapps.list", h);
-    snprintf(paths[np++], PATH_MAX, "/etc/xdg/mimeapps.list");
-    if (h) snprintf(paths[np++], PATH_MAX, "%s/.local/share/applications/mimeapps.list", h);
-    snprintf(paths[np++], PATH_MAX, "/usr/local/share/applications/mimeapps.list");
-    snprintf(paths[np++], PATH_MAX, "/usr/share/applications/mimeapps.list");
-    snprintf(paths[np++], PATH_MAX, "/usr/share/applications/defaults.list");
-    char *removed_in = NULL;                    /* the user's file: its Removed Associations apply below */
-    for (int i = 0; i < np; i++) {
-        char *t = slurp(paths[i]);
-        if (!t) continue;
-        int found = mimeapps_default(t, mime, id, n) == 0 && !(removed_in && mimeapps_removed(removed_in, mime, id));
-        if (i == 0) removed_in = t;
-        else free(t);
-        if (found) { free(removed_in); return 0; }
-    }
-    free(removed_in);
-    return -1;
+    DefaultsFiles f;
+    defaults_load(&f);
+    int r = -1;
+    /* a file's Removed Associations apply to it and to the files after it */
+    for (int i = 0; i < f.n && r; i++)
+        if (mimeapps_default(f.text[i], mime, id, n) == 0 && !defaults_removed(&f, i, mime, id)) r = 0;
+    defaults_free(&f);
+    return r;
+}
+
+int defaults_unset(const char *mime) {
+    const char *h = home();
+    if (!h || !mime_valid(mime)) return -1;
+    char path[PATH_MAX];
+    snprintf(path, sizeof path, "%s/.config/mimeapps.list", h);
+    char *old = slurp(path);
+    if (!old) return 0;                         /* nothing chosen: already automatic */
+    char *now = mimeapps_unset_default(old, mime);
+    int r = !now ? -1 : !strcmp(now, old) ? 0 : write_atomic(path, now);
+    free(old);
+    free(now);
+    return r;
 }
 
 int defaults_set(const char *mime, const char *id) {
@@ -81,19 +123,13 @@ int defaults_set(const char *mime, const char *id) {
 int defaults_guess(const char *path, char *mime, size_t n) {
     static char *globs;
     static int tried;
-    if (!tried) { tried = 1; globs = slurp("/usr/share/mime/globs2"); }
+    if (!tried) {
+        char p[PATH_MAX];
+        snprintf(p, sizeof p, "%s/usr/share/mime/globs2", sysroot);
+        tried = 1;
+        globs = slurp(p);
+    }
     return globs ? mime_guess(globs, path, mime, n) : -1;
-}
-
-int defaults_app_for(const char *path, char *id, size_t n) {
-    char mime[MIME_MAX], d[DESKTOP_ID_MAX];
-    if (defaults_guess(path, mime, sizeof mime) || defaults_lookup(mime, d, sizeof d)) return -1;
-    if (!strncmp(d, "lordos-", 7)) return -1;            /* one of ours: the theme opens it */
-    size_t l = strlen(d) - 8;                             /* without ".desktop" */
-    if (l >= n) return -1;
-    memcpy(id, d, l);
-    id[l] = 0;
-    return 0;
 }
 
 int defaults_terminal(char *id, size_t n) {

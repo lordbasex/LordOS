@@ -16,6 +16,8 @@
  *   lord.bt.state() / power(on) / discover(on) / pair(path) / connect(path) / disconnect(path)
  *          / forget(path) / answer(id, accept, value)
  *   lord.mime.get(mime) / set(mime, id) / guess(path) / terminal() / setTerminal(id)
+ *   lord.mime.resolve(mime)                     { id, explicit, source }: the app launchWith('') uses
+ *   lord.mime.unset(mime)                       back to the automatic choice
  *   lord.timedate.refresh()                     answer as __lordHw('timedate', …)
  *   lord.notifyd.closed(id, reason) / action(id, key)   back to the Linux app that notified
  *   lord.hwinfo.scan()                          read-only hardware facts for the Store's suggestions
@@ -54,6 +56,7 @@
 #include "js_fan.h"
 #include "../hw/brframe.h"
 #include "../hw/bt.h"
+#include "../apps.h"
 #include "../hw/defaults.h"
 #include "../hw/display.h"
 #include "../hw/hw.h"
@@ -318,6 +321,29 @@ static JSValue f_mime_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     return JS_NewBool(c, mime_valid(mime) && desktop_id_valid(id) && defaults_set(mime, id) == 0);
 }
 
+/* lord.mime.resolve(mime) → { id: 'x.desktop', explicit, source: 'user'|'system'|'declared' } or
+ * null: the app launchWith('', …) uses (apps_default_for); explicit only for the user's own choice. */
+static JSValue f_mime_resolve(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char mime[MIME_MAX], id[DESKTOP_ID_MAX];
+    if (!argc || arg_str(c, argv[0], mime, sizeof mime) || !mime_valid(mime)) return JS_NULL;
+    int r = apps_default_for(mime, id, sizeof id);
+    if (r <= 0) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "id", JS_NewString(c, id));
+    JS_SetPropertyStr(c, o, "explicit", JS_NewBool(c, r == APPS_DEFAULT_USER));
+    JS_SetPropertyStr(c, o, "source", JS_NewString(c, r == APPS_DEFAULT_USER ? "user" : r == APPS_DEFAULT_LISTED ? "system" : "declared"));
+    return o;
+}
+
+/* lord.mime.unset(mime): the user's choice for that type is removed (back to automatic). */
+static JSValue f_mime_unset(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char mime[MIME_MAX];
+    if (!argc || arg_str(c, argv[0], mime, sizeof mime)) return JS_FALSE;
+    return JS_NewBool(c, mime_valid(mime) && defaults_unset(mime) == 0);
+}
+
 static JSValue f_mime_guess(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char path[1024], mime[MIME_MAX];
@@ -341,6 +367,8 @@ static JSValue f_mime_set_terminal(JSContext *c, JSValueConst t, int argc, JSVal
 static const JSCFunctionListEntry mime_funcs[] = {
     JS_CFUNC_DEF("get", 1, f_mime_get),
     JS_CFUNC_DEF("set", 2, f_mime_set),
+    JS_CFUNC_DEF("resolve", 1, f_mime_resolve),
+    JS_CFUNC_DEF("unset", 1, f_mime_unset),
     JS_CFUNC_DEF("guess", 1, f_mime_guess),
     JS_CFUNC_DEF("terminal", 0, f_mime_terminal),
     JS_CFUNC_DEF("setTerminal", 1, f_mime_set_terminal),

@@ -54,6 +54,8 @@
   "bt.unblock": "Activar",
   "bt.visibleAs": "Visible como «{name}».",
   "bt.working": "Conectando…",
+  "defaults.automatic": "Automática ({name})",
+  "defaults.automaticPlain": "Automática",
   "defaults.cat.browser": "Navegador web",
   "defaults.cat.images": "Imágenes",
   "defaults.cat.mail": "Correo",

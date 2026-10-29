@@ -343,10 +343,52 @@ and the Linux apps whose `.desktop` `MimeType` covers the category (terminals: `
   `/usr/local/share/applications`, `/usr/share/applications`, `defaults.list`), with the user's
   `[Removed Associations]` applied. File types come from shared-mime-info's `globs2` (highest
   weight, longest pattern, case-sensitive patterns first).
+- **Automatic default (0.8.6, in development).** When the user never chose an app for a type,
+  `apps_default_for()` (`server/src/apps.c`) still finds one, using only apps the launcher itself
+  would run (a `.desktop` in `/usr/share/applications` or `~/.local/share/applications` that
+  `apps_list` lists: not `Hidden`/`NoDisplay`/`Terminal`, `TryExec` found, `OnlyShowIn`/`NotShowIn`
+  honoured, a `MimeType`, and an `Exec` with `%f`/`%F`/`%u`/`%U` naming a program that exists).
+  The order:
+  1. `[Default Applications]` of the files above, file by file and entry by entry, skipping entries
+     that are not installed: the user's own files first (an *explicit* choice; there a
+     `lordos-<app>.desktop` counts too, and the theme opens it), then what the system marks as
+     default (`/etc/xdg/mimeapps.list`, `/usr/local/share/applications/mimeapps.list`,
+     `/usr/share/applications/mimeapps.list`, `defaults.list`);
+  2. their `[Added Associations]`, in the same file order;
+  3. the installed apps whose `MimeType` declares the type, in `mimeinfo.cache` order
+     (`~/.local/share/applications`, then `/usr/share/applications`), then the rest sorted by
+     desktop id (strcmp), so the choice is the same on every run.
+
+  `[Removed Associations]` of a file apply to it and to every file after it (and to steps 2–3).
+  No MIME subclasses or aliases are followed (`text/html` does not match an app that only lists
+  `application/xhtml+xml`). No app → nothing opens, as before. No path or argument was added:
+  the folders are the launcher's, the file still goes through `launchWith`'s checks.
+- **The JS side.** `lord.mime.resolve(mime)` returns `{ id, explicit, source }` (`source`:
+  `user`, `system` for a system default or added association, `declared` for the first app that
+  declares the type) or `null`; `lord.mime.unset(mime)` removes the user's line for that type
+  from `[Default Applications]` and `[Added Associations]` of `~/.config/mimeapps.list` (as
+  GLib's reset does; `[Removed Associations]` and every other line are kept). `lord.mime.get`
+  still returns the first `[Default Applications]` entry without checking it is installed.
+- **What Settings shows.** A category the user never chose shows **Automatic (<app>)**: the
+  system's default if there is one, else LordOS's own app for the category (Photos, Player, PDF
+  Viewer, Text Editor, Mail), else the first installed app that declares the type (the web
+  browser on a fresh account). Choosing an app writes it as before; an explicit choice can go
+  back with **Automatic**, which calls `lord.mime.unset` for every type of the category. The
+  terminal is unchanged (`~/.config/xdg-terminals.list`).
 - **Files** lists the default app first in "Open With", marked "(default)", and double-click opens
-  it. **`lord.apps.launchWith('', path)`** opens a file with the default Linux app for its type
-  (the same rules as `launchWith`: a real path in the home or `/media/$USER`, one argument, no
-  shell); it returns false when the default is a LordOS app, which the theme opens itself.
+  it (`defaultOpenerId`: the user's choice or the system's default if installed, else the
+  category's LordOS app, else the first declaring app; on a fresh account an `.html` file now
+  opens in the installed browser instead of the Text Editor). **`lord.apps.launchWith('', path)`**
+  opens a file with the default Linux app for its type, the automatic one included (the same
+  rules as `launchWith`: a real path in the home or `/media/$USER`, one argument, no shell); it
+  returns false when the default is a LordOS app, which the theme opens itself, or when no
+  installed app opens the type.
+- Tests: `build/defaults-test` (`tests/defaults_test.c`, in `make -C server test`) builds a fake
+  XDG tree (`defaults_set_root`, tests only) and checks the user's choice, the system lists and
+  their order, the first declaring app (by id and by `mimeinfo.cache`), the skipped apps
+  (Hidden, NoDisplay, Terminal, OnlyShowIn, a missing TryExec, an Exec without a file code or with
+  a missing program), ids outside the launcher's folders, `[Removed]`/`[Added Associations]`,
+  going back to automatic, and that `launchWith('')` really opens the chosen app.
 
   ![Open With](files-open-with-menu.png)
 

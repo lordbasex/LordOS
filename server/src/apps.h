@@ -3,6 +3,7 @@
 #define LORD_APPS_H
 
 #include <limits.h>
+#include <stddef.h>
 
 typedef struct {
     char id[160];                       /* "org.featherpad.FeatherPad" (.desktop name without the extension) */
@@ -27,6 +28,21 @@ int apps_launch(const char *id);
 /* Same, but opening a file or folder (see apps.c: only apps with MimeType and paths in the
  * home folder or the user's mounts, as a single argument). */
 int apps_launch_with(const char *id, const char *path);
+/* The app that opens files of a MIME type, as apps_launch_with(id = "") picks it: out gets its desktop
+ * id ("firefox-esr.desktop", or the user's "lordos-<app>.desktop"). Order: [Default Applications] of
+ * the mimeapps.list files (the user's first, then the system's: /etc/xdg,
+ * /usr/local/share/applications, /usr/share/applications, then defaults.list), then their [Added
+ * Associations], then the installed apps whose MimeType declares the type, in mimeinfo.cache order
+ * (~/.local/share/applications, then /usr/share/applications) and then by desktop id. Only apps this
+ * launcher lists and can open a file with count; [Removed Associations] are honoured.
+ * Returns APPS_DEFAULT_USER (the user's own [Default Applications] choice: "explicit"),
+ * APPS_DEFAULT_LISTED (a system default or an added association: "automatic") or
+ * APPS_DEFAULT_DECLARED (the first installed app that declares the type: "automatic"), or 0 if no
+ * app opens it; n must be at least 160 (DESKTOP_ID_MAX in hw/mimeapps.h). */
+#define APPS_DEFAULT_USER 1
+#define APPS_DEFAULT_LISTED 2
+#define APPS_DEFAULT_DECLARED 3
+int apps_default_for(const char *mime, char *out, size_t n);
 /* Desktop actions ("Actions=" + "[Desktop Action <name>]", e.g. a browser's "New Private Window"):
  * only those listed in Actions=, with a [A-Za-z0-9-] name, a Name and an Exec line. */
 #define APPS_MAX_ACTIONS 16

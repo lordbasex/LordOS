@@ -28,6 +28,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 2.2 | `lord-server` runs as the user | Check `serverUser` (configured) | Holds |
 | 2.4 | `lord-netd` only takes `net-*` actions from uid 0 peers | Design; `net-test` covers the actions | Partly tested |
 | 2.4 | `lord-fand` writes only fans its scan found and restores them on stop or crash | Test (`fan-test`, fake sysfs); Measured on the Pi 5 (§7.4) | Holds |
+| 2.4 | (0.8.6, in development) With no default chosen, a file opens with the system's default or the first installed app that declares its type, shown as "Automatic" | Test (`defaults-test`, fake XDG tree); checked once in an isolated session on VM 116 (2026-10-29) | Holds |
 | 2.4 | Display changes revert after 15 s without confirmation | Manual | Not automated |
 | 3.6 | Passwords are checked by the root process, not the login screen | Design; `remote-sec-test` covers the parsers | Design |
 

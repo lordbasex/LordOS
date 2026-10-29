@@ -275,6 +275,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   371. With the build's defaults then (the pipeline while frames are heavy, GPU drag on): under load render
   13.85/19.07, GPU 15.63/23.38, `heldMs` 18.27/31.60, 148 on time, 1 CPU-late, 285 GPU-late of 436. So under load the
   frame is late on the GPU's side: its time per frame goes from about 1.5 ms alone to 14–16 ms.
+- **Automatic default apps** (in development for 0.8.6; `docs/SETTINGS.md`, "Default Apps"): when you never chose
+  an app for a file type, a file of that type still opens. Before, `lord.apps.launchWith('', path)` only read the
+  `[Default Applications]` lines of the mimeapps.list files and, on a fresh account with none, nothing opened (Files
+  opened an `.html` in the Text Editor, and anything that asks for "the default app" got nothing). Now
+  `apps_default_for()` (`server/src/apps.c`) follows the freedesktop MIME Applications order: the user's own
+  `[Default Applications]` (an explicit choice), then what the system marks as default (`/etc/xdg/mimeapps.list`,
+  `/usr/local/share/applications/mimeapps.list`, `/usr/share/applications/mimeapps.list`, `defaults.list`), skipping
+  entries that aren't installed, then `[Added Associations]`, then the first installed app whose `MimeType` declares
+  the type, in `mimeinfo.cache` order and then by desktop id (deterministic); `[Removed Associations]` are honoured,
+  MIME subclasses and aliases are not followed. Only apps the launcher itself runs count: a `.desktop` in
+  `/usr/share/applications` or `~/.local/share/applications` that it lists (not Hidden, NoDisplay or Terminal,
+  TryExec found, OnlyShowIn/NotShowIn) with a `MimeType` and an `Exec` that takes a file (`%f %F %u %U`) and names a
+  program that exists. No path, argument or way to write `.desktop` files was added; the file still goes through
+  `launchWith`'s checks (a real path in the home or the user's mounts, one argument, no shell).
+  `lord.mime.resolve(mime)` returns `{ id, explicit, source }` and `lord.mime.unset(mime)` goes back to automatic
+  (removes the user's line from `[Default Applications]` and `[Added Associations]` of `~/.config/mimeapps.list`,
+  every other line kept, as GLib's reset does). **Settings → Default Apps** shows a category you never chose as
+  "Automatic (<app>)" ("Automática (…)", "Automático (…)"): the system's default, else LordOS's own app for it, else
+  the first installed app that declares the type; an explicit choice can go back with "Automatic". Files' default
+  (`defaultOpenerId`) uses the same order, so on a fresh account an `.html` file opens in the installed browser.
+  Tests: `build/defaults-test` (38 checks, in `make -C server test`) over a fake XDG tree: the user's choice wins
+  (also `lordos-<app>.desktop`, left to the theme), the system's lists in order with uninstalled entries skipped,
+  the first declaring app by id and by `mimeinfo.cache` (the user's first), Hidden/NoDisplay/Terminal/OnlyShowIn/a
+  missing TryExec/an Exec without a file code or with a missing program skipped, ids outside the launcher's folders
+  ignored, `[Removed]` and `[Added Associations]`, going back to automatic, no app → nothing, and that
+  `launchWith('')` really starts the chosen app with the file. Checked on VM 116 in an isolated headless session
+  with a fresh home and no mimeapps.list (2026-10-29): Settings → Default Apps showed "Automatic (Chromium Web
+  Browser)" for the web browser and "Automatic (Mail/Player/Photos/PDF Viewer/Text Editor)" for the rest;
+  choosing Chromium wrote the four browser types, "Automatic" removed them again; double-clicking `page.html` in
+  Files opened it in Chromium (the only installed app that declares `text/html` there).
 
 ### Changed
 
