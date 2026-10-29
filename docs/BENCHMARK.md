@@ -1,12 +1,12 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not. Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
 | **0.8.5 — System Information** | Every piece of hardware detected, what LordOS uses (above all the GPU), the services, the paper's claims checked on this machine, JSON/Markdown reports. |
 | **0.8.6 — LordBench** | Measurements of CPU, memory, GPU, the compositor, video and storage under recorded, reproducible conditions, with versioned results. |
-| **0.8.7 — Community hardware reports** | Publishing reports as GitHub issues, validating them, and a tested-hardware catalogue on lordos.org that the app also reads. |
+| **0.8.7 — Community hardware reports** | Publishing reports as GitHub issues, validating them, and a tested-hardware catalogue on lordos.org that the app also reads. Also LordBench's x86 PC reference and hardware video decoding, moved from 0.8.6 (2026-10-29). |
 | **Later — Lumo and AutoTune** | `ROADMAP.md`, "Lumo, the local assistant": explains a report and tunes settings from what the machine measured. |
 
 Each claim of the paper, how it is checked today and what is still missing: `PAPER-VALIDATION.md`.
@@ -287,7 +287,7 @@ development package.
   "skipped: no codec". lord-media answers only `MM_BENCH` records (a measurement, a kind, a rate in thousandths),
   checked by `lbv_record_valid` before they become results. Hardware decoding is not measured: neither test
   machine has it (no VA-API on VM 116; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's FFmpeg
-  lacks).
+  lacks; hardware decoding moved to 0.8.7).
 - **Desktop impact** (its own button, its own result file `lordbench-desktop.json`): after the quiet wait,
   System Information opens a second window with a scene (cards, shadows and a square turned through
   `lord.setStyle` with the engine's `rotate` key; until 0.8.6's frame-cost work it sent a `transform` key the engine
@@ -432,7 +432,7 @@ development package.
   copied from the `lordbench.json` it wrote (numbers below). A measurement added after a machine's run is listed in
   its `notMeasured` until it is measured again: VM 116's layout, paint and shaping numbers come from a later Full
   run; the Pi 5's were measured only in Quick runs from a terminal (below), so its reference still lists them as not
-  measured. The modest x86 PC is added when measured.
+  measured. The modest x86 PC is added when measured (moved to 0.8.7 on 2026-10-29).
 
 VM 116, Full with 30 s sustained, LordBench 1 (2026-10-27, 159 s): SHA-256 166 MB/s on one core and 984 MB/s on
 eight; matrix product 3.3 and 19.9 GFLOP/s; xz 60 and 363 MB/s; QuickJS 57 and 336 runs/s; memory copy
@@ -770,13 +770,16 @@ measurement (or the JSON with `--json`); exit 0 when the run finished, 1 when it
 but the helper-sandbox self-test let a try through or one is missing (text output only; with `--json` the exit
 code is 0 or 1 and the tries are in `sandboxTries`). On VM 116 a quick run took 46 s.
 
-Not built yet: hardware video decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's
-`v4l2request`); detecting the Pi's firmware throttling during a run on kernels that don't expose it; a Full run of
-the Pi 5 with the layout, paint and shaping workloads for its reference (two Quick runs measured them, above); and
-the x86 PC reference.
+Not built yet: detecting the Pi's firmware throttling during a run on kernels that don't expose it; and a Full run
+of the Pi 5 with the layout, paint and shaping workloads for its reference (two Quick runs measured them, above).
+Moved to 0.8.7 (decided by the maintainer on 2026-10-29; `ROADMAP.md`, "Release 0.8.7 (planned)"): hardware video
+decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`) and the x86 PC
+reference.
 
 ## 0.8.7 — Community hardware reports
 
+- **Moved from 0.8.6** (decided by the maintainer on 2026-10-29): LordBench's modest x86 PC reference and
+  hardware video decoding in `lord-media` and the video workloads ("Built so far", the end of the 0.8.6 section).
 - **Share on GitHub** saves the report as a small HTML page and opens it with the default browser
   (the existing `lord.apps.launchWith('', path)` rule). That page opens GitHub's new-issue form with
   the `hardware-report` template, title and summary filled in; the user attaches the JSON and

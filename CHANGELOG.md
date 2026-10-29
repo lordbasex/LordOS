@@ -25,6 +25,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   by LordBench (two monitors and 4K still not).
 - **The 0.8.6 plan** (2026-10-28): `docs/ROADMAP.md` has a "Release 0.8.6 (in development)" section listing what is
   built and what is left for LordBench and for the desktop under load on the Pi 5.
+- **The 0.8.7 plan** (2026-10-29, decided by the maintainer): LordBench's x86 PC reference (a modest PC still to be
+  chosen) and hardware video decoding (VA-API on PCs, the Pi 5's HEVC decoder) move from 0.8.6 to a new "Release 0.8.7
+  (planned)" section of `docs/ROADMAP.md`, next to the community hardware reports. `BENCHMARK.md`,
+  `PAPER-VALIDATION.md` and the paper (§7.5; en, es, pt) say so.
 
 - **0.8.5-beta published** (2026-10-27): the GitHub release carries the live ISO, the Raspberry Pi 5 image
   (`lordos-0.8.5-rpi5-arm64.img.xz`, the LordOS kernel 6.18.57-lordos.3 for the Pi 5; the Pi 4 still boots Raspberry

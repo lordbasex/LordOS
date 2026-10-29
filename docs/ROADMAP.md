@@ -562,8 +562,8 @@ LordBench and a desktop that stays smooth under load. Each item is described in 
 - [ ] The interface workloads measured on the Pi 5 for its reference. *Two Quick runs from a terminal (2026-10-29):*
   layout and paint 39.3–39.4 fps on one core, 45.4 fps with the paint threads; shaping 630–632 runs/s on one core,
   2,522–2,527 on four (`BENCHMARK.md`); the reference waits for a Full run.
-- [ ] The x86 PC reference (a modest PC still to be chosen; may move to 0.8.7).
-- [ ] Hardware video decoding (may move after 0.8.6).
+- The x86 PC reference and hardware video decoding moved to 0.8.7 (decided by the maintainer on 2026-10-29;
+  "Release 0.8.7 (planned)" below).
 - [x] Detecting the Pi 5 firmware's throttling. *Built (2026-10-28/29), checked on the Pi 5 on 2026-10-29:* the
   LordOS kernel (`rpi-6.18.y`) only exposes the firmware's under-voltage alarm (`rpi_volt`'s `in0_lcrit_alarm`, the
   last 2 s), not its capped, throttled or soft-limit bits, so LordBench watches that alarm and `get_throttled` where
@@ -613,6 +613,13 @@ desktop fell to 24 fps under an all-core load:
 **Release:**
 - [ ] Re-measure the references after the release (results compare only within one LordOS version).
 - [ ] Release cleanup, packages, the Pi 5 image and the ISO, as for 0.8.5.
+
+## Release 0.8.7 (planned)
+
+Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), and what LordBench left for after 0.8.6:
+- [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
+- [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
+  FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29).
 
 ## Before 1.0
 
@@ -779,14 +786,15 @@ desktop fell to 24 fps under an all-core load:
   code, one core and with the paint threads, and shaping fixed paragraphs in five scripts, with the fonts built
   into the helper; VM 116: 37.0 and 39.9 fps, 619 and 3,595 runs/s), and the helper-sandbox self-test inside
   `lord-bench` (six tries that must fail, checked by the Stability verdict and `lordos-sysreport bench`). Left:
-  hardware video decoding, the x86 PC reference, a Full run of the Pi 5 with the interface workloads for its reference
+  a Full run of the Pi 5 with the interface workloads for its reference
   (two Quick runs measured them on 2026-10-29), and the rest of what it found on the Pi 5 (the desktop fell to 24 fps under load;
   the compositor's CPU weight and its real-time priority fix it on VM 116; on the Pi 5 with its monitor they take it
   to 29–30 fps; the frame-cost work cuts a drag frame's build under load to 12.9 ms and keeps 60 fps alone, but
   under load the frames still miss the refresh, at about 31 fps, now on the GPU's side (its time per frame 1.5 → 14–16
   ms under load, no throttling); the frame pipeline and GPU drag, measured on 2026-10-29, gave too little and are off
   by default: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost"). The firmware throttling
-  detection was checked on the Pi 5 (the under-voltage alarm present, reading 0).
+  detection was checked on the Pi 5 (the under-voltage alarm present, reading 0). Hardware video decoding and the x86 PC
+  reference moved to 0.8.7 (2026-10-29, "Release 0.8.7 (planned)").
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel
