@@ -61,7 +61,7 @@ void wl_paint_begin(void) { nwdraw = 0; }
 void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
 void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
-/* G0 (paint_root_g0): an app window in the list is drawn below the UI where its box is, as wl.c's */
+/* GPU drag (paint_root_gdrag): an app window in the list is drawn below the UI where its box is, as wl.c's */
 int wl_draws_meet(Rect r) {
     const float k = paint_view.k;
     for (int i = 0; i < nwdraw; i++) {
@@ -1513,9 +1513,9 @@ static void test_overlay_scrollbar(void) {
  * backdrop blur with one of those squares within its reach differed, in 2,386 of 2,417 frames (GPU
  * path: 498,692 and 431,316 in 2,387), none anywhere else. "gpu" is the same run with
  * gpu_active() on: paint.c's GPU path (the layer's sentinel, the app holes, no skipped nodes) on the
- * same CPU canvas the GPU uploads. "g0" is the GPU path with G0 (paint_root_g0, docs/GPU.md): a stub GPU
+ * same CPU canvas the GPU uploads. "gpu-drag" is the GPU path with GPU drag (paint_root_gdrag, docs/GPU.md): a stub GPU
  * keeps the UI texture (what was uploaded of the canvas) and the layer's and the copy's textures (only
- * their dirty rectangles), and writes the window's rectangle with canvas_g0_model (gpu.c's shader in C);
+ * their dirty rectangles), and writes the window's rectangle with canvas_gdrag_model (gpu.c's shader in C);
  * what it shows must hash as drag_golden_gpu.txt. Shorter runs cover what makes the layer paint again: a text
  * that changes a child's size, a child moving inside the window, a terminal whose cursor blinks
  * (damage from outside the tree), a square turning across the window's edge, the window crossing
@@ -1555,14 +1555,14 @@ enum { DW = 1024, DH = 640, DRAG_FRAMES = 480, CASE_FRAMES = 60, FULL_EVERY = 16
  * "anc" the bar and the panel, with both windows in a rounded container that clips them and has a
  * border (an ancestor painted around the dragged window); "tfgrow" the still square, and a dot on it
  * that changes color every 20 frames (a part of the copy that cuts the square's image). */
-/* The runs after DC_N have no golden hashes: G0 (paint_root_g0) is compared with the GPU path itself
- * in them (test_g0_extra): "pause" stops the drag for 30 frames with nothing changing (frames with no UI
+/* The runs after DC_N have no golden hashes: GPU drag (paint_root_gdrag) is compared with the GPU path itself
+ * in them (test_gdrag_extra): "pause" stops the drag for 30 frames with nothing changing (frames with no UI
  * damage, which only draw the window again on the GPU), "two" is the drag on two displays side by side
- * (the window crosses from one to the other: the layer, the copy and G0 follow the one with most of it),
+ * (the window crosses from one to the other: the layer, the copy and GPU drag follow the one with most of it),
  * "app" drags over the window below with its app window, "ancedge" slowly away from the rounded,
  * bordered container's top-left corner, "corner" over a rounded overflow:hidden box painted after the
  * window that paints nothing itself (its corners' save and restore still change the pixels below). Their frames are compared as the GPU shows them: the app
- * windows below the UI texture, the UI blended over them, G0's rectangle written over both. */
+ * windows below the UI texture, the UI blended over them, GPU drag's rectangle written over both. */
 enum { DC_DRAG, DC_TEXT, DC_CHILD, DC_TERM, DC_EDGE, DC_NEG, DC_REMOVE, DC_K2,
        DC_BELOW, DC_AFTER, DC_BELOWTF, DC_BLUR, DC_ZRAISE, DC_MIX, DC_K2MIX, DC_ANC, DC_TFGROW, DC_N,
        DC_PAUSE = DC_N, DC_TWO, DC_APP, DC_ANCEDGE, DC_CORNER, DC_ALL };
@@ -1585,29 +1585,29 @@ static int dc_hashes(void) {                        /* each run: its frames and 
     return n;
 }
 
-/* G0 (test_g0): the frame as the GPU shows it. tex is the GPU's UI texture (what was uploaded of the
- * scene c), fb the composed frame: tex with the window's rectangle written by canvas_g0_model (gpu.c's
- * shader in C) from two textures that get only paint.c's dirty rectangles, as gpu.c's. g0on, g0w:
+/* GPU drag (test_gdrag): the frame as the GPU shows it. tex is the GPU's UI texture (what was uploaded of the
+ * scene c), fb the composed frame: tex with the window's rectangle written by canvas_gdrag_model (gpu.c's
+ * shader in C) from two textures that get only paint.c's dirty rectangles, as gpu.c's. gdrag_on, gdragw:
  * main.c's bookkeeping of the scene's stale rectangle. */
 typedef struct {
     OutView v;
     Canvas c, ref, fbc;
     uint32_t *px, *rpx, *tex, *fb, *cmp;
-    int g0on;
-    Rect g0w;
-    GpuG0 g;
+    int gdrag_on;
+    Rect gdragw;
+    GpuDrag g;
 } DOut;
-static int test_g0;
+static int test_gdrag;
 /* the frame pipeline (main.c, fpipe.h): each frame painted is presented only after the next frame's changes
  * (the pointer, JS) are made, right before that frame is painted, as a frame prepared during a pending flip
  * is submitted at the flip; its pixels must be the same */
 static int test_pipe;
 typedef struct { int on, taken, last, why; Rect pr; } DPend;
 static DPend dpend[4];
-static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner[2]; } g0tex;   /* the stub GPU's G0 textures (owner: 0 the copy, 1 the layer) */
-static long g0_fed;                                 /* pixels sent between frames (paint_g0_feed) */
-static long g0_whole;                               /* G0 frames that had to send a texture whole */
-static long g0_quads;
+static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner[2]; } gdragtex;   /* the stub GPU's GPU drag textures (owner: 0 the copy, 1 the layer) */
+static long gdrag_fed;                                 /* pixels sent between frames (paint_gdrag_feed) */
+static long gdrag_whole;                               /* GPU drag frames that had to send a texture whole */
+static long gdrag_quads;
 typedef struct { Node *root, *win, *spin, *edge, *child, *term, *caption, *below, *btitle, *fill, *mtext, *square, *ptext, *dot; } DScene;
 
 static uint64_t frame_hash(const Canvas *c) {
@@ -1637,9 +1637,9 @@ static void copy_rect(uint32_t *dst, int dstride, const uint32_t *src, int sstri
 }
 
 /* The stub GPU's texture t (*tw × *th): all of px if its size changed, it was another display's or
- * full, else the dirty rectangles (gpu.c's g0_upload). */
-static long g0_frame_px, g0_frame_max;              /* pixels the G0 frames sent: this one, the most one did */
-static void g0_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
+ * full, else the dirty rectangles (gpu.c's gdrag_upload). */
+static long gdrag_frame_px, gdrag_frame_max;              /* pixels the GPU drag frames sent: this one, the most one did */
+static void gdrag_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
     if (*tw != w || *th != h) {
         free(*t);
         *t = malloc((size_t)w * h * 4);
@@ -1648,20 +1648,20 @@ static void g0_tex_up(uint32_t **t, int *tw, int *th, const uint32_t *px, int w,
         full = 1;
     }
     if (!*t) return;
-    if (full) { memcpy(*t, px, (size_t)w * h * 4); g0_frame_px += (long)w * h; return; }
+    if (full) { memcpy(*t, px, (size_t)w * h * 4); gdrag_frame_px += (long)w * h; return; }
     for (int i = 0; i < n; i++) {
         Rect q = { r[i].x0 < 0 ? 0 : r[i].x0, r[i].y0 < 0 ? 0 : r[i].y0, r[i].x1 > w ? w : r[i].x1, r[i].y1 > h ? h : r[i].y1 };
-        if (q.x1 > q.x0 && q.y1 > q.y0) { copy_rect(*t, w, px, w, q); g0_frame_px += (long)(q.x1 - q.x0) * (q.y1 - q.y0); }
+        if (q.x1 > q.x0 && q.y1 > q.y0) { copy_rect(*t, w, px, w, q); gdrag_frame_px += (long)(q.x1 - q.x0) * (q.y1 - q.y0); }
     }
 }
 
-/* gpu.c's gpu_g0_feed on the stub GPU (ctx: the display's index): a texture that is not this display's
+/* gpu.c's gpu_gdrag_feed on the stub GPU (ctx: the display's index): a texture that is not this display's
  * at this size is made again, filled with a pattern no frame has (so a pixel the feed missed shows) */
-static int g0_tex_feed(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
+static int gdrag_tex_feed(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
     int index = *(const int *)ctx;
-    uint32_t **t = which ? &g0tex.l : &g0tex.b;
-    int *tw = which ? &g0tex.lw : &g0tex.bw, *th = which ? &g0tex.lh : &g0tex.bh;
-    if (g0tex.owner[which] != index || *tw != w || *th != h) {
+    uint32_t **t = which ? &gdragtex.l : &gdragtex.b;
+    int *tw = which ? &gdragtex.lw : &gdragtex.bw, *th = which ? &gdragtex.lh : &gdragtex.bh;
+    if (gdragtex.owner[which] != index || *tw != w || *th != h) {
         if (*tw != w || *th != h) {
             free(*t);
             *t = malloc((size_t)w * h * 4);
@@ -1670,67 +1670,67 @@ static int g0_tex_feed(void *ctx, int which, const uint32_t *px, int w, int h, R
             if (!*t) return -1;
             for (size_t i = 0; i < (size_t)w * h; i++) (*t)[i] = 0x7f13ff13u;
         }
-        g0tex.owner[which] = index;
+        gdragtex.owner[which] = index;
         return 1;
     }
     Rect q = { r.x0 < 0 ? 0 : r.x0, r.y0 < 0 ? 0 : r.y0, r.x1 > w ? w : r.x1, r.y1 > h ? h : r.y1 };
     if (q.x1 > q.x0 && q.y1 > q.y0) {
         copy_rect(*t, w, px, w, q);
-        g0_fed += (long)(q.x1 - q.x0) * (q.y1 - q.y0);
+        gdrag_fed += (long)(q.x1 - q.x0) * (q.y1 - q.y0);
     }
     return 0;
 }
 
 /* main.c's presentation on the GPU (render_frame, gpu_frame_ex): the painted rectangles (pr, or the
- * strips) go to the UI texture; with G0 the two textures get their dirty rectangles and the window is
+ * strips) go to the UI texture; with GPU drag the two textures get their dirty rectangles and the window is
  * written over the texture's stale rectangle in the composed frame. A frame refused only for what the
- * textures lack (G0R_FEED) then sends a slice of it (paint_g0_feed), as main.c does after queueing the flip. */
-static void g0_present(DOut *o, int index, Rect pr, int taken, int last, int why) {
+ * textures lack (GDRAG_R_FEED) then sends a slice of it (paint_gdrag_feed), as main.c does after queueing the flip. */
+static void gdrag_present(DOut *o, int index, Rect pr, int taken, int last, int why) {
     int W = o->c.w, H = o->c.h;
     if (!taken) {
         copy_rect(o->tex, W, o->c.px, o->c.stride, pr);
-        if (last == 0 && why == G0R_FEED && paint_g0_backlog(index) > 0)
-            paint_g0_feed(index, G0_FEED_PX, g0_tex_feed, &index);
+        if (last == 0 && why == GDRAG_R_FEED && paint_gdrag_backlog(index) > 0)
+            paint_gdrag_feed(index, GDRAG_FEED_PX, gdrag_tex_feed, &index);
     } else {
-        const GpuG0 *g = &o->g;
+        const GpuDrag *g = &o->g;
         for (int i = 0; i < g->nstrip; i++) copy_rect(o->tex, W, o->c.px, o->c.stride, g->strip[i]);
-        /* paint.c sent the rest first: a G0 frame never has more than G0_FEED_PX left */
+        /* paint.c sent the rest first: a GPU drag frame never has more than GDRAG_FEED_PX left */
         long left = 0;
         if (g->bfull) left += (long)g->bw * g->bh;
         else for (int i = 0; i < g->nb; i++) left += (long)(g->bdirty[i].x1 - g->bdirty[i].x0) * (g->bdirty[i].y1 - g->bdirty[i].y0);
-        CHECK(left <= G0_FEED_PX, "a G0 frame with %ld px of the copy left to send", left);
-        int bother = g0tex.owner[0] != index, lother = g0tex.owner[1] != index;
-        if (bother || lother || g->bfull || g->lfull) g0_whole++;
-        g0_tex_up(&g0tex.b, &g0tex.bw, &g0tex.bh, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || bother);
-        g0_tex_up(&g0tex.l, &g0tex.lw, &g0tex.lh, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || lother);
-        g0tex.owner[0] = g0tex.owner[1] = index;
-        if (g0_frame_px > g0_frame_max) g0_frame_max = g0_frame_px;
-        g0_frame_px = 0;
-        paint_g0_done();
-        g0_quads++;
+        CHECK(left <= GDRAG_FEED_PX, "a GPU drag frame with %ld px of the copy left to send", left);
+        int bother = gdragtex.owner[0] != index, lother = gdragtex.owner[1] != index;
+        if (bother || lother || g->bfull || g->lfull) gdrag_whole++;
+        gdrag_tex_up(&gdragtex.b, &gdragtex.bw, &gdragtex.bh, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull || bother);
+        gdrag_tex_up(&gdragtex.l, &gdragtex.lw, &gdragtex.lh, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull || lother);
+        gdragtex.owner[0] = gdragtex.owner[1] = index;
+        if (gdrag_frame_px > gdrag_frame_max) gdrag_frame_max = gdrag_frame_px;
+        gdrag_frame_px = 0;
+        paint_gdrag_done();
+        gdrag_quads++;
     }
     memcpy(o->fb, o->tex, (size_t)W * H * 4);
     if (taken) {
-        const GpuG0 *g = &o->g;
+        const GpuDrag *g = &o->g;
         for (int y = g->w.y0; y < g->w.y1; y++)
             for (int x = g->w.x0; x < g->w.x1; x++)
-                o->fb[(size_t)y * W + x] = canvas_g0_model(g0tex.l[(size_t)(y - g->ly) * g0tex.lw + (x - g->lx)],
-                                                           g0tex.b[(size_t)y * g0tex.bw + x]);
-        o->g0w = g->w;
+                o->fb[(size_t)y * W + x] = canvas_gdrag_model(gdragtex.l[(size_t)(y - g->ly) * gdragtex.lw + (x - g->lx)],
+                                                           gdragtex.b[(size_t)y * gdragtex.bw + x]);
+        o->gdragw = g->w;
     }
-    o->g0on = taken;
+    o->gdrag_on = taken;
 }
 
 /* One display's paint_out (the damaged box in physical px, cleared and painted with paint_root_clear;
- * with G0, main.c's paint_out and render_frame: the stale rectangle joins the damage, a display with no
- * damage keeps its frame, unless the G0 textures are another display's) */
+ * with GPU drag, main.c's paint_out and render_frame: the stale rectangle joins the damage, a display with no
+ * damage keeps its frame, unless the GPU drag textures are another display's) */
 static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
     int empty = d.x1 <= d.x0 || d.y1 <= d.y0;
-    if (test_g0 && o->g0on) {
+    if (test_gdrag && o->gdrag_on) {
         float gx0, gy0, gx1, gy1;
-        out_logical_box(&o->v, o->g0w, &gx0, &gy0, &gx1, &gy1);
+        out_logical_box(&o->v, o->gdragw, &gx0, &gy0, &gx1, &gy1);
         if (!empty) d = (Box){ fminf(d.x0, gx0), fminf(d.y0, gy0), fmaxf(d.x1, gx1), fmaxf(d.y1, gy1) };
-        else if (g0tex.owner[0] != index || g0tex.owner[1] != index) { d = (Box){ gx0, gy0, gx1, gy1 }; o->g0on = 0; }   /* g0_stale */
+        else if (gdragtex.owner[0] != index || gdragtex.owner[1] != index) { d = (Box){ gx0, gy0, gx1, gy1 }; o->gdrag_on = 0; }   /* gdrag_stale */
         /* else: drawn again from the textures, the frame stays as it is */
     }
     if (d.x1 <= d.x0 || d.y1 <= d.y0) return;
@@ -1742,15 +1742,15 @@ static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
     ui.damage = (Box){ lx0, ly0, lx1, ly1 };
     canvas_set_clip(&o->c, pr);
     int taken = 0;
-    if (test_g0) taken = paint_root_g0(&o->c, root, &o->g);
+    if (test_gdrag) taken = paint_root_gdrag(&o->c, root, &o->g);
     else paint_root_clear(&o->c, root, 0x000000);
     canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
-    if (!test_g0) return;
-    int why, sub, last = paint_g0_last(&why, &sub);
+    if (!test_gdrag) return;
+    int why, sub, last = paint_gdrag_last(&why, &sub);
     if (test_pipe && index < 4) dpend[index] = (DPend){ 1, taken, last, why, pr };
-    else g0_present(o, index, pr, taken, last, why);
+    else gdrag_present(o, index, pr, taken, last, why);
 }
 
 /* the frame pipeline: the frames painted are presented now (main.c's out_submit) */
@@ -1758,7 +1758,7 @@ static void drag_present(DOut *const *os, int n) {
     for (int i = 0; i < n && i < 4; i++)
         if (dpend[i].on) {
             dpend[i].on = 0;
-            g0_present(os[i], i, dpend[i].pr, dpend[i].taken, dpend[i].last, dpend[i].why);
+            gdrag_present(os[i], i, dpend[i].pr, dpend[i].taken, dpend[i].last, dpend[i].why);
         }
 }
 
@@ -1794,7 +1794,7 @@ static long drag_full_diff(Node *root, DOut *o, int *worst) {
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
     term_at = keep;
     long n = 0;
-    const uint32_t *px = test_g0 ? o->fb : o->px;          /* G0: the frame as shown */
+    const uint32_t *px = test_gdrag ? o->fb : o->px;          /* GPU drag: the frame as shown */
     for (size_t i = 0; i < (size_t)o->c.w * o->c.h; i++) {
         if (px[i] == o->rpx[i]) continue;
         n++;
@@ -1983,7 +1983,7 @@ static DScene drag_scene(int dc, float x, float y) {
     sn(dock, "backdropBlur", 20);
     for (int i = 0; i < 6; i++) dview(dock, 48, 48, accents[i], 12);
     /* pause: 300 more nodes painted after the window, each in its own box below the Dock (LordOS's real
-     * menu bar and Dock are a few hundred; G0's list of them once held 128 and refused every frame) */
+     * menu bar and Dock are a few hundred; GPU drag's list of them once held 128 and refused every frame) */
     if (dc == DC_PAUSE) for (int i = 0; i < 300; i++) box_in(dockl, 12 + 3 * i, DH - 6, 2, 2, accents[i % 6]);
     ss(dock, "flexDirection", "row"); ss(dock, "alignItems", "center"); ss(dock, "justifyContent", "center");
     sn(dock, "gap", 12);
@@ -1999,12 +1999,12 @@ static DScene drag_scene(int dc, float x, float y) {
 }
 
 /* What the GPU shows (test_compose): the app windows of the list (a solid colour each) below the UI
- * texture, the texture blended over them (ONE, ONE_MINUS_SRC_ALPHA, rounded), and with G0 the window's
+ * texture, the texture blended over them (ONE, ONE_MINUS_SRC_ALPHA, rounded), and with GPU drag the window's
  * rectangle written over both (blending off: its colour, opaque). */
 static int test_compose;
 static uint64_t composed_hash(DOut *o) {
     int W = o->c.w, H = o->c.h;
-    const uint32_t *t = test_g0 ? o->tex : o->c.px;    /* without G0 every painted pixel was uploaded */
+    const uint32_t *t = test_gdrag ? o->tex : o->c.px;    /* without GPU drag every painted pixel was uploaded */
     uint32_t *f = o->cmp;
     memset(f, 0, (size_t)W * H * 4);
     const float k = (float)o->v.k;
@@ -2023,19 +2023,19 @@ static uint64_t composed_hash(DOut *o) {
         }
         f[i] = o2;
     }
-    if (test_g0 && o->g0on)
-        for (int y = o->g0w.y0; y < o->g0w.y1; y++)
-            for (int x = o->g0w.x0; x < o->g0w.x1; x++) f[(size_t)y * W + x] = 0xff000000u | (o->fb[(size_t)y * W + x] & 0xffffff);
+    if (test_gdrag && o->gdrag_on)
+        for (int y = o->gdragw.y0; y < o->gdragw.y1; y++)
+            for (int x = o->gdragw.x0; x < o->gdragw.x1; x++) f[(size_t)y * W + x] = 0xff000000u | (o->fb[(size_t)y * W + x] & 0xffffff);
     Canvas c;
     canvas_init(&c, f, W, H, W);
     return frame_hash(&c);
 }
 
-/* The hash of what the displays show (with G0, the composed frames) */
+/* The hash of what the displays show (with GPU drag, the composed frames) */
 static uint64_t outs_hash(DOut *const *os, int nos) {
     uint64_t h = 0;
     for (int i = 0; i < nos; i++)
-        h = h * 1099511628211ull ^ (test_compose ? composed_hash(os[i]) : frame_hash(test_g0 ? &os[i]->fbc : &os[i]->c));
+        h = h * 1099511628211ull ^ (test_compose ? composed_hash(os[i]) : frame_hash(test_gdrag ? &os[i]->fbc : &os[i]->c));
     return h;
 }
 
@@ -2057,16 +2057,16 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
     for (int i = 0; i < nos; i++) {
         canvas_set_clip(&os[i]->c, (Rect){ 0, 0, os[i]->c.w, os[i]->c.h });
         canvas_clear(&os[i]->c, 0x000000);
-        os[i]->g0on = 0;
+        os[i]->gdrag_on = 0;
     }
-    g0tex.owner[0] = g0tex.owner[1] = -1;
+    gdragtex.owner[0] = gdragtex.owner[1] = -1;
     damage_add((Box){ 0, 0, DW, DH });
     ui.dirty = 1;
     drag_paint_n(s.root, os, nos);
     drag_present(os, nos);
     paint_layer_begin(s.win->id, 0);                    /* grab.c's setup */
     float gx = x0, gy = y0, rot = 0;
-    unsigned pipe_epoch = paint_g0_epoch();
+    unsigned pipe_epoch = paint_gdrag_epoch();
     *full = 0;
     *worst = 0;
     for (int f = 0; f < n; f++) {
@@ -2112,12 +2112,12 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
         }
         if (test_pipe) {
             /* the frame before is submitted only now, after this frame's changes: they must not touch what it
-             * hands the GPU (paint_g0_epoch, else main.c paints it again) */
-            CHECK(paint_g0_epoch() == pipe_epoch, "pipelined: frame %d's changes moved G0's epoch", f);
+             * hands the GPU (paint_gdrag_epoch, else main.c paints it again) */
+            CHECK(paint_gdrag_epoch() == pipe_epoch, "pipelined: frame %d's changes moved GPU drag's epoch", f);
             drag_present(os, nos);
             if (f) hash[f - 1] = outs_hash(os, nos);
             drag_paint_n(s.root, os, nos);
-            pipe_epoch = paint_g0_epoch();
+            pipe_epoch = paint_gdrag_epoch();
             continue;                                   /* (a full repaint now would be of the next frame's tree) */
         }
         drag_paint_n(s.root, os, nos);
@@ -2128,9 +2128,9 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
         drag_present(os, nos);
         hash[n - 1] = outs_hash(os, nos);
     }
-    unsigned before_end = paint_g0_epoch();
+    unsigned before_end = paint_gdrag_epoch();
     paint_layer_end();                                  /* grab_finish */
-    CHECK(paint_g0_epoch() != before_end, "the drag's end moves G0's epoch (a prepared G0 frame is painted again)");
+    CHECK(paint_gdrag_epoch() != before_end, "the drag's end moves GPU drag's epoch (a prepared GPU drag frame is painted again)");
     ui.dirty = 1;
     drag_paint_n(s.root, os, nos);
     drag_present(os, nos);
@@ -2216,28 +2216,28 @@ static int dout_init(DOut *o, OutView v) {
 }
 static void dout_free(DOut *o) { free(o->px); free(o->rpx); free(o->tex); free(o->fb); free(o->cmp); }
 
-/* G0's frames counted since the last call, printed for a run (some_g0: at least one is expected) */
-static void g0_report(const char *what, int some_g0) {
-    G0Stats g;
-    paint_g0_stats(&g);
-    printf("drag-exact %s: G0 composed %ld of %ld frames that used the copy (%ld presented), strips %ld px "
+/* GPU drag's frames counted since the last call, printed for a run (some_gdrag: at least one is expected) */
+static void gdrag_report(const char *what, int some_gdrag) {
+    GdragStats g;
+    paint_gdrag_stats(&g);
+    printf("drag-exact %s: GPU drag composed %ld of %ld frames that used the copy (%ld presented), strips %ld px "
            "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up); %ld px sent between "
-           "frames, %ld G0 frames sent a texture whole, the most one G0 frame sent %ld px\n", what, g.frames, g.tried, g0_quads,
-           g.strip_px, g.refused[G0R_LAYER], g.refused[G0R_CLIP], g.refused[G0R_ANCESTOR], g.refused[G0R_APP],
-           g.refused[G0R_AFTER], g.refused[G0R_POST], g.refused[G0R_FEED], g0_fed, g0_whole, g0_frame_max);
-    CHECK((g.frames > 0 || !some_g0) && g.frames == g0_quads, "drag-exact %s: G0 frames %ld, presented %ld", what, g.frames,
-          g0_quads);
-    g0_quads = g0_fed = g0_whole = g0_frame_max = 0;
+           "frames, %ld GPU drag frames sent a texture whole, the most one GPU drag frame sent %ld px\n", what, g.frames, g.tried, gdrag_quads,
+           g.strip_px, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP], g.refused[GDRAG_R_ANCESTOR], g.refused[GDRAG_R_APP],
+           g.refused[GDRAG_R_AFTER], g.refused[GDRAG_R_POST], g.refused[GDRAG_R_FEED], gdrag_fed, gdrag_whole, gdrag_frame_max);
+    CHECK((g.frames > 0 || !some_gdrag) && g.frames == gdrag_quads, "drag-exact %s: GPU drag frames %ld, presented %ld", what, g.frames,
+          gdrag_quads);
+    gdrag_quads = gdrag_fed = gdrag_whole = gdrag_frame_max = 0;
 }
 
-/* The runs without golden hashes (pause, two displays): G0 must show what the GPU path shows, frame by
+/* The runs without golden hashes (pause, two displays): GPU drag must show what the GPU path shows, frame by
  * frame (that path is the one the golden hashes check in the other runs). */
-static void test_g0_extra(void) {
+static void test_gdrag_extra(void) {
     DOut a, b, c;
     int ok = dout_init(&a, out_view(0, 0, DW, DH, 100)) && dout_init(&b, out_view(0, 0, DW / 2, DH, 100)) &&
              dout_init(&c, out_view(DW / 2, 0, DW / 2, DH, 100));
     uint64_t *h0 = malloc(sizeof *h0 * 1024), *h1 = malloc(sizeof *h1 * 1024);
-    if (!ok || !h0 || !h1) { CHECK(0, "g0-extra: out of memory"); goto done; }
+    if (!ok || !h0 || !h1) { CHECK(0, "gpu-drag-extra: out of memory"); goto done; }
     for (int dc = DC_N; dc < DC_ALL; dc++) {
         DOut *two[2] = { &b, &c }, *one[1] = { &a };
         DOut *const *os = dc == DC_TWO ? two : one;
@@ -2245,23 +2245,23 @@ static void test_g0_extra(void) {
         long full;
         int worst;
         test_gpu = 1;
-        test_g0 = 0;
+        test_gdrag = 0;
         test_compose = nos == 1;
         drag_run_n(dc, os, nos, h0, &full, &worst);
-        test_g0 = 1;
-        G0Stats st;
-        paint_g0_stats(&st);
-        g0_quads = 0;
+        test_gdrag = 1;
+        GdragStats st;
+        paint_gdrag_stats(&st);
+        gdrag_quads = 0;
         drag_run_n(dc, os, nos, h1, &full, &worst);
-        test_g0 = test_compose = 0;
+        test_gdrag = test_compose = 0;
         int bad = 0, first = -1;
         for (int f = 0; f <= dc_frames[dc]; f++) if (h0[f] != h1[f]) { if (first < 0) first = f; bad++; }
         char what[32];
-        snprintf(what, sizeof what, "g0 %s", dc_name[dc]);
-        /* corner: the box is in every frame's damage, so G0 refuses them all (without that refusal the
+        snprintf(what, sizeof what, "gpu-drag %s", dc_name[dc]);
+        /* corner: the box is in every frame's damage, so GPU drag refuses them all (without that refusal the
          * frames differ from the GPU path) */
-        g0_report(what, dc != DC_CORNER);
-        CHECK(!bad, "drag-exact g0, run %s: %d of %d frames differ from the GPU path (the first: frame %d)", dc_name[dc], bad,
+        gdrag_report(what, dc != DC_CORNER);
+        CHECK(!bad, "drag-exact gpu-drag, run %s: %d of %d frames differ from the GPU path (the first: frame %d)", dc_name[dc], bad,
               dc_frames[dc] + 1, first);
     }
 done:
@@ -2271,7 +2271,7 @@ done:
 }
 
 static void test_drag_exact(int write) {
-    static const char *const variant[4] = { "cpu", "gpu", "g0", "g0 pipelined" };
+    static const char *const variant[4] = { "cpu", "gpu", "gpu-drag", "gpu-drag pipelined" };
     DOut o, o2;                                         /* the display at 100 %, and at 200 % (DC_K2) */
     int ok = dout_init(&o, out_view(0, 0, DW, DH, 100));
     ok = dout_init(&o2, out_view(0, 0, 2 * DW, 2 * DH, 200)) && ok;
@@ -2281,11 +2281,11 @@ static void test_drag_exact(int write) {
         dout_free(&o); dout_free(&o2); free(hash);
         return;
     }
-    /* g0: the GPU path with G0 (the window composited by canvas_g0_model), against the GPU's hashes */
-    /* g0 pipelined: the same, each frame presented after the next frame's changes (the frame pipeline) */
+    /* gpu-drag: the GPU path with GPU drag (the window composited by canvas_gdrag_model), against the GPU's hashes */
+    /* gpu-drag pipelined: the same, each frame presented after the next frame's changes (the frame pipeline) */
     for (int g = 0; g < (write ? 2 : 4); g++) {
         test_gpu = g > 0;
-        test_g0 = g >= 2;
+        test_gdrag = g >= 2;
         test_pipe = g == 3;
         char path[64];
         snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g >= 2 ? 1 : g]);
@@ -2298,10 +2298,10 @@ static void test_drag_exact(int write) {
         BelowStats bs;
         paint_below_stats(&bs);
         paint_below_bad = paint_below_checked = 0;
-        paint_below_verify = !test_g0;                  /* G0's frames leave the window to the GPU: the hashes check them */
-        G0Stats g0s;
-        paint_g0_stats(&g0s);
-        g0_quads = 0;
+        paint_below_verify = !test_gdrag;                  /* GPU drag's frames leave the window to the GPU: the hashes check them */
+        GdragStats gdrags;
+        paint_gdrag_stats(&gdrags);
+        gdrag_quads = 0;
         if (getenv("LORD_BELOW_SWITCH")) paint_below_switch = atoi(getenv("LORD_BELOW_SWITCH"));
         for (int dc = 0; dc < DC_N; dc++) {
             drag_run(dc, dc_k2(dc) ? &o2 : &o, hash + k, &fullw[dc], &worst[dc]);
@@ -2317,10 +2317,10 @@ static void test_drag_exact(int write) {
                "%ld blur, %ld transform, %ld unreached, %ld cost), %ld pixels differ in %ld of them painted the old way\n",
                variant[g], bs.full, bs.part, bs.switched, bs.refused[BR_ANCESTOR], bs.refused[BR_BLUR], bs.refused[BR_TRANSFORM],
                bs.refused[BR_UNREACHED], bs.refused[BR_COST], paint_below_bad, paint_below_checked);
-        if (!test_g0)
+        if (!test_gdrag)
             CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
                   "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
-        else g0_report(variant[g], 1);
+        else gdrag_report(variant[g], 1);
         printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
         for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
         printf("\n");
@@ -2347,11 +2347,11 @@ static void test_drag_exact(int write) {
         }
         free(file);
     }
-    test_gpu = test_g0 = test_pipe = 0;
+    test_gpu = test_gdrag = test_pipe = 0;
     dout_free(&o);
     dout_free(&o2);
     free(hash);
-    if (!write) test_g0_extra();
+    if (!write) test_gdrag_extra();
 }
 
 /* ---- The corners of a dragged window ----

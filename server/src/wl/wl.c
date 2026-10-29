@@ -2144,7 +2144,7 @@ void wl_paint_restore(void) {
     memcpy(ndraws, verify_n, sizeof ndraws);
 }
 
-/* G0 (ui/paint.c): whether an app window noted so far for layer 0 is drawn into r (physical px of the
+/* GPU drag (ui/paint.c): whether an app window noted so far for layer 0 is drawn into r (physical px of the
  * display being painted): its box as draw_surface gives it, one pixel more on each side for the
  * filtering, cut by its clip. A window that is gone is not drawn. */
 int wl_draws_meet(Rect r) {

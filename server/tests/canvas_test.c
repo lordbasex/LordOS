@@ -1,7 +1,7 @@
 /* canvas_test.c — the SIMD rows of canvas.c (NEON on ARM64, NEON=1) must give the same result,
  * bit for bit, as the portable C ones. On x86-64 (no SIMD of its own) it compares C against C and also
  * checks the exact division by 255 that the NEON version uses. See docs/RASPBERRY.md.
- * G0's shader in C (canvas_g0_model, docs/GPU.md "The dragged window on the GPU") must give blit_row's
+ * GPU drag's shader in C (canvas_gdrag_model, docs/GPU.md "The dragged window on the GPU") must give blit_row's
  * pixel at k = 256 for every valid premultiplied source channel (c ≤ alpha) over every destination
  * channel, and every source alpha over every destination alpha: checked exhaustively against both.
  *
@@ -16,7 +16,7 @@
 const char *canvas_test_simd(void);
 void canvas_test_blit_row(int simd, uint32_t *row, const uint32_t *s, int n, uint32_t k);
 void canvas_test_mask_row(int simd, uint32_t *row, const uint8_t *m, int n, uint32_t argb);
-uint32_t canvas_g0_model(uint32_t src, uint32_t dst);
+uint32_t canvas_gdrag_model(uint32_t src, uint32_t dst);
 
 static uint32_t rng = 12345;
 static uint32_t rnd(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
@@ -70,10 +70,10 @@ int main(void) {
             }
     }
 
-    /* G0's model against blit_row_c and the SIMD row, exhaustively: for every alpha a and colour c ≤ a,
+    /* GPU drag's model against blit_row_c and the SIMD row, exhaustively: for every alpha a and colour c ≤ a,
      * a row of 256 destinations with every channel value d (all three channels, so each sum is checked
      * on each), the destination alpha (7d + a) & 255 (every value once per a) */
-    long g0cases = 0, g0bad = 0;
+    long gdragcases = 0, gdragbad = 0;
     for (uint32_t a = 0; a < 256; a++)
         for (uint32_t c = 0; c <= a; c++) {
             static uint32_t gs[256], gd[256], gc[256], gn[256];
@@ -86,10 +86,10 @@ int main(void) {
             canvas_test_blit_row(0, gc, gs, 256, 256);
             canvas_test_blit_row(1, gn, gs, 256, 256);
             for (int i = 0; i < 256; i++) {
-                uint32_t m = canvas_g0_model(gs[i], gd[i]);
-                g0cases++;
+                uint32_t m = canvas_gdrag_model(gs[i], gd[i]);
+                gdragcases++;
                 if (m != gc[i] || m != gn[i]) {
-                    if (g0bad++ < 10) printf("G0 model: src=%08x dst=%08x C=%08x SIMD=%08x model=%08x\n", gs[i], gd[i], gc[i], gn[i], m);
+                    if (gdragbad++ < 10) printf("GPU drag model: src=%08x dst=%08x C=%08x SIMD=%08x model=%08x\n", gs[i], gd[i], gc[i], gn[i], m);
                 }
             }
         }
@@ -98,12 +98,12 @@ int main(void) {
         uint32_t sp = premul(), dp = rnd(), cr = dp, nr = dp;
         canvas_test_blit_row(0, &cr, &sp, 1, 256);
         canvas_test_blit_row(1, &nr, &sp, 1, 256);
-        uint32_t m = canvas_g0_model(sp, dp);
-        g0cases++;
-        if ((m != cr || m != nr) && g0bad++ < 10) printf("G0 model: src=%08x dst=%08x C=%08x SIMD=%08x model=%08x\n", sp, dp, cr, nr, m);
+        uint32_t m = canvas_gdrag_model(sp, dp);
+        gdragcases++;
+        if ((m != cr || m != nr) && gdragbad++ < 10) printf("GPU drag model: src=%08x dst=%08x C=%08x SIMD=%08x model=%08x\n", sp, dp, cr, nr, m);
     }
-    printf("canvas-test: G0 model: %ld cases, %ld differ\n", g0cases, g0bad);
-    fails += (int)g0bad;
+    printf("canvas-test: GPU drag model: %ld cases, %ld differ\n", gdragcases, gdragbad);
+    fails += (int)gdragbad;
 
     /* time for one 1920×1080 screen with each (not a test: it measures) */
     static uint32_t big_s[1920], big_d[1920];

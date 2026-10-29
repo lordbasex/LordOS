@@ -109,28 +109,28 @@ static void below_stats_text(char *buf, size_t len) {
              b.refused[BR_BLUR], b.refused[BR_TRANSFORM], b.refused[BR_UNREACHED], b.refused[BR_COST]);
 }
 
-/* G0, the dragged window composited on the GPU (docs/GPU.md): frames, the strips the CPU painted
+/* GPU drag, the dragged window composited on the GPU (docs/GPU.md): frames, the strips the CPU painted
  * around it, what was uploaded of the copy of what is below and of the layer, and why other frames that
  * used the copy were painted by the CPU. Appended to the "drag: …" lines. */
-static void g0_stats_text(char *buf, size_t len) {
-    G0Stats g;
+static void gdrag_stats_text(char *buf, size_t len) {
+    GdragStats g;
     long bpx, lpx, quads;
-    paint_g0_stats(&g);
-    gpu_g0_stats(&bpx, &lpx, &quads);
-    int k = snprintf(buf, len, "G0: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
+    paint_gdrag_stats(&g);
+    gpu_gdrag_stats(&bpx, &lpx, &quads);
+    int k = snprintf(buf, len, "GPU drag: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
                                "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up",
-                     g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[G0R_LAYER], g.refused[G0R_CLIP],
-                     g.refused[G0R_ANCESTOR], g.refused[G0R_APP], g.refused[G0R_AFTER], g.refused[G0R_POST], g.refused[G0R_FEED]);
-    /* the layer's refusals by cause (G0L_*) */
-    for (int i = 0, first = 1; i < G0L_N && k > 0 && (size_t)k < len; i++)
+                     g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP],
+                     g.refused[GDRAG_R_ANCESTOR], g.refused[GDRAG_R_APP], g.refused[GDRAG_R_AFTER], g.refused[GDRAG_R_POST], g.refused[GDRAG_R_FEED]);
+    /* the layer's refusals by cause (GDRAG_L_*) */
+    for (int i = 0, first = 1; i < GDRAG_L_N && k > 0 && (size_t)k < len; i++)
         if (g.layer[i]) {
-            int w = snprintf(buf + k, len - (size_t)k, "%s%s %ld", first ? "; layer: " : ", ", lbf_g0l_name(i), g.layer[i]);
+            int w = snprintf(buf + k, len - (size_t)k, "%s%s %ld", first ? "; layer: " : ", ", lbf_gdrag_l_name(i), g.layer[i]);
             if (w > 0) k += w;
             first = 0;
         }
     if (k > 0 && (size_t)k < len) snprintf(buf + k, len - (size_t)k, ")");
 }
-_Static_assert(G0R_N <= LBF_G0R && G0L_N <= LBF_G0L, "lbframes.c names every G0R_* and G0L_*");
+_Static_assert(GDRAG_R_N <= LBF_GDRAG_R && GDRAG_L_N <= LBF_GDRAG_L, "lbframes.c names every GDRAG_R_* and GDRAG_L_*");
 
 /* One display (docs/DISPLAYS.md): its KMS head, where it sits in the global logical space, and the
  * frame the UI paints for it at its own resolution. out[0]'s head owns the card's fd; the main display
@@ -158,17 +158,17 @@ typedef struct {
     int full_copy, was_fs;
     int gpu;                    /* its GPU output (gpu_frame), -1 = composed by the CPU */
     int wl_new;                 /* GPU path: a Linux app's window has new content not presented here yet */
-    /* G0 (paint_root_g0, docs/GPU.md): this frame left the dragged window's rectangle to the GPU
-     * (g0taken, g0); the last frame shown has it there, so the scene and the UI texture are stale in g0w
-     * (g0on) until a frame paints it on the CPU; g0cpu: the GPU could not draw it, the next frame paints
-     * it on the CPU without trying G0 */
-    int g0taken, g0on, g0cpu;
-    Rect g0w;
-    GpuG0 g0;
-    int pg0, pg0why, pg0sub;    /* what the frame painted last got from G0 (paint_g0_last), until it is submitted */
+    /* GPU drag (paint_root_gdrag, docs/GPU.md): this frame left the dragged window's rectangle to the GPU
+     * (gdragtaken, gdrag); the last frame shown has it there, so the scene and the UI texture are stale in gdragw
+     * (gdrag_on) until a frame paints it on the CPU; gdragcpu: the GPU could not draw it, the next frame paints
+     * it on the CPU without trying GPU drag */
+    int gdragtaken, gdrag_on, gdragcpu;
+    Rect gdragw;
+    GpuDrag gdrag;
+    int pgdrag, pgdragwhy, pgdragsub;    /* what the frame painted last got from GPU drag (paint_gdrag_last), until it is submitted */
     /* the frame pipeline (fpipe.h, docs/GPU.md "The frame pipeline"): a frame painted into the scene while the
      * flip was pending (prep, an FPIPE_*), what it painted (prep_r; prep_whole: all of it) and what it was painted
-     * against, checked before it is submitted (the scene's pixels, the GPU context and output, paint.c's G0
+     * against, checked before it is submitted (the scene's pixels, the GPU context and output, paint.c's GPU drag
      * epoch); its CPU time so far and its phases for LordBench (main display) */
     int prep, prep_whole, prep_gpu;
     Rect prep_r;
@@ -224,22 +224,22 @@ static Box box_join(Box a, Box b) {
 }
 static int box_empty(Box b) { return b.x1 <= b.x0 || b.y1 <= b.y0; }
 
-/* The scene's G0 rectangle (still the GPU's) is painted again on the CPU in the next frame of the display */
-static void g0_stale(Out *o) {
+/* The scene's GPU drag rectangle (still the GPU's) is painted again on the CPU in the next frame of the display */
+static void gdrag_stale(Out *o) {
     float x0, y0, x1, y1;
-    out_logical_box(&o->v, o->g0w, &x0, &y0, &x1, &y1);
+    out_logical_box(&o->v, o->gdragw, &x0, &y0, &x1, &y1);
     if (box_empty(o->pend)) o->pl.n = 0;
     o->pend = box_join(o->pend, (Box){ x0, y0, x1, y1 });
-    o->g0on = 0;
+    o->gdrag_on = 0;
 }
 
-/* The frame pipeline: a prepared frame that will not be submitted (the GPU, the displays or G0's layer changed
+/* The frame pipeline: a prepared frame that will not be submitted (the GPU, the displays or GPU drag's layer changed
  * under it). What it painted is in the scene but not on the screen, so it joins the next frame's damage (with
- * the rectangle it left to G0, stale in the scene). */
+ * the rectangle it left to GPU drag, stale in the scene). */
 static void prep_undo(Out *o) {
     if (o->prep == FPIPE_READY) {
         Rect r = o->prep_r;
-        if (o->g0taken) r = rect_join(r, o->g0.w);
+        if (o->gdragtaken) r = rect_join(r, o->gdrag.w);
         if (o->prep_whole) o->full = 1;
         else if (r.x1 > r.x0 && r.y1 > r.y0) {
             float x0, y0, x1, y1;
@@ -247,7 +247,7 @@ static void prep_undo(Out *o) {
             if (box_empty(o->pend)) o->pl.n = 0;
             o->pend = box_join(o->pend, (Box){ x0, y0, x1, y1 });
         }
-        o->g0taken = 0;
+        o->gdragtaken = 0;
     }
     o->prep = FPIPE_NONE;
 }
@@ -470,7 +470,7 @@ static void dispatch_pointer(Server *s) {
             paint_layer_stats(&lr, &lb);
             char bs[192], gs[512];
             below_stats_text(bs, sizeof bs);
-            g0_stats_text(gs, sizeof gs);
+            gdrag_stats_text(gs, sizeof gs);
             fprintf(stderr, "drag: %ld frames in %.0f ms = %.1f FPS (%ld moves); per frame: work %.2f ms "
                             "(max %.2f; JS %.2f, layout %.2f, paint %.2f, present %.2f), max gap %.1f ms; "
                             "layer: %ld painted (%ld of them a part), %ld copied (%s); %s; %s\n",
@@ -658,8 +658,8 @@ static void cpu_takeover(Server *s) {
         o->gpu = -1;
         o->full_copy = 2;
         o->wl_new = 0;
-        if (o->g0on) o->full = 1;               /* the scene's G0 rectangle is stale */
-        o->g0on = o->g0taken = 0;
+        if (o->gdrag_on) o->full = 1;               /* the scene's GPU drag rectangle is stale */
+        o->gdrag_on = o->gdragtaken = 0;
     }
     s->hw_cursor = 0;
 }
@@ -1111,7 +1111,7 @@ static Box paint_ui(Server *s) {
  * differ from the display's frame are counted on stderr. Off by default; it only reads the frame. The
  * terminals and Linux apps note where they were painted, so with N = 1 a terminal's change during a
  * drag always repaints the whole layer: use N > 1 to check the layer's partial repaints. On a frame
- * whose dragged window the GPU composites (G0, skip) the scene is stale there and skip is left out:
+ * whose dragged window the GPU composites (GPU drag, skip) the scene is stale there and skip is left out:
  * LORD_GPU_VERIFY checks those pixels against the CPU's. */
 static void paint_verify(Out *o, int index, Rect skip) {
     static int every = -1;
@@ -1166,12 +1166,12 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     int whole = o->full;
     o->full = 0;
     o->pend = (Box){ 0, 0, 0, 0 };
-    o->g0taken = 0;
+    o->gdragtaken = 0;
     if (box_empty(b) || !o->scene.px) return r;
-    /* G0: the rectangle the GPU composed last frame is stale in the scene: painted again with this damage */
-    if (o->g0on && !whole) {
+    /* GPU drag: the rectangle the GPU composed last frame is stale in the scene: painted again with this damage */
+    if (o->gdrag_on && !whole) {
         float gx0, gy0, gx1, gy1;
-        out_logical_box(&o->v, o->g0w, &gx0, &gy0, &gx1, &gy1);
+        out_logical_box(&o->v, o->gdragw, &gx0, &gy0, &gx1, &gy1);
         b = box_join(b, (Box){ gx0, gy0, gx1, gy1 });
     }
     /* several damaged rectangles (paint.c, "Several damaged rectangles"): each one painted on its
@@ -1191,10 +1191,10 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     }
     multi = !whole && !gpu_active() && l.n > 1;
     int nparts = multi ? l.n : 1;
-    /* G0 (paint_root_g0): one box on a GPU display while a window is dragged */
-    int g0 = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
-             !wl_fullscreen_active() && !o->g0cpu && paint_layer_node() && gpu_g0_ready(o->gpu);
-    o->g0cpu = 0;
+    /* GPU drag (paint_root_gdrag): one box on a GPU display while a window is dragged */
+    int gdrag = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
+             !wl_fullscreen_active() && !o->gdragcpu && paint_layer_node() && gpu_gdrag_ready(o->gpu);
+    o->gdragcpu = 0;
     Box parts[DAMAGE_MAX];
     if (multi) memcpy(parts, l.r, sizeof(Box) * (size_t)nparts);
     else parts[0] = b;
@@ -1210,13 +1210,13 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         out_logical_box(&o->v, pr, &lx0, &ly0, &lx1, &ly1);
         ui.damage = (Box){ lx0, ly0, lx1, ly1 };      /* paint_root skips what this region does not need */
         canvas_set_clip(&o->scene, pr);
-        if (g0) o->g0taken = paint_root_g0(&o->scene, ui.root, &o->g0);
+        if (gdrag) o->gdragtaken = paint_root_gdrag(&o->scene, ui.root, &o->gdrag);
         else paint_root_clear(&o->scene, ui.root, 0x000000);
         if (feed) media_scene_painted(&o->scene);     /* recording/remote desktop with protected windows */
         r = rect_join(r, pr);
-        if (o->g0taken) {                             /* only the strips around the window were painted */
-            for (int i = 0; i < o->g0.nstrip; i++) {
-                Rect q = o->g0.strip[i];
+        if (o->gdragtaken) {                             /* only the strips around the window were painted */
+            for (int i = 0; i < o->gdrag.nstrip; i++) {
+                Rect q = o->gdrag.strip[i];
                 o->painted[o->npainted++] = (Box){ (float)q.x0, (float)q.y0, (float)q.x1, (float)q.y1 };
                 px += (double)(q.x1 - q.x0) * (q.y1 - q.y0);
             }
@@ -1236,7 +1236,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     if (s->debug || paint_profile)
         fprintf(stderr, "render %ld: display %d, layout %.2f ms, paint %.2f ms, repainted %.1f%% in %d rect%s\n", s->renders, index, ui.layout_ms, ms,
                 100.0 * px / ((double)o->scene.w * o->scene.h), nparts, nparts == 1 ? "" : "s");
-    paint_verify(o, index, o->g0taken ? o->g0.w : (Rect){ 0, 0, 0, 0 });
+    paint_verify(o, index, o->gdragtaken ? o->gdrag.w : (Rect){ 0, 0, 0, 0 });
     return r;
 }
 
@@ -1338,13 +1338,13 @@ static uint64_t render_r0;
 static int call_piped;
 
 static int render_frame(Server *s);
-static void g0_feed_now(Server *s, LbPhase *ph);
+static void gdrag_feed_now(Server *s, LbPhase *ph);
 static void render(Server *s) {
     int phases = lbf_recording();
     gpu_fence_on(phases);                       /* the GPU's finish time of each frame, only while recording */
     uint64_t r0 = phases ? mono_ns() : 0;
     double t0 = now_ms();
-    fph = (LbPhase){ .g0 = -1, .g0_why = -1, .g0_sub = -1 };
+    fph = (LbPhase){ .gdrag = -1, .gdrag_why = -1, .gdrag_sub = -1 };
     fph_main = 0;
     render_r0 = r0;
     call_piped = 0;
@@ -1353,7 +1353,7 @@ static void render(Server *s) {
     uint64_t r1 = phases ? mono_ns() : 0;
     /* LordBench's compositor measurement (bench/lbframes.c); a prepared frame's goes at its submission */
     if (shown && !call_piped) lbf_frame(t1 - t0);
-    g0_feed_now(s, &fph);                       /* after the frame's time: its flip is queued already */
+    gdrag_feed_now(s, &fph);                       /* after the frame's time: its flip is queued already */
     if (phases && fph_main) {
         fph.wake = loop_wake;
         fph.from_flip = loop_wake_flip;
@@ -1559,19 +1559,19 @@ static int outs_have_work(const Server *s) {
     return 0;
 }
 
-/* paint_g0_feed's way to the GPU: ctx is the display's GPU output */
-static int g0_feed_up(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
-    return gpu_g0_feed(*(const int *)ctx, which, px, w, h, r);
+/* paint_gdrag_feed's way to the GPU: ctx is the display's GPU output */
+static int gdrag_feed_up(void *ctx, int which, const uint32_t *px, int w, int h, Rect r) {
+    return gpu_gdrag_feed(*(const int *)ctx, which, px, w, h, r);
 }
-/* the displays whose G0 textures catch up after this frame: after its flips are queued and its time is
+/* the displays whose GPU drag textures catch up after this frame: after its flips are queued and its time is
  * taken, while the CPU would wait for the vblank anyway (docs/GPU.md, "Uploads without a stall") */
 static int feed_idx[OUT_MAX], nfeed;
-static void g0_feed_now(Server *s, LbPhase *ph) {
+static void gdrag_feed_now(Server *s, LbPhase *ph) {
     for (int k = 0; k < nfeed; k++) {
         Out *o = &s->out[feed_idx[k]];
-        if (!o->on || o->gpu < 0 || !gpu_g0_ready(o->gpu) || paint_g0_backlog(feed_idx[k]) <= 0) continue;
+        if (!o->on || o->gpu < 0 || !gpu_gdrag_ready(o->gpu) || paint_gdrag_backlog(feed_idx[k]) <= 0) continue;
         double f0 = now_ms();
-        long sent = paint_g0_feed(feed_idx[k], G0_FEED_PX, g0_feed_up, &o->gpu);
+        long sent = paint_gdrag_feed(feed_idx[k], GDRAG_FEED_PX, gdrag_feed_up, &o->gpu);
         if (o == main_out(s)) { ph->feed_ms = now_ms() - f0; ph->feed_px = sent; }
     }
     nfeed = 0;
@@ -1579,7 +1579,7 @@ static void g0_feed_now(Server *s, LbPhase *ph) {
 
 /* the frame pipeline (fpipe.h): it applies to this display now. One display with real page flips: without a
  * monitor there is no flip, a driver paced in software waits for its slot rather than the flip, and with
- * several displays paint.c's drag layer and G0 state are shared between them (each frame is built and
+ * several displays paint.c's drag layer and GPU drag state are shared between them (each frame is built and
  * submitted at once there, as before). */
 static int pipe_on(const Server *s, const Out *o) {
     return fpipe_engaged(&fpipe) && !s->headless && flip_instant < 3 && o->on && out_count(s) == 1;
@@ -1606,10 +1606,10 @@ static int prep_ready(const Server *s) {
     return 0;
 }
 /* the prepared frame can be submitted as it was painted: the same scene, GPU context and output, and with
- * G0 the same layer buffers and textures' bookkeeping (paint_g0_epoch) */
+ * GPU drag the same layer buffers and textures' bookkeeping (paint_gdrag_epoch) */
 static int prep_valid(const Out *o) {
     if (o->prep_px != o->scene.px || o->prep_gen != gpu_generation() || o->prep_gpu != (gpu_active() ? o->gpu : -1)) return 0;
-    return !o->g0taken || (o->prep_epoch == paint_g0_epoch() && gpu_g0_ready(o->gpu));
+    return !o->gdragtaken || (o->prep_epoch == paint_gdrag_epoch() && gpu_gdrag_ready(o->gpu));
 }
 
 static int par_on, par_light;           /* the paint threads (render_frame) */
@@ -1634,22 +1634,22 @@ static void cursor_mark(Server *s) {
     s->cursor_dirty = 0;
 }
 
-/* The CPU part of a display's frame: its damage painted into the scene (paint_out), and what G0 did. */
+/* The CPU part of a display's frame: its damage painted into the scene (paint_out), and what GPU drag did. */
 static Rect out_paint(Server *s, Out *o, int i, const Out *feed) {
-    /* G0 with no UI damage: the GPU draws the window again from its textures, if they are still this
+    /* GPU drag with no UI damage: the GPU draws the window again from its textures, if they are still this
      * display's; otherwise its rectangle is painted by the CPU now */
-    if (o->g0on && box_empty(o->pend) && !o->full && !gpu_g0_holds(o->gpu)) g0_stale(o);
+    if (o->gdrag_on && box_empty(o->pend) && !o->full && !gpu_gdrag_holds(o->gpu)) gdrag_stale(o);
     Rect r = paint_out(s, o, i, o == feed);
-    o->pg0why = o->pg0sub = -1;
-    o->pg0 = r.x1 > r.x0 ? paint_g0_last(&o->pg0why, &o->pg0sub) : -1;
+    o->pgdragwhy = o->pgdragsub = -1;
+    o->pgdrag = r.x1 > r.x0 ? paint_gdrag_last(&o->pgdragwhy, &o->pgdragsub) : -1;
     return r;
 }
 
 /* The rest of the frame: what paint_out painted (r) and the layers go to the display (GPU: upload, draw, swap
  * and page flip; CPU: copied into its KMS buffer, then the flip). ph: the main display's phases, else NULL. */
 static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPhase *ph) {
-    int g0why = o->pg0why, g0sub = o->pg0sub, g0last = o->pg0;
-    if (ph) { ph->g0 = g0last; ph->g0_why = g0why; ph->g0_sub = g0sub; }
+    int gdragwhy = o->pgdragwhy, gdragsub = o->pgdragsub, gdraglast = o->pgdrag;
+    if (ph) { ph->gdrag = gdraglast; ph->gdrag_why = gdragwhy; ph->gdrag_sub = gdragsub; }
     if (gpu_active() && o->gpu >= 0) {
         update_cursor(s);
         gpu_server = s;
@@ -1667,27 +1667,27 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
         }
         /* compatible fullscreen (one display): straight to the card; otherwise composed (always
          * composed while the remote desktop reads it back) */
-        /* G0: the strips around the window, and the window from its textures (gpu_frame_ex); a frame
+        /* GPU drag: the strips around the window, and the window from its textures (gpu_frame_ex); a frame
          * with nothing painted while the last one had it draws it again (its rectangle is stale) */
         Rect up[4] = { r };
-        int nup = 1, g0drawn = 0;
-        GpuG0 again;
-        const GpuG0 *g0 = NULL;
-        if (o->g0taken) {
-            g0 = &o->g0;
-            nup = o->g0.nstrip;
-            memcpy(up, o->g0.strip, sizeof up);
-        } else if (o->g0on && r.x1 <= r.x0) {
-            again = o->g0;
+        int nup = 1, gdragdrawn = 0;
+        GpuDrag again;
+        const GpuDrag *gdrag = NULL;
+        if (o->gdragtaken) {
+            gdrag = &o->gdrag;
+            nup = o->gdrag.nstrip;
+            memcpy(up, o->gdrag.strip, sizeof up);
+        } else if (o->gdrag_on && r.x1 <= r.x0) {
+            again = o->gdrag;
             again.lpx = again.bpx = NULL;
             again.nl = again.nb = again.lfull = again.bfull = 0;
             again.ref = NULL;
-            g0 = &again;
+            gdrag = &again;
         }
         int scanned = !readback && out_count(s) == 1 && wl_try_scanout(s->hw_cursor || s->cursor_mode == 2);
-        int res = scanned ? 0 : gpu_frame_ex(o->gpu, &o->scene, up, nup, g0, &g0drawn, gpu_layer);
+        int res = scanned ? 0 : gpu_frame_ex(o->gpu, &o->scene, up, nup, gdrag, &gdragdrawn, gpu_layer);
         int failed = res == -1, unshown = res == -2;
-        if (o->g0taken && g0drawn) paint_g0_done();    /* the textures have what paint.c had */
+        if (o->gdragtaken && gdragdrawn) paint_gdrag_done();    /* the textures have what paint.c had */
         if (ph) {
             /* a frame scanned out straight has no times of its own (gpu_frame_times keeps the last
              * composed frame's) and no fence (one left from before would give an old GPU time) */
@@ -1696,32 +1696,32 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
             else if (lbf_recording()) { uint64_t old; gpu_fence_time(o->gpu, &old); }
             ph->up_ms = ft.up_ms;
             ph->up_px = ft.up_px;
-            ph->g0_ms = ft.g0_ms;
-            ph->g0_px = ft.g0_px;
-            ph->g0_full = ft.g0_full;
+            ph->gdrag_ms = ft.gdrag_ms;
+            ph->gdrag_px = ft.gdrag_px;
+            ph->gdrag_full = ft.gdrag_full;
             ph->swap_ms = ft.swap_ms;
             ph->submit_ms = ft.submit_ms;
             ph->unshown = unshown;
         }
-        /* G0's textures catch up after the frame (render, g0_feed_now): only when this frame
-         * would have been G0's but for what they lack (paint.c, paint_g0_feed); sent while G0 is
+        /* GPU drag's textures catch up after the frame (render, gdrag_feed_now): only when this frame
+         * would have been GPU drag's but for what they lack (paint.c, paint_gdrag_feed); sent while GPU drag is
          * refused for another reason, most of it would be sent again before it is used */
-        if (!failed && !g0drawn && g0last == 0 && g0why == G0R_FEED && nfeed < OUT_MAX) feed_idx[nfeed++] = i;
+        if (!failed && !gdragdrawn && gdraglast == 0 && gdragwhy == GDRAG_R_FEED && nfeed < OUT_MAX) feed_idx[nfeed++] = i;
         if (unshown) {
             /* the quad could not be drawn: nothing was shown (the display keeps the frame before,
              * which was right); W joins the damage and the next frame paints it on the CPU */
-            o->g0w = g0->w;
-            g0_stale(o);
-            o->g0cpu = 1;
-        } else if (g0 && !g0drawn && !failed) {
-            /* shown without the quad (direct scanout, or G0 turned off): painted next frame */
-            o->g0w = g0->w;
-            g0_stale(o);
+            o->gdragw = gdrag->w;
+            gdrag_stale(o);
+            o->gdragcpu = 1;
+        } else if (gdrag && !gdragdrawn && !failed) {
+            /* shown without the quad (direct scanout, or GPU drag turned off): painted next frame */
+            o->gdragw = gdrag->w;
+            gdrag_stale(o);
         } else {
-            o->g0on = g0drawn;
-            if (g0drawn) o->g0w = g0->w;
+            o->gdrag_on = gdragdrawn;
+            if (gdragdrawn) o->gdragw = gdrag->w;
         }
-        o->g0taken = 0;
+        o->gdragtaken = 0;
         if (readback && !res && gpu_read_done()) {
             static int said;
             if (!said++) fprintf(stderr, "remote: composing on the GPU; frames read back for the remote desktop\n");
@@ -1777,7 +1777,7 @@ static void out_prepare(Server *s, Out *o, int i, const Out *feed, int is_main, 
     o->prep_px = o->scene.px;
     o->prep_gen = gpu_generation();
     o->prep_gpu = gpu_active() ? o->gpu : -1;
-    o->prep_epoch = paint_g0_epoch();
+    o->prep_epoch = paint_gdrag_epoch();
     o->prep_ms = now_ms() - ui0;
     if (!is_main) return;
     lbf_painted();                              /* the synthetic pointer's events so far are in it */
@@ -1821,7 +1821,7 @@ static int render_frame(Server *s) {
     int main_shown = 0, main_built = 0;     /* the main display got this frame; built here (not prepared before) */
     int done[OUT_MAX] = { 0 };              /* submitted or built in this render */
     /* The frame pipeline: the prepared frames are submitted first, before the JS frame callbacks and the
-     * layout of the next one; G0's textures catch up before that one is painted. One that can no longer be
+     * layout of the next one; GPU drag's textures catch up before that one is painted. One that can no longer be
      * submitted as painted is undone and built below like any frame. */
     int ready = !s->headless && prep_ready(s);
     if (ready) {
@@ -1836,7 +1836,7 @@ static int render_frame(Server *s) {
             if (o == mo) main_shown = 1;
         }
         if (call_piped) {
-            g0_feed_now(s, &mo->pph);
+            gdrag_feed_now(s, &mo->pph);
             lbf_phase_built(&mo->pph);
         }
     }
@@ -1851,7 +1851,7 @@ static int render_frame(Server *s) {
     if (s->headless) {
         Out *o = &s->out[0];
         Rect drawn = paint_out(s, o, 0, 1);
-        if (drawn.x1 > drawn.x0) fph.g0 = paint_g0_last(&fph.g0_why, &fph.g0_sub);
+        if (drawn.x1 > drawn.x0) fph.gdrag = paint_gdrag_last(&fph.gdrag_why, &fph.gdrag_sub);
         present_memory(s, o, 0, 1, drawn);
         fph_main = 1;                           /* presented at the end of this frame (below) */
     } else {
@@ -1876,7 +1876,7 @@ static int render_frame(Server *s) {
             Out *o = &s->out[i];
             if (!o->on) continue;
             int work = prep_only || o->full || !box_empty(o->pend);
-            /* (not with G0's catch-up still queued by a frame built here: it runs after render_frame, and must
+            /* (not with GPU drag's catch-up still queued by a frame built here: it runs after render_frame, and must
              * never run between a frame's paint and its upload) */
             if (nfeed) continue;
             if (fpipe_step(pipe_on(s, o), o->kms.flip_pending, o->prep, 0, work) == FPIPE_PREPARE)
@@ -2271,7 +2271,7 @@ int main(int argc, char **argv) {
             paint_layer_stats(&lr, &lb);
             char bs[192], gs[512], ps[1536];
             below_stats_text(bs, sizeof bs);
-            g0_stats_text(gs, sizeof gs);
+            gdrag_stats_text(gs, sizeof gs);
             LbPhaseStats ph;
             lbf_drag_end(&ph);
             lbf_phases_text(&ph, ps, sizeof ps);
@@ -2281,13 +2281,13 @@ int main(int argc, char **argv) {
         if (!scripted && grab_scripted()) {     /* its start: what came before is not counted */
             long lr, lb;
             BelowStats b;
-            G0Stats g;
+            GdragStats g;
             paint_layer_stats(&lr, &lb);
             paint_layer_parts();
             paint_below_stats(&b);
-            paint_g0_stats(&g);
+            paint_gdrag_stats(&g);
             long q[3];
-            gpu_g0_stats(&q[0], &q[1], &q[2]);
+            gpu_gdrag_stats(&q[0], &q[1], &q[2]);
             lbf_drag_begin();                   /* its frames' phases (bench/lbframes.h) */
         }
         scripted = grab_scripted();

@@ -205,7 +205,7 @@ int main(void) {
     /* on time: woke 0.1 ms after a flip, render 0.5 ms later for 9 ms, queued at 10 ms, GPU done at 12, shown at the next vblank */
     LbPhase a = { .prev_flip = F0, .wake = F0 + 100000, .from_flip = 1, .render0 = F0 + 600000, .built = F0 + 9600000,
                   .paint_ms = 6, .up_ms = 2, .swap_ms = 0.1, .submit_ms = 0.2, .up_px = 1000, .submit = F0 + 10000000,
-                  .period = (uint32_t)P, .par = 1, .g0 = 1 };
+                  .period = (uint32_t)P, .par = 1, .gdrag = 1 };
     lbf_phase_built(&a);
     lbf_phase_shown(F0 + P, F0 + 12000000);
     /* CPU-late: queued 18 ms after that flip, past the next vblank */
@@ -216,9 +216,9 @@ int main(void) {
     b.built = b.wake + 17000000;
     b.submit = b.wake + 18000000;
     b.par = 0;
-    b.g0 = 0;
-    b.g0_why = 0;                                       /* G0R_LAYER, G0L_INVALID */
-    b.g0_sub = 1;
+    b.gdrag = 0;
+    b.gdrag_why = 0;                                       /* GDRAG_R_LAYER, GDRAG_L_INVALID */
+    b.gdrag_sub = 1;
     lbf_phase_built(&b);
     lbf_phase_shown(F0 + 3 * P, b.submit + 2000000);
     /* GPU-late: queued at 12 ms, the GPU finished at 17, past the vblank at 16.7 */
@@ -228,9 +228,9 @@ int main(void) {
     c.render0 = c.wake + 500000;
     c.built = c.wake + 11000000;
     c.submit = c.prev_flip + 12000000;
-    c.g0 = 0;
-    c.g0_why = 6;                                       /* G0R_FEED */
-    c.g0_sub = -1;
+    c.gdrag = 0;
+    c.gdrag_why = 6;                                       /* GDRAG_R_FEED */
+    c.gdrag_sub = -1;
     c.unshown = 0;
     c.feed_ms = 1.5;
     c.feed_px = 262144;
@@ -240,7 +240,7 @@ int main(void) {
     LbPhase d = a;
     d.submit = 0;
     d.unshown = 1;
-    d.g0 = -1;
+    d.gdrag = -1;
     lbf_phase_built(&d);
     lbf_phase_shown(F0 + 6 * P, 0);                     /* a flip of something else: nothing waits for it */
     lbf_drag_end(&ps);
@@ -253,16 +253,16 @@ int main(void) {
     CHECK(fabs(ps.build.p50 - 10.5) < 1e-3 && fabs(ps.build.p99 - 16.5) < 1e-3, "render %f/%f", ps.build.p50, ps.build.p99);
     CHECK(fabs(ps.gpu.p50 - 2) < 1e-3 && fabs(ps.gpu.p99 - 5) < 1e-3, "GPU %f/%f", ps.gpu.p50, ps.gpu.p99);
     CHECK(fabs(ps.wait.p50 - 13.233333) < 1e-3 && fabs(ps.wait.p99 - 16.333333) < 1e-3, "to the vblank %f/%f", ps.wait.p50, ps.wait.p99);
-    CHECK(ps.par == 3 && ps.g0_tried == 3 && ps.g0_taken == 1 && ps.g0_refused[0] == 1 && ps.g0_layer[1] == 1 &&
-          ps.g0_refused[6] == 1 && ps.unshown == 1, "counts: par %d, G0 %d of %d, refused %d %d (%d), unshown %d", ps.par,
-          ps.g0_taken, ps.g0_tried, ps.g0_refused[0], ps.g0_refused[6], ps.g0_layer[1], ps.unshown);
+    CHECK(ps.par == 3 && ps.gdrag_tried == 3 && ps.gdrag_taken == 1 && ps.gdrag_refused[0] == 1 && ps.gdrag_layer[1] == 1 &&
+          ps.gdrag_refused[6] == 1 && ps.unshown == 1, "counts: par %d, GPU drag %d of %d, refused %d %d (%d), unshown %d", ps.par,
+          ps.gdrag_taken, ps.gdrag_tried, ps.gdrag_refused[0], ps.gdrag_refused[6], ps.gdrag_layer[1], ps.unshown);
     CHECK(fabs(ps.feed_mpx - 262144 / 4.0 / 1e6) < 1e-9 && fabs(ps.feed.p99 - 1.5) < 1e-6, "catch-up %f Mpx %f ms", ps.feed_mpx, ps.feed.p99);
     char pt[1536];
     lbf_phases_text(&ps, pt, sizeof pt);
     CHECK(strstr(pt, "CPU-late 1") && strstr(pt, "not layer 1 [invalid 1]") && strstr(pt, "not feed 1") && strstr(pt, "unshown 1"),
           "phases text: %s", pt);
-    CHECK(!strcmp(lbf_g0r_name(6), "feed") && !lbf_g0r_name(7) && !lbf_g0r_name(-1) && !strcmp(lbf_g0l_name(14), "part") &&
-          !lbf_g0l_name(15), "G0 names");
+    CHECK(!strcmp(lbf_gdrag_r_name(6), "feed") && !lbf_gdrag_r_name(7) && !lbf_gdrag_r_name(-1) && !strcmp(lbf_gdrag_l_name(14), "part") &&
+          !lbf_gdrag_l_name(15), "GPU drag names");
     char small[16];
     lbf_phases_text(&ps, small, sizeof small);
     CHECK(strlen(small) == 15, "a short buffer is cut, terminated");
@@ -277,7 +277,7 @@ int main(void) {
     /* a frame the pipeline prepared: painted during the flip before (12 ms), held until that flip, submitted
      * at it in 2 ms and shown at the next vblank: on time, its build is both parts */
     LbPhase e = { .piped = 1, .prev_flip = F0 + 7 * P, .wake = F0 + 6 * P + 100000, .from_flip = 1, .period = (uint32_t)P,
-                  .paint_ms = 10, .g0 = -1, .g0_why = -1, .g0_sub = -1 };
+                  .paint_ms = 10, .gdrag = -1, .gdrag_why = -1, .gdrag_sub = -1 };
     e.pre_end = e.wake + 300000;
     e.render0 = e.pre_end + 200000;
     e.built = e.render0 + 12000000;

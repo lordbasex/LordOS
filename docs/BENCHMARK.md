@@ -593,12 +593,12 @@ by lord-server itself, never by a helper):
 | `beforeRenderMs` | that wake → `render()`: pointer motion, LordBench's scripted step, the JS timers |
 | `renderMs` | `render()` itself (the same as the build time) |
 | `paintMs` | its layout and paint |
-| `uploadMs`, `g0UploadMs` | the UI texture's upload; G0's texture uploads in a G0 frame (`docs/GPU.md`) |
+| `uploadMs`, `gpuDragUploadMs` | the UI texture's upload; GPU drag's texture uploads in a GPU drag frame (`docs/GPU.md`) |
 | `swapMs`, `flipIoctlMs` | `eglSwapBuffers`; the front buffer, its framebuffer and the page flip ioctl |
 | `gpuMs` | the flip queued → the GPU finished the frame (below) |
 | `vblankWaitMs` | the later of those two → the flip |
 | `wakeToFlipMs` | the wake → the flip |
-| `catchUpMs` | G0's textures catching up after the flip was queued (`docs/GPU.md`, "Uploads without a stall") |
+| `catchUpMs` | GPU drag's textures catching up after the flip was queued (`docs/GPU.md`, "Uploads without a stall") |
 | `heldMs` | a prepared frame (the frame pipeline, `docs/GPU.md`): its paint done → its submission at the flip before it |
 
 A frame the pipeline prepared (counted in `prepared`) is painted while the previous flip is pending and submitted at
@@ -621,7 +621,7 @@ since its paint was done before):
 - `otherLate`: late with both before it, or with the GPU time unknown.
 
 And counted per frame: `paintThreads` (the pool was on), `unshown` (`gpu_frame_ex` returned -2), `uploadMpx`,
-`g0UploadMpx` and `catchUpMpx` (pixels per frame, average), and `g0`: `tried`, `taken`, `refused` by reason
+`gpuDragUploadMpx` and `catchUpMpx` (pixels per frame, average), and `gpuDrag`: `tried`, `taken`, `refused` by reason
 (`layer`, `clip`, `ancestor`, `app`, `after`, `post`, `feed`), `layer` refusals by cause (`invalid`, `rendering`,
 `holes`, `surfaces`, `premul`, `opacity`, `part`…), `wholeUploads` and `wholeMpx`. The result's `frames` object has
 `phases.alone` and `phases.load`; the session log gets `lordbench: desktop alone: phases, N frames (ms p50/p99): …`
@@ -635,17 +635,17 @@ worktree's lord-server in an isolated headless session (a test theme moving one 
 40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601 frames, all on time,
 render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three runs). Those are a check
 that it works, not a measurement (a small scene, no GPU). The GPU fields were not exercised: VM 116 sessions are
-headless, so the fence, the uploads' times and G0's counts have been built, not run.
+headless, so the fence, the uploads' times and GPU drag's counts have been built, not run.
 
 **What to run on the Pi 5 next** (the package from this work installed, the monitor on, logged in):
-1. LordBench → Desktop impact, twice with G0 (default) and twice with `LORD_G0=0` in the session's environment.
+1. LordBench → Desktop impact, twice with GPU drag (default) and twice with `LORD_GPU_DRAG=0` in the session's environment.
 2. From `~/.cache/lordos/session.log`: the `lordbench: desktop … phases` lines and the `drag (scripted):` line, and
    from `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
 3. Read under load: if most frames are `cpuLate`, the build is too long (`paintMs`, `uploadMs`, `beforeRenderMs`
    say which part, and `paintThreads` whether the pool helped); if `gpuLate`, the GPU's own work (`gpuMs`) is; if
    `onTime` is high and the rate still 30, the classification is wrong and the flip times must be looked at.
-   With G0, `g0.refused`/`g0.layer` say what keeps it off and `catchUpMpx` what the slices cost.
-4. `LORD_GPU_VERIFY=1` once with G0 over a Desktop impact run: `gpu-verify: … differ=0` on every line.
+   With GPU drag, `gpuDrag.refused`/`gpuDrag.layer` say what keeps it off and `catchUpMpx` what the slices cost.
+4. `LORD_GPU_VERIFY=1` once with GPU drag over a Desktop impact run: `gpu-verify: … differ=0` on every line.
 
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
 systemd-analyze gives 2.1 s kernel + 4.2 s userspace). Boots where the monitor was connected late took 61 and

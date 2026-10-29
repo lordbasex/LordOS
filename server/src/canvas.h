@@ -62,7 +62,7 @@ int  canvas_affine_cut(void);           /* 1 if one was cut since canvas_affine_
 void canvas_alpha_mask(Canvas *c, int x, int y, const uint8_t *a, int w, int h, int stride, uint32_t argb);
 /* Premultiplied ARGB image, with rounded corners and opacity. */
 void canvas_blit(Canvas *c, const uint32_t *src, int sw, int sh, int x, int y, float r, float opacity, int opaque);
-uint32_t canvas_g0_model(uint32_t src, uint32_t dst);   /* G0's shader in C: src (valid premultiplied) over dst, as blit_row at k = 256 */
+uint32_t canvas_gdrag_model(uint32_t src, uint32_t dst);   /* GPU drag's shader in C: src (valid premultiplied) over dst, as blit_row at k = 256 */
 /* Character bitmap: 'X' = fg, 'o' = bg, rest transparent (cursor). */
 /* Scaled, bilinear: source rect (sx, sy, sw, sh) of an image sw_px × sh_px (stride in pixels) into the
  * destination rect (dx, dy, dw, dh). Wayland buffers at another scale and wp_viewporter (CPU path). */

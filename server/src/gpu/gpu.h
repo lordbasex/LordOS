@@ -67,53 +67,53 @@ int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h);
  * fullscreen (on top). */
 int  gpu_frame(int out, const Canvas *scene, Rect damage, void (*draw_layer)(int layer));
 
-/* G0: the dragged window composited on the GPU with the CPU's own arithmetic (docs/GPU.md, "The
- * dragged window on the GPU"). paint_root_g0 (ui/paint.c) leaves the window's rectangle w out of the
+/* GPU drag: the dragged window composited on the GPU with the CPU's own arithmetic (docs/GPU.md, "The
+ * dragged window on the GPU"). paint_root_gdrag (ui/paint.c) leaves the window's rectangle w out of the
  * scene and fills this; one shader then writes, inside w, the layer (lpx) over the copy of what is
  * below (bpx) exactly as canvas_blit's blit_row does. The two are textures of their own, uploaded
  * only where they changed (ldirty, bdirty; *full: all of it). */
-#define G0_DIRTY 16
+#define GDRAG_DIRTY 16
 /* At most this many pixels of the two textures are sent in one frame: a frame that would need more is
- * painted by the CPU, and the rest is sent after its flip is queued (paint_g0_feed, gpu_g0_feed), a slice
+ * painted by the CPU, and the rest is sent after its flip is queued (paint_gdrag_feed, gpu_gdrag_feed), a slice
  * a frame, so no frame uploads a whole screen (docs/GPU.md, "Uploads without a stall"). 1 MB. */
-#define G0_FEED_PX 262144L
-typedef struct GpuG0 {
+#define GDRAG_FEED_PX 262144L
+typedef struct GpuDrag {
     Rect w;                             /* where the shader writes (the output's physical px, top-down) */
     const uint32_t *lpx;                /* the layer: lw × lh, its pixel (0, 0) at (lx, ly) */
     int lw, lh, lx, ly;
     const uint32_t *bpx;                /* the copy of what is below: bw × bh, the scene's size */
     int bw, bh;
-    Rect ldirty[G0_DIRTY], bdirty[G0_DIRTY];    /* in the layer's and the copy's pixels */
+    Rect ldirty[GDRAG_DIRTY], bdirty[GDRAG_DIRTY];    /* in the layer's and the copy's pixels */
     int nl, nb, lfull, bfull;
     Rect strip[4];                      /* what the CPU painted around w this frame (uploaded to the UI texture) */
     int nstrip;
     const uint32_t *ref;                /* LORD_GPU_VERIFY: the CPU's pixels for w (w's width a row), or NULL */
     long frame;                         /* its number, for the log */
-} GpuG0;
-/* 1 if G0 may be used on that output: the shader has 24-bit floats, LORD_G0 is not 0, the self-test
+} GpuDrag;
+/* 1 if GPU drag may be used on that output: the shader has 24-bit floats, LORD_GPU_DRAG is not 0, the self-test
  * (every valid premultiplied combination, and a placement pass at least as large as the output, drawn
  * into a framebuffer and read back) gave the CPU's pixels. gpu_init runs that test, once per GL renderer
  * and version. */
-int  gpu_g0_ready(int out);
-/* gpu_frame with several UI rectangles to upload and, with g0, the window composited over w (g0
+int  gpu_gdrag_ready(int out);
+/* gpu_frame with several UI rectangles to upload and, with gdrag, the window composited over w (gdrag
  * without dirty rectangles redraws the last one: a frame with no UI damage while the scene's w is
- * stale). Returns -1 like gpu_frame; *g0_drawn says whether the G0 quad was drawn. -2: g0 was given but
- * its quad could not be drawn (G0 turned off, or its textures are not that output's): nothing was
+ * stale). Returns -1 like gpu_frame; *gdrag_drawn says whether the GPU drag quad was drawn. -2: gdrag was given but
+ * its quad could not be drawn (GPU drag turned off, or its textures are not that output's): nothing was
  * shown, and the caller paints w on the CPU in its next frame. */
-int  gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuG0 *g0, int *g0_drawn,
+int  gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuDrag *gdrag, int *gdrag_drawn,
                   void (*draw_layer)(int layer));
-int  gpu_g0_holds(int out);             /* the G0 textures hold that output's last upload, in this context */
+int  gpu_gdrag_holds(int out);             /* the GPU drag textures hold that output's last upload, in this context */
 /* Texture which (0 the copy of what is below, 1 the layer) of output out gets r of px (w × h, stride w),
- * between frames (paint_g0_feed's up). 1: it held nothing of that output at that size: it is now that
- * output's, and the caller sends all of it again; 0 sent; -1 failed (G0 is then off). */
-int  gpu_g0_feed(int out, int which, const uint32_t *px, int w, int h, Rect r);
+ * between frames (paint_gdrag_feed's up). 1: it held nothing of that output at that size: it is now that
+ * output's, and the caller sends all of it again; 0 sent; -1 failed (GPU drag is then off). */
+int  gpu_gdrag_feed(int out, int which, const uint32_t *px, int w, int h, Rect r);
 /* Where the last gpu_frame_ex of an output spent its time (LordBench's frame phases, bench/lbframes.h) */
 typedef struct {
     double up_ms;                       /* the UI texture's rectangles */
     long up_px;
-    double g0_ms;                       /* the G0 textures' uploads for the quad */
-    long g0_px;
-    int g0_full;                        /* one of them was sent whole */
+    double gdrag_ms;                       /* the GPU drag textures' uploads for the quad */
+    long gdrag_px;
+    int gdrag_full;                        /* one of them was sent whole */
     double swap_ms;                     /* eglSwapBuffers */
     double submit_ms;                   /* the front buffer, its framebuffer and the page flip */
 } GpuFrameTimes;
@@ -123,8 +123,8 @@ void gpu_frame_times(int out, GpuFrameTimes *t);
  * 0 unknown (no fence, or not signalled yet). Each fence is read once and closed. Off: nothing is taken. */
 void gpu_fence_on(int on);
 int  gpu_fence_time(int out, uint64_t *ns);
-/* uploaded pixels of the copy of what is below and of the layer, and G0 quads drawn, since the last call */
-void gpu_g0_stats(long *below_px, long *layer_px, long *quads);
+/* uploaded pixels of the copy of what is below and of the layer, and GPU drag quads drawn, since the last call */
+void gpu_gdrag_stats(long *below_px, long *layer_px, long *quads);
 /* Another display (docs/DISPLAYS.md): its own GBM/EGL surface on the same context; gpu_init made
  * output 0. Returns the output index for gpu_frame, or -1 (then that display goes by the CPU). */
 int  gpu_add_output(Kms *k);

@@ -141,22 +141,22 @@ static void cond_json(HBuf *b, const LbCond *c) {
 static void phases_json(HBuf *b, const LbPhaseStats *p) {
     const struct { const char *k; LbPct v; } t[] = {
         { "wakeMs", p->wake }, { "beforeRenderMs", p->pre }, { "renderMs", p->build }, { "paintMs", p->paint },
-        { "uploadMs", p->up }, { "g0UploadMs", p->g0up }, { "swapMs", p->swap }, { "flipIoctlMs", p->submit_call },
+        { "uploadMs", p->up }, { "gpuDragUploadMs", p->gdragup }, { "swapMs", p->swap }, { "flipIoctlMs", p->submit_call },
         { "gpuMs", p->gpu }, { "vblankWaitMs", p->wait }, { "wakeToFlipMs", p->chain }, { "catchUpMs", p->feed },
         { "heldMs", p->held },
     };
     hb_printf(b, "{\"frames\":%d", p->n);
     for (size_t i = 0; i < sizeof t / sizeof *t; i++) hb_printf(b, ",\"%s\":[%.3f,%.3f]", t[i].k, t[i].v.p50, t[i].v.p99);
-    hb_printf(b, ",\"uploadMpx\":%.4f,\"g0UploadMpx\":%.4f,\"catchUpMpx\":%.4f,\"onTime\":%d,\"cpuLate\":%d,\"gpuLate\":%d,"
-                 "\"otherLate\":%d,\"gpuKnown\":%d,\"paintThreads\":%d,\"unshown\":%d,\"prepared\":%d,\"g0\":{\"tried\":%d,\"taken\":%d,"
+    hb_printf(b, ",\"uploadMpx\":%.4f,\"gpuDragUploadMpx\":%.4f,\"catchUpMpx\":%.4f,\"onTime\":%d,\"cpuLate\":%d,\"gpuLate\":%d,"
+                 "\"otherLate\":%d,\"gpuKnown\":%d,\"paintThreads\":%d,\"unshown\":%d,\"prepared\":%d,\"gpuDrag\":{\"tried\":%d,\"taken\":%d,"
                  "\"wholeUploads\":%d,\"wholeMpx\":%.3f,\"refused\":{",
-              p->up_mpx, p->g0_mpx, p->feed_mpx, p->on_time, p->cpu_late, p->gpu_late, p->other_late, p->gpu_known, p->par,
-              p->unshown, p->piped, p->g0_tried, p->g0_taken, p->g0_full, p->g0_full_px / 1e6);
-    for (int i = 0, k = 0; i < LBF_G0R; i++)
-        if (p->g0_refused[i] && lbf_g0r_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_g0r_name(i), p->g0_refused[i]);
+              p->up_mpx, p->gdrag_mpx, p->feed_mpx, p->on_time, p->cpu_late, p->gpu_late, p->other_late, p->gpu_known, p->par,
+              p->unshown, p->piped, p->gdrag_tried, p->gdrag_taken, p->gdrag_full, p->gdrag_full_px / 1e6);
+    for (int i = 0, k = 0; i < LBF_GDRAG_R; i++)
+        if (p->gdrag_refused[i] && lbf_gdrag_r_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_gdrag_r_name(i), p->gdrag_refused[i]);
     hb_printf(b, "},\"layer\":{");
-    for (int i = 0, k = 0; i < LBF_G0L; i++)
-        if (p->g0_layer[i] && lbf_g0l_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_g0l_name(i), p->g0_layer[i]);
+    for (int i = 0, k = 0; i < LBF_GDRAG_L; i++)
+        if (p->gdrag_layer[i] && lbf_gdrag_l_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_gdrag_l_name(i), p->gdrag_layer[i]);
     hb_printf(b, "}}}");
 }
 

@@ -516,55 +516,55 @@ static struct {
                                  * shift-exact across 0: roundf, (int) truncation, canvas_corners_save) */
     int ext_part;               /* outside damage went into layer.part through layer.at since then */
     int odd_text;               /* text in it took a path that may not move exactly (text_drew_inexact) */
-    int premul_bad;             /* GPU path: a pixel of it has a colour above its alpha (layer_holes; G0 needs none) */
+    int premul_bad;             /* GPU path: a pixel of it has a colour above its alpha (layer_holes; GPU drag needs none) */
 } layer;
 
-/* ---- G0: the dragged window composited on the GPU (paint_root_g0, docs/GPU.md) ----
+/* ---- GPU drag: the dragged window composited on the GPU (paint_root_gdrag, docs/GPU.md) ----
  * What of the layer and of the copy of what is below changed since the GPU last got them: the
- * rectangles (in their own pixels) or all of it. They add up over frames that don't use G0 and are
- * consumed only when one does (paint_g0_done). */
-typedef struct { Rect r[G0_DIRTY]; int n, full; } G0Dirty;
-static G0Dirty g0_ld, g0_bd;
-static G0Stats g0stat;
-static Rect g0_join(Rect a, Rect b) {
+ * rectangles (in their own pixels) or all of it. They add up over frames that don't use GPU drag and are
+ * consumed only when one does (paint_gdrag_done). */
+typedef struct { Rect r[GDRAG_DIRTY]; int n, full; } GdragDirty;
+static GdragDirty gdrag_ld, gdrag_bd;
+static GdragStats gdragstat;
+static Rect gdrag_join(Rect a, Rect b) {
     return (Rect){ a.x0 < b.x0 ? a.x0 : b.x0, a.y0 < b.y0 ? a.y0 : b.y0, a.x1 > b.x1 ? a.x1 : b.x1, a.y1 > b.y1 ? a.y1 : b.y1 };
 }
-static long g0_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 - r.x0) * (r.y1 - r.y0) : 0; }
-static void g0_dirty(G0Dirty *d, Rect r) {
+static long gdrag_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 - r.x0) * (r.y1 - r.y0) : 0; }
+static void gdrag_dirty(GdragDirty *d, Rect r) {
     if (d->full || r.x1 <= r.x0 || r.y1 <= r.y0) return;
     for (int i = 0; i < d->n; i++)              /* already inside one */
         if (r.x0 >= d->r[i].x0 && r.y0 >= d->r[i].y0 && r.x1 <= d->r[i].x1 && r.y1 <= d->r[i].y1) return;
-    if (d->n < G0_DIRTY) { d->r[d->n++] = r; return; }
+    if (d->n < GDRAG_DIRTY) { d->r[d->n++] = r; return; }
     /* no room: of the rectangles and r, the two whose box adds the fewest pixels become that box (the
      * last one growing, as before, could turn a few small changes into most of the screen) */
-    int bi = 0, bj = G0_DIRTY;                  /* bj == G0_DIRTY: r itself */
+    int bi = 0, bj = GDRAG_DIRTY;                  /* bj == GDRAG_DIRTY: r itself */
     long best = -1;
-    for (int i = 0; i < G0_DIRTY; i++)
-        for (int j = i + 1; j <= G0_DIRTY; j++) {
-            Rect b = j < G0_DIRTY ? d->r[j] : r;
-            long w = g0_area(g0_join(d->r[i], b)) - g0_area(d->r[i]) - g0_area(b);
+    for (int i = 0; i < GDRAG_DIRTY; i++)
+        for (int j = i + 1; j <= GDRAG_DIRTY; j++) {
+            Rect b = j < GDRAG_DIRTY ? d->r[j] : r;
+            long w = gdrag_area(gdrag_join(d->r[i], b)) - gdrag_area(d->r[i]) - gdrag_area(b);
             if (best < 0 || w < best) { best = w; bi = i; bj = j; }
         }
-    if (bj == G0_DIRTY) { d->r[bi] = g0_join(d->r[bi], r); return; }
-    d->r[bi] = g0_join(d->r[bi], d->r[bj]);
+    if (bj == GDRAG_DIRTY) { d->r[bi] = gdrag_join(d->r[bi], r); return; }
+    d->r[bi] = gdrag_join(d->r[bi], d->r[bj]);
     d->r[bj] = r;
 }
-/* bumped whenever a GpuG0 filled earlier may no longer be submitted as it is (its buffers or the textures'
- * bookkeeping changed): see paint_g0_epoch */
-static unsigned g0_epoch;
-unsigned paint_g0_epoch(void) { return g0_epoch; }
-static void g0_dirty_all(void) { g0_ld = (G0Dirty){ .full = 1 }; g0_bd = (G0Dirty){ .full = 1 }; g0_epoch++; }
-void paint_g0_done(void) { g0_ld = (G0Dirty){ 0 }; g0_bd = (G0Dirty){ 0 }; }
-void paint_g0_stats(G0Stats *out) {
-    *out = g0stat;
-    memset(&g0stat, 0, sizeof g0stat);
+/* bumped whenever a GpuDrag filled earlier may no longer be submitted as it is (its buffers or the textures'
+ * bookkeeping changed): see paint_gdrag_epoch */
+static unsigned gdrag_epoch;
+unsigned paint_gdrag_epoch(void) { return gdrag_epoch; }
+static void gdrag_dirty_all(void) { gdrag_ld = (GdragDirty){ .full = 1 }; gdrag_bd = (GdragDirty){ .full = 1 }; gdrag_epoch++; }
+void paint_gdrag_done(void) { gdrag_ld = (GdragDirty){ 0 }; gdrag_bd = (GdragDirty){ 0 }; }
+void paint_gdrag_stats(GdragStats *out) {
+    *out = gdragstat;
+    memset(&gdragstat, 0, sizeof gdragstat);
 }
-typedef struct { int taken, why, sub; } G0Last;
-static G0Last g0_last = { -1, -1, -1 };
-int paint_g0_last(int *why, int *sub) {
-    *why = g0_last.why;
-    *sub = g0_last.sub;
-    return g0_last.taken;
+typedef struct { int taken, why, sub; } GdragLast;
+static GdragLast gdrag_last = { -1, -1, -1 };
+int paint_gdrag_last(int *why, int *sub) {
+    *why = gdrag_last.why;
+    *sub = gdrag_last.sub;
+    return gdrag_last.taken;
 }
 
 void paint_layer_begin(int node, int resize) {
@@ -574,7 +574,7 @@ void paint_layer_begin(int node, int resize) {
     layer.valid = 0;
     layer.lg_valid = 0;
     layer.bdmg_full = 1;
-    g0_dirty_all();
+    gdrag_dirty_all();
 }
 
 void paint_layer_end(void) {
@@ -585,7 +585,7 @@ void paint_layer_end(void) {
     free(layer.below);
     free(layer.hole);
     memset(&layer, 0, sizeof layer);
-    g0_dirty_all();
+    gdrag_dirty_all();
 }
 
 void paint_layer_external_damage(void) { layer.valid = 0; }
@@ -597,7 +597,7 @@ int paint_layer_node(void) { return layer.want ? layer.node : 0; }
 
 void paint_layer_view(int index) {
     if (layer.view == index) return;
-    g0_epoch++;
+    gdrag_epoch++;
     layer.view = index;
     layer.valid = 0;
     layer.lg_valid = 0;
@@ -674,13 +674,13 @@ static int in_surface(int x, int y) {
  * with no app surfaces: then it neither writes the map nor does layer_paint walk it. The bytes it
  * left are made zeros only when a part brings a hole into a map that had none. */
 /* A valid premultiplied pixel has no colour above its alpha; with one that does, blit_row's sum
- * carries into the next channel (C) or wraps (NEON), and G0 would not match: noted, G0 refuses. */
+ * carries into the next channel (C) or wraps (NEON), and GPU drag would not match: noted, GPU drag refuses. */
 static inline int premul_bad(uint32_t p) {
     uint32_t a = p >> 24;
     return (p >> 16 & 255) > a || (p >> 8 & 255) > a || (p & 255) > a;
 }
 static void layer_holes(int x0, int y0, int x1, int y1) {
-    /* no map (the CPU path): the pixels are not checked either, so G0 must not trust them */
+    /* no map (the CPU path): the pixels are not checked either, so GPU drag must not trust them */
     if (!gpu_active() || !layer.hole) { layer.premul_bad = 1; return; }
     int any = nlsurf || lsurf_all, bad = 0;
     if (!any && !layer.has_holes) {
@@ -787,7 +787,7 @@ static int layer_render(Node *n, float opacity) {
         uint8_t *hole = realloc(layer.hole, (size_t)w * h);
         if (px) layer.px = px;
         if (hole) layer.hole = hole;
-        g0_epoch++;
+        gdrag_epoch++;
         if (!px || !hole) { layer.want = 0; return 0; }
         layer.cap = w * h;
     }
@@ -823,55 +823,55 @@ static int layer_render(Node *n, float opacity) {
     layer_surfaces(n, x0, y0);
     layer.premul_bad = 0;
     layer_holes(0, 0, w, h);
-    g0_ld = (G0Dirty){ .full = 1 };
+    gdrag_ld = (GdragDirty){ .full = 1 };
     layer.valid = 1;
     layer.painted = 1;
     layer_renders++;
     return 1;
 }
 
-/* ---- G0's textures catching up between frames (docs/GPU.md, "Uploads without a stall") ----
+/* ---- GPU drag's textures catching up between frames (docs/GPU.md, "Uploads without a stall") ----
  * A whole copy of what is below (a drag's start, a copy built again whole) is a screen of pixels: sent in
- * one frame it took that frame past its vblank. Now a frame that uses G0 sends at most G0_FEED_PX
- * (g0_backlog_now; else the CPU paints it, the same pixels), and what is left is sent after a frame's
- * flip is queued, a slice a frame (paint_g0_feed), while the CPU waits for the vblank anyway. */
-static long g0_backlog_one(const G0Dirty *d, int w, int h) {
+ * one frame it took that frame past its vblank. Now a frame that uses GPU drag sends at most GDRAG_FEED_PX
+ * (gdrag_backlog_now; else the CPU paints it, the same pixels), and what is left is sent after a frame's
+ * flip is queued, a slice a frame (paint_gdrag_feed), while the CPU waits for the vblank anyway. */
+static long gdrag_backlog_one(const GdragDirty *d, int w, int h) {
     if (d->full) return (long)w * h;
     long a = 0;
     for (int i = 0; i < d->n; i++) {
         Rect q = d->r[i];
-        a += g0_area((Rect){ q.x0 < 0 ? 0 : q.x0, q.y0 < 0 ? 0 : q.y0, q.x1 > w ? w : q.x1, q.y1 > h ? h : q.y1 });
+        a += gdrag_area((Rect){ q.x0 < 0 ? 0 : q.x0, q.y0 < 0 ? 0 : q.y0, q.x1 > w ? w : q.x1, q.y1 > h ? h : q.y1 });
     }
     return a;
 }
-static long g0_backlog_now(void) {
-    return g0_backlog_one(&g0_bd, layer.bw, layer.bh) + (layer.px ? g0_backlog_one(&g0_ld, layer.w, layer.h) : 0);
+static long gdrag_backlog_now(void) {
+    return gdrag_backlog_one(&gdrag_bd, layer.bw, layer.bh) + (layer.px ? gdrag_backlog_one(&gdrag_ld, layer.w, layer.h) : 0);
 }
-/* whether G0 could use the layer on display view soon: else sending it is wasted work */
-static int g0_feedable(int view) {
+/* whether GPU drag could use the layer on display view soon: else sending it is wasted work */
+static int gdrag_feedable(int view) {
     return gpu_active() && layer.want && layer.node && layer.view == view && !layer.resize && !layer.rendering &&
            layer.below && !layer.bdmg_full && !layer.has_holes && !layer.premul_bad && !nlsurf && !lsurf_all;
 }
-long paint_g0_backlog(int view) { return g0_feedable(view) ? g0_backlog_now() : 0; }
+long paint_gdrag_backlog(int view) { return gdrag_feedable(view) ? gdrag_backlog_now() : 0; }
 
-long paint_g0_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
+long paint_gdrag_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
                    void *ctx) {
-    if (!g0_feedable(view)) return 0;
+    if (!gdrag_feedable(view)) return 0;
     long sent = 0;
     for (int which = 0; which < 2 && sent < budget; which++) {
-        G0Dirty *d = which ? &g0_ld : &g0_bd;
+        GdragDirty *d = which ? &gdrag_ld : &gdrag_bd;
         const uint32_t *px = which ? layer.px : layer.below;
         int w = which ? layer.w : layer.bw, h = which ? layer.h : layer.bh;
         if (!px || w <= 0 || h <= 0 || (which && !layer.valid)) continue;
         /* an empty rectangle first: does the texture hold this at all? */
         int k = up(ctx, which, px, w, h, (Rect){ 0, 0, 0, 0 });
         if (k < 0) return sent;
-        if (k > 0) *d = (G0Dirty){ .full = 1 };
+        if (k > 0) *d = (GdragDirty){ .full = 1 };
         while (d->full || d->n) {
-            if (d->full) *d = (G0Dirty){ .r = { { 0, 0, w, h } }, .n = 1 };
+            if (d->full) *d = (GdragDirty){ .r = { { 0, 0, w, h } }, .n = 1 };
             Rect *l = &d->r[d->n - 1];
             Rect q = { l->x0 < 0 ? 0 : l->x0, l->y0 < 0 ? 0 : l->y0, l->x1 > w ? w : l->x1, l->y1 > h ? h : l->y1 };
-            long a = g0_area(q), room = budget - sent;
+            long a = gdrag_area(q), room = budget - sent;
             if (!a) { d->n--; continue; }
             if (room <= 0) break;
             Rect part = q;
@@ -882,8 +882,8 @@ long paint_g0_feed(int view, long budget, int (*up)(void *ctx, int which, const 
             }
             k = up(ctx, which, px, w, h, part);
             if (k < 0) return sent;
-            if (k > 0) { *d = (G0Dirty){ .full = 1 }; break; }     /* lost meanwhile: all again, next time */
-            sent += g0_area(part);
+            if (k > 0) { *d = (GdragDirty){ .full = 1 }; break; }     /* lost meanwhile: all again, next time */
+            sent += gdrag_area(part);
             if (part.y1 >= q.y1) d->n--;
             else *l = (Rect){ q.x0, part.y1, q.x1, q.y1 };
         }
@@ -921,7 +921,7 @@ static int layer_render_part(Node *n, float opacity) {
     nlsurf = lsurf_all = 0;
     layer_surfaces(n, x0, y0);
     layer_holes(px0, py0, px1, py1);
-    g0_dirty(&g0_ld, (Rect){ px0, py0, px1, py1 });
+    gdrag_dirty(&gdrag_ld, (Rect){ px0, py0, px1, py1 });
     layer.painted = 1;
     float k = paint_view.k, lx = (x0 - paint_view.dx) / k + paint_view.x, ly = (y0 - paint_view.dy) / k + paint_view.y;
     layer.at = (Box){ lx, ly, lx + layer.w / k, ly + layer.h / k };
@@ -1048,12 +1048,12 @@ static int view_eq(PaintView a, PaintView b) { return a.x == b.x && a.y == b.y &
 static int below_alloc(const Canvas *c) {
     if (layer.below && layer.bw == c->w && layer.bh == c->h) return 1;
     free(layer.below);
-    g0_epoch++;
+    gdrag_epoch++;
     layer.below = malloc((size_t)c->w * c->h * 4);
     layer.bw = layer.below ? c->w : 0;
     layer.bh = layer.below ? c->h : 0;
     layer.bdmg_full = 1;
-    g0_bd = (G0Dirty){ .full = 1 };
+    gdrag_bd = (GdragDirty){ .full = 1 };
     return layer.below != NULL;
 }
 
@@ -1144,10 +1144,10 @@ static void below_build(const Canvas *c, Node *root, const Rect *r, int n) {
         layer.bsig = layer.osig;
         layer.bview = paint_view;
         bstat.full++;
-        g0_bd = (G0Dirty){ .full = 1 };
+        gdrag_bd = (GdragDirty){ .full = 1 };
     } else {
         bstat.part++;
-        for (int i = 0; i < n; i++) g0_dirty(&g0_bd, r[i]);
+        for (int i = 0; i < n; i++) gdrag_dirty(&gdrag_bd, r[i]);
     }
     paint_cull = cull;
     layer.bdmg.n = 0;
@@ -1340,12 +1340,12 @@ static int below_order(Node *root) {
     return ord_n ? ORD_PATH : ORD_BEFORE;
 }
 
-/* G0: the nodes painted after the window that paint something (their box on screen, grown by what a
- * backdrop blur reads around it or a turned image's bilinear edge, logical px). A frame G0 composes
- * must have none of them in its damaged box (paint_root_g0). */
-#define G0_AFTER_MAX 65536                      /* the menu bar and the Dock alone are a few hundred */
-static Box *g0_after;
-static int ng0_after, g0_after_cap, g0_after_over;
+/* GPU drag: the nodes painted after the window that paint something (their box on screen, grown by what a
+ * backdrop blur reads around it or a turned image's bilinear edge, logical px). A frame GPU drag composes
+ * must have none of them in its damaged box (paint_root_gdrag). */
+#define GDRAG_AFTER_MAX 65536                      /* the menu bar and the Dock alone are a few hundred */
+static Box *gdrag_after;
+static int ngdrag_after, gdrag_after_cap, gdrag_after_over;
 static int node_paints(const Node *n) {
     const Style *s = &n->s;
     if (n->type != NODE_VIEW) return 1;             /* text, image, terminal, app window, video */
@@ -1356,25 +1356,25 @@ static int node_paints(const Node *n) {
     if (s->overflow_hidden && (node_edges_plain(n) ? s->radius : max4(s->ext->r.rad)) > 0) return 1;
     return 0;
 }
-static void g0_note_after(const Node *n, Box cur) {
+static void gdrag_note_after(const Node *n, Box cur) {
     if (cur.x1 <= cur.x0 || cur.y1 <= cur.y0 || !node_paints(n)) return;
-    if (g0_after_over) return;
+    if (gdrag_after_over) return;
     float m = 0;
     if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
     if (n->has_tf && m < 4) m = 4;
     Box b = { cur.x0 - m, cur.y0 - m, cur.x1 + m, cur.y1 + m };
-    if (ng0_after) {                /* inside the box noted last (a child in its bar): meets D only if that one does */
-        const Box *p = &g0_after[ng0_after - 1];
+    if (ngdrag_after) {                /* inside the box noted last (a child in its bar): meets D only if that one does */
+        const Box *p = &gdrag_after[ngdrag_after - 1];
         if (b.x0 >= p->x0 && b.y0 >= p->y0 && b.x1 <= p->x1 && b.y1 <= p->y1) return;
     }
-    if (ng0_after == g0_after_cap) {
-        int cap = g0_after_cap ? g0_after_cap * 2 : 256;
-        Box *nb = cap <= G0_AFTER_MAX ? realloc(g0_after, (size_t)cap * sizeof *nb) : NULL;
-        if (!nb) { g0_after_over = 1; return; }
-        g0_after = nb;
-        g0_after_cap = cap;
+    if (ngdrag_after == gdrag_after_cap) {
+        int cap = gdrag_after_cap ? gdrag_after_cap * 2 : 256;
+        Box *nb = cap <= GDRAG_AFTER_MAX ? realloc(gdrag_after, (size_t)cap * sizeof *nb) : NULL;
+        if (!nb) { gdrag_after_over = 1; return; }
+        gdrag_after = nb;
+        gdrag_after_cap = cap;
     }
-    g0_after[ng0_after++] = b;
+    gdrag_after[ngdrag_after++] = b;
 }
 
 /* ord: ORD_PATH for the window's ancestors, else whether the node is painted before or after it */
@@ -1407,7 +1407,7 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         layer.gdy = cur.y0 - n->prev_box.y0;
     }
     if (in_layer && vis) layer_note_exact(n, dirty);
-    if (ord == ORD_AFTER && vis) g0_note_after(n, cur);
+    if (ord == ORD_AFTER && vis) gdrag_note_after(n, cur);
     if (dirty || !box_eq(cur, n->prev_box)) {
         damage_add(n->prev_box);
         damage_add(cur);
@@ -1683,7 +1683,7 @@ int paint_damage(Node *root) {
         below_damage(ext);
     }
     int ord = below_order(root);
-    ng0_after = g0_after_over = 0;
+    ngdrag_after = gdrag_after_over = 0;
     if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, ord);
     ndrects = 0;
     if (multi_rects(root)) return 1;
@@ -1767,7 +1767,7 @@ static void below_verify(const Canvas *c, Node *root, uint32_t *pre) {
     free(pre);
 }
 
-/* ---- G0: the dragged window composited on the GPU (docs/GPU.md, "The dragged window on the GPU") ----
+/* ---- GPU drag: the dragged window composited on the GPU (docs/GPU.md, "The dragged window on the GPU") ----
  * On a frame that uses the copy of what is below (below_ready), the CPU's pixels inside the window's
  * rectangle W are the layer blitted over that copy (canvas_blit, k = 256: blit_row) and nothing else,
  * when: the layer is painted as it is (valid, the same opacity, no full render pending, no app window
@@ -1786,35 +1786,35 @@ static Rect rect_and(Rect a, Rect b) {
     return r;
 }
 static int rect_eq(Rect a, Rect b) { return a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1; }
-static int g0_bx, g0_by;                /* where the layer's pixel (0, 0) lands (layer_paint's bx, by) */
+static int gdrag_bx, gdrag_by;                /* where the layer's pixel (0, 0) lands (layer_paint's bx, by) */
 
-/* W for this frame (-1), or why there is none (G0R_*): where layer_paint's blit lands, cut by the
+/* W for this frame (-1), or why there is none (GDRAG_R_*): where layer_paint's blit lands, cut by the
  * ancestors' clips and by c->clip, the frame's box (inside the canvas). */
-static int g0_sub;                      /* the G0L_* of g0_gate's last G0R_LAYER */
-#define G0_NO_LAYER(why) do { g0_sub = (why); return G0R_LAYER; } while (0)
-static int g0_gate(const Canvas *c, Node *root, Rect *wout) {
+static int gdrag_sub;                      /* the GDRAG_L_* of gdrag_gate's last GDRAG_R_LAYER */
+#define GDRAG_NO_LAYER(why) do { gdrag_sub = (why); return GDRAG_R_LAYER; } while (0)
+static int gdrag_gate(const Canvas *c, Node *root, Rect *wout) {
     Node *w = node_get(layer.node);
-    g0_sub = -1;
-    if (!w || !layer.want) G0_NO_LAYER(G0L_GONE);
-    if (!layer.valid) G0_NO_LAYER(G0L_INVALID);
-    if (layer.resize) G0_NO_LAYER(G0L_RESIZE);
-    if (layer.rendering) G0_NO_LAYER(G0L_RENDERING);
-    if (paint_capture_mode) G0_NO_LAYER(G0L_CAPTURE);
-    if (paint_view.index != layer.view) G0_NO_LAYER(G0L_VIEW);
-    if (w->has_tf) G0_NO_LAYER(G0L_TRANSFORM);
-    if (w->type == NODE_RAW || w->s.display_none) G0_NO_LAYER(G0L_RAW);
-    if (layer.has_holes) G0_NO_LAYER(G0L_HOLES);
-    if (nlsurf || lsurf_all) G0_NO_LAYER(G0L_SURFACES);
-    if (layer.premul_bad) G0_NO_LAYER(G0L_PREMUL);
-    if (!layer.px || !layer.below) G0_NO_LAYER(G0L_NOBUF);
+    gdrag_sub = -1;
+    if (!w || !layer.want) GDRAG_NO_LAYER(GDRAG_L_GONE);
+    if (!layer.valid) GDRAG_NO_LAYER(GDRAG_L_INVALID);
+    if (layer.resize) GDRAG_NO_LAYER(GDRAG_L_RESIZE);
+    if (layer.rendering) GDRAG_NO_LAYER(GDRAG_L_RENDERING);
+    if (paint_capture_mode) GDRAG_NO_LAYER(GDRAG_L_CAPTURE);
+    if (paint_view.index != layer.view) GDRAG_NO_LAYER(GDRAG_L_VIEW);
+    if (w->has_tf) GDRAG_NO_LAYER(GDRAG_L_TRANSFORM);
+    if (w->type == NODE_RAW || w->s.display_none) GDRAG_NO_LAYER(GDRAG_L_RAW);
+    if (layer.has_holes) GDRAG_NO_LAYER(GDRAG_L_HOLES);
+    if (nlsurf || lsurf_all) GDRAG_NO_LAYER(GDRAG_L_SURFACES);
+    if (layer.premul_bad) GDRAG_NO_LAYER(GDRAG_L_PREMUL);
+    if (!layer.px || !layer.below) GDRAG_NO_LAYER(GDRAG_L_NOBUF);
     const Node *anc[SKIP_PATH_MAX];
     int na = 0;
     for (const Node *a = w->parent; a; a = a->parent) {
-        if (na == SKIP_PATH_MAX) return G0R_ANCESTOR;
-        if (a->type == NODE_RAW || a->s.display_none) G0_NO_LAYER(G0L_RAW);
+        if (na == SKIP_PATH_MAX) return GDRAG_R_ANCESTOR;
+        if (a->type == NODE_RAW || a->s.display_none) GDRAG_NO_LAYER(GDRAG_L_RAW);
         anc[na++] = a;
     }
-    if (!na || anc[na - 1] != root) G0_NO_LAYER(G0L_TREE);
+    if (!na || anc[na - 1] != root) GDRAG_NO_LAYER(GDRAG_L_TREE);
     const float k = paint_view.k;
     int bx = (int)lroundf(VX(w->ax) + layer.pox), by = (int)lroundf(VY(w->ay) + layer.poy);
     Rect r = { bx, by, bx + layer.w, by + layer.h };
@@ -1823,33 +1823,33 @@ static int g0_gate(const Canvas *c, Node *root, Rect *wout) {
     for (int i = na - 1; i >= 0; i--) {
         const Node *a = anc[i];
         op = op * a->s.opacity;
-        if (op < 0.004f) G0_NO_LAYER(G0L_OPACITY);
+        if (op < 0.004f) GDRAG_NO_LAYER(GDRAG_L_OPACITY);
         if (a->s.overflow_hidden) {
             float x = VX(a->ax), y = VY(a->ay), aw = a->w * k, ah = a->h * k;
             r = rect_and(r, (Rect){ (int)floorf(x), (int)floorf(y), (int)ceilf(x + aw), (int)ceilf(y + ah) });
         }
     }
-    if (op != layer.op) G0_NO_LAYER(G0L_OPACITY);
+    if (op != layer.op) GDRAG_NO_LAYER(GDRAG_L_OPACITY);
     Box pb;
-    if (layer.tree_part && !layer_part_exact(w, &pb)) G0_NO_LAYER(G0L_PART);    /* it would be painted whole */
+    if (layer.tree_part && !layer_part_exact(w, &pb)) GDRAG_NO_LAYER(GDRAG_L_PART);    /* it would be painted whole */
     r = rect_and(r, c->clip);                   /* the blit is clipped to the frame's box too */
-    if (!rect_area(r)) return G0R_CLIP;
-    if (!below_ancestors_ok(w, r)) return G0R_ANCESTOR;
-    if (wl_draws_meet(r)) return G0R_APP;
-    if (!ord_n || g0_after_over) return G0R_AFTER;
-    for (int i = 0; i < ng0_after; i++) {
-        Box b = g0_after[i];
+    if (!rect_area(r)) return GDRAG_R_CLIP;
+    if (!below_ancestors_ok(w, r)) return GDRAG_R_ANCESTOR;
+    if (wl_draws_meet(r)) return GDRAG_R_APP;
+    if (!ord_n || gdrag_after_over) return GDRAG_R_AFTER;
+    for (int i = 0; i < ngdrag_after; i++) {
+        Box b = gdrag_after[i];
         Rect q = { (int)floorf(VX(b.x0)) - 1, (int)floorf(VY(b.y0)) - 1, (int)ceilf(VX(b.x1)) + 1, (int)ceilf(VY(b.y1)) + 1 };
-        if (rect_meets(q, c->clip)) return G0R_AFTER;
+        if (rect_meets(q, c->clip)) return GDRAG_R_AFTER;
     }
-    g0_bx = bx;
-    g0_by = by;
+    gdrag_bx = bx;
+    gdrag_by = by;
     *wout = r;
     return -1;
 }
 
 /* One walk of a frame that uses the copy, clipped to c->clip: the copy, then from the window on */
-static void g0_walk(Canvas *c, Node *root) {
+static void gdrag_walk(Canvas *c, Node *root) {
     wl_paint_begin();
     wl_paint_kept();
     below_copy(c);
@@ -1859,11 +1859,11 @@ static void g0_walk(Canvas *c, Node *root) {
     paint_node(c, root, 1);
 }
 
-/* LORD_GPU_VERIFY=N: every N-th G0 frame, W painted by the CPU (a walk clipped to W on a scratch
+/* LORD_GPU_VERIFY=N: every N-th GPU drag frame, W painted by the CPU (a walk clipped to W on a scratch
  * canvas the scene's size: the save of an ancestor's rounded corners reads outside the clip), leaving
  * the frame's list of app windows and the counters as they were. W's rows are returned packed (W's
  * width a row). */
-static const uint32_t *g0_reference(const Canvas *c, Node *root, Rect w) {
+static const uint32_t *gdrag_reference(const Canvas *c, Node *root, Rect w) {
     static uint32_t *buf;
     static size_t cap;
     size_t n = (size_t)c->w * c->h;
@@ -1878,7 +1878,7 @@ static const uint32_t *g0_reference(const Canvas *c, Node *root, Rect w) {
     canvas_set_clip(&rc, w);
     long lb = layer_blits, lr = layer_renders, tr = tf_renders, tc = tf_composites;
     wl_paint_save();
-    g0_walk(&rc, root);
+    gdrag_walk(&rc, root);
     wl_paint_restore();
     layer_blits = lb; layer_renders = lr; tf_renders = tr; tf_composites = tc;
     int ww = w.x1 - w.x0;
@@ -1888,8 +1888,8 @@ static const uint32_t *g0_reference(const Canvas *c, Node *root, Rect w) {
 }
 
 /* The strips around w, then the post-check. 1: g is filled and w is left to the GPU; 0: w was painted
- * too (the frame is the same as without G0). */
-static int g0_paint(Canvas *c, Node *root, Rect w, GpuG0 *g) {
+ * too (the frame is the same as without GPU drag). */
+static int gdrag_paint(Canvas *c, Node *root, Rect w, GpuDrag *g) {
     static int every = -1;
     static long frames;
     if (every < 0) {
@@ -1907,34 +1907,34 @@ static int g0_paint(Canvas *c, Node *root, Rect w, GpuG0 *g) {
     for (int i = 0; i < (ns ? ns : 1); i++) {
         /* no strip: one walk with nothing to paint (the layer's part is rendered, app windows noted) */
         canvas_set_clip(c, ns ? st[i] : (Rect){ w.x0, w.y0, w.x0, w.y0 });
-        g0_walk(c, root);
+        gdrag_walk(c, root);
     }
     layer_blits = lb + 1;
     canvas_set_clip(c, d);
     Rect w2;
-    if (g0_gate(c, root, &w2) >= 0 || !rect_eq(w, w2)) {
+    if (gdrag_gate(c, root, &w2) >= 0 || !rect_eq(w, w2)) {
         canvas_set_clip(c, w);
-        g0_walk(c, root);
+        gdrag_walk(c, root);
         canvas_set_clip(c, d);
         return 0;
     }
-    *g = (GpuG0){ .w = w, .lpx = layer.px, .lw = layer.w, .lh = layer.h, .lx = g0_bx, .ly = g0_by,
-                  .bpx = layer.below, .bw = layer.bw, .bh = layer.bh, .nl = g0_ld.n, .nb = g0_bd.n,
-                  .lfull = g0_ld.full, .bfull = g0_bd.full, .nstrip = ns };
-    memcpy(g->ldirty, g0_ld.r, sizeof g0_ld.r);
-    memcpy(g->bdirty, g0_bd.r, sizeof g0_bd.r);
+    *g = (GpuDrag){ .w = w, .lpx = layer.px, .lw = layer.w, .lh = layer.h, .lx = gdrag_bx, .ly = gdrag_by,
+                  .bpx = layer.below, .bw = layer.bw, .bh = layer.bh, .nl = gdrag_ld.n, .nb = gdrag_bd.n,
+                  .lfull = gdrag_ld.full, .bfull = gdrag_bd.full, .nstrip = ns };
+    memcpy(g->ldirty, gdrag_ld.r, sizeof gdrag_ld.r);
+    memcpy(g->bdirty, gdrag_bd.r, sizeof gdrag_bd.r);
     memcpy(g->strip, st, sizeof st);
     g->frame = ++frames;
-    g->ref = every && frames % every == 0 ? g0_reference(c, root, w) : NULL;
-    g0stat.frames++;
-    for (int i = 0; i < ns; i++) g0stat.strip_px += rect_area(st[i]);
+    g->ref = every && frames % every == 0 ? gdrag_reference(c, root, w) : NULL;
+    gdragstat.frames++;
+    for (int i = 0; i < ns; i++) gdragstat.strip_px += rect_area(st[i]);
     return 1;
 }
 
 /* clear: fill the clip with rgb first, unless the copy of what is below the dragged window is
  * about to write every pixel of that same clip (below_copy), which makes the fill wasted work.
- * g (G0, paint_root_g0): the window's rectangle may be left to the GPU; 1 if it was. */
-static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuG0 *g) {
+ * g (GPU drag, paint_root_gdrag): the window's rectangle may be left to the GPU; 1 if it was. */
+static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuDrag *g) {
     if (!root) { if (clear) canvas_clear(c, rgb); return 0; }
     wl_paint_begin();
     /* solo cambió un cuadro de video que tapa esa región: se pinta desde ese nodo (no en el camino
@@ -1949,24 +1949,24 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuG0
     int below = !skip_until && below_ready(c, root, clear && rgb == 0x000000);
     uint32_t *pre = below && layer.switched && paint_below_verify ? below_snapshot(c) : NULL;
     int done = 0, taken = 0;
-    g0_last = (G0Last){ -1, -1, -1 };
-    if (below && g && gpu_active()) {           /* G0: only after below_ready, so its decisions are the same */
+    gdrag_last = (GdragLast){ -1, -1, -1 };
+    if (below && g && gpu_active()) {           /* GPU drag: only after below_ready, so its decisions are the same */
         Rect w;
-        int why = g0_gate(c, root, &w);
-        /* what the textures still lack goes first, a slice a frame after the flip (paint_g0_feed): a
+        int why = gdrag_gate(c, root, &w);
+        /* what the textures still lack goes first, a slice a frame after the flip (paint_gdrag_feed): a
          * frame that would have to send more is painted here, the same pixels */
-        if (why < 0 && g0_backlog_now() > G0_FEED_PX) why = G0R_FEED;
-        g0stat.tried++;
+        if (why < 0 && gdrag_backlog_now() > GDRAG_FEED_PX) why = GDRAG_R_FEED;
+        gdragstat.tried++;
         if (why < 0) {
             done = 1;
-            taken = g0_paint(c, root, w, g);
-            if (!taken) why = G0R_POST;
+            taken = gdrag_paint(c, root, w, g);
+            if (!taken) why = GDRAG_R_POST;
         }
         if (!taken) {
-            g0stat.refused[why]++;
-            if (why == G0R_LAYER && g0_sub >= 0) g0stat.layer[g0_sub]++;
+            gdragstat.refused[why]++;
+            if (why == GDRAG_R_LAYER && gdrag_sub >= 0) gdragstat.layer[gdrag_sub]++;
         }
-        g0_last = (G0Last){ taken, taken ? -1 : why, !taken && why == G0R_LAYER ? g0_sub : -1 };
+        gdrag_last = (GdragLast){ taken, taken ? -1 : why, !taken && why == GDRAG_R_LAYER ? gdrag_sub : -1 };
     }
     if (!done) {
         if (below) {
@@ -2001,8 +2001,8 @@ void paint_root_clear(Canvas *c, Node *root, uint32_t rgb) {
     paint_root_body(c, root, 1, rgb, NULL);
 }
 
-/* paint_root_clear(c, root, 0) with the dragged window's rectangle left to the GPU when exact (G0, above) */
-int paint_root_g0(Canvas *c, Node *root, GpuG0 *g) {
+/* paint_root_clear(c, root, 0) with the dragged window's rectangle left to the GPU when exact (GPU drag, above) */
+int paint_root_gdrag(Canvas *c, Node *root, GpuDrag *g) {
     return paint_root_body(c, root, 1, 0x000000, g);
 }
 

@@ -105,16 +105,16 @@ milliseconds no longer turns 60 frames a second into 57.
   moving the mouse composites nothing. If the driver has no cursor plane, it's drawn as a quad
   (`LORD_SW_CURSOR=1` forces it).
 
-## The dragged window on the GPU ("G0", 0.8.6, in development)
+## The dragged window on the GPU ("GPU drag", 0.8.6, in development)
 
 While a window is dragged its pixels are a cached layer blitted over a copy of what is below it
 (`docs/WINDOWS.md`, "The moving window is a layer"). On the GPU path, a frame that uses that copy no
 longer paints and uploads the window's rectangle: the GPU writes it, with exactly the pixels the CPU would
 have written. Approved by the maintainer on 2026-10-28 (step 10 of the drag-frame work).
 
-**What the frame does** (`paint_root_g0` in `ui/paint.c`, `gpu_frame_ex` in `gpu/gpu.c`):
+**What the frame does** (`paint_root_gdrag` in `ui/paint.c`, `gpu_frame_ex` in `gpu/gpu.c`):
 
-1. `below_ready` decides, as before, whether the frame uses the copy. G0 only acts on those frames.
+1. `below_ready` decides, as before, whether the frame uses the copy. GPU drag only acts on those frames.
 2. W is where `layer_paint` would blit the layer, cut by the window's ancestors' clips and by the
    frame's damaged box D. The CPU paints only D minus W (up to four strips), each a walk of the tree
    clipped to the strip (the copy, then from the window on); the scene keeps its stale W.
@@ -123,7 +123,7 @@ have written. Approved by the maintainer on 2026-10-28 (step 10 of the drag-fram
    the copy's partial rebuilds; all of it after a full render, a new size, another display or a new
    context), and draws one quad over W, after the UI texture and before the menus and the cursor
    (layer 1), with blending off.
-4. The shader (`fs_g0`) does `blit_row`'s arithmetic at k = 256 (`canvas.c`): where the layer's alpha
+4. The shader (`fs_gdrag`) does `blit_row`'s arithmetic at k = 256 (`canvas.c`): where the layer's alpha
    is 0 the copy's pixel; else `s + floor(d·(255−a)/256)` per colour and `a + floor(((d_a·(255−a) +
    128)·257) / 65536)` for alpha, with integers held in `highp` floats. Every intermediate value is an
    integer below 2^24 (the largest is 16,744,321) and every scaling is by 2^-8 or 2^-16, so a 24-bit
@@ -131,7 +131,7 @@ have written. Approved by the maintainer on 2026-10-28 (step 10 of the drag-fram
    through 16-bit floats) and the output c/255 is converted to c by the framebuffer as the UI
    texture's own pixels are. Over a framebuffer that is black under W (no app window is drawn there),
    writing the result is what blending the UI texture gave. The pixel it works on comes from `v_px`, a
-   `highp` varying in pixels that G0's own vertex shader (`vs_g0`) passes from the quad's corners, not
+   `highp` varying in pixels that GPU drag's own vertex shader (`vs_gdrag`) passes from the quad's corners, not
    from `gl_FragCoord`: GLSL ES 1.00 makes that `mediump`, and with 16-bit floats it cannot tell x or y
    from the next pixel past 1024. Dithering is off for the quad.
 
@@ -147,42 +147,42 @@ D is cut into strips); or something changed while the strips were painted, and t
 CPU in the same frame (post). Also not with several damaged rectangles, a rotated display, a fullscreen
 app, or on another display than the one that owns the layer.
 
-**The stale rectangle** (`main.c`, `g0on`/`g0w` per display): the next frame that paints the display
+**The stale rectangle** (`main.c`, `gdrag_on`/`gdragw` per display): the next frame that paints the display
 joins W to its damage; a frame with no UI damage (the cursor, an app's new frame) draws the window again
 from the textures while they are still that display's, else paints W on the CPU; direct scanout, a
 failed frame and the GPU going away (`cpu_takeover`) paint it again; the frame after the drag ends
 (`paint_layer_end` damages the window's box) paints it on the CPU. When the quad cannot be drawn (an
-upload failed, or the layer or output is larger than the self-test covered: G0 turns off) `gpu_frame_ex`
+upload failed, or the layer or output is larger than the self-test covered: GPU drag turns off) `gpu_frame_ex`
 returns -2 before presenting: no frame is shown with a stale W, the display keeps the one before, and
-`main.c` paints W on the CPU in the next frame without trying G0 (`g0cpu`). `LORD_PAINT_VERIFY` leaves W
-out of its count on G0 frames.
+`main.c` paints W on the CPU in the next frame without trying GPU drag (`gdragcpu`). `LORD_PAINT_VERIFY` leaves W
+out of its count on GPU drag frames.
 
 **Uploads without a stall (0.8.6, in development).** The two textures get only what changed (paint.c's dirty
 rectangles, in their own pixels). A drag's start, or the copy of what is below built again whole, changes all of the
 copy: a screen of pixels (8.3 MB at 1920 × 1080), and on V3D `glTexSubImage2D` converts it to the GPU's tiled layout
-on the CPU inside the call, so the first G0 frame after such a change missed its vblank. Now:
+on the CPU inside the call, so the first GPU drag frame after such a change missed its vblank. Now:
 
-- `paint_root_body` refuses a frame G0 would compose when the textures still lack more than `G0_FEED_PX` pixels
-  (262,144, 1 MB; both textures counted) as `G0R_FEED` ("catching up"): the CPU paints W, the same pixels.
+- `paint_root_body` refuses a frame GPU drag would compose when the textures still lack more than `GDRAG_FEED_PX` pixels
+  (262,144, 1 MB; both textures counted) as `GDRAG_R_FEED` ("catching up"): the CPU paints W, the same pixels.
 - After such a frame's flip is queued (`main.c`, after `gpu_frame_ex`), while the CPU waits for the vblank anyway,
-  `paint_g0_feed` sends up to `G0_FEED_PX` pixels of what is missing through `gpu_g0_feed`: the copy first, then the
+  `paint_gdrag_feed` sends up to `GDRAG_FEED_PX` pixels of what is missing through `gpu_gdrag_feed`: the copy first, then the
   layer, rectangles cut by rows, each sent rectangle (or part) dropped from the dirty list. Each texture is asked
   first with an empty rectangle whether it holds that display's pixels at that size; if not, it is allocated
   (`glTexImage2D` with no data), marked as that display's, and all of it is sent in slices. Only frames refused for
-  `G0R_FEED` send slices: sent while G0 is refused for another reason (the menu bar or the Dock in the damage),
+  `GDRAG_R_FEED` send slices: sent while GPU drag is refused for another reason (the menu bar or the Dock in the damage),
   most of it would change again before it is used (`engine-test`: 162.8 million pixels against 2.4 million).
-- Each texture knows whose pixels it holds (`g0tout[2]`); a G0 frame that would find another display's or the
-  wrong size still sends all of it (correct, and rare now). The dirty list keeps `G0_DIRTY` (16) rectangles and,
+- Each texture knows whose pixels it holds (`gdragtout[2]`); a GPU drag frame that would find another display's or the
+  wrong size still sends all of it (correct, and rare now). The dirty list keeps `GDRAG_DIRTY` (16) rectangles and,
   when full, merges the two whose box adds the fewest pixels (it used to grow the last one).
 - Frames don't overlap (a frame starts after the last flip), so the job that read the textures has finished when
   they are written: no second copy of them is needed. If frames are ever built while a flip is pending, each
   texture needs a pair, each with its own dirty list. GLES3 pixel buffers (the GPU doing the tiling) are not used.
 
 `engine-test`'s stub GPU does the same as `main.c` and `gpu.c` (a texture made again is filled with a pattern no
-frame has, so a pixel the slices missed shows): every frame matches, and it checks that no G0 frame has more than
-`G0_FEED_PX` of the copy left to send.
+frame has, so a pixel the slices missed shows): every frame matches, and it checks that no GPU drag frame has more than
+`GDRAG_FEED_PX` of the copy left to send.
 
-**Off unless it proves itself:** `gpu_init` sets G0 up. It needs a fragment shader with at least 24-bit
+**Off unless it proves itself:** `gpu_init` sets GPU drag up. It needs a fragment shader with at least 24-bit
 `highp` floats (`glGetShaderPrecisionFormat`) and then a self-test, drawn into a framebuffer, read back
 and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
 - arithmetic: every valid premultiplied (alpha, colour ≤ alpha) over every destination value (three of
@@ -192,34 +192,34 @@ and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
   the GPU allows, and the log says `placement in WxH, the largest framebuffer the GPU allows`), a copy
   of what is below of that size and a layer at an odd offset (37, 21) that reaches its far edges, every
   pixel a different random value, so a texel read from the wrong place shows. An output larger than
-  that is refused (`gpu_g0_ready(out)`), and a layer larger than it turns G0 off.
+  that is refused (`gpu_gdrag_ready(out)`), and a layer larger than it turns GPU drag off.
 
 One differing pixel turns it off. The outcome is kept per GL renderer and version across contexts, so a
-GPU restart doesn't run it again. The log says `gpu: G0 on: … self-test: N pixels, every valid
-premultiplied combination and a WxH placement pass, the same as the CPU's, T ms` or `gpu: G0 off: …`
+GPU restart doesn't run it again. The log says `gpu: GPU drag on: … self-test: N pixels, every valid
+premultiplied combination and a WxH placement pass, the same as the CPU's, T ms` or `gpu: GPU drag off: …`
 with the reason.
 
 | Switch | Effect |
 |---|---|
-| `LORD_G0=0` | G0 off: the dragged window is painted by the CPU as before |
-| `LORD_GPU_VERIFY=N` | every N-th G0 frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
+| `LORD_GPU_DRAG=0` | GPU drag off: the dragged window is painted by the CPU as before |
+| `LORD_GPU_VERIFY=N` | every N-th GPU drag frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
 
-The `drag: …` and `drag (scripted): …` lines end with `G0: N of M frames (Q quads), strips … Mpx,
+The `drag: …` and `drag (scripted): …` lines end with `GPU drag: N of M frames (Q quads), strips … Mpx,
 uploaded below … Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post, … catching up;
 layer: invalid …, holes …, …)`: frames composited, of those that used the copy; quads drawn; what the CPU painted
-around W; what went up to the two textures (in G0 frames and in slices between frames); why the others were not;
-and the `layer` refusals by cause (`G0L_*` in `ui/ui.h`: `gone`, `invalid`, `resize`, `rendering`, `capture`,
+around W; what went up to the two textures (in GPU drag frames and in slices between frames); why the others were not;
+and the `layer` refusals by cause (`GDRAG_L_*` in `ui/ui.h`: `gone`, `invalid`, `resize`, `rendering`, `capture`,
 `view`, `transform`, `raw`, `holes`, `surfaces`, `premul`, `nobuf`, `tree`, `opacity`, `part`). The
 `drag (scripted): …` line then ends with the frames' phases (`docs/BENCHMARK.md`, "Frame phases").
 
 **Checked** (VM 116, x86_64):
-- `canvas-test`: the shader written in C with the same float operations (`canvas_g0_model`) against
+- `canvas-test`: the shader written in C with the same float operations (`canvas_gdrag_model`) against
   `blit_row_c` and the SIMD row: all 8,421,376 valid (alpha, colour, destination) combinations, every
   alpha pair, and 200,000 random pixels, 0 differ. The NEON row was not run (no ARM machine was used).
-- `engine-test`'s `g0` path: `test_drag_exact` with G0 and a stub GPU (the UI texture, the two textures
-  with only their dirty rectangles, `main.c`'s bookkeeping, W written by `canvas_g0_model`) gives every
-  one of the 2,417 frames of `drag_golden_gpu.txt`; 250 of 1,856 frames that use the copy are G0 frames
-  there (241 with the uploads in slices: 9 frames catch up; no G0 frame sends a texture whole, and the most one
+- `engine-test`'s `gpu-drag` path: `test_drag_exact` with GPU drag and a stub GPU (the UI texture, the two textures
+  with only their dirty rectangles, `main.c`'s bookkeeping, W written by `canvas_gdrag_model`) gives every
+  one of the 2,417 frames of `drag_golden_gpu.txt`; 250 of 1,856 frames that use the copy are GPU drag frames
+  there (241 with the uploads in slices: 9 frames catch up; no GPU drag frame sends a texture whole, and the most one
   sends fell from 934,022 to 170,330 pixels). Five more runs are compared frame by frame with the GPU path: a pause with no damage, two
   displays side by side, the window over an app window below, the window against a rounded,
   bordered container's corner, and (`corner`) a rounded `overflow: hidden` box with no colour painted
@@ -231,23 +231,23 @@ and the `layer` refusals by cause (`G0L_*` in `ui/ui.h`: `gone`, `invalid`, `res
   earlier context. With the shader changed to round `v_px` as 16-bit floats would, the tiles pass and the
   placement pass fails from x = 1024 on (6,207,545 pixels differ): the tiles alone would not catch it.
   With a layer larger than the placement covered, `gpu_frame_ex` returns -2, presents nothing and turns
-  G0 off. `main.c`'s side of -2 has been built, not run.
+  GPU drag off. `main.c`'s side of -2 has been built, not run.
 - At runtime with llvmpipe (`LORD_GPU=1`; an isolated session lent the card by `tests/seat_cycle.c`, a
   scene moved by `lord.wm.script`; before the fixes above, with the self-test of that time: tiles only,
   run in the first drag frame): the self-test passes in 75–113 ms; with `LORD_GPU_VERIFY=1`, 1,481
-  G0 frames of 1,483 and 0 pixels differ; across 4 context re-creations during the move, 1,328 G0 frames,
+  GPU drag frames of 1,483 and 0 pixels differ; across 4 context re-creations during the move, 1,328 GPU drag frames,
   0 differ; `tests/gpu_cycle.sh` (10 cycles) keeps 38 fds and the same memory. Layout and paint of a
-  drag frame: 0.29–0.35 ms with G0, 0.92 ms without (llvmpipe's composition is most of the frame, so
+  drag frame: 0.29–0.35 ms with GPU drag, 0.92 ms without (llvmpipe's composition is most of the frame, so
   this is no measure of the gain on a real GPU).
 - With the default theme (the same kind of session, Calculator dragged over the remote desktop socket,
-  real screenshots with QMP `screendump`): 152 of 153 frames G0 while the window stays in the band the
+  real screenshots with QMP `screendump`): 152 of 153 frames GPU drag while the window stays in the band the
   menu bar and the Dock leave free, 7 of 153 along a figure of eight that reaches them; `LORD_GPU_VERIFY=1`
-  over 160 G0 frames (W up to 462 × 592): 0 pixels differ. The nodes painted after the window are kept
+  over 160 GPU drag frames (W up to 462 × 592): 0 pixels differ. The nodes painted after the window are kept
   as a list that grows as needed (up to 65,536 boxes; a box inside the one noted before it is skipped, so
-  the menu bar and the Dock are 2 boxes): a fixed list of 128 was full with LordOS's own shell and G0
-  refused every frame. LordBench's Desktop impact at 1280 × 800 gets 1 G0 frame of 2,024: its window,
+  the menu bar and the Dock are 2 boxes): a fixed list of 128 was full with LordOS's own shell and GPU drag
+  refused every frame. LordBench's Desktop impact at 1280 × 800 gets 1 GPU drag frame of 2,024: its window,
   with its shadow, always reaches the Dock's or the menu bar's blurred backdrop, and its turning square
-  makes the layer be painted whole. Its numbers with G0 on and with `LORD_G0=0` are the same within
+  makes the layer be painted whole. Its numbers with GPU drag on and with `LORD_GPU_DRAG=0` are the same within
   llvmpipe's noise.
 
 **Not checked yet:** the Raspberry Pi 5 (V3D), the machine this is for: its self-test, `LORD_GPU_VERIFY=1`
@@ -268,17 +268,17 @@ second vblank and the rate locks at half the refresh. That is the Raspberry Pi 5
 of frame N is pending, the CPU part of frame N+1 is done ahead (it is *prepared*): pointer input and LordBench's
 scripted step are dispatched, the JS frame callbacks and the layout run (`paint_ui`) and its damage is painted into
 the display's scene (`paint_out`, `out_prepare`), keeping what the submission needs on the display (`Out`): the rect
-it painted, its painted rectangles for the CPU path, its G0 result (`g0taken`, `g0`), the cursor and app flags
+it painted, its painted rectangles for the CPU path, its GPU drag result (`gdragtaken`, `gdrag`), the cursor and app flags
 (`cdirty`, `wl_new`). When N's flip event arrives, only what is left is done for N+1 (`out_submit` →
 `out_present`, the same code a frame built at once uses): the texture upload, `gpu_frame_ex` (or the copy into the
-dumb buffer on the CPU path) and the page flip. Then G0's textures catch up and N+2 is prepared. The upload copies
+dumb buffer on the CPU path) and the page flip. Then GPU drag's textures catch up and N+2 is prepared. The upload copies
 the scene when it is called (`glTexSubImage2D` from client memory), so painting the next frame into the scene
 right after it is safe; the dumb buffers are written only at submission, when the flip has freed one.
 
 **When it applies** (`pipe_on`): one display with real page flips. Not without a monitor (no flip: the headless
 path is unchanged), not when the driver completes flips at once and frames are paced in software (`soft`, a
 virtual card: the wait there is the pacing slot, not the flip), and not with several displays (paint.c's drag
-layer and G0 state are shared between them; each frame is built and submitted at once there, as before). Both the
+layer and GPU drag state are shared between them; each frame is built and submitted at once there, as before). Both the
 GPU and the CPU composition paths use it.
 
 **The switch** `LORD_PIPELINE`, read once at startup (the session log says which): `0` off (exactly the previous
@@ -303,10 +303,10 @@ before the flips themselves came every other vblank) and the rate can double.
   pointer is the exception it always was: the cursor is drawn at submission (CPU path) or moved on its plane at
   once. A Linux app's new buffer is drawn at submission (GPU path: its texture), so it is never older than before.
 - **A prepared frame that can no longer be submitted as painted** is undone (`prep_undo`): what it painted, and the
-  window rectangle it left to G0, join the next frame's damage, and that frame is built at once. That happens when
-  the scene was reallocated, the GPU context or output changed (`gpu_generation`), or, for a G0 frame, the drag
-  layer began, ended, moved to another display or reallocated its buffers (`paint_g0_epoch`, `ui/paint.c`; the
-  frame's `GpuG0` points into those buffers). Every path that changes the GPU or the displays also undoes it first:
+  window rectangle it left to GPU drag, join the next frame's damage, and that frame is built at once. That happens when
+  the scene was reallocated, the GPU context or output changed (`gpu_generation`), or, for a GPU drag frame, the drag
+  layer began, ended, moved to another display or reallocated its buffers (`paint_gdrag_epoch`, `ui/paint.c`; the
+  frame's `GpuDrag` points into those buffers). Every path that changes the GPU or the displays also undoes it first:
   `cpu_takeover` (screen recording, a remote viewer with protected windows, a failed frame), `gpu_start`,
   `outputs_apply` (hotplug, Settings → Displays) and `display_detach` (a session switch: the card's master is
   dropped with nothing left prepared). A frame prepared before the screen went off (idle, DPMS) is undone too, so it
@@ -314,12 +314,12 @@ before the flips themselves came every other vblank) and the rate can double.
 - **Never while the flip is pending:** stopping the GPU for a recording or a remote viewer with protected windows
   (`cpu_switch`: `gpu_shutdown`, and `cpu_takeover` sets the dumb buffer with a modeset) waits for the flip, as it
   did before; a frame prepared for the GPU meanwhile is undone there and painted again on the CPU path.
-- **G0:** the prepared frame keeps its `GpuG0` (dirty rectangles, strips, `LORD_GPU_VERIFY`'s reference) until its
-  submission, and `paint_g0_done` runs only when its quad is drawn, as before. G0's textures catch up
-  (`paint_g0_feed`) after the submission and before the next frame is painted, so the feed never runs between a
+- **GPU drag:** the prepared frame keeps its `GpuDrag` (dirty rectangles, strips, `LORD_GPU_VERIFY`'s reference) until its
+  submission, and `paint_gdrag_done` runs only when its quad is drawn, as before. GPU drag's textures catch up
+  (`paint_gdrag_feed`) after the submission and before the next frame is painted, so the feed never runs between a
   frame's paint and its upload (a frame built at once queues its catch-up for the end of `render`, so nothing is
   prepared in the same call after it). `engine-test` runs every drag case again with each frame presented only after the
-  next frame's changes are made ("g0 pipelined") and checks the same golden hashes, and that those changes never
+  next frame's changes are made ("gpu-drag pipelined") and checks the same golden hashes, and that those changes never
   move the epoch.
 - **-2 (unshown)**, direct scanout of a fullscreen app, the remote desktop's read-back and the protected windows'
   black: decided at submission, by the same code as before.
