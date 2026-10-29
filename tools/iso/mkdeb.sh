@@ -146,6 +146,17 @@ install -m 644 code-manifest.json "$L/code-manifest.json"
 if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ ! -f "$L/code-manifest.sig" ]; then
     echo "missing code-manifest.sig: sign the manifest on the maintainer's machine (tools/release/sign-code.sh)" >&2; exit 1
 fi
+# (0.8.7) the tested-hardware catalogue's snapshot for System Information's Compatibility panel and its
+# signature (tools/release/sign-hwsnapshot.sh, release key; lord-server shows it only if it verifies,
+# sysreport/hwsnap.c). It updates with this package through the signed APT repository.
+if [ -f assets/hwreport/snapshot.json ]; then
+    install -d "$L/assets/hwreport"
+    install -m 644 assets/hwreport/snapshot.json "$L/assets/hwreport/snapshot.json"
+    [ -f assets/hwreport/snapshot.json.sig ] && install -m 644 assets/hwreport/snapshot.json.sig "$L/assets/hwreport/snapshot.json.sig"
+    if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ ! -f "$L/assets/hwreport/snapshot.json.sig" ]; then
+        echo "missing assets/hwreport/snapshot.json.sig: sign it on the maintainer's machine (tools/release/sign-hwsnapshot.sh)" >&2; exit 1
+    fi
+fi
 # the check is the same on any architecture: building another architecture's package on this host
 # (tools/rpi/build-img.sh on x86-64 with an aarch64 server/build), CODE_CHECK_SERVER names a
 # lord-server built for this host from the same tree

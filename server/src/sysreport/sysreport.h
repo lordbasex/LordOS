@@ -139,6 +139,7 @@ typedef struct {
     int landlock_abi;                   /* -1 unknown, 0 unavailable */
     int bpf_lsm;                        /* "bpf" in the LSM list */
     int cgroup2;                        /* unified hierarchy mounted */
+    int live;                           /* the live session (/run/live exists) */
     int nkconf;
     SrKconf kconf[SR_MAX_KCONF];
     int sessiond, netperm, fand, netd;  /* their sockets in /run/lordos (-1 unknown) */

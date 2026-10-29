@@ -177,6 +177,7 @@ char *sysreport_json(const SysReport *r) {
     js(&b, &g, "os", s->os); js(&b, &g, "osId", s->os_id); js(&b, &g, "osVersion", s->os_version);
     js(&b, &g, "kernel", s->kernel); js(&b, &g, "lordos", s->lordos); js(&b, &g, "lsm", s->lsm);
     jn(&b, &g, "landlockAbi", s->landlock_abi, -1); jb(&b, &g, "bpfLsm", s->bpf_lsm); jb(&b, &g, "cgroup2", s->cgroup2);
+    jb(&b, &g, "live", s->live);
     jkey(&b, &g, "kernelConfig"); hb_printf(&b, "{");
     for (int i = 0; i < s->nkconf; i++) {
         if (i) hb_printf(&b, ",");

@@ -677,6 +677,12 @@ static void test_empty(void) {
     char *json, *md;
     SysReport *r = run(root, &json, &md);
     CHECK(!r->ngpu && !r->ndisk && !r->cpu.threads && contains(md, "none found"), "empty tree");
+    CHECK(!r->sw.live && contains(json, "\"live\":false"), "empty tree: not live");
+    free(json); free(md); free(r);
+    /* (0.8.7) the live session: live-boot's /run/live */
+    mkdirs_in(root, "run/live");
+    r = run(root, &json, &md);
+    CHECK(r->sw.live && contains(json, "\"cgroup2\":false,\"live\":true"), "live session: live");
     free(json); free(md); free(r);
     rmtree(root);
 }

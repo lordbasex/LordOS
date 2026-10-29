@@ -1,0 +1,340 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-10-28",
+  "source": "community",
+  "lordos": "0.8.7-beta",
+  "live": true,
+  "system": {
+    "machine": {
+      "vendor": "LENOVO",
+      "product": "21CB",
+      "version": "ThinkPad T14 Gen 3",
+      "boardVendor": "LENOVO",
+      "boardName": "21CB",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "LENOVO",
+      "biosVersion": "R23ET70W (1.46 )",
+      "biosDate": "06/14/2026",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "12th Gen Intel(R) Core(TM) i5-1235U",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 10,
+      "threads": 12,
+      "minMHz": 400,
+      "maxMHz": 4400,
+      "governor": "powersave"
+    },
+    "memory": {
+      "totalKB": 16073328,
+      "swapKB": 8388604,
+      "zram": [
+        {
+          "sizeKB": 8038400,
+          "algorithm": "zstd"
+        }
+      ]
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "46a8",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-UP3 GT2 [Iris Xe Graphics]",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 4,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "AUO",
+        "product": "403d",
+        "year": 2021,
+        "widthCm": 31,
+        "heightCm": 17,
+        "diagonalTenths": 140,
+        "nativeWidth": 1920,
+        "nativeHeight": 1200,
+        "mode": "1920x1200"
+      }
+    ],
+    "storage": [
+      {
+        "model": "SAMSUNG MZVL2512HCJQ-00BL7",
+        "vendor": "",
+        "bytes": 512110190592,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "PCIe 4.0 x4"
+      }
+    ],
+    "pci": [
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "46a8",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-UP3 GT2 [Iris Xe Graphics]",
+        "driver": "i915"
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "51f0",
+        "vendor": "Intel Corporation",
+        "device": "Alder Lake-P PCH CNVi WiFi",
+        "driver": "iwlwifi"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "04f2",
+        "productId": "b7b6",
+        "vendor": "Chicony Electronics Co., Ltd",
+        "product": "Integrated Camera",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      }
+    ],
+    "network": [
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": true,
+        "speedMbps": null
+      },
+      {
+        "kind": "ethernet",
+        "driver": "e1000e",
+        "up": false,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "battery",
+        "vendor": "SMP",
+        "model": "5B10W51867",
+        "technology": "Li-poly",
+        "status": "Discharging",
+        "capacity": 87,
+        "health": 91,
+        "online": -1
+      },
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": -1,
+        "health": -1,
+        "online": 0
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 48000,
+        "fans": 1
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.57+deb13-amd64",
+      "lordos": "0.8.7-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,bpf",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": true,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_BPF_LSM": "y"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": false
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Graphics (ADL GT2)",
+      "dmabuf": true,
+      "scanouts": 3
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": {
+    "lordbench": 1,
+    "mode": "quick",
+    "seconds": 52,
+    "status": "done",
+    "stopReason": "",
+    "lordos": "0.8.7-beta",
+    "kernel": "6.12.57+deb13-amd64",
+    "arch": "x86_64",
+    "live": true,
+    "threads": 12,
+    "cpus": 12,
+    "quiet": {
+      "quiet": true,
+      "busyPct": 2.1,
+      "waitedS": 10
+    },
+    "before": {
+      "tempC": 47,
+      "zone": "x86_pkg_temp",
+      "power": "mains",
+      "governor": "powersave"
+    },
+    "after": {
+      "tempC": 71,
+      "zone": "x86_pkg_temp",
+      "power": "mains"
+    },
+    "storage": {
+      "kind": "none",
+      "mb": 0
+    },
+    "gpuKind": "hardware",
+    "sandbox": 62,
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Graphics (ADL GT2)",
+      "displays": [
+        {
+          "connector": "eDP-1",
+          "builtin": true,
+          "mode": {
+            "w": 1920,
+            "h": 1200,
+            "refresh": 60000
+          },
+          "scale": 125,
+          "rotation": 0
+        }
+      ]
+    },
+    "results": {
+      "cpu.sha256.1": {
+        "value": 1950.2,
+        "spread": 12,
+        "unit": "MB/s"
+      },
+      "cpu.sha256.n": {
+        "value": 9100.4,
+        "spread": 80,
+        "unit": "MB/s"
+      },
+      "cpu.matmul.n": {
+        "value": 61.2,
+        "spread": 2,
+        "unit": "GFLOP/s"
+      },
+      "mem.copy": {
+        "value": 31.5,
+        "spread": 0.5,
+        "unit": "GB/s"
+      },
+      "mem.latency": {
+        "value": 96.1,
+        "spread": 2,
+        "unit": "ns",
+        "lowerBetter": true
+      },
+      "gpu.scene": {
+        "value": 1450,
+        "spread": 30,
+        "unit": "fps"
+      }
+    },
+    "skipped": {
+      "disk.seqwrite": "mode"
+    }
+  },
+  "desktop": null
+}

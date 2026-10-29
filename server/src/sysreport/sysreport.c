@@ -757,6 +757,9 @@ static void collect_software(SysReport *r, const char *root) {
     s->netperm = exists(root, "/run/lordos/netperm.sock");
     s->fand = exists(root, "/run/lordos/fand.sock");
     s->netd = exists(root, "/run/lordos/netd.sock");
+    /* the live session from the ISO (live-boot's marker, as LordBench reads it): a shared report says so
+     * (docs/BENCHMARK.md, "From the live USB") */
+    s->live = exists(root, "/run/live");
 }
 
 /* ---- all of it ---- */

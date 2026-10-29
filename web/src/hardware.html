@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="hardware" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main" class="wrap g-main hw">
+<p class="kicker">{{t.pages.hardware.kicker}}</p>
+<h1>{{t.pages.hardware.title}}</h1>
+<p class="g-lead">{{t.pages.hardware.lead}}</p>
+<p class="hw-note">{{{status}}}</p>
+
+<section class="hw-sec" aria-labelledby="hw-m">
+<h2 id="hw-m">{{t.pages.hardware.machinesTitle}}</h2>
+<div class="hw-grid">
+{{{machines}}}
+</div>
+</section>
+
+<section class="hw-sec" aria-labelledby="hw-g">
+<h2 id="hw-g">{{t.pages.hardware.gpusTitle}}</h2>
+{{{gpus}}}
+</section>
+
+<section class="hw-sec" aria-labelledby="hw-p">
+<h2 id="hw-p">{{t.pages.hardware.problemsTitle}}</h2>
+{{{problems}}}
+</section>
+
+<section class="hw-sec" aria-labelledby="hw-s">
+<h2 id="hw-s">{{t.pages.hardware.shareTitle}}</h2>
+<p class="g-lead">{{t.pages.hardware.shareText}}</p>
+<p><a class="btn btn-ghost" href="{{{newIssue}}}" rel="noopener">{{t.pages.hardware.shareLink}}</a></p>
+</section>
+</main>
+
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>
