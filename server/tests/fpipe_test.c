@@ -19,8 +19,8 @@ static void note(FPipe *p, double cpu_ms, double period_ms) { clock_ms += 16.67;
 
 static void test_mode(void) {
     FPipe p;
-    fpipe_init(&p, NULL);
-    CHECK(p.mode == FPIPE_AUTO && !fpipe_engaged(&p));
+    fpipe_init(&p, NULL);                       /* unset: off (the default since the Pi 5 run) */
+    CHECK(p.mode == FPIPE_OFF && !fpipe_engaged(&p));
     fpipe_init(&p, "0");
     CHECK(p.mode == FPIPE_OFF && !fpipe_engaged(&p));
     note(&p, 30, 16.67);                        /* off stays off, however heavy */
@@ -32,13 +32,16 @@ static void test_mode(void) {
     CHECK(fpipe_engaged(&p));
     fpipe_init(&p, "1");
     CHECK(p.mode == FPIPE_AUTO);
-    fpipe_init(&p, "yes");                      /* anything else: auto */
-    CHECK(p.mode == FPIPE_AUTO);
+    CHECK(!fpipe_engaged(&p));
+    fpipe_init(&p, "yes");                      /* anything else: off */
+    CHECK(p.mode == FPIPE_OFF);
+    fpipe_init(&p, "");
+    CHECK(p.mode == FPIPE_OFF);
 }
 
 static void test_auto(void) {
     FPipe p;
-    fpipe_init(&p, NULL);
+    fpipe_init(&p, "1");
     note(&p, 13, 16.67);                        /* one heavy frame: not yet */
     CHECK(!fpipe_engaged(&p));
     note(&p, 5, 16.67);                         /* the run is broken */
@@ -89,7 +92,7 @@ typedef struct { long shown, prepares, spins, max_latency; } Sim;
 static Sim simulate(int mode, long cpu, long sub, long gpu, int animate, long n) {
     const long P = 16667;
     FPipe fp;
-    fpipe_init(&fp, mode == FPIPE_OFF ? "0" : mode == FPIPE_ALWAYS ? "2" : NULL);
+    fpipe_init(&fp, mode == FPIPE_OFF ? "0" : mode == FPIPE_ALWAYS ? "2" : "1");
     Sim r = { 0, 0, 0, 0 };
     long t = 0, flip_at = -1;                   /* when the pending flip lands (-1: none) */
     int prep = FPIPE_NONE;
@@ -165,7 +168,7 @@ static void test_sim(void) {
  * longer than FPIPE_IDLE_MS lets go (a heavy one counts as the first of the two that engage it again). */
 static void test_idle(void) {
     FPipe p;
-    fpipe_init(&p, NULL);
+    fpipe_init(&p, "1");
     fpipe_note(&p, 1000, 13, 16.67);
     fpipe_note(&p, 1016.7, 13, 16.67);
     CHECK(fpipe_engaged(&p));
@@ -198,7 +201,7 @@ static void test_idle(void) {
     CHECK(!fpipe_engaged(&p));
     /* a frame-by-frame run: a heavy drag engages it, the desktop goes idle for 2 s, then a light click: the
      * click's frame lets go, so the next input waits for the flip as without the pipeline */
-    fpipe_init(&p, NULL);
+    fpipe_init(&p, "1");
     double t = 1000;
     for (int i = 0; i < 100; i++, t += 16.67) fpipe_note(&p, t, 13, 16.67);
     CHECK(fpipe_engaged(&p));
@@ -217,7 +220,7 @@ static void test_idle(void) {
 static void sim_callbacks(int mode, int hold, long n, long *shown, long *cbs) {
     const long P = 16667, cpu = 2000, gpu = 2000;
     FPipe fp;
-    fpipe_init(&fp, mode == FPIPE_OFF ? "0" : mode == FPIPE_ALWAYS ? "2" : NULL);
+    fpipe_init(&fp, mode == FPIPE_OFF ? "0" : mode == FPIPE_ALWAYS ? "2" : "1");
     long t = 0, flip_at = -1;
     int prep = FPIPE_NONE, prep_js = 0, app_new = 1;
     *shown = *cbs = 0;

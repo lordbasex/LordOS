@@ -2271,7 +2271,7 @@ int main(int argc, char **argv) {
     sigprocmask(SIG_BLOCK, &mask, NULL);
     keylag_init(s.greeter);                 /* key latency trace, only with LORD_INPUT_DEBUG=1 (keylag.h) */
     fpipe_init(&fpipe, getenv("LORD_PIPELINE"));
-    fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: 0 off, 2 always)\n",
+    fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
             fpipe.mode == FPIPE_OFF ? "off" : fpipe.mode == FPIPE_ALWAYS ? "always" : "while frames are heavy");
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
 

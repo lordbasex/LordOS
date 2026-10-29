@@ -16,8 +16,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `GPU.md`, `ROADMAP.md`, `PAPER-VALIDATION.md`, the paper (§3.2, §7.2, §7.4, §10.2; en, es, pt; `docs/PAPER.md`
   regenerated), the FAQ and "A desktop of its own" (en, es, pt) now say that dragged windows' corners no longer turn
   black and that LordBench's square and the Cooling fans turn (the docs audit's "still there, fixed in development"
-  wording below is superseded), with the Pi 5 frame numbers measured so far and HTML comments starting with `PI-RESULT:`
-  where the final Pi 5 run's numbers go, each next to a sentence that is true without them. The site's Markdown
+  wording below is superseded), with the Pi 5 frame numbers measured so far and HTML comments marking where the final Pi 5 run's numbers go, each
+  next to a sentence that is true without them (all filled after that run on 2026-10-29, the first entry under Changed). The site's Markdown
   renderer (`web/lib/md.mjs`) now drops HTML comments, so a marker left behind is never published.
   `THIRD_PARTY.md` lists the QuickJS `JS_GetMallocSize` patch as a table row.
 - **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the
@@ -157,7 +157,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and the temperature are the evidence instead, and the firmware's documented 80 °C limit now counts as
     throttling (next item).
   - **The Raspberry Pi firmware's throttling during a run** (`bench/lbcond.c`, `bench/lbrun.c`; `docs/BENCHMARK.md`,
-    "The Raspberry Pi firmware's throttling"; tested on fake sysfs trees and VM 116, **not yet run on a real Pi**).
+    "The Raspberry Pi firmware's throttling"; tested on fake sysfs trees and VM 116, and on the Pi 5 on 2026-10-29:
+    `piFirmware` `{"flags": false, "voltageAlarm": true, "underVoltage": false, "tempLimit": false, "tempLimitC": 80}`,
+    the alarm 0 before and after the run with the official supply).
     Checked in Raspberry Pi's `rpi-6.18.y` source, the kernel LordOS ships: `drivers/firmware/raspberrypi.c` has no
     `get_throttled` file any more, and the `rpi_volt` hwmon (`drivers/hwmon/raspberrypi-hwmon.c`, a module in
     `bcm2712_defconfig`) asks the firmware every 2 s with the sticky bits cleared and exposes only
@@ -261,10 +263,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `remote.sock`) wrote both phase objects in three runs (alone 601 frames, all on time; under load 720–721, 715–721 on time) and
   the drag line. The
   GPU fields (uploads, swap, fence) were 0 there: that path was built, not run.
-  <!-- PI-RESULT: the first phases measured on a GPU: the Pi 5 run's frames.phases.load (paintMs, uploadMs, gpuMs,
-  vblankWaitMs p50/p99; onTime / cpuLate / gpuLate) with the defaults, LORD_GPU_DRAG=0 and LORD_PIPELINE=0 -->
+  The first phases on a GPU came from the Raspberry Pi 5 with its monitor (V3D, 1920×1080, 2026-10-29; p50/p99 in ms).
+  With the frame pipeline and GPU drag off (the defaults now): alone `renderMs` 8.15/11.57 (`paintMs` 6.31/9.56,
+  `uploadMs` 1.41/1.72, 0.971 Mpx a frame) and `gpuMs` 1.51/1.57; under load `renderMs` 13.25/18.92 (paint 8.55/13.11,
+  upload 4.24/5.25) and `gpuMs` 14.49/19.00, and of 374 frames 39 on time, 14 CPU-late and 320 GPU-late. With the
+  pipeline off and GPU drag on: under load render 13.20/18.25, GPU 14.19/18.25, 23 on time, 15 CPU-late, 327 GPU-late of
+  371. With the build's defaults then (the pipeline while frames are heavy, GPU drag on): under load render
+  13.85/19.07, GPU 15.63/23.38, `heldMs` 18.27/31.60, 148 on time, 1 CPU-late, 285 GPU-late of 436. So under load the
+  frame is late on the GPU's side: its time per frame goes from about 1.5 ms alone to 14–16 ms.
 
 ### Changed
+
+- **The frame pipeline and GPU drag are off by default, after the final Raspberry Pi 5 run** (2026-10-29, in
+  development for 0.8.6; `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/GPU.md`). The Pi 5 16 GB with its
+  1920×1080 60 Hz HDMI monitor, the LordOS kernel 6.18.57-lordos.3, an autologin session and the arm64 build of this
+  branch; LordBench → Desktop impact, "under load" = all four cores busy at the lowest priority:
+
+  | Configuration | Runs | Alone fps | Pointer to screen p50 alone | Under load fps | Late under load | Pointer to screen p50 / p99 under load |
+  |---|---|---|---|---|---|---|
+  | Pipeline while frames are heavy, GPU drag on (the build's defaults then) | 2 | 60.0 | 42.1–42.5 ms | 33.0–36.2 | 65.8–81.6 % | 77.3–79.8 / 98.7–99.8 ms |
+  | `LORD_PIPELINE=0`, GPU drag on | 3 | 59.9 | 25.5–25.7 ms | 30.8–31.6 | 87.3–94.3 % | 48.8–49.0 / 66.1–79.4 ms |
+  | Both off (**the defaults now**) | 2 | 59.9 | 25.7–25.9 ms | 30.5–31.1 | 89.5–96.2 % | 48.5–49.0 / 66.3–80.6 ms |
+
+  - `LORD_PIPELINE` is now off unless set to `1` (while frames are heavy) or `2` (always): it gave 2–5 frames a second
+    under load but 17 ms more pointer latency alone and 29 ms more under load, and its auto mode engaged even alone at
+    60 fps. The code stays; the session log says `lord-server: frame pipeline off (LORD_PIPELINE: unset or 0 off, 1
+    while frames are heavy, 2 always)`.
+  - GPU drag is now off unless `LORD_GPU_DRAG=1`, and its self-test runs only then: it is correct on V3D (its
+    self-test passes, 11,373,321 pixels in 341 ms; `LORD_GPU_VERIFY=1` compared 138 frames, all equal) but gave no
+    measurable gain (30.5–31.1 fps under load off, 30.8–31.6 on; it composed about one frame in five). The log says
+    `gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is composed by the CPU`.
+  - With both off the frames are the ones measured in the last row; the goldens are unchanged. So on the Pi 5 an
+    all-core load still takes the desktop from 60 to about 31 frames a second. What remains is the GPU's time per
+    frame: 1.5 ms alone, 14–16 ms under load (`frames.phases`: 320 of 374 frames GPU-late), and the upload of about
+    1 Mpx a frame from 1.4 to about 4 ms, while `vcgencmd` every 2 s showed V3D at 0.86–1.15 GHz, the ARM cores at
+    1.8–2.4 GHz, 36.7–47.2 °C and `get_throttled=0x0` throughout: no clock or thermal throttling. Most likely memory
+    contention with the load; not proven (no memory-bandwidth counter was read). Next: fewer pixels uploaded and
+    composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load (`ROADMAP.md`).
+  - In the same run: the firmware's power alarm (System Information's and LordBench's reader, `hw/rpifw.c`) is present
+    on the Pi 5's LordOS kernel and reads 0 with the official supply (`piFirmware`: `voltageAlarm` true, `underVoltage`
+    false; `in0_lcrit_alarm` 0 before and after); the dragged window's rounded corners are clean on the monitor (no
+    black squares, over a window and over the wallpaper; `docs/WINDOWS.md`); `lordos-sysreport bench --quick` (two
+    runs): `cpu.ui.1` 39.3–39.4 fps, `cpu.ui.n` 45.4 fps, `cpu.shape.1` 630–632 runs/s, `cpu.shape.n` 2,522–2,527
+    runs/s (`docs/BENCHMARK.md`).
+  - Checked on VM 116 with the new defaults: `make -j8` with no warnings; `make test`: 23 passed, 0 failed, 13
+    skipped; `engine-test`: 6,907 checks, 0 failures, `drag_golden_{cpu,gpu}.txt` unchanged; `fpipe-test`: 61 checks
+    (unset, `0`, an empty or any other value off, `1` while frames are heavy, `2` always; the auto mode's tests now
+    ask for `1`); `lordbench-test`: 1,217 ok.
 
 - **The desktop under load, third step: a cheaper frame while a window is dragged** (in development for 0.8.6;
   `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/WINDOWS.md`; `docs/GPU.md`). Steps 0–11 (the next two
@@ -278,10 +323,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     30.1–30.3 fps (build p50 12.9 ms, 98.1–99.2 % late). Under load the build, the GPU's part and the flip still run
     one after another and miss the 16.7 ms period, so the monitor shows every other vblank;
   - with GPU drag on, the same build stalled (52 fps alone; its entry below);
-  - the frame pipeline was built after these runs and has not run on a display yet. <!-- PI-RESULT: the final Pi 5
-    run with the monitor: alone / under load fps, late %, build p50/p99 and pointer to screen with the defaults (GPU
-    drag where its self-test passes, the pipeline while frames are heavy), with LORD_GPU_DRAG=0 and with
-    LORD_PIPELINE=0 -->
+  - the frame pipeline was built after these runs; the final run with everything in this list (2026-10-29) has its own
+    entry at the top of Changed: with the frame pipeline and GPU drag off, the defaults now, alone 59.9 fps (build p50
+    8.03–8.13 ms, p99 11.42–11.57 ms, 0.17 % late, pointer to screen p50 25.7–25.9 ms) and under load 30.5–31.1 fps
+    (build p50 13.15–13.25 ms, 89.5–96.2 % late, pointer to screen p50 48.5–49.0 ms, p99 66.3–80.6 ms).
   - Checked on VM 116 at the frame pipeline's commit: `make -j8` and lord-server with `GPU=0` (no EGL, GBM or GLES
     linked): no warnings; `make test`: 23 passed, 0 failed, 13 skipped; `engine-test`: 6,883 checks, 0 failures (the
     2,417 golden frames per path, the `gpu-drag` path and the pipelined drag runs); `fpipe-test`: 39 checks;
@@ -476,8 +521,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (`glGetShaderPrecisionFormat`), then a self-test in `gpu_init` that draws every valid premultiplied (alpha,
     colour ≤ alpha) over every destination value, and every source alpha over every destination alpha, into a
     framebuffer (3,145,728 pixels in three 1024 × 1024 tiles), then a placement pass (below), and compares each
-    pixel with `canvas_blit` on the CPU (NEON on the Pi). One differing pixel turns GPU drag off. `LORD_GPU_DRAG=0` turns it
-    off. `LORD_GPU_VERIFY=N` paints W on the CPU too every N-th GPU drag frame
+    pixel with `canvas_blit` on the CPU (NEON on the Pi). One differing pixel turns GPU drag off. Since the Pi 5 run of
+    2026-10-29 GPU drag is off by default and `LORD_GPU_DRAG=1` turns it on (the first entry under Changed); the
+    self-test runs only then. `LORD_GPU_VERIFY=N` paints W on the CPU too every N-th GPU drag frame
     and compares it with the framebuffer read back (`gpu-verify: frame N W=wxh differ=K worst=D`).
   - **`main.c`** keeps, per display, that the scene and the UI texture are stale in W (`gdrag_on`, `gdragw`): W joins the
     next frame's damage; a frame with no UI damage (the cursor, an app's new frame) draws the window again from the
@@ -570,11 +616,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     with the build before the uploads in slices and the phase timing; three runs): with GPU drag on, 52.2–52.9 fps
     alone (build p99 21.3–21.7 ms, 13.5–15.0 % late) and 25.8–27.5 fps under load, against 59.8–60.0 and
     30.1–30.3 fps with `LORD_GPU_DRAG=0` in the same build. It stalled; its cause was not measured (the phases did not
-    exist yet). The next entry (the uploads in slices) and LordBench's phase timing (Added) were made for it. GPU
-    drag stays on wherever its self-test passes until the final Pi run decides its default; its self-test and `LORD_GPU_VERIFY`
-    have not been read on V3D yet. <!-- PI-RESULT: GPU drag on the Pi 5 with the final build: the `gpu: GPU drag
-    on|off` line (self-test pixels and ms on V3D), LORD_GPU_VERIFY=1 differ= results, alone / under load fps with GPU
-    drag on and with LORD_GPU_DRAG=0, frames.phases gpuDrag taken/refused and catchUpMpx; and the default chosen -->
+    exist yet). The next entry (the uploads in slices) and LordBench's phase timing (Added) were made for it.
+  - **On the Raspberry Pi 5 with the final build** (2026-10-29, with the uploads in slices): the self-test passes on
+    V3D (`gpu: GPU drag on: … self-test: 11373321 pixels, every valid premultiplied combination and a 4096x2048
+    placement pass, the same as the CPU's, 341 ms`), and with `LORD_GPU_VERIFY=1` the 138 GPU drag frames compared were
+    all `differ=0 worst=0`. It no longer stalls: with the frame pipeline off, 59.9 fps alone and 30.8–31.6 fps under
+    load (three runs) with GPU drag on, against 59.9 and 30.5–31.1 fps with it off (two runs). It composed only part of
+    the frames (138 of 601 alone, refused: `layer` 214, `after` 241, catching up 8; 80 of 436 under load). Correct,
+    but no measurable gain, so it is now **off by default** and `LORD_GPU_DRAG=1` turns it on (the first entry under
+    Changed).
 - **GPU drag's textures catch up between frames instead of inside one** (0.8.6, in development; `docs/GPU.md`, "Uploads without a
   stall"). A drag's start, or a copy of what is below built again whole, made the first GPU drag frame send the whole
   copy (a screen, 8.3 MB at 1920 × 1080) and the layer; on V3D `glTexSubImage2D` converts to the GPU's tiled layout
@@ -601,8 +651,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   7.5 ms (under 70 %) while the frame took about 13 ms, so the threads, which run at real-time priority, stayed off.
   The pixels are the same (the pool's bands are exact). On VM 116 headless under load they were on for 0, 10 and 91
   of 720–721 frames in three runs; the gain on the Pi is not measured yet.
-- **The frame pipeline: the next frame is painted while the flip is pending** (0.8.6, in development, not yet
-  measured on the Pi; `docs/GPU.md`, "The frame pipeline"; `src/fpipe.c` and `main.c`). A frame was started only
+- **The frame pipeline: the next frame is painted while the flip is pending** (0.8.6, in development; measured on the
+  Pi 5 and **off by default** since then, `LORD_PIPELINE=1` or `2` turns it on; `docs/GPU.md`, "The frame pipeline"; `src/fpipe.c` and `main.c`). A frame was started only
   after the previous flip completed, so input, JS, layout, paint, the upload, the GPU and the flip ran one after
   another; on the Pi 5 under an all-core load that chain (about 13 ms of CPU, 3–5 ms more) passes the 16.7 ms
   period, every frame waits for the second vblank and the monitor shows 30 frames a second, 98 % late.
@@ -615,8 +665,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     flipped at once, so an idle desktop answers input as before.
   - Only with one display that has real page flips, on the GPU and the CPU path; never without a monitor, with a
     driver paced in software, or with several displays (each frame built and submitted at once there, as before).
-  - `LORD_PIPELINE`, read once at startup and named in the session log: `0` off (the previous behaviour exactly), `2`
-    always, unset (the default) on while frames are heavy: after 2 frames in a row whose CPU time passes 60 % of the
+  - `LORD_PIPELINE`, read once at startup and named in the session log: unset, `0` or anything else off (the previous
+    behaviour exactly; the default since the Pi 5 run), `2` always, `1` on while frames are heavy: after 2 frames in a row whose CPU time passes 60 % of the
     period, off after 60 in a row under 40 % or at the first frame after more than half a second without one
     (`FPIPE_IDLE_MS`; an idle desktop gives no frames to count, and without this the pipeline stayed on through it, so
     the first input after it was shown a vblank later; that frame counts as the first of the two heavy ones that
@@ -664,10 +714,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `lordbench-test` (1,197 ok) checks a prepared frame's phases, its class, a late one and the pointer's latency
     across the pipeline. LordBench's desktop test in an isolated headless session with `LORD_PIPELINE=1` and `=0`:
     the same results (60 fps alone and under load, `prepared 0`: no flips without a monitor). VM 116 has no free
-    DRM card (lord-sessiond holds its virtio-gpu card), so the pipeline itself has not run on a display yet.
-    <!-- PI-RESULT: the frame pipeline on the Pi 5 with its monitor: Desktop impact alone and under load with
-    LORD_PIPELINE unset and =0, two runs each (fps, late %, build p50/p99, pointer to screen p50/p99, prepared,
-    heldMs p50/p99) -->
+    DRM card (lord-sessiond holds its virtio-gpu card), so the pipeline itself had not run on a display then.
+  - **On the Raspberry Pi 5 with its monitor** (2026-10-29, GPU drag on in both, two runs each): with the pipeline
+    while frames are heavy, alone 60.0 fps (build p50 8.26–8.31, p99 11.90–11.98 ms, 0 % late), pointer to screen p50
+    42.1–42.5 ms; under load 33.0–36.2 fps (build p50 13.85–13.90, p99 19.07–19.36 ms, 65.8–81.6 % late), pointer to
+    screen p50 77.3–79.8, p99 98.7–99.8 ms; every frame was prepared ahead, alone too (held for the flip p50/p99 8.40/15.72
+    ms alone, 18.27/31.60 under load). With `LORD_PIPELINE=0`: alone 59.9 fps, pointer to screen p50 25.5–25.7 ms;
+    under load 30.8 fps (93.8–94.3 % late), pointer to screen p50 48.8–49.0, p99 66.1–66.3 ms. So it gave 2–5 frames a
+    second under load for 17 ms more pointer latency alone and 29 ms more under load, and its auto mode engaged even
+    alone at 60 fps (a frame of about 11.5 ms with the GPU's part passes 60 % of 16.7 ms): it is now **off by
+    default** (the first entry under Changed).
 - **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every
   `setStyle` call: a style an animation sends every frame wrote a line to the session log every frame (as
   `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
@@ -677,7 +733,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Fixed
 
 - **System Information's Raspberry Pi power and throttling rows** (2026-10-29; `server/src/hw/rpifw.c`,
-  `sysreport/sysreport.c`, `apps/sysinfo`; tested on fake sysfs trees and VM 116, **not yet on a real Pi**): the
+  `sysreport/sysreport.c`, `apps/sysinfo`; tested on fake sysfs trees and VM 116; the shared reader ran on the Pi 5 in
+  LordBench on 2026-10-29, the alarm present and reading 0, while System Information's rows were not looked at there): the
   collector looked only for the firmware's `get_throttled` (`soc@107c000000:firmware` on the Pi 5), which the
   `rpi-6.18.y` kernel LordOS ships doesn't have, so on a Pi 5 with LordOS the Power and Throttling rows were always
   empty (and the Markdown report said nothing). System Information now reads the firmware the same way LordBench's

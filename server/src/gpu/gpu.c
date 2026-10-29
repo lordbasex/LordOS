@@ -1068,7 +1068,8 @@ static void gdrag_teardown(void) {
 /* GPU drag's program and textures in this context, and the self-test (or its earlier outcome). 1 = on. */
 static int gdrag_setup(void) {
     const char *e = getenv("LORD_GPU_DRAG");
-    if (e && !strcmp(e, "0")) { fprintf(stderr, "gpu: GPU drag off (LORD_GPU_DRAG=0): the dragged window is composed by the CPU\n"); return 0; }
+    /* off by default since the Raspberry Pi 5 run of 2026-10-29: right on V3D but no measurable gain (docs/GPU.md) */
+    if (!e || strcmp(e, "1")) { fprintf(stderr, "gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is composed by the CPU\n"); return 0; }
     GOut *o = G.cur && G.cur->used ? G.cur : &G.out[0];
     if (!o->used || !eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) return 0;
     GLint range[2] = { 0, 0 }, prec = 0;

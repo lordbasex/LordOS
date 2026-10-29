@@ -559,14 +559,18 @@ LordBench and a desktop that stays smooth under load. Each item is described in 
   pointer-to-screen latency, the N-boot test, `lordos-sysreport bench` and the Pi 5 reference.
 - [x] LordOS's own interface work as workloads (`cpu.ui`, `cpu.shape`, fonts built into the helper) and the
   helper-sandbox self-test inside `lord-bench` (2026-10-28).
-- [ ] The interface workloads measured on the Pi 5 (its reference lists them as not measured).
+- [ ] The interface workloads measured on the Pi 5 for its reference. *Two Quick runs from a terminal (2026-10-29):*
+  layout and paint 39.3–39.4 fps on one core, 45.4 fps with the paint threads; shaping 630–632 runs/s on one core,
+  2,522–2,527 on four (`BENCHMARK.md`); the reference waits for a Full run.
 - [ ] The x86 PC reference (a modest PC still to be chosen; may move to 0.8.7).
 - [ ] Hardware video decoding (may move after 0.8.6).
-- [ ] Detecting the Pi 5 firmware's throttling. *Built, waiting for the check on a real Pi (2026-10-28/29):* the
+- [x] Detecting the Pi 5 firmware's throttling. *Built (2026-10-28/29), checked on the Pi 5 on 2026-10-29:* the
   LordOS kernel (`rpi-6.18.y`) only exposes the firmware's under-voltage alarm (`rpi_volt`'s `in0_lcrit_alarm`, the
   last 2 s), not its capped, throttled or soft-limit bits, so LordBench watches that alarm and `get_throttled` where
   an older kernel has it, and counts 80 °C on a Pi as the firmware's limit (peak tests stop as throttled); System
-  Information's Raspberry Pi rows read the same way through the shared `hw/rpifw.c`. Tested on fake sysfs trees only.
+  Information's Raspberry Pi rows read the same way through the shared `hw/rpifw.c`. Tested on fake sysfs trees, and
+  on the Pi 5: the `rpi_volt` alarm is present and reads 0 with the official supply (`piFirmware.voltageAlarm` true,
+  `underVoltage` false), `get_throttled` absent. An actual under-voltage was not provoked.
 
 **The desktop under load** (`BENCHMARK.md`, "The desktop under load"; `GPU.md`). On the Pi 5 with its monitor the
 desktop fell to 24 fps under an all-core load:
@@ -585,21 +589,26 @@ desktop fell to 24 fps under an all-core load:
   GPU drag off: alone 53–58 → 59.8–60 fps, under load 24–25 → 30 fps; with GPU drag on it stalled (52 fps alone; that
   run predates the slices and the phase timing).
 - [x] Build the next frame while the previous flip is pending (the frame pipeline, `fpipe.c`, `LORD_PIPELINE`; `GPU.md`,
-  "The frame pipeline"): on while frames are heavy, one display with real page flips, pixels unchanged
-  (`fpipe-test`, `engine-test`'s pipelined drag runs). Estimated, not measured: 30 → 52–58 fps under load.
-- [ ] Measure the frame-cost work, GPU drag and the frame pipeline on the Pi 5 with its monitor and the phase timing
-  (`BENCHMARK.md`, "What to run on the Pi 5 next"), with `LORD_GPU_VERIFY=1` once and a real screenshot.
-  <!-- PI-RESULT: tick this item and add the measured numbers (alone / under load fps with the defaults, with
-  LORD_GPU_DRAG=0 and with LORD_PIPELINE=0) -->
-- [ ] Decide GPU drag's default after that run: today it is on wherever its self-test passes (`LORD_GPU_DRAG=0` turns
-  it off); off by default unless the new run shows no stalls.
+  "The frame pipeline"): one display with real page flips, pixels unchanged (`fpipe-test`, `engine-test`'s pipelined
+  drag runs). Estimated 30 → 52–58 fps under load; measured on the Pi 5, 30.8 → 33–36 fps for 17–29 ms more pointer
+  latency, so it is off by default (`LORD_PIPELINE=1` while frames are heavy, `2` always).
+- [x] Measure the frame-cost work, GPU drag and the frame pipeline on the Pi 5 with its monitor and the phase timing
+  (`BENCHMARK.md`, "What was run on the Pi 5"), with `LORD_GPU_VERIFY=1` once and a real screenshot (2026-10-29).
+  Both off (the defaults now): 59.9 fps alone, 30.5–31.1 fps under load, pointer to screen p50 25.7–25.9 / 48.5–49.0
+  ms; GPU drag on: 59.9 and 30.8–31.6 fps; the pipeline while frames are heavy: 60.0 and 33.0–36.2 fps, pointer
+  42 / 78 ms. GPU drag's self-test passes on V3D and 138 verified frames had 0 differences; the dragged window's
+  corners are clean on the monitor. Under load 320 of 374 frames are GPU-late (the GPU's time per frame 1.5 → 14–16
+  ms, no clock or thermal throttling).
+- [x] Decide GPU drag's default after that run: **off** (`LORD_GPU_DRAG=1` turns it on): correct on V3D, no
+  measurable gain.
 - [ ] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window.
-- [ ] Optional: cheaper uploads (pixel buffers or a linear canvas), scissoring the GPU composite to the damage,
-  a 1000 Hz kernel tick for the Pi 5.
-- [ ] Merge `perf-frame`, with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, `FANS.md`, the paper, the FAQ, the
-  features page and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch); the docs are ready on the branch, with
-  `PI-RESULT` comments where the Pi 5 run's numbers go. <!-- PI-RESULT: tick at the merge; fill every PI-RESULT
-  marker (grep -rn PI-RESULT docs web/content CHANGELOG.md) -->
+- [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
+  composes only the damage, PBO uploads or a linear canvas) and finding what slows V3D under an all-core CPU load
+  (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention is the likeliest cause, not proven:
+  read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5.
+- [x] Merge `perf-frame` (2026-10-29), with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, `FANS.md`, the paper,
+  the FAQ, the features page and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch), with the final Pi 5 run's
+  numbers and the frame pipeline and GPU drag off by default.
 
 **Release:**
 - [ ] Re-measure the references after the release (results compare only within one LordOS version).
@@ -770,13 +779,14 @@ desktop fell to 24 fps under an all-core load:
   code, one core and with the paint threads, and shaping fixed paragraphs in five scripts, with the fonts built
   into the helper; VM 116: 37.0 and 39.9 fps, 619 and 3,595 runs/s), and the helper-sandbox self-test inside
   `lord-bench` (six tries that must fail, checked by the Stability verdict and `lordos-sysreport bench`). Left:
-  hardware video decoding, the x86 PC reference, measuring the Pi 5 with the interface workloads (its reference
-  lists them as not measured), checking the Pi 5 firmware's throttling detection on a real Pi (built on fake sysfs
-  trees: the LordOS kernel only exposes the under-voltage alarm, so 80 °C counts as the firmware's limit), and the rest of what it found on the Pi 5 (the desktop fell to 24 fps under load;
+  hardware video decoding, the x86 PC reference, a Full run of the Pi 5 with the interface workloads for its reference
+  (two Quick runs measured them on 2026-10-29), and the rest of what it found on the Pi 5 (the desktop fell to 24 fps under load;
   the compositor's CPU weight and its real-time priority fix it on VM 116; on the Pi 5 with its monitor they take it
   to 29–30 fps; the frame-cost work cuts a drag frame's build under load to 12.9 ms and keeps 60 fps alone, but
-  under load the build, the GPU and the flip still miss the refresh, at 30 fps, and the frame pipeline built for
-  that is not yet measured: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost").
+  under load the frames still miss the refresh, at about 31 fps, now on the GPU's side (its time per frame 1.5 → 14–16
+  ms under load, no throttling); the frame pipeline and GPU drag, measured on 2026-10-29, gave too little and are off
+  by default: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost"). The firmware throttling
+  detection was checked on the Pi 5 (the under-voltage alarm present, reading 0).
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel

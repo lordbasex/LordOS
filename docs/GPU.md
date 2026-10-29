@@ -183,7 +183,8 @@ on the CPU inside the call, so the first GPU drag frame after such a change miss
 frame has, so a pixel the slices missed shows): every frame matches, and it checks that no GPU drag frame has more than
 `GDRAG_FEED_PX` of the copy left to send.
 
-**Off unless it proves itself:** `gpu_init` sets GPU drag up. It needs a fragment shader with at least 24-bit
+**Off by default** since the Raspberry Pi 5 run of 2026-10-29 (below): `LORD_GPU_DRAG=1` turns it on.
+**Then off unless it proves itself:** with it, `gpu_init` sets GPU drag up. It needs a fragment shader with at least 24-bit
 `highp` floats (`glGetShaderPrecisionFormat`) and then a self-test, drawn into a framebuffer, read back
 and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
 - arithmetic: every valid premultiplied (alpha, colour ≤ alpha) over every destination value (three of
@@ -198,11 +199,13 @@ and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
 One differing pixel turns it off. The outcome is kept per GL renderer and version across contexts, so a
 GPU restart doesn't run it again. The log says `gpu: GPU drag on: … self-test: N pixels, every valid
 premultiplied combination and a WxH placement pass, the same as the CPU's, T ms` or `gpu: GPU drag off: …`
-with the reason.
+with the reason; without `LORD_GPU_DRAG=1`, `gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is
+composed by the CPU`, and no self-test runs.
 
 | Switch | Effect |
 |---|---|
-| `LORD_GPU_DRAG=0` | GPU drag off: the dragged window is painted by the CPU as before |
+| unset, `LORD_GPU_DRAG=0` or anything but `1` | GPU drag off (the default): the dragged window is painted by the CPU as before |
+| `LORD_GPU_DRAG=1` | GPU drag on wherever its self-test passes |
 | `LORD_GPU_VERIFY=N` | every N-th GPU drag frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
 
 The `drag: …` and `drag (scripted): …` lines end with `GPU drag: N of M frames (Q quads), strips … Mpx,
@@ -256,14 +259,24 @@ before the uploads in slices and the phase timing): with GPU drag on, 52.2–52.
 13.5–15.0 % late) and 25.8–27.5 fps under load, against 59.8–60.0 and 30.1–30.3 fps with `LORD_GPU_DRAG=0` in the
 same build (`docs/BENCHMARK.md`, "The drag frame's cost"). It stalled; the whole uploads inside a frame (V3D tiles
 the texture on the CPU) are the likely cause and the reason for the slices above, but it was not measured, since
-the phases did not exist yet. <!-- PI-RESULT: GPU drag on the Pi 5 with the final build: the `gpu: GPU drag on|off`
-line (self-test pixels and ms on V3D), LORD_GPU_VERIFY=1 differ= over a Desktop impact run, alone / under load fps
-with GPU drag on and with LORD_GPU_DRAG=0, frames.phases gpuDrag taken/refused and catchUpMpx; then the default -->
+the phases did not exist yet.
 
-**Not checked yet:** on the Pi 5, its self-test, `LORD_GPU_VERIFY=1` over full LordBench desktop runs alone and under
-load, a run with the slices, a real screenshot and one run with `LORD_SW_CURSOR=1`. Until then no gain is claimed,
-and its default (on wherever the self-test passes) is decided after that run. Near the menu bar or the Dock the
-frame is still painted by the CPU.
+**The final run on the Pi 5** (2026-10-29, the build with the uploads in slices, the phase timing and the frame
+pipeline; LordBench's Desktop impact, with the pipeline off unless said; `docs/BENCHMARK.md`, "The drag frame's cost"):
+- The self-test passes on V3D: `gpu: GPU drag on: … self-test: 11373321 pixels, every valid premultiplied
+  combination and a 4096x2048 placement pass, the same as the CPU's, 341 ms`.
+- `LORD_GPU_VERIFY=1` over a whole Desktop impact run (alone and under load): 138 GPU drag frames compared, all
+  `differ=0 worst=0` (that run is slower, 52.7 and 26.6 fps, because of the read-back).
+- It no longer stalls: 59.9 fps alone and 30.8–31.6 fps under load with GPU drag on (three runs), 59.9 and
+  30.5–31.1 fps with it off (two runs); pointer to screen p50 25.5–25.9 ms alone and 48.5–49.0 ms under load either
+  way. It composed 138 of 601 frames alone (refused: `layer` 214, `after` 241, catching up 8) and 80 of 436 under
+  load; the UI texture's upload fell from 0.97 to 0.84 Mpx a frame.
+- The rounded corners of the dragged window were clean in screenshots of the monitor during the scripted drag.
+
+Correct on V3D, but no measurable gain, so it is **off by default**, `LORD_GPU_DRAG=1` turns it on, and the self-test
+runs only then. What keeps the Pi at about 31 fps under load is the GPU's time per frame (1.5 ms alone, 14–16 ms
+under load, with no clock or thermal throttling; "The frame pipeline" below), which GPU drag does not reduce.
+**Not checked yet:** a run with `LORD_SW_CURSOR=1`. Near the menu bar or the Dock the frame is still painted by the CPU.
 
 ## The frame pipeline (0.8.6, in development)
 
@@ -291,8 +304,9 @@ virtual card: the wait there is the pacing slot, not the flip), and not with sev
 layer and GPU drag state are shared between them; each frame is built and submitted at once there, as before). Both the
 GPU and the CPU composition paths use it.
 
-**The switch** `LORD_PIPELINE`, read once at startup (the session log says which): `0` off (exactly the previous
-behaviour), `2` always, anything else (and unset, the default) *while frames are heavy*: on after 2 frames in a row
+**The switch** `LORD_PIPELINE`, read once at startup (the session log says which): unset, `0` or anything else off
+(exactly the previous behaviour; **the default** since the Pi 5 run below), `2` always, `1` *while frames are heavy*:
+on after 2 frames in a row
 whose CPU time (JS frame callbacks, layout, paint, upload, swap and flip ioctl; for a prepared frame its prepare
 plus its submission) is above 60 % of the refresh period, off after 60 frames in a row below 40 %, or at the first
 frame after more than half a second without one (`FPIPE_IDLE_MS`: an idle desktop gives no frames to count, so
@@ -353,13 +367,28 @@ before the flips themselves came every other vblank) and the rate can double.
 `heldMs` the time it waited for the flip, and the synthetic pointer's latency ends at its own presentation
 (`lbf_painted`, `lbf_submitted`).
 
-**Not measured yet:** the Raspberry Pi 5 with its monitor, the machine this is for: LordBench's Desktop impact
-alone and under load with `LORD_PIPELINE` unset and with `LORD_PIPELINE=0`. VM 116 has no free DRM card (its
-virtio-gpu card belongs to lord-sessiond, and its flips would be paced in software anyway), so on it only the
-headless path ran (unchanged: `prepared 0`), with the unit tests and `engine-test`'s pipelined drag runs. No gain
-is claimed until the Pi run. <!-- PI-RESULT: the frame pipeline on the Pi 5 with its monitor: Desktop impact alone
-and under load with LORD_PIPELINE unset and =0 (fps, late %, pointer to screen p50/p99, prepared, heldMs p50/p99),
-and whether auto mode engaged (the `frame pipeline` lines with -d) -->
+VM 116 has no free DRM card (its virtio-gpu card belongs to lord-sessiond, and its flips would be paced in software
+anyway), so on it only the headless path ran (unchanged: `prepared 0`), with the unit tests and `engine-test`'s
+pipelined drag runs.
+
+**Measured on the Raspberry Pi 5 with its monitor** (2026-10-29, LordBench's Desktop impact, two runs each, GPU drag
+on in both; `docs/BENCHMARK.md`, "The drag frame's cost"):
+
+| Pi 5, monitor | Alone | Pointer to screen p50 alone | Under load | Late under load | Pointer to screen p50 / p99 under load |
+|---|---|---|---|---|---|
+| `LORD_PIPELINE` while frames are heavy (the default then) | 60.0 fps | 42.1–42.5 ms | 33.0–36.2 fps | 65.8–81.6 % | 77.3–79.8 / 98.7–99.8 ms |
+| `LORD_PIPELINE=0` | 59.9 fps | 25.5–25.7 ms | 30.8 fps | 93.8–94.3 % | 48.8–49.0 / 66.1–66.3 ms |
+
+The auto mode engaged even alone at 60 fps: a frame of about 11.5 ms with the GPU's part passes 60 % of the period,
+so every frame was prepared ahead (held for the flip p50/p99 8.40/15.72 ms alone, 18.27/31.60 ms under load). Under
+load it gained 2–5 frames a second, not the 60 the model expected, because the frames there are late on the GPU's
+side, not the CPU's: 285 of 436 GPU-late with it (148 on time, 1 CPU-late), 327 of 371 without it. The GPU's time per
+frame goes from about 1.5 ms alone to 14–16 ms under load, and the upload of about 1 Mpx from 1.4 to about 4 ms,
+while V3D stays at 0.86–1.15 GHz, the cores at 1.8–2.4 GHz, 36.7–47.2 °C and `get_throttled=0x0` (`vcgencmd` every
+2 s): no clock or thermal throttling, most likely memory contention with the busy cores (not proven: no
+memory-bandwidth counter was read). The pointer reached the screen 17 ms later alone and 29 ms later under load.
+So the pipeline is **off by default**; the code stays, with `LORD_PIPELINE=1` (while frames are heavy) and `2`
+(always) to turn it on.
 
 ## The CPU path on several threads (0.8.5)
 
@@ -525,9 +554,9 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 
 ## Pending
 
-- GPU drag on the Raspberry Pi 5 (its self-test, `LORD_GPU_VERIFY`, a run with the uploads in slices) and its
-  default; GPU drag also where the menu bar or the Dock overlap the window (step 12).
-- The frame pipeline measured on a real display (the Pi 5 with its monitor).
+- GPU drag also where the menu bar or the Dock overlap the window (step 12); it is off by default after the Pi 5 run.
+- Fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU composes only the damage, PBO uploads)
+  and finding what slows V3D under an all-core CPU load (14–16 ms of GPU a frame instead of 1.5).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

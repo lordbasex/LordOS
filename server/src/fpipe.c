@@ -5,7 +5,7 @@
 
 void fpipe_init(FPipe *p, const char *env) {
     memset(p, 0, sizeof *p);
-    p->mode = env && !strcmp(env, "0") ? FPIPE_OFF : env && !strcmp(env, "2") ? FPIPE_ALWAYS : FPIPE_AUTO;
+    p->mode = env && !strcmp(env, "1") ? FPIPE_AUTO : env && !strcmp(env, "2") ? FPIPE_ALWAYS : FPIPE_OFF;
 }
 
 void fpipe_note(FPipe *p, double now_ms, double cpu_ms, double period_ms) {

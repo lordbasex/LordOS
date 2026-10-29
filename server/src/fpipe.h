@@ -8,8 +8,10 @@
 #ifndef LORD_FPIPE_H
 #define LORD_FPIPE_H
 
-/* LORD_PIPELINE, read once at startup: 0 off (every frame is built after the flip, as before 0.8.6),
- * 2 always, anything else (and unset) auto: on while frames are heavy (fpipe_note) */
+/* LORD_PIPELINE, read once at startup: 1 auto (on while frames are heavy, fpipe_note), 2 always, anything
+ * else (and unset) off: every frame is built after the flip, as before 0.8.6. Off by default since the
+ * Raspberry Pi 5 run of 2026-10-29: auto gave 2-5 more frames a second under an all-core load but 17-29 ms
+ * more pointer latency, and engaged even alone at 60 fps (docs/GPU.md, "The frame pipeline"). */
 enum { FPIPE_OFF, FPIPE_AUTO, FPIPE_ALWAYS };
 typedef struct {
     int mode;

@@ -333,8 +333,8 @@ development package.
   the scratch file is recorded (NVMe, SD/eMMC, SSD, HDD, USB, virtual, or RAM in the live session). Unit tests
   on fake sysfs trees (`tests/lordbench_test.c`): an x86 laptop on battery, a Raspberry Pi 5 with the kernel
   LordOS ships, a Pi known only from its device tree, and an older Pi kernel with `get_throttled`.
-- **The Raspberry Pi firmware's throttling** (0.8.6 in development, 2026-10-28; `bench/lbcond.c`, not yet run
-  on a real Pi). On a Pi the firmware itself lowers the ARM clock on under-voltage, at its temperature limit
+- **The Raspberry Pi firmware's throttling** (0.8.6 in development, 2026-10-28; `bench/lbcond.c`; run on the Pi 5
+  on 2026-10-29, below). On a Pi the firmware itself lowers the ARM clock on under-voltage, at its temperature limit
   or when the clock is capped, and cpufreq may not show it. What the kernel tells an unprivileged process,
   checked in Raspberry Pi's `rpi-6.18.y` source (the branch `tools/rpi/build-kernel.sh` builds;
   `bcm2712_defconfig` has `CONFIG_SENSORS_RASPBERRYPI_HWMON=m`):
@@ -374,7 +374,11 @@ development package.
   "It reached 80 °C, where the board's firmware starts slowing the processor down", and "The board reports low
   supply voltage" from `piFirmware` (older results keep using the end's bits), and Conditions gets a "Board
   firmware" row listing what happened, or what was watched when nothing did. Machines that are not a Pi get no
-  `piFirmware` and behave as before. Not verified on a real Pi yet: that the alarm reads `1` during an actual
+  `piFirmware` and behave as before. **On the Pi 5** (2026-10-29, the LordOS kernel 6.18.57-lordos.3, the official
+  supply, LordBench → Desktop impact): `piFirmware` was `{"flags": false, "voltageAlarm": true, "underVoltage": false,
+  "tempLimit": false, "tempLimitC": 80}`, `rpiUnderVoltageAlarm` 0 before and after and `in0_lcrit_alarm` 0: the
+  `rpi_volt` alarm is there and reads 0, and `get_throttled` is absent as the source says (`vcgencmd get_throttled`,
+  run by hand as root, said `0x0` throughout). Not verified yet: that the alarm reads `1` during an actual
   under-voltage, and how fast the Pi 5 reaches 80 °C without a cooler in the peak tests.
 
   The reader is shared (`hw/rpifw.c`, `rpifw_read`: lord-server, `lordos-sysreport` and the tests link it), and
@@ -387,7 +391,8 @@ development package.
   only. The report's `raspberryPi` has `throttled` (the raw bits or `null`) and `underVoltageAlarm` (`true`,
   `false` or `null`). Tested on fake sysfs trees (`tests/sysreport_test.c`: the LordOS kernel with the alarm clear,
   set, malformed and missing; older Pi 4 and Pi 5 kernels with `get_throttled`; both; neither; a machine that isn't
-  a Pi), not yet on a real Pi.
+  a Pi); on the Pi 5 the shared reader gave LordBench the values above, while System Information's rows themselves
+  were not looked at there.
 - **Helper-sandbox self-test** (`sec.helper-sandbox`, repeated inside `lord-bench`, `sandbox_tries` in
   `bench/lbmain.c`): right after `sandbox_apply_helper` and before any work, in every mode, `lord-bench` tries six
   things that must fail: the Sandbox Probe's helper tries (`app/probe.c`) with its own versions of the data-folder
@@ -426,7 +431,8 @@ development package.
 - **Reference machines** (`apps/sysinfo/references.js`): VM 116 and the Raspberry Pi 5 16 GB, each a Full run
   copied from the `lordbench.json` it wrote (numbers below). A measurement added after a machine's run is listed in
   its `notMeasured` until it is measured again: VM 116's layout, paint and shaping numbers come from a later Full
-  run; the Pi 5 has none yet. The modest x86 PC is added when measured.
+  run; the Pi 5's were measured only in Quick runs from a terminal (below), so its reference still lists them as not
+  measured. The modest x86 PC is added when measured.
 
 VM 116, Full with 30 s sustained, LordBench 1 (2026-10-27, 159 s): SHA-256 166 MB/s on one core and 984 MB/s on
 eight; matrix product 3.3 and 19.9 GFLOP/s; xz 60 and 363 MB/s; QuickJS 57 and 336 runs/s; memory copy
@@ -460,6 +466,12 @@ a cpufreq cooling device are not exposed, so firmware throttling can't be seen d
 throttling does not fire on the Pi; the `rpi_volt` under-voltage alarm is read); the sustained curve and the
 temperature are the evidence that it did not throttle. (Since then the alarm is watched during the whole run and
 the firmware's documented 80 °C limit counts as throttling on a Pi: "The Raspberry Pi firmware's throttling" above.)
+
+Raspberry Pi 5 16 GB, the interface workloads, two Quick runs from a terminal (`lordos-sysreport bench --quick
+--json`, the arm64 build of the `perf-frame` branch, 2026-10-29; 39 s each, 36.4 → 40.8 °C, the `ondemand` governor,
+4 threads): layout and paint 39.31–39.37 fps on one core and 45.38–45.41 fps with the paint threads; shaping
+630.0–632.3 runs/s on one core and 2,521.7–2,526.7 runs/s on four (4.0×). The Pi's paint threads gain about 15 %
+(VM 116: 8 %). These are not in `references.js` yet: a reference comes from a Full run.
 
 Desktop impact:
 
@@ -594,29 +606,49 @@ With GPU drag off the desktop is back at the refresh rate alone, and under the l
 20 ms to 12.9 ms but every other frame is still late (30 fps): the chain of build, GPU and flip is still longer
 than one period. With GPU drag on, that build stalled (52 fps alone, p99 about 21.5 ms): it ran before GPU drag's
 textures caught up in slices between frames (`docs/GPU.md`, "Uploads without a stall") and before the frame phases
-below existed, so the cause was not measured. <!-- PI-RESULT: GPU drag on the Pi 5 with the final build: its
-self-test line from session.log (on/off, pixels, ms), LORD_GPU_VERIFY=1 differ= results, and a row "Frame-cost work,
-GPU drag on (slices)" with alone fps / p99 / late and under-load fps / p50 / late; then say whether it still stalls -->
-GPU drag's default is decided after that run: today it is on wherever its self-test passes, and
-`LORD_GPU_DRAG=0` turns it off.
+below existed, so the cause was not measured.
 
-**The frame pipeline (in development, not yet measured on the Pi).** A frame that takes 13–16 ms to build cannot
+**The final run** (2026-10-29, the arm64 build of the branch with everything in this section: the uploads in
+slices, the phase timing and the frame pipeline; the same Pi, monitor and test; build p50/p99 alone and under load
+are the compositor's own times):
+
+| Pi 5, monitor, final build | Runs | Alone: frames shown | Build p99 | Late | Under load: frames shown | Build p50 | Late |
+|---|---|---|---|---|---|---|---|
+| Pipeline and GPU drag off (**the defaults**) | 2 | 59.9 fps | 11.4–11.6 ms | 0.17 % | 30.5–31.1 fps | 13.2–13.3 ms | 89.5–96.2 % |
+| Pipeline off, GPU drag on | 3 | 59.9 fps | 11.4–11.7 ms | 0.17 % | 30.8–31.6 fps | 12.9–13.5 ms | 87.3–94.3 % |
+| Pipeline while frames are heavy, GPU drag on | 2 | 60.0 fps | 11.9–12.0 ms | 0 % | 33.0–36.2 fps | 13.9 ms | 65.8–81.6 % |
+| `LORD_GPU_VERIFY=1` (pipeline off, GPU drag on, every GPU drag frame read back) | 1 | 52.7 fps | 21.7 ms | 13.9 % | 26.6 fps | 14.6 ms | 97.2 % |
+
+Pointer to screen (LordBench's synthetic pointer, p50 alone; p50 / p99 under load): both off 25.7–25.9 ms and
+48.5–49.0 / 66.3–80.6 ms; GPU drag on 25.5–25.7 ms and 48.8–49.0 / 66.1–79.4 ms; the pipeline 42.1–42.5 ms and
+77.3–79.8 / 98.7–99.8 ms.
+
+GPU drag no longer stalls: its self-test passes on V3D (`gpu: GPU drag on: … self-test: 11373321 pixels, every valid
+premultiplied combination and a 4096x2048 placement pass, the same as the CPU's, 341 ms`), the 138 frames
+`LORD_GPU_VERIFY=1` compared were all `differ=0 worst=0` (the read-back is what slows that run), and it composed 138
+of 601 frames alone (refused: `layer` 214, `after` 241, `feed` 8) and 80 of 436 under load. Correct, but with no
+measurable gain (30.8–31.6 against 30.5–31.1 fps under load), so **GPU drag is off by default** since this run and
+`LORD_GPU_DRAG=1` turns it on (its self-test runs only then).
+
+**The frame pipeline (in development, measured on the Pi 5, off by default).** A frame that takes 13–16 ms to build cannot
 fit with the GPU's part in a 16.7 ms period while the next frame is started only after the flip. Now, while a flip
 is pending, the next frame's CPU part (input, JS frame callbacks, layout, paint into the scene) is done ahead, and at
-the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). On by
-default while frames are heavy (more than 60 % of the period, 2 frames in a row; off after 60 frames below 40 %, or
-at the first frame after more than half a second without one, so an idle desktop answers its next input without it),
-`LORD_PIPELINE=0` turns it off and `LORD_PIPELINE=2` keeps it on. Only with one display that has real page flips:
+the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). Off by
+default since the Pi 5 run; `LORD_PIPELINE=1` turns it on while frames are heavy (more than 60 % of the period, 2
+frames in a row; off after 60 frames below 40 %, or at the first frame after more than half a second without one, so
+an idle desktop answers its next input without it) and `LORD_PIPELINE=2` keeps it on. Only with one display that has real page flips:
 without a monitor, with a driver paced in software or with several displays nothing changes. Expected on the Pi
 under the load: the frames shown every vblank instead of every other one as long as the CPU part stays under one
 period, with about the same pointer latency; that is a model (`build/fpipe-test` drives a display on a vblank
 grid: 13 ms of CPU, 1 ms to submit and 3 ms of GPU give 299 flips in 600 periods without it and 598 with it, input
-to screen at most 33.3 and 36.0 ms), not a measurement. <!-- PI-RESULT: frame pipeline on the Pi 5 with its
-monitor: a table "Pi 5, monitor, pipeline" with LORD_PIPELINE unset vs LORD_PIPELINE=0, two runs each: alone and
-under-load frames shown, build p50/p99, late %, pointer to screen p50/p99, and frames.phases.load prepared /
-heldMs / onTime / cpuLate / gpuLate --> To measure: LordBench → Desktop impact twice with `LORD_PIPELINE` unset and
-twice with `LORD_PIPELINE=0` in the session's environment, comparing `desk.fps`, `desk.missed`, `desk.in50`/`in99`
-and `frames.phases.load` (`prepared`, `heldMs`, `onTime`).
+to screen at most 33.3 and 36.0 ms), not a measurement. **Measured on the Pi 5** (the table above, its auto
+mode then the default, with GPU drag on): under load 33.0–36.2 fps instead of 30.8–31.6, not 60, because the
+GPU's part, not the CPU's, is what passes the period there (below); every frame was prepared ahead, alone too
+(held for the flip p50/p99 8.40/15.72 ms alone, 18.27/31.60 ms under load; 148 of 436 frames on time under load, 1
+CPU-late, 285 GPU-late), since a frame of about 11.5 ms with the GPU's part passes 60 % of the period even at 60 fps;
+and the pointer reached the screen 17 ms later alone (42 against 25.5 ms) and 29 ms later under load (78 against 49
+ms). Two to five frames a second do not pay for that latency, so the pipeline is **off by default** and the code
+stays for `LORD_PIPELINE=1`/`2`.
 
 #### Frame phases (0.8.6, in development)
 
@@ -676,14 +708,33 @@ run of the branch's lord-server in an isolated headless session (a test theme mo
 `lord.wm.script` over 40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601
 frames, all on time, render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three
 runs). Those are a check that it works, not a measurement (a small scene, no GPU). The GPU fields were not
-exercised: VM 116 sessions are headless, so the fence, the uploads' times and GPU drag's counts have been built,
-not run. <!-- PI-RESULT: the Pi 5 run's frames.phases.load (p50/p99 of paintMs, uploadMs, gpuMs, vblankWaitMs and the
-onTime / cpuLate / gpuLate counts), with and without GPU drag and the pipeline, as the first measurement of the phases
-on a GPU -->
+exercised there: VM 116 sessions are headless.
 
-**What to run on the Pi 5 next** (the package from this work installed, the monitor on, logged in):
-1. LordBench → Desktop impact, twice with the defaults (GPU drag where its self-test passes, the pipeline while frames
-   are heavy), twice with `LORD_GPU_DRAG=0`, and twice with `LORD_PIPELINE=0`, in the session's environment.
+**On the Pi 5 with its monitor** (2026-10-29, the first phases on a GPU; p50/p99 in ms):
+
+| Pi 5, final build | Phase | `renderMs` | `paintMs` | `uploadMs` | `gpuMs` | On time / CPU-late / GPU-late |
+|---|---|---|---|---|---|---|
+| Both off (the defaults) | alone | 8.15 / 11.57 | 6.31 / 9.56 | 1.41 / 1.72 | 1.51 / 1.57 | — |
+| | under load | 13.25 / 18.92 | 8.55 / 13.11 | 4.24 / 5.25 | 14.49 / 19.00 | 39 / 14 / 320 of 374 |
+| Pipeline off, GPU drag on | alone | 8.15 / 11.49 | 6.32 / 9.42 | 1.41 / 1.72 | 1.50 / 2.25 | — |
+| | under load | 13.20 / 18.25 | 8.59 / 12.91 | 3.96 / 4.87 | 14.19 / 18.25 | 23 / 15 / 327 of 371 |
+| Pipeline while heavy, GPU drag on | alone | 8.32 / 11.90 | 6.75 / 9.99 | 1.32 / 1.70 | 3.38 / 4.15 | — |
+| | under load | 13.85 / 19.07 | 9.03 / 13.55 | 3.93 / 4.78 | 15.63 / 23.38 | 148 / 1 / 285 of 436 |
+
+The UI texture's upload was 0.97 Mpx a frame with GPU drag off (0.84 with it on). Under load the frames are
+**GPU-late**: the build fits (about 13 ms), but the GPU's time per frame goes from about 1.5 ms alone to 14–16 ms,
+and the upload (a copy of about 1 Mpx) from 1.4 to about 4 ms. `vcgencmd`, every 2 s during a run, showed V3D at
+0.86–1.15 GHz (mostly 1.15), the ARM cores at 1.8–2.4 GHz, the core clock at 0.59–0.91 GHz, 36.7–47.2 °C and
+`get_throttled=0x0` throughout: no clock or thermal throttling. The likeliest cause is memory contention between the
+GPU and the four busy cores; that is not proven (no memory-bandwidth counter was read). The next step is fewer pixels
+uploaded and composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load
+(`ROADMAP.md`).
+
+**What was run on the Pi 5** (2026-10-29; the package from this work installed, the monitor on, an autologin
+session, the variables set in the session's environment; the results above):
+1. LordBench → Desktop impact, twice with the build's defaults then (GPU drag where its self-test passes, the
+   pipeline while frames are heavy), three times with `LORD_PIPELINE=0`, and twice with `LORD_PIPELINE=0
+   LORD_GPU_DRAG=0` (the defaults now).
 2. From `~/.cache/lordos/session.log`: the `gpu: GPU drag on|off` line, the `lord-server: frame pipeline …` line, the
    `lordbench: desktop … phases` lines and the `drag (scripted):` line, and from
    `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
@@ -693,7 +744,9 @@ on a GPU -->
    With GPU drag, `gpuDrag.refused`/`gpuDrag.layer` say what keeps it off and `catchUpMpx` what the slices cost;
    with the pipeline, `prepared` and `heldMs` say how many frames were painted ahead and how long they waited.
 4. `LORD_GPU_VERIFY=1` once with GPU drag over a Desktop impact run: `gpu-verify: … differ=0` on every line.
-5. A real screenshot of a dragged window on the monitor (its rounded corners, `docs/WINDOWS.md`).
+5. A real screenshot of a dragged window on the monitor (its rounded corners, `docs/WINDOWS.md`): clean.
+6. `vcgencmd` every 2 s during one run (clocks, temperature, `get_throttled`), and `lordos-sysreport bench --quick
+   --json` twice (the interface workloads above).
 
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
 systemd-analyze gives 2.1 s kernel + 4.2 s userspace). Boots where the monitor was connected late took 61 and
@@ -718,9 +771,9 @@ but the helper-sandbox self-test let a try through or one is missing (text outpu
 code is 0 or 1 and the tries are in `sandboxTries`). On VM 116 a quick run took 46 s.
 
 Not built yet: hardware video decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's
-`v4l2request`); detecting the Pi's firmware throttling during a run on kernels that don't expose it; measuring the
-Pi 5 with the layout, paint and shaping workloads (its reference lists them as not measured); and the x86 PC
-reference.
+`v4l2request`); detecting the Pi's firmware throttling during a run on kernels that don't expose it; a Full run of
+the Pi 5 with the layout, paint and shaping workloads for its reference (two Quick runs measured them, above); and
+the x86 PC reference.
 
 ## 0.8.7 — Community hardware reports
 

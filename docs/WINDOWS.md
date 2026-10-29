@@ -153,7 +153,8 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
     and the copy (two textures uploaded only where they changed) with `blit_row`'s own arithmetic, so
     the pixels are the same. Not when an ancestor paints over the window, an app window is under it,
     a node painted after it (the menu bar, the Dock) meets the box, or the layer has an app window or
-    would be painted whole; then the frame is painted as before. `LORD_GPU_DRAG=0` turns it off,
+    would be painted whole; then the frame is painted as before. Off by default since the Pi 5 run
+    of 2026-10-29 (right on V3D, no measurable gain there); `LORD_GPU_DRAG=1` turns it on,
     `LORD_GPU_VERIFY=N` compares it with the CPU every N-th frame. `engine-test`'s `gpu-drag` path checks it
     against the GPU path's golden hashes.
 - **There's no layer** if there is a backdrop blur inside (`backdropFilter`), or a video on the GPU
@@ -208,8 +209,16 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 - **`test_drag_corners`** checks the corners of a dragged rounded window against a full repaint (above).
 - **On the Raspberry Pi 5** with its monitor, LordBench's desktop test (its square turning) went from 53–58
   to 59.8–60 fps alone and from 24–25 to 30 fps under load with this work and GPU drag off
-  (`docs/BENCHMARK.md`, "The drag frame's cost"). <!-- PI-RESULT: the final Pi 5 run (defaults, LORD_GPU_DRAG=0,
-  LORD_PIPELINE=0) and a real screenshot of a dragged window's corners on the monitor -->
+  (`docs/BENCHMARK.md`, "The drag frame's cost"). The final run (2026-10-29, GPU drag and the frame pipeline off,
+  the defaults now): 59.9 fps alone and 30.5–31.1 fps under load, the pointer on screen 25.7–25.9 ms after it moved
+  alone (p50) and 48.5–49.0 ms under load; with GPU drag on 30.8–31.6 fps, with the frame pipeline 33.0–36.2 fps
+  but 17–29 ms more pointer latency, so both stay off. Under load the frames are late on the GPU's side
+  (`docs/GPU.md`, "The frame pipeline"). Screenshots of the monitor during the scripted drag (crops of the dragged
+  window's lower corners, over another window and over the wallpaper): the rounded corners are clean, no black
+  squares.
+
+  ![A dragged window's lower-left corner over another window, Raspberry Pi 5 monitor](drag-corner-pi5-over-window.png)
+  ![A dragged window's lower-right corner over the wallpaper, Raspberry Pi 5 monitor](drag-corner-pi5-over-wallpaper.png)
 - **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
   display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
   the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where

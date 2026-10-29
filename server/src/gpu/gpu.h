@@ -90,7 +90,7 @@ typedef struct GpuDrag {
     const uint32_t *ref;                /* LORD_GPU_VERIFY: the CPU's pixels for w (w's width a row), or NULL */
     long frame;                         /* its number, for the log */
 } GpuDrag;
-/* 1 if GPU drag may be used on that output: the shader has 24-bit floats, LORD_GPU_DRAG is not 0, the self-test
+/* 1 if GPU drag may be used on that output: LORD_GPU_DRAG is 1 (off by default), the shader has 24-bit floats, the self-test
  * (every valid premultiplied combination, and a placement pass at least as large as the output, drawn
  * into a framebuffer and read back) gave the CPU's pixels. gpu_init runs that test, once per GL renderer
  * and version. */
