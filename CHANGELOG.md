@@ -876,9 +876,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (the moving dots, Monitor's live numbers and charts on both sides and its footer next to the blurred Dock never
   stayed several rectangles), so the blur margin adds next to nothing there; the per-frame difference measured in
   `test_multi_damage` (24,078 → 27,363 px) was not visible at the process level. Why the 0.8.2 VM 119 scene gave 5
-  to 11 rectangles and this one gives one is not investigated.
+  to 11 rectangles and this one gave one: a translucent, blurred Terminal hidden behind Monitor (next entry).
   LordBench's desktop mode in the headless harness (three runs each): 58.9-60.0 fps, build p50 1.25-1.26 ms and p99
   5.9-7.6 ms before; 60.0 fps, p50 1.24-1.27 ms and p99 5.95-6.32 ms after.
+- **A blurred window hidden behind another no longer makes every frame repaint it** (`paint.c`, `blur_hidden`; both
+  damage modes). The blur rule (a change that touches a blurred surface or the margin its blur samples repaints the
+  whole surface and its margin) also held for a blurred surface covered whole by an opaque window above it, which
+  shows nothing of its blur. A translucent Terminal (30 % transparency, blur) behind Monitor → Network: every frame
+  of the moving dots repainted the hidden Terminal's body and margin, one box of 45 % of a 1280×800 screen (62 to
+  73 % when its margin met the Dock's, which then joined), even with `LORD_DAMAGE=multi`, where without it the dots
+  are a few rectangles under 1 % of the screen. Now a blurred node that an opaque node painted after it covers whole
+  (the same test as the opaque-cover skip: opaque background, opacity 1 down the tree, no transform, away from
+  rounded corners, clipped by its ancestors; CPU path without a dragged window) is left out of the rule; when the
+  window on top moves, turns translucent or closes, the change reaches the blurred one and the rule applies again.
+  A blurred Terminal in front of the map is still repainted whole with its margin every frame (75 to 80 % of the
+  screen when its margin meets the Dock's): that is the rule itself.
+  **Found** on VM 116: the sessions of the repaint check above (and their `--profile` numbers) had such a Terminal
+  behind Monitor, restored from a `lord-term-holder` left by an earlier run (the harness killed holders with a
+  pattern that never matched the holder's process name). **Measured** (VM 116, isolated headless session, 1280×800,
+  CPU composition, one remote viewer, `--profile`, last 150 frames): repainted per frame 46.4 → 14.5 % (one box) and
+  46.2 → 3.8 % in 5.6 rectangles (several), paint 5.6 → 2.0 ms and 5.2 → 1.7 ms per frame; `lord-server` (whole
+  process, % of one core, 5 × 30 s, two batches): 24.3 / 22.3 → 13.2 / 15.3 % (one box) and 21.5 / 21.7 → 15.0 /
+  14.3 % (several). With no hidden blurred window the frames are the same as before (Monitor → Network alone, one
+  box: 10.2 / 13.8 % per frame, the live charts). **Checked:** `test_hidden_blur_damage` in `build/engine-test`
+  (a blurred window under an opaque one with moving dots, both modes: every frame matches a full repaint while the
+  hidden window moves and the one on top moves away and back, turns translucent, closes and reopens; the hidden
+  window no longer joins the damage; a visible one is still repainted whole; three of its checks fail without the
+  change); `make test` and a full build without warnings on VM 116; and on a running desktop with the repaint
+  check above, the original scenario (54 checks per mode) and a new one with the Terminal hidden behind Monitor's
+  moving map, raised over it and sent back ten times (21 checks per mode): no stale area in either mode, only
+  Monitor's live numbers and charts and the clocks changing between the two copies.
 - **The desktop under load** (found by LordBench's desktop test; `docs/BENCHMARK.md`, "The desktop under load"): the
   compositor's cgroup (`server`) had the same `cpu.weight` as every app scope, and nice values don't count between
   cgroups, so an app keeping every core busy took half of the compositor's CPU even at nice 19. On a Raspberry Pi 5

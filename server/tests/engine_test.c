@@ -722,6 +722,99 @@ static void test_minimize_damage(void) {
     paint_multi_damage = 0;
 }
 
+/* A blurred window hidden behind an opaque one (0.8.6, VM 116: a translucent Terminal behind
+ * Monitor): the moving dots over it no longer repaint it and its blur margin every frame, in either
+ * damage mode, and every frame still matches a full repaint while the window on top moves away,
+ * turns translucent, is removed and comes back, and while the hidden one moves. */
+static void test_hidden_blur_damage(void) {
+    enum { W = 640, H = 400, DOTS = 16 };
+    for (int mode = 0; mode < 2; mode++) {
+        paint_multi_damage = mode;
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff1c1c1e);
+        for (int i = 0; i < 16; i++) box_in(root, (float)(i * 40), 0, 14, H, 0xff2c4a7a);      /* something to blur */
+        Node *term = box_in(root, 120, 90, 380, 220, 0x50202020);                               /* the hidden window */
+        ss(term, "overflow", "hidden");
+        sn(term, "borderRadius", 10);
+        Node *tbody = box_in(term, 0, 24, 380, 196, 0x00000000);
+        sn(tbody, "backdropBlur", 14);
+        box_in(tbody, 10, 10, 120, 12, 0xffd0d0d0);                                            /* a prompt */
+        Node *mon = NULL, *map = NULL, *dots[DOTS];
+        float dx[DOTS], dy[DOTS];
+        Node *barl = layer_node(root, 20, W, H);
+        Node *bar = box_in(barl, 0, 0, W, 24, 0x80ffffff);
+        sn(bar, "backdropBlur", 10);
+        Node *dock = box_in(barl, 60, H - 50, W - 120, 44, 0x80ffffff);
+        sn(dock, "backdropBlur", 10);
+        sn(dock, "borderRadius", 12);
+        int built = 0, multi = 0, bad = 0, small = 0, quiet_frames = 0;
+        for (int f = 0; f < 48; f++) {
+            if (!built) {                                /* Monitor over it, its map with moving dots */
+                mon = box_in(root, 40, 40, 560, 310, 0xff2a2a2c);
+                ss(mon, "overflow", "hidden");
+                sn(mon, "borderRadius", 10);
+                map = box_in(mon, 100, 50, 360, 220, 0xff20304a);
+                ss(map, "overflow", "hidden");
+                for (int i = 0; i < DOTS; i++) {
+                    dx[i] = (float)(rnd() % 340);
+                    dy[i] = (float)(rnd() % 200);
+                    dots[i] = box_in(map, dx[i], dy[i], 9, 9, i % 2 ? 0xd8ff9f0a : 0xd830d158);
+                    sn(dots[i], "borderRadius", 4);
+                }
+                render(root, W, H);
+                built = 1;
+            }
+            for (int i = 0; i < DOTS && mon; i++) {
+                if (i % 4 != f % 4) continue;           /* a few dots per frame */
+                dx[i] += (float)((int)(rnd() % 9) - 4);
+                dy[i] += (float)((int)(rnd() % 7) - 3);
+                if (dx[i] < 0 || dx[i] > 350) dx[i] = 170;
+                if (dy[i] < 0 || dy[i] > 210) dy[i] = 100;
+                sn(dots[i], "left", dx[i]);
+                sn(dots[i], "top", dy[i]);
+            }
+            if (f == 14) { sn(term, "left", 130); sn(term, "top", 96); }       /* the hidden one moves */
+            if (f == 18) sn(mon, "left", 300);                                  /* Monitor moves: the Terminal shows */
+            if (f == 22) sn(mon, "left", 40);                                   /* and back over it */
+            if (f == 26) sn(mon, "opacity", 0.9);                               /* translucent: it shows through */
+            if (f == 28) sn(mon, "opacity", 1);
+            if (f == 32) { node_destroy(mon); mon = NULL; }                     /* closed */
+            if (f == 36) built = 0;                                             /* reopened next frame */
+            layout_root(root, W, H);
+            int n = 0;
+            float area = 0;
+            if (paint_partial(root, W, H, &n, &area) < 0) { bad++; continue; }
+            int where = 0, worst = full_differs(root, W, H, &where);
+            CHECK(worst <= 1, "hidden blur mode %d frame %d (%d rects) differs from a full repaint by %d at %d,%d",
+                  mode, f, n, worst, where % W, where / W);
+            /* frames where only dots moved under a covered Terminal */
+            int still = (f >= 2 && f < 14) || (f >= 40);
+            if (still && mon) {
+                quiet_frames++;
+                if (area <= (mode ? 0.05f * W * H : 360.0f * 220)) small++;   /* several: a few dots; one box: within the map */
+                if (n > 1) multi++;
+            }
+        }
+        CHECK(!bad, "hidden blur mode %d: %d frames with bad rectangles", mode, bad);
+        CHECK(small == quiet_frames, "hidden blur mode %d: %d of %d frames repainted the hidden window", mode, quiet_frames - small, quiet_frames);
+        if (mode) CHECK(multi >= quiet_frames / 2, "hidden blur: only %d of %d frames used several rectangles", multi, quiet_frames);
+        /* the rule still holds for a visible one: Monitor away, a dot next to the Terminal repaints it whole */
+        if (mon) node_destroy(mon);
+        render(root, W, H);
+        Node *dot = box_in(root, 112, 150, 9, 9, 0xd8ff9f0a);      /* inside the body's blur margin */
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        paint_partial(root, W, H, &n, &area);
+        int where = 0;
+        CHECK(area >= 380.0f * 196 && full_differs(root, W, H, &where) <= 1, "hidden blur mode %d: a visible blurred window is still repainted whole (%.0f px)", mode, area);
+        (void)dot;
+    }
+    paint_multi_damage = 0;
+}
+
 /* ---- lord-server's whole CPU damage pipeline (main.c), modelled ----
  * The tests above paint each frame's rectangles straight into one canvas. lord-server does more:
  * paint_ui adds each frame's rectangles to the display's pending list (o->pl, o->pend) and a display
@@ -2769,6 +2862,7 @@ int main(int argc, char **argv) {
     test_backdrop_band();
     test_multi_damage();
     test_minimize_damage();
+    test_hidden_blur_damage();
     test_damage_pipeline();
     test_damage_fuzz();
     test_grow_wrap_height();

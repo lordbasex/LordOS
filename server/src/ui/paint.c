@@ -1492,12 +1492,54 @@ static Box blur_near(const Node *n) {
     return near;
 }
 
+/* (0.8.6) A blurred node that an opaque node painted after it covers whole (a translucent Terminal
+ * behind Monitor's window) shows nothing of its blur: wherever a repaint cuts through it, the
+ * opaque node paints over the result. The rule above is left out for it; otherwise every change
+ * near it, such as Monitor's moving dots over the hidden Terminal, repainted it and its margin
+ * (45 % of a 1280x800 screen per frame on VM 116, in one box even with several rectangles on,
+ * instead of a few small rectangles; docs/MONITOR.md). Same test as cover_walk below (opaque
+ * background, opacity 1 down the tree, no transform, away from rounded corners, clipped by its
+ * ancestors), in paint order: only a cover met after the node counts. CPU path without a dragged
+ * window only, as the opaque-cover skip (engine-test test_hidden_blur_damage). */
+typedef struct { int target, seen, covered; Box d; } HideWalk;
+
+static void hide_walk(Node *n, Box clip, HideWalk *h) {
+    const Style *s = &n->s;
+    if (h->covered || n->type == NODE_RAW || s->display_none || n->own_tf) return;
+    if (n->id == h->target) h->seen = 1;
+    if (s->opacity < 0.999f) return;
+    Box box = box_and((Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h }, clip);
+    if (h->seen && n->id != h->target && (s->bg >> 24) == 0xff && !s->has_gradient && s->backdrop_blur < 1) {
+        float k = s->radius * 0.3f;
+        if (box_inside(h->d, (Box){ box.x0 + k, box.y0 + k, box.x1 - k, box.y1 - k })) { h->covered = 1; return; }
+    }
+    if (n->type == NODE_TEXT) return;
+    /* a node clipping its children that doesn't hold the box: none of them covers it (and the
+     * target is not inside, or only partly seen: then it isn't counted as hidden) */
+    if (s->overflow_hidden && !box_inside(h->d, box)) return;
+    Box inner = s->overflow_hidden ? box : clip;
+    float rr = node_edges_plain(n) ? s->radius : max4(s->ext->r.rad);
+    if (s->overflow_hidden && rr > 0) inner = (Box){ inner.x0 + rr, inner.y0 + rr, inner.x1 - rr, inner.y1 - rr };
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !h->covered; i++) hide_walk(kids[i], inner, h);
+}
+
+static int blur_hidden(Node *n) {
+    if (gpu_active() || layer.want || !ui.root || n->has_tf) return 0;
+    Box b = n->prev_box;
+    if (b.x1 <= b.x0 || b.y1 <= b.y0) return 0;
+    HideWalk h = { n->id, 0, 0, { floorf(b.x0), floorf(b.y0), ceilf(b.x1), ceilf(b.y1) } };
+    hide_walk(ui.root, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &h);
+    return h.covered;
+}
+
 static void blur_walk(Node *n, int *grew) {
     if (n->type == NODE_RAW || n->s.display_none) return;
     Box b = n->prev_box;
     if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0) {
         Box near = blur_near(n);
-        if (box_meets(ui.damage, near) && !box_inside(near, ui.damage)) { damage_add(near); *grew = 1; }
+        if (box_meets(ui.damage, near) && !box_inside(near, ui.damage) && !blur_hidden(n)) { damage_add(near); *grew = 1; }
     }
     for (Node *c = n->first; c; c = c->next) blur_walk(c, grew);
 }
@@ -1553,7 +1595,7 @@ static Box dl_bbox(const DamageList *l) {
 static void blur_collect(Node *n, Box *bb, int *k) {
     if (n->type == NODE_RAW || n->s.display_none) return;
     Box b = n->prev_box;
-    if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0) {
+    if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0 && !blur_hidden(n)) {
         if (*k < BLUR_MAX) bb[*k] = blur_near(n);   /* the node and the margin it samples, as blur_walk */
         (*k)++;
     }

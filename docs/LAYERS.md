@@ -126,6 +126,15 @@ old rule paints whole (what is below changed twice within 8 frames) may use the 
 when its damaged box meets a blurred surface below the window: painted whole, that blur reads the last
 frame outside the box, and the copy would not give the same pixels.
 
+A blurred surface that an opaque node painted after it covers whole (a translucent Terminal behind
+Monitor's window) shows nothing of its blur, so the rule leaves it out (`blur_hidden` in `paint.c`,
+0.8.6): before, every change near it repainted the hidden surface and its margin, 45 % of the screen
+per frame with Monitor's moving dots over a hidden Terminal (MONITOR.md, "A blurred window hidden
+behind Monitor"). The test is the opaque-cover skip's (opaque background, opacity 1 down the tree, no
+transform, away from rounded corners, clipped by its ancestors), in paint order; when the window on
+top moves, turns translucent or closes, the change reaches the blurred surface and the rule applies
+again (`test_hidden_blur_damage`).
+
 | | |
 |---|---|
 | ![before](menubar-band-before.png) | ![after](menubar-band-after.png) |

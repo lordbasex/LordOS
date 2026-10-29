@@ -891,13 +891,43 @@ batches, the build alternated):
 
 Layout and paint per frame (`LORD_FRAME_STATS`) were the same within 0.1 ms in every row (14.6 to
 14.8 ms). `--profile` shows why: in these sessions every frame repainted one box of 64 to 79 % of the
-screen, also with `LORD_DAMAGE=multi` (the dots, the live numbers and charts on both sides of the
-window and its footer next to the blurred Dock never stayed several rectangles), so the blur margin
-adds next to nothing; why VM 119's scene gave 5 to 11 rectangles and this one gives one was not
-looked into. Most of the process's CPU here is the remote desktop's frame comparison and the session
-itself, not paint. LordBench's desktop mode in the headless harness (`perf-theme.js`, three runs each):
+screen, also with `LORD_DAMAGE=multi`, so the blur margin adds next to nothing. The reason, found
+afterwards (next section): those sessions had a translucent, blurred Terminal hidden behind Monitor,
+and the blur rule repainted it whole every frame. Most of the process's CPU here is the remote
+desktop's frame comparison and the session itself, not paint. LordBench's desktop mode in the headless harness (`perf-theme.js`, three runs each):
 58.9–60.0 fps, build p50 1.25–1.26 ms, p99 5.9–7.6 ms before; 60.0 fps, p50 1.24–1.27 ms, p99
 5.95–6.32 ms after.
+
+**A blurred window hidden behind Monitor (0.8.6, VM 116).** Why the repeated scene gave one box of
+64 to 79 % per frame where VM 119 gave 5 to 11 small rectangles: the harness left the Terminal's
+session holder (`lord-term-holder`) of an earlier run alive (it killed holders with a pattern that
+never matched the holder's process name), so each new session restored a Terminal window at 30 %
+transparency with blur, and Monitor opened over it. A debug build printing `multi_rects`' steps
+showed three blurred nodes every frame: the menu bar, the Dock and the hidden Terminal's body
+(858×437 at 211,201, opacity 1, fully under Monitor's opaque window). The dots' rectangles all
+touched that body's blur margin, so the blur rule joined them into the body and its margin, 918×497
+(44.6 % of the screen); when the Terminal sat lower, its margin met the Dock's and the Dock joined
+too (62 to 73 %; with the Terminal in front of the map, 75 to 80 %, which is the rule itself). The
+one-box mode grew its box the same way. A fresh session with no Terminal gave the expected 5 to 10
+rectangles under 1 % of the screen.
+
+The blur rule now leaves out a blurred node that an opaque node painted after it covers whole
+(`blur_hidden` in `paint.c`, the opaque-cover skip's test in paint order; CPU path without a dragged
+window). The same scene, Terminal opened first and Monitor → Network over it, ten downloads, one
+remote viewer, `--profile` over the last 150 frames, and `lord-server`'s CPU (whole process, % of
+one core, 5 × 30 s, two batches):
+
+| Mode | Repainted per frame | Paint per frame | CPU before | CPU after |
+|---|---|---|---|---|
+| one box | 46.4 → 14.5 % | 5.6 → 2.0 ms | 24.3 / 22.3 % | 13.2 / 15.3 % |
+| several (`multi`) | 46.2 % in 1 → 3.8 % in 5.6 rectangles | 5.2 → 1.7 ms | 21.5 / 21.7 % | 15.0 / 14.3 % |
+
+Without a hidden blurred window nothing changes (Monitor → Network alone, one box: 10.2 and 13.8 %
+of the screen per frame, the live charts). Visual check with the same tools, both modes: the 0.8.2
+scenario (54 checks) and a new one where the Terminal is hidden behind the moving map, raised over it
+from the Dock and sent back behind it ten times (21 checks): no stale area, only Monitor's live
+numbers and charts and the clocks changing between the partial and the full copy.
+`build/engine-test` `test_hidden_blur_damage` covers it (three of its checks fail without the change).
 
 VM 119: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio` GPU without 3D, CPU compositing, 1280×800.
 Network tab in front, ten slow downloads to mirrors in ten countries (arcs to 8–11 countries, about
