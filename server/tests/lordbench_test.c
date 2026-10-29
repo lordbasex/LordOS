@@ -168,6 +168,30 @@ int main(void) {
     lbf_presented(5000, 0);                             /* a presentation stamped before the event: not a latency */
     lbf_presented(6000, 0);
     CHECK(lbf_end(&fs) == 0 && fs.inputs == 0, "no negative latency");
+    /* the frame pipeline (fpipe.h): a frame painted ahead holds the events applied before its paint, and they end
+     * at its own presentation, one flip after the one it was painted during */
+    lbf_begin();
+    lbf_presented(10000000, 16666667);
+    lbf_input(11000000);
+    lbf_painted();                                      /* frame A, while the flip before it is pending */
+    lbf_input(12000000);                                /* after A's paint: the next frame */
+    lbf_presented(26666667, 16666667);                  /* the flip A was painted during: none of A's */
+    lbf_submitted();                                    /* A submitted at that flip */
+    lbf_input(27000000);
+    lbf_painted();                                      /* frame B: 12 and 27 */
+    lbf_presented(43333334, 16666667);                  /* A shown: 32.33 ms */
+    lbf_submitted();
+    lbf_presented(60000000, 16666667);                  /* B shown: 48 and 33 ms */
+    CHECK(lbf_end(&fs) == 0 && fs.inputs == 3 && fabs(fs.in_p50 - 33) < 0.001 && fabs(fs.in_p99 - 48) < 0.001,
+          "pipelined input: %d events, p50 %f p99 %f", fs.inputs, fs.in_p50, fs.in_p99);
+    lbf_begin();                                        /* a prepared frame dropped: its events go with the next one */
+    lbf_input(1000);
+    lbf_painted();
+    lbf_input(2000);
+    lbf_built(1);
+    lbf_presented(5000, 0);
+    lbf_presented(6000, 0);
+    CHECK(lbf_end(&fs) == 0 && fs.inputs == 2, "a dropped prepared frame's events: %d", fs.inputs);
 
     /* ---- frame phases: what each part of a frame took, and why it was late ---- */
     {
@@ -233,7 +257,7 @@ int main(void) {
           ps.g0_refused[6] == 1 && ps.unshown == 1, "counts: par %d, G0 %d of %d, refused %d %d (%d), unshown %d", ps.par,
           ps.g0_taken, ps.g0_tried, ps.g0_refused[0], ps.g0_refused[6], ps.g0_layer[1], ps.unshown);
     CHECK(fabs(ps.feed_mpx - 262144 / 4.0 / 1e6) < 1e-9 && fabs(ps.feed.p99 - 1.5) < 1e-6, "catch-up %f Mpx %f ms", ps.feed_mpx, ps.feed.p99);
-    char pt[1024];
+    char pt[1536];
     lbf_phases_text(&ps, pt, sizeof pt);
     CHECK(strstr(pt, "CPU-late 1") && strstr(pt, "not layer 1 [invalid 1]") && strstr(pt, "not feed 1") && strstr(pt, "unshown 1"),
           "phases text: %s", pt);
@@ -250,6 +274,36 @@ int main(void) {
     lbf_phase_shown(F0 + P, 0);
     lbf_phases(&ps);
     CHECK(ps.n == 1 && ps.on_time == 1 && ps.gpu_known == 0 && ps.gpu.p50 == 0, "LordBench's phases: %d frames", ps.n);
+    /* a frame the pipeline prepared: painted during the flip before (12 ms), held until that flip, submitted
+     * at it in 2 ms and shown at the next vblank: on time, its build is both parts */
+    LbPhase e = { .piped = 1, .prev_flip = F0 + 7 * P, .wake = F0 + 6 * P + 100000, .from_flip = 1, .period = (uint32_t)P,
+                  .paint_ms = 10, .g0 = -1, .g0_why = -1, .g0_sub = -1 };
+    e.pre_end = e.wake + 300000;
+    e.render0 = e.pre_end + 200000;
+    e.built = e.render0 + 12000000;
+    e.swake = F0 + 7 * P + 100000;
+    e.sfrom_flip = 1;
+    e.sub0 = e.swake + 200000;
+    e.sub1 = e.sub0 + 2000000;
+    e.submit = e.sub1;
+    lbf_drag_begin();
+    lbf_phase_built(&e);
+    lbf_phase_shown(F0 + 8 * P, e.sub1 + 3000000);
+    lbf_drag_end(&ps);
+    CHECK(ps.n == 1 && ps.piped == 1 && ps.on_time == 1 && fabs(ps.build.p50 - 14) < 1e-3 && fabs(ps.wake.p50 - 0.1) < 1e-3 &&
+          fabs(ps.pre.p50 - 0.3) < 1e-3 && fabs(ps.held.p50 - (P / 1e6 + 0.3 - 12.6)) < 1e-3 && fabs(ps.gpu.p50 - 3) < 1e-3,
+          "a prepared frame: %d (%d piped), on time %d, render %f, wake %f, before %f, held %f, GPU %f", ps.n, ps.piped,
+          ps.on_time, ps.build.p50, ps.wake.p50, ps.pre.p50, ps.held.p50, ps.gpu.p50);
+    lbf_phases_text(&ps, pt, sizeof pt);
+    CHECK(strstr(pt, "prepared ahead 1 (held for the flip 4.37/4.37)") != NULL, "phases text: %s", pt);
+    e.sub0 = e.swake + 17000000;                        /* submitted late: after the vblank it was meant for */
+    e.sub1 = e.sub0 + 1000000;
+    e.submit = e.sub1;
+    lbf_drag_begin();
+    lbf_phase_built(&e);
+    lbf_phase_shown(F0 + 9 * P, 0);
+    lbf_drag_end(&ps);
+    CHECK(ps.n == 1 && ps.cpu_late == 1, "a prepared frame submitted late: CPU-late %d", ps.cpu_late);
     }
 
     /* ---- the synthetic pointer: its path, and the thread's events through the eventfd ---- */

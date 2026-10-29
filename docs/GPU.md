@@ -255,6 +255,88 @@ over full LordBench desktop runs alone and under load, a perf run, a real screen
 `LORD_SW_CURSOR=1`. Until then no gain is claimed. Near the menu bar or the Dock the frame is still
 painted by the CPU.
 
+## The frame pipeline (0.8.6, in development)
+
+Until now a display's next frame was started only after its page flip completed: pointer input, LordBench's
+scripted step, the JS frame callbacks, layout, paint, the texture upload, the GPU's draw and the flip ran one after
+another, one frame in flight. When that whole chain takes more than a refresh period, every frame waits for the
+second vblank and the rate locks at half the refresh. That is the Raspberry Pi 5 under an all-core load
+(`docs/BENCHMARK.md`, "The desktop under load"): about 13 ms to build a frame, 3–5 ms more of GPU and submission,
+98 % of the frames late, 30 fps; alone it builds in 7 ms and shows 60.
+
+**What changed** (`main.c`; the decisions in `fpipe.c`, without I/O, tested by `build/fpipe-test`): while the flip
+of frame N is pending, the CPU part of frame N+1 is done ahead (it is *prepared*): pointer input and LordBench's
+scripted step are dispatched, the JS frame callbacks and the layout run (`paint_ui`) and its damage is painted into
+the display's scene (`paint_out`, `out_prepare`), keeping what the submission needs on the display (`Out`): the rect
+it painted, its painted rectangles for the CPU path, its G0 result (`g0taken`, `g0`), the cursor and app flags
+(`cdirty`, `wl_new`). When N's flip event arrives, only what is left is done for N+1 (`out_submit` →
+`out_present`, the same code a frame built at once uses): the texture upload, `gpu_frame_ex` (or the copy into the
+dumb buffer on the CPU path) and the page flip. Then G0's textures catch up and N+2 is prepared. The upload copies
+the scene when it is called (`glTexSubImage2D` from client memory), so painting the next frame into the scene
+right after it is safe; the dumb buffers are written only at submission, when the flip has freed one.
+
+**When it applies** (`pipe_on`): one display with real page flips. Not without a monitor (no flip: the headless
+path is unchanged), not when the driver completes flips at once and frames are paced in software (`soft`, a
+virtual card: the wait there is the pacing slot, not the flip), and not with several displays (paint.c's drag
+layer and G0 state are shared between them; each frame is built and submitted at once there, as before). Both the
+GPU and the CPU composition paths use it.
+
+**The switch** `LORD_PIPELINE`, read once at startup (the session log says which): `0` off (exactly the previous
+behaviour), `2` always, anything else (and unset, the default) *while frames are heavy*: on after 2 frames in a row
+whose CPU time (JS frame callbacks, layout, paint, upload, swap and flip ioctl; for a prepared frame its prepare
+plus its submission) is above 60 % of the refresh period, off after 60 frames in a row below 40 % (`fpipe_note`;
+`-d` logs each change). The auto mode exists because the pipeline costs a frame of latency when frames already
+fit: input that comes after a frame was prepared waits for the next one, shown a vblank later. When frames don't
+fit, the latency stays about the same (input waits for at most one flip and is shown two vblanks after it, where
+before the flips themselves came every other vblank) and the rate can double.
+
+**The rules for each case:**
+
+- **Idle desktop, input:** with nothing pending, a frame is built and flipped at once, as before. While a flip is
+  pending and nothing is prepared, input is dispatched at once (before, it waited for the flip) and, if it damages
+  something, painted ahead; only once a frame is prepared (or was tried) for that flip does input wait for it
+  (`fpipe_blocked`). At most one frame is prepared at a time.
+- **A prepare that paints nothing** (a JS frame callback with no damage) marks the display `FPIPE_EMPTY`: nothing more
+  is tried until the flip, and the frame is then built as before, so there is no busy loop.
+- **What changes between paint and submission** is not painted into the prepared frame: it is shown as it was
+  painted, exactly as a frame built at that moment would have been, and the change goes into the next frame. The
+  pointer is the exception it always was: the cursor is drawn at submission (CPU path) or moved on its plane at
+  once. A Linux app's new buffer is drawn at submission (GPU path: its texture), so it is never older than before.
+- **A prepared frame that can no longer be submitted as painted** is undone (`prep_undo`): what it painted, and the
+  window rectangle it left to G0, join the next frame's damage, and that frame is built at once. That happens when
+  the scene was reallocated, the GPU context or output changed (`gpu_generation`), or, for a G0 frame, the drag
+  layer began, ended, moved to another display or reallocated its buffers (`paint_g0_epoch`, `ui/paint.c`; the
+  frame's `GpuG0` points into those buffers). Every path that changes the GPU or the displays also undoes it first:
+  `cpu_takeover` (screen recording, a remote viewer with protected windows, a failed frame), `gpu_start`,
+  `outputs_apply` (hotplug, Settings → Displays) and `display_detach` (a session switch: the card's master is
+  dropped with nothing left prepared). A frame prepared before the screen went off (idle, DPMS) is undone too, so it
+  is never shown stale when the screen comes back.
+- **Never while the flip is pending:** stopping the GPU for a recording or a remote viewer with protected windows
+  (`cpu_switch`: `gpu_shutdown`, and `cpu_takeover` sets the dumb buffer with a modeset) waits for the flip, as it
+  did before; a frame prepared for the GPU meanwhile is undone there and painted again on the CPU path.
+- **G0:** the prepared frame keeps its `GpuG0` (dirty rectangles, strips, `LORD_GPU_VERIFY`'s reference) until its
+  submission, and `paint_g0_done` runs only when its quad is drawn, as before. G0's textures catch up
+  (`paint_g0_feed`) after the submission and before the next frame is painted, so the feed never runs between a
+  frame's paint and its upload (a frame built at once queues its catch-up for the end of `render`, so nothing is
+  prepared in the same call after it). `engine-test` runs every drag case again with each frame presented only after the
+  next frame's changes are made ("g0 pipelined") and checks the same golden hashes, and that those changes never
+  move the epoch.
+- **-2 (unshown)**, direct scanout of a fullscreen app, the remote desktop's read-back and the protected windows'
+  black: decided at submission, by the same code as before.
+- **Frame callbacks and presentation:** the Linux apps' frame callbacks (`wl_frame_done`) go with a submitted frame,
+  never with one only prepared; presentation feedback still follows the main display's flip events.
+
+**LordBench's phases** (`docs/BENCHMARK.md`, "Frame phases") record a prepared frame at its submission:
+`paintMs` is its prepare's, `uploadMs`, `swapMs` and `flipIoctlMs` its submission's, `renderMs` both, the new
+`heldMs` the time it waited for the flip, and the synthetic pointer's latency ends at its own presentation
+(`lbf_painted`, `lbf_submitted`).
+
+**Not measured yet:** the Raspberry Pi 5 with its monitor, the machine this is for: LordBench's Desktop impact
+alone and under load with `LORD_PIPELINE` unset and with `LORD_PIPELINE=0`. VM 116 has no free DRM card (its
+virtio-gpu card belongs to lord-sessiond, and its flips would be paced in software anyway), so on it only the
+headless path ran (unchanged: `prepared 0`), with the unit tests and `engine-test`'s pipelined drag runs. No gain
+is claimed until the Pi run.
+
 ## The CPU path on several threads (0.8.5)
 
 Without a GPU (a virtual machine like VM 116, a board without a working driver) the CPU path paints

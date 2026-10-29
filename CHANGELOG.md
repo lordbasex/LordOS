@@ -533,6 +533,56 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     7.5 ms (under 70 %) while the frame took about 13 ms, so the threads, which run at real-time priority, stayed off.
     The pixels are the same (the pool's bands are exact). On VM 116 headless under load they were on for 0, 10 and 91
     of 720–721 frames in three runs; the gain on the Pi is not measured yet.
+  - **The frame pipeline: the next frame is painted while the flip is pending** (0.8.6, in development, not yet
+    measured on the Pi; `docs/GPU.md`, "The frame pipeline"; `src/fpipe.c` and `main.c`). A frame was started only
+    after the previous flip completed, so input, JS, layout, paint, the upload, the GPU and the flip ran one after
+    another; on the Pi 5 under an all-core load that chain (about 13 ms of CPU, 3–5 ms more) passes the 16.7 ms
+    period, every frame waits for the second vblank and the monitor shows 30 frames a second, 98 % late.
+    - Now, while the flip of frame N is pending, frame N+1's CPU part is done ahead: pointer input and LordBench's
+      scripted step are dispatched, the JS frame callbacks and the layout run and its damage is painted into the
+      display's scene (`out_prepare`), and at N's flip event only its upload, `gpu_frame_ex` (or the copy into the dumb
+      buffer) and the page flip are left (`out_submit`, through the same `out_present` a frame built at once uses;
+      `render_frame` is split into `out_paint` and `out_present`). G0's textures catch up after the submission and
+      before the next frame is painted. At most one frame is prepared; with nothing pending a frame is still built and
+      flipped at once, so an idle desktop answers input as before.
+    - Only with one display that has real page flips, on the GPU and the CPU path; never without a monitor, with a
+      driver paced in software, or with several displays (each frame built and submitted at once there, as before).
+    - `LORD_PIPELINE`, read once at startup and named in the session log: `0` off (the previous behaviour exactly), `2`
+      always, unset (the default) on while frames are heavy: after 2 frames in a row whose CPU time passes 60 % of the
+      period, off after 60 in a row under 40 % (`fpipe_note`; `-d` logs each change), because when frames already fit
+      a prepared frame shows input one vblank later.
+    - The rules: what changes between a frame's paint and its submission goes into the next frame (the prepared one
+      is shown as a frame painted at that moment would have been; the cursor and a Linux app's new buffer are still
+      taken at submission). A prepare that paints nothing tries nothing more until the flip (no busy loop). A
+      prepared frame that can't be submitted as painted (the scene reallocated, the GPU context or output changed, or
+      for a G0 frame the drag layer began, ended, changed display or reallocated: the new `paint_g0_epoch`) is undone
+      into the next frame's damage, its G0 rectangle included, and that frame is built at once; `cpu_takeover`
+      (recording, protected windows for a remote viewer, a failed frame), `gpu_start`, `outputs_apply` (hotplug,
+      Settings → Displays) and `display_detach` (a session switch, before the card's master goes) undo it first, and
+      so does the screen going off (DPMS), so it is never shown stale when it comes back. Stopping the GPU for a
+      recording or protected windows (`cpu_switch`, whose `cpu_takeover` sets the dumb buffer with a modeset) never
+      runs in a render that only prepares, while the flip is pending; and nothing is prepared in a render whose
+      built frame still has G0's catch-up queued (it would run between that prepared frame's paint and its upload).
+      Direct scanout, the remote desktop's read-back, the protected windows' black, `LORD_GPU_VERIFY` and the -2
+      path are decided at submission by the same code. The Linux apps' frame callbacks go with a submitted frame,
+      never with one only prepared.
+    - LordBench records a prepared frame at its submission: its prepare's paint, its submission's upload, swap and
+      flip ioctl, both as `renderMs`, and a new `heldMs` (prepared → submitted) with a `prepared` count, in
+      `frames.phases` and the `drag (scripted):` line (`… prepared ahead N (held for the flip p50/p99)`); such a
+      frame is on time when shown by the first vblank after the wake that submitted it, and the synthetic pointer's
+      events end at its own presentation (`lbf_painted`, `lbf_submitted`; `lbf_frame` gets its prepare plus its
+      submission).
+    - Checked on VM 116: `make -j8` and the changed files with `GPU=0`: no warnings; `make test`: 23 passed, 0 failed,
+      13 skipped; the new `fpipe-test` (39 checks: the switch, the auto mode's hysteresis, every decision, and a
+      display on a vblank grid where 13 ms of CPU, 1 ms to submit and 3 ms of GPU give 299 flips in 600 periods
+      without the pipeline and 598 with it, a 20 ms frame 299 and 475, and a light frame 599 either way with auto
+      never engaging); `engine-test` (6,883 checks, 0 failures) runs every drag case again with each frame presented
+      only after the next frame's changes, as a prepared frame is, and all 2,417 frames match
+      `drag_golden_gpu.txt`, unchanged, with no change between paint and submission moving the G0 epoch;
+      `lordbench-test` (1,197 ok) checks a prepared frame's phases, its class, a late one and the pointer's latency
+      across the pipeline. LordBench's desktop test in an isolated headless session with `LORD_PIPELINE=1` and `=0`:
+      the same results (60 fps alone and under load, `prepared 0`: no flips without a monitor). VM 116 has no free
+      DRM card (lord-sessiond holds its virtio-gpu card), so the pipeline itself has not run on a display yet.
   - `make -j8` and lord-server with `GPU=0` (no EGL, GBM or GLES linked): no warnings; `make test`: 23 passed, 0
     failed, 13 skipped, every suite's checks passing; `engine-test`: 4,146 checks, 0 failures.
   - **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every

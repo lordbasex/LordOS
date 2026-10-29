@@ -1598,6 +1598,12 @@ typedef struct {
     GpuG0 g;
 } DOut;
 static int test_g0;
+/* the frame pipeline (main.c, fpipe.h): each frame painted is presented only after the next frame's changes
+ * (the pointer, JS) are made, right before that frame is painted, as a frame prepared during a pending flip
+ * is submitted at the flip; its pixels must be the same */
+static int test_pipe;
+typedef struct { int on, taken, last, why; Rect pr; } DPend;
+static DPend dpend[4];
 static struct { uint32_t *b, *l; int bw, bh, lw, lh, owner[2]; } g0tex;   /* the stub GPU's G0 textures (owner: 0 the copy, 1 the layer) */
 static long g0_fed;                                 /* pixels sent between frames (paint_g0_feed) */
 static long g0_whole;                               /* G0 frames that had to send a texture whole */
@@ -1679,12 +1685,11 @@ static int g0_tex_feed(void *ctx, int which, const uint32_t *px, int w, int h, R
  * strips) go to the UI texture; with G0 the two textures get their dirty rectangles and the window is
  * written over the texture's stale rectangle in the composed frame. A frame refused only for what the
  * textures lack (G0R_FEED) then sends a slice of it (paint_g0_feed), as main.c does after queueing the flip. */
-static void g0_present(DOut *o, int index, Rect pr, int taken) {
+static void g0_present(DOut *o, int index, Rect pr, int taken, int last, int why) {
     int W = o->c.w, H = o->c.h;
     if (!taken) {
         copy_rect(o->tex, W, o->c.px, o->c.stride, pr);
-        int why, sub;
-        if (paint_g0_last(&why, &sub) == 0 && why == G0R_FEED && paint_g0_backlog(index) > 0)
+        if (last == 0 && why == G0R_FEED && paint_g0_backlog(index) > 0)
             paint_g0_feed(index, G0_FEED_PX, g0_tex_feed, &index);
     } else {
         const GpuG0 *g = &o->g;
@@ -1742,7 +1747,19 @@ static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
     canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
-    if (test_g0) g0_present(o, index, pr, taken);
+    if (!test_g0) return;
+    int why, sub, last = paint_g0_last(&why, &sub);
+    if (test_pipe && index < 4) dpend[index] = (DPend){ 1, taken, last, why, pr };
+    else g0_present(o, index, pr, taken, last, why);
+}
+
+/* the frame pipeline: the frames painted are presented now (main.c's out_submit) */
+static void drag_present(DOut *const *os, int n) {
+    for (int i = 0; i < n && i < 4; i++)
+        if (dpend[i].on) {
+            dpend[i].on = 0;
+            g0_present(os[i], i, dpend[i].pr, dpend[i].taken, dpend[i].last, dpend[i].why);
+        }
 }
 
 /* main.c's frame: paint_ui (layout, damage, the layer's display: the one with most of the window), then
@@ -2046,8 +2063,10 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
     damage_add((Box){ 0, 0, DW, DH });
     ui.dirty = 1;
     drag_paint_n(s.root, os, nos);
+    drag_present(os, nos);
     paint_layer_begin(s.win->id, 0);                    /* grab.c's setup */
     float gx = x0, gy = y0, rot = 0;
+    unsigned pipe_epoch = paint_g0_epoch();
     *full = 0;
     *worst = 0;
     for (int f = 0; f < n; f++) {
@@ -2091,13 +2110,30 @@ static void drag_run_n(int dc, DOut *const *os, int nos, uint64_t *hash, long *f
             damage_add((Box){ floorf(term_at.x0), floorf(term_at.y0 + 8 - 2), ceilf(term_at.x1), ceilf(term_at.y0 + 24 + 2) });
             ui.dirty = 1;
         }
+        if (test_pipe) {
+            /* the frame before is submitted only now, after this frame's changes: they must not touch what it
+             * hands the GPU (paint_g0_epoch, else main.c paints it again) */
+            CHECK(paint_g0_epoch() == pipe_epoch, "pipelined: frame %d's changes moved G0's epoch", f);
+            drag_present(os, nos);
+            if (f) hash[f - 1] = outs_hash(os, nos);
+            drag_paint_n(s.root, os, nos);
+            pipe_epoch = paint_g0_epoch();
+            continue;                                   /* (a full repaint now would be of the next frame's tree) */
+        }
         drag_paint_n(s.root, os, nos);
         hash[f] = outs_hash(os, nos);
         if (nos == 1 && f % FULL_EVERY == FULL_EVERY - 1) { long d = drag_full_diff(s.root, o, worst); if (d > *full) *full = d; }
     }
+    if (test_pipe) {
+        drag_present(os, nos);
+        hash[n - 1] = outs_hash(os, nos);
+    }
+    unsigned before_end = paint_g0_epoch();
     paint_layer_end();                                  /* grab_finish */
+    CHECK(paint_g0_epoch() != before_end, "the drag's end moves G0's epoch (a prepared G0 frame is painted again)");
     ui.dirty = 1;
     drag_paint_n(s.root, os, nos);
+    drag_present(os, nos);
     hash[n] = outs_hash(os, nos);
     if (nos == 1) {
         long d = drag_full_diff(s.root, o, worst);
@@ -2235,7 +2271,7 @@ done:
 }
 
 static void test_drag_exact(int write) {
-    static const char *const variant[3] = { "cpu", "gpu", "g0" };
+    static const char *const variant[4] = { "cpu", "gpu", "g0", "g0 pipelined" };
     DOut o, o2;                                         /* the display at 100 %, and at 200 % (DC_K2) */
     int ok = dout_init(&o, out_view(0, 0, DW, DH, 100));
     ok = dout_init(&o2, out_view(0, 0, 2 * DW, 2 * DH, 200)) && ok;
@@ -2246,11 +2282,13 @@ static void test_drag_exact(int write) {
         return;
     }
     /* g0: the GPU path with G0 (the window composited by canvas_g0_model), against the GPU's hashes */
-    for (int g = 0; g < (write ? 2 : 3); g++) {
+    /* g0 pipelined: the same, each frame presented after the next frame's changes (the frame pipeline) */
+    for (int g = 0; g < (write ? 2 : 4); g++) {
         test_gpu = g > 0;
-        test_g0 = g == 2;
+        test_g0 = g >= 2;
+        test_pipe = g == 3;
         char path[64];
-        snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g == 2 ? 1 : g]);
+        snprintf(path, sizeof path, "tests/drag_golden_%s.txt", variant[g >= 2 ? 1 : g]);
         long fullw[DC_N];
         int worst[DC_N];
         long parts = 0, renders = 0, blits = 0;
@@ -2282,7 +2320,7 @@ static void test_drag_exact(int write) {
         if (!test_g0)
             CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
                   "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
-        else g0_report("g0", 1);
+        else g0_report(variant[g], 1);
         printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
         for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
         printf("\n");
@@ -2309,7 +2347,7 @@ static void test_drag_exact(int write) {
         }
         free(file);
     }
-    test_gpu = test_g0 = 0;
+    test_gpu = test_g0 = test_pipe = 0;
     dout_free(&o);
     dout_free(&o2);
     free(hash);

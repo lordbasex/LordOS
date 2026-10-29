@@ -30,14 +30,20 @@ void lbf_presented(uint64_t ns, uint32_t period_ns);
  * applied so far are in that frame and their latency ends at its presentation */
 void lbf_input(uint64_t ev_ns);
 void lbf_built(int main_drawn);
+/* the frame pipeline (fpipe.h): a frame of the main display painted ahead, while the previous one's flip is
+ * pending (the events applied so far are in it), then submitted at that flip (they end at its presentation).
+ * lbf_built is both at once; events of a prepared frame that is dropped go with the next frame submitted. */
+void lbf_painted(void);
+void lbf_submitted(void);
 
 /* lbrun.c: begin clears and starts; end stops and fills st (0, or -1 with fewer than 2 shown frames) */
 void lbf_begin(void);
 int  lbf_end(LbFrameStats *st);
 
 /* ---- where a frame's time goes (docs/BENCHMARK.md, "Frame phases") ----
- * main.c fills one LbPhase for each frame the main display gets, when render() ends (lbf_phase_built),
- * and completes it at that frame's presentation (lbf_phase_shown). Times are CLOCK_MONOTONIC ns, 0 =
+ * main.c fills one LbPhase for each frame the main display gets, when it is submitted (lbf_phase_built: at
+ * the end of render(), or for a frame the pipeline prepared, right after its submission), and completes it at
+ * that frame's presentation (lbf_phase_shown). Times are CLOCK_MONOTONIC ns, 0 =
  * unknown. All measured by lord-server itself; nothing comes from a helper. Two recorders take them:
  * LordBench's (lbf_begin/lbf_end, lbf_phases) and the scripted drag's (lbf_drag_begin/lbf_drag_end), for
  * its "drag (scripted):" line. Off, each call is one atomic read. */
@@ -61,6 +67,13 @@ typedef struct {
     int g0;                             /* 1 G0 composed it, 0 refused (g0_why, g0_sub), -1 not tried */
     int g0_why, g0_sub;
     int unshown;                        /* gpu_frame_ex's -2: nothing shown, a vblank lost */
+    /* the frame pipeline (fpipe.h): piped = painted ahead while the previous flip was pending, then submitted
+     * at that flip. Then wake/from_flip/render0/built are its prepare's (render0..built: JS frame callbacks,
+     * layout and paint), pre_end is when that render() started (the end of "before render"), swake and
+     * sfrom_flip are the wake whose flip let it be submitted, sub0..sub1 its submission (upload, swap, flip
+     * ioctl), and prev_flip is the presentation just before that submission */
+    int piped, sfrom_flip;
+    uint64_t pre_end, swake, sub0, sub1;
 } LbPhase;
 typedef struct { double p50, p99; } LbPct;
 typedef struct {
@@ -73,6 +86,7 @@ typedef struct {
     LbPct wait;                         /* the later of the two to the flip: the vblank */
     LbPct chain;                        /* the wake to the flip */
     LbPct feed;
+    LbPct held;                         /* piped frames: prepared until submitted (the previous flip's wait) */
     double up_mpx, g0_mpx, feed_mpx;    /* pixels sent per frame, average, millions */
     int on_time;                        /* shown by the first vblank after the frame started (+ half a period) */
     int cpu_late;                       /* late, and queued after that vblank */
@@ -83,6 +97,7 @@ typedef struct {
     int g0_tried, g0_taken, g0_refused[LBF_G0R], g0_layer[LBF_G0L], g0_full;
     long g0_full_px;
     int unshown;
+    int piped;                          /* frames prepared ahead (fpipe.h) */
 } LbPhaseStats;
 void lbf_phase_built(const LbPhase *p);
 void lbf_phase_shown(uint64_t flip_ns, uint64_t gpu_done_ns);

@@ -320,6 +320,10 @@ void  paint_below_stats(BelowStats *s);    /* builds (whole, part) and switched 
 struct GpuG0;
 int   paint_root_g0(Canvas *c, Node *root, struct GpuG0 *g);
 void  paint_g0_done(void);
+/* changes whenever a GpuG0 that paint_root_g0 filled may no longer be submitted as it is: the drag layer began,
+ * ended or moved to another display, its buffers were reallocated or the textures need everything again. The
+ * frame pipeline (main.c) checks it before submitting a prepared G0 frame. */
+unsigned paint_g0_epoch(void);
 /* why a frame that used the copy was not composited on the GPU: the layer (invalid, re-rendered, app
  * windows or invalid pixels in it, other opacity, a transform), its rectangle not inside the damage,
  * an ancestor painting over it, an app window under it, a node painted after the window in the

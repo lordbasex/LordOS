@@ -549,7 +549,11 @@ static void g0_dirty(G0Dirty *d, Rect r) {
     d->r[bi] = g0_join(d->r[bi], d->r[bj]);
     d->r[bj] = r;
 }
-static void g0_dirty_all(void) { g0_ld = (G0Dirty){ .full = 1 }; g0_bd = (G0Dirty){ .full = 1 }; }
+/* bumped whenever a GpuG0 filled earlier may no longer be submitted as it is (its buffers or the textures'
+ * bookkeeping changed): see paint_g0_epoch */
+static unsigned g0_epoch;
+unsigned paint_g0_epoch(void) { return g0_epoch; }
+static void g0_dirty_all(void) { g0_ld = (G0Dirty){ .full = 1 }; g0_bd = (G0Dirty){ .full = 1 }; g0_epoch++; }
 void paint_g0_done(void) { g0_ld = (G0Dirty){ 0 }; g0_bd = (G0Dirty){ 0 }; }
 void paint_g0_stats(G0Stats *out) {
     *out = g0stat;
@@ -593,6 +597,7 @@ int paint_layer_node(void) { return layer.want ? layer.node : 0; }
 
 void paint_layer_view(int index) {
     if (layer.view == index) return;
+    g0_epoch++;
     layer.view = index;
     layer.valid = 0;
     layer.lg_valid = 0;
@@ -782,6 +787,7 @@ static int layer_render(Node *n, float opacity) {
         uint8_t *hole = realloc(layer.hole, (size_t)w * h);
         if (px) layer.px = px;
         if (hole) layer.hole = hole;
+        g0_epoch++;
         if (!px || !hole) { layer.want = 0; return 0; }
         layer.cap = w * h;
     }
@@ -1042,6 +1048,7 @@ static int view_eq(PaintView a, PaintView b) { return a.x == b.x && a.y == b.y &
 static int below_alloc(const Canvas *c) {
     if (layer.below && layer.bw == c->w && layer.bh == c->h) return 1;
     free(layer.below);
+    g0_epoch++;
     layer.below = malloc((size_t)c->w * c->h * 4);
     layer.bw = layer.below ? c->w : 0;
     layer.bh = layer.below ? c->h : 0;

@@ -143,14 +143,15 @@ static void phases_json(HBuf *b, const LbPhaseStats *p) {
         { "wakeMs", p->wake }, { "beforeRenderMs", p->pre }, { "renderMs", p->build }, { "paintMs", p->paint },
         { "uploadMs", p->up }, { "g0UploadMs", p->g0up }, { "swapMs", p->swap }, { "flipIoctlMs", p->submit_call },
         { "gpuMs", p->gpu }, { "vblankWaitMs", p->wait }, { "wakeToFlipMs", p->chain }, { "catchUpMs", p->feed },
+        { "heldMs", p->held },
     };
     hb_printf(b, "{\"frames\":%d", p->n);
     for (size_t i = 0; i < sizeof t / sizeof *t; i++) hb_printf(b, ",\"%s\":[%.3f,%.3f]", t[i].k, t[i].v.p50, t[i].v.p99);
     hb_printf(b, ",\"uploadMpx\":%.4f,\"g0UploadMpx\":%.4f,\"catchUpMpx\":%.4f,\"onTime\":%d,\"cpuLate\":%d,\"gpuLate\":%d,"
-                 "\"otherLate\":%d,\"gpuKnown\":%d,\"paintThreads\":%d,\"unshown\":%d,\"g0\":{\"tried\":%d,\"taken\":%d,"
+                 "\"otherLate\":%d,\"gpuKnown\":%d,\"paintThreads\":%d,\"unshown\":%d,\"prepared\":%d,\"g0\":{\"tried\":%d,\"taken\":%d,"
                  "\"wholeUploads\":%d,\"wholeMpx\":%.3f,\"refused\":{",
               p->up_mpx, p->g0_mpx, p->feed_mpx, p->on_time, p->cpu_late, p->gpu_late, p->other_late, p->gpu_known, p->par,
-              p->unshown, p->g0_tried, p->g0_taken, p->g0_full, p->g0_full_px / 1e6);
+              p->unshown, p->piped, p->g0_tried, p->g0_taken, p->g0_full, p->g0_full_px / 1e6);
     for (int i = 0, k = 0; i < LBF_G0R; i++)
         if (p->g0_refused[i] && lbf_g0r_name(i)) hb_printf(b, "%s\"%s\":%d", k++ ? "," : "", lbf_g0r_name(i), p->g0_refused[i]);
     hb_printf(b, "},\"layer\":{");

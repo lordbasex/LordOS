@@ -563,14 +563,29 @@ matrix products, and the CPU and the GPU share the Pi's memory, but that has not
 **What remains.** Under load a frame takes about twice as long to build on the Pi (15–16 ms instead of 7 ms), for
 a cause not measured yet, which no priority fixes; the Pi kernel at `CONFIG_HZ=1000` (`tools/rpi/build-kernel.sh`, a rebuild) is not built.
 
+**The frame pipeline (in development, not yet measured on the Pi).** A frame that takes 15–16 ms to build cannot
+fit with the GPU's part in a 16.7 ms period while the next frame is started only after the flip. Now, while a flip
+is pending, the next frame's CPU part (input, JS frame callbacks, layout, paint into the scene) is done ahead, and at
+the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). On by
+default while frames are heavy (more than 60 % of the period, 2 frames in a row; off after 60 frames below 40 %),
+`LORD_PIPELINE=0` turns it off and `LORD_PIPELINE=2` keeps it on. Only with one display that has real page flips:
+without a monitor, with a driver paced in software or with several displays nothing changes. Expected on the Pi
+under the load: the frames shown every vblank instead of every other one as long as the CPU part stays under one
+period, with about the same pointer latency; that is a model (`build/fpipe-test` drives a display on a vblank
+grid: 13 ms of CPU, 1 ms to submit and 3 ms of GPU give 299 flips in 600 periods without it and 598 with it, input
+to screen at most 33.3 and 36.0 ms), not a measurement. To measure: LordBench → Desktop impact twice with `LORD_PIPELINE` unset and twice with
+`LORD_PIPELINE=0` in the session's environment, comparing `desk.fps`, `desk.missed`, `desk.in50`/`in99` and
+`frames.phases.load` (`prepared`, `heldMs`, `onTime`).
+
 #### Frame phases (0.8.6, in development)
 
 A frame is started only after the last flip completed (one frame in flight), so any frame whose whole chain (the
 work before `render()`, the build, the GPU's own part, the flip) takes more than one period is shown a vblank late,
 and the rate locks at half the refresh. The build time alone (`desk.p50`/`p99`) can't tell which part was too long.
 So lord-server also records, for every frame the main display shows, while LordBench records or while a scripted
-move runs (`bench/lbframes.c`: `lbf_phase_built` when `render()` ends, `lbf_phase_shown` at that frame's flip; all
-of it measured by lord-server itself, never by a helper):
+move runs (`bench/lbframes.c`: `lbf_phase_built` when the frame is submitted, at the end of `render()` or, for a
+frame the pipeline prepared, right after its submission; `lbf_phase_shown` at that frame's flip; all of it measured
+by lord-server itself, never by a helper):
 
 | Phase (JSON key, `[p50, p99]` ms) | From → to |
 |---|---|
@@ -584,12 +599,21 @@ of it measured by lord-server itself, never by a helper):
 | `vblankWaitMs` | the later of those two → the flip |
 | `wakeToFlipMs` | the wake → the flip |
 | `catchUpMs` | G0's textures catching up after the flip was queued (`docs/GPU.md`, "Uploads without a stall") |
+| `heldMs` | a prepared frame (the frame pipeline, `docs/GPU.md`): its paint done → its submission at the flip before it |
+
+A frame the pipeline prepared (counted in `prepared`) is painted while the previous flip is pending and submitted at
+that flip: its `wakeMs` runs from that flip to the wake that submitted it, `beforeRenderMs` is the input and JS
+before its prepare, `paintMs` its prepare's, `uploadMs`, `swapMs` and `flipIoctlMs` its submission's, `renderMs` the
+two together (its CPU time, not the time between them, which is `heldMs`), and `wakeToFlipMs` runs from its
+prepare's wake, so it spans two flips. The synthetic pointer's events applied before its paint end at its own
+presentation.
 
 The GPU's finish time comes from a native fence taken right after `eglSwapBuffers`
 (`EGL_ANDROID_native_fence_sync`, `gpu.c`) and read once at the frame's flip with `SYNC_IOC_FILE_INFO`: the
 kernel's signal time of the sync file, one ioctl a frame, no wait. Fences are taken only while recording. Without
 the extension `gpuKnown` stays 0. Each frame is also put in one class against the first vblank after it started
-(the vblanks fall on the previous flip plus whole periods):
+(the vblanks fall on the previous flip plus whole periods; for a prepared frame, after the wake that submitted it,
+since its paint was done before):
 
 - `onTime`: shown within half a period of that vblank;
 - `cpuLate`: late, and its flip was queued after that vblank;

@@ -19,8 +19,10 @@ static int nwork, nshown;
 static uint32_t period;
 static double lat[MAXI];                /* ms */
 static int nlat;
-static uint64_t applied[BATCH], inframe[BATCH];     /* events applied, not yet in a frame; in the frame being shown */
-static int napplied, ninframe;
+/* events applied, not yet in a frame; in a frame painted ahead but not submitted (the frame pipeline); in the
+ * frame being shown */
+static uint64_t applied[BATCH], painted[BATCH], inframe[BATCH];
+static int napplied, npainted, ninframe;
 
 static int cmp_d(const void *a, const void *b) { double x = *(const double *)a, y = *(const double *)b; return (x > y) - (x < y); }
 
@@ -33,13 +35,13 @@ static double pct(const double *v, int n, double p) {
 
 /* ---- frame phases (lbframes.h) ---- */
 
-enum { PH_WAKE, PH_PRE, PH_PAINT, PH_UP, PH_G0UP, PH_SWAP, PH_SUBC, PH_BUILD, PH_GPU, PH_WAIT, PH_CHAIN, PH_FEED, PH_N };
+enum { PH_WAKE, PH_PRE, PH_PAINT, PH_UP, PH_G0UP, PH_SWAP, PH_SUBC, PH_BUILD, PH_GPU, PH_WAIT, PH_CHAIN, PH_FEED, PH_HELD, PH_N };
 typedef struct {
     atomic_int on;
     float v[PH_N][MAXF];                /* ms */
     int nv[PH_N];
     int n, on_time, cpu_late, gpu_late, other_late, gpu_known;
-    int built, par, g0_tried, g0_taken, g0_refused[LBF_G0R], g0_layer[LBF_G0L], g0_full, unshown;
+    int built, par, g0_tried, g0_taken, g0_refused[LBF_G0R], g0_layer[LBF_G0L], g0_full, unshown, piped;
     double up_px, g0_px, feed_px, g0_full_px;
 } Rec;
 static Rec rec_lb, rec_drag;            /* LordBench's recording, the scripted drag's */
@@ -49,7 +51,7 @@ static int have_pend;
 static void rec_clear(Rec *r) {        /* everything but on and the values (nv says how many count) */
     memset(r->nv, 0, sizeof r->nv);
     r->n = r->on_time = r->cpu_late = r->gpu_late = r->other_late = r->gpu_known = 0;
-    r->built = r->par = r->g0_tried = r->g0_taken = r->g0_full = r->unshown = 0;
+    r->built = r->par = r->g0_tried = r->g0_taken = r->g0_full = r->unshown = r->piped = 0;
     memset(r->g0_refused, 0, sizeof r->g0_refused);
     memset(r->g0_layer, 0, sizeof r->g0_layer);
     r->up_px = r->g0_px = r->feed_px = r->g0_full_px = 0;
@@ -65,6 +67,7 @@ static void rec_built(Rec *r, const LbPhase *p) {
     r->built++;
     r->par += p->par != 0;
     r->unshown += p->unshown != 0;
+    r->piped += p->piped != 0;
     if (p->g0 >= 0) {
         r->g0_tried++;
         if (p->g0 > 0) r->g0_taken++;
@@ -95,14 +98,23 @@ static double ms_between(uint64_t a, uint64_t b) { return a && b && b >= a ? (do
 static void rec_shown(Rec *r, const LbPhase *p, uint64_t flip, uint64_t gpu) {
     if (!rec_on(r)) return;
     r->n++;
-    if (p->from_flip) rec_put(r, PH_WAKE, ms_between(p->prev_flip, p->wake));
-    rec_put(r, PH_PRE, ms_between(p->wake, p->render0));
+    /* a piped frame: the flip that let it be submitted woke lord-server (swake); its CPU time is its prepare
+     * and its submission, and between them it was held for that flip */
+    uint64_t start = p->piped ? p->swake : p->wake;
+    if (p->piped ? p->sfrom_flip : p->from_flip) rec_put(r, PH_WAKE, ms_between(p->prev_flip, start));
+    rec_put(r, PH_PRE, ms_between(p->wake, p->piped ? p->pre_end : p->render0));
     rec_put(r, PH_PAINT, p->paint_ms);
     rec_put(r, PH_UP, p->up_ms);
     if (p->g0 > 0) rec_put(r, PH_G0UP, p->g0_ms);
     rec_put(r, PH_SWAP, p->swap_ms);
     rec_put(r, PH_SUBC, p->submit_ms);
-    rec_put(r, PH_BUILD, ms_between(p->render0, p->built));
+    double build = ms_between(p->render0, p->built);
+    if (p->piped) {
+        double sub = ms_between(p->sub0, p->sub1);
+        build = build >= 0 && sub >= 0 ? build + sub : -1;
+        rec_put(r, PH_HELD, ms_between(p->built, p->sub0));
+    }
+    rec_put(r, PH_BUILD, build);
     uint64_t ready = p->submit;
     if (gpu) {
         r->gpu_known++;
@@ -111,9 +123,10 @@ static void rec_shown(Rec *r, const LbPhase *p, uint64_t flip, uint64_t gpu) {
     }
     rec_put(r, PH_WAIT, ms_between(ready, flip));
     rec_put(r, PH_CHAIN, ms_between(p->wake, flip));
-    /* the first vblank after the frame started (the vblanks fall on prev_flip + k periods) */
-    if (!p->prev_flip || !p->period || !p->wake || p->wake < p->prev_flip) { r->other_late++; return; }
-    uint64_t k = (p->wake - p->prev_flip) / p->period + 1, target = p->prev_flip + k * p->period;
+    /* the first vblank after the frame started (the vblanks fall on prev_flip + k periods); a piped frame is
+     * on time when shown by the first vblank after its submission's wake (its paint was done before) */
+    if (!p->prev_flip || !p->period || !start || start < p->prev_flip) { r->other_late++; return; }
+    uint64_t k = (start - p->prev_flip) / p->period + 1, target = p->prev_flip + k * p->period;
     if (flip <= target + p->period / 2) r->on_time++;
     else if (p->submit > target) r->cpu_late++;
     else if (gpu && gpu > target) r->gpu_late++;
@@ -154,6 +167,7 @@ static void rec_stats(const Rec *r, LbPhaseStats *st) {
     st->wait = rec_pct(r, PH_WAIT);
     st->chain = rec_pct(r, PH_CHAIN);
     st->feed = rec_pct(r, PH_FEED);
+    st->held = rec_pct(r, PH_HELD);
     int b = r->built ? r->built : 1;
     st->up_mpx = r->up_px / b / 1e6;
     st->g0_mpx = r->g0_px / b / 1e6;
@@ -171,6 +185,7 @@ static void rec_stats(const Rec *r, LbPhaseStats *st) {
     st->g0_full = r->g0_full;
     st->g0_full_px = (long)r->g0_full_px;
     st->unshown = r->unshown;
+    st->piped = r->piped;
 }
 
 /* lbf_begin and lbf_end start and stop LordBench's recorder with the frame times */
@@ -232,7 +247,8 @@ void lbf_phases_text(const LbPhaseStats *st, char *buf, size_t n) {
             if (!f2) PUT("]");
         }
     }
-    PUT("), whole G0 uploads %d (%.2f Mpx), unshown %d", st->g0_full, st->g0_full_px / 1e6, st->unshown);
+    PUT("), whole G0 uploads %d (%.2f Mpx), unshown %d; prepared ahead %d (held for the flip %.2f/%.2f)", st->g0_full,
+        st->g0_full_px / 1e6, st->unshown, st->piped, st->held.p50, st->held.p99);
 #undef PUT
     if (n) buf[k < n ? k : n - 1] = 0;
 }
@@ -263,19 +279,45 @@ void lbf_input(uint64_t ev_ns) {
     pthread_mutex_unlock(&mu);
 }
 
+/* n events of from[] join to[] (*nto of them), the newest kept when it is full */
+static void move_events(uint64_t *to, int *nto, const uint64_t *from, int n) {
+    for (int i = 0; i < n; i++) {
+        if (*nto == BATCH) { memmove(to, to + 1, sizeof(uint64_t) * (BATCH - 1)); (*nto)--; }
+        to[(*nto)++] = from[i];
+    }
+}
+
 void lbf_built(int main_drawn) {
     if (!main_drawn || !atomic_load_explicit(&on, memory_order_relaxed)) return;
     pthread_mutex_lock(&mu);
-    /* a frame built while the previous one is still waiting for its flip never happens on the main display
-     * (main.c waits for the flip); if it did, both groups end at this frame's presentation */
-    for (int i = 0; i < napplied && ninframe < BATCH; i++) inframe[ninframe++] = applied[i];
+    /* a frame is built and submitted only once the previous one was shown (main.c waits for the flip, or
+     * prepares the next one ahead: lbf_painted, lbf_submitted); if one were not, both groups would end at
+     * this frame's presentation */
+    move_events(inframe, &ninframe, painted, npainted);
+    move_events(inframe, &ninframe, applied, napplied);
+    npainted = napplied = 0;
+    pthread_mutex_unlock(&mu);
+}
+
+void lbf_painted(void) {
+    if (!atomic_load_explicit(&on, memory_order_relaxed)) return;
+    pthread_mutex_lock(&mu);
+    move_events(painted, &npainted, applied, napplied);
     napplied = 0;
+    pthread_mutex_unlock(&mu);
+}
+
+void lbf_submitted(void) {
+    if (!atomic_load_explicit(&on, memory_order_relaxed)) return;
+    pthread_mutex_lock(&mu);
+    move_events(inframe, &ninframe, painted, npainted);
+    npainted = 0;
     pthread_mutex_unlock(&mu);
 }
 
 void lbf_begin(void) {
     pthread_mutex_lock(&mu);
-    nwork = nshown = nlat = napplied = ninframe = 0;
+    nwork = nshown = nlat = napplied = npainted = ninframe = 0;
     period = 0;
     atomic_store(&on, 1);
     pthread_mutex_unlock(&mu);
