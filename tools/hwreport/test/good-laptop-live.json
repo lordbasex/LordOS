@@ -176,6 +176,9 @@
       "bpfLsm": true,
       "cgroup2": true,
       "live": true,
+      "bootMedium": "usb",
+      "bootLinkMbps": 5000,
+      "bootToRam": false,
       "kernelConfig": {
         "CONFIG_SECURITY_LANDLOCK": "y",
         "CONFIG_BPF_LSM": "y"

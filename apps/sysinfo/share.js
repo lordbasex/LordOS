@@ -160,8 +160,24 @@ const oneLine = (s, max) => {
   return [...t].length > max ? `${[...t].slice(0, max - 1).join('')}…` : t;
 };
 
+// What the system started from (0.8.7): the medium's class, a USB link speed, and whether a live session was
+// copied to memory; '' when unknown. Classes only: the collector never gives a device name.
+export const BOOT_MEDIA = ['internal', 'usb', 'sd', 'emmc', 'optical', 'network'];
+export function bootInfo(rep) {
+  const sw = ((rep && rep.system) || {}).software || {};
+  return {
+    medium: BOOT_MEDIA.includes(sw.bootMedium) ? sw.bootMedium : '',
+    mbps: Number.isInteger(sw.bootLinkMbps) && sw.bootLinkMbps > 0 ? sw.bootLinkMbps : null,
+    toRam: sw.bootToRam === true,
+  };
+}
+export function bootText(rep) {
+  const b = bootInfo(rep);
+  return [b.medium, b.mbps ? `${b.mbps} Mbps` : '', b.toRam ? 'toram' : ''].filter(Boolean).join(', ');
+}
+
 // The short, non-identifying summary that goes into the issue's link: the machine, CPU, GPU, memory,
-// LordOS version, live or installed, and the compatibility states. Nothing else of the report travels in
+// LordOS version, live or installed, the boot medium's class, and the compatibility states. Nothing else of the report travels in
 // the URL; the full JSON is attached by the user.
 export function summaryRows(rep) {
   const s = (rep && rep.system) || {};
@@ -177,6 +193,7 @@ export function summaryRows(rep) {
     ['lordos', rep && rep.lordos],
     ['kernel', (s.software && s.software.kernel) || ''],
     ['live', rep && rep.live ? 'yes' : 'no'],
+    ['boot', bootText(rep)],
     ['bench', rep && rep.bench ? rep.bench.mode : ''],
     ['compat', ((rep && rep.compatibility) || []).filter((c) => c.state !== 'absent').map((c) => `${c.id}=${c.state}`).join(' ')],
   ];

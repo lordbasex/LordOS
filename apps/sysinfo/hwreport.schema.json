@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://lordos.org/schemas/hwreport-1.schema.json",
   "title": "LordOS hardware report, version 1",
-  "description": "The report System Information shares on GitHub (docs/BENCHMARK.md, '0.8.7 — Community hardware reports'). It is an allow-list: every object closes its properties, so a field that isn't listed here can't be shared. It has no field for serials, UUIDs, MAC or IP addresses, host or user names, Wi-Fi network names or home-folder paths. Used by apps/sysinfo/share.js (to pick the fields), tools/hwreport (the workflow's validator and the catalogue) and their tests. Only the subset of JSON Schema that tools/hwreport/jsonschema.mjs implements is used.",
+  "description": "The report System Information shares on GitHub (docs/BENCHMARK.md, '0.8.7 — Community hardware reports'). It is an allow-list: every object closes its properties, so a field that isn't listed here can't be shared. It has no field for serials, UUIDs, MAC or IP addresses, host or user names, Wi-Fi network names, device names (the boot medium is a class: internal, usb, sd…) or home-folder paths. Used by apps/sysinfo/share.js (to pick the fields), tools/hwreport (the workflow's validator and the catalogue) and their tests. Only the subset of JSON Schema that tools/hwreport/jsonschema.mjs implements is used.",
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "version", "createdAt", "source", "lordos", "live", "system", "compatibility"],
@@ -150,6 +150,9 @@
             "kernel": { "$ref": "#/$defs/word" }, "lordos": { "$ref": "#/$defs/word" }, "lsm": { "$ref": "#/$defs/text" },
             "landlockAbi": { "$ref": "#/$defs/optCount" }, "bpfLsm": { "type": "boolean" }, "cgroup2": { "type": "boolean" },
             "live": { "type": "boolean" },
+            "bootMedium": { "enum": ["", "internal", "usb", "sd", "emmc", "optical", "network"] },
+            "bootLinkMbps": { "anyOf": [{ "type": "null" }, { "type": "integer", "minimum": 1, "maximum": 100000 }] },
+            "bootToRam": { "type": "boolean" },
             "kernelConfig": {
               "type": "object", "maxProperties": 32,
               "propertyNames": { "pattern": "^CONFIG_[A-Z0-9_]{1,40}$" },

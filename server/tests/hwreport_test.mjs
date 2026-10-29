@@ -65,6 +65,11 @@ const badCases = {
   'too many PCI devices': (r) => { r.system.pci = Array.from({ length: 129 }, () => r.system.pci[0]); },
   'a kernel option that is not CONFIG_': (r) => { r.system.software.kernelConfig.HOME = 'y'; },
   'live as a string': (r) => { r.live = 'yes'; },
+  'a device name as the boot medium': (r) => { r.system.software.bootMedium = 'sdb'; },
+  'a mount point as the boot medium': (r) => { r.system.software.bootMedium = '/run/live/medium'; },
+  'a boot link speed as text': (r) => { r.system.software.bootLinkMbps = '5000'; },
+  'a zero boot link speed': (r) => { r.system.software.bootLinkMbps = 0; },
+  'toram as a string': (r) => { r.system.software.bootToRam = 'yes'; },
 };
 for (const [name, f] of Object.entries(badCases)) ok(`invalid: ${name}`, !valid(variant(f)));
 await throws('the validator refuses keywords it does not implement', () => validate({ type: 'string', format: 'email' }, 'x'), /unsupported/);
@@ -79,7 +84,7 @@ const raw = {
   gpus: [{ card: 'card1', bus: 'pci', vendorId: '8086', deviceId: '46a8', vendor: 'Intel', device: 'Iris Xe', driver: 'i915', bootVga: true, renderNode: true, connectors: 4, connected: 1 }],
   network: [{ kind: 'wifi', driver: 'iwlwifi', up: true, speedMbps: null, mac: '3c:22:fb:12:34:56', ssid: 'HomeNet' }],
   storage: [{ name: 'nvme0n1', model: 'SSD', bytes: 512e9, rotational: false, removable: false, transport: 'nvme', link: '', serial: 'S64' }],
-  software: { kernel: '6.12.57', lordos: '0.8.7-beta', landlockAbi: 6, bpfLsm: true, cgroup2: true, live: false, home: '/home/alice' },
+  software: { kernel: '6.12.57', lordos: '0.8.7-beta', landlockAbi: 6, bpfLsm: true, cgroup2: true, live: false, home: '/home/alice', bootMedium: 'internal', bootLinkMbps: null, bootToRam: false, bootDevice: 'nvme0n1p2' },
   session: { composition: 'gpu', gpuInit: 'on', renderer: 'Mesa Intel', renderNode: '/dev/dri/renderD128', dmabuf: true, scanouts: 1, fixture: false },
 };
 const bench = { lordbench: 1, mode: 'quick', at: 1, status: 'done', lordos: '0.8.7-beta', live: true, results: { 'cpu.js.1': { value: 50, unit: 'runs/s', extra: 1 } }, secret: 'x' };
@@ -94,13 +99,18 @@ ok('live from LordBench\'s flag', built.live === true);
 eq('a bench of another version is left out', buildShareReport({ report: raw, bench: { ...bench, lordos: '0.8.6-beta' }, compat: [], schema, date: '2026-10-28' }).bench, null);
 ok('live from the report', buildShareReport({ report: { ...raw, software: { ...raw.software, live: true } }, compat: [], schema, date: '2026-10-28' }).live);
 ok('not live', !buildShareReport({ report: raw, compat: [], schema, date: '2026-10-28' }).live);
+eq('the boot medium is shared as a class', [built.system.software.bootMedium, built.system.software.bootLinkMbps, built.system.software.bootToRam, 'bootDevice' in built.system.software], ['internal', null, false, false]);
+eq('pick drops a boot medium outside the list', pick({ bootMedium: 'mmcblk0', bootLinkMbps: 480 }, schema.$defs.system.properties.software, schema), { bootLinkMbps: 480 });
 eq('pick cuts long text and drops a bad enum', pick({ chassis: 'spaceship', model: 'y'.repeat(200) }, schema.$defs.system.properties.machine, schema), { model: 'y'.repeat(128) });
 eq('pick drops a value with control characters', pick({ model: 'a\u0001b' }, schema.$defs.system.properties.cpu, schema), {});
 eq('pick caps arrays', pick(Array(40).fill({ kind: 'ethernet' }), schema.$defs.system.properties.network, schema).length, 32);
 eq('kind, vendors', [reportKind(laptop), gpuVendor(laptop), cpuVendor(laptop)], ['laptop', 'intel', 'intel']);
 eq('kind and vendors of the references', [reportKind(vm), gpuVendor(vm), cpuVendor(vm), reportKind(pi), gpuVendor(pi), cpuVendor(pi)], ['vm', 'virtual', 'intel', 'board', 'broadcom', 'arm']);
 const rows = Object.fromEntries(summaryRows(laptop));
-eq('summary rows', [rows.machine, rows.kind, rows.lordos, rows.live, rows.memory], ['LENOVO 21CB', 'laptop', '0.8.7-beta', 'yes', '15 GB']);
+eq('summary rows', [rows.machine, rows.kind, rows.lordos, rows.live, rows.memory, rows.boot], ['LENOVO 21CB', 'laptop', '0.8.7-beta', 'yes', '15 GB', 'usb, 5000 Mbps']);
+eq('boot row with the copy to memory', Object.fromEntries(summaryRows(variant((r) => { r.system.software.bootToRam = true; delete r.system.software.bootLinkMbps; }))).boot, 'usb, toram');
+ok('no boot row when unknown', !summaryRows(variant((r) => { r.system.software.bootMedium = ''; r.system.software.bootLinkMbps = null; })).some(([k]) => k === 'boot'));
+ok('the summary carries the boot class', summaryText(laptop).includes('boot: usb, 5000 Mbps'));
 ok('the title says live', issueTitle(laptop).endsWith(', live)') && issueTitle(laptop).length <= TITLE_MAX);
 ok('a long machine name keeps the title short', issueTitle({ ...laptop, system: { ...laptop.system, machine: { vendor: 'V'.repeat(80), product: 'P'.repeat(80) } } }).length <= TITLE_MAX);
 const url = new URL(issueUrl(laptop));
@@ -171,7 +181,11 @@ eq('mismatches', plausibility(variant((r) => { r.bench.lordos = '0.8.6-beta'; r.
 
 const today = { today: '2026-10-29' };
 eq('check: valid', checkReport(laptop, schema, today).status, 'valid');
-eq('check: labels from fixed lists', checkReport(laptop, schema, today).labels, ['hardware-report', 'report:valid', 'kind:laptop', 'gpu:intel', 'cpu:intel', 'live']);
+eq('check: labels from fixed lists', checkReport(laptop, schema, today).labels, ['hardware-report', 'report:valid', 'kind:laptop', 'gpu:intel', 'cpu:intel', 'live', 'boot:usb']);
+eq('no boot label when unknown', labelsFor('valid', variant((r) => { r.system.software.bootMedium = ''; })).includes('boot:'), false);
+eq('boot plausibility', plausibility(variant((r) => { r.live = false; r.bench.live = false; r.desktop = null; r.system.software.live = false; r.system.software.bootToRam = true; r.system.software.bootMedium = 'sd'; }), { today: '2026-10-29' }).map((f) => f.id),
+  ['boot-mismatch', 'boot-mismatch']);
+ok('the comment names the boot medium', commentBody(checkReport(laptop, schema, today)).includes('started from `usb`'));
 eq('check: implausible → a person looks', checkReport(silly, schema, today).status, 'check');
 eq('check: an extra field → invalid', checkReport(variant(badCases['a serial number field']), schema, today).status, 'invalid');
 eq('check: a MAC in an allowed text → invalid', checkReport(variant((r) => { r.system.cpu.model = 'cpu 3c:22:fb:12:34:56'; }), schema, today).status, 'invalid');

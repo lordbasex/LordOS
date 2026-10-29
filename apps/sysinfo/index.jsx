@@ -13,7 +13,7 @@ import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PE
 import Performance from './performance.jsx';
 import { Scene } from './scene.jsx';
 import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines } from './model.js';
-import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage } from './share.js';
+import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
 import { communityFor, communitySummary } from './community.js';
 import HWREPORT_SCHEMA from './hwreport.schema.json';
 
@@ -264,6 +264,7 @@ function Section({ id, r }) {
           <Row label={tr('sysinfo.f.lsm')} value={sw.lsm} />
           <Row label={tr('sysinfo.f.landlock')} value={sw.landlockAbi == null ? '' : sw.landlockAbi ? String(sw.landlockAbi) : tr('sysinfo.unavailable')} />
           <Row label={tr('sysinfo.f.cgroup2')} value={yesNo(sw.cgroup2)} />
+          <Row label={tr('sysinfo.f.boot')} value={bootLabel(tr, { system: r })} />
         </GroupBox>
         <GroupBox title={tr('sysinfo.services')}>
           {Object.entries(sw.services || {}).map(([k, v]) => <Row key={k} label={k} value={v ? tr('sysinfo.running') : tr('sysinfo.notRunning')} />)}
@@ -526,7 +527,7 @@ function Preview({ text }) {
 
 // ---- Share on GitHub (0.8.7) ----
 
-const SHARE_ROWS = ['machine', 'kind', 'cpu', 'gpu', 'memory', 'arch', 'lordos', 'kernel', 'live', 'bench', 'compat'];
+const SHARE_ROWS = ['machine', 'kind', 'cpu', 'gpu', 'memory', 'arch', 'lordos', 'kernel', 'live', 'boot', 'bench', 'compat'];
 const PAGE_KEYS = ['title', 'lead', 'summaryHead', 'sharedHead', 'shared1', 'shared2', 'shared3', 'shared4', 'neverHead', 'never1', 'never2', 'never3',
   'stepsHead', 'step1', 'step2', 'step3', 'step4', 'open', 'fileLabel', 'footer'];
 
@@ -534,10 +535,19 @@ function savedBench(which) {
   try { return (typeof lord !== 'undefined' && lord.sysinfo.bench.saved(which)) || null; } catch (e) { return null; }
 }
 
+// What the system started from, in the user's language (0.8.7): the medium's class, a USB link speed, the copy to
+// memory of a live session. rep: a shared report, or { system: lord.sysinfo.report() }.
+function bootLabel(tr, rep) {
+  const b = bootInfo(rep);
+  return [b.medium ? tr(`sysinfo.boot.${b.medium}`) : tr('sysinfo.unknown'),
+    b.mbps ? tr('sysinfo.boot.mbps', { n: b.mbps }) : '', b.toRam ? tr('sysinfo.boot.toRam') : ''].filter(Boolean).join(', ');
+}
+
 // The summary rows with their labels in the user's language (the values are the report's own, as they travel).
 function shareRows(tr, rep) {
   return summaryRows(rep).filter(([k]) => SHARE_ROWS.includes(k)).map(([k, v]) => [tr(`sysinfo.share.row.${k}`),
     k === 'live' ? tr(v === 'yes' ? 'sysinfo.perf.liveYes' : 'sysinfo.perf.liveNo')
+      : k === 'boot' ? bootLabel(tr, rep)
       : k === 'kind' && ['board', 'desktop', 'laptop', 'server', 'vm'].includes(v) ? tr(`sysinfo.share.kind.${v}`) : v]);
 }
 

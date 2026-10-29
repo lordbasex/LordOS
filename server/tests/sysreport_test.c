@@ -687,6 +687,203 @@ static void test_empty(void) {
     rmtree(root);
 }
 
+/* (0.8.7) The boot medium: one fake tree per case, built from mountinfo, the /sys/dev/block links and the
+ * sysfs attributes the collector reads. The report may carry the class (and a USB link speed), never the
+ * device's name, its model, a mount point or the kernel command line. */
+static const char *BOOT_NEVER[] = { "sdb", "nvme0n1", "mmcblk0", "dm-0", "sr0", "SECRET-STICK", "/run/live/medium", "BOOT_IMAGE", "server.lan" };
+
+static char *boot_root(void) {
+    static char root[64];
+    snprintf(root, sizeof root, "/tmp/sysreport-boot-XXXXXX");
+    if (!mkdtemp(root)) { printf("mkdtemp\n"); exit(2); }
+    return root;
+}
+
+/* A block device <dev> ("devices/…/block/<disk>[/<part>]") with major:minor; a partition gets its file. */
+static void boot_dev(const char *root, const char *majmin, const char *dev, int part) {
+    char f[512], t[512];
+    snprintf(f, sizeof f, "sys/%s/dev", dev); put(root, f, majmin);
+    if (part) { snprintf(f, sizeof f, "sys/%s/partition", dev); put(root, f, "1\n"); }
+    snprintf(f, sizeof f, "sys/dev/block/%s", majmin);
+    snprintf(t, sizeof t, "../../%s", dev);
+    lnk(root, f, t);
+    const char *name = strrchr(dev, '/') + 1;
+    snprintf(f, sizeof f, "sys/class/block/%s", name);
+    lnk(root, f, t);
+}
+
+static void boot_check(char *root, const char *what, int live, const char *medium, int mbps, int toram) {
+    if (live) mkdirs_in(root, "run/live");
+    char *json, *md;
+    SysReport *r = run(root, &json, &md);
+    char want[96];
+    snprintf(want, sizeof want, "\"bootMedium\":\"%s\"", medium);
+    CHECK(r->sw.live == live && !strcmp(r->sw.boot_medium, medium) && r->sw.boot_link_mbps == mbps && r->sw.boot_toram == toram,
+          "boot %s: \"%s\" %d %d (want \"%s\" %d %d)", what, r->sw.boot_medium, r->sw.boot_link_mbps, r->sw.boot_toram, medium, mbps, toram);
+    CHECK(contains(json, want), "boot %s: JSON %s", what, want);
+    if (mbps < 0) CHECK(contains(json, "\"bootLinkMbps\":null"), "boot %s: no link speed", what);
+    CHECK(contains(json, toram ? "\"bootToRam\":true" : "\"bootToRam\":false"), "boot %s: toram in the JSON", what);
+    for (size_t i = 0; i < sizeof BOOT_NEVER / sizeof BOOT_NEVER[0]; i++) {
+        CHECK(!contains(json, BOOT_NEVER[i]), "boot %s: the JSON carries \"%s\"", what, BOOT_NEVER[i]);
+        CHECK(!contains(md, BOOT_NEVER[i]), "boot %s: the Markdown carries \"%s\"", what, BOOT_NEVER[i]);
+    }
+    if (live || medium[0]) CHECK(contains(md, live ? "| Started | live session" : "| Started | installed"), "boot %s: Markdown row", what);
+    if (mbps > 0) {
+        char m[64];
+        snprintf(m, sizeof m, "from a USB drive (%d Mbps)", mbps);
+        CHECK(contains(md, m), "boot %s: Markdown \"%s\"", what, m);
+    }
+    CHECK(contains(md, "copied to memory") == toram, "boot %s: Markdown copy to memory", what);
+    if (!strcmp(medium, "internal")) CHECK(contains(md, "from an internal disk"), "boot %s: Markdown internal", what);
+    free(json); free(md); free(r);
+    rmtree(root);
+}
+
+static void test_boot(void) {
+    const char *nvme = "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1";
+    const char *usb3 = "devices/pci0000:00/0000:00:14.0/usb2/2-3";
+    char d[512];
+    char *r;
+
+    /* installed on an NVMe disk */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "22 1 0:21 / /proc rw - proc proc rw\n29 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw\n");
+    put(r, "proc/cmdline", "BOOT_IMAGE=/boot/vmlinuz root=UUID=SECRET-UUID ro quiet\n");
+    snprintf(d, sizeof d, "%s/nvme0n1p2", nvme); boot_dev(r, "259:2", d, 1);
+    boot_check(r, "nvme", 0, "internal", -1, 0);
+
+    /* live from a USB 3 stick */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 0:30 / / rw - overlay overlay rw\n41 29 8:17 / /run/live/medium ro - iso9660 /dev/sdb1 ro\n");
+    put(r, "proc/cmdline", "BOOT_IMAGE=/live/vmlinuz boot=live components quiet\n");
+    snprintf(d, sizeof d, "%s/2-3:1.0/host4/target4:0:0/4:0:0:0/block/sdb/sdb1", usb3); boot_dev(r, "8:17", d, 1);
+    snprintf(d, sizeof d, "sys/%s/speed", usb3); put(r, d, "5000\n");
+    snprintf(d, sizeof d, "sys/%s/serial", usb3); put(r, d, "SECRET-STICK\n");
+    boot_check(r, "live usb3", 1, "usb", 5000, 0);
+
+    /* live from a USB 2 stick behind a hub, copied to RAM (medium still mounted) */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "41 29 8:17 / /run/live/medium ro - iso9660 /dev/sdb1 ro\n");
+    put(r, "proc/cmdline", "BOOT_IMAGE=/live/vmlinuz boot=live toram lordos.lang=en\n");
+    boot_dev(r, "8:17", "devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2.4/1-2.4:1.0/host5/target5:0:0/5:0:0:0/block/sdb/sdb1", 1);
+    put(r, "sys/devices/pci0000:00/0000:00:14.0/usb1/1-2/speed", "480\n");
+    put(r, "sys/devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2.4/speed", "480\n");
+    boot_check(r, "live usb2 toram", 1, "usb", 480, 1);
+
+    /* copied to RAM and the medium let go: the class is unknown, the copy is not */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 0:30 / / rw - overlay overlay rw\n");
+    put(r, "proc/cmdline", "boot=live toram\n");
+    boot_check(r, "toram, medium gone", 1, "", -1, 1);
+
+    /* "notoram" and toram on an installed system are not the live copy */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 259:2 / / rw - ext4 /dev/nvme0n1p2 rw\n");
+    put(r, "proc/cmdline", "notoram toram\n");
+    snprintf(d, sizeof d, "%s/nvme0n1p2", nvme); boot_dev(r, "259:2", d, 1);
+    boot_check(r, "toram when installed", 0, "internal", -1, 0);
+    r = boot_root();
+    put(r, "proc/cmdline", "boot=live notoram toramx\n");
+    boot_check(r, "notoram", 1, "", -1, 0);
+
+    /* a Raspberry Pi's SD card, and an eMMC */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 179:2 / / rw - ext4 /dev/mmcblk0p2 rw\n");
+    boot_dev(r, "179:2", "devices/platform/axi/1000fff000.mmc/mmc_host/mmc0/mmc0:aaaa/block/mmcblk0/mmcblk0p2", 1);
+    lnk(r, "sys/devices/platform/axi/1000fff000.mmc/mmc_host/mmc0/mmc0:aaaa/block/mmcblk0/device", "../../../mmc0:aaaa");
+    put(r, "sys/devices/platform/axi/1000fff000.mmc/mmc_host/mmc0/mmc0:aaaa/type", "SD\n");
+    put(r, "sys/devices/platform/axi/1000fff000.mmc/mmc_host/mmc0/mmc0:aaaa/serial", "SECRET-STICK\n");
+    boot_check(r, "sd", 0, "sd", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 179:2 / / rw - ext4 /dev/mmcblk0p2 rw\n");
+    boot_dev(r, "179:2", "devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/mmcblk0p2", 1);
+    lnk(r, "sys/devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/device", "../../../mmc0:0001");
+    put(r, "sys/devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/type", "MMC\n");
+    boot_check(r, "emmc", 0, "emmc", -1, 0);
+    r = boot_root();                    /* a card whose type can't be read: unknown, not a guess */
+    put(r, "proc/self/mountinfo", "29 1 179:2 / / rw - ext4 /dev/mmcblk0p2 rw\n");
+    boot_dev(r, "179:2", "devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/mmcblk0p2", 1);
+    boot_check(r, "mmc unknown", 0, "", -1, 0);
+
+    /* encrypted root (device mapper) on the NVMe disk, and on a USB disk */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 254:0 / / rw - ext4 /dev/mapper/root rw\n");
+    boot_dev(r, "254:0", "devices/virtual/block/dm-0", 0);
+    mkdirs_in(r, "sys/devices/virtual/block/dm-0/slaves/nvme0n1p3");
+    snprintf(d, sizeof d, "%s/nvme0n1p3", nvme); boot_dev(r, "259:3", d, 1);
+    boot_check(r, "luks nvme", 0, "internal", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 254:1 / / rw - ext4 /dev/mapper/root rw\n");
+    boot_dev(r, "254:1", "devices/virtual/block/dm-1", 0);
+    mkdirs_in(r, "sys/devices/virtual/block/dm-1/slaves/dm-0");
+    boot_dev(r, "254:0", "devices/virtual/block/dm-0", 0);
+    mkdirs_in(r, "sys/devices/virtual/block/dm-0/slaves/sdb2");
+    snprintf(d, sizeof d, "%s/2-3:1.0/host4/target4:0:0/4:0:0:0/block/sdb/sdb2", usb3); boot_dev(r, "8:18", d, 1);
+    snprintf(d, sizeof d, "sys/%s/speed", usb3); put(r, d, "10000\n");
+    boot_check(r, "lvm on luks on usb", 0, "usb", 10000, 0);
+    r = boot_root();                    /* a loop of device mapper layers ends, unknown */
+    put(r, "proc/self/mountinfo", "29 1 254:0 / / rw - ext4 /dev/mapper/root rw\n");
+    boot_dev(r, "254:0", "devices/virtual/block/dm-0", 0);
+    mkdirs_in(r, "sys/devices/virtual/block/dm-0/slaves/dm-0");
+    boot_check(r, "dm loop", 0, "", -1, 0);
+
+    /* btrfs shows an anonymous device: the source names the disk */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 0:31 /@ / rw - btrfs /dev/sdb2 rw\n");
+    boot_dev(r, "8:18", "devices/pci0000:00/0000:00:17.0/ata1/host0/target0:0:0/0:0:0:0/block/sdb/sdb2", 1);
+    boot_check(r, "btrfs sata", 0, "internal", -1, 0);
+
+    /* the last mount on / wins */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "1 0 0:2 / / rw - rootfs rootfs rw\n29 1 179:2 / / rw - ext4 /dev/mmcblk0p2 rw\n");
+    boot_dev(r, "179:2", "devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/mmcblk0p2", 1);
+    lnk(r, "sys/devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/block/mmcblk0/device", "../../../mmc0:0001");
+    put(r, "sys/devices/platform/soc/mmc0/mmc_host/mmc0/mmc0:0001/type", "SD\n");
+    boot_check(r, "stacked mounts", 0, "sd", -1, 0);
+
+    /* a live DVD (or a virtual machine's CD drive) */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "41 29 11:0 / /run/live/medium ro - iso9660 /dev/sr0 ro\n");
+    boot_dev(r, "11:0", "devices/pci0000:00/0000:00:1f.2/ata2/host1/target1:0:0/1:0:0:0/block/sr0", 0);
+    boot_check(r, "optical", 1, "optical", -1, 0);
+
+    /* network: an NFS root, iSCSI, NBD, and a live system fetched over the network */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 0:23 / / rw - nfs4 server.lan:/export/root rw\n");
+    boot_check(r, "nfs", 0, "network", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 8:33 / / rw - ext4 /dev/sdc1 rw\n");
+    boot_dev(r, "8:33", "devices/platform/host5/session1/target5:0:0/5:0:0:0/block/sdc/sdc1", 1);
+    boot_check(r, "iscsi", 0, "network", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 43:0 / / rw - ext4 /dev/nbd0 rw\n");
+    boot_dev(r, "43:0", "devices/virtual/block/nbd0", 0);
+    boot_check(r, "nbd", 0, "network", -1, 0);
+    r = boot_root();
+    put(r, "proc/cmdline", "boot=live fetch=http://server.lan/live/filesystem.squashfs\n");
+    boot_check(r, "live fetch", 1, "network", -1, 0);
+
+    /* a virtual machine's disk, a live ISO on a loop device, and a link that climbs out of /sys */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 253:1 / / rw - ext4 /dev/vda1 rw\n");
+    boot_dev(r, "253:1", "devices/pci0000:00/0000:00:04.0/virtio1/block/vda/vda1", 1);
+    boot_check(r, "virtio", 0, "internal", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "41 29 7:0 / /run/live/medium ro - iso9660 /dev/loop0 ro\n");
+    boot_dev(r, "7:0", "devices/virtual/block/loop0", 0);
+    boot_check(r, "loop", 1, "", -1, 0);
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 8:1 / / rw - ext4 /dev/sda1 rw\n");
+    lnk(r, "sys/dev/block/8:1", "../../devices/../../../etc/block/sda/sda1");
+    boot_check(r, "escaping link", 0, "", -1, 0);
+    /* USB without a readable speed: the class, no number */
+    r = boot_root();
+    put(r, "proc/self/mountinfo", "29 1 8:17 / / rw - ext4 /dev/sdb1 rw\n");
+    snprintf(d, sizeof d, "%s/2-3:1.0/host4/target4:0:0/4:0:0:0/block/sdb/sdb1", usb3); boot_dev(r, "8:17", d, 1);
+    snprintf(d, sizeof d, "sys/%s/speed", usb3); put(r, d, "fast\n");
+    boot_check(r, "usb no speed", 0, "usb", -1, 0);
+}
+
 int main(int argc, char **argv) {
     if (argc == 2 && !strcmp(argv[1], "smbios")) {
         for (int i = 0; i < 64; i++) {
@@ -722,6 +919,7 @@ int main(int argc, char **argv) {
     CHECK(fetch_color_mode("auto", 1) == FETCH_TRUECOLOR && fetch_color_mode("auto", 0) == FETCH_PLAIN && fetch_color_mode("never", 1) == FETCH_PLAIN, "color modes");
     test_pi_firmware();
     test_empty();
+    test_boot();
     printf("sysreport-test: %d ok, %d failed\n", n_ok, n_bad);
     return n_bad ? 1 : 0;
 }

@@ -140,6 +140,10 @@ typedef struct {
     int bpf_lsm;                        /* "bpf" in the LSM list */
     int cgroup2;                        /* unified hierarchy mounted */
     int live;                           /* the live session (/run/live exists) */
+    char boot_medium[12];               /* what the system started from (0.8.7): "internal", "usb", "sd", "emmc",
+                                         * "optical", "network" or "" unknown; never a device name */
+    int boot_link_mbps;                 /* a USB medium's link speed, -1 unknown or not USB */
+    int boot_toram;                     /* live session copied to RAM (the "toram" boot option) */
     int nkconf;
     SrKconf kconf[SR_MAX_KCONF];
     int sessiond, netperm, fand, netd;  /* their sockets in /run/lordos (-1 unknown) */

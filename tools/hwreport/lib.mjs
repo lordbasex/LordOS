@@ -10,7 +10,7 @@
 // inside code spans. Labels come from fixed lists, never from the report's text.
 import { validate } from './jsonschema.mjs';
 import { REFERENCES } from '../../apps/sysinfo/references.js';
-import { reportKind, gpuVendor, cpuVendor, machineLabel, sameVersion, mainGpu, FORMAT } from '../../apps/sysinfo/share.js';
+import { reportKind, gpuVendor, cpuVendor, machineLabel, sameVersion, mainGpu, bootInfo, BOOT_MEDIA, FORMAT } from '../../apps/sysinfo/share.js';
 
 export const MAX_BYTES = 512 * 1024;
 export const MAX_DEPTH = 12;
@@ -151,6 +151,10 @@ export function plausibility(rep, { today = new Date().toISOString().slice(0, 10
   if (kb != null && (kb < 256 * 1024 || kb > 64 * 1024 * 1024 * 1024)) flag('memory-size', kb);
   if (rep.createdAt > today) flag('date-future', rep.createdAt);
   if (s.software && s.software.lordos && !sameVersion(s.software.lordos, rep.lordos)) flag('version-mismatch', `${s.software.lordos} / ${rep.lordos}`);
+  // the boot medium (0.8.7): a copy to memory only exists in a live session, a link speed only for USB
+  const boot = bootInfo(rep);
+  if (boot.toRam && rep.live !== true) flag('boot-mismatch', 'toram, installed');
+  if (boot.mbps && boot.medium !== 'usb') flag('boot-mismatch', `${boot.mbps} Mbps, ${boot.medium || 'unknown'}`);
   for (const [which, b] of [['bench', rep.bench], ['desktop', rep.desktop]]) {
     if (!b) continue;
     if (b.lordos && !sameVersion(b.lordos, rep.lordos)) flag('bench-version', `${which}: ${b.lordos}`);
@@ -200,6 +204,8 @@ export function labelsFor(status, rep) {
     if (GPU_V.includes(g)) out.push(`gpu:${g}`);
     if (CPU_V.includes(c)) out.push(`cpu:${c}`);
     out.push(rep.live ? 'live' : 'installed');
+    const b = bootInfo(rep).medium;
+    if (BOOT_MEDIA.includes(b)) out.push(`boot:${b}`);
   }
   return out;
 }
@@ -208,7 +214,7 @@ function summaryOf(rep) {
   const s = rep.system || {};
   const g = mainGpu(s);
   return {
-    machine: machineLabel(rep), kind: reportKind(rep), lordos: rep.lordos, live: rep.live,
+    machine: machineLabel(rep), kind: reportKind(rep), lordos: rep.lordos, live: rep.live, boot: bootInfo(rep).medium,
     cpu: (s.cpu && s.cpu.model) || '', threads: (s.cpu && s.cpu.threads) || 0,
     gpu: g ? `${[g.vendor, g.device].filter(Boolean).join(' ')}${g.driver ? ` (${g.driver})` : ''}` : '',
     compat: (rep.compatibility || []).filter((c) => c.state !== 'absent').map((c) => `${c.id}: ${c.state}`),
@@ -239,7 +245,7 @@ export function commentBody(result, { fileName = '' } = {}) {
     const s = result.summary;
     L.push('| | |', '|---|---|',
       `| Machine | ${code(s.machine)} (${code(s.kind)}) |`,
-      `| LordOS | ${code(s.lordos)}${s.live ? ' — live session' : ''} |`,
+      `| LordOS | ${code(s.lordos)}${s.live ? ' — live session' : ''}${s.boot ? ` — started from ${code(s.boot)}` : ''} |`,
       `| CPU | ${code(s.cpu)}${s.threads ? ` — ${s.threads} threads` : ''} |`,
       `| GPU | ${code(s.gpu)} |`,
       `| Compatibility | ${s.compat.length ? s.compat.slice(0, 12).map(code).join(' ') : '—'} |`,
