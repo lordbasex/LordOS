@@ -171,6 +171,7 @@ typedef struct {
      * against, checked before it is submitted (the scene's pixels, the GPU context and output, paint.c's GPU drag
      * epoch); its CPU time so far and its phases for LordBench (main display) */
     int prep, prep_whole, prep_gpu;
+    int prep_js;                /* an FPIPE_EMPTY prepare ran the JS frame callbacks and they asked again (fpipe_hold_callbacks) */
     Rect prep_r;
     const uint32_t *prep_px;
     unsigned prep_gen, prep_epoch;
@@ -228,8 +229,9 @@ static int box_empty(Box b) { return b.x1 <= b.x0 || b.y1 <= b.y0; }
 static void gdrag_stale(Out *o) {
     float x0, y0, x1, y1;
     out_logical_box(&o->v, o->gdragw, &x0, &y0, &x1, &y1);
-    if (box_empty(o->pend)) o->pl.n = 0;
+    if (box_empty(o->pend)) { o->pl.n = 0; o->pframes = 0; }
     o->pend = box_join(o->pend, (Box){ x0, y0, x1, y1 });
+    o->pframes++;                       /* another frame's damage joins: paint_out settles the blur rule again */
     o->gdrag_on = 0;
 }
 
@@ -244,12 +246,14 @@ static void prep_undo(Out *o) {
         else if (r.x1 > r.x0 && r.y1 > r.y0) {
             float x0, y0, x1, y1;
             out_logical_box(&o->v, r, &x0, &y0, &x1, &y1);
-            if (box_empty(o->pend)) o->pl.n = 0;
+            if (box_empty(o->pend)) { o->pl.n = 0; o->pframes = 0; }
             o->pend = box_join(o->pend, (Box){ x0, y0, x1, y1 });
+            o->pframes++;               /* (as gdrag_stale) */
         }
         o->gdragtaken = 0;
     }
     o->prep = FPIPE_NONE;
+    o->prep_js = 0;
 }
 
 /* ---- the displays ---- */
@@ -1068,9 +1072,11 @@ static void remote_pinch(int phase, double scale, double rotation) { tp_route_pi
 
 /* Layout and damage of the UI (once per frame, logical px). The damage goes to every display; each
  * one paints it when its flip is not pending (paint_out), at its own scale. */
+/* render_frame: paint_ui skips the JS frame callbacks (hold); they ran in this render (ran) */
+static int ui_js_hold, ui_js_ran;
 static Box paint_ui(Server *s) {
     Box d = { 0, 0, 0, 0 };
-    if (js_wants_frame()) js_frame(now_ms());
+    if (!ui_js_hold && js_wants_frame()) { js_frame(now_ms()); ui_js_ran = 1; }
     if (!ui.dirty) return d;
     ui.dirty = 0;
     double t0 = now_ms();
@@ -1168,11 +1174,14 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     o->pend = (Box){ 0, 0, 0, 0 };
     o->gdragtaken = 0;
     if (box_empty(b) || !o->scene.px) return r;
-    /* GPU drag: the rectangle the GPU composed last frame is stale in the scene: painted again with this damage */
+    int joined = o->pframes > 1;
+    /* GPU drag: the rectangle the GPU composed last frame is stale in the scene: painted again with this damage
+     * (another frame's rectangle joined: the blur rule is settled again below) */
     if (o->gdrag_on && !whole) {
         float gx0, gy0, gx1, gy1;
         out_logical_box(&o->v, o->gdragw, &gx0, &gy0, &gx1, &gy1);
         b = box_join(b, (Box){ gx0, gy0, gx1, gy1 });
+        joined = 1;
     }
     /* several damaged rectangles (paint.c, "Several damaged rectangles"): each one painted on its
      * own; r, what is presented, is the box around them (the scene keeps the pixels in between) */
@@ -1184,7 +1193,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     else if (!whole) dlist_add(&l, b);
     /* several frames' damage (a pending flip): joined rectangles, or an older frame's after a
      * blurred node moved, may cut through a blurred node (paint_damage_settle) */
-    if (!whole && o->pframes > 1) paint_damage_settle(&l);
+    if (!whole && joined) paint_damage_settle(&l);
     if (!whole && l.n) {
         b = l.r[0];
         for (int k = 1; k < l.n; k++) b = box_join(b, l.r[k]);
@@ -1757,7 +1766,7 @@ static double out_period_ms(const Out *o) { return o->kms.mode.vrefresh ? 1000.0
 /* a main display's frame for the pipeline's auto mode (fpipe_note); with -d its changes are logged */
 static void pipe_note(const Server *s, double ms, const Out *o) {
     int was = fpipe_engaged(&fpipe);
-    fpipe_note(&fpipe, ms, out_period_ms(o));
+    fpipe_note(&fpipe, now_ms(), ms, out_period_ms(o));
     if (s->debug && was != fpipe_engaged(&fpipe))
         fprintf(stderr, "frames: pipeline %s (a frame took %.1f ms of %.1f)\n", was ? "off" : "on", ms, out_period_ms(o));
 }
@@ -1770,7 +1779,11 @@ static void out_prepare(Server *s, Out *o, int i, const Out *feed, int is_main, 
     Rect r = out_paint(s, o, i, feed);
     /* nothing painted: the frame is built after the flip as without the pipeline, and nothing more is tried
      * before it (input waits for it as before, and a JS frame callback without damage does not spin) */
-    if (r.x1 <= r.x0 || r.y1 <= r.y0) { o->prep = FPIPE_EMPTY; return; }
+    if (r.x1 <= r.x0 || r.y1 <= r.y0) {
+        o->prep = FPIPE_EMPTY;
+        o->prep_js = ui_js_ran && js_wants_frame();     /* (fpipe_hold_callbacks) */
+        return;
+    }
     o->prep = FPIPE_READY;
     o->prep_r = r;
     o->prep_whole = whole;
@@ -1790,6 +1803,7 @@ static void out_submit(Server *s, Out *o, int i, const Out *feed, int is_main) {
     uint64_t s0 = lbf_recording() ? mono_ns() : 0;
     double t0 = now_ms();
     o->prep = FPIPE_NONE;
+    o->prep_js = 0;
     LbPhase *ph = is_main ? &o->pph : NULL;
     out_present(s, o, i, o->prep_r, feed, ph);
     if (!is_main) return;
@@ -1842,12 +1856,23 @@ static int render_frame(Server *s) {
     }
     double ui0 = now_ms();
     uint64_t ui0_ns = lbf_recording() ? mono_ns() : 0;
+    /* the JS frame callbacks already ran for the frame built now, in a prepare that painted nothing during
+     * the flip (fpipe_hold_callbacks): not again; the ones they asked for run with the next frame */
+    ui_js_hold = ui_js_ran = 0;
+    if (!prep_only)
+        for (int i = 0; i < OUT_MAX; i++) {
+            Out *o = &s->out[i];
+            if (!o->on || o->kms.flip_pending) continue;
+            if (fpipe_hold_callbacks(o->prep, o->prep_js)) ui_js_hold = 1;
+            o->prep_js = 0;
+        }
     paint_ui(s);
     s->last_render = now_ms();
     cursor_mark(s);
     /* (not while every display waits for its flip: stopping the GPU sets the dumb buffer with a modeset, and a
      * pending flip's buffer must stay; a frame prepared meanwhile is undone at the flip by cpu_takeover) */
     if (!ready && !prep_only && cpu_switch(s)) paint_ui(s);
+    ui_js_hold = 0;
     if (s->headless) {
         Out *o = &s->out[0];
         Rect drawn = paint_out(s, o, 0, 1);

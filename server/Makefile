@@ -414,7 +414,7 @@ build/fpipe-test: tests/fpipe_test.c src/fpipe.c src/fpipe.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fpipe_test.c src/fpipe.c
 	./$@ || { rm -f $@; exit 1; }
 # test_drag_exact's golden hashes for this architecture: only on the reference code (001633b plus
-# step 9 and the corners' restore on the drag layer), never to make a changed frame pass
+# step 9, the corners' restore on the drag layer and main's blur-margin repaint), never to make a changed frame pass
 # (tests/engine_test.c, "The dragged window, pixel for pixel")
 drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread

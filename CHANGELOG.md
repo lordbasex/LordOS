@@ -291,7 +291,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
   paths (VM 116, x86_64) through these steps. The golden hashes were written again twice, each time after a
   pixel-by-pixel comparison with the code before: for the approved corner change of step 9 (its own entry below) and
-  for the black-corner fix (Fixed). What the steps save was measured on the Pi 5 only all together (the first entry
+  for the black-corner fix (Fixed). A third time, on the GPU path only, when this work was rebased onto the
+  partial-repaint fixes (Fixed, "Partial repaints that left stale areas"): their rule that a blurred surface is
+  repainted with the margin its blur samples (`blur_near`) changed frame 0 of three runs (`neg`, `mix`, `k2mix`),
+  where the first dragged frame's damage reaches the menu bar's or the blurred panel's margin, and nothing else. With
+  that one rule reverted every one of the 2,417 hashes matched the old file; the CPU path's file is unchanged; those
+  three frames differ from a full repaint by at most 2 levels (1,596, 8,778 and 40,180 pixels; 1,532, 8,400 and
+  38,099 before). What the steps save was measured on the Pi 5 only all together (the first entry
   of this section).
   - **No clear under the copy of what is below the window:** `paint_root_clear` (`ui/paint.c`) replaces
     `canvas_clear` + `paint_root` in `main.c`, `app/appclient.c` and `engine-test`, and skips the clear when the drag
@@ -611,8 +617,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     driver paced in software, or with several displays (each frame built and submitted at once there, as before).
   - `LORD_PIPELINE`, read once at startup and named in the session log: `0` off (the previous behaviour exactly), `2`
     always, unset (the default) on while frames are heavy: after 2 frames in a row whose CPU time passes 60 % of the
-    period, off after 60 in a row under 40 % (`fpipe_note`; `-d` logs each change), because when frames already fit
-    a prepared frame shows input one vblank later.
+    period, off after 60 in a row under 40 % or at the first frame after more than half a second without one
+    (`FPIPE_IDLE_MS`; an idle desktop gives no frames to count, and without this the pipeline stayed on through it, so
+    the first input after it was shown a vblank later; that frame counts as the first of the two heavy ones that
+    engage it again) (`fpipe_note`; `-d` logs each change), because when frames already fit a prepared frame shows
+    input one vblank later.
   - The rules: what changes between a frame's paint and its submission goes into the next frame (the prepared one
     is shown as a frame painted at that moment would have been; the cursor and a Linux app's new buffer are still
     taken at submission). A prepare that paints nothing tries nothing more until the flip (no busy loop). A
@@ -627,7 +636,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     built frame still has GPU drag's catch-up queued (it would run between that prepared frame's paint and its upload).
     Direct scanout, the remote desktop's read-back, the protected windows' black, `LORD_GPU_VERIFY` and the -2
     path are decided at submission by the same code. The Linux apps' frame callbacks go with a submitted frame,
-    never with one only prepared.
+    never with one only prepared. The theme's JS frame callbacks run once per frame shown: a prepare that painted
+    nothing (`FPIPE_EMPTY`) had run them, and when they asked for another frame (an animation callback that changes
+    nothing while an app's frames or the cursor keep the display flipping) the frame built after that flip ran them
+    again, twice per frame shown; that frame now skips them and they run with the next one (`fpipe_hold_callbacks`,
+    `Out.prep_js`). A prepared frame that is undone, or GPU drag's rectangle painted again on the CPU, joins the next
+    frame's damage as a second frame's, so `paint_out` applies the blur rule again (`paint_damage_settle`).
+    Checked on VM 116 after these two fixes (and the rebase onto the partial-repaint fixes): `make -j8` with no
+    warnings; `fpipe-test` 59 checks (new: the idle gap, at and past `FPIPE_IDLE_MS`, re-engaging after it, `2` and
+    `0` ignoring it, a heavy drag then 2 s idle then a click; and a display flipping for an app on the GPU path
+    while an animation callback changes nothing: 600 callbacks for 599 frames shown with the pipeline off, 1,200
+    with it before the fix, 601 after); `engine-test` 6,907 checks, 0 failures; `lordbench-test` 1,217 ok;
+    `make test` 23 passed, 0 failed, 13 skipped. The pipeline itself still has not run on a display.
   - LordBench records a prepared frame at its submission: its prepare's paint, its submission's upload, swap and
     flip ioctl, both as `renderMs`, and a new `heldMs` (prepared → submitted) with a `prepared` count, in
     `frames.phases` and the `drag (scripted):` line (`… prepared ahead N (held for the flip p50/p99)`); such a

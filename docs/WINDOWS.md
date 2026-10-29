@@ -174,7 +174,13 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   to this path and written again at the corner change above (from 001633b plus that change alone) and at
   the black-corner fix (only the dragged window's corner squares and the Dock's and menu bar's backdrop
   blur within reach of them changed, compared pixel by pixel first: 498,743 and 445,199 pixels in 2,386
-  of 2,417 frames on the CPU path): a faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
+  of 2,417 frames on the CPU path), and once more, on the GPU path only, when `main`'s partial-repaint fixes
+  were merged under this work (0.8.6, `docs/LAYERS.md`: a blurred surface is repainted with the margin its blur
+  samples): frame 0 of three runs (`neg`, `mix`, `k2mix`), where the first dragged frame's damage reaches the
+  menu bar's or the blurred panel's margin, changed and nothing else; with that one rule reverted (`blur_near`)
+  all 2,417 hashes match the old file again, the CPU path's file is unchanged, and those three frames differ
+  from a full repaint by at most 2 levels (in 1,596, 8,778 and 40,180 pixels; 1,532, 8,400 and 38,099 before).
+  A faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
   by pixel with the earlier code's: 178,634 pixels in 1,686 of 1,816 frames differed, all by one
   level, inside a rounded `overflow: hidden` node's corner squares (`ceil(r) + 1` px) or within the
   Dock's and menu bar's backdrop blur reach of one, and none moved away from a full repaint. The hashes

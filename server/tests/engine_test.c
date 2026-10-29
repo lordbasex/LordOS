@@ -2181,7 +2181,8 @@ static int gold_write(const char *path, const char *variant, const uint64_t *has
         fprintf(f, "# engine-test test_drag_exact, %s path: FNV-1a hash of every frame of the dragged window.\n"
                    "# Written by `make drag-golden` from 001633b plus step 9 (2026-10-28: the corners of rounded windows\n"
                    "# below the dragged one, 1 level, towards a full repaint) and the corners' restore on the drag layer\n"
-                   "# (no black squares outside the dragged window's rounded corners); later code must give the same\n"
+                   "# (no black squares outside the dragged window's rounded corners), and main's 0.8.6 blur-margin repaint\n"
+                   "# (blur_near: GPU path, frame 0 of neg, mix and k2mix); later code must give the same\n"
                    "# pixels. Lines: architecture, run, frame, hash.\n", variant);
     size_t al = strlen(GOLD_ARCH);
     for (const char *p = old; p && *p; ) {

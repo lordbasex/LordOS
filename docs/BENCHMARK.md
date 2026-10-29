@@ -604,7 +604,8 @@ GPU drag's default is decided after that run: today it is on wherever its self-t
 fit with the GPU's part in a 16.7 ms period while the next frame is started only after the flip. Now, while a flip
 is pending, the next frame's CPU part (input, JS frame callbacks, layout, paint into the scene) is done ahead, and at
 the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). On by
-default while frames are heavy (more than 60 % of the period, 2 frames in a row; off after 60 frames below 40 %),
+default while frames are heavy (more than 60 % of the period, 2 frames in a row; off after 60 frames below 40 %, or
+at the first frame after more than half a second without one, so an idle desktop answers its next input without it),
 `LORD_PIPELINE=0` turns it off and `LORD_PIPELINE=2` keeps it on. Only with one display that has real page flips:
 without a monitor, with a driver paced in software or with several displays nothing changes. Expected on the Pi
 under the load: the frames shown every vblank instead of every other one as long as the CPU part stays under one

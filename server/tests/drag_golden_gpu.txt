@@ -1,7 +1,8 @@
 # engine-test test_drag_exact, gpu path: FNV-1a hash of every frame of the dragged window.
 # Written by `make drag-golden` from 001633b plus step 9 (2026-10-28: the corners of rounded windows
 # below the dragged one, 1 level, towards a full repaint) and the corners' restore on the drag layer
-# (no black squares outside the dragged window's rounded corners); later code must give the same
+# (no black squares outside the dragged window's rounded corners), and main's 0.8.6 blur-margin repaint
+# (blur_near: frame 0 of neg, mix and k2mix, rewritten at the rebase onto it); later code must give the same
 # pixels. Lines: architecture, run, frame, hash.
 x86_64 drag 0 16b358d6ecdc9df7
 x86_64 drag 1 b48adda05df8c08f
@@ -728,7 +729,7 @@ x86_64 edge 57 a671c76ab2f68bbb
 x86_64 edge 58 f7541d7022c202b4
 x86_64 edge 59 e3db2c5f8a432e85
 x86_64 edge 60 6c285a9ccaeb404f
-x86_64 neg 0 200885d230f0183e
+x86_64 neg 0 a61562f0fcc4f072
 x86_64 neg 1 c11adafe5265ecd8
 x86_64 neg 2 21b18aeaef2a2f54
 x86_64 neg 3 90001bf3a5534539
@@ -1696,7 +1697,7 @@ x86_64 zraise 117 a99a86313a15bebe
 x86_64 zraise 118 8c111073b4c93682
 x86_64 zraise 119 b7dbfcad5f369c08
 x86_64 zraise 120 d988d35c13563cc3
-x86_64 mix 0 9e700bfc95d09976
+x86_64 mix 0 e50b8d9ad83fbb64
 x86_64 mix 1 2a86b1340ef8ea4a
 x86_64 mix 2 b23a07aadd744b7a
 x86_64 mix 3 2ea2c7866bcc13be
@@ -1937,7 +1938,7 @@ x86_64 mix 237 8a70ee56dd7a7c68
 x86_64 mix 238 60ecf43e14b2825a
 x86_64 mix 239 b9d37be1633c6291
 x86_64 mix 240 4c4ea00d0f734222
-x86_64 k2mix 0 fd6b1e7771eb1239
+x86_64 k2mix 0 aec9b2b9f6fef494
 x86_64 k2mix 1 cddacf466272e432
 x86_64 k2mix 2 00b17e62cb42da53
 x86_64 k2mix 3 fa73dad29b011126

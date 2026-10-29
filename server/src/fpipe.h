@@ -15,13 +15,19 @@ typedef struct {
     int mode;
     int on;                             /* auto: engaged */
     int heavy, light;                   /* heavy frames in a row (to engage), light ones (to let go) */
+    double last;                        /* when the last frame was noted (ms; 0: none yet) */
 } FPipe;
+/* A gap this long without a frame is an idle desktop: auto lets go at the next frame (fpipe_note). */
+#define FPIPE_IDLE_MS 500.0
 void fpipe_init(FPipe *p, const char *env);
-/* after each frame the main display got: the CPU time it took (input excluded: JS frame callbacks,
- * layout, paint, the upload and the flip's submission) against the refresh period. Auto engages after
- * 2 frames in a row above 60 % of the period (where a frame plus the GPU's part stops fitting before
- * the next vblank) and lets go after 60 in a row below 40 %, like the paint threads (main.c). */
-void fpipe_note(FPipe *p, double cpu_ms, double period_ms);
+/* after each frame the main display got, at now_ms: the CPU time it took (input excluded: JS frame
+ * callbacks, layout, paint, the upload and the flip's submission) against the refresh period. Auto
+ * engages after 2 frames in a row above 60 % of the period (where a frame plus the GPU's part stops
+ * fitting before the next vblank) and lets go after 60 in a row below 40 %, like the paint threads
+ * (main.c), or when this frame came more than FPIPE_IDLE_MS after the last one: an idle desktop gives
+ * no frames to count, and the first change after it (a click, a key) is then shown without a frame of
+ * the pipeline's latency; heavy frames engage it again after 2 (this one counts as the first). */
+void fpipe_note(FPipe *p, double now_ms, double cpu_ms, double period_ms);
 int  fpipe_engaged(const FPipe *p);
 
 /* A display's prepared frame */
@@ -46,5 +52,12 @@ int fpipe_step(int eligible, int pending, int prep, int needs, int paint);
  * frame, and only one is prepared at a time): without the pipeline while its flip is pending, with it
  * only once a frame is prepared (or was tried) for that flip. */
 int fpipe_blocked(int eligible, int pending, int prep);
+/* The JS frame callbacks run once for each frame: in the frame's prepare when there is one, or in the
+ * frame built after the flip. A prepare that painted nothing (FPIPE_EMPTY) still ran them, and when they
+ * asked for another frame (asked_again: js_wants_frame() right after that prepare) the frame built after
+ * that flip must not run them again: they would run twice for one frame shown (an animation callback
+ * that changes nothing while an app's frames or the cursor keep the display flipping). 1: the render
+ * that follows the flip skips them (they run in the next one). */
+int fpipe_hold_callbacks(int prep, int asked_again);
 
 #endif

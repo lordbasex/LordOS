@@ -294,8 +294,11 @@ GPU and the CPU composition paths use it.
 **The switch** `LORD_PIPELINE`, read once at startup (the session log says which): `0` off (exactly the previous
 behaviour), `2` always, anything else (and unset, the default) *while frames are heavy*: on after 2 frames in a row
 whose CPU time (JS frame callbacks, layout, paint, upload, swap and flip ioctl; for a prepared frame its prepare
-plus its submission) is above 60 % of the refresh period, off after 60 frames in a row below 40 % (`fpipe_note`;
-`-d` logs each change). The auto mode exists because the pipeline costs a frame of latency when frames already
+plus its submission) is above 60 % of the refresh period, off after 60 frames in a row below 40 %, or at the first
+frame after more than half a second without one (`FPIPE_IDLE_MS`: an idle desktop gives no frames to count, so
+before this the pipeline stayed on through it and the first input after it was shown a frame later; the frame that
+ends the gap counts as the first of the two heavy ones that engage it again) (`fpipe_note`; `-d` logs each change).
+The auto mode exists because the pipeline costs a frame of latency when frames already
 fit: input that comes after a frame was prepared waits for the next one, shown a vblank later. When frames don't
 fit, the latency stays about the same (input waits for at most one flip and is shown two vblanks after it, where
 before the flips themselves came every other vblank) and the rate can double.
@@ -334,7 +337,16 @@ before the flips themselves came every other vblank) and the rate can double.
 - **-2 (unshown)**, direct scanout of a fullscreen app, the remote desktop's read-back and the protected windows'
   black: decided at submission, by the same code as before.
 - **Frame callbacks and presentation:** the Linux apps' frame callbacks (`wl_frame_done`) go with a submitted frame,
-  never with one only prepared; presentation feedback still follows the main display's flip events.
+  never with one only prepared; presentation feedback still follows the main display's flip events. The theme's JS
+  frame callbacks (`requestAnimationFrame`) run once per frame shown: in the frame's prepare, or in the frame built
+  after the flip. A prepare that painted nothing (`FPIPE_EMPTY`) still ran them; when they asked for another frame
+  (an animation callback that changed nothing, while an app's frames or the cursor kept the display flipping), the
+  frame built after that flip ran them again, so they ran twice per frame shown. That frame now skips them
+  (`fpipe_hold_callbacks`, `Out.prep_js`), and they run with the next one. With the pipeline off nothing is
+  prepared, so nothing changes there.
+- **Damage of two frames:** a prepared frame that is undone, and GPU drag's rectangle painted again on the CPU
+  (`gdrag_stale`, and its join in `paint_out`), join the next frame's damage like a frame gathered while a flip was
+  pending, so `paint_out` applies the blur rule again to them (`paint_damage_settle`, `docs/LAYERS.md`).
 
 **LordBench's phases** (`docs/BENCHMARK.md`, "Frame phases") record a prepared frame at its submission:
 `paintMs` is its prepare's, `uploadMs`, `swapMs` and `flipIoctlMs` its submission's, `renderMs` both, the new

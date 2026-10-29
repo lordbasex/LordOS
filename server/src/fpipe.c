@@ -8,8 +8,11 @@ void fpipe_init(FPipe *p, const char *env) {
     p->mode = env && !strcmp(env, "0") ? FPIPE_OFF : env && !strcmp(env, "2") ? FPIPE_ALWAYS : FPIPE_AUTO;
 }
 
-void fpipe_note(FPipe *p, double cpu_ms, double period_ms) {
+void fpipe_note(FPipe *p, double now_ms, double cpu_ms, double period_ms) {
     if (p->mode != FPIPE_AUTO || period_ms <= 0) return;
+    int idle = p->last > 0 && now_ms - p->last > FPIPE_IDLE_MS;
+    p->last = now_ms;
+    if (idle) { p->on = 0; p->heavy = p->light = 0; }
     if (!p->on) {
         p->heavy = cpu_ms > period_ms * 0.6 ? p->heavy + 1 : 0;
         if (p->heavy >= 2) { p->on = 1; p->heavy = p->light = 0; }
@@ -30,3 +33,5 @@ int fpipe_step(int eligible, int pending, int prep, int needs, int paint) {
 }
 
 int fpipe_blocked(int eligible, int pending, int prep) { return pending && (!eligible || prep != FPIPE_NONE); }
+
+int fpipe_hold_callbacks(int prep, int asked_again) { return prep == FPIPE_EMPTY && asked_again; }
