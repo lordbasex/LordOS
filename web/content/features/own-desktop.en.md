@@ -65,6 +65,7 @@ LordOS aims at modest machines. A few real measurements from the project's test 
 - When the machine has no 3D-capable card, `lord-server` doesn't even load Mesa and stays at about 32 MB of RSS (`docs/GPU.md`).
 - Since 0.8.5 the login screen no longer stays in memory behind your session: it closes 10 seconds after a session takes the screen and starts again in a few milliseconds when you lock or switch user. On a VMware VM the whole system went from **603 to 548 MB** in use, and locking the screen went from 903 ms to **141 ms**.
 - On virtual graphics cards that complete every page flip at once (VMware's `vmwgfx`), 0.8.5 paces frames to the display's refresh instead of drawing 500–580 frames a second: **59.8 frames a second** at 60 Hz, 99th percentile 18.4 ms. Every boot's time is shown in About LordOS → Startup time and kept for comparing versions (`docs/RESULTS.md`).
+- **In development for 0.8.6:** on a Raspberry Pi 5 with a 1920×1080 monitor, LordBench's desktop test moves a window with a turning square inside at **59.8–60 frames a second** (53–58 before the work on a dragged window's frame, which keeps every pixel the same), and at 30 while every core is busy with a low-priority load (24–25 before; `docs/BENCHMARK.md`). <!-- PI-RESULT: own-desktop, the Pi 5 with its monitor and the final build: the under-load frame rate with the frame pipeline (and GPU drag if on by default) -->
 
 These numbers come from virtual machines and one board, not from a range of real PCs. They are a starting point, not a promise for every machine.
 
@@ -81,6 +82,7 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **Real GPUs are not verified yet.** The GPU path was exercised with Mesa's software renderer in virtual machines. Testing on real AMD and Nvidia cards is still pending (`docs/GPU.md`).
 - **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`).
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
+- **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** 30 instead of 60 frames a second in LordBench's desktop test while every core is busy. Painting the next frame while the previous one waits for the screen is built for 0.8.6 and not yet measured (`docs/GPU.md`). <!-- PI-RESULT: own-desktop limit, remove or reword with the measured number if the frame pipeline brings the Pi 5 under load near 60 fps -->
 - **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
 - **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting; a screen reader, zoom and high contrast are on the roadmap.
 

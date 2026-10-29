@@ -4,7 +4,7 @@
 //   indentation), > blockquotes, ``` fenced code, | tables |, ---, **bold**, *italic*, `code`,
 //   [links](url), ![images](repo/path.png "caption") and block directives on their own line:
 //   [[diagram:<id>]]  [[shot:<n>]]
-// Raw HTML is never passed through.
+// Raw HTML is never passed through; HTML comments (<!-- … -->) are dropped.
 
 export const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -46,7 +46,10 @@ const cells = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').m
 
 // Returns { html, headings: [{level, id, text}] }
 export function markdown(src, opts = {}) {
-  const lines = src.replace(/\r\n/g, '\n').split('\n');
+  // HTML comments are notes for editors (e.g. `<!-- PI-RESULT: … -->` where a measurement goes): never
+  // rendered, so one left behind publishes nothing. A comment alone on its line takes the line with it.
+  const lines = src.replace(/\r\n/g, '\n').replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\n/gm, '')
+    .replace(/[ \t]?<!--[\s\S]*?-->/g, '').split('\n');
   const out = [];
   const headings = [];
   const used = new Set();

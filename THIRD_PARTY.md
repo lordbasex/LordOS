@@ -26,10 +26,12 @@ the components below, each under its own license.
 
 ### Local changes to bundled components
 
-- **QuickJS** (`third_party/quickjs`, version in `VERSION`): adds `size_t JS_GetMallocSize(JSRuntime *rt)`
-  (`quickjs.c`, next to `JS_ComputeMemoryUsage`, and its prototype in `quickjs.h`). It returns the
-  same `malloc_size` that `JS_ComputeMemoryUsage` reports, without walking every object, so
-  `lord.stats()` (`server/src/ui/js.c`) costs O(1). Re-apply it when QuickJS is updated.
+Each change is marked `LordOS patch` in the source and has to be applied again when the component is
+updated. Nothing else in `third_party/` differs from upstream.
+
+| Component (upstream version) | Change | Files | Why | Since |
+|---|---|---|---|---|
+| QuickJS 2025-04-26 (`third_party/quickjs/VERSION`) | Adds `size_t JS_GetMallocSize(JSRuntime *rt)`, which returns `rt->malloc_state.malloc_size`: the same `malloc_size` that `JS_ComputeMemoryUsage` reports, without walking every object, string and shape of the runtime. No existing function or structure changes. | `quickjs.c` (7 lines, just before `JS_ComputeMemoryUsage`), `quickjs.h` (its prototype, after `JS_ComputeMemoryUsage`'s) | `lord.stats()` (`f_stats` in `server/src/ui/js.c`) gives `jsKB` from it in O(1); About, Settings → General and System Information poll it while open, and the full walk grew with the number of objects. Checked equal to `JS_ComputeMemoryUsage`'s `malloc_size` on a runtime with 100,000 objects, a 50,000-entry Map and after GC | 0.8.6 (in development) |
 
 ## npm packages (bundled into the theme JavaScript at build time)
 

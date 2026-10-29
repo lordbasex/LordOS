@@ -1,6 +1,6 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not. Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not. Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -289,9 +289,10 @@ development package.
   machine has it (no VA-API on VM 116; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's FFmpeg
   lacks).
 - **Desktop impact** (its own button, its own result file `lordbench-desktop.json`): after the quiet wait,
-  System Information opens a second window with a scene (cards, shadows and one element meant to turn through
-  `lord.setStyle`; in this build it stays still, because the engine has no `transform` style key: fixed in
-  development with a `rotate` key, not merged) and lord-server moves that window along a figure of eight through the drag's own path
+  System Information opens a second window with a scene (cards, shadows and a square turned through
+  `lord.setStyle` with the engine's `rotate` key; until 0.8.6's frame-cost work it sent a `transform` key the engine
+  doesn't have and stood still, so desktop results from before that change measured a lighter scene and aren't
+  comparable) and lord-server moves that window along a figure of eight through the drag's own path
   (`lord.wm.script`, `grab_script_begin` in `ui/grab.c`: painted once into a layer, one step per frame, no JS per
   frame). lord-server records every frame it builds and every frame the main display shows (`bench/lbframes.c`,
   from `render()` and the page flips; one atomic read per frame when off): 10 s alone, then 10 s while `lord-bench`
@@ -473,7 +474,8 @@ On the Pi the desktop stays at the refresh rate alone, but under an all-core loa
 still got 5.0 GFLOP/s done) it fell to 24 frames per second: a stability problem LordBench found, investigated
 below ("The desktop under load"). The first scene moved its window from JS
 (`wm.move` every frame) and measured React instead of the compositor (12.8 fps on VM 116); it was replaced by the
-drag's own path in C before these numbers.
+drag's own path in C before these numbers. These rows were measured with the scene's square standing still (it
+sent a style key the engine lacked); with it turning, see "The drag frame's cost" below.
 
 #### The desktop under load (2026-10-28)
 
@@ -560,10 +562,45 @@ second for a CPU (299 ms per second before the weight). What remains is the fram
 monitor shows every other one (about 30 fps). The cause is not found yet; the load keeps four cores busy with
 matrix products, and the CPU and the GPU share the Pi's memory, but that has not been measured.
 
-**What remains.** Under load a frame takes about twice as long to build on the Pi (15–16 ms instead of 7 ms), for
-a cause not measured yet, which no priority fixes; the Pi kernel at `CONFIG_HZ=1000` (`tools/rpi/build-kernel.sh`, a rebuild) is not built.
+**What remains.** Under load a frame took about twice as long to build on the Pi (15–16 ms instead of 7 ms), which
+no priority fixes. The frame-cost work below cuts what a drag frame paints (build p50 under load about 20 → 12.9 ms
+with the turning square), but the build, the GPU's part and the flip still run one after another and miss the
+16.7 ms refresh under the load, so the rate stays at 30 fps; the frame pipeline below is built for that and not yet
+measured. The Pi kernel at `CONFIG_HZ=1000` (`tools/rpi/build-kernel.sh`, a rebuild) is not built.
 
-**The frame pipeline (in development, not yet measured on the Pi).** A frame that takes 15–16 ms to build cannot
+#### The drag frame's cost (0.8.6, in development)
+
+The scene's square turns since this work (the `rotate` key above), so the layer of the moved window changes every
+frame and the test is heavier than the one measured before; the "before" rows below are the code before this work
+with the square turning. What changed in a drag frame, all with the same pixels except an approved 1-level change
+at rounded corners below the window (`docs/WINDOWS.md`, "The moving window is a layer" and "Checking it"): only the
+changed part of the window's layer is painted again; what is below the window is painted again only where it
+changed and is copied where the old rule painted everything; nodes the frame skips are no longer walked for their
+rounded corners; the GPU path's hole walk is skipped for a window without app windows; a turn or scale no longer
+lays its node out again; the JS timers no longer look at every pending timer; React sends fewer unchanged props;
+`lord.stats()` reads QuickJS's memory in O(1). On the GPU path the dragged window can also be composed by the GPU
+with the CPU's exact arithmetic ("GPU drag", `docs/GPU.md`, "The dragged window on the GPU").
+
+**Measured on the Pi 5 with its monitor** (1920×1080 at 60 Hz, GPU composition, the installed session with the
+weight and the real-time priority, LordBench → Desktop impact; 2026-10-28):
+
+| Pi 5, monitor | Runs | Alone: frames shown | Build p99 | Late | Under load: frames shown | Build p50 | Late |
+|---|---|---|---|---|---|---|---|
+| Before (square turning) | 3 | 53.2–58.1 fps | 15.7–16.5 ms | 3.1–12.8 % | 23.6–25.1 fps | 19.8–20.3 ms | 100 % |
+| Frame-cost work, `LORD_GPU_DRAG=0` | 2 | 59.8–60.0 fps | 11.3–11.6 ms | 0–0.3 % | 30.1–30.3 fps | 12.9 ms | 98.1–99.2 % |
+| Frame-cost work, GPU drag on | 3 | 52.2–52.9 fps | 21.3–21.7 ms | 13.5–15.0 % | 25.8–27.5 fps | 13.4–14.2 ms | 91.5–99.4 % |
+
+With GPU drag off the desktop is back at the refresh rate alone, and under the load the build fell from about
+20 ms to 12.9 ms but every other frame is still late (30 fps): the chain of build, GPU and flip is still longer
+than one period. With GPU drag on, that build stalled (52 fps alone, p99 about 21.5 ms): it ran before GPU drag's
+textures caught up in slices between frames (`docs/GPU.md`, "Uploads without a stall") and before the frame phases
+below existed, so the cause was not measured. <!-- PI-RESULT: GPU drag on the Pi 5 with the final build: its
+self-test line from session.log (on/off, pixels, ms), LORD_GPU_VERIFY=1 differ= results, and a row "Frame-cost work,
+GPU drag on (slices)" with alone fps / p99 / late and under-load fps / p50 / late; then say whether it still stalls -->
+GPU drag's default is decided after that run: today it is on wherever its self-test passes, and
+`LORD_GPU_DRAG=0` turns it off.
+
+**The frame pipeline (in development, not yet measured on the Pi).** A frame that takes 13–16 ms to build cannot
 fit with the GPU's part in a 16.7 ms period while the next frame is started only after the flip. Now, while a flip
 is pending, the next frame's CPU part (input, JS frame callbacks, layout, paint into the scene) is done ahead, and at
 the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). On by
@@ -573,19 +610,22 @@ without a monitor, with a driver paced in software or with several displays noth
 under the load: the frames shown every vblank instead of every other one as long as the CPU part stays under one
 period, with about the same pointer latency; that is a model (`build/fpipe-test` drives a display on a vblank
 grid: 13 ms of CPU, 1 ms to submit and 3 ms of GPU give 299 flips in 600 periods without it and 598 with it, input
-to screen at most 33.3 and 36.0 ms), not a measurement. To measure: LordBench → Desktop impact twice with `LORD_PIPELINE` unset and twice with
-`LORD_PIPELINE=0` in the session's environment, comparing `desk.fps`, `desk.missed`, `desk.in50`/`in99` and
-`frames.phases.load` (`prepared`, `heldMs`, `onTime`).
+to screen at most 33.3 and 36.0 ms), not a measurement. <!-- PI-RESULT: frame pipeline on the Pi 5 with its
+monitor: a table "Pi 5, monitor, pipeline" with LORD_PIPELINE unset vs LORD_PIPELINE=0, two runs each: alone and
+under-load frames shown, build p50/p99, late %, pointer to screen p50/p99, and frames.phases.load prepared /
+heldMs / onTime / cpuLate / gpuLate --> To measure: LordBench → Desktop impact twice with `LORD_PIPELINE` unset and
+twice with `LORD_PIPELINE=0` in the session's environment, comparing `desk.fps`, `desk.missed`, `desk.in50`/`in99`
+and `frames.phases.load` (`prepared`, `heldMs`, `onTime`).
 
 #### Frame phases (0.8.6, in development)
 
-A frame is started only after the last flip completed (one frame in flight), so any frame whose whole chain (the
-work before `render()`, the build, the GPU's own part, the flip) takes more than one period is shown a vblank late,
-and the rate locks at half the refresh. The build time alone (`desk.p50`/`p99`) can't tell which part was too long.
-So lord-server also records, for every frame the main display shows, while LordBench records or while a scripted
-move runs (`bench/lbframes.c`: `lbf_phase_built` when the frame is submitted, at the end of `render()` or, for a
-frame the pipeline prepared, right after its submission; `lbf_phase_shown` at that frame's flip; all of it measured
-by lord-server itself, never by a helper):
+Without the frame pipeline a frame is started only after the last flip completed (one frame in flight), so any
+frame whose whole chain (the work before `render()`, the build, the GPU's own part, the flip) takes more than one
+period is shown a vblank late, and the rate locks at half the refresh. The build time alone (`desk.p50`/`p99`) can't
+tell which part was too long. So lord-server also records, for every frame the main display shows, while LordBench
+records or while a scripted move runs (`bench/lbframes.c`: `lbf_phase_built` when the frame is submitted, at the
+end of `render()` or, for a frame the pipeline prepared, right after its submission; `lbf_phase_shown` at that
+frame's flip; all of it measured by lord-server itself, never by a helper):
 
 | Phase (JSON key, `[p50, p99]` ms) | From → to |
 |---|---|
@@ -630,22 +670,29 @@ monitor a frame is "shown" when it ends (on the pacing grid), so `gpuMs` and the
 not show these yet; results keep comparing as before (no new result ids, LordBench 1).
 
 **Checked** on VM 116: `lordbench-test` feeds known frames (one on time, one queued after its vblank, one whose GPU
-finished after it, one not shown) and checks each class, percentile, count and the text. A desktop run of the
-worktree's lord-server in an isolated headless session (a test theme moving one window with `lord.wm.script` over
-40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601 frames, all on time,
-render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three runs). Those are a check
-that it works, not a measurement (a small scene, no GPU). The GPU fields were not exercised: VM 116 sessions are
-headless, so the fence, the uploads' times and GPU drag's counts have been built, not run.
+finished after it, one not shown, a prepared one) and checks each class, percentile, count and the text. A desktop
+run of the branch's lord-server in an isolated headless session (a test theme moving one window with
+`lord.wm.script` over 40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601
+frames, all on time, render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three
+runs). Those are a check that it works, not a measurement (a small scene, no GPU). The GPU fields were not
+exercised: VM 116 sessions are headless, so the fence, the uploads' times and GPU drag's counts have been built,
+not run. <!-- PI-RESULT: the Pi 5 run's frames.phases.load (p50/p99 of paintMs, uploadMs, gpuMs, vblankWaitMs and the
+onTime / cpuLate / gpuLate counts), with and without GPU drag and the pipeline, as the first measurement of the phases
+on a GPU -->
 
 **What to run on the Pi 5 next** (the package from this work installed, the monitor on, logged in):
-1. LordBench → Desktop impact, twice with GPU drag (default) and twice with `LORD_GPU_DRAG=0` in the session's environment.
-2. From `~/.cache/lordos/session.log`: the `lordbench: desktop … phases` lines and the `drag (scripted):` line, and
-   from `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
+1. LordBench → Desktop impact, twice with the defaults (GPU drag where its self-test passes, the pipeline while frames
+   are heavy), twice with `LORD_GPU_DRAG=0`, and twice with `LORD_PIPELINE=0`, in the session's environment.
+2. From `~/.cache/lordos/session.log`: the `gpu: GPU drag on|off` line, the `lord-server: frame pipeline …` line, the
+   `lordbench: desktop … phases` lines and the `drag (scripted):` line, and from
+   `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
 3. Read under load: if most frames are `cpuLate`, the build is too long (`paintMs`, `uploadMs`, `beforeRenderMs`
    say which part, and `paintThreads` whether the pool helped); if `gpuLate`, the GPU's own work (`gpuMs`) is; if
    `onTime` is high and the rate still 30, the classification is wrong and the flip times must be looked at.
-   With GPU drag, `gpuDrag.refused`/`gpuDrag.layer` say what keeps it off and `catchUpMpx` what the slices cost.
+   With GPU drag, `gpuDrag.refused`/`gpuDrag.layer` say what keeps it off and `catchUpMpx` what the slices cost;
+   with the pipeline, `prepared` and `heldMs` say how many frames were painted ahead and how long they waited.
 4. `LORD_GPU_VERIFY=1` once with GPU drag over a Desktop impact run: `gpu-verify: … differ=0` on every line.
+5. A real screenshot of a dragged window on the monitor (its rounded corners, `docs/WINDOWS.md`).
 
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
 systemd-analyze gives 2.1 s kernel + 4.2 s userspace). Boots where the monitor was connected late took 61 and

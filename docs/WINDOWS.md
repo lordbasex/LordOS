@@ -69,6 +69,16 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   shadow are not repainted.
   - It is painted in its screen coordinates (a canvas with a shifted origin). That way the terminal
     and Linux apps keep recording where they are.
+  - Its rounded corners stay transparent outside the curve (0.8.6, in development). A rounded
+    `overflow: hidden` window saves its corner squares before its children paint and restores them
+    after (`canvas_corners_restore`/`canvas_corners_restore4` in `canvas.c`). The restore used to mix
+    the saved pixel in with `blend()`, which takes its source as opaque, so on the layer's transparent
+    canvas the shadow saved there came back opaque and nearly black: black squares at the corners of
+    every dragged window, on the CPU and GPU paths (0.8.5 and before). It now mixes both premultiplied
+    pixels alpha included (`mix_px`); on an opaque canvas that is `blend()`'s pixel exactly, so nothing
+    else changes. `test_drag_corners` (`engine-test`) drags a rounded window with a shadow over a light
+    box on both paths, with one radius and with per-corner radii, and each corner square must equal a
+    full repaint within 2 levels (before the fix: 217–221 levels off).
 - **If something inside changes,** like a terminal line or the blinking cursor, only that part of
   the layer is repainted.
 - **If a node inside changes** (a style, a text, a transform such as LordBench's turning square, or a
@@ -161,8 +171,10 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   200 %; the last three with boxes and text at half pixels), on the CPU path and on the GPU path's
   canvas. Every frame's hash must match
   `server/tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt`, written from the code before any change
-  to this path and written again at the corner change above (from 001633b plus that change alone): a
-  faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
+  to this path and written again at the corner change above (from 001633b plus that change alone) and at
+  the black-corner fix (only the dragged window's corner squares and the Dock's and menu bar's backdrop
+  blur within reach of them changed, compared pixel by pixel first: 498,743 and 445,199 pixels in 2,386
+  of 2,417 frames on the CPU path): a faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
   by pixel with the earlier code's: 178,634 pixels in 1,686 of 1,816 frames differed, all by one
   level, inside a rounded `overflow: hidden` node's corner squares (`ceil(r) + 1` px) or within the
   Dock's and menu bar's backdrop blur reach of one, and none moved away from a full repaint. The hashes
@@ -187,6 +199,11 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   (one level darker in its shadow); before the corners' restore on the drag layer was fixed (black
   squares outside the dragged window's rounded corners), 2,217 and 70,882; before the corner change,
   2,265 and 70,940.
+- **`test_drag_corners`** checks the corners of a dragged rounded window against a full repaint (above).
+- **On the Raspberry Pi 5** with its monitor, LordBench's desktop test (its square turning) went from 53–58
+  to 59.8–60 fps alone and from 24–25 to 30 fps under load with this work and GPU drag off
+  (`docs/BENCHMARK.md`, "The drag frame's cost"). <!-- PI-RESULT: the final Pi 5 run (defaults, LORD_GPU_DRAG=0,
+  LORD_PIPELINE=0) and a real screenshot of a dragged window's corners on the monitor -->
 - **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
   display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
   the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where

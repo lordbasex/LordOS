@@ -174,9 +174,10 @@ on the CPU inside the call, so the first GPU drag frame after such a change miss
 - Each texture knows whose pixels it holds (`gdragtout[2]`); a GPU drag frame that would find another display's or the
   wrong size still sends all of it (correct, and rare now). The dirty list keeps `GDRAG_DIRTY` (16) rectangles and,
   when full, merges the two whose box adds the fewest pixels (it used to grow the last one).
-- Frames don't overlap (a frame starts after the last flip), so the job that read the textures has finished when
-  they are written: no second copy of them is needed. If frames are ever built while a flip is pending, each
-  texture needs a pair, each with its own dirty list. GLES3 pixel buffers (the GPU doing the tiling) are not used.
+- The textures are only written at a frame's submission and in the catch-up right after it, never between a frame's
+  paint and its upload: with the frame pipeline (below) the next frame is painted ahead into the CPU's scene only, and
+  its uploads wait for its submission. GL orders those writes after the draws that read the textures, so no second
+  copy of them is kept. GLES3 pixel buffers (the GPU doing the tiling) are not used.
 
 `engine-test`'s stub GPU does the same as `main.c` and `gpu.c` (a texture made again is filled with a pattern no
 frame has, so a pixel the slices missed shows): every frame matches, and it checks that no GPU drag frame has more than
@@ -250,10 +251,19 @@ and the `layer` refusals by cause (`GDRAG_L_*` in `ui/ui.h`: `gone`, `invalid`, 
   makes the layer be painted whole. Its numbers with GPU drag on and with `LORD_GPU_DRAG=0` are the same within
   llvmpipe's noise.
 
-**Not checked yet:** the Raspberry Pi 5 (V3D), the machine this is for: its self-test, `LORD_GPU_VERIFY=1`
-over full LordBench desktop runs alone and under load, a perf run, a real screenshot and one run with
-`LORD_SW_CURSOR=1`. Until then no gain is claimed. Near the menu bar or the Dock the frame is still
-painted by the CPU.
+**On the Raspberry Pi 5** (V3D, its 1920×1080 monitor; LordBench's Desktop impact, 2026-10-28, with the build
+before the uploads in slices and the phase timing): with GPU drag on, 52.2–52.9 fps alone (build p99 21.3–21.7 ms,
+13.5–15.0 % late) and 25.8–27.5 fps under load, against 59.8–60.0 and 30.1–30.3 fps with `LORD_GPU_DRAG=0` in the
+same build (`docs/BENCHMARK.md`, "The drag frame's cost"). It stalled; the whole uploads inside a frame (V3D tiles
+the texture on the CPU) are the likely cause and the reason for the slices above, but it was not measured, since
+the phases did not exist yet. <!-- PI-RESULT: GPU drag on the Pi 5 with the final build: the `gpu: GPU drag on|off`
+line (self-test pixels and ms on V3D), LORD_GPU_VERIFY=1 differ= over a Desktop impact run, alone / under load fps
+with GPU drag on and with LORD_GPU_DRAG=0, frames.phases gpuDrag taken/refused and catchUpMpx; then the default -->
+
+**Not checked yet:** on the Pi 5, its self-test, `LORD_GPU_VERIFY=1` over full LordBench desktop runs alone and under
+load, a run with the slices, a real screenshot and one run with `LORD_SW_CURSOR=1`. Until then no gain is claimed,
+and its default (on wherever the self-test passes) is decided after that run. Near the menu bar or the Dock the
+frame is still painted by the CPU.
 
 ## The frame pipeline (0.8.6, in development)
 
@@ -335,7 +345,9 @@ before the flips themselves came every other vblank) and the rate can double.
 alone and under load with `LORD_PIPELINE` unset and with `LORD_PIPELINE=0`. VM 116 has no free DRM card (its
 virtio-gpu card belongs to lord-sessiond, and its flips would be paced in software anyway), so on it only the
 headless path ran (unchanged: `prepared 0`), with the unit tests and `engine-test`'s pipelined drag runs. No gain
-is claimed until the Pi run.
+is claimed until the Pi run. <!-- PI-RESULT: the frame pipeline on the Pi 5 with its monitor: Desktop impact alone
+and under load with LORD_PIPELINE unset and =0 (fps, late %, pointer to screen p50/p99, prepared, heldMs p50/p99),
+and whether auto mode engaged (the `frame pipeline` lines with -d) -->
 
 ## The CPU path on several threads (0.8.5)
 
@@ -501,6 +513,9 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 
 ## Pending
 
+- GPU drag on the Raspberry Pi 5 (its self-test, `LORD_GPU_VERIFY`, a run with the uploads in slices) and its
+  default; GPU drag also where the menu bar or the Dock overlap the window (step 12).
+- The frame pipeline measured on a real display (the Pi 5 with its monitor).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

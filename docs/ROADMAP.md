@@ -572,23 +572,34 @@ LordBench and a desktop that stays smooth under load. Each item is described in 
 desktop fell to 24 fps under an all-core load:
 - [x] The compositor's cgroup CPU weight and its real-time priority (main and paint threads at `SCHED_RR` 2): the
   main thread no longer waits for a CPU; 24 → 29–30 fps on the Pi 5.
-- [ ] Black squares at a dragged window's rounded corners (also in 0.8.5): fixed with its own test on branch
-  `perf-frame`, not merged yet (still there on `main`, CPU and GPU paths).
-- [ ] The frame-cost work on branch `perf-frame`, not merged yet: steps 0–11 (pixel-identical except the approved
-  1-LSB corner change), the dragged window composited on the GPU ("G0", step 10) with its self-test and
-  `LORD_GPU_VERIFY`, LordBench's per-frame phase timing (CPU-late or GPU-late per frame, G0 refusals by cause), G0
-  textures catching up in slices, and the paint pool turning on for slow whole frames. Pi 5 with its monitor,
-  G0 off: alone 53–58 → 59.8–60 fps, under load 24–25 → 30 fps; with G0 on it stalls (52 fps alone).
-- [ ] Measure that branch on the Pi 5 with the phase timing, then decide G0's default (off with `LORD_G0=1` to turn
-  it on, unless the new run shows no stalls).
-- [ ] Build the next frame while the previous flip is pending (today build, GPU and flip run one after another, so
-  a 13 ms build plus the GPU's work misses the vblank and the rate locks at 30 fps). Estimated, not measured:
-  30 → 52–58 fps under load. Pixels unchanged.
-- [ ] Step 12: G0 for the whole drag, also where the Dock or the menu bar overlap the window.
+- [x] Black squares at a dragged window's rounded corners (also in 0.8.5, CPU and GPU paths, the remote desktop's
+  frames too): the corner restore on the drag layer now mixes both pixels alpha included (`mix_px` in `canvas.c`),
+  checked against a full repaint by `test_drag_corners` on both paths (`WINDOWS.md`).
+- [x] The frame-cost work (`WINDOWS.md`, `GPU.md`, `BENCHMARK.md` "The drag frame's cost"): steps 0–11, pixel-identical
+  (golden hashes of 2,417 drag frames per path) except the approved 1-level corner change of step 9; LordBench's
+  square and the Cooling fans turn (the `rotate` key); a transformed node repaints when its own style changes; GPU
+  composition without `GL_EXT_unpack_subimage`; the dragged window composited on the GPU ("GPU drag", step 10) with
+  its self-test, `LORD_GPU_DRAG=0` and `LORD_GPU_VERIFY`; LordBench's per-frame phase timing (CPU-late or GPU-late per
+  frame, GPU drag's refusals by cause); GPU drag's textures catching up in slices between frames; the paint pool
+  turning on for slow whole frames; `lord.stats()` in O(1) (a QuickJS patch, `THIRD_PARTY.md`). Pi 5 with its monitor,
+  GPU drag off: alone 53–58 → 59.8–60 fps, under load 24–25 → 30 fps; with GPU drag on it stalled (52 fps alone; that
+  run predates the slices and the phase timing).
+- [x] Build the next frame while the previous flip is pending (the frame pipeline, `fpipe.c`, `LORD_PIPELINE`; `GPU.md`,
+  "The frame pipeline"): on while frames are heavy, one display with real page flips, pixels unchanged
+  (`fpipe-test`, `engine-test`'s pipelined drag runs). Estimated, not measured: 30 → 52–58 fps under load.
+- [ ] Measure the frame-cost work, GPU drag and the frame pipeline on the Pi 5 with its monitor and the phase timing
+  (`BENCHMARK.md`, "What to run on the Pi 5 next"), with `LORD_GPU_VERIFY=1` once and a real screenshot.
+  <!-- PI-RESULT: tick this item and add the measured numbers (alone / under load fps with the defaults, with
+  LORD_GPU_DRAG=0 and with LORD_PIPELINE=0) -->
+- [ ] Decide GPU drag's default after that run: today it is on wherever its self-test passes (`LORD_GPU_DRAG=0` turns
+  it off); off by default unless the new run shows no stalls.
+- [ ] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window.
 - [ ] Optional: cheaper uploads (pixel buffers or a linear canvas), scissoring the GPU composite to the damage,
   a 1000 Hz kernel tick for the Pi 5.
-- [ ] Merge `perf-frame`, with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, the paper, the FAQ (on the Pi a
-  busy app still halves the frame rate) and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch).
+- [ ] Merge `perf-frame`, with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, `FANS.md`, the paper, the FAQ, the
+  features page and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch); the docs are ready on the branch, with
+  `PI-RESULT` comments where the Pi 5 run's numbers go. <!-- PI-RESULT: tick at the merge; fill every PI-RESULT
+  marker (grep -rn PI-RESULT docs web/content CHANGELOG.md) -->
 
 **Release:**
 - [ ] Re-measure the references after the release (results compare only within one LordOS version).
@@ -763,8 +774,9 @@ desktop fell to 24 fps under an all-core load:
   lists them as not measured), checking the Pi 5 firmware's throttling detection on a real Pi (built on fake sysfs
   trees: the LordOS kernel only exposes the under-voltage alarm, so 80 °C counts as the firmware's limit), and the rest of what it found on the Pi 5 (the desktop fell to 24 fps under load;
   the compositor's CPU weight and its real-time priority fix it on VM 116; on the Pi 5 with its monitor they take it
-  to 29–30 fps and the frame's own build time under load, 15–16 ms instead of 7, is what remains to find,
-  `BENCHMARK.md` "The desktop under load").
+  to 29–30 fps; the frame-cost work cuts a drag frame's build under load to 12.9 ms and keeps 60 fps alone, but
+  under load the build, the GPU and the flip still miss the refresh, at 30 fps, and the frame pipeline built for
+  that is not yet measured: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost").
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel

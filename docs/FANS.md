@@ -171,11 +171,11 @@ config and socket); the unit never passes them.
   renders): the Argon ONE V5 case (aluminium body, fins, the blower, front ports), a Raspberry Pi 5
   with a heatsink and fan, a PC tower with a CPU cooler and case fans, or a passive heatsink when no
   fan can be driven. Light and dark variants (`docs/polish/fans-*.png`).
-- The fan is meant to turn at a speed proportional to the real duty (eased; still at 0 %; in this build it
-  stays still, because the rotors are set through a `transform` style key the engine doesn't have; fixed in
-  development with the `rotate` key, not released), and the fins warm
+- The fan turns at a speed proportional to the real duty (eased; still at 0 %), and the fins warm
   from blue (40 °C) through amber (65 °C) to orange-red (80 °C). The rotors are turned with
-  `lord.setStyle` on their nodes at 20 frames per second, with no React render per frame; the timer
+  `lord.setStyle(id, 'rotate', degrees)` on their nodes at 20 frames per second, with no React render per
+  frame (until 0.8.6, in development, they were sent as a `transform` key the engine doesn't have, so they
+  stood still between React renders and the session log got `js: unsupported style 'transform'`); the timer
   stops at 0 %, while the window is minimized and with **Appearance → Reduce motion** (a new
   setting, `reduceMotion`). Frames: `docs/polish/fans-anim-1.png` … `-5.png`.
 - The curve chart (`FanCurveChart`) shows the steps, the hysteresis band of each step (orange,
