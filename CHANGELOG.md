@@ -10,6 +10,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### 0.8.7, in development on branch `v087-hwreports` (not merged; the latest release is 0.8.5-beta, 0.8.6 is in development on main)
+
+- **Community hardware reports, first part** (2026-10-29; `docs/BENCHMARK.md`, "0.8.7 — Community hardware reports",
+  "Built so far"):
+  - **The report format:** `apps/sysinfo/hwreport.schema.json`, a versioned JSON Schema (`lordos-hwreport`, version 1)
+    that is an allow-list of what can be shared: a subset of System Information's report, the Compatibility rows and
+    the last LordBench peak and desktop results of the same LordOS version. No field for serials, UUIDs, MAC or IP
+    addresses, host, user or network names or paths. Validated by `tools/hwreport/jsonschema.mjs`, our own subset of
+    JSON Schema with no dependency (unknown keywords throw).
+  - **Live session flag:** the collector (`sysreport/sysreport.c`) records `software.live` (`/run/live`), in
+    `lord.sysinfo.report()`, `lordos-sysreport report --json` and the shared report; `build/sysreport-test` checks it.
+  - **Share on GitHub** in System Information → Report: a preview of the summary and of the exact file, then (on
+    every click, nothing remembered) `lordos-hwreport-<date>.json` and a self-contained `.html` page in Documents,
+    never over an existing file, the page opened in the default browser with the existing
+    `lord.apps.launchWith('', path)`. The page (no scripts, CSP `default-src 'none'`, light/dark, right to left for
+    RTL languages, everything escaped) explains what is shared and what never is, shows the summary and the steps,
+    and links to GitHub's new-issue form with the `hardware-report` template, title, version and the short summary
+    in the URL; the user attaches the JSON and submits it with their own account. LordOS sends nothing and holds no
+    token. Text in en, es and pt (`assets/locales/*/sysinfo.json`, `sysinfo.share.*`).
+  - **Issue form and workflow:** `.github/ISSUE_TEMPLATE/hardware-report.yml` and
+    `.github/workflows/hardware-report.yml` (`issues` opened/edited/labeled with `hardware-report`; `contents: read`,
+    `issues: write`; `actions/checkout` pinned by commit, sparse, no persisted credentials) run
+    `tools/hwreport/validate.mjs --github`: the issue is read from the event file (never through an expression or a
+    shell); only GitHub attachment links of a fixed form; the download is https-only to GitHub's attachment hosts
+    (each redirect checked), without credentials, at most 512 KB, strict UTF-8, with a timeout; `JSON.parse` with
+    depth, value-count and `__proto__` limits; schema validation; reference reports refused from issues; a privacy
+    scan (MAC, IP, UUID, e-mail, home paths); plausibility against the reference machines (per-unit ceilings, 50×
+    the fastest reference, mismatched versions, architecture, threads or live flag, future dates); one comment
+    updated on every edit with report values only in code spans; labels from fixed lists only
+    (`report:valid|check|invalid|missing`, `kind:*`, `gpu:*`, `cpu:*`, `live`/`installed`). Also a command line:
+    `node tools/hwreport/validate.mjs <report.json>...`.
+  - **The catalogue:** `tools/hwreport/catalog.mjs` builds, from the accepted reports in
+    `web/content/hardware/reports/` (validated; community ones need their issue number in `index.json`, which can
+    record the version that fixed a problem), the **lordos.org/hardware** page (`web/src/hardware.html`, en/es/pt in
+    `web/i18n/pages.json`; machines, graphics cards and drivers, known problems and the fix version; built, not
+    published, labelled in development) and `assets/hwreport/snapshot.json`, a compact, deterministic snapshot per
+    device key, component and LordOS version. Two fixtures are the project's own reference machines (VM 116 with its
+    real report, the Raspberry Pi 5 16 GB written from the documented machine), marked `"source": "reference"`.
+  - **The signed snapshot:** `tools/release/sign-hwsnapshot.sh` signs it on the maintainer's machine with the release
+    key (the same format as `code-manifest.sig`); `tools/iso/mkdeb.sh` ships it in the `lordos` package (a release
+    build refuses it unsigned), so it updates through the signed APT repository (downloading it on its own is left
+    for later). New native call `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS):
+    `sysreport/hwsnap.c` reads `<assets>/hwreport/snapshot.json` and its `.sig` without following links, verifies the
+    signature before parsing and checks the structure; JS gets the snapshot only then. The Compatibility panel shows,
+    for this machine's devices and the same LordOS version, what others confirmed, marked *Community* (or as a
+    reference machine), with a footer saying where the data comes from or why there is none.
+  - **Tests:** `server/tests/hwreport_test.mjs` (125 checks, in `run_suites.sh`) and `build/hwsnap-test` (43 checks,
+    in `make test`, including the built snapshot signed with a test key). Built on VM 116 with 0 warnings and
+    `make test` passing (23 suites, 0 failed); checked there in an isolated headless session with a test-key build
+    (community rows shown, a tampered snapshot refused, both share files written and the JSON valid).
+
 ### Release
 
 - **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the

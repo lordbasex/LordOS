@@ -53,6 +53,9 @@ The releases page is the project's public changelog: every release is documented
      bundle, the app host and the system apps) and writes `code-manifest.sig` with the release key,
      checked against `tools/release/lordos-release.pub.pem` ([SIGNING.md](SIGNING.md), "Verified system
      code"). The bundles are the same for every architecture: one signature serves all the images.
+     (0.8.7) Also `tools/release/sign-hwsnapshot.sh`: the tested-hardware snapshot
+     (`assets/hwreport/snapshot.json.sig`, same key and format); `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh` refuses
+     an unsigned one.
    - Send the tree, with both files, to the build VMs (never the key). Build lord-server as a release:
      `make -C server RELEASE=1` (it only runs code signed with the release key, with no development
      mode).

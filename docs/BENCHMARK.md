@@ -1,6 +1,8 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not. Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not. Community reports (0.8.7) are in development on the branch `v087-hwreports` (see "Built so far" under 0.8.7: the
+report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the
+Compatibility panel); a `checks` subcommand of `lordos-sysreport` is not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -603,6 +605,98 @@ reference.
   real LordOS performance per device. The app's Compatibility panel reads a signed snapshot of it
   (downloaded with the package engine's checks), so it works offline.
 
+### Built so far (branch `v087-hwreports`, 0.8.7 in development)
+
+- **The report format**: `apps/sysinfo/hwreport.schema.json`, a JSON Schema (`format: "lordos-hwreport"`,
+  `version: 1`) that is an allow-list: every object closes its properties, and there is no field for serials,
+  UUIDs, MAC or IP addresses, host or user names, Wi-Fi network names or paths. It holds a subset of System
+  Information's report (machine, CPU, memory, GPUs, displays, storage, PCI and USB devices, network, audio,
+  Bluetooth, power, thermal, the Raspberry Pi block, software, how the session composes), the Compatibility rows
+  as codes, and the last LordBench peak and desktop results measured with the same LordOS version (no timestamp, no
+  render node path, no sustained samples). The schema lives with the app because the app picks the fields with it
+  (`share.js` `pick()`: a field the collector adds is never shared until the schema lists it); the workflow and the
+  catalogue read the same file. The validator is our own subset of JSON Schema, `tools/hwreport/jsonschema.mjs`,
+  with no dependency (the repository has no JSON Schema validator); a keyword it doesn't implement makes it throw.
+- **Live session flag**: the collector now records `software.live` (live-boot's `/run/live`, as LordBench already
+  did), and a shared report is `live: true` if either says so. The boot medium is not collected yet, so it is not
+  in the report; the rest of "From the live USB" is not built.
+- **Share on GitHub** (Report → *Share on GitHub…*, `apps/sysinfo/share.js`): a preview of the summary and of the
+  exact JSON first, then on every click (nothing remembered) the app writes `lordos-hwreport-<date>.json` and
+  `.html` to Documents (never over an existing file) and opens the page with `lord.apps.launchWith('', path)`. The
+  page is self-contained (no scripts, a CSP of `default-src 'none'`, light and dark, right to left for RTL
+  languages, every value escaped), says in plain words what is shared and what never is, shows the summary, the
+  steps, and one link to GitHub's new-issue form with the `hardware-report` template, the title, the version and
+  the short summary in the URL (machine, kind, CPU, GPU, memory, architecture, versions, live, LordBench mode and
+  the Compatibility states; at most 600 characters). The full JSON is attached by the user. LordOS sends nothing
+  and holds no token.
+- **The issue form and its workflow**: `.github/ISSUE_TEMPLATE/hardware-report.yml` (label `hardware-report`, the
+  `lordos` and `summary` fields the link fills, the file box, two confirmations) and
+  `.github/workflows/hardware-report.yml` running `tools/hwreport/validate.mjs --github` on `issues`
+  opened/edited/labeled with that label. The script reads the issue from the event file (no issue text passes
+  through an expression or a shell), takes only GitHub attachment links of a fixed form (`user-attachments/files`,
+  or this repository's `files`; at most three, `.json` only), downloads the first without credentials, with
+  manual redirects checked against GitHub's attachment hosts (https only), at most 512 KB (Content-Length and while
+  reading), strict UTF-8 and a timeout; `JSON.parse` only (never evaluated) with depth (12), value (40,000) and
+  `__proto__` limits; validates it against the schema; refuses `source: "reference"` from issues; scans every text
+  for MAC, IPv4/IPv6, UUID, e-mail and home-folder paths (a report with one is refused); flags implausible numbers
+  (beyond a per-unit ceiling, more than 50× the fastest reference machine of the same LordBench version, not
+  positive, versions, architecture, live or thread counts that disagree, a future date, memory out of range);
+  then comments once (updated on every edit) with report values only inside code spans, and labels the issue from
+  fixed lists only: `report:valid|check|invalid|missing`, `kind:vm|board|laptop|server|desktop`,
+  `gpu:<vendor>`, `cpu:<vendor>`, `live` or `installed`. Permissions: `contents: read` (to check out the script
+  and the schema, sparse) and `issues: write`; the checkout action is pinned by commit, without persisted
+  credentials. Workflows for `issues` events run from the default branch, so it takes effect when this is merged.
+- **The catalogue**: `tools/hwreport/catalog.mjs` reads the accepted reports in `web/content/hardware/reports/`
+  (each validated; a community report needs its issue number in `index.json`, which can also say which version
+  fixed a problem) and builds (a) the model of **lordos.org/hardware**, rendered by `web/build.mjs` in en, es and pt
+  (machines with what works and four numbers, graphics cards and drivers, known problems and the version that
+  fixed them, how to add a computer; labelled in development while the package version is below 0.8.7), and (b)
+  `assets/hwreport/snapshot.json`: one entry per device key (PCI ids, a GPU, network, Wi-Fi or Bluetooth driver, a
+  sound card name, or the machine's vendor and product for displays, storage, battery and suspend), component and
+  LordOS version, with the counts of works / with limits / doesn't work and how many came from reference machines.
+  The output depends only on the reports, so the same folder gives the same bytes. Two fixtures are the project's
+  own reference machines, marked `"source": "reference"`, not community reports: VM 116 (its real report, 2026-10-29)
+  and the Raspberry Pi 5 16 GB (written from the documented machine until a captured report replaces it), both with
+  the LordBench numbers of `references.js`.
+- **The signed snapshot**: `tools/release/sign-hwsnapshot.sh` rebuilds and signs it on the maintainer's machine with
+  the release key (Ed25519, the same format as `code-manifest.sig`; the key never leaves it). It ships
+  in the `lordos` package (`tools/iso/mkdeb.sh`; a release build refuses an unsigned one) and so updates through the
+  signed APT repository. **Deviation from the design above:** it is not downloaded on its own with the package
+  engine's checks; that remains possible later without changing the format or the verification.
+  `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS) reads the two files from
+  `<assets>/hwreport/` without following links (`sysreport/hwsnap.c`), verifies the signature with the key the
+  build trusts before parsing anything, checks the structure (format, version, at most 1 MB and 20,000 entries,
+  known components, x.y.z versions, whole counts that add up) and only then gives JS the snapshot; otherwise only
+  its state (`missing`, `unsigned`, `bad-signature`, `invalid`). The Compatibility panel shows, under each row,
+  what the snapshot says about this machine's devices with the same LordOS version (x.y.z), marked *Community*, or
+  as a reference machine when only those reported it, and a footer with the snapshot's date and count, or why
+  there is no community data.
+- **Tests**: `server/tests/hwreport_test.mjs` (125 checks: the schema with good reports and 22 bad ones, what the
+  built report leaves out of a report full of identifying values, the summary and the link, the page's escaping
+  and direction, attachment links, the download's limits with a fake fetch, parsing limits, the privacy scan,
+  plausibility, labels, the comment's escaping, the catalogue, the snapshot being the one the reports give, and the
+  community matching), in `run_suites.sh`; `build/hwsnap-test` (43 checks: signature before parsing, another key,
+  one byte changed, malformed signatures, 19 malformed snapshots, limits, links refused, and the snapshot the
+  builder wrote signed with a test key passing the C checks), in `make test`; `build/sysreport-test` checks the
+  live flag.
+- **Checked on VM 116** in an isolated headless session, with `lord-server` built for a throwaway test key
+  (`CODE_PUBKEY`) and the snapshot signed by `sign-hwsnapshot.sh` with that key: the Compatibility panel shows the
+  reference machine's data for the virtio GPU, the network and the sound card; the same snapshot with one count
+  changed is refused ("the signature didn't verify") and nothing is shown. Share on GitHub wrote both files; the
+  JSON passed `validate.mjs` (`report:valid`, `kind:vm`, `gpu:virtual`, `cpu:intel`, `installed`). The headless
+  session has no browser, so it said where the page is instead of opening it.
+
+![Compatibility with community data](hwreport-compat.png)
+
+![Share on GitHub](hwreport-share.png)
+
+![The page that opens in the browser](hwreport-page.png)
+
+Left for 0.8.7: creating the labels in the repository (the template's `hardware-report` label must exist for the
+form to apply it), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
+one, the boot medium of a live session and the rest of "From the live USB", downloading a newer snapshot between
+releases, and opening the page on a real session with a browser.
+
 ## From the live USB, without installing
 
 The app and LordBench are in the ISO, so anyone can start a PC from the LordOS USB stick, check
@@ -642,6 +736,8 @@ before installing.
 - The probe app for the effective checks: a signed system package started through the existing
   `lord.apps.launchPackage(id)`; no new launcher path.
 - `lord-bench` (0.8.6), as above.
+- `lord.sysinfo.community()` in `server/src/ui/js_hw.c` (0.8.7): the catalogue's snapshot, only after
+  `sysreport/hwsnap.c` verified its signature with the release key; no arguments and no path from JS.
 - Data packages `pci.ids` and `usb.ids` (Debian, architecture `all`), documented in `VM-SETUP.md`.
 
 ## Work plan for 0.8.5

@@ -768,7 +768,20 @@ desktop fell to 24 fps under an all-core load:
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel
-  reads as a signed snapshot.
+  reads as a signed snapshot. In development on the branch `v087-hwreports`:
+  - [x] The report format: a versioned JSON Schema that is an allow-list (`apps/sysinfo/hwreport.schema.json`),
+    with the live session flag.
+  - [x] Share on GitHub in System Information: the report and a self-contained page in Documents, opened with
+    `lord.apps.launchWith('', path)`; the issue link carries only the short summary.
+  - [x] The `hardware-report` issue form and its workflow: safe download, schema, privacy and plausibility checks,
+    labels from fixed lists, one comment (`tools/hwreport/validate.mjs`).
+  - [x] The catalogue: lordos.org/hardware (en, es, pt; built, not published) and the snapshot, from the accepted
+    reports, with the two reference machines as fixtures (`tools/hwreport/catalog.mjs`).
+  - [x] The signed snapshot (release key, signed on the maintainer's machine) shipped in the `lordos` package and
+    verified in C before the Compatibility panel shows it as community data (`lord.sysinfo.community()`).
+  - [ ] The repository's labels, the first community reports and a captured Raspberry Pi 5 report.
+  - [ ] Downloading a newer snapshot between releases (it updates with the package for now).
+  - [ ] The rest of "From the live USB": the boot medium, the boot menu entry, live references.
 
 - [x] **Remote desktop over WebRTC (0.8.4)** — see `REMOTE.md`, "Video (WebRTC)". Until 0.8.3 the
   browser got PNG/JPEG tiles over a TLS WebSocket, and a connection switched the session to CPU

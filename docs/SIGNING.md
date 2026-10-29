@@ -313,6 +313,10 @@ noise of the build without the check (727–870 ms against 745–855 ms).
    `code-manifest.json`, signs it with `~/.config/lordos-release/release-ed25519.key.pem` into
    `code-manifest.sig` and verifies it against `lordos-release.pub.pem`). The bundles don't depend on
    the architecture, so one signature serves amd64 and arm64.
+   (0.8.7, branch `v087-hwreports`) Then `tools/release/sign-hwsnapshot.sh`: it rebuilds
+   `assets/hwreport/snapshot.json` (the tested-hardware catalogue's snapshot, `tools/hwreport/catalog.mjs`) and
+   signs it the same way into `assets/hwreport/snapshot.json.sig`. lord-server verifies it in C
+   (`sysreport/hwsnap.c`) before System Information shows any of it ([BENCHMARK.md](BENCHMARK.md), "0.8.7").
 2. The tree (with both files) goes to the build VMs; `make -C server RELEASE=1`.
 3. `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh` installs both files into `/usr/lib/lordos/` and runs
    `lord-server --check-code` on the staged tree: the `.deb` is not built if a bundle doesn't match
