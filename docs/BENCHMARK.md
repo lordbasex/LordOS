@@ -618,16 +618,33 @@ reference.
   catalogue read the same file. The validator is our own subset of JSON Schema, `tools/hwreport/jsonschema.mjs`,
   with no dependency (the repository has no JSON Schema validator); a keyword it doesn't implement makes it throw.
 - **Live session flag**: the collector now records `software.live` (live-boot's `/run/live`, as LordBench already
-  did), and a shared report is `live: true` if either says so. The boot medium is not collected yet, so it is not
-  in the report; the rest of "From the live USB" is not built.
+  did), and a shared report is `live: true` if either says so.
+- **Boot medium** (2026-10-29): the collector also records what the system started from, as a class only
+  (`software.bootMedium`: `internal`, `usb`, `sd`, `emmc`, `optical`, `network`, or `""` when it can't tell), a USB
+  medium's link speed (`bootLinkMbps`, from the USB device's `speed`) and whether a live session was copied to memory
+  (`bootToRam`, the `toram` boot option). How (`collect_boot` in `sysreport/sysreport.c`, no root, world-readable
+  files only): the mount under `/` (installed) or live-boot's `/run/live/medium` (live) is found in
+  `/proc/self/mountinfo` (the last line for that mount point); an NFS or SMB file system is `network`; otherwise its
+  `major:minor` is followed through `/sys/dev/block` (a link that climbs out of `/sys/devices` is refused), from a
+  partition to its disk, and through device mapper or RAID `slaves` (LUKS, LVM; at most 4 layers); btrfs's anonymous
+  `0:N` device is replaced by the block device its source names. The disk's sysfs path decides: `sr*` is `optical`,
+  a path through a USB controller is `usb`, `nbd*` or an iSCSI session is `network`, an MMC card whose `type` is `SD`
+  or `MMC` is `sd` or `emmc` (unknown type: `""`, not a guess), loop and RAM disks are `""`, everything else
+  (SATA, NVMe, virtio, SCSI) is `internal`. A live session with no medium mounted that was fetched over the network
+  (`fetch=`, `netboot=`) is `network`. The kernel command line is only searched for those whole words, never kept.
+  Nothing else leaves the function: no device name, model, serial, mount point or path. The schema lists only the
+  classes, the speed (1–100,000) and the flag; the share preview, the issue summary (`boot: usb, 5000 Mbps`), the
+  workflow's comment and a `boot:<class>` label show it; a copy to memory on an installed system, or a link speed on
+  anything but USB, is flagged as implausible. System Information shows it in Software (*Started from*) and
+  `lordos-sysreport report` in the Overview (*Started*). VM 116 (ext4 on a SCSI disk) reports `internal`.
 - **Share on GitHub** (Report → *Share on GitHub…*, `apps/sysinfo/share.js`): a preview of the summary and of the
   exact JSON first, then on every click (nothing remembered) the app writes `lordos-hwreport-<date>.json` and
   `.html` to Documents (never over an existing file) and opens the page with `lord.apps.launchWith('', path)`. The
   page is self-contained (no scripts, a CSP of `default-src 'none'`, light and dark, right to left for RTL
   languages, every value escaped), says in plain words what is shared and what never is, shows the summary, the
   steps, and one link to GitHub's new-issue form with the `hardware-report` template, the title, the version and
-  the short summary in the URL (machine, kind, CPU, GPU, memory, architecture, versions, live, LordBench mode and
-  the Compatibility states; at most 600 characters). The full JSON is attached by the user. LordOS sends nothing
+  the short summary in the URL (machine, kind, CPU, GPU, memory, architecture, versions, live, the boot medium's class, LordBench mode
+  and the Compatibility states; at most 600 characters). The full JSON is attached by the user. LordOS sends nothing
   and holds no token.
 - **The issue form and its workflow**: `.github/ISSUE_TEMPLATE/hardware-report.yml` (label `hardware-report`, the
   `lordos` and `summary` fields the link fills, the file box, two confirmations) and
@@ -643,7 +660,7 @@ reference.
   positive, versions, architecture, live or thread counts that disagree, a future date, memory out of range);
   then comments once (updated on every edit) with report values only inside code spans, and labels the issue from
   fixed lists only: `report:valid|check|invalid|missing`, `kind:vm|board|laptop|server|desktop`,
-  `gpu:<vendor>`, `cpu:<vendor>`, `live` or `installed`. Permissions: `contents: read` (to check out the script
+  `gpu:<vendor>`, `cpu:<vendor>`, `live` or `installed`, and `boot:<class>` when the boot medium is known. Permissions: `contents: read` (to check out the script
   and the schema, sparse) and `issues: write`; the checkout action is pinned by commit, without persisted
   credentials. Workflows for `issues` events run from the default branch, so it takes effect when this is merged.
 - **The catalogue**: `tools/hwreport/catalog.mjs` reads the accepted reports in `web/content/hardware/reports/`
@@ -662,7 +679,8 @@ reference.
   the release key (Ed25519, the same format as `code-manifest.sig`; the key never leaves it). It ships
   in the `lordos` package (`tools/iso/mkdeb.sh`; a release build refuses an unsigned one) and so updates through the
   signed APT repository. **Deviation from the design above:** it is not downloaded on its own with the package
-  engine's checks; that remains possible later without changing the format or the verification.
+  engine's checks; that remains possible later without changing the format or the verification (see "Newer
+  snapshots between releases" below: a separate `lordos-hwdata` package is the recommendation).
   `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS) reads the two files from
   `<assets>/hwreport/` without following links (`sysreport/hwsnap.c`), verifies the signature with the key the
   build trusts before parsing anything, checks the structure (format, version, at most 1 MB and 20,000 entries,
@@ -671,31 +689,102 @@ reference.
   what the snapshot says about this machine's devices with the same LordOS version (x.y.z), marked *Community*, or
   as a reference machine when only those reported it, and a footer with the snapshot's date and count, or why
   there is no community data.
-- **Tests**: `server/tests/hwreport_test.mjs` (125 checks: the schema with good reports and 22 bad ones, what the
+- **Tests**: `server/tests/hwreport_test.mjs` (138 checks: the schema with good reports and 22 bad ones, what the
   built report leaves out of a report full of identifying values, the summary and the link, the page's escaping
   and direction, attachment links, the download's limits with a fake fetch, parsing limits, the privacy scan,
   plausibility, labels, the comment's escaping, the catalogue, the snapshot being the one the reports give, and the
   community matching), in `run_suites.sh`; `build/hwsnap-test` (43 checks: signature before parsing, another key,
   one byte changed, malformed signatures, 19 malformed snapshots, limits, links refused, and the snapshot the
   builder wrote signed with a test key passing the C checks), in `make test`; `build/sysreport-test` checks the
-  live flag.
+  live flag and the boot medium on 23 fake trees (NVMe, USB 3 and USB 2 behind a hub, a copy to memory with and
+  without the medium, `notoram`, SD, eMMC, an unknown MMC card, LUKS on NVMe, LVM on LUKS on USB, a device mapper
+  loop, btrfs, stacked mounts, a DVD, NFS, iSCSI, NBD, a live system fetched over the network, virtio, a loop
+  device, a link that climbs out of `/sys`, a USB speed that isn't a number), each also checked for device names,
+  serials, the mount point and the command line in the JSON and the Markdown.
 - **Checked on VM 116** in an isolated headless session, with `lord-server` built for a throwaway test key
   (`CODE_PUBKEY`) and the snapshot signed by `sign-hwsnapshot.sh` with that key: the Compatibility panel shows the
   reference machine's data for the virtio GPU, the network and the sound card; the same snapshot with one count
   changed is refused ("the signature didn't verify") and nothing is shown. Share on GitHub wrote both files; the
   JSON passed `validate.mjs` (`report:valid`, `kind:vm`, `gpu:virtual`, `cpu:intel`, `installed`). The headless
   session has no browser, so it said where the page is instead of opening it.
+- **Opening the page, checked on VM 116** (2026-10-29, isolated headless session of this branch, Chromium 156 from
+  Debian installed on the VM): Share on GitHub wrote `lordos-hwreport-2026-10-29.json` and `.html` to Documents and
+  `lord.apps.launchWith('', path)` opened the page in the browser, inside the session, from the user's default for
+  `text/html`; the page showed the summary (with *Started from: Internal disk*), the steps and the link to the
+  `hardware-report` form, and the JSON passed `validate.mjs` (`report:valid`, `kind:vm`, `gpu:virtual`, `cpu:intel`,
+  `installed`, `boot:internal`). What it took on that VM, and what it says about real systems:
+  - **A fresh account with no default browser:** `defaults_lookup` (`hw/defaults.c`) only reads `mimeapps.list` and
+    `defaults.list` files, and this VM has none for `text/html` (Debian's Chromium doesn't write one, and without
+    `desktop-file-utils` there is no `mimeinfo.cache`), so `launchWith('', …)` refused and the app said where the
+    page was ("Open … with your browser to go on") — the fallback works. Choosing the browser in Settings → Default
+    Apps (which writes `~/.config/mimeapps.list`) is what makes it open. Falling back to an installed app that
+    declares the type, as the XDG spec allows, is left for the maintainer to decide (it changes Default Apps for
+    every type, not only this one).
+  - **Chromium needs X11 here:** Debian's Chromium starts on X11 unless told otherwise, and VM 116 has no `xwayland`
+    package, so with the stock `chromium.desktop` it exited ("Missing X server"). A system with `xwayland` (the
+    Xwayland launcher gives launched apps `DISPLAY`) runs it as is. On the VM the test used a user entry in
+    `~/.local/share/applications` with `--ozone-platform=wayland`, chosen as the default for `text/html`.
+  - **The test session's environment:** the isolated session must not set `LORDOS_SESSIOND` at all: with it set (even
+    empty) the launcher, which can't place the app in its own scope outside a real session, refuses to start it
+    (fail closed, as designed: `apps.log` said "could not place the app in its own scope: not launched").
+
+![The page opened in the browser by Share on GitHub](hwreport-browser.png)
 
 ![Compatibility with community data](hwreport-compat.png)
 
 ![Share on GitHub](hwreport-share.png)
 
-![The page that opens in the browser](hwreport-page.png)
+![The whole page (rendered outside the session, before the boot medium row)](hwreport-page.png)
+
+### Newer snapshots between releases (design, for the maintainer's approval)
+
+Today the signed snapshot ships inside the `lordos` package, so the Compatibility panel only learns about new
+reports when LordOS itself is released. The goal is a newer snapshot between releases **without giving
+`lord-server` or any helper a new network power** (AGENTS.md: no generic network, the Store's download child and
+`lord-tls` only fetch packages, `lord-fetch` only fetches blocklists). The options:
+
+| | How | New network code | Verdict |
+|---|---|---|---|
+| A | Keep it in `lordos` (today) | none | Updates only with a release |
+| B | **A separate small package, `lordos-hwdata`**, in the signed APT repository | none: the existing package engine | **Recommended** |
+| C | `lord-server` downloads `snapshot.json` from lordos.org through the Store's download child and `lord-tls` | a new kind of download in the package engine (a URL that is not a package, a new admin action or engine call) | Not recommended: a new network job to review for one file |
+| D | `lord-fetch` downloads it next to the blocklists | a second job for `lord-fetch`, which AGENTS.md forbids | Rejected |
+| E | The user downloads it from lordos.org/hardware and opens it in System Information | none (a file the user picks, verified with the same key) | Possible later as a complement for machines that never update; clumsy as the main path |
+
+**B, in detail.** `lordos-hwdata` is an `Architecture: all` package holding only `snapshot.json` and
+`snapshot.json.sig` at the same place `lord.sysinfo.community()` already reads (`<assets>/hwreport/`), with a version
+of its own (the snapshot's date, `YYYY.MM.DD`, plus `.N` for a second one on the same day). The `lordos` package
+stops shipping the two files and `Depends: lordos-hwdata`; no released `lordos` has ever shipped them (they are new
+in 0.8.7), so no `Replaces`/`Breaks` dance is needed. Between releases the maintainer runs
+`tools/release/sign-hwsnapshot.sh` (as now), builds the package (a short `tools/iso/mkdeb-hwdata.sh`) and adds it to
+the repository with `tools/release/apt-repo.sh build live <deb>` and `publish`, exactly like a `lordos` build. On
+every system the daily update check (`pkg-update`, `updates.autoCheck`) sees one available update and says so once,
+and Store → Updates → *Update all* (`pkg-upgrade`) installs it; `lord.sysinfo.community()` reads the files again on
+every call, so the panel shows the new data without restarting the session. Machines without internet get it from a
+`file:` copy of the repository, as any update.
+
+Why this is safe: nothing new runs or connects. The snapshot is checked twice: the repository's `InRelease` (the
+APT archive key, by our own package engine) and then the snapshot's own Ed25519 signature with the release key
+(`sysreport/hwsnap.c`, before any parsing), so a package from anywhere else still can't change what the panel
+shows. Rolling back to an older snapshot needs a downgrade, which the engine never does on its own. The cost:
+one more package in the repository and in the release steps (`RELEASING.md`), the ISO and the Raspberry Pi image
+builds installing it next to `lordos` (`tools/iso/build.sh`, `tools/rpi/build-img.sh`), and a rule for the format:
+while any supported `lordos` reads format 1, `lordos-hwdata` keeps writing format 1; a format 2 needs
+`Breaks: lordos (<< <first version that reads it>)`. An older `lordos` with a newer snapshot works, since entries
+are per LordOS version and it shows only its own.
+
+**Not implemented on this branch:** it changes the release steps on the maintainer's machine, adds a package name to
+the published repository and changes the ISO and Pi image builds, none of which can be tested end to end here
+(the Pi image is built on the Pi). Once approved, the work is: `mkdeb-hwdata.sh`, the `Depends` and the removal from
+`mkdeb.sh`, installing it in the two image builds, `RELEASING.md` and `UPDATES.md`, and a staging test on a VM
+(`apt-repo.sh build staging`): publish a newer `lordos-hwdata`, see the notification, update, see the panel change.
 
 Left for 0.8.7: creating the labels in the repository (the template's `hardware-report` label must exist for the
 form to apply it), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
-one, the boot medium of a live session and the rest of "From the live USB", downloading a newer snapshot between
-releases, and opening the page on a real session with a browser.
+one, the rest of "From the live USB" (the boot menu entry, live references, the overlay's size), the separate
+`lordos-hwdata` package above once approved, and deciding whether Default Apps should fall back to an installed app
+that declares a type when the user chose none (so a fresh account's Share on GitHub opens the page without a visit
+to Settings).
 
 ## From the live USB, without installing
 
@@ -707,7 +796,8 @@ before installing.
 - **A boot menu entry**, *Check this computer*, starts the live session straight into System
   Information (0.8.5) and its Performance tab (0.8.6). The normal live session has it in the Dock.
 - **The report says it was live**: boot medium (USB, its link speed), the overlay in RAM, no
-  persistence. Live and installed results are kept apart in comparisons and in the catalogue.
+  persistence. (Built in 0.8.7: the live flag, the boot medium's class, a USB link speed and the copy to memory;
+  the overlay's size is not.) Live and installed results are kept apart in comparisons and in the catalogue.
 - **Different references where live changes the numbers**: idle memory is compared with the
   paper's live figure (465 MB) and the overlay's size is subtracted and shown; boot time includes
   reading from the stick and is reported, not judged.

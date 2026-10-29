@@ -61,6 +61,50 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `make test` passing (23 suites, 0 failed); checked there in an isolated headless session with a test-key build
     (community rows shown, a tampered snapshot refused, both share files written and the JSON valid).
 
+- **The boot medium in the hardware report** (2026-10-29; `docs/BENCHMARK.md`, "Built so far" under 0.8.7):
+  - **Collector:** `collect_boot` in `server/src/sysreport/sysreport.c` records `software.bootMedium` (`internal`,
+    `usb`, `sd`, `emmc`, `optical`, `network`, or `""` when unknown), `bootLinkMbps` (a USB medium's link speed, from
+    the USB device's `speed`; `null` otherwise) and `bootToRam` (a live session started with `toram`). No root and
+    world-readable files only: the mount under `/` (or live-boot's `/run/live/medium` in a live session) from
+    `/proc/self/mountinfo`, NFS/SMB as `network`, otherwise its `major:minor` through `/sys/dev/block` (links that
+    leave `/sys/devices` refused), partition to disk, device mapper and RAID `slaves` (at most 4 layers), btrfs's
+    anonymous device through its source; then the disk's sysfs path: `sr*` optical, a USB controller in the path
+    `usb`, NBD or an iSCSI session `network`, an MMC card by its `type` (`SD`/`MMC`; unknown is `""`), loop and RAM
+    disks `""`, the rest `internal`. A live session fetched over the network (`fetch=`, `netboot=`) with no medium
+    mounted is `network`. The kernel command line is only searched for those words. Only the class and the speed
+    leave the collector: never a device name, model, serial, mount point or path. In `lord.sysinfo.report()`,
+    `lordos-sysreport report --json` and, as *Started*, in its Markdown Overview.
+  - **Report and workflow:** the schema (`apps/sysinfo/hwreport.schema.json`) lists only the classes, a speed of
+    1–100,000 and the flag; `share.js` adds a `boot` row to the issue summary (`usb, 5000 Mbps`, `toram`);
+    `tools/hwreport/lib.mjs` adds a `boot:<class>` label from the fixed list, a *started from* note in the comment,
+    and flags a copy to memory on an installed system or a link speed on anything but USB (`boot-mismatch`).
+  - **App:** System Information → Software → *Started from* and the share preview's row (internal disk, USB drive,
+    SD card, built-in flash memory, DVD or CD, network; the speed; "copied to memory"); the page's "What is shared"
+    says the kind of drive is shared, never its name. en, es and pt.
+  - **Tests:** `build/sysreport-test` builds 23 fake trees (NVMe, USB 3, USB 2 behind a hub, `toram` with and without
+    the medium, `notoram`, SD, eMMC, an unknown MMC card, LUKS on NVMe, LVM on LUKS on USB, a device mapper loop,
+    btrfs, stacked mounts, DVD, NFS, iSCSI, NBD, a fetched live system, virtio, a loop device, an escaping link, a
+    bad USB speed) and checks the class, the speed, the flag, the Markdown row, and that no device name, serial,
+    mount point or command line reaches the JSON or the Markdown; `server/tests/hwreport_test.mjs` grows to 138
+    checks (the schema refuses a device name, a mount point, a text or zero speed and a text flag; the built report
+    keeps the class and drops an extra device field; the summary row; the label; the plausibility flags; the comment).
+    VM 116 reports `internal` (ext4 on its SCSI disk).
+- **Share on GitHub checked in a real session with a browser** (2026-10-29, VM 116, isolated headless session of the
+  branch, Debian's Chromium 156): the report and the page landed in Documents and `lord.apps.launchWith('', path)`
+  opened the page in the browser inside the session (`docs/hwreport-browser.png`); the JSON passed `validate.mjs`
+  (`report:valid … installed, boot:internal`) and the link carried only the title, version and summary. Found on the
+  way (documented in `docs/BENCHMARK.md`, nothing changed in the code): a fresh account has no `text/html` default
+  unless one is chosen in Settings → Default Apps (`defaults_lookup` reads only `mimeapps.list`/`defaults.list`;
+  the app then says where the page is), Debian's Chromium needs `xwayland` (absent on VM 116) unless started with
+  `--ozone-platform=wayland`, and an isolated test session must leave `LORDOS_SESSIOND` unset or the launcher fails
+  closed.
+- **Newer hardware snapshots between releases: design** (2026-10-29; `docs/BENCHMARK.md`, "Newer snapshots between
+  releases"): five options compared; the recommendation is a separate `Architecture: all` package, `lordos-hwdata`,
+  in the signed APT repository, which `lordos` depends on, updated between releases through the existing daily check
+  and Store → Updates, with the snapshot's own Ed25519 signature still checked in C, so no component gets a new
+  network power. Not implemented: it changes the release steps, the published repository and the ISO and Pi image
+  builds, and waits for the maintainer's approval.
+
 ### Release
 
 - **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the

@@ -771,8 +771,14 @@ desktop fell to 24 fps under an all-core load:
   reads as a signed snapshot. In development on the branch `v087-hwreports`:
   - [x] The report format: a versioned JSON Schema that is an allow-list (`apps/sysinfo/hwreport.schema.json`),
     with the live session flag.
+  - [x] The boot medium as a class (internal, USB, SD, eMMC, optical, network), a USB medium's link speed and the
+    copy to memory of a live session, from world-readable kernel facts without root (`collect_boot` in
+    `sysreport/sysreport.c`; no device names), in the report, the schema, the summary, the workflow's labels and
+    plausibility checks.
   - [x] Share on GitHub in System Information: the report and a self-contained page in Documents, opened with
     `lord.apps.launchWith('', path)`; the issue link carries only the short summary.
+    Checked on VM 116 with a browser (2026-10-29): the page opens from the user's default for `text/html`; with no
+    default chosen the app says where the page is (a fallback for that is the maintainer's decision).
   - [x] The `hardware-report` issue form and its workflow: safe download, schema, privacy and plausibility checks,
     labels from fixed lists, one comment (`tools/hwreport/validate.mjs`).
   - [x] The catalogue: lordos.org/hardware (en, es, pt; built, not published) and the snapshot, from the accepted
@@ -780,8 +786,10 @@ desktop fell to 24 fps under an all-core load:
   - [x] The signed snapshot (release key, signed on the maintainer's machine) shipped in the `lordos` package and
     verified in C before the Compatibility panel shows it as community data (`lord.sysinfo.community()`).
   - [ ] The repository's labels, the first community reports and a captured Raspberry Pi 5 report.
-  - [ ] Downloading a newer snapshot between releases (it updates with the package for now).
-  - [ ] The rest of "From the live USB": the boot medium, the boot menu entry, live references.
+  - [ ] A newer snapshot between releases: designed (`BENCHMARK.md`, "Newer snapshots between releases"; a separate
+    `lordos-hwdata` package in the signed APT repository, no new network code), waiting for the maintainer's
+    approval; it updates with the `lordos` package for now.
+  - [ ] The rest of "From the live USB": the boot menu entry, live references, the overlay's size.
 
 - [x] **Remote desktop over WebRTC (0.8.4)** — see `REMOTE.md`, "Video (WebRTC)". Until 0.8.3 the
   browser got PNG/JPEG tiles over a TLS WebSocket, and a connection switched the session to CPU
