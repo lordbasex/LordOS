@@ -677,10 +677,9 @@ reference.
   the LordBench numbers of `references.js`.
 - **The signed snapshot**: `tools/release/sign-hwsnapshot.sh` rebuilds and signs it on the maintainer's machine with
   the release key (Ed25519, the same format as `code-manifest.sig`; the key never leaves it). It ships
-  in the `lordos` package (`tools/iso/mkdeb.sh`; a release build refuses an unsigned one) and so updates through the
-  signed APT repository. **Deviation from the design above:** it is not downloaded on its own with the package
-  engine's checks; that remains possible later without changing the format or the verification (see "Newer
-  snapshots between releases" below: a separate `lordos-hwdata` package is the recommendation).
+  in its own package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`; a release build refuses an unsigned one),
+  which `lordos` depends on, and so it updates through the signed APT repository, also between releases (see
+  "Newer snapshots between releases" below, implemented on 2026-10-29).
   `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS) reads the two files from
   `<assets>/hwreport/` without following links (`sysreport/hwsnap.c`), verifies the signature with the key the
   build trusts before parsing anything, checks the structure (format, version, at most 1 MB and 20,000 entries,
@@ -736,17 +735,17 @@ reference.
 
 ![The whole page (rendered outside the session, before the boot medium row)](hwreport-page.png)
 
-### Newer snapshots between releases (design, for the maintainer's approval)
+### Newer snapshots between releases (implemented, option B)
 
-Today the signed snapshot ships inside the `lordos` package, so the Compatibility panel only learns about new
-reports when LordOS itself is released. The goal is a newer snapshot between releases **without giving
+Until 2026-10-29 the signed snapshot shipped inside the `lordos` package, so the Compatibility panel only learned
+about new reports when LordOS itself was released. The goal is a newer snapshot between releases **without giving
 `lord-server` or any helper a new network power** (AGENTS.md: no generic network, the Store's download child and
 `lord-tls` only fetch packages, `lord-fetch` only fetches blocklists). The options:
 
 | | How | New network code | Verdict |
 |---|---|---|---|
 | A | Keep it in `lordos` (today) | none | Updates only with a release |
-| B | **A separate small package, `lordos-hwdata`**, in the signed APT repository | none: the existing package engine | **Recommended** |
+| B | **A separate small package, `lordos-hwdata`**, in the signed APT repository | none: the existing package engine | **Chosen** (approved by the maintainer, 2026-10-29) and implemented |
 | C | `lord-server` downloads `snapshot.json` from lordos.org through the Store's download child and `lord-tls` | a new kind of download in the package engine (a URL that is not a package, a new admin action or engine call) | Not recommended: a new network job to review for one file |
 | D | `lord-fetch` downloads it next to the blocklists | a second job for `lord-fetch`, which AGENTS.md forbids | Rejected |
 | E | The user downloads it from lordos.org/hardware and opens it in System Information | none (a file the user picks, verified with the same key) | Possible later as a complement for machines that never update; clumsy as the main path |
@@ -773,16 +772,60 @@ while any supported `lordos` reads format 1, `lordos-hwdata` keeps writing forma
 `Breaks: lordos (<< <first version that reads it>)`. An older `lordos` with a newer snapshot works, since entries
 are per LordOS version and it shows only its own.
 
-**Not implemented on this branch:** it changes the release steps on the maintainer's machine, adds a package name to
-the published repository and changes the ISO and Pi image builds, none of which can be tested end to end here
-(the Pi image is built on the Pi). Once approved, the work is: `mkdeb-hwdata.sh`, the `Depends` and the removal from
-`mkdeb.sh`, installing it in the two image builds, `RELEASING.md` and `UPDATES.md`, and a staging test on a VM
-(`apt-repo.sh build staging`): publish a newer `lordos-hwdata`, see the notification, update, see the panel change.
+**Implemented** (2026-10-29, branch `v087-hwreports`):
+
+- **The package:** `tools/iso/mkdeb-hwdata.sh <folder>` builds `lordos-hwdata_<version>_all.deb` (`Architecture: all`,
+  `Multi-Arch: foreign`) with only the two files, a copyright and a changelog. The version is the snapshot's
+  `generated` date as `YYYY.MM.DD`, plus `.N` from `HWDATA_SERIAL=N` (1–99) for a second, different snapshot with the
+  same date. It is reproducible: file times, the changelog's date and the archive's times (`SOURCE_DATE_EPOCH`) come
+  from that date, so the same snapshot and signature give the same bytes (checked: two builds compared equal), which
+  lets `apt-repo.sh` accept it again unchanged at the next release and still refuse a different one under the same
+  version. `REQUIRE_SIGNED_CODE=1` refuses a missing signature and checks it with `openssl` against
+  `lordos-release.pub.pem` (`CODE_PUB` for a test key). It refuses a snapshot whose header is not format 1: the
+  format rule above, enforced until someone adds the `Breaks`.
+- **`lordos`:** `tools/iso/mkdeb.sh` no longer ships `assets/hwreport/` and adds `Depends: lordos-hwdata (>=
+  2026.10.27)`, the first format-1 snapshot. No `Replaces`/`Breaks`: checked against every release tag
+  (`v0.8.0-beta` to `v0.8.5-beta`), none has `assets/hwreport/` in the tree or in its `mkdeb.sh`.
+- **Images:** `tools/iso/build.sh` and `tools/rpi/build-img.sh` build the package next to `lordos` (the Pi build on
+  the host, since it is the same for every architecture) and install both in one `apt-get install`.
+- **`install.sh`** (Debian 13, where the LordOS repository is not there yet): when the `lordos` package depends on
+  `lordos-hwdata`, it takes the newest `lordos-hwdata_<version>_all.deb` the release's signed `SHA256SUMS` lists
+  (or, with `--deb`, the one in the same folder, checked against the `SHA256SUMS` there when present), checks it the
+  same way as the main package (SHA-256, then again on root's copy, `Package` and `Architecture`), and installs both;
+  with none it stops before apt, unless a configured repository has it. `--uninstall` removes it too.
+- **The repository:** `tools/release/apt-repo.sh` adds it like any `.deb` (`apt-ftparchive` lists `all` packages in
+  the amd64 and arm64 indexes), but only if its snapshot verifies with `lordos-release.pub.pem`
+  (`LORDOS_HWDATA_PUB`, a test key, is accepted only for `staging`), and refuses a `lordos` that depends on it while
+  the pool has none. `sign-hwsnapshot.sh` prints the version the package will have. The release folder and the
+  release notes' downloads table carry `lordos-hwdata_<date>_all.deb`.
+- **The steps:** a release adds the package to its folder and to `apt-repo.sh build`; a snapshot alone between
+  releases is `sign-hwsnapshot.sh`, `mkdeb-hwdata.sh`, `apt-repo.sh build|publish|verify staging`, then `live`
+  ([RELEASING.md](RELEASING.md), "A newer hardware snapshot between releases"; [UPDATES.md](UPDATES.md), "The
+  tested-hardware snapshot").
+- **On the system:** nothing changed in C or JS. `lord.sysinfo.community()` already read the files on every call,
+  so a newer package shows in the panel without a restart, and a missing package (or folder) is `state: "missing"`
+  ("no community data"), checked by `build/hwsnap-test`. A snapshot update is listed in Store → Updates with the
+  other packages and announced by the daily check as "1 update is available".
+- **Tests:** `build/pkg-test` (8 new checks, 112 in all): updating a 0.8.5 system's `lordos` to one that depends on
+  `lordos-hwdata` brings it in at its newest version, with *Update* (`pkg-install lordos`) and *Update all*
+  (`pkg-upgrade`); on a 0.8.7 system a newer snapshot alone is one upgrade and nothing else; the date versions sort
+  as intended (`2026.11.05.1` > `2026.11.05` > `2026.10.29.9`). On VM 116: both packages built (`dpkg-deb --info` /
+  `--contents`: `lordos` has no `hwreport` entry and the `Depends`; `lordos-hwdata` has only its files, root-owned,
+  644); the unsigned and the wrongly signed snapshot refused in release mode; `HWDATA_SERIAL` checked; `make -C server
+  test` passed (23 suites, 0 failed). In a `debian:trixie` container: apt refuses `lordos` alone ("Depends:
+  lordos-hwdata (>= 2026.10.27) but it is not installable"), installs both, upgrades `2026.10.27` to `2026.10.27.2`,
+  and removing the package leaves no `hwreport` folder; `install.sh`'s functions with a release signed by a test key
+  (download through a `file:` URL, and `--deb`) take `2026.10.27.2`, refuse a changed file by its SHA-256, and stop
+  before apt when there is none; `apt-repo.sh build staging` offline (a throwaway archive key, in the container) did
+  every refusal above, accepted the same bytes again, and apt on a container with `2026.10.27` installed saw
+  `2026.10.27.2` as an upgrade from the built repository (`file:` source).
+- **Not run yet:** the staging test on a VM with the real repository (publish to `apt-staging`, see the
+  notification, update, see the panel's footer change), which needs the maintainer's archive and release keys.
 
 Left for 0.8.7: creating the labels in the repository (the template's `hardware-report` label must exist for the
 form to apply it), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
-one, the rest of "From the live USB" (the boot menu entry, live references, the overlay's size), the separate
-`lordos-hwdata` package above once approved, and deciding whether Default Apps should fall back to an installed app
+one, the rest of "From the live USB" (the boot menu entry, live references, the overlay's size), the staging test of
+`lordos-hwdata` above, and deciding whether Default Apps should fall back to an installed app
 that declares a type when the user chose none (so a fresh account's Share on GitHub opens the page without a visit
 to Settings).
 

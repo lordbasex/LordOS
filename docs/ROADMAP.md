@@ -783,12 +783,14 @@ desktop fell to 24 fps under an all-core load:
     labels from fixed lists, one comment (`tools/hwreport/validate.mjs`).
   - [x] The catalogue: lordos.org/hardware (en, es, pt; built, not published) and the snapshot, from the accepted
     reports, with the two reference machines as fixtures (`tools/hwreport/catalog.mjs`).
-  - [x] The signed snapshot (release key, signed on the maintainer's machine) shipped in the `lordos` package and
-    verified in C before the Compatibility panel shows it as community data (`lord.sysinfo.community()`).
+  - [x] The signed snapshot (release key, signed on the maintainer's machine), verified in C before the
+    Compatibility panel shows it as community data (`lord.sysinfo.community()`).
   - [ ] The repository's labels, the first community reports and a captured Raspberry Pi 5 report.
-  - [ ] A newer snapshot between releases: designed (`BENCHMARK.md`, "Newer snapshots between releases"; a separate
-    `lordos-hwdata` package in the signed APT repository, no new network code), waiting for the maintainer's
-    approval; it updates with the `lordos` package for now.
+  - [x] A newer snapshot between releases (approved 2026-10-29): the snapshot is its own `Architecture: all`
+    package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`, version = the snapshot's date), which `lordos` depends
+    on; the ISO, the Pi image and `install.sh` install it, `apt-repo.sh` checks its signature, and a newer one is
+    published alone between releases (`RELEASING.md`, "A newer hardware snapshot between releases"). No new
+    network code. Resolver, packaging, apt and repository tests done; the staging test with the real keys is left.
   - [ ] The rest of "From the live USB": the boot menu entry, live references, the overlay's size.
 
 - [x] **Remote desktop over WebRTC (0.8.4)** — see `REMOTE.md`, "Video (WebRTC)". Until 0.8.3 the

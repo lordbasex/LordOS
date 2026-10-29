@@ -98,7 +98,7 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- [options]
 |---|---|
 | `-y`, `--yes` | don't ask (also `LORDOS_YES=1`). With it, the display manager **is** disabled; add `--keep-display-manager` to avoid that |
 | `--version X` | install release `X` (`0.8.0-beta` or `v0.8.0-beta`) instead of the latest |
-| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified |
+| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified. (0.8.7) The `lordos-hwdata_<date>_all.deb` the package depends on (the signed tested-hardware snapshot) is taken from the same folder, checked the same way |
 | `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root with no `sudo`, nobody) |
 | `--keep-display-manager` | leave the current display manager enabled; LordOS is not enabled at boot |
 | `--no-extras` | don't install the extra sound and font packages |

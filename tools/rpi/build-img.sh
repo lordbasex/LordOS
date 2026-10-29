@@ -5,7 +5,8 @@
 # Usage (as root, on Debian 13, from the repository root with the themes already built):
 #   sudo tools/rpi/build-img.sh [work folder]          # default /var/tmp/lordos-rpi
 #
-# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256) and lordos_<version>_arm64.deb
+# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256), lordos_<version>_arm64.deb and
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
 #
 # - On an arm64 host (the Pi 5 itself, an ARM server) everything is native. If server/build/lord-server
 #   is already aarch64 (make -C server on the Pi) it is used; otherwise it is built in the build chroot.
@@ -218,6 +219,9 @@ else
 fi
 # mkdeb.sh (the same as the ISO's) takes the architecture from DEB_ARCH
 echo "   $(basename "$DEB") ($(du -h "$DEB" | cut -f1))"
+# the tested-hardware snapshot lordos depends on: the same Architecture: all package as the ISO's
+HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
+echo "   $(basename "$HWDEB")"
 
 # ---- 2. the image's system ----
 echo "== debootstrap $SUITE $ARCH (minbase)"
@@ -291,8 +295,9 @@ fi
 in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_RPI_EXTRA >> "$WORK/apt.log" 2>&1 ||
     echo "   warning: $PKGS_RPI_EXTRA were not installed (see $WORK/apt.log)"
 cp "$DEB" "$CH/tmp/lordos.deb"
-in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
-rm -f "$CH/tmp/lordos.deb"
+cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
+in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
 # the browsers' defaults, the same as the ISO's
 sh "$ROOT/tools/iso/browser-defaults.sh" "$CH"
 

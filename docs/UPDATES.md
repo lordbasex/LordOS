@@ -15,6 +15,7 @@ a server or VPS, and `apt` sees the same repository.
 | Building, signing and uploading it | `tools/release/apt-repo.sh` (on the maintainer's Mac) |
 | The Store's side | `apps/store/debian.js` (`Updates`), `sdk/updates.js`, `lord.pkg.releaseNotes` and `lord.pkg.rebootRequired` (`server/src/ui/js_pkg.c`) |
 | Version-to-version changes | `packaging/migrations/` (system, as root) and `MIGRATIONS` in `sdk/settings.js` (each user's settings) |
+| The tested-hardware snapshot (0.8.7) | the `lordos-hwdata` package (`tools/iso/mkdeb-hwdata.sh`), which `lordos` depends on; published with a release or alone between releases (below) |
 
 ## The repository
 
@@ -26,6 +27,7 @@ https://lordos.org/apt/
   dists/stable/main/binary-arm64/Packages(.xz, .gz)
   dists/stable/main/notes/ReleaseNotes(.xz)   release notes of each lordos version (below)
   pool/main/l/lordos/lordos_<version>_<arch>.deb
+  pool/main/l/lordos-hwdata/lordos-hwdata_<YYYY.MM.DD[.N]>_all.deb   (0.8.7) the signed tested-hardware snapshot
   lordos.sources                       the same file the package installs
 https://lordos.org/keys/lordos-archive-keyring.gpg (.asc)   the public key
 https://lordos.org/apt-staging/        the same layout, for tests before anything goes live
@@ -165,6 +167,12 @@ Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg
   opens Updates. It never installs anything. When nothing changed it costs a few small requests
   (`If-Modified-Since`, 304). LordOS has no metered-connection setting yet; turning the check off
   is the way to avoid it on a metered link.
+- **The tested-hardware snapshot** (0.8.7, `lordos-hwdata`): a newer one published between releases is an
+  ordinary update of that package, listed with the other packages ("Debian updates", with its description) and
+  announced by the daily check as "1 update is available"; *Update all* installs it. It needs no restart and no
+  migration: `lord.sysinfo.community()` reads the files again whenever System Information's Compatibility panel
+  asks, and verifies the snapshot's Ed25519 signature before using it. Updating `lordos` from 0.8.5 or 0.8.6
+  brings `lordos-hwdata` in as a new dependency (the plan shows it). See "The tested-hardware snapshot" below.
 - **Local repositories.** The engine also reads `file:/path` sources (a copy of the repository on a
   disk or USB stick, for machines without internet), checked the same way.
 
@@ -172,6 +180,45 @@ The whole path is our own engine ([PACKAGES.md](PACKAGES.md)): the `InRelease` s
 by `server/src/pkg/pgp.c` (Ed25519 v4, SHA-512) against the keyring named in `Signed-By`, every
 file by its SHA-256, and dpkg installs. `apt` and the Store share dpkg's lock and see the same
 state, so either can be used.
+
+## The tested-hardware snapshot (lordos-hwdata)
+
+(0.8.7; design and reasons in [BENCHMARK.md](BENCHMARK.md), "Newer snapshots between releases".) System
+Information's Compatibility panel shows what the community confirmed about this machine's devices, from a signed
+snapshot of the accepted hardware reports. The snapshot is not in the `lordos` package but in its own:
+
+| | |
+|---|---|
+| Package | `lordos-hwdata`, `Architecture: all`, `Multi-Arch: foreign`, built by `tools/iso/mkdeb-hwdata.sh` |
+| Contents | `/usr/lib/lordos/assets/hwreport/snapshot.json` and `snapshot.json.sig` (Ed25519, release key), its copyright and changelog |
+| Version | the snapshot's date (its newest report), `YYYY.MM.DD`, plus `.N` (`HWDATA_SERIAL`) for a second, different snapshot on the same date |
+| Dependency | `lordos` `Depends: lordos-hwdata (>= 2026.10.27)` (any snapshot of format 1) |
+| Reproducible | file times, the changelog date and the archive times come from the snapshot's date: the same snapshot and signature give the same bytes, so `apt-repo.sh` takes it again unchanged and refuses another one under the same version |
+
+How it gets to a system: the ISO and the Raspberry Pi image install it with `lordos`; `install.sh` takes it from
+the same GitHub release as the `lordos` package (checked against the signed `SHA256SUMS`, as the main package),
+or from the folder of a `--deb` file; afterwards it comes from this repository like any update. Publishing a newer
+one alone is in [RELEASING.md](RELEASING.md), "A newer hardware snapshot between releases".
+
+What is checked: `apt-repo.sh` adds a `lordos-hwdata` only if its snapshot verifies with
+`tools/release/lordos-release.pub.pem`, and refuses a `lordos` that depends on it while the pool has none; the
+package engine checks `InRelease` and the file's SHA-256; `lord-server` verifies the snapshot's signature with the
+key compiled into it before parsing anything (`sysreport/hwsnap.c`). Without the package (removed by hand with
+`dpkg --force-depends`, or a development install) the panel says there is no community data (`state: "missing"`;
+`build/hwsnap-test` checks a missing folder) and everything else works.
+
+Tests (2026-10-29): `build/pkg-test` plans the update of a 0.8.5 system to a `lordos` that depends on
+`lordos-hwdata` (the dependency comes in, at its newest version, both with *Update* and with *Update all*) and a
+newer snapshot alone on a 0.8.7 system (one upgrade, nothing else), and checks the date versions' order. Both
+packages were built on VM 116 and checked with `dpkg-deb --info`/`--contents` (no `hwreport` file left in
+`lordos`; the `Depends` line); in a `debian:trixie` container, apt refuses `lordos` alone, installs both, upgrades
+`2026.10.27` to `2026.10.27.2`; `install.sh`'s download and `--deb` paths take the newest `lordos-hwdata` the signed
+`SHA256SUMS` lists, refuse a changed one and refuse to start apt when there is none; `apt-repo.sh build staging`
+(offline, with a throwaway archive key and a throwaway snapshot key) refused `lordos` without `lordos-hwdata`, a
+snapshot signed with another key, a test key on `live` and the same version with other bytes, accepted the same
+bytes again, indexed the package for amd64 and arm64, and apt on a system with `2026.10.27` saw `2026.10.27.2` as an
+upgrade from the `file:` copy. Not yet run: the end-to-end staging test on a VM (publish to `apt-staging`, see the
+notification, update, see the panel change), which needs the maintainer's keys.
 
 ## Migrations
 

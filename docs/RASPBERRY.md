@@ -110,7 +110,9 @@ SD card or an NVMe, and the same image boots on the Pi 5 and the Pi 4.
   PipeWire) and `rfkill`, plus our SCO-routing helper (`lordos-rpi-bt@hciN`).
 - **Debian 13's Mesa:** v3d (GLES 3.1), v3dv (Vulkan) and kmsro (vc4 for the display, v3d for
   rendering). lord-server is compiled with `GPU=1`.
-- **The same LordOS package as the ISO.** Built by `tools/iso/mkdeb.sh` with `DEB_ARCH=arm64`.
+- **The same LordOS package as the ISO.** Built by `tools/iso/mkdeb.sh` with `DEB_ARCH=arm64`, installed with
+  the same `lordos-hwdata` package (0.8.7, `tools/iso/mkdeb-hwdata.sh`, `Architecture: all`: the signed
+  tested-hardware snapshot it depends on).
 - **Partitions:** MBR, in the layout Raspberry Pi Imager and the firmware expect:
 
   | Partition | Size | What it holds |
