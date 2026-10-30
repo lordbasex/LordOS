@@ -11,7 +11,7 @@
  *   history() / clearHistory()    what ran: counts and bytes, never a path
  *   cancel(forget)                stops the job; forget (boolean) also drops the results
  *   results(scanId | 'plan', offset, limit, filter)  a page of { id, rule, path, size, allocated, … };
- *                                 filter: { rule, minSize, olderThanDays, type }
+ *                                 filter: { rule, minSize, olderThanDays, type, under }
  *   plan(scanId, ids)             builds a plan from candidate ids, or { rules: [ids] }, on a thread: its id
  *   emptyTrash()                  the real emptyTrash, on a thread; can't be undone
  *   execute(planId)               runs that plan once, on a thread
@@ -145,7 +145,7 @@ static JSValue f_results(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     }
     if (exact_int(c, argv[0], 1, 2147483647.0, &id)) return js_throw_code(c, "sys.badArgument", NULL);
     CleanFilter f = { .type = -1 };
-    const char *rule = NULL, *type = NULL;
+    const char *rule = NULL, *type = NULL, *under = NULL;
     int bad = 0;
     if (argc == 4 && !JS_IsUndefined(argv[3])) {
         if (!JS_IsObject(argv[3])) return js_throw_code(c, "sys.badArgument", NULL);
@@ -162,10 +162,15 @@ static JSValue f_results(JSContext *c, JSValueConst t, int argc, JSValueConst *a
             if (f.type < 0) bad = 1;
         } else if (!JS_IsUndefined(y)) bad = 1;
         f.rule = rule;
+        JSValue u = JS_GetPropertyStr(c, argv[3], "under");
+        if (JS_IsString(u)) { under = JS_ToCString(c, u); if (!under || !clean_relpath_ok(under, CLEAN_MAX_DEPTH)) bad = 1; } else if (!JS_IsUndefined(u)) bad = 1;
+        JS_FreeValue(c, u);
+        f.under = under;
         JS_FreeValue(c, r); JS_FreeValue(c, m); JS_FreeValue(c, d); JS_FreeValue(c, y);
     }
     JSValue v = bad ? js_throw_code(c, "sys.badArgument", NULL) : json_value(c, clean_results_of((int)id, (long)off, (int)lim, &f));
     if (rule) JS_FreeCString(c, rule);
+    if (under) JS_FreeCString(c, under);
     if (type) JS_FreeCString(c, type);
     return v;
 }

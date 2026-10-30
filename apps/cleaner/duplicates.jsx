@@ -6,7 +6,7 @@ import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp } from
 
 export function DupHero({ folders, chosen, toggle }) {
   return (
-    <Hero title={tr('cleaner.hero.dups.title')} line={tr('cleaner.hero.dups.line')}>
+    <Hero art="duplicates" title={tr('cleaner.hero.dups.title')} line={tr('cleaner.hero.dups.line')} features={[['large', tr('cleaner.hero.dups.f1')], ['duplicates', tr('cleaner.hero.dups.f2')], ['activity', tr('cleaner.hero.dups.f3')]]}>
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap', marginTop: spacing.s }}>
         {folders.map((f) => <Pill key={f} label={f} on={chosen.has(f)} onClick={() => toggle(f)} />)}
       </View>
@@ -30,10 +30,10 @@ export function DupList({ scan, selected, setSelected }) {
     return { rows, total };
   }, [scan.id]);
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
-          <Label size={typeScale.title} weight={600}>{tr('cleaner.dups.title')}</Label>
+          <Label size={32} weight={300}>{tr('cleaner.dups.title')}</Label>
           <Label dim size={typeScale.callout}>{tr('cleaner.dups.hint')}</Label>
         </View>
         <View style={{ alignItems: 'flex-end' }}>

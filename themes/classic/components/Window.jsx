@@ -160,10 +160,10 @@ export function Window({ win, t, focused, app, tv }) {
 
   // Linux app with its own frame (GTK, Chromium and Firefox with their own bar): only the content,
   // with the theme's shadow. A right click on its bar asks for the window menu (w.windowMenu).
-  if (win.args?.csd) {
+  if (win.args?.csd || app.ownFrame) {
     const wmenu = !tv && win.windowMenu;
     return (
-      <WindowShell win={win} resizable={!tv} onMouseDown={() => wm.focus(win.id)} style={{ boxShadow: shadow, ...tvStyle }}>
+      <WindowShell win={win} resizable={!tv} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow, ...tvStyle }}>
         <AppHost id={win.id} focused={focused && !tv} />
         {tvCover}
         {wmenu && (

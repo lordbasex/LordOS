@@ -38,11 +38,11 @@ export function Window({ win, app, t, focused, fx }) {
   // Linux app that draws its own frame (GTK, Chromium and Firefox with their own bar): only the
   // content, with the theme's shadow. A right click on its bar asks for the window menu
   // (w.windowMenu): the same items as the menu bar's Window menu.
-  if (win.args?.csd) {
+  if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
       <WindowShell win={win} onMouseDown={() => wm.focus(win.id)}
-        style={{ boxShadow: focused ? '0 24px 56px rgba(0,0,0,0.5)' : '0 10px 28px rgba(0,0,0,0.3)', ...fxs }}>
+        style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: focused ? '0 24px 56px rgba(0,0,0,0.5)' : '0 10px 28px rgba(0,0,0,0.3)', ...fxs }}>
         <AppHost id={win.id} focused={focused} />
         {wmenu && (
           <Menu x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={[

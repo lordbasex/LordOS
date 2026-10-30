@@ -83,6 +83,8 @@ typedef struct {
     uint32_t *order;                        /* tree: candidates by size, largest first */
     long seen, dirs, hashed, symlinks, special, mounts, unreadable, protect, names, nomatch, refused, foreign, excluded;
     char limit[8];
+    char now[CLEAN_PATH_MAX + 1];           /* the path being read, validated */
+    int now_src;
     double logical, allocated;
     int nsrc;
     Src src[CLEAN_MAX_ROOTS];
@@ -518,6 +520,9 @@ static int take_batch(Scan *s, const JVal *root) {
     s->seen = (long)seen;
     s->dirs = (long)dirs;
     s->hashed = (long)hashed;
+    const char *now = json_str(root, "now");
+    double src;
+    if (now && !json_count(root, "r", &src) && src < s->nsrc && (!*now || clean_relpath_ok(now, CLEAN_MAX_DEPTH))) { snprintf(s->now, sizeof s->now, "%s", now); s->now_src = (int)src; }
     for (const JVal *v = items->kid; v && r >= 0; v = v->next) if (take_record(s, v) < 0) r = -1;
     for (const JVal *v = nodes->kid; v && r >= 0; v = v->next) if (take_node(s, v) < 0) r = -1;
     if (r >= 0 && s->kind == CLEAN_KIND_DUPS && json_bool(root, "group", 0)) r = close_group(s);
@@ -1468,6 +1473,14 @@ static void scan_json(JBuf *b, const Scan *s, int running) {
     for (size_t i = 0; i < s->n && !running; i++) est += estimated(&s->c[i]);
     jb_printf(b, "{\"id\":%d,\"kind\":\"%s\",\"running\":%s,\"complete\":%s,\"limit\":\"%s\",\"seen\":%ld,\"dirs\":%ld,\"hashed\":%ld,\"candidates\":%zu,\"groups\":%zu,",
               s->id, kind_name[s->kind], running ? "true" : "false", s->complete ? "true" : "false", s->limit, s->seen < 0 ? 0 : s->seen, s->dirs, s->hashed, s->n, s->ngrp);
+    if (running) {
+        char abs[PATH_MAX * 2];
+        src_path(&s->src[s->now_src], s->now, abs, sizeof abs);
+        size_t n = strlen(fsops_home());
+        jb_raw(b, "\"now\":");
+        if (!strncmp(abs, fsops_home(), n)) { abs[n - 1] = '~'; jb_str(b, abs + n - 1); } else jb_str(b, abs);
+        jb_raw(b, ",");
+    }
     jb_raw(b, "\"logical\":"); jb_num(b, s->logical);
     jb_raw(b, ",\"allocated\":"); jb_num(b, s->allocated);
     jb_raw(b, ",\"estimated\":"); jb_num(b, est);
@@ -1634,6 +1647,7 @@ static int passes(const Scan *s, const Cand *c, const CleanFilter *f) {
         if (!r || strcmp(r->id, f->rule)) return 0;
     }
     if ((double)c->size < f->min_size || (f->older_than > 0 && (double)c->mtime > f->older_than)) return 0;
+    if (f->under && !clean_under(c->rel, f->under)) return 0;
     return f->type < 0 || c->type == f->type;
 }
 

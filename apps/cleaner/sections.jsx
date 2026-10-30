@@ -1,9 +1,9 @@
 // Scan, Cleanup, Large files, Activity and Settings.
 import {
-  View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
+  View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, PagedList, CountUp } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, usePal } from './ui.jsx';
 
 const n = (v) => formatNumber(v);
 const when = (sec) => { const d = new Date(sec * 1000); return `${formatDate(d, 'short')} ${formatTime(d)}`; };
@@ -24,22 +24,24 @@ export function DiskCard({ status, last }) {
   );
 }
 
-export function ScanHero({ status, last, scanning, scan }) {
+export function ScanHero({ status, last }) {
   return (
-    <Hero title={tr(scanning ? 'cleaner.scanning' : 'cleaner.hero.scan.title')} line={tr('cleaner.hero.scan.line')}>
-      {scanning ? (
-        <Glass style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.xl, marginTop: spacing.s }}>
-          <Counter label={tr('cleaner.seen')} value={n(scan ? scan.seen : 0)} />
-          <Counter label={tr('cleaner.dirs')} value={n(scan ? scan.dirs : 0)} />
-          <Counter label={tr('cleaner.found')} value={n(scan ? scan.candidates : 0)} />
-        </Glass>
-      ) : <DiskCard status={status} last={last} />}
+    <Hero art="scan" title={tr('cleaner.hero.scan.title')} line={tr('cleaner.hero.scan.line')} features={[
+      ['cleanup', tr('cleaner.hero.scan.f1')], ['storage', tr('cleaner.hero.scan.f2')], ['duplicates', tr('cleaner.hero.scan.f3')],
+    ]}>
+      <DiskCard status={status} last={last} />
     </Hero>
   );
 }
 
-function Counter({ label, value }) {
-  return <View style={{ gap: 2 }}><Label dim size={typeScale.callout}>{label}</Label><Label size={20} weight={600}>{value}</Label></View>;
+// no total is known while walking: real counters, and a percentage only once a plan runs
+export function Working({ info }) {
+  const scan = info.scan, plan = info.plan;
+  if (info.job === 'execute') {
+    return <ProgressRing progress={plan.items ? plan.processed / plan.items : 0} big={`${Math.round((plan.processed / (plan.items || 1)) * 100)} %`} small={tr('cleaner.workingCount', { done: n(plan.processed), total: n(plan.items) })} />;
+  }
+  if (info.job === 'plan') return <ProgressRing big="…" small={tr('cleaner.preparing')} />;
+  return <ProgressRing big={n(scan ? scan.seen : 0)} small={tr('cleaner.seen')} under={<Label size={15} weight={600}>{scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.candidates : 0), dirs: n(scan ? scan.dirs : 0) })}</Label>} />;
 }
 
 // ---- Cleanup: categories, each with its reason, what will happen, and its files on request ----
@@ -50,16 +52,16 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, 
   const [open, setOpen] = useState(false);
   const selectable = rule.action !== 'none' && !blocked && !rule.explicit;
   return (
-    <Enter delay={delay} x={0} y={12}>
-      <Glass style={{ padding: spacing.m, gap: spacing.s }}>
+    <Enter delay={delay} x={0} y={14} ms={500}>
+      <Glass lift style={{ padding: spacing.m, gap: spacing.s }}>
         <View style={{ flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
-          {selectable ? <Check on={on} onClick={onToggle} /> : <View style={{ width: 20 }} />}
+          {selectable ? <Check on={on} onClick={onToggle} /> : <View style={{ width: 22 }} />}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Label weight={600}>{tr(`cleaner.ruleName.${rule.id}`)}</Label>
             <Label dim size={typeScale.callout}>{blocked ? tr(`cleaner.blocked.${blocked}`) : tr(rule.text)}</Label>
             <View style={{ flexDirection: 'row', gap: spacing.s, marginTop: 2, flexWrap: 'wrap' }}>
               <Tag label={tr(`cleaner.risk.${rule.risk}`)} />
-              <Tag label={tr(ACTION_KEY[rule.action])} strong={rule.action === 'delete'} />
+              <Tag label={tr(ACTION_KEY[rule.action])} />
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
@@ -85,29 +87,31 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, 
   );
 }
 
-function Tag({ label, strong }) {
+function Tag({ label }) {
+  const p = usePal();
   return (
-    <View style={{ paddingHorizontal: 8, height: 18, borderRadius: 9, justifyContent: 'center', opacity: strong ? 1 : 0.75 }}>
-      <Label size={typeScale.caption} weight={500}>{label}</Label>
+    <View style={{ paddingHorizontal: 8, height: 20, borderRadius: 8, justifyContent: 'center', backgroundColor: p.track }}>
+      <Label size={typeScale.caption} weight={600}>{label}</Label>
     </View>
   );
 }
 
 export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels, onRemoveModels }) {
+  const pal = usePal();
   const rows = scan.rules.filter((r) => r.files > 0 || r.root === 'busy');
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
   let i = 0;
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
       <View style={{ flexDirection: 'row', gap: spacing.l, alignItems: 'flex-end' }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Label size={typeScale.title} weight={600}>{tr('cleaner.cleanup.title')}</Label>
+          <Label size={32} weight={300}>{tr('cleaner.cleanup.title')}</Label>
           <Label dim size={typeScale.callout}>{tr('cleaner.estimateNote')}</Label>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Label dim size={typeScale.callout}>{tr('cleaner.estimated')}</Label>
-          <CountUp value={scan.estimated} format={formatBytes} />
+          <CountUp value={scan.estimated} format={formatBytes} color={pal.accent} />
         </View>
       </View>
       {incomplete ? <Label>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
@@ -173,7 +177,7 @@ function SystemCard() {
 // ---- Large files: found by a tree scan, filtered in lord-server ----
 
 export function LargeHero() {
-  return <Hero title={tr('cleaner.hero.large.title')} line={tr('cleaner.hero.large.line')} />;
+  return <Hero art="large" title={tr('cleaner.hero.large.title')} line={tr('cleaner.hero.large.line')} features={[['large', tr('cleaner.hero.large.f1')], ['activity', tr('cleaner.hero.large.f2')], ['cleanup', tr('cleaner.hero.large.f3')]]} />;
 }
 
 export function LargeList({ scan, prefs, selected, setSelected }) {
@@ -184,8 +188,8 @@ export function LargeList({ scan, prefs, selected, setSelected }) {
   const reset = `${scan.id}.${minMB}.${days}.${type}`;
   const total = useMemo(() => cleaner.results(scan.id, 0, 1, filter).total, [reset]);
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
-      <Label size={typeScale.title} weight={600}>{tr('cleaner.large.title')}</Label>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+      <Label size={32} weight={300}>{tr('cleaner.large.title')}</Label>
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
         {[1, 10, 100, 1024].map((m) => <Pill key={m} label={formatBytes(m * 1048576)} on={minMB === m} onClick={() => setMinMB(m)} />)}
         <View style={{ width: spacing.s }} />
@@ -219,12 +223,12 @@ export function Activity({ gen }) {
   const [v, setV] = useState(0);
   const items = useMemo(() => cleaner.history().slice().reverse(), [v, gen]);
   if (!items.length) {
-    return <Hero title={tr('cleaner.activity.title')} line={tr('cleaner.activity.empty')} />;
+    return <Hero art="activity" title={tr('cleaner.activity.title')} line={tr('cleaner.activity.empty')} features={[['activity', tr('cleaner.activity.f1')], ['settings', tr('cleaner.activity.f2')], ['cleanup', tr('cleaner.activity.f3')]]} />;
   }
   return (
     <Enter style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ flex: 1 }}><Label size={typeScale.title} weight={600}>{tr('cleaner.activity.title')}</Label></View>
+        <View style={{ flex: 1 }}><Label size={32} weight={300}>{tr('cleaner.activity.title')}</Label></View>
         <GlassButton small label={tr('cleaner.activity.clear')} onClick={() => { cleaner.clearHistory(); setV(v + 1); }} />
       </View>
       <Label dim size={typeScale.callout}>{tr('cleaner.activity.privacy')}</Label>
@@ -261,7 +265,7 @@ export function Preferences() {
   };
   return (
     <Enter style={{ flex: 1, minHeight: 0, gap: spacing.m }}>
-      <Label size={typeScale.title} weight={600}>{tr('cleaner.prefs.title')}</Label>
+      <Label size={32} weight={300}>{tr('cleaner.prefs.title')}</Label>
       <ScrollView style={{ flex: 1 }} contentStyle={{ gap: spacing.m }}>
         <Glass style={{ padding: spacing.m, gap: spacing.s }}>
           <Label weight={600}>{tr('cleaner.prefs.exclude')}</Label>
@@ -276,6 +280,14 @@ export function Preferences() {
               <GlassButton small label={tr('cleaner.prefs.remove')} onClick={() => save({ exclude: p.exclude.filter((y) => y !== x) })} />
             </View>
           ))}
+        </Glass>
+        <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.theme')}</Label></View>
+          {CLEANER_THEMES.map((id) => <Pill key={id} label={tr(`cleaner.prefs.theme.${id}`)} on={(p.theme || 'noche') === id} onClick={() => save({ theme: id })} />)}
+        </Glass>
+        <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.menuItem')}</Label></View>
+          <Pill label={tr(p.menuItem === false ? 'cleaner.prefs.off' : 'cleaner.prefs.on')} on={p.menuItem !== false} onClick={() => save({ menuItem: p.menuItem === false })} />
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s }}>
           <Label weight={600}>{tr('cleaner.prefs.large')}</Label>

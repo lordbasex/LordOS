@@ -255,7 +255,8 @@ sandbox-test helper: 17/17   see "Helpers" below
 Cleaner is the only place in LordOS that deletes a file outside the Trash (approved by the maintainer on 2026-10-30;
 `CLEANER-SECURITY.md`). It runs in `lord-server` as the session user, only for a file a scan found under a `regenerable`
 rule's fixed root, from a plan the user confirmed, with a confirmation that says it can't be undone. JS can't name a path,
-`lord.fs` gained nothing, and the scans stay on this machine.
+`lord.fs` gained nothing, and the scans stay on this machine. Its history keeps counts and sizes, never a path. Three closed
+admin actions clean the operating system's own files, for administrators (`clean-journal`, `clean-apt-cache`, `clean-var-tmp`).
 
 ## Decoding helpers: `sandbox_apply_helper`
 

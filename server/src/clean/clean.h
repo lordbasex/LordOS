@@ -36,6 +36,7 @@ typedef struct {
     const char *rule;                       /* NULL or a rule id */
     double min_size, older_than;            /* bytes; a modification time in seconds, 0 = any */
     int type;                               /* CLEAN_TYPE_*, -1 = any */
+    const char *under;                      /* NULL, or a folder relative to the scan's root */
 } CleanFilter;
 
 int   clean_available(void);                /* 1 if the helper is there and safe to start */

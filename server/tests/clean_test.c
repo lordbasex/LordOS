@@ -1140,6 +1140,7 @@ static void test_tree(void) {
     CHECK(image_s == (3 << 20) + 1000);
     poll_free(&p);
     CHECK(page_total(scan, &(CleanFilter){ .type = CLEAN_TYPE_VIDEO }) == 1);
+    CHECK(page_total(scan, &(CleanFilter){ .type = -1, .under = "Documents" }) == 2);
     CHECK(page_total(scan, &(CleanFilter){ .type = -1, .min_size = 3 << 20 }) == 2);
     CHECK(page_total(scan, &(CleanFilter){ .type = -1, .older_than = 1200000000 }) == 1);
     /* largest first */

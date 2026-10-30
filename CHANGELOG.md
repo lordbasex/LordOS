@@ -25,6 +25,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
   before (`fsops-test`).
 
+- **Cleaner, Phase 1** (2026-10-30; `docs/CLEANER.md`, `docs/CLEANER-SECURITY.md`, `docs/CLEANER-TESTS.md`): on top of the entries below.
+  - **Sections:** Scan, Cleanup, Large files, Storage, Duplicates, Activity and Settings. Large and old files filter by size, age and type. Storage covers `/`, the home folder and
+    the user's mounts, with a map, a folder list with logical and allocated sizes, and a summary by type, from a bounded tree in `lord-clean`. Duplicates are found by size, partial and
+    full SHA-256 in chosen folders, nothing is selected, and a byte comparison against the copy that stays runs right before acting. Activity keeps counts and sizes, never a path. A moved
+    item can be restored from its result.
+  - **Rules:** 41, each conditional on its folder: caches, developer tools (pip, npm, yarn, Go; pnpm's store to the Trash), browser caches for Firefox and Chromium families (only cache
+    folders, skipped while the profile's lock names a live process), temporary files, crash reports, logs, and shown-only items. AI models from Hugging Face and LM Studio move whole to the
+    Trash, one by one, named in the confirmation; Ollama is measured only, as its models share files.
+  - **System files:** closed admin actions `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp`, with no arguments.
+  - **Looks:** Noche, following the system's mode, and Aurora and Cristal, as data; animated without a React render per frame, stopped when the window isn't in front and with Reduce motion.
+    Built-in apps can draw their own window frame (`"ownFrame"` in the manifest).
+  - **Item by the clock:** a still item with a panel of real readings, read only while it is open.
+  - **Measured on VM 116** (122,000 files, warm cache): see `docs/CLEANER-TESTS.md`.
+
 - **Cleaner: cache rules, the real delete and the Trash** (2026-10-30, the delete approved by the maintainer that day):
   rules for the thumbnails, font, graphics shader and media plugin caches, each at an explicit root and regenerable;
   `temporary` (`.cache/tmp`, older than a week, reviewed, to the Trash); and `trash`, which measures the Trash and is emptied

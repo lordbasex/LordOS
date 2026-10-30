@@ -71,10 +71,10 @@ int main(int argc, char **argv) {
     free(j);
     const char *const names[] = { "thumbnails" };
     int plan = clean_plan_rules(scan, names, 1);
-    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); }
+    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); nanosleep(&(struct timespec){ 0, 5000000 }, NULL); }
     double t1 = now();
     clean_execute(plan);
-    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); }
+    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); nanosleep(&(struct timespec){ 0, 5000000 }, NULL); }
     printf("plan of the thumbnails %.0f ms, real delete %.0f ms\n", t1 - t0, now() - t1);
     run("tree", CLEAN_KIND_TREE, &(CleanOpts){ .min_size = 1 << 20 });
     run("tree1", CLEAN_KIND_TREE, &(CleanOpts){ .min_size = 1 });

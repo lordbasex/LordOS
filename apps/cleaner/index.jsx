@@ -3,12 +3,12 @@
 // paths, never authority. Scanning runs in the sandboxed lord-clean helper; plans and their execution stay in
 // lord-server (lord.clean). Sections appear only for what works.
 import {
-  View, ConfirmDialog, SidebarItem, Button, Hairline, cleaner, useTheme, useSettings, userDirs, t as tr, formatNumber, spacing,
+  View, cleaner, wm, useAppWindow, useSettings, userDirs, t as tr, spacing,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Label } from './ui.jsx';
-import { PlanConfirm, PlanResult } from './flow.jsx';
-import { ScanHero, CleanupList, LargeHero, LargeList, Activity, Preferences, prefsOf } from './sections.jsx';
+import { Label, Sky, Tile, Orb, Enter, PalProvider, usePal } from './ui.jsx';
+import { PlanConfirm, PlanResult, AskDialog } from './flow.jsx';
+import { Working, ScanHero, CleanupList, LargeHero, LargeList, Activity, Preferences, prefsOf } from './sections.jsx';
 import { StorageHero, StorageView } from './storage.jsx';
 import { DupHero, DupList } from './duplicates.jsx';
 
@@ -17,7 +17,7 @@ export function Icon({ size }) {
   const s = size;
   return (
     <View style={{ width: s, height: s, borderRadius: s * 0.225, overflow: 'hidden', direction: 'ltr',
-      background: 'linear-gradient(180deg, #17a398 0%, #0b6e6e 100%)' }}>
+      background: 'linear-gradient(160deg, #1b1f6b 0%, #0d1138 100%)' }}>
       <View style={{ position: 'absolute', left: s * 0.47, top: s * 0.12, width: s * 0.06, height: s * 0.46, borderRadius: s * 0.03, backgroundColor: '#EEEAFF' }} />
       <View style={{ position: 'absolute', left: s * 0.39, top: s * 0.54, width: s * 0.22, height: s * 0.08, borderRadius: s * 0.02, backgroundColor: '#ffffff' }} />
       <View style={{ position: 'absolute', left: s * 0.3, top: s * 0.62, width: s * 0.4, height: s * 0.24,
@@ -33,13 +33,40 @@ export function Icon({ size }) {
 const TICK_MS = 200;
 const SECTIONS = ['scan', 'cleanup', 'large', 'storage', 'duplicates'];
 const BOTTOM = ['activity', 'settings'];
+
+function SideItem({ id, section, go }) {
+  const p = usePal();
+  const [hover, setHover] = useState(false);
+  const on = section === id;
+  return (
+    <View onClick={() => go(id)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ height: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m, borderRadius: 13, border: `1px solid ${on ? p.line : 'transparent'}`,
+        backgroundColor: on || hover ? p.glass : 'transparent' }}>
+      <Tile name={id} size={28} />
+      <Label size={14} lines={1}>{tr(`cleaner.section.${id}`)}</Label>
+    </View>
+  );
+}
+
+function Lights({ id }) {
+  const [hover, setHover] = useState(false);
+  const dot = (c, act) => <View onMouseDown={(e) => e.stopPropagation()} onClick={() => act(id)} style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c, opacity: hover ? 1 : 0.85 }} />;
+  return (
+    <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, direction: 'ltr' }}>
+      {dot('#ff5f57', wm.close)}{dot('#febc2e', wm.minimize)}{dot('#28c840', wm.toggleMaximize)}
+    </View>
+  );
+}
 const KIND = { scan: 'rules', cleanup: 'rules', large: 'tree', storage: 'tree', duplicates: 'dups' };
 
-export default function Cleaner() {
-  const th = useTheme();
+export default function Cleaner() { return <PalProvider><Body /></PalProvider>; }
+
+function Body() {
+  const p = usePal();
+  const { id: winId, args } = useAppWindow() || {};
   const [s, setSettings] = useSettings();
   const prefs = prefsOf(s);
-  const [section, setSection] = useState('scan');
+  const [section, setSection] = useState((args && args.section) || 'scan');
   const [status, setStatus] = useState(() => cleaner.status());
   const [gen, setGen] = useState(0);
   const [polling, setPolling] = useState(false);
@@ -64,7 +91,6 @@ export default function Cleaner() {
   const scan = info.scan;
   const plan = info.plan;
   const running = info.state === 'running';
-  const scanning = running && info.job === 'scan';
   const ready = !!scan && !scan.running && scan.id > 0 && !(info.job === 'scan' && (info.state === 'cancelled' || info.state === 'failed'));
   const planHere = plan && scan && plan.scan === scan.id;
 
@@ -125,11 +151,12 @@ export default function Cleaner() {
     if (section === 'activity') return <Activity gen={gen} />;
     if (section === 'settings') return <Preferences />;
     if (showResult) return <PlanResult key={plan.id} plan={plan} onDone={() => { setResultOf(''); start(); }} />;
-    if (section === 'scan' || (section === 'cleanup' && !ready)) return <ScanHero key={section} status={status} last={prefs.lastScan} scanning={scanning} scan={scan} />;
+    if (running && info.job !== 'emptyTrash') return <Working info={cleaner.poll()} />;
+    if (section === 'scan' || (section === 'cleanup' && !ready)) return <ScanHero key={section} status={status} last={prefs.lastScan} />;
     if (section === 'cleanup') return <CleanupList key={scan.id} scan={scan} chosen={chosen} setChosen={setChosen} onEmpty={() => setEmptyAsk(true)} blockedOf={(r) => (r.root === 'busy' ? 'busy' : '')} models={models} setModels={setModels}
       onRemoveModels={() => attempt(() => { cleaner.plan(scan.id, [...models]); setModels(new Set()); setResultOf(''); watch(); })} />;
     if (section === 'large') return ready ? <LargeList key={scan.id} scan={scan} prefs={prefs} selected={picked} setSelected={setPicked} /> : <LargeHero />;
-    if (section === 'storage') return ready ? <StorageView key={scan.id} scan={scan} /> : <StorageHero volumes={volumes} volume={volume} setVolume={setVolume} />;
+    if (section === 'storage') return ready ? <StorageView key={scan.id} scan={scan} onScan={start} /> : <StorageHero volumes={volumes} volume={volume} setVolume={setVolume} />;
     return ready ? <DupList key={scan.id} scan={scan} selected={picked} setSelected={setPicked} />
       : <DupHero folders={dirs} chosen={folders} toggle={(f) => setFolders((o) => { const x = new Set(o); if (x.has(f)) x.delete(f); else x.add(f); return x; })} />;
   })();
@@ -137,13 +164,10 @@ export default function Cleaner() {
   // what the round button does here
   const orb = (() => {
     if (section === 'activity' || section === 'settings' || showResult) return null;
-    if (running) {
-      if (info.job === 'execute') return { sub: tr('cleaner.workingCount', { done: formatNumber(plan.processed), total: formatNumber(plan.items) }), busy: true };
-      if (info.job === 'scan') return { label: tr('cleaner.cancel'), busy: true, onClick: stop };
-      return { sub: tr('cleaner.preparing'), busy: true };
-    }
-    if (section === 'cleanup' && ready) return { label: tr('cleaner.clean'), sub: tr('cleaner.categories', { count: chosen.size }), onClick: makePlan, disabled: !chosen.size };
-    if ((section === 'large' || section === 'duplicates') && ready && picked.size) return { label: tr('cleaner.orb.trash'), sub: formatNumber(picked.size), onClick: makePlan };
+    if (running) return info.job === 'scan' ? { label: tr('cleaner.cancel'), onClick: stop } : null;
+    if (section === 'cleanup' && ready) return { label: tr('cleaner.clean'), onClick: makePlan, disabled: !chosen.size };
+    if (section === 'storage' && ready) return null;
+    if ((section === 'large' || section === 'duplicates') && ready && picked.size) return { label: tr('cleaner.orb.trash'), onClick: makePlan };
     if (section === 'duplicates' && !folders.size) return { label: tr('cleaner.scan'), disabled: true };
     return { label: tr('cleaner.scan'), onClick: start, disabled: !status.available };
   })();
@@ -151,27 +175,24 @@ export default function Cleaner() {
   const failed = info.state === 'failed' && info.error ? tr(`cleaner.error.${info.error}`) : '';
 
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      <View style={{ width: 180, padding: spacing.s, gap: 2, backgroundColor: th.sidebarBg }}>
-        {SECTIONS.map((id) => <SidebarItem key={id} label={tr(`cleaner.section.${id}`)} selected={section === id} onClick={() => go(id)} />)}
+    <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden', borderRadius: 12 }}>
+      <Sky />
+      <View onMouseDown={() => wm.beginMove(winId)} onDoubleClick={() => wm.toggleMaximize(winId)} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 34 }} />
+      <View style={{ width: 236, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14, gap: 4, backgroundColor: p.side, borderInlineEnd: `1px solid ${p.line}` }}>
+        <View style={{ paddingHorizontal: 6, marginBottom: spacing.m }}><Lights id={winId} /></View>
+        {SECTIONS.map((id) => <SideItem key={id} id={id} section={section} go={go} />)}
         <View style={{ flex: 1 }} />
-        {BOTTOM.map((id) => <SidebarItem key={id} label={tr(`cleaner.section.${id}`)} selected={section === id} onClick={() => go(id)} />)}
-        <Hairline edge="end" />
+        {BOTTOM.map((id) => <SideItem key={id} id={id} section={section} go={go} />)}
       </View>
-      <View style={{ flex: 1, minWidth: 0, padding: spacing.xl, gap: spacing.s }}>
+      <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 38, paddingTop: 34 }}>
         {!status.available ? <Label>{tr('cleaner.unavailable')}</Label> : null}
         {error ? <Label>{error}</Label> : null}
         {failed ? <Label>{failed}</Label> : null}
-        <View style={{ flex: 1, minHeight: 0 }}>{showing}</View>
-        {orb ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.s }}>
-            {orb.sub ? <Label dim>{orb.sub}</Label> : null}
-            {orb.label ? <Button primary={!orb.busy} label={orb.label} onClick={orb.onClick} disabled={orb.disabled || !orb.onClick} /> : null}
-          </View>
-        ) : null}
+        <Enter key={section} style={{ flex: 1, minHeight: 0 }}>{showing}</Enter>
+        {orb && orb.label ? <Orb label={orb.label} onClick={orb.onClick} disabled={orb.disabled} /> : null}
       </View>
       {confirm && plan && plan.state === 'ready' ? <PlanConfirm plan={plan} onOk={execute} onCancel={() => setConfirm(false)} /> : null}
-      {emptyAsk ? <ConfirmDialog destructive title={tr('cleaner.empty.title')} detail={tr('cleaner.empty.detail')} okLabel={tr('cleaner.empty.ok')} cancelLabel={tr('cleaner.cancel')} onOk={emptyTrash} onCancel={() => setEmptyAsk(false)} /> : null}
+      {emptyAsk ? <AskDialog title={tr('cleaner.empty.title')} note={tr('cleaner.empty.detail')} okLabel={tr('cleaner.empty.ok')} onOk={emptyTrash} onCancel={() => setEmptyAsk(false)} /> : null}
     </View>
   );
 }

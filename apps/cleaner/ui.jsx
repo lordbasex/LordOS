@@ -1,79 +1,305 @@
-// Cleaner's small building blocks, plain SDK and theme colours. The app's final look waits for the maintainer's
-// choice of design, so nothing here animates.
-import { View, Text, Button, useTheme, typeScale, spacing } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+// Cleaner's look, "Noche": a night sky in the dark theme and its day version in the light one, with slowly
+// twinkling stars, orbits around the hero, glass cards and cyan-to-violet accents. Colours follow the system's
+// mode. Motion goes through one timer and lord.setStyle on nodes (no React render per frame); it runs only while
+// the window is in front, and with Reduce motion nothing moves. Timing: entrances 320-500 ms with a decelerating
+// curve, ambient loops on slow sines, staggers under 400 ms in all.
+import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-export function Enter({ children, style }) { return <View style={style}>{children}</View>; }
-
-export function Label({ children, size = typeScale.body, weight = 400, dim, mono, lines, style, align = 'start' }) {
+const Pal = createContext(null);
+export const usePal = () => useContext(Pal);
+export function PalProvider({ children }) {
   const th = useTheme();
+  const s = useStore(settings);
+  return <Pal.Provider value={cleanerPalette(s, th.mode)}>{children}</Pal.Provider>;
+}
+
+const FPS = 30;
+const jobs = new Set();
+let timer = 0;
+function tick() {
+  timer = 0;
+  const now = Date.now();
+  for (const j of [...jobs]) if (j(now) === false) jobs.delete(j);
+  if (jobs.size) timer = setTimeout(tick, 1000 / FPS);
+}
+function run(fn) {
+  jobs.add(fn);
+  if (!timer) timer = setTimeout(tick, 0);
+  return () => jobs.delete(fn);
+}
+
+const reduced = () => !!settings.get().reduceMotion;
+const set = (id, k, v) => { try { lord.setStyle(id, k, v); } catch (e) { /* the node went away */ } };
+const decel = (x) => 1 - (1 - x) ** 3;
+
+export function tween(node, props, { ms = 320, delay = 0, done } = {}) {
+  const id = node && node.id;
+  if (id == null) return () => {};
+  const end = () => { for (const k in props) set(id, k, props[k][1]); if (done) done(); };
+  if (reduced()) { end(); return () => {}; }
+  for (const k in props) set(id, k, props[k][0]);
+  const start = Date.now() + delay;
+  return run((now) => {
+    if (now < start) return true;
+    const x = Math.min(1, (now - start) / ms), e = decel(x);
+    for (const k in props) set(id, k, props[k][0] + (props[k][1] - props[k][0]) * e);
+    if (x >= 1) { end(); return false; }
+    return true;
+  });
+}
+
+export function useLive() {
+  const w = useAppWindow() || {};
+  const hidden = useStore(windows, (ws) => !!ws.find((x) => x.id === w.id)?.minimized);
+  const still = useStore(settings, (s) => !!s.reduceMotion);
+  return !still && !hidden && !!w.focused;
+}
+
+export function useLoop(fn, on = true) {
+  const live = useLive();
+  const f = useRef(fn);
+  f.current = fn;
+  useEffect(() => {
+    if (!live || !on) return undefined;
+    const t0 = Date.now();
+    return run((now) => { f.current((now - t0) / 1000); return true; });
+  }, [live, on]);
+}
+
+export function Enter({ children, style, delay = 0, y = 0, x = 12, ms = 420 }) {
+  const r = useRef(null);
+  useEffect(() => tween(r.current, { opacity: [0, 1], translateX: [x, 0], translateY: [y, 0] }, { delay, ms }), []);
+  return <View ref={r} style={style}>{children}</View>;
+}
+
+export function Label({ children, size = typeScale.body, weight = 400, dim, mono, lines, style, align = 'start', tref }) {
+  const p = usePal();
   return (
-    <Text style={{ fontSize: size, fontWeight: weight, color: dim ? th.textDim : th.text, textAlign: align,
+    <Text ref={tref} style={{ fontSize: size, fontWeight: weight, color: dim ? p.sub : p.text, textAlign: align,
       ...(mono ? { fontFamily: 'monospace' } : null), ...(lines ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : null), ...style }}>{children}</Text>
   );
 }
 
-export function CountUp({ value, format }) { return <Label size={typeScale.title} weight={600}>{format(value)}</Label>; }
-
-export function Glass({ children, style, onClick }) {
-  const th = useTheme();
-  return <View onClick={onClick} style={{ backgroundColor: th.control, borderRadius: th.groupRadius, ...style }}>{children}</View>;
+// A number that counts up to its real value, through the text node
+export function CountUp({ value, format, size = 30, weight = 600, color }) {
+  const p = usePal();
+  const r = useRef(null);
+  useEffect(() => {
+    const id = r.current && r.current.id;
+    if (id == null) return undefined;
+    const put = (v) => { try { lord.setText(id, format(v)); } catch (e) { /* gone */ } };
+    if (reduced() || !value) { put(value); return undefined; }
+    const t0 = Date.now();
+    return run((now) => {
+      const x = Math.min(1, (now - t0) / 800);
+      put(x >= 1 ? value : value * decel(x));
+      return x < 1;
+    });
+  }, [value]);
+  return <Label tref={r} size={size} weight={weight} style={{ color: color || p.text }}>{format(value)}</Label>;
 }
 
-export function Pill({ label, on, onClick }) { return <Button small primary={on} label={label} onClick={onClick} />; }
-export function GlassButton({ label, onClick, disabled, small }) { return <Button small={small} label={label} onClick={onClick} disabled={disabled} />; }
+export function Tile({ name, size = 28 }) {
+  return <Image src={`asset:cleaner/tile-${name}.png`} style={{ width: size, height: size, flexShrink: 0 }} />;
+}
+
+export function Glass({ children, style, onClick, lift }) {
+  const p = usePal();
+  const r = useRef(null);
+  const hover = (a, b) => () => { if (lift) tween(r.current, { translateX: [a, b] }, { ms: 180 }); };
+  return (
+    <View ref={r} onClick={onClick} onMouseEnter={hover(0, 3)} onMouseLeave={hover(3, 0)}
+      style={{ backgroundColor: p.glass, borderRadius: 14, border: `1px solid ${p.line}`, ...style }}>{children}</View>
+  );
+}
+
+export function Pill({ label, on, onClick }) {
+  const p = usePal();
+  return (
+    <View onClick={onClick} style={{ height: 28, paddingHorizontal: 12, borderRadius: 14, justifyContent: 'center',
+      background: on ? `linear-gradient(135deg, ${p.btnA}, ${p.btnB})` : undefined, backgroundColor: on ? undefined : p.glass, border: `1px solid ${on ? 'transparent' : p.line}` }}>
+      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, whiteSpace: 'nowrap', color: on ? p.btnText : p.text }}>{label}</Text>
+    </View>
+  );
+}
+
+export function GlassButton({ label, onClick, disabled, small, danger }) {
+  const p = usePal();
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ height: small ? 28 : 40, paddingHorizontal: small ? 12 : 18, borderRadius: small ? 10 : 12, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: danger ? p.danger : hover && !disabled ? p.track : p.glass, border: danger ? 'none' : `1px solid ${p.line}`, opacity: disabled ? 0.5 : 1, flexShrink: 0 }}>
+      <Text style={{ fontSize: small ? typeScale.callout : typeScale.body, fontWeight: 600, color: danger ? '#ffffff' : p.text, whiteSpace: 'nowrap' }}>{label}</Text>
+    </View>
+  );
+}
 
 export function Check({ on, onClick }) {
-  const th = useTheme();
+  const p = usePal();
   return (
-    <View onClick={onClick} style={{ width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      backgroundColor: on ? th.accent : 'transparent', border: `1.5px solid ${on ? th.accent : th.textDim}` }}>
-      {on ? <Text style={{ fontSize: 11, lineHeight: 12, color: '#fff' }}>✓</Text> : null}
+    <View onClick={onClick} style={{ width: 22, height: 22, borderRadius: 7, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: on ? p.accent : p.track }}>
+      {on ? <Text style={{ fontSize: 14, lineHeight: 16, fontWeight: 700, color: p.btnText }}>✓</Text> : null}
     </View>
   );
 }
 
-export function Bar({ value, style }) {
-  const th = useTheme();
+export function Bar({ value, style, h = 6 }) {
+  const p = usePal();
   return (
-    <View style={{ height: 6, borderRadius: 3, backgroundColor: th.separator, overflow: 'hidden', direction: 'ltr', ...style }}>
-      <View style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 1000) / 10}%`, height: '100%', backgroundColor: th.accent }} />
+    <View style={{ height: h, borderRadius: h / 2, backgroundColor: p.track, overflow: 'hidden', direction: 'ltr', ...style }}>
+      <View style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 1000) / 10}%`, height: h, borderRadius: h / 2, background: `linear-gradient(90deg, ${p.barA}, ${p.barB})` }} />
     </View>
   );
 }
 
-export function Hero({ title, line, children }) {
+// ---- the sky ----
+
+const STARS = [[18, 22, 3], [42, 12, 2], [66, 32, 3], [84, 18, 2], [30, 72, 2], [72, 82, 3], [92, 60, 2], [52, 58, 2], [10, 48, 2], [60, 8, 2], [36, 40, 2], [78, 46, 2]];
+
+export function Sky() {
+  const p = usePal();
+  const dots = useRef([]);
+  // stars breathe out of step; ten updates a second, a few pixels each
+  const last = useRef(0);
+  useLoop((t) => {
+    if (t - last.current < 0.1 || !p.stars) return;
+    last.current = t;
+    dots.current.forEach((d, i) => { if (d) set(d.id, 'opacity', 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.85 + i * 2.1))); });
+  });
   return (
-    <View style={{ gap: spacing.s }}>
-      <Label size={typeScale.title} weight={600}>{title}</Label>
-      <Label dim>{line}</Label>
-      {children}
+    <>
+      {p.sky ? <Image src={`asset:cleaner/${p.sky}.png`} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} />
+        : <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, background: p.bg }} />}
+      {p.stars && STARS.map(([x, y, s], i) => (
+        <View key={i} ref={(r) => { dots.current[i] = r; }} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, width: s, height: s, borderRadius: s / 2, backgroundColor: p.star, opacity: 0.7, pointerEvents: 'none' }} />
+      ))}
+    </>
+  );
+}
+
+// ---- a section's opening ----
+
+export function Hero({ art, title, line, features = [], children }) {
+  const p = usePal();
+  const img = useRef(null), outer = useRef(null), inner = useRef(null), sheen = useRef(null);
+  useLoop((t) => {
+    if (img.current) set(img.current.id, 'translateY', -7 + Math.sin(t * 1.05) * 7);
+    if (outer.current) set(outer.current.id, 'rotate', (t * 40) % 360);
+    if (inner.current) set(inner.current.id, 'rotate', -(t * 25.7) % 360);
+    if (sheen.current) { const x = (t % 5) / 5; set(sheen.current.id, 'translateX', x < 0.7 ? 0 : ((x - 0.7) / 0.3) * 420); }
+  });
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxl, paddingBottom: 96, minHeight: 0 }}>
+      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
+        {p.orbit ? <Image ref={outer} src={`asset:cleaner/orbit-outer-${p.orbit}.png`} style={{ position: 'absolute', left: 0, top: 0, width: 340, height: 340 }} /> : null}
+        {p.orbit ? <Image ref={inner} src={`asset:cleaner/orbit-inner-${p.orbit}.png`} style={{ position: 'absolute', left: 42, top: 42, width: 256, height: 256 }} /> : null}
+        {p.pane ? <View style={{ position: 'absolute', left: 40, top: 40, right: 40, bottom: 40, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 30px 60px rgba(90,60,170,0.25)', transform: 'rotate(-6deg)', overflow: 'hidden' }}>
+          <View ref={sheen} style={{ position: 'absolute', top: -60, bottom: -60, left: -90, width: 70, backgroundColor: 'rgba(255,255,255,0.75)', transform: 'rotate(18deg)' }} />
+        </View> : null}
+        <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={{ width: 262, height: 250 }} />
+      </View>
+      <Enter style={{ flex: 1, minWidth: 0, gap: spacing.s }} y={14} x={0} ms={500}>
+        <Label size={40} weight={300}>{title}</Label>
+        <Label size={15} dim>{line}</Label>
+        <View style={{ gap: spacing.m, marginTop: spacing.m }}>
+          {features.map(([tile, text]) => (
+            <View key={text} style={{ flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
+              <Tile name={tile} size={30} />
+              <View style={{ flex: 1, minWidth: 0 }}><Label size={15} weight={600}>{text}</Label></View>
+            </View>
+          ))}
+        </View>
+        {children}
+      </Enter>
+    </View>
+  );
+}
+
+// The large round button at the bottom edge: its glow breathes and its ring pulses.
+export function Orb({ label, onClick, disabled }) {
+  const p = usePal();
+  const glow = useRef(null), ring = useRef(null), press = useRef(null);
+  useLoop((t) => {
+    const b = 0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5;
+    if (glow.current) { const s = 1 + b * 0.16; set(glow.current.id, 'opacity', 0.35 + b * 0.5); set(glow.current.id, 'scaleX', s); set(glow.current.id, 'scaleY', s); }
+    if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.55; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
+  });
+  const hit = () => { if (press.current) tween(press.current, { scaleX: [0.95, 1], scaleY: [0.95, 1] }, { ms: 240 }); if (onClick) onClick(); };
+  const SIZE = 96;
+  return (
+    <View style={{ position: 'absolute', left: '50%', marginLeft: -80, bottom: 16, width: 160, height: 112, alignItems: 'center', justifyContent: 'center', direction: 'ltr', opacity: disabled ? 0.55 : 1 }}>
+      <View ref={glow} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, opacity: 0.5, boxShadow: `0 0 44px 14px ${p.glow}` }} />
+      <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />
+      <View ref={press} onClick={disabled ? undefined : hit} style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, alignItems: 'center', justifyContent: 'center',
+        border: `3px solid ${p.ringLine}`, background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` }}>
+        <Text style={{ fontSize: label && label.length > 9 ? typeScale.body : 15, fontWeight: 600, color: p.btnText, textAlign: 'center', paddingHorizontal: 6 }}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+// The ring while working: a conic bar in an Image (the engine has no conic gradient), only with a known total,
+// and a fast spinner. With no total, only the spinner turns and the middle shows real counters.
+const RING = 240;
+const angles = (() => {
+  let a = null;
+  return () => {
+    if (a) return a;
+    a = new Float32Array(RING * RING);
+    for (let y = 0; y < RING; y++) for (let x = 0; x < RING; x++) {
+      const dx = x + 0.5 - RING / 2, dy = y + 0.5 - RING / 2, r = Math.hypot(dx, dy);
+      a[y * RING + x] = r > RING / 2 || r < RING / 2 - 10 ? -1 : ((Math.atan2(dx, -dy) / (Math.PI * 2) + 1) % 1);
+    }
+    return a;
+  };
+})();
+const hex = (s) => { const n = parseInt(s.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+
+export function ProgressRing({ progress, big, small, under }) {
+  const p = usePal();
+  const spin = useRef(null);
+  useLoop((t) => { if (spin.current) set(spin.current.id, 'rotate', (t / 1.4 * 360) % 360); });
+  const pixels = useMemo(() => {
+    const a = angles(), data = new Uint8Array(RING * RING * 4), c = hex(p.accent);
+    const known = progress != null;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] < 0) continue;
+      const on = known && a[i] <= progress, o = i * 4;
+      data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = on ? 255 : 46;
+    }
+    return { width: RING, height: RING, data };
+  }, [progress == null ? -1 : Math.round(progress * 200), p]);
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.m, paddingBottom: 96 }}>
+      <View style={{ width: RING, height: RING, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
+        <Image pixels={pixels} style={{ position: 'absolute', left: 0, top: 0, width: RING, height: RING }} />
+        <Image ref={spin} src="asset:cleaner/ring.png" style={{ position: 'absolute', left: 24, top: 24, width: RING - 48, height: RING - 48 }} />
+        <Label size={36} weight={300}>{big}</Label>
+        <Label size={typeScale.callout} dim>{small}</Label>
+      </View>
+      {under}
     </View>
   );
 }
 
 // A long list drawn a window at a time: fetch(offset, limit) → { items, total }; a few dozen views at most.
 export function PagedList({ fetch, rowH = 34, render, reset, style }) {
-  const th = useTheme();
-  const box = useRef(null);
-  const [h, setH] = useState(520);          // rows drawn; a box that reports no layout still shows a full window of them
+  const p = usePal();
   const [y, setY] = useState(0);
   const st = useRef({ pages: new Map(), total: -1 });
-  const PAGE = 100;
-  const load = (p) => {
-    if (st.current.pages.has(p)) return st.current.pages.get(p);
-    const r = fetch(p * PAGE, PAGE);
-    st.current.pages.set(p, r.items);
+  const PAGE = 100, h = 520;                // rows drawn past the box are clipped
+  const load = (n) => {
+    if (st.current.pages.has(n)) return st.current.pages.get(n);
+    const r = fetch(n * PAGE, PAGE);
+    st.current.pages.set(n, r.items);
     st.current.total = r.total;
     return r.items;
   };
   const seen = useRef(reset);
   if (seen.current !== reset) { seen.current = reset; st.current = { pages: new Map(), total: -1 }; }
   useEffect(() => { setY(0); }, [reset]);
-  useEffect(() => {
-    const id = setTimeout(() => { if (box.current) { const v = lord.getLayout(box.current.id)[3]; if (v > 0 && Math.abs(v - h) > 1) setH(v); } }, 20);
-    return () => clearTimeout(id);
-  });
   if (st.current.total < 0) load(0);
   const total = Math.max(0, st.current.total), full = total * rowH, max = Math.max(0, full - 200), top = Math.min(y, max);
   const first = Math.max(0, Math.floor(top / rowH) - 1), last = Math.min(total, Math.ceil((top + h) / rowH) + 1);
@@ -82,11 +308,11 @@ export function PagedList({ fetch, rowH = 34, render, reset, style }) {
     const it = load(Math.floor(i / PAGE))[i % PAGE];
     if (it) rows.push(render(it, i));
   }
-  const bar = full > h ? Math.max(28, (h * h) / full) : 0;
+  const bar = full > 400 ? Math.max(28, 400 * (400 / full)) : 0;
   return (
-    <View ref={box} onWheel={(e) => setY(Math.max(0, Math.min(max, top + e.deltaY)))} style={{ flex: 1, minHeight: 0, overflow: 'hidden', ...style }}>
+    <View onWheel={(e) => setY(Math.max(0, Math.min(max, top + e.deltaY)))} style={{ flex: 1, minHeight: 0, overflow: 'hidden', ...style }}>
       <View style={{ position: 'absolute', left: 0, right: bar ? 10 : 0, top: first * rowH - top }}>{rows}</View>
-      {bar ? <View style={{ position: 'absolute', end: 2, width: 6, borderRadius: 3, height: bar, top: (h - bar) * (top / (max || 1)), backgroundColor: th.textDim }} /> : null}
+      {bar ? <View style={{ position: 'absolute', end: 2, width: 5, borderRadius: 3, height: bar, top: (400 - bar) * (top / (max || 1)), backgroundColor: p.sub, opacity: 0.6 }} /> : null}
     </View>
   );
 }

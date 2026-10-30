@@ -3,8 +3,9 @@
   "version": "0.8.7",
   "name": "Cleaner",
   "description": "Finds regenerable files, shows what they use and moves what you choose to the Trash",
-  "size": [980, 660],
-  "minSize": [760, 500],
+  "size": [1100, 700],
+  "minSize": [880, 600],
+  "ownFrame": true,
   "dock": false,
   "permissions": ["fs:home"],
   "category": "System"

@@ -67,6 +67,8 @@ static const char *limit_hit = "";
 static int stop;
 static const char *exclude[CLEAN_MAX_EXCLUDE + 1];
 
+static char now_path[CLEAN_PATH_MAX + 1];         /* the folder being read, for the progress line */
+static int now_root;
 static JBuf items, nodes;
 static int nitems, nnodes;
 static double last_flush;
@@ -90,7 +92,9 @@ static void limit(const char *what) { if (!limit_hit[0]) limit_hit = what; }
 static void flush_batch(int group) {
     JBuf b;
     jb_init(&b);
-    jb_printf(&b, "{\"seen\":%ld,\"dirs\":%ld,\"hashed\":%ld,\"group\":%s,\"items\":[", seen, dirs, hashed, group ? "true" : "false");
+    jb_printf(&b, "{\"seen\":%ld,\"dirs\":%ld,\"hashed\":%ld,\"group\":%s,\"r\":%d,\"now\":", seen, dirs, hashed, group ? "true" : "false", now_root);
+    jb_str(&b, now_path);
+    jb_raw(&b, ",\"items\":[");
     if (nitems) jb_raw(&b, items.p);
     jb_raw(&b, "],\"nodes\":[");
     if (nnodes) jb_raw(&b, nodes.p);
@@ -202,6 +206,8 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
     DIR *d = fdopendir(fd);
     if (!d) { close(fd); nunread++; return; }
     dirs++;
+    snprintf(now_path, sizeof now_path, "%s", rel);
+    now_root = r->index;
     Ag here = { 0, 0, 0 };
     for (;;) {
         errno = 0;
@@ -290,6 +296,8 @@ static int by_hash(const void *a, const void *b) {
 
 /* the same object the walk saw, read-only; -1 otherwise */
 static int open_file(const File *f, const Root *list) {
+    snprintf(now_path, sizeof now_path, "%s", f->rel);
+    now_root = f->root;
     int fd = clean_open(list[f->root].fd, f->rel, O_RDONLY | O_NONBLOCK);
     if (fd < 0) return -1;
     struct stat st;

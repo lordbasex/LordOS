@@ -1,6 +1,6 @@
 # Cleaner: architecture
 
-**Status: design for 0.8.7, with its first slice built (`lord-clean`, one rule, plan and execution to the Trash, Overview).**
+**Status: design for 0.8.7, with Phase 1 built (`CLEANER-ROADMAP.md`).**
 Checked against the code on branch `v087` on 2026-10-30. Each feature's real state lives in `CLEANER-ROADMAP.md`; a line
 here is a plan, not a claim.
 
@@ -113,8 +113,7 @@ Other rules (`review`) use the Trash.
 
 ## Security
 
-`CLEANER-SECURITY.md` will hold the full model. The fixed points: read-only scans, no shell or `system()`, no root in
-Phase 1, nothing leaves the machine, and when something can't be shown to be safe to remove, it is shown and not offered.
+`CLEANER-SECURITY.md` holds the full model. The fixed points: read-only scans, no shell or `system()`, root only through closed admin actions (approved 2026-10-30), nothing leaves the machine, and when something can't be shown to be safe to remove, it is shown and not offered.
 
 Tests that delete run only in throwaway folders, never in a real home folder.
 
@@ -136,8 +135,7 @@ the copy being kept confirms it. At least one independent copy always stays, and
 
 ## Storage map
 
-One scan builds a bounded tree, drawn three ways: a directory tree, a treemap (squarified, drawn into an `Image`, hit
-tested in JS, small files grouped) and a summary by type. Selecting a rectangle does nothing but select it.
+One scan builds a bounded tree, drawn three ways: a directory tree, a treemap (squarified, up to 28 views a level so areas can rise in, the rest grouped) and a summary by type. Selecting a rectangle does nothing but select it.
 
 ## Phases
 

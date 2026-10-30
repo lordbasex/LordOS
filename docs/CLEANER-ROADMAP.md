@@ -14,51 +14,35 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 
 | Feature | State | Notes |
 |---|---|---|
-| `lord-clean` scanner | Built | Sandboxed, read-only; `openat2` and `statx`; bounded by entries (200,000), depth (32) and path length (1,024 bytes). Refuses to run without Landlock |
-| Cancel | Built | Kills the helper; a cancelled or failed scan offers nothing |
-| Compiled rule table | Built | Seven rules, validated by a test |
-| `lord.clean` | Built | `start`, `poll`, `cancel`, `results`, `plan`, `execute`, `status`. No history |
-| Plan in C with expiry | Built | Ten minutes, runs once, checked on a thread; JS holds a plan id only |
-| Execution to the Trash | Built | Reopens each object from its root; per-item result; a name swapped at the last moment is put back |
-| Hard links counted once | Built | Within one scan. A file with a link outside the scan estimates nothing freed |
-| Free space measured after | Built | Before and after the execution. Moving to the Trash doesn't free space and the app says so |
-| Overview section | Partly | Scan, counters, progress, list, selection, confirmation, result per item. See "Tested" |
-| en, es, pt | Built | `cleaner.json`, `apps.json` and the `clean.*` codes in `errors.json` |
+| `lord-clean` scanner | Built | Rules, tree and duplicates modes |
+| Compiled rule table | Built | 41 rules; `CLEANER.md` lists them |
+| `lord.clean` | Built | No history of paths, by design |
+| Plan in C with expiry | Built | Ten minutes, runs once |
+| Execution to the Trash | Built | Restore per item in the result |
 | Real delete for caches | Built | Approved 2026-10-30. Regenerable rules only |
-| Cache and temporary rules | Built | Seven rules; `/tmp` is outside the design's home-relative roots and is not scanned |
-| Trash (size, emptying) | Built | The real empty, on a thread, confirmed as irreversible |
-| Large and old files | Not started | |
-| Duplicates | Not started | |
-| Storage map | Not started | |
-| History | Not started | |
-| Preferences | Not started | |
-| `CLEANER-SECURITY.md` | Not started | |
-
-## Phases 2 and 3
-
-Nothing is started: apps and their leftovers, the performance page, similar images, developer and AI caches, privacy
-recommendations, the optional scanner, configuration audit, browser, mail and cloud modules, scheduled scans.
+| Trash (size, emptying) | Built | The real empty, on a thread |
+| Large and old files | Built | Files of at least 1 MiB; 50,000 at most |
+| Storage map | Built | Up to 100,000 folders, 5,000,000 entries; 28 areas per level |
+| Duplicates | Built | 1,024 files shown per group |
+| History | Built | Counts and sizes, 100 entries |
+| Preferences | Built | Exclusions, threshold, look, item by the clock |
+| Item by the clock and panel | Built | Still item; reads only while open |
+| Looks | Built | Noche, Aurora, Cristal |
+| System files | Built | Three closed admin actions, not run on the VM |
+| Status word: updates | Partly | The rule exists; the panel doesn't read the update state |
+| Translated Downloads folders | Not started | Only `Downloads` is covered |
+| Old kernels | Not started | Goes through `lord.pkg.plan`, never custom logic |
 
 ## Limits of what exists
 
-- A scan reads one root only, so a hard link's other location is found only through its link count.
-- A candidate is a regular file. Empty folders left behind in the root stay there.
+- A hard link's other location is found only through its link count.
+- A candidate is a regular file, or a whole folder for a model. Empty folders left behind stay.
 - A name that isn't valid UTF-8 or holds control characters is never offered, and marks the scan incomplete.
-- A root that is a symbolic link or a mount is not read, and marks the scan incomplete: someone with `~/.cache` on another
-  disk gets nothing from this rule.
-- The list shows 200 rows at a time; "Select all" takes every page.
-- The Trash is the home folder's. The rule's root must be on the same disk as the home folder, or the item ends as
-  *unsupported*.
+- A root that is a symbolic link or a mount is not read: someone with `~/.cache` on another disk gets nothing from those rules.
+- Lists draw a fixed window of rows and don't yet know the box's real height, so the last screenful of a long list needs a little extra scrolling room.
+- A `.deb` cache is often empty on LordOS: the package engine deletes its own downloads.
 - Closing the app cancels a running job and drops its results.
 
 ## Tested
 
-See `CHANGELOG.md` for the tests run at each step. Automated: `build/clean-test` (`server/tests/clean_test.c`), in
-throwaway folders under `/tmp` only, against the real `lord-clean`.
-
-Seen on screen on VM 116 (2026-10-30), in an isolated headless session with a throwaway home folder: opening from Search,
-Scan, the list, selecting two items, the confirmation, the move, the result per item and the Trash on disk. In that session
-Landlock and seccomp were active in the helper and the `lordos-cleaner` scope was refused, as no `lord-sessiond` ran it.
-
-Not tested: entering that scope under `lord-sessiond`, a real installed session, the Raspberry Pi, right-to-left layout, Spanish
-and Portuguese on screen, themes other than the default, more than a few thousand files, and a package built by `mkdeb.sh`.
+See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root.

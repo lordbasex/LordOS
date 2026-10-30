@@ -1,10 +1,10 @@
 // Storage: a volume's bounded tree, drawn as a squarified treemap in an Image, a folder tree with logical and
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
-import { View, Image, cleaner, useAppWindow, useStore, windows, wm, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
+import { View, cleaner, useAppWindow, useStore, windows, wm, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList } from './ui.jsx';
 
-const PALETTE = [[180, 108, 255], [94, 234, 212], [255, 209, 102], [125, 211, 252], [253, 164, 175], [190, 242, 100], [124, 92, 255], [255, 255, 255]];
+const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
 
 // squarified layout of values (largest first) in x, y, w, h
 export function squarify(items, x, y, w, h) {
@@ -38,50 +38,33 @@ export function squarify(items, x, y, w, h) {
   return out;
 }
 
-function paint(rects, W, H, sel) {
-  const data = new Uint8Array(W * H * 4);
-  rects.forEach((r, n) => {
-    const c = PALETTE[n % PALETTE.length];
-    const x0 = Math.round(r.x) + 1, y0 = Math.round(r.y) + 1, x1 = Math.round(r.x + r.w) - 1, y1 = Math.round(r.y + r.h) - 1;
-    const on = sel === r.item.id;
-    for (let y = Math.max(0, y0); y < Math.min(H, y1); y++) {
-      const shade = 1 - ((y - y0) / Math.max(1, y1 - y0)) * 0.28;
-      const a = on ? 255 : 205;
-      let o = (y * W + Math.max(0, x0)) * 4;
-      for (let x = Math.max(0, x0); x < Math.min(W, x1); x++, o += 4) { data[o] = c[0] * shade; data[o + 1] = c[1] * shade; data[o + 2] = c[2] * shade; data[o + 3] = a; }
-    }
-  });
-  return { width: W, height: H, data };
-}
-
+// One view per area, 28 at most: the rest are shown together, so areas can rise in and stay crisp.
 function Treemap({ data, onOpen }) {
   const [sel, setSel] = useState(null);
-  // the map's size follows the window (sidebar, padding, title, the lines around the map)
   const { id } = useAppWindow() || {};
   const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
   const geo = win ? wm.frame(win) : null;
-  const size = useMemo(() => (geo ? { w: Math.max(200, Math.round(geo.w - 222)), h: Math.max(120, Math.round(geo.h - 240)) } : { w: 0, h: 0 }), [geo && geo.w, geo && geo.h]);
+  const W = geo ? Math.max(240, Math.round(geo.w - 236 - 76)) : 0, H = geo ? Math.max(160, Math.round(geo.h - 194)) : 0;
   const rects = useMemo(() => {
-    const items = data.children.filter((c) => c.allocated > 0).slice(0, 120).map((c) => ({ ...c, v: c.allocated }));
+    const kids = data.children.filter((c) => c.allocated > 0);
+    const items = kids.slice(0, 26).map((c) => ({ ...c, v: c.allocated }));
+    const rest = kids.slice(26).reduce((a, c) => a + c.allocated, 0);
+    if (rest > 0) items.push({ id: -2, name: tr('cleaner.map.others'), v: rest, allocated: rest, logical: rest });
     if (data.ownAllocated > 0) items.push({ id: -1, name: tr('cleaner.map.looseFiles'), v: data.ownAllocated, allocated: data.ownAllocated, logical: data.ownLogical });
     items.sort((a, b) => b.v - a.v);
-    return squarify(items, 0, 0, size.w, size.h);
-  }, [data, size]);
-  const pixels = useMemo(() => (size.w ? paint(rects, size.w, size.h, sel && sel.id) : null), [rects, size, sel]);
-  const click = (e) => {
-    const { x, y } = e.local(e.currentTarget);
-    const hit = rects.find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
-    setSel(hit ? hit.item : null);
-  };
+    return squarify(items, 0, 0, W, H);
+  }, [data, W, H]);
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
-      <View onClick={click} style={{ width: size.w, height: size.h, borderRadius: 12, overflow: 'hidden', direction: 'ltr' }}>
-        {pixels ? <Image pixels={pixels} style={{ position: 'absolute', left: 0, top: 0, width: size.w, height: size.h }} /> : null}
-        {rects.filter((r) => r.w > 90 && r.h > 34).slice(0, 18).map((r) => (
-          <View key={r.item.id} style={{ position: 'absolute', left: r.x + 8, top: r.y + 6, width: r.w - 14, pointerEvents: 'none' }}>
-            <Label size={typeScale.callout} weight={600} lines={1} style={{ color: '#12122A' }}>{r.item.name}</Label>
-            <Label size={typeScale.caption} lines={1} style={{ color: '#12122A' }}>{formatBytes(r.item.allocated)}</Label>
-          </View>
+      <View style={{ width: W, height: H, borderRadius: 16, overflow: 'hidden', direction: 'ltr' }}>
+        {rects.map((r, i) => (
+          <Enter key={r.item.id} delay={Math.min(i * 40, 360)} x={0} y={14} ms={500} style={{ position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, padding: 1 }}>
+            <View onClick={() => setSel(r.item)} style={{ flex: 1, borderRadius: 12, backgroundColor: COLOURS[i % COLOURS.length], padding: r.w > 70 && r.h > 34 ? 10 : 0, overflow: 'hidden',
+              opacity: sel && sel.id !== r.item.id ? 0.7 : 1, border: sel && sel.id === r.item.id ? '2px solid #ffffff' : 'none' }}>
+              {r.w > 70 && r.h > 34 ? <Label size={typeScale.callout} weight={600} lines={1} style={{ color: '#ffffff' }}>{r.item.name}</Label> : null}
+              {r.w > 70 && r.h > 50 ? <Label size={typeScale.caption} lines={1} style={{ color: '#ffffff' }}>{formatBytes(r.item.allocated)}</Label> : null}
+            </View>
+          </Enter>
         ))}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, height: 28 }}>
@@ -142,7 +125,7 @@ export function VolumeChips({ volumes, value, onChange }) {
   return (
     <View style={{ gap: spacing.xs, marginTop: spacing.s }}>
       {volumes.map((v) => (
-        <Glass key={v.id} lift onClick={() => onChange(v.id)} style={{ padding: spacing.s, gap: 4, opacity: value === v.id ? 1 : 0.6 }}>
+        <Glass key={v.id} lift onClick={() => onChange(v.id)} style={{ padding: spacing.s, gap: 4, opacity: value === v.id ? 1 : 0.65 }}>
           <View style={{ flexDirection: 'row', gap: spacing.s }}>
             <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} weight={600} lines={1}>{v.id === 'home' ? tr('cleaner.map.home') : v.id === 'root' ? tr('cleaner.map.root') : v.path}</Label></View>
             <Label dim size={typeScale.caption}>{tr('cleaner.disk.free', { size: formatBytes(v.free) })}</Label>
@@ -156,13 +139,13 @@ export function VolumeChips({ volumes, value, onChange }) {
 
 export function StorageHero({ volumes, volume, setVolume }) {
   return (
-    <Hero title={tr('cleaner.hero.storage.title')} line={tr('cleaner.hero.storage.line')}>
+    <Hero art="storage" title={tr('cleaner.hero.storage.title')} line={tr('cleaner.hero.storage.line')} features={[['storage', tr('cleaner.hero.storage.f1')], ['settings', tr('cleaner.hero.storage.f2')]]}>
       <VolumeChips volumes={volumes} value={volume} onChange={setVolume} />
     </Hero>
   );
 }
 
-export function StorageView({ scan }) {
+export function StorageView({ scan, onScan }) {
   const [node, setNode] = useState(0);
   const [view, setView] = useState('map');
   useEffect(() => setNode(0), [scan.id]);
@@ -172,9 +155,10 @@ export function StorageView({ scan }) {
     <Enter style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.s }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Label size={typeScale.title} weight={600} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : data.base}</Label>
+          <Label size={32} weight={300} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : data.base}</Label>
           <Label dim size={typeScale.callout}>{tr('cleaner.map.totals', { logical: formatBytes(data.node.logical), allocated: formatBytes(data.node.allocated), files: formatNumber(data.node.files) })}</Label>
         </View>
+        <GlassButton small label={tr('cleaner.scan')} onClick={onScan} />
         {node ? <GlassButton small label={tr('cleaner.map.up')} onClick={() => setNode(data.node.up)} /> : null}
         <GlassButton small label={tr('cleaner.show')} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${data.trail.map((t) => t.name).join('/')}/.`)} />
         {[['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ['types', 'cleaner.map.viewTypes']].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
