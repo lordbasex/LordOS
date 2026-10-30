@@ -106,12 +106,16 @@ static int bench_print(const char *json) {
     return leaks;
 }
 
+/* a Full run's sustained load, the same 3 minutes as System Information's Full (SUSTAINED_S in
+   apps/sysinfo/performance.jsx), so a terminal run and the app's are the same test */
+#define CLI_SUSTAINED_S 180
+
 static int bench(int full, int json) {
     struct sigaction sa = { 0 };
     sa.sa_handler = on_signal;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-    if (lbrun_start(full ? "full" : "quick", 0, "{\"cli\":true}")) {
+    if (lbrun_start(full ? "full" : "quick", full ? CLI_SUSTAINED_S : 0, "{\"cli\":true}")) {
         fprintf(stderr, "lordos-sysreport: LordBench did not start: another run is going on, or the lord-bench next to this program is missing or writable by others\n");
         return 1;
     }

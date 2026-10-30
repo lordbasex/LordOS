@@ -138,11 +138,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       workloads, from a later Full run (2026-10-28): layout and paint 37.0 fps on one core and 39.9 fps with the
       paint threads (a frame is about 28 ms, almost all of it paint: the layout of the 529 nodes takes 0.15 ms, and
       only big row-local fills, shadows and blits are split into bands); shaping 619 runs/s on one core and 3,595 on
-      eight. A Quick run from a terminal now takes 46 s. The Pi 5 has not been measured with them yet (its reference lists them as not measured).
+      eight. A Quick run from a terminal now takes 46 s.
     - Pi 5: SHA-256 933/3,693 MB/s, matrix product 2.26/5.99 GFLOP/s, memory copy 7.6 GB/s, latency 115 ns; V3D scene
       795 fps, fill 2,455 Mpixel/s; SD card 66 MB/s write, 91 MB/s read; 3 minutes sustained at 5.86 → 5.88 GFLOP/s
       with the fan, 55.6 °C at most; software decoding H.264 1080p 258 fps, AV1 1080p 159 fps, H.264 4K 55 fps,
-      HEVC 4K 57 fps; H.264 encoder 75 fps. Quick takes 34 s, Full 339 s.
+      HEVC 4K 57 fps; H.264 encoder 75 fps. Quick takes 34 s, Full 339 s. The interface workloads, from a later Full
+      run (2026-10-30, from a terminal over SSH without the monitor, the arm64 build of main with its helpers in a
+      temporary folder, the LordOS kernel 6.18.57-lordos.3, `ondemand`, 180 s sustained, 37.0 → 49.6 °C and 59.0 °C at
+      most, under-voltage alarm 0, all six sandbox tries refused, 358 s): layout and paint 39.22 fps on one core and
+      45.23 fps with the paint threads; shaping 628.3 runs/s on one core and 2,514.0 on four, with `"lordos":
+      "0.8.5-beta"`; its `notMeasured` list is gone. A second Full run without the sustained part (178 s) gave 39.37,
+      45.28, 628.8 and 2,513.4 (within 0.4 %), and the two Quick runs of 2026-10-29 were within 0.6 %. The rest of
+      that run was within 3.2 % of the 2026-10-27 reference except the matrix product on four cores and the sustained
+      load (+12 %: 6.72 and 6.55 GFLOP/s, same workload code, cause not looked for), random 4K reads (−10 %), xz (−4 %)
+      and the GPU upload (−4 to −5 %); the reference keeps its 2026-10-27 values for those (`docs/BENCHMARK.md`).
   - **Desktop impact measured** on the Pi 5 with a 1920×1080 60 Hz monitor and GPU composition: alone 59.4 fps, frame
     build 10.9 ms median and 13.0 ms p99, 1.0 % late; under the low-priority all-core load 24.0 fps, 20.1/29.3 ms,
     96.5 % late. A stability problem found by LordBench; its cause and the fix are under Fixed ("The desktop under
@@ -772,6 +781,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ones are not. Nothing else changes: the key is still ignored the same way (`docs/THEMES-GUIDE.md`).
 
 ### Fixed
+
+- **`lordos-sysreport bench --full` ran no sustained load** (2026-10-30; `server/src/sysreport/cli.c`): it passed
+  no sustained time to `lbrun_start`, so the sustained part was skipped (`"skipped": {"sustained.start": "mode"}`) and
+  a Full run from a terminal took 178 s on the Pi 5, although its help says 3 minutes of sustained load. It now passes
+  `CLI_SUSTAINED_S`, 180 s, the same as System Information's Full (`SUSTAINED_S` in `apps/sysinfo/performance.jsx`);
+  checked on the Pi 5 (18 samples over 180 s, 358 s in all). On VM 116: the build with no warnings, `make -C server
+  test` 23 passed, 0 failed, 13 skipped (`sysreport-test` 790 ok); `sysinfo-perf-test` 62 ok with the Pi 5's new
+  reference values.
 
 - **System Information's Raspberry Pi power and throttling rows** (2026-10-29; `server/src/hw/rpifw.c`,
   `sysreport/sysreport.c`, `apps/sysinfo`; tested on fake sysfs trees and VM 116; the shared reader ran on the Pi 5 in

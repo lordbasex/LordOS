@@ -430,9 +430,9 @@ development package.
   conditions, the boot times per version, and **Save to Documents** (the JSON). Nothing is sent.
 - **Reference machines** (`apps/sysinfo/references.js`): VM 116 and the Raspberry Pi 5 16 GB, each a Full run
   copied from the `lordbench.json` it wrote (numbers below). A measurement added after a machine's run is listed in
-  its `notMeasured` until it is measured again: VM 116's layout, paint and shaping numbers come from a later Full
-  run; the Pi 5's were measured only in Quick runs from a terminal (below), so its reference still lists them as not
-  measured. The modest x86 PC is added when measured (moved to 0.8.7 on 2026-10-29).
+  its `notMeasured` until it is measured again: the layout, paint and shaping numbers of both come from a later Full
+  run (VM 116 on 2026-10-28, the Pi 5 on 2026-10-30, below), each with the LordOS version it reported. The modest x86
+  PC is added when measured (moved to 0.8.7 on 2026-10-29).
 
 VM 116, Full with 30 s sustained, LordBench 1 (2026-10-27, 159 s): SHA-256 166 MB/s on one core and 984 MB/s on
 eight; matrix product 3.3 and 19.9 GFLOP/s; xz 60 and 363 MB/s; QuickJS 57 and 336 runs/s; memory copy
@@ -471,7 +471,24 @@ Raspberry Pi 5 16 GB, the interface workloads, two Quick runs from a terminal (`
 --json`, the arm64 build of the `perf-frame` branch, 2026-10-29; 39 s each, 36.4 → 40.8 °C, the `ondemand` governor,
 4 threads): layout and paint 39.31–39.37 fps on one core and 45.38–45.41 fps with the paint threads; shaping
 630.0–632.3 runs/s on one core and 2,521.7–2,526.7 runs/s on four (4.0×). The Pi's paint threads gain about 15 %
-(VM 116: 8 %). These are not in `references.js` yet: a reference comes from a Full run.
+(VM 116: 8 %). These are not in `references.js`: a reference comes from a Full run (next paragraph).
+
+Raspberry Pi 5 16 GB, the interface workloads for its reference, two Full runs from a terminal over SSH, without the
+monitor (`lordos-sysreport bench --full --json`, the arm64 build of main at 601b5d5 run from a folder in the home
+with `lord-bench` and `lord-media` next to it, not the installed 0.8.5 package's; the LordOS kernel
+6.18.57-lordos.3, the `ondemand` governor, 4 threads, the fan on its header; 2026-10-30; the load average 0.00 and
+35.3 °C before, the quiet check 0.4–0.5 % busy; the under-voltage alarm read 0 throughout, no throttling). The
+first run took 178 s and had no sustained part: `lordos-sysreport bench --full` passed no sustained time, although
+its help says 3 minutes, so it was fixed to the app's 180 s (`CLI_SUSTAINED_S` in `sysreport/cli.c`) and run
+again: 358 s, 37.0 → 49.6 °C, 59.0 °C at most. The second run is the reference: layout and paint 39.22 fps on one
+core (spread 0.06) and 45.23 fps with the paint threads (spread 0.53); shaping 628.3 runs/s on one core and 2,514.0
+on four (4.0×). The first run gave 39.37, 45.28, 628.8 and 2,513.4: within 0.4 % of it, and within 0.6 % of the two
+Quick runs above. The sandbox self-test refused all six tries in both. Its other measurements were within 3.2 % of
+the 2026-10-27 run except the matrix product on four cores, 6.72 instead of 5.99 GFLOP/s (+12 %, both runs), the
+sustained load with it, 6.55 → 6.56 instead of 5.86 → 5.88 GFLOP/s (+12 %; the same `lord-bench` workload code;
+the cause was not looked for), the random 4K reads, 2,429–2,437 instead of 2,692 (−10 %), the GPU upload, 3,687–3,738
+instead of 3,897 MB/s (−4 to −5 %), and xz, 64.0 and 244.0 instead of 67.0 and 254.0 MB/s (−4 %); the reference keeps the 2026-10-27 values for those, and adds only the four interface
+workloads, with `"lordos": "0.8.5-beta"`, the version the run reported.
 
 Desktop impact:
 
@@ -769,10 +786,11 @@ then shows it). It is installed as `/usr/lib/lordos/bin/lordos-sysreport` with `
 g-w`). Without a session the helpers get no cgroup scope, and the desktop test needs a session. One line per
 measurement (or the JSON with `--json`); exit 0 when the run finished, 1 when it didn't, and 3 when it finished
 but the helper-sandbox self-test let a try through or one is missing (text output only; with `--json` the exit
-code is 0 or 1 and the tries are in `sandboxTries`). On VM 116 a quick run took 46 s.
+code is 0 or 1 and the tries are in `sandboxTries`). On VM 116 a quick run took 46 s. `--full` runs the same 3 minutes of sustained load as the app's Full
+(`CLI_SUSTAINED_S`, 180 s; until 2026-10-30 it passed none and skipped that part); on the Pi 5 it took 358 s.
 
-Not built yet: detecting the Pi's firmware throttling during a run on kernels that don't expose it; and a Full run
-of the Pi 5 with the layout, paint and shaping workloads for its reference (two Quick runs measured them, above).
+Not built yet: detecting the Pi's firmware throttling during a run on kernels that don't expose it. The Pi 5's
+reference has the layout, paint and shaping workloads since a Full run on 2026-10-30 (above).
 Moved to 0.8.7 (decided by the maintainer on 2026-10-29; `ROADMAP.md`, "Release 0.8.7 (planned)"): hardware video
 decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`) and the x86 PC
 reference. Also moved to 0.8.7 (decided on 2026-10-30): GPU drag for the whole drag (step 12, also where the Dock or

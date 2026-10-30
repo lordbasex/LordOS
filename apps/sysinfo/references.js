@@ -51,7 +51,12 @@ export const REFERENCES = [
       'video.vp9.1080': { value: 204.453 }, 'video.av1.1080': { value: 159.402 },
       'video.h264.2160': { value: 55.007 }, 'video.hevc.2160': { value: 57.213 },
       'video.enc.h264': { value: 75.332 }, 'video.enc.vp8': { value: 54.526 },
+      // the layout, paint and shaping workloads, from a later Full run of the same board (2026-10-30, the arm64
+      // build of main from a terminal, 180 s sustained, ondemand governor, 37.0 -> 49.6 °C, 59 °C at most; a
+      // second Full run without the sustained part gave the same within 0.4 %). Compared only with results of the
+      // same LordOS version (perf.js ENGINE_IDS): measure them again for every release
+      'cpu.ui.1': { value: 39.2238, lordos: '0.8.5-beta' }, 'cpu.ui.n': { value: 45.2309, lordos: '0.8.5-beta' },
+      'cpu.shape.1': { value: 628.321, lordos: '0.8.5-beta' }, 'cpu.shape.n': { value: 2514.02, lordos: '0.8.5-beta' },
     },
-    notMeasured: ['cpu.ui.1', 'cpu.ui.n', 'cpu.shape.1', 'cpu.shape.n'],
   },
 ];

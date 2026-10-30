@@ -559,9 +559,12 @@ LordBench and a desktop that stays smooth under load. Each item is described in 
   pointer-to-screen latency, the N-boot test, `lordos-sysreport bench` and the Pi 5 reference.
 - [x] LordOS's own interface work as workloads (`cpu.ui`, `cpu.shape`, fonts built into the helper) and the
   helper-sandbox self-test inside `lord-bench` (2026-10-28).
-- [ ] The interface workloads measured on the Pi 5 for its reference. *Two Quick runs from a terminal (2026-10-29):*
+- [x] The interface workloads measured on the Pi 5 for its reference. *Two Quick runs from a terminal (2026-10-29):*
   layout and paint 39.3–39.4 fps on one core, 45.4 fps with the paint threads; shaping 630–632 runs/s on one core,
-  2,522–2,527 on four (`BENCHMARK.md`); the reference waits for a Full run.
+  2,522–2,527 on four. *Full run (2026-10-30, over SSH without the monitor, `ondemand`, 180 s sustained, 37.0 → 49.6
+  °C):* 39.22 / 45.23 fps and 628.3 / 2,514.0 runs/s, now in `apps/sysinfo/references.js` (a second Full run without
+  the sustained part: within 0.4 %). That run found `lordos-sysreport bench --full` passed no sustained time; it now
+  runs the app's 180 s (`BENCHMARK.md`).
 - The x86 PC reference and hardware video decoding moved to 0.8.7 (decided by the maintainer on 2026-10-29;
   "Release 0.8.7 (planned)" below).
 - [x] Detecting the Pi 5 firmware's throttling. *Built (2026-10-28/29), checked on the Pi 5 on 2026-10-29:* the
@@ -789,9 +792,9 @@ load left for after 0.8.6:
   LordOS's own interface work as workloads (layout and paint of a fixed 1920×1080 scene with the engine's real
   code, one core and with the paint threads, and shaping fixed paragraphs in five scripts, with the fonts built
   into the helper; VM 116: 37.0 and 39.9 fps, 619 and 3,595 runs/s), and the helper-sandbox self-test inside
-  `lord-bench` (six tries that must fail, checked by the Stability verdict and `lordos-sysreport bench`). Left:
-  a Full run of the Pi 5 with the interface workloads for its reference
-  (two Quick runs measured them on 2026-10-29), and the rest of what it found on the Pi 5 (the desktop fell to 24 fps under load;
+  `lord-bench` (six tries that must fail, checked by the Stability verdict and `lordos-sysreport bench`). The Pi 5's
+  reference has the interface workloads since a Full run on 2026-10-30 (39.22 / 45.23 fps, 628.3 / 2,514.0 runs/s).
+  What it found on the Pi 5 under load (the desktop fell to 24 fps under load;
   the compositor's CPU weight and its real-time priority fix it on VM 116; on the Pi 5 with its monitor they take it
   to 29–30 fps; the frame-cost work cuts a drag frame's build under load to 12.9 ms and keeps 60 fps alone, but
   under load the frames still miss the refresh, at about 31 fps, now on the GPU's side (its time per frame 1.5 → 14–16
