@@ -474,7 +474,7 @@ setup_groups() {
         prev=$(state_get GROUPS_ADDED)
         state_set GROUPS_USER "$TARGET_USER"
         state_set GROUPS_ADDED "$(printf '%s %s' "$prev" "$added" | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/ $//')"
-        changed "user $TARGET_USER added to:$added (takes effect at the next login)"
+        changed "user $TARGET_USER added to:$added (takes effect after a reboot: the user's services keep their old groups across a logout)"
     else
         ok "user $TARGET_USER already has the groups LordOS uses"
     fi
