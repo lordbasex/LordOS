@@ -187,7 +187,7 @@ export function LargeList({ scan, prefs, selected, setSelected }) {
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
       <Label size={typeScale.title} weight={600}>{tr('cleaner.large.title')}</Label>
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
-        {[10, 100, 1024].map((m) => <Pill key={m} label={formatBytes(m * 1048576)} on={minMB === m} onClick={() => setMinMB(m)} />)}
+        {[1, 10, 100, 1024].map((m) => <Pill key={m} label={formatBytes(m * 1048576)} on={minMB === m} onClick={() => setMinMB(m)} />)}
         <View style={{ width: spacing.s }} />
         {[0, 180, 365, 730].map((d) => <Pill key={d} label={tr(d ? 'cleaner.large.older' : 'cleaner.large.anyAge', { count: d })} on={days === d} onClick={() => setDays(d)} />)}
       </View>

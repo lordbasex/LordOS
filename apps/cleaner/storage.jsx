@@ -1,7 +1,7 @@
 // Storage: a volume's bounded tree, drawn as a squarified treemap in an Image, a folder tree with logical and
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
-import { View, Image, cleaner, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Image, cleaner, useAppWindow, useStore, windows, wm, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
+import { useEffect, useMemo, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList } from './ui.jsx';
 
 const PALETTE = [[180, 108, 255], [94, 234, 212], [255, 209, 102], [125, 211, 252], [253, 164, 175], [190, 242, 100], [124, 92, 255], [255, 255, 255]];
@@ -39,13 +39,13 @@ export function squarify(items, x, y, w, h) {
 }
 
 function paint(rects, W, H, sel) {
-  const data = new Uint8ClampedArray(W * H * 4);
+  const data = new Uint8Array(W * H * 4);
   rects.forEach((r, n) => {
     const c = PALETTE[n % PALETTE.length];
     const x0 = Math.round(r.x) + 1, y0 = Math.round(r.y) + 1, x1 = Math.round(r.x + r.w) - 1, y1 = Math.round(r.y + r.h) - 1;
     const on = sel === r.item.id;
     for (let y = Math.max(0, y0); y < Math.min(H, y1); y++) {
-      const shade = 1.08 - ((y - y0) / Math.max(1, y1 - y0)) * 0.34;
+      const shade = 1 - ((y - y0) / Math.max(1, y1 - y0)) * 0.28;
       const a = on ? 255 : 205;
       let o = (y * W + Math.max(0, x0)) * 4;
       for (let x = Math.max(0, x0); x < Math.min(W, x1); x++, o += 4) { data[o] = c[0] * shade; data[o + 1] = c[1] * shade; data[o + 2] = c[2] * shade; data[o + 3] = a; }
@@ -55,17 +55,12 @@ function paint(rects, W, H, sel) {
 }
 
 function Treemap({ data, onOpen }) {
-  const box = useRef(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
   const [sel, setSel] = useState(null);
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (!box.current) return;
-      const [, , w, h] = lord.getLayout(box.current.id);
-      if (w > 0 && (Math.abs(w - size.w) > 2 || Math.abs(h - size.h) > 2)) setSize({ w: Math.round(w), h: Math.round(h) });
-    }, 30);
-    return () => clearTimeout(id);
-  });
+  // the map's size follows the window (sidebar, padding, title, the lines around the map)
+  const { id } = useAppWindow() || {};
+  const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
+  const geo = win ? wm.frame(win) : null;
+  const size = useMemo(() => (geo ? { w: Math.max(200, Math.round(geo.w - 222)), h: Math.max(120, Math.round(geo.h - 240)) } : { w: 0, h: 0 }), [geo && geo.w, geo && geo.h]);
   const rects = useMemo(() => {
     const items = data.children.filter((c) => c.allocated > 0).slice(0, 120).map((c) => ({ ...c, v: c.allocated }));
     if (data.ownAllocated > 0) items.push({ id: -1, name: tr('cleaner.map.looseFiles'), v: data.ownAllocated, allocated: data.ownAllocated, logical: data.ownLogical });
@@ -74,13 +69,13 @@ function Treemap({ data, onOpen }) {
   }, [data, size]);
   const pixels = useMemo(() => (size.w ? paint(rects, size.w, size.h, sel && sel.id) : null), [rects, size, sel]);
   const click = (e) => {
-    const [x, y] = lord.getLayout(box.current.id);
-    const hit = rects.find((r) => e.x - x >= r.x && e.x - x < r.x + r.w && e.y - y >= r.y && e.y - y < r.y + r.h);
+    const { x, y } = e.local(e.currentTarget);
+    const hit = rects.find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
     setSel(hit ? hit.item : null);
   };
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s }}>
-      <View ref={box} onClick={click} style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden', direction: 'ltr' }}>
+      <View onClick={click} style={{ width: size.w, height: size.h, borderRadius: 12, overflow: 'hidden', direction: 'ltr' }}>
         {pixels ? <Image pixels={pixels} style={{ position: 'absolute', left: 0, top: 0, width: size.w, height: size.h }} /> : null}
         {rects.filter((r) => r.w > 90 && r.h > 34).slice(0, 18).map((r) => (
           <View key={r.item.id} style={{ position: 'absolute', left: r.x + 8, top: r.y + 6, width: r.w - 14, pointerEvents: 'none' }}>

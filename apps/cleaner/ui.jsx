@@ -56,7 +56,7 @@ export function Hero({ title, line, children }) {
 export function PagedList({ fetch, rowH = 34, render, reset, style }) {
   const th = useTheme();
   const box = useRef(null);
-  const [h, setH] = useState(320);
+  const [h, setH] = useState(520);          // rows drawn; a box that reports no layout still shows a full window of them
   const [y, setY] = useState(0);
   const st = useRef({ pages: new Map(), total: -1 });
   const PAGE = 100;
@@ -75,7 +75,7 @@ export function PagedList({ fetch, rowH = 34, render, reset, style }) {
     return () => clearTimeout(id);
   });
   if (st.current.total < 0) load(0);
-  const total = Math.max(0, st.current.total), full = total * rowH, max = Math.max(0, full - h), top = Math.min(y, max);
+  const total = Math.max(0, st.current.total), full = total * rowH, max = Math.max(0, full - 200), top = Math.min(y, max);
   const first = Math.max(0, Math.floor(top / rowH) - 1), last = Math.min(total, Math.ceil((top + h) / rowH) + 1);
   const rows = [];
   for (let i = first; i < last; i++) {

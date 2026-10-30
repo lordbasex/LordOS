@@ -24,3 +24,7 @@ build/clean-test: $(CLEAN_TEST_SRC) $(wildcard src/clean/*.h) src/fsops.h build/
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -DCLEAN_TEST $(CFLAGS) $(WARN) -std=c11 -o $@ $(CLEAN_TEST_SRC) tests/clean_admin_stub.c -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+
+# times, memory and call costs on a throwaway folder: build/clean-bench <folder> (docs/CLEANER-TESTS.md)
+build/clean-bench: tests/clean_bench.c tests/clean_admin_stub.c src/clean/clean.c src/clean/cleanfs.c src/clean/rules.c src/clean/clean_admin.c src/doc/wire.c src/fsops.c src/sec/json.c build/lord-clean
+	$(CC) $(CPPFLAGS) -DCLEAN_TEST $(CFLAGS) $(WARN) -std=c11 -o $@ tests/clean_bench.c tests/clean_admin_stub.c src/clean/clean.c src/clean/cleanfs.c src/clean/rules.c src/clean/clean_admin.c src/doc/wire.c src/fsops.c src/sec/json.c -lm -lpthread
