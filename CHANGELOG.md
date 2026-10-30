@@ -98,7 +98,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     records the boot with its number in the test and, while boots are left, restarts 30 s later. The login screen
     shows the boot and the countdown with **Stop the test**, and a login stops it too. The count only goes down, a
     state older than 30 minutes is discarded, and the action is refused in the live session. The Boot time group shows
-    each version's latest test (median and range). Checked by unit tests; not yet run end to end on a machine.
+    each version's latest test (median and range). Checked by unit tests and by 3 boots in a row on the Pi 5
+    (2026-10-30; autologin, started from the state file, so the app's button and the login screen's countdown were not exercised).
   - **References:** VM 116 (8 vCPU Xeon Silver 4108, llvmpipe) and a **Raspberry Pi 5 16 GB** (SD card, V3D), each a
     real Full run (`apps/sysinfo/references.js`):
     - VM 116: SHA-256 166/984 MB/s (one core/all), matrix product 3.3/19.9 GFLOP/s, memory copy 20.0 GB/s; software

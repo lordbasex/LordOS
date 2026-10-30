@@ -768,9 +768,10 @@ session, the variables set in the session's environment; the results above):
 
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
 systemd-analyze gives 2.1 s kernel + 4.2 s userspace). Boots where the monitor was connected late took 61 and
-103 s, which is the wait for the monitor, not the boot. The N-boot test was checked by its unit tests
-(`tests/lordbench_test.c`: the state file's format, parsing, ownership, staleness and countdown) only;
-the measured Pi number is a single boot.
+103 s, which is the wait for the monitor, not the boot. The N-boot test has its unit tests (`tests/lordbench_test.c`: the state file's format, parsing, ownership, staleness
+and countdown) and one run on the Pi 5 (2026-10-30, 3 boots with autologin: 7.66, 7.71 and 7.63 s, restarting and
+removing its state file on its own). That run was started by writing the state file, so the app's button and the
+login screen's countdown and Stop were not exercised.
 
 The same Full run from System Information in VM 116's isolated headless session (3 minutes of sustained load;
 its home is on tmpfs, so the storage test measured memory and says so, ×24 the reference's virtio disk; this

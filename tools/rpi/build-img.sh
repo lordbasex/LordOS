@@ -197,7 +197,7 @@ else
     # ls is split on purpose (zero, one or two file names)
     # shellcheck disable=SC2046
     tar -C "$ROOT" --exclude=server/build --exclude=node_modules -cf - \
-        package.json README.md server third_party assets themes tools packaging \
+        package.json README.md server third_party assets themes tools packaging apt \
         $(cd "$ROOT" && ls code-manifest.json code-manifest.sig 2>/dev/null) | tar -C "$BR/src/LordOS" -xf -
     J=$(nproc)
     in_root "$BR" sh -c "cd /src/LordOS && make -C server -j$J GPU=1 RELEASE=${RELEASE:-0} && make -C server build/canvas-test" > "$WORK/build.log" 2>&1 || {

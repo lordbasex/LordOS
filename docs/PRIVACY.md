@@ -254,8 +254,8 @@ sandbox-test helper: 17/17   see "Helpers" below
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data
 (`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
-`lord-maild`, `lord-vault`, and since 0.8.5 the blocklist downloader `lord-fetch` and the package
-engine's TLS relay `lord-tls`) use
+`lord-maild`, `lord-vault`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
+engine's TLS relay `lord-tls`, and since 0.8.6 LordBench's `lord-bench`) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
 
 ```c
