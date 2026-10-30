@@ -2,7 +2,7 @@
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
 import { View, cleaner, useAppWindow, useStore, windows, wm, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, Tile, usePal } from './ui.jsx';
 
 const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
 
@@ -79,6 +79,54 @@ function Treemap({ data, onOpen }) {
   );
 }
 
+// ---- bubbles: the largest folders as glass circles, 14 at most, the rest together ----
+
+export function pack(items, W, H) {
+  const total = items.reduce((a, b) => a + b.v, 0) || 1;
+  for (let k = 0.62; k > 0.1; k *= 0.9) {
+    const placed = [];
+    let ok = true;
+    for (const it of items) {
+      const r = Math.max(36, Math.sqrt(it.v / total) * Math.min(W, H) * k);
+      let done = false;
+      for (let t = 0; t < 900 && !done; t++) {
+        const a = t * 0.42, d = t * 1.6, x = W / 2 + Math.cos(a) * d * (W / H), y = H / 2 + Math.sin(a) * d;
+        if (x - r < 0 || y - r < 0 || x + r > W || y + r > H) continue;
+        if (placed.every((c) => Math.hypot(c.x - x, c.y - y) >= c.r + r + 6)) { placed.push({ item: it, x, y, r }); done = true; }
+      }
+      if (!done) { ok = false; break; }
+    }
+    if (ok) return placed;
+  }
+  return [];
+}
+
+function Bubbles({ data, W, H, onOpen, selected, onSelect }) {
+  const p = usePal();
+  const circles = useMemo(() => {
+    const kids = data.children.filter((c) => c.allocated > 0);
+    const items = kids.slice(0, 13).map((c) => ({ ...c, v: c.allocated }));
+    const rest = kids.slice(13).reduce((a, c) => a + c.allocated, 0) + Math.max(0, data.ownAllocated);
+    if (rest > 0) items.push({ id: -2, name: tr('cleaner.map.others'), v: rest, allocated: rest, logical: rest });
+    return pack(items, W, H);
+  }, [data, W, H]);
+  return (
+    <View style={{ width: W, height: H, direction: 'ltr' }}>
+      {circles.map((c, i) => (
+        <Enter key={c.item.id} delay={Math.min(i * 40, 360)} x={0} y={14} ms={500} style={{ position: 'absolute', left: c.x - c.r, top: c.y - c.r, width: c.r * 2, height: c.r * 2 }}>
+          <View onClick={() => { if (c.item.hasKids) onOpen(c.item.id); else onSelect(c.item); }}
+            style={{ flex: 1, borderRadius: c.r, alignItems: 'center', justifyContent: 'center', backgroundColor: p.glass, border: `${selected && selected.id === c.item.id ? 2 : 1}px solid ${selected && selected.id === c.item.id ? p.accent : p.line}`, padding: 6 }}>
+            {c.r > 50 ? <Tile name="storage" size={c.r > 80 ? 32 : 22} /> : null}
+            <Label size={c.r > 70 ? typeScale.body : typeScale.caption} weight={600} lines={1} align="center">{c.item.name}</Label>
+            <Label size={typeScale.caption} dim align="center">{formatBytes(c.item.allocated)}</Label>
+            {c.item.id >= 0 ? <View onClick={(e) => { e.stopPropagation(); onSelect(c.item); }} style={{ position: 'absolute', top: c.r * 0.22, right: c.r * 0.22, width: 18, height: 18, borderRadius: 9, backgroundColor: selected && selected.id === c.item.id ? p.accent : p.track }} /> : null}
+          </View>
+        </Enter>
+      ))}
+    </View>
+  );
+}
+
 function Folders({ scanId, data, onOpen }) {
   const rows = data.children;
   return (
@@ -145,26 +193,58 @@ export function StorageHero({ volumes, volume, setVolume }) {
   );
 }
 
-export function StorageView({ scan, onScan }) {
+export function StorageView({ scan, onScan, volume, onReview }) {
   const [node, setNode] = useState(0);
-  const [view, setView] = useState('map');
-  useEffect(() => setNode(0), [scan.id]);
+  const [back, setBack] = useState([]);
+  const [ahead, setAhead] = useState([]);
+  const [view, setView] = useState('bubbles');
+  const [sel, setSel] = useState(null);
+  const { id } = useAppWindow() || {};
+  const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
+  const geo = win ? wm.frame(win) : null;
+  const W = geo ? Math.max(260, Math.round(geo.w - 236 - 76 - 228)) : 400, H = geo ? Math.max(200, Math.round(geo.h - 196)) : 300;
   const data = useMemo(() => cleaner.tree(scan.id, node, 500), [scan.id, node]);
+  const go = (n) => { setBack([...back, node]); setAhead([]); setNode(n); setSel(null); };
+  const undo = () => { setAhead([node, ...ahead]); setNode(back[back.length - 1]); setBack(back.slice(0, -1)); setSel(null); };
+  const redo = () => { setBack([...back, node]); setNode(ahead[0]); setAhead(ahead.slice(1)); setSel(null); };
   if (!data) return <Label dim>{tr('cleaner.map.empty')}</Label>;
+  const rel = (name) => [...data.trail.map((t) => t.name), name].join('/');
   return (
-    <Enter style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.s }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Label size={32} weight={300} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : data.base}</Label>
-          <Label dim size={typeScale.callout}>{tr('cleaner.map.totals', { logical: formatBytes(data.node.logical), allocated: formatBytes(data.node.allocated), files: formatNumber(data.node.files) })}</Label>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.m }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <GlassButton small label="‹" disabled={!back.length} onClick={undo} />
+        <GlassButton small label="›" disabled={!ahead.length} onClick={redo} />
+        <View style={{ flex: 1, minWidth: 0, paddingHorizontal: spacing.s }}>
+          <Label size={20} weight={300} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : tr('cleaner.section.storage')}</Label>
         </View>
+        {[['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ['types', 'cleaner.map.viewTypes']].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
         <GlassButton small label={tr('cleaner.scan')} onClick={onScan} />
-        {node ? <GlassButton small label={tr('cleaner.map.up')} onClick={() => setNode(data.node.up)} /> : null}
-        <GlassButton small label={tr('cleaner.show')} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${data.trail.map((t) => t.name).join('/')}/.`)} />
-        {[['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ['types', 'cleaner.map.viewTypes']].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
       </View>
       {!scan.complete ? <Label size={typeScale.callout}>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
-      {view === 'map' ? <Treemap data={data} onOpen={setNode} /> : view === 'tree' ? <Folders scanId={scan.id} data={data} onOpen={setNode} /> : <Types scan={scan} />}
-    </Enter>
+      <View style={{ flex: 1, minHeight: 0, flexDirection: 'row', gap: spacing.m }}>
+        {view === 'bubbles' ? (
+          <Glass style={{ width: 216, padding: spacing.m, gap: spacing.s }}>
+            <Label weight={600} lines={1}>{volume ? (volume.id === 'home' ? tr('cleaner.map.home') : volume.id === 'root' ? tr('cleaner.map.root') : volume.path) : data.base}</Label>
+            {volume && volume.total > 0 ? <Bar value={1 - volume.free / volume.total} /> : null}
+            <Label dim size={typeScale.caption}>{tr('cleaner.map.totals', { logical: formatBytes(data.node.logical), allocated: formatBytes(data.node.allocated), files: formatNumber(data.node.files) })}</Label>
+            {data.children.slice(0, 12).map((c) => (
+              <View key={c.id} onClick={c.hasKids ? () => go(c.id) : undefined} style={{ flexDirection: 'row', gap: spacing.xs, height: 24, alignItems: 'center' }}>
+                <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{c.name}</Label></View>
+                <Label dim size={typeScale.caption}>{formatBytes(c.allocated)}</Label>
+              </View>
+            ))}
+          </Glass>
+        ) : null}
+        {view === 'bubbles' ? <Bubbles data={data} W={W} H={H} onOpen={go} selected={sel} onSelect={(c) => setSel(sel && sel.id === c.id ? null : c)} />
+          : view === 'map' ? <Treemap data={data} onOpen={go} /> : view === 'tree' ? <View style={{ flex: 1 }}><Folders scanId={scan.id} data={data} onOpen={go} /></View> : <View style={{ flex: 1 }}><Types scan={scan} /></View>}
+      </View>
+      {view === 'bubbles' ? (
+        <Glass style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
+          <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{sel ? tr('cleaner.map.selectedShort', { name: sel.name, size: formatBytes(sel.allocated) }) : tr('cleaner.map.noneSelected')}</Label></View>
+          <GlassButton small label={tr('cleaner.map.review')} disabled={!sel} onClick={() => onReview(rel(sel.name))} />
+          <GlassButton small label={tr('cleaner.show')} disabled={!sel} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${rel(sel.name)}/.`)} />
+        </Glass>
+      ) : null}
+    </View>
   );
 }

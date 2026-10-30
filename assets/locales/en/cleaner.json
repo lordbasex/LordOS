@@ -315,8 +315,31 @@
   "prefs.menuItem": "Show by the clock",
   "prefs.on": "On",
   "prefs.off": "Off",
-  "prefs.theme": "Look",
-  "prefs.theme.noche": "Noche",
-  "prefs.theme.aurora": "Aurora",
-  "prefs.theme.cristal": "Cristal"
+  "prefs.look": "Look",
+  "stop": "Stop",
+  "waiting": "Waiting",
+  "seenCount": "{n} items examined",
+  "dash.storage": "in {n} folders",
+  "review": "Review",
+  "reviewAll": "Review all",
+  "startOver": "‹ Start over",
+  "review.headline": "{size} could be freed",
+  "review.cleanup": {
+    "one": "{size} in {count} category",
+    "other": "{size} in {count} categories"
+  },
+  "review.large": {
+    "one": "{count} file over 10 MB",
+    "other": "{count} files over 10 MB"
+  },
+  "review.dups": {
+    "one": "{size} in {count} group of exact copies",
+    "other": "{size} in {count} groups of exact copies"
+  },
+  "review.storage": "A map of {n} folders",
+  "map.viewBubbles": "Bubbles",
+  "map.review": "Review and remove",
+  "map.selectedShort": "{name}: {size}",
+  "map.noneSelected": "Nothing selected",
+  "large.allFolders": "All folders"
 }

@@ -3,7 +3,7 @@ import {
   View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, usePal } from './ui.jsx';
 
 const n = (v) => formatNumber(v);
 const when = (sec) => { const d = new Date(sec * 1000); return `${formatDate(d, 'short')} ${formatTime(d)}`; };
@@ -34,14 +34,14 @@ export function ScanHero({ status, last }) {
   );
 }
 
-// no total is known while walking: real counters, and a percentage only once a plan runs
-export function Working({ info }) {
+// no total is known while walking: real counters and the real path; a percentage only once a plan runs
+export function Working({ info, art }) {
   const scan = info.scan, plan = info.plan;
   if (info.job === 'execute') {
     return <ProgressRing progress={plan.items ? plan.processed / plan.items : 0} big={`${Math.round((plan.processed / (plan.items || 1)) * 100)} %`} small={tr('cleaner.workingCount', { done: n(plan.processed), total: n(plan.items) })} />;
   }
   if (info.job === 'plan') return <ProgressRing big="…" small={tr('cleaner.preparing')} />;
-  return <ProgressRing big={n(scan ? scan.seen : 0)} small={tr('cleaner.seen')} under={<Label size={15} weight={600}>{scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.candidates : 0), dirs: n(scan ? scan.dirs : 0) })}</Label>} />;
+  return <SectionScan art={art} verb={tr('cleaner.scanning')} path={scan ? scan.now : ''} counter={scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.seen : 0), dirs: n(scan ? scan.dirs : 0) })} />;
 }
 
 // ---- Cleanup: categories, each with its reason, what will happen, and its files on request ----
@@ -180,16 +180,17 @@ export function LargeHero() {
   return <Hero art="large" title={tr('cleaner.hero.large.title')} line={tr('cleaner.hero.large.line')} features={[['large', tr('cleaner.hero.large.f1')], ['activity', tr('cleaner.hero.large.f2')], ['cleanup', tr('cleaner.hero.large.f3')]]} />;
 }
 
-export function LargeList({ scan, prefs, selected, setSelected }) {
-  const [minMB, setMinMB] = useState(prefs.largeMB);
+export function LargeList({ scan, prefs, selected, setSelected, under, clearUnder }) {
+  const [minMB, setMinMB] = useState(under ? 1 : prefs.largeMB);
   const [days, setDays] = useState(0);
   const [type, setType] = useState('');
-  const filter = useMemo(() => ({ minSize: minMB * 1048576, ...(days ? { olderThanDays: days } : null), ...(type ? { type } : null) }), [minMB, days, type]);
-  const reset = `${scan.id}.${minMB}.${days}.${type}`;
+  const filter = useMemo(() => ({ minSize: minMB * 1048576, ...(days ? { olderThanDays: days } : null), ...(type ? { type } : null), ...(under ? { under } : null) }), [minMB, days, type, under]);
+  const reset = `${scan.id}.${minMB}.${days}.${type}.${under}`;
   const total = useMemo(() => cleaner.results(scan.id, 0, 1, filter).total, [reset]);
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
       <Label size={32} weight={300}>{tr('cleaner.large.title')}</Label>
+      {under ? <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}><Label dim size={typeScale.callout} mono lines={1}>{under}</Label><GlassButton small label={tr('cleaner.large.allFolders')} onClick={clearUnder} /></View> : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
         {[1, 10, 100, 1024].map((m) => <Pill key={m} label={formatBytes(m * 1048576)} on={minMB === m} onClick={() => setMinMB(m)} />)}
         <View style={{ width: spacing.s }} />
@@ -282,8 +283,8 @@ export function Preferences() {
           ))}
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.theme')}</Label></View>
-          {CLEANER_THEMES.map((id) => <Pill key={id} label={tr(`cleaner.prefs.theme.${id}`)} on={(p.theme || 'noche') === id} onClick={() => save({ theme: id })} />)}
+          <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.look')}</Label></View>
+          {CLEANER_THEMES.map((id) => <Pill key={id} label={tr(`cleaner.look.${id}`)} on={(p.theme || 'noche') === id} onClick={() => save({ theme: id })} />)}
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.menuItem')}</Label></View>

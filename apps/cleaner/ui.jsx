@@ -179,6 +179,29 @@ export function Sky() {
   );
 }
 
+// the window's colour for a section, crossfaded slowly
+export function Tints({ section }) {
+  const p = usePal();
+  const refs = useRef({});
+  const shown = useRef(section);
+  useEffect(() => {
+    const was = shown.current;
+    if (was === section) return;
+    shown.current = section;
+    if (refs.current[was]) tween(refs.current[was], { opacity: [1, 0] }, { ms: 700 });
+    if (refs.current[section]) tween(refs.current[section], { opacity: [0, 1] }, { ms: 700 });
+  }, [section]);
+  return Object.keys(p.tints).map((k) => (
+    <View key={k} ref={(r) => { refs.current[k] = r; }} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: p.tints[k], opacity: k === section ? 1 : 0, pointerEvents: 'none' }} />
+  ));
+}
+
+export function midTrim(path, max = 64) {
+  if (!path || path.length <= max) return path || '';
+  const k = Math.floor((max - 1) / 2);
+  return `${path.slice(0, k)}…${path.slice(-k)}`;
+}
+
 // ---- a section's opening ----
 
 export function Hero({ art, title, line, features = [], children }) {
@@ -218,12 +241,13 @@ export function Hero({ art, title, line, features = [], children }) {
 }
 
 // The large round button at the bottom edge: its glow breathes and its ring pulses.
-export function Orb({ label, onClick, disabled }) {
+export function Orb({ label, onClick, disabled, busy }) {
   const p = usePal();
-  const glow = useRef(null), ring = useRef(null), press = useRef(null);
+  const glow = useRef(null), ring = useRef(null), press = useRef(null), arc = useRef(null);
   useLoop((t) => {
     const b = 0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5;
     if (glow.current) { const s = 1 + b * 0.16; set(glow.current.id, 'opacity', 0.35 + b * 0.5); set(glow.current.id, 'scaleX', s); set(glow.current.id, 'scaleY', s); }
+    if (arc.current) set(arc.current.id, 'rotate', (t * 260) % 360);
     if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.55; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
   });
   const hit = () => { if (press.current) tween(press.current, { scaleX: [0.95, 1], scaleY: [0.95, 1] }, { ms: 240 }); if (onClick) onClick(); };
@@ -231,11 +255,26 @@ export function Orb({ label, onClick, disabled }) {
   return (
     <View style={{ position: 'absolute', left: '50%', marginLeft: -80, bottom: 16, width: 160, height: 112, alignItems: 'center', justifyContent: 'center', direction: 'ltr', opacity: disabled ? 0.55 : 1 }}>
       <View ref={glow} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, opacity: 0.5, boxShadow: `0 0 44px 14px ${p.glow}` }} />
-      <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />
+      {busy ? <Image ref={arc} src="asset:cleaner/ring.png" style={{ position: 'absolute', left: 24, top: 0, width: SIZE + 16, height: SIZE + 16 }} />
+        : <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />}
       <View ref={press} onClick={disabled ? undefined : hit} style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, alignItems: 'center', justifyContent: 'center',
         border: `3px solid ${p.ringLine}`, background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` }}>
         <Text style={{ fontSize: label && label.length > 9 ? typeScale.body : 15, fontWeight: 600, color: p.btnText, textAlign: 'center', paddingHorizontal: 6 }}>{label}</Text>
       </View>
+    </View>
+  );
+}
+
+// A section scanning: its object large and centred, the verb, and the real path going by.
+export function SectionScan({ art, verb, path, counter }) {
+  const img = useRef(null);
+  useLoop((t) => { if (img.current) { const s = 1 + Math.sin(t * 2.4) * 0.03; set(img.current.id, 'scaleX', s); set(img.current.id, 'scaleY', s); } });
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingBottom: 110 }}>
+      <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={{ width: 300, height: 286 }} />
+      <Label size={28} weight={300}>{verb}</Label>
+      <Label size={typeScale.callout} mono dim lines={1}>{midTrim(path)}</Label>
+      <Label size={typeScale.callout} dim>{counter}</Label>
     </View>
   );
 }

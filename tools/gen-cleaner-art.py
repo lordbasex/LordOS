@@ -22,6 +22,8 @@ DEFS = '''<defs>
 <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fe3ff"/><stop offset="1" stop-color="#2a6fe0"/></linearGradient>
 <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
 <radialGradient id="lens" cx=".4" cy=".35"><stop offset="0" stop-color="#e6fbff" stop-opacity=".85"/><stop offset="1" stop-color="#39c5ff" stop-opacity=".35"/></radialGradient>
+<linearGradient id="pane" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".34"/><stop offset=".5" stop-color="#9fd8ff" stop-opacity=".16"/><stop offset="1" stop-color="#8a6bff" stop-opacity=".3"/></linearGradient>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
 <filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#060920" flood-opacity=".5"/></filter>
 </defs>'''
 
@@ -70,6 +72,23 @@ ART = {
    '<path d="M220 76L320 114V170Q222 200 120 150V114Z" fill="url(#gloss)" opacity=".4"/>'
    '<path d="M170 208l36 36 66-74" fill="none" stroke="url(#crown)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></g>' + spark(380, 96, 12) + spark(58, 160, 9, .85),
 }
+
+# each object sits inside a thick piece of glass of its own shape
+GLASS = {'scan': 'M220 18L392 112a24 24 0 0 1 12 21v154a24 24 0 0 1-12 21L220 402 48 308a24 24 0 0 1-12-21V133a24 24 0 0 1 12-21z',
+         'cleanup': 'M96 30h248a66 66 0 0 1 66 66v228a66 66 0 0 1-66 66H96a66 66 0 0 1-66-66V96a66 66 0 0 1 66-66z',
+         'large': 'M220 22a188 188 0 1 0 0 376 188 188 0 0 0 0-376z',
+         'storage': 'M120 26h200a84 84 0 0 1 84 84v200a84 84 0 0 1-84 84H120a84 84 0 0 1-84-84V110a84 84 0 0 1 84-84z',
+         'duplicates': 'M110 46h232a60 60 0 0 1 60 60v208a60 60 0 0 1-60 60H98a60 60 0 0 1-60-60V118a72 72 0 0 1 72-72z',
+         'activity': 'M220 22a188 188 0 1 0 0 376 188 188 0 0 0 0-376z',
+         'settings': 'M220 18c30 26 98 44 168 48 14 150-40 290-168 336C92 356 38 216 52 66c70-4 138-22 168-48z'}
+
+def glassed(name, body):
+    d = GLASS[name]
+    return (f'<clipPath id="gc"><path d="{d}"/></clipPath><path d="{d}" fill="#0a1040" opacity=".28" transform="translate(0 14)" filter="url(#soft)"/>'
+            f'<path d="{d}" fill="url(#pane)"/>'
+            f'<g clip-path="url(#gc)"><path d="{d}" fill="none" stroke="#bfeeff" stroke-opacity=".75" stroke-width="30" filter="url(#soft)"/><ellipse cx="170" cy="60" rx="190" ry="84" fill="url(#gloss)" opacity=".5"/></g>'
+            f'<path d="{d}" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="3"/>'
+            f'<g transform="translate(88 82) scale(.6)">{body}</g>')
 
 # the tiles: a colour and a white line glyph
 TILES = {'scan': ('#b14bff', 'M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2M4 12h16'),
@@ -122,7 +141,7 @@ subprocess.check_call(['rsvg-convert', '-w', '160', '-h', '160', str(SRC / 'ring
 
 for name, body in ART.items():
     p = SRC / f'hero-{name}.svg'
-    p.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="440" height="420" viewBox="0 0 440 420">{DEFS}{body}</svg>\n')
+    p.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="440" height="420" viewBox="0 0 440 420">{DEFS}{glassed(name, body)}</svg>\n')
     subprocess.check_call(['rsvg-convert', '-w', '440', '-h', '420', str(p), '-o', str(OUT / f'hero-{name}.png')])
 for name, (c, d) in TILES.items():
     p = SRC / f'tile-{name}.svg'
