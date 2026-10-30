@@ -1,7 +1,7 @@
 {
   "name": "lordos-imager-desktop",
   "private": true,
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "LordOS Imager for the desktop (Tauri). The UI is apps/imager, shared with LordOS.",
   "scripts": {
     "web": "node build-web.mjs",
