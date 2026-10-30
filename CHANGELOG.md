@@ -10,43 +10,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-### Release
-
-- **Docs for the frame-cost work** (2026-10-29, branch `perf-frame`): `FANS.md`, `BENCHMARK.md`, `WINDOWS.md`,
-  `GPU.md`, `ROADMAP.md`, `PAPER-VALIDATION.md`, the paper (§3.2, §7.2, §7.4, §10.2; en, es, pt; `docs/PAPER.md`
-  regenerated), the FAQ and "A desktop of its own" (en, es, pt) now say that dragged windows' corners no longer turn
-  black and that LordBench's square and the Cooling fans turn (the docs audit's "still there, fixed in development"
-  wording below is superseded), with the Pi 5 frame numbers measured so far and HTML comments marking where the final Pi 5 run's numbers go, each
-  next to a sentence that is true without them (all filled after that run on 2026-10-29, the first entry under Changed). The site's Markdown
-  renderer (`web/lib/md.mjs`) now drops HTML comments, so a marker left behind is never published.
-  `THIRD_PARTY.md` lists the QuickJS `JS_GetMallocSize` patch as a table row.
-- **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the
-  engine lacks; fixed in development), and `RASPBERRY.md` records that frame rates on the Pi 5's monitor were measured
-  by LordBench (two monitors and 4K still not).
-- **The 0.8.6 plan** (2026-10-28): `docs/ROADMAP.md` has a "Release 0.8.6 (in development)" section listing what is
-  built and what is left for LordBench and for the desktop under load on the Pi 5.
-- **The 0.8.7 plan** (2026-10-29, decided by the maintainer): LordBench's x86 PC reference (a modest PC still to be
-  chosen) and hardware video decoding (VA-API on PCs, the Pi 5's HEVC decoder) move from 0.8.6 to a new "Release 0.8.7
-  (planned)" section of `docs/ROADMAP.md`, next to the community hardware reports. `BENCHMARK.md`,
-  `PAPER-VALIDATION.md` and the paper (§7.5; en, es, pt) say so.
-  (2026-10-30, decided by the maintainer) Two items of the desktop under load follow them: step 12 of GPU drag (the
-  dragged window composited on the GPU for the whole drag, also where the Dock or the menu bar overlap it) and the
-  next work on the Pi 5 under load (fewer pixels uploaded and composed per frame with a buffer-age scissor, PBO uploads
-  or a linear canvas; finding what slows V3D under an all-core CPU load, 14–16 ms of GPU a frame instead of 1.5;
-  optionally a 1000 Hz kernel tick). `ROADMAP.md` keeps a one-line note in 0.8.6 and lists them in 0.8.7 "moved from
-  0.8.6 on 2026-10-30"; `BENCHMARK.md`, `GPU.md` ("Pending"), `PAPER-VALIDATION.md`, the paper (§7.4; en, es, pt;
-  dated 2026-10-30), the FAQ and the own-desktop feature page (en, es, pt) say so.
-
-- **0.8.5-beta published** (2026-10-27): the GitHub release carries the live ISO, the Raspberry Pi 5 image
-  (`lordos-0.8.5-rpi5-arm64.img.xz`, the LordOS kernel 6.18.57-lordos.3 for the Pi 5; the Pi 4 still boots Raspberry
-  Pi's archive kernel), the amd64 and arm64 packages with their SBOMs, `install.sh` and the three desktop downloads of **LordOS Imager 0.8.5**
-  (the universal build, signed and notarized; the 64-bit installer; the Debian package). The Imager 0.8.5 is the first desktop build that reads point
-  releases (`v0.8.4.1-beta`) in its app update check and its release list. `SHA256SUMS` (11 files) is signed with the
-  release key. The site's downloads (`lordos.media`) now point to 0.8.5.
+## [0.8.6-beta] - 2026-10-30
 
 ### Added
 
-- **LordBench, first part (in development for 0.8.6; `docs/BENCHMARK.md`, "Built so far"):** System Information has a
+- **LordBench, first part (`docs/BENCHMARK.md`, "Built so far"):** System Information has a
   **Performance** tab with a Quick test (less than a minute) and a Full test (adds storage and three minutes of
   sustained load). The work runs in **`lord-bench`**, a new sandboxed helper launched by lord-server like `lord-doc`
   and `lord-media` (its own folder only, no arguments, `sandbox_apply_helper` before any work, scope
@@ -219,7 +187,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   set of commands in their own network scope with Flathub's key pinned, and the exceptions to `AGENTS.md` the
   maintainer has to approve before any code.
 
-- **A pixel-exact check for the dragged window's frames** (in development for 0.8.6, the groundwork for making a drag
+- **A pixel-exact check for the dragged window's frames** (the groundwork for making a drag
   frame cheaper on the Raspberry Pi; `docs/WINDOWS.md`, "Checking it"). Tests and debugging only: no frame changes.
   - **`test_drag_exact`** in `build/engine-test` (`make -C server test`): LordBench's desktop scene (a 760×480 rounded
     window with a shadow, a turning 72 px square and six cards with shadows and text, a rounded window below, a menu
@@ -253,7 +221,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - The drag line in `session.log` now says how many of the layer's renders were only a part of it
     (`paint_layer_parts`). `lord.setStyle`'s decision of what to place or repaint moved to `node_restyled`
     (`ui/node.c`), unchanged, so the test drives the same C path.
-- **LordBench: where a frame's time goes, measured per frame** (0.8.6, in development; `docs/BENCHMARK.md`, "Frame
+- **LordBench: where a frame's time goes, measured per frame** (`docs/BENCHMARK.md`, "Frame
   phases"). On the Pi 5 with its monitor a loaded frame is built in about 13 ms and still the monitor shows 30 frames a
   second, 98 % of them late: the time outside the "build" number (JS before the frame, the GPU's own work, the wait
   for the vblank) was not measured. lord-server now records, for every frame the main display shows, while
@@ -291,7 +259,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   371. With the build's defaults then (the pipeline while frames are heavy, GPU drag on): under load render
   13.85/19.07, GPU 15.63/23.38, `heldMs` 18.27/31.60, 148 on time, 1 CPU-late, 285 GPU-late of 436. So under load the
   frame is late on the GPU's side: its time per frame goes from about 1.5 ms alone to 14–16 ms.
-- **Automatic default apps** (in development for 0.8.6; `docs/SETTINGS.md`, "Default Apps"): when you never chose
+- **Automatic default apps** (`docs/SETTINGS.md`, "Default Apps"): when you never chose
   an app for a file type, a file of that type still opens. Before, `lord.apps.launchWith('', path)` only read the
   `[Default Applications]` lines of the mimeapps.list files and, on a fresh account with none, nothing opened (Files
   opened an `.html` in the Text Editor, and anything that asks for "the default app" got nothing). Now
@@ -324,8 +292,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
-- **The frame pipeline and GPU drag are off by default, after the final Raspberry Pi 5 run** (2026-10-29, in
-  development for 0.8.6; `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/GPU.md`). The Pi 5 16 GB with its
+- **The frame pipeline and GPU drag are off by default, after the final Raspberry Pi 5 run** (2026-10-29;
+  `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/GPU.md`). The Pi 5 16 GB with its
   1920×1080 60 Hz HDMI monitor, the LordOS kernel 6.18.57-lordos.3, an autologin session and the arm64 build of this
   branch; LordBench → Desktop impact, "under load" = all four cores busy at the lowest priority:
 
@@ -361,8 +329,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (unset, `0`, an empty or any other value off, `1` while frames are heavy, `2` always; the auto mode's tests now
     ask for `1`); `lordbench-test`: 1,217 ok.
 
-- **The desktop under load, third step: a cheaper frame while a window is dragged** (in development for 0.8.6;
-  `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/WINDOWS.md`; `docs/GPU.md`). Steps 0–11 (the next two
+- **The desktop under load, third step: a cheaper frame while a window is dragged** (`docs/BENCHMARK.md`, "The drag frame's cost"; `docs/WINDOWS.md`; `docs/GPU.md`). Steps 0–11 (the next two
   entries), GPU drag (the third) and the Fixed entries for the black corners, the rotated node's repaint and
   LordBench's turning square, measured together on the Raspberry Pi 5 with its 1920×1080 60 Hz monitor (GPU
   composition, the session with the weight and the real-time priority, LordBench → Desktop impact, 2026-10-28); the
@@ -382,7 +349,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     2,417 golden frames per path, the `gpu-drag` path and the pipelined drag runs); `fpipe-test`: 39 checks;
     `lordbench-test`: 1,197 ok. The codename "G0" of the work became "GPU drag" everywhere (`LORD_GPU_DRAG`,
     `gdrag_*`, LordBench's `gpuDrag` keys).
-- **Less work in a dragged window's frame, same pixels** (in development for 0.8.6; the first steps of making a
+- **Less work in a dragged window's frame, same pixels** (the first steps of making a
   drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
   paths (VM 116, x86_64) through these steps. The golden hashes were written again twice, each time after a
   pixel-by-pixel comparison with the code before: for the approved corner change of step 9 (its own entry below) and
@@ -529,7 +496,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       001633b's six files (3,390, 3,874 and 5,084 frame hashes) are identical. `make -C server test`: 23 passed.
     - Not done: skipping the copy under the window's opaque middle (it would have to know, before the layer is
       painted this frame, that the layer stays opaque there and that no ancestor's rounded corner reads it).
-- **The corners of rounded windows below a dragged window now match a full repaint** (in development for 0.8.6; step
+- **The corners of rounded windows below a dragged window now match a full repaint** (step
   9, the one pixel change of the drag-frame work's steps, approved by the maintainer on 2026-10-28; `ui/paint.c`). A drag frame
   copies what is below the window and then walks the tree to the window, painting nothing before it; that walk still
   saved and restored the corners of every rounded `overflow: hidden` node on the way, and the restore blended each
@@ -548,7 +515,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   same hashes came out of 001633b's code with only this change (and the test's entry points) added. The
   differential harnesses against 001633b's `paint.c` (5,324 frame outputs in the largest) are still identical: their
   scenes have no rounded `overflow: hidden` node below the window.
-- **The dragged window composited on the GPU, with the CPU's pixels ("GPU drag", in development for 0.8.6; step
+- **The dragged window composited on the GPU, with the CPU's pixels ("GPU drag"; step
   10, approved by the maintainer on 2026-10-28; `ui/paint.c`, `gpu/gpu.c`, `main.c`; `docs/GPU.md`, "The dragged
   window on the GPU").** On the GPU
   path a frame that uses the copy of what is below the window paints only the strips of its damaged box around
@@ -675,7 +642,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the frames (138 of 601 alone, refused: `layer` 214, `after` 241, catching up 8; 80 of 436 under load). Correct,
     but no measurable gain, so it is now **off by default** and `LORD_GPU_DRAG=1` turns it on (the first entry under
     Changed).
-- **GPU drag's textures catch up between frames instead of inside one** (0.8.6, in development; `docs/GPU.md`, "Uploads without a
+- **GPU drag's textures catch up between frames instead of inside one** (`docs/GPU.md`, "Uploads without a
   stall"). A drag's start, or a copy of what is below built again whole, made the first GPU drag frame send the whole
   copy (a screen, 8.3 MB at 1920 × 1080) and the layer; on V3D `glTexSubImage2D` converts to the GPU's tiled layout
   on the CPU, inside the frame. Now a frame GPU drag would compose but whose textures lack more than 262,144 pixels
@@ -695,13 +662,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (1024 × 640); 241 of 1,856 frames that use the copy are GPU drag (250 before: 9 catch up), 2,358,312 pixels went up
   between frames; `pause` 45 of 61 (54), `two` 148 of 240 (150), `app` 2 of 180 (5), `ancedge` 12 of 90 (15),
   `corner` 0 of 90. Not run on a GPU yet.
-- **The paint threads turn on by the whole frame too** (0.8.6, in development): on when the frame (`render_frame`:
+- **The paint threads turn on by the whole frame too**: on when the frame (`render_frame`:
   layout, paint, upload, submit) takes more than 60 % of a period, or painting more than 70 % as before; off after
   60 frames in a row with painting under 25 % and the frame under 45 %. On the Pi 5 under load painting took about
   7.5 ms (under 70 %) while the frame took about 13 ms, so the threads, which run at real-time priority, stayed off.
   The pixels are the same (the pool's bands are exact). On VM 116 headless under load they were on for 0, 10 and 91
   of 720–721 frames in three runs; the gain on the Pi is not measured yet.
-- **The frame pipeline: the next frame is painted while the flip is pending** (0.8.6, in development; measured on the
+- **The frame pipeline: the next frame is painted while the flip is pending** (measured on the
   Pi 5 and **off by default** since then, `LORD_PIPELINE=1` or `2` turns it on; `docs/GPU.md`, "The frame pipeline"; `src/fpipe.c` and `main.c`). A frame was started only
   after the previous flip completed, so input, JS, layout, paint, the upload, the GPU and the flip ran one after
   another; on the Pi 5 under an all-core load that chain (about 13 ms of CPU, 3–5 ms more) passes the 16.7 ms
@@ -779,6 +746,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
   different keys are remembered; the 65th is logged with `(further unknown style keys are not logged)` and later
   ones are not. Nothing else changes: the key is still ignored the same way (`docs/THEMES-GUIDE.md`).
+- **Docs for the frame-cost work** (2026-10-29, branch `perf-frame`): `FANS.md`, `BENCHMARK.md`, `WINDOWS.md`,
+  `GPU.md`, `ROADMAP.md`, `PAPER-VALIDATION.md`, the paper (§3.2, §7.2, §7.4, §10.2; en, es, pt; `docs/PAPER.md`
+  regenerated), the FAQ and "A desktop of its own" (en, es, pt) now say that dragged windows' corners no longer turn
+  black and that LordBench's square and the Cooling fans turn (the docs audit's "still there, fixed in development"
+  wording under Fixed is superseded), with the Pi 5 frame numbers measured so far and HTML comments marking where the final Pi 5 run's numbers go, each
+  next to a sentence that is true without them (all filled after that run on 2026-10-29, the first entry under Changed). The site's Markdown
+  renderer (`web/lib/md.mjs`) now drops HTML comments, so a marker left behind is never published.
+  `THIRD_PARTY.md` lists the QuickJS `JS_GetMallocSize` patch as a table row.
+- **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the
+  engine lacks; fixed since), and `RASPBERRY.md` records that frame rates on the Pi 5's monitor were measured
+  by LordBench (two monitors and 4K still not).
+- **The 0.8.6 plan** (2026-10-28): `docs/ROADMAP.md` has a "Release 0.8.6" section listing what is
+  built and what is left for LordBench and for the desktop under load on the Pi 5.
+- **The 0.8.7 plan** (2026-10-29, decided by the maintainer): LordBench's x86 PC reference (a modest PC still to be
+  chosen) and hardware video decoding (VA-API on PCs, the Pi 5's HEVC decoder) move from 0.8.6 to a new "Release 0.8.7
+  (planned)" section of `docs/ROADMAP.md`, next to the community hardware reports. `BENCHMARK.md`,
+  `PAPER-VALIDATION.md` and the paper (§7.5; en, es, pt) say so.
+  (2026-10-30, decided by the maintainer) Two items of the desktop under load follow them: step 12 of GPU drag (the
+  dragged window composited on the GPU for the whole drag, also where the Dock or the menu bar overlap it) and the
+  next work on the Pi 5 under load (fewer pixels uploaded and composed per frame with a buffer-age scissor, PBO uploads
+  or a linear canvas; finding what slows V3D under an all-core CPU load, 14–16 ms of GPU a frame instead of 1.5;
+  optionally a 1000 Hz kernel tick). `ROADMAP.md` keeps a one-line note in 0.8.6 and lists them in 0.8.7 "moved from
+  0.8.6 on 2026-10-30"; `BENCHMARK.md`, `GPU.md` ("Pending"), `PAPER-VALIDATION.md`, the paper (§7.4; en, es, pt;
+  dated 2026-10-30), the FAQ and the own-desktop feature page (en, es, pt) say so.
+- **0.8.5-beta published** (2026-10-27): the GitHub release carries the live ISO, the Raspberry Pi 5 image
+  (`lordos-0.8.5-rpi5-arm64.img.xz`, the LordOS kernel 6.18.57-lordos.3 for the Pi 5; the Pi 4 still boots Raspberry
+  Pi's archive kernel), the amd64 and arm64 packages with their SBOMs, `install.sh` and the three desktop downloads of **LordOS Imager 0.8.5**
+  (the universal build, signed and notarized; the 64-bit installer; the Debian package). The Imager 0.8.5 is the first desktop build that reads point
+  releases (`v0.8.4.1-beta`) in its app update check and its release list. `SHA256SUMS` (11 files) is signed with the
+  release key. The site's downloads (`lordos.media`) now point to 0.8.5.
 
 ### Fixed
 
@@ -821,7 +818,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   older Pi 4 and Pi 5 kernel with `get_throttled` set, clear and "now"; both sources; a malformed value and a second
   line; a Pi with neither; a machine that isn't a Pi with both files; 790 checks) and
   `tests/sysinfo_model_test.mjs` (`piStatus`, 68 checks). `build/lordbench-test` still passes (1,198 checks).
-- **No black squares at the corners of a dragged window** (0.8.6, in development). While any window was dragged, the
+- **No black squares at the corners of a dragged window**. While any window was dragged, the
   area just outside its rounded corners showed opaque black squares, on the CPU and the GPU path (seen on VM 116 with
   Calculator; still windows were fine). The drag layer paints the window on a transparent canvas, and a rounded
   `overflow: hidden` window saves its corner squares before its children paint and restores them afterwards
@@ -1029,7 +1026,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Paper (en, es, pt; `docs/PAPER.md` regenerated):** §7.2 no longer says a dragged window's rounded corners stopped
     turning black on the monitor; it says what the 0.8.5 fix did (on the GPU path only pixels inside an app surface are
     taken for a Linux window's hole) and that small black squares can still show at the corners, on the CPU and GPU
-    paths. §10.2 lists them as a known limitation (fixed in development on the `perf-frame` branch, not released), and
+    paths. §10.2 lists them as a known limitation (fixed later in this release, see "No black squares at the corners of a dragged window"), and
     the remote-desktop line no longer says the monitor shows them right. §7.4: the board results are "without a monitor
     unless stated", and the CPU weight alone is said to have been measured on the monitor only together with the
     real-time priority (it said the monitor measurement was pending, then gave it). The PDF/Markdown header writes the
@@ -1042,23 +1039,56 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     in progress) instead of "already fixed", and a doubled word in Spanish is gone.
   - **Features (en, es, pt):** Linux apps no longer says a Flathub section is planned for 0.8.6 (Flatpak is not planned
     for any release; `docs/FLATPAK.md`); A desktop of its own says the Pi 5 has been tested with one HDMI monitor (not
-    with two or 4K) instead of never with a monitor; Private by design adds `lord-fetch`, `lord-tls` and `lord-bench` (in
-    development) to the sandboxed helpers; the Portuguese page puts its screenshot where the other two do.
+    with two or 4K) instead of never with a monitor; Private by design adds `lord-fetch`, `lord-tls` and `lord-bench` to the sandboxed helpers; the Portuguese page puts its screenshot where the other two do.
   - **`docs/BENCHMARK.md`:** the status lists what is built (interface and video workloads, desktop-impact mode, boot
     test, `lordos-sysreport bench`, two of three references) and what is not (the x86 PC reference, a `checks`
     subcommand); the CLI diagram shows `report | fetch | bench`; the design table notes xz instead of deflate and
     software-only video decoding; the Pi 5 reference is the 16 GB board; the desktop test's turning element stays still
-    in this build (there is no `transform` style key; fixed in development with a `rotate` key); the Quick-run times
+    in this build (there is no `transform` style key; fixed later in this release with a `rotate` key); the Quick-run times
     (33 s, then 39 s and 46 s from a terminal) are told apart; "not yet measured with the monitor" and "about 20 %
     slower" are replaced by what was measured (a frame takes 15–16 ms instead of 7 ms under load, cause not measured).
-  - **`docs/ROADMAP.md`:** the black-corners item under Release 0.8.6 is unticked (fixed on `perf-frame`, not merged);
+  - **`docs/ROADMAP.md`:** the black-corners item under Release 0.8.6 is unticked (fixed on `perf-frame`, merged later in this release);
     "Pending before the final ISO" is marked done; LordBench's "Left:" adds detecting the Pi 5 firmware's throttling;
     the Pi 5 report item says what is still missing. `docs/FLATPAK.md` points to the roadmap item's current title.
   - **`docs/PAPER-VALIDATION.md`:** the Pi 5 load result is recorded as measured on the monitor with both changes;
     one Full and four Quick runs; 34 folders in `apps/`.
   - **`README.md`:** the "Measured, not promised" numbers are labelled as the pre-release 0.7.0 ISO test and joined by
     the released 0.8.5-beta's (592 MB whole system, first frame 7.4 s after the kernel); the repository map adds
-    `lord-bench` (in development).
+    `lord-bench`.
+
+### Known issues and limitations
+
+- **Raspberry Pi 5 under an all-core load: about 31 frames a second.** Alone the desktop holds 60; with all four
+  cores busy at the lowest priority it runs at 30.5–31.1 fps, up from 24, with the pointer reaching the screen in
+  about 49 ms (`docs/BENCHMARK.md`, "The drag frame's cost"). The GPU's time per frame goes from 1.5 ms to 14–16 ms
+  with no clock or thermal throttling; memory contention is the likeliest cause, not proven. The next steps are
+  planned for 0.8.7 (`docs/ROADMAP.md`).
+- **The frame pipeline and GPU drag are built but off by default.** On the Pi 5 the pipeline gave 2–5 frames a
+  second under load for 17–29 ms more pointer latency, and GPU drag, correct on V3D, gave no measurable gain.
+  `LORD_PIPELINE=1` (or `2`) and `LORD_GPU_DRAG=1` turn them on for testing. GPU drag does not yet cover the whole
+  drag (where the Dock or the menu bar overlap the window); that is planned for 0.8.7.
+- **LordBench's comparisons.** There is no x86 PC reference yet (planned for 0.8.7), and video decoding is measured
+  in software only. The reference machines' layout, paint and shaping values were measured before this version and
+  are used only for results of the same LordOS version, so a 0.8.6 result leaves those four measurements out of its
+  ×N until the references are measured again.
+- **Raspberry Pi 5:** one 1920×1080 HDMI monitor has been measured; two monitors and 4K have not.
+- **llama.cpp on a GPU is not tested on real hardware yet** (as in 0.8.5): only the CPU path and the backend loading
+  (software Vulkan) were checked.
+- **Legacy BIOS: a black rectangle between the boot menu and the splash** while GRUB loads the kernel and the
+  initrd, as in 0.8.5; barely visible on UEFI.
+- **Searching "displays" in the search panel** opens the Help article on touchpads and touch screens before
+  Settings → Displays.
+- **Settings → Displays:** in the arrangement, the name of a small display is cut without an ellipsis.
+
+### Upgrading
+
+- **From 0.8.5 (and 0.8.4.1 to 0.8.1):** Store → Updates shows "LordOS 0.8.6 is available" with these notes;
+  **Update** installs it and a restart finishes it. `sudo apt update && sudo apt upgrade` does the same. This version
+  adds no migration (`ls /var/lib/lordos/migrations` is unchanged from 0.8.5); your settings are kept.
+- The compositor's CPU weight and real-time priority are set when `lord-sessiond` starts a session, so they apply
+  after that restart.
+- Default apps you chose in Settings stay as they are; automatic defaults apply only to file types you never chose
+  an app for.
 
 ## [0.8.5-beta] - 2026-10-27
 
@@ -2691,7 +2721,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...HEAD
+[0.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...v0.8.6-beta
 [0.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4.1-beta...v0.8.5-beta
 [0.8.4.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4-beta...v0.8.4.1-beta
 [0.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.3-beta...v0.8.4-beta
