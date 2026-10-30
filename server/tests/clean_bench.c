@@ -64,6 +64,18 @@ int main(int argc, char **argv) {
     if (argc != 2 || !realpath(argv[1], h)) return 1;
     fsops_init(h, "bench");
     run("rules", CLEAN_KIND_RULES, NULL);
+    double t0 = now();
+    char *j = clean_poll(CLEAN_KIND_RULES);
+    char *idp = strstr(j, "\"scan\":{\"id\":");
+    int scan = idp ? atoi(idp + 13) : 0;
+    free(j);
+    const char *const names[] = { "thumbnails" };
+    int plan = clean_plan_rules(scan, names, 1);
+    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); }
+    double t1 = now();
+    clean_execute(plan);
+    for (int waiting = 1; waiting;) { j = clean_poll(CLEAN_KIND_RULES); waiting = strstr(j, "\"state\":\"running\"") != NULL; free(j); }
+    printf("plan of the thumbnails %.0f ms, real delete %.0f ms\n", t1 - t0, now() - t1);
     run("tree", CLEAN_KIND_TREE, &(CleanOpts){ .min_size = 1 << 20 });
     run("tree1", CLEAN_KIND_TREE, &(CleanOpts){ .min_size = 1 });
     run("dups", CLEAN_KIND_DUPS, &(CleanOpts){ .folders = { "Data" }, .nfolders = 1 });
