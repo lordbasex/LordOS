@@ -59,6 +59,7 @@ static int under(const char *p, const char *root) {
 }
 
 int fsops_allowed(const char *real) { return under(real, home) || under(real, media1) || under(real, media2); }
+const char *fsops_home(void) { return home; }
 
 /* Reading only (0.8.5, Files → This computer): the whole tree as the session user, so the system's
  * own permissions decide, except the kernel's and the runtime's pseudo-filesystems: /proc (this
@@ -72,8 +73,7 @@ int fsops_readable(const char *real) {
     return 1;
 }
 
-int fsops_protected(const char *real) {
-    static const char *const protect[] = { "/.local/share/applications", "/.config/autostart",
+static const char *const protect[] = { "/.local/share/applications", "/.config/autostart",
                                            "/.local/share/lordos/apps", "/.config/lordos/settings.json",
                                            "/.config/lordos/permisos.json",
                                            "/.config/lordos/firewall.json", /* network permissions: an app does not write its own rules */
@@ -85,10 +85,22 @@ int fsops_protected(const char *real) {
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
                                            "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
                                            NULL };
+
+int fsops_protected(const char *real) {
     for (int i = 0; protect[i]; i++) {
         char p[PATH_MAX + 64];
         pathf(p, sizeof p, "%s%s", home, protect[i]);
         if (under(real, p)) return 1;
+    }
+    return 0;
+}
+
+/* Is a protected path strictly below real? (Cleaner's rule table: a rule's root must not hold one.) */
+int fsops_protected_below(const char *real) {
+    for (int i = 0; protect[i]; i++) {
+        char p[PATH_MAX + 64];
+        pathf(p, sizeof p, "%s%s", home, protect[i]);
+        if (strcmp(p, real) && under(p, real)) return 1;
     }
     return 0;
 }
@@ -98,6 +110,22 @@ static double now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &
 /* err buffers carry code lines (errcode.h): lord.fs throws them translated */
 static void seterr(char *e, size_t n, const char *code) { if (e && n) lerr_set(e, n, code, NULL); }
 static void seterrno(char *e, size_t n, int no) { if (e && n) lerr_set(e, n, "sys.errno", "errno", lerr_errno(no), NULL); }
+
+/* Moving a parent of a protected path takes the protected path with it, and a folder arriving under such a
+ * name brings its own: neither may happen through rename, move, Trash or restore. RENAME_NOREPLACE: the
+ * kernel refuses an existing target, with no gap between a check and the rename. */
+int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
+    if (fsops_protected(from) || fsops_protected(to) || fsops_protected_below(from) || fsops_protected_below(to)) {
+        seterr(err, errlen, "fs.protected");
+        return -1;
+    }
+    if (renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) {
+        if (errno == EEXIST) seterr(err, errlen, "fs.exists");
+        else seterrno(err, errlen, errno);
+        return -1;
+    }
+    return 0;
+}
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */
 
@@ -217,6 +245,7 @@ static void *job_main(void *arg) {
 
 int fsjob_start(const char *src, const char *dst, int move, char *err, size_t errlen) {
     struct stat st;
+    if ((move && fsops_protected_below(src)) || fsops_protected_below(dst)) { seterr(err, errlen, "fs.protected"); return -1; }
     if (lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
     if (!lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
     size_t n = strlen(src);
@@ -316,11 +345,15 @@ static void url_decode(const char *s, char *out, size_t n) {
     out[o] = 0;
 }
 
-int fstrash_put(const char *real, char *err, size_t errlen) {
+/* The object moved is `from` relative to dirfd (or a path with AT_FDCWD); real names it for the
+ * .trashinfo and for choosing the trash. dest (optional) gets the item's path inside the Trash. On
+ * failure errno says why. */
+static int trash_put(int dirfd, const char *from, const char *real, char *destout, size_t destn, char *err, size_t errlen) {
+    if (fsops_protected_below(real)) { seterr(err, errlen, "fs.protected"); errno = EPERM; return -1; }
     char dir[PATH_MAX], top[PATH_MAX];
     int rel;
-    if (trash_dir_for(real, dir, sizeof dir, top, sizeof top, &rel) || mkdirs_trash(dir)) { seterr(err, errlen, "fs.noTrash"); return -1; }
-    if (!strncmp(real, dir, strlen(dir))) { seterr(err, errlen, "fs.alreadyInTrash"); return -1; }
+    if (trash_dir_for(real, dir, sizeof dir, top, sizeof top, &rel) || mkdirs_trash(dir)) { seterr(err, errlen, "fs.noTrash"); errno = EIO; return -1; }
+    if (!strncmp(real, dir, strlen(dir))) { seterr(err, errlen, "fs.alreadyInTrash"); errno = EINVAL; return -1; }
     const char *base = strrchr(real, '/');
     base = base ? base + 1 : real;
     char name[NAME_MAX + 16], info[PATH_MAX + 300], dest[PATH_MAX + 300];
@@ -335,7 +368,7 @@ int fstrash_put(const char *real, char *err, size_t errlen) {
         fd = open(info, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (fd < 0 && errno != EEXIST) break;
     }
-    if (fd < 0) { seterr(err, errlen, "fs.trashEntryFailed"); return -1; }
+    if (fd < 0) { seterr(err, errlen, "fs.trashEntryFailed"); errno = EIO; return -1; }
     char path[PATH_MAX * 3], enc[PATH_MAX * 3], when[32];
     pathf(path, sizeof path, "%s", rel ? real + strlen(top) + 1 : real);
     url_encode(path, enc, sizeof enc);
@@ -345,14 +378,25 @@ int fstrash_put(const char *real, char *err, size_t errlen) {
     strftime(when, sizeof when, "%Y-%m-%dT%H:%M:%S", &tm);
     dprintf(fd, "[Trash Info]\nPath=%s\nDeletionDate=%s\n", enc, when);
     close(fd);
-    if (rename(real, dest)) {
+    if (renameat(dirfd, from, AT_FDCWD, dest)) {
         int e = errno;
         unlink(info);
         seterr(err, errlen, e == EXDEV ? "fs.trashOtherDisk" : "sys.errno");
         if (e != EXDEV) seterrno(err, errlen, e);
+        errno = e;
         return -1;
     }
+    if (destout) pathf(destout, destn, "%s", dest);
     return 0;
+}
+
+int fstrash_put(const char *real, char *err, size_t errlen) { return trash_put(AT_FDCWD, real, real, NULL, 0, err, errlen); }
+
+/* (Cleaner) The same Trash, for a name in an already open folder: a folder swapped for a link after
+ * the caller checked it can't redirect the move. */
+int fstrash_put_at(int dirfd, const char *name, const char *real, char *dest, size_t destn, char *err, size_t errlen) {
+    if (strchr(name, '/')) { seterr(err, errlen, "sys.badArgument"); errno = EINVAL; return -1; }
+    return trash_put(dirfd, name, real, dest, destn, err, errlen);
 }
 
 /* Known trash folders: the home one and those of the user's mounts. */
@@ -466,7 +510,7 @@ int fstrash_restore(const char *id, char *err, size_t errlen) {
     if (!realpath(parent[0] ? parent : "/", rparent) || !fsops_allowed(rparent)) { seterr(err, errlen, "fs.trashOriginGone"); return -1; }
     char dest[PATH_MAX * 2];
     pathf(dest, sizeof dest, "%s/%s", rparent, sl + 1);
-    if (fsops_protected(dest)) { seterr(err, errlen, "fs.protected"); return -1; }
+    if (fsops_protected(dest) || fsops_protected_below(dest)) { seterr(err, errlen, "fs.protected"); return -1; }
     struct stat st;
     if (!lstat(dest, &st)) { seterr(err, errlen, "fs.trashRestoreExists"); return -1; }
     if (rename(id, dest)) { seterrno(err, errlen, errno); return -1; }

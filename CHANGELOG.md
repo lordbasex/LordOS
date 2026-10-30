@@ -18,6 +18,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **`lord.fs` refuses a parent of a protected path** (2026-10-30, a bug found by Cleaner's audit): `trash`, `rename` and a
+  move of a folder that holds a protected path (`~/.config/lordos`, `~/.config`, `~/.local/share/lordos`) took the settings,
+  permissions and vaults with them. Those calls, a move or copy onto such a name and a restore onto it now answer
+  `fs.protected` (`fsops_protected_below`, `fsops_rename`). `lord.fs.rename` also uses `RENAME_NOREPLACE`, so the kernel
+  refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
+  before (`fsops-test`).
+
+- **Cleaner, first slice** (2026-10-30; `docs/CLEANER-ARCHITECTURE.md`, each feature's state in `docs/CLEANER-ROADMAP.md`):
+  one rule, end to end, from a scan to the Trash.
+  - **`lord-clean`** (`server/src/clean/helper/`): a read-only scanner started like `lord-doc`. lord-server opens each
+    root as an `O_DIRECTORY` fd and passes it over `SCM_RIGHTS`; the helper lists it in `ro_dir_fds` and calls
+    `sandbox_apply_helper` (scope `lordos-cleaner`) before reading, and refuses to run without Landlock. It walks with
+    `openat2` (`RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV`) and `statx` at the lowest CPU and I/O priority,
+    bounded to 200,000 entries, 32 levels and 1,024 bytes of path. A limit reached, an unreadable folder or a name that
+    can't be shown marks the scan incomplete. Cancel kills the helper.
+  - **lord-server's side** (`server/src/clean/`, `lord.clean` in `ui/js_clean.c`): `start`, `poll`, `cancel`, paged
+    `results`, `plan`, `execute`, `status`, each on a thread with its input validated. Every record from the helper is
+    validated with `sec/json.c`, and `fsops_protected` is applied again. JS holds candidate ids and display paths only.
+    A plan stays in C, expires after ten minutes and runs once. Execution reopens each object from its root, compares
+    device, inode, size and modification time, and ends each item as done, skipped, changed, denied, failed, cancelled or
+    unsupported.
+  - **One rule** (`clean/rules.c`): `thumbnails`, `.cache/thumbnails`, `*.png`, regenerable, moved to the Trash. The table
+    is compiled and validated by a test; a root can't be a whole top-level folder or hold a protected path.
+  - **`fsops`:** `fstrash_put_at`, the same Trash for a name in an open folder, so a folder swapped for a link after the
+    check can't redirect the move; `fsops_protected_below`, for the rule table. `lord.fs`, `admin.c` and the broker are
+    unchanged. If a name is pointed at another file at the last moment, that file is put back and the item ends as
+    changed.
+  - **No real delete exists.** Moving to the Trash doesn't free space and the app says so in the confirmation; space is
+    measured again afterwards. A delete for caches waits for the maintainer's approval.
+  - **The app** (`apps/cleaner/`, `sdk/cleaner.js`, en/es/pt): built in, not isolated. Overview only: Scan, real counters
+    (no percentage until the total is known), list, selection, confirmation, result per item, free space before and after.
+    Its icon is in `web/src/app-icons/`.
+  - **Tested on VM 116:** `build/clean-test` against the real helper in throwaway folders under `/tmp` (rule table, symbolic
+    link and `..` escapes, a file changed between scan and execution, protected paths, hard links counted once, limits,
+    plan expiry, cancel); `make test`; and the whole flow by hand, seen on screen, in an isolated headless session with a
+    throwaway home folder (Landlock and seccomp active in the helper). The `lordos-cleaner` scope was refused there, as
+    that session has no `lord-sessiond`: entering it, the Raspberry Pi and right-to-left layout are not tested.
+
 - **Community hardware reports, first part** (2026-10-29; `docs/BENCHMARK.md`, "0.8.7 — Community hardware reports",
   "Built so far"):
   - **The report format:** `apps/sysinfo/hwreport.schema.json`, a versioned JSON Schema (`lordos-hwreport`, version 1)

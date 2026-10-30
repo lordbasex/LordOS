@@ -19,6 +19,7 @@
 #include "js_input.h"
 #include "js_fw.h"
 #include "js_backup.h"
+#include "js_clean.h"
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "js_net.h"
@@ -422,6 +423,7 @@ static void session_context(void) {
     js_disk_register(ctx, lord);       /* lord.disks: disks and partitions (Disks app) */
     js_imager_register(ctx, lord);     /* lord.imager: LordOS Imager (docs/IMAGER.md) */
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
+    js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */

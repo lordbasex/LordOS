@@ -168,6 +168,11 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   and one HTTP GET with a size limit, parses the list strictly and returns normalized lines in a
   sealed memfd. See `FIREWALL.md`, "Blocklists".
 
+- **`lord-clean`** (0.8.7, in development): Cleaner's read-only scanner. Same rules as `lord-doc` (fixed path, no
+  arguments, minimal environment, `sandbox_apply_helper` in scope `lordos-cleaner` before reading anything, and it
+  refuses to run without Landlock). It gets each root as an opened folder over SCM_RIGHTS, walks with `openat2` and
+  `statx`, and answers with records lord-server validates. It writes nothing. See `CLEANER-ARCHITECTURE.md`.
+
 - **`lord-tls`** (0.8.5): the package engine's HTTPS. The Store's download child (as `nobody`, in
   `lordos-net-store.scope`) connects the TCP socket itself and execs only `<lord-server dir>/lord-tls`
   (root's, not writable by others) with no arguments, an empty environment, the socket on fd 3 and a

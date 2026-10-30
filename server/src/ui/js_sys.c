@@ -1071,10 +1071,8 @@ static JSValue f_fs_rename(JSContext *c, JSValueConst this_val, int argc, JSValu
     if (a) JS_FreeCString(c, a);
     if (b) JS_FreeCString(c, b);
     if (r) return fs_path_error(c, r);
-    struct stat st;
-    if (lstat(from, &st)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
-    if (!lstat(to, &st)) return js_throw_code(c, "fs.exists", NULL);
-    if (rename(from, to)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
+    char err[256] = "";
+    if (fsops_rename(from, to, err, sizeof err)) return js_throw_line(c, err);
     return JS_TRUE;
 }
 
