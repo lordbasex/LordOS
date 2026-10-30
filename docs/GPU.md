@@ -555,8 +555,10 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 ## Pending
 
 - GPU drag also where the menu bar or the Dock overlap the window (step 12); it is off by default after the Pi 5 run.
+  Moved to 0.8.7 (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release 0.8.7 (planned)").
 - Fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU composes only the damage, PBO uploads)
-  and finding what slows V3D under an all-core CPU load (14–16 ms of GPU a frame instead of 1.5).
+  and finding what slows V3D under an all-core CPU load (14–16 ms of GPU a frame instead of 1.5). Moved to 0.8.7
+  (2026-10-30).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

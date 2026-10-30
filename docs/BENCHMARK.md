@@ -6,7 +6,7 @@
 |---|---|
 | **0.8.5 — System Information** | Every piece of hardware detected, what LordOS uses (above all the GPU), the services, the paper's claims checked on this machine, JSON/Markdown reports. |
 | **0.8.6 — LordBench** | Measurements of CPU, memory, GPU, the compositor, video and storage under recorded, reproducible conditions, with versioned results. |
-| **0.8.7 — Community hardware reports** | Publishing reports as GitHub issues, validating them, and a tested-hardware catalogue on lordos.org that the app also reads. Also LordBench's x86 PC reference and hardware video decoding, moved from 0.8.6 (2026-10-29). |
+| **0.8.7 — Community hardware reports** | Publishing reports as GitHub issues, validating them, and a tested-hardware catalogue on lordos.org that the app also reads. Also LordBench's x86 PC reference and hardware video decoding, moved from 0.8.6 (2026-10-29), and GPU drag for the whole drag and the rest of the desktop under load on the Pi 5 (fewer pixels per frame, what slows V3D), moved on 2026-10-30. |
 | **Later — Lumo and AutoTune** | `ROADMAP.md`, "Lumo, the local assistant": explains a report and tunes settings from what the machine measured. |
 
 Each claim of the paper, how it is checked today and what is still missing: `PAPER-VALIDATION.md`.
@@ -727,8 +727,9 @@ and the upload (a copy of about 1 Mpx) from 1.4 to about 4 ms. `vcgencmd`, every
 0.86–1.15 GHz (mostly 1.15), the ARM cores at 1.8–2.4 GHz, the core clock at 0.59–0.91 GHz, 36.7–47.2 °C and
 `get_throttled=0x0` throughout: no clock or thermal throttling. The likeliest cause is memory contention between the
 GPU and the four busy cores; that is not proven (no memory-bandwidth counter was read). The next step is fewer pixels
-uploaded and composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load
-(`ROADMAP.md`).
+uploaded and composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load,
+moved to 0.8.7 with GPU drag for the whole drag (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release
+0.8.7 (planned)").
 
 **What was run on the Pi 5** (2026-10-29; the package from this work installed, the monitor on, an autologin
 session, the variables set in the session's environment; the results above):
@@ -774,7 +775,9 @@ Not built yet: detecting the Pi's firmware throttling during a run on kernels th
 of the Pi 5 with the layout, paint and shaping workloads for its reference (two Quick runs measured them, above).
 Moved to 0.8.7 (decided by the maintainer on 2026-10-29; `ROADMAP.md`, "Release 0.8.7 (planned)"): hardware video
 decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`) and the x86 PC
-reference.
+reference. Also moved to 0.8.7 (decided on 2026-10-30): GPU drag for the whole drag (step 12, also where the Dock or
+the menu bar overlap the window) and the rest of the desktop under load on the Pi 5 (fewer pixels uploaded and
+composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz kernel tick).
 
 ## 0.8.7 — Community hardware reports
 

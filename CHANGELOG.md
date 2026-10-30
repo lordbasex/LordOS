@@ -29,6 +29,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   chosen) and hardware video decoding (VA-API on PCs, the Pi 5's HEVC decoder) move from 0.8.6 to a new "Release 0.8.7
   (planned)" section of `docs/ROADMAP.md`, next to the community hardware reports. `BENCHMARK.md`,
   `PAPER-VALIDATION.md` and the paper (§7.5; en, es, pt) say so.
+  (2026-10-30, decided by the maintainer) Two items of the desktop under load follow them: step 12 of GPU drag (the
+  dragged window composited on the GPU for the whole drag, also where the Dock or the menu bar overlap it) and the
+  next work on the Pi 5 under load (fewer pixels uploaded and composed per frame with a buffer-age scissor, PBO uploads
+  or a linear canvas; finding what slows V3D under an all-core CPU load, 14–16 ms of GPU a frame instead of 1.5;
+  optionally a 1000 Hz kernel tick). `ROADMAP.md` keeps a one-line note in 0.8.6 and lists them in 0.8.7 "moved from
+  0.8.6 on 2026-10-30"; `BENCHMARK.md`, `GPU.md` ("Pending"), `PAPER-VALIDATION.md`, the paper (§7.4; en, es, pt;
+  dated 2026-10-30), the FAQ and the own-desktop feature page (en, es, pt) say so.
 
 - **0.8.5-beta published** (2026-10-27): the GitHub release carries the live ISO, the Raspberry Pi 5 image
   (`lordos-0.8.5-rpi5-arm64.img.xz`, the LordOS kernel 6.18.57-lordos.3 for the Pi 5; the Pi 4 still boots Raspberry

@@ -601,11 +601,8 @@ desktop fell to 24 fps under an all-core load:
   ms, no clock or thermal throttling).
 - [x] Decide GPU drag's default after that run: **off** (`LORD_GPU_DRAG=1` turns it on): correct on V3D, no
   measurable gain.
-- [ ] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window.
-- [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
-  composes only the damage, PBO uploads or a linear canvas) and finding what slows V3D under an all-core CPU load
-  (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention is the likeliest cause, not proven:
-  read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5.
+- Step 12 of GPU drag and the next work on the Pi 5 under load (fewer pixels per frame, what slows V3D) moved to
+  0.8.7 (decided by the maintainer on 2026-10-30; "Release 0.8.7 (planned)" below).
 - [x] Merge `perf-frame` (2026-10-29), with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, `FANS.md`, the paper,
   the FAQ, the features page and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch), with the final Pi 5 run's
   numbers and the frame pipeline and GPU drag off by default.
@@ -616,10 +613,17 @@ desktop fell to 24 fps under an all-core load:
 
 ## Release 0.8.7 (planned)
 
-Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), and what LordBench left for after 0.8.6:
+Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), and what LordBench and the desktop under
+load left for after 0.8.6:
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
   FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29).
+- [ ] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window (moved from 0.8.6
+  on 2026-10-30).
+- [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
+  composes only the damage, PBO uploads or a linear canvas) and finding what slows V3D under an all-core CPU load
+  (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention is the likeliest cause, not proven:
+  read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5 (moved from 0.8.6 on 2026-10-30).
 
 ## Before 1.0
 
@@ -794,7 +798,8 @@ Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), and wh
   ms under load, no throttling); the frame pipeline and GPU drag, measured on 2026-10-29, gave too little and are off
   by default: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost"). The firmware throttling
   detection was checked on the Pi 5 (the under-voltage alarm present, reading 0). Hardware video decoding and the x86 PC
-  reference moved to 0.8.7 (2026-10-29, "Release 0.8.7 (planned)").
+  reference moved to 0.8.7 (2026-10-29, "Release 0.8.7 (planned)"), and so did GPU drag for the whole drag and the
+  rest of the Pi 5 under load (fewer pixels per frame, what slows V3D; 2026-10-30).
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel
