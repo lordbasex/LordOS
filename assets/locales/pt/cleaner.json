@@ -44,7 +44,7 @@
   "freeAfter": "Espaço livre agora: {size}",
   "trashNote": "Os itens estão na Lixeira e podem ser restaurados pelo Arquivos. O espaço só é liberado ao esvaziar a Lixeira.",
   "backToList": "Voltar",
-  "status.done": "Movido para a Lixeira",
+  "status.done": "Concluído",
   "status.skipped": "Ignorado",
   "status.changed": "Mudou desde a análise",
   "status.denied": "Acesso negado",
@@ -63,5 +63,14 @@
   "error.protocol": "O analisador enviou algo inválido, então os resultados foram descartados.",
   "error.timeout": "O analisador parou de responder.",
   "error.sandbox": "O analisador não conseguiu se isolar, então não foi executado.",
-  "cancelled": "Análise cancelada."
+  "cancelled": "Análise cancelada.",
+  "clean": "Limpar…",
+  "confirm.delete": "{n} arquivos regeneráveis ({size}) serão excluídos. Isso não pode ser desfeito.",
+  "rule.fontconfig": "O cache de fontes. É reconstruído na próxima vez que as fontes forem usadas.",
+  "rule.shader-cache": "Shaders gráficos compilados. São compilados de novo quando necessário.",
+  "rule.shader-db": "O banco de dados de shaders gráficos compilados. É reconstruído quando necessário.",
+  "rule.media-registry": "A lista de plugins de mídia. É reconstruída na próxima reprodução.",
+  "rule.temporary": "Arquivos temporários com mais de uma semana. Verifique antes: eles vão para a Lixeira.",
+  "rule.trash": "Itens na Lixeira. Esvazie a Lixeira para liberar o espaço.",
+  "warn.deleteIsFinal": "Arquivos excluídos não podem ser restaurados."
 }

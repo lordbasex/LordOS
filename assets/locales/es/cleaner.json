@@ -44,7 +44,7 @@
   "freeAfter": "Espacio libre ahora: {size}",
   "trashNote": "Los elementos están en la Papelera y se pueden restaurar desde Archivos. El espacio se libera solo al vaciar la Papelera.",
   "backToList": "Volver",
-  "status.done": "Movido a la Papelera",
+  "status.done": "Hecho",
   "status.skipped": "Omitido",
   "status.changed": "Cambió desde el análisis",
   "status.denied": "Acceso denegado",
@@ -63,5 +63,14 @@
   "error.protocol": "El analizador envió algo inválido, así que sus resultados se descartaron.",
   "error.timeout": "El analizador dejó de responder.",
   "error.sandbox": "El analizador no pudo aislarse, así que no se ejecutó.",
-  "cancelled": "Análisis cancelado."
+  "cancelled": "Análisis cancelado.",
+  "clean": "Limpiar…",
+  "confirm.delete": "Se eliminarán {n} archivos regenerables ({size}). Esto no se puede deshacer.",
+  "rule.fontconfig": "La caché de fuentes. Se reconstruye la próxima vez que se usen las fuentes.",
+  "rule.shader-cache": "Sombreadores gráficos compilados. Se compilan de nuevo cuando hacen falta.",
+  "rule.shader-db": "La base de datos de sombreadores gráficos compilados. Se reconstruye cuando hace falta.",
+  "rule.media-registry": "La lista de complementos multimedia. Se reconstruye la próxima vez que se reproduzca algo.",
+  "rule.temporary": "Archivos temporales de más de una semana. Revísalos antes: van a la Papelera.",
+  "rule.trash": "Elementos en la Papelera. Vacía la Papelera para liberar su espacio.",
+  "warn.deleteIsFinal": "Los archivos eliminados no se pueden restaurar."
 }

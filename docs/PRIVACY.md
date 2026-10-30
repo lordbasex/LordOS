@@ -250,6 +250,13 @@ sandbox-test net: 14/14      the same, but an AF_INET socket opens (network perm
 sandbox-test helper: 17/17   see "Helpers" below
 ```
 
+## Cleaner's delete
+
+Cleaner is the only place in LordOS that deletes a file outside the Trash (approved by the maintainer on 2026-10-30;
+`CLEANER-SECURITY.md`). It runs in `lord-server` as the session user, only for a file a scan found under a `regenerable`
+rule's fixed root, from a plan the user confirmed, with a confirmation that says it can't be undone. JS can't name a path,
+`lord.fs` gained nothing, and the scans stay on this machine.
+
 ## Decoding helpers: `sandbox_apply_helper`
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data

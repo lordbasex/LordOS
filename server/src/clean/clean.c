@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
@@ -29,9 +30,9 @@
 #define IDLE_MS 30000                       /* the helper reports at least every ~1024 entries */
 #define SAFE_INT 9007199254740992.0         /* 2^53: exact in a JSON number */
 
-enum { JOB_NONE, JOB_SCAN, JOB_PLAN, JOB_EXEC };
+enum { JOB_NONE, JOB_SCAN, JOB_PLAN, JOB_EXEC, JOB_EMPTY };
 enum { ST_IDLE, ST_RUNNING, ST_DONE, ST_FAILED, ST_CANCELLED };
-static const char *const job_name[] = { "none", "scan", "plan", "execute" };
+static const char *const job_name[] = { "none", "scan", "plan", "execute", "emptyTrash" };
 static const char *const st_name[] = { "idle", "running", "done", "failed", "cancelled" };
 
 /* a plan item's state; the last seven are the results an item can end with */
@@ -79,6 +80,8 @@ typedef struct {
     size_t n, done;
     long count[I_COUNT];
     double logical, allocated, estimated;
+    long trash_items, delete_items;
+    double trash_alloc, delete_alloc;
     double expires, free_before, free_after;
     int links_elsewhere;
 } Plan;
@@ -91,6 +94,8 @@ static pid_t child = -1;
 static Scan *scan;
 static Plan *plan;
 static int next_id = 1;
+static long empty_items = -1;
+static double empty_before, empty_after;
 
 #ifdef CLEAN_TEST
 long clean_test_max_files = CLEAN_MAX_FILES;
@@ -583,7 +588,8 @@ static int item_check(const Cand *c, const int *rootfd, const int *root_err, int
     int nrules;
     const CleanRule *rule = &clean_rules(&nrules)[c->rule];
     *parent = -1;
-    if (rule->action != CLEAN_ACT_TRASH || rule->risk == CLEAN_RISK_PROTECTED) return I_UNSUPPORTED;
+    if (rule->risk == CLEAN_RISK_PROTECTED || (rule->action != CLEAN_ACT_TRASH && rule->action != CLEAN_ACT_DELETE) ||
+        (rule->action == CLEAN_ACT_DELETE && rule->risk != CLEAN_RISK_REGENERABLE)) return I_UNSUPPORTED;
     if (protected_path(rule, c->rel)) return I_DENIED;
     if (rootfd[c->rule] < 0) return root_err[c->rule];
     const char *base = strrchr(c->rel, '/');
@@ -651,8 +657,23 @@ static void *plan_thread(void *arg) {
         else elsewhere = 1;
     }
     for (size_t i = 0; i < s->n; i++) s->c[i].selected = 0;
+    long trash_items = 0, delete_items = 0;
+    double trash_alloc = 0, delete_alloc = 0;
+    int nrules;
+    const CleanRule *rules = clean_rules(&nrules);
+    for (size_t i = 0; i < p->n; i++) {
+        if (p->it[i].status != I_READY) continue;
+        const Cand *c = &s->c[p->it[i].cand];
+        int del = rules[c->rule].action == CLEAN_ACT_DELETE;
+        if (del) delete_items++; else trash_items++;
+        if (!c->first) { if (del) delete_alloc += (double)c->alloc; else trash_alloc += (double)c->alloc; }
+    }
     close_roots(rootfd);
     pthread_mutex_lock(&mu);
+    p->trash_items = trash_items;
+    p->delete_items = delete_items;
+    p->trash_alloc = trash_alloc;
+    p->delete_alloc = delete_alloc;
     memcpy(p->count, count, sizeof count);
     p->logical = logical;
     p->allocated = allocated;
@@ -665,49 +686,109 @@ static void *plan_thread(void *arg) {
     return NULL;
 }
 
+/* with mu held; takes it */
+static int plan_begin(Item *it, size_t k) {
+    Plan *p = calloc(1, sizeof *p);
+    if (!p) { free(it); return CLEAN_E_UNAVAILABLE; }
+    p->id = next_id++;
+    p->it = it;
+    p->n = k;
+    p->state = P_BUILDING;
+    plan_free(plan);
+    plan = p;
+    begin(JOB_PLAN);
+    if (start_thread(plan_thread, p)) { plan = NULL; state = ST_IDLE; plan_free(p); return CLEAN_E_UNAVAILABLE; }
+    return p->id;
+}
+
 int clean_plan(int sid, const uint32_t *ids, size_t n) {
     pthread_mutex_lock(&mu);
-    int r = CLEAN_E_NOSCAN;
+    int r;
     if (state == ST_RUNNING) r = CLEAN_E_BUSY;
     else if (!scan || scan->id != sid || job == JOB_NONE) r = CLEAN_E_NOSCAN;
     else if (!n || n > CLEAN_MAX_FILES) r = CLEAN_E_BADID;
     else {
-        unsigned char *seen = calloc(scan->n, 1);
-        Plan *p = calloc(1, sizeof *p);
+        unsigned char *seen = calloc(scan->n ? scan->n : 1, 1);
         Item *it = malloc(n * sizeof *it);
         size_t k = 0;
-        r = CLEAN_E_BADID;
-        if (seen && p && it) {
-            int ok = 1;
-            for (size_t i = 0; i < n && ok; i++) {
-                if (ids[i] < 1 || ids[i] > scan->n) { ok = 0; break; }
-                if (seen[ids[i] - 1]) continue;     /* the same id twice is one item */
-                seen[ids[i] - 1] = 1;
-                it[k++] = (Item){ ids[i] - 1, I_READY };
-            }
-            if (ok) {
-                p->id = next_id++;
-                p->it = it;
-                p->n = k;
-                p->state = P_BUILDING;
-                plan_free(plan);
-                plan = p;
-                begin(JOB_PLAN);
-                if (start_thread(plan_thread, p)) { plan = NULL; state = ST_IDLE; r = CLEAN_E_UNAVAILABLE; plan_free(p); }
-                else r = p->id;
-                p = NULL;
-                it = NULL;
-            }
+        int ok = seen && it;
+        for (size_t i = 0; i < n && ok; i++) {
+            if (ids[i] < 1 || ids[i] > scan->n) { ok = 0; break; }
+            if (seen[ids[i] - 1]) continue;         /* the same id twice is one item */
+            seen[ids[i] - 1] = 1;
+            it[k++] = (Item){ ids[i] - 1, I_READY };
         }
         free(seen);
-        free(it);
-        free(p);
+        if (ok) r = plan_begin(it, k);
+        else { free(it); r = CLEAN_E_BADID; }
+    }
+    pthread_mutex_unlock(&mu);
+    return r;
+}
+
+int clean_plan_rules(int sid, const char *const *names, int n) {
+    int nrules;
+    const CleanRule *rules = clean_rules(&nrules);
+    unsigned wanted = 0;
+    for (int i = 0; i < n; i++) {
+        int found = 0;
+        for (int k = 0; k < nrules && k < CLEAN_MAX_ROOTS; k++) if (!strcmp(names[i], rules[k].id)) { wanted |= 1u << k; found = 1; }
+        if (!found) return CLEAN_E_BADID;
+    }
+    pthread_mutex_lock(&mu);
+    int r;
+    if (state == ST_RUNNING) r = CLEAN_E_BUSY;
+    else if (!scan || scan->id != sid || job == JOB_NONE) r = CLEAN_E_NOSCAN;
+    else {
+        size_t k = 0;
+        Item *it = malloc((scan->n ? scan->n : 1) * sizeof *it);
+        if (!it) r = CLEAN_E_UNAVAILABLE;
+        else {
+            for (size_t i = 0; i < scan->n; i++) if (wanted >> scan->c[i].rule & 1) it[k++] = (Item){ (uint32_t)i, I_READY };
+            if (k) r = plan_begin(it, k);
+            else { free(it); r = CLEAN_E_BADID; }
+        }
     }
     pthread_mutex_unlock(&mu);
     return r;
 }
 
 /* ---- execution ---- */
+
+static int same_file(int fd, const char *name, const Cand *c) {
+    struct statx sx;
+    if (statx(fd, name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_INO | STATX_SIZE | STATX_MTIME, &sx)) return 0;
+    return S_ISREG(sx.stx_mode) && makedev(sx.stx_dev_major, sx.stx_dev_minor) == c->dev && sx.stx_ino == c->ino &&
+           (int64_t)sx.stx_size == c->size && sx.stx_mtime.tv_sec == c->mtime && sx.stx_mtime.tv_nsec == c->nsec;
+}
+
+/* The real delete, for a regenerable rule's file only, in the folder item_check opened beneath the root:
+ * nothing is resolved by path here. The name moves to a private one in the same folder, the object now
+ * behind that private name is compared, and only that object is unlinked. Anything else goes back. */
+static int delete_file(int fd, const char *name, const Cand *c) {
+    static unsigned serial;
+    char tmp[64];
+    snprintf(tmp, sizeof tmp, ".lordos-clean-%d-%u", (int)getpid(), __atomic_add_fetch(&serial, 1, __ATOMIC_RELAXED));
+    if (renameat2(fd, name, fd, tmp, RENAME_NOREPLACE)) return status_of_errno(errno);
+    if (!same_file(fd, tmp, c)) return renameat2(fd, tmp, fd, name, RENAME_NOREPLACE) ? I_FAILED : I_CHANGED;
+    if (unlinkat(fd, tmp, 0)) {
+        int e = errno;
+        return renameat2(fd, tmp, fd, name, RENAME_NOREPLACE) ? I_FAILED : status_of_errno(e);
+    }
+    return I_DONE;
+}
+
+static int trash_file(int fd, const char *name, const char *real, const Cand *c) {
+    char dest[PATH_MAX * 2], err[256];
+    if (fstrash_put_at(fd, name, real, dest, sizeof dest, err, sizeof err))
+        return errno == EXDEV ? I_UNSUPPORTED : status_of_errno(errno);
+    /* the name could have been pointed at another file between the check and the move: then that file
+     * goes back where it was */
+    struct stat sb;
+    if (lstat(dest, &sb) || sb.st_ino != c->ino || sb.st_dev != c->dev)
+        return fstrash_restore(dest, err, sizeof err) ? I_FAILED : I_CHANGED;
+    return I_DONE;
+}
 
 static void *exec_thread(void *arg) {
     Plan *p = arg;
@@ -729,21 +810,12 @@ static void *exec_thread(void *arg) {
             if (cancel_req) { cancelled = 1; st = I_CANCELLED; }
             else st = item_check(c, rootfd, root_err, &fd, &name);
             if (st == I_READY) {
-                char real[PATH_MAX * 2 + CLEAN_PATH_MAX], dest[PATH_MAX * 2], err[256];
+                char real[PATH_MAX * 2 + CLEAN_PATH_MAX];
                 snprintf(real, sizeof real, "%s/%s/%s", fsops_home(), rules[c->rule].root, c->rel);
 #ifdef CLEAN_TEST
                 if (clean_test_before_trash) clean_test_before_trash(real);
 #endif
-                if (fstrash_put_at(fd, name, real, dest, sizeof dest, err, sizeof err)) {
-                    st = errno == EXDEV ? I_UNSUPPORTED : status_of_errno(errno);
-                } else {
-                    /* the name could have been pointed at another file between the check and the move: then
-                     * that file goes back where it was */
-                    struct stat sb;
-                    if (lstat(dest, &sb) || sb.st_ino != c->ino || sb.st_dev != c->dev)
-                        st = fstrash_restore(dest, err, sizeof err) ? I_FAILED : I_CHANGED;
-                    else st = I_DONE;
-                }
+                st = rules[c->rule].action == CLEAN_ACT_DELETE ? delete_file(fd, name, c) : trash_file(fd, name, real, c);
             }
             if (fd >= 0) close(fd);
         }
@@ -762,6 +834,33 @@ static void *exec_thread(void *arg) {
     pthread_mutex_unlock(&mu);
     job_end(cancelled ? ST_CANCELLED : ST_DONE, NULL);
     return NULL;
+}
+
+static void *empty_thread(void *arg) {
+    (void)arg;
+    double before = free_bytes();
+    long n = cancel_req ? 0 : fstrash_empty();
+    double after = free_bytes();
+    pthread_mutex_lock(&mu);
+    empty_items = n;
+    empty_before = before;
+    empty_after = after;
+    pthread_mutex_unlock(&mu);
+    job_end(ST_DONE, NULL);
+    return NULL;
+}
+
+int clean_empty_trash(void) {
+    pthread_mutex_lock(&mu);
+    int r = 0;
+    if (state == ST_RUNNING) r = CLEAN_E_BUSY;
+    else {
+        begin(JOB_EMPTY);
+        empty_items = -1;
+        if (start_thread(empty_thread, NULL)) { state = ST_IDLE; r = CLEAN_E_UNAVAILABLE; }
+    }
+    pthread_mutex_unlock(&mu);
+    return r;
 }
 
 int clean_execute(int id) {
@@ -825,8 +924,23 @@ char *clean_poll(void) {
         jb_raw(&b, ",\"estimated\":"); jb_num(&b, p->estimated);
         jb_raw(&b, ",\"freeBefore\":"); jb_num(&b, p->free_before);
         jb_raw(&b, ",\"freeAfter\":"); jb_num(&b, p->free_after);
-        jb_printf(&b, ",\"warnings\":[\"trashKeepsSpace\"%s%s]}", scan && !scan->complete ? ",\"scanIncomplete\"" : "",
-                  p->links_elsewhere ? ",\"linksElsewhere\"" : "");
+        jb_printf(&b, ",\"trashItems\":%ld,\"deleteItems\":%ld,\"trashAllocated\":", p->trash_items, p->delete_items);
+        jb_num(&b, p->trash_alloc);
+        jb_raw(&b, ",\"deleteAllocated\":");
+        jb_num(&b, p->delete_alloc);
+        jb_raw(&b, ",\"warnings\":[");
+        const char *const ws[] = { p->trash_items ? "trashKeepsSpace" : NULL, p->delete_items ? "deleteIsFinal" : NULL,
+                                   scan && !scan->complete ? "scanIncomplete" : NULL, p->links_elsewhere ? "linksElsewhere" : NULL };
+        for (int i = 0, k = 0; i < 4; i++) if (ws[i]) jb_printf(&b, "%s\"%s\"", k++ ? "," : "", ws[i]);
+        jb_raw(&b, "]}");
+    } else jb_raw(&b, "null");
+    jb_raw(&b, ",\"emptied\":");
+    if (empty_items >= 0) {
+        jb_printf(&b, "{\"items\":%ld,\"freeBefore\":", empty_items);
+        jb_num(&b, empty_before);
+        jb_raw(&b, ",\"freeAfter\":");
+        jb_num(&b, empty_after);
+        jb_raw(&b, "}");
     } else jb_raw(&b, "null");
     jb_raw(&b, "}");
     pthread_mutex_unlock(&mu);

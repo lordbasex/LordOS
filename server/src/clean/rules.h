@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 typedef enum { CLEAN_RISK_REGENERABLE, CLEAN_RISK_REVIEW, CLEAN_RISK_PROTECTED } CleanRisk;
-typedef enum { CLEAN_ACT_NONE, CLEAN_ACT_TRASH } CleanAction;
+typedef enum { CLEAN_ACT_NONE, CLEAN_ACT_TRASH, CLEAN_ACT_DELETE } CleanAction;
 
 typedef struct {
     const char *id;                 /* [a-z0-9-], at most 32 bytes */
@@ -17,7 +17,7 @@ typedef struct {
     int min_age_days;               /* 0 = any age */
     const char *const *exclude;     /* names (patterns) never offered, NULL-terminated; NULL = none */
     CleanRisk risk;
-    CleanAction action;
+    CleanAction action;             /* CLEAN_ACT_DELETE: regenerable rules only, approved 2026-10-30 */
     const char *text_key;           /* cleaner.rule.<id> in assets/locales/<lang>/cleaner.json */
 } CleanRule;
 

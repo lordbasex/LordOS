@@ -25,6 +25,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
   before (`fsops-test`).
 
+- **Cleaner: cache rules, the real delete and the Trash** (2026-10-30, the delete approved by the maintainer that day):
+  rules for the thumbnails, font, graphics shader and media plugin caches, each at an explicit root and regenerable;
+  `temporary` (`.cache/tmp`, older than a week, reviewed, to the Trash); and `trash`, which measures the Trash and is emptied
+  with the real `fstrash_empty` on a thread, confirmed as irreversible. The delete exists only inside `lord.clean`, as the
+  session user, for regenerable rules: the name moves to a private one in a folder opened beneath the root, the object is
+  compared again, and only that object is unlinked. `build/clean-test` covers link swaps, a mount inside the root (in a
+  user and mount namespace), a file changed after the plan, and a fingerprint of everything outside the root.
+
 - **Cleaner, first slice** (2026-10-30; `docs/CLEANER-ARCHITECTURE.md`, each feature's state in `docs/CLEANER-ROADMAP.md`):
   one rule, end to end, from a scan to the Trash.
   - **`lord-clean`** (`server/src/clean/helper/`): a read-only scanner started like `lord-doc`. lord-server opens each
@@ -45,8 +53,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     check can't redirect the move; `fsops_protected_below`, for the rule table. `lord.fs`, `admin.c` and the broker are
     unchanged. If a name is pointed at another file at the last moment, that file is put back and the item ends as
     changed.
-  - **No real delete exists.** Moving to the Trash doesn't free space and the app says so in the confirmation; space is
-    measured again afterwards. A delete for caches waits for the maintainer's approval.
+  - Moving to the Trash doesn't free space and the app says so in the confirmation; space is measured again afterwards.
   - **The app** (`apps/cleaner/`, `sdk/cleaner.js`, en/es/pt): built in, not isolated. Overview only: Scan, real counters
     (no percentage until the total is known), list, selection, confirmation, result per item, free space before and after.
     Its icon is in `web/src/app-icons/`.

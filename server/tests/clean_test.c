@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sched.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -161,6 +163,8 @@ static int plan_all(int scan, Poll *p) {
 
 #define T ".cache/thumbnails"
 
+static CleanRule base;                              /* one rule to the Trash: most tests below use it */
+
 /* ---- rule table ---- */
 
 static CleanRule good(void) {
@@ -172,9 +176,16 @@ static void test_rules(void) {
     int n;
     char why[128];
     const CleanRule *t = clean_rules(&n);
-    CHECK(n == 1);
+    CHECK(n == 7);
     CHECK(!clean_rules_check(t, n, why, sizeof why));
-    CHECK(!strcmp(t[0].id, "thumbnails") && !strcmp(t[0].root, T) && t[0].risk == CLEAN_RISK_REGENERABLE && t[0].action == CLEAN_ACT_TRASH);
+    CHECK(!strcmp(t[0].id, "thumbnails") && !strcmp(t[0].root, T) && t[0].risk == CLEAN_RISK_REGENERABLE && t[0].action == CLEAN_ACT_DELETE);
+    for (int i = 0; i < n; i++) {                   /* a real delete only for regenerable rules, the Trash folder never cleaned item by item */
+        CHECK(t[i].action != CLEAN_ACT_DELETE || t[i].risk == CLEAN_RISK_REGENERABLE);
+        CHECK(strcmp(t[i].root, ".cache"));
+    }
+    CleanRule del = good();
+    del.risk = CLEAN_RISK_REVIEW; del.action = CLEAN_ACT_DELETE;
+    CHECK(clean_rule_check(&del, why, sizeof why));
     CleanRule r = good();
     CHECK(!clean_rule_check(&r, why, sizeof why));
 #define BAD(field, value) do { r = good(); r.field = value; CHECK(clean_rule_check(&r, why, sizeof why)); } while (0)
@@ -374,7 +385,7 @@ static void test_protected(void) {
     unsigned M = (unsigned)(st.st_dev >> 8) & 0xfff, m = (unsigned)(st.st_dev & 0xff) | ((unsigned)(st.st_dev >> 12) & 0xfff00);
     snprintf(rec, sizeof rec, "{\"r\":0,\"p\":\"fwlists/list.png\",\"M\":%u,\"m\":%u,\"i\":\"1\",\"l\":1,\"s\":1,\"a\":1,\"t\":1,\"n\":0,\"u\":%u}", M, m, (unsigned)getuid());
     CHECK(clean_test_record(rec, 1) == 1);
-    clean_rules_override(NULL, 0);
+    clean_rules_override(&base, 1);
 
     /* a candidate that became protected: the plan and the execution both refuse it */
     wipe();
@@ -395,7 +406,7 @@ static void test_protected(void) {
     wait_job(&q);
     CHECK(count(q.plan, "denied") == 1 && count(q.plan, "done") == 0);
     poll_free(&q);
-    clean_rules_override(NULL, 0);
+    clean_rules_override(&base, 1);
     CHECK(exists(".cache/lordos/fwlists/a.png") && exists(T "/a.png"));
 
     /* a rule that stopped offering the action, and one the file is too new for */
@@ -414,7 +425,7 @@ static void test_protected(void) {
     plan_all(scan, &q);
     CHECK(count(q.plan, "skipped") == 1);
     poll_free(&q);
-    clean_rules_override(NULL, 0);
+    clean_rules_override(&base, 1);
     CHECK(exists(T "/a.png"));
 }
 
@@ -638,6 +649,222 @@ static void test_cancel_scan(void) {
     poll_free(&p);
 }
 
+/* ---- the real delete: real table, throwaway folder ---- */
+
+/* a fingerprint of everything outside the rule's root */
+static void outside_sum(char *out, size_t n) {
+    char cmd[PATH_MAX * 3];
+    snprintf(cmd, sizeof cmd, "cd '%s' && find . -path ./.cache/thumbnails -prune -o -printf '%%p %%y %%s %%T@ %%l\\n' | LC_ALL=C sort | sha256sum", H);
+    FILE *f = popen(cmd, "r");
+    if (!f || !fgets(out, (int)n, f)) abort();
+    pclose(f);
+}
+
+static char deepdir[64];
+static void swap_folder(const char *real) {         /* the folder becomes a link at the last moment */
+    (void)real;
+    char a[PATH_MAX * 2], b[PATH_MAX * 2 + 8];
+    path_of(a, sizeof a, deepdir);
+    snprintf(b, sizeof b, "%s.old", a);
+    if (rename(a, b) || symlink("../../Documents", a)) abort();
+    clean_test_before_trash = NULL;
+}
+
+static void test_delete(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    put(T "/n/a.png", "aaaa");
+    put(T "/n/b.png", "bbbb");
+    put(T "/n/grown.png", "grown");
+    put(T "/m/c.png", "cccc");
+    put(T "/l/d.png", "dddd");
+    put("Documents/c.png", "personal");
+    put("Documents/d.png", "personal");
+    put("Documents/swapped.png", "other");
+    char before[128], after[128];
+    outside_sum(before, sizeof before);
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 5);
+    poll_free(&p);
+    const char *const names[] = { "thumbnails" };
+    int plan = clean_plan_rules(scan, names, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(num(p.plan, "deleteItems") == 5 && num(p.plan, "trashItems") == 0);
+    int final = 0;
+    for (const JVal *w = json_get(p.plan, "warnings")->kid; w; w = w->next) final |= !strcmp(w->str, "deleteIsFinal");
+    CHECK(final);
+    poll_free(&p);
+    /* after the plan: a changed file, and a folder swapped for a link to personal files of the same name */
+    put(T "/n/grown.png", "grown a lot");
+    char a[PATH_MAX * 2], b[PATH_MAX * 2];
+    path_of(a, sizeof a, T "/m");
+    path_of(b, sizeof b, T "/m.old");
+    CHECK(!rename(a, b));
+    link_to("../../Documents", T "/m");
+    /* and one swapped in the instant after its item was checked */
+    snprintf(deepdir, sizeof deepdir, T "/l");
+    clean_test_before_trash = NULL;
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(count(p.plan, "changed") == 2 && count(p.plan, "done") == 3);
+    poll_free(&p);
+    CHECK(!exists(T "/n/a.png") && !exists(T "/n/b.png") && !exists(T "/l/d.png"));
+    CHECK(exists(T "/n/grown.png") && exists(T "/m.old/c.png"));
+    CHECK(!exists(".local/share/Trash"));           /* deleted, not moved */
+    outside_sum(after, sizeof after);
+    CHECK(!strcmp(before, after));                  /* nothing outside the root moved */
+
+    /* the folder swapped after its item was checked: only the original folder's file can go */
+    wipe();
+    put(T "/l/d.png", "dddd");
+    put("Documents/d.png", "personal");
+    outside_sum(before, sizeof before);
+    scan = run_scan(&p);
+    poll_free(&p);
+    plan = clean_plan_rules(scan, names, 1);
+    wait_job(&p);
+    poll_free(&p);
+    clean_test_before_trash = swap_folder;
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    poll_free(&p);
+    outside_sum(after, sizeof after);
+    CHECK(!strcmp(before, after) && exists("Documents/d.png"));
+    CHECK(!exists(T "/l.old/d.png"));
+
+    /* the name pointed at another file at the last moment: that file survives, under its name */
+    wipe();
+    put(T "/a.png", "a");
+    put("Documents/swapped.png", "b");
+    scan = run_scan(&p);
+    poll_free(&p);
+    plan = clean_plan_rules(scan, names, 1);
+    wait_job(&p);
+    poll_free(&p);
+    snprintf(swap_rel, sizeof swap_rel, T "/a.png");
+    clean_test_before_trash = swap_file;
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    clean_test_before_trash = NULL;
+    CHECK(count(p.plan, "changed") == 1 && count(p.plan, "done") == 0);
+    poll_free(&p);
+    CHECK(exists(T "/a.png"));
+    char list[PATH_MAX * 3];
+    snprintf(list, sizeof list, "ls -A '%s/" T "' | grep -c lordos-clean", H);
+    FILE *f = popen(list, "r");
+    int leftovers = -1;
+    if (f) { if (fscanf(f, "%d", &leftovers) != 1) leftovers = -1; pclose(f); }
+    CHECK(leftovers == 0);                          /* no private name left behind */
+
+    /* a rule's name can't be asked for if it isn't in the table */
+    const char *const nope[] = { "../etc" };
+    CHECK(clean_plan_rules(scan, nope, 1) == CLEAN_E_BADID);
+    /* the Trash rule shows its size and offers no action item by item */
+    wipe();
+    put(".local/share/Trash/files/old.bin", "old");
+    scan = run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 1);
+    poll_free(&p);
+    const char *const tr[] = { "trash" };
+    plan = clean_plan_rules(scan, tr, 1);
+    wait_job(&p);
+    CHECK(count(p.plan, "unsupported") == 1);
+    poll_free(&p);
+    /* a review rule never gets the real delete, even from a table that asks for it */
+    static CleanRule forced[16];
+    int nreal;
+    const CleanRule *real = clean_rules(&nreal);
+    memcpy(forced, real, (size_t)nreal * sizeof *forced);
+    forced[nreal - 1].action = CLEAN_ACT_DELETE;
+    clean_rules_override(forced, nreal);
+    plan = plan_all(scan, &p);
+    CHECK(count(p.plan, "unsupported") == 1);
+    poll_free(&p);
+    clean_rules_override(NULL, 0);
+    CHECK(exists(".local/share/Trash/files/old.bin"));
+    /* the temporary rule's age and the real emptyTrash */
+    CHECK(clean_empty_trash() == 0);
+    wait_job(&p);
+    CHECK(num(json_get(p.d.root, "emptied"), "items") == 1);
+    poll_free(&p);
+    CHECK(!exists(".local/share/Trash/files/old.bin"));
+    wipe();
+    put(".cache/tmp/new.bin", "new");
+    put(".cache/tmp/old.bin", "old");
+    char o[PATH_MAX * 2];
+    path_of(o, sizeof o, ".cache/tmp/old.bin");
+    struct timespec tm[2] = { { 1000000000, 0 }, { 1000000000, 0 } };
+    CHECK(!utimensat(AT_FDCWD, o, tm, 0));
+    run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 1 && has_candidate("old.bin") && !has_candidate("new.bin"));
+    poll_free(&p);
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+/* a mount inside the root, in a user and mount namespace of a child: returns fails, or -1 if the kernel refuses */
+static int mount_child(void) {
+    clean_rules_override(NULL, 0);
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+    if (unshare(CLONE_NEWUSER | CLONE_NEWNS)) return -1;
+    char m[64];
+    int fd = open("/proc/self/setgroups", O_WRONLY);
+    if (fd >= 0) { if (write(fd, "deny", 4) < 0) return -1; close(fd); }
+    fd = open("/proc/self/uid_map", O_WRONLY);
+    int n = snprintf(m, sizeof m, "%u %u 1", (unsigned)uid, (unsigned)uid);
+    if (fd < 0 || write(fd, m, (size_t)n) < 0) return -1;
+    close(fd);
+    fd = open("/proc/self/gid_map", O_WRONLY);
+    n = snprintf(m, sizeof m, "%u %u 1", (unsigned)gid, (unsigned)gid);
+    if (fd < 0 || write(fd, m, (size_t)n) < 0) return -1;
+    close(fd);
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL)) return -1;
+    wipe();
+    put(T "/plain.png", "p");
+    put(T "/over/under.png", "under");
+    put(T "/mnt/.keep", "");
+    char a[PATH_MAX * 2];
+    path_of(a, sizeof a, T "/mnt");
+    if (mount("tmpfs", a, "tmpfs", 0, NULL)) return -1;
+    put(T "/mnt/inside.png", "inside");
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 2 && skipped(p.scan, "mounts") == 1);
+    CHECK(!has_candidate("inside.png"));
+    poll_free(&p);
+    /* a mount placed over a folder after the scan: its same-named file isn't touched, nor what it hides */
+    const char *const names[] = { "thumbnails" };
+    int plan = clean_plan_rules(scan, names, 1);
+    wait_job(&p);
+    poll_free(&p);
+    path_of(a, sizeof a, T "/over");
+    if (mount("tmpfs", a, "tmpfs", 0, NULL)) return -1;
+    put(T "/over/under.png", "under");
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "changed") == 1 && count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(exists(T "/over/under.png") && exists(T "/mnt/inside.png") && !exists(T "/plain.png"));
+    umount(a);
+    CHECK(exists(T "/over/under.png"));
+    return fails;
+}
+
+static void test_mounts(void) {
+    fflush(NULL);
+    pid_t pid = fork();
+    if (pid == 0) { fails = 0; int r = mount_child(); _exit(r < 0 ? 77 : r ? 1 : 0); }
+    int st = 0;
+    waitpid(pid, &st, 0);
+    if (WIFEXITED(st) && WEXITSTATUS(st) == 77) { printf("clean-test: mount cases skipped: needs user namespaces\n"); return; }
+    checks++;
+    if (!WIFEXITED(st) || WEXITSTATUS(st)) { fails++; fprintf(stderr, "FAIL: mount cases\n"); }
+}
+
 int main(void) {
     if (syscall(SYS_landlock_create_ruleset, NULL, 0U, 1U) < 1) { printf("clean-test: skipped: needs Landlock\n"); return 0; }
     char tmpl[] = "/tmp/clean-test.XXXXXX";
@@ -645,6 +872,11 @@ int main(void) {
     fsops_init(H, "clean-test");
     CHECK(clean_available());
     test_rules();
+    base = good();
+    base.root = T;
+    base.pattern = "*.png";
+    base.text_key = "cleaner.rule.good";
+    clean_rules_override(&base, 1);
     test_scan();
     test_absent();
     test_symlinks();
@@ -659,6 +891,8 @@ int main(void) {
     test_hardlinks();
     test_plan_input();
     test_cancel_scan();
+    test_delete();
+    test_mounts();
     wipe();
     rmdir(H);
     printf("clean-test: %d checks, %d failed\n", checks, fails);

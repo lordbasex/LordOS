@@ -4,12 +4,13 @@
  *   poll()                        { job, state, error, scan, plan }: real counters, never a percentage
  *   cancel(forget)                stops the job; forget (boolean) also drops the results
  *   results(kind, offset, limit)  a page ('scan' | 'plan') of { id, rule, path, size, allocated, … }
- *   plan(scanId, ids)             builds a plan from candidate ids, on a thread: its id
+ *   plan(scanId, ids)             builds a plan from candidate ids, or { rules: [ids] }, on a thread: its id
+ *   emptyTrash()                  the real emptyTrash, on a thread; can't be undone
  *   execute(planId)               runs that plan once, on a thread
  *   status()                      { available, free, total }
  *
- * JS only holds ids of the current scan and display paths: authority is never a path from JS, and
- * there is no real delete here. Registered for the session's JS only, never for an isolated app. */
+ * JS only holds ids of the current scan and display paths: authority is never a path from JS. The real
+ * delete is reached only through a plan of a regenerable rule. Registered for the session's JS only, never for an isolated app. */
 #include "js_clean.h"
 #include "js_err.h"
 #include "../clean/clean.h"
@@ -85,7 +86,29 @@ static JSValue f_results(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_plan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     double scan, len;
-    if (argc != 2 || exact_int(c, argv[0], 1, 2147483647.0, &scan) || !JS_IsArray(c, argv[1])) return js_throw_code(c, "sys.badArgument", NULL);
+    if (argc != 2 || exact_int(c, argv[0], 1, 2147483647.0, &scan) || !JS_IsObject(argv[1])) return js_throw_code(c, "sys.badArgument", NULL);
+    if (!JS_IsArray(c, argv[1])) {                  /* { rules: ['thumbnails', …] } */
+        JSValue rules = JS_GetPropertyStr(c, argv[1], "rules");
+        JSValue l = JS_IsArray(c, rules) ? JS_GetPropertyStr(c, rules, "length") : JS_UNDEFINED;
+        double count;
+        int r = CLEAN_E_BADID;
+        if (!exact_int(c, l, 1, CLEAN_MAX_ROOTS, &count)) {
+            const char *names[CLEAN_MAX_ROOTS];
+            int n = 0, ok = 1;
+            for (uint32_t i = 0; i < (uint32_t)count; i++) {
+                JSValue v = JS_GetPropertyUint32(c, rules, i);
+                const char *t = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+                JS_FreeValue(c, v);
+                if (!t) { ok = 0; break; }
+                names[n++] = t;
+            }
+            if (ok) r = clean_plan_rules((int)scan, names, n);
+            for (int i = 0; i < n; i++) JS_FreeCString(c, names[i]);
+        }
+        JS_FreeValue(c, l);
+        JS_FreeValue(c, rules);
+        return result(c, r);
+    }
     JSValue l = JS_GetPropertyStr(c, argv[1], "length");
     int bad = exact_int(c, l, 1, CLEAN_MAX_FILES, &len);
     JS_FreeValue(c, l);
@@ -112,6 +135,11 @@ static JSValue f_execute(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return result(c, clean_execute((int)plan));
 }
 
+static JSValue f_empty_trash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return result(c, clean_empty_trash());
+}
+
 void js_clean_register(JSContext *c, JSValue lord) {
     JSValue o = JS_NewObject(c);
 #define F(name, fn, n) JS_SetPropertyStr(c, o, name, JS_NewCFunction(c, fn, name, n))
@@ -122,6 +150,7 @@ void js_clean_register(JSContext *c, JSValue lord) {
     F("plan", f_plan, 2);
     F("execute", f_execute, 1);
     F("status", f_status, 0);
+    F("emptyTrash", f_empty_trash, 0);
 #undef F
     JS_SetPropertyStr(c, lord, "clean", o);
 }

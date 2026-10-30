@@ -10,8 +10,22 @@
 #include <string.h>
 
 static const CleanRule table[] = {
-    { .id = "thumbnails", .version = 1, .category = "cache", .root = ".cache/thumbnails", .pattern = "*.png",
-      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule.thumbnails" },
+    { .id = "thumbnails", .version = 2, .category = "cache", .root = ".cache/thumbnails", .pattern = "*.png",
+      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE, .text_key = "cleaner.rule.thumbnails" },
+    { .id = "fontconfig", .version = 1, .category = "cache", .root = ".cache/fontconfig", .pattern = "*",
+      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE, .text_key = "cleaner.rule.fontconfig" },
+    { .id = "shader-cache", .version = 1, .category = "cache", .root = ".cache/mesa_shader_cache", .pattern = "*",
+      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE, .text_key = "cleaner.rule.shader-cache" },
+    { .id = "shader-db", .version = 1, .category = "cache", .root = ".cache/mesa_shader_cache_db", .pattern = "*",
+      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE, .text_key = "cleaner.rule.shader-db" },
+    { .id = "media-registry", .version = 1, .category = "cache", .root = ".cache/gstreamer-1.0", .pattern = "*",
+      .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE, .text_key = "cleaner.rule.media-registry" },
+    /* the name proves little, so review, a week old, and only to the Trash */
+    { .id = "temporary", .version = 1, .category = "temporary", .root = ".cache/tmp", .pattern = "*", .min_age_days = 7,
+      .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule.temporary" },
+    /* shown and measured; only the real Trash empties it (lord.clean.emptyTrash) */
+    { .id = "trash", .version = 1, .category = "trash", .root = ".local/share/Trash/files", .pattern = "*",
+      .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE, .text_key = "cleaner.rule.trash" },
 };
 #define TABLE_N ((int)(sizeof table / sizeof *table))
 
@@ -27,7 +41,7 @@ const CleanRule *clean_rules(int *n) { *n = TABLE_N; return table; }
 const char *clean_risk_name(CleanRisk r) {
     return r == CLEAN_RISK_REGENERABLE ? "regenerable" : r == CLEAN_RISK_REVIEW ? "review" : "protected";
 }
-const char *clean_action_name(CleanAction a) { return a == CLEAN_ACT_TRASH ? "trash" : "none"; }
+const char *clean_action_name(CleanAction a) { return a == CLEAN_ACT_TRASH ? "trash" : a == CLEAN_ACT_DELETE ? "delete" : "none"; }
 
 static int say(char *why, size_t n, const char *id, const char *what) {
     if (why && n) snprintf(why, n, "%s: %s", id ? id : "(no id)", what);
@@ -68,7 +82,8 @@ int clean_rule_check(const CleanRule *r, char *why, size_t n) {
     if (r->min_age_days < 0 || r->min_age_days > 3650) return say(why, n, r->id, "bad age");
     for (const char *const *e = r->exclude; e && *e; e++) if (!pattern_ok(*e)) return say(why, n, r->id, "bad exclusion");
     if (r->risk != CLEAN_RISK_REGENERABLE && r->risk != CLEAN_RISK_REVIEW && r->risk != CLEAN_RISK_PROTECTED) return say(why, n, r->id, "bad risk");
-    if (r->action != CLEAN_ACT_NONE && r->action != CLEAN_ACT_TRASH) return say(why, n, r->id, "bad action");
+    if (r->action != CLEAN_ACT_NONE && r->action != CLEAN_ACT_TRASH && r->action != CLEAN_ACT_DELETE) return say(why, n, r->id, "bad action");
+    if (r->action == CLEAN_ACT_DELETE && r->risk != CLEAN_RISK_REGENERABLE) return say(why, n, r->id, "delete is for regenerable rules only");
     if (r->risk == CLEAN_RISK_PROTECTED && r->action != CLEAN_ACT_NONE) return say(why, n, r->id, "a protected rule has an action");
     char key[64];
     snprintf(key, sizeof key, "cleaner.rule.%s", r->id);

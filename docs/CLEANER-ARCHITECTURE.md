@@ -93,21 +93,23 @@ there. A name like `.tmp` or a folder called `cache` proves nothing by itself.
 Actions:
 
 - **Trash:** the existing `fsops` path. Space isn't reported as freed until the Trash is really emptied.
-- **Clear a cache:** needs the new operation below.
+- **Clear a cache:** the real delete below.
 - **Package removal:** the Store's existing path, with `lord.pkg.plan` shown first.
 
-## One decision for the maintainer: a real delete for caches
+## The real delete for caches: approved by the maintainer on 2026-10-30
 
-`AGENTS.md` says `lord.fs` has no general delete, and the Trash doesn't free space. Caches need one, or Cleaner can only
-move them to the Trash. Proposed, and **not built until approved**: execution inside `lord.clean`, as the session user,
-never root, for **`regenerable` rules only**.
+`AGENTS.md` says `lord.fs` has no general delete, and the Trash doesn't free space. Caches need one. It lives inside
+`lord.clean`, as the session user, never root, for **`regenerable` rules only**.
 
 - No path comes from JS: only a plan id, and the plan's items come from the rule table.
 - It deletes only files beneath that rule's fixed root, with `openat2` and `unlinkat`, and never crosses a mount.
+- The object is pinned first: its name moves to a private one in the folder already opened beneath the root, the object
+  behind that name is compared again, and only that object is unlinked. Anything else goes back to its name.
 - The `fsops_protected` list stays in force.
-- The same operation does not exist in `lord.fs`.
+- The same operation does not exist in `lord.fs`, `admin.c` or the broker.
+- The confirmation says it can't be undone.
 
-Until then, cache rules use the Trash.
+Other rules (`review`) use the Trash.
 
 ## Security
 

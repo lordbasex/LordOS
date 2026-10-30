@@ -44,7 +44,7 @@
   "freeAfter": "Free space now: {size}",
   "trashNote": "The items are in the Trash and can be restored from Files. Space is freed only when the Trash is emptied.",
   "backToList": "Back",
-  "status.done": "Moved to the Trash",
+  "status.done": "Done",
   "status.skipped": "Skipped",
   "status.changed": "Changed since the scan",
   "status.denied": "Access denied",
@@ -63,5 +63,14 @@
   "error.protocol": "The scanner sent something invalid, so its results were discarded.",
   "error.timeout": "The scanner stopped responding.",
   "error.sandbox": "The scanner could not lock itself in, so it did not run.",
-  "cancelled": "Scan cancelled."
+  "cancelled": "Scan cancelled.",
+  "clean": "Clean…",
+  "confirm.delete": "{n} regenerable files ({size}) will be deleted. This can't be undone.",
+  "rule.fontconfig": "The font cache. It is rebuilt when fonts are next used.",
+  "rule.shader-cache": "Compiled graphics shaders. They are compiled again when needed.",
+  "rule.shader-db": "The database of compiled graphics shaders. It is rebuilt when needed.",
+  "rule.media-registry": "The list of media plugins. It is rebuilt the next time media plays.",
+  "rule.temporary": "Temporary files older than a week. Check them first: they go to the Trash.",
+  "rule.trash": "Items in the Trash. Empty the Trash to free their space.",
+  "warn.deleteIsFinal": "Deleted files can't be restored."
 }

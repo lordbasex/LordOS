@@ -16,7 +16,7 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 |---|---|---|
 | `lord-clean` scanner | Built | Sandboxed, read-only; `openat2` and `statx`; bounded by entries (200,000), depth (32) and path length (1,024 bytes). Refuses to run without Landlock |
 | Cancel | Built | Kills the helper; a cancelled or failed scan offers nothing |
-| Compiled rule table | Partly | One rule: `thumbnails` (`.cache/thumbnails`, `*.png`, regenerable, Trash). The validator is complete for the fields that exist |
+| Compiled rule table | Built | Seven rules, validated by a test |
 | `lord.clean` | Built | `start`, `poll`, `cancel`, `results`, `plan`, `execute`, `status`. No history |
 | Plan in C with expiry | Built | Ten minutes, runs once, checked on a thread; JS holds a plan id only |
 | Execution to the Trash | Built | Reopens each object from its root; per-item result; a name swapped at the last moment is put back |
@@ -24,9 +24,9 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 | Free space measured after | Built | Before and after the execution. Moving to the Trash doesn't free space and the app says so |
 | Overview section | Partly | Scan, counters, progress, list, selection, confirmation, result per item. See "Tested" |
 | en, es, pt | Built | `cleaner.json`, `apps.json` and the `clean.*` codes in `errors.json` |
-| Real delete for caches | Waiting for approval | "One decision for the maintainer" in `CLEANER-ARCHITECTURE.md`. Until then a cache moved to the Trash still uses its space |
-| Other cache and temporary rules | Not started | |
-| Trash section (size, emptying) | Not started | |
+| Real delete for caches | Built | Approved 2026-10-30. Regenerable rules only |
+| Cache and temporary rules | Built | Seven rules; `/tmp` is outside the design's home-relative roots and is not scanned |
+| Trash (size, emptying) | Built | The real empty, on a thread, confirmed as irreversible |
 | Large and old files | Not started | |
 | Duplicates | Not started | |
 | Storage map | Not started | |

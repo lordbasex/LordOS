@@ -4,8 +4,9 @@
  *
  * JS gets candidate ids and display paths; authority stays here. A plan is built from ids of the
  * current scan, lives only in this process and expires. Execution reopens each object from its rule's
- * root and compares device, inode, size and modification time before moving it to the Trash. There is
- * no real delete: nothing here unlinks a file. */
+ * root and compares device, inode, size and modification time before acting. A real delete exists
+ * only here, as the session user, for regenerable rules, for a file beneath a rule's fixed root that
+ * came from a plan (approved by the maintainer on 2026-10-30). Nothing in lord.fs can reach it. */
 #ifndef LORD_CLEAN_H
 #define LORD_CLEAN_H
 
@@ -26,13 +27,15 @@ char *clean_status(void);                   /* availability and free space, as J
 char *clean_results(int plan, long offset, int limit);      /* a page of candidates or of plan items, as JSON (malloc) */
 int   clean_plan(int scan, const uint32_t *ids, size_t n);  /* its id; the checks run on the thread */
 int   clean_execute(int plan);
+int   clean_plan_rules(int scan, const char *const *rules, int n);   /* every candidate of those rules */
+int   clean_empty_trash(void);              /* the real emptyTrash, on the thread; can't be undone */
 
 #ifdef CLEAN_TEST
 /* tests only: not in lord-server */
 extern long clean_test_max_files;
 extern int  clean_test_plan_ttl;
 extern int  clean_test_stop_helper;
-extern void (*clean_test_before_trash)(const char *real);
+extern void (*clean_test_before_trash)(const char *real);    /* right before the action, Trash or delete */
 int clean_test_helper_pid(void);
 int clean_test_record(const char *json, int nrules);        /* 0 kept, 1 dropped, -1 protocol error */
 #endif

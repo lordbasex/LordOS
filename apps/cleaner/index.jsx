@@ -252,7 +252,7 @@ export default function Cleaner() {
                     <Button small label={tr('cleaner.selectAll')} onClick={selectAll} />
                     <Button small label={tr('cleaner.selectNone')} onClick={() => setSelected(new Set())} disabled={!selected.size} />
                     <View style={{ flex: 1 }}><Label dim size={typeScale.callout}>{tr('cleaner.selected', { n: formatNumber(selected.size) })}</Label></View>
-                    <Button primary label={tr('cleaner.moveToTrash')} onClick={askPlan} disabled={!selected.size || running} />
+                    <Button primary label={tr('cleaner.clean')} onClick={askPlan} disabled={!selected.size || running} />
                   </View>
                   <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
                     {list.items.map((it) => <Row key={it.id} item={it} on={selected.has(it.id)} onToggle={() => toggle(it.id)} />)}
@@ -269,10 +269,12 @@ export default function Cleaner() {
       {confirm && plan && plan.counts.ready > 0 ? (
         <ConfirmDialog
           title={tr('cleaner.confirm.title', { count: plan.counts.ready })}
+          destructive={plan.deleteItems > 0}
           detail={[
-            tr('cleaner.confirm.detail', { size: formatBytes(plan.allocated) }),
+            plan.deleteItems ? tr('cleaner.confirm.delete', { n: formatNumber(plan.deleteItems), size: formatBytes(plan.deleteAllocated) }) : '',
+            plan.trashItems ? tr('cleaner.confirm.detail', { size: formatBytes(plan.trashAllocated) }) : '',
             notReady > 0 ? tr('cleaner.confirm.notReady', { n: formatNumber(notReady) }) : '',
-            ...plan.warnings.filter((w) => w !== 'trashKeepsSpace').map((w) => tr(`cleaner.warn.${w}`)),
+            ...plan.warnings.filter((w) => w !== 'trashKeepsSpace' && w !== 'deleteIsFinal').map((w) => tr(`cleaner.warn.${w}`)),
           ].filter(Boolean).join(' ')}
           okLabel={tr('cleaner.confirm.ok')}
           cancelLabel={tr('cleaner.cancel')}
