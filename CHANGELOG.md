@@ -10,6 +10,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13
+  virtual machine). The Store then refused everything with "<user> is not an administrator", and LordOS has no way to
+  name an administrator from inside. `install.sh` now picks the user who logged in, or the only regular user, when it
+  runs as plain root; when the system has no member of `sudo`, `admin` or `wheel` it offers to make that user an
+  administrator; and it installs `sudo`. Uninstalling removes what it added.
+
 ### Release
 
 - **0.8.6-beta published** (2026-10-30): the GitHub release carries the live ISO

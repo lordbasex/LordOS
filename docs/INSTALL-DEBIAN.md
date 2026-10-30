@@ -48,7 +48,9 @@ this works even though the script itself comes through a pipe.
 5. **Sets up LordOS** like the ISO:
    - creates the `lordos-greeter` system user (the login screen's user) if it doesn't exist;
    - adds your user (the one who ran `sudo`, or `--user NAME`) to whichever of these groups exist:
-     `audio video input render lpadmin pipewire plugdev`. It does **not** add anyone to `sudo`;
+     `audio video input render lpadmin pipewire plugdev`. If the system has no administrator at all (a Debian
+     installed with a root password), it also offers to make that user one, by adding them to `sudo`: the Store
+     can't install or update without an administrator. Otherwise it does **not** add anyone to `sudo`;
    - generates the `en_US`, `es_ES` and `pt_BR` UTF-8 locales (the languages the interface ships).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
@@ -99,7 +101,7 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- [options]
 | `-y`, `--yes` | don't ask (also `LORDOS_YES=1`). With it, the display manager **is** disabled; add `--keep-display-manager` to avoid that |
 | `--version X` | install release `X` (`0.8.0-beta` or `v0.8.0-beta`) instead of the latest |
 | `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified |
-| `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root with no `sudo`, nobody) |
+| `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root, who logged in, or the only regular user) |
 | `--keep-display-manager` | leave the current display manager enabled; LordOS is not enabled at boot |
 | `--no-extras` | don't install the extra sound and font packages |
 | `--boot-splash` | set up the LordOS boot splash without asking (see "Boot splash (optional)") |
