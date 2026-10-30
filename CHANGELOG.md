@@ -776,6 +776,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (the universal build, signed and notarized; the 64-bit installer; the Debian package). The Imager 0.8.5 is the first desktop build that reads point
   releases (`v0.8.4.1-beta`) in its app update check and its release list. `SHA256SUMS` (11 files) is signed with the
   release key. The site's downloads (`lordos.media`) now point to 0.8.5.
+- **Release files catch up with LordBench:** the Noto subsets built into `lord-bench` are in the package's `copyright`
+  file (license in `usr/share/doc/lordos/OFL-Noto.txt`) and the SBOM; `tools/results/collect.sh` writes `lordbench.json`
+  (`--no-lordbench` skips it); a table inside a list item keeps its lines in the release notes; System Information and
+  Settings move to version 0.8.6.
 
 ### Fixed
 

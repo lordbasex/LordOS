@@ -14,7 +14,8 @@ materials (SBOM) published with each release. The website summary is at
   added there in the same change that adds it.
 - The `.deb` carries a machine-readable `usr/share/doc/lordos/copyright` (Debian copyright format,
   written by `tools/iso/mkdeb.sh`), and each font ships its license text next to it
-  (`assets/fonts/*-LICENSE.txt`).
+  (`assets/fonts/*-LICENSE.txt`). The Noto subsets built into `lord-bench` have no files of their own:
+  their license is `usr/share/doc/lordos/OFL-Noto.txt`.
 - Debian packages keep their own `/usr/share/doc/<package>/copyright` on the installed system.
 - **Raspberry Pi packages mirrored in the LordOS APT repository** (arm64, since 0.8.4.1;
   `tools/release/rpi-mirror.list`, [UPDATES.md](UPDATES.md), "Raspberry Pi firmware packages") are
@@ -45,7 +46,7 @@ document for a built package:
 |---|---|---|
 | `lordos` | the `.deb` itself: version, architecture, SHA-256, download URL on GitHub Releases, MIT | `dpkg-deb -f` |
 | Bundled code | QuickJS, Monocypher, stb_image, stb_image_write, stb_truetype, the EFF and SecLists word lists, react, react-reconciler, scheduler, the Unicode data | `third_party/*/VERSION`, the stb headers, `package-lock.json`, `server/src/ui/unidata.h` |
-| Fonts | Inter, Plus Jakarta Sans, JetBrains Mono (OFL-1.1), with the SHA-256 of each `.ttf` in the package | the font's revision (`fc-scan`, when fontconfig is installed) |
+| Fonts | Inter, Plus Jakarta Sans, JetBrains Mono (OFL-1.1), with the SHA-256 of each `.ttf` in the package; the Noto subsets built into `lord-bench` (OFL-1.1), with no checksum of their own | the font's revision (`fc-scan`, when fontconfig is installed); not versioned for the Noto subsets |
 | Data | DB-IP Lite Country (CC-BY-4.0) and Natural Earth (public domain), with the SHA-256 of the files in the package | not versioned |
 | Debian packages | every package in the `.deb`'s `Depends` (`DEPENDS_ON`) and `Recommends` (`OPTIONAL_DEPENDENCY_OF`), with a `pkg:deb/debian/…` purl | `dpkg-query` on the machine that runs the script |
 

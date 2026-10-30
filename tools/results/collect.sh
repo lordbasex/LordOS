@@ -2,7 +2,7 @@
 # collect.sh — the evidence for one machine and one LordOS version, written to results/<version>/<machine>/
 # (docs/RESULTS.md). Run it as the user, inside a LordOS session (the Test Bench is a Wayland client):
 #
-#   tools/results/collect.sh <machine> [--no-memory] [--bench-seconds N] [--version V]
+#   tools/results/collect.sh <machine> [--no-memory] [--no-lordbench] [--bench-seconds N] [--version V]
 #
 # <machine> is a short name, [a-z0-9-] (e.g. vm116-headless, pi5-8gb-hdmi). It writes:
 #   sysreport.json   lordos-sysreport report --json (no serial numbers, addresses or names)
@@ -11,18 +11,20 @@
 #                    sudo, root's processes too
 #   boot.txt         systemd-analyze, and the time to the desktop's first frame from the kernel's start
 #   boot-times.jsonl every recorded boot on this machine: seconds to the first frame, version, kernel
+#   lordbench.json   lordos-sysreport bench --full --json (LordBench, about 5 minutes; --no-lordbench skips it)
 #   README.md        when, what version, the conditions to fill in, and these exact commands
 # The version is the installed one (software.lordos in the report); --version names it for a development
 # build, e.g. 0.8.5-dev.
 # Nothing is sent anywhere.
 set -eu
 M=${1:-}
-case "$M" in ''|*[!a-z0-9-]*) echo "usage: $0 <machine [a-z0-9-]> [--no-memory] [--bench-seconds N]" >&2; exit 2 ;; esac
+case "$M" in ''|*[!a-z0-9-]*) echo "usage: $0 <machine [a-z0-9-]> [--no-memory] [--no-lordbench] [--bench-seconds N]" >&2; exit 2 ;; esac
 shift
-MEM=1 SECS=30 V=
+MEM=1 LB=1 SECS=30 V=
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-memory) MEM=0 ;;
+        --no-lordbench) LB=0 ;;
         --bench-seconds) SECS=$2; shift ;;
         --version) V=$2; shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
@@ -76,6 +78,11 @@ J() { if sudo -n true 2>/dev/null; then sudo -n journalctl "$@"; else journalctl
 # every boot's time to the first frame on this machine, with its version (lord-sessiond; no names)
 [ -r /var/lib/lordos/boot-times.jsonl ] && cp /var/lib/lordos/boot-times.jsonl "$D/boot-times.jsonl"
 
+# last: its load would disturb the memory and frame times above
+if [ "$LB" = 1 ]; then
+    lordos-sysreport bench --full --json > "$D/lordbench.json" || { rm -f "$D/lordbench.json"; echo "LordBench ended with an error: lordbench.json skipped" >&2; }
+fi
+
 cat > "$D/README.md" <<MD
 # $M — LordOS $V
 
@@ -93,6 +100,7 @@ lordos-testbench --gl --auto $SECS > testbench.json      # inside a LordOS sessi
 free -m                                                  # whole system
 sudo sh -c 'for f in /proc/[0-9]*/smaps_rollup; do ...'  # PSS per process: see tools/results/collect.sh
 systemd-analyze
+lordos-sysreport bench --full --json > lordbench.json
 \`\`\`
 MD
 echo "written to $D"

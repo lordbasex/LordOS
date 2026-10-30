@@ -15,11 +15,11 @@ results/<version>/<machine>/
     memory.txt       the whole system (`free -m`) and PSS per process (/proc/<pid>/smaps_rollup)
     boot.txt         systemd-analyze, and the time from the kernel's start to the desktop's first frame
                      (lord-sessiond's log line; the boot splash shows its own timer from a little later)
-    lordbench.json   from 0.8.6, LordBench (docs/BENCHMARK.md)
+    lordbench.json   from 0.8.6, LordBench: lordos-sysreport bench --full --json (docs/BENCHMARK.md)
 ```
 
-`tools/results/collect.sh <machine> [--no-memory] [--bench-seconds N] [--version V]` writes such a
-folder; run it as the user inside a LordOS session, and with `sudo` to include root's processes in the PSS
+`tools/results/collect.sh <machine> [--no-memory] [--no-lordbench] [--bench-seconds N] [--version V]` writes
+such a folder; run it as the user inside a LordOS session, and with `sudo` to include root's processes in the PSS
 list. Fill in the conditions in its README before committing. Each release attaches its `results/<version>`
 folder to the GitHub release (`docs/RELEASING.md`).
 

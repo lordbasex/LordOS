@@ -60,7 +60,7 @@ printf '%s\n' "$section" |
         /^[[:space:]]*```/ { code = !code; emit($0); next }
         code { emit($0); next }
         /^[[:space:]]*$/ { emit(""); next }
-        /^(#|\||---)/ { emit($0); next }
+        /^(#|---)|^[[:space:]]*\|/ { emit($0); next }
         /^[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]/ { flush(); buf = $0; next }
         {
             if (buf == "") { buf = $0; next }

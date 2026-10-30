@@ -27,7 +27,7 @@
 #   /usr/share/plymouth/themes/lordos/    the boot splash theme (selected by the ISO, the Raspberry Pi
 #                                         image or install.sh; the package never selects it)
 #   /usr/share/grub/themes/lordos/        the boot menu theme (amd64; the ISO and the disk installer)
-#   /usr/share/doc/lordos/                README, copyright, changelog
+#   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
 #   /usr/lib/lordos/apt/lordos.sources    the signed LordOS repository on lordos.org (updates from the
 #                                         Store and apt; docs/UPDATES.md): postinst copies it to
 #                                         /etc/apt/sources.list.d/ when missing, postrm removes it
@@ -251,6 +251,12 @@ License: OFL-1.1
  font's license text ships next to it, *-LICENSE.txt).
  On Debian: /usr/share/common-licenses does not include it; see https://openfontlicense.org
 
+Files: usr/lib/lordos/bin/lord-bench
+License: OFL-1.1
+ Built into lord-bench for LordBench's shaping workload: subsets of Noto Sans Arabic,
+ Devanagari, Thai and CJK SC. SIL Open Font License 1.1, full text and copyright
+ notices in usr/share/doc/lordos/OFL-Noto.txt.
+
 Files: usr/lib/lordos/assets/monitor/geoip-country.mmdb.xz
 Copyright: db-ip.com
 License: CC-BY-4.0
@@ -266,6 +272,7 @@ License: MIT and public-domain
  QuickJS (MIT) and stb (public domain / MIT), compiled into lord-server.
 C
 chmod 644 "$D/copyright"
+install -m 644 server/src/bench/fonts/OFL.txt "$D/OFL-Noto.txt"
 printf 'lordos (%s) trixie; urgency=medium\n\n  * Package built by tools/iso/mkdeb.sh.\n\n -- LordOS <lord.basex@gmail.com>  %s\n' \
     "$VERSION" "$(date -R)" | gzip -9n > "$D/changelog.gz"
 chmod 644 "$D/changelog.gz"

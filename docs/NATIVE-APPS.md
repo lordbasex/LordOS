@@ -107,7 +107,8 @@ listed. `isSystemApp(id)` from `@lordos/sdk` tells them apart.
 (all start at `0.8.5`); `tools/build-theme.mjs` refuses an app without a valid semver one
 (`MAJOR.MINOR.PATCH`, optionally `-` or `~` and a suffix). Store → Installed shows it next to the app
 ("LordOS app · 0.8.5") and About <app> shows it too, so the apps can later be versioned and released
-apart from LordOS.
+apart from LordOS. A system app moves to a new version when it changes: in 0.8.6, System Information and
+Settings.
 
 ## Permissions and trust (M8)
 

@@ -184,6 +184,11 @@ for name, prefix, home in fonts:
                         checksums=files_like(r"/fonts/" + re.escape(prefix)) or None,
                         comment="Font shipped in usr/lib/lordos/assets/fonts (checksums of its .ttf files)"))
     contains.append(sid)
+sid = spdxid("Font-Noto-subsets")
+packages.append(pkg(sid, "Noto Sans Arabic, Devanagari, Thai and CJK SC (subsets)", "NOASSERTION", "OFL-1.1", "NOASSERTION",
+                    home="https://github.com/notofonts",
+                    comment="Subsets built into usr/lib/lordos/bin/lord-bench, not separate files (tools/gen-lbfonts.py)"))
+contains.append(sid)
 
 data = [("DB-IP Lite Country", r"/monitor/geoip-country", "CC-BY-4.0", "https://db-ip.com",
          "Offline IP-to-country database of Monitor (assets/monitor/geoip-country.mmdb.xz). IP geolocation by DB-IP."),
