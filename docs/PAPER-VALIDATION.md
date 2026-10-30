@@ -121,6 +121,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 10.2 | Secure Boot must be off | System Information shows Secure Boot | Holds |
 | 11.2 | `make test` 23 passed, 1 skipped | Today (2026-10-27, VM 116) 23 passed, 0 failed, 12 skipped (the node suites; they pass on a machine with node) | Holds |
 | 11.2 | (0.8.6, in development) every frame compared with a full repaint; seven partial-repaint errors fixed; the 0.8.2 scene on a running desktop found no stale area | `build/engine-test` (`test_damage_pipeline`, `test_damage_fuzz`); VM 116 isolated headless session, six runs of 54 checks (`docs/MONITOR.md`, "The 0.8.2 integration test, repeated") | Holds (2026-10-29) |
+| 11.2 | (0.8.6, in development) a blurred window hidden whole behind an opaque one is no longer repainted with every change near it (a translucent Terminal behind Monitor's moving map: 46 % of the screen per frame → 11–15 % in one box, 3–4 % in several rectangles) | `build/engine-test` (`test_hidden_blur_damage`); VM 116 `--profile` and the repaint check in both modes, before and after rebasing onto the frame-cost work (`docs/MONITOR.md`, "A blurred window hidden behind Monitor") | Holds (2026-10-29; rebased build: 11.2 % and 3.3 %) |
 | 11.2 | 30,953 parser checks with mutation fuzzing | Tests (`remote-fuzz`, mail, doc, imager fuzzers) | Holds; count to refresh |
 | 11.4 | Port 5673 closed until enabled | Check `remoteClosed` (effective) | Holds |
 

@@ -929,6 +929,27 @@ from the Dock and sent back behind it ten times (21 checks): no stale area, only
 numbers and charts and the clocks changing between the partial and the full copy.
 `build/engine-test` `test_hidden_blur_damage` covers it (three of its checks fail without the change).
 
+Checked again after rebasing onto the frame-cost work (2026-10-29). `blur_hidden` stays off with a
+dragged window, on the GPU path (so with GPU drag) and inside a transform; a frame the pipeline undoes
+and GPU drag's rectangle repainted on the CPU join the next frame's damage, and `paint_damage_settle`
+applies the rule, this one included, to the tree being painted. That first check of the 0.8.2
+scenario had a flaw: with no leftover holder, a fresh Terminal opens at 240,153, and the scenario's
+minimize click (placed for the restored Terminal) missed its button, so its 54 checks ran with the
+Terminal over the map, never minimized. With the click on the button, the rebased build, both modes:
+
+| Scenario | One box | Several rectangles |
+|---|---|---|
+| 0.8.2 (22 minimize/restore cycles, menus; 54 checks), downloads paused 2.5 s | 0 | 0 |
+| the same, scene still 7 s before each check | 0 | 0 |
+| Terminal hidden behind the map, raised and sent back 10 times (21 checks) | 1 (a Dock corner next to the live Load line) | 0 |
+
+(Pixels differing between the partial and the full copy outside Monitor's live numbers and charts
+and the clocks. The fresh Terminal no longer covers Monitor's left-panel chart, the `curl` row's
+sparkline or its own footer clock, so those were added to the live areas.) `--profile` on the rebased
+build, Terminal hidden behind Monitor → Network, last 150 frames: 11.2 % of the screen per frame in
+one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor → Network alone: 9.1 % and
+3.2 % in 6.1 rectangles.
+
 VM 119: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio` GPU without 3D, CPU compositing, 1280×800.
 Network tab in front, ten slow downloads to mirrors in ten countries (arcs to 8–11 countries, about
 20 moving dots). `lord-server` (whole process, % of one core), 5 × 30 s each, the same session

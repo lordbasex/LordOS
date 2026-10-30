@@ -910,6 +910,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   check above, the original scenario (54 checks per mode) and a new one with the Terminal hidden behind Monitor's
   moving map, raised over it and sent back ten times (21 checks per mode): no stale area in either mode, only
   Monitor's live numbers and charts and the clocks changing between the two copies.
+  **Rebased onto the frame-cost work and checked again** (2026-10-29, VM 116): `blur_hidden` stays off with a dragged
+  window, on the GPU path (so with GPU drag) and inside a transform; the damage of a frame the pipeline undoes, or of
+  GPU drag's rectangle repainted on the CPU, goes through `paint_damage_settle`, which applies the same rule to the
+  tree being painted. A build without warnings; `make test` (23 suites passed, 13 skipped for missing tools);
+  `engine-test` 7,010 checks, its drag runs printing exactly what main's build prints (the golden hashes of 2,417
+  drag frames per path unchanged); `fpipe-test` 61 checks; `lordbench-test` 1,217. The first check of the 0.8.2
+  scenario above never minimized the Terminal: with the leftover holder gone a fresh Terminal opens at another
+  place, and the scenario's click, placed for the restored one, missed its minimize button. The click now hits it,
+  and the rebased build was checked with the Terminal minimized into the Dock and restored 22 times: 0 differing
+  pixels outside Monitor's live numbers and charts and the clocks in all 54 checks, one box and several rectangles,
+  with the downloads paused 2.5 s and with the scene still 7 s before each check (four runs); the hidden-Terminal
+  scenario, 1 pixel (a Dock corner next to Monitor's live Load line) and 0. The live areas left out now also hold the
+  fresh Terminal's footer clock, Monitor's left-panel chart and the `curl` row's sparkline, which the restored
+  Terminal used to cover. `--profile` on the rebased build, the Terminal hidden behind Monitor → Network: 11.2 % of
+  the screen per frame in one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor alone: 9.1 % and 3.2 %.
 - **The desktop under load** (found by LordBench's desktop test; `docs/BENCHMARK.md`, "The desktop under load"): the
   compositor's cgroup (`server`) had the same `cpu.weight` as every app scope, and nice values don't count between
   cgroups, so an app keeping every core busy took half of the compositor's CPU even at nice 19. On a Raspberry Pi 5
