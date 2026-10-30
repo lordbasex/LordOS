@@ -670,7 +670,7 @@ Now the subtree stays **root-owned** and the scopes are created by root:
 
 - `cgroup_delegate_session()` (`server/src/sec/cgroup.c`) creates `lordos-session-<uid>/server`
   and moves the session's `lord-server` there, but no longer chowns anything to the user
-  (`cgroup_harden_session`). Since 0.8.6 (in development) it also gives `server` `cpu.weight` 1000
+  (`cgroup_harden_session`). Since 0.8.6 it also gives `server` `cpu.weight` 1000
   against 100 for every scope, so a busy app can't take half of the compositor's CPU (nice values
   don't count between cgroups; `BENCHMARK.md`, "The desktop under load"). lord-sessiond also starts the
   session's lord-server with `RLIMIT_RTPRIO` 2 (and `RLIMIT_RTTIME` 5 s): lord-server puts its main and paint threads

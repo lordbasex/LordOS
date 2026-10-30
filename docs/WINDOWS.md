@@ -69,7 +69,7 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   shadow are not repainted.
   - It is painted in its screen coordinates (a canvas with a shifted origin). That way the terminal
     and Linux apps keep recording where they are.
-  - Its rounded corners stay transparent outside the curve (0.8.6, in development). A rounded
+  - Its rounded corners stay transparent outside the curve (0.8.6). A rounded
     `overflow: hidden` window saves its corner squares before its children paint and restores them
     after (`canvas_corners_restore`/`canvas_corners_restore4` in `canvas.c`). The restore used to mix
     the saved pixel in with `blend()`, which takes its source as opaque, so on the layer's transparent
@@ -83,7 +83,7 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   the layer is repainted.
 - **If a node inside changes** (a style, a text, a transform such as LordBench's turning square, or a
   child moving inside the window), only its old box (moved with the window) and its new one are
-  repainted in the layer, with a 4 px margin (`layer_tree_part`; 0.8.6, in development). The window's
+  repainted in the layer, with a 4 px margin (`layer_tree_part`; 0.8.6). The window's
   own style or size, a part outside the layer or bigger than half of it still repaint the whole layer.
   That gives the same pixels as repainting it whole, and the layer is repainted whole whenever that
   can't be shown (`layer_part_exact`, `layer_note_exact`):
@@ -110,11 +110,11 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 
   The walk to the window paints nothing before it. Only the window's ancestors are walked
   (`skip_stamp` in `paint_root` notes them), because they clip it and restore their corners around it;
-  any other node before the window returns at once (0.8.6, in development). Before, those nodes still
+  any other node before the window returns at once (0.8.6). Before, those nodes still
   saved and restored their rounded corners over the copy, which left those corners one level darker
   than a full repaint: the one pixel change of the drag-frame work, approved on 2026-10-28.
 - **If something below changes** (a clock, a video), the below part is rebuilt. If it changes very
-  often, it stops being used. Since 0.8.6 (in development) both of those go further, with the same
+  often, it stops being used. Since 0.8.6 both of those go further, with the same
   pixels (`below_ready` in `ui/paint.c`, "The copy of what is below the dragged window"):
   - **Only what changed is painted again** (`below_update`): the boxes of the nodes painted before the
     window that changed, and damage from outside the tree (a terminal, an app window), as up to four
@@ -142,12 +142,12 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   - the layer remembers where the app holes are: exact alpha 0, distinguished from an empty
     background thanks to a sentinel value. They are reopened over the blend and the app is recorded
     at its new place (`wl_paint_holes(0)`).
-  - a window with no app surface skips that work (0.8.6, in development): `layer.has_holes` is 0
+  - a window with no app surface skips that work (0.8.6): `layer.has_holes` is 0
     only while the hole map stands for all zeros, so `layer_holes` just turns the sentinel back into
     0 and `layer_paint` doesn't walk the map. A part that brings the first hole into such a map zeroes
     the rest of it first, so what is read is always what the full walk would have written. The
     sentinel fill writes one row and copies it.
-  - **the GPU composites the window itself** (GPU drag, 0.8.6, in development; `docs/GPU.md`, "The dragged
+  - **the GPU composites the window itself** (GPU drag, 0.8.6; `docs/GPU.md`, "The dragged
     window on the GPU"): on a frame that uses the copy of what is below, the CPU paints only the strips
     of the damaged box around the window's rectangle, and the GPU writes the rectangle from the layer
     and the copy (two textures uploaded only where they changed) with `blit_row`'s own arithmetic, so
@@ -162,7 +162,7 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 - **A `canvas_blit` detail:** opaque pixels are copied directly (same result as blending, without
   the math).
 
-### Checking it (0.8.6, in development)
+### Checking it (0.8.6)
 
 - **`test_drag_exact`** (`server/tests/engine_test.c`, run by `make -C server test`) drags LordBench's
   desktop scene along its figure of eight for 480 frames, plus seven short runs (a text that resizes a
@@ -283,7 +283,7 @@ JS 0.20, layout 0.56, paint 11.43, present 0.61), max gap 36.9 ms; layer: 1023 p
 ```
 
 "work" is what lord-server spends per frame: the pointer and timer JS, layout, painting
-("paint") and presentation ("present"). Since 0.8.6 (in development) the line ends with what the copy
+("paint") and presentation ("present"). Since 0.8.6 the line ends with what the copy
 of what is below did during the drag: `below: B built whole, P in part, S frames switched to it (not:
 … ancestor, … blur, … transform, … unreached, … cost)`, the last part counting the frames where the old
 rule painted everything and the copy could not be used, by reason. LordBench's scripted move (no
@@ -331,7 +331,7 @@ was checked against this path:
   clears `layout_ok` up to the root) and that gets the same box keeps its children's layout. Moving a
   window only changes its `left`/`top` (`grab.c` calls `node_moved`), so a frame of a drag lays out the
   desktop's top level and places the rest (`place()`), instead of laying out every window.
-- **A transform-only setStyle keeps the node's layout** (0.8.6, in development; `node_restyled` in
+- **A transform-only setStyle keeps the node's layout** (0.8.6; `node_restyled` in
   `ui/node.c`). A change of only `rotate`, `scaleX`, `scaleY` or `transformOriginX/Y` on a node that
   already has its `StyleExt`, with no text node above it and no text or image in its subtree, marks
   it for repaint and has its parent place it again (`node_moved`) instead of `node_invalidate`.
@@ -339,7 +339,7 @@ was checked against this path:
   only that node's own layout pass is saved (its ancestors are laid out as before).
   `test_transform_restyle` compares every node's layout and every pixel with the `node_invalidate`
   path. `'transform'` itself is not a key `lord.setStyle` takes and changes nothing.
-- **A main-loop pass with no timer due doesn't walk the timers** (0.8.6, in development;
+- **A main-loop pass with no timer due doesn't walk the timers** (0.8.6;
   `ui/js_prelude.h`). `__lordTick` keeps the earliest deadline and returns at once when it hasn't
   come; when it has, one pass fires the due timers by deadline, then by id, as before. Clearing the
   earliest timer marks that deadline stale and it is computed again before use, so the wait returned

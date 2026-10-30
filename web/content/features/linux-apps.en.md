@@ -40,6 +40,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **Notifications** from Linux apps arrive through the standard notifications service, which `lord-server` provides, and can be configured per app in Settings.
 - **Passwords:** the standard Secret Service is served by LordOS's keyring, so browsers can keep their secrets there without another keyring daemon.
 - **Force Quit** (since 0.8.5): in Lord Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.
+- **Default apps without choosing** (since 0.8.6): when you haven't chosen an app for a file type, the file opens with the system's default or the first installed app that declares its type, shown as "Automatic" in Settings → Default Apps. Apps you chose stay as they are.
 
 [[shot:2]]
 

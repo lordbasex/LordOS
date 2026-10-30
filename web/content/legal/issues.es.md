@@ -13,7 +13,7 @@ Antes de escribir, revisá las [preguntas frecuentes](/faq/) y, cuando sean púb
 
 ## Qué incluir en un reporte de error
 
-- **La versión de LordOS**, como aparece en la app Acerca de LordOS (por ejemplo "0.8.5 · Beta").
+- **La versión de LordOS**, como aparece en la app Acerca de LordOS (por ejemplo "0.8.6 · Beta").
 - **Cómo la instalaste:** la ISO (live o instalada), la imagen para Raspberry Pi 5 o el `.deb` en Debian 13.
 - **Tu hardware:** el modelo de la computadora o de la placa, la placa de video, la memoria y cualquier dispositivo que tenga que ver (impresora, touchpad, adaptador Wi-Fi, monitor).
 - **Pasos para reproducirlo:** qué hiciste, un paso por línea, desde un arranque limpio si podés.

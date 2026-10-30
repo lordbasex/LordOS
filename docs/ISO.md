@@ -20,8 +20,8 @@ erased.
 
 - **Linux and other Unix-like systems:**
   ```sh
-  sha256sum -c lordos-live-0.8.5-amd64.iso.sha256      # or: shasum -a 256 -c …
-  sudo dd if=lordos-live-0.8.5-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
+  sha256sum -c lordos-live-0.8.6-amd64.iso.sha256      # or: shasum -a 256 -c …
+  sudo dd if=lordos-live-0.8.6-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
   ```
   `/dev/sdX` is the whole USB stick (not a partition). On BSD-derived systems it is usually `/dev/rdiskN`: find
   it with the system disk tool and unmount it first.
@@ -453,6 +453,27 @@ The installer screenshots up to "Done" and those of the installed system are fro
 text was fixed (sha256 `daba6313…c8ec65`). That ISO has the same binaries; only those texts change.
 With the final ISO, UEFI boot, the network, ❖L/Enter and the installer summary were repeated. Nothing
 was installed in that repeat.
+
+## Release test (0.8.6 Beta, October 30)
+
+`lordos-live-0.8.6-amd64.iso` (1,054,357,504 bytes, sha256
+`3de95e586041de3a8d0a8dbea11970600468a1988527862efac5a679568b7efe`) and the Raspberry Pi image `lordos-0.8.6-rpi5-arm64.img.xz` (783,667,748 bytes, sha256
+`a81a2e068870099ac70aef8eaa08d0f1e33c0b3825f18f231f2e43ee251ea613`) are the 0.8.6-beta release files, from the tag `v0.8.6-beta`, built on VM 116 with `GPU=1 RELEASE=1`
+from a signed tree. What was tested before the release:
+
+| Test | Result |
+|---|---|
+| Development build of the tag's code on VM 116 (not rerun on the final ISO or on the Pi) | `make test`: 23 passed, 0 failed, 13 skipped (12 need node and ran on the maintainer's machine, 12/12; `bidi-test` needs its data file); `engine-test` 7,010 checks; `defaults-test` 38/38; `test-full` 7 passed |
+| Update 0.8.5 → 0.8.6 with `apt` against lordos.org/apt-staging, a live-session amd64 VM (no restart is possible there) | no migration ran, settings files unchanged |
+| Update 0.8.5 → 0.8.6 with `apt` against lordos.org/apt-staging, Raspberry Pi 5, then a restart | no migration ran, settings files unchanged; came back with 0.8.6-beta build 20261030, first frame 7.63 s after the kernel, a release build with signed code |
+
+The Store's own package engine and the Store → Updates screen were not exercised in these updates, and a second
+reinstall was not run.
+
+The final `lordos-live-0.8.6-amd64.iso` booted once under QEMU/KVM on VM 116 (BIOS, 1.8 GB of memory, 2 cores, virtio display) to the live desktop with the installer open, on its own. That is the whole boot test: UEFI, an install from it, and a real PC were not tried with this file.
+
+Known issues of the release that concern the image: the legacy BIOS black rectangle between the boot
+menu and the splash, as in 0.8.5 ("Boot splash and boot menu" above). The others are in the CHANGELOG.
 
 ## Release test (0.8.5 Beta, October 27)
 

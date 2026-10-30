@@ -1,6 +1,6 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench (0.8.6) is in development: the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -104,7 +104,7 @@ the test:
 |---|---|---|---|
 | `sec.server-user` | §2.2 | `lord-server`'s uid ≠ 0 | — |
 | `sec.app-sandbox` | §6.4 | `Seccomp: 2`, `NoNewPrivs: 1` on an isolated app | a probe app (a system package started like any isolated app) tries to read a file outside its grant, open a socket, `ptrace`, create a user namespace and reach another app's scope; every attempt must be refused |
-| `sec.helper-sandbox` | §6.7 | — | a child of the probe app that takes `sandbox_apply_helper()` checks that a unix socket, `exec`, `fork` and the app's data folder fail (0.8.5); `lord-bench` repeats it after its own lock-in on every LordBench run, with an internet socket, a new file and a system file too, shown in Performance's Stability verdict (0.8.6, in development) |
+| `sec.helper-sandbox` | §6.7 | — | a child of the probe app that takes `sandbox_apply_helper()` checks that a unix socket, `exec`, `fork` and the app's data folder fail (0.8.5); `lord-bench` repeats it after its own lock-in on every LordBench run, with an internet socket, a new file and a system file too, shown in Performance's Stability verdict (0.8.6) |
 | `sec.landlock` | §6.4 | Landlock ABI ≥ 6 | covered by the probe app |
 | `sec.netperm` | §6.6 | `lord-netperm` running, programs attached, devices and Bluetooth programs loaded | the probe app, denied the network by a temporary rule, fails to connect to a local listener |
 | `sec.code` | §6.9 | manifest present | every loaded bundle verified in this session |
@@ -194,9 +194,9 @@ Three separate verdicts, never folded into one score:
 - **Compatibility**: from the Compatibility panel.
 - **Stability**: errors and crashes during the run, frames missed under load, throttling.
 
-### Built so far (in development for 0.8.6, 2026-10-27 and 2026-10-28)
+### Built so far (released in 0.8.6-beta, 2026-10-30; written 2026-10-27 and 2026-10-28)
 
-Unreleased; the latest release is 0.8.5-beta. Checked on VM 116 (Proxmox VE, 8 vCPU of a Xeon Silver
+Released in 0.8.6-beta. Checked during development on VM 116 (Proxmox VE, 8 vCPU of a Xeon Silver
 4108, 4 GB, virtio disk, no GPU passthrough: Mesa's llvmpipe) from a terminal (`build/lordbench-cli`) and
 in an isolated headless session through System Information → Performance, and on a Raspberry Pi 5 16 GB
 (SD card, the LordOS kernel 6.18.57-lordos.3, V3D 7.1, the fan on its header) from a terminal and in the
@@ -333,7 +333,7 @@ development package.
   the scratch file is recorded (NVMe, SD/eMMC, SSD, HDD, USB, virtual, or RAM in the live session). Unit tests
   on fake sysfs trees (`tests/lordbench_test.c`): an x86 laptop on battery, a Raspberry Pi 5 with the kernel
   LordOS ships, a Pi known only from its device tree, and an older Pi kernel with `get_throttled`.
-- **The Raspberry Pi firmware's throttling** (0.8.6 in development, 2026-10-28; `bench/lbcond.c`; run on the Pi 5
+- **The Raspberry Pi firmware's throttling** (0.8.6, 2026-10-28; `bench/lbcond.c`; run on the Pi 5
   on 2026-10-29, below). On a Pi the firmware itself lowers the ARM clock on under-voltage, at its temperature limit
   or when the clock is capped, and cpufreq may not show it. What the kernel tells an unprivileged process,
   checked in Raspberry Pi's `rpi-6.18.y` source (the branch `tools/rpi/build-kernel.sh` builds;
@@ -597,7 +597,7 @@ with the turning square), but the build, the GPU's part and the flip still run o
 16.7 ms refresh under the load, so the rate stays at 30 fps; the frame pipeline below is built for that and not yet
 measured. The Pi kernel at `CONFIG_HZ=1000` (`tools/rpi/build-kernel.sh`, a rebuild) is not built.
 
-#### The drag frame's cost (0.8.6, in development)
+#### The drag frame's cost (0.8.6)
 
 The scene's square turns since this work (the `rotate` key above), so the layer of the moved window changes every
 frame and the test is heavier than the one measured before; the "before" rows below are the code before this work
@@ -647,7 +647,7 @@ of 601 frames alone (refused: `layer` 214, `after` 241, `feed` 8) and 80 of 436 
 measurable gain (30.8–31.6 against 30.5–31.1 fps under load), so **GPU drag is off by default** since this run and
 `LORD_GPU_DRAG=1` turns it on (its self-test runs only then).
 
-**The frame pipeline (in development, measured on the Pi 5, off by default).** A frame that takes 13–16 ms to build cannot
+**The frame pipeline (0.8.6, measured on the Pi 5, off by default).** A frame that takes 13–16 ms to build cannot
 fit with the GPU's part in a 16.7 ms period while the next frame is started only after the flip. Now, while a flip
 is pending, the next frame's CPU part (input, JS frame callbacks, layout, paint into the scene) is done ahead, and at
 the flip only its upload, the GPU's draw and its flip are left (`docs/GPU.md`, "The frame pipeline"). Off by
@@ -667,7 +667,7 @@ and the pointer reached the screen 17 ms later alone (42 against 25.5 ms) and 29
 ms). Two to five frames a second do not pay for that latency, so the pipeline is **off by default** and the code
 stays for `LORD_PIPELINE=1`/`2`.
 
-#### Frame phases (0.8.6, in development)
+#### Frame phases (0.8.6)
 
 Without the frame pipeline a frame is started only after the last flip completed (one frame in flight), so any
 frame whose whole chain (the work before `render()`, the build, the GPU's own part, the flip) takes more than one
@@ -845,7 +845,8 @@ before installing.
 
 - `lord.sysinfo` in `server/src/ui/js_hw.c`: `report()`, `markdown()`, `facts()`, `probe()` (built in
   0.8.5; the checks are evaluated in `apps/sysinfo/checks.js`); in 0.8.6
-  `bench.start(kind)`, `bench.poll()`, `bench.cancel()`.
+  `bench.start(mode, sustainedSeconds)`, `bench.poll()`, `bench.cancel()`, `bench.saved(which)`,
+  `bench.boots()`, `bench.bootTest()`.
 - `lordos-sysreport`, a user command (not started by `lord-server`).
 - One read-only admin action, `hw-memory-modules` (anyone, no arguments): SMBIOS memory device
   entries parsed strictly in C, returning slot, size, type, speed and manufacturer only.

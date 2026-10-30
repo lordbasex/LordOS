@@ -174,7 +174,7 @@ config and socket); the unit never passes them.
 - The fan turns at a speed proportional to the real duty (eased; still at 0 %), and the fins warm
   from blue (40 °C) through amber (65 °C) to orange-red (80 °C). The rotors are turned with
   `lord.setStyle(id, 'rotate', degrees)` on their nodes at 20 frames per second, with no React render per
-  frame (until 0.8.6, in development, they were sent as a `transform` key the engine doesn't have, so they
+  frame (until 0.8.6, they were sent as a `transform` key the engine doesn't have, so they
   stood still between React renders and the session log got `js: unsupported style 'transform'`); the timer
   stops at 0 %, while the window is minimized and with **Appearance → Reduce motion** (a new
   setting, `reduceMotion`). Frames: `docs/polish/fans-anim-1.png` … `-5.png`.

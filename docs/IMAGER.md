@@ -277,7 +277,7 @@ On the development machine (the Mac download is built on one), with Rust (rustup
 ```sh
 desktop/imager/scripts/build-mac.sh
 # → desktop/imager/target/release/bundle/macos/LordOS Imager.app (6.3 MB)
-#   desktop/imager/target/universal-apple-darwin/release/bundle/dmg/lordos_imager_0.8.5_universal.dmg (7.5 MB)
+#   desktop/imager/target/universal-apple-darwin/release/bundle/dmg/lordos_imager_0.8.6_universal.dmg (7.5 MB)
 ```
 
 **Signing (since 2026-10-19):** the download is built for both processor families
@@ -296,7 +296,7 @@ In a Debian 13 container (Docker), so the host needs nothing but Docker:
 
 ```sh
 desktop/imager/scripts/build-linux.sh
-# → desktop/imager/target/linux/lordos_imager_0.8.5_amd64.deb (4.1 MB, depends on udisks2 and WebKitGTK 4.1)
+# → desktop/imager/target/linux/lordos_imager_0.8.6_amd64.deb (4.1 MB, depends on udisks2 and WebKitGTK 4.1)
 #   desktop/imager/target/linux/lordos-imager (7.6 MB)
 ```
 
@@ -307,7 +307,7 @@ xwin downloads), NSIS for the installer:
 
 ```sh
 desktop/imager/scripts/build-windows.sh
-# → desktop/imager/target/windows/lordos_imager_0.8.5_x64_setup.exe (3.3 MB)
+# → desktop/imager/target/windows/lordos_imager_0.8.6_x64_setup.exe (3.3 MB)
 #   desktop/imager/target/windows/lordos-imager.exe (6.2 MB, requireAdministrator)
 ```
 

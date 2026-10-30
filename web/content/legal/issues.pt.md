@@ -13,7 +13,7 @@ Antes de escrever, veja as [perguntas frequentes](/faq/) e, quando forem públic
 
 ## O que incluir num relato de bug
 
-- **A versão do LordOS**, como aparece no app Sobre o LordOS (por exemplo "0.8.5 · Beta").
+- **A versão do LordOS**, como aparece no app Sobre o LordOS (por exemplo "0.8.6 · Beta").
 - **Como você instalou:** a ISO (live ou instalada), a imagem para Raspberry Pi 5 ou o `.deb` no Debian 13.
 - **O seu hardware:** o modelo do computador ou da placa, a placa de vídeo, a quantidade de memória e qualquer dispositivo envolvido (impressora, touchpad, adaptador Wi-Fi, monitor).
 - **Passos para reproduzir:** o que você fez, um passo por linha, a partir de uma inicialização limpa se possível.

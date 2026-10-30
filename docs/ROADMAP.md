@@ -548,7 +548,11 @@ no migration (`UPDATES.md`). What it delivered, each item described in its own d
 
 Flatpak and Flathub are not planned for any release (decided by the maintainer on 2026-10-27, item below).
 
-## Release 0.8.6 (in development)
+## Release 0.8.6-beta ✅ (2026-10-30)
+
+Released 2026-10-30 (`CHANGELOG.md`, "0.8.6-beta"; ISO `lordos-live-0.8.6-amd64.iso` and the
+Raspberry Pi 5 image `lordos-0.8.6-rpi5-arm64.img.xz`). Updated in place from 0.8.5 with no migration
+(`UPDATES.md`).
 
 LordBench and a desktop that stays smooth under load. Each item is described in its own document.
 
@@ -586,7 +590,7 @@ desktop fell to 24 fps under an all-core load:
   (golden hashes of 2,417 drag frames per path) except the approved 1-level corner change of step 9; LordBench's
   square and the Cooling fans turn (the `rotate` key); a transformed node repaints when its own style changes; GPU
   composition without `GL_EXT_unpack_subimage`; the dragged window composited on the GPU ("GPU drag", step 10) with
-  its self-test, `LORD_GPU_DRAG=0` and `LORD_GPU_VERIFY`; LordBench's per-frame phase timing (CPU-late or GPU-late per
+  its self-test, `LORD_GPU_DRAG` (only `1` turns it on) and `LORD_GPU_VERIFY`; LordBench's per-frame phase timing (CPU-late or GPU-late per
   frame, GPU drag's refusals by cause); GPU drag's textures catching up in slices between frames; the paint pool
   turning on for slow whole frames; `lord.stats()` in O(1) (a QuickJS patch, `THIRD_PARTY.md`). Pi 5 with its monitor,
   GPU drag off: alone 53–58 → 59.8–60 fps, under load 24–25 → 30 fps; with GPU drag on it stalled (52 fps alone; that
@@ -611,8 +615,9 @@ desktop fell to 24 fps under an all-core load:
   numbers and the frame pipeline and GPU drag off by default.
 
 **Release:**
-- [ ] Re-measure the references after the release (results compare only within one LordOS version).
-- [ ] Release cleanup, packages, the Pi 5 image and the ISO, as for 0.8.5.
+- [ ] Re-measure the references after the release (results compare only within one LordOS version; the engine
+  references stay tagged 0.8.5-beta until then).
+- [x] Release cleanup, packages, the Pi 5 image and the ISO, as for 0.8.5 (2026-10-30).
 
 ## Release 0.8.7 (planned)
 
@@ -778,13 +783,13 @@ load left for after 0.8.6:
   resolver (same arch by default; `foreign`, `allowed` with `:any`, explicit `:i386`), co-installable
   `Multi-Arch: same` packages and dpkg called with `name:arch`.
 
-- [ ] **LordBench (0.8.6)** — `BENCHMARK.md`. Workloads in the sandboxed `lord-bench` helper
+- [x] **LordBench (first part released in 0.8.6-beta, 2026-10-30; the open items moved to 0.8.7)** — `BENCHMARK.md`. Workloads in the sandboxed `lord-bench` helper
   (CPU and LordOS's own work, memory, GPU, compositor, video, storage, sustained load); peak
   performance and desktop impact measured apart; frame times against the refresh rate actually in
   use; stops on the hardware's trip points and throttling; every result records its conditions;
   three verdicts (performance against several reference machines, compatibility, stability), no
   single score; results versioned.
-  *In development (2026-10-27):* the `lord-bench` helper, CPU, memory, GPU, storage and sustained workloads,
+  *Built (2026-10-27):* the `lord-bench` helper, CPU, memory, GPU, storage and sustained workloads,
   the thermal, throttle and battery guards, the boot history and System Information → Performance are built
   (`BENCHMARK.md`, "Built so far"), and so are the video workloads (software decoding, the remote desktop's
   encoders), the desktop-impact mode (the compositor's frame times alone and under a low-priority load), the N-boot

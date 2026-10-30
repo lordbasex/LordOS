@@ -105,7 +105,7 @@ milliseconds no longer turns 60 frames a second into 57.
   moving the mouse composites nothing. If the driver has no cursor plane, it's drawn as a quad
   (`LORD_SW_CURSOR=1` forces it).
 
-## The dragged window on the GPU ("GPU drag", 0.8.6, in development)
+## The dragged window on the GPU ("GPU drag", 0.8.6)
 
 While a window is dragged its pixels are a cached layer blitted over a copy of what is below it
 (`docs/WINDOWS.md`, "The moving window is a layer"). On the GPU path, a frame that uses that copy no
@@ -157,7 +157,7 @@ returns -2 before presenting: no frame is shown with a stale W, the display keep
 `main.c` paints W on the CPU in the next frame without trying GPU drag (`gdragcpu`). `LORD_PAINT_VERIFY` leaves W
 out of its count on GPU drag frames.
 
-**Uploads without a stall (0.8.6, in development).** The two textures get only what changed (paint.c's dirty
+**Uploads without a stall (0.8.6).** The two textures get only what changed (paint.c's dirty
 rectangles, in their own pixels). A drag's start, or the copy of what is below built again whole, changes all of the
 copy: a screen of pixels (8.3 MB at 1920 × 1080), and on V3D `glTexSubImage2D` converts it to the GPU's tiled layout
 on the CPU inside the call, so the first GPU drag frame after such a change missed its vblank. Now:
@@ -278,7 +278,7 @@ runs only then. What keeps the Pi at about 31 fps under load is the GPU's time p
 under load, with no clock or thermal throttling; "The frame pipeline" below), which GPU drag does not reduce.
 **Not checked yet:** a run with `LORD_SW_CURSOR=1`. Near the menu bar or the Dock the frame is still painted by the CPU.
 
-## The frame pipeline (0.8.6, in development)
+## The frame pipeline (0.8.6)
 
 Until now a display's next frame was started only after its page flip completed: pointer input, LordBench's
 scripted step, the JS frame callbacks, layout, paint, the texture upload, the GPU's draw and the flip ran one after
@@ -402,7 +402,7 @@ pixels are the same as on one thread (`blurbench`/`rrbench` compare them byte fo
 
 Waking the pool costs CPU, so it is used only while frames are heavy: it turns on when painting takes
 more than 70 % of a frame at the target rate (the monitor's refresh, or the fastest remote viewer's
-screen without a monitor), or (0.8.6, in development) when the whole frame (layout, paint, upload and submit)
+screen without a monitor), or (0.8.6) when the whole frame (layout, paint, upload and submit)
 takes more than 60 % of it, and off after 60 frames in a row with painting under 25 % and the frame under 45 %.
 The second rule is for the GPU path under load: on the Pi 5 painting took about 7.5 ms there while the frame took
 about 13 ms and missed the vblank, and the pool stayed off. Its gain there is not measured yet. On VM 116 (8 cores, Xeon 1.8 GHz), a

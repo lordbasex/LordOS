@@ -73,6 +73,7 @@ the two apart.
 
 | Version | Machine | Conditions | What |
 |---|---|---|---|
+| 0.8.6-beta | `pi5-16gb-hdmi` | Raspberry Pi 5 16 GB, HDMI | First frame 7.63 s after the kernel; 489 MB used at idle; sustained 7.0 GFLOP/s from start to end, 50 → 59 °C (`ondemand`, the autologin session, LordBench Full) |
 | 0.8.5-beta | `vmware-fusion` | the same VM, updated from 0.8.4.1 to the 0.8.5 package with LordOS's package engine (lordos.org/apt-staging), measured about five minutes after the restart, Chrome, VS Code, Spotify and llama.cpp installed but not running | whole system 592 MB used (`free -m`); 59.8 fps at 60 Hz, p50 16.6 ms, p99 17.9 ms, 1 frame over budget in 30 s; 16 Wayland checks passed; first frame 7.4 s after the kernel started (`systemd-analyze` 7.6 s) |
 | 0.8.5~rc1 | `vmware-fusion` | VMware Fusion VM, virtual GPU (`vmwgfx`, SVGA3D), 1280×800 @ 60 Hz, updated from 0.8.4.1 by `apt install` | whole system 606–622 MB used one minute after sign-in, PSS of all processes 316 MB (login screen 78 MB of it); 59.8 fps at 60 Hz, p99 18.4 ms; 17 Wayland checks passed; boot 7.5 s |
 | 0.8.5~rc1 | `vmware-fusion-before-pacing` | the same, before software vblank pacing | 524 fps at 60 Hz: the driver completes flips at once |

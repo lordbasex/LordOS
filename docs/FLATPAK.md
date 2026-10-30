@@ -332,7 +332,7 @@ chosen file after start, which is the document portal's FUSE file system (Debian
 GTK 4 and Qt fall back to their own in-process file dialogs, which show only what the sandbox sees
 (**Unverified** per toolkit).
 
-**Recommendation: C for 0.8.6, B later** with its own review (E8 below is not requested now). The
+**Recommendation when this was written: C for 0.8.6, B later** with its own review (E8 below is not requested now). The
 Store says which apps need portals to be useful (declares no `home`/`host` file access and expects
 FileChooser).
 
@@ -396,7 +396,7 @@ still has to produce a layout `flatpak run` accepts. Not for 0.8.6.
 **C. System-wide installs through the admin helper.** *Rejected:* the roadmap asks for per-user
 installs and no new admin action; it would also need the system helper or root-run `flatpak`.
 
-**Recommendation: A for 0.8.6, B kept as the later way to make the catalog independent of
+**Recommendation when this was written: A for 0.8.6, B kept as the later way to make the catalog independent of
 Flatpak's code.** The closed list (all with `--user --noninteractive`, argv built in C, no shell,
 minimal environment, stdin `/dev/null`, output to a log or parsed strictly):
 
@@ -534,7 +534,7 @@ option B), which gets its own review in a later phase.
 
 ## Phased plan
 
-**Phase 1, 0.8.6 (if E1–E7 are approved):**
+**Phase 1, planned at the time for 0.8.6 (if E1–E7 are approved):**
 
 1. Store → "Flathub" switch: installs `flatpak` (no Recommends), runs `remote-add` from the shipped
    file. Masks per E5. x86-64 only.

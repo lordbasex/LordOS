@@ -40,6 +40,7 @@ El JavaScript de LordOS no puede escribir archivos `.desktop`, así que la inter
 - **Las notificaciones** de las apps de Linux llegan por el servicio estándar de notificaciones, que provee `lord-server`, y se pueden configurar por app en Ajustes.
 - **Contraseñas:** el Secret Service estándar lo sirve el llavero de LordOS, así que los navegadores pueden guardar ahí sus secretos sin otro demonio de llavero.
 - **Forzar salida** (desde 0.8.5): en Lord Flow, Forzar salida… en el menú de la corona lista las apps abiertas y termina la elegida sin preguntarle. Para una app de Linux termina solo el proceso de esa app; a una app X11 se le pide que se cierre.
+- **Apps por defecto sin elegir** (desde 0.8.6): si no se eligió una app para un tipo de archivo, el archivo se abre con la predeterminada del sistema o con la primera app instalada que declara su tipo, que se muestra como "Automática" en Ajustes → Apps por defecto. Las apps elegidas quedan como están.
 
 [[shot:2]]
 

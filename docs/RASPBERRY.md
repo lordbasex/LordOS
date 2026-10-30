@@ -42,6 +42,18 @@ This document gathers what's needed to build the image, write it, develop on the
 > Raspberry Pi's builds of Debian packages, and packages with a `+` in their name (`kms++-utils`,
 > `libkms++0`) download from lordos.org, so Settings → Board firmware can install the bootloader tools
 > from the LordOS repository alone (`PACKAGES.md`). Still not measured: the same as above.
+>
+> **Update (2026-10-30, 0.8.6):** released with the image `lordos-0.8.6-rpi5-arm64.img.xz` (783,667,748
+> bytes, sha256 `a81a2e068870099ac70aef8eaa08d0f1e33c0b3825f18f231f2e43ee251ea613`). A Pi 5 on 0.8.5 updated to 0.8.6 with `apt` against
+> `lordos.org/apt-staging` and restarted: no migration ran, the settings files are unchanged, and it
+> came back with 0.8.6-beta build 20261030, the first frame 7.63 s after the kernel, in a release build
+> with signed code (`UPDATES.md`, "Release tests"). The Store's own package engine and the Store → Updates
+> screen were not exercised, and a second reinstall was not run. The test suites were not rerun on the
+> Pi for 0.8.6. Results are in `results/0.8.6-beta/pi5-16gb-hdmi/` (`RESULTS.md`). Still not
+> measured: the same as above.
+>
+> **Not tested:** the `lordos-0.8.6-rpi5-arm64.img.xz` file itself was not written to a card or booted. Its package is
+> the one tested on the Pi above, built in the same run.
 
 ## Models
 

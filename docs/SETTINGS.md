@@ -343,7 +343,7 @@ and the Linux apps whose `.desktop` `MimeType` covers the category (terminals: `
   `/usr/local/share/applications`, `/usr/share/applications`, `defaults.list`), with the user's
   `[Removed Associations]` applied. File types come from shared-mime-info's `globs2` (highest
   weight, longest pattern, case-sensitive patterns first).
-- **Automatic default (0.8.6, in development).** When the user never chose an app for a type,
+- **Automatic default (0.8.6).** When the user never chose an app for a type,
   `apps_default_for()` (`server/src/apps.c`) still finds one, using only apps the launcher itself
   would run (a `.desktop` in `/usr/share/applications` or `~/.local/share/applications` that
   `apps_list` lists: not `Hidden`/`NoDisplay`/`Terminal`, `TryExec` found, `OnlyShowIn`/`NotShowIn`

@@ -1,0 +1,8 @@
+Startup finished in 1.798s (kernel) + 6.059s (userspace) = 7.857s 
+graphical.target reached after 6.058s in userspace.
+
+# the desktop's first frame, from the kernel's start (lord-sessiond); the splash's own timer starts later
+first frame on the monitor 7.630 s after the kernel started
+# the boot splash started: subtract the first line's monotonic time from the second's
+[    2.500706] kernel: Linux version 6.18.57-lordos.3-rpi-2712 (lordos@lordos) (aarch64-linux-gnu-gcc (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #3+lordos SMP PREEMPT Tue Oct 27 12:15:34 -03 2026
+[    3.112946] systemd[1]: Started plymouth-start.service - Show Plymouth Boot Screen.

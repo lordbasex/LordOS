@@ -907,6 +907,7 @@
         "The graphics card layer by layer, with the reason when the screen is composed on the CPU",
         "Compatibility: what works, what works with limits and what wasn't checked",
         "Checks of LordOS's claims on this computer, with a Sandbox Probe that tries what an isolated app must not do",
+        "Performance: LordBench, quick and full tests of the processor, memory, graphics, video and disk, shown against reference machines, never as one score",
         "Reports in Markdown or JSON, shown before you copy or save them; nothing is sent"
       ],
       "es": [
@@ -914,6 +915,7 @@
         "La placa de video capa por capa, con el motivo cuando la pantalla se compone en la CPU",
         "Compatibilidad: qué funciona, qué funciona con límites y qué no se comprobó",
         "Verificaciones de lo que LordOS afirma, en esta computadora, con la Prueba del aislamiento, que intenta lo que una app aislada no debe poder hacer",
+        "Rendimiento: LordBench, pruebas rápida y completa del procesador, la memoria, los gráficos, el video y el disco, frente a máquinas de referencia, nunca como un único puntaje",
         "Informes en Markdown o JSON, que ves antes de copiarlos o guardarlos; no se envía nada"
       ],
       "pt": [
@@ -921,6 +923,7 @@
         "A placa de vídeo camada por camada, com o motivo quando a tela é composta na CPU",
         "Compatibilidade: o que funciona, o que funciona com limites e o que não foi verificado",
         "Verificações do que o LordOS afirma, neste computador, com o Teste do isolamento, que tenta o que um app isolado não deve conseguir fazer",
+        "Desempenho: o LordBench, testes rápido e completo do processador, da memória, dos gráficos, do vídeo e do disco, frente a máquinas de referência, nunca como uma única pontuação",
         "Relatórios em Markdown ou JSON, que você vê antes de copiar ou salvar; nada é enviado"
       ]
     }

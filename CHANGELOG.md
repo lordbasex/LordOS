@@ -10,12 +10,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Release
+
+- **0.8.6-beta published** (2026-10-30): the GitHub release carries the live ISO
+  (`lordos-live-0.8.6-amd64.iso`), the Raspberry Pi 5 image (`lordos-0.8.6-rpi5-arm64.img.xz`), the amd64 and arm64
+  packages with their SBOMs, **LordOS Imager 0.8.6** and `SHA256SUMS`, and the apt repository is updated. The site's
+  downloads (`lordos.media`) now point to 0.8.6, and the docs, README, paper (en/es/pt), FAQ, features, legal and apps
+  pages describe it as the current release; the engine references stay tagged 0.8.5-beta.
+
 ## [0.8.6-beta] - 2026-10-30
 
 ### Added
 
 - **LordBench, first part (`docs/BENCHMARK.md`, "Built so far"):** System Information has a
-  **Performance** tab with a Quick test (less than a minute) and a Full test (adds storage and three minutes of
+  **Performance** tab (on `lord.sysinfo.bench`) with a Quick test (less than a minute) and a Full test (adds storage and three minutes of
   sustained load). The work runs in **`lord-bench`**, a new sandboxed helper launched by lord-server like `lord-doc`
   and `lord-media` (its own folder only, no arguments, `sandbox_apply_helper` before any work, scope
   `lordos-bench.scope`, 2 GB cap), which gets only the GPU's render node and an unnamed scratch file opened by
@@ -1089,7 +1097,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - **From 0.8.5 (and 0.8.4.1 to 0.8.1):** Store → Updates shows "LordOS 0.8.6 is available" with these notes;
   **Update** installs it and a restart finishes it. `sudo apt update && sudo apt upgrade` does the same. This version
-  adds no migration (`ls /var/lib/lordos/migrations` is unchanged from 0.8.5); your settings are kept.
+  adds no migration (`ls /var/lib/lordos/migrations` is unchanged from 0.8.5); your settings are kept. Tested on
+  2026-10-30 with `apt` against `lordos.org/apt-staging`, on a live-session amd64 VM (no restart is possible there)
+  and on the Raspberry Pi 5 with a restart: no migration ran, the settings files were unchanged, and the Pi came back
+  with 0.8.6-beta build 20261030, its first frame 7.63 s after the kernel, in a release build with signed code. The
+  Store's own package engine and the Store → Updates screen were not exercised, and a second reinstall was not run.
 - The compositor's CPU weight and real-time priority are set when `lord-sessiond` starts a session, so they apply
   after that restart.
 - Default apps you chose in Settings stay as they are; automatic defaults apply only to file types you never chose

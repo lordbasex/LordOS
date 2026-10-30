@@ -400,6 +400,11 @@ for now.
 
 ## Release tests
 
+- **0.8.6 (2026-10-30):** 0.8.5 → 0.8.6 with `apt` against `lordos.org/apt-staging` on a live-session
+  amd64 VM (no restart is possible there) and on the Raspberry Pi 5 with a restart: no migration ran,
+  the settings files are unchanged, and the Pi came back with 0.8.6-beta build 20261030, the first frame
+  7.63 s after the kernel, in a release build with signed code. The Store's own package engine and the
+  Store → Updates screen were not exercised, and a second reinstall was not run.
 - **0.8.5 (2026-10-27):** 0.8.4.1 → 0.8.5 with `apt` on a VMware machine and 0.8.4 → 0.8.5 with `apt`
   on the Raspberry Pi 5, both tested before the release with the same package built as `0.8.5~rc2`,
   then a restart; no migration runs (`/var/lib/lordos/migrations` unchanged from 0.8.4) and the

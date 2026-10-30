@@ -6,7 +6,7 @@ Escreva pelo **[nosso formulário de contato](https://www.iperfex.com/contacto/?
 
 Inclua, na medida do possível:
 
-- a versão do LordOS (no app Sobre o LordOS, por exemplo "0.8.5 · Beta") e se é a ISO, a imagem para Raspberry Pi ou o pacote do Debian;
+- a versão do LordOS (no app Sobre o LordOS, por exemplo "0.8.6 · Beta") e se é a ISO, a imagem para Raspberry Pi ou o pacote do Debian;
 - o componente afetado (por exemplo o compositor, o sandbox de apps, o firewall por app, a área de trabalho remota, o cofre de senhas, a Loja, o script de instalação para Debian ou o site);
 - os passos para reproduzir, uma prova de conceito se você tiver, e o impacto que você vê;
 - como você gostaria de ser creditado, se quiser.

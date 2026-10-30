@@ -7755,6 +7755,17 @@
   }
  },
  {
+  "file": "docs/sysinfo-performance.png",
+  "category": "hardware",
+  "theme": "dark",
+  "variant": "normal",
+  "caption": {
+   "en": "System Information → Performance: LordBench's verdicts and results against a reference machine",
+   "es": "Información del sistema → Rendimiento: los veredictos y resultados de LordBench frente a una máquina de referencia",
+   "pt": "Informações do sistema → Desempenho: os vereditos e resultados do LordBench frente a uma máquina de referência"
+  }
+ },
+ {
   "file": "docs/system-info-checks.png",
   "category": "hardware",
   "theme": "light",
