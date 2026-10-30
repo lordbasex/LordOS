@@ -37,7 +37,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Looks:** Noche, following the system's mode, and Aurora and Cristal, as data; animated without a React render per frame, stopped when the window isn't in front and with Reduce motion.
     Built-in apps can draw their own window frame (`"ownFrame"` in the manifest).
   - **Item by the clock:** a still item with a panel of real readings, read only while it is open.
-  - **Measured on VM 116** (122,000 files, warm cache): see `docs/CLEANER-TESTS.md`.
+  - **Full scan:** a dashboard of tiles with the real path being read, a sidebar rail, a tint per section, then a review board; Storage opens on bubbles of the largest folders.
+  - **Measured on VM 116** (122,000 files, warm cache): a tree of 102,653 entries in 446 ms, duplicates in 5.1 s, a real delete of 20,000 files in 1.0 s (`docs/CLEANER-TESTS.md`). Paint cost on a display is not measured.
 
 - **Cleaner: cache rules, the real delete and the Trash** (2026-10-30, the delete approved by the maintainer that day):
   rules for the thumbnails, font, graphics shader and media plugin caches, each at an explicit root and regenerable;

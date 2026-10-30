@@ -28,6 +28,10 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 | Preferences | Built | Exclusions, threshold, look, item by the clock |
 | Item by the clock and panel | Built | Still item; reads only while open |
 | Looks | Built | Noche, Aurora, Cristal |
+| Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn |
+| Bubble view | Built | Selecting a folder reviews its large files; no folder action |
+| Similar images | Not started | Phase 2 |
+| Apps | Not started | Phase 2 |
 | System files | Built | Three closed admin actions, not run on the VM |
 | Status word: updates | Partly | The rule exists; the panel doesn't read the update state |
 | Translated Downloads folders | Not started | Only `Downloads` is covered |
@@ -45,4 +49,4 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 
 ## Tested
 
-See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root.
+See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root, paint cost and on-screen frame times.

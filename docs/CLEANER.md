@@ -10,10 +10,10 @@ The rule is **analyse, review, plan, confirm, execute, verify**. A scan only rea
 
 | Section | What it does |
 |---|---|
-| Scan | Disk usage and the last scan; runs the rule scan |
+| Scan | Disk usage and the last scan; a full scan runs Cleanup, Storage and Duplicates one after the other on a dashboard of tiles, then a review board of what was really found |
 | Cleanup | The rules' findings by category, each with its reason, risk, action, count and size; the system's own files |
 | Large files | Files found by a tree scan, filtered by size, age by modification time and type |
-| Storage | Volumes (`/`, the home folder, the user's mounts); a map of folders, a folder list with logical and allocated sizes, a summary by type |
+| Storage | Volumes (`/`, the home folder, the user's mounts); bubbles of the largest folders (the default, 14 at most, the rest grouped), a map, a folder list with logical and allocated sizes, a summary by type. A selected folder goes to Large files to be reviewed |
 | Duplicates | Exact copies in chosen folders; nothing is selected for the user |
 | Activity | What ran: counts and sizes, never a path |
 | Settings | Excluded folders, the large file threshold, the look, the item by the clock |
@@ -65,9 +65,12 @@ SMART is not part of it: reading it needs the admin helper and can wake a restin
 Themes are data, one token object each (`sdk/cleanertheme.js`). Noche is the default and follows the system's light or dark mode live.
 Aurora and Cristal, chosen in Settings, have one fixed look. The app and its panel use the same one.
 
-The engine has no radial or conic gradient. So the night sky is a stretched image, the progress ring is an `Image pixels`, and the
-storage map is up to 28 views rather than one image, so its areas can rise in. A scan has no known total, so it shows real
-counters and a spinner; a percentage appears only while a plan runs.
+Each section tints the window, crossfading over 700 ms. During a full scan the sidebar narrows to a rail with a step badge.
+
+What differs from the mockup: the engine has no radial or conic gradient, so the night sky is a stretched image and the progress ring is an `Image pixels`; the
+storage map is up to 28 views rather than one image, so its areas can rise in. A scan has no known total, so it shows real counters, the real path and a spinner; a
+percentage appears only while a plan runs. Selecting a folder in Storage doesn't remove the folder: it opens its large files for review, as no action on whole folders
+exists outside AI models. Previews are real thumbnails for images and the file's extension otherwise.
 
 Motion uses one timer and `lord.setStyle`, runs only while the window is in front, and stops entirely with Reduce motion.
 
