@@ -88,6 +88,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     on it while the pool has none. A snapshot alone between releases: `sign-hwsnapshot.sh` (which now prints the
     package version), `mkdeb-hwdata.sh`, `apt-repo.sh build|publish|verify staging`, then `live`. The release
     folder and the release notes' downloads table carry `lordos-hwdata_<date>_all.deb`.
+  - **In Store → Updates** (approved 2026-10-30): the update is shown as "Tested hardware list" ("Lista de
+    hardware probado", "Lista de hardware testado") with the line "Updated list of hardware tested with LordOS
+    (<date>)", the version read as a date in the user's region (`formatDate(…, 'numeric')`; a version that isn't
+    `YYYY.MM.DD[.N]` is shown as is), and the plans of *Update all* name it the same way. Only presentation: the
+    package name, what is installed and the admin actions are unchanged. The names come from a small table in
+    `apps/store/syspkg.js` (`sysPkgKey`, `snapshotDate`; the `lordos` package keeps its own card), the text from
+    `store.updates.hwdata.name`/`.summary` (en, es, pt). Test: `tests/store_syspkg_test.mjs` (36 checks: only that
+    package gets a label, versions with and without `.N`, impossible dates and other formats refused, the three
+    languages), run by `run_suites.sh`. Not checked on screen: the Store has no fixture for a fake update.
   - **Tests:** `build/pkg-test` (8 new checks: the new dependency on update and *Update all*, a snapshot-only
     upgrade, the date versions' order; 112 passed). Both packages built on VM 116 and checked with `dpkg-deb
     --info`/`--contents`; `make -C server test` passed (23 suites, 0 failed). In a `debian:trixie` container: apt

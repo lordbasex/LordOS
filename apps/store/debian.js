@@ -10,6 +10,7 @@ import {
 } from '@lordos/sdk';
 import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
+import { sysPkgKey, snapshotDate } from './syspkg.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -65,6 +66,18 @@ function PkgIcon({ app, name, size = 48 }) {
   return h(LetterIcon, { size, name: app?.name || name });
 }
 
+// A package's name as the Updates list and the plans show it: LordOS's data packages in words
+// (syspkg.js), every other package by its name.
+const pkgLabel = (name) => { const k = sysPkgKey(name); return k ? t(`${k}.name`) : name; };
+// The line under it: for a data package, what it is and its date (in the user's region when the
+// version is a date); otherwise the versions and the package's summary.
+function pkgLine(u) {
+  const k = sysPkgKey(u.name);
+  if (!k) return `${u.from} → ${u.to} · ${u.summary}`;
+  const d = snapshotDate(u.to);
+  return t(`${k}.summary`, { date: d ? formatDate(d, 'numeric') : u.to });
+}
+
 function Progress() {
   const th = useTheme();
   const { job, msg } = useStore(state);
@@ -86,7 +99,7 @@ function PlanView({ plan }) {
   if (!plan.ok) return h(Text, { style: { fontSize: 12, color: '#ff453a' } }, (plan.error && errorText(plan.error)) || t('store.plan.impossible'));
   const by = (a) => plan.items.filter((i) => i.action === a);
   const line = (label, list) => (list.length ? h(Text, { style: { fontSize: 12, color: th.text, lineHeight: 1.4 } },
-    `${label}: ${list.slice(0, 14).map((i) => i.name).join(', ')}${list.length > 14 ? ` ${t('store.plan.more', { count: list.length - 14 })}` : ''}`) : null);
+    `${label}: ${list.slice(0, 14).map((i) => pkgLabel(i.name)).join(', ')}${list.length > 14 ? ` ${t('store.plan.more', { count: list.length - 14 })}` : ''}`) : null);
   const delta = plan.installedDelta;
   return h(View, { style: { gap: 4 } },
     line(t('store.plan.install', { count: by('install').length }), by('install')),
@@ -361,8 +374,8 @@ function Updates() {
       h(GroupBox, null, ...others.map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
         h(PkgIcon, { name: u.name, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
-          h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, u.name),
-          h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, `${u.from} → ${u.to} · ${u.summary}`)),
+          h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, pkgLabel(u.name)),
+          h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, pkgLine(u))),
         h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size)))))) : null,
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.m, paddingHorizontal: spacing.xs } },
       h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },

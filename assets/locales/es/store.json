@@ -253,6 +253,8 @@
     "one": "Actualizaciones de Debian ({count})",
     "other": "Actualizaciones de Debian ({count})"
   },
+  "updates.hwdata.name": "Lista de hardware probado",
+  "updates.hwdata.summary": "Lista actualizada del hardware probado con LordOS ({date})",
   "updates.none": "Todo está al día.",
   "updates.title": "Actualizaciones",
   "upgrade": "Actualizar",

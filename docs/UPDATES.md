@@ -168,7 +168,8 @@ Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg
   (`If-Modified-Since`, 304). LordOS has no metered-connection setting yet; turning the check off
   is the way to avoid it on a metered link.
 - **The tested-hardware snapshot** (0.8.7, `lordos-hwdata`): a newer one published between releases is an
-  ordinary update of that package, listed with the other packages ("Debian updates", with its description) and
+  ordinary update of that package, listed with the other packages ("Debian updates") as "Tested hardware list" with
+  its date in the user's region (`apps/store/syspkg.js`; the package name is not shown) and
   announced by the daily check as "1 update is available"; *Update all* installs it. It needs no restart and no
   migration: `lord.sysinfo.community()` reads the files again whenever System Information's Compatibility panel
   asks, and verifies the snapshot's Ed25519 signature before using it. Updating `lordos` from 0.8.5 or 0.8.6
