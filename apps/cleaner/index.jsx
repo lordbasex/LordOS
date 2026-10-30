@@ -113,6 +113,11 @@ function Body() {
       if (p && p.state === 'running') t = setTimeout(tick, TICK_MS);
       else {
         setStatus(cleaner.status());
+        if (p && p.job === 'scan' && p.state === 'done' && p.scan.kind === 'rules') {
+          setSettings({ cleaner: { ...prefsOf(s), lastScan: { at: Math.floor(Date.now() / 1000), allocated: p.scan.estimated, candidates: p.scan.candidates } } });
+          setChosen(new Set(p.scan.rules.filter((r) => r.risk === 'regenerable' && r.action === 'delete' && r.files > 0 && !r.explicit).map((r) => r.id)));
+          setSection((c) => (c === 'cleanup' || q ? c : c));
+        }
         const q = pipeRef.current;
         if (q && p && p.job === 'scan' && p.state === 'done') {
           const results = { ...q.results, [MODULES[q.step].id]: moduleResult(MODULES[q.step].id, p.scan) };
@@ -129,11 +134,6 @@ function Body() {
           setBoard(true);
         } else if (q) { pipeRef.current = null; setPipe(null); }
         setPolling(false);
-        if (p && p.job === 'scan' && p.state === 'done' && p.scan.kind === 'rules') {
-          setSettings({ cleaner: { ...prefsOf(s), lastScan: { at: Math.floor(Date.now() / 1000), allocated: p.scan.estimated, candidates: p.scan.candidates } } });
-          setChosen(new Set(p.scan.rules.filter((r) => r.risk === 'regenerable' && r.action === 'delete' && r.files > 0 && !r.explicit).map((r) => r.id)));
-          setSection((c) => (c === 'cleanup' || q ? c : c));
-        }
       }
     };
     t = setTimeout(tick, TICK_MS);
