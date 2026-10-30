@@ -72,5 +72,10 @@
   "rule.media-registry": "The list of media plugins. It is rebuilt the next time media plays.",
   "rule.temporary": "Temporary files older than a week. Check them first: they go to the Trash.",
   "rule.trash": "Items in the Trash. Empty the Trash to free their space.",
-  "warn.deleteIsFinal": "Deleted files can't be restored."
+  "warn.deleteIsFinal": "Deleted files can't be restored.",
+  "confirm.titleDelete": {
+    "one": "Clean {count} item?",
+    "other": "Clean {count} items?"
+  },
+  "confirm.okDelete": "Delete and clean"
 }

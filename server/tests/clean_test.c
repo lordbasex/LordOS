@@ -83,7 +83,7 @@ typedef struct { JDoc d; const JVal *scan, *plan; const char *state, *error; } P
 static void poll_free(Poll *p) { json_free(&p->d); memset(p, 0, sizeof *p); }
 
 static void poll_read(Poll *p) {
-    char *j = clean_poll();
+    char *j = clean_poll(-1);
     memset(p, 0, sizeof *p);
     if (!j || json_parse(j, strlen(j), &p->d, NULL, 0)) abort();
     free(j);
@@ -865,6 +865,301 @@ static void test_mounts(void) {
     if (!WIFEXITED(st) || WEXITSTATUS(st)) { fails++; fprintf(stderr, "FAIL: mount cases\n"); }
 }
 
+/* ---- the tree: large and old files, the storage map ---- */
+
+static void put_size(const char *rel, size_t n, char fill) {
+    char p[PATH_MAX * 2];
+    mkparents(rel);
+    path_of(p, sizeof p, rel);
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    char buf[4096];
+    memset(buf, fill, sizeof buf);
+    for (size_t off = 0; off < n; off += sizeof buf) if (write(fd, buf, n - off < sizeof buf ? n - off : sizeof buf) < 0) abort();
+    close(fd);
+}
+
+static int page_total(int scan, const CleanFilter *f) {
+    char *j = clean_results_of(scan, 0, CLEAN_PAGE_MAX, f);
+    JDoc d = { 0 };
+    if (!j || json_parse(j, strlen(j), &d, NULL, 0)) abort();
+    int n = (int)json_num(d.root, "total", -1);
+    json_free(&d);
+    free(j);
+    return n;
+}
+
+static void test_tree(void) {
+    wipe();
+    put_size("Pictures/a/big.png", 3 << 20, 'a');
+    put_size("Pictures/small.png", 1000, 'b');
+    put_size("Videos/film.mkv", 2 << 20, 'c');
+    hardlink("Videos/film.mkv", "Videos/same-film.mkv");
+    put_size("Documents/old.pdf", 2 << 20, 'd');
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, "Documents/old.pdf");
+    struct timespec tm[2] = { { 1000000000, 0 }, { 1000000000, 0 } };
+    CHECK(!utimensat(AT_FDCWD, f, tm, 0));
+    path_of(f, sizeof f, "Documents/sparse.bin");
+    int fd = open(f, O_WRONLY | O_CREAT, 0600);
+    CHECK(fd >= 0 && !ftruncate(fd, 8 << 20));
+    close(fd);
+    put(".local/share/lordos/vault/secret.png", "must not be listed");
+    put("Skip/hidden.bin", "x");
+    put_size("Skip/huge.bin", 2 << 20, 'e');
+    CleanOpts o = { .min_size = 1 << 20, .exclude = { "Skip" }, .nexclude = 1 };
+    int scan = clean_start_kind(CLEAN_KIND_TREE, &o);
+    CHECK(scan > 0);
+    Poll p;
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(json_bool(p.scan, "complete", 0) == 1);
+    CHECK(num(p.scan, "candidates") == 4);          /* big.png, film (one link), old.pdf, sparse.bin */
+    CHECK(skipped(p.scan, "protected") >= 1 && skipped(p.scan, "excluded") >= 1);
+    const JVal *ty = json_get(p.scan, "types");
+    double video_files = -1, image_s = -1;
+    for (const JVal *t = ty->kid; t; t = t->next) {
+        if (!strcmp(json_str(t, "type"), "video")) video_files = json_num(t, "files", -1);
+        if (!strcmp(json_str(t, "type"), "image")) image_s = json_num(t, "logical", -1);
+    }
+    CHECK(video_files == 1);                        /* a hard link counts once */
+    CHECK(image_s == (3 << 20) + 1000);
+    poll_free(&p);
+    CHECK(page_total(scan, &(CleanFilter){ .type = CLEAN_TYPE_VIDEO }) == 1);
+    CHECK(page_total(scan, &(CleanFilter){ .type = -1, .min_size = 3 << 20 }) == 2);
+    CHECK(page_total(scan, &(CleanFilter){ .type = -1, .older_than = 1200000000 }) == 1);
+    /* largest first */
+    char *j = clean_results_of(scan, 0, 1, &(CleanFilter){ .type = -1 });
+    CHECK(j && strstr(j, "sparse.bin"));
+    free(j);
+    /* the tree: allocated order, logical and allocated apart */
+    j = clean_tree(scan, 0, 50);
+    JDoc d = { 0 };
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0));
+    const JVal *kids = json_get(d.root, "children");
+    CHECK(kids && kids->len >= 3);
+    CHECK(!strcmp(json_str(kids->kid, "name"), "Pictures") || !strcmp(json_str(kids->kid, "name"), "Videos") || !strcmp(json_str(kids->kid, "name"), "Documents"));
+    double last = 1e30, doc_l = 0, doc_a = 1e30;
+    int doc = -1;
+    for (const JVal *k = kids->kid; k; k = k->next) {
+        CHECK(json_num(k, "allocated", 0) <= last);
+        last = json_num(k, "allocated", 0);
+        CHECK(strcmp(json_str(k, "name"), "Skip"));
+        if (!strcmp(json_str(k, "name"), "Documents")) { doc_l = json_num(k, "logical", 0); doc_a = last; doc = (int)json_num(k, "id", -1); }
+    }
+    CHECK(doc_l == (10 << 20) && doc_a < (3 << 20));/* sparse: 8 MB logical, nothing allocated */
+    CHECK(doc > 0);
+    json_free(&d);
+    free(j);
+    j = clean_tree(scan, doc, 10);
+    CHECK(j && strstr(j, "\"trail\":[{"));
+    free(j);
+    CHECK(clean_tree(scan, 99999, 10) == NULL);
+    CHECK(clean_tree(scan + 1000, 0, 10) == NULL);
+    /* large files go to the Trash, and can come back */
+    uint32_t id = 0;
+    j = clean_results_of(scan, 0, 1, &(CleanFilter){ .type = CLEAN_TYPE_IMAGE });
+    CHECK(!json_parse(j, strlen(j), &d, NULL, 0));
+    id = (uint32_t)json_num(json_get(d.root, "items")->kid, "id", 0);
+    CHECK(!strcmp(json_str(json_get(d.root, "items")->kid, "action"), "trash"));
+    json_free(&d);
+    free(j);
+    int plan = clean_plan(scan, &id, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(!exists("Pictures/a/big.png") && exists(".local/share/Trash/files/big.png"));
+    CHECK(clean_restore(plan, id + 1) == CLEAN_E_BADID);
+    CHECK(clean_restore(plan, id) == 0);
+    CHECK(exists("Pictures/a/big.png") && !exists(".local/share/Trash/files/big.png"));
+    CHECK(clean_restore(plan, id) == CLEAN_E_BADID);/* once */
+    poll_read(&p);
+    CHECK(count(p.plan, "restored") == 1);
+    poll_free(&p);
+    /* the history holds counts, never a path */
+    j = clean_history();
+    CHECK(j && strstr(j, "\"action\":\"clean\"") && !strstr(j, "Pictures") && !strstr(j, H) && !strstr(j, "big.png"));
+    free(j);
+    char hist[PATH_MAX * 2];
+    path_of(hist, sizeof hist, ".local/state/lordos/cleaner-history.json");
+    CHECK(exists(".local/state/lordos/cleaner-history.json"));
+    clean_history_clear();
+    CHECK(!exists(".local/state/lordos/cleaner-history.json"));
+    /* options: a volume and a folder C doesn't know */
+    CHECK(clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .volume = "mount:9" }) == CLEAN_E_BADFOLDER);
+    CHECK(clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .volume = "/etc" }) == CLEAN_E_BADFOLDER);
+    CHECK(clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .exclude = { "../x" }, .nexclude = 1 }) == CLEAN_E_BADFOLDER);
+    j = clean_volumes();
+    CHECK(j && strstr(j, "\"id\":\"root\"") && strstr(j, "\"id\":\"home\""));
+    free(j);
+}
+
+/* a scan limited to one source: lord-server reports the root as read-only with no action */
+static void test_tree_limits(void) {
+    wipe();
+    for (int i = 0; i < 300; i++) { char n[64]; snprintf(n, sizeof n, "many/d%d/f.bin", i); put(n, "x"); }
+    int scan = clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .min_size = 1 });
+    CHECK(scan > 0);
+    Poll p;
+    wait_job(&p);
+    CHECK(num(p.scan, "candidates") == 300 && num(p.scan, "dirs") == 302);
+    poll_free(&p);
+    char *j = clean_tree(scan, 1, 500);
+    JDoc d = { 0 };
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0) && json_get(d.root, "children")->len == 300);
+    json_free(&d);
+    free(j);
+    j = clean_tree(scan, 1, 10);
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0) && json_num(d.root, "more", 0) == 290);
+    json_free(&d);
+    free(j);
+}
+
+/* ---- exact duplicates ---- */
+
+static int member_id(int scan, const char *tail) {
+    char *j = clean_groups(scan, 0, 100);
+    JDoc d = { 0 };
+    int id = 0;
+    if (!j || json_parse(j, strlen(j), &d, NULL, 0)) abort();
+    for (const JVal *g = json_get(d.root, "groups")->kid; g; g = g->next)
+        for (const JVal *m = json_get(g, "members")->kid; m; m = m->next) {
+            const char *p = json_str(m, "path");
+            size_t a = strlen(p), b = strlen(tail);
+            if (a >= b && !strcmp(p + a - b, tail)) id = (int)json_num(m, "id", 0);
+        }
+    json_free(&d);
+    free(j);
+    return id;
+}
+
+static void make_dups(void) {
+    wipe();
+    put_size("D/a/one.bin", 100000, 'x');
+    put_size("D/b/two.bin", 100000, 'x');
+    put_size("D/c/three.bin", 100000, 'x');
+    put_size("D/same-size.bin", 100000, 'y');       /* same size, other content */
+    /* the first and last 16 KB equal, the middle not: the partial hash matches, the full one must not */
+    put_size("D/mid1.bin", 200000, 'm');
+    put_size("D/mid2.bin", 200000, 'm');
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, "D/mid2.bin");
+    int fd = open(f, O_WRONLY);
+    if (fd < 0 || pwrite(fd, "Z", 1, 100000) != 1) abort();
+    close(fd);
+    put("D/empty1.bin", "");
+    put("D/empty2.bin", "");
+    put_size("D/link1.bin", 50000, 'l');            /* only hard links: one file, no duplicate */
+    hardlink("D/link1.bin", "D/link2.bin");
+    put_size("D/h1.bin", 60000, 'h');               /* a copy and a pair of links */
+    hardlink("D/h1.bin", "D/h2.bin");
+    put_size("D/h3.bin", 60000, 'h');
+}
+
+static void test_dups(void) {
+    make_dups();
+    const CleanOpts o = { .folders = { "D" }, .nfolders = 1 };
+    int scan = clean_start_kind(CLEAN_KIND_DUPS, &o);
+    CHECK(scan > 0);
+    Poll p;
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(num(p.scan, "groups") == 2);
+    CHECK(num(p.scan, "candidates") == 6);          /* one, two, three; h1, h2, h3 */
+    CHECK(num(p.scan, "hashed") >= 5);
+    poll_free(&p);
+    CHECK(member_id(scan, "same-size.bin") == 0 && member_id(scan, "mid1.bin") == 0 && member_id(scan, "empty1.bin") == 0 && member_id(scan, "link1.bin") == 0);
+
+    /* nothing is selected by itself; choosing the whole group is refused: a copy stays */
+    uint32_t all[3] = { (uint32_t)member_id(scan, "one.bin"), (uint32_t)member_id(scan, "two.bin"), (uint32_t)member_id(scan, "three.bin") };
+    int plan = clean_plan(scan, all, 3);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "skipped") == 3 && count(p.plan, "ready") == 0);
+    int warned = 0;
+    for (const JVal *w = json_get(p.plan, "warnings")->kid; w; w = w->next) warned |= !strcmp(w->str, "keepOneCopy");
+    CHECK(warned);
+    poll_free(&p);
+    /* a hard link is not a copy: h1 and h2 are one file, so taking both still keeps h3, taking h3 and h1 keeps nothing else */
+    uint32_t links[2] = { (uint32_t)member_id(scan, "h1.bin"), (uint32_t)member_id(scan, "h3.bin") };
+    plan = clean_plan(scan, links, 2);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 1 && count(p.plan, "skipped") == 1);   /* h3 has no other inode left unselected */
+    poll_free(&p);
+
+    /* two of three: both go, the third stays */
+    plan = clean_plan(scan, all, 2);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 2);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 2);
+    poll_free(&p);
+    CHECK(!exists("D/a/one.bin") && !exists("D/b/two.bin") && exists("D/c/three.bin"));
+
+    /* the copy that stays changed, its size, inode and date the same: the byte comparison stops it */
+    make_dups();
+    scan = clean_start_kind(CLEAN_KIND_DUPS, &o);
+    wait_job(&p);
+    poll_free(&p);
+    uint32_t one = (uint32_t)member_id(scan, "one.bin");
+    uint32_t pair[2] = { one, (uint32_t)member_id(scan, "two.bin") };
+    plan = clean_plan(scan, pair, 2);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 2);
+    poll_free(&p);
+    char f[PATH_MAX * 2];
+    struct stat st;
+    path_of(f, sizeof f, "D/c/three.bin");
+    CHECK(!stat(f, &st));
+    int fd = open(f, O_WRONLY);
+    CHECK(fd >= 0 && pwrite(fd, "!", 1, 50000) == 1);
+    close(fd);
+    struct timespec tm[2] = { st.st_atim, st.st_mtim };
+    CHECK(!utimensat(AT_FDCWD, f, tm, 0));
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 0 && count(p.plan, "changed") == 2);
+    poll_free(&p);
+    CHECK(exists("D/a/one.bin") && exists("D/b/two.bin"));
+
+    /* the copy that stays is gone */
+    make_dups();
+    scan = clean_start_kind(CLEAN_KIND_DUPS, &o);
+    wait_job(&p);
+    poll_free(&p);
+    uint32_t single = (uint32_t)member_id(scan, "one.bin"), other[1] = { single };
+    uint32_t dropped[2] = { other[0], (uint32_t)member_id(scan, "two.bin") };
+    plan = clean_plan(scan, dropped, 2);
+    wait_job(&p);
+    poll_free(&p);
+    path_of(f, sizeof f, "D/c/three.bin");
+    CHECK(!unlink(f));
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "changed") == 2 && count(p.plan, "done") == 0);
+    poll_free(&p);
+
+    /* folders: only under the home folder, no overlap */
+    CHECK(clean_start_kind(CLEAN_KIND_DUPS, &(CleanOpts){ .folders = { "../etc" }, .nfolders = 1 }) == CLEAN_E_BADFOLDER);
+    CHECK(clean_start_kind(CLEAN_KIND_DUPS, &(CleanOpts){ .folders = { "/etc" }, .nfolders = 1 }) == CLEAN_E_BADFOLDER);
+    CHECK(clean_start_kind(CLEAN_KIND_DUPS, &(CleanOpts){ .folders = { "D", "D/a" }, .nfolders = 2 }) == CLEAN_E_BADFOLDER);
+    CHECK(clean_start_kind(CLEAN_KIND_DUPS, &(CleanOpts){ .nfolders = 0 }) == CLEAN_E_BADFOLDER);
+    /* two folders are compared with each other */
+    wipe();
+    put_size("X/a.bin", 30000, 'q');
+    put_size("Y/b.bin", 30000, 'q');
+    scan = clean_start_kind(CLEAN_KIND_DUPS, &(CleanOpts){ .folders = { "X", "Y" }, .nfolders = 2 });
+    wait_job(&p);
+    CHECK(num(p.scan, "groups") == 1);
+    poll_free(&p);
+    clean_cancel(1);
+}
+
 int main(void) {
     if (syscall(SYS_landlock_create_ruleset, NULL, 0U, 1U) < 1) { printf("clean-test: skipped: needs Landlock\n"); return 0; }
     char tmpl[] = "/tmp/clean-test.XXXXXX";
@@ -893,6 +1188,9 @@ int main(void) {
     test_cancel_scan();
     test_delete();
     test_mounts();
+    test_tree();
+    test_tree_limits();
+    test_dups();
     wipe();
     rmdir(H);
     printf("clean-test: %d checks, %d failed\n", checks, fails);

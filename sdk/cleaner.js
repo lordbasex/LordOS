@@ -4,7 +4,7 @@
 //   cleaner.start()                      a new scan of every rule: its id. It takes no path
 //   cleaner.poll()                       { job, state, error, scan, plan }: real counters
 //   cleaner.cancel(forget)               stops the job; forget also drops the results
-//   cleaner.results(kind, offset, limit) a page ('scan' | 'plan') of { id, rule, path, size, allocated, … }
+//   cleaner.results(scanId | 'plan', offset, limit, filter) a page of { id, rule, path, size, allocated, … }
 //   cleaner.plan(scanId, ids)            a plan, built and checked in lord-server: its id
 //   cleaner.execute(planId)              runs it once
 //   cleaner.status()                     { available, free, total }
@@ -22,7 +22,7 @@ export const cleaner = {
   start: () => lord.clean.start(),
   poll: () => (has() ? lord.clean.poll() : null),
   cancel: (forget) => { if (has()) lord.clean.cancel(!!forget); },
-  results: (kind, offset, limit) => lord.clean.results(kind, offset, limit),
+  results: (source, offset, limit, filter) => lord.clean.results(source, offset, limit, filter),
   plan: (scanId, ids) => lord.clean.plan(scanId, ids),
   execute: (planId) => lord.clean.execute(planId),
 };

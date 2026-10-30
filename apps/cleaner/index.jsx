@@ -80,10 +80,10 @@ function usePages(kind, key) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const load = useCallback((offset) => {
-    const r = cleaner.results(kind, offset, PAGE);
+    const r = cleaner.results(kind === 'plan' ? 'plan' : key, offset, PAGE);
     setItems((old) => (offset ? [...old, ...r.items] : r.items));
     setTotal(r.total);
-  }, [kind]);
+  }, [kind, key]);
   useEffect(() => { if (key) load(0); else { setItems([]); setTotal(0); } }, [key, load]);
   return { items, total, more: () => load(items.length) };
 }
@@ -150,7 +150,7 @@ export default function Cleaner() {
   const selectAll = async () => {
     const all = new Set();
     for (let off = 0; off < list.total; off += 500) {
-      cleaner.results('scan', off, 500).items.forEach((c) => all.add(c.id));
+      cleaner.results(scan.id, off, 500).items.forEach((c) => all.add(c.id));
       await new Promise((r) => setTimeout(r, 0));     // long lists: the compositor keeps drawing
     }
     setSelected(all);
@@ -268,7 +268,7 @@ export default function Cleaner() {
 
       {confirm && plan && plan.counts.ready > 0 ? (
         <ConfirmDialog
-          title={tr('cleaner.confirm.title', { count: plan.counts.ready })}
+          title={tr(plan.deleteItems ? 'cleaner.confirm.titleDelete' : 'cleaner.confirm.title', { count: plan.counts.ready })}
           destructive={plan.deleteItems > 0}
           detail={[
             plan.deleteItems ? tr('cleaner.confirm.delete', { n: formatNumber(plan.deleteItems), size: formatBytes(plan.deleteAllocated) }) : '',
@@ -276,7 +276,7 @@ export default function Cleaner() {
             notReady > 0 ? tr('cleaner.confirm.notReady', { n: formatNumber(notReady) }) : '',
             ...plan.warnings.filter((w) => w !== 'trashKeepsSpace' && w !== 'deleteIsFinal').map((w) => tr(`cleaner.warn.${w}`)),
           ].filter(Boolean).join(' ')}
-          okLabel={tr('cleaner.confirm.ok')}
+          okLabel={tr(plan.deleteItems ? 'cleaner.confirm.okDelete' : 'cleaner.confirm.ok')}
           cancelLabel={tr('cleaner.cancel')}
           onOk={execute}
           onCancel={() => setConfirm(false)}

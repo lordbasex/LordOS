@@ -64,6 +64,7 @@
   "camera.photoFailed": "Could not take the photo",
   "camera.startFailed": "Could not turn on the camera",
   "camera.unsupportedFormat": "Unsupported camera format",
+  "clean.badFolder": "That folder can't be scanned; choose a folder inside your home folder",
   "clean.badCandidate": "That item isn't part of the current scan",
   "clean.busy": "Cleaner is already working; wait for it to finish",
   "clean.noPlan": "That cleanup plan isn't available any more; review the list again",

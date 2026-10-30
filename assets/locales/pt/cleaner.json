@@ -72,5 +72,10 @@
   "rule.media-registry": "A lista de plugins de mídia. É reconstruída na próxima reprodução.",
   "rule.temporary": "Arquivos temporários com mais de uma semana. Verifique antes: eles vão para a Lixeira.",
   "rule.trash": "Itens na Lixeira. Esvazie a Lixeira para liberar o espaço.",
-  "warn.deleteIsFinal": "Arquivos excluídos não podem ser restaurados."
+  "warn.deleteIsFinal": "Arquivos excluídos não podem ser restaurados.",
+  "confirm.titleDelete": {
+    "one": "Limpar {count} item?",
+    "other": "Limpar {count} itens?"
+  },
+  "confirm.okDelete": "Excluir e limpar"
 }

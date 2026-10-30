@@ -8,7 +8,7 @@ $(CLEAN_SRV_OBJ): $(wildcard src/clean/*.h) src/fsops.h src/doc/wire.h src/doc/p
 build/lord-server: $(CLEAN_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_clean.h
 
-CLEAN_HELPER_SRC := src/clean/helper/lcmain.c src/clean/cleanfs.c src/doc/wire.c src/fsops.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
+CLEAN_HELPER_SRC := src/clean/helper/lcmain.c src/clean/cleanfs.c src/doc/wire.c src/fsops.c src/pkg/crypto.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 all: build/lord-clean
 build/lord-clean: $(CLEAN_HELPER_SRC) $(wildcard src/clean/*.h) src/fsops.h src/doc/wire.h src/doc/proto.h src/sec/json.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build

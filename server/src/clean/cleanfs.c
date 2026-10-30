@@ -69,3 +69,35 @@ int clean_glob(const char *pattern, const char *name) {
     size_t head = (size_t)(star - pattern), tail = strlen(star + 1), n = strlen(name);
     return n >= head + tail && !strncmp(name, pattern, head) && !strcmp(name + n - tail, star + 1);
 }
+
+int clean_type(const char *name) {
+    static const struct { int type; const char *ext; } t[] = {
+        { CLEAN_TYPE_IMAGE, "png jpg jpeg gif webp bmp tif tiff svg heic avif raw cr2 nef" },
+        { CLEAN_TYPE_VIDEO, "mp4 mkv webm avi mov m4v mpg mpeg ts wmv" },
+        { CLEAN_TYPE_AUDIO, "mp3 flac ogg opus wav m4a aac wma" },
+        { CLEAN_TYPE_DOCUMENT, "pdf doc docx odt ods odp xls xlsx ppt pptx txt md rtf epub csv" },
+        { CLEAN_TYPE_ARCHIVE, "zip tar gz bz2 xz zst 7z rar deb iso img lpk" },
+        { CLEAN_TYPE_CODE, "c h cc cpp hpp js jsx ts py rs go java sh json xml html css o so a" },
+    };
+    const char *dot = strrchr(name, '.');
+    if (!dot || dot == name || !dot[1]) return CLEAN_TYPE_OTHER;
+    char ext[8];
+    size_t n = strlen(dot + 1);
+    if (n >= sizeof ext) return CLEAN_TYPE_OTHER;
+    for (size_t i = 0; i <= n; i++) ext[i] = dot[1 + i] >= 'A' && dot[1 + i] <= 'Z' ? (char)(dot[1 + i] + 32) : dot[1 + i];
+    for (size_t i = 0; i < sizeof t / sizeof *t; i++) {
+        for (const char *p = t[i].ext; (p = strstr(p, ext)); p += n)
+            if ((p == t[i].ext || p[-1] == ' ') && (p[n] == ' ' || !p[n])) return t[i].type;
+    }
+    return CLEAN_TYPE_OTHER;
+}
+
+const char *clean_type_name(int type) {
+    static const char *const names[CLEAN_TYPES] = { "other", "image", "video", "audio", "document", "archive", "code" };
+    return type >= 0 && type < CLEAN_TYPES ? names[type] : "other";
+}
+
+int clean_under(const char *path, const char *ex) {
+    size_t n = strlen(ex);
+    return n > 1 && !strncmp(path, ex, n) && (!path[n] || path[n] == '/');
+}

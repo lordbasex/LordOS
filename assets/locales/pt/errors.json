@@ -64,6 +64,7 @@
   "camera.photoFailed": "Não foi possível tirar a foto",
   "camera.startFailed": "Não foi possível ligar a câmera",
   "camera.unsupportedFormat": "Formato de câmera não suportado",
+  "clean.badFolder": "Essa pasta não pode ser analisada; escolha uma dentro da sua pasta pessoal",
   "clean.badCandidate": "Esse item não faz parte da análise atual",
   "clean.busy": "A Limpeza já está trabalhando; aguarde terminar",
   "clean.noPlan": "Esse plano de limpeza não está mais disponível; revise a lista novamente",

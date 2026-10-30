@@ -12,4 +12,10 @@ int clean_relpath_ok(const char *rel, int depth);
 /* The rule tables' bounded pattern: literal text with at most one `*`. Linear. */
 int clean_glob(const char *pattern, const char *name);
 
+/* The kind of file a name suggests (CLEAN_TYPE_*). Only for grouping: it decides nothing. */
+int clean_type(const char *name);
+const char *clean_type_name(int type);
+/* path is ex or under it */
+int clean_under(const char *path, const char *ex);
+
 #endif

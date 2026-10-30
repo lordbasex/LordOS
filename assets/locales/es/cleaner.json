@@ -72,5 +72,10 @@
   "rule.media-registry": "La lista de complementos multimedia. Se reconstruye la próxima vez que se reproduzca algo.",
   "rule.temporary": "Archivos temporales de más de una semana. Revísalos antes: van a la Papelera.",
   "rule.trash": "Elementos en la Papelera. Vacía la Papelera para liberar su espacio.",
-  "warn.deleteIsFinal": "Los archivos eliminados no se pueden restaurar."
+  "warn.deleteIsFinal": "Los archivos eliminados no se pueden restaurar.",
+  "confirm.titleDelete": {
+    "one": "¿Limpiar {count} elemento?",
+    "other": "¿Limpiar {count} elementos?"
+  },
+  "confirm.okDelete": "Eliminar y limpiar"
 }
