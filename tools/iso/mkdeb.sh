@@ -28,6 +28,8 @@
 #                                         image or install.sh; the package never selects it)
 #   /usr/share/grub/themes/lordos/        the boot menu theme (amd64; the ISO and the disk installer)
 #   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
+#   (not here: /usr/lib/lordos/assets/hwreport/, the signed tested-hardware snapshot, is the lordos-hwdata
+#   package from tools/iso/mkdeb-hwdata.sh, which this one Depends on; docs/BENCHMARK.md)
 #   /usr/lib/lordos/apt/lordos.sources    the signed LordOS repository on lordos.org (updates from the
 #                                         Store and apt; docs/UPDATES.md): postinst copies it to
 #                                         /etc/apt/sources.list.d/ when missing, postrm removes it
@@ -146,6 +148,8 @@ install -m 644 code-manifest.json "$L/code-manifest.json"
 if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ ! -f "$L/code-manifest.sig" ]; then
     echo "missing code-manifest.sig: sign the manifest on the maintainer's machine (tools/release/sign-code.sh)" >&2; exit 1
 fi
+# (0.8.7) the tested-hardware snapshot for System Information's Compatibility panel is not in this package: it
+# is lordos-hwdata (tools/iso/mkdeb-hwdata.sh, Depends below), so a newer one can be published between releases
 # the check is the same on any architecture: building another architecture's package on this host
 # (tools/rpi/build-img.sh on x86-64 with an aarch64 server/build), CODE_CHECK_SERVER names a
 # lord-server built for this host from the same tree
@@ -293,6 +297,9 @@ if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, li
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
 RTCDEPS=", libsrtp2-1, libusrsctp2"
 if ! objdump -p "$L/bin/lord-sessiond" 2>/dev/null | grep -q "libsrtp2"; then echo "lord-sessiond is not linked with libsrtp2: rebuild it (make -C server)" >&2; exit 1; fi
+# the signed tested-hardware snapshot, its own package (tools/iso/mkdeb-hwdata.sh): any version of format 1,
+# the first being the snapshot of 2026-10-27 (a format 2 is a Breaks in lordos-hwdata, not a change here)
+HWDATADEPS=", lordos-hwdata (>= 2026.10.27)"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
 cat > "$PKG/DEBIAN/control" <<C
 Package: lordos
@@ -300,7 +307,7 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
 Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
 Section: x11
 Priority: optional

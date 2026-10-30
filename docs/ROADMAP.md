@@ -621,8 +621,14 @@ desktop fell to 24 fps under an all-core load:
 
 ## Release 0.8.7 (planned)
 
-Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), and what LordBench and the desktop under
-load left for after 0.8.6:
+Decided by the maintainer on 2026-10-30: everything below goes in 0.8.7, with **Cleaner** added.
+
+Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), what LordBench and the desktop under load
+left for after 0.8.6, and the new native app:
+- [ ] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
+  are read-only, and every change goes through a reviewed plan the user confirms. Nothing is copied from other
+  projects. Design: `CLEANER-ARCHITECTURE.md` (to be written), in phases: the core, then system care, then the
+  optional modules.
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
   FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29).
@@ -811,7 +817,30 @@ load left for after 0.8.6:
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel
-  reads as a signed snapshot.
+  reads as a signed snapshot. In development on the branch `v087-hwreports`:
+  - [x] The report format: a versioned JSON Schema that is an allow-list (`apps/sysinfo/hwreport.schema.json`),
+    with the live session flag.
+  - [x] The boot medium as a class (internal, USB, SD, eMMC, optical, network), a USB medium's link speed and the
+    copy to memory of a live session, from world-readable kernel facts without root (`collect_boot` in
+    `sysreport/sysreport.c`; no device names), in the report, the schema, the summary, the workflow's labels and
+    plausibility checks.
+  - [x] Share on GitHub in System Information: the report and a self-contained page in Documents, opened with
+    `lord.apps.launchWith('', path)`; the issue link carries only the short summary.
+    Checked on VM 116 with a browser (2026-10-29): the page opens from the user's default for `text/html`; with no
+    default chosen the app says where the page is (a fallback for that is the maintainer's decision).
+  - [x] The `hardware-report` issue form and its workflow: safe download, schema, privacy and plausibility checks,
+    labels from fixed lists, one comment (`tools/hwreport/validate.mjs`).
+  - [x] The catalogue: lordos.org/hardware (en, es, pt; built, not published) and the snapshot, from the accepted
+    reports, with the two reference machines as fixtures (`tools/hwreport/catalog.mjs`).
+  - [x] The signed snapshot (release key, signed on the maintainer's machine), verified in C before the
+    Compatibility panel shows it as community data (`lord.sysinfo.community()`).
+  - [ ] The repository's labels, the first community reports and a captured Raspberry Pi 5 report.
+  - [x] A newer snapshot between releases (approved 2026-10-29): the snapshot is its own `Architecture: all`
+    package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`, version = the snapshot's date), which `lordos` depends
+    on; the ISO, the Pi image and `install.sh` install it, `apt-repo.sh` checks its signature, and a newer one is
+    published alone between releases (`RELEASING.md`, "A newer hardware snapshot between releases"). No new
+    network code. Resolver, packaging, apt and repository tests done; the staging test with the real keys is left.
+  - [ ] The rest of "From the live USB": the boot menu entry, live references, the overlay's size.
 
 - [x] **Remote desktop over WebRTC (0.8.4)** — see `REMOTE.md`, "Video (WebRTC)". Until 0.8.3 the
   browser got PNG/JPEG tiles over a TLS WebSocket, and a connection switched the session to CPU

@@ -7,7 +7,8 @@
 #   (the themes: npm run build on the development machine; the .bundle.js files travel with the tree)
 #   sudo tools/iso/build.sh [work folder]   # default /var/tmp/lordos-iso
 #
-# Result: <work>/out/lordos-live-<version>-amd64.iso and lordos_<version>_amd64.deb
+# Result: <work>/out/lordos-live-<version>-amd64.iso, lordos_<version>_amd64.deb and
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
 set -eu
 
 [ "$(id -u)" = 0 ] || { echo "build.sh: run as root (sudo)" >&2; exit 1; }
@@ -64,8 +65,10 @@ umount_all
 rm -rf "$CH" "$IMG"
 mkdir -p "$CH" "$IMG/live" "$IMG/boot/grub" "$OUT"
 
-# 1. the LordOS package
+# 1. the LordOS packages: lordos and the tested-hardware snapshot it depends on (docs/BENCHMARK.md)
 sh tools/iso/mkdeb.sh "$DEB"
+HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
+echo "   $(basename "$HWDEB")"
 
 # 2. sistema base
 echo "== debootstrap $SUITE (minbase)"
@@ -97,12 +100,13 @@ in_ch apt-get update -q > "$WORK/apt.log" 2>&1
 in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_GPU $PKGS_APPS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 cp "$DEB" "$CH/tmp/lordos.deb"
-in_ch apt-get install -y -q --no-install-recommends /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
+in_ch apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # the browsers' defaults (their own bar with LordOS's window buttons), shared with the Pi image
 sh tools/iso/browser-defaults.sh "$CH"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$CH/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
-rm -f "$CH/tmp/lordos.deb"
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
 
 # 3. configuration
 echo "== configuration"

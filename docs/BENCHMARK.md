@@ -1,6 +1,6 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) and a `checks` subcommand of `lordos-sysreport` are not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) are in development (see "Built so far" under 0.8.7: the report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the Compatibility panel); a `checks` subcommand of `lordos-sysreport` is not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -813,6 +813,230 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
   real LordOS performance per device. The app's Compatibility panel reads a signed snapshot of it
   (downloaded with the package engine's checks), so it works offline.
 
+### Built so far (branch `v087-hwreports`, 0.8.7 in development)
+
+- **The report format**: `apps/sysinfo/hwreport.schema.json`, a JSON Schema (`format: "lordos-hwreport"`,
+  `version: 1`) that is an allow-list: every object closes its properties, and there is no field for serials,
+  UUIDs, MAC or IP addresses, host or user names, Wi-Fi network names or paths. It holds a subset of System
+  Information's report (machine, CPU, memory, GPUs, displays, storage, PCI and USB devices, network, audio,
+  Bluetooth, power, thermal, the Raspberry Pi block, software, how the session composes), the Compatibility rows
+  as codes, and the last LordBench peak and desktop results measured with the same LordOS version (no timestamp, no
+  render node path, no sustained samples). The schema lives with the app because the app picks the fields with it
+  (`share.js` `pick()`: a field the collector adds is never shared until the schema lists it); the workflow and the
+  catalogue read the same file. The validator is our own subset of JSON Schema, `tools/hwreport/jsonschema.mjs`,
+  with no dependency (the repository has no JSON Schema validator); a keyword it doesn't implement makes it throw.
+- **Live session flag**: the collector now records `software.live` (live-boot's `/run/live`, as LordBench already
+  did), and a shared report is `live: true` if either says so.
+- **Boot medium** (2026-10-29): the collector also records what the system started from, as a class only
+  (`software.bootMedium`: `internal`, `usb`, `sd`, `emmc`, `optical`, `network`, or `""` when it can't tell), a USB
+  medium's link speed (`bootLinkMbps`, from the USB device's `speed`) and whether a live session was copied to memory
+  (`bootToRam`, the `toram` boot option). How (`collect_boot` in `sysreport/sysreport.c`, no root, world-readable
+  files only): the mount under `/` (installed) or live-boot's `/run/live/medium` (live) is found in
+  `/proc/self/mountinfo` (the last line for that mount point); an NFS or SMB file system is `network`; otherwise its
+  `major:minor` is followed through `/sys/dev/block` (a link that climbs out of `/sys/devices` is refused), from a
+  partition to its disk, and through device mapper or RAID `slaves` (LUKS, LVM; at most 4 layers); btrfs's anonymous
+  `0:N` device is replaced by the block device its source names. The disk's sysfs path decides: `sr*` is `optical`,
+  a path through a USB controller is `usb`, `nbd*` or an iSCSI session is `network`, an MMC card whose `type` is `SD`
+  or `MMC` is `sd` or `emmc` (unknown type: `""`, not a guess), loop and RAM disks are `""`, everything else
+  (SATA, NVMe, virtio, SCSI) is `internal`. A live session with no medium mounted that was fetched over the network
+  (`fetch=`, `netboot=`) is `network`. The kernel command line is only searched for those whole words, never kept.
+  Nothing else leaves the function: no device name, model, serial, mount point or path. The schema lists only the
+  classes, the speed (1–100,000) and the flag; the share preview, the issue summary (`boot: usb, 5000 Mbps`), the
+  workflow's comment and a `boot:<class>` label show it; a copy to memory on an installed system, or a link speed on
+  anything but USB, is flagged as implausible. System Information shows it in Software (*Started from*) and
+  `lordos-sysreport report` in the Overview (*Started*). VM 116 (ext4 on a SCSI disk) reports `internal`.
+- **Share on GitHub** (Report → *Share on GitHub…*, `apps/sysinfo/share.js`): a preview of the summary and of the
+  exact JSON first, then on every click (nothing remembered) the app writes `lordos-hwreport-<date>.json` and
+  `.html` to Documents (never over an existing file) and opens the page with `lord.apps.launchWith('', path)`. The
+  page is self-contained (no scripts, a CSP of `default-src 'none'`, light and dark, right to left for RTL
+  languages, every value escaped), says in plain words what is shared and what never is, shows the summary, the
+  steps, and one link to GitHub's new-issue form with the `hardware-report` template, the title, the version and
+  the short summary in the URL (machine, kind, CPU, GPU, memory, architecture, versions, live, the boot medium's class, LordBench mode
+  and the Compatibility states; at most 600 characters). The full JSON is attached by the user. LordOS sends nothing
+  and holds no token.
+- **The issue form and its workflow**: `.github/ISSUE_TEMPLATE/hardware-report.yml` (label `hardware-report`, the
+  `lordos` and `summary` fields the link fills, the file box, two confirmations) and
+  `.github/workflows/hardware-report.yml` running `tools/hwreport/validate.mjs --github` on `issues`
+  opened/edited/labeled with that label. The script reads the issue from the event file (no issue text passes
+  through an expression or a shell), takes only GitHub attachment links of a fixed form (`user-attachments/files`,
+  or this repository's `files`; at most three, `.json` only), downloads the first without credentials, with
+  manual redirects checked against GitHub's attachment hosts (https only), at most 512 KB (Content-Length and while
+  reading), strict UTF-8 and a timeout; `JSON.parse` only (never evaluated) with depth (12), value (40,000) and
+  `__proto__` limits; validates it against the schema; refuses `source: "reference"` from issues; scans every text
+  for MAC, IPv4/IPv6, UUID, e-mail and home-folder paths (a report with one is refused); flags implausible numbers
+  (beyond a per-unit ceiling, more than 50× the fastest reference machine of the same LordBench version, not
+  positive, versions, architecture, live or thread counts that disagree, a future date, memory out of range);
+  then comments once (updated on every edit) with report values only inside code spans, and labels the issue from
+  fixed lists only: `report:valid|check|invalid|missing`, `kind:vm|board|laptop|server|desktop`,
+  `gpu:<vendor>`, `cpu:<vendor>`, `live` or `installed`, and `boot:<class>` when the boot medium is known. Permissions: `contents: read` (to check out the script
+  and the schema, sparse) and `issues: write`; the checkout action is pinned by commit, without persisted
+  credentials. Workflows for `issues` events run from the default branch, so it takes effect when this is merged.
+- **The catalogue**: `tools/hwreport/catalog.mjs` reads the accepted reports in `web/content/hardware/reports/`
+  (each validated; a community report needs its issue number in `index.json`, which can also say which version
+  fixed a problem) and builds (a) the model of **lordos.org/hardware**, rendered by `web/build.mjs` in en, es and pt
+  (machines with what works and four numbers, graphics cards and drivers, known problems and the version that
+  fixed them, how to add a computer; labelled in development while the package version is below 0.8.7), and (b)
+  `assets/hwreport/snapshot.json`: one entry per device key (PCI ids, a GPU, network, Wi-Fi or Bluetooth driver, a
+  sound card name, or the machine's vendor and product for displays, storage, battery and suspend), component and
+  LordOS version, with the counts of works / with limits / doesn't work and how many came from reference machines.
+  The output depends only on the reports, so the same folder gives the same bytes. Two fixtures are the project's
+  own reference machines, marked `"source": "reference"`, not community reports: VM 116 (its real report, 2026-10-29)
+  and the Raspberry Pi 5 16 GB (written from the documented machine until a captured report replaces it), both with
+  the LordBench numbers of `references.js`.
+- **The signed snapshot**: `tools/release/sign-hwsnapshot.sh` rebuilds and signs it on the maintainer's machine with
+  the release key (Ed25519, the same format as `code-manifest.sig`; the key never leaves it). It ships
+  in its own package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`; a release build refuses an unsigned one),
+  which `lordos` depends on, and so it updates through the signed APT repository, also between releases (see
+  "Newer snapshots between releases" below, implemented on 2026-10-29).
+  `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS) reads the two files from
+  `<assets>/hwreport/` without following links (`sysreport/hwsnap.c`), verifies the signature with the key the
+  build trusts before parsing anything, checks the structure (format, version, at most 1 MB and 20,000 entries,
+  known components, x.y.z versions, whole counts that add up) and only then gives JS the snapshot; otherwise only
+  its state (`missing`, `unsigned`, `bad-signature`, `invalid`). The Compatibility panel shows, under each row,
+  what the snapshot says about this machine's devices with the same LordOS version (x.y.z), marked *Community*, or
+  as a reference machine when only those reported it, and a footer with the snapshot's date and count, or why
+  there is no community data.
+- **Tests**: `server/tests/hwreport_test.mjs` (138 checks: the schema with good reports and 22 bad ones, what the
+  built report leaves out of a report full of identifying values, the summary and the link, the page's escaping
+  and direction, attachment links, the download's limits with a fake fetch, parsing limits, the privacy scan,
+  plausibility, labels, the comment's escaping, the catalogue, the snapshot being the one the reports give, and the
+  community matching), in `run_suites.sh`; `build/hwsnap-test` (43 checks: signature before parsing, another key,
+  one byte changed, malformed signatures, 19 malformed snapshots, limits, links refused, and the snapshot the
+  builder wrote signed with a test key passing the C checks), in `make test`; `build/sysreport-test` checks the
+  live flag and the boot medium on 23 fake trees (NVMe, USB 3 and USB 2 behind a hub, a copy to memory with and
+  without the medium, `notoram`, SD, eMMC, an unknown MMC card, LUKS on NVMe, LVM on LUKS on USB, a device mapper
+  loop, btrfs, stacked mounts, a DVD, NFS, iSCSI, NBD, a live system fetched over the network, virtio, a loop
+  device, a link that climbs out of `/sys`, a USB speed that isn't a number), each also checked for device names,
+  serials, the mount point and the command line in the JSON and the Markdown.
+- **Checked on VM 116** in an isolated headless session, with `lord-server` built for a throwaway test key
+  (`CODE_PUBKEY`) and the snapshot signed by `sign-hwsnapshot.sh` with that key: the Compatibility panel shows the
+  reference machine's data for the virtio GPU, the network and the sound card; the same snapshot with one count
+  changed is refused ("the signature didn't verify") and nothing is shown. Share on GitHub wrote both files; the
+  JSON passed `validate.mjs` (`report:valid`, `kind:vm`, `gpu:virtual`, `cpu:intel`, `installed`). The headless
+  session has no browser, so it said where the page is instead of opening it.
+- **Opening the page, checked on VM 116** (2026-10-29, isolated headless session of this branch, Chromium 156 from
+  Debian installed on the VM): Share on GitHub wrote `lordos-hwreport-2026-10-29.json` and `.html` to Documents and
+  `lord.apps.launchWith('', path)` opened the page in the browser, inside the session, from the user's default for
+  `text/html`; the page showed the summary (with *Started from: Internal disk*), the steps and the link to the
+  `hardware-report` form, and the JSON passed `validate.mjs` (`report:valid`, `kind:vm`, `gpu:virtual`, `cpu:intel`,
+  `installed`, `boot:internal`). What it took on that VM, and what it says about real systems:
+  - **A fresh account with no default browser:** `defaults_lookup` (`hw/defaults.c`) only reads `mimeapps.list` and
+    `defaults.list` files, and this VM has none for `text/html` (Debian's Chromium doesn't write one, and without
+    `desktop-file-utils` there is no `mimeinfo.cache`), so `launchWith('', …)` refused and the app said where the
+    page was ("Open … with your browser to go on") — the fallback works. Choosing the browser in Settings → Default
+    Apps (which writes `~/.config/mimeapps.list`) is what makes it open. Falling back to an installed app that
+    declares the type, as the XDG spec allows, is left for the maintainer to decide (it changes Default Apps for
+    every type, not only this one).
+  - **Chromium needs X11 here:** Debian's Chromium starts on X11 unless told otherwise, and VM 116 has no `xwayland`
+    package, so with the stock `chromium.desktop` it exited ("Missing X server"). A system with `xwayland` (the
+    Xwayland launcher gives launched apps `DISPLAY`) runs it as is. On the VM the test used a user entry in
+    `~/.local/share/applications` with `--ozone-platform=wayland`, chosen as the default for `text/html`.
+  - **The test session's environment:** the isolated session must not set `LORDOS_SESSIOND` at all: with it set (even
+    empty) the launcher, which can't place the app in its own scope outside a real session, refuses to start it
+    (fail closed, as designed: `apps.log` said "could not place the app in its own scope: not launched").
+
+![The page opened in the browser by Share on GitHub](hwreport-browser.png)
+
+![Compatibility with community data](hwreport-compat.png)
+
+![Share on GitHub](hwreport-share.png)
+
+![The whole page (rendered outside the session, before the boot medium row)](hwreport-page.png)
+
+### Newer snapshots between releases (implemented, option B)
+
+Until 2026-10-29 the signed snapshot shipped inside the `lordos` package, so the Compatibility panel only learned
+about new reports when LordOS itself was released. The goal is a newer snapshot between releases **without giving
+`lord-server` or any helper a new network power** (AGENTS.md: no generic network, the Store's download child and
+`lord-tls` only fetch packages, `lord-fetch` only fetches blocklists). The options:
+
+| | How | New network code | Verdict |
+|---|---|---|---|
+| A | Keep it in `lordos` (today) | none | Updates only with a release |
+| B | **A separate small package, `lordos-hwdata`**, in the signed APT repository | none: the existing package engine | **Chosen** (approved by the maintainer, 2026-10-29) and implemented |
+| C | `lord-server` downloads `snapshot.json` from lordos.org through the Store's download child and `lord-tls` | a new kind of download in the package engine (a URL that is not a package, a new admin action or engine call) | Not recommended: a new network job to review for one file |
+| D | `lord-fetch` downloads it next to the blocklists | a second job for `lord-fetch`, which AGENTS.md forbids | Rejected |
+| E | The user downloads it from lordos.org/hardware and opens it in System Information | none (a file the user picks, verified with the same key) | Possible later as a complement for machines that never update; clumsy as the main path |
+
+**B, in detail.** `lordos-hwdata` is an `Architecture: all` package holding only `snapshot.json` and
+`snapshot.json.sig` at the same place `lord.sysinfo.community()` already reads (`<assets>/hwreport/`), with a version
+of its own (the snapshot's date, `YYYY.MM.DD`, plus `.N` for a second one on the same day). The `lordos` package
+stops shipping the two files and `Depends: lordos-hwdata`; no released `lordos` has ever shipped them (they are new
+in 0.8.7), so no `Replaces`/`Breaks` dance is needed. Between releases the maintainer runs
+`tools/release/sign-hwsnapshot.sh` (as now), builds the package (a short `tools/iso/mkdeb-hwdata.sh`) and adds it to
+the repository with `tools/release/apt-repo.sh build live <deb>` and `publish`, exactly like a `lordos` build. On
+every system the daily update check (`pkg-update`, `updates.autoCheck`) sees one available update and says so once,
+and Store → Updates → *Update all* (`pkg-upgrade`) installs it; `lord.sysinfo.community()` reads the files again on
+every call, so the panel shows the new data without restarting the session. Machines without internet get it from a
+`file:` copy of the repository, as any update.
+
+Why this is safe: nothing new runs or connects. The snapshot is checked twice: the repository's `InRelease` (the
+APT archive key, by our own package engine) and then the snapshot's own Ed25519 signature with the release key
+(`sysreport/hwsnap.c`, before any parsing), so a package from anywhere else still can't change what the panel
+shows. Rolling back to an older snapshot needs a downgrade, which the engine never does on its own. The cost:
+one more package in the repository and in the release steps (`RELEASING.md`), the ISO and the Raspberry Pi image
+builds installing it next to `lordos` (`tools/iso/build.sh`, `tools/rpi/build-img.sh`), and a rule for the format:
+while any supported `lordos` reads format 1, `lordos-hwdata` keeps writing format 1; a format 2 needs
+`Breaks: lordos (<< <first version that reads it>)`. An older `lordos` with a newer snapshot works, since entries
+are per LordOS version and it shows only its own.
+
+**Implemented** (2026-10-29, branch `v087-hwreports`):
+
+- **The package:** `tools/iso/mkdeb-hwdata.sh <folder>` builds `lordos-hwdata_<version>_all.deb` (`Architecture: all`,
+  `Multi-Arch: foreign`) with only the two files, a copyright and a changelog. The version is the snapshot's
+  `generated` date as `YYYY.MM.DD`, plus `.N` from `HWDATA_SERIAL=N` (1–99) for a second, different snapshot with the
+  same date. It is reproducible: file times, the changelog's date and the archive's times (`SOURCE_DATE_EPOCH`) come
+  from that date, so the same snapshot and signature give the same bytes (checked: two builds compared equal), which
+  lets `apt-repo.sh` accept it again unchanged at the next release and still refuse a different one under the same
+  version. `REQUIRE_SIGNED_CODE=1` refuses a missing signature and checks it with `openssl` against
+  `lordos-release.pub.pem` (`CODE_PUB` for a test key). It refuses a snapshot whose header is not format 1: the
+  format rule above, enforced until someone adds the `Breaks`.
+- **`lordos`:** `tools/iso/mkdeb.sh` no longer ships `assets/hwreport/` and adds `Depends: lordos-hwdata (>=
+  2026.10.27)`, the first format-1 snapshot. No `Replaces`/`Breaks`: checked against every release tag
+  (`v0.8.0-beta` to `v0.8.5-beta`), none has `assets/hwreport/` in the tree or in its `mkdeb.sh`.
+- **Images:** `tools/iso/build.sh` and `tools/rpi/build-img.sh` build the package next to `lordos` (the Pi build on
+  the host, since it is the same for every architecture) and install both in one `apt-get install`.
+- **`install.sh`** (Debian 13, where the LordOS repository is not there yet): when the `lordos` package depends on
+  `lordos-hwdata`, it takes the newest `lordos-hwdata_<version>_all.deb` the release's signed `SHA256SUMS` lists
+  (or, with `--deb`, the one in the same folder, checked against the `SHA256SUMS` there when present), checks it the
+  same way as the main package (SHA-256, then again on root's copy, `Package` and `Architecture`), and installs both;
+  with none it stops before apt, unless a configured repository has it. `--uninstall` removes it too.
+- **The repository:** `tools/release/apt-repo.sh` adds it like any `.deb` (`apt-ftparchive` lists `all` packages in
+  the amd64 and arm64 indexes), but only if its snapshot verifies with `lordos-release.pub.pem`
+  (`LORDOS_HWDATA_PUB`, a test key, is accepted only for `staging`), and refuses a `lordos` that depends on it while
+  the pool has none. `sign-hwsnapshot.sh` prints the version the package will have. The release folder and the
+  release notes' downloads table carry `lordos-hwdata_<date>_all.deb`.
+- **The steps:** a release adds the package to its folder and to `apt-repo.sh build`; a snapshot alone between
+  releases is `sign-hwsnapshot.sh`, `mkdeb-hwdata.sh`, `apt-repo.sh build|publish|verify staging`, then `live`
+  ([RELEASING.md](RELEASING.md), "A newer hardware snapshot between releases"; [UPDATES.md](UPDATES.md), "The
+  tested-hardware snapshot").
+- **On the system:** nothing changed in C or JS. `lord.sysinfo.community()` already read the files on every call,
+  so a newer package shows in the panel without a restart, and a missing package (or folder) is `state: "missing"`
+  ("no community data"), checked by `build/hwsnap-test`. A snapshot update is listed in Store → Updates with the
+  other packages and announced by the daily check as "1 update is available".
+- **Tests:** `build/pkg-test` (8 new checks, 112 in all): updating a 0.8.5 system's `lordos` to one that depends on
+  `lordos-hwdata` brings it in at its newest version, with *Update* (`pkg-install lordos`) and *Update all*
+  (`pkg-upgrade`); on a 0.8.7 system a newer snapshot alone is one upgrade and nothing else; the date versions sort
+  as intended (`2026.11.05.1` > `2026.11.05` > `2026.10.29.9`). On VM 116: both packages built (`dpkg-deb --info` /
+  `--contents`: `lordos` has no `hwreport` entry and the `Depends`; `lordos-hwdata` has only its files, root-owned,
+  644); the unsigned and the wrongly signed snapshot refused in release mode; `HWDATA_SERIAL` checked; `make -C server
+  test` passed (23 suites, 0 failed). In a `debian:trixie` container: apt refuses `lordos` alone ("Depends:
+  lordos-hwdata (>= 2026.10.27) but it is not installable"), installs both, upgrades `2026.10.27` to `2026.10.27.2`,
+  and removing the package leaves no `hwreport` folder; `install.sh`'s functions with a release signed by a test key
+  (download through a `file:` URL, and `--deb`) take `2026.10.27.2`, refuse a changed file by its SHA-256, and stop
+  before apt when there is none; `apt-repo.sh build staging` offline (a throwaway archive key, in the container) did
+  every refusal above, accepted the same bytes again, and apt on a container with `2026.10.27` installed saw
+  `2026.10.27.2` as an upgrade from the built repository (`file:` source).
+- **Not run yet:** the staging test on a VM with the real repository (publish to `apt-staging`, see the
+  notification, update, see the panel's footer change), which needs the maintainer's archive and release keys.
+
+Left for 0.8.7: creating the labels in the repository (the template's `hardware-report` label must exist for the
+form to apply it), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
+one, the rest of "From the live USB" (the boot menu entry, live references, the overlay's size), the staging test of
+`lordos-hwdata` above, and deciding whether Default Apps should fall back to an installed app
+that declares a type when the user chose none (so a fresh account's Share on GitHub opens the page without a visit
+to Settings).
+
 ## From the live USB, without installing
 
 The app and LordBench are in the ISO, so anyone can start a PC from the LordOS USB stick, check
@@ -823,7 +1047,8 @@ before installing.
 - **A boot menu entry**, *Check this computer*, starts the live session straight into System
   Information (0.8.5) and its Performance tab (0.8.6). The normal live session has it in the Dock.
 - **The report says it was live**: boot medium (USB, its link speed), the overlay in RAM, no
-  persistence. Live and installed results are kept apart in comparisons and in the catalogue.
+  persistence. (Built in 0.8.7: the live flag, the boot medium's class, a USB link speed and the copy to memory;
+  the overlay's size is not.) Live and installed results are kept apart in comparisons and in the catalogue.
 - **Different references where live changes the numbers**: idle memory is compared with the
   paper's live figure (465 MB) and the overlay's size is subtracted and shown; boot time includes
   reading from the stick and is reported, not judged.
@@ -853,6 +1078,8 @@ before installing.
 - The probe app for the effective checks: a signed system package started through the existing
   `lord.apps.launchPackage(id)`; no new launcher path.
 - `lord-bench` (0.8.6), as above.
+- `lord.sysinfo.community()` in `server/src/ui/js_hw.c` (0.8.7): the catalogue's snapshot, only after
+  `sysreport/hwsnap.c` verified its signature with the release key; no arguments and no path from JS.
 - Data packages `pci.ids` and `usb.ids` (Debian, architecture `all`), documented in `VM-SETUP.md`.
 
 ## Work plan for 0.8.5

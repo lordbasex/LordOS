@@ -22,6 +22,7 @@ import { markdown, inline, frontMatter, slugify } from './lib/md.mjs';
 import { diagram } from './lib/diagram.mjs';
 import { paperMarkdown } from './lib/papermd.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
+import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(WEB, '..');
@@ -260,6 +261,12 @@ function legalDesc(p, l) {
   const m = plain.match(/^(.{40,220}?[.!?])(\s|$)/);
   return m ? m[1] : plain.slice(0, 200);
 }
+// the tested-hardware catalogue (0.8.7, tools/hwreport/catalog.mjs): accepted reports → /hardware/
+const hwDir = path.join(CONTENT, 'hardware/reports');
+const HAS_HW = fs.existsSync(hwDir);
+const hwModel = HAS_HW ? buildModel(readReports(hwDir)) : null;
+const verNum = (v) => String(v).split('.').map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
+const HW_IN_DEV = verNum(PKG.version) < verNum('0.8.7');      // Share on GitHub ships with 0.8.7
 const faqFile = path.join(CONTENT, 'faq/faq.json');
 const faqJson = fs.existsSync(faqFile) ? readJson(faqFile) : null;
 let faqHeld = 0;
@@ -426,7 +433,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -517,7 +524,7 @@ ${icons}
 </section>`;
 }
 
-const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -886,6 +893,17 @@ ${(c.items || []).map((it) => {
     }, t));
   }
 
+  // tested hardware (0.8.7)
+  if (HAS_HW) {
+    const H = t.pages.hardware;
+    const sec = renderSections(hwModel, H, esc, (k) => `${GITHUB}/issues/${k}`);
+    write(path.join(pageUrl(l, 'hardware'), 'index.html'), render(tpl.hardware, {
+      ...common('hardware', [`${H.title} · LordOS`, H.lead], true), ...sec,
+      status: HW_IN_DEV ? esc(H.statusDev.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
+      newIssue: `${GITHUB}/issues/new?template=hardware-report.yml`,
+    }, t));
+  }
+
   // about
   {
     const A = t.pages.about;
@@ -955,7 +973,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>

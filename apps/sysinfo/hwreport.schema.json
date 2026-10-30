@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lordos.org/schemas/hwreport-1.schema.json",
+  "title": "LordOS hardware report, version 1",
+  "description": "The report System Information shares on GitHub (docs/BENCHMARK.md, '0.8.7 — Community hardware reports'). It is an allow-list: every object closes its properties, so a field that isn't listed here can't be shared. It has no field for serials, UUIDs, MAC or IP addresses, host or user names, Wi-Fi network names, device names (the boot medium is a class: internal, usb, sd…) or home-folder paths. Used by apps/sysinfo/share.js (to pick the fields), tools/hwreport (the workflow's validator and the catalogue) and their tests. Only the subset of JSON Schema that tools/hwreport/jsonschema.mjs implements is used.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "createdAt", "source", "lordos", "live", "system", "compatibility"],
+  "properties": {
+    "format": { "const": "lordos-hwreport" },
+    "version": { "const": 1 },
+    "createdAt": { "type": "string", "pattern": "^20[2-9][0-9]-[01][0-9]-[0-3][0-9]$" },
+    "source": { "enum": ["community", "reference"] },
+    "lordos": { "$ref": "#/$defs/version" },
+    "live": { "type": "boolean" },
+    "system": { "$ref": "#/$defs/system" },
+    "compatibility": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "state"],
+        "properties": {
+          "id": { "enum": ["gpu", "display", "storage", "network", "wifi", "bluetooth", "audio", "power", "isolation", "suspend"] },
+          "state": { "enum": ["works", "limits", "no", "absent", "unchecked"] },
+          "note": { "anyOf": [{ "type": "null" }, { "type": "string", "maxLength": 48, "pattern": "^[a-zA-Z0-9._-]*$" }] }
+        }
+      }
+    },
+    "bench": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/bench" }] },
+    "desktop": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/bench" }] }
+  },
+  "$defs": {
+    "text": { "type": "string", "maxLength": 128, "pattern": "^[^\\u0000-\\u001f\\u007f]*$" },
+    "word": { "type": "string", "maxLength": 48, "pattern": "^[A-Za-z0-9._+:,/ -]*$" },
+    "hex": { "type": "string", "maxLength": 8, "pattern": "^[0-9a-fA-F]*$" },
+    "version": { "type": "string", "maxLength": 32, "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?(-[a-z0-9.]+)?$" },
+    "count": { "type": "integer", "minimum": 0, "maximum": 100000 },
+    "optCount": { "anyOf": [{ "type": "null" }, { "type": "integer", "minimum": -1, "maximum": 1000000 }] },
+    "num": { "type": "number", "minimum": -1000000000, "maximum": 1000000000000000 },
+    "system": {
+      "type": "object", "additionalProperties": false,
+      "required": ["machine", "cpu", "memory", "gpus", "software"],
+      "properties": {
+        "machine": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "vendor": { "$ref": "#/$defs/text" }, "product": { "$ref": "#/$defs/text" }, "version": { "$ref": "#/$defs/text" },
+            "boardVendor": { "$ref": "#/$defs/text" }, "boardName": { "$ref": "#/$defs/text" },
+            "chassis": { "enum": ["", "desktop", "laptop", "handheld", "all-in-one", "server", "tablet", "mini-pc", "other", "vm"] },
+            "model": { "$ref": "#/$defs/text" },
+            "biosVendor": { "$ref": "#/$defs/text" }, "biosVersion": { "$ref": "#/$defs/text" }, "biosDate": { "$ref": "#/$defs/text" },
+            "firmware": { "enum": ["", "uefi", "bios", "dt"] },
+            "secureBoot": { "type": ["boolean", "null"] },
+            "virtualization": { "enum": ["", "vm", "kvm", "vmware", "virtualbox", "hyper-v", "xen", "parallels"] }
+          }
+        },
+        "cpu": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "model": { "$ref": "#/$defs/text" }, "vendor": { "$ref": "#/$defs/text" }, "arch": { "$ref": "#/$defs/word" },
+            "sockets": { "$ref": "#/$defs/count" }, "cores": { "$ref": "#/$defs/count" }, "threads": { "$ref": "#/$defs/count" },
+            "minMHz": { "$ref": "#/$defs/count" }, "maxMHz": { "$ref": "#/$defs/count" }, "governor": { "$ref": "#/$defs/word" },
+            "l1dKB": { "$ref": "#/$defs/count" }, "l1iKB": { "$ref": "#/$defs/count" }, "l2KB": { "$ref": "#/$defs/count" }, "l3KB": { "$ref": "#/$defs/count" }
+          }
+        },
+        "memory": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "totalKB": { "type": "integer", "minimum": 0, "maximum": 100000000000 },
+            "swapKB": { "type": "integer", "minimum": 0, "maximum": 100000000000 },
+            "zram": {
+              "type": "array", "maxItems": 16,
+              "items": { "type": "object", "additionalProperties": false, "properties": {
+                "sizeKB": { "type": "integer", "minimum": 0, "maximum": 100000000000 }, "algorithm": { "$ref": "#/$defs/word" } } }
+            }
+          }
+        },
+        "gpus": {
+          "type": "array", "maxItems": 16,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "bus": { "enum": ["", "pci", "platform"] }, "vendorId": { "$ref": "#/$defs/hex" }, "deviceId": { "$ref": "#/$defs/hex" },
+            "vendor": { "$ref": "#/$defs/text" }, "device": { "$ref": "#/$defs/text" }, "driver": { "$ref": "#/$defs/word" },
+            "bootVga": { "type": "boolean" }, "renderNode": { "type": "boolean" },
+            "connectors": { "$ref": "#/$defs/count" }, "connected": { "$ref": "#/$defs/count" } } }
+        },
+        "displays": {
+          "type": "array", "maxItems": 16,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "connector": { "$ref": "#/$defs/word" }, "enabled": { "type": "boolean" },
+            "name": { "$ref": "#/$defs/text" }, "manufacturer": { "$ref": "#/$defs/word" }, "product": { "$ref": "#/$defs/hex" },
+            "year": { "$ref": "#/$defs/count" }, "widthCm": { "$ref": "#/$defs/count" }, "heightCm": { "$ref": "#/$defs/count" },
+            "diagonalTenths": { "$ref": "#/$defs/count" }, "nativeWidth": { "$ref": "#/$defs/count" }, "nativeHeight": { "$ref": "#/$defs/count" },
+            "mode": { "$ref": "#/$defs/word" } } }
+        },
+        "storage": {
+          "type": "array", "maxItems": 32,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "model": { "$ref": "#/$defs/text" }, "vendor": { "$ref": "#/$defs/text" },
+            "bytes": { "type": "integer", "minimum": 0, "maximum": 1000000000000000000 },
+            "rotational": { "type": "boolean" }, "removable": { "type": "boolean" },
+            "transport": { "$ref": "#/$defs/word" }, "link": { "$ref": "#/$defs/word" } } }
+        },
+        "pci": {
+          "type": "array", "maxItems": 128,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "class": { "$ref": "#/$defs/hex" }, "className": { "$ref": "#/$defs/text" },
+            "vendorId": { "$ref": "#/$defs/hex" }, "deviceId": { "$ref": "#/$defs/hex" },
+            "vendor": { "$ref": "#/$defs/text" }, "device": { "$ref": "#/$defs/text" }, "driver": { "$ref": "#/$defs/word" } } }
+        },
+        "usb": {
+          "type": "array", "maxItems": 128,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "vendorId": { "$ref": "#/$defs/hex" }, "productId": { "$ref": "#/$defs/hex" },
+            "vendor": { "$ref": "#/$defs/text" }, "product": { "$ref": "#/$defs/text" }, "class": { "$ref": "#/$defs/hex" },
+            "speedMbps": { "$ref": "#/$defs/count" }, "driver": { "$ref": "#/$defs/word" } } }
+        },
+        "network": {
+          "type": "array", "maxItems": 32,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "kind": { "enum": ["ethernet", "wifi", "virtual", "other"] }, "driver": { "$ref": "#/$defs/word" },
+            "up": { "type": "boolean" }, "speedMbps": { "$ref": "#/$defs/optCount" } } }
+        },
+        "audio": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/text" } },
+        "bluetooth": {
+          "type": "array", "maxItems": 8,
+          "items": { "type": "object", "additionalProperties": false, "properties": { "driver": { "$ref": "#/$defs/word" } } }
+        },
+        "power": {
+          "type": "array", "maxItems": 8,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "kind": { "$ref": "#/$defs/word" }, "vendor": { "$ref": "#/$defs/text" }, "model": { "$ref": "#/$defs/text" },
+            "technology": { "$ref": "#/$defs/word" }, "status": { "$ref": "#/$defs/word" },
+            "capacity": { "$ref": "#/$defs/optCount" }, "health": { "$ref": "#/$defs/optCount" }, "online": { "$ref": "#/$defs/optCount" } } }
+        },
+        "thermal": {
+          "type": "array", "maxItems": 32,
+          "items": { "type": "object", "additionalProperties": false, "properties": {
+            "sensor": { "$ref": "#/$defs/word" },
+            "milliC": { "anyOf": [{ "type": "null" }, { "type": "integer", "minimum": -100000, "maximum": 200000 }] },
+            "fans": { "$ref": "#/$defs/count" } } }
+        },
+        "raspberryPi": {
+          "type": "object", "additionalProperties": false, "properties": {
+            "model": { "$ref": "#/$defs/text" }, "revision": { "$ref": "#/$defs/hex" },
+            "throttled": { "$ref": "#/$defs/optCount" }, "underVoltageAlarm": { "type": ["boolean", "null"] } }
+        },
+        "software": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "os": { "$ref": "#/$defs/text" }, "osId": { "$ref": "#/$defs/word" }, "osVersion": { "$ref": "#/$defs/word" },
+            "kernel": { "$ref": "#/$defs/word" }, "lordos": { "$ref": "#/$defs/word" }, "lsm": { "$ref": "#/$defs/text" },
+            "landlockAbi": { "$ref": "#/$defs/optCount" }, "bpfLsm": { "type": "boolean" }, "cgroup2": { "type": "boolean" },
+            "live": { "type": "boolean" },
+            "bootMedium": { "enum": ["", "internal", "usb", "sd", "emmc", "optical", "network"] },
+            "bootLinkMbps": { "anyOf": [{ "type": "null" }, { "type": "integer", "minimum": 1, "maximum": 100000 }] },
+            "bootToRam": { "type": "boolean" },
+            "kernelConfig": {
+              "type": "object", "maxProperties": 32,
+              "propertyNames": { "pattern": "^CONFIG_[A-Z0-9_]{1,40}$" },
+              "additionalProperties": { "anyOf": [{ "type": "null" }, { "enum": ["y", "m", "n", "?"] }] }
+            },
+            "services": {
+              "type": "object", "additionalProperties": false, "properties": {
+                "lord-sessiond": { "type": "boolean" }, "lord-netd": { "type": "boolean" },
+                "lord-netperm": { "type": "boolean" }, "lord-fand": { "type": "boolean" } }
+            }
+          }
+        },
+        "session": {
+          "type": "object", "additionalProperties": false, "properties": {
+            "composition": { "$ref": "#/$defs/word" }, "gpuInit": { "$ref": "#/$defs/word" },
+            "renderer": { "$ref": "#/$defs/text" }, "dmabuf": { "type": "boolean" }, "scanouts": { "$ref": "#/$defs/num" } }
+        }
+      }
+    },
+    "cond": {
+      "type": "object", "additionalProperties": false, "properties": {
+        "tempC": { "$ref": "#/$defs/num" }, "zone": { "$ref": "#/$defs/word" }, "passiveC": { "$ref": "#/$defs/num" },
+        "criticalC": { "$ref": "#/$defs/num" }, "throttleEvents": { "$ref": "#/$defs/num" }, "rpiThrottled": { "$ref": "#/$defs/num" },
+        "rpiUnderVoltageAlarm": { "$ref": "#/$defs/num" }, "freqMHz": { "$ref": "#/$defs/num" }, "freqMaxMHz": { "$ref": "#/$defs/num" },
+        "governor": { "$ref": "#/$defs/word" }, "platformProfile": { "$ref": "#/$defs/word" },
+        "power": { "enum": ["unknown", "battery", "mains"] }, "batteryPct": { "$ref": "#/$defs/num" } }
+    },
+    "bench": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lordbench", "mode", "status", "results"],
+      "properties": {
+        "lordbench": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "mode": { "enum": ["quick", "full", "desktop"] },
+        "seconds": { "$ref": "#/$defs/num" },
+        "status": { "enum": ["done", "stopped", "failed", "running", "cancelled"] },
+        "stopReason": { "$ref": "#/$defs/word" },
+        "lordos": { "$ref": "#/$defs/word" }, "kernel": { "$ref": "#/$defs/word" }, "arch": { "$ref": "#/$defs/word" },
+        "live": { "type": "boolean" }, "threads": { "$ref": "#/$defs/count" }, "cpus": { "$ref": "#/$defs/count" },
+        "quiet": { "type": "object", "additionalProperties": false, "properties": {
+          "quiet": { "type": "boolean" }, "busyPct": { "$ref": "#/$defs/num" }, "waitedS": { "$ref": "#/$defs/num" } } },
+        "before": { "$ref": "#/$defs/cond" }, "after": { "$ref": "#/$defs/cond" },
+        "piFirmware": { "type": "object", "additionalProperties": false, "properties": {
+          "flags": { "type": "boolean" }, "voltageAlarm": { "type": "boolean" }, "underVoltage": { "type": "boolean" },
+          "capped": { "type": "boolean" }, "throttled": { "type": "boolean" }, "softLimit": { "type": "boolean" },
+          "tempLimit": { "type": "boolean" }, "tempLimitC": { "$ref": "#/$defs/num" } } },
+        "storage": { "type": "object", "additionalProperties": false, "properties": {
+          "kind": { "$ref": "#/$defs/word" }, "mb": { "$ref": "#/$defs/num" } } },
+        "gpuKind": { "enum": ["", "hardware", "virtual", "software"] },
+        "sandbox": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "sandboxTries": { "type": "array", "maxItems": 16, "items": { "type": "object", "additionalProperties": false, "properties": {
+          "id": { "$ref": "#/$defs/word" }, "denied": { "type": "boolean" }, "errno": { "type": "integer", "minimum": 0, "maximum": 4095 } } } },
+        "session": { "type": "object", "additionalProperties": false, "properties": {
+          "cli": { "type": "boolean" }, "composition": { "$ref": "#/$defs/word" }, "gpuInit": { "$ref": "#/$defs/word" },
+          "renderer": { "$ref": "#/$defs/text" },
+          "displays": { "type": "array", "maxItems": 16, "items": { "type": "object", "additionalProperties": false, "properties": {
+            "connector": { "$ref": "#/$defs/word" }, "builtin": { "type": "boolean" },
+            "mode": { "type": "object", "additionalProperties": false, "properties": {
+              "w": { "$ref": "#/$defs/count" }, "h": { "$ref": "#/$defs/count" }, "refresh": { "$ref": "#/$defs/count" } } },
+            "scale": { "$ref": "#/$defs/count" }, "rotation": { "$ref": "#/$defs/count" } } } } } },
+        "results": {
+          "type": "object", "maxProperties": 96,
+          "propertyNames": { "pattern": "^[a-z0-9]{1,16}(\\.[a-z0-9]{1,16}){1,3}$" },
+          "additionalProperties": { "type": "object", "additionalProperties": false, "required": ["value"], "properties": {
+            "value": { "$ref": "#/$defs/num" }, "spread": { "$ref": "#/$defs/num" }, "unit": { "$ref": "#/$defs/word" },
+            "lowerBetter": { "type": "boolean" } } }
+        },
+        "skipped": {
+          "type": "object", "maxProperties": 96,
+          "propertyNames": { "pattern": "^[a-z0-9]{1,16}(\\.[a-z0-9]{1,16}){1,3}$" },
+          "additionalProperties": { "enum": ["nodev", "failed", "mode", "memory", "nocodec", "noframes", ""] }
+        },
+        "frames": { "type": "object", "additionalProperties": false, "properties": {
+          "budgetMs": { "$ref": "#/$defs/num" }, "gapMaxMs": { "$ref": "#/$defs/num" } } },
+        "sustained": { "type": "object", "additionalProperties": false, "properties": {
+          "throttleAtS": { "$ref": "#/$defs/num" }, "throttleTempC": { "$ref": "#/$defs/num" } } }
+      }
+    }
+  }
+}

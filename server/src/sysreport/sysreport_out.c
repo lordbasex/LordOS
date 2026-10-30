@@ -177,6 +177,9 @@ char *sysreport_json(const SysReport *r) {
     js(&b, &g, "os", s->os); js(&b, &g, "osId", s->os_id); js(&b, &g, "osVersion", s->os_version);
     js(&b, &g, "kernel", s->kernel); js(&b, &g, "lordos", s->lordos); js(&b, &g, "lsm", s->lsm);
     jn(&b, &g, "landlockAbi", s->landlock_abi, -1); jb(&b, &g, "bpfLsm", s->bpf_lsm); jb(&b, &g, "cgroup2", s->cgroup2);
+    jb(&b, &g, "live", s->live);
+    js(&b, &g, "bootMedium", s->boot_medium); jn(&b, &g, "bootLinkMbps", s->boot_link_mbps, -1);
+    jb(&b, &g, "bootToRam", s->boot_toram);
     jkey(&b, &g, "kernelConfig"); hb_printf(&b, "{");
     for (int i = 0; i < s->nkconf; i++) {
         if (i) hb_printf(&b, ",");
@@ -233,7 +236,21 @@ char *sysreport_markdown(const SysReport *r) {
     hb_printf(&b, "| Secure Boot |"); cell(&b, m->secure_boot < 0 ? "" : m->secure_boot ? "on" : "off"); hb_printf(&b, "\n");
     hb_printf(&b, "| System |"); cell(&b, r->sw.os); hb_printf(&b, "\n");
     hb_printf(&b, "| Kernel |"); cell(&b, r->sw.kernel); hb_printf(&b, "\n");
-    hb_printf(&b, "| LordOS |"); cell(&b, r->sw.lordos); hb_printf(&b, "\n\n");
+    hb_printf(&b, "| LordOS |"); cell(&b, r->sw.lordos); hb_printf(&b, "\n");
+    if (r->sw.live || r->sw.boot_medium[0]) {
+        static const char *const media[][2] = {
+            { "internal", "an internal disk" }, { "usb", "a USB drive" }, { "sd", "an SD card" },
+            { "emmc", "built-in flash memory (eMMC)" }, { "optical", "a DVD or CD" }, { "network", "the network" },
+        };
+        const char *from = "";
+        for (size_t i = 0; i < sizeof media / sizeof media[0]; i++) if (!strcmp(r->sw.boot_medium, media[i][0])) from = media[i][1];
+        char bm[96];
+        snprintf(bm, sizeof bm, "%s%s%s", r->sw.live ? "live session" : "installed", from[0] ? ", from " : "", from);
+        if (from[0] && r->sw.boot_link_mbps > 0) snprintf(bm + strlen(bm), sizeof bm - strlen(bm), " (%d Mbps)", r->sw.boot_link_mbps);
+        if (r->sw.boot_toram) snprintf(bm + strlen(bm), sizeof bm - strlen(bm), ", copied to memory");
+        hb_printf(&b, "| Started |"); cell(&b, bm); hb_printf(&b, "\n");
+    }
+    hb_printf(&b, "\n");
 
     const SrCpu *c = &r->cpu;
     hb_printf(&b, "## Processor\n\n| | |\n|---|---|\n");

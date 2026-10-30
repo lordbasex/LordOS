@@ -1,0 +1,278 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-10-27",
+  "source": "reference",
+  "lordos": "0.8.5-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "",
+      "product": "",
+      "version": "",
+      "boardVendor": "",
+      "boardName": "",
+      "chassis": "",
+      "model": "Raspberry Pi 5 Model B Rev 1.1",
+      "biosVendor": "",
+      "biosVersion": "",
+      "biosDate": "",
+      "firmware": "dt",
+      "secureBoot": null,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "Cortex-A76",
+      "vendor": "ARM",
+      "arch": "aarch64",
+      "sockets": 1,
+      "cores": 4,
+      "threads": 4
+    },
+    "memory": {
+      "totalKB": 16777216,
+      "swapKB": 0,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "platform",
+        "vendorId": "",
+        "deviceId": "",
+        "vendor": "Broadcom",
+        "device": "V3D 7.1",
+        "driver": "v3d",
+        "bootVga": false,
+        "renderNode": true,
+        "connectors": 0,
+        "connected": 0
+      },
+      {
+        "bus": "platform",
+        "vendorId": "",
+        "deviceId": "",
+        "vendor": "Broadcom",
+        "device": "VideoCore VII display",
+        "driver": "vc4",
+        "bootVga": true,
+        "renderNode": false,
+        "connectors": 2,
+        "connected": 1
+      }
+    ],
+    "displays": [],
+    "storage": [
+      {
+        "model": "SD card",
+        "vendor": "",
+        "bytes": 32000000000,
+        "rotational": false,
+        "removable": true,
+        "transport": "sd",
+        "link": ""
+      }
+    ],
+    "network": [
+      {
+        "kind": "ethernet",
+        "driver": "macb",
+        "up": true,
+        "speedMbps": 1000
+      }
+    ],
+    "audio": [],
+    "bluetooth": [],
+    "power": [],
+    "thermal": [
+      {
+        "sensor": "cpu-thermal",
+        "milliC": null,
+        "fans": 1
+      }
+    ],
+    "raspberryPi": {
+      "model": "Raspberry Pi 5 Model B Rev 1.1",
+      "revision": "",
+      "throttled": null,
+      "underVoltageAlarm": false
+    },
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.18.57-lordos.3",
+      "lordos": "0.8.5-beta",
+      "lsm": "landlock,lockdown,yama,integrity,bpf",
+      "landlockAbi": null,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "V3D 7.1",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "wifi",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "absent",
+      "note": null
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": {
+    "lordbench": 1,
+    "mode": "full",
+    "status": "done",
+    "stopReason": "",
+    "lordos": "0.8.5-beta",
+    "live": false,
+    "results": {
+      "cpu.sha256.1": {
+        "value": 933.43
+      },
+      "cpu.sha256.n": {
+        "value": 3692.78
+      },
+      "cpu.matmul.1": {
+        "value": 2.26049
+      },
+      "cpu.matmul.n": {
+        "value": 5.98807
+      },
+      "cpu.xz.1": {
+        "value": 66.9597
+      },
+      "cpu.xz.n": {
+        "value": 254.003
+      },
+      "cpu.js.1": {
+        "value": 54.342
+      },
+      "cpu.js.n": {
+        "value": 181.428
+      },
+      "mem.copy": {
+        "value": 7.61055
+      },
+      "mem.triad": {
+        "value": 7.29512
+      },
+      "mem.latency": {
+        "value": 114.505
+      },
+      "gpu.scene": {
+        "value": 795.282
+      },
+      "gpu.fill": {
+        "value": 2454.68
+      },
+      "gpu.upload": {
+        "value": 3897.05
+      },
+      "gpu.layers": {
+        "value": 115.042
+      },
+      "disk.seqwrite": {
+        "value": 65.9909
+      },
+      "disk.seqread": {
+        "value": 90.5924
+      },
+      "disk.random4k": {
+        "value": 2692.31
+      },
+      "sustained.start": {
+        "value": 5.85622
+      },
+      "sustained.end": {
+        "value": 5.87865
+      },
+      "video.h264.1080": {
+        "value": 257.551
+      },
+      "video.hevc.1080": {
+        "value": 246.029
+      },
+      "video.vp9.1080": {
+        "value": 204.453
+      },
+      "video.av1.1080": {
+        "value": 159.402
+      },
+      "video.h264.2160": {
+        "value": 55.007
+      },
+      "video.hevc.2160": {
+        "value": 57.213
+      },
+      "video.enc.h264": {
+        "value": 75.332
+      },
+      "video.enc.vp8": {
+        "value": 54.526
+      }
+    },
+    "kernel": "6.18.57-lordos.3",
+    "arch": "aarch64",
+    "threads": 4,
+    "cpus": 4,
+    "gpuKind": "hardware",
+    "piFirmware": {
+      "flags": false,
+      "voltageAlarm": true,
+      "underVoltage": false,
+      "tempLimit": false,
+      "tempLimitC": 80
+    }
+  },
+  "desktop": null
+}

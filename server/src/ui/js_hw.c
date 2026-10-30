@@ -34,6 +34,11 @@
  *                                               the system package `sysprobe`, app/probe.c), or null
  *   lord.sysinfo.markdown()                     the same report as Markdown, as lordos-sysreport prints it,
  *                                               with a "This session" section (System Information's Report tab)
+ *   lord.sysinfo.community()                    (0.8.7) the tested-hardware catalogue's snapshot for the Compatibility
+ *                                               panel: { state, snapshot } where snapshot is given only when
+ *                                               <assets>/hwreport/snapshot.json is signed with the key this build
+ *                                               trusts and well formed (sysreport/hwsnap.c); no arguments, no path
+ *                                               from JS; state 'ok' | 'missing' | 'unsigned' | 'bad-signature' | 'invalid'
  *   lord.sysinfo.bench.start(mode, sustainedS) / poll() / cancel() / saved(which) / boots()
  *                                               LordBench (bench/lbrun.c, the lord-bench helper): mode
  *                                               'quick' | 'full' (then video in lord-media) | 'desktop'
@@ -64,6 +69,9 @@
 #include "../gpu/gpu.h"
 #include "../sysreport/sysreport.h"
 #include "../sysreport/facts.h"
+#include "../sysreport/hwsnap.h"
+#include "../sec/codesig.h"
+#include "js_sys.h"
 #include "../bench/lbrun.h"
 #include "../bench/boottest.h"
 #include "../sec/broker.h"
@@ -505,6 +513,30 @@ static JSValue f_sysinfo_probe(JSContext *c, JSValueConst t, int argc, JSValueCo
     return j ? JS_ParseJSON(c, j, strlen(j), "<probe>") : JS_NULL;
 }
 
+/* (0.8.7) the catalogue's snapshot, verified in C before JS sees any of it; read again on every call (the
+ * Compatibility tab asks once when it opens), so a package update is seen without restarting the session */
+static JSValue f_sysinfo_community(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char dir[4096], err[160] = "";
+    const char *assets = js_sys_assets();
+    JSValue o = JS_NewObject(c);
+    char *json = NULL;
+    size_t len = 0;
+    HwSnapState st = HWSNAP_MISSING;
+    if (assets && assets[0] == '/' && (size_t)snprintf(dir, sizeof dir, "%s/hwreport", assets) < sizeof dir)
+        st = hwsnap_load(dir, codesig_key(), &json, &len, err, sizeof err);
+    JS_SetPropertyStr(c, o, "state", JS_NewString(c, hwsnap_state_name(st)));
+    if (st == HWSNAP_OK) {
+        JSValue v = JS_ParseJSON(c, json, len, "<hwsnapshot>");
+        if (JS_IsException(v)) { JS_FreeValue(c, JS_GetException(c)); JS_SetPropertyStr(c, o, "state", JS_NewString(c, "invalid")); }
+        else JS_SetPropertyStr(c, o, "snapshot", v);
+    } else if (st != HWSNAP_MISSING) {
+        fprintf(stderr, "sysinfo: hardware snapshot not used: %s (%s)\n", hwsnap_state_name(st), err);
+    }
+    free(json);
+    return o;
+}
+
 /* ---- lord.sysinfo.bench (LordBench) ---- */
 
 /* what a result records about this session: how the screen is composed and each active display's
@@ -608,6 +640,7 @@ static const JSCFunctionListEntry sysinfo_funcs[] = {
     JS_CFUNC_DEF("probe", 0, f_sysinfo_probe),
     JS_CFUNC_DEF("facts", 0, f_sysinfo_facts),
     JS_CFUNC_DEF("markdown", 0, f_sysinfo_markdown),
+    JS_CFUNC_DEF("community", 0, f_sysinfo_community),
 };
 
 /* ---- lord.browserFrame (Settings → Appearance; hw/brframe.c, docs/WAYLAND.md) ---- */

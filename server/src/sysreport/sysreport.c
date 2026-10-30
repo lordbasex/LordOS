@@ -705,6 +705,185 @@ static void collect_pi(SysReport *r, const char *root, const char *cpuinfo) {
     r->pi.uv_alarm = fw.uv_alarm;
 }
 
+/* ---- the boot medium (0.8.7) ----
+ *
+ * What the system started from, as one word: the device under / (installed) or under live-boot's
+ * /run/live/medium (live), found in /proc/self/mountinfo by its major:minor and classified by its sysfs path,
+ * all world-readable. Device mapper and RAID layers are followed through "slaves". Only the class leaves this
+ * function (and a USB medium's link speed): never the device's name, its model, a serial or a path. */
+
+#define BOOT_MAX_DEPTH 4
+
+/* The sysfs path ("/sys/devices/…") a block link points at (<root><link> is a symlink such as
+ * /sys/dev/block/8:1 -> ../../devices/…/block/sda/sda1); "" when it isn't one. */
+static void blk_sysfs(const char *root, const char *link, char *out, size_t size) {
+    char p[1024], l[1024];
+    out[0] = 0;
+    snprintf(p, sizeof p, "%s%s", root, link);
+    ssize_t n = readlink(p, l, sizeof l - 1);
+    if (n <= 0) return;
+    l[n] = 0;
+    const char *d = strstr(l, "devices/");
+    if (!d || strstr(d, "/../") || strstr(d, "/./")) return;
+    snprintf(out, size, "/sys/%s", d);
+}
+
+/* The last component of a path ("" when the path ends in '/'). */
+static const char *base_of(const char *path) {
+    const char *b = strrchr(path, '/');
+    return b ? b + 1 : path;
+}
+
+/* A block device name as the kernel writes them ([A-Za-z0-9_-], at most 31 characters). */
+static int blk_name_ok(const char *s) {
+    size_t n = strlen(s);
+    if (!n || n > 31) return 0;
+    for (; *s; s++) if (!isalnum((unsigned char)*s) && *s != '_' && *s != '-') return 0;
+    return 1;
+}
+
+/* attr() for the long sysfs paths of the boot medium: nothing ("") when <root><dir>/<name> doesn't fit */
+static void attr_long(const char *root, const char *dir, const char *name, char *out, size_t size) {
+    char p[2400];
+    out[0] = 0;
+    int n = snprintf(p, sizeof p, "%s%s/%s", root, dir, name);
+    if (n > 0 && (size_t)n < sizeof p) read_attr(p, out, size);
+}
+
+/* A USB device's link speed in Mbps: the deepest "<bus>-<port>[.<port>…]" component after "usbN" in a disk's
+ * sysfs path holds "speed" (1.5, 12, 480, 5000…); -1 when it can't be read. */
+static int usb_link_mbps(const char *root, const char *dev) {
+    char best[1024];
+    best[0] = 0;
+    size_t len = strlen(dev);
+    if (len >= sizeof best) return -1;
+    int after_usb = 0;
+    for (size_t i = 1; i <= len; i++) {
+        if (dev[i] != '/' && dev[i] != 0) continue;
+        size_t s = i;                                   /* the component is dev[start, i) */
+        while (s > 0 && dev[s - 1] != '/') s--;
+        const char *c = dev + s;
+        size_t cl = i - s;
+        if (cl > 3 && !strncmp(c, "usb", 3) && isdigit((unsigned char)c[3])) { after_usb = 1; continue; }
+        if (!after_usb || !cl || !isdigit((unsigned char)c[0])) continue;
+        size_t dash = 0;
+        int ok = 1;
+        for (size_t k = 0; k < cl; k++) {
+            if (c[k] == '-') dash++;
+            else if (!isdigit((unsigned char)c[k]) && c[k] != '.') ok = 0;
+        }
+        if (ok && dash == 1) { memcpy(best, dev, i); best[i] = 0; }
+    }
+    if (!best[0]) return -1;
+    char v[32];
+    attr_long(root, best, "speed", v, sizeof v);
+    if (!v[0]) return -1;
+    char *end;
+    double mbps = strtod(v, &end);
+    if (end == v || mbps <= 0 || mbps > 1000000) return -1;
+    return mbps < 1 ? 1 : (int)mbps;
+}
+
+/* Classify the block device at <root><link> (a /sys/dev/block or /sys/class/block symlink). */
+static void boot_classify(SrSoftware *s, const char *root, const char *link, int depth) {
+    char dev[1024], disk[1024];
+    blk_sysfs(root, link, dev, sizeof dev);
+    if (!dev[0] || depth > BOOT_MAX_DEPTH) return;
+    /* a partition's disk is its parent folder */
+    char part[1100];
+    snprintf(part, sizeof part, "%s%s/partition", root, dev);
+    struct stat st;
+    snprintf(disk, sizeof disk, "%s", dev);
+    if (!lstat(part, &st)) { char *sl = strrchr(disk, '/'); if (sl && sl != disk) *sl = 0; }
+    const char *name = base_of(disk);
+    if (!blk_name_ok(name)) return;
+
+    /* device mapper (LUKS, LVM) and software RAID: the first layer below */
+    if (!strncmp(name, "dm-", 3) || !strncmp(name, "md", 2)) {
+        char sl[1100], **b;
+        snprintf(sl, sizeof sl, "%s/slaves", dev);
+        int n = list_dir(root, sl, &b);
+        if (n > 0 && blk_name_ok(b[0])) {
+            char next[96];
+            snprintf(next, sizeof next, "/sys/class/block/%s", b[0]);
+            boot_classify(s, root, next, depth + 1);
+        }
+        free_list(b, n);
+        return;
+    }
+    const char *cls = "";
+    if (!strncmp(name, "loop", 4) || !strncmp(name, "zram", 4) || !strncmp(name, "ram", 3)) cls = "";
+    else if (!strncmp(name, "nbd", 3) || strstr(disk, "/session")) cls = "network";   /* NBD, iSCSI */
+    else if (!strncmp(name, "sr", 2)) cls = "optical";
+    else if (strstr(disk, "/usb")) cls = "usb";
+    else if (!strncmp(name, "mmcblk", 6)) {
+        char d[1100], type[16];
+        if ((size_t)snprintf(d, sizeof d, "%s/device", disk) >= sizeof d) return;
+        attr_long(root, d, "type", type, sizeof type);
+        cls = !strcmp(type, "SD") ? "sd" : !strcmp(type, "MMC") ? "emmc" : "";
+    } else cls = "internal";
+    snprintf(s->boot_medium, sizeof s->boot_medium, "%s", cls);
+    if (!strcmp(cls, "usb")) s->boot_link_mbps = usb_link_mbps(root, disk);
+}
+
+/* Whether the kernel command line holds the word w (or w=… when w ends in '='). Nothing of it is kept. */
+static int cmdline_has(const char *cmdline, const char *w) {
+    size_t n = strlen(w);
+    for (const char *p = cmdline; (p = strstr(p, w)); p += n) {
+        int start = p == cmdline || p[-1] == ' ';
+        char e = p[n];
+        if (start && (w[n - 1] == '=' || e == 0 || e == ' ' || e == '\n')) return 1;
+    }
+    return 0;
+}
+
+static void collect_boot(SrSoftware *s, const char *root) {
+    s->boot_medium[0] = 0;
+    s->boot_link_mbps = -1;
+    char p[1024];
+    snprintf(p, sizeof p, "%s/proc/cmdline", root);
+    char *cmd = read_file(p, 4096, NULL);
+    if (s->live && cmd) s->boot_toram = cmdline_has(cmd, "toram") || cmdline_has(cmd, "toram=");
+    int fetched = s->live && cmd && (cmdline_has(cmd, "fetch=") || cmdline_has(cmd, "netboot="));
+    free(cmd);
+
+    const char *want = s->live ? "/run/live/medium" : "/";
+    snprintf(p, sizeof p, "%s/proc/self/mountinfo", root);
+    char *mi = read_file(p, 1u << 20, NULL);
+    unsigned ma = 0, mn = 0;
+    int found = 0;
+    char fstype[32] = "", source[128] = "";
+    /* "<id> <parent> <major>:<minor> <root> <mount point> <options> [optional…] - <fstype> <source> <super>";
+     * the last line for a mount point is the one on top */
+    for (char *line = mi, *next; line && *line; line = next) {
+        next = strchr(line, '\n');
+        if (next) *next++ = 0;
+        unsigned a, b;
+        char mroot[256], point[256];
+        if (sscanf(line, "%*u %*u %u:%u %255s %255s", &a, &b, mroot, point) != 4 || strcmp(point, want)) continue;
+        const char *dash = strstr(line, " - ");
+        if (!dash) continue;
+        char ft[32] = "", src[128] = "";
+        if (sscanf(dash + 3, "%31s %127s", ft, src) < 1) continue;
+        ma = a; mn = b; found = 1;
+        snprintf(fstype, sizeof fstype, "%s", ft);
+        snprintf(source, sizeof source, "%s", src);
+    }
+    free(mi);
+
+    if (found && (!strcmp(fstype, "nfs") || !strcmp(fstype, "nfs4") || !strcmp(fstype, "cifs") || !strcmp(fstype, "smb3"))) {
+        snprintf(s->boot_medium, sizeof s->boot_medium, "network");
+    } else if (found && ma != 0) {
+        snprintf(p, sizeof p, "/sys/dev/block/%u:%u", ma, mn);
+        boot_classify(s, root, p, 0);
+    } else if (found && !strncmp(source, "/dev/", 5) && blk_name_ok(base_of(source))) {
+        /* btrfs and others show an anonymous 0:N device: the source names the block device */
+        snprintf(p, sizeof p, "/sys/class/block/%s", base_of(source));
+        boot_classify(s, root, p, 0);
+    }
+    if (!s->boot_medium[0] && fetched) snprintf(s->boot_medium, sizeof s->boot_medium, "network");
+}
+
 /* ---- software ---- */
 
 static void collect_software(SysReport *r, const char *root) {
@@ -757,6 +936,10 @@ static void collect_software(SysReport *r, const char *root) {
     s->netperm = exists(root, "/run/lordos/netperm.sock");
     s->fand = exists(root, "/run/lordos/fand.sock");
     s->netd = exists(root, "/run/lordos/netd.sock");
+    /* the live session from the ISO (live-boot's marker, as LordBench reads it): a shared report says so
+     * (docs/BENCHMARK.md, "From the live USB") */
+    s->live = exists(root, "/run/live");
+    collect_boot(s, root);
 }
 
 /* ---- all of it ---- */

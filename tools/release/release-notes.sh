@@ -85,6 +85,7 @@ cat <<EOF
 | \`lordos-${filever}-rpi5-arm64.img.xz\` | Image for the Raspberry Pi 5, for the LordOS Imager (below) or Raspberry Pi Imager ("Use custom"), an SD card or an NVMe drive. |
 | \`lordos_${filever}_amd64.deb\` | The LordOS package for an existing Debian 13 on a PC (installed by \`install.sh\`, or with \`apt install ./…\`). |
 | \`lordos_${filever}_arm64.deb\` | The same package for Debian 13 on arm64. |
+| \`lordos-hwdata_<date>_all.deb\` | The signed tested-hardware snapshot for System Information's Compatibility panel, which the LordOS package depends on (both architectures; \`install.sh\` installs it with the package, or \`apt install ./lordos-hwdata_…_all.deb ./lordos_…\`). Newer ones arrive through Store → Updates between releases. |
 | \`lordos_imager_${filever}_universal.dmg\` | LordOS Imager for Mac (both processor families, signed and notarized): writes LordOS to an SD card or a USB stick and prepares the Raspberry Pi 5's first boot. |
 | \`lordos_imager_${filever}_x64_setup.exe\` | LordOS Imager for Windows (64-bit installer; not code-signed yet, so the system asks before running it). |
 | \`lordos_imager_${filever}_amd64.deb\` | LordOS Imager for Linux (Debian 13 and similar, amd64; needs udisks2). |

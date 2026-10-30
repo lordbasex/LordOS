@@ -348,6 +348,71 @@ static const char *cand_ver(const Idx *x, const char *name, const StPkg *inst) {
     return c < 0 ? "-" : idx_s(x, x->pkg[c].version);
 }
 
+/* (0.8.7) lordos-hwdata, the signed tested-hardware snapshot (tools/iso/mkdeb-hwdata.sh): an Architecture: all
+ * package that lordos depends on, whose versions are dates. Updating lordos from a release without it brings it
+ * in, and a newer snapshot alone is an ordinary upgrade (docs/BENCHMARK.md, "Newer snapshots between releases"). */
+static const char *HW_REPO =
+    "Package: lordos\nVersion: 0.8.7\nArchitecture: amd64\nDepends: libc6 (>= 2.38), lordos-hwdata (>= 2026.10.27)\nFilename: pool/main/l/lordos/lordos_0.8.7_amd64.deb\nSize: 9000\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.10.29\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.10.29_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.11.05.1\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.11.05.1_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.11.05\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.11.05_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n";
+static const char *HW_OLD =        /* a 0.8.5 system: no lordos-hwdata */
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.5\nArchitecture: amd64\nDepends: libc6 (>= 2.38)\nDescription: l\n\n";
+static const char *HW_NEW =        /* 0.8.7 with an older snapshot */
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.7\nArchitecture: amd64\nDepends: libc6 (>= 2.38), lordos-hwdata (>= 2026.10.27)\nDescription: l\n\n"
+    "Package: lordos-hwdata\nStatus: install ok installed\nVersion: 2026.10.29\nArchitecture: all\nDescription: h\n\n";
+
+static const char *item_ver(const Plan *p, const char *name) {
+    for (int i = 0; i < p->n; i++) if (!strcmp(p->items[i].name, name)) return p->items[i].version;
+    return "-";
+}
+
+static void test_hwdata(const char *dir) {
+    char idir[700], sp[700], err[200];
+    snprintf(idir, sizeof idir, "%s/hwidx", dir);
+    mkdir(idir, 0755);
+    CHECK(ver_cmp("2026.11.05.1", "2026.11.05") > 0 && ver_cmp("2026.11.05", "2026.10.29.9") > 0 && ver_cmp("2026.10.29", "2026.10.27") > 0,
+          "snapshot versions: the date, then .N for a second one that day");
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "https://lordos.org/apt", "stable", "main", "stable", "LordOS", "LordOS", 0, 0, 500);
+    idxb_packages(b, s, HW_REPO, strlen(HW_REPO), "amd64");
+    CHECK(!idxb_write(b, idir, "amd64", err, sizeof err), "write hwdata index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, idir) && x.h->npkg == 4, "hwdata index: the all packages are in the amd64 one (%u)", x.map ? x.h->npkg : 0);
+    Status st = { 0 };
+    Plan p;
+    PlanOpts o = { 0 };
+    /* Store → Updates' LordOS card: pkg-install lordos brings the new dependency, its newest version */
+    snprintf(sp, sizeof sp, "%s/hwstatus-old", dir);
+    write_text(sp, HW_OLD);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 2, "old status");
+    const char *lo[] = { "lordos" };
+    plan_make(&x, &st, lo, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 2 && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_INSTALL, "lordos-hwdata") && !strcmp(item_ver(&p, "lordos-hwdata"), "2026.11.05.1"),
+          "updating lordos installs lordos-hwdata 2026.11.05.1: %d %s %s", p.n, item_ver(&p, "lordos-hwdata"), p.err);
+    plan_free(&p);
+    /* Update all (pkg-upgrade) does the same */
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_INSTALL, "lordos-hwdata"), "update all brings lordos-hwdata too: %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+    /* between releases: only the snapshot is newer, an upgrade of one package */
+    snprintf(sp, sizeof sp, "%s/hwstatus-new", dir);
+    write_text(sp, HW_NEW);
+    memset(&st, 0, sizeof st);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 3, "new status");
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 1 && has(&p, PA_UPGRADE, "lordos-hwdata") && !strcmp(item_ver(&p, "lordos-hwdata"), "2026.11.05.1"),
+          "a newer snapshot alone: one upgrade, %d %s", p.n, p.err);
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+}
+
 static void test_pins(const char *dir) {
     char root[600], path[700];
     snprintf(root, sizeof root, "%s/pins", dir);
@@ -496,6 +561,7 @@ int main(int argc, char **argv) {
     test_compress();
     pin_root = dir;                     /* never the machine's own /etc/apt/preferences */
     test_resolver(dir);
+    test_hwdata(dir);
     test_pins(dir);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", dir);

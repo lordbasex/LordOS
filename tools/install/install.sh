@@ -79,7 +79,8 @@ Options:
   -y, --yes                 do not ask for confirmation (also LORDOS_YES=1)
   --version X               install release X (for example 0.8.0-beta); default: the latest
   --deb FILE                install a local lordos_<version>_<arch>.deb instead of downloading;
-                            a SHA256SUMS file next to it is verified when present
+                            a SHA256SUMS file next to it is verified when present, and the
+                            lordos-hwdata_<date>_all.deb it needs is taken from the same folder
   --user NAME               the user to set up (default: the user who ran sudo)
   --keep-display-manager    do not disable the current display manager (LordOS is not
                             enabled at boot then; see the final message)
@@ -388,6 +389,57 @@ get_package() {
     fi
     check_deb_file "$DEB_PATH"
     ok "package: lordos $DEB_VERSION ($ARCH)"
+    get_hwdata
+}
+
+# (0.8.7) lordos depends on lordos-hwdata, the signed tested-hardware snapshot of System Information
+# (docs/BENCHMARK.md): an Architecture: all package in the same release, checked like the main one. On a
+# Debian system the LordOS repository is not there yet, so apt can only take it from here.
+get_hwdata() {
+    HW_PATH=""
+    HW_NEEDED=0
+    case "$(dpkg-deb -f "$DEB_PATH" Depends 2>/dev/null || true)" in *lordos-hwdata*) HW_NEEDED=1 ;; *) return 0 ;; esac
+    hwsums=""; hwbase=""; hwdir=""; hwsha=""
+    if [ -n "$LOCAL_DEB" ]; then
+        hwdir=$(dirname "$LOCAL_DEB")
+        [ -f "$hwdir/SHA256SUMS" ] && hwsums="$hwdir/SHA256SUMS"
+    else
+        hwsums="$TMP/SHA256SUMS"
+    fi
+    if [ -n "$hwsums" ]; then
+        hwbase=$(awk '{ n = $2; sub(/^\*/, "", n); print n }' "$hwsums" \
+            | grep -E '^lordos-hwdata_[0-9][0-9.]*_all\.deb$' | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    else
+        hwbase=$(for f in "$hwdir"/lordos-hwdata_*_all.deb; do [ -f "$f" ] && basename "$f"; done \
+            | grep -E '^lordos-hwdata_[0-9][0-9.]*_all\.deb$' | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    fi
+    # an upgrade with the LordOS repository already configured: apt takes it from there (install_package)
+    [ -n "$hwbase" ] || return 0
+    if [ -n "$LOCAL_DEB" ]; then
+        [ -f "$hwdir/$hwbase" ] || return 0
+        cp "$hwdir/$hwbase" "$TMP/$hwbase"
+    else
+        fetch "$base_url/$hwbase" "$TMP/$hwbase" || die "could not download $hwbase"
+    fi
+    if [ -n "$hwsums" ]; then
+        hwsha=$(sum_for "$hwsums" "$hwbase")
+        [ "$(sha256_of "$TMP/$hwbase")" = "$hwsha" ] || die "SHA-256 mismatch for $hwbase: the file is corrupted or not the released one. Nothing was installed."
+        ok "SHA-256 of $hwbase matches SHA256SUMS"
+    else
+        warn "no SHA256SUMS next to $LOCAL_DEB: the checksum of $hwbase was not verified (you provided this file)."
+    fi
+    chmod 644 "$TMP/$hwbase"
+    HW_PATH="$TMP/$hwbase"
+    if [ -n "$ROOT_TMP" ]; then
+        as_root install -m 644 "$HW_PATH" "$ROOT_TMP/$hwbase" || die "could not copy $hwbase for installation"
+        HW_PATH="$ROOT_TMP/$hwbase"
+    fi
+    if [ -n "$hwsha" ]; then
+        [ "$(sha256_of "$HW_PATH")" = "$hwsha" ] || die "SHA-256 mismatch for $hwbase after copying it: refusing to install"
+    fi
+    [ "$(dpkg-deb -f "$HW_PATH" Package 2>/dev/null || true)" = lordos-hwdata ] || die "$hwbase is not the lordos-hwdata package"
+    [ "$(dpkg-deb -f "$HW_PATH" Architecture 2>/dev/null || true)" = all ] || die "$hwbase is not an Architecture: all package"
+    ok "package: lordos-hwdata $(dpkg-deb -f "$HW_PATH" Version) (the tested-hardware snapshot)"
 }
 
 # ---------------------------------------------------------------- install
@@ -413,8 +465,11 @@ install_package() {
         && dpkg --compare-versions "$DEB_VERSION" lt "$was"; then
         die "the release offered ($DEB_VERSION) is older than the installed LordOS ($was): refusing to downgrade (use --version X to choose a version)"
     fi
-    # shellcheck disable=SC2086 # $extras is a list of package names
-    apt_install "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
+    if [ "$HW_NEEDED" = 1 ] && [ -z "$HW_PATH" ] && ! apt-cache show lordos-hwdata >/dev/null 2>&1; then
+        die "this release's lordos needs lordos-hwdata, which is neither next to it nor in a configured repository. Nothing was changed."
+    fi
+    # shellcheck disable=SC2086 # $extras is a list of package names; $HW_PATH is one path or empty
+    apt_install $HW_PATH "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
     if [ -n "$was" ]; then changed "package lordos $was replaced by $DEB_VERSION"
     else changed "package lordos $DEB_VERSION installed (with its Debian dependencies)"; fi
     if [ -n "$extras" ]; then changed "extra packages ensured:$extras"; fi
@@ -811,6 +866,8 @@ do_install() {
 
     TMP=$(mktemp -d)
     ROOT_TMP=""
+    HW_PATH=""
+    HW_NEEDED=0
     trap cleanup_tmp EXIT INT TERM
     step "Getting the package"
     get_package
@@ -956,6 +1013,11 @@ do_uninstall() {
             else
                 as_root env DEBIAN_FRONTEND=noninteractive apt-get remove -y -q lordos </dev/null
                 changed "package lordos removed (its /etc files are kept; --purge removes them)"
+            fi
+            # the tested-hardware snapshot it depended on (data only)
+            if [ "$(dpkg-query -W -f '${Status}' lordos-hwdata 2>/dev/null || true)" = "install ok installed" ]; then
+                as_root env DEBIAN_FRONTEND=noninteractive apt-get purge -y -q lordos-hwdata </dev/null &&
+                    changed "package lordos-hwdata removed"
             fi ;;
     esac
     gu=$(state_get GROUPS_USER)

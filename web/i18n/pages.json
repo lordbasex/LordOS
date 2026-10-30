@@ -119,7 +119,81 @@
     "menu": "Menu",
     "closeMenu": "Close menu",
     "contact": "Contact",
-    "toTop": "Back to top"
+    "toTop": "Back to top",
+    "hardware": {
+      "kicker": "Hardware",
+      "title": "Tested hardware",
+      "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people shared with System Information and from the project's own reference machines.",
+      "statusDev": "In development for LordOS 0.8.7 (the latest release is {release}): sharing reports from System Information is not released yet, so for now this catalogue holds only the project's reference machines.",
+      "machinesTitle": "Machines",
+      "gpusTitle": "Graphics cards and drivers",
+      "problemsTitle": "Known problems",
+      "shareTitle": "Add your computer",
+      "shareText": "Open System Information → Report → Share on GitHub. It saves a report with no serial numbers, addresses or names, and a page that opens GitHub's form; you attach the file and submit it with your own account. LordOS sends nothing by itself.",
+      "shareLink": "The hardware report form on GitHub",
+      "reference": "Reference machine",
+      "live": "live session",
+      "threads": "threads",
+      "cpu": "Processor",
+      "gpu": "Graphics",
+      "memory": "Memory",
+      "wifi": "Wi-Fi",
+      "driver": "Driver",
+      "machine": "Machine",
+      "stateHead": "State",
+      "componentHead": "Component",
+      "versions": "LordOS versions",
+      "reportedIn": "Reported with",
+      "fixedIn": "Fixed in",
+      "noProblems": "No problems reported yet.",
+      "state": {
+        "works": "Works",
+        "limits": "Works with limits",
+        "no": "Doesn't work",
+        "unchecked": "Not checked"
+      },
+      "kind": {
+        "vm": "Virtual machine",
+        "board": "Board",
+        "laptop": "Laptop",
+        "server": "Server",
+        "desktop": "Desktop"
+      },
+      "component": {
+        "gpu": "Graphics",
+        "display": "Displays",
+        "storage": "Storage",
+        "network": "Network",
+        "wifi": "Wi-Fi",
+        "bluetooth": "Bluetooth",
+        "audio": "Audio",
+        "power": "Battery",
+        "isolation": "App isolation",
+        "suspend": "Suspend"
+      },
+      "perf": {
+        "cpu": "CPU (all cores)",
+        "memory": "Memory",
+        "gpu": "Graphics",
+        "storage": "Disk read",
+        "desktop": "Desktop under load"
+      },
+      "notes": {
+        "cpu.software": "(composed on the CPU: only a software renderer)",
+        "cpu.no3d": "(composed on the CPU: no 3D acceleration)",
+        "cpu.noGbm": "(composed on the CPU: no GBM)",
+        "cpu.noEgl": "(composed on the CPU: EGL didn't start)",
+        "cpu.rotated": "(composed on the CPU: rotated display)",
+        "noGpu": "(no graphics card found)",
+        "noEdid": "(a display doesn't report its identity)",
+        "notConnected": "(not connected)",
+        "noDriver": "(no driver bound)",
+        "batteryWorn": "(worn battery)",
+        "missing.landlock": "(the kernel has no Landlock)",
+        "missing.bpfLsm": "(the BPF security module is off)",
+        "missing.cgroup2": "(no unified cgroup tree)"
+      }
+    }
   },
   "es": {
     "navPaper": "Paper",
@@ -241,7 +315,81 @@
     "menu": "Menú",
     "closeMenu": "Cerrar menú",
     "contact": "Contacto",
-    "toTop": "Volver arriba"
+    "toTop": "Volver arriba",
+    "hardware": {
+      "kicker": "Hardware",
+      "title": "Hardware probado",
+      "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente compartió con Información del Sistema y de las máquinas de referencia del propio proyecto.",
+      "statusDev": "En desarrollo para LordOS 0.8.7 (la última versión publicada es {release}): compartir reportes desde Información del Sistema todavía no está publicado, así que por ahora este catálogo tiene solo las máquinas de referencia del proyecto.",
+      "machinesTitle": "Máquinas",
+      "gpusTitle": "Tarjetas gráficas y drivers",
+      "problemsTitle": "Problemas conocidos",
+      "shareTitle": "Sumá tu computadora",
+      "shareText": "Abrí Información del Sistema → Reporte → Compartir en GitHub. Guarda un reporte sin números de serie, direcciones ni nombres, y una página que abre el formulario de GitHub; adjuntás el archivo y lo enviás con tu propia cuenta. LordOS no envía nada por su cuenta.",
+      "shareLink": "El formulario de reporte de hardware en GitHub",
+      "reference": "Máquina de referencia",
+      "live": "sesión live",
+      "threads": "hilos",
+      "cpu": "Procesador",
+      "gpu": "Gráficos",
+      "memory": "Memoria",
+      "wifi": "Wi-Fi",
+      "driver": "Driver",
+      "machine": "Máquina",
+      "stateHead": "Estado",
+      "componentHead": "Componente",
+      "versions": "Versiones de LordOS",
+      "reportedIn": "Reportado con",
+      "fixedIn": "Resuelto en",
+      "noProblems": "Todavía no hay problemas reportados.",
+      "state": {
+        "works": "Funciona",
+        "limits": "Funciona con límites",
+        "no": "No funciona",
+        "unchecked": "Sin revisar"
+      },
+      "kind": {
+        "vm": "Máquina virtual",
+        "board": "Placa",
+        "laptop": "Portátil",
+        "server": "Servidor",
+        "desktop": "Escritorio"
+      },
+      "component": {
+        "gpu": "Gráficos",
+        "display": "Pantallas",
+        "storage": "Almacenamiento",
+        "network": "Red",
+        "wifi": "Wi-Fi",
+        "bluetooth": "Bluetooth",
+        "audio": "Sonido",
+        "power": "Batería",
+        "isolation": "Aislamiento de apps",
+        "suspend": "Suspensión"
+      },
+      "perf": {
+        "cpu": "CPU (todos los núcleos)",
+        "memory": "Memoria",
+        "gpu": "Gráficos",
+        "storage": "Lectura de disco",
+        "desktop": "Escritorio con carga"
+      },
+      "notes": {
+        "cpu.software": "(compuesto en la CPU: solo un renderizador por software)",
+        "cpu.no3d": "(compuesto en la CPU: sin aceleración 3D)",
+        "cpu.noGbm": "(compuesto en la CPU: sin GBM)",
+        "cpu.noEgl": "(compuesto en la CPU: EGL no arrancó)",
+        "cpu.rotated": "(compuesto en la CPU: pantalla rotada)",
+        "noGpu": "(no se encontró tarjeta gráfica)",
+        "noEdid": "(una pantalla no informa su identidad)",
+        "notConnected": "(sin conectar)",
+        "noDriver": "(sin driver)",
+        "batteryWorn": "(batería gastada)",
+        "missing.landlock": "(el kernel no tiene Landlock)",
+        "missing.bpfLsm": "(el módulo de seguridad BPF está apagado)",
+        "missing.cgroup2": "(sin árbol de cgroups unificado)"
+      }
+    }
   },
   "pt": {
     "navPaper": "Paper",
@@ -363,6 +511,80 @@
     "menu": "Menu",
     "closeMenu": "Fechar menu",
     "contact": "Contato",
-    "toTop": "Voltar ao topo"
+    "toTop": "Voltar ao topo",
+    "hardware": {
+      "kicker": "Hardware",
+      "title": "Hardware testado",
+      "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilharam com as Informações do Sistema e das máquinas de referência do próprio projeto.",
+      "statusDev": "Em desenvolvimento para o LordOS 0.8.7 (a última versão publicada é {release}): compartilhar relatórios pelas Informações do Sistema ainda não foi publicado, então por enquanto este catálogo tem só as máquinas de referência do projeto.",
+      "machinesTitle": "Máquinas",
+      "gpusTitle": "Placas de vídeo e drivers",
+      "problemsTitle": "Problemas conhecidos",
+      "shareTitle": "Adicione o seu computador",
+      "shareText": "Abra Informações do Sistema → Relatório → Compartilhar no GitHub. Ele salva um relatório sem números de série, endereços nem nomes, e uma página que abre o formulário do GitHub; você anexa o arquivo e envia com a sua própria conta. O LordOS não envia nada por conta própria.",
+      "shareLink": "O formulário de relatório de hardware no GitHub",
+      "reference": "Máquina de referência",
+      "live": "sessão live",
+      "threads": "threads",
+      "cpu": "Processador",
+      "gpu": "Gráficos",
+      "memory": "Memória",
+      "wifi": "Wi-Fi",
+      "driver": "Driver",
+      "machine": "Máquina",
+      "stateHead": "Estado",
+      "componentHead": "Componente",
+      "versions": "Versões do LordOS",
+      "reportedIn": "Relatado com",
+      "fixedIn": "Resolvido em",
+      "noProblems": "Ainda não há problemas relatados.",
+      "state": {
+        "works": "Funciona",
+        "limits": "Funciona com limites",
+        "no": "Não funciona",
+        "unchecked": "Não verificado"
+      },
+      "kind": {
+        "vm": "Máquina virtual",
+        "board": "Placa",
+        "laptop": "Notebook",
+        "server": "Servidor",
+        "desktop": "Desktop"
+      },
+      "component": {
+        "gpu": "Gráficos",
+        "display": "Telas",
+        "storage": "Armazenamento",
+        "network": "Rede",
+        "wifi": "Wi-Fi",
+        "bluetooth": "Bluetooth",
+        "audio": "Som",
+        "power": "Bateria",
+        "isolation": "Isolamento de apps",
+        "suspend": "Suspensão"
+      },
+      "perf": {
+        "cpu": "CPU (todos os núcleos)",
+        "memory": "Memória",
+        "gpu": "Gráficos",
+        "storage": "Leitura de disco",
+        "desktop": "Desktop com carga"
+      },
+      "notes": {
+        "cpu.software": "(composto na CPU: só um renderizador por software)",
+        "cpu.no3d": "(composto na CPU: sem aceleração 3D)",
+        "cpu.noGbm": "(composto na CPU: sem GBM)",
+        "cpu.noEgl": "(composto na CPU: o EGL não iniciou)",
+        "cpu.rotated": "(composto na CPU: tela girada)",
+        "noGpu": "(nenhuma placa de vídeo encontrada)",
+        "noEdid": "(uma tela não informa sua identidade)",
+        "notConnected": "(desconectado)",
+        "noDriver": "(sem driver)",
+        "batteryWorn": "(bateria desgastada)",
+        "missing.landlock": "(o kernel não tem Landlock)",
+        "missing.bpfLsm": "(o módulo de segurança BPF está desligado)",
+        "missing.cgroup2": "(sem árvore de cgroups unificada)"
+      }
+    }
   }
 }

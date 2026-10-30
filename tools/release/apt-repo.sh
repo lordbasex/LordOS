@@ -35,6 +35,13 @@
 # vendor has its own signed APT repository ("delivery": "direct") are only checked, never mirrored: the
 # user's system installs them from the vendor (docs/UPDATES.md, "Mirrored apps (catalog)").
 #
+# lordos-hwdata (0.8.7, docs/BENCHMARK.md "Newer snapshots between releases"): the signed tested-hardware
+# snapshot, an Architecture: all package (tools/iso/mkdeb-hwdata.sh) that lordos depends on. It is added like any
+# .deb, with a release or alone between releases (`build live lordos-hwdata_<date>_all.deb`, docs/RELEASING.md),
+# and only after its snapshot's Ed25519 signature verifies with tools/release/lordos-release.pub.pem
+# (LORDOS_HWDATA_PUB=<public.pem> names a throwaway test key, for the staging target only). A lordos that
+# depends on it is refused while the pool has no lordos-hwdata.
+#
 # --notes VERSION=SECTION takes the notes of lordos VERSION from CHANGELOG.md section SECTION (for
 # example 0.8.1~staging1=Unreleased). By default the section is "VERSION" or "VERSION-<suffix>".
 #
@@ -223,6 +230,26 @@ rpi_src_import() {
     rm -rf "$t"
 }
 
+# a lordos-hwdata package (in $TREE/incoming): Architecture all, and its snapshot signed with the release key
+check_hwdata() {
+    [ "$2" = all ] || die "$1: lordos-hwdata must be Architecture: all, not $2"
+    pub=$ROOT/tools/release/lordos-release.pub.pem
+    if [ -n "${LORDOS_HWDATA_PUB:-}" ]; then
+        [ "$target" = staging ] || die "LORDOS_HWDATA_PUB (a test key) is only for the staging target"
+        pub=$LORDOS_HWDATA_PUB
+    fi
+    command -v openssl >/dev/null 2>&1 || die "openssl is needed to check the snapshot of $1"
+    t=$(mktemp -d)
+    debtool dpkg-deb --fsys-tarfile "$1" | tar -x -C "$t" -f - || { rm -rf "$t"; die "cannot read $1"; }
+    h=$t/usr/lib/lordos/assets/hwreport
+    [ -f "$h/snapshot.json" ] && [ -f "$h/snapshot.json.sig" ] || { rm -rf "$t"; die "$1 has no signed snapshot (tools/release/sign-hwsnapshot.sh)"; }
+    { base64 -d < "$h/snapshot.json.sig" > "$t/sig.bin" || base64 -D < "$h/snapshot.json.sig" > "$t/sig.bin"; } 2>/dev/null
+    openssl pkeyutl -verify -pubin -inkey "$pub" -rawin -in "$h/snapshot.json" -sigfile "$t/sig.bin" >/dev/null 2>&1 ||
+        { rm -rf "$t"; die "$1: the snapshot's signature does not verify with $pub"; }
+    rm -rf "$t"
+    echo "  $1: snapshot signature verified"
+}
+
 # is this package one of the mirrored Raspberry Pi packages? (they go to pool/rpi, arm64 index only)
 is_rpi_pkg() { grep -v '^#' "$RPI_LIST" | awk -v n="$1" '$1 == n { f = 1 } END { exit !f }'; }
 
@@ -270,6 +297,7 @@ do_build() {
         comp=main
         is_rpi_pkg "$name" && comp=rpi
         case "$cats" in *" $deb "*) comp=catalog ;; esac
+        [ "$name" = lordos-hwdata ] && check_hwdata "incoming/$b" "$arch"
         dest="pool/$comp/$dir/$name/${name}_${ver#*:}_$arch.deb"
         if [ -f "$TREE/$dest" ] && ! cmp -s "$TREE/incoming/$b" "$TREE/$dest"; then
             die "$dest is already published with different contents: a version is never replaced (bump it)"
@@ -279,6 +307,14 @@ do_build() {
         echo "  $dest"
     done
     rm -rf "$TREE/incoming"
+    # every lordos that depends on lordos-hwdata needs one in the pool, or no system could install it
+    if [ -z "$(find "$TREE/pool/main/l/lordos-hwdata" -name 'lordos-hwdata_*_all.deb' 2>/dev/null | head -n 1)" ]; then
+        for d in $(find "$TREE/pool/main/l/lordos" -name 'lordos_*.deb' 2>/dev/null | sed "s#^$TREE/##"); do
+            case "$(debtool dpkg-deb -f "$d" Depends)" in
+                *lordos-hwdata*) die "$d depends on lordos-hwdata and the pool has none: add tools/iso/mkdeb-hwdata.sh's package" ;;
+            esac
+        done
+    fi
     # the sources of the mirrored copyleft packages, next to them and unindexed (append-only too)
     if [ "$RPI" = 1 ]; then
         for d in $(rpi_src_import) ; do

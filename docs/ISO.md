@@ -350,7 +350,8 @@ previous one is kept with its date: `lordos-live-0.7.0-amd64-20261016-1529.iso` 
 `lordos-session` (sha256 `d4a8b25f…4b4dc5`).
 
 `build.sh` steps:
-1. `mkdeb.sh`: the LordOS package.
+1. `mkdeb.sh`: the LordOS package; (0.8.7) `mkdeb-hwdata.sh`: `lordos-hwdata_<date>_all.deb`, the signed
+   tested-hardware snapshot it depends on (installed together with it in step 3).
 2. `debootstrap --variant=minbase` of trixie, with main, contrib, non-free and non-free-firmware.
 3. `apt-get install --no-install-recommends` of the list above and the LordOS package.
 4. Configuration:

@@ -177,6 +177,13 @@ EOF
     # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
     if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
     else skip "sysinfo-perf-test" "node"; fi
+    # (0.8.7) community hardware reports: the schema, Share on GitHub (apps/sysinfo/share.js), the workflow's
+    # checks (tools/hwreport/lib.mjs), the catalogue and its snapshot, the Compatibility panel's community data
+    if have node; then run "hwreport-test (tools/hwreport, apps/sysinfo/share.js)" node tests/hwreport_test.mjs
+    else skip "hwreport-test" "node"; fi
+    # (0.8.7) Store → Updates' names for LordOS's data packages (apps/store/syspkg.js): lordos-hwdata as a dated list
+    if have node; then run "store-syspkg-test (apps/store/syspkg.js)" node tests/store_syspkg_test.mjs
+    else skip "store-syspkg-test" "node"; fi
     # (0.8.5) Settings → Displays' arrangement (sdk/displaylayout.js): numbers, magnetic snap, valid drops
     if have node; then run "display-layout-test (sdk/displaylayout.js)" node tests/display_layout_test.mjs
     else skip "display-layout-test" "node"; fi

@@ -19,3 +19,10 @@ build/sysreport-test: tests/sysreport_test.c $(SYSREPORT_SRC) $(SYSREPORT_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sysreport_test.c $(SYSREPORT_SRC)
 	./$@ || { rm -f $@; exit 1; }
+# (0.8.7) the catalogue's signed snapshot (src/sysreport/hwsnap.c, lord.sysinfo.community()): signature first,
+# structure, limits, no links; and the snapshot tools/hwreport/catalog.mjs wrote, signed with a test key
+test: build/hwsnap-test
+build/hwsnap-test: tests/hwsnap_test.c src/sysreport/hwsnap.c src/sec/codesig.c src/sec/json.c src/pkg/crypto.c src/sysreport/hwsnap.h src/sec/codesig.h src/sec/json.h src/pkg/crypto.h build/gen/codesig_build.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hwsnap_test.c src/sysreport/hwsnap.c src/sec/codesig.c src/sec/json.c src/pkg/crypto.c -lpthread
+	./$@ ../assets/hwreport/snapshot.json || { rm -f $@; exit 1; }

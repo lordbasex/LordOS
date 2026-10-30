@@ -1,5 +1,5 @@
 // System Information (0.8.5, docs/BENCHMARK.md): every piece of hardware detected and what LordOS
-// makes of it. Overview, Hardware (a source list and a detail pane) and Compatibility. The report
+// makes of it. (0.8.7) Report → Share on GitHub (share.js) and community data in Compatibility (community.js). Overview, Hardware (a source list and a detail pane) and Compatibility. The report
 // comes from lord.sysinfo.report() (server/src/sysreport, the same collector as lordos-sysreport and
 // lordos-fetch), read once on open and again with Refresh; model.js works out the GPU layers and the
 // Compatibility panel; Performance (0.8.6, performance.jsx) runs LordBench. Nothing here holds serial numbers, addresses or names: the report has none.
@@ -13,6 +13,9 @@ import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PE
 import Performance from './performance.jsx';
 import { Scene } from './scene.jsx';
 import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines } from './model.js';
+import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
+import { communityFor, communitySummary } from './community.js';
+import HWREPORT_SCHEMA from './hwreport.schema.json';
 
 // The app's icon: a chip on the brand gradient.
 export function Icon({ size: s }) {
@@ -261,6 +264,7 @@ function Section({ id, r }) {
           <Row label={tr('sysinfo.f.lsm')} value={sw.lsm} />
           <Row label={tr('sysinfo.f.landlock')} value={sw.landlockAbi == null ? '' : sw.landlockAbi ? String(sw.landlockAbi) : tr('sysinfo.unavailable')} />
           <Row label={tr('sysinfo.f.cgroup2')} value={yesNo(sw.cgroup2)} />
+          <Row label={tr('sysinfo.f.boot')} value={bootLabel(tr, { system: r })} />
         </GroupBox>
         <GroupBox title={tr('sysinfo.services')}>
           {Object.entries(sw.services || {}).map(([k, v]) => <Row key={k} label={k} value={v ? tr('sysinfo.running') : tr('sysinfo.notRunning')} />)}
@@ -335,15 +339,51 @@ function compatNote(tr, c) {
   return tr(`sysinfo.compat.${c.note.replace('.', '_')}`, c.vars);
 }
 
+// (0.8.7) the catalogue's snapshot, verified in C (lord.sysinfo.community(), sysreport/hwsnap.c): { state, snapshot }
+function useCommunity(r) {
+  return useMemo(() => {
+    try { return (typeof lord !== 'undefined' && lord.sysinfo.community && lord.sysinfo.community()) || { state: 'missing' }; } catch (e) { return { state: 'missing' }; }
+  }, [r]);
+}
+
+// what other LordOS users confirmed for this row's devices with this version, marked as community data
+function communityNote(tr, s) {
+  if (!s) return '';
+  if (s.onlyReferences) return tr(`sysinfo.community.reference.${s.state}`);
+  return tr('sysinfo.community.counts', { count: s.reports, works: s.works, limits: s.limits, no: s.no });
+}
+
 function Compatibility({ r }) {
+  const t = useTheme();
   const { t: tr } = useLocale();
   const rows = useMemo(() => compatibility(r), [r]);
+  const comm = useCommunity(r);
+  const version = (r.software && r.software.lordos) || '';
+  const byRow = useMemo(() => (comm.state === 'ok' ? communityFor(comm.snapshot, r, version) : {}), [comm, r, version]);
+  const sn = comm.state === 'ok' ? comm.snapshot : null;
   return (
     <ScrollView style={{ flex: 1 }}>
       <View style={{ padding: spacing.xl, gap: spacing.l }}>
         <GroupBox footer={tr('sysinfo.compatFooter')}>
-          {rows.map((c) => <StateRow key={c.id} label={tr(`sysinfo.component.${c.id}`)} state={c.state} detail={compatNote(tr, c)} />)}
+          {rows.map((c) => {
+            const cs = communitySummary(byRow[c.id]);
+            return (
+              <View key={c.id}>
+                <StateRow label={tr(`sysinfo.component.${c.id}`)} state={c.state} detail={compatNote(tr, c)} />
+                {cs ? (
+                  <View style={{ flexDirection: 'row', gap: spacing.m, paddingBottom: 6 }}>
+                    <View style={{ width: 170 }} />
+                    <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>
+                      {`${tr('sysinfo.community.label')} · ${communityNote(tr, cs)}`}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </GroupBox>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>
+          {sn ? tr('sysinfo.community.footer', { date: sn.generated, count: sn.reports, version: version.replace(/-.*$/, '') })
+            : tr(`sysinfo.community.none.${comm.state === 'missing' ? 'missing' : 'unverified'}`)}</Text>
       </View>
     </ScrollView>
   );
@@ -485,7 +525,91 @@ function Preview({ text }) {
   );
 }
 
+// ---- Share on GitHub (0.8.7) ----
+
+const SHARE_ROWS = ['machine', 'kind', 'cpu', 'gpu', 'memory', 'arch', 'lordos', 'kernel', 'live', 'boot', 'bench', 'compat'];
+const PAGE_KEYS = ['title', 'lead', 'summaryHead', 'sharedHead', 'shared1', 'shared2', 'shared3', 'shared4', 'neverHead', 'never1', 'never2', 'never3',
+  'stepsHead', 'step1', 'step2', 'step3', 'step4', 'open', 'fileLabel', 'footer'];
+
+function savedBench(which) {
+  try { return (typeof lord !== 'undefined' && lord.sysinfo.bench.saved(which)) || null; } catch (e) { return null; }
+}
+
+// What the system started from, in the user's language (0.8.7): the medium's class, a USB link speed, the copy to
+// memory of a live session. rep: a shared report, or { system: lord.sysinfo.report() }.
+function bootLabel(tr, rep) {
+  const b = bootInfo(rep);
+  return [b.medium ? tr(`sysinfo.boot.${b.medium}`) : tr('sysinfo.unknown'),
+    b.mbps ? tr('sysinfo.boot.mbps', { n: b.mbps }) : '', b.toRam ? tr('sysinfo.boot.toRam') : ''].filter(Boolean).join(', ');
+}
+
+// The summary rows with their labels in the user's language (the values are the report's own, as they travel).
+function shareRows(tr, rep) {
+  return summaryRows(rep).filter(([k]) => SHARE_ROWS.includes(k)).map(([k, v]) => [tr(`sysinfo.share.row.${k}`),
+    k === 'live' ? tr(v === 'yes' ? 'sysinfo.perf.liveYes' : 'sysinfo.perf.liveNo')
+      : k === 'boot' ? bootLabel(tr, rep)
+      : k === 'kind' && ['board', 'desktop', 'laptop', 'server', 'vm'].includes(v) ? tr(`sysinfo.share.kind.${v}`) : v]);
+}
+
+// Preview first, explicit consent on every share (nothing is remembered); then the report and the page are saved to
+// Documents and the page opens in the default browser through lord.apps.launchWith('', path). LordOS sends nothing.
+function Share({ r, onClose }) {
+  const t = useTheme();
+  const { t: tr, lang, dir } = useLocale();
+  const [msg, setMsg] = useState(null);
+  const rep = useMemo(() => buildShareReport({
+    report: r, bench: savedBench(0), desktop: savedBench(2), compat: compatibility(r), schema: HWREPORT_SCHEMA,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date : '',
+  }), [r]);
+  const json = useMemo(() => shareJson(rep), [rep]);
+  const rows = useMemo(() => shareRows(tr, rep), [rep, tr]);
+  const save = () => {
+    const docs = userDirs().documents;
+    try { fs.mkdir(docs); } catch (e) { /* already there */ }
+    const names = shareFileNames(rep.createdAt, (n) => { try { return !!fs.stat(`${docs}/${n}`); } catch (e) { return false; } });
+    if (!names) { setMsg({ ok: false, text: tr('sysinfo.share.failed') }); return; }
+    const text = Object.fromEntries(PAGE_KEYS.map((k) => [k, tr(`sysinfo.share.page.${k}`)]));
+    const html = sharePage({ text, rows, url: issueUrl(rep), jsonName: names.json, lang: lang || 'en', rtl: dir === 'rtl' });
+    try {
+      fs.write(`${docs}/${names.json}`, json);
+      fs.write(`${docs}/${names.html}`, html);
+    } catch (e) { setMsg({ ok: false, text: tr('sysinfo.share.failed') }); return; }
+    let opened = false;
+    try { opened = !!lord.apps.launchWith('', `${docs}/${names.html}`); } catch (e) { opened = false; }
+    setMsg({ ok: true, dir: docs, text: tr(opened ? 'sysinfo.share.opened' : 'sysinfo.share.savedOnly', { json: names.json, html: names.html }) });
+  };
+  return (
+    <ScrollView style={{ flex: 1 }}>
+    <View style={{ padding: spacing.xl, gap: spacing.m }}>
+      <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('sysinfo.share.title')}</Text>
+      <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('sysinfo.share.intro')}</Text>
+      <GroupBox footer={[rep.live ? tr('sysinfo.share.live') : '', rep.bench || rep.desktop ? tr('sysinfo.share.withBench') : tr('sysinfo.share.noBench')].filter(Boolean).join(' ')}>
+        {rows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
+      </GroupBox>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+        <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text>
+        <Button label={tr('sysinfo.share.back')} onClick={onClose} />
+        <Button primary label={tr('sysinfo.share.go')} onClick={save} />
+      </View>
+      {msg ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: msg.ok ? '#30d158' : '#ff453a', textAlign: 'start' }}>{msg.text}</Text>
+          {msg.dir ? <Button small plain label={tr('sysinfo.report.showInFiles')} onClick={() => wm.open('files', { new: true, args: { path: msg.dir } })} /> : null}
+        </View>
+      ) : null}
+      <View style={{ height: 320 }}><Preview text={json} /></View>
+    </View>
+    </ScrollView>
+  );
+}
+
 function Report({ r }) {
+  const [sharing, setSharing] = useState(false);
+  if (sharing) return <Share r={r} onClose={() => setSharing(false)} />;
+  return <ReportText r={r} onShare={() => setSharing(true)} />;
+}
+
+function ReportText({ r, onShare }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [fmt, setFmt] = useState('markdown');
@@ -510,6 +634,7 @@ function Report({ r }) {
         <Segmented small value={fmt} onChange={(v) => { setFmt(v); setMsg(null); }} options={[['markdown', tr('sysinfo.report.markdown')], ['json', 'JSON']]} />
         <View style={{ flex: 1 }} />
         <Button label={tr('sysinfo.report.copy')} onClick={copy} />
+        <Button label={tr('sysinfo.share.button')} onClick={onShare} />
         <Button primary label={tr('sysinfo.report.save')} onClick={save} />
       </View>
       {msg ? (
