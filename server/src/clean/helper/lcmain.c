@@ -44,7 +44,7 @@
 enum { M_RULES, M_TREE, M_DUPS };
 
 typedef struct {
-    int fd, index;
+    int fd, index, unit;
     const char *pattern, *base;
     unsigned dev_major, dev_minor;
 } Root;
@@ -103,6 +103,28 @@ static void flush_batch(int group) {
     jb_init(&nodes);
     nitems = nnodes = 0;
     last_flush = now_ms();
+}
+
+/* a whole folder's totals; nothing below it is reported */
+static void sum_tree(int fd, double *s, double *a) {
+    DIR *d = fdopendir(fd);
+    if (!d) { close(fd); nunread++; return; }
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        if (seen >= max_files) { limit("files"); stop = 1; break; }
+        seen++;
+        struct statx sx;
+        if (statx(dirfd(d), e->d_name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_SIZE | STATX_BLOCKS, &sx)) { nunread++; continue; }
+        if (S_ISREG(sx.stx_mode)) { *s += (double)sx.stx_size; *a += (double)sx.stx_blocks * 512; }
+        else if (S_ISDIR(sx.stx_mode)) {
+            int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
+            if (sub >= 0) sum_tree(sub, s, a);
+            else if (errno == EXDEV) nmount++;
+            else nunread++;
+        }
+    }
+    closedir(d);
 }
 
 static void emit(int root, const char *rel, const struct statx *sx) {
@@ -207,7 +229,23 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
         else if (S_ISDIR(sx.stx_mode)) {
             if (mountroot || other_dev) nmount++;
             else if (depth >= max_depth) limit("depth");
-            else {
+            else if (r->unit && depth + 1 == r->unit) {
+                if (!clean_glob(r->pattern, e->d_name)) nnomatch++;
+                else {
+                    int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
+                    if (sub < 0) nunread++;
+                    else {
+                        double total = 0, alloc = 0;
+                        sum_tree(sub, &total, &alloc);
+                        jb_printf(&items, "%s{\"r\":%d,\"d\":true,\"p\":", nitems ? "," : "", r->index);
+                        jb_str(&items, rel);
+                        jb_printf(&items, ",\"M\":%u,\"m\":%u,\"i\":\"%llu\",\"l\":1,\"s\":%.0f,\"a\":%.0f,\"t\":%lld,\"n\":%u,\"u\":%u}",
+                                  sx.stx_dev_major, sx.stx_dev_minor, (unsigned long long)sx.stx_ino, total, alloc,
+                                  (long long)sx.stx_mtime.tv_sec, sx.stx_mtime.tv_nsec, sx.stx_uid);
+                        if (++nitems >= CLEAN_BATCH) flush_batch(0);
+                    }
+                }
+            } else {
                 int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
                 if (sub >= 0) {
                     long child = -1;
@@ -223,6 +261,7 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
             }
         } else if (!S_ISREG(sx.stx_mode)) nspecial++;
         else if (mountroot || other_dev) nmount++;
+        else if (r->unit) nnomatch++;             /* only whole folders here */
         else on_file(r, rel, e->d_name, &sx, &here);
     next:
         rel[rl] = 0;
@@ -360,8 +399,19 @@ static void reply_err(const char *code) {
 
 int main(void) {
     prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+    static int rootfds[CLEAN_MAX_ROOTS];
+    int nfds = 0;
     DocMsg go;
-    if (doc_recv(SOCK, &go) || go.h.op != CQ_GO || !go.json) return 1;
+    for (;;) {                                  /* the root fds, then the request */
+        if (doc_recv(SOCK, &go)) return 1;
+        if (go.h.op != CQ_FDS) break;
+        for (int i = 0; i < go.nfds; i++) {
+            if (nfds >= CLEAN_MAX_ROOTS) return 1;
+            rootfds[nfds++] = fcntl(go.fds[i], F_DUPFD_CLOEXEC, 0);
+        }
+        doc_msg_free(&go);
+    }
+    if (go.h.op != CQ_GO || !go.json) return 1;
     JDoc d = { 0 };
     if (json_parse(go.json, go.len, &d, NULL, 0)) { reply_err("request"); return 1; }
     const JVal *roots = json_get(d.root, "roots");
@@ -371,7 +421,7 @@ int main(void) {
     min_size = (long)json_num(d.root, "minSize", 0);
     int nroots = roots && roots->type == J_ARR ? (int)roots->len : -1;
     mode = m && !strcmp(m, "tree") ? M_TREE : m && !strcmp(m, "dups") ? M_DUPS : M_RULES;
-    if (!home || nroots < 0 || nroots > CLEAN_MAX_ROOTS || nroots != go.nfds || max_files < 1 || max_files > CLEAN_TREE_MAX_FILES ||
+    if (!home || nroots < 0 || nroots > CLEAN_MAX_ROOTS || nroots != nfds || max_files < 1 || max_files > CLEAN_TREE_MAX_FILES ||
         max_depth < 0 || max_depth > CLEAN_MAX_DEPTH) { reply_err("request"); return 1; }
     const JVal *ex = json_get(d.root, "exclude");
     int nex = 0;
@@ -388,14 +438,14 @@ int main(void) {
     for (const JVal *v = roots->kid; v; v = v->next, i++) {
         struct statx sx;
         double rule = json_num(v, "rule", -1);
-        list[i] = (Root){ .fd = go.fds[i], .index = (int)rule, .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
-        if (rule < 0 || rule >= CLEAN_MAX_ROOTS || !list[i].pattern || !list[i].base || statx(go.fds[i], "", AT_EMPTY_PATH, STATX_TYPE, &sx) || !S_ISDIR(sx.stx_mode)) {
+        list[i] = (Root){ .fd = rootfds[i], .index = (int)rule, .unit = (int)json_num(v, "unit", 0), .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
+        if (rule < 0 || rule >= CLEAN_MAX_ROOTS || !list[i].pattern || !list[i].base || statx(rootfds[i], "", AT_EMPTY_PATH, STATX_TYPE, &sx) || !S_ISDIR(sx.stx_mode)) {
             reply_err("request");
             return 1;
         }
         list[i].dev_major = sx.stx_dev_major;
         list[i].dev_minor = sx.stx_dev_minor;
-        rofd[i] = go.fds[i];
+        rofd[i] = rootfds[i];
     }
     rofd[nroots] = -1;
     SandboxHelperCfg cfg = { .name = "lordos-cleaner", .ro_paths = NULL, .extra_syscalls = NULL, .mem_max_mb = 512,

@@ -13,6 +13,7 @@ export function PlanConfirm({ plan, onOk, onCancel }) {
     plan.deleteItems ? tr('cleaner.confirm.lineDelete', { n: n(plan.deleteItems), size: formatBytes(plan.deleteAllocated) }) : '',
     plan.trashItems ? tr('cleaner.confirm.lineTrash', { n: n(plan.trashItems), size: formatBytes(plan.trashAllocated) }) : '',
     leftAlone > 0 ? tr('cleaner.confirm.lineLeft', { n: n(leftAlone) }) : '',
+    ...(plan.named ? [tr('cleaner.models.warn'), ...cleaner.results('plan', 0, 30).items.filter((i) => i.status === 'ready').map((i) => i.path.split('/').pop())] : []),
     ...plan.warnings.filter((w) => w === 'linksElsewhere' || w === 'scanIncomplete' || w === 'keepOneCopy').map((w) => tr(`cleaner.warn.${w}`)),
   ].filter(Boolean);
   if (!plan.counts.ready) {

@@ -7,6 +7,7 @@
 #include "../fsops.h"
 #include "../sec/json.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -41,8 +42,8 @@ static const char *const kind_name[] = { "rules", "tree", "dups" };
 enum { I_READY, I_DONE, I_SKIPPED, I_CHANGED, I_DENIED, I_FAILED, I_CANCELLED, I_UNSUPPORTED, I_RESTORED, I_COUNT };
 static const char *const item_name[] = { "ready", "done", "skipped", "changed", "denied", "failed", "cancelled", "unsupported", "restored" };
 
-enum { ROOT_OK, ROOT_ABSENT, ROOT_DENIED, ROOT_CHANGED };
-static const char *const root_name[] = { "ok", "absent", "denied", "changed" };
+enum { ROOT_OK, ROOT_ABSENT, ROOT_DENIED, ROOT_CHANGED, ROOT_BUSY };
+static const char *const root_name[] = { "ok", "absent", "denied", "changed", "busy" };
 
 typedef struct {
     uint64_t ino, dev;
@@ -53,7 +54,7 @@ typedef struct {
     uint32_t first;                         /* a later link: index + 1 of the first; 0 for the first */
     uint32_t group;                         /* duplicates: group + 1 */
     uint16_t src;
-    uint8_t type;
+    uint8_t type, dir;                      /* dir: a whole folder (a rule's unit) */
     char *rel;
 } Cand;
 
@@ -66,6 +67,7 @@ typedef struct {
     int state;
     dev_t dev;
     char base[PATH_MAX];
+    char star[256];                         /* what `*` matched in the rule's root */
     Tot tot;
 } Src;
 
@@ -109,7 +111,7 @@ typedef struct {
     long trash_items, delete_items, trashed, deleted;
     double trash_alloc, delete_alloc, trashed_alloc, deleted_alloc;
     double expires, free_before, free_after;
-    int links_elsewhere, keep_one;
+    int links_elsewhere, keep_one, named;           /* named: the confirmation lists each item */
 } Plan;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
@@ -254,7 +256,10 @@ static int spawn_helper(const char *path, const char *go, size_t len, const int 
 #ifdef CLEAN_TEST
     if (clean_test_stop_helper) kill(*pid, SIGSTOP);
 #endif
-    if (doc_send(sv[0], CQ_GO, 1, go, len, fds, nfd)) {
+    int bad = 0;
+    for (int i = 0; i < nfd && !bad; i += CLEAN_FDS_MSG)
+        bad = doc_send(sv[0], CQ_FDS, 1, "{}", 2, fds + i, nfd - i < CLEAN_FDS_MSG ? nfd - i : CLEAN_FDS_MSG);
+    if (bad || doc_send(sv[0], CQ_GO, 1, go, len, NULL, 0)) {
         kill(*pid, SIGKILL);
         waitpid(*pid, NULL, 0);
         close(sv[0]);
@@ -300,6 +305,40 @@ static int covered(const Src *src, const char *name, double mtime) {
     if (!r || !clean_glob(r->pattern, name)) return 0;
     for (const char *const *e = r->exclude; e && *e; e++) if (clean_glob(*e, name)) return 0;
     return !r->min_age_days || (double)time(NULL) - mtime >= r->min_age_days * 86400.0;
+}
+
+/* Is the process behind a rule's lock alive? Both browsers keep a symbolic link whose target ends in the
+ * pid (host-pid, or address:+pid). A stale link doesn't block; anything else that can't be read does. */
+static int locked(const Src *src) {
+    const CleanRule *r = src_rule(src);
+    if (!r || !r->lock) return 0;
+    char rel[PATH_MAX], p[PATH_MAX * 2], target[256];
+    const char *d = strchr(r->lock, '$');
+    if (d) snprintf(rel, sizeof rel, "%.*s%s%s", (int)(d - r->lock), r->lock, src->star, d + 1);
+    else snprintf(rel, sizeof rel, "%s", r->lock);
+    snprintf(p, sizeof p, "%s/%s", fsops_home(), rel);
+    ssize_t n = readlink(p, target, sizeof target - 1);
+    if (n < 0) {
+        struct stat st;
+        return errno == ENOENT ? 0 : errno == EINVAL && !lstat(p, &st) ? 1 : 0;
+    }
+    target[n] = 0;
+    const char *e = target + n;
+    while (e > target && e[-1] >= '0' && e[-1] <= '9') e--;
+    if (!*e) return 1;
+    char proc[280];
+    snprintf(proc, sizeof proc, "/proc/%s", e);
+    return !access(proc, F_OK);
+}
+
+/* the place a source stands now: a rule's fixed root decides, and what `*` matched must still fit it */
+static int src_now(const Src *src, Src *now) {
+    const CleanRule *r = src_rule(src);
+    *now = *src;
+    if (!r || r->on_mounts) return 0;
+    if (!strchr(r->root, '*')) { snprintf(now->base, sizeof now->base, "%s/%s", fsops_home(), r->root); return 0; }
+    size_t n = strlen(fsops_home());
+    return strncmp(src->base, fsops_home(), n) || src->base[n] != '/' || !clean_root_fits(r->root, src->base + n + 1, NULL, 0) ? -1 : 0;
 }
 
 /* ---- what the helper reports: nothing here is trusted ---- */
@@ -371,6 +410,8 @@ static int take_record(Scan *s, const JVal *rec) {
     base = base ? base + 1 : rel;
     int excl = 0;
     if (refused_path(s, src, rel, &excl)) { if (excl) s->excluded++; else { s->protect++; s->refused++; } return 1; }
+    const CleanRule *rule = src_rule(src);
+    if (json_bool(rec, "d", 0) && (!rule || !rule->unit_depth)) return -1;      /* a folder only where a rule asks for one */
     if (!covered(src, base, mt)) { s->refused++; return 1; }
     if ((uid_t)uid != getuid() && s->kind == CLEAN_KIND_RULES) { s->foreign++; return 1; }
     if (s->n >= (size_t)CLEAN_MAX_FILES) return -1;
@@ -391,7 +432,7 @@ static int take_record(Scan *s, const JVal *rec) {
     }
     Cand *c = &s->c[s->n];
     *c = (Cand){ .ino = ino, .dev = dev, .size = (int64_t)size, .alloc = (int64_t)alloc, .mtime = (int64_t)mt, .nsec = (uint32_t)ns,
-                 .nlink = (uint32_t)nl, .links = 1, .src = (uint16_t)r, .type = (uint8_t)clean_type(base), .rel = copy };
+                 .nlink = (uint32_t)nl, .links = 1, .src = (uint16_t)r, .type = (uint8_t)clean_type(base), .dir = (uint8_t)json_bool(rec, "d", 0), .rel = copy };
     if (first) {                                /* a hard link: one file, counted once */
         c->first = (uint32_t)(first - s->c) + 1;
         first->links++;
@@ -595,6 +636,60 @@ static int open_src(const Src *src, int home, int flags) {
     return open(src->base, flags | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 }
 
+typedef struct { Scan *s; int rule; } MountAdd;
+static void add_mount(void *ud, const char *path, const char *fstype, double total, double avail) {
+    MountAdd *m = ud;
+    Scan *s = m->s;
+    (void)fstype; (void)total; (void)avail;
+    if (s->nsrc >= CLEAN_MAX_ROOTS) return;
+    int n;
+    const CleanRule *r = &clean_rules(&n)[m->rule];
+    const char *d = strchr(r->root, '$');
+    char tail[128];
+    snprintf(tail, sizeof tail, "%.*s%u%s", d ? (int)(d - r->root) : 0, r->root, (unsigned)getuid(), d ? d + 1 : "");
+    Src *src = &s->src[s->nsrc];
+    memset(src, 0, sizeof *src);
+    src->rule = m->rule;
+    if ((size_t)snprintf(src->base, sizeof src->base, "%s/%s", path, tail) < sizeof src->base) s->nsrc++;
+}
+
+/* A rule's `*`: one source per folder that exists, each of them held to the rule's root again. */
+static void expand_rule(Scan *s, int home, int rule, const CleanRule *r) {
+    const char *st = strchr(r->root, '*');
+    char prefix[PATH_MAX];
+    snprintf(prefix, sizeof prefix, "%.*s", st > r->root ? (int)(st - r->root - 1) : 0, r->root);
+    int fd = clean_open(home, prefix, O_RDONLY | O_DIRECTORY);
+    DIR *d = fd >= 0 ? fdopendir(fd) : NULL;
+    if (!d) { if (fd >= 0) close(fd); return; }
+    struct dirent *e;
+    while ((e = readdir(d)) && s->nsrc < CLEAN_MAX_ROOTS) {
+        if (e->d_name[0] == '.' || !clean_name_ok(e->d_name) || strlen(e->d_name) >= sizeof s->src[0].star) continue;
+        char rel[PATH_MAX];
+        if ((size_t)snprintf(rel, sizeof rel, "%s/%s%s", prefix, e->d_name, st + 1) >= sizeof rel) continue;
+        struct stat sb;
+        if (fstatat(home, rel, &sb, AT_SYMLINK_NOFOLLOW) || !S_ISDIR(sb.st_mode)) continue;
+        Src *src = &s->src[s->nsrc];
+        memset(src, 0, sizeof *src);
+        src->rule = rule;
+        snprintf(src->star, sizeof src->star, "%s", e->d_name);
+        if ((size_t)snprintf(src->base, sizeof src->base, "%s/%s", fsops_home(), rel) < sizeof src->base) s->nsrc++;
+    }
+    closedir(d);
+}
+
+static void expand_sources(Scan *s, int home) {
+    int n;
+    const CleanRule *t = clean_rules(&n);
+    int literal = s->nsrc;
+    for (int i = 0; i < literal; i++) {
+        int rule = s->src[i].rule;
+        if (rule < 0 || (!strchr(t[rule].root, '*') && !t[rule].on_mounts)) continue;
+        s->src[i].state = ROOT_ABSENT;              /* the pattern itself is no folder */
+        if (t[rule].on_mounts) { MountAdd m = { s, rule }; fs_volumes(add_mount, &m); }
+        else expand_rule(s, home, rule, &t[rule]);
+    }
+}
+
 static void *scan_thread(void *arg) {
     Scan *s = arg;
     int st = ST_FAILED, sock = -1, fds[CLEAN_MAX_ROOTS], nfd = 0, home = -1, finished = 0;
@@ -613,8 +708,13 @@ static void *scan_thread(void *arg) {
     jb_raw(&go, ",\"exclude\":[");
     for (int i = 0; i < s->nexclude; i++) { if (i) jb_raw(&go, ","); jb_str(&go, s->exclude[i]); }
     jb_raw(&go, "],\"roots\":[");
+    pthread_mutex_lock(&mu);
+    if (s->kind == CLEAN_KIND_RULES) expand_sources(s, home);
+    pthread_mutex_unlock(&mu);
     for (int i = 0; i < s->nsrc; i++) {
         Src *src = &s->src[i];
+        if (src->state == ROOT_ABSENT) continue;
+        if (locked(src)) { src->state = ROOT_BUSY; continue; }
         int fd = strcmp(src->base, fsops_home()) ? open_src(src, home, O_RDONLY | O_DIRECTORY) : open(fsops_home(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
         struct stat sb;
         if (fd >= 0 && fstat(fd, &sb)) { close(fd); fd = -1; errno = EIO; }
@@ -622,7 +722,7 @@ static void *scan_thread(void *arg) {
         src->dev = sb.st_dev;
         fds[nfd++] = fd;
         const CleanRule *r = src_rule(src);
-        jb_printf(&go, "%s{\"rule\":%d,\"pattern\":", nfd > 1 ? "," : "", i);
+        jb_printf(&go, "%s{\"rule\":%d,\"unit\":%d,\"pattern\":", nfd > 1 ? "," : "", i, r ? r->unit_depth : 0);
         jb_str(&go, r ? r->pattern : "*");
         jb_raw(&go, ",\"base\":");
         jb_str(&go, src->base);
@@ -634,7 +734,7 @@ static void *scan_thread(void *arg) {
     if (!nfd) {                                     /* nothing to walk */
         pthread_mutex_lock(&mu);
         s->complete = 1;
-        for (int i = 0; i < s->nsrc; i++) if (s->src[i].state != ROOT_ABSENT) s->complete = 0;
+        for (int i = 0; i < s->nsrc; i++) if (s->src[i].state != ROOT_ABSENT && s->src[i].state != ROOT_BUSY) s->complete = 0;
         pthread_mutex_unlock(&mu);
         st = ST_DONE;
         why = NULL;
@@ -745,7 +845,7 @@ static int fill_sources(Scan *s, const CleanOpts *o) {
     if (s->kind == CLEAN_KIND_RULES) {
         int nrules;
         const CleanRule *t = clean_rules(&nrules);
-        s->nsrc = nrules > CLEAN_MAX_ROOTS ? CLEAN_MAX_ROOTS : nrules;
+        s->nsrc = nrules > CLEAN_MAX_RULES ? CLEAN_MAX_RULES : nrules;
         for (int i = 0; i < s->nsrc; i++) {
             s->src[i].rule = i;
             if ((size_t)snprintf(s->src[i].base, sizeof s->src[i].base, "%s/%s", fsops_home(), t[i].root) >= sizeof s->src[i].base) return -1;
@@ -833,15 +933,11 @@ void clean_cancel(int forget) {
 static void open_roots(const Scan *s, int *rootfd, int *root_err) {
     int home = open(fsops_home(), O_PATH | O_DIRECTORY | O_CLOEXEC);
     for (int i = 0; i < s->nsrc; i++) {
-        const Src *src = &s->src[i];
-        char base[PATH_MAX + 8];
-        snprintf(base, sizeof base, "%s", src->base);
-        const CleanRule *r = src_rule(src);
-        if (r) snprintf(base, sizeof base, "%s/%s", fsops_home(), r->root);        /* the table decides, not what the scan stored */
-        if (home < 0) rootfd[i] = -1;
-        else if (!strcmp(base, fsops_home())) rootfd[i] = dup(home);
-        else if (r) rootfd[i] = clean_open(home, r->root, O_PATH | O_DIRECTORY);
-        else rootfd[i] = open_src(src, home, O_PATH | O_DIRECTORY);
+        Src now;
+        int bad = src_now(&s->src[i], &now);
+        if (home < 0 || bad) { rootfd[i] = -1; errno = ENOENT; }
+        else if (!strcmp(now.base, fsops_home())) rootfd[i] = dup(home);
+        else rootfd[i] = open_src(&now, home, O_PATH | O_DIRECTORY);
         if (rootfd[i] < 0) root_err[i] = errno == EACCES || errno == EPERM ? I_DENIED : I_CHANGED;
     }
     if (home >= 0) close(home);
@@ -857,8 +953,9 @@ static int status_of_errno(int e) {
 }
 
 static int same_identity(const struct statx *sx, const Cand *c) {
-    return S_ISREG(sx->stx_mode) && makedev(sx->stx_dev_major, sx->stx_dev_minor) == c->dev && sx->stx_ino == c->ino &&
-           (int64_t)sx->stx_size == c->size && sx->stx_mtime.tv_sec == c->mtime && sx->stx_mtime.tv_nsec == c->nsec;
+    if (c->dir ? !S_ISDIR(sx->stx_mode) : (!S_ISREG(sx->stx_mode) || (int64_t)sx->stx_size != c->size)) return 0;
+    return makedev(sx->stx_dev_major, sx->stx_dev_minor) == c->dev && sx->stx_ino == c->ino &&
+           sx->stx_mtime.tv_sec == c->mtime && sx->stx_mtime.tv_nsec == c->nsec;
 }
 
 /* Is this still the object the scan saw? I_READY with its folder open in *parent and its name in *name;
@@ -869,11 +966,11 @@ static int item_check(const Scan *s, const Cand *c, const int *rootfd, const int
     *parent = -1;
     if (risk == CLEAN_RISK_PROTECTED || (action != CLEAN_ACT_TRASH && action != CLEAN_ACT_DELETE) ||
         (action == CLEAN_ACT_DELETE && risk != CLEAN_RISK_REGENERABLE)) return I_UNSUPPORTED;
-    const CleanRule *r = src_rule(src);
-    Src now = *src;
-    if (r) snprintf(now.base, sizeof now.base, "%s/%s", fsops_home(), r->root);
+    Src now;
+    if (src_now(src, &now)) return I_CHANGED;
     if (refused_path(s, &now, c->rel, NULL)) return I_DENIED;
     if (rootfd[c->src] < 0) return root_err[c->src];
+    if (locked(src)) return I_SKIPPED;              /* the browser came back since the scan */
     const char *base = strrchr(c->rel, '/');
     int fd;
     if (base) {
@@ -947,6 +1044,10 @@ static void *plan_thread(void *arg) {
     close_roots(s, rootfd);
     pthread_mutex_lock(&mu);
     if (!cancelled && s->kind == CLEAN_KIND_DUPS) pick_keepers(p, s);
+    for (size_t i = 0; i < p->n && !cancelled; i++) {
+        const CleanRule *r = src_rule(&s->src[s->c[p->it[i].cand].src]);
+        if (r && r->explicit_only) p->named = 1;
+    }
     pthread_mutex_unlock(&mu);
     long count[I_COUNT] = { 0 }, trash_items = 0, delete_items = 0;
     double logical = 0, allocated = 0, est = 0, trash_alloc = 0, delete_alloc = 0;
@@ -1035,10 +1136,11 @@ int clean_plan(int sid, const uint32_t *ids, size_t n) {
 int clean_plan_rules(int sid, const char *const *names, int n) {
     int nrules;
     const CleanRule *rules = clean_rules(&nrules);
-    unsigned wanted = 0;
+    unsigned char wanted[CLEAN_MAX_RULES] = { 0 };
     for (int i = 0; i < n; i++) {
         int found = 0;
-        for (int k = 0; k < nrules && k < CLEAN_MAX_ROOTS; k++) if (!strcmp(names[i], rules[k].id)) { wanted |= 1u << k; found = 1; }
+        for (int k = 0; k < nrules && k < CLEAN_MAX_RULES; k++)
+            if (!strcmp(names[i], rules[k].id) && !rules[k].explicit_only) { wanted[k] = 1; found = 1; }  /* models never go by category */
         if (!found) return CLEAN_E_BADID;
     }
     pthread_mutex_lock(&mu);
@@ -1051,7 +1153,7 @@ int clean_plan_rules(int sid, const char *const *names, int n) {
         Item *it = malloc((s->n ? s->n : 1) * sizeof *it);
         if (!it) r = CLEAN_E_UNAVAILABLE;
         else {
-            for (size_t i = 0; i < s->n; i++) if (wanted >> s->c[i].src & 1) it[k++] = (Item){ .cand = (uint32_t)i, .status = I_READY };
+            for (size_t i = 0; i < s->n; i++) if (s->src[s->c[i].src].rule >= 0 && wanted[s->src[s->c[i].src].rule]) it[k++] = (Item){ .cand = (uint32_t)i, .status = I_READY };
             if (k) r = plan_begin(s, it, k);
             else { free(it); r = CLEAN_E_BADID; }
         }
@@ -1073,6 +1175,7 @@ static int same_file(int fd, const char *name, const Cand *c) {
  * behind that private name is compared, and only that object is unlinked. Anything else goes back. */
 static int delete_file(int fd, const char *name, const Cand *c) {
     static unsigned serial;
+    if (c->dir) return I_UNSUPPORTED;               /* files only: a folder is never deleted */
     char tmp[64];
     snprintf(tmp, sizeof tmp, ".lordos-clean-%d-%u", (int)getpid(), __atomic_add_fetch(&serial, 1, __ATOMIC_RELAXED));
     if (renameat2(fd, name, fd, tmp, RENAME_NOREPLACE)) return status_of_errno(errno);
@@ -1244,9 +1347,9 @@ static void *exec_thread(void *arg) {
             if (st == I_READY && p->it[i].keeper) st = keeper_check(s, &p->it[i], fd, name, rootfd, root_err);
             if (st == I_READY) {
                 char real[PATH_MAX * 2];
-                const CleanRule *r = src_rule(src);
-                if (r) snprintf(real, sizeof real, "%s/%s/%s", fsops_home(), r->root, c->rel);
-                else src_path(src, c->rel, real, sizeof real);
+                Src now;
+                src_now(src, &now);
+                src_path(&now, c->rel, real, sizeof real);
 #ifdef CLEAN_TEST
                 if (clean_test_before_trash) clean_test_before_trash(real);
 #endif
@@ -1374,13 +1477,24 @@ static void scan_json(JBuf *b, const Scan *s, int running) {
     jb_printf(b, ",\"skipped\":{\"symlinks\":%ld,\"special\":%ld,\"mounts\":%ld,\"unreadable\":%ld,\"protected\":%ld,"
                  "\"names\":%ld,\"nomatch\":%ld,\"refused\":%ld,\"foreign\":%ld,\"excluded\":%ld},\"rules\":[",
               s->symlinks, s->special, s->mounts, s->unreadable, s->protect, s->names, s->nomatch, s->refused, s->foreign, s->excluded);
-    int k = 0;
-    for (int i = 0; i < s->nsrc; i++) {
-        const CleanRule *r = src_rule(&s->src[i]);
-        if (!r) continue;
-        jb_printf(b, "%s{\"id\":\"%s\",\"category\":\"%s\",\"risk\":\"%s\",\"action\":\"%s\",\"text\":\"%s\",\"root\":\"%s\",", k++ ? "," : "", r->id, r->category,
-                  clean_risk_name(r->risk), clean_action_name(r->action), r->text_key, root_name[s->src[i].state]);
-        tot_json(b, &s->src[i].tot);
+    int nrules, k = 0;
+    const CleanRule *t = clean_rules(&nrules);
+    for (int i = 0; s->kind == CLEAN_KIND_RULES && i < nrules; i++) {      /* a rule may have several sources */
+        Tot sum = { 0, 0, 0 };
+        int st = ROOT_ABSENT, any = 0;
+        for (int j = 0; j < s->nsrc; j++) {
+            if (s->src[j].rule != i) continue;
+            any = 1;
+            sum.files += s->src[j].tot.files;
+            sum.logical += s->src[j].tot.logical;
+            sum.allocated += s->src[j].tot.allocated;
+            if (s->src[j].state == ROOT_BUSY) st = ROOT_BUSY;
+            else if (st != ROOT_BUSY && s->src[j].state != ROOT_ABSENT) st = s->src[j].state;
+        }
+        if (!any) continue;
+        jb_printf(b, "%s{\"id\":\"%s\",\"category\":\"%s\",\"risk\":\"%s\",\"action\":\"%s\",\"text\":\"%s\",\"root\":\"%s\",\"explicit\":%s,", k++ ? "," : "", t[i].id, t[i].category,
+                  clean_risk_name(t[i].risk), clean_action_name(t[i].action), t[i].text_key, root_name[st], t[i].explicit_only ? "true" : "false");
+        tot_json(b, &sum);
         jb_raw(b, "}");
     }
     jb_raw(b, "],\"types\":[");
@@ -1412,7 +1526,7 @@ char *clean_poll(int kind) {
         jb_raw(&b, ",\"estimated\":"); jb_num(&b, p->estimated);
         jb_raw(&b, ",\"freeBefore\":"); jb_num(&b, p->free_before);
         jb_raw(&b, ",\"freeAfter\":"); jb_num(&b, p->free_after);
-        jb_printf(&b, ",\"trashItems\":%ld,\"deleteItems\":%ld,\"trashAllocated\":", p->trash_items, p->delete_items);
+        jb_printf(&b, ",\"named\":%s,\"trashItems\":%ld,\"deleteItems\":%ld,\"trashAllocated\":", p->named ? "true" : "false", p->trash_items, p->delete_items);
         jb_num(&b, p->trash_alloc);
         jb_raw(&b, ",\"deleteAllocated\":");
         jb_num(&b, p->delete_alloc);
@@ -1510,7 +1624,7 @@ static void cand_json(JBuf *b, const Scan *s, const Cand *c) {
     jb_num(b, estimated(c));
     jb_raw(b, ",\"mtime\":");
     jb_num(b, (double)c->mtime);
-    jb_printf(b, ",\"links\":%u,\"linked\":%s", c->nlink, c->first ? "true" : "false");
+    jb_printf(b, ",\"links\":%u,\"linked\":%s,\"folder\":%s", c->nlink, c->first ? "true" : "false", c->dir ? "true" : "false");
 }
 
 static int passes(const Scan *s, const Cand *c, const CleanFilter *f) {

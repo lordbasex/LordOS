@@ -7,8 +7,10 @@
  * CR_DONE or CR_ERR. Everything lord-clean says is validated by lord-server (clean.c); to stop a scan it
  * kills the helper.
  *
+ *   CQ_FDS    {}                                 + up to CLEAN_FDS_MSG root fds, in the order of "roots"
  *   CQ_GO     {"mode":"rules"|"tree"|"dups","home","maxFiles","maxDepth","minSize","exclude":[paths],
- *              "roots":[{"rule","pattern","base"}]}                               + one fd per root
+ *              "roots":[{"rule","pattern","base","unit"}]}   unit > 0: entries at that depth are reported whole
+ *              as one folder record ("d":true, s and a its contents' totals)
  *   CR_BATCH  {"seen","dirs","hashed","items":[{"r","p","M","m","i","l","s","a","t","n","u"}],
  *              "nodes":[{"id","up","name","s","a","f"}],"group":bool}
  *             r the source, p path relative to it, M/m device major and minor, i inode (decimal text: it
@@ -22,7 +24,7 @@
 #ifndef LORD_CLEAN_PROTO_H
 #define LORD_CLEAN_PROTO_H
 
-#define CLEAN_MAX_ROOTS 12         /* fds in one message: below DOC_MAX_FDS */
+#define CLEAN_MAX_ROOTS 64
 #define CLEAN_MAX_DEPTH 32          /* folders below a root */
 #define CLEAN_MAX_FILES 200000      /* entries examined in one scan: past this the scan is incomplete */
 #define CLEAN_PATH_MAX  1024        /* bytes of a path relative to its root */
@@ -36,6 +38,9 @@
 
 enum { CLEAN_TYPE_OTHER, CLEAN_TYPE_IMAGE, CLEAN_TYPE_VIDEO, CLEAN_TYPE_AUDIO, CLEAN_TYPE_DOCUMENT, CLEAN_TYPE_ARCHIVE, CLEAN_TYPE_CODE, CLEAN_TYPES };
 
-enum { CQ_GO = 1, CR_BATCH = 2, CR_DONE = 3, CR_ERR = 4 };
+#define CLEAN_MAX_RULES 64
+#define CLEAN_FDS_MSG   12         /* root fds in one CQ_FDS */
+
+enum { CQ_GO = 1, CR_BATCH = 2, CR_DONE = 3, CR_ERR = 4, CQ_FDS = 5 };
 
 #endif

@@ -70,6 +70,7 @@
   "clean.noPlan": "That cleanup plan isn't available any more; review the list again",
   "clean.noScan": "That scan isn't available any more; scan again",
   "clean.planExpired": "That cleanup plan expired; review the list again",
+  "clean.systemFailed": "The system cleanup didn't finish (code {code})",
   "clean.unavailable": "The Cleaner scanner is not available",
   "disk.alreadyMounted": "{name} is already mounted",
   "disk.badDevice": "Invalid device",

@@ -46,6 +46,7 @@ export default function Cleaner() {
   const [error, setError] = useState('');
   const [chosen, setChosen] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
+  const [models, setModels] = useState(() => new Set());
   const [confirm, setConfirm] = useState(false);
   const [emptyAsk, setEmptyAsk] = useState(false);
   const [resultOf, setResultOf] = useState('');
@@ -79,7 +80,7 @@ export default function Cleaner() {
         setStatus(cleaner.status());
         if (p && p.job === 'scan' && p.state === 'done' && p.scan.kind === 'rules') {
           setSettings({ cleaner: { ...prefsOf(s), lastScan: { at: Math.floor(Date.now() / 1000), allocated: p.scan.estimated, candidates: p.scan.candidates } } });
-          setChosen(new Set(p.scan.rules.filter((r) => r.risk === 'regenerable' && r.action === 'delete' && r.files > 0).map((r) => r.id)));
+          setChosen(new Set(p.scan.rules.filter((r) => r.risk === 'regenerable' && r.action === 'delete' && r.files > 0 && !r.explicit).map((r) => r.id)));
           setSection((c) => (c === 'scan' ? 'cleanup' : c));
         }
       }
@@ -125,7 +126,8 @@ export default function Cleaner() {
     if (section === 'settings') return <Preferences />;
     if (showResult) return <PlanResult key={plan.id} plan={plan} onDone={() => { setResultOf(''); start(); }} />;
     if (section === 'scan' || (section === 'cleanup' && !ready)) return <ScanHero key={section} status={status} last={prefs.lastScan} scanning={scanning} scan={scan} />;
-    if (section === 'cleanup') return <CleanupList key={scan.id} scan={scan} chosen={chosen} setChosen={setChosen} onEmpty={() => setEmptyAsk(true)} blockedOf={() => ''} />;
+    if (section === 'cleanup') return <CleanupList key={scan.id} scan={scan} chosen={chosen} setChosen={setChosen} onEmpty={() => setEmptyAsk(true)} blockedOf={(r) => (r.root === 'busy' ? 'busy' : '')} models={models} setModels={setModels}
+      onRemoveModels={() => attempt(() => { cleaner.plan(scan.id, [...models]); setModels(new Set()); setResultOf(''); watch(); })} />;
     if (section === 'large') return ready ? <LargeList key={scan.id} scan={scan} prefs={prefs} selected={picked} setSelected={setPicked} /> : <LargeHero />;
     if (section === 'storage') return ready ? <StorageView key={scan.id} scan={scan} /> : <StorageHero volumes={volumes} volume={volume} setVolume={setVolume} />;
     return ready ? <DupList key={scan.id} scan={scan} selected={picked} setSelected={setPicked} />

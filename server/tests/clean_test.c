@@ -3,6 +3,7 @@
  * folder: the rule table, the walk (links, `..`, mounts, limits, names, protected paths), what is
  * accepted from the helper, plans, execution against changed files, hard links and cancel. */
 #include "clean/clean.h"
+#include "clean/clean_admin.h"
 #include "clean/cleanfs.h"
 #include "clean/cleanproto.h"
 #include "clean/rules.h"
@@ -176,12 +177,23 @@ static void test_rules(void) {
     int n;
     char why[128];
     const CleanRule *t = clean_rules(&n);
-    CHECK(n == 7);
+    CHECK(n >= 30);
     CHECK(!clean_rules_check(t, n, why, sizeof why));
     CHECK(!strcmp(t[0].id, "thumbnails") && !strcmp(t[0].root, T) && t[0].risk == CLEAN_RISK_REGENERABLE && t[0].action == CLEAN_ACT_DELETE);
     for (int i = 0; i < n; i++) {                   /* a real delete only for regenerable rules, the Trash folder never cleaned item by item */
         CHECK(t[i].action != CLEAN_ACT_DELETE || t[i].risk == CLEAN_RISK_REGENERABLE);
         CHECK(strcmp(t[i].root, ".cache"));
+        /* browsers: cache folders only, never what holds a person's data */
+        for (const char *const *w = (const char *const[]){ "Cookies", "Login", "History", "sessionstore", "places", "Local Storage", NULL }; *w; w++) CHECK(!strstr(t[i].root, *w));
+        if (!strcmp(t[i].category, "browser")) CHECK(strstr(t[i].root, "ache") && t[i].lock);
+        if (!strcmp(t[i].category, "ai")) CHECK(t[i].explicit_only || t[i].action == CLEAN_ACT_NONE);
+        if (!strcmp(t[i].category, "info")) CHECK(t[i].action == CLEAN_ACT_NONE);
+    }
+    {
+        char star[64];
+        CHECK(clean_root_fits(".cache/x/*/cache2", ".cache/x/a.default/cache2", star, sizeof star) && !strcmp(star, "a.default"));
+        CHECK(!clean_root_fits(".cache/x/*/cache2", ".cache/x/a/b/cache2", star, sizeof star));
+        CHECK(!clean_root_fits(".cache/x/*/cache2", ".cache/y/a/cache2", star, sizeof star));
     }
     CleanRule del = good();
     del.risk = CLEAN_RISK_REVIEW; del.action = CLEAN_ACT_DELETE;
@@ -774,11 +786,11 @@ static void test_delete(void) {
     CHECK(count(p.plan, "unsupported") == 1);
     poll_free(&p);
     /* a review rule never gets the real delete, even from a table that asks for it */
-    static CleanRule forced[16];
+    static CleanRule forced[CLEAN_MAX_RULES];
     int nreal;
     const CleanRule *real = clean_rules(&nreal);
     memcpy(forced, real, (size_t)nreal * sizeof *forced);
-    forced[nreal - 1].action = CLEAN_ACT_DELETE;
+    for (int i = 0; i < nreal; i++) if (!strcmp(forced[i].id, "trash")) forced[i].action = CLEAN_ACT_DELETE;
     clean_rules_override(forced, nreal);
     plan = plan_all(scan, &p);
     CHECK(count(p.plan, "unsupported") == 1);
@@ -886,6 +898,209 @@ static int page_total(int scan, const CleanFilter *f) {
     json_free(&d);
     free(j);
     return n;
+}
+
+static void set_lock(const char *rel, const char *target) {
+    char p[PATH_MAX * 2];
+    mkparents(rel);
+    path_of(p, sizeof p, rel);
+    unlink(p);
+    if (symlink(target, p)) abort();
+}
+
+static void test_browser(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    put(".cache/mozilla/firefox/abc.default/cache2/entries/one", "cached");
+    put(".cache/mozilla/firefox/abc.default/cookies.sqlite", "person");
+    put(".mozilla/firefox/abc.default/cookies.sqlite", "person");
+    put(".mozilla/firefox/abc.default/places.sqlite", "person");
+    put(".cache/chromium/Default/Cache/data_1", "cached");
+    put(".config/chromium/Default/Cookies", "person");
+    put(".config/chromium/Default/GPUCache/data_0", "cached");
+    char live[64];
+    snprintf(live, sizeof live, "127.0.1.1:+%d", (int)getpid());
+    set_lock(".mozilla/firefox/abc.default/lock", live);
+    snprintf(live, sizeof live, "host-%d", (int)getpid());
+    set_lock(".config/chromium/SingletonLock", live);
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 0);          /* the browsers run: not read */
+    int busy = 0;
+    for (const JVal *r = json_get(p.scan, "rules")->kid; r; r = r->next) busy += !strcmp(json_str(r, "root"), "busy");
+    CHECK(busy >= 3);
+    poll_free(&p);
+    set_lock(".mozilla/firefox/abc.default/lock", "127.0.1.1:+999999");   /* stale: that process is gone */
+    unlink(strcat(strcpy((char[PATH_MAX * 2]){ 0 }, H), "/.config/chromium/SingletonLock"));
+    scan = run_scan(&p);
+    CHECK(num(p.scan, "candidates") == 3);
+    CHECK(!has_candidate("cookies") && !has_candidate("Cookies") && !has_candidate("places"));
+    poll_free(&p);
+    const char *const names[] = { "firefox-cache", "chromium-cache", "chromium-gpu" };
+    int plan = clean_plan_rules(scan, names, 3);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 3);
+    poll_free(&p);
+    /* the browser starts between the plan and the cleanup */
+    snprintf(live, sizeof live, "host-%d", (int)getpid());
+    set_lock(".config/chromium/SingletonLock", live);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1 && count(p.plan, "skipped") == 2);
+    poll_free(&p);
+    CHECK(!exists(".cache/mozilla/firefox/abc.default/cache2/entries/one") && exists(".cache/chromium/Default/Cache/data_1"));
+    CHECK(exists(".mozilla/firefox/abc.default/cookies.sqlite") && exists(".config/chromium/Default/Cookies"));
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+static void test_rules_on_disk(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    /* every rule's kind of place, with what must not be touched next to it */
+    put(".cache/pip/http/a", "x");
+    put(".npm/_cacache/content/a", "x");
+    put(".cache/yarn/v6/a", "x");
+    put(".cache/go-build/00/a", "x");
+    put(".local/share/pnpm/store/v3/a", "x");
+    put(".cache/lordos/thumbs/a.png", "x");
+    put(".cache/lordos/fwlists/list", "must stay");
+    put(".npm/other", "must stay");
+    put(".cargo/registry/cache/a", "x");
+    put(".gradle/caches/a", "x");
+    put("Downloads/film.part", "x");
+    put("Downloads/old.iso", "x");
+    put("Downloads/new.iso", "x");
+    char f[PATH_MAX * 2];
+    struct timespec tm[2] = { { 1000000000, 0 }, { 1000000000, 0 } };
+    path_of(f, sizeof f, "Downloads/film.part");
+    CHECK(!utimensat(AT_FDCWD, f, tm, 0));
+    path_of(f, sizeof f, "Downloads/old.iso");
+    CHECK(!utimensat(AT_FDCWD, f, tm, 0));
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(has_candidate(".cache/pip/http/a") && has_candidate(".npm/_cacache/content/a") && has_candidate(".cache/go-build/00/a"));
+    CHECK(has_candidate("thumbs/a.png") && !has_candidate("fwlists") && !has_candidate(".npm/other") && !has_candidate("new.iso"));
+    poll_free(&p);
+    /* a category-wide cleanup never takes a shown-only rule's files */
+    const char *const names[] = { "pip", "npm", "yarn", "go-build", "lordos-thumbnails", "pnpm-store", "partial-downloads" };
+    int plan = clean_plan_rules(scan, names, 7);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(num(p.plan, "deleteItems") == 5 && num(p.plan, "trashItems") == 2);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 7);
+    poll_free(&p);
+    CHECK(!exists(".cache/pip/http/a") && exists(".local/share/Trash/files/a") && exists(".cargo/registry/cache/a") && exists("Downloads/old.iso"));
+    CHECK(exists(".npm/other") && exists(".cache/lordos/fwlists/list"));
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+static void test_models(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    put_size(".cache/huggingface/hub/models--org--small/blobs/aaa", 40000, 'a');
+    put_size(".cache/huggingface/hub/models--org--small/snapshots/r1/x.bin", 20000, 'b');
+    put_size(".cache/huggingface/hub/models--org--big/blobs/ccc.incomplete", 50000, 'c');
+    put(".cache/huggingface/hub/version.txt", "1");
+    put(".cache/huggingface/hub/datasets--x/blob", "not a model");
+    put_size(".lmstudio/models/maker/tiny/m.gguf", 30000, 'd');
+    put(".ollama/models/blobs/sha256-a", "shared");
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(has_candidate("models--org--small") && !has_candidate("/snapshots/") && !has_candidate("datasets--x"));
+    CHECK(has_candidate(".lmstudio/models/maker/tiny") && !has_candidate("m.gguf"));
+    poll_free(&p);
+    /* never by category */
+    const char *const hf[] = { "ai-huggingface" }, *const part[] = { "ai-huggingface-partial" }, *const ol[] = { "ai-ollama" };
+    CHECK(clean_plan_rules(scan, hf, 1) == CLEAN_E_BADID && clean_plan_rules(scan, part, 1) == CLEAN_E_BADID);
+    /* one model, by its id, and its size is the folder's */
+    char *j = clean_results(0, 0, CLEAN_PAGE_MAX);
+    JDoc d = { 0 };
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0));
+    uint32_t model = 0, ollama = 0;
+    for (const JVal *v = json_get(d.root, "items")->kid; v; v = v->next) {
+        if (strstr(json_str(v, "path"), "models--org--small")) { model = (uint32_t)json_num(v, "id", 0); CHECK(json_num(v, "size", 0) == 60000 && json_bool(v, "folder", 0) == 1); }
+        if (strstr(json_str(v, "path"), ".ollama")) ollama = (uint32_t)json_num(v, "id", 0);
+    }
+    json_free(&d);
+    free(j);
+    CHECK(model && ollama);
+    int plan = clean_plan(scan, &model, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(json_bool(p.plan, "named", 0) == 1 && num(p.plan, "trashItems") == 1);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(!exists(".cache/huggingface/hub/models--org--small") && exists(".local/share/Trash/files/models--org--small/blobs/aaa"));
+    CHECK(clean_restore(plan, model) == 0);
+    CHECK(exists(".cache/huggingface/hub/models--org--small/blobs/aaa"));
+    /* Ollama shares blobs: measured, nothing offered */
+    plan = clean_plan(scan, &ollama, 1);
+    wait_job(&p);
+    CHECK(count(p.plan, "unsupported") == 1);
+    poll_free(&p);
+    (void)ol;
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+/* the system actions' folder rules, on throwaway folders (the actions fix the real ones) */
+static void test_system_rules(void) {
+    wipe();
+    put("apt/a_1.0_amd64.deb", "deb");
+    put("apt/lock", "");
+    put("apt/keep.txt", "");
+    put("apt/sub/inner.deb", "deb");
+    link_to("../secret.deb", "apt/evil.deb");
+    put("secret.deb", "must stay");
+    put("apt/partial/half.deb", "half");
+    char p[PATH_MAX * 2];
+    path_of(p, sizeof p, "apt");
+    int fd = open(p, O_RDONLY | O_DIRECTORY);
+    double freed = 0;
+    CHECK(clean_folder_bytes(fd, 1) > 0);
+    CHECK(clean_purge_debs(fd, &freed) == 1);
+    close(fd);
+    CHECK(!exists("apt/a_1.0_amd64.deb") && exists("apt/lock") && exists("apt/keep.txt") && exists("apt/sub/inner.deb"));
+    CHECK(exists("apt/evil.deb") && exists("secret.deb"));
+    path_of(p, sizeof p, "apt/partial");
+    fd = open(p, O_RDONLY | O_DIRECTORY);
+    CHECK(clean_purge_partial(fd, &freed) == 1);
+    close(fd);
+
+    put("tmp/old", "o");
+    put("tmp/recent", "n");
+    put("tmp/inuse", "u");
+    put("tmp/linked", "l");
+    put("tmp/sub/deep", "d");
+    hardlink("tmp/linked", "tmp/sub/other");
+    link_to("../secret.deb", "tmp/oldlink");
+    time_t future = time(NULL) + 40 * 86400;
+    path_of(p, sizeof p, "tmp/inuse");
+    int held = open(p, O_RDONLY);
+    path_of(p, sizeof p, "tmp");
+    fd = open(p, O_RDONLY | O_DIRECTORY);
+    /* "now" a little over 30 days ahead makes the files old, the recent one is touched past it */
+    char q[PATH_MAX * 2];
+    path_of(q, sizeof q, "tmp/recent");
+    struct timespec tm[2] = { { future, 0 }, { future, 0 } };
+    CHECK(!utimensat(AT_FDCWD, q, tm, 0));
+    CHECK(clean_purge_old(fd, getuid() + 1, future + 1, &freed) == 0);        /* another owner's: not root's rule */
+    CHECK(clean_purge_old(fd, getuid(), future - 40 * 86400, &freed) == 0);   /* nothing old yet */
+    CHECK(clean_purge_old(fd, getuid(), future, &freed) == 1);
+    close(fd);
+    close(held);
+    CHECK(!exists("tmp/old") && exists("tmp/recent") && exists("tmp/inuse") && exists("tmp/linked") && exists("tmp/oldlink") && exists("secret.deb"));
 }
 
 static void test_tree(void) {
@@ -1188,6 +1403,10 @@ int main(void) {
     test_cancel_scan();
     test_delete();
     test_mounts();
+    test_browser();
+    test_rules_on_disk();
+    test_models();
+    test_system_rules();
     test_tree();
     test_tree_limits();
     test_dups();

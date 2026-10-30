@@ -1,6 +1,6 @@
 // Scan, Cleanup, Large files, Activity and Settings.
 import {
-  View, ScrollView, TextInput, cleaner, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
+  View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, PagedList, CountUp } from './ui.jsx';
@@ -46,9 +46,9 @@ function Counter({ label, value }) {
 
 const ACTION_KEY = { delete: 'cleaner.action.delete', trash: 'cleaner.action.trash', none: 'cleaner.action.none' };
 
-function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked }) {
+function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, setModels }) {
   const [open, setOpen] = useState(false);
-  const selectable = rule.action !== 'none' && !blocked;
+  const selectable = rule.action !== 'none' && !blocked && !rule.explicit;
   return (
     <Enter delay={delay} x={0} y={12}>
       <Glass style={{ padding: spacing.m, gap: spacing.s }}>
@@ -66,13 +66,14 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked }) {
             <Label weight={600}>{formatBytes(rule.allocated)}</Label>
             <Label dim size={typeScale.callout}>{tr('cleaner.files', { count: rule.files })}</Label>
           </View>
-          {rule.id === 'trash' ? <GlassButton small label={tr('cleaner.emptyTrash')} onClick={onEmpty} /> : null}
+          {rule.category === 'trash' ? <GlassButton small label={tr('cleaner.emptyTrash')} onClick={onEmpty} /> : null}
           <GlassButton small label={open ? '▴' : '▾'} onClick={() => setOpen(!open)} />
         </View>
         {open ? (
           <View style={{ height: 170 }}>
             <PagedList rowH={28} reset={scanId} fetch={(o, l) => cleaner.results(scanId, o, l, { rule: rule.id })} render={(it) => (
               <View key={it.id} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+                {rule.explicit && rule.action !== 'none' ? <Check on={models.has(it.id)} onClick={() => setModels((o) => { const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })} /> : null}
                 <View style={{ flex: 1, minWidth: 0 }}><Label mono size={typeScale.callout} lines={1}>{it.path}</Label></View>
                 <Label dim size={typeScale.callout}>{formatBytes(it.allocated)}</Label>
               </View>
@@ -92,8 +93,8 @@ function Tag({ label, strong }) {
   );
 }
 
-export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf }) {
-  const rows = scan.rules.filter((r) => r.files > 0);
+export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels, onRemoveModels }) {
+  const rows = scan.rules.filter((r) => r.files > 0 || r.root === 'busy');
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
   let i = 0;
@@ -117,13 +118,54 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf }) {
               <Label dim size={typeScale.callout} weight={600}>{tr(`cleaner.category.${c}`)}</Label>
               {rows.filter((r) => r.category === c).map((r) => {
                 const k = i++;
-                return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r.id)} onEmpty={onEmpty}
+                return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r)} onEmpty={onEmpty} models={models} setModels={setModels}
                   onToggle={() => setChosen((o) => { const x = new Set(o); if (x.has(r.id)) x.delete(r.id); else x.add(r.id); return x; })} />;
               })}
+              {c === 'ai' && models.size ? <GlassButton label={tr('cleaner.models.remove', { count: models.size })} onClick={onRemoveModels} /> : null}
             </View>
           ))}
+          <SystemCard />
         </ScrollView>
       )}
+    </View>
+  );
+}
+
+// ---- the operating system's own files: closed actions in the admin helper, for administrators ----
+
+const SYSTEM = [['journal', 'clean-journal'], ['apt', 'clean-apt-cache'], ['vartmp', 'clean-var-tmp']];
+
+function SystemCard() {
+  const [sizes, setSizes] = useState(null);
+  const [ask, setAsk] = useState(null);
+  const [msg, setMsg] = useState('');
+  const read = () => admin.run('clean-status', '', null, { quiet: true }).then((t) => {
+    const o = {};
+    for (const kv of String(t).split(' ')) { const [k, v] = kv.split('='); o[k] = Number(v); }
+    setSizes(o);
+  }).catch(() => setSizes(null));
+  useEffect(() => { read(); }, []);
+  if (!sizes) return null;
+  const run = () => {
+    const [k, action] = ask;
+    setAsk(null);
+    admin.run(action, '').then(() => { setMsg(tr('cleaner.system.done', { name: tr(`cleaner.system.${k}`) })); read(); }).catch((e) => setMsg(e.message));
+  };
+  return (
+    <View style={{ gap: spacing.s }}>
+      <Label dim size={typeScale.callout} weight={600}>{tr('cleaner.category.system')}</Label>
+      {msg ? <Label dim size={typeScale.callout}>{msg}</Label> : null}
+      {SYSTEM.map(([k, action]) => (
+        <Glass key={k} style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Label weight={600}>{tr(`cleaner.system.${k}`)}</Label>
+            <Label dim size={typeScale.callout}>{tr(`cleaner.system.${k}Text`)}</Label>
+          </View>
+          <Label weight={600}>{formatBytes(sizes[k] || 0)}</Label>
+          <GlassButton small label={tr('cleaner.clean')} onClick={() => setAsk([k, action])} />
+        </Glass>
+      ))}
+      {ask ? <ConfirmDialog destructive title={tr(`cleaner.system.${ask[0]}`)} detail={tr('cleaner.system.confirm')} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setAsk(null)} /> : null}
     </View>
   );
 }

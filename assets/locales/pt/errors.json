@@ -70,6 +70,7 @@
   "clean.noPlan": "Esse plano de limpeza não está mais disponível; revise a lista novamente",
   "clean.noScan": "Essa análise não está mais disponível; analise novamente",
   "clean.planExpired": "Esse plano de limpeza expirou; revise a lista novamente",
+  "clean.systemFailed": "A limpeza do sistema não terminou (código {code})",
   "clean.unavailable": "O analisador da Limpeza não está disponível",
   "disk.alreadyMounted": "{name} já está montado",
   "disk.badDevice": "Dispositivo inválido",

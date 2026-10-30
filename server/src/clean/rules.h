@@ -12,13 +12,19 @@ typedef struct {
     const char *id;                 /* [a-z0-9-], at most 32 bytes */
     int version;
     const char *category;           /* [a-z0-9-] */
-    const char *root;               /* relative to the home folder, at least two levels */
+    const char *root;               /* relative to the home folder, at least two levels; one level may be `*` */
     const char *pattern;            /* file names: literal text with at most one `*` */
     int min_age_days;               /* 0 = any age */
     const char *const *exclude;     /* names (patterns) never offered, NULL-terminated; NULL = none */
     CleanRisk risk;
     CleanAction action;             /* CLEAN_ACT_DELETE: regenerable rules only, approved 2026-10-30 */
     const char *text_key;           /* cleaner.rule.<id> in assets/locales/<lang>/cleaner.json */
+    /* a process's lock: while it is alive the rule's folder isn't read or changed. Relative to the home
+     * folder, $ stands for what `*` matched in root (a browser's profile) */
+    const char *lock;
+    int unit_depth;                 /* > 0: an entry this deep is one candidate as a whole (a model's folder) */
+    int explicit_only;              /* never in a cleanup by category: chosen one by one, with its own confirmation */
+    int on_mounts;                  /* root is relative to each of the user's mounts, with $ the user id: measured only */
 } CleanRule;
 
 const CleanRule *clean_rules(int *n);
@@ -29,6 +35,8 @@ int clean_rule_check(const CleanRule *r, char *why, size_t n);
 int clean_rules_check(const CleanRule *t, int n, char *why, size_t wn);
 const char *clean_risk_name(CleanRisk r);
 const char *clean_action_name(CleanAction a);
+/* does this path relative to the home folder fit a rule's root? star gets what `*` matched */
+int clean_root_fits(const char *root, const char *rel, char *star, size_t n);
 
 #ifdef CLEAN_TEST
 void clean_rules_override(const CleanRule *t, int n);   /* tests only: not in lord-server */
