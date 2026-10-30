@@ -625,6 +625,8 @@ Decided by the maintainer on 2026-10-30: everything below goes in 0.8.7, with **
 
 Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), what LordBench and the desktop under load
 left for after 0.8.6, and the new native app:
+- [ ] An arm64 live ISO (decided by the maintainer on 2026-10-30): generic UEFI arm64 machines and virtual machines, so
+  they no longer need a Debian install plus the script. `tools/iso/build.sh` only builds amd64 today.
 - [ ] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
   are read-only, and every change goes through a reviewed plan the user confirms. Nothing is copied from other
   projects. Design: `CLEANER-ARCHITECTURE.md`, in phases: the core, then system care, then the optional modules. The
