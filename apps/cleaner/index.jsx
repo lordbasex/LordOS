@@ -109,6 +109,7 @@ function Body() {
   const running = info.state === 'running';
   const ready = !!scan && !scan.running && scan.id > 0 && !(info.job === 'scan' && (info.state === 'cancelled' || info.state === 'failed'));
   const planHere = plan && scan && plan.scan === scan.id;
+  useEffect(() => { setPicked(new Set()); setModels(new Set()); }, [scan && scan.id]);   // ids belong to one scan, however it started
 
   useEffect(() => {
     if (!polling) return undefined;
