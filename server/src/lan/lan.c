@@ -223,7 +223,7 @@ static int helper_wait(uint32_t id, DocMsg *m) {
 static uint32_t job_id;
 
 static int ask(uint32_t op, const char *payload, size_t len, int fd, DocMsg *m) {
-    if (helper_fd < 0) return -1;
+    if (helper_fd < 0) { if (fd >= 0) close(fd); return -1; }
     uint32_t id = ++job_id;
     int r = doc_send(helper_fd, op, id, payload, len, fd >= 0 ? &fd : NULL, fd >= 0 ? 1 : 0);
     if (fd >= 0) close(fd);
