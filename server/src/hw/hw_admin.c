@@ -240,6 +240,18 @@ const char *hw_rpi_case_text(const char *id) {
     return NULL;
 }
 
+/* The boot partition is root's alone: this copy is what Settings reads (js_fan.c). */
+static void case_note(const char *id) {
+    mkdir("/var/lib/lordos", 0755);
+    const char *tmp = "/var/lib/lordos/case.tmp", *dst = "/var/lib/lordos/case";
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+    if (fd < 0) return;
+    size_t l = strlen(id);
+    int ok = write(fd, id, l) == (ssize_t)l;
+    close(fd);
+    if (!ok || rename(tmp, dst)) unlink(tmp);
+}
+
 void hw_act_rpi_case(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     char id[24], model[96] = "";
@@ -260,6 +272,7 @@ void hw_act_rpi_case(const AdminReq *r, const char *arg, size_t len) {
     int ok = write(fd, text, l) == (ssize_t)l && fsync(fd) == 0;
     close(fd);
     if (!ok || rename(tmp, dst)) { unlink(tmp); admin_err("hw.caseFailed", "errno", lerr_errno(errno), NULL); return; }
+    case_note(id);
     admin_ok("hw.caseSet", "case", id, NULL);
 }
 
@@ -357,6 +370,70 @@ static void eeprom_report(void) {
     int pending = lstat(RPI_EEPROM_PENDING, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == 0;
     admin_say("OK", "%s %lld %lld %s", pending ? "pending" : e.update ? "available" : "uptodate",   /* i18n-ok: parsed by apps/settings/Firmware.jsx */
               e.current, e.latest, e.release);
+}
+
+/* ---- finding the Argon ONE V5 case ---- */
+
+#define DTOVERLAY "/usr/bin/dtoverlay"
+#define CASE_USB  "/sys/bus/platform/drivers/dwc2/1000480000.usb"      /* the USB-C controller, in host mode */
+
+static int usb_id(const char *dev, const char *attr, char *out, size_t n) {
+    char p[PATH_MAX];
+    snprintf(p, sizeof p, "/sys/bus/usb/devices/%s/%s", dev, attr);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    ssize_t k = read(fd, out, n - 1);
+    close(fd);
+    if (k < 4) return -1;
+    out[4] = 0;
+    return 0;
+}
+
+/* The case's hub and audio chip, on that controller: generic chips, but nothing else puts them there */
+static int case_chips(void) {
+    DIR *d = opendir("/sys/bus/usb/devices");
+    if (!d) return 0;
+    int hub = 0, audio = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        char link[PATH_MAX], target[PATH_MAX], v[8], m[8];
+        snprintf(link, sizeof link, "/sys/bus/usb/devices/%s", e->d_name);
+        ssize_t k = readlink(link, target, sizeof target - 1);
+        if (k <= 0) continue;
+        target[k] = 0;
+        if (!strstr(target, "/1000480000.usb/") || usb_id(e->d_name, "idVendor", v, sizeof v) || usb_id(e->d_name, "idProduct", m, sizeof m)) continue;
+        if (!strcmp(v, "1a86") && !strcmp(m, "8091")) hub = 1;
+        if (!strcmp(v, "0d8c") && !strcmp(m, "0014")) audio = 1;
+    }
+    closedir(d);
+    return hub && audio;
+}
+
+/* No arguments. The case can't be seen until the USB-C controller is a host, so it is made one until the next
+ * restart (nothing is written to the boot partition) and its chips are looked for. Found: it stays on, and the
+ * ports and the sound work at once. Not found: it goes back. Answers OK "argon-one-v5" or OK "none". */
+void hw_act_rpi_case_detect(const AdminReq *r, const char *arg, size_t len) {
+    (void)r; (void)arg;
+    if (len) { admin_err("admin.invalidArgument", NULL); return; }
+    if (!board_is_bcm2712()) { admin_err("hw.notRaspberryPi5", NULL); return; }
+    int loaded = 0;
+    if (access(CASE_USB, F_OK)) {
+        if (!file_ok(DTOVERLAY)) { admin_say("OK", "none"); return; }   /* i18n-ok: parsed by sdk/suggestions.js */
+        const char *const argv[] = { DTOVERLAY, "dwc2", "dr_mode=host", NULL };
+        if (admin_run(argv)) { admin_say("OK", "none"); return; }       /* i18n-ok: parsed by sdk/suggestions.js */
+        loaded = 1;
+    }
+    int found = 0;
+    for (int i = 0; i < 40 && !found; i++) {
+        struct timespec ts = { 0, 200000000 };
+        nanosleep(&ts, NULL);
+        found = case_chips();
+    }
+    if (!found && loaded) {
+        const char *const argv[] = { DTOVERLAY, "-r", "dwc2", NULL };
+        admin_run(argv);
+    }
+    admin_say("OK", "%s", found ? "argon-one-v5" : "none");             /* i18n-ok: parsed by sdk/suggestions.js */
 }
 
 static int eeprom_ready(void) {

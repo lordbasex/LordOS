@@ -225,9 +225,7 @@ into a scratch folder and read; **none of them was executed**.
   USB ports and mic in and audio out ports"). The script also adds `usb_max_current_enable=1`,
   `dtparam=nvme`/`pciex1_gen=3`, and `PSU_MAX_CURRENT=5000` in the bootloader EEPROM.
 
-**Detection.** The case cannot be detected from software: it has no EEPROM, no I2C device, and its
-USB hub and DAC only appear after the USB-C controller is switched to host mode, and even then they
-are generic chips used by other products. So LordOS does **not** guess. Settings → Cooling on a
+**Detection.** The case has no EEPROM or I2C device, and its USB hub and DAC only appear after the USB-C controller is a host. So on a Raspberry Pi 5 with no case chosen, once, the Store's suggestions run the admin action `rpi-case-detect`: it loads the `dwc2` overlay until the next restart, writes nothing to the boot partition, and looks on that controller for the hub 1a86:8091 and the audio chip 0d8c:0014, as read on one Argon ONE V5. Found, the overlay stays, so the ports and sound work at once, and a card offers keeping them on. Not found, it is removed. A later unit with other chips isn't found, and is still chosen by hand. Settings → Cooling on a
 Raspberry Pi 5 shows **Case: None or another case / Argon ONE V5 case**; choosing the Argon runs
 the admin action `rpi-case argon-one-v5`, which writes `/boot/firmware/lordos-case.txt` (fixed
 text, included at the end of `config.txt` by the image) and takes effect after a restart. Any other

@@ -267,5 +267,9 @@
   "updates.title": "Updates",
   "upgrade": "Update",
   "version": "Version {version}",
-  "working": "Working…"
+  "working": "Working…",
+  "suggest.argonCase.title": "Argon ONE V5 case found",
+  "suggest.argonCase.why": "Its two front USB ports and its sound card are on now, until you restart.",
+  "suggest.argonCase.detail": "Keep them on after each restart. Nothing is installed.",
+  "suggest.keepOn": "Keep on"
 }

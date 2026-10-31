@@ -27,6 +27,7 @@
 
 #define FAN_SOCK      "/run/lordos/fand.sock"
 #define FAN_CASE_FILE "/boot/firmware/lordos-case.txt"
+#define FAN_CASE_NOTE "/var/lib/lordos/case"
 #define FAN_WAIT_MS   300
 #define FAN_REPLY_MAX 8192
 
@@ -151,9 +152,16 @@ static JSValue f_force(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 static JSValue f_case(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     const char *path = getenv("LORD_FAN_CASE_FILE");
-    if (!path || !*path) path = FAN_CASE_FILE;
+    if (!path || !*path) {                      /* the boot partition is root's alone: the helper leaves a copy */
+        char id[32];
+        int fd = open(FAN_CASE_NOTE, O_RDONLY | O_CLOEXEC);
+        ssize_t r = fd < 0 ? -1 : read(fd, id, sizeof id - 1);
+        if (fd >= 0) close(fd);
+        if (r > 0) { id[r] = 0; return JS_NewString(c, strcmp(id, "argon-one-v5") ? "none" : "argon-one-v5"); }
+        path = FAN_CASE_FILE;
+    }
     int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd < 0) return JS_NULL;
+    if (fd < 0) return errno == EACCES ? JS_NewString(c, "none") : JS_NULL;
     char b[1024];
     ssize_t r = read(fd, b, sizeof b - 1);
     close(fd);

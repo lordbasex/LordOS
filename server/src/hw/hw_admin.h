@@ -13,6 +13,8 @@
  *   rpi-case none|argon-one-v5         Raspberry Pi 5 only: writes /boot/firmware/lordos-case.txt
  *                                      (fixed text, included from config.txt; takes effect
  *                                      after a restart)                                      admin
+ *   rpi-case-detect                    (no arguments) Raspberry Pi 5 only: turns the USB-C controller into a host
+ *                                      until the next restart and looks for the Argon ONE V5's chips; left on if found
  *   rpi-eeprom-status                  (no arguments) BCM2712 boards (Pi 5, 500, CM5) only: runs
  *                                      /usr/bin/rpi-eeprom-update (no options), parses its report
  *                                      strictly and answers "OK <uptodate|available|pending>
@@ -53,6 +55,7 @@ void hw_act_ntp(const AdminReq *r, const char *arg, size_t len);
 void hw_act_time_set(const AdminReq *r, const char *arg, size_t len);
 void hw_act_bt_unblock(const AdminReq *r, const char *arg, size_t len);
 void hw_act_rpi_case(const AdminReq *r, const char *arg, size_t len);
+void hw_act_rpi_case_detect(const AdminReq *r, const char *arg, size_t len);
 void hw_act_firmware_missing(const AdminReq *r, const char *arg, size_t len);
 void hw_act_memory_modules(const AdminReq *r, const char *arg, size_t len);
 void hw_act_eeprom_status(const AdminReq *r, const char *arg, size_t len);
@@ -87,6 +90,7 @@ int hw_backlight_name_valid(const char *n);
     { "time-set", hw_act_time_set, 0 }, \
     { "bt-unblock", hw_act_bt_unblock, A_ANYONE }, \
     { "rpi-case", hw_act_rpi_case, 0 }, \
+    { "rpi-case-detect", hw_act_rpi_case_detect, A_FORK }, \
     { "hw-firmware-missing", hw_act_firmware_missing, A_ANYONE }, \
     { "hw-memory-modules", hw_act_memory_modules, A_ANYONE }, \
     { "rpi-eeprom-status", hw_act_eeprom_status, A_ANYONE | A_FORK }, \

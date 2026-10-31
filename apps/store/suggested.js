@@ -6,6 +6,7 @@ import { createElement as h, useEffect, useState } from 'react';
 import {
   View, Text, Button, EmptyState, useTheme, useStore, admin, typeScale, spacing, t, direction,
   suggestions, refreshSuggestions, reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen,
+  fanCase,
 } from '@lordos/sdk';
 
 // ---- drawn glyphs (monochrome on a tinted tile) ----
@@ -79,6 +80,7 @@ function Card({ s, deb }) {
   const { job } = useStore(deb.state);
   const [plan, setPlan] = useState(null);
   const [more, setMore] = useState(false);
+  const [error, setError] = useState('');
   const isAdmin = admin.available();
   const nonfree = !s.free;
   const ask = () => setPlan(lord.pkg.plan({ install: s.install }));
@@ -109,7 +111,9 @@ function Card({ s, deb }) {
       h(View, { style: { alignItems: 'flex-end', gap: 2 } },
         s.state === 'install' ? h(Button, { primary: !nonfree, label: nonfree ? t('store.suggest.installNonfree') : t('store.install'), disabled: !isAdmin || !!job,
           onClick: () => isAdmin && !job && ask() }) : null,
+        s.state === 'setup' ? h(Button, { primary: true, label: t('store.suggest.keepOn'), disabled: !isAdmin, onClick: () => admin.run('rpi-case', 'argon-one-v5').then(() => { fanCase.set(() => 'argon-one-v5'); refreshSuggestions(); }, (e) => setError(e.message)) }) : null,
         s.state !== 'installed' ? h(Button, { plain: true, small: true, label: t('store.suggest.dismiss'), onClick: () => dismissSuggestion(s.id) }) : null)),
+    error ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, error) : null,
     !isAdmin && s.state === 'install' ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')) : null,
     plan && h(View, { style: { gap: spacing.s, marginTop: spacing.xs, paddingTop: spacing.s, borderTop: `1px solid ${th.separator}` } },
       nonfree ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', lineHeight: 1.4, textAlign: 'start' } }, t('store.suggest.confirmNonfree')) : null,

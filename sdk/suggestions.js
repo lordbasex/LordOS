@@ -51,6 +51,23 @@ function firmwareViaHelper() {
     .then(() => firmwareFromLog(lines), () => null);
 }
 
+// The Argon ONE V5 case can only be seen once the USB-C controller is a host: looked for once on a Raspberry Pi 5
+// with no case chosen, and again only while one was found and not kept. Its ports and sound stay on if it is there.
+let caseAsked = false;
+async function caseFound(f) {
+  if (!(f.compatible || []).includes('raspberrypi,5-model-b') || !admin.available()) return null;
+  let chosen = null;
+  try { chosen = lord.fan.caseConfig(); } catch (e) { return null; }
+  if (chosen !== 'none' || (prefs().caseChecked && !caseAsked)) return null;
+  if (caseAsked === 'found') return 'argon-one-v5';
+  if (caseAsked) return null;
+  caseAsked = true;
+  const said = await admin.run('rpi-case-detect', '', null, { quiet: true }).catch(() => '');
+  if (String(said).includes('argon-one-v5')) { caseAsked = 'found'; return 'argon-one-v5'; }
+  setPrefs(() => ({ caseChecked: true }));
+  return null;
+}
+
 let running = null;
 export function refreshSuggestions({ firmware = true } = {}) {
   if (!has()) return Promise.resolve([]);
@@ -63,6 +80,7 @@ export function refreshSuggestions({ firmware = true } = {}) {
       const missing = await firmwareViaHelper();
       if (missing) f.firmware = { readable: true, missing };
     }
+    if (f) f.caseFound = await caseFound(f);
     facts = f;
     return reevaluate();
   })().finally(() => { running = null; suggestions.set({ scanning: false }); });
@@ -79,7 +97,7 @@ export function unseenSuggestions(list = suggestions.get().list) {
 }
 
 export function markSuggestionsSeen(list = suggestions.get().list) {
-  const ids = list.filter((s) => s.state === 'install').map((s) => s.id);
+  const ids = list.filter((s) => s.state === 'install' || s.state === 'setup').map((s) => s.id);
   const p = prefs();
   if (ids.every((id) => p.seen.includes(id))) return;
   setPrefs((q) => ({ seen: [...new Set([...q.seen, ...ids])].slice(-200), notified: [...new Set([...q.notified, ...ids])].slice(-200) }));

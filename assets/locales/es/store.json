@@ -267,5 +267,9 @@
   "updates.title": "Actualizaciones",
   "upgrade": "Actualizar",
   "version": "Versión {version}",
-  "working": "Trabajando…"
+  "working": "Trabajando…",
+  "suggest.argonCase.title": "Caja Argon ONE V5 detectada",
+  "suggest.argonCase.why": "Sus dos USB frontales y su placa de sonido ya están activos hasta que reinicies.",
+  "suggest.argonCase.detail": "Déjalos activos en cada inicio. No se instala nada.",
+  "suggest.keepOn": "Dejar activo"
 }
