@@ -1579,7 +1579,10 @@ static void tot_json(JBuf *b, const Tot *t) {
 
 static void scan_json(JBuf *b, const Scan *s, int running) {
     double est = 0;
-    for (size_t i = 0; i < s->n && !running; i++) est += estimated(&s->c[i]);
+    for (size_t i = 0; i < s->n && !running; i++) {
+        const CleanRule *r = src_rule(&s->src[s->c[i].src]);
+        if (!r || !r->system_root) est += estimated(&s->c[i]);      /* /tmp is only shown: it gives nothing back */
+    }
     jb_printf(b, "{\"id\":%d,\"kind\":\"%s\",\"running\":%s,\"complete\":%s,\"limit\":\"%s\",\"seen\":%ld,\"dirs\":%ld,\"hashed\":%ld,\"candidates\":%zu,\"groups\":%zu,",
               s->id, kind_name[s->kind], running ? "true" : "false", s->complete ? "true" : "false", s->limit, s->seen < 0 ? 0 : s->seen, s->dirs, s->hashed, s->n, s->ngrp);
     if (running) {

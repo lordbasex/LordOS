@@ -94,7 +94,8 @@ def glassed(name, body):
 TILES = {'scan': ('#b14bff', 'M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2M4 12h16'),
          'cleanup': ('#ff5fa2', 'M9 15l-5 5M14 4l6 6-8 8-6-6z'), 'storage': ('#2fa8ff', 'M4 5h7v7H4zM13 5h7v14h-7zM4 14h7v5H4z'),
          'large': ('#f7a81b', 'M11 4a7 7 0 100 14 7 7 0 000-14zM16 16l5 5'), 'duplicates': ('#ff9f3d', 'M9 9h11v11H9zM5 15H4V4h11v1'),
-         'activity': ('#22c28f', 'M3 12h4l3 7 4-14 3 7h4'), 'settings': ('#7a7fa8', 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4')}
+         'activity': ('#22c28f', 'M3 12h4l3 7 4-14 3 7h4'), 'settings': ('#7a7fa8', 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4'),
+         'apps': ('#7c5cff', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z')}
 
 def tile(colour, d):
     return ('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">'

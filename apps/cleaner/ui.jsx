@@ -328,7 +328,13 @@ export function PagedList({ fetch, rowH = 34, render, reset, style }) {
   const p = usePal();
   const [y, setY] = useState(0);
   const st = useRef({ pages: new Map(), total: -1 });
-  const PAGE = 100, h = 520;                // rows drawn past the box are clipped
+  const PAGE = 100;
+  const box = useRef(null);
+  const [h, setH] = useState(400);          // the box's real height, once laid out
+  useEffect(() => {
+    const id = setTimeout(() => { if (box.current) { const v = lord.getLayout(box.current.id)[3]; if (v > 0 && Math.abs(v - h) > 1) setH(v); } }, 30);
+    return () => clearTimeout(id);
+  });
   const load = (n) => {
     if (st.current.pages.has(n)) return st.current.pages.get(n);
     const r = fetch(n * PAGE, PAGE);
@@ -340,18 +346,18 @@ export function PagedList({ fetch, rowH = 34, render, reset, style }) {
   if (seen.current !== reset) { seen.current = reset; st.current = { pages: new Map(), total: -1 }; }
   useEffect(() => { setY(0); }, [reset]);
   if (st.current.total < 0) load(0);
-  const total = Math.max(0, st.current.total), full = total * rowH, max = Math.max(0, full - 200), top = Math.min(y, max);
+  const total = Math.max(0, st.current.total), full = total * rowH, max = Math.max(0, full - h), top = Math.min(y, max);
   const first = Math.max(0, Math.floor(top / rowH) - 1), last = Math.min(total, Math.ceil((top + h) / rowH) + 1);
   const rows = [];
   for (let i = first; i < last; i++) {
     const it = load(Math.floor(i / PAGE))[i % PAGE];
     if (it) rows.push(render(it, i));
   }
-  const bar = full > 400 ? Math.max(28, 400 * (400 / full)) : 0;
+  const bar = full > h ? Math.max(28, h * (h / full)) : 0;
   return (
-    <View onWheel={(e) => setY(Math.max(0, Math.min(max, top + e.deltaY)))} style={{ flex: 1, minHeight: 0, overflow: 'hidden', ...style }}>
+    <View ref={box} onWheel={(e) => setY(Math.max(0, Math.min(max, top + e.deltaY)))} style={{ flex: 1, minHeight: 0, overflow: 'hidden', ...style }}>
       <View style={{ position: 'absolute', left: 0, right: bar ? 10 : 0, top: first * rowH - top }}>{rows}</View>
-      {bar ? <View style={{ position: 'absolute', end: 2, width: 5, borderRadius: 3, height: bar, top: (400 - bar) * (top / (max || 1)), backgroundColor: p.sub, opacity: 0.6 }} /> : null}
+      {bar ? <View style={{ position: 'absolute', end: 2, width: 5, borderRadius: 3, height: bar, top: (h - bar) * (top / (max || 1)), backgroundColor: p.sub, opacity: 0.6 }} /> : null}
     </View>
   );
 }

@@ -6,13 +6,15 @@ import {
   View, cleaner, wm, windows, useStore, useAppWindow, useSettings, userDirs, t as tr, spacing,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Sky, Tints, Tile, Orb, Enter, PalProvider, usePal, tween } from './ui.jsx';
+import { Label, Sky, Tints, Tile, Orb, Enter, Pill, PalProvider, usePal, tween } from './ui.jsx';
 import { Dashboard, MODULES, moduleResult } from './dashboard.jsx';
 import { ReviewBoard } from './review.jsx';
 import { PlanConfirm, PlanResult, AskDialog } from './flow.jsx';
 import { Working, ScanHero, CleanupList, LargeHero, LargeList, Activity, Preferences, prefsOf } from './sections.jsx';
 import { StorageHero, StorageView } from './storage.jsx';
 import { DupHero, DupList } from './duplicates.jsx';
+import { SimilarHero, SimilarList } from './similar.jsx';
+import { AppsView } from './apps.jsx';
 
 // ---- icon: a broom with a spark (drawn with View) ----
 export function Icon({ size }) {
@@ -34,7 +36,7 @@ export function Icon({ size }) {
 
 const TICK_MS = 200;
 const ART = { cleanup: 'cleanup', large: 'large', storage: 'storage', duplicates: 'duplicates' };
-const SECTIONS = ['scan', 'cleanup', 'large', 'storage', 'duplicates'];
+const SECTIONS = ['scan', 'cleanup', 'large', 'storage', 'duplicates', 'apps'];
 const BOTTOM = ['activity', 'settings'];
 
 function SideItem({ id, section, go, rail, badge }) {
@@ -61,7 +63,7 @@ function Lights({ id }) {
     </View>
   );
 }
-const KIND = { scan: 'rules', cleanup: 'rules', large: 'tree', storage: 'tree', duplicates: 'dups' };
+const KIND = { scan: 'rules', cleanup: 'rules', large: 'tree', storage: 'tree', duplicates: 'dups', apps: 'rules' };
 
 export default function Cleaner() { return <PalProvider><Body /></PalProvider>; }
 
@@ -95,8 +97,11 @@ function Body() {
     return [...new Set(['documents', 'pictures', 'music', 'videos', 'downloads'].map((k) => u[k]).filter(Boolean))].map((p) => p.slice(u.home.length + 1)).filter(Boolean);
   }, []);
   const [folders, setFolders] = useState(() => new Set(dirs.slice(0, 1)));
+  const [similar, setSimilar] = useState(false);
+  const [imageFolders, setImageFolders] = useState(() => new Set(dirs.slice(1, 2)));
+  const pickFrom = (set) => (f) => set((o) => { const x = new Set(o); if (x.has(f)) x.delete(f); else x.add(f); return x; });
 
-  const kind = KIND[section];
+  const kind = section === 'duplicates' && similar ? 'images' : KIND[section];
   const info = cleaner.poll(kind) || { state: 'idle' };
   const scan = info.scan;
   const plan = info.plan;
@@ -171,12 +176,13 @@ function Body() {
     planShown.current = 0;
     if (kind === 'rules') cleaner.start('rules', { exclude: prefs.exclude });
     else if (kind === 'tree') cleaner.start('tree', { volume, exclude: prefs.exclude });
+    else if (kind === 'images') cleaner.start('images', { folders: [...imageFolders], exclude: prefs.exclude });
     else cleaner.start('dups', { folders: [...folders], exclude: prefs.exclude });
     watch();
   });
   const stop = () => { cleaner.cancel(false); setGen((g) => g + 1); };
   const makePlan = () => attempt(() => {
-    if (kind === 'rules') cleaner.plan(scan.id, { rules: [...chosen] });
+    if (kind === 'rules' && section !== 'apps') cleaner.plan(scan.id, { rules: [...chosen] });
     else cleaner.plan(scan.id, [...picked]);
     setResultOf('');
     watch();
@@ -208,8 +214,10 @@ function Body() {
       onRemoveModels={() => attempt(() => { cleaner.plan(scan.id, [...models]); setModels(new Set()); setResultOf(''); watch(); })} />;
     if (section === 'large') return ready ? <LargeList key={`${scan.id}.${under}`} scan={scan} prefs={prefs} selected={picked} setSelected={setPicked} under={under} clearUnder={() => setUnder('')} /> : <LargeHero />;
     if (section === 'storage') return ready ? <StorageView key={scan.id} scan={scan} onScan={start} volume={volumes.find((v) => v.id === volume)} onReview={(rel) => { setSection('large'); setUnder(rel); }} /> : <StorageHero volumes={volumes} volume={volume} setVolume={setVolume} />;
+    if (section === 'apps') return <AppsView scan={ready ? scan : null} onFind={start} selected={picked} setSelected={setPicked} />;
+    if (kind === 'images') return ready ? <SimilarList key={scan.id} scan={scan} selected={picked} setSelected={setPicked} /> : <SimilarHero folders={dirs} chosen={imageFolders} toggle={pickFrom(setImageFolders)} />;
     return ready ? <DupList key={scan.id} scan={scan} selected={picked} setSelected={setPicked} />
-      : <DupHero folders={dirs} chosen={folders} toggle={(f) => setFolders((o) => { const x = new Set(o); if (x.has(f)) x.delete(f); else x.add(f); return x; })} />;
+      : <DupHero folders={dirs} chosen={folders} toggle={pickFrom(setFolders)} />;
   })();
 
   // what the round button does here
@@ -220,8 +228,9 @@ function Body() {
     if (section === 'scan') return { label: tr('cleaner.scan'), onClick: startAll, disabled: !status.available };
     if (section === 'cleanup' && ready) return { label: tr('cleaner.clean'), onClick: makePlan, disabled: !chosen.size };
     if (section === 'storage' && ready) return null;
-    if ((section === 'large' || section === 'duplicates') && ready && picked.size) return { label: tr('cleaner.orb.trash'), onClick: makePlan };
-    if (section === 'duplicates' && !folders.size) return { label: tr('cleaner.scan'), disabled: true };
+    if ((section === 'large' || section === 'duplicates' || section === 'apps') && ready && picked.size) return { label: tr('cleaner.orb.trash'), onClick: makePlan };
+    if (section === 'apps') return null;
+    if (section === 'duplicates' && !(similar ? imageFolders : folders).size) return { label: tr('cleaner.scan'), disabled: true };
     return { label: tr('cleaner.scan'), onClick: start, disabled: !status.available };
   })();
 
@@ -249,6 +258,12 @@ function Body() {
         {!status.available ? <Label>{tr('cleaner.unavailable')}</Label> : null}
         {error ? <Label>{error}</Label> : null}
         {failed ? <Label>{failed}</Label> : null}
+        {section === 'duplicates' && !running && !showResult ? (
+          <View style={{ flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.s, marginTop: -18 }}>
+            <Pill label={tr('cleaner.dups.exact')} on={!similar} onClick={() => { setSimilar(false); setPicked(new Set()); }} />
+            <Pill label={tr('cleaner.similar.tab')} on={similar} onClick={() => { setSimilar(true); setPicked(new Set()); }} />
+          </View>
+        ) : null}
         <Enter key={section} style={{ flex: 1, minHeight: 0 }}>{showing}</Enter>
         {orb && orb.label ? <Orb key={orb.busy ? 'busy' : 'idle'} label={orb.label} onClick={orb.onClick} disabled={orb.disabled} busy={orb.busy} /> : null}
       </View>

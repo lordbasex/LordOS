@@ -1,6 +1,6 @@
 // Scan, Cleanup, Large files, Activity and Settings.
 import {
-  View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
+  View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, oldKernels, kernelPlanOk, systemInfo, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, usePal } from './ui.jsx';
@@ -98,7 +98,7 @@ function Tag({ label }) {
 
 export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels, onRemoveModels }) {
   const pal = usePal();
-  const rows = scan.rules.filter((r) => r.files > 0 || r.root === 'busy');
+  const rows = scan.rules.filter((r) => (r.files > 0 || r.root === 'busy') && r.category !== 'apps');   // leftovers are reviewed in Apps
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
   let i = 0;
@@ -129,6 +129,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
             </View>
           ))}
           <SystemCard />
+          <OldKernels />
         </ScrollView>
       )}
     </View>
@@ -170,6 +171,42 @@ function SystemCard() {
         </Glass>
       ))}
       {ask ? <ConfirmDialog destructive title={tr(`cleaner.system.${ask[0]}`)} detail={tr('cleaner.system.confirm')} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setAsk(null)} /> : null}
+    </View>
+  );
+}
+
+// ---- old kernels: chosen in sdk/oldkernels.js, removed by the package engine with its own plan shown first ----
+
+function OldKernels() {
+  const [gen, setGen] = useState(0);
+  const [plan, setPlan] = useState(null);
+  const [msg, setMsg] = useState('');
+  const release = useMemo(() => { try { return systemInfo().kernel; } catch (e) { return ''; } }, []);
+  const old = useMemo(() => { try { return lord.pkg.available() ? oldKernels(lord.pkg.installed({}), release) : []; } catch (e) { return []; } }, [gen]);
+  if (!old.length || !admin.available()) return msg ? <Label dim size={typeScale.callout}>{msg}</Label> : null;
+  const size = old.reduce((a, p) => a + p.installedSize, 0);
+  const review = () => {
+    const p = lord.pkg.plan({ remove: old.map((k) => k.name) });
+    if (kernelPlanOk(p, release)) setPlan(p);
+    else setMsg(tr('cleaner.kernels.refused'));
+  };
+  const run = () => {
+    const names = old.map((k) => k.name).join(' ');
+    setPlan(null);
+    admin.run('pkg-remove', names).then(() => { setMsg(tr('cleaner.system.done', { name: tr('cleaner.kernels.title') })); setGen((g) => g + 1); }).catch((e) => setMsg(e.message));
+  };
+  return (
+    <View style={{ gap: spacing.s }}>
+      {msg ? <Label dim size={typeScale.callout}>{msg}</Label> : null}
+      <Glass style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Label weight={600}>{tr('cleaner.kernels.title')}</Label>
+          <Label dim size={typeScale.callout}>{tr('cleaner.kernels.text', { count: old.length })}</Label>
+        </View>
+        <Label weight={600}>{formatBytes(size)}</Label>
+        <GlassButton small label={tr('cleaner.review')} onClick={review} />
+      </Glass>
+      {plan ? <ConfirmDialog destructive title={tr('cleaner.kernels.title')} detail={`${plan.items.map((i) => i.name).join(', ')}. ${tr('cleaner.system.confirm')}`} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setPlan(null)} /> : null}
     </View>
   );
 }

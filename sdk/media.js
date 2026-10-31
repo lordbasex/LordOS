@@ -190,7 +190,7 @@ export function userDirs() {
     return `${home}/${m ? m[1] : def}`;
   };
   return { home, pictures: get('PICTURES', 'Pictures'), music: get('MUSIC', 'Music'), videos: get('VIDEOS', 'Videos'), desktop: get('DESKTOP', 'Desktop'),
-    documents: get('DOCUMENTS', 'Documents') };
+    documents: get('DOCUMENTS', 'Documents'), downloads: get('DOWNLOAD', 'Downloads') };
 }
 
 // ---- what's playing now (Control Center and media keys) ----

@@ -1,7 +1,7 @@
 // cleaner.js — Cleaner's native API (lord.clean, docs/CLEANER-ARCHITECTURE.md).
 //
 //   cleaner.available()                  the sandboxed scanner is installed
-//   cleaner.start(kind, opts)            a new scan ('rules', 'tree' or 'dups'): its id
+//   cleaner.start(kind, opts)            a new scan ('rules', 'tree', 'dups' or 'images'): its id
 //   cleaner.poll(kind)                   { job, state, error, scan, plan, emptied }: real counters
 //   cleaner.volumes() / tree / groups    what a tree or a duplicates scan found
 //   cleaner.restore(planId, id)          back from the Trash; history() / clearHistory(); emptyTrash()

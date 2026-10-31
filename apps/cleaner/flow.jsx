@@ -38,8 +38,10 @@ export function PlanConfirm({ plan, onOk, onCancel }) {
   if (plan.deleteItems) rows.push([tr('cleaner.confirm.rowDelete', { n: n(plan.deleteItems) }), formatBytes(plan.deleteAllocated)]);
   if (plan.trashItems) rows.push([tr('cleaner.confirm.rowTrash', { n: n(plan.trashItems) }), formatBytes(plan.trashAllocated)]);
   if (left > 0) rows.push([tr('cleaner.confirm.rowLeft', { n: n(left) }), '']);
-  if (plan.named) for (const i of cleaner.results('plan', 0, 30).items) if (i.status === 'ready') rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
-  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr('cleaner.models.warn') : '',
+  const named = plan.named ? cleaner.results('plan', 0, 30).items.filter((i) => i.status === 'ready') : [];
+  for (const i of named) rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
+  const leftovers = named.some((i) => i.rule === 'app-leftovers');
+  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : 'cleaner.models.warn') : '',
     ...plan.warnings.filter((w) => w === 'linksElsewhere' || w === 'scanIncomplete' || w === 'keepOneCopy').map((w) => tr(`cleaner.warn.${w}`))].filter(Boolean);
   if (!plan.counts.ready) return <Dialog title={tr('cleaner.noneReady')} rows={rows} note={notes.join(' ')} onCancel={onCancel} />;
   return <Dialog title={tr(plan.deleteItems ? 'cleaner.confirm.titleDelete' : 'cleaner.confirm.title', { count: plan.counts.ready })} rows={rows} note={notes.join(' ')} danger={plan.deleteItems > 0}
