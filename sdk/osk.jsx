@@ -12,7 +12,7 @@ import { shellTokens, useTheme } from './theme.js';
 import { t as tr } from './i18n.js';
 import { keyboard } from './keyboard.js';
 import { osk, oskState } from './osk.js';
-import { KEY, letterRows, panelSize, punctuation, symbolRows } from './oskmodel.js';
+import { KEY, TOP_GAP, letterRows, panelSize, punctuation, symbolRows } from './oskmodel.js';
 
 const HOLD_MS = 420, REPEAT_MS = 70, CAPS_MS = 400;
 
@@ -60,7 +60,7 @@ export function OskPanel() {
   const box = st.box || (() => { const m = mainDisplay(); return { x: m.x, y: m.y, w: m.w, h: m.h }; })();
   const s = panelSize(box);
   const left = box.x + Math.round((box.w - s.width) / 2);
-  const top = st.dock === 'top' ? box.y + 30 : box.y + box.h - s.height;
+  const top = st.dock === 'top' ? box.y + TOP_GAP : box.y + box.h - s.height;
   const c = {
     panel: t.panelBg || t.windowBg, text: t.text, accent: t.accent,
     key: t.control, side: t.sidebarBg || t.separator, down: t.accent,

@@ -148,12 +148,13 @@ function showHud() {
 // While it runs: the windows' start offset, read once by WindowShell. Null when idle.
 export const desktopFx = createStore(null);
 let fxTimer = 0;
+// lord.setStyle takes native properties: a CSS transform only exists in React styles (runtime/style.js)
 const style = (node, k, v) => { try { lord.setStyle(node, k, v); } catch (e) { /* closed meanwhile */ } };
 
 function endFx(nodes) {
   clearTimeout(fxTimer);
   fxTimer = 0;
-  for (const n of nodes) { style(n, 'transform', undefined); style(n, 'opacity', undefined); }
+  for (const n of nodes) { style(n, 'translateX', undefined); style(n, 'opacity', undefined); }
   desktopFx.set(null);
 }
 function animate(step) {
@@ -168,7 +169,7 @@ function animate(step) {
     if (p >= 1) { endFx(nodes); return; }
     const e = 1 - (1 - p) * (1 - p) * (1 - p);        // ease-out
     for (const n of nodes) {
-      style(n, 'transform', `translate(${(dx * (1 - e)).toFixed(1)}px, 0px)`);
+      style(n, 'translateX', +(dx * (1 - e)).toFixed(1));
       style(n, 'opacity', +e.toFixed(3));
     }
     fxTimer = setTimeout(tick, 16);

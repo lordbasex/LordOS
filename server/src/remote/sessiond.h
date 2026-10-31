@@ -22,6 +22,7 @@
 /* created when the first session frame is on the monitor; lordos-splash-quit.service waits for it to
  * end the boot splash (plymouth quit --retain-splash). See docs/SESSIONS.md, "Boot splash". */
 #define SD_FIRST_FRAME SD_RUN_DIR "/first-frame"
+#define SD_NO_DISPLAY SD_RUN_DIR "/no-display"   /* lordos-splash: the console has to show, nothing else will */
 #define SD_GREETER_RUN SD_RUN_DIR "/greeter"        /* XDG_RUNTIME_DIR of the login screen */
 #define SD_SESSION_CONF "/etc/lordos/session.conf"   /* AUTOLOGIN=user (empty: login screen) */
 #define SD_STATE_DIR "/var/lib/lordos"               /* boot-times.jsonl (docs/SESSIONS.md, "Boot time") */

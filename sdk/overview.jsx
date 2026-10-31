@@ -17,7 +17,7 @@ import { useTheme } from './theme.js';
 import { Layer } from './layers.js';
 import { settings } from './settings.js';
 import { windows, wm, getApp, workAreaOf, windowTitle, activeDesktop, desktopList, onActiveDesktop, overviewShowing, setActiveDesktop, createDesktop, closeDesktop } from './windows.js';
-import { MAX_DESKTOPS, onDesktop, gridLayout, stripLayout, hitRect, OVERVIEW_LABEL } from './desktopmodel.js';
+import { MAX_DESKTOPS, onDesktop, gridLayout, stripLayout, hitRect, overviewPlaceholder, OVERVIEW_LABEL } from './desktopmodel.js';
 import { launcherIdOf } from './dock.js';
 import { windowIcon } from './apps.js';
 import { findWallpaper, wallpaperThumb } from './wallpapers.js';
@@ -105,6 +105,18 @@ export function OverviewCover({ id, scale, radius }) {
       border: hovered ? `${Math.round(3 / scale)}px solid ${th.accent}` : '0 solid transparent' },
   });
 }
+// A minimized window's body when it has nothing else to show: its app icon and title. Inside the
+// window's scaled node, so the sizes are divided by the scale.
+export function OverviewPlaceholder({ win, scale }) {
+  const th = useTheme();
+  if (!overviewPlaceholder(win, true)) return null;
+  const Icon = windowIcon(win, getApp);
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: Math.round(10 / scale),
+    padding: Math.round(12 / scale), backgroundColor: th.windowBg, borderRadius: win.maximized ? 0 : 8, overflow: 'hidden', pointerEvents: 'none' } },
+  Icon ? h(Icon, { size: Math.round(48 / scale) }) : null,
+  h(Text, { style: { maxWidth: '100%', fontSize: Math.round(13 / scale), color: th.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis' } }, windowTitle(win)));
+}
+
 // The window's place in the overview, or null. WindowShell reads it.
 export function useOverviewPlace(id) {
   return useStore(overview, (o) => o?.places.get(id) || null);

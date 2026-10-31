@@ -17,7 +17,7 @@ import { useStore } from './store.js';
 import { wm, fxNodes, activeDesktop } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { desktopFx } from './desktops.js';
-import { OverviewCover, useOverviewPlace } from './overview.jsx';
+import { OverviewCover, OverviewPlaceholder, useOverviewPlace } from './overview.jsx';
 
 export const WINDOW_EDGE = 6;     // px of border outside the frame
 const INSIDE = 3;                 // and inside
@@ -48,6 +48,7 @@ export function WindowShell({ win, style, children, onMouseDown, resizable = tru
     <View ref={wm.frameRef(win.id, m)} onMouseDown={tv ? undefined : onMouseDown}
       style={{ position: 'absolute', left: geo.x - m, top: geo.y - m, width: geo.w + 2 * m, height: geo.h + 2 * m, display: here ? 'flex' : 'none' }}>
       <View ref={inner.current} style={{ position: 'absolute', left: m, top: m, right: m, bottom: m, ...style, ...place }}>
+        {tv ? h(OverviewPlaceholder, { win, scale: tv.scale }) : null}
         {children}
         {tv ? h(OverviewCover, { id: win.id, scale: tv.scale, radius: win.maximized ? 0 : 8 }) : null}
       </View>

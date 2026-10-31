@@ -121,6 +121,16 @@ put in graphics mode once (`KD_GRAPHICS`) and goes back to text when the service
 The card, the input and the monitor socket are never left open in the children (web
 connections, workers): `sd_mon_child()` closes them before dropping root.
 
+### No usable display driver
+
+`sd_mon_open` (`remote/monitor.c`) waits up to 30 s for a card with KMS, a connector and a CRTC
+(`drmcard.h`). A card that opens but has none of that, such as a render-only GPU, counts as no card:
+lord-server could not start on it. lord-sessiond logs `no usable display driver`, creates
+`/run/lordos/no-display`, writes what happened on tty1 (`tell_no_display`) and keeps running with no
+monitor, so remote desktop still works if it is on. `lordos.service` stays active for that reason: read
+the journal, not the unit's state. Once the driver is fixed, `systemctl restart lordos.service` picks the
+display up; a driver that loads later than the wait is not picked up by itself.
+
 ### Boot splash
 
 The boot splash (Plymouth, theme `lordos`; see `ISO.md` and `RASPBERRY.md`, "Boot splash") hands
@@ -143,7 +153,8 @@ the screen to LordOS without a black frame or a flash of the text console:
 4. **lord-sessiond** creates `/run/lordos/first-frame` (also at once when there is no monitor).
 5. **`lordos-splash-quit.service`** (wanted by `lordos.service`) waits for that file and runs
    `plymouth quit --retain-splash`: Plymouth closes its card without touching the screen, which
-   already shows LordOS. Without the file after 30 s it ends Plymouth anyway.
+   already shows LordOS. Without the file after 35 s it ends Plymouth anyway. With no usable display
+   (below) it ends Plymouth without `--retain-splash`, so the console shows.
 6. Plymouth's own `plymouth-quit.service` (a plain `plymouth quit`) is ordered after it by
    `plymouth-quit.service.d/lordos.conf`, so it can't end the splash early. There is no
    `Conflicts=` with it (the display-manager way): starting `plymouth-quit.service` by hand would
@@ -491,6 +502,7 @@ session. Everything that changes something goes through closed `admin.c` actions
 | `apps/settings/Users.jsx`              | Settings → Users                                          |
 | `/run/lordos/status.json`              | sessions, who's on the monitor and who's connected over the network |
 | `/run/lordos/first-frame`              | the first session frame of this boot is on the monitor (boot splash hand-off) |
+| `/run/lordos/no-display`               | no usable display: the boot splash ends without keeping its frame |
 | `tools/boot/lordos-splash`, `tools/boot/systemd/` | the boot splash hand-off: `deactivate`, `quit` and the units |
 | `/etc/lordos/session.conf`             | `AUTOLOGIN=`                                              |
 

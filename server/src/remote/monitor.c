@@ -27,6 +27,7 @@
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* the card with a display (on the Pi 5 it's usually card1: card0 is v3d, without connectors; drmcard.h) */
@@ -55,21 +56,37 @@ static int useful(int fd) {
            (HAS(ev, EV_ABS) && HAS(abs, ABS_X) && HAS(abs, ABS_Y));
 }
 
+/* Nothing can be shown. The caller reports it on tty1 (sessiond.c tell_no_display); the file makes the
+ * boot splash end for real instead of keeping its last picture over that message (lordos-splash). */
+static int no_display(void) {
+    mkdir(SD_RUN_DIR, 0755);
+    int fd = open(SD_NO_DISPLAY, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd >= 0) close(fd);
+    return -1;
+}
+
 int sd_mon_open(void) {
     /* On ARM boards the display driver can show up well after boot (on a Raspberry Pi 5's first
      * boot vc4 may come after lordos.service has started): wait up to 30 s for a card with KMS
      * before giving up, instead of falling back to the text console for good. */
-    int tries = 0;
-    while (drm_pick_card(card, sizeof card) && tries < 150) {
+    int tries = 0, none;
+    unlink(SD_NO_DISPLAY);
+    while ((none = drm_pick_card(card, sizeof card)) && tries < 150) {
         if (!tries) sd_log("no card with KMS yet; waiting up to 30 s");
         struct timespec ts = { 0, 200000000 };
         nanosleep(&ts, NULL);
         tries++;
     }
-    if (tries >= 150) sd_log("no card with KMS after 30 s; trying %s", card);
-    else sd_log("display: %s%s", card, tries ? " (after waiting)" : "");
+    /* A card that opens but has no KMS (a render-only GPU) can't show anything either: lord-server
+     * would fail on it, quietly, once per attempt, while this process and the unit look fine. */
+    if (none) {
+        sd_log("no usable display driver: no /dev/dri/card* with connectors and CRTCs after 30 s, the login screen will not start "
+               "(lspci -k shows the graphics driver; once it is fixed, restart lordos.service)");
+        return no_display();
+    }
+    sd_log("display: %s%s", card, tries ? " (after waiting)" : "");
     int fd = open(CARD, O_RDWR | O_CLOEXEC);
-    if (fd < 0) { sd_log("no monitor (%s: %s)", CARD, strerror(errno)); return -1; }
+    if (fd < 0) { sd_log("no usable display: %s: %s, the login screen will not start", CARD, strerror(errno)); return no_display(); }
     close(fd);
     hp = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (hp >= 0 && inotify_add_watch(hp, "/dev/input", IN_CREATE | IN_ATTRIB | IN_DELETE) < 0) { close(hp); hp = -1; }

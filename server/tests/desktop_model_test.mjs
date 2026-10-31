@@ -10,7 +10,7 @@ const M = await import(path.join(here, '../../sdk/desktopmodel.js'));
 const S = await import(path.join(here, '../../sdk/sessionmodel.js'));
 const {
   onDesktop, windowHidden, visibleOn, mountedOn, focusedOn, keyboardSurface, acceptsAppRequest, surfaceState, pickWindow, addDesktop, removeDesktop,
-  nextDesktop, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, gridLayout, stripLayout, hitRect, MAX_DESKTOPS,
+  nextDesktop, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, gridLayout, stripLayout, hitRect, overviewPlaceholder, MAX_DESKTOPS,
 } = M;
 
 let n = 0, bad = 0;
@@ -149,6 +149,24 @@ eq('index', [cleanIndex(3), cleanIndex(-1), cleanIndex(99), cleanIndex('1'), cle
   eq('nine fit on 1024', nine.cards[8].x + nine.cards[8].w <= 1024 && nine.cards[0].x >= 0, true);
   eq('hit', [hitRect({ x: 1, y: 1, w: 2, h: 2 }, 2, 2), hitRect({ x: 1, y: 1, w: 2, h: 2 }, 3, 2), hitRect(null, 0, 0)], [true, false, false]);
 }
+
+// lord.setStyle takes native properties only: a CSS transform there is `js: unsupported style 'transform'`
+// and does nothing (the Desktops animation's slide)
+{
+  const fs = await import('node:fs');
+  const sent = (dir, out = []) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules') sent(p, out); } else if (/\.jsx?$/.test(e.name) && /\b(setStyle|style|set)\([^,()]+(\.id)?,\s*'transform'/.test(fs.readFileSync(p, 'utf8'))) out.push(p);
+    }
+    return out;
+  };
+  const root = path.join(here, '../..');
+  eq('nothing sends transform to setStyle', ['sdk', 'themes', 'apps', 'runtime'].flatMap((d) => sent(path.join(root, d))).map((p) => path.relative(root, p)), []);
+}
+
+// a minimized window has a placeholder behind its body in the overview, and only there
+eq('placeholder: minimized, in the overview', [overviewPlaceholder({ minimized: true }, true), overviewPlaceholder({ minimized: true }, false), overviewPlaceholder({}, true)], [true, false, false]);
 
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

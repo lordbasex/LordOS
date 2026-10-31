@@ -3,6 +3,8 @@
   "fileName": "Captura de tela {date}",
   "recName": "Gravação de tela {date}",
   "annotated": "anotada",
+  "refused": "Não foi possível capturar a tela",
+  "refused.open": "Abrir Privacidade",
   "mode.full": "Tela inteira",
   "mode.window": "Janela",
   "mode.area": "Área",
