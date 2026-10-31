@@ -102,6 +102,10 @@ int  gpu_gdrag_ready(int out);
  * shown, and the caller paints w on the CPU in its next frame. */
 int  gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuDrag *gdrag, int *gdrag_drawn,
                   void (*draw_layer)(int layer));
+/* The buffer-age scissor (LORD_GPU_SCISSOR=1, docs/GPU.md): the next gpu_frame_ex of this output draws only the
+ * UI, no app window, menu or cursor, so it may redraw only what changed. Asked before every frame; unset, it is
+ * composed whole. */
+void gpu_scissor_quiet(int out, int quiet);
 int  gpu_gdrag_holds(int out);             /* the GPU drag textures hold that output's last upload, in this context */
 /* Texture which (0 the copy of what is below, 1 the layer) of output out gets r of px (w × h, stride w),
  * between frames (paint_gdrag_feed's up). 1: it held nothing of that output at that size: it is now that
@@ -116,6 +120,7 @@ typedef struct {
     int gdrag_full;                        /* one of them was sent whole */
     double swap_ms;                     /* eglSwapBuffers */
     double submit_ms;                   /* the front buffer, its framebuffer and the page flip */
+    long comp_px;                       /* what the frame composed: the output, or the scissor's rectangle */
 } GpuFrameTimes;
 void gpu_frame_times(int out, GpuFrameTimes *t);
 /* While on, each frame takes a native fence after eglSwapBuffers (EGL_ANDROID_native_fence_sync); at

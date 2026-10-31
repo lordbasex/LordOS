@@ -66,6 +66,7 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
 void wl_paint_popups(Canvas *c);
 
 /* Presentation (main.c). */
+int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu to draw (the buffer-age scissor) */
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
