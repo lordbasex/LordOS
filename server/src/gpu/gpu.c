@@ -52,10 +52,6 @@ int  gpu_gdrag_feed(int out, int which, const uint32_t *px, int w, int h, Rect r
     (void)out; (void)which; (void)px; (void)w; (void)h; (void)r;
     return -1;
 }
-void gpu_scissor_quiet(int out, int quiet) {
-    if (G.on && out >= 0 && out < OUT_MAX && G.out[out].used) G.out[out].sc_quiet = quiet;
-}
-
 void gpu_frame_times(int out, GpuFrameTimes *t) { (void)out; *t = (GpuFrameTimes){ 0 }; }
 void gpu_fence_on(int on) { (void)on; }
 int  gpu_fence_time(int out, uint64_t *ns) { (void)out; *ns = 0; return 0; }
@@ -1333,6 +1329,10 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     int r = present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
     o->times.submit_ms = mono_ms() - t2;
     return r;
+}
+
+void gpu_scissor_quiet(int out, int quiet) {
+    if (G.on && out >= 0 && out < OUT_MAX && G.out[out].used) G.out[out].sc_quiet = quiet;
 }
 
 void gpu_frame_times(int out, GpuFrameTimes *t) {
