@@ -38,11 +38,11 @@ Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.
 | Translated Downloads folders | Built | From `XDG_DOWNLOAD_DIR`, only a `$HOME/…` value that passes as a rule's root |
 | Old kernels | Built | Chosen in `sdk/oldkernels.js`, shown through `lord.pkg.plan`, run by `pkg-remove`. The real plan was read on the VM; the removal was not run |
 | System temporary folder | Built | Your own files over a week old, measured only |
-| Code project outputs | Partly | Eight kinds, proved by evidence, checked again at plan and execution, to the Trash. Code exists; no case in `clean-test` yet |
-| Tool and installer rules | Partly | Playwright, Puppeteer, Go module downloads, JetBrains, Dart pub, Maven repository, Flatpak app caches, old installers, big videos. Code exists; no case in `clean-test` yet |
-| Bands and summary on the map | Partly | Code exists; no case in `clean-test` yet |
+| Code project outputs | Built | Eight kinds, proved by evidence, checked again at plan and execution, to the Trash. Covered in `clean-test` |
+| Tool and installer rules | Built | Playwright, Puppeteer, Go module downloads, JetBrains, Dart pub, Maven repository, Flatpak app caches, old installers, big videos. Covered in `clean-test` |
+| Bands and summary on the map | Built | Covered in `clean-test` |
 | What each rule finds, during a scan | Partly | Code exists; no case in `clean-test` yet |
-| Kept storage map | Partly | `~/.cache/lordos/cleaner-map.txt`, 0600, on by default, with a switch in Settings. Code exists; no case in `clean-test` yet |
+| Kept storage map | Built | `~/.cache/lordos/cleaner-map.txt`, 0600, on by default, with a switch in Settings. Covered in `clean-test` |
 | Minimum time per scan step | Partly | 2.6 s a step of a full scan, 1.8 s a section's scan. Code exists; no case in `clean-test` yet |
 
 ## Phases 2 and 3: what has no row above
@@ -70,7 +70,6 @@ Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.
 - A `.deb` cache is often empty on LordOS: the package engine deletes its own downloads.
 - Closing the app cancels a running job and drops its results. The kept storage map stays, by design.
 - A project's evidence is a name of a file, not proof that it can be built again: that is why outputs are chosen by name and go to the Trash.
-- A project's idle time is the scan's figure: it isn't worked out again at the plan or before acting, only the evidence is.
 - A scan of another disk removes the kept map and saves none.
 - The walk's cost on a large home folder has not been measured.
 

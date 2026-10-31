@@ -28,7 +28,7 @@
 #ifndef LORD_CLEAN_PROTO_H
 #define LORD_CLEAN_PROTO_H
 
-#define CLEAN_MAX_ROOTS 96
+#define CLEAN_MAX_ROOTS 160
 #define CLEAN_MAX_DEPTH 32          /* folders below a root */
 #define CLEAN_MAX_FILES 200000      /* entries examined in one scan: past this the scan is incomplete */
 #define CLEAN_PATH_MAX  1024        /* bytes of a path relative to its root */

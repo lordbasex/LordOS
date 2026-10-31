@@ -78,7 +78,7 @@ function Stat({ label, value, delay }) {
   );
 }
 
-export function PlanResult({ plan, onDone }) {
+export function PlanResult({ plan, onDone, onEmpty }) {
   const [detail, setDetail] = useState(false);
   const [gen, setGen] = useState(0);
   const others = REASONS.filter((k) => plan.counts[k] > 0);
@@ -100,6 +100,7 @@ export function PlanResult({ plan, onDone }) {
       <View style={{ flexDirection: 'row', gap: spacing.s }}>
         <GlassButton small label={tr(detail ? 'cleaner.hideDetails' : 'cleaner.showDetails')} onClick={() => setDetail(!detail)} />
         <GlassButton small label={tr('cleaner.close')} onClick={onDone} />
+        {plan.trashed ? <GlassButton small label={tr('cleaner.empty.now')} onClick={onEmpty} /> : null}
       </View>
       {detail ? (
         <Glass style={{ flex: 1, minHeight: 80, padding: spacing.xs, alignSelf: 'stretch' }}>

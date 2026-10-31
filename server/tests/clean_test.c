@@ -1881,6 +1881,7 @@ static void test_projects(void) {
     CHECK(exists("idle/node_modules/dep/index.js"));
     /* or between the plan and the action */
     put("idle/package.json", "{}");
+    age_all("idle/package.json", 90);       /* the proof comes back, the project stays idle */
     plan = clean_plan(scan, &id, 1);
     CHECK(plan > 0);
     wait_job(&p);
@@ -1894,6 +1895,7 @@ static void test_projects(void) {
     CHECK(exists("idle/node_modules/dep/index.js"));
     /* a real run: to the Trash, whole, and back */
     put("idle/package.json", "{}");
+    age_all("idle/package.json", 90);       /* the proof comes back, the project stays idle */
     plan = clean_plan(scan, &id, 1);
     wait_job(&p);
     CHECK(count(p.plan, "ready") == 1);
@@ -2007,6 +2009,25 @@ static int tree_scan(const CleanOpts *o, Poll *p) {
     CHECK(id > 0);
     wait_job(p);
     return id;
+}
+
+/* an idle project that is used again after the scan is left alone: the time is judged again, not only the proof */
+static void test_project_wakes(void) {
+    clean_rules_override(project_rules, (int)(sizeof project_rules / sizeof *project_rules));
+    wipe();
+    make_node_project("woke");
+    age_all("woke", 90);
+    Poll p;
+    int scan = run_scan(&p);
+    poll_free(&p);
+    uint32_t id = candidate_id("woke/node_modules");
+    CHECK(id > 0);
+    put("woke/src/deep/new.txt", "x");
+    CHECK(clean_plan(scan, &id, 1) > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "skipped") == 1 && count(p.plan, "ready") == 0);
+    poll_free(&p);
+    clean_rules_override(&base, 1);
 }
 
 static void test_map(void) {
@@ -2157,6 +2178,7 @@ int main(void) {
     test_leftovers();
     test_system_tmp();
     test_projects();
+    test_project_wakes();
     test_map();
     wipe();
     rmdir(H);

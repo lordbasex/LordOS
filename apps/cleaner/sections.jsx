@@ -132,8 +132,8 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
       {incomplete ? <Label>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
       {offered.length ? <SelectBar selected={chosen} onPick={(ids) => setChosen(new Set(ids))} size={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.allocated : 0), 0)} count={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.files : 0), 0) + models.size}
         options={[{ key: 'smart', ids: rows.filter((r) => offered.includes(r.id) && r.risk === 'regenerable' && !r.explicit).map((r) => r.id) }, { key: 'all', ids: offered }]} /> : null}
-      {!rows.length ? <Label dim>{tr('cleaner.emptyHint')}</Label> : (
-        <ScrollView style={{ flex: 1 }} contentStyle={{ gap: spacing.s }}>
+      <ScrollView style={{ flex: 1 }} contentStyle={{ gap: spacing.s }}>
+          {!rows.length ? <Label dim>{tr('cleaner.emptyHint')}</Label> : null}
           {cats.map((c) => (
             <View key={c} style={{ gap: spacing.s }}>
               <Label dim size={typeScale.callout} weight={600}>{tr(`cleaner.category.${c}`)}</Label>
@@ -146,8 +146,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
           ))}
           <SystemCard />
           <OldKernels />
-        </ScrollView>
-      )}
+      </ScrollView>
     </View>
   );
 }
@@ -297,7 +296,7 @@ export function Activity({ gen }) {
             <Glass style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
               
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Label weight={600}>{tr(e.action === 'emptyTrash' ? 'cleaner.activity.emptied' : 'cleaner.activity.cleaned', { n: n(e.action === 'emptyTrash' ? e.items : e.counts.done) })}</Label>
+                <Label weight={600}>{e.action === 'emptyTrash' ? tr('cleaner.activity.emptied', { n: n(e.items) }) : e.trashed == null ? tr('cleaner.activity.cleaned', { n: n(e.counts.done) }) : tr('cleaner.activity.split', { deleted: n(e.deleted), trashed: n(e.trashed) })}</Label>
                 <Label dim size={typeScale.callout}>{when(e.at)}</Label>
               </View>
               <Label dim size={typeScale.callout}>{tr('cleaner.result.free', { before: formatBytes(e.freeBefore), after: formatBytes(e.freeAfter) })}</Label>

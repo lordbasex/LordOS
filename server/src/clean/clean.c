@@ -30,6 +30,7 @@
 #define IDLE_MS 30000                       /* the helper reports at least every ~1024 entries, or while hashing */
 #define SAFE_INT 9007199254740992.0         /* 2^53: exact in a JSON number */
 #define HISTORY_MAX 100
+#define PROJECT_RECHECK 2000000             /* entries read to judge one project again; past this it isn't offered */
 #define HISTORY_LINE 512
 
 enum { JOB_NONE, JOB_SCAN, JOB_PLAN, JOB_EXEC, JOB_EMPTY };
@@ -1304,6 +1305,11 @@ static int item_check(const Scan *s, const Cand *c, const int *rootfd, const int
     else {
         const CleanRule *r = src_rule(src);
         if (r && r->project && clean_project_kind(fd, base) != r->project - 1) st = I_CHANGED;   /* what proved it is gone */
+        else if (r && r->project && clean_project_idle_days(r->project - 1)) {   /* the project came back to life */
+            long left = PROJECT_RECHECK;
+            long long newest = clean_project_newest(fd, CLEAN_MAX_DEPTH, &left, NULL);
+            if (left <= 0 || !covered(src, base, (double)newest, (double)c->size)) st = I_SKIPPED;
+        }
     }
     if (st != I_READY) { close(fd); return st; }
     *parent = fd;
@@ -1634,7 +1640,7 @@ static void history_plan(const Plan *p, int cancelled) {
     jb_num(&b, p->free_before);
     jb_raw(&b, ",\"freeAfter\":");
     jb_num(&b, p->free_after);
-    jb_raw(&b, "}");
+    jb_printf(&b, ",\"deleted\":%ld,\"trashed\":%ld}", p->deleted, p->trashed);
     if (!b.oom) history_add(b.p);
     jb_free(&b);
 }

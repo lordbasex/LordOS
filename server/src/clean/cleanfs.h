@@ -20,6 +20,10 @@ int clean_glob(const char *pattern, const char *name);
 int clean_project_kind(int parent, const char *name);
 int clean_project_named(int kind, const char *name);    /* name is one of that kind's folders */
 int clean_project_output(const char *name);             /* left out when judging how recent a project is */
+/* The newest change in the project in folder parent, its build outputs apart: 0 when nothing else is there, which
+ * proves nothing. A folder's time says only that its entries changed, so the walk goes all the way down. left bounds
+ * the entries read; tick, if any, runs for each. */
+long long clean_project_newest(int parent, int max_depth, long *left, void (*tick)(void));
 int clean_project_idle_days(int kind);                  /* offered only after this long without a change; 0 = any time */
 
 /* The kind of file a name suggests (CLEAN_TYPE_*). Only for grouping: it decides nothing. */

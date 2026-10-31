@@ -2,6 +2,7 @@
 #include "cleanfs.h"
 #include "cleanproto.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/openat2.h>
@@ -115,6 +116,33 @@ int clean_project_kind(int parent, const char *name) {
 int clean_project_output(const char *name) {
     for (int k = 0; k < CLEAN_PROJECT_KINDS; k++) if (clean_project_named(k, name)) return 1;
     return !strcmp(name, ".git") || !strcmp(name, "dist") || !strcmp(name, "coverage") || !strcmp(name, "__pycache__");
+}
+
+static long long newest_in(int fd, int depth, int max_depth, long *left, void (*tick)(void)) {
+    DIR *d = fdopendir(fd);
+    if (!d) { close(fd); return 0; }
+    long long best = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && *left > 0) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || clean_project_output(e->d_name)) continue;
+        --*left;
+        if (tick) tick();
+        struct statx sx;
+        if (statx(dirfd(d), e->d_name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_MTIME, &sx)) continue;
+        if (!S_ISREG(sx.stx_mode) && !S_ISDIR(sx.stx_mode)) continue;
+        if (sx.stx_mtime.tv_sec > best) best = sx.stx_mtime.tv_sec;
+        if (S_ISDIR(sx.stx_mode) && depth < max_depth) {
+            int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
+            if (sub >= 0) { long long t = newest_in(sub, depth + 1, max_depth, left, tick); if (t > best) best = t; }
+        }
+    }
+    closedir(d);
+    return best;
+}
+
+long long clean_project_newest(int parent, int max_depth, long *left, void (*tick)(void)) {
+    int top = clean_open(parent, ".", O_RDONLY | O_DIRECTORY);
+    return top < 0 ? 0 : newest_in(top, 0, max_depth, left, tick);
 }
 
 int clean_project_idle_days(int kind) { return kind >= 0 && kind < CLEAN_PROJECT_KINDS ? project[kind].idle_days : 0; }

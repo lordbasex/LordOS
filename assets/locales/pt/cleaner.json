@@ -453,5 +453,8 @@
     "one": "{count} item selecionado",
     "other": "{count} itens selecionados"
   },
-  "confirm.more": "e mais {n}"
+  "confirm.more": "e mais {n}",
+  "empty.now": "Esvaziar Lixeira e liberar espaço",
+  "empty.done": "Lixeira esvaziada: {size} liberados",
+  "activity.split": "{deleted} excluídos, {trashed} movidos para a Lixeira"
 }

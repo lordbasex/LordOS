@@ -453,5 +453,8 @@
     "one": "{count} elemento seleccionado",
     "other": "{count} elementos seleccionados"
   },
-  "confirm.more": "y {n} más"
+  "confirm.more": "y {n} más",
+  "empty.now": "Vaciar Papelera y liberar espacio",
+  "empty.done": "Papelera vaciada: {size} liberados",
+  "activity.split": "{deleted} eliminados, {trashed} movidos a la Papelera"
 }

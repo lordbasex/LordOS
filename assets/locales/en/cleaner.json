@@ -453,5 +453,8 @@
     "one": "{count} item selected",
     "other": "{count} items selected"
   },
-  "confirm.more": "and {n} more"
+  "confirm.more": "and {n} more",
+  "empty.now": "Empty Trash and free space",
+  "empty.done": "Trash emptied: {size} freed",
+  "activity.split": "{deleted} deleted, {trashed} moved to the Trash"
 }

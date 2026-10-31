@@ -142,29 +142,9 @@ static void sum_tree(int fd, double *s, double *a) {
     closedir(d);
 }
 
-/* The newest change in a project, its build outputs apart: 0 when nothing else is there, which proves nothing.
- * Takes fd. A folder's time says only that its entries changed, so the walk goes all the way down. */
-static int64_t newest_in(int fd, int depth) {
-    DIR *d = fdopendir(fd);
-    if (!d) { close(fd); nunread++; return 0; }
-    int64_t best = 0;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || clean_project_output(e->d_name)) continue;
-        if (seen >= max_files) { limit("files"); stop = 1; break; }
-        seen++;
-        if ((seen & 4095) == 0) flush_batch(0);
-        struct statx sx;
-        if (statx(dirfd(d), e->d_name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_MTIME, &sx)) { nunread++; continue; }
-        if (S_ISLNK(sx.stx_mode) || !(S_ISREG(sx.stx_mode) || S_ISDIR(sx.stx_mode))) continue;
-        if (sx.stx_mtime.tv_sec > best) best = sx.stx_mtime.tv_sec;
-        if (S_ISDIR(sx.stx_mode) && depth < max_depth) {
-            int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
-            if (sub >= 0) { int64_t t = newest_in(sub, depth + 1); if (t > best) best = t; }
-        }
-    }
-    closedir(d);
-    return best;
+static void walk_tick(void) {
+    seen++;
+    if ((seen & 4095) == 0) flush_batch(0);      /* a long silence would look like a dead helper */
 }
 
 static void emit(int root, const char *rel, const struct statx *sx) {
@@ -254,8 +234,9 @@ static int project_entry(int parent, const char *rel, const char *name, const st
     int64_t newest = sx->stx_mtime.tv_sec;
     int idle = clean_project_idle_days(k);
     if (idle) {
-        int top = clean_open(parent, ".", O_RDONLY | O_DIRECTORY);
-        newest = top >= 0 ? newest_in(top, 0) : 0;
+        long left = max_files - seen;
+        newest = clean_project_newest(parent, max_depth, &left, walk_tick);
+        if (left <= 0) { limit("files"); stop = 1; return 1; }
         if (!newest || (double)time(NULL) - (double)newest < idle * 86400.0) { nnomatch++; return 1; }
     }
     int sub = clean_open(parent, name, O_RDONLY | O_DIRECTORY);
