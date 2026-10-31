@@ -99,10 +99,11 @@ const MARGIN = 12;
 // known (a Linux app that doesn't say where its caret is: then the whole window); frame: the window
 // with the field or null (a shell surface such as Search); area: its work area; top: the keyboard's
 // top edge. → { dock: 'bottom' | 'top', frame?: where the window goes }.
-export function planAvoid({ caret, frame, area, top, minHeight = 160 }) {
+export function planAvoid({ caret, frame, area, top, minHeight = 160, refused = false }) {
   const need = (caret ? caret.y + caret.h + MARGIN : frame ? frame.y + frame.h : 0) - top;
   if (need <= 0) return { dock: 'bottom' };
   if (!frame) return { dock: 'top' };                   // nothing to move: the keyboard goes up
+  if (refused) return { dock: caret ? 'top' : 'bottom' };   // a window with a larger minimum size kept it
   const room = frame.y - area.y;
   if (need <= room) return { dock: 'bottom', frame: { ...frame, y: frame.y - need } };
   const height = Math.max(minHeight, top - area.y);

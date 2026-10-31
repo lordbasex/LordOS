@@ -48,7 +48,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   namespace: guest, password, wrong password, NFS 4.2, ⏏ from the sidebar.
 
 ### Fixed
-
+- **Found by the end-to-end run on the final build (VM 125):** an X11 window grew by twice its border width every time its state changed, so xterm got 4 px larger with each trip between Desktops (the window manager now removes the border, as Xwayland counts it in the surface). The on-screen keyboard follows light mode and the accent, as documented: it was mounted outside the theme and always drew the dark default. It opens by itself for fields of isolated apps (Passwords, Mail): the hint compared the app's id with the window's `linux#` id and was always dropped. A window lifted for the on-screen keyboard is saved for session restore where the person left it, not in its lifted, shrunk frame. A field focused while an isolated app's window opens reports its place again once laid out, and when a window's minimum size keeps it from shrinking enough the keyboard moves to the top of the display.
 - Shortcuts: a key pressed with no Linux app in front and released with one left the dispatcher waiting for its release, and the next
   press of that key did nothing (`sdk/shortcuts.js`). Seen with the key that switches to a desktop holding a Linux window.
 - **A network mount that stops answering no longer freezes the interface.** `lord.fs` asks the server from a thread of
