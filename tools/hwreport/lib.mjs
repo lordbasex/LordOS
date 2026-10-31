@@ -195,6 +195,10 @@ export const STATUS_LABELS = ['report:valid', 'report:check', 'report:invalid', 
 const KINDS = ['vm', 'board', 'laptop', 'server', 'desktop'];
 const GPU_V = ['intel', 'amd', 'nvidia', 'virtual', 'broadcom', 'arm', 'vivante', 'qualcomm', 'other', 'none'];
 const CPU_V = ['intel', 'amd', 'arm', 'riscv', 'other'];
+// Every label the workflow can set (the repository must have them: docs/RELEASING.md, "The labels of hardware reports").
+export const ALL_LABELS = ['hardware-report', ...STATUS_LABELS, ...KINDS.map((k) => `kind:${k}`), ...GPU_V.map((g) => `gpu:${g}`),
+  ...CPU_V.map((c) => `cpu:${c}`), 'live', 'installed', ...BOOT_MEDIA.map((b) => `boot:${b}`)];
+
 // Labels from fixed lists only.
 export function labelsFor(status, rep) {
   const out = ['hardware-report', `report:${status}`];
