@@ -30,7 +30,7 @@ export function DupList({ scan, selected, setSelected }) {
     return { rows, total };
   }, [scan.id]);
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <Label size={32} weight={300}>{tr('cleaner.dups.title')}</Label>
