@@ -52,18 +52,22 @@ function Device({ d, tr }) {
   );
 }
 
+const SEARCH_MS = 40000;
+
 export function BluetoothSettings() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const st = useBluetooth();
   const [err, setErr] = useState('');
   const a = st?.adapter;
-  // discovery while the page is open and Bluetooth is on
+  // a search of its own, for a while: the kernel doesn't listen for paired devices coming back while one runs
+  const [search, setSearch] = useState(0);
   useEffect(() => {
     if (!a?.powered) return undefined;
     lord.bt.discover(true);
-    return () => lord.bt.discover(false);
-  }, [a?.powered, a?.path]);
+    const stop = setTimeout(() => lord.bt.discover(false), SEARCH_MS);
+    return () => { clearTimeout(stop); lord.bt.discover(false); };
+  }, [a?.powered, a?.path, search]);
   useEffect(() => onBluetoothResult((r) => {
     if (r.ok || r.op === 'stop') { if (r.ok && r.op !== 'stop') setErr(''); return; }
     const key = /Blocked|rfkill/i.test(r.error) ? 'blocked' : /profile-unavailable|NotAvailable|NotSupported/i.test(r.error) ? 'noProfile'
@@ -108,6 +112,7 @@ export function BluetoothSettings() {
             : <SettingRow label={a.discovering ? tr('prefs.bt.searching') : tr('prefs.bt.noneNearby')} />}
         </GroupBox>
       )}
+      {a.powered && !a.discovering ? <View style={{ alignItems: 'flex-end' }}><Button small label={tr('prefs.bt.searchAgain')} onClick={() => setSearch((n) => n + 1)} /></View> : null}
       {a.powered ? <Note>{tr('prefs.bt.audioHint')}</Note> : null}
       {!st.agent && a.powered ? <Note tone="warn">{tr('prefs.bt.noAgent')}</Note> : null}
     </Stack>

@@ -264,5 +264,6 @@
   "video.statusAuto": "Ligado: este computador não consegue decodificar {codecs} por hardware ({reason}), então os sites de vídeo recebem o pedido de H.264.",
   "video.statusHardware": "Desligado: este computador decodifica vídeo VP9 e AV1 por hardware.",
   "video.statusNever": "Desligado: os sites de vídeo escolhem o formato, mesmo quando o computador precisa decodificá-lo sem ajuda.",
-  "video.title": "Vídeo no navegador"
+  "video.title": "Vídeo no navegador",
+  "bt.searchAgain": "Procurar de novo"
 }

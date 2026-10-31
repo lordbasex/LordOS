@@ -264,5 +264,6 @@
   "video.statusAuto": "Encendido: esta computadora no puede decodificar {codecs} por hardware ({reason}), así que se les pide H.264 a los sitios de video.",
   "video.statusHardware": "Apagado: esta computadora decodifica video VP9 y AV1 por hardware.",
   "video.statusNever": "Apagado: los sitios de video eligen el formato, aunque la computadora lo tenga que decodificar sin ayuda.",
-  "video.title": "Video en el navegador"
+  "video.title": "Video en el navegador",
+  "bt.searchAgain": "Buscar de nuevo"
 }
