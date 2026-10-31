@@ -440,6 +440,19 @@
             "es": "Un `.lpk` es el formato de paquete de las apps nativas de LordOS: un archivo comprimido con un manifiesto, el código de la app, su ícono y sus traducciones. Se instala en tu carpeta personal sin root, corre en su propio proceso aislado y puede estar firmado para que sepas quién lo hizo.",
             "pt": "Um `.lpk` é o formato de pacote dos apps nativos do LordOS: um arquivo compactado com um manifesto, o código do app, o ícone e as traduções. Ele é instalado na sua pasta pessoal sem root, roda no próprio processo isolado e pode ser assinado para você saber quem o fez."
           }
+        },
+        {
+          "id": "cleaner",
+          "q": {
+            "en": "Does LordOS have a disk cleaner?",
+            "es": "¿LordOS tiene un limpiador de disco?",
+            "pt": "O LordOS tem um limpador de disco?"
+          },
+          "a": {
+            "en": "It is in development for 0.8.7; the latest release, 0.8.6-beta, does not include it. [Cleaner](/features/cleaner/) shows what takes up your disk and helps you remove what can safely go. A scan only reads, and nothing changes until you confirm. It does not look for malware, has no memory \"free up\" and no speed test.",
+            "es": "Está en desarrollo para 0.8.7; la última versión publicada, 0.8.6-beta, no lo incluye. [Limpieza](/features/cleaner/) muestra qué ocupa el disco y ayuda a quitar lo que se puede quitar con seguridad. Un análisis solo lee, y nada cambia hasta que confirmás. No busca malware, no tiene \"liberar memoria\" ni prueba de velocidad.",
+            "pt": "Está em desenvolvimento para 0.8.7; a versão mais recente, 0.8.6-beta, não o inclui. [Limpeza](/features/cleaner/) mostra o que ocupa o disco e ajuda a remover o que pode sair com segurança. Uma análise só lê, e nada muda até você confirmar. Não procura malware, não tem \"liberar memória\" nem teste de velocidade."
+          }
         }
       ]
     },
