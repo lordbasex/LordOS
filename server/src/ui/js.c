@@ -716,6 +716,14 @@ void js_key(int code, int value) {
     drain_jobs();
 }
 
+/* A keyboard was plugged in, removed, or typed for the first time → __lordKeyboards(present). */
+void js_keyboards_event(int present) {
+    if (!ctx) return;
+    JSValueConst arg = JS_NewBool(ctx, present);
+    JS_FreeValue(ctx, call_global("__lordKeyboards", 1, &arg));
+    drain_jobs();
+}
+
 /* Media (media/) → __lordMedia(id, type, JSON data). */
 void js_media_event(int id, const char *type, const char *json) {
     if (!ctx) return;

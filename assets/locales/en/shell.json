@@ -257,5 +257,10 @@
   "window.zone.top": "Top",
   "window.zone.top-left": "Top Left",
   "window.zone.top-right": "Top Right",
-  "window.zoom": "Zoom"
+  "window.zoom": "Zoom",
+  "osk.name": "On-Screen Keyboard",
+  "osk.space": "space",
+  "osk.return": "return",
+  "osk.tab": "tab",
+  "osk.esc": "esc"
 }

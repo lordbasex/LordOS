@@ -339,9 +339,21 @@ export const wm = {
     if (to === 'minimize') wm.minimize(id);
     else wm.snap(id, to);
   },
-  move: (id, x, y) => patch(id, { x: Math.round(x), y: Math.round(Math.max(workAreaOf(displayAt(x, y)).y, y)), maximized: false, snapped: null, restore: null }),
+  move: (id, x, y) => patch(id, { x: Math.round(x), y: Math.round(Math.max(workAreaOf(displayAt(x, y)).y, y)), maximized: false, snapped: null, restore: null, oskFrame: null }),
   resize: (id, w, h) => patch(id, { w: Math.round(w), h: Math.round(h) }),
-  setFrame: (id, f) => patch(id, { ...f, maximized: false, snapped: null, restore: null }),
+  setFrame: (id, f) => patch(id, { ...f, maximized: false, snapped: null, restore: null, oskFrame: null }),
+  // The on-screen keyboard moves the window with the field out of its way, and puts it back as it was
+  // (sdk/osk.js). A window the person moves meanwhile stays where they left it.
+  liftForKeyboard(id, f) {
+    const w = windows.get().find((x) => x.id === id);
+    if (!w) return;
+    const oskFrame = w.oskFrame || { x: w.x, y: w.y, w: w.w, h: w.h, maximized: w.maximized, snapped: w.snapped, restore: w.restore };
+    patch(id, { ...f, maximized: false, snapped: null, restore: null, oskFrame });
+  },
+  dropFromKeyboard(id) {
+    const w = windows.get().find((x) => x.id === id);
+    if (w?.oskFrame) patch(id, { ...w.oskFrame, oskFrame: null });
+  },
   setTitle: (id, title) => {
     const w = windows.get().find((x) => x.id === id);
     if (w && w.title !== title) patch(id, { title });

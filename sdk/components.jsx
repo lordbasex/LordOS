@@ -8,6 +8,7 @@ import { useStore } from './store.js';
 import { textDirection, direction } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
+import { noteTextField } from './textfocus.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -243,7 +244,12 @@ let focused = null;          // token of the active TextInput
 let focusedNow = false;      // it got focus during the mouse event in progress
 const handlers = new Map();
 const focusSubs = new Set();
-const setFocus = (tok) => { focused = tok; for (const fn of focusSubs) fn(); };
+const carets = new Map();    // token → where its caret is (also for password fields, off the input method)
+const setFocus = (tok) => {
+  focused = tok;
+  for (const fn of focusSubs) fn();
+  noteTextField('input', tok !== null ? () => carets.get(tok)?.() || null : null);
+};
 
 addListener('pointerdown', () => { if (!focusedNow) setFocus(null); focusedNow = false; });
 addListener('keydown', (e) => { if (focused && handlers.has(focused)) handlers.get(focused)(e); });
@@ -301,6 +307,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       if (focused === token && !secureRef.current) ime.attach(token, caretRect, { inline: true }); else ime.detach(token);
     };
     focusSubs.add(sync);
+    carets.set(token, caretRect);
     handlers.set(token, (e) => {
       const p = latest.current;
       if (p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
@@ -315,7 +322,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       setBlink(true);
     });
     if (autoFocus) setFocus(token);
-    return () => { focusSubs.delete(sync); handlers.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+    return () => { focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   const imeSt = useIme();
   const preedit = isFocused ? imeSt.preedit : '';

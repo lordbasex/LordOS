@@ -12,6 +12,7 @@ import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, opening
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
+import { osk } from './osk.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
 const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : linuxAppFor(appId)?.id || null);
@@ -56,6 +57,10 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
   const id = idOf(sid);
   const win = wm.get(id);
   switch (type) {
+    case 'textinput':
+      // a text field of the app took or lost focus (zwp_text_input_v3)
+      osk.linuxField(id, !!d.on, d.h > 0 ? d.y : -1, d.h);
+      break;
     case 'map': {
       // X11 (Xwayland): the WM_CLASS class, or its instance when only that names a .desktop
       if (d.x11 && d.appAlt && !linuxAppFor(d.appId) && linuxAppFor(d.appAlt)) d = { ...d, appId: d.appAlt };

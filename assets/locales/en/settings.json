@@ -406,5 +406,12 @@
   "wallpaperCategory.gradients": "Gradients",
   "wallpaperCategory.lumo": "Lumo",
   "wallpaperCategory.other": "Other",
-  "wallpaperCategory.signature": "Signature"
+  "wallpaperCategory.signature": "Signature",
+  "osk.title": "On-Screen Keyboard",
+  "osk.open": "Open by itself",
+  "osk.off": "Off",
+  "osk.auto": "Automatic",
+  "osk.always": "Always",
+  "osk.show": "Show Keyboard",
+  "osk.hint": "Automatic opens it when a text field takes focus and no physical keyboard is attached. The login and lock screens always follow Automatic, so nobody is locked out. Its button in the menu bar, or ❖⌃K, opens it at any time."
 }

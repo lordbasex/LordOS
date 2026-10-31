@@ -48,7 +48,7 @@ El JavaScript de LordOS no puede escribir archivos `.desktop`, así que la inter
 
 ## Qué protocolos Wayland hay
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (uno por pantalla), `xdg_wm_base` con menús emergentes, `wl_seat` (puntero, teclado, táctil), `wl_data_device_manager` (portapapeles), `zxdg_decoration_manager_v1`, el protocolo de decoración del servidor de KDE, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (desde 0.8.3) y `zwp_idle_inhibit_manager_v1` (desde 0.8.5).
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (uno por pantalla), `xdg_wm_base` con menús emergentes, `wl_seat` (puntero, teclado, táctil), `wl_data_device_manager` (portapapeles), `zxdg_decoration_manager_v1`, el protocolo de decoración del servidor de KDE, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (desde 0.8.3) y `zwp_idle_inhibit_manager_v1` (desde 0.8.5) y, en desarrollo para 0.8.7, `zwp_text_input_manager_v3`, para el teclado en pantalla.
 
 **Comprobalo desde afuera** (desde 0.8.5): el **Banco de pruebas** (`lordos-testbench`) es una ventana con una carta de ajuste que revisa el servidor gráfico como lo ve cualquier app: los tiempos de los cuadros y cuándo llegan de verdad a la pantalla, cada tecla del teclado, el mouse y la rueda, y los protocolos Wayland que ofrece el sistema.
 

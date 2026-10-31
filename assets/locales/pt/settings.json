@@ -406,5 +406,12 @@
   "wallpaperCategory.gradients": "Degradês",
   "wallpaperCategory.lumo": "Lumo",
   "wallpaperCategory.other": "Outros",
-  "wallpaperCategory.signature": "Signature"
+  "wallpaperCategory.signature": "Signature",
+  "osk.title": "Teclado na tela",
+  "osk.open": "Abrir sozinho",
+  "osk.off": "Desativado",
+  "osk.auto": "Automático",
+  "osk.always": "Sempre",
+  "osk.show": "Mostrar teclado",
+  "osk.hint": "Automático o abre quando um campo de texto recebe o foco e não há um teclado físico conectado. As telas de login e de bloqueio sempre seguem Automático, para que ninguém fique de fora. Seu botão na barra de menus, ou ❖⌃K, o abre a qualquer momento."
 }

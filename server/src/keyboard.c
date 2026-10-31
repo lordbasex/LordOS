@@ -6,6 +6,7 @@
  * If xkb-data is not installed, kb_ready() is 0 and the UI uses its fallback tables. */
 #include "keyboard.h"
 
+#include <linux/input.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -104,6 +105,66 @@ void kb_set_group(int g) {
     xkb_mod_mask_t lat = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_LATCHED);
     xkb_mod_mask_t lock = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_LOCKED);
     xkb_state_update_mask(state, dep, lat, lock, 0, 0, (xkb_layout_index_t)g);
+}
+
+/* ---- labels of the on-screen keyboard: a scratch state per level ---- */
+
+static struct xkb_state *level_state[4];
+
+void kb_labels_end(void) {
+    for (int i = 0; i < 4; i++) { if (level_state[i]) xkb_state_unref(level_state[i]); level_state[i] = NULL; }
+}
+
+int kb_labels_begin(void) {
+    kb_labels_end();
+    if (!state) return 0;
+    xkb_layout_index_t group = (xkb_layout_index_t)kb_group();
+    for (int i = 0; i < 4; i++) {
+        if (!(level_state[i] = xkb_state_new(keymap))) { kb_labels_end(); return 0; }
+        if (i & 1) xkb_state_update_key(level_state[i], KEY_LEFTSHIFT + 8, XKB_KEY_DOWN);
+        if (i & 2) xkb_state_update_key(level_state[i], KEY_RIGHTALT + 8, XKB_KEY_DOWN);
+        xkb_mod_mask_t dep = (xkb_mod_mask_t)xkb_state_serialize_mods(level_state[i], XKB_STATE_MODS_DEPRESSED);
+        xkb_state_update_mask(level_state[i], dep, 0, 0, 0, 0, group);
+    }
+    return 1;
+}
+
+/* A dead key's own symbol has no text: the mark it adds. */
+static const char *dead_mark(xkb_keysym_t s) {
+    switch (s) {
+    case XKB_KEY_dead_acute:       return "´";
+    case XKB_KEY_dead_grave:       return "`";
+    case XKB_KEY_dead_circumflex:  return "^";
+    case XKB_KEY_dead_tilde:       return "~";
+    case XKB_KEY_dead_diaeresis:   return "¨";
+    case XKB_KEY_dead_cedilla:     return "¸";
+    case XKB_KEY_dead_abovering:   return "°";
+    case XKB_KEY_dead_macron:      return "¯";
+    case XKB_KEY_dead_caron:       return "ˇ";
+    case XKB_KEY_dead_breve:       return "˘";
+    case XKB_KEY_dead_abovedot:    return "˙";
+    case XKB_KEY_dead_ogonek:      return "˛";
+    case XKB_KEY_dead_doubleacute: return "˝";
+    default:                       return NULL;
+    }
+}
+
+void kb_label(int code, int level, char *out, size_t n) {
+    out[0] = 0;
+    if (level < 0 || level > 3 || !level_state[level]) return;
+    xkb_keysym_t s = xkb_state_key_get_one_sym(level_state[level], (xkb_keycode_t)code + 8);
+    const char *mark = dead_mark(s);
+    if (mark) snprintf(out, n, "dead:%s", mark);
+    else if (s != XKB_KEY_NoSymbol && xkb_keysym_to_utf8(s, out, n) <= 0) out[0] = 0;
+    if ((unsigned char)out[0] < 0x20 || out[0] == 0x7f) out[0] = 0;    /* control characters: Tab, Enter */
+}
+
+int kb_has_altgr(void) {
+    if (!keymap) return 0;
+    const xkb_keysym_t *syms;
+    xkb_layout_index_t group = (xkb_layout_index_t)kb_group();
+    int n = xkb_keymap_key_get_syms_by_level(keymap, KEY_RIGHTALT + 8, group, 0, &syms);
+    return n == 1 && syms[0] == XKB_KEY_ISO_Level3_Shift;
 }
 
 /* Key names as on the web (KeyboardEvent.key) for keys that do not type. */

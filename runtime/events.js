@@ -1,6 +1,8 @@
 // events.js — mouse and keyboard events sent by lord-server, with DOM-style bubbling.
 // Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
 // onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe.
+// keepFocus on a View: a press inside it is not a click elsewhere: the global 'pointerdown' listeners
+// don't hear it, so a text field keeps the focus and an open menu stays (the on-screen keyboard).
 import { DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority } from 'react-reconciler/constants';
 import { translate, nativeKey, modifiers } from './keymap.js';
 
@@ -76,10 +78,13 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
   else if (type === 'down') run(DiscreteEventPriority, () => {
     down = chain;
     dispatch(chain, 'onMouseDown', makeEvent('mousedown', target, x, y, button));
+    if (chain.some((n) => n.props.keepFocus)) return;
     fire('pointerdown', makeEvent('pointerdown', target, x, y, button));
   });
   else if (type === 'up') run(DiscreteEventPriority, () => {
-    dispatch(chain, 'onMouseUp', makeEvent('mouseup', target, x, y, button));
+    // a press that began in a keepFocus surface which closed meanwhile doesn't release on what was below it
+    const stray = down?.some((n) => n.props.keepFocus) && !chain.some((n) => n.props.keepFocus);
+    if (!stray) dispatch(chain, 'onMouseUp', makeEvent('mouseup', target, x, y, button));
     fire('pointerup', makeEvent('pointerup', target, x, y, button));
     if (!down) return;
     const pressed = new Set(down);

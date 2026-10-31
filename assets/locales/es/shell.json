@@ -257,5 +257,10 @@
   "window.zone.top": "Superior",
   "window.zone.top-left": "Parte superior izquierda",
   "window.zone.top-right": "Parte superior derecha",
-  "window.zoom": "Zoom"
+  "window.zoom": "Zoom",
+  "osk.name": "Teclado en pantalla",
+  "osk.space": "espacio",
+  "osk.return": "intro",
+  "osk.tab": "tab",
+  "osk.esc": "esc"
 }

@@ -392,6 +392,12 @@ and the Linux apps whose `.desktop` `MimeType` covers the category (terminals: `
 
   ![Open With](files-open-with-menu.png)
 
+## Keyboard: On-Screen Keyboard
+
+Off, Automatic (the default: it opens when a text field takes focus and no physical keyboard is attached)
+or Always (`settings.osk`), plus **Show Keyboard**. See [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md). The
+login and lock screens always behave as Automatic.
+
 ## Appearance: «Browsers: tabs in the title bar»
 
 Not a hardware page, but its native side lives here too: `hw/brframe.c`, exposed as
