@@ -23,6 +23,10 @@ DEFS = '''<defs>
 <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
 <radialGradient id="lens" cx=".4" cy=".35"><stop offset="0" stop-color="#e6fbff" stop-opacity=".85"/><stop offset="1" stop-color="#39c5ff" stop-opacity=".35"/></radialGradient>
 <linearGradient id="pane" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".34"/><stop offset=".5" stop-color="#9fd8ff" stop-opacity=".16"/><stop offset="1" stop-color="#8a6bff" stop-opacity=".3"/></linearGradient>
+<radialGradient id="back" cx=".5" cy=".5"><stop offset="0" stop-color="#bfeeff" stop-opacity=".75"/><stop offset=".55" stop-color="#7a7dff" stop-opacity=".3"/><stop offset="1" stop-color="#7a7dff" stop-opacity="0"/></radialGradient>
+<radialGradient id="well" cx=".5" cy=".42"><stop offset="0" stop-color="#2a2f8c" stop-opacity=".1"/><stop offset="1" stop-color="#050828" stop-opacity=".62"/></radialGradient>
+<linearGradient id="edgelit" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#bfeeff" stop-opacity=".25"/><stop offset="1" stop-color="#8a6bff" stop-opacity=".7"/></linearGradient>
+<filter id="contact" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="7"/></filter>
 <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
 <filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#060920" flood-opacity=".5"/></filter>
 </defs>'''
@@ -38,14 +42,24 @@ def disc(cy, rx, ry, h, fill):
             f'<ellipse cx="{220-rx*.28}" cy="{cy-ry*.3}" rx="{rx*.5}" ry="{ry*.4}" fill="url(#gloss)"/>')
 
 
-CROWN = ('<g filter="url(#lift)"><path d="M92 236L70 92l76 68 74-132 74 132 76-68-22 144z" fill="url(#crown)"/>'
-         '<path d="M92 236L70 92l76 68 74-132 22 39-58 104z" fill="#fff" opacity=".22"/>'
-         '<circle cx="70" cy="90" r="13" fill="url(#gold)"/><circle cx="220" cy="28" r="15" fill="url(#gold)"/><circle cx="370" cy="90" r="13" fill="url(#gold)"/>'
-         '<circle cx="220" cy="176" r="24" fill="url(#gem)"/><ellipse cx="212" cy="167" rx="9" ry="6" fill="#fff" opacity=".65"/>'
-         '<circle cx="136" cy="196" r="12" fill="url(#gemc)"/><circle cx="304" cy="196" r="12" fill="url(#gemc)"/>'
-         '<rect x="92" y="240" width="256" height="26" rx="13" fill="url(#band)"/><rect x="104" y="243" width="150" height="7" rx="3.5" fill="#fff" opacity=".6"/></g>')
+CROWN = ('<g filter="url(#lift)">'
+         # the far side of the crown: its inside shows, so it reads as a ring and not as a cut-out
+         '<ellipse cx="220" cy="236" rx="132" ry="30" fill="#6b3410"/><path d="M104 232L132 150l44 44 44-78 44 78 44-44 28 82z" fill="#8a4a16"/>'
+         '<path d="M92 240L60 96l90 74 70-136 70 136 90-74-32 144Q220 300 92 240z" fill="url(#crown)"/>'
+         # each point lit on one side and shaded on the other
+         '<path d="M220 34l-70 136 70 96z" fill="#fff" opacity=".3"/><path d="M220 34l70 136-70 96z" fill="#8a4210" opacity=".3"/>'
+         '<path d="M60 96l90 74-26 84-32-14z" fill="#fff" opacity=".16"/><path d="M380 96l-90 74 26 84 32-14z" fill="#8a4210" opacity=".34"/>'
+         # the band follows the curve of the ring
+         '<path d="M90 236Q220 298 350 236L344 266Q220 328 96 266z" fill="url(#band)"/>'
+         '<path d="M94 241Q220 301 346 241" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="4" stroke-linecap="round"/>'
+         '<path d="M97 264Q220 326 343 264" fill="none" stroke="#7a3f10" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>'
+         '<circle cx="60" cy="92" r="15" fill="url(#gold)"/><circle cx="220" cy="30" r="17" fill="url(#gold)"/><circle cx="380" cy="92" r="15" fill="url(#gold)"/>'
+         '<circle cx="55" cy="87" r="5" fill="#fff" opacity=".85"/><circle cx="214" cy="24" r="6" fill="#fff" opacity=".85"/><circle cx="375" cy="87" r="5" fill="#fff" opacity=".85"/>'
+         '<path d="M220 158l26 22-10 34h-32l-10-34z" fill="url(#gem)"/><path d="M220 158l26 22h-52z" fill="#fff" opacity=".4"/><path d="M204 214l16-34 16 34z" fill="#3b0f78" opacity=".35"/>'
+         '<circle cx="136" cy="262" r="11" fill="url(#gemc)"/><circle cx="304" cy="262" r="11" fill="url(#gemc)"/><circle cx="220" cy="284" r="13" fill="url(#gem)"/>'
+         '<circle cx="132" cy="258" r="3.5" fill="#fff"/><circle cx="300" cy="258" r="3.5" fill="#fff"/><circle cx="215" cy="279" r="4" fill="#fff"/></g>')
 ART = {
- 'scan': CROWN + disc(322, 100, 22, 30, 'plinth') + disc(292, 72, 15, 16, 'plinth') + spark(58, 42, 12) + spark(392, 196, 9, .85),
+ 'scan': disc(344, 112, 24, 30, 'plinth') + disc(316, 84, 17, 16, 'plinth') + '<ellipse cx="220" cy="312" rx="96" ry="13" fill="#060920" opacity=".55" filter="url(#contact)"/>' + CROWN,
  'cleanup': '<g transform="rotate(24 220 210)" filter="url(#lift)">'
    '<rect x="208" y="28" width="24" height="232" rx="12" fill="url(#steel)"/><rect x="212" y="34" width="6" height="210" rx="3" fill="#fff" opacity=".6"/>'
    '<rect x="174" y="236" width="92" height="42" rx="12" fill="url(#band)"/><rect x="182" y="240" width="76" height="12" rx="6" fill="url(#gloss)"/>'
@@ -82,13 +96,17 @@ GLASS = {'scan': 'M220 18L392 112a24 24 0 0 1 12 21v154a24 24 0 0 1-12 21L220 40
          'activity': 'M220 22a188 188 0 1 0 0 376 188 188 0 0 0 0-376z',
          'settings': 'M220 18c30 26 98 44 168 48 14 150-40 290-168 336C92 356 38 216 52 66c70-4 138-22 168-48z'}
 
-def glassed(name, body):
+def glass(name):
+    """The pane alone: dark enough inside for the object to stand on, lit on one edge, with a glow behind the object."""
     d = GLASS[name]
-    return (f'<clipPath id="gc"><path d="{d}"/></clipPath><path d="{d}" fill="#0a1040" opacity=".28" transform="translate(0 14)" filter="url(#soft)"/>'
-            f'<path d="{d}" fill="url(#pane)"/>'
-            f'<g clip-path="url(#gc)"><path d="{d}" fill="none" stroke="#bfeeff" stroke-opacity=".75" stroke-width="30" filter="url(#soft)"/><ellipse cx="170" cy="60" rx="190" ry="84" fill="url(#gloss)" opacity=".5"/></g>'
-            f'<path d="{d}" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="3"/>'
-            f'<g transform="translate(88 82) scale(.6)">{body}</g>')
+    return (f'<clipPath id="gc"><path d="{d}"/></clipPath><path d="{d}" fill="#0a1040" opacity=".34" transform="translate(0 16)" filter="url(#soft)"/>'
+            f'<path d="{d}" fill="url(#pane)"/><path d="{d}" fill="url(#well)"/>'
+            f'<g clip-path="url(#gc)"><path d="{d}" fill="none" stroke="#bfeeff" stroke-opacity=".6" stroke-width="26" filter="url(#soft)"/>'
+            '<ellipse cx="220" cy="210" rx="170" ry="150" fill="url(#back)"/><ellipse cx="170" cy="54" rx="190" ry="70" fill="url(#gloss)" opacity=".42"/></g>'
+            f'<path d="{d}" fill="none" stroke="url(#edgelit)" stroke-width="4"/>')
+
+def object_(body):
+    return f'<g transform="translate(62 54) scale(.72)">{body}</g>'
 
 # the tiles: a colour and a white line glyph
 TILES = {'scan': ('#b14bff', 'M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2M4 12h16'),
@@ -101,6 +119,29 @@ def tile(colour, d):
             f'<rect width="64" height="64" rx="20" fill="{colour}"/><rect width="64" height="32" rx="20" fill="#fff" opacity=".12"/>'
             f'<g transform="translate(14 14) scale(1.5)"><path d="{d}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>')
 
+# the storage bubbles' folders: what the folder is, not a repeated icon
+FOLDERS = {'documents': ('#3b82f6', 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5'), 'pictures': ('#ec4899', 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01'),
+           'music': ('#a855f7', 'M9 18V6l10-2v12M9 18a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM19 16a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z'), 'videos': ('#ef4444', 'M4 5h16v14H4zM10 9l5 3-5 3z'),
+           'downloads': ('#10b981', 'M12 4v11M7 11l5 5 5-5M5 20h14'), 'desktop': ('#6366f1', 'M3 5h18v11H3zM9 20h6M12 16v4'),
+           'code': ('#f59e0b', 'M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14'), 'cache': ('#fb7185', 'M13 3L5 14h6l-1 7 8-11h-6z'),
+           'config': ('#94a3b8', 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4'), 'data': ('#14b8a6', 'M5 6c0-3 14-3 14 0v12c0 3-14 3-14 0zM5 6c0 3 14 3 14 0M5 12c0 3 14 3 14 0'),
+           'trash': ('#78716c', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6'), 'folder': ('#38bdf8', 'M3 6h6l2 3h10v10H3z'), 'others': ('#71717a', 'M6 12h.01M12 12h.01M18 12h.01')}
+
+# a glass sphere: colour at the rim, nearly clear in the middle for the text, one highlight. Stretched to each bubble.
+HUES = {'violet': '#8a4bff', 'blue': '#2f8bff', 'pink': '#ff4fa8', 'teal': '#17c3b2', 'orange': '#ff8a3d', 'rose': '#f0436a', 'indigo': '#6366f1', 'sky': '#38bdf8'}
+def bubble(colour):
+    return ('<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360"><defs>'
+            f'<radialGradient id="b" cx=".5" cy=".46" r=".54"><stop offset="0" stop-color="{colour}" stop-opacity=".2"/><stop offset=".72" stop-color="{colour}" stop-opacity=".34"/><stop offset=".95" stop-color="{colour}" stop-opacity=".82"/><stop offset="1" stop-color="{colour}" stop-opacity=".95"/></radialGradient>'
+            '<radialGradient id="h" cx=".5" cy=".5"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
+            '<linearGradient id="e" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity=".4"/></linearGradient>'
+            f'</defs><circle cx="180" cy="180" r="176" fill="url(#b)"/><circle cx="180" cy="180" r="175" fill="none" stroke="url(#e)" stroke-width="3"/>'
+            '<ellipse cx="116" cy="84" rx="66" ry="36" fill="url(#h)" transform="rotate(-34 116 84)"/><ellipse cx="256" cy="288" rx="46" ry="16" fill="url(#h)" opacity=".4" transform="rotate(-38 256 288)"/></svg>')
+
+PARTS = {'spark': (48, 48, '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><path d="M24 2Q27 21 46 24Q27 27 24 46Q21 27 2 24Q21 21 24 2Z" fill="#fff"/></svg>'),
+         'shadow': (220, 44, '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="44" viewBox="0 0 220 44"><defs><filter id="s" x="-20%" y="-100%" width="140%" height="300%"><feGaussianBlur stdDeviation="9"/></filter></defs><ellipse cx="110" cy="22" rx="84" ry="10" fill="#050828" filter="url(#s)"/></svg>'),
+         'orbit-dot-dark': (28, 28, '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="#7fe3ff" opacity=".25"/><circle cx="14" cy="14" r="7" fill="#7fe3ff"/></svg>'),
+         'orbit-dot-light': (28, 28, '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="#0a6fc2" opacity=".25"/><circle cx="14" cy="14" r="7" fill="#0a6fc2"/></svg>')}
+
 def sky(a, b, c, d, name):
     s = ('<svg xmlns="http://www.w3.org/2000/svg" width="660" height="440" viewBox="0 0 660 440"><defs>'
          f'<linearGradient id="l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{a}"/><stop offset=".6" stop-color="{b}"/><stop offset="1" stop-color="{c}"/></linearGradient>'
@@ -111,10 +152,8 @@ def sky(a, b, c, d, name):
     subprocess.check_call(['rsvg-convert', '-w', '660', '-h', '440', str(p), '-o', str(OUT / f'{name}.png')])
 
 def orbits(accent, line, name):
-    outer = (f'<svg xmlns="http://www.w3.org/2000/svg" width="340" height="340" viewBox="0 0 340 340"><circle cx="170" cy="170" r="162" fill="none" stroke="{accent}" stroke-opacity=".7" stroke-dasharray="3 5"/>'
-             f'<circle cx="170" cy="170" r="162" fill="none"/><circle cx="170" cy="8" r="14" fill="{accent}" opacity=".25"/><circle cx="170" cy="8" r="7" fill="{accent}"/></svg>')
-    inner = (f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><circle cx="128" cy="128" r="120" fill="none" stroke="{line}" stroke-opacity=".45"/>'
-             '<circle cx="76" cy="237" r="5" fill="#ffd36b"/></svg>')
+    outer = (f'<svg xmlns="http://www.w3.org/2000/svg" width="340" height="340" viewBox="0 0 340 340"><circle cx="170" cy="170" r="162" fill="none" stroke="{accent}" stroke-opacity=".7" stroke-dasharray="3 5"/></svg>')
+    inner = (f'<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><circle cx="128" cy="128" r="120" fill="none" stroke="{line}" stroke-opacity=".45"/></svg>')
     for n, s, w in (('outer', outer, 340), ('inner', inner, 256)):
         p = SRC / f'orbit-{n}-{name}.svg'
         p.write_text(s + '\n')
@@ -139,11 +178,21 @@ RING = ('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBo
 (SRC / 'ring.svg').write_text(RING + '\n')
 subprocess.check_call(['rsvg-convert', '-w', '160', '-h', '160', str(SRC / 'ring.svg'), '-o', str(OUT / 'ring.png')])
 
+def png(name, w, h, svg):
+    p = SRC / f'{name}.svg'
+    p.write_text(svg + '\n')
+    subprocess.check_call(['rsvg-convert', '-w', str(w), '-h', str(h), str(p), '-o', str(OUT / f'{name}.png')])
+
+HEAD = '<svg xmlns="http://www.w3.org/2000/svg" width="440" height="420" viewBox="0 0 440 420">' + DEFS
 for name, body in ART.items():
-    p = SRC / f'hero-{name}.svg'
-    p.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="440" height="420" viewBox="0 0 440 420">{DEFS}{glassed(name, body)}</svg>\n')
-    subprocess.check_call(['rsvg-convert', '-w', '440', '-h', '420', str(p), '-o', str(OUT / f'hero-{name}.png')])
+    png(f'hero-{name}', 440, 420, f'{HEAD}{glass(name)}{object_(body)}</svg>')   # scan screens and the dashboard
+    png(f'glass-{name}', 440, 420, f'{HEAD}{glass(name)}</svg>')                 # a section's opening: pane and object apart,
+    png(f'object-{name}', 440, 420, f'{HEAD}{object_(body)}</svg>')              # so the object floats over its pane
 for name, (c, d) in TILES.items():
-    p = SRC / f'tile-{name}.svg'
-    p.write_text(tile(c, d) + '\n')
-    subprocess.check_call(['rsvg-convert', '-w', '64', '-h', '64', str(p), '-o', str(OUT / f'tile-{name}.png')])
+    png(f'tile-{name}', 64, 64, tile(c, d))
+for name, (c, d) in FOLDERS.items():
+    png(f'folder-{name}', 64, 64, tile(c, d))
+for name, c in HUES.items():
+    png(f'bubble-{name}', 360, 360, bubble(c))
+for name, (w, h, svg) in PARTS.items():
+    png(name, w, h, svg)
