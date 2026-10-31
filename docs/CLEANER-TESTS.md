@@ -19,8 +19,8 @@ Runs against the real `build/lord-clean`, with a home folder made by `mkdtemp` u
 - **Duplicates:** equal size with other content, equal partial hash, empty files, hard links, a group fully selected, a kept copy changed with its date restored, a kept copy removed, overlapping folders.
 - **Plans:** bad ids, repeated ids, expiry, one run. **Cancel:** the helper is killed and reaped.
 - **Similar images:** real PNG and JPEG files: a resized, a recompressed and a brighter version group, another picture, other proportions and hard links don't. A blank page, a text file with an image's name, and PNG headers claiming 60,000 and 8,000 pixels a side aren't decoded; a small icon and a link aren't read. The whole group is refused, three of four go to the Trash and come back, and when every other image is gone by the time of the action, nothing goes. A group of different pictures, other proportions, a bad hash, impossible sizes or no pixels is refused from the helper.
-- **Translated Downloads:** the English name with no settings file, the user's folder, the setting moved after the plan, a real run, and six bad values and a link as the settings file, each falling back to `Downloads` and never reaching a wider folder.
-- **Leftovers:** a removed app's folder is offered; an installed app's, a system app's, a name no app can have and a loose file aren't. Refused by category, skipped if the app comes back after the plan, moved whole, restored, and not offered when the system's apps can't be located.
+- **Translated Downloads:** the English name with no settings file, the user's folder, the setting moved after the plan, a real run, and six bad values and a link as the settings file, each falling back to `Downloads` and never reaching a wider folder; a named pipe as the settings file doesn't hold up the scan.
+- **Leftovers:** a removed app's folder is offered; an installed app's, a system app's, a name no app can have and a loose file aren't. Refused by category, skipped if the app comes back after the plan, moved whole, restored, and not offered when the system's apps can't be located or their folder is missing.
 - **`/tmp`:** age, a link, no plan by rule or by id can act, and the table refuses any other system root and any action on one. It runs on a throwaway stand-in; another user's files were only seen in the session below.
 
 Checked by breaking the code on purpose on 2026-10-30, 823 checks each time: without the installed-app check 6 fail; without lord-server's check of a group of images 2 fail; taking any `XDG_DOWNLOAD_DIR` value 3 fail.
@@ -55,6 +55,8 @@ between updates, over section changes and a full scan. `lord-server` used 100 ms
 on-screen frame times are **not** measured.
 
 Similar images on VM 116, 2026-10-30, under a load of about 8 with the helper at its lowest priority: 80 JPEG files, 40 of 12 MP and 40 of 1.9 MP, in 5.4 s, about 67 ms each; helper peak 32 MB, a lower bound. Those test pictures are mostly fine patterns, so most were left out as flat: this is a time, not a result. For results, 60 real images from the repository (wallpapers, artwork and screenshots) in three versions each (JPEG 92, JPEG 40, half size PNG), 180 files, took 1.7 s: 175 files landed in a group with a version of their own picture and 5 in none. 5 of the 54 groups joined different pictures, 11 in all, every one a screenshot of the same desktop or window with small differences.
+
+A 311 KB 16-bit RGBA PNG of 6,200 × 6,200 pixels made the decoder peak at 588 MB, over the scope's 512 MB. With the helper's 480 MiB of address space the same file came back as not decodable, and `clean-bench images` with that file in the folder still finished and found its groups. Measured on VM 116 on 2026-10-30, outside a scope, by hand: that file is not in `clean-test`.
 
 ## An isolated session on VM 116
 

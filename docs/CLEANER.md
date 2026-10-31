@@ -58,7 +58,7 @@ always stays.
 ## Apps
 
 Only apps the package index knows as desktop applications appear, plus LordOS `.lpk` apps. Essential packages and `lordos`
-itself are left out, and a plan that would take `lordos` is refused. Without administrator rights, Linux apps are listed with no
+itself are left out, and a plan that would take `lordos` is refused. So is a removal the engine won't do alone because other packages need that app: Cleaner shows a message and doesn't offer to take them too. Without administrator rights, Linux apps are listed with no
 Remove button.
 
 A removed `.lpk` app keeps its data folder (`~/.local/share/lordos/appdata/<id>`). That folder is a leftover only while no installed

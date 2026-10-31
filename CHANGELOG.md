@@ -40,7 +40,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **The update word:** the panel by the clock reads whether a newer `lordos` package is known, once, as it opens.
   - **`/tmp`:** a new rule shows your own files there over a week old. Measured only, left out of the estimate: another program's use of them can't be ruled out.
   - **Lists** know their box's real height, so a long list ends with its last row at the bottom.
-  - **Tested on VM 116:** `clean-test` 823 checks, `oldkernels-test`, measurements in `docs/CLEANER-TESTS.md`, and an isolated session driving the real app. **Not tested:** removing an app or a kernel (that session has no admin helper), the update word from a real pending update, an installed session, the Raspberry Pi.
+  - **Tested on VM 116:** `clean-test` 828 checks, `oldkernels-test`, measurements in `docs/CLEANER-TESTS.md`, and an isolated session driving the real app. **Not tested:** removing an app or a kernel (that session has no admin helper), the update word from a real pending update, an installed session, the Raspberry Pi.
 
 - **Cleaner, Phase 1** (2026-10-30; `docs/CLEANER.md`, `docs/CLEANER-SECURITY.md`, `docs/CLEANER-TESTS.md`): on top of the entries below.
   - **Sections:** Scan, Cleanup, Large files, Storage, Duplicates, Activity and Settings. Large and old files filter by size, age and type. Storage covers `/`, the home folder and
