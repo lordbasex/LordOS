@@ -2233,6 +2233,8 @@ static void fs_box(float *x, float *y, float *sx, float *sy) {
     *y = fy - fs_surf->gy * *sy;
 }
 
+int wl_gpu_layers_empty(void) { return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups; }
+
 void wl_gpu_draw_layer(int layer) {
     Rect all = { -65536, -65536, 65536, 65536 };
     if (layer == 0) {

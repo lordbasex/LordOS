@@ -14,6 +14,7 @@
  * softpipe) our own CPU path is faster. LORD_GPU=1 forces it (tests), LORD_GPU=0
  * turns it off, LORD_GPU_DEBUG=1 reports what it does. Built without Mesa (no -DLORD_GPU) these are stubs. */
 #include "gpu.h"
+#include "gscissor.h"
 #include "../outputs.h"
 
 #include <stdio.h>
@@ -39,6 +40,7 @@ int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
+void gpu_scissor_quiet(int out, int quiet) { (void)out; (void)quiet; }
 int  gpu_frame_ex(int out, const Canvas *s, const Rect *d, int n, const GpuDrag *g, int *drawn, void (*f)(int)) {
     (void)out; (void)s; (void)d; (void)n; (void)g; (void)f;
     if (drawn) *drawn = 0;
@@ -131,6 +133,8 @@ typedef struct {
     Shown front, pending;
     GpuFrameTimes times;                /* the last frame's (gpu_frame_times) */
     int fence;                          /* its native fence's fd + 1 (a sync file), 0 none (so a wiped GOut has none) */
+    GpuScissor sc;                      /* what the last frames changed (the buffer-age scissor) */
+    int sc_quiet, sc_busy;              /* this frame has only the UI (gpu_scissor_quiet); the last one didn't */
 } GOut;
 
 static struct {
@@ -155,6 +159,7 @@ static struct {
     long frames, scanouts;
     char render_node[64];               /* where Mesa renders (on the Pi 5: v3d, not vc4) */
     unsigned gen;                       /* this context's generation (0 = none) */
+    int scissor;                        /* the buffer-age scissor: LORD_GPU_SCISSOR=1 and EGL_EXT_buffer_age */
     /* GPU drag, the dragged window composited here (gpu_gdrag_ready): 0 off, 1 on (gdrag_setup, at gpu_init) */
     int gdrag;
     int gdragtout[2];                      /* the output whose pixels each texture holds (-1: none); what it
@@ -175,6 +180,8 @@ static unsigned last_gen;
 static const char *last_why = "";       /* gpu_info: the last gpu_init's outcome */
 static unsigned long total_scanouts;
 static char last_renderer[160];         /* the software renderer that was turned down */
+static long sc_frames, sc_cut;          /* frames with the scissor on, and those that redrew less than the whole output */
+static double sc_px, sc_all_px;         /* what they composed, and what they would have without it */
 static long gdrag_bpx, gdrag_lpx, gdrag_quads;   /* GPU drag's uploads and quads since gpu_gdrag_stats (across contexts) */
 static void (*hook_lost)(void), (*hook_changed)(void);
 
@@ -517,6 +524,12 @@ int gpu_init(Kms *k) {
     G.bgra = has_ext(gl_exts, "GL_EXT_texture_format_BGRA8888");
     G.have_external = has_ext(gl_exts, "GL_OES_EGL_image_external");
     G.unpack_sub = has_ext(gl_exts, "GL_EXT_unpack_subimage");
+    {
+        const char *sc = getenv("LORD_GPU_SCISSOR");
+        int want = sc && !strcmp(sc, "1");
+        G.scissor = want && has_ext(exts, "EGL_EXT_buffer_age");
+        fprintf(stderr, "gpu: buffer-age scissor %s\n", G.scissor ? "on" : want ? "off: no EGL_EXT_buffer_age" : "off (LORD_GPU_SCISSOR=1 turns it on)");
+    }
     if (!G.unpack_sub) dbg("no GL_EXT_unpack_subimage: damage is uploaded as whole rows");
     if (make_prog(0, fs_2d) || (G.have_external && make_prog(1, fs_ext))) { fprintf(stderr, "gpu: shaders failed, CPU composition\n"); last_why = "shaders"; goto fail; }
     if (has_ext(exts, "EGL_EXT_image_dma_buf_import")) {
@@ -563,6 +576,9 @@ fail:
 
 void gpu_shutdown(void) {
     int was_on = G.on;
+    if (sc_frames) fprintf(stderr, "gpu: buffer-age scissor: %ld frames, %ld of them partial, composed %.1f Mpx of %.1f\n", sc_frames, sc_cut, sc_px / 1e6, sc_all_px / 1e6);
+    sc_frames = sc_cut = 0;
+    sc_px = sc_all_px = 0;
     if (was_on && hook_lost) {
         /* the compositor reads back and frees what it holds while the context still works */
         for (int i = 0; i < OUT_MAX; i++)
@@ -1251,16 +1267,39 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     glBindTexture(GL_TEXTURE_2D, o->canvas.id);
     for (int i = 0; i < n; i++) o->times.up_px += upload_rect(scene->px, scene->stride, scene->w, o->W, dmg[i]);
     o->times.up_ms = mono_ms() - t0;
+    /* what this frame changes, the window GPU drag writes included */
+    Rect all = { 0, 0, o->W, o->H }, cur = { 0, 0, 0, 0 }, reg = all;
+    for (int i = 0; i < n; i++) cur = gsc_join(cur, dmg[i]);
+    if (gdrag) cur = gsc_join(cur, gdrag->w);
+    int partial = 0;
+    if (G.scissor) {
+        /* a frame with app windows, menus or a cursor is whole, and so is the one after it */
+        if (o->sc_quiet && !o->sc_busy) {
+            EGLint age = 0;
+            if (!eglQuerySurface(G.dpy, o->surf, EGL_BUFFER_AGE_EXT, &age)) age = 0;
+            reg = gsc_region(&o->sc, age, cur, o->W, o->H);
+            partial = 1;
+        }
+        o->sc_busy = !o->sc_quiet;
+        o->sc_quiet = 0;
+    }
+    o->times.comp_px = gsc_area(reg);
     glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    Rect all = { 0, 0, o->W, o->H };
+    if (partial && o->times.comp_px) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(reg.x0, o->H - reg.y1, reg.x1 - reg.x0, reg.y1 - reg.y0);
+    }
+    if (!partial || o->times.comp_px) glClear(GL_COLOR_BUFFER_BIT);
+    if (partial) glDisable(GL_SCISSOR_TEST);
     if (draw_layer) draw_layer(0);
-    gpu_draw(&o->canvas, 0, 0, (float)o->W, (float)o->H, 0, 0, (float)o->W, (float)o->H, all, 1);
+    gpu_draw(&o->canvas, 0, 0, (float)o->W, (float)o->H, 0, 0, (float)o->W, (float)o->H, reg, 1);
     /* the dragged window over the UI's stale rectangle: nothing of layer 0 is under it (paint.c checks).
      * Not drawn, that rectangle is stale in the UI texture: nothing is shown (-2), the caller paints it */
     if (gdrag) {
         if (!gdrag_frame(o, out, gdrag)) {
             rb.px = NULL;
+            gsc_reset(&o->sc);              /* the buffer was written and is not swapped */
+            o->sc_busy = 1;
             return -2;
         }
         if (gdrag_drawn) *gdrag_drawn = 1;
@@ -1273,6 +1312,13 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     double t1 = mono_ms();
     if (!eglSwapBuffers(G.dpy, o->surf)) { fprintf(stderr, "gpu: eglSwapBuffers failed\n"); return -1; }
     double t2 = mono_ms();
+    if (G.scissor) {
+        gsc_push(&o->sc, partial ? cur : all);
+        sc_frames++;
+        sc_cut += o->times.comp_px < (long)o->W * o->H;
+        sc_px += (double)o->times.comp_px;
+        sc_all_px += (double)o->W * o->H;
+    }
     o->times.swap_ms = t2 - t1;
     take_fence(o);
     struct gbm_bo *bo = gbm_surface_lock_front_buffer(o->gs);
@@ -1283,6 +1329,10 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     int r = present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
     o->times.submit_ms = mono_ms() - t2;
     return r;
+}
+
+void gpu_scissor_quiet(int out, int quiet) {
+    if (G.on && out >= 0 && out < OUT_MAX && G.out[out].used) G.out[out].sc_quiet = quiet;
 }
 
 void gpu_frame_times(int out, GpuFrameTimes *t) {
@@ -1395,6 +1445,8 @@ int gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) {
     }
     G.scanouts++;
     total_scanouts++;
+    gsc_reset(&o->sc);                  /* the UI changed with nothing composed */
+    o->sc_busy = 1;
     if (G.debug && (G.scanouts == 1 || G.scanouts % 300 == 0)) dbg("direct scanout: %ld frames (composed %ld)", G.scanouts, G.frames);
     return present(o, s);
 }

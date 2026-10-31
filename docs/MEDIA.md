@@ -112,6 +112,15 @@ We took the way the apps of popular desktop systems work, never their logos or t
   - `v4l2request` (Raspberry Pi 5 HEVC) is prepared: it needs the Raspberry Pi FFmpeg and creating
     the device over fds (TODO in `lm_io.c`).
   - If there is no driver, the decoder carries on in software without interruption.
+  - (0.8.7, in development) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
+    that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
+    hand over none; a frame clears its own count, so one damaged packet changes nothing) make the player open a software
+    decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames
+    (`build/lord-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
+    load from other jobs): a 640 × 360 H.264 clip with no audio, five runs of each, 119 frames received in 4 s and a largest gap
+    of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, 6 s, two runs with the decoder failure, one with each other case), the switch
+    is a seek: the audio left in the ring is dropped, the largest gap was 229–272 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended 0.2–0.6 s
+    behind the run without a failure, and audio and video stayed in step (mean offset at most about 2 ms). That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
 
 ### Video frames: a single copy
 
@@ -348,7 +357,10 @@ something changes), 0 dropped frames.
 
 - **VA-API measured on real hardware**, and dmabuf → EGL **zero-copy** on the GPU path. Test them
   on the AMD PC.
-- **Raspberry Pi 5:** HEVC through `v4l2request` over fds (Debian's FFmpeg doesn't have it).
+- **LordBench's video workloads with hardware decoding (maintainer's decision):** `MK_VBENCH` gets no fds and no ioctl
+  classes; a hardware workload needs the render node and `SANDBOX_IOCTL_DRM` for that job, which widens its sandbox.
+- **Raspberry Pi 5:** HEVC through `v4l2request` over fds (Debian's FFmpeg doesn't have it; the maintainer's decision:
+  it needs another FFmpeg, and the device opens `/dev/media*` by path, which the sandbox doesn't allow).
 - **Image subtitles** (PGS, DVD): only text ones today.
 - **Playback speed** and saved **playlists**.
 - **Screenshots:** record only an area (today, the whole screen) and record system audio (today,

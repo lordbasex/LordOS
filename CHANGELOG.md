@@ -27,6 +27,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Cleaner's images were missing from the package** (2026-10-30, found booting the arm64 ISO): `mkdeb.sh` didn't copy `assets/cleaner`, so on any installed `.deb` or ISO Cleaner drew without its background, tiles and hero art, and the windows behind showed through. Fixed; checked by adding the folder on the installed test system.
 
 - **Cleaner's root actions and scope ran for the first time** (2026-10-30), in a throwaway emulated arm64 installed system: `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp` did what their rules say on planted files, and `lordos-cleaner.scope` appeared under the session (`docs/CLEANER-TESTS.md`). Two open bugs came out: a scan finds nothing in a live session (the overlay's file devices), and the system card can't be reached when a scan finds nothing.
+- **The buffer-age scissor, off by default** (`server/src/gpu/gscissor.c`, `LORD_GPU_SCISSOR=1`, `docs/GPU.md`): a frame
+  with only the UI (no app window, menu or cursor drawn by the GPU) composes the rectangle that changed plus what
+  changed since its buffer was last shown (`EGL_EXT_buffer_age`), instead of the whole output. A buffer of unknown age,
+  a frame not swapped and a direct scanout make the next frame whole. `build/engine-test` runs the same code over a
+  simulated three-buffer chain with undefined buffers: 7,567 frames (the GPU drag runs, the damage pipeline and the
+  fuzz), 0 differ; without the history it fails. A real EGL chain on llvmpipe (VM 116, a scratch driver, 1920 × 1080): 600
+  frames, every 20th read back, 0 pixels differ, 3.77 ms of composition against 8.80, on the CPU. **Not run on any GPU**:
+  no number for the Raspberry Pi 5 yet, which is why it stays off.
+- **`build/gpu-contention`, an experiment for what slows the GPU under CPU load** (`tests/gpu_contention.c`, the rules in
+  `src/gpu/gcontend.c`, tested in `build/engine-test`): a fixed frame under loads that stay in the caches, read or write
+  memory, on 1, 2, 4 and all cores, with a verdict. It ran on VM 116 on llvmpipe only, which proves the tool, not the
+  cause; the Raspberry Pi 5 run is pending.
+- **The player leaves a failing hardware decoder** (`lm_hwfall.h`, `docs/MEDIA.md`): 8 decoder failures in a row, or
+  8 frames in a row that can't be read back from the hardware, switch that file to software at the current position,
+  as a seek: with sound, what was left in the audio ring is dropped and playback ended 0.2–0.6 s behind. Tested with both failures faked on a software decoder
+  (`build/lord-media-hwfall`, VM 116, with and without sound) and `build/hwfall-test`; **not run on real VA-API
+  hardware**. No change to the sandbox and none to FFmpeg.
 
 - **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13
   virtual machine). The Store then refused everything with "<user> is not an administrator", and LordOS has no way to

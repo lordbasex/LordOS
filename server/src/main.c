@@ -1694,6 +1694,7 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
             gdrag = &again;
         }
         int scanned = !readback && out_count(s) == 1 && wl_try_scanout(s->hw_cursor || s->cursor_mode == 2);
+        if (!scanned) gpu_scissor_quiet(o->gpu, wl_gpu_layers_empty() && (s->hw_cursor || s->cursor_mode == 2 || !s->cursor_tex));
         int res = scanned ? 0 : gpu_frame_ex(o->gpu, &o->scene, up, nup, gdrag, &gdragdrawn, gpu_layer);
         int failed = res == -1, unshown = res == -2;
         if (o->gdragtaken && gdragdrawn) paint_gdrag_done();    /* the textures have what paint.c had */

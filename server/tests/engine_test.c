@@ -15,7 +15,9 @@
 #include <time.h>
 
 #include "bench/lbinput.h"
+#include "gpu/gcontend.h"
 #include "gpu/gpu.h"
+#include "gpu/gscissor.h"
 #include "outputs.h"
 #include "ui/fonts.h"
 #include "ui/ui.h"
@@ -824,6 +826,59 @@ static void test_hidden_blur_damage(void) {
  * that bookkeeping (kept in step with main.c: paint_ui, paint_out, present_cpu) checks every
  * painted scene against a full repaint and every presented buffer against the scene. */
 enum { SW = 1280, SH = 800 };
+/* The buffer-age scissor (gpu/gscissor.c, docs/GPU.md) against a swap chain as Mesa's on GBM: three buffers of
+ * undefined content, the frame drawn into a free one, with the region gsc_region gives for its age, and
+ * compared with what a whole composition shows. Now and then a frame is drawn and not swapped (gpu_frame_ex's
+ * -2: the region written with junk, the history forgotten, the next one whole). */
+typedef struct { uint32_t *b[3]; int age[3], front, w, h, skip_whole, bad, frames, partial; long px, px_all; unsigned rng; GpuScissor sc; } GscChain;
+static GscChain gc_all;                 /* the runs' totals */
+static unsigned gc_rand(GscChain *c) { c->rng ^= c->rng << 13; c->rng ^= c->rng >> 17; c->rng ^= c->rng << 5; return c->rng; }
+static void gc_init(GscChain *c, int w, int h, unsigned seed) {
+    memset(c, 0, sizeof *c);
+    c->w = w; c->h = h; c->rng = seed | 1; c->front = -1;
+    for (int i = 0; i < 3; i++) {
+        c->b[i] = malloc((size_t)w * h * 4);
+        for (size_t k = 0; k < (size_t)w * h; k++) c->b[i][k] = 0xdeadbeefu;
+    }
+}
+static void gc_free(GscChain *c) {
+    gc_all.frames += c->frames; gc_all.partial += c->partial; gc_all.bad += c->bad; gc_all.px += c->px; gc_all.px_all += c->px_all;
+    for (int i = 0; i < 3; i++) free(c->b[i]);
+    memset(c, 0, sizeof *c);
+}
+static Rect gc_draw(GscChain *c, int bi, Rect cur, const uint32_t *src, int src_stride, int junk) {
+    Rect reg = c->skip_whole ? (Rect){ 0, 0, c->w, c->h } : gsc_region(&c->sc, c->age[bi], cur, c->w, c->h);
+    for (int y = reg.y0; y < reg.y1; y++)
+        for (int x = reg.x0; x < reg.x1; x++) c->b[bi][(size_t)y * c->w + x] = junk ? 0xdeadbeefu : src[(size_t)y * src_stride + x];
+    return reg;
+}
+/* One frame that changes cur; src is what it must show. 0 if the buffer shown is src. */
+static int gc_frame(GscChain *c, Rect cur, const uint32_t *src, int src_stride) {
+    if (!c->b[0]) return 0;
+    int bi = -1;
+    for (int i = 0; i < 3; i++)            /* a free buffer: the oldest, or (one in four) the other one */
+        if (i != c->front && (bi < 0 || c->age[i] > c->age[bi] || (c->age[i] == 0 && c->age[bi] != 0))) bi = i;
+    if (!(gc_rand(c) & 3) && c->front >= 0) bi = 3 - c->front - bi;
+    if (!(gc_rand(c) & 31)) {
+        gc_draw(c, bi, cur, src, src_stride, 1);
+        gsc_reset(&c->sc);
+        c->skip_whole = 1;
+    }
+    Rect reg = gc_draw(c, bi, cur, src, src_stride, 0);
+    gsc_push(&c->sc, c->skip_whole ? (Rect){ 0, 0, c->w, c->h } : cur);
+    c->skip_whole = 0;
+    c->frames++;
+    c->partial += gsc_area(reg) < (long)c->w * c->h;
+    c->px += gsc_area(reg);
+    c->px_all += (long)c->w * c->h;
+    for (int i = 0; i < 3; i++) if (c->age[i]) c->age[i]++;
+    c->age[bi] = 1;
+    c->front = bi;
+    for (int y = 0; y < c->h; y++)
+        if (memcmp(c->b[bi] + (size_t)y * c->w, src + (size_t)y * src_stride, (size_t)c->w * 4)) { c->bad++; return 1; }
+    return 0;
+}
+
 typedef struct {
     Box pend;
     DamageList pl;
@@ -836,6 +891,7 @@ typedef struct {
     DamageList pstale[2];
     Box painted[DAMAGE_MAX];
     int npainted, full_copy;
+    GscChain gc;
 } SimOut;
 
 static Rect sim_rjoin(Rect a, Rect b) {
@@ -855,11 +911,13 @@ static void sim_init(SimOut *o) {
     o->scene = calloc((size_t)SW * SH, 4);
     o->buf[0] = calloc((size_t)SW * SH, 4);
     o->buf[1] = calloc((size_t)SW * SH, 4);
+    static unsigned gc_seed = 1;
+    gc_init(&o->gc, SW, SH, gc_seed++ * 2654435761u);
     canvas_init(&o->sc, o->scene, SW, SH, SW);
     o->full = 1;
     o->full_copy = 2;
 }
-static void sim_free(SimOut *o) { free(o->scene); free(o->buf[0]); free(o->buf[1]); }
+static void sim_free(SimOut *o) { free(o->scene); free(o->buf[0]); free(o->buf[1]); gc_free(&o->gc); }
 
 /* main.c paint_ui: layout, damage, and the damage goes to the display's pending list */
 static void sim_paint_ui(SimOut *o, Node *root) {
@@ -926,6 +984,7 @@ static Rect sim_paint_out(SimOut *o, Node *root, int *nparts_out) {
 /* main.c present_cpu (no rotation, no Night Light): returns the back buffer it drew */
 static int sim_present(SimOut *o, Rect r, Rect cur) {
     int bi = o->front ^ 1;
+    if (gc_frame(&o->gc, r, o->scene, SW) && o->gc.bad <= 3) printf("  scissor: a composed buffer differs from the scene (frame %d)\n", o->gc.frames);
     uint32_t *out = o->buf[bi];
     if (o->full_copy > 0) {
         memcpy(out, o->scene, (size_t)SW * SH * 4);
@@ -1355,6 +1414,73 @@ static int fz_run(int seed, int frames, int pend_pct, int *multi_frames) {
     return bad;
 }
 
+/* gsc_region's rules, then the contention experiment's plan and verdict */
+static void test_gscissor_unit(void) {
+    GpuScissor g;
+    memset(&g, 0, sizeof g);
+    Rect all = { 0, 0, 100, 50 }, a = { 10, 10, 20, 20 }, b = { 50, 5, 60, 8 }, e = { 0, 0, 0, 0 };
+#define RE(x, y) (!memcmp(&(x), &(y), sizeof(Rect)))
+    Rect r = gsc_region(&g, 0, a, 100, 50);
+    CHECK(RE(r, all), "age 0 (undefined) redraws everything");
+    r = gsc_region(&g, 2, a, 100, 50);
+    CHECK(RE(r, all), "no history: everything");
+    r = gsc_region(&g, 1, a, 100, 50);
+    CHECK(RE(r, a), "age 1: only this frame");
+    gsc_push(&g, a);
+    r = gsc_region(&g, 2, b, 100, 50);
+    Rect ab = { 10, 5, 60, 20 };
+    CHECK(RE(r, ab), "age 2: this frame and the last");
+    r = gsc_region(&g, 3, b, 100, 50);
+    CHECK(RE(r, all), "age past the history: everything");
+    gsc_push(&g, e);
+    r = gsc_region(&g, 2, e, 100, 50);
+    CHECK(!gsc_area(r), "nothing changed: nothing redrawn");
+    r = gsc_region(&g, 3, e, 100, 50);
+    CHECK(RE(r, a), "an empty frame in the history adds nothing");
+    r = gsc_region(&g, 1, (Rect){ -5, 40, 200, 90 }, 100, 50);
+    Rect cl = { 0, 40, 100, 50 };
+    CHECK(RE(r, cl), "clipped to the output");
+    for (int i = 0; i < GSC_HIST + 3; i++) gsc_push(&g, a);
+    CHECK(g.n == GSC_HIST, "the history is bounded");
+    r = gsc_region(&g, GSC_HIST + 1, b, 100, 50);
+    CHECK(gsc_area(r) && !RE(r, all), "the oldest age the history covers");
+    r = gsc_region(&g, GSC_HIST + 2, b, 100, 50);
+    CHECK(RE(r, all), "one older: everything");
+    gsc_reset(&g);
+    r = gsc_region(&g, 2, a, 100, 50);
+    CHECK(RE(r, all), "after a reset: everything");
+#undef RE
+}
+
+static void test_gcontend(void) {
+    GcPhase p[32];
+    int n = gc_plan(p, 32, 4);
+    CHECK(n == 11, "plan: no load, 3 kinds on 1, 2, 4 workers, no load (%d)", n);
+    CHECK(p[0].kind == GC_NONE && p[n - 1].kind == GC_NONE && p[3].workers == 4 && p[4].kind == GC_READ, "plan's order");
+    CHECK(gc_plan(p, 32, 6) == 14 && p[3].workers == 4 && p[4].workers == 6, "plan on 6 cores ends on all of them");
+    CHECK(gc_plan(p, 32, 1) == 5, "plan on one core");
+    CHECK(gc_plan(p, 3, 4) == 3, "plan fits the array");
+    double v[] = { 5, 1, 4, 2, 3 };
+    CHECK(gc_quantile(v, 5, 0.5) == 3 && gc_quantile(v, 5, 0.99) == 5 && gc_quantile(v, 5, 0) == 1 && gc_quantile(v, 0, 0.5) == 0, "quantiles");
+#define GR(k, w, t) { .ph = { k, w }, .gpu_p50 = (t), .bus_mb_s = -1, .temp_mc = -1 }
+    GcResult mem[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 1, 1.5), GR(GC_SPIN, 4, 1.7), GR(GC_READ, 1, 2), GR(GC_READ, 4, 14), GR(GC_WRITE, 4, 15), GR(GC_NONE, 0, 1.6) };
+    CHECK(gc_verdict(mem, 7) == GC_V_MEMORY, "memory load alone slows it: memory");
+    GcResult cpu[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 14), GR(GC_READ, 4, 14), GR(GC_WRITE, 4, 14), GR(GC_NONE, 0, 1.5) };
+    CHECK(gc_verdict(cpu, 5) == GC_V_CPU, "load in the caches slows it too: not memory alone");
+    GcResult none[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 1.6), GR(GC_READ, 4, 1.7), GR(GC_WRITE, 4, 1.8), GR(GC_NONE, 0, 1.5) };
+    CHECK(gc_verdict(none, 5) == GC_V_NONE, "nothing reached 1.5x");
+    GcResult drift[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 14), GR(GC_READ, 4, 14), GR(GC_WRITE, 4, 14), GR(GC_NONE, 0, 3) };
+    CHECK(gc_verdict(drift, 5) == GC_V_DRIFT, "the runs without load disagree");
+    GcResult mid[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 2.5), GR(GC_READ, 4, 4), GR(GC_WRITE, 4, 4), GR(GC_NONE, 0, 1.5) };
+    CHECK(gc_verdict(mid, 5) == GC_V_CPU || gc_verdict(mid, 5) == GC_V_UNCLEAR, "a mixed result is not called memory");
+    CHECK(gc_verdict(mid, 2) == GC_V_UNCLEAR, "phases missing: unclear");
+    char js[256];
+    size_t l = gc_json(&mem[4], js, sizeof js);
+    CHECK(l && strstr(js, "\"load\":\"read\"") && strstr(js, "\"busMBs\":null") && strstr(js, "\"gpuP50\":14.000"), "json");
+    CHECK(gc_json(&mem[4], js, 8) == 0, "json that doesn't fit");
+#undef GR
+}
+
 static void test_damage_fuzz(void) {
     int seeds = getenv("FUZZ_SEEDS") ? atoi(getenv("FUZZ_SEEDS")) : 12, multi = 0, failed = 0;
     for (int seed = 0; seed < seeds; seed++) {
@@ -1689,6 +1815,7 @@ typedef struct {
     int gdrag_on;
     Rect gdragw;
     GpuDrag g;
+    GscChain gc;
 } DOut;
 static int test_gdrag;
 /* the frame pipeline (main.c, fpipe.h): each frame painted is presented only after the next frame's changes
@@ -1811,6 +1938,15 @@ static void gdrag_present(DOut *o, int index, Rect pr, int taken, int last, int 
                                                            gdragtex.b[(size_t)y * gdragtex.bw + x]);
         o->gdragw = g->w;
     }
+    if (!o->gc.b[0]) gc_init(&o->gc, W, H, 0x51ed270bu);
+    Rect gcur = pr;
+    if (taken) {
+        gcur = o->g.w;
+        for (int i = 0; i < o->g.nstrip; i++) gcur = gsc_join(gcur, o->g.strip[i]);
+    }
+    gc_frame(&o->gc, gcur, o->fb, W);
+    gc_all.bad += o->gc.bad; gc_all.frames += o->gc.frames; gc_all.partial += o->gc.partial; gc_all.px += o->gc.px; gc_all.px_all += o->gc.px_all;
+    o->gc.bad = o->gc.frames = o->gc.partial = 0; o->gc.px = o->gc.px_all = 0;
     o->gdrag_on = taken;
 }
 
@@ -2308,7 +2444,7 @@ static int dout_init(DOut *o, OutView v) {
     canvas_init(&o->fbc, o->fb, v.pw, v.ph, v.pw);
     return 1;
 }
-static void dout_free(DOut *o) { free(o->px); free(o->rpx); free(o->tex); free(o->fb); free(o->cmp); }
+static void dout_free(DOut *o) { free(o->px); free(o->rpx); free(o->tex); free(o->fb); free(o->cmp); gc_free(&o->gc); }
 
 /* GPU drag's frames counted since the last call, printed for a run (some_gdrag: at least one is expected) */
 static void gdrag_report(const char *what, int some_gdrag) {
@@ -2851,6 +2987,8 @@ int main(int argc, char **argv) {
 #else
     if (argc > 1 && !strcmp(argv[1], "drag-golden")) { test_drag_exact(1); return fails ? 1 : 0; }
     test_drag_exact(0);                     /* first: the transform cache is keyed by node id */
+    CHECK(!gc_all.bad, "scissor over the GPU drag runs: %d frames differ", gc_all.bad);
+    printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
     test_ellipsis();
     test_borders();
@@ -2863,8 +3001,13 @@ int main(int argc, char **argv) {
     test_multi_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
+    test_gscissor_unit();
+    test_gcontend();
+    memset(&gc_all, 0, sizeof gc_all);
     test_damage_pipeline();
     test_damage_fuzz();
+    CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
+    printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_grow_wrap_height();
     test_overlay_scrollbar();
     test_transform_restyle();
