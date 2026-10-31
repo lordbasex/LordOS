@@ -442,7 +442,12 @@ On the Pi: `make -C server build/gpu-contention`, then `build/gpu-contention --n
 **Checked** only as a tool: VM 116, llvmpipe, 120 frames a phase on 4 cores, with other jobs on that CPU: GPU p50 9.9–12.3 ms
 alone, 18.5 spinning, 22.8 reading, 22.2 writing, verdict `unclear` (spinning reached 1.5×, not 2×); `busMBs` was null. An earlier run on a
 quieter machine, timed from the end of the upload, gave 3.6, 11.8, 14.1 and 14.5, verdict `cpu`. So on a shared CPU the verdict moves: run it on an idle machine.
-No GPU has been measured with it, and the cause on the Pi remains unproven.
+**Measured on the Pi 5 16 GB** (2026-10-31, build 0.8.6+v087.4, V3D 7.1.10.2 on `renderD128`, GPU time from the native fence, 240 frames a phase,
+two runs, the desktop idle beside it): GPU p50 1.42–1.44 ms with no load at both ends, 1.39–1.42 on 1–4 spinning cores, 6.1, 10.9 and 28.1–28.3 ms reading on
+1, 2 and 4 cores (p99 38–41), 3.6–3.7 ms writing. Upload p50 went from 1.4 to 23 ms reading and 11.5 ms writing on 4 cores. Verdict `memory`, both runs. The V3D clock
+stayed at 1.15 GHz, `get_throttled` at 0x0 and the temperature at or below 44 °C. So on this board the cause is memory contention, reads above all, and not CPU
+load, the clock or heat. `busMBs` read about 11,000 MB/s for the readers but about 1 MB/s for the writers, so that counter does not show write traffic. Still to find: which
+reads a real desktop load does, and how much of this a change in the compositor can avoid. On VM 116, with llvmpipe, nothing of this applies.
 
 ## The CPU path on several threads (0.8.5)
 

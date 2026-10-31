@@ -643,7 +643,7 @@ left for after 0.8.6, and the new native app:
   on 2026-10-30). Not built: it needs a measured gain, and VM 116 has no 3D (`GPU.md`, "Pending").
 - [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
   composes only the damage, PBO uploads or a linear canvas) and finding what slows V3D under an all-core CPU load
-  (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention is the likeliest cause, not proven:
+  (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention measured as the cause on 2026-10-31, `GPU.md`:
   read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5 (moved from 0.8.6 on 2026-10-30).
   In development, tested without a GPU and waiting for a Pi 5 run: the scissor (`LORD_GPU_SCISSOR=1`, off by default)
   and `build/gpu-contention` (`GPU.md`).

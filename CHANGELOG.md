@@ -18,6 +18,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **What slows the Pi 5's GPU under load: memory** (2026-10-31, measured with `build/gpu-contention` on the Pi 5 16 GB, build 0.8.6+v087.4, two runs; `docs/GPU.md`): GPU time per frame
+  stays at about 1.4 ms with all four cores spinning, and goes to 28 ms with four cores reading memory (3.7 ms writing), with the V3D clock at 1.15 GHz, no throttling and at most 44 °C.
+  No desktop change comes with this measurement; it says where the work on the desktop under load has to go.
+
 - **An arm64 live ISO** (2026-10-30; `docs/ISO.md`, "The arm64 ISO"): `lordos-live-<version>-arm64.iso` for generic UEFI arm64 machines and virtual machines, with the live desktop and the disk installer.
   - **Build:** `tools/iso/build.sh` takes the architecture from the host; amd64 keeps its steps (`linux-image-amd64`, both grub platforms, BCJ x86). arm64 uses `linux-image-arm64`, `grub-efi-arm64-bin`, UEFI only, no BCJ. `tools/iso/build-arm64.sh` runs it from x86-64 in the arm64 chroot under qemu-user, through an overlay in a private mount namespace, so the chroot isn't changed.
   - **Installer:** on arm64 no BIOS partition, ESP first, root with the Linux ARM64 partition type, `grub-install --target=arm64-efi` only; the wizard's Summary shows that layout (en, es, pt). The amd64 steps are the same.
