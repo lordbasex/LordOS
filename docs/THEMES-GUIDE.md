@@ -207,8 +207,7 @@ window takes the work area), `windowTitle(w)` for the title, `windowIcon(w)` for
 `focus`, `minimize`, `toggleMaximize`, `snap`, `center`, `moveToDisplay`, `arrange`, `move`,
 `resize`, `setFrame`, `beginMove`, `beginResize` and more (`sdk/windows.js`).
 
-Both bundled themes open windows at start (`wm.open('files')`, `wm.open('about')`); that is a
-choice, not a requirement.
+A session starts on an empty desktop: a theme opens no window of its own at start.
 
 ### Window frames
 

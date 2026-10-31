@@ -40,8 +40,6 @@ const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s
 
 // chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame
 configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
-wm.open('files');
-wm.open('about');
 
 // Pinned by default (the user changes the Dock by dragging and with «Keep in Dock»: settings.dockPinned).
 const DOCK_DEFAULT = [...DOCK_ORDER, ...apps.filter((a) => a.dock && !DOCK_ORDER.includes(a.id)).map((a) => a.id)];

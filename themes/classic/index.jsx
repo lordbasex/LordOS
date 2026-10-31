@@ -57,7 +57,6 @@ function trayPanel(pos, width, height, m = mainDisplay()) {
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame
 configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2 }, snap: true });
-wm.open('about');
 
 // What is being dragged (from the bar or the start menu), and the remove cue.
 function DragGhost({ t }) {
