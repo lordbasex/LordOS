@@ -6,7 +6,7 @@
 import {
   View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo,
+  useDisks, admin, systemInfo, lan,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -18,6 +18,7 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
+import { NetworkView, NetGlyph, isShareFs } from './network.jsx';
 
 export function Icon({ size: s }) {
   return (
@@ -58,7 +59,8 @@ function unmountedDisks(list) {
 }
 // What ⏏ does for a mounted volume: a removable disk is ejected whole (disk-eject), another disk's
 // partition is unmounted (disk-unmount); nothing on the disk the system runs from.
-function volumeRelease(list, path) {
+function volumeRelease(list, path, fstype) {
+  if (isShareFs(fstype)) return { action: 'share-unmount', name: path };
   for (const d of list || []) {
     if (d.system) continue;
     const p = (d.partitions?.length ? d.partitions : [d]).find((x) => x.mountpoint === path);
@@ -68,6 +70,7 @@ function volumeRelease(list, path) {
 }
 function argLoc(args) {
   if (args?.place === 'trash') return { type: 'trash' };
+  if (args?.place === 'network') return { type: 'network' };
   if (!args?.path) return null;
   const home = fs.home();
   const p = String(args.path).replace(/^~(?=\/|$)/, home);
@@ -95,6 +98,7 @@ function locTitle(loc, dirs) {
     case 'recent': return tr('files.place.recent');
     case 'apps': return tr('files.place.apps');
     case 'trash': return tr('files.place.trash');
+    case 'network': return tr('files.place.network');
     case 'tag': return tr(`files.tag.${loc.color}`);
     case 'search': return tr('files.searchTitle', { q: loc.query });
     case 'archive': return loc.inner ? fs.basename(loc.inner) : fs.basename(loc.path);
@@ -194,6 +198,7 @@ export default function Files() {
   const [diskList] = useDisks();
   useEffect(() => { setTimeout(warmDocs, 800); }, []);             // PDF Quick Preview without waiting for the helper
   const [msg, setMsg] = useState(null);
+  const [netModal, setNetModal] = useState(false);        // Network's connect sheet has the keyboard
   const root = useRef(null);
   const press = useRef(null);
   const typed = useRef({ text: '', at: 0 });
@@ -422,7 +427,7 @@ export default function Files() {
     anchor.current = p;
   };
   useKeyboard((e) => {
-    if (renaming || confirm || menu) return;
+    if (renaming || confirm || menu || netModal) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
     const space = e.char === ' ' || e.key === ' ' || b === ' ';
@@ -503,6 +508,7 @@ export default function Files() {
         { label: tr('files.place.home'), onClick: () => navigate(homeLoc()) },
         { label: computerName(), onClick: () => navigate(computerLoc()) },
         ...dirs.map((d) => ({ label: tr(`files.place.${d.label}`), onClick: () => navigate({ type: 'dir', path: d.path }) })),
+        ...(lan.available() ? [{ label: tr('files.place.network'), onClick: () => navigate({ type: 'network' }) }] : []),
         { label: tr('files.place.apps'), onClick: () => navigate({ type: 'apps' }) },
         { label: tr('files.place.trash'), onClick: () => navigate({ type: 'trash' }) },
       ] },
@@ -579,8 +585,9 @@ export default function Files() {
         <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
           drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />
         <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />
+        {lan.available() && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
         {volumes.map((v) => {
-          const rel = volumeRelease(diskList, v.path);
+          const rel = volumeRelease(diskList, v.path, v.fs);
           return (
             <SideItem key={v.path} t={t} label={v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
               drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null} />
@@ -665,10 +672,12 @@ export default function Files() {
         {/* content */}
         <View style={{ flex: 1 }} onMouseDown={() => { if (renaming) commitRename(); setSelected(new Set()); }} onContextMenu={onBgContext}
           {...(curDir ? { dropPath: curDir } : {})}>
-          {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
-          {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
-          {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort} />}
-          {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
+          {loc.type === 'network' ? <NetworkView volumes={volumes} refreshVolumes={() => setVolumes(fs.volumes())} openFolder={(p) => navigate(dirLoc(p))} setMsg={setMsg} setModal={setNetModal} /> : <>
+            {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
+            {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
+            {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort} />}
+            {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
+          </>}
         </View>
         {/* path bar and status bar */}
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.m, overflow: 'hidden' }}>
@@ -697,8 +706,8 @@ export default function Files() {
             </View>
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {msg || [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
-                freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(', ')}
+              {msg || (loc.type === 'network' ? '' : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+                freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(', '))}
             </Text>
           )}
         </View>

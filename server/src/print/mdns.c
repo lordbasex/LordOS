@@ -1,6 +1,8 @@
 /* mdns.c — see mdns.h. */
 #include "mdns.h"
+#ifndef MDNS_PARSE_ONLY
 #include "../sec/netconn.h"
+#endif
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -14,13 +16,15 @@
 #include <time.h>
 #include <unistd.h>
 
-enum { T_A = 1, T_PTR = 12, T_TXT = 16, T_SRV = 33 };
+enum { T_A = MDNS_T_A, T_PTR = MDNS_T_PTR, T_TXT = MDNS_T_TXT, T_SRV = MDNS_T_SRV };
 
+#ifndef MDNS_PARSE_ONLY
 static double now_ms(void) {
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
+#endif
 
 /* DNS name with compression → "a.b.c" (without the final dot). first = first label as is.
  * Returns the position after the name (in the original place) or -1. */
@@ -80,7 +84,7 @@ int mdns_parse(const uint8_t *p, size_t len, MdnsCache *c) {
         if (off + rdlen > len) return -1;
         size_t rd = off;
         off += rdlen;
-        if (type == T_PTR && c->nptr < 64) {
+        if (type == T_PTR && c->nptr < MDNS_MAX) {
             char first[128];
             if (read_name(p, len, rd, tmp, sizeof tmp, first, sizeof first) < 0) continue;
             int dup = 0;
@@ -90,14 +94,14 @@ int mdns_parse(const uint8_t *p, size_t len, MdnsCache *c) {
             snprintf(c->ptr[c->nptr].target, sizeof c->ptr[0].target, "%s", tmp);
             snprintf(c->ptr[c->nptr].first, sizeof c->ptr[0].first, "%s", first);
             c->nptr++;
-        } else if (type == T_SRV && rdlen >= 7 && c->nsrv < 64) {
+        } else if (type == T_SRV && rdlen >= 7 && c->nsrv < MDNS_MAX) {
             int port = p[rd + 4] << 8 | p[rd + 5];
             if (read_name(p, len, rd + 6, tmp, sizeof tmp, NULL, 0) < 0) continue;
             snprintf(c->srv[c->nsrv].name, sizeof c->srv[0].name, "%s", name);
             snprintf(c->srv[c->nsrv].host, sizeof c->srv[0].host, "%s", tmp);
             c->srv[c->nsrv].port = port;
             c->nsrv++;
-        } else if (type == T_TXT && c->ntxt < 64) {
+        } else if (type == T_TXT && c->ntxt < MDNS_MAX) {
             char *t = c->txt[c->ntxt].txt;
             size_t o = 0, q = rd;
             while (q < rd + rdlen) {
@@ -112,7 +116,7 @@ int mdns_parse(const uint8_t *p, size_t len, MdnsCache *c) {
             t[o] = 0;
             snprintf(c->txt[c->ntxt].name, sizeof c->txt[0].name, "%s", name);
             c->ntxt++;
-        } else if (type == T_A && rdlen == 4 && c->na < 64) {
+        } else if (type == T_A && rdlen == 4 && c->na < MDNS_MAX) {
             snprintf(c->a[c->na].host, sizeof c->a[0].host, "%s", name);
             inet_ntop(AF_INET, p + rd, c->a[c->na].addr, sizeof c->a[0].addr);
             c->na++;
@@ -138,7 +142,7 @@ static int put_name(uint8_t *q, size_t cap, size_t *o, const char *name) {
 }
 
 /* question (several questions in one packet) */
-static size_t build_query(uint8_t *q, size_t cap, const char *const *names, const int *types, int n, uint16_t id) {
+size_t mdns_query(uint8_t *q, size_t cap, const char *const *names, const int *types, int n, uint16_t id) {
     if (cap < 12) return 0;
     memset(q, 0, 12);
     q[0] = (uint8_t)(id >> 8);
@@ -203,6 +207,7 @@ const char *mdns_txt(const MdnsSvc *s, const char *key, char *out, size_t n) {
     return out;
 }
 
+#ifndef MDNS_PARSE_ONLY
 int mdns_browse(const char *const *types, int ntypes, int ms, MdnsSvc *out, int max) {
     int fd = netconn_socket(NC_PRINT, AF_INET, SOCK_DGRAM, NULL, 0);   /* the printers' own (sec/netconn.h) */
     if (fd < 0) return 0;
@@ -227,7 +232,7 @@ int mdns_browse(const char *const *types, int ntypes, int ms, MdnsSvc *out, int 
     int sends = 0, followed = 0;
     while (now_ms() - start < ms) {
         if (now_ms() >= next_send && sends < 3) {
-            size_t qn = build_query(pkt, sizeof pkt, names, qt, nq, id);
+            size_t qn = mdns_query(pkt, sizeof pkt, names, qt, nq, id);
             if (qn) sendto(fd, pkt, qn, 0, (struct sockaddr *)&to, sizeof to);
             sends++;
             next_send = now_ms() + (sends == 1 ? 350 : 700);
@@ -249,7 +254,7 @@ int mdns_browse(const char *const *types, int ntypes, int ms, MdnsSvc *out, int 
                 if (!has && nf < 14) { fn[nf] = c->ptr[i].target; ft[nf++] = T_SRV; }
                 if (!txt && nf < 14) { fn[nf] = c->ptr[i].target; ft[nf++] = T_TXT; }
             }
-            if (nf) { size_t qn = build_query(pkt, sizeof pkt, fn, ft, nf, id); if (qn) sendto(fd, pkt, qn, 0, (struct sockaddr *)&to, sizeof to); }
+            if (nf) { size_t qn = mdns_query(pkt, sizeof pkt, fn, ft, nf, id); if (qn) sendto(fd, pkt, qn, 0, (struct sockaddr *)&to, sizeof to); }
         }
         int left = (int)(ms - (now_ms() - start));
         int w = (int)(next_send - now_ms());
@@ -269,3 +274,4 @@ int mdns_browse(const char *const *types, int ntypes, int ms, MdnsSvc *out, int 
     free(c);
     return n;
 }
+#endif

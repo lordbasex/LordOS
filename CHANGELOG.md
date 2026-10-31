@@ -10,6 +10,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Files → Network** (in development; `docs/FILES.md`, "Network"). A Network place in the sidebar shows what is on the
+  local network by itself: computers, SMB shared folders, NFS exports, other network storage and services, with
+  name, address, kind and what can be done with each. Off until the page opens; one bounded pass (mDNS, then ports 445
+  and 2049 on this computer's own private links, at most the /24, at most 30 connections a second, port 22 and a reverse mDNS
+  name for machines that turned out to be there), IPv4 only. Everything that comes back is read by the new sandboxed helper `lord-lan`
+  (no sockets, no files, libc only; our own SMB2, NTLMSSP, DCE/RPC, ONC RPC parsers, `build/lan-test` under ASan/UBSan with
+  40,000 damaged answers). JS names no address: `lord.lan` is `start`, `stop`, `poll`.
+  **Inside a session the search needs the maintainer's review of a connector name** (`docs/FIREWALL.md`, "Files → Network
+  and the connectors") and until then the page says it isn't available; shares can't be listed there yet.
+- **Connecting to a share** from Files: the closed admin actions `share-mount` and `share-unmount` (approved in the
+  roadmap on 2026-10-25) mount SMB and NFS with the kernel's clients through `fsconfig()`, one call per option, with no
+  program, shell or extra package, only private IPv4 addresses, only under `/media/<user>`; the password can be
+  remembered in the keyring and nowhere else. Tested on VM 125 against a Samba and NFS server inside a network
+  namespace: guest, password, wrong password, NFS 4.2, ⏏ from the sidebar.
+
+### Fixed
+
+- **A network mount that stops answering no longer freezes the interface.** `lord.fs` asks the server from a thread of
+  its own first (`fsops_share_down`, at most 800 ms, once), `fs_volumes` doesn't `statvfs` shares and the Trash skips them;
+  measured before: 30 s on SMB and over 100 s on NFSv4 with the thread blocked, after: never blocked in 24 samples.
+
+### Changed
+
+- `MdnsCache` keeps 256 records of each kind (64 before) and `mdns_query` is public, for `lord-lan`; printing's use is the same.
+
 ### Planned
 
 - **The 0.8.7 plan** (2026-10-30, decided by the maintainer): the community hardware reports, LordBench's x86 PC

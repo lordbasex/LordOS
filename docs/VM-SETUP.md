@@ -612,6 +612,7 @@ sudo usermod -aG lpadmin lord        # manage printers (LordOS administrators ha
 | `cups` (`cups-daemon`, `cups-client`, `cups-filters`…) | 2.4.10 | the queue and the drivers; LordOS speaks IPP to it over `/run/cups/cups.sock` |
 | `printer-driver-cups-pdf` | 3.0.2 | tests only: the virtual «PDF» printer (it leaves jobs in `~/PDF/`) |
 | `cups-ipp-utils` | 2.4.10 | tests only: `ippeveprinter`, an IPP Everywhere printer "on the network" |
+| `samba`, `nfs-kernel-server` | 0.8.7 | VM 125, for an hour on 2026-10-31: the test servers of Files → Network, inside a network namespace, with every unit masked so nothing listened on the LAN; purged afterwards (`FILES.md`, "Network") |
 | `avahi-daemon`, `avahi-utils` | 0.8 | CUPS announces and finds printers; in the tests, announcing the scanner (`avahi-publish`). LordOS's mDNS doesn't need it |
 | `libarchive-tools`, `zstd` | 3.7.4, 1.5.7 | tests only: building `.7z` and `.tar.zst` in `tests/doc_evil.sh` |
 | `strace` | — | only for debugging the helper |

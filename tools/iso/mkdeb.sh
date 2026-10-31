@@ -108,6 +108,9 @@ ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
 # lord-clean (0.8.7): Cleaner's sandboxed read-only scanner (docs/CLEANER-ARCHITECTURE.md); lord-server only launches the one in its own folder
 [ -x server/build/lord-clean ] && install -m 755 server/build/lord-clean "$L/bin/lord-clean"
 [ -x "$L/bin/lord-clean" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-clean" 2>/dev/null || true; }
+# lord-lan (0.8.7): reads what the local network answers for Files → Network, sandboxed (docs/FILES.md, "Network")
+[ -x server/build/lord-lan ] && install -m 755 server/build/lord-lan "$L/bin/lord-lan"
+[ -x "$L/bin/lord-lan" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-lan" 2>/dev/null || true; }
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }

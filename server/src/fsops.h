@@ -10,6 +10,10 @@
 /* Allowed roots: the home folder and the user's mounts (/media/$USER, /run/media/$USER). */
 void fsops_init(const char *home, const char *user);
 int  fsops_allowed(const char *real);          /* already resolved path (realpath) inside a root */
+/* Network shares (see fsops.c): a kernel file system name of a share, and whether a path lies on a
+ * share that stopped answering. Doesn't touch the path itself and waits under a second. */
+int fsops_share_fs(const char *fstype);
+int fsops_share_down(const char *path);
 int  fsops_readable(const char *real);         /* (0.8.5) read-only: the whole tree but /proc, /sys, /dev, /run */
 int  fsops_protected(const char *real);        /* folders JS does not write to (launcher, apps, settings) */
 int  fsops_protected_below(const char *real);  /* a protected path lies strictly below real (rule tables) */

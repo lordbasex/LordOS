@@ -102,6 +102,95 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   under the window's title bar). In a folder the user can't write (This Computer), the menus and the
   context menu leave out or disable the actions that would change it.
 
+## Network (0.8.7, in development)
+
+**Files → Network** shows what is on the local network by itself: computers, SMB shared folders, NFS exports,
+other network storage and network services, each with its name, address, kind and what can be done with it. It
+stays off until the page is opened and leaves when the page closes.
+
+**State of the feature: inside a LordOS session the search is waiting for one decision.** Sockets of a
+component come from its connector (`sec/netconn.h`), and a new connector name needs the maintainer's review
+(`AGENTS.md`), which has not happened. Until then `lan_socket` makes no socket in a session, the page says the
+search isn't available, and everything below was tested outside a session (see "What was tested"). The proposal
+is in `FIREWALL.md`, "Files → Network and the connectors". Mounting doesn't depend on it.
+
+**How a pass works** (`server/src/lan/lan.c`, on a thread of its own):
+
+1. It takes the interfaces with a real device (`/sys/class/net/<if>/device`: no container bridges, veths or
+   tunnels), up, with a private IPv4 address (`lan_private`: 10/8, 172.16/12, 192.168/16, 169.254/16). IPv6 is not
+   searched. With no such interface nothing is sent.
+2. **mDNS/DNS-SD:** three legacy-unicast questions per link for the service types in `lan/lanservices.h`. Datagrams
+   stay in lord-server's socket and are handed to the helper; an unconnected UDP socket in the helper could reach
+   any address.
+3. **TCP probe of ports 445 and 2049:** first the neighbours the kernel knows and what mDNS named, then the rest of
+   the subnet, at most its /24 (`lan_sweep_range`), at most 512 addresses in a pass, at most 30 new connections a
+   second (`LAN_RATE`), 24 at once, 600 ms each. A /24 takes about 20 seconds. Only addresses on a local subnet
+   (`on_link`) are ever connected to, whatever an mDNS answer claims.
+4. **Each server:** where 445 answered, one SMB2 exchange (below). Where 2049 answered, port 111 (portmapper) for
+   mountd's port and then the export list from that same host.
+5. **The ones that turned out to be there:** every neighbour that answered ARP during the sweep goes on the list,
+   with port 22 tried and a reverse mDNS question for its name. This is how a machine with no shares appears.
+
+The page opening keeps what a pass under 5 minutes old found; *Search again* needs 30 seconds between passes
+(`LAN_REST_S`, `LAN_KEEP_S`). Leaving the page cancels the pass and ends the helper.
+
+**`lord-lan`** (`lan/lanhelper.c`, `lan/lanparse.c`, protocol in `lan/lanproto.h`) reads everything that comes back.
+Same rules as `lord-fetch`: fixed path next to lord-server (owned by root or the user, not writable by others), no
+arguments, `LANG` only, the channel on fd 3, `sandbox_apply_helper` before anything is read (no socket, connect,
+bind or exec, no files, 64 MB). It links libc only. It gets datagrams and sockets lord-server already connected and
+never chooses where to connect: the one port it names, mountd's, is connected by lord-server on that same host.
+Its answers are parsed again with `sec/json.c` and every text goes through `lan_clean_text`. `lord.lan`
+(`ui/js_lan.c`) has `start`, `stop` and `poll`: JS names no address, port or socket, and it doesn't exist for
+isolated apps.
+
+**What SMB gives without a password:** the negotiate reply, then an anonymous NTLMSSP session: the challenge carries
+the computer's and domain's names, and if the server lets an anonymous session in, a `NetrShareEnum` over the
+`srvsvc` pipe lists its disk shares (printers, `IPC$` and names ending in `$` are left out). SMB 2.0 to 3.0.2 are
+offered; a server that only speaks SMB 1 doesn't answer and has no shares here, on purpose. A server that refuses
+anonymous sessions (most desktop systems by default) shows as "lists its folders only after signing in", and the
+share's name is typed in *Connect*. Listing with a password is not built: it needs NTLMv2 and signing in `lord-lan`.
+
+**Connecting** runs the closed `share-mount` action (`lan/share_admin.c`, table in `SYSTEM.md`). The kernel's own
+`cifs` and `nfs` clients do the work through the new mount API, one `fsconfig()` per option: no option string, no
+program, no shell. **No package is needed** beyond the kernel's modules: `cifs-utils` and `nfs-common` are not used
+(Debian's and the Pi kernel both ship the modules; the client side was tested on Debian's). Addresses are IPv4 and private, never names, so nothing
+resolves as root. SMB tries the password given, or the guest; NFS tries 4.2, 4.1, 4.0 and 3 (`nolock`, without
+`rpc.statd` its locks stay local), `sec=sys`, and has no sign-in: the server decides by address. The folder is
+`/media/<user>/<share> on <address>`, `nosuid,nodev`; on SMB the files are the session user's, 0600 and 0700.
+
+The password goes from the sheet to the action with `{ quiet: true }` and from there to one `fsconfig()`, and is
+wiped; it was not in `/proc/mounts`, the session's log, the journal or any command line. *Remember the password*
+saves it in the keyring (owner `files`, service `smb://<address>/<share>`) and nowhere else; with a locked or
+missing keyring the share still connects and the page says it wasn't remembered.
+
+**A server that goes away.** `lord.fs` runs on the interface's thread, and a call on a network mount blocks in
+the kernel. Measured on VM 125 with the test server's link down: browsing an SMB mount held the thread for 30
+seconds, and an NFSv4.2 `soft` mount held `ls` for over 100 seconds; the Dock's look at the Trash alone was enough to hang a
+session that has this mount. So `fsops_share_down` runs in `resolve_readable`, `resolve_in_home` and
+`resolve_target`, before `realpath`: a thread of its own asks the server (`statvfs`), the caller waits at most 800 ms,
+and while that question hangs the share counts as down at once. With the same dead link the thread was never
+blocked again (24 samples, one a second, all in `poll`), and the page shows "The computer sharing this does not
+answer". `fs_volumes` no longer calls `statvfs` on shares, and the Trash leaves out a share that doesn't answer.
+Left open: a server that dies inside the 3 seconds an answer is trusted, and paths other than `lord.fs`'s (Quick
+Preview's helpers, thumbnails) opened right after it, can still block for the kernel's time.
+
+**The traffic of a mounted share isn't in the firewall.** The kernel's client opens its own sockets, outside any
+app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app as `ROADMAP.md` first said.
+
+**What was tested** (2026-10-31; everything outside a LordOS session, as said above):
+
+| What | Where | Seen |
+|---|---|---|
+| A pass with the real helper in its sandbox | VM 116 and VM 125 on the real LAN | about 19 s for 506 connections on one /24; two of the maintainer's desktop computers (name, `_smb._tcp`, SSH, SFTP; SMB 3.0.2, signing required, anonymous session refused), `lordos-pi` at 172.17.0.24 (name by reverse mDNS, SSH), VM 116, VM 125, and three machines with SSH and no name |
+| Share list, export list | test server on VM 125 | Samba's `Public` and `Private`, its export; reached over a veth to a network namespace, not over the LAN |
+| `share-mount` / `share-unmount` | VM 125 (kernel 6.12) against that server | guest, password, wrong password (`share.denied`), NFS 4.2, writing as the user, refusals (public address, `..`, a folder that isn't a share) |
+| The page and the sheet in a real `lord-server` | VM 125, a private headless session (as root with `--user`, so with the admin helper), built with `LAN_ANY_LINK` so the veth counted | the list, Connect as guest, with a typed password, NFS, ⏏, the keyring's "not remembered" note, a dead server |
+| Parsers | `build/lan-test` under ASan/UBSan | every format against crafted, truncated and 40,000 damaged answers |
+
+**Not tested:** a real SMB or NFS server on the LAN (the only ones there refuse anonymous sessions, and the
+open test server was kept off the LAN), the keyring when it
+is unlocked, arm64, a server that isn't Samba, the connector inside a session.
+
 ## Shortcuts
 
 | Shortcut | What it does |

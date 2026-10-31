@@ -641,5 +641,13 @@
   "wifi.rejected": "The Wi-Fi service did not accept the network",
   "wifi.saveFailed": "Could not save the network",
   "wifi.selectFailed": "The Wi-Fi service could not select the network",
-  "wifi.startFailed": "Could not start Wi-Fi on {name}"
+  "wifi.startFailed": "Could not start Wi-Fi on {name}",
+  "share.alreadyMounted": "{path} is already in use",
+  "share.denied": "{name}: the server refused this user or password",
+  "share.noKernelSupport": "This system's kernel has no client for this kind of share",
+  "share.mountFailed": "Could not connect to {name}: {errno}",
+  "share.notMounted": "It is not a connected share",
+  "share.busy": "It is in use: close what is open on it first",
+  "share.unmountFailed": "Could not disconnect: {errno}",
+  "share.notResponding": "The computer sharing this does not answer"
 }

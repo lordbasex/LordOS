@@ -641,5 +641,13 @@
   "wifi.rejected": "O serviço de Wi-Fi não aceitou a rede",
   "wifi.saveFailed": "Não foi possível salvar a rede",
   "wifi.selectFailed": "O serviço de Wi-Fi não conseguiu escolher a rede",
-  "wifi.startFailed": "Não foi possível iniciar o Wi-Fi em {name}"
+  "wifi.startFailed": "Não foi possível iniciar o Wi-Fi em {name}",
+  "share.alreadyMounted": "{path} já está em uso",
+  "share.denied": "{name}: o servidor recusou este usuário ou senha",
+  "share.noKernelSupport": "O kernel deste sistema não tem cliente para este tipo de compartilhamento",
+  "share.mountFailed": "Não foi possível conectar a {name}: {errno}",
+  "share.notMounted": "Não é um compartilhamento conectado",
+  "share.busy": "Está em uso: feche primeiro o que estiver aberto",
+  "share.unmountFailed": "Não foi possível desconectar: {errno}",
+  "share.notResponding": "O computador que compartilha isto não responde"
 }

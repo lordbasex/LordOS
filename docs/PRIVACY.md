@@ -262,7 +262,7 @@ admin actions clean the operating system's own files, for administrators (`clean
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data
 (`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
-`lord-maild`, `lord-vault`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
+`lord-maild`, `lord-vault`, since 0.8.7 the network reader `lord-lan`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
 engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `lord-bench`, and in 0.8.7's development Cleaner's
 scanner `lord-clean`) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
@@ -860,3 +860,12 @@ Tested in headless sessions on VM 116 (`lord-server --headless` as `lord`, real 
 through the remote desktop socket): the app's menu opens from the menu bar and its
 items run in the app (File → New entry), ❖N/❖A/❖C/❖W reach the app while ❖V opens the clipboard
 history, and ❖Q and Dock → Quit end the process.
+
+## Files → Network (0.8.7, in development)
+
+The page sends nothing until it is opened, and stops when it closes. A pass stays on the local network: private
+IPv4 addresses on this computer's own links, never the internet, at most 30 connections a second. What it learns
+(names, addresses, shares) stays in lord-server's memory and is written nowhere. What other machines see: mDNS
+questions, TCP connections to ports 445, 2049 and 22, and on an SMB server one anonymous session attempt, which a
+server may log as a failed logon; an intrusion detector on the LAN may notice the sweep. Passwords go to the
+kernel and, only if asked, to the keyring. See `FILES.md`, "Network".

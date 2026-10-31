@@ -25,6 +25,7 @@
 #include <ftw.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -402,8 +403,10 @@ int fstrash_put_at(int dirfd, const char *name, const char *real, char *dest, si
 /* Known trash folders: the home one and those of the user's mounts. */
 typedef struct { char dirs[17][PATH_MAX]; int n; } TrashDirs;
 static void vol_dir_cb(void *ud, const char *path, const char *fs, double total, double avail) {
-    (void)fs; (void)total; (void)avail;
+    (void)total; (void)avail;
     TrashDirs *t = ud;
+    /* the Dock asks for the Trash on the interface's thread: a share that doesn't answer is left out */
+    if (fsops_share_fs(fs) && fsops_share_down(path)) return;
     if (t->n < 17) pathf(t->dirs[t->n++], PATH_MAX, "%s/.Trash-%u", path, (unsigned)getuid());
 }
 static TrashDirs *trash_dirs(void) {
@@ -660,6 +663,129 @@ static void unescape_mount(char *s) {
     *o = 0;
 }
 
+int fsops_share_fs(const char *t) { return !strcmp(t, "cifs") || !strcmp(t, "smb3") || !strcmp(t, "nfs") || !strcmp(t, "nfs4"); }
+
+/* ---- shares that stopped answering ----
+ * lord.fs runs on the interface's thread, and a call on a network mount whose server went away
+ * blocks in the kernel: tens of seconds on SMB, minutes on NFSv4 even when soft (measured, docs/FILES.md).
+ * So before lord.fs touches a path under a share, a thread of its own asks the server (statvfs) and
+ * the caller waits at most SHARE_WAIT_MS. While that question hangs the share counts as down, without
+ * waiting. What it can't cover: a server that dies inside the SHARE_OK_MS an answer is trusted. */
+#define SHARE_WAIT_MS 800
+#define SHARE_OK_MS 3000
+#define SHARE_MAX 8
+
+typedef struct { char mnt[PATH_MAX]; int asking, ok; long long when; } ShareMount;
+static ShareMount sh[SHARE_MAX];
+static int nsh;
+static long long sh_read;
+static pthread_mutex_t sh_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t sh_cv;
+static pthread_once_t sh_once = PTHREAD_ONCE_INIT;
+
+static long long mono_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000LL + t.tv_nsec / 1000000;
+}
+
+static void sh_init(void) {
+    pthread_condattr_t a;
+    pthread_condattr_init(&a);
+    pthread_condattr_setclock(&a, CLOCK_MONOTONIC);
+    pthread_cond_init(&sh_cv, &a);
+    pthread_condattr_destroy(&a);
+}
+
+static void *sh_ask(void *arg) {
+    char mnt[PATH_MAX];
+    pthread_mutex_lock(&sh_mu);
+    snprintf(mnt, sizeof mnt, "%s", (char *)arg);
+    pthread_mutex_unlock(&sh_mu);
+    free(arg);
+    struct statvfs vs;
+    int ok = !statvfs(mnt, &vs);
+    pthread_mutex_lock(&sh_mu);
+    for (int i = 0; i < nsh; i++) {
+        if (strcmp(sh[i].mnt, mnt)) continue;
+        sh[i].asking = 0;
+        sh[i].ok = ok;
+        sh[i].when = mono_ms();
+    }
+    pthread_cond_broadcast(&sh_cv);
+    pthread_mutex_unlock(&sh_mu);
+    return NULL;
+}
+
+static void sh_reread(void) {
+    FILE *f = fopen("/proc/mounts", "r");
+    if (!f) return;
+    ShareMount fresh[SHARE_MAX];
+    int n = 0;
+    char line[4096];
+    size_t l1 = strlen(media1), l2 = strlen(media2);
+    while (n < SHARE_MAX && fgets(line, sizeof line, f)) {
+        char dev[1024], mnt[2048], fstype[64];
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, fstype) != 3 || !fsops_share_fs(fstype)) continue;
+        unescape_mount(mnt);
+        if (!((!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/'))) continue;
+        memset(&fresh[n], 0, sizeof fresh[n]);
+        snprintf(fresh[n].mnt, sizeof fresh[n].mnt, "%s", mnt);
+        for (int i = 0; i < nsh; i++) if (!strcmp(sh[i].mnt, mnt)) fresh[n] = sh[i];    /* an answer on its way stays */
+        n++;
+    }
+    fclose(f);
+    memcpy(sh, fresh, (size_t)n * sizeof sh[0]);
+    nsh = n;
+}
+
+int fsops_share_down(const char *path) {
+    if (!under(path, media1) && !under(path, media2)) return 0;
+    pthread_once(&sh_once, sh_init);
+    pthread_mutex_lock(&sh_mu);
+    long long now = mono_ms();
+    if (now - sh_read > 2000 || !sh_read) { sh_reread(); sh_read = now; }
+    int k = -1;
+    for (int i = 0; i < nsh; i++) if (under(path, sh[i].mnt)) k = i;
+    if (k < 0) { pthread_mutex_unlock(&sh_mu); return 0; }
+    ShareMount *m = &sh[k];
+    int down = 0;
+    if (m->asking) down = 1;
+    else if (!m->when || now - m->when > SHARE_OK_MS) {
+        char *arg = strdup(m->mnt);
+        pthread_t th;
+        pthread_attr_t at;
+        pthread_attr_init(&at);
+        pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+        pthread_attr_setstacksize(&at, 128 * 1024);
+        sigset_t all, old;
+        sigfillset(&all);
+        pthread_sigmask(SIG_BLOCK, &all, &old);
+        int e = arg ? pthread_create(&th, &at, sh_ask, arg) : -1;
+        pthread_sigmask(SIG_SETMASK, &old, NULL);
+        pthread_attr_destroy(&at);
+        if (e) { free(arg); down = 1; }
+        else {
+            m->asking = 1;
+            char want[PATH_MAX];
+            snprintf(want, sizeof want, "%s", m->mnt);
+            struct timespec until;
+            clock_gettime(CLOCK_MONOTONIC, &until);
+            until.tv_nsec += SHARE_WAIT_MS * 1000000L;
+            if (until.tv_nsec >= 1000000000L) { until.tv_sec++; until.tv_nsec -= 1000000000L; }
+            for (;;) {
+                int r = pthread_cond_timedwait(&sh_cv, &sh_mu, &until);
+                int still = 0;
+                for (int i = 0; i < nsh; i++) if (!strcmp(sh[i].mnt, want)) { still = sh[i].asking; down = !still && !sh[i].ok; }
+                if (!still) break;
+                if (r == ETIMEDOUT) { down = 1; break; }
+            }
+        }
+    } else down = !m->ok;
+    pthread_mutex_unlock(&sh_mu);
+    return down;
+}
+
 void fs_volumes(FsVolFn fn, void *ud) {
     FILE *f = fopen("/proc/mounts", "r");
     if (!f) return;
@@ -673,7 +799,9 @@ void fs_volumes(FsVolFn fn, void *ud) {
         if (!ok) continue;
         struct statvfs vs;
         double total = 0, avail = 0;
-        if (!statvfs(mnt, &vs)) { total = (double)vs.f_blocks * vs.f_frsize; avail = (double)vs.f_bavail * vs.f_frsize; }
+        /* never on a network mount: this runs on the interface's thread and a server that went away
+         * would hold it for as long as the file system's timeout */
+        if (!fsops_share_fs(fstype) && !statvfs(mnt, &vs)) { total = (double)vs.f_blocks * vs.f_frsize; avail = (double)vs.f_bavail * vs.f_frsize; }
         fn(ud, mnt, fstype, total, avail);
     }
     fclose(f);
