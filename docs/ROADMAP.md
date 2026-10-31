@@ -763,6 +763,11 @@ left for after 0.8.6, and the new native app:
   one new closed admin action, `share-mount` (host, share and user validated; the password on
   standard input, never in argv; fixed options `nosuid,nodev` and the user's uid; only under
   `/media/<user>/`), the password in the keyring, the mount's traffic as its own firewall app.
+  *Built (0.8.7, in development, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `lord-lan`, listing
+  shares and exports, `share-mount` and `share-unmount`, the keyring. *Waiting for the maintainer:* the connector name
+  for the search inside a session (`FIREWALL.md`, "Files → Network and the connectors"). *Can't be done as written:*
+  the mount's traffic as a firewall app (the kernel's client has no cgroup of an app). *Not built:* typing a server
+  ("Connect to server…"), listing shares with a password, IPv6.
 
 - [ ] **Flatpak and Flathub (future, undecided; not planned for any release)** — a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak

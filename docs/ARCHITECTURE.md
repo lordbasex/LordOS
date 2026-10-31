@@ -62,6 +62,7 @@ like React Native but on top of our display server.
 | `server/src/sysreport/`, `server/src/app/probe.c`, `apps/sysinfo`, `apps/sysprobe` | **0.8.5** | System Information: the hardware collector behind `lordos-sysreport report` and `lordos-fetch`, the app (Overview, Hardware, Compatibility, Checks, Report) and the Sandbox Probe system package (see `BENCHMARK.md`) |
 | `server/src/testbench/` | **0.8.5** | Test Bench (`lordos-testbench`): a Wayland client that checks the display server from the outside (frame timing, presentation, keyboard, pointer, protocols, an optional GLES 3D view) (see `BENCHMARK.md`, `RESULTS.md`) |
 | `server/src/tls/`, `server/src/pkg/sources_admin.c`, `apt/catalog.json` | **0.8.5** | The package engine's HTTPS (the sandboxed relay `lord-tls`), the signed featured banner, and vendor APT repositories from LordOS's catalog added and removed by the closed `pkg-source-add`/`pkg-source-remove` actions (Store → Artificial Intelligence and Commercial; see `PACKAGES.md`, `UPDATES.md`) |
+| `server/src/lan/`, `js_lan.c`, `sdk/lan.js`, `apps/files/network.jsx` | **0.8.7** | Files → Network: a bounded pass over the LAN (mDNS, ports 445 and 2049 at most 30 connections a second) on a thread of lord-server, its answers read by the sandboxed helper `lord-lan`; SMB and NFS shares mounted by the kernel's clients through the closed `share-mount` action (see `FILES.md`) |
 | `server/src/mail/`, `js_mail.c`, `sdk/{mail,calendar,contacts}.js`, `apps/{mail,calendar,contacts,reminders}` | **M9** | Mail, Calendar, Contacts and Reminders (each app an isolated process since 0.8.2): the sandboxed helper `lord-maild` (IMAP with IDLE/CONDSTORE, SMTP, CalDAV/CardDAV, OpenSSL) with no sockets of its own — `lord-server` connects only to configured servers and hands it the fd; own MIME, HTML sanitizer, iCalendar, vCard and XML parsers (see `MAIL.md`) |
 | `server/src/backup/`, `js_backup.c`, `sdk/backup.js`, `apps/backup` | **M9** | Backups: hard-link snapshots in a lord-server thread (nice 19, idle I/O), hourly/daily/weekly retention, optional encryption with the vendored Monocypher; no root and no `admin.c` actions (see `SYSTEM.md`) |
 | `server/src/logs/`, `js_logs.c`, `sdk/logs.js`, `apps/logs` | **M9** | Logs: our own systemd journal reader (no libsystemd), LordOS logs, system logs for admins through a closed action, live follow with inotify (see `SYSTEM.md`) |
@@ -174,6 +175,12 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   `statx`, and answers with records lord-server validates. It writes nothing. For similar images it also decodes pictures
   (`stb_image`, PNG, JPEG, GIF and BMP), the only decoding in Cleaner and never in `lord-server`. See `CLEANER-ARCHITECTURE.md`.
 
+- **`lord-lan`** (0.8.7, in development): reads what the local network answers for Files → Network. Same rules as
+  `lord-fetch` (fixed path, no arguments, minimal environment, `sandbox_apply_helper` before anything is read), no
+  sockets or files; libc only. It gets mDNS datagrams and sockets lord-server already connected (SMB2 negotiate and an
+  anonymous share list, portmapper and mountd), with our own parsers, and answers with text lord-server validates. See
+  `FILES.md`, "Network".
+
 - **`lord-tls`** (0.8.5): the package engine's HTTPS. The Store's download child (as `nobody`, in
   `lordos-net-store.scope`) connects the TCP socket itself and execs only `<lord-server dir>/lord-tls`
   (root's, not writable by others) with no arguments, an empty environment, the socket on fd 3 and a
@@ -211,7 +218,9 @@ Since M7, what LordOS does with its own code and what it delegates to a Debian p
   - the PulseAudio protocol client (`server/src/sound`);
   - netlink, DHCP and WireGuard (`server/src/net`);
   - the CUPS IPP client, mDNS/DNS-SD and eSCL (`server/src/print`, M9): no libcups, avahi-client
-    or SANE.
+    or SANE;
+  - the SMB2 and ONC RPC clients of Files → Network (`server/src/lan`, 0.8.7), only as far as naming a server and
+    listing what it shares: no libsmbclient or libnfs. Mounting is the kernel's `cifs` and `nfs`.
 - **Debian services spoken to over their protocol:** CUPS (IPP over
   `/run/cups/cups.sock`; it manages the queue and the drivers, see `PRINTING.md`).
 - **D-Bus services (Settings, `SETTINGS.md`):** BlueZ (`bluetoothd`), power-profiles-daemon and

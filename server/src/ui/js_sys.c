@@ -76,11 +76,14 @@ void js_sys_init(void) {
 
 /* Resolves a path (relative to the home folder or absolute) and checks that it doesn't leave the
  * allowed roots: the home folder and the user's mounts (/media/$USER, /run/media/$USER). */
+static int share_down;                  /* the last path refused was on a share that doesn't answer */
+static int gone(const char *full) { return share_down = fsops_share_down(full); }
+
 static int resolve_in_home(const char *path, char *out) {
     char full[PATH_MAX * 2];
     if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
     else snprintf(full, sizeof full, "%s/%s", home, path);
-    if (!realpath(full, out)) return -1;
+    if (gone(full) || !realpath(full, out)) return -1;
     return fsops_allowed(out) ? 0 : -1;
 }
 
@@ -90,7 +93,7 @@ static int resolve_readable(const char *path, char *out) {
     char full[PATH_MAX * 2];
     if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
     else snprintf(full, sizeof full, "%s/%s", home, path);
-    if (!realpath(full, out)) return -1;
+    if (gone(full) || !realpath(full, out)) return -1;
     return fsops_readable(out) ? 0 : -2;      /* -2: exists, but one of the folders not read */
 }
 
@@ -147,7 +150,7 @@ static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
     if (bad) {
         /* an existing folder that is not read on purpose (/proc, /sys, /dev, /run) says so */
         if (bad == -2) return js_throw_code(c, "fs.systemFolder", NULL);
-        return js_throw_code(c, "fs.outsideHome", NULL);
+        return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     }
     DIR *d = opendir(dir);
     if (!d) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
@@ -188,7 +191,7 @@ static JSValue f_fs_read(JSContext *c, JSValueConst this_val, int argc, JSValueC
     char path[PATH_MAX];
     int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
-    if (bad) return js_throw_code(c, "fs.outsideHome", NULL);
+    if (bad) return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     struct stat st;
     if (stat(path, &st) || !S_ISREG(st.st_mode)) return js_throw_code(c, "fs.notFile", NULL);
     if (st.st_size > FS_READ_MAX) return js_throw_code(c, "fs.tooLarge", "max", "8 MB", NULL);
@@ -998,7 +1001,7 @@ static int resolve_target(const char *path, char *out, size_t n, char *dir, size
     if (!base[0] || !strcmp(base, ".") || !strcmp(base, "..") || strlen(base) > 255) return -1;
     *slash = 0;
     char rdir[PATH_MAX];
-    if (!realpath(full[0] ? full : "/", rdir)) return -1;
+    if (gone(full) || !realpath(full[0] ? full : "/", rdir)) return -1;
     if (!fsops_allowed(rdir)) return -1;
     if ((size_t)snprintf(out, n, "%s/%s", rdir, base) >= n) return -1;
     if (dir && (size_t)snprintf(dir, dn, "%s", rdir) >= dn) return -1;
@@ -1009,7 +1012,7 @@ static int resolve_target(const char *path, char *out, size_t n, char *dir, size
 int js_sys_resolve_target(const char *path, char *out, size_t n) { return resolve_target(path, out, n, NULL, 0); }
 
 static JSValue fs_path_error(JSContext *c, int r) {
-    return js_throw_code(c, r == -2 ? "fs.protected" : "fs.outsideHome", NULL);
+    return js_throw_code(c, r == -2 ? "fs.protected" : share_down ? "share.notResponding" : "fs.outsideHome", NULL);
 }
 
 /* lord.fs.write(path, text | ArrayBuffer): creates or replaces the file atomically. */
@@ -1659,7 +1662,7 @@ static JSValue lpk_check(JSContext *c, JSValueConst arg, int install) {
     char path[PATH_MAX];
     int bad = resolve_in_home(p, path);
     JS_FreeCString(c, p);
-    if (bad) return js_throw_code(c, "fs.outsideHome", NULL);
+    if (bad) return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     Lpk pk;
     char err[160];
     if (lpk_open(path, &pk, err, sizeof err)) return js_throw_line(c, err);

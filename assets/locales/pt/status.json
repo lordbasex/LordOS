@@ -108,6 +108,7 @@
   "remote.unblocked": "{address} desbloqueado",
   "remote.userAdded": "{name} pode se conectar remotamente",
   "remote.userRemoved": "{name} não pode mais se conectar remotamente",
+  "share.unmounted": "Desconectado",
   "ssh.off": "Login remoto desativado",
   "ssh.on": "Login remoto ativado",
   "ssh.saved": "Configurações salvas",
