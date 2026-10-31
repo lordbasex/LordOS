@@ -836,13 +836,16 @@ left for after 0.8.6, and the new native app:
     reports, with the two reference machines as fixtures (`tools/hwreport/catalog.mjs`).
   - [x] The signed snapshot (release key, signed on the maintainer's machine), verified in C before the
     Compatibility panel shows it as community data (`lord.sysinfo.community()`).
-  - [ ] The repository's labels, the first community reports and a captured Raspberry Pi 5 report.
+  - [ ] The repository's labels (steps in `RELEASING.md`, the maintainer's), the first community reports and a captured
+    Raspberry Pi 5 report.
   - [x] A newer snapshot between releases (approved 2026-10-29): the snapshot is its own `Architecture: all`
     package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`, version = the snapshot's date), which `lordos` depends
     on; the ISO, the Pi image and `install.sh` install it, `apt-repo.sh` checks its signature, and a newer one is
     published alone between releases (`RELEASING.md`, "A newer hardware snapshot between releases"). No new
     network code. Resolver, packaging, apt and repository tests done; the staging test with the real keys is left.
-  - [ ] The rest of "From the live USB": the boot menu entry, live references, the overlay's size.
+  - [x] The live ISO's *Check this computer* boot entry (`lordos.check=1`, `sdk/livestart.js`): checked in QEMU with
+    BIOS, not on a real ISO of this branch, UEFI or a real PC (`BENCHMARK.md`, "The boot entry").
+  - [ ] The rest of "From the live USB": live references, the overlay's size.
 
 - [x] **Remote desktop over WebRTC (0.8.4)** — see `REMOTE.md`, "Video (WebRTC)". Until 0.8.3 the
   browser got PNG/JPEG tiles over a TLS WebSocket, and a connection switched the session to CPU

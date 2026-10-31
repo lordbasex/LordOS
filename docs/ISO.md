@@ -37,6 +37,7 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 | Entry | What for |
 |---|---|
 | LordOS (live) | normal, in English (the default language) |
+| Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7, in development). Nothing is measured until the user asks. The interface is in English, like the first entry |
 | LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
 | LordOS (Español) / LordOS (Português) | `lordos.lang=es` / `lordos.lang=pt`: the interface in Spanish or Portuguese the first time |
 | LordOS (copy to RAM) | `toram`: copies the system to memory (~1 GB free is needed) and the USB stick can be removed |
@@ -121,7 +122,10 @@ text in between.
   on a rounded violet band,. The ISO copies it to
   `/boot/grub/themes/lordos/`; the package installs it in `/usr/share/grub/themes/lordos/` (amd64
   only) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português,
-  safe mode, copy to RAM) are the same as before.
+  safe mode, copy to RAM) are the same as before; *Check this computer* joined them in 0.8.7, and the menu's height
+  went from 290 to 344 for its six lines. GRUB's theme has no scrollbar and takes the padding and the selection
+  band's edges from that height (`get_num_shown_items`), so 290 shows five lines. `tests/livestart_test.mjs` works
+  the same count out from `theme.txt` and fails if an entry wouldn't show.
 - **Boot splash:** the Plymouth theme `lordos` (`tools/boot/plymouth/lordos/`, the `script`
   module), installed by the package in `/usr/share/plymouth/themes/lordos/`. The ISO installs
   `plymouth` and `plymouth-label` and selects it (`plymouth-set-default-theme lordos`) before building
