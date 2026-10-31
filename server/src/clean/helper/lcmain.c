@@ -525,6 +525,10 @@ int main(void) {
     rofd[nroots] = -1;
     SandboxHelperCfg cfg = { .name = "lordos-cleaner", .ro_paths = NULL, .extra_syscalls = NULL, .mem_max_mb = 512,
                              .ro_dir_fds = rofd, .rw_dir_fds = NULL };
+    /* a tiny 16-bit PNG can ask for more than the scope allows: malloc fails and that image is left out, where the
+     * scope would kill the helper and fail the whole scan */
+    struct rlimit as = { CLEAN_IMAGE_AS, CLEAN_IMAGE_AS };
+    if (mode == M_IMAGES && setrlimit(RLIMIT_AS, &as)) { reply_err("sandbox"); return 1; }
     int mask = sandbox_apply_helper(&cfg);
     if (!(mask & SB_LANDLOCK_FS)) { reply_err("sandbox"); return 1; }
 

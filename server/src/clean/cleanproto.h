@@ -43,6 +43,7 @@
 #define CLEAN_IMAGE_MIN    8192     /* bytes: smaller files are icons, not photos */
 #define CLEAN_IMAGE_MAX    (64u << 20)    /* bytes of a file read into memory */
 #define CLEAN_IMAGE_PIXELS 40000000LL     /* pixels of an image decoded */
+#define CLEAN_IMAGE_AS     (480ull << 20) /* address space while decoding, under the scope's 512 MB: a picture that needs more is left out */
 #define CLEAN_IMAGE_MIN_DIM 32      /* pixels of the shorter side */
 #define CLEAN_SIMILAR_BITS 6        /* bits of 64 two similar images may differ in */
 #define CLEAN_SIMILAR_ASPECT 0.02   /* how far their proportions may differ */
