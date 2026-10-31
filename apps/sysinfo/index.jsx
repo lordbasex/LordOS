@@ -651,12 +651,12 @@ function ReportText({ r, onShare }) {
 export default function SystemInformation() {
   const { args } = useAppWindow() || {};
   if (args && args.scene) return <Scene />;      // LordBench's desktop scene (scene.jsx)
-  return <SystemInformationMain />;
+  return <SystemInformationMain startTab={args && args.tab} />;
 }
 
-function SystemInformationMain() {
+function SystemInformationMain({ startTab }) {
   const { t: tr } = useLocale();
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState(startTab === 'perf' ? 'perf' : 'overview');      // 'perf': "Check this computer"
   const [n, setN] = useState(0);
   const r = useMemo(() => systemReport(), [n]);
   const info = useMemo(() => systemInfo(), [n]);

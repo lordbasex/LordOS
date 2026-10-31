@@ -79,6 +79,7 @@ import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
 import { maybeStartTour } from './help.js';
+import { liveStartWindow } from './livestart.js';
 import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
 export { systemInfo, systemReport, lordosVersion, useSystemInfo, useServerStats, useCpuUsage, formatBytes, formatDuration } from './system.js';
@@ -196,8 +197,12 @@ export function startShell(element) {
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   reopenAfterThemeSwitch();
   render(createElement(LocaleRoot, null, element));
-  // live ISO: the installation assistant opens by itself, in front
-  if (isLiveSystemOf() && getAppOf('installer')) setTimeout(() => wmOf.open('installer'), 300);
+  // live ISO: the installation assistant opens by itself, in front, or System Information for the
+  // boot entry "Check this computer" (livestart.js)
+  if (isLiveSystemOf()) {
+    const opening = liveStartWindow(lord.system.info(), getAppOf);
+    if (opening) setTimeout(() => wmOf.open(...opening), 300);
+  }
   startAlarms();                        // Clock alarms and timer, with the app closed
   startMail();                          // new-mail notifications and passwords on demand (docs/MAIL.md)
   startReminders();                     // calendar and reminder alarms, with the apps closed

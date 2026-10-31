@@ -7,6 +7,9 @@
 #                    user's settings the first time
 #   lordos.gpu=0     safe mode: everything on the CPU. lord-sessiond reads it from /proc/cmdline and
 #                    passes LORD_GPU=0 to every session (nothing is needed here).
+#   lordos.check=1   "Check this computer": the session opens System Information on its Performance
+#                    tab instead of the installer. lord-server reads it (lord.system.info().liveCheck,
+#                    sdk/livestart.js); nothing is needed here either.
 set -u
 [ -d /run/live ] || exit 0          # only on the live system (live-boot)
 USER_NAME=lordos

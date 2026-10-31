@@ -185,4 +185,7 @@ void sysreport_collect(SysReport *r, const char *root, const char *pci_ids, cons
 char *sysreport_json(const SysReport *r);
 char *sysreport_markdown(const SysReport *r);
 
+/* Whether the kernel command line holds the whole word w (or w=… when w ends in '='). */
+int sysreport_cmdline_has(const char *cmdline, const char *w);
+
 #endif
