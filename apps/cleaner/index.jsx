@@ -241,9 +241,9 @@ function Body() {
       <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 38, paddingTop: 34 }}>
         {board && section === 'scan' && !pipe ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.s, marginTop: -18 }}>
-            <View onClick={startAll} style={{ width: 120 }}><Label size={13} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View>
+            <View onClick={startAll} style={{ width: 170 }}><Label size={13} lines={1} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View>
             <View style={{ flex: 1 }}><Label size={13} weight={600} align="center">{tr('cleaner.section.scan')}</Label></View>
-            <View style={{ width: 120 }} />
+            <View style={{ width: 170 }} />
           </View>
         ) : null}
         {!status.available ? <Label>{tr('cleaner.unavailable')}</Label> : null}

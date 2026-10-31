@@ -1,8 +1,8 @@
 // Storage: a volume's bounded tree, drawn as a squarified treemap in an Image, a folder tree with logical and
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
-import { View, cleaner, useAppWindow, useStore, windows, wm, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
+import { View, Image, cleaner, useAppWindow, useStore, windows, wm, userDirs, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, Tile, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, usePal } from './ui.jsx';
 
 const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
 
@@ -79,11 +79,36 @@ function Treemap({ data, onOpen }) {
   );
 }
 
-// ---- bubbles: the largest folders as glass circles, 14 at most, the rest together ----
+// ---- bubbles: the largest folders as glass spheres, 14 at most, the rest together ----
+
+// what a folder is, by its name: the icon and the colour of its bubble. In the home folder its own folders count too,
+// under whatever name the user's language gave them.
+const NAMED = { '.cache': 'cache', '.config': 'config', '.local': 'data', '.var': 'data', Downloads: 'downloads', Trash: 'trash', '.Trash': 'trash',
+  node_modules: 'code', '.git': 'code', '.npm': 'code', '.cargo': 'code', '.rustup': 'code', '.gradle': 'code', '.m2': 'code', go: 'code', src: 'code', Projects: 'code', projects: 'code' };
+const HUE = { documents: 'blue', pictures: 'pink', music: 'violet', videos: 'rose', downloads: 'teal', desktop: 'indigo', code: 'orange', cache: 'rose', config: 'indigo', data: 'teal', trash: 'orange', others: 'indigo' };
+const CYCLE = ['sky', 'violet', 'teal', 'blue', 'orange', 'pink', 'indigo', 'rose'];
+
+export function folderKinds() {
+  const u = userDirs(), kinds = {};
+  for (const k of ['documents', 'pictures', 'music', 'videos', 'desktop']) if (u[k]) kinds[u[k].split('/').pop()] = k;
+  return kinds;
+}
+export const folderKind = (c, kinds) => (c.id === -2 ? 'others' : (kinds && kinds[c.name]) || NAMED[c.name] || 'folder');
+
+// A small circle with a check: the bubble itself opens, this only selects.
+function BubbleCheck({ on, r, onClick }) {
+  const p = usePal();
+  return (
+    <View onClick={onClick} style={{ position: 'absolute', top: r * 0.293 - 11, right: r * 0.293 - 11, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: on ? p.accent : p.glass, border: `1px solid ${on ? p.accent : p.line}` }}>
+      {on ? <Label size={typeScale.caption} weight={700} style={{ color: p.btnText }}>✓</Label> : null}
+    </View>
+  );
+}
 
 export function pack(items, W, H) {
   const total = items.reduce((a, b) => a + b.v, 0) || 1;
-  for (let k = 0.62; k > 0.1; k *= 0.9) {
+  for (let k = 0.72; k > 0.1; k *= 0.93) {
     const placed = [];
     let ok = true;
     for (const it of items) {
@@ -101,7 +126,7 @@ export function pack(items, W, H) {
   return [];
 }
 
-function Bubbles({ data, W, H, onOpen, selected, onSelect }) {
+function Bubbles({ data, W, H, onOpen, selected, onSelect, kinds }) {
   const p = usePal();
   const circles = useMemo(() => {
     const kids = data.children.filter((c) => c.allocated > 0);
@@ -110,19 +135,25 @@ function Bubbles({ data, W, H, onOpen, selected, onSelect }) {
     if (rest > 0) items.push({ id: -2, name: tr('cleaner.map.others'), v: rest, allocated: rest, logical: rest });
     return pack(items, W, H);
   }, [data, W, H]);
+  const whole = data.node.allocated || 1;
   return (
     <View style={{ width: W, height: H, direction: 'ltr' }}>
-      {circles.map((c, i) => (
-        <Enter key={c.item.id} delay={Math.min(i * 40, 360)} x={0} y={14} ms={500} style={{ position: 'absolute', left: c.x - c.r, top: c.y - c.r, width: c.r * 2, height: c.r * 2 }}>
-          <View onClick={() => { if (c.item.hasKids) onOpen(c.item.id); else onSelect(c.item); }}
-            style={{ flex: 1, borderRadius: c.r, alignItems: 'center', justifyContent: 'center', backgroundColor: p.glass, border: `${selected && selected.id === c.item.id ? 2 : 1}px solid ${selected && selected.id === c.item.id ? p.accent : p.line}`, padding: 6 }}>
-            {c.r > 50 ? <Tile name="storage" size={c.r > 80 ? 32 : 22} /> : null}
-            <Label size={c.r > 70 ? typeScale.body : typeScale.caption} weight={600} lines={1} align="center">{c.item.name}</Label>
-            <Label size={typeScale.caption} dim align="center">{formatBytes(c.item.allocated)}</Label>
-            {c.item.id >= 0 ? <View onClick={(e) => { e.stopPropagation(); onSelect(c.item); }} style={{ position: 'absolute', top: c.r * 0.22, right: c.r * 0.22, width: 18, height: 18, borderRadius: 9, backgroundColor: selected && selected.id === c.item.id ? p.accent : p.track }} /> : null}
-          </View>
-        </Enter>
-      ))}
+      {circles.map((c, i) => {
+        const kind = folderKind(c.item, kinds), on = selected && selected.id === c.item.id, share = Math.round((c.item.allocated / whole) * 100);
+        return (
+          <Enter key={c.item.id} delay={Math.min(i * 40, 360)} x={0} y={0} scale={0.7} ms={500} style={{ position: 'absolute', left: c.x - c.r, top: c.y - c.r, width: c.r * 2, height: c.r * 2 }}>
+            <View onClick={() => { if (c.item.hasKids) onOpen(c.item.id); else onSelect(c.item); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 1 }}>
+              <Image src={`asset:cleaner/bubble-${HUE[kind] || CYCLE[i % CYCLE.length]}.png`} style={{ position: 'absolute', left: 0, top: 0, width: c.r * 2, height: c.r * 2 }} />
+              {on ? <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: c.r, border: `2px solid ${p.accent}` }} /> : null}
+              {c.r > 46 ? <Image src={`asset:cleaner/folder-${kind}.png`} style={{ width: c.r > 90 ? 40 : c.r > 62 ? 30 : 22, height: c.r > 90 ? 40 : c.r > 62 ? 30 : 22, marginBottom: 2 }} /> : null}
+              <Label size={c.r > 70 ? typeScale.body : typeScale.caption} weight={600} lines={1} align="center">{c.item.name}</Label>
+              <Label size={c.r > 70 ? typeScale.callout : typeScale.caption} dim align="center">{formatBytes(c.item.allocated)}</Label>
+              {c.r > 80 ? <Label size={typeScale.caption} dim align="center">{tr('cleaner.map.share', { pct: formatNumber(share) })}</Label> : null}
+              {c.item.id >= 0 ? <BubbleCheck on={on} r={c.r} onClick={(e) => { e.stopPropagation(); onSelect(c.item); }} /> : null}
+            </View>
+          </Enter>
+        );
+      })}
     </View>
   );
 }
@@ -204,6 +235,7 @@ export function StorageView({ scan, onScan, volume, onReview }) {
   const geo = win ? wm.frame(win) : null;
   const W = geo ? Math.max(260, Math.round(geo.w - 236 - 76 - 228)) : 400, H = geo ? Math.max(200, Math.round(geo.h - 196)) : 300;
   const data = useMemo(() => cleaner.tree(scan.id, node, 500), [scan.id, node]);
+  const kinds = useMemo(() => (data && !data.trail.length && volume && volume.id === 'home' ? folderKinds() : null), [data, volume]);
   const go = (n) => { setBack([...back, node]); setAhead([]); setNode(n); setSel(null); };
   const undo = () => { setAhead([node, ...ahead]); setNode(back[back.length - 1]); setBack(back.slice(0, -1)); setSel(null); };
   const redo = () => { setBack([...back, node]); setNode(ahead[0]); setAhead(ahead.slice(1)); setSel(null); };
@@ -229,13 +261,14 @@ export function StorageView({ scan, onScan, volume, onReview }) {
             <Label dim size={typeScale.caption}>{tr('cleaner.map.totals', { logical: formatBytes(data.node.logical), allocated: formatBytes(data.node.allocated), files: formatNumber(data.node.files) })}</Label>
             {data.children.slice(0, 12).map((c) => (
               <View key={c.id} onClick={c.hasKids ? () => go(c.id) : undefined} style={{ flexDirection: 'row', gap: spacing.xs, height: 24, alignItems: 'center' }}>
+                <Image src={`asset:cleaner/folder-${folderKind(c, kinds)}.png`} style={{ width: 18, height: 18, flexShrink: 0 }} />
                 <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{c.name}</Label></View>
                 <Label dim size={typeScale.caption}>{formatBytes(c.allocated)}</Label>
               </View>
             ))}
           </Glass>
         ) : null}
-        {view === 'bubbles' ? <Bubbles data={data} W={W} H={H} onOpen={go} selected={sel} onSelect={(c) => setSel(sel && sel.id === c.id ? null : c)} />
+        {view === 'bubbles' ? <Bubbles data={data} W={W} H={H} kinds={kinds} onOpen={go} selected={sel} onSelect={(c) => setSel(sel && sel.id === c.id ? null : c)} />
           : view === 'map' ? <Treemap data={data} onOpen={go} /> : view === 'tree' ? <View style={{ flex: 1 }}><Folders scanId={scan.id} data={data} onOpen={go} /></View> : <View style={{ flex: 1 }}><Types scan={scan} /></View>}
       </View>
       {view === 'bubbles' ? (
