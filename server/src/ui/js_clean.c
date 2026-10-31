@@ -9,6 +9,7 @@
  *   groups(scanId, offset, limit) a page of groups of duplicates or similar images
  *   restore(planId, id)           back from the Trash, for an item that plan moved
  *   history() / clearHistory()    what ran: counts and bytes, never a path
+ *   noteSystem(name, freeBefore)  a system cleanup, for the history: a fixed name
  *   saved() / forgetSaved()       the storage map kept between sessions: { at, volume } or null; its folder names stay in C
  *   cancel(forget)                stops the job; forget (boolean) also drops the results
  *   results(scanId | 'plan', offset, limit, filter)  a page of { id, rule, path, size, allocated, … };
@@ -118,6 +119,16 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     free_strs(c, o.exclude, o.nexclude);
     if (volume) JS_FreeCString(c, volume);
     return result(c, r);
+}
+
+static JSValue f_note_system(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    double before;
+    const char *name = argc == 2 ? JS_ToCString(c, argv[0]) : NULL;
+    int ok = name && (!strcmp(name, "journal") || !strcmp(name, "apt") || !strcmp(name, "vartmp") || !strcmp(name, "kernels")) && !exact_int(c, argv[1], 0, 1e18, &before);
+    if (ok) clean_history_system(name, before);
+    if (name) JS_FreeCString(c, name);
+    return ok ? JS_UNDEFINED : js_throw_code(c, "sys.badArgument", NULL);
 }
 
 static JSValue f_saved(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -309,6 +320,7 @@ void js_clean_register(JSContext *c, JSValue lord) {
     F("restore", f_restore, 2);
     F("history", f_history, 0);
     F("clearHistory", f_clear_history, 0);
+    F("noteSystem", f_note_system, 2);
     F("saved", f_saved, 0);
     F("forgetSaved", f_forget_saved, 0);
 #undef F

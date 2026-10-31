@@ -399,7 +399,7 @@
   "map.savedAt": "Mapa guardado de {when}. Verifique de novo para agir sobre ele.",
   "prefs.rememberMap": "Lembrar o mapa de armazenamento",
   "prefs.rememberMapHint": "Guarda nomes e tamanhos de pastas neste computador, só para você, até a próxima verificação.",
-  "projects.warn": "Isto vai para a Lixeira. O projeto precisará repetir a instalação ou a compilação:",
+  "projects.warn": "Isto vai para a Lixeira. O projeto precisará repetir a instalação ou a compilação.",
   "ruleName.playwright": "Navegadores de teste baixados",
   "rule.playwright": "Navegadores baixados por ferramentas de teste. São baixados de novo quando necessário.",
   "ruleName.puppeteer": "Navegador sem interface baixado",
@@ -456,5 +456,13 @@
   "confirm.more": "e mais {n}",
   "empty.now": "Esvaziar Lixeira e liberar espaço",
   "empty.done": "Lixeira esvaziada: {size} liberados",
-  "activity.split": "{deleted} excluídos, {trashed} movidos para a Lixeira"
+  "activity.split": "{deleted} excluídos, {trashed} movidos para a Lixeira",
+  "result.bothBig": "{freed} liberados, {trashed} na Lixeira",
+  "result.freeGain": "Espaço livre agora {free}, {gain} a mais",
+  "items": {
+    "one": "{count} item",
+    "other": "{count} itens"
+  },
+  "select.nothing": "Nada selecionado",
+  "activity.system": "Limpeza do sistema: {name}"
 }

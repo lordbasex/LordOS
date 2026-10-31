@@ -40,7 +40,7 @@ export function PlanConfirm({ plan, onOk, onCancel }) {
   if (plan.trashItems) rows.push([tr('cleaner.confirm.rowTrash', { n: n(plan.trashItems) }), formatBytes(plan.trashAllocated)]);
   if (left > 0) rows.push([tr('cleaner.confirm.rowLeft', { n: n(left) }), '']);
   const named = plan.named ? cleaner.results('plan', 0, 30).items.filter((i) => i.status === 'ready') : [];
-  for (const i of named.slice(0, SHOWN)) rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
+  for (const i of named.slice(0, SHOWN)) rows.push([i.path.split('/').slice(-2).join('/'), formatBytes(i.allocated)]);
   if (plan.counts.ready > SHOWN && named.length) rows.push([tr('cleaner.confirm.more', { n: n(plan.counts.ready - Math.min(SHOWN, named.length)) }), '']);
   const leftovers = named.some((i) => i.rule === 'app-leftovers'), projects = named.some((i) => i.rule.startsWith('project-'));
   const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : projects ? 'cleaner.projects.warn' : 'cleaner.models.warn') : '',
@@ -78,7 +78,7 @@ function Stat({ label, value, delay }) {
   );
 }
 
-export function PlanResult({ plan, onDone, onEmpty }) {
+export function PlanResult({ plan, onDone, onEmpty, onRestored }) {
   const [detail, setDetail] = useState(false);
   const [gen, setGen] = useState(0);
   const others = REASONS.filter((k) => plan.counts[k] > 0);
@@ -87,8 +87,9 @@ export function PlanResult({ plan, onDone, onEmpty }) {
   return (
     <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: detail ? 'flex-start' : 'center', gap: spacing.s, paddingBottom: spacing.m }}>
       <Pulse />
-      <CountUp value={plan.deletedAllocated || plan.trashedAllocated} format={(v) => tr(plan.deletedAllocated ? 'cleaner.result.freedBig' : 'cleaner.result.trashedBig', { size: formatBytes(v) })} size={36} weight={300} />
-      <Label dim>{tr('cleaner.result.free', { before: formatBytes(plan.freeBefore), after: formatBytes(plan.freeAfter) })}</Label>
+      {plan.deletedAllocated && plan.trashedAllocated ? <Label size={30} weight={300} align="center">{tr('cleaner.result.bothBig', { freed: formatBytes(plan.deletedAllocated), trashed: formatBytes(plan.trashedAllocated) })}</Label>
+        : <CountUp value={plan.deletedAllocated || plan.trashedAllocated} format={(v) => tr(plan.deletedAllocated ? 'cleaner.result.freedBig' : 'cleaner.result.trashedBig', { size: formatBytes(v) })} size={36} weight={300} />}
+      <Label dim>{tr('cleaner.result.freeGain', { free: formatBytes(plan.freeAfter), gain: formatBytes(Math.max(0, plan.freeAfter - plan.freeBefore)) })}</Label>
       <View style={{ flexDirection: 'row', gap: spacing.s, marginTop: spacing.s, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Stat delay={0} label={tr('cleaner.result.freedSub', { n: n(plan.deleted) })} value={formatBytes(plan.deletedAllocated)} />
         <Stat delay={80} label={tr('cleaner.result.trashedSub', { n: n(plan.trashed) })} value={formatBytes(plan.trashedAllocated)} />
@@ -107,7 +108,7 @@ export function PlanResult({ plan, onDone, onEmpty }) {
           <PagedList rowH={32} reset={`${plan.id}.${gen}`} fetch={(o, l) => cleaner.results('plan', o, l)} render={(it) => (
             <View key={it.id} style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.s }}>
               <View style={{ flex: 1, minWidth: 0 }}><Label mono size={typeScale.callout} lines={1}>{it.path}</Label></View>
-              {it.restorable ? <GlassButton small label={tr('cleaner.restore')} onClick={() => { cleaner.restore(plan.id, it.id); setGen(gen + 1); }} /> : null}
+              {it.restorable ? <GlassButton small label={tr('cleaner.restore')} onClick={() => { cleaner.restore(plan.id, it.id); setGen(gen + 1); onRestored(); }} /> : null}
               {it.status === 'restored' ? <GlassButton small label={tr('cleaner.showInFiles')} onClick={() => revealPath(it.abs)} /> : null}
               <Label dim size={typeScale.callout}>{tr(`cleaner.status.${it.status}${it.status === 'done' ? (it.restorable ? 'Trash' : 'Delete') : ''}`)}</Label>
             </View>

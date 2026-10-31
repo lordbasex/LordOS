@@ -194,6 +194,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
 
   const onMove = (e) => {
     if (!outer.current) return;
+    if (!geom) measure();                       // content that grew by itself has told nobody
     const [ox, oy, ow] = lord.getLayout(outer.current.id);
     const near = !!geom && nearEdge(e.x - ox, ow, rtl);
     const hover = !!geom && st.current.ui.shown && hitThumb(e.x - ox, e.y - oy, ow, geom, rtl);
@@ -226,7 +227,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
           st.current.ui = { ...st.current.ui, dragging: true };
           show({ dragging: true });
         }} style={{ position: 'absolute', end: 0, top: geom.top, width: SCROLLBAR.hit, height: geom.size,
-          pointerEvents: shown ? 'auto' : 'none' }}>
+          pointerEvents: shown || ui.near ? 'auto' : 'none' }}>
           <View ref={thumb} style={{ position: 'absolute', end: SCROLLBAR.inset, top: 0, height: geom.size, width: w,
             borderRadius: t.scrollRadius != null ? Math.min(t.scrollRadius, w / 2) : w / 2, backgroundColor: thumbColor,
             ...(t.scrollThumbBorder ? { border: `1px solid ${t.scrollThumbBorder}` } : null), opacity: shown ? 1 : 0 }} />

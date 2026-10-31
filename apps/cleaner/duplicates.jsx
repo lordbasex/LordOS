@@ -6,10 +6,10 @@ import { useMemo } from 'react';
 import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, SelectBar, ORB_SPACE } from './ui.jsx';
 
 // which copies to pick; lord-server keeps one of each group whatever is picked
-export const picks = (groups) => {
+export const picks = (groups, smart) => {
   const by = (keep) => groups.flatMap((g) => { const k = keep(g); return g.filter((m) => m !== k).map((m) => m.id); });
   const newest = (g) => g.reduce((a, m) => (m.mtime > a.mtime ? m : a)), oldest = (g) => g.reduce((a, m) => (m.mtime < a.mtime ? m : a));
-  return [{ key: 'smart', ids: by((g) => g[0]) }, { key: 'older', ids: by(newest) }, { key: 'newer', ids: by(oldest) }, { key: 'all', ids: groups.flat().map((m) => m.id) }];
+  return [{ key: 'smart', ids: by(smart || oldest) }, { key: 'older', ids: by(newest) }, { key: 'newer', ids: by(oldest) }];
 };
 
 export function DupHero({ folders, chosen, toggle }) {

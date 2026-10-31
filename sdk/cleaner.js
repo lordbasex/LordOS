@@ -29,6 +29,7 @@ export const cleaner = {
   restore: (planId, id) => lord.clean.restore(planId, id),
   history: () => (has() ? lord.clean.history() : []),
   clearHistory: () => lord.clean.clearHistory(),
+  noteSystem: (name, before) => lord.clean.noteSystem(name, before),
   saved: () => (has() ? lord.clean.saved() : null),
   forgetSaved: () => lord.clean.forgetSaved(),
   emptyTrash: () => lord.clean.emptyTrash(),

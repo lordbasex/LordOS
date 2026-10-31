@@ -340,12 +340,13 @@ export function Orb({ label, onClick, disabled, busy }) {
 export function SelectBar({ options, selected, onPick, size, count }) {
   const same = (o) => (typeof o.ids === 'function' ? o.n > 0 && selected.size === o.n : o.ids.length === selected.size && o.ids.every((i) => selected.has(i)));
   const now = !selected.size ? 'none' : (options.find(same) || { key: 'custom' }).key;
+  const shownKey = now === 'none' ? 'nothing' : now;
   const items = [...options.map((o) => ({ label: tr(`cleaner.select.${o.key}`), checked: now === o.key, onClick: () => onPick(typeof o.ids === 'function' ? o.ids() : o.ids) })),
     '-', { label: tr('cleaner.select.none'), checked: now === 'none', onClick: () => onPick([]) }];
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
       <Label dim size={typeScale.callout}>{tr('cleaner.select.label')}</Label>
-      <MenuButton small icon={null} label={`${tr(`cleaner.select.${now}`)} ▾`} items={items} />
+      <MenuButton small icon={null} label={`${tr(`cleaner.select.${shownKey}`)} ▾`} items={items} />
       <View style={{ flex: 1 }} />
       {selected.size ? <Label dim size={typeScale.callout}>{`${tr('cleaner.select.count', { count: count || selected.size })}${size > 0 ? ` · ${formatBytes(size)}` : ''}`}</Label> : null}
     </View>

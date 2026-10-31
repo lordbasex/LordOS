@@ -3,7 +3,7 @@
 // lord-server keeps at least one image of each group. They aren't the same bytes, so what goes is the user's choice.
 import { View, Image, cleaner, useThumb, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, SelectBar, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, SelectBar, ORB_SPACE, usePal } from './ui.jsx';
 import { picks } from './duplicates.jsx';
 
 export function SimilarHero({ folders, chosen, toggle }) {
@@ -39,13 +39,14 @@ export function SimilarList({ scan, selected, setSelected }) {
         groups.push(g.members);
       }
     }
-    rows.options = picks(groups);
+    // what stays: the most pixels, then the oldest file, which is likelier to be the original
+    rows.options = picks(groups, (g) => g.reduce((a, m) => { const pa = a.width * a.height, pm = m.width * m.height; return pm > pa || (pm === pa && m.mtime < a.mtime) ? m : a; }));
     rows.size = new Map(groups.flat().map((m) => [m.id, m.allocated]));
     return rows;
   }, [scan.id]);
   const toggle = (id) => setSelected((old) => { const x = new Set(old); if (x.has(id)) x.delete(id); else x.add(id); return x; });
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <Label size={32} weight={300}>{tr('cleaner.similar.title')}</Label>

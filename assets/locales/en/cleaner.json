@@ -190,7 +190,7 @@
   "category.info": "For your information",
   "category.system": "This computer's system files",
   "blocked.busy": "Skipped while this browser is open. Close it and scan again.",
-  "models.warn": "Other apps may use these and would download them again:",
+  "models.warn": "Other apps may use these and would download them again.",
   "system.journal": "System log",
   "system.journalText": "Trims the system journal to its newest 200 MB.",
   "system.apt": "Downloaded system packages",
@@ -399,7 +399,7 @@
   "map.savedAt": "Saved map from {when}. Scan again to act on it.",
   "prefs.rememberMap": "Remember the storage map",
   "prefs.rememberMapHint": "Keeps folder names and sizes on this computer, for you alone, until the next scan.",
-  "projects.warn": "These go to the Trash. A project needs its install or build step run again:",
+  "projects.warn": "These go to the Trash. A project needs its install or build step run again.",
   "ruleName.playwright": "Browser test downloads",
   "rule.playwright": "Browsers downloaded by test tools, fetched again when needed.",
   "ruleName.puppeteer": "Headless browser downloads",
@@ -456,5 +456,13 @@
   "confirm.more": "and {n} more",
   "empty.now": "Empty Trash and free space",
   "empty.done": "Trash emptied: {size} freed",
-  "activity.split": "{deleted} deleted, {trashed} moved to the Trash"
+  "activity.split": "{deleted} deleted, {trashed} moved to the Trash",
+  "result.bothBig": "{freed} freed, {trashed} in the Trash",
+  "result.freeGain": "Free space now {free}, {gain} more",
+  "items": {
+    "one": "{count} item",
+    "other": "{count} items"
+  },
+  "select.nothing": "Nothing selected",
+  "activity.system": "System cleanup: {name}"
 }

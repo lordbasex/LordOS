@@ -62,7 +62,7 @@ export function allIds(scanId, filter, sizes) {
 
 const ACTION_KEY = { delete: 'cleaner.action.delete', trash: 'cleaner.action.trash', none: 'cleaner.action.none' };
 
-function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, setModels }) {
+function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, setModels, sizes }) {
   const [open, setOpen] = useState(false);
   const selectable = rule.action !== 'none' && !blocked;
   return (
@@ -80,7 +80,7 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, 
           </View>
           <View style={{ alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
             <Label weight={600}>{formatBytes(rule.allocated)}</Label>
-            <Label dim size={typeScale.callout}>{tr('cleaner.files', { count: rule.files })}</Label>
+            <Label dim size={typeScale.callout}>{tr(rule.explicit ? 'cleaner.items' : 'cleaner.files', { count: rule.files })}</Label>
           </View>
           {rule.category === 'trash' ? <GlassButton small label={tr('cleaner.emptyTrash')} onClick={onEmpty} /> : null}
           <GlassButton small label={open ? '▴' : '▾'} onClick={() => setOpen(!open)} />
@@ -89,7 +89,7 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, 
           <View style={{ height: 170 }}>
             <PagedList rowH={28} reset={scanId} fetch={(o, l) => cleaner.results(scanId, o, l, { rule: rule.id })} render={(it) => (
               <View key={it.id} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
-                {rule.explicit && rule.action !== 'none' && !on ? <Check on={models.has(it.id)} onClick={() => setModels((o) => { const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })} /> : null}
+                {rule.explicit && rule.action !== 'none' && !on ? <Check on={models.has(it.id)} onClick={() => setModels((o) => { sizes.current.set(it.id, it.allocated); const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })} /> : null}
                 <View style={{ flex: 1, minWidth: 0 }}><Label mono size={typeScale.callout} lines={1}>{it.path}</Label></View>
                 <Label dim size={typeScale.callout}>{formatBytes(it.allocated)}</Label>
               </View>
@@ -112,6 +112,8 @@ function Tag({ label }) {
 
 export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels }) {
   const pal = usePal();
+  const sizes = useRef(new Map());
+  const [dialog, setDialog] = useState(null);
   const rows = scan.rules.filter((r) => (r.files > 0 || r.root === 'busy') && r.category !== 'apps');   // leftovers are reviewed in Apps
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
@@ -130,7 +132,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
         </View>
       </View>
       {incomplete ? <Label>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
-      {offered.length ? <SelectBar selected={chosen} onPick={(ids) => setChosen(new Set(ids))} size={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.allocated : 0), 0)} count={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.files : 0), 0) + models.size}
+      {offered.length ? <SelectBar selected={chosen} onPick={(ids) => setChosen(new Set(ids))} size={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.allocated : 0), 0) + [...models].reduce((a, i) => a + (sizes.current.get(i) || 0), 0)} count={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.files : 0), 0) + models.size}
         options={[{ key: 'smart', ids: rows.filter((r) => offered.includes(r.id) && r.risk === 'regenerable' && !r.explicit).map((r) => r.id) }, { key: 'all', ids: offered }]} /> : null}
       <ScrollView style={{ flex: 1 }} contentStyle={{ gap: spacing.s }}>
           {!rows.length ? <Label dim>{tr('cleaner.emptyHint')}</Label> : null}
@@ -139,14 +141,15 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
               <Label dim size={typeScale.callout} weight={600}>{tr(`cleaner.category.${c}`)}</Label>
               {rows.filter((r) => r.category === c).map((r) => {
                 const k = i++;
-                return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r)} onEmpty={onEmpty} models={models} setModels={setModels}
+                return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r)} onEmpty={onEmpty} models={models} setModels={setModels} sizes={sizes}
                   onToggle={() => setChosen((o) => { const x = new Set(o); if (x.has(r.id)) x.delete(r.id); else x.add(r.id); return x; })} />;
               })}
             </View>
           ))}
-          <SystemCard />
-          <OldKernels />
+          <SystemCard setDialog={setDialog} />
+          <OldKernels setDialog={setDialog} />
       </ScrollView>
+      {dialog}
     </View>
   );
 }
@@ -155,7 +158,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
 
 const SYSTEM = [['journal', 'clean-journal'], ['apt', 'clean-apt-cache'], ['vartmp', 'clean-var-tmp']];
 
-function SystemCard() {
+function SystemCard({ setDialog }) {
   const [sizes, setSizes] = useState(null);
   const [ask, setAsk] = useState(null);
   const [msg, setMsg] = useState('');
@@ -165,11 +168,13 @@ function SystemCard() {
     setSizes(o);
   }).catch(() => setSizes(null));
   useEffect(() => { read(); }, []);
+  useEffect(() => { setDialog(ask ? <ConfirmDialog destructive title={tr(`cleaner.system.${ask[0]}`)} detail={tr('cleaner.system.confirm')} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setAsk(null)} /> : null); }, [ask]);
   if (!sizes) return null;
   const run = () => {
     const [k, action] = ask;
+    const before = cleaner.status().free;
     setAsk(null);
-    admin.run(action, '').then(() => { setMsg(tr('cleaner.system.done', { name: tr(`cleaner.system.${k}`) })); read(); }).catch((e) => setMsg(e.message));
+    admin.run(action, '').then(() => { cleaner.noteSystem(k, Math.max(0, before)); setMsg(tr('cleaner.system.done', { name: tr(`cleaner.system.${k}`) })); read(); }).catch((e) => setMsg(e.message));
   };
   return (
     <View style={{ gap: spacing.s }}>
@@ -182,22 +187,22 @@ function SystemCard() {
             <Label dim size={typeScale.callout}>{tr(`cleaner.system.${k}Text`)}</Label>
           </View>
           <Label weight={600}>{formatBytes(sizes[k] || 0)}</Label>
-          <GlassButton small label={tr('cleaner.clean')} onClick={() => setAsk([k, action])} />
+          <GlassButton small label={tr('cleaner.clean')} disabled={!sizes[k]} onClick={() => setAsk([k, action])} />
         </Glass>
       ))}
-      {ask ? <ConfirmDialog destructive title={tr(`cleaner.system.${ask[0]}`)} detail={tr('cleaner.system.confirm')} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setAsk(null)} /> : null}
     </View>
   );
 }
 
 // ---- old kernels: chosen in sdk/oldkernels.js, removed by the package engine with its own plan shown first ----
 
-function OldKernels() {
+function OldKernels({ setDialog }) {
   const [gen, setGen] = useState(0);
   const [plan, setPlan] = useState(null);
   const [msg, setMsg] = useState('');
   const release = useMemo(() => { try { return systemInfo().kernel; } catch (e) { return ''; } }, []);
   const old = useMemo(() => { try { return lord.pkg.available() ? oldKernels(lord.pkg.installed({}), release) : []; } catch (e) { return []; } }, [gen]);
+  useEffect(() => { setDialog(plan ? <ConfirmDialog destructive title={tr('cleaner.kernels.title')} detail={`${plan.items.map((i) => i.name).join(', ')}. ${tr('cleaner.system.confirm')}`} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setPlan(null)} /> : null); }, [plan]);
   if (!old.length || !admin.available()) return msg ? <Label dim size={typeScale.callout}>{msg}</Label> : null;
   const size = old.reduce((a, p) => a + p.installedSize, 0);
   const review = () => {
@@ -207,8 +212,9 @@ function OldKernels() {
   };
   const run = () => {
     const names = old.map((k) => k.name).join(' ');
+    const before = cleaner.status().free;
     setPlan(null);
-    admin.run('pkg-remove', names).then(() => { setMsg(tr('cleaner.system.done', { name: tr('cleaner.kernels.title') })); setGen((g) => g + 1); }).catch((e) => setMsg(e.message));
+    admin.run('pkg-remove', names).then(() => { cleaner.noteSystem('kernels', Math.max(0, before)); setMsg(tr('cleaner.system.done', { name: tr('cleaner.kernels.title') })); setGen((g) => g + 1); }).catch((e) => setMsg(e.message));
   };
   return (
     <View style={{ gap: spacing.s }}>
@@ -221,7 +227,6 @@ function OldKernels() {
         <Label weight={600}>{formatBytes(size)}</Label>
         <GlassButton small label={tr('cleaner.review')} onClick={review} />
       </Glass>
-      {plan ? <ConfirmDialog destructive title={tr('cleaner.kernels.title')} detail={`${plan.items.map((i) => i.name).join(', ')}. ${tr('cleaner.system.confirm')}`} okLabel={tr('cleaner.clean')} cancelLabel={tr('cleaner.cancel')} onOk={run} onCancel={() => setPlan(null)} /> : null}
     </View>
   );
 }
@@ -296,7 +301,7 @@ export function Activity({ gen }) {
             <Glass style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
               
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Label weight={600}>{e.action === 'emptyTrash' ? tr('cleaner.activity.emptied', { n: n(e.items) }) : e.trashed == null ? tr('cleaner.activity.cleaned', { n: n(e.counts.done) }) : tr('cleaner.activity.split', { deleted: n(e.deleted), trashed: n(e.trashed) })}</Label>
+                <Label weight={600}>{e.action === 'system' ? tr('cleaner.activity.system', { name: e.name === 'kernels' ? tr('cleaner.kernels.title') : tr(`cleaner.system.${e.name}`) }) : e.action === 'emptyTrash' ? tr('cleaner.activity.emptied', { n: n(e.items) }) : e.trashed == null ? tr('cleaner.activity.cleaned', { n: n(e.counts.done) }) : tr('cleaner.activity.split', { deleted: n(e.deleted), trashed: n(e.trashed) })}</Label>
                 <Label dim size={typeScale.callout}>{when(e.at)}</Label>
               </View>
               <Label dim size={typeScale.callout}>{tr('cleaner.result.free', { before: formatBytes(e.freeBefore), after: formatBytes(e.freeAfter) })}</Label>

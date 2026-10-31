@@ -190,7 +190,7 @@
   "category.info": "Para tu información",
   "category.system": "Archivos del sistema de esta computadora",
   "blocked.busy": "Omitido mientras este navegador está abierto. Ciérralo y vuelve a analizar.",
-  "models.warn": "Otras apps pueden usarlos y los descargarían otra vez:",
+  "models.warn": "Otras apps pueden usarlos y los descargarían otra vez.",
   "system.journal": "Registro del sistema",
   "system.journalText": "Reduce el diario del sistema a sus 200 MB más nuevos.",
   "system.apt": "Paquetes del sistema descargados",
@@ -399,7 +399,7 @@
   "map.savedAt": "Mapa guardado del {when}. Escanea de nuevo para actuar sobre él.",
   "prefs.rememberMap": "Recordar el mapa de almacenamiento",
   "prefs.rememberMapHint": "Guarda nombres y tamaños de carpetas en este equipo, solo para ti, hasta el próximo escaneo.",
-  "projects.warn": "Esto va a la Papelera. El proyecto necesitará repetir su instalación o compilación:",
+  "projects.warn": "Esto va a la Papelera. El proyecto necesitará repetir su instalación o compilación.",
   "ruleName.playwright": "Navegadores de pruebas descargados",
   "rule.playwright": "Navegadores descargados por herramientas de pruebas. Se descargan otra vez si hacen falta.",
   "ruleName.puppeteer": "Navegador sin interfaz descargado",
@@ -456,5 +456,13 @@
   "confirm.more": "y {n} más",
   "empty.now": "Vaciar Papelera y liberar espacio",
   "empty.done": "Papelera vaciada: {size} liberados",
-  "activity.split": "{deleted} eliminados, {trashed} movidos a la Papelera"
+  "activity.split": "{deleted} eliminados, {trashed} movidos a la Papelera",
+  "result.bothBig": "{freed} liberados, {trashed} en la Papelera",
+  "result.freeGain": "Espacio libre ahora {free}, {gain} más",
+  "items": {
+    "one": "{count} elemento",
+    "other": "{count} elementos"
+  },
+  "select.nothing": "Nada seleccionado",
+  "activity.system": "Limpieza del sistema: {name}"
 }

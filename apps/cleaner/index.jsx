@@ -214,7 +214,6 @@ function Body() {
       const ids = new Set(models);
       for (const r of [...whole].sort((a, b) => b.explicit - a.explicit)) for (const id of allIds(scan.id, { rule: r.id })) ids.add(id);
       cleaner.plan(scan.id, [...ids]);
-      setModels(new Set());
     } else if (kind === 'rules' && section !== 'apps') cleaner.plan(scan.id, { rules: [...chosen] });
     else cleaner.plan(scan.id, [...picked]);
     setResultOf('');
@@ -231,15 +230,17 @@ function Body() {
       setBoard(false);
     }
   }, [plan && plan.id, plan && plan.state]);
-  const execute = () => attempt(() => { setConfirm(false); cleaner.execute(plan.id); watch(); });
+  const execute = () => attempt(() => { setConfirm(false); setModels(new Set()); cleaner.execute(plan.id); watch(); });
   const freeAtEmpty = useRef(0);
-  const emptyTrash = () => attempt(() => { setEmptyAsk(false); setEmptied(''); freeAtEmpty.current = cleaner.status().free; cleaner.emptyTrash(); watch(); });
+  const emptying = useRef(false);
+  const emptyTrash = () => attempt(() => { setEmptyAsk(false); setEmptied(''); freeAtEmpty.current = cleaner.status().free; emptying.current = true; cleaner.emptyTrash(); watch(); });
   useEffect(() => {
-    if (info.job !== 'emptyTrash' || info.state !== 'done' || polling) return;
+    if (!emptying.current || info.job !== 'emptyTrash' || info.state !== 'done' || polling) return;
+    emptying.current = false;
     setEmptied(tr('cleaner.empty.done', { size: formatBytes(Math.max(0, cleaner.status().free - freeAtEmpty.current)) }));
     setResultOf('');
     if (['cleanup', 'large', 'duplicates'].includes(section)) start();
-  }, [info.job, info.state]);
+  }, [info.job, info.state, polling]);
 
   // the map of an earlier session, once, only until a real scan replaces it
   const triedSaved = useRef(false);
@@ -256,7 +257,7 @@ function Body() {
   const showing = (() => {
     if (section === 'activity') return <Activity gen={gen} />;
     if (section === 'settings') return <Preferences />;
-    if (showResult) return <PlanResult key={plan.id} plan={plan} onDone={() => { setResultOf(''); start(); }} onEmpty={() => setEmptyAsk(true)} />;
+    if (showResult) return <PlanResult key={plan.id} plan={plan} onDone={() => { setResultOf(''); start(); }} onEmpty={() => setEmptyAsk(true)} onRestored={() => setGen((g) => g + 1)} />;
     if (pipe) {
       const l = cleaner.poll();
       const g = win ? wm.frame(win) : { w: 1100, h: 700 };
@@ -277,6 +278,7 @@ function Body() {
   // what the round button does here
   const orb = (() => {
     if (section === 'activity' || section === 'settings' || showResult) return null;
+    if (pipe) return { label: tr('cleaner.stop'), onClick: () => { pipeRef.current = null; setPipe(null); if (running) stop(); }, busy: true };
     if (hold && !running) return null;
     if (running) return info.job === 'scan' ? { label: tr('cleaner.stop'), onClick: () => { pipeRef.current = null; setPipe(null); stop(); }, busy: true } : null;
     if (section === 'scan' && board) return null;
@@ -314,7 +316,6 @@ function Body() {
         {!status.available ? <Label>{tr('cleaner.unavailable')}</Label> : null}
         {error ? <Label>{error}</Label> : null}
         {failed ? <Label>{failed}</Label> : null}
-        {emptied ? <Label size={13}>{emptied}</Label> : null}
         {['cleanup', 'large', 'storage', 'duplicates'].includes(section) && !running && !hold && !showResult && (ready || section === 'duplicates') ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.s, marginTop: -18 }}>
             {ready ? <View onClick={startOver}><Label size={13} lines={1} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View> : null}
@@ -324,6 +325,7 @@ function Body() {
             {ready ? <GlassButton small label={tr('cleaner.rescan')} onClick={start} /> : null}
           </View>
         ) : null}
+        {emptied ? <Label size={13} style={{ marginBottom: spacing.xs }}>{emptied}</Label> : null}
         <Enter key={section} style={{ flex: 1, minHeight: 0 }}>{showing}</Enter>
         {orb && orb.label ? <Orb key={orb.busy ? 'busy' : 'idle'} label={orb.label} onClick={orb.onClick} disabled={orb.disabled} busy={orb.busy} /> : null}
       </View>

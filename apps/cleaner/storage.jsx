@@ -54,7 +54,7 @@ function Bands({ item, h }) {
 function Legend() {
   const dot = (c, key) => (
     <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-      <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
+      <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c, opacity: 0.7 }} />
       <Label dim size={typeScale.callout}>{tr(key)}</Label>
     </View>
   );

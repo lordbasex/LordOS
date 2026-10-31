@@ -1621,6 +1621,19 @@ char *clean_history(void) {
     return b.p;
 }
 
+/* a system cleanup run through the admin helper: its name and the free space, never a path */
+void clean_history_system(const char *name, double before) {
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"at\":%lld,\"action\":\"system\",\"name\":\"%s\",\"freeBefore\":", (long long)time(NULL), name);
+    jb_num(&b, before);
+    jb_raw(&b, ",\"freeAfter\":");
+    jb_num(&b, free_bytes());
+    jb_raw(&b, "}");
+    if (!b.oom) history_add(b.p);
+    jb_free(&b);
+}
+
 void clean_history_clear(void) {
     char p[PATH_MAX + 64];
     history_path(p, sizeof p);
@@ -1767,6 +1780,7 @@ int clean_restore(int id, uint32_t cand) {
             plan->count[I_DONE]--;
             plan->count[I_RESTORED]++;
             plan->trashed--;
+            if (!plan->scan->c[it->cand].first) plan->trashed_alloc -= (double)plan->scan->c[it->cand].alloc;
             r = 0;
             break;
         }

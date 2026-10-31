@@ -59,6 +59,7 @@ int   clean_execute(int plan);
 int   clean_restore(int plan, uint32_t id); /* back from the Trash, for an item that plan moved there */
 int   clean_empty_trash(void);              /* the real emptyTrash, on the thread; can't be undone */
 char *clean_history(void);                  /* what ran, without paths, as JSON (malloc) */
+void  clean_history_system(const char *name, double before);   /* name: journal, apt, vartmp or kernels */
 void  clean_history_clear(void);           /* and the kept map */
 char *clean_saved(void);                    /* the kept map: { at, volume } or null, as JSON (malloc) */
 void  clean_forget_saved(void);
