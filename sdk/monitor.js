@@ -280,4 +280,7 @@ export const monitor = {
   stopProcess,
   history,
   clearHistory,
+  // Monitor → Voltage (docs/MONITOR.md, "Voltage"): only while that view is on screen
+  wantVoltage: (on) => { if (available()) lord.monitor.wantVoltage(!!on); },
+  voltage: () => (available() ? lord.monitor.voltage() : null),
 };

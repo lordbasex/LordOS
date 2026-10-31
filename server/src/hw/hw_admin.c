@@ -279,17 +279,6 @@ void hw_act_rpi_case(const AdminReq *r, const char *arg, size_t len) {
 
 /* ---- Raspberry Pi 5 bootloader (Settings → Board firmware, docs/SETTINGS.md) ---- */
 
-/* Is this device tree "compatible" list (NUL-separated strings) a BCM2712 board (Pi 5, Pi 500,
- * CM5)? Those keep their bootloader in an EEPROM that rpi-eeprom-update can update. */
-int hw_is_bcm2712(const char *compat, size_t n) {
-    for (size_t i = 0; compat && i < n;) {
-        size_t l = strnlen(compat + i, n - i);
-        if (l == 12 && !memcmp(compat + i, "brcm,bcm2712", 12)) return 1;
-        i += l + 1;
-    }
-    return 0;
-}
-
 static int board_is_bcm2712(void) {
     char b[512];
     int fd = open("/proc/device-tree/compatible", O_RDONLY | O_CLOEXEC);
@@ -463,6 +452,155 @@ void hw_act_eeprom_update(const AdminReq *r, const char *arg, size_t len) {
     if (rc == 3) { admin_err("hw.eepromFrozen", NULL); return; }
     if (rc != 0) { admin_err("hw.eepromUpdateFailed", "code", lerr_int(rc), NULL); return; }
     eeprom_report();
+}
+
+/* ---- Monitor → Voltage: the Raspberry Pi 5 power chip (docs/MONITOR.md, "Voltage") ---- */
+
+#define VCGENCMD "/usr/bin/vcgencmd"
+
+/* The rails of the board's PMIC, as the firmware names them. Nothing else ever leaves the helper. */
+static const char *const pmic_rails[HW_PMIC_RAILS] = {
+    "EXT5V", "VDD_CORE", "3V3_SYS", "1V8_SYS", "1V1_SYS", "0V8_SW", "0V8_AON", "DDR_VDD2", "DDR_VDDQ",
+    "3V7_WL_SW", "3V3_DAC", "3V3_ADC", "HDMI", "BATT",
+};
+
+/* "5.18312000" up to the unit letter, into micro units: 1-2 digits, a point, 1-12 digits. -1 if not. */
+static long pmic_number(const char *s, const char *end) {
+    const char *p = s;
+    long v = 0;
+    while (p < end && *p >= '0' && *p <= '9' && p - s < 3) v = v * 10 + (*p++ - '0');
+    if (p == s || p - s > 2 || p >= end || *p != '.') return -1;
+    const char *f = ++p;
+    long frac = 0;
+    int k = 0;
+    for (; p < end; p++, k++) {
+        if (*p < '0' || *p > '9' || k >= 12) return -1;
+        if (k < 6) frac = frac * 10 + (*p - '0');
+    }
+    if (p == f) return -1;
+    for (; k < 6; k++) frac *= 10;
+    return v * 1000000L + frac;
+}
+
+/* One line: [spaces]NAME_V volt(N)=D.DDDV or [spaces]NAME_A current(N)=D.DDDA, exactly. */
+static int pmic_line(const char *line, size_t len, HwPmic *p) {
+    const char *s = line, *end = line + len;
+    while (s < end && *s == ' ') s++;
+    const char *sp = memchr(s, ' ', (size_t)(end - s));
+    if (!sp || sp - s < 3 || sp - s > 24 || sp[-2] != '_') return -1;
+    for (const char *c = s; c < sp; c++) if (!((*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_')) return -1;
+    int volt = sp[-1] == 'V';
+    if (!volt && sp[-1] != 'A') return -1;
+    const char *word = volt ? "volt(" : "current(";
+    size_t wl = strlen(word);
+    const char *q = sp + 1;
+    if ((size_t)(end - q) < wl || memcmp(q, word, wl)) return -1;
+    q += wl;
+    const char *d = q;
+    while (q < end && *q >= '0' && *q <= '9' && q - d < 4) q++;
+    if (q == d || q + 2 >= end || q[0] != ')' || q[1] != '=') return -1;
+    q += 2;
+    if (end[-1] != (volt ? 'V' : 'A')) return -1;
+    long v = pmic_number(q, end - 1);
+    if (v < 0 || v > HW_PMIC_LIMIT) return -1;
+    size_t nl = (size_t)(sp - s) - 2;
+    const char *name = NULL;
+    for (int i = 0; i < HW_PMIC_RAILS; i++)
+        if (strlen(pmic_rails[i]) == nl && !memcmp(pmic_rails[i], s, nl)) name = pmic_rails[i];
+    if (!name) return 0;
+    HwPmicRail *r = NULL;
+    for (int i = 0; i < p->n; i++) if (p->r[i].name == name) r = &p->r[i];
+    if (!r) { r = &p->r[p->n++]; r->name = name; r->uv = r->ua = -1; }
+    long *slot = volt ? &r->uv : &r->ua;
+    if (*slot >= 0) return -1;
+    *slot = v;
+    return 0;
+}
+
+int hw_pmic_parse(const char *out, HwPmic *p) {
+    memset(p, 0, sizeof *p);
+    int lines = 0;
+    for (const char *s = out; *s;) {
+        const char *nl = strchr(s, '\n');
+        if (!nl || nl - s > 64 || ++lines > 64 || pmic_line(s, (size_t)(nl - s), p)) return -1;
+        s = nl + 1;
+    }
+    int ok = 0, w = 0;
+    for (int i = 0; i < p->n; i++) {
+        if (p->r[i].uv < 0) continue;                /* a current with no voltage says nothing */
+        if (!strcmp(p->r[i].name, "EXT5V")) ok = 1;
+        p->r[w++] = p->r[i];
+    }
+    p->n = w;
+    return ok ? 0 : -1;
+}
+
+int hw_pmic_line(const HwPmic *p, int uv_count, long long uv_last_s, char *out, size_t n) {
+    int w = snprintf(out, n, "uv %d %lld", uv_count, uv_last_s);
+    if (w < 0 || (size_t)w >= n) return -1;
+    size_t o = (size_t)w;
+    for (int i = 0; i < p->n; i++) {
+        w = snprintf(out + o, n - o, " %s=%ld,%ld", p->r[i].name, p->r[i].uv, p->r[i].ua);
+        if (w < 0 || (size_t)w >= n - o) return -1;
+        o += (size_t)w;
+    }
+    return 0;
+}
+
+int hw_uv_log(const char *log, size_t n, long long *last_s) {
+    static const char tail[] = ": Undervoltage detected!";
+    const size_t tl = sizeof tail - 1;
+    int count = 0;
+    *last_s = -1;
+    const char *p = log, *end = log + n;
+    while (p < end) {
+        const char *nl = memchr(p, '\n', (size_t)(end - p));
+        const char *e = nl ? nl : end, *line = p;
+        p = nl ? nl + 1 : end;
+        /* "<priority>,<seq>,<usec>,<flags>[,...];<text>" */
+        const char *semi = memchr(line, ';', (size_t)(e - line));
+        if (!semi || (size_t)(e - semi - 1) <= tl || memcmp(e - tl, tail, tl)) continue;
+        char head[64];
+        size_t hl = (size_t)(semi - line);
+        if (hl >= sizeof head) continue;
+        memcpy(head, line, hl);
+        head[hl] = 0;
+        int prio;
+        unsigned long long seq, usec;
+        if (sscanf(head, "%d,%llu,%llu,", &prio, &seq, &usec) != 3 || prio < 0 || prio > 7) continue;     /* kernel facility only */
+        /* "<driver> <device>" before the colon, nothing else */
+        int spaces = 0, clean = 1;
+        for (const char *c = semi + 1; c < e - tl; c++) {
+            if (*c == ' ') spaces++;
+            else if (!isalnum((unsigned char)*c) && !strchr("_-.:@", *c)) clean = 0;
+        }
+        if (!clean || spaces != 1) continue;
+        count++;
+        *last_s = (long long)(usec / 1000000ULL);
+    }
+    return count;
+}
+
+/* Read-only, no arguments, on the boards that have this chip: the fixed program with one fixed word. The session
+ * gets numbers and the closed rail names, never the program's text. */
+void hw_act_rpi_pmic(const AdminReq *r, const char *arg, size_t len) {
+    (void)r; (void)arg;
+    if (len) { admin_err("admin.invalidArgument", NULL); return; }
+    if (!board_is_bcm2712()) { admin_err("hw.notRaspberryPi5", NULL); return; }
+    if (!file_ok(VCGENCMD)) { admin_err("hw.noVcgencmd", NULL); return; }
+    const char *const argv[] = { VCGENCMD, "pmic_read_adc", NULL };
+    char out[4096], line[768];
+    int rc = admin_run_capture(argv, out, sizeof out);
+    HwPmic p;
+    if (rc != 0 || hw_pmic_parse(out, &p)) { admin_err("hw.pmicFailed", "code", lerr_int(rc), NULL); return; }
+    /* what the hwmon driver logged: with it loaded, the firmware's own "has occurred" bits only cover 2 s (rpifw.h) */
+    size_t n;
+    int denied, count = -1;
+    long long last = -1;
+    char *log = hwscan_read_kmsg("", &n, &denied);
+    if (log) { count = hw_uv_log(log, n, &last); free(log); }
+    if (hw_pmic_line(&p, count, last, line, sizeof line)) { admin_err("hw.pmicFailed", "code", "0", NULL); return; }
+    admin_say("OK", "%s", line);   /* i18n-ok: numbers, parsed by apps/monitor/voltmodel.js */
 }
 
 /* ---- missing firmware (the Store's suggestions, hwscan.c) ---- */

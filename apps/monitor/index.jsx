@@ -21,6 +21,7 @@ import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
 import { ProcessesTab, ProcessLayers } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
+import { VoltageTab } from './Voltage.jsx';
 
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
@@ -413,9 +414,13 @@ export default function Monitor() {
   // which lists lord-server builds (without redrawing this window on every sample)
   useMonitor({ procs: tab === 'processes', conns: showConns, geo: showConns && prefs.geo !== false, everyMs: 0 });
   const ready = useStore(monitorSamples, (l) => l.length > 0);
+  // Voltage only exists where the machine reports something (not in a virtual machine, for one)
+  const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);
+  const view = tab === 'voltage' && !hasVolt ? 'overview' : tab;
   const tabs = [
     ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')],
     ['network', tr('monitor.network')], ['disks', tr('monitor.disks')], ['processes', tr('monitor.processes')], ['cooling', tr('monitor.tab.cooling')],
+    ...(hasVolt ? [['voltage', tr('monitor.tab.voltage')]] : []),
   ];
   if (!monitor.available()) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.unavailable')}</Text></View>;
@@ -425,24 +430,28 @@ export default function Monitor() {
       <Toolbar style={{ paddingHorizontal: 20 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, width: 110, whiteSpace: 'nowrap' }}>{tr('monitor.title')}</Text>
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Segmented value={tab} onChange={setTab} options={tabs} />
+          <Segmented value={view} onChange={setTab} options={tabs} />
         </View>
         <View style={{ width: 110 }} />
       </Toolbar>
       {!ready ? (
         <View style={{ flex: 1, padding: 20 }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.waiting')}</Text></View>
-      ) : tab === 'network' ? (
+      ) : view === 'network' ? (
         <Network prefs={prefs} />
-      ) : tab === 'cooling' ? (
+      ) : view === 'voltage' ? (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
+        </ScrollView>
+      ) : view === 'cooling' ? (
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
-      ) : tab === 'processes' ? (
+      ) : view === 'processes' ? (
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (
-        <Charts tab={tab} rate={focused === false ? 1000 : 250} />
+        <Charts tab={view} rate={focused === false ? 1000 : 250} />
       )}
       <View style={{ height: 1, backgroundColor: t.separator }} />
       <Footer />

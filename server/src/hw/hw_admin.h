@@ -22,6 +22,10 @@
  *   rpi-eeprom-update                  (no arguments) BCM2712 only: /usr/bin/rpi-eeprom-update -A
  *                                      bootloader (the newest bootloader of the configured
  *                                      release; finished by a restart), then the same report admin
+ *   rpi-pmic                           (no arguments) BCM2712 only: runs /usr/bin/vcgencmd pmic_read_adc, parses it
+ *                                      strictly (hw_pmic_parse) and counts the kernel log's under-voltage alarms
+ *                                      (hw_uv_log). Answers "OK uv <count|-1> <last_s|-1> <RAIL>=<uV>,<uA|-1> ...",
+ *                                      numbers and a closed list of rail names only (Monitor → Voltage); read-only anyone
  *   hw-firmware-missing                (no arguments) reads the kernel log (/dev/kmsg) and returns
  *                                      only the validated names of firmware files a driver asked
  *                                      for and that are still missing, as "LOG fw <file> <driver>"
@@ -51,6 +55,7 @@
 #define LORD_HW_ADMIN_H
 
 #include "../admin.h"
+#include "rpifw.h"
 
 void hw_act_brightness(const AdminReq *r, const char *arg, size_t len);
 void hw_act_power_profile(const AdminReq *r, const char *arg, size_t len);
@@ -73,7 +78,23 @@ typedef struct {
     int update;                         /* the program says an update is available */
 } HwEeprom;
 int hw_eeprom_parse(const char *out, HwEeprom *e);
-int hw_is_bcm2712(const char *compat, size_t n);     /* device tree "compatible" (NUL-separated) */
+void hw_act_rpi_pmic(const AdminReq *r, const char *arg, size_t len);
+/* vcgencmd pmic_read_adc, parsed (exposed for tests). Rails are from a closed list of names; a well-formed line of
+ * an unknown rail is left out; anything malformed, repeated, out of range or cut fails the whole reading. */
+#define HW_PMIC_RAILS 14
+#define HW_PMIC_LIMIT 30000000L                 /* 30 V or 30 A, in micro units: no such rail on these boards */
+typedef struct {
+    const char *name;                           /* from the closed list, static */
+    long uv, ua;                                /* microvolts, microamps; -1 not reported */
+} HwPmicRail;
+typedef struct { HwPmicRail r[HW_PMIC_RAILS]; int n; } HwPmic;
+int hw_pmic_parse(const char *out, HwPmic *p);
+/* "uv <count> <last_s> <RAIL>=<uV>,<uA> ..."; 0 if it fits */
+int hw_pmic_line(const HwPmic *p, int uv_count, long long uv_last_s, char *out, size_t n);
+/* The kernel's own records of the board's alarm in /dev/kmsg's text: how many "Undervoltage detected!" lines from a
+ * kernel driver are in the log (the ring: older ones may be gone) and the last one's time in seconds since boot, -1
+ * with none. Text from anything but the kernel facility is ignored. */
+int hw_uv_log(const char *log, size_t n, long long *last_s);
 const char *hw_rpi_case_text(const char *id);   /* fixed file text of a known case, NULL otherwise */
 void hw_act_video(const AdminReq *r, const char *arg, size_t len);
 void hw_act_boot_test(const AdminReq *r, const char *arg, size_t len);          /* LordBench, bench/boottest.h */
@@ -100,6 +121,7 @@ int hw_backlight_name_valid(const char *n);
     { "bt-unblock", hw_act_bt_unblock, A_ANYONE }, \
     { "rpi-case", hw_act_rpi_case, 0 }, \
     { "rpi-case-detect", hw_act_rpi_case_detect, A_FORK }, \
+    { "rpi-pmic", hw_act_rpi_pmic, A_ANYONE | A_FORK }, \
     { "hw-firmware-missing", hw_act_firmware_missing, A_ANYONE }, \
     { "hw-memory-modules", hw_act_memory_modules, A_ANYONE }, \
     { "hw-serial-numbers", hw_act_serial_numbers, 0 }, \
