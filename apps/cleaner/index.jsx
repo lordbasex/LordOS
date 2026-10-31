@@ -94,7 +94,8 @@ function Body() {
   const volumes = useMemo(() => cleaner.volumes(), [gen]);
   const dirs = useMemo(() => {
     const u = userDirs();
-    return [...new Set(['documents', 'pictures', 'music', 'videos', 'downloads'].map((k) => u[k]).filter(Boolean))].map((p) => p.slice(u.home.length + 1)).filter(Boolean);
+    const all = [...new Set(['documents', 'pictures', 'music', 'videos', 'downloads'].map((k) => u[k]).filter(Boolean))].map((p) => p.slice(u.home.length + 1)).filter(Boolean);
+    return all.filter((d) => !all.some((o) => d.startsWith(`${o}/`)));   // a scan refuses a folder inside another
   }, []);
   const [folders, setFolders] = useState(() => new Set(dirs.slice(0, 1)));
   const [similar, setSimilar] = useState(false);
@@ -147,7 +148,10 @@ function Body() {
   useEffect(() => () => cleaner.cancel(true), []);
 
   const attempt = (fn) => { setError(''); try { fn(); } catch (e) { setError(e.message); } setGen((g) => g + 1); };
-  const go = (id) => { setSection(id); setResultOf(''); setError(''); setUnder(''); };
+  const go = (id) => {
+    if (KIND[id] !== KIND[section]) setPicked(new Set());     // ids belong to one scan: another list's would name other files
+    setSection(id); setResultOf(''); setError(''); setUnder('');
+  };
   const watch = () => setPolling(true);
 
   const startModule = (step) => {
