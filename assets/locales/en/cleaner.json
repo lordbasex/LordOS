@@ -377,6 +377,7 @@
   "apps.removeTitle": "Remove {name}?",
   "apps.confirmLpk": "The app is removed. Its data stays, and you can review it here afterwards.",
   "apps.refused": "{name} can't be removed here: other parts of the system need it.",
+  "apps.failed": "{name} could not be removed.",
   "leftovers.title": "Left by removed apps",
   "leftovers.find": "Look for them",
   "leftovers.again": "Look again",
