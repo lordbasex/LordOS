@@ -215,6 +215,8 @@
   "hw.noKernelLog": "The kernel log could not be read",
   "hw.noRfkill": "Wireless devices cannot be unblocked on this computer",
   "hw.notRaspberryPi5": "This only works on a Raspberry Pi 5",
+  "hw.noVcgencmd": "The firmware tools (raspi-utils) are not installed",
+  "hw.pmicFailed": "Could not read the board's power chip",
   "hw.ntpFailed": "Could not change automatic time (code {code})",
   "hw.outOfRange": "Value out of range (0 to {max})",
   "hw.profileRefused": "The processor did not accept the power mode",

@@ -18,6 +18,11 @@
 #define RPIFW_NOW_MASK    0x0000fu
 #define RPIFW_STICKY_MASK 0xf0000u
 
+#include <stddef.h>
+
+/* Is this device tree "compatible" list (NUL-separated strings) a BCM2712 board (Pi 5, Pi 500, CM5)? */
+int hw_is_bcm2712(const char *compat, size_t n);
+
 typedef struct {
     int hwmon;          /* 1 if the rpi_volt hwmon exists (even if its alarm can't be read) */
     int uv_alarm;       /* its in0_lcrit_alarm: 1 under-voltage in the last report, 0 none, -1 unknown */

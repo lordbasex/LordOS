@@ -372,6 +372,96 @@ int admin_run(const char *const argv[]) { (void)argv; return -1; }
 int admin_run_capture(const char *const argv[], char *out, size_t cap) { (void)argv; if (cap) out[0] = 0; return -1; }
 
 /* rpi-eeprom-update's report: the strict parser behind rpi-eeprom-status */
+
+/* Monitor → Voltage: vcgencmd pmic_read_adc as the owner's Raspberry Pi 5 printed it (firmware of 2026), then damage */
+static void test_pmic(void) {
+    static const char real[] =
+        " 3V7_WL_SW_A current(0)=0.00097593A\n"
+        "   3V3_SYS_A current(1)=0.12101530A\n"
+        "   1V8_SYS_A current(2)=0.27911600A\n"
+        "  DDR_VDD2_A current(3)=0.32791250A\n"
+        "  DDR_VDDQ_A current(4)=0.02549040A\n"
+        "   1V1_SYS_A current(5)=0.17761930A\n"
+        "    0V8_SW_A current(6)=0.35328660A\n"
+        "  VDD_CORE_A current(7)=2.49147000A\n"
+        "   3V3_DAC_A current(17)=0.00000000A\n"
+        "   3V3_ADC_A current(18)=0.00000000A\n"
+        "   0V8_AON_A current(16)=0.00268620A\n"
+        "      HDMI_A current(22)=0.00573870A\n"
+        " 3V7_WL_SW_V volt(8)=3.71648000V\n"
+        "   3V3_SYS_V volt(9)=3.31003300V\n"
+        "   1V8_SYS_V volt(10)=1.81098700V\n"
+        "  DDR_VDD2_V volt(11)=1.10842400V\n"
+        "  DDR_VDDQ_V volt(12)=0.60292980V\n"
+        "   1V1_SYS_V volt(13)=1.10439400V\n"
+        "    0V8_SW_V volt(14)=0.80292960V\n"
+        "  VDD_CORE_V volt(15)=0.85421160V\n"
+        "   3V3_DAC_V volt(20)=3.32508800V\n"
+        "   3V3_ADC_V volt(21)=3.32142500V\n"
+        "   0V8_AON_V volt(19)=0.80175740V\n"
+        "      HDMI_V volt(23)=5.16704000V\n"
+        "     EXT5V_V volt(24)=5.15096000V\n"
+        "      BATT_V volt(25)=0.00000000V\n"
+        ;
+    HwPmic p;
+    CHECK(!hw_pmic_parse(real, &p) && p.n == 14);
+    const HwPmicRail *ext = NULL, *core = NULL, *batt = NULL;
+    for (int i = 0; i < p.n; i++) {
+        if (!strcmp(p.r[i].name, "EXT5V")) ext = &p.r[i];
+        if (!strcmp(p.r[i].name, "VDD_CORE")) core = &p.r[i];
+        if (!strcmp(p.r[i].name, "BATT")) batt = &p.r[i];
+    }
+    CHECK(ext && ext->uv > 4000000 && ext->uv < 6000000 && ext->ua == -1);
+    CHECK(core && core->uv > 700000 && core->uv < 1100000 && core->ua > 0);
+    CHECK(batt && batt->uv == 0 && batt->ua == -1);
+    char line[768];
+    CHECK(!hw_pmic_line(&p, 2, 7265, line, sizeof line) && !strncmp(line, "uv 2 7265 ", 10) && strstr(line, " BATT=0,-1"));
+    CHECK(hw_pmic_line(&p, 0, -1, line, 20));
+    CHECK(!hw_pmic_parse("     EXT5V_V volt(24)=5.18312000V\n", &p) && p.n == 1 && p.r[0].uv == 5183120);
+    CHECK(!hw_pmic_parse("EXT5V_V volt(24)=5.1V\n", &p) && p.r[0].uv == 5100000);
+    /* well-formed but unknown rails are left out, never forwarded */
+    CHECK(!hw_pmic_parse("  NEW_RAIL_V volt(30)=1.00000000V\n  EXT5V_V volt(24)=5.00000000V\n", &p) && p.n == 1);
+    /* a current alone is dropped */
+    CHECK(!hw_pmic_parse(" VDD_CORE_A current(7)=0.80370000A\n EXT5V_V volt(24)=5.00000000V\n", &p) && p.n == 1);
+    static const char *const bad[] = {
+        "", "\n", "garbage\n", "error=1 error_msg=\"Command not registered\"\n",
+        " VDD_CORE_V volt(15)=0.82842410V\n",                     /* no input rail */
+        "  EXT5V_V volt(24)=5.18312000V",                          /* cut: no newline */
+        "  EXT5V_V volt(24)=5.18312000V\n  VDD_CORE_V volt(15)=0.8",
+        "  EXT5V_V volt(24)=5.18312000V\n  EXT5V_V volt(24)=5.18312000V\n",   /* repeated */
+        "  EXT5V_V volt(24)=5.18312000A\n", "  EXT5V_V current(24)=5.18312000V\n", "  EXT5V_A volt(24)=5.18312000V\n",
+        "  EXT5V_V volt(24)=-5.18312000V\n", "  EXT5V_V volt(24)=5.18312000 V\n", "  EXT5V_V volt(24)=5,18312000V\n",
+        "  EXT5V_V volt(24)=5V\n", "  EXT5V_V volt(24)=.5V\n", "  EXT5V_V volt(24)=5.V\n", "  EXT5V_V volt(24)=31.00000000V\n",
+        "  EXT5V_V volt(24)=999.00000000V\n", "  EXT5V_V volt(24)=5.1234567890123V\n", "  EXT5V_V volt()=5.1V\n", "  EXT5V_V volt(12345)=5.1V\n",
+        "  EXT5V_V volt(x)=5.1V\n", "  EXT5V_V  volt(24)=5.1V\n", "  ext5v_V volt(24)=5.1V\n", "  EXT5V;rm_V volt(24)=5.1V\n", "  EXT5V_V volt(24)=5.1V;\n",
+        "  EXT5V_V volt(24)=5.1V\n\n", "  EXT5V_V volt(24)=5.1V trailing\n",
+        "  EXT5V_V volt(24)=5.18312000000000000000000000000000000000000000000000000000000000V\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(hw_pmic_parse(bad[i], &p));
+    /* the kernel log */
+    long long last;
+    static const char log[] =
+        "6,100,1000000,-;Booting Linux\n"
+        "2,101,3726000000,-;raspberrypi-hwmon raspberrypi-hwmon: Undervoltage detected!\n"
+        " SUBSYSTEM=platform\n"
+        " DEVICE=+platform:raspberrypi-hwmon\n"
+        "6,102,3728000000,-;raspberrypi-hwmon raspberrypi-hwmon: Voltage normalised\n"
+        "2,103,7265500000,c;hwmon hwmon3: Undervoltage detected!\n";
+    CHECK(hw_uv_log(log, sizeof log - 1, &last) == 2 && last == 7265);
+    CHECK(hw_uv_log("6,1,5,-;all good\n", 16, &last) == 0 && last == -1);
+    CHECK(hw_uv_log("", 0, &last) == 0 && last == -1);
+    /* a user's text (facility 1 and up), or anything that isn't "<driver> <device>:" */
+    static const char fake[] =
+        "14,1,5,-;user user: Undervoltage detected!\n"
+        "2,2,5,-;Undervoltage detected!\n"
+        "2,3,5,-;a b c: Undervoltage detected!\n"
+        "2,4,5,-;x: Undervoltage detected!\n"
+        "2,5,5,-;a b: Undervoltage detected! again\n"
+        "x,6,5,-;a b: Undervoltage detected!\n"
+        "a b: Undervoltage detected!\n";
+    CHECK(hw_uv_log(fake, sizeof fake - 1, &last) == 0 && last == -1);
+}
+
 static void test_eeprom(void) {
     /* as printed on the Raspberry Pi 5 (rpi-eeprom 28.34-1, 2026-10-25) */
     const char *avail =
@@ -408,6 +498,7 @@ static void test_eeprom(void) {
     CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: Default;rm (/x)\n", &e));
     CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: averyveryverylongname (/x)\n", &e));
     CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE:  (/x)\n", &e));
+    test_pmic();
     /* the board: BCM2712 in the device tree's compatible list */
     static const char pi5[] = "raspberrypi,5-model-b\0brcm,bcm2712\0";
     static const char pi4[] = "raspberrypi,4-model-b\0brcm,bcm2711\0";

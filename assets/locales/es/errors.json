@@ -215,6 +215,8 @@
   "hw.noKernelLog": "No se pudo leer el registro del kernel",
   "hw.noRfkill": "En esta computadora no se pueden desbloquear los dispositivos inalámbricos",
   "hw.notRaspberryPi5": "Esto solo funciona en una Raspberry Pi 5",
+  "hw.noVcgencmd": "Las herramientas del firmware (raspi-utils) no están instaladas",
+  "hw.pmicFailed": "No se pudo leer el chip de energía de la placa",
   "hw.ntpFailed": "No se pudo cambiar la hora automática (código {code})",
   "hw.outOfRange": "Valor fuera de rango (0 a {max})",
   "hw.profileRefused": "El procesador no aceptó el modo de energía",

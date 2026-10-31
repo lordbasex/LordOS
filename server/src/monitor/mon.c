@@ -13,6 +13,7 @@
 #include "monpriv.h"
 #include "procctl.h"
 #include "disktemp.h"
+#include "voltage.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -127,10 +128,10 @@ void mon_buf_free(Buf *b) { free(b->p); memset(b, 0, sizeof *b); }
 static struct {
     pthread_mutex_t mu;
     pthread_cond_t cv;
-    int started, refs, want_procs, want_conns, want_geo;
+    int started, refs, want_procs, want_conns, want_geo, want_volt;
     double last_poll;
-    char *sample, *procs, *conns, *detail, *dtemps;
-    uint64_t sseq, pseq, cseq, dseq, tseq;
+    char *sample, *procs, *conns, *detail, *dtemps, *volt;
+    uint64_t sseq, pseq, cseq, dseq, tseq, vseq;
     int watch_disks;                    /* background disk temperatures (notifications), see below */
     int detail_pid;                     /* Get Info: 0 = none */
     unsigned long long detail_start;
@@ -168,6 +169,7 @@ static unsigned temp_ticks;             /* samples since the last temperature re
 #define TEMP_EVERY 12                   /* 3 s at 4 samples per second */
 #define AWAKE_MS 60000                  /* a spinning disk counts as awake for 60 s after its last I/O */
 #define WATCH_MS 30000                  /* background disk temperatures: every 30 s */
+#define VOLT_MS 1900                     /* Monitor → Voltage: about every 2 s, only while it is on screen */
 
 /* Sensors: paths found at startup. */
 static char temp_path[8][PATH_MAX], fan_path[8][PATH_MAX];
@@ -628,9 +630,25 @@ static void watch_pass(void) {
     publish_temps();
 }
 
+/* Monitor → Voltage: a full read (a slow embedded controller can take a while; this thread can wait). */
+static void publish_volt(void) {
+    VoltState v;
+    volt_read("", &v);
+    Buf b = { .p = volt_json(&v) };
+    if (b.p) publish(&M.volt, &M.vseq, &b);
+}
+
+/* Does this machine have anything for Monitor → Voltage? Asked once per (re)start of the thread. */
+static int volt_probe(void) {
+    VoltState v;
+    volt_read("", &v);
+    return volt_any(&v);
+}
+
 static void *worker(void *arg) {
     (void)arg;
-    double next_watch = 0;
+    double next_watch = 0, next_volt = 0;
+    int volt_here = 0;
     Mmdb geo;
     int geo_open = 0, geo_tried = 0;
     unsigned tick = 0;
@@ -657,7 +675,7 @@ static void *worker(void *arg) {
             ts.tv_nsec = (long)(ns % 1000000000LL);
             pthread_cond_timedwait(&M.cv, &M.mu, &ts);
         }
-        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, dpid = M.detail_pid;
+        int wp = M.want_procs, wc = M.want_conns, wg = M.want_geo, wv = M.want_volt, dpid = M.detail_pid;
         unsigned long long dstart = M.detail_start;
         pthread_mutex_unlock(&M.mu);
         if (slept || !tick) {                       /* (re)start: no stale rates */
@@ -669,6 +687,8 @@ static void *worker(void *arg) {
             sensors_scan();
             tick = 0;
             temp_ticks = 0;
+            volt_here = volt_probe();
+            next_volt = 0;
         }
         double t0 = mon_now_ms(), dt = prev.t > 0 ? t0 - prev.t : 0;
         Buf b = { 0 };
@@ -680,10 +700,11 @@ static void *worker(void *arg) {
         int temps = temp_ticks++ % TEMP_EVERY == 0;
         disk_sample(&b, dt, temps);
         sensors_sample(&b);
-        mon_buf_printf(&b, "}");
+        mon_buf_printf(&b, ",\"volt\":%s}", volt_here ? "true" : "false");
         prev.t = t0;
         publish(&M.sample, &M.sseq, &b);
         if (temps) publish_temps();
+        if (wv && t0 >= next_volt) { publish_volt(); next_volt = t0 + VOLT_MS; }
         if (wp && tick % 4 == 0) {
             Buf p = { 0 };
             procs_scan(&p);
@@ -731,7 +752,7 @@ void mon_init(const char *assets_dir) {
 void mon_reset(void) {
     pthread_mutex_lock(&M.mu);
     M.refs = 0;
-    M.want_procs = M.want_conns = M.want_geo = 0;
+    M.want_procs = M.want_conns = M.want_geo = M.want_volt = 0;
     M.detail_pid = 0;
     M.watch_disks = 0;
     pthread_mutex_unlock(&M.mu);
@@ -789,6 +810,12 @@ void mon_want(int procs, int conns, int geo) {
     pthread_mutex_unlock(&M.mu);
 }
 
+void mon_want_voltage(int on) {
+    pthread_mutex_lock(&M.mu);
+    M.want_volt = !!on;
+    pthread_mutex_unlock(&M.mu);
+}
+
 static char *take(char *slot, uint64_t have, uint64_t *seq) {
     pthread_mutex_lock(&M.mu);
     M.last_poll = mon_now_ms();
@@ -803,6 +830,7 @@ char *mon_sample_json(uint64_t *seq) { return take(M.sample, M.sseq, seq); }
 char *mon_procs_json(uint64_t *seq) { return take(M.procs, M.pseq, seq); }
 char *mon_conns_json(uint64_t *seq) { return take(M.conns, M.cseq, seq); }
 char *mon_detail_json(uint64_t *seq) { return take(M.detail, M.dseq, seq); }
+char *mon_voltage_json(uint64_t *seq) { return take(M.volt, M.vseq, seq); }
 
 void mon_detail(int pid, unsigned long long start) {
     pthread_mutex_lock(&M.mu);

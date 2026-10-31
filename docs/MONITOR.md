@@ -28,6 +28,7 @@ blocklists arrived ("Network, second generation").
 | Disks | total read and write; one row per disk (model, `/dev`, size, temperature, health, rates); the chosen disk's temperature over the last 30 minutes and its health, with "Open in Disks" (see "Disk temperature and health") |
 | Processes | sortable table (CPU, memory, threads, PID, user), search, "Mine" / "All"; Stop and Get Info for the selected process (see "Process actions") |
 | Cooling | the cooling hardware drawn live, the active fan profile, a temperature and fan history and "full speed" (`apps/monitor/Cooling.jsx`, see `FANS.md`) |
+| Voltage | (0.8.7) only on machines that report something: the input rail or battery with a trace, the board's power state and rails, motherboard sensors, batteries and adapters (`apps/monitor/Voltage.jsx`, see "Voltage") |
 
 Charts pause with the mouse over them and show a crosshair with the values at that instant, as in
 TangoOS. Time always runs left to right, also in Arabic and Hebrew; the rest of the window mirrors
@@ -485,6 +486,65 @@ protected list, a stale start time refused while the process survives, TERM and 
 children, the session and PID 1 refused, and the Get Info JSON (a pipe and a listening TCP socket
 among the open files; no private parts when not the owner; "gone" for another start time).
 
+## Voltage (0.8.7)
+
+One view with several sources (`apps/monitor/voltmodel.js` turns them into one list). It shows only what the machine
+really reports: nothing is estimated except the board power, which says so. The tab itself exists only if there is
+something to show (each sample's `volt`, decided by `volt_read` when the Monitor's thread starts); in a virtual machine it
+is not there.
+
+| Source | Where | Privilege |
+|---|---|---|
+| Raspberry Pi 5, 500, CM5 power chip | `rpi-pmic` admin action: fixed `/usr/bin/vcgencmd pmic_read_adc` | root (`/dev/vcio` is 0600), through the helper |
+| The board's under-voltage alarm | hwmon `rpi_volt` `in0_lcrit_alarm`, or `get_throttled` on older kernels (`hw/rpifw.c`) | none |
+| Motherboard and other chips | `/sys/class/hwmon/*/in*_input` with `in*_label` | none |
+| Batteries, adapters | `/sys/class/power_supply/*/voltage_now` (`voltage_min_design`) | none |
+
+**`rpi-pmic`** (`hw/hw_admin.c`, anyone, no arguments, read-only, BCM2712 only) runs the fixed program with one fixed
+word and parses its text strictly (`hw_pmic_parse`): every line must be exactly `NAME_V volt(N)=D.DDDV` or `NAME_A
+current(N)=D.DDDA`, the input rail must be there, and anything malformed, repeated, cut or over 30 V or 30 A fails the
+whole reading. Rail names come from a closed list in C; a well-formed line of an unknown rail is left out. It answers
+`uv <count|-1> <last_s|-1> <RAIL>=<uV>,<uA|-1> ...`: numbers and those names, never the program's text.
+`apps/monitor/voltmodel.js` (`parsePmic`) checks that line again.
+
+**States.** Under-voltage is only ever the board's own alarm; LordOS doesn't decide it from a number:
+
+| State | When |
+|---|---|
+| Under-voltage now | the alarm is on (`rpi_volt`'s window is the last 2 s) |
+| Low | the 5 V input reads under **4.8 V** (`LOW_5V`) and the alarm is off. This is LordOS's own line, a warning that the supply or the cable is weak; it isn't a limit of the board |
+| Happened since boot | an alarm earlier and none now |
+| Normal | the alarm is off and the input is at 4.8 V or more |
+
+"Since boot" needed a source of its own. `rpi_volt` asks the firmware every 2 s and clears its "has occurred" bits, so on
+the LordOS kernel those bits never mean "since boot" (`hw/rpifw.h`). The kernel does log each alarm, as `<driver> <device>:
+Undervoltage detected!`, so `rpi-pmic` also counts those lines in `/dev/kmsg` (`hw_uv_log`: kernel facility only, only that
+exact shape) and answers the count and the last time. That log is a ring: very old messages can be gone, and the view says
+so. Without `rpi_volt`, `get_throttled`'s own bit is used. An alarm seen while the view is open also counts.
+
+**Board power** is the sum of volts × amps of the rails with both readings. It leaves out USB devices, the fan and the
+regulators' losses, so the real draw is higher, and the view says it is an estimate of the listed rails.
+
+**hwmon.** The chip's name and `inN` are shown as the kernel gives them, labels when it has them. Many motherboards have no
+labels without a per-board configuration, and those inputs are the value at the chip's pin, before the board's resistor
+dividers: they are shown as raw, never scaled, and get no trace. A raw 0 is an empty pin and is left out. The Raspberry Pi
+5's `rp1_adc` inputs appear the same way. A hwmon that only mirrors a `power_supply` device is left to the battery list. A
+processor with no sensor driver has no `in*_input` at all, so nothing is shown for it. A value that isn't a strict integer
+in range is left out (`volt_parse_int`), not guessed.
+
+**Reading.** `monitor/voltage.c` runs on the Monitor's thread, because a slow embedded controller must not hold a frame. It
+reads only after `lord.monitor.wantVoltage(true)`, at most every 1.9 s; `apps/monitor/Voltage.jsx` asks only while the view
+is mounted and its window isn't minimized, and calls `rpi-pmic` once per cycle. The trace starts over when the view opens.
+With the tab elsewhere or the window minimized nothing is read. `lord.monitor.voltage()` takes no arguments.
+
+**Tested.** `vcgencmd`'s real text from a Raspberry Pi 5 (`tests/settings_hw_test.c`, with 30 damaged variants; the board's
+driver module holds the exact "Undervoltage detected!" text) and the sysfs layout of the same board. On fake trees: a desktop,
+a laptop, hostile values (`build/voltage-test`), and the model (`tests/voltage_model_test.mjs`). The whole view ran in an
+isolated session on VM 116 with that board's values as a fixture: the four states, the desktop and laptop lists, and
+6 reads in 12 s on screen against 0 with another tab or the window minimized; on the same VM with its real sysfs, a virtual
+machine, there is no tab. Not yet tested: installed on the real Raspberry Pi, a real under-voltage event, a real motherboard
+sensor chip, a real battery or adapter.
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)
@@ -574,6 +634,8 @@ assets/monitor/          land.bin (Natural Earth 1:50m), geoip-country.mmdb.xz (
 tools/gen-monitor-data.py    generates that data, countries.js and the country names
 apps/monitor/RemoteDesktop.jsx  (0.8.3) the remote desktop row and its detail
 apps/monitor/Cooling.jsx     the Cooling tab (lord.fan, see FANS.md)
+apps/monitor/Voltage.jsx, voltmodel.js   (0.8.7) the Voltage tab and its pure model
+server/src/monitor/voltage.c  hwmon, batteries and adapters, read on the Monitor's thread
 apps/monitor/Firewall.jsx, FwRules.jsx, RuleSheet.jsx   Settings → Privacy's firewall sections and the rule sheet
 server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchmark
 ```
@@ -595,6 +657,8 @@ server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchma
 | `signal(pid, st, 'TERM' \| 'KILL')` | stops one of the user's own processes: `null`, or an error code (`proc.gone`, `proc.protected…`, `proc.notOwn`, `proc.denied`) |
 | `watchDisks(on)` | (0.8.2) with the Monitor closed, the thread wakes every 30 s and reads only the disk sensors |
 | `diskTemps()` | (0.8.2) `{ t, disks: [{ name, model, rota, sensor, temp, tempT, tempMax, tempCrit, tempIdle, awake }] }` or `null` if nothing new; it does not keep the 4 Hz sampling alive |
+| `wantVoltage(on)` | (0.8.7) Monitor → Voltage is on screen: the thread reads the voltages about every 2 s (see "Voltage") |
+| `voltage()` | (0.8.7) `{ board, alarm, sinceBoot, chips: [{ dev, name, in: [{ i, v, label }] }], supplies: [{ name, battery, v, min }] }` or `null` if nothing new |
 
 | `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
 | `netTotals()` | (0.8.5) `{ t, rx, tx }`: the machine's byte counters now (every interface but `lo`), without the sampling thread (the menu bar item) |

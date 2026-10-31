@@ -22,6 +22,9 @@
  *   watchDisks(on)              disk temperatures with the Monitor closed (every 30 s; sdk/diskwatch.js)
  *   diskTemps()                 the latest { t, disks: [{ name, model, sensor, temp, tempMax, … }] } or
  *                               null if nothing new; it does not keep the 4 Hz sampling awake
+ *   wantVoltage(on)             Monitor → Voltage on screen: the thread reads the voltages about every 2 s
+ *   voltage()                   the latest { board, alarm, sinceBoot, chips, supplies } (monitor/voltage.c), or null
+ *                               if nothing new; the sample's "volt" says whether this machine has any
  *   historyEnable(on)           Settings → Privacy → Monitor → "Keep a traffic history" (0.8.2)
  *   history({ from, step, n, app })  bytes per bucket from the history file (monitor/nethist.c):
  *                               { res, oldest, now, rx: [n], tx: [n], top: [[app, rx, tx]] } or null;
@@ -48,7 +51,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps;
+static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps, seq_volt;
 
 static JSValue parse(JSContext *c, char *j, const char *what) {
     if (!j) return JS_NULL;
@@ -90,6 +93,17 @@ static JSValue f_watch_disks(JSContext *c, JSValueConst t, int argc, JSValueCons
 static JSValue f_disk_temps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     return parse(c, mon_disk_temps_json(&seq_temps), "<monitor.diskTemps>");
+}
+
+static JSValue f_want_voltage(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    mon_want_voltage(argc > 0 && JS_ToBool(c, argv[0]) > 0);
+    return JS_TRUE;
+}
+
+static JSValue f_voltage(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return parse(c, mon_voltage_json(&seq_volt), "<monitor.voltage>");
 }
 
 static JSValue f_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -515,6 +529,8 @@ static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("signal", 3, f_signal),
     JS_CFUNC_DEF("watchDisks", 1, f_watch_disks),
     JS_CFUNC_DEF("diskTemps", 0, f_disk_temps),
+    JS_CFUNC_DEF("wantVoltage", 1, f_want_voltage),
+    JS_CFUNC_DEF("voltage", 0, f_voltage),
     JS_CFUNC_DEF("historyEnable", 1, f_history_enable),
     JS_CFUNC_DEF("history", 1, f_history),
     JS_CFUNC_DEF("historyClear", 0, f_history_clear),
@@ -524,7 +540,7 @@ void js_monitor_register(JSContext *c, JSValue lord, const char *assets_dir) {
     mon_init(assets_dir);
     map_init(assets_dir);
     mon_reset();                       /* new context: the previous one's start() calls don't count */
-    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = 0;
+    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = seq_volt = 0;
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, monitor_funcs, sizeof monitor_funcs / sizeof monitor_funcs[0]);
     JS_SetPropertyStr(c, lord, "monitor", o);

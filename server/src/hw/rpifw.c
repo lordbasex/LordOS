@@ -18,6 +18,15 @@ static int rd(const char *root, const char *path, char *out, size_t n) {
     return 0;
 }
 
+int hw_is_bcm2712(const char *compat, size_t n) {
+    for (size_t i = 0; compat && i < n;) {
+        size_t l = strnlen(compat + i, n - i);
+        if (l == 12 && !memcmp(compat + i, "brcm,bcm2712", 12)) return 1;
+        i += l + 1;
+    }
+    return 0;
+}
+
 int rpifw_parse_throttled(const char *s) {
     if (!s) return -1;
     if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;

@@ -12,9 +12,9 @@ build/lord-server: $(HW_OBJ)
 # pure parts: EDID, mode selection, gamma/temperature/sun math, mimeapps.list and globs2, power_supply,
 # and the admin actions' validators
 test: build/settings-hw-test
-build/settings-hw-test: tests/settings_hw_test.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c $(HW_HDR) src/bench/boottest.h
+build/settings-hw-test: tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c $(HW_HDR) src/bench/boottest.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
 	./$@ || { rm -f $@; exit 1; }
 # BlueZ parsing (GetManagedObjects, PropertiesChanged, Battery1, paths, state JSON) without a bus
 test: build/bt-test
