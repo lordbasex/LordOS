@@ -187,7 +187,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
         <SearchGlyph color={t.text} size={17} />
       </BarButton>
       <BarButton t={t} vert={vert} active={taskView} refFn={tvRef} onClick={() => { hideTip(); onTaskView(); }}
-        onEnter={() => showTip(tr('shell.classic.taskView'), tvRef.current)} onLeave={hideTip}>
+        onEnter={() => showTip(tr('shell.desktops.overview'), tvRef.current)} onLeave={hideTip}>
         <TaskViewGlyph color={t.text} bg={t.mode === 'dark' ? '#2a2a30' : '#eceef2'} size={19} />
       </BarButton>
       {entries.map(appButton)}

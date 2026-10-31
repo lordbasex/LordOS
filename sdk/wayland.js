@@ -8,7 +8,9 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop } from './windows.js';
+import { acceptsAppRequest, keyboardSurface, focusedOn, surfaceState } from './desktopmodel.js';
+import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
@@ -77,6 +79,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
         instance: String(sid),
         frame: saved?.frame || { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) },
         args,
+        desktop: saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
       saved?.then(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
@@ -103,8 +106,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     // desde donde se apretó el botón (la app pide mover recién después de un umbral)
     // lo sigue lord-server en C (wm.beginMove/beginResize, docs/WINDOWS.md); si no se puede (el tema no
     // marcó el nodo de la ventana), con los eventos del puntero como antes
-    case 'move': if (win) { wm.focus(id); if (!wm.beginMove(id)) drag = { id, edges: null, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
-    case 'resize': if (win) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
+    // A hidden desktop's window never gets to bring itself forward: these requests come from the app.
+    case 'move': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginMove(id)) drag = { id, edges: null, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
+    case 'resize': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
     case 'maximize': if (win && !win.maximized) wm.toggleMaximize(id); break;
     case 'unmaximize': if (win && win.maximized) wm.toggleMaximize(id); break;
     case 'minimize': if (win) wm.minimize(id); break;
@@ -113,7 +117,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     // theme's frame comes or goes (the content area grows or shrinks by it, and the app is configured).
     case 'deco': if (win && !!win.args?.csd !== !!d.csd) { if (win.windowMenu) wm.closeWindowMenu(id); wm.setArgs(id, { csd: !!d.csd }); } break;
     // right click on the app's own bar (xdg_toplevel.show_window_menu): the theme's window menu
-    case 'menu': if (win) { wm.focus(id); wm.showWindowMenu(id, d.x, d.y); } break;
+    case 'menu': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); wm.showWindowMenu(id, d.x, d.y); } break;
     default: break;
   }
 };
@@ -121,25 +125,28 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
 // A terminal emulator, from its .desktop: there ❖C reaches it as Ctrl+Shift+C (Ctrl+C is the signal).
 const isTerminalEmulator = (w) => String(linuxAppFor(w.args?.appId || '')?.categories || '').split(';').includes('TerminalEmulator');
 
-/* el teclado va a la app Linux del frente; maximizada o no, se le avisa */
+// The keyboard goes to the Linux app in front of the showing desktop, never to a window of a hidden
+// one (a security rule: desktopmodel.js keyboardSurface, docs/DESKTOPS.md). Parking comes first: it
+// takes the keyboard and fullscreen from a window that just left the desktop in view, so the focus
+// below lands on a compositor that agrees.
 let lastFocus = -1;
 const lastState = new Map();
 function sync() {
   if (typeof lord.wayland === 'undefined') return;
-  const list = windows.get();
-  const vis = list.filter((w) => !w.minimized);
-  const top = vis.length ? vis[vis.length - 1] : null;
-  // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
-  const f = top && !shellHasKeyboard() ? surfaceOf(top.id) : 0;
-  if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f, !!f && isTerminalEmulator(top)); }
+  const list = windows.get(), active = activeDesktop.get();
   for (const w of list) {
     const s = surfaceOf(w.id);
     if (!s) continue;
-    const st = (w.maximized ? 1 : 0) | (w.minimized ? 2 : 0);
-    if (lastState.get(s) !== st) { lastState.set(s, st); lord.wayland.state(s, !!w.maximized, false, !!w.minimized); }
+    const st = surfaceState(w, active);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked); }
   }
+  // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
+  const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
+  if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f, !!f && isTerminalEmulator(focusedOn(list, active))); }
 }
 windows.subscribe(sync);
+activeDesktop.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());
 
 export const wayland = {

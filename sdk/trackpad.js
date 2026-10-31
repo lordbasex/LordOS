@@ -3,12 +3,14 @@
 //
 // The theme chooses what each direction does with registerGestureActions({ up, down, left, right }):
 // the default theme opens the app launcher upwards. Without a theme action, left/right
-// switch windows (the one behind comes to the front) and up/down do nothing.
+// switch windows (the one behind comes to the front) and up/down do nothing. The themes give left and
+// right to sdk/desktops.js desktopSwipe, which switches desktops and with only one falls back to that.
 import { useEffect } from 'react';
 import { addListener } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
-import { windows } from './windows.js';
+import { windows, activeDesktop } from './windows.js';
+import { visibleOn } from './desktopmodel.js';
 
 export const TRACKPAD_DEFAULTS = {
   speed: 0.5,               // pointer speed (0..1)
@@ -60,16 +62,16 @@ export function registerGestureActions(map) {
 }
 
 // Switch windows: left brings the rearmost one; right sends the front one behind all the others.
-function cycle(dir) {
+export function cycleWindows(dir) {
   windows.set((ws) => {
-    const vis = ws.filter((w) => !w.minimized && !w.fullscreen && !w.pip);
+    const vis = visibleOn(ws, activeDesktop.get());
     if (vis.length < 2) return ws;
     if (dir === 'left') { const back = vis[0]; return [...ws.filter((w) => w !== back), back]; }
     const front = vis[vis.length - 1];
     return [front, ...ws.filter((w) => w !== front)];
   });
 }
-const DEFAULTS = { left: () => cycle('left'), right: () => cycle('right') };
+const DEFAULTS = { left: () => cycleWindows('left'), right: () => cycleWindows('right') };
 
 // Last recognized swipe (for the interface or tests).
 export const lastSwipe = createStore(null);

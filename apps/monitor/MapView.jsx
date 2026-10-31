@@ -6,7 +6,7 @@
 //
 // Mientras llega el cuadro nuevo se muestra el anterior corrido (y escalado, si cambió el zoom),
 // así que mover y acercar no esperan al dibujo. Las etiquetas son texto del motor: siempre nítidas.
-import { View, Text, Image, useTheme, useLocale, addListener, formatNumber, tOptional, useAppWindow, useStore, windows, settings } from '@lordos/sdk';
+import { View, Text, Image, useTheme, useLocale, addListener, formatNumber, tOptional, useAppWindow, useStore, useWindowHidden, settings } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseColor, canvas, dot } from './draw.js';
 import { COUNTRY_LL } from './countries.js';
@@ -40,7 +40,7 @@ function FlowLayer({ arcs, w, h, paused }) {
   const t = useTheme();
   const { id, focused } = useAppWindow() || {};
   const fps = focused === false ? FLOW_FPS_BEHIND : FLOW_FPS;
-  const hidden = useStore(windows, (ws) => !!ws.find((x) => x.id === id)?.minimized);
+  const hidden = useWindowHidden(id);
   const motion = useStore(settings, (st) => !st.reduceMotion);
   // each moving dot: arc index, direction (1 sent, -1 received), phase offset, seconds per trip
   const dots = [];

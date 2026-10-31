@@ -424,5 +424,9 @@
   "osk.auto": "Automático",
   "osk.always": "Sempre",
   "osk.show": "Mostrar teclado",
-  "osk.hint": "Automático o abre quando um campo de texto recebe o foco e não há um teclado físico conectado. As telas de login e de bloqueio sempre seguem Automático, para que ninguém fique de fora. Seu botão na barra de menus, ou ❖⌃K, o abre a qualquer momento."
+  "osk.hint": "Automático o abre quando um campo de texto recebe o foco e não há um teclado físico conectado. As telas de login e de bloqueio sempre seguem Automático, para que ninguém fique de fora. Seu botão na barra de menus, ou ❖⌃K, o abre a qualquer momento.",
+  "kb.shortcuts.desktops": "Áreas de trabalho",
+  "kb.desktopArrows.title": "Áreas de trabalho",
+  "kb.desktopArrows.label": "Usar Ctrl + setas para as áreas de trabalho",
+  "kb.desktopArrows.hint": "Ctrl+Cima abre a visão geral, Ctrl+Esquerda e Direita trocam de área de trabalho, Ctrl+Baixo mostra as janelas do app. Desative para deixar estas teclas para mover por palavra nos apps; Super+Ctrl+Esquerda e Direita continuam trocando de área de trabalho."
 }

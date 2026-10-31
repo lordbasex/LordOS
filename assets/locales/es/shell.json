@@ -43,7 +43,6 @@
   "classic.noNotifications": "No hay notificaciones nuevas",
   "classic.noPins": "Hacé clic derecho en una app de Todas las apps para anclarla acá.",
   "classic.noResults": "No hay resultados para «{query}»",
-  "classic.noWindows": "No hay ventanas abiertas",
   "classic.notifications": "Notificaciones",
   "classic.personalize": "Personalizar",
   "classic.pinStart": "Anclar a Inicio",
@@ -57,7 +56,6 @@
   "classic.snapLeft": "Acomodar en la mitad izquierda",
   "classic.snapRight": "Acomodar en la mitad derecha",
   "classic.start": "Inicio",
-  "classic.taskView": "Vista de tareas",
   "classic.trash": "Papelera",
   "classic.unpinStart": "Desanclar de Inicio",
   "clipboard.chars": {
@@ -286,7 +284,6 @@
   "shortcuts.files": "Archivos",
   "shortcuts.settings": "Ajustes",
   "shortcuts.monitor": "Monitor",
-  "shortcuts.taskView": "Vista de tareas",
   "shortcuts.snap": "Acoplar la ventana",
   "shortcuts.closeWindow": "Cerrar la ventana",
   "shortcuts.taskbarItem": "Abrir la app de ese lugar de la barra",
@@ -299,5 +296,15 @@
   "osk.space": "espacio",
   "osk.return": "intro",
   "osk.tab": "tab",
-  "osk.esc": "esc"
+  "osk.esc": "esc",
+  "desktops.name": "Escritorio {n}",
+  "desktops.overview": "Vista general",
+  "desktops.moveTo": "Mover a escritorio",
+  "desktops.new": "Nuevo escritorio",
+  "desktops.empty": "No hay ventanas en este escritorio",
+  "shortcuts.overview": "Vista general",
+  "shortcuts.appWindows": "Ventanas de la app",
+  "shortcuts.switchDesktop": "Cambiar de escritorio",
+  "shortcuts.newDesktop": "Nuevo escritorio",
+  "shortcuts.closeDesktop": "Cerrar escritorio"
 }

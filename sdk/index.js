@@ -70,8 +70,12 @@ export { packages, packageList, refreshPackages, packageFile, loadWasm } from '.
 import { refreshPackages } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, appRegistry, appMenuClick,
-  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES,
+  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList,
 } from './windows.js';
+// Desktops and the Overview (docs/DESKTOPS.md)
+export { desktopName, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
+import { startDesktops, desktopsForThemeSwitch, desktopAt, indexOfDesktop } from './desktops.js';
+export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen } from './overview.jsx';
 export { codeStatus } from './codesig.js';
 import { reportRefusedCode } from './codesig.js';
 export { WindowShell, WINDOW_EDGE } from './windowshell.jsx';
@@ -166,10 +170,10 @@ export const themes = {
     try {
       reopen = windowsStore.get().filter((w) => { const a = getAppOf(w.id); return a && !a.builtin; }).slice(-8)
         .map((w) => ({ app: w.app, id: w.id, args: w.args ? JSON.parse(JSON.stringify(w.args)) : null, minimized: !!w.minimized,
-          frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized }));
+          frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized, desk: indexOfDesktop(w.desktop) }));
     } catch (e) { reopen = []; }
     markThemeSwitch();
-    settings.set({ theme: id, themeReopen: reopen.length ? reopen : null });
+    settings.set({ theme: id, themeReopen: reopen.length ? reopen : null, themeDesktops: desktopsForThemeSwitch() });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
     return lord.themes.use(id);
   },
@@ -197,6 +201,7 @@ onScreenChange(() => screenRev.set((v) => v + 1));
 
 // Entry point of a theme: respects the theme chosen by the user.
 export function startShell(element) {
+  startDesktops();
   const wanted = settings.get().theme;
   const current = themes.current();
   if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
@@ -237,14 +242,14 @@ function reopenAfterThemeSwitch() {
   for (const r of list) {
     if (!r || typeof r.app !== 'string' || !getAppOf(r.app)) continue;
     const inst = typeof r.id === 'string' && r.id.includes('#') ? r.id.split('#')[1] : null;
-    const id = wmOf.open(r.app, { ...(inst ? { instance: inst } : null), ...(r.args ? { args: r.args } : null), frame: r.frame });
+    const id = wmOf.open(r.app, { ...(inst ? { instance: inst } : null), ...(r.args ? { args: r.args } : null), frame: r.frame, desktop: desktopAt(r.desk) });
     if (id && r.maximized) wmOf.toggleMaximize(id);
     if (id && r.minimized) wmOf.minimize(id);
   }
   // apps that bring their own windows back as they start (the Terminal's sessions) must not end up
   // in front of the one the user was using
   const top = [...list].reverse().find((r) => r && !r.minimized && getAppOf(r.app));
-  if (top) setTimeout(() => { if (windowsStore.get().some((w) => w.id === top.id)) wmOf.focus(top.id); }, 900);
+  if (top) setTimeout(() => { if (windowsStore.get().some((w) => w.id === top.id)) wmOf.raise(top.id); }, 900);
 }
 
 // Changing the language remounts the whole interface (windows, tabs and

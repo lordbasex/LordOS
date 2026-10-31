@@ -9,6 +9,7 @@ import { screen, onScreenChange, addListener, mainDisplay, displayAt, displayFor
 import { createStore, useStore } from './store.js';
 import { appName } from './i18n.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext } from './snap.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -49,6 +50,8 @@ export function openingArea(appKey) {
   return workAreaOf(d || pointerDisplay());
 }
 const areaOfWindow = (w) => workAreaOf(displayFor(w));
+// Window id → the node of its frame inside WindowShell (the Desktops animation, sdk/desktops.js).
+export const fxNodes = new Map();
 // Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
 let linuxPlacement = null;
 export function setLinuxPlacement(fn) { linuxPlacement = fn; }
@@ -58,6 +61,38 @@ const guards = new Map();
 
 // State: list ordered from bottom to top (the last one is in front).
 export const windows = createStore([]);
+
+// Desktops (docs/DESKTOPS.md, the rules are in desktopmodel.js): each window has w.desktop, and only
+// the windows of activeDesktop show, take the front place and get the keyboard. All displays switch
+// together. desktopList is the order on screen; sdk/desktops.js switches, persists and animates.
+export const activeDesktop = createStore(FIRST_DESKTOP);
+export const desktopList = createStore([FIRST_DESKTOP]);
+export const onActiveDesktop = (w) => onDesktop(w, activeDesktop.get());
+const desktopState = () => ({ list: desktopList.get(), active: activeDesktop.get() });
+// The overview shows this desktop's minimized windows too (sdk/overview.jsx sets it).
+export const overviewShowing = createStore(false);
+export function setActiveDesktop(id) {
+  if (desktopList.get().includes(id)) activeDesktop.set(id);
+}
+export function createDesktop() {
+  const { state, id } = addDesktop(desktopState());
+  if (id != null) desktopList.set(state.list);
+  return id;
+}
+// Closes a desktop: its windows move to the next one. false for the last desktop.
+export function closeDesktop(id) {
+  const { state, target } = removeDesktop(desktopState(), id);
+  if (target == null) return false;
+  windows.set((ws) => ws.map((w) => ((w.desktop ?? FIRST_DESKTOP) === id ? { ...w, desktop: target } : w)));
+  desktopList.set(state.list);
+  activeDesktop.set(state.active);
+  return true;
+}
+// Exactly `list`, in that order (a new session, sdk/desktops.js): no window is on any other desktop yet.
+export function setDesktops(list, active) {
+  desktopList.set(list);
+  activeDesktop.set(active);
+}
 
 // The screen size changed: the work area keeps the theme's margins (menu
 // bar, dock) and the windows are rearranged to stay in view.
@@ -144,6 +179,12 @@ const raise = (ws, id) => {
   const w = ws.find((x) => x.id === id);
   return w ? [...ws.filter((x) => x.id !== id), { ...w, minimized: false }] : ws;
 };
+const raiseUnlessTop = (ws, id) => (ws[ws.length - 1]?.id === id && !ws[ws.length - 1].minimized ? ws : raise(ws, id));
+// Bringing a window forward shows its desktop, except picture-in-picture, which is on all of them.
+function showDesktopOf(id) {
+  const w = windows.get().find((x) => x.id === id);
+  if (w && !onActiveDesktop(w)) setActiveDesktop(w.desktop);
+}
 const patch = (id, p) => windows.set((ws) => ws.map((w) => (w.id === id ? { ...w, ...p } : w)));
 
 // ---- dragging in C (lord.wm, docs/WINDOWS.md) ----
@@ -264,7 +305,9 @@ export const openedAt = new Map();
 export const wm = {
   // opts: { new: true } another window of the same app; { instance: 'x' } named window;
   //       { frame: { x, y, w, h } } initial geometry; { args: {...} } data for the app
-  //       (e.g. wm.open('files', { args: { path: '/home/lord/Documentos' } })).
+  //       (e.g. wm.open('files', { args: { path: '/home/lord/Documentos' } }));
+  //       { desktop: n } a new window on that desktop, not the showing one (session restore: it
+  //       doesn't take the front or the keyboard from the desktop in view).
   // Returns the window id.
   open(appId, opts = {}) {
     if (!registry.has(appId)) {
@@ -280,9 +323,11 @@ export const wm = {
     const id = opts.instance ? `${appId}#${opts.instance}` : opts.new ? `${appId}#${seq++}` : appId;
     const args = opts.args ? { ...opts.args, nonce: seq++ } : null;
     if (globalThis.__lordTiming && typeof lord !== 'undefined' && lord.now) openedAt.set(id, lord.now());
+    const desktop = desktopList.get().includes(opts.desktop) ? opts.desktop : activeDesktop.get();
+    showDesktopOf(id);                                 // already open: its desktop comes into view
     windows.set((ws) => (ws.some((w) => w.id === id)
       ? raise(ws, id).map((w) => (w.id === id && args ? { ...w, args } : w))
-      : [...ws, { id, app: appId, title: null, args, ...place(appId, ws.length, opts.frame) }]));
+      : [...ws, { id, app: appId, title: null, args, desktop, ...place(appId, ws.length, opts.frame) }]));
     return id;
   },
   // Closes the window; if the app set a guard and it returns false, it doesn't close.
@@ -294,7 +339,17 @@ export const wm = {
     windows.set((ws) => ws.filter((w) => w.id !== id));
     return true;
   },
-  focus: (id) => windows.set((ws) => (ws[ws.length - 1]?.id === id && !ws[ws.length - 1].minimized ? ws : raise(ws, id))),
+  // To the front of its desktop, and that desktop comes into view.
+  focus(id) {
+    showDesktopOf(id);
+    windows.set((ws) => raiseUnlessTop(ws, id));
+  },
+  // To the front of its own desktop, whichever is showing.
+  raise: (id) => windows.set((ws) => raiseUnlessTop(ws, id)),
+  // To another desktop: the window leaves, and the desktop in view stays.
+  moveToDesktop(id, desktop) {
+    if (desktopList.get().includes(desktop)) patch(id, { desktop });
+  },
   minimize: (id) => patch(id, { minimized: true }),
   toggleMaximize: (id) => windows.set((ws) => ws.map((w) => (w.id !== id ? w : w.snapped && w.restore
     ? { ...w, ...w.restore, snapped: null, restore: null, maximized: true }
@@ -373,10 +428,8 @@ export const wm = {
     appMenus.set((m) => ({ ...m, [id]: menus }));
   },
   get: (id) => windows.get().find((w) => w.id === id) || null,
-  focused() {
-    const vis = windows.get().filter((w) => !w.minimized);
-    return vis.length ? vis[vis.length - 1].id : null;
-  },
+  // The window in front of the showing desktop.
+  focused: () => focusedOn(windows.get(), activeDesktop.get())?.id ?? null,
   // Protected window (capture protection): it looks normal on screen, but
   // comes out black in screenshots, recordings and remote desktop (docs/MEDIA.md). Used, for
   // example, by a password app.
@@ -391,7 +444,9 @@ export const wm = {
   // without the theme's frame. Esc or wm.setFullscreen(id, false) goes back.
   setFullscreen: (id, on = true) => windows.set((ws) => ws.map((w) => (w.id === id ? { ...w, fullscreen: !!on, minimized: false } : w))),
   // Picture-in-picture: a small frameless window, always on top (frame = { x, y, w, h } or null).
-  setPip: (id, frame) => patch(id, { pip: frame ? { ...frame } : null, fullscreen: false }),
+  // It shows on every desktop; back from it, the window stays on the one in view.
+  desktop: () => activeDesktop.get(),
+  setPip: (id, frame) => patch(id, { pip: frame ? { ...frame } : null, fullscreen: false, ...(frame ? null : { desktop: activeDesktop.get() }) }),
   // Dragging in C (see frameRef above). beginMove/beginResize return false if it wasn't possible (no
   // marked node, maximized, or no button held): the theme can continue with its own JS drag.
   // edges as in xdg_toplevel.resize: 1 top, 2 bottom, 4 left, 8 right (5 = top-left…).
@@ -412,11 +467,22 @@ export const wm = {
   frame: (w) => { if (!w.maximized) return w; const a = areaOfWindow(w); return { x: a.x, y: a.y, w: a.w, h: a.h }; },
 };
 
+// windows: all of them, every desktop. visible: what shows on this desktop. focused: its front window.
+// mounted: what the theme draws, in stacking order: visible, plus the LordOS apps of hidden desktops
+// (WindowShell keeps those display: none so they keep their state) and, in the overview, the minimized.
 export function useWindows() {
   const list = useStore(windows);
+  const desktop = useStore(activeDesktop);
+  const overview = useStore(overviewShowing);
   // fullscreen and picture-in-picture windows are drawn by the SDK (FloatingWindows)
-  const visible = list.filter((w) => !w.minimized && !w.fullscreen && !w.pip);
-  return { windows: list, visible, focused: visible.length ? visible[visible.length - 1].id : null };
+  const visible = visibleOn(list, desktop);
+  const top = visible.length ? visible[visible.length - 1].id : null;
+  return { windows: list, visible, mounted: mountedOn(list, desktop, overview), focused: top, desktop };
+}
+// The window is out of sight (minimized or on a hidden desktop): what animates in it should stop.
+export function useWindowHidden(id) {
+  const desktop = useStore(activeDesktop);
+  return useStore(windows, (ws) => windowHidden(ws.find((w) => w.id === id), desktop));
 }
 
 // ---- menus of an isolated app: serialize to the broker and receive the clicks ----

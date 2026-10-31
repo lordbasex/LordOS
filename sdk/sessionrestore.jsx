@@ -19,7 +19,9 @@ import { t } from './i18n.js';
 import { useTheme } from './theme.js';
 import { spacing, typeScale, controlSize } from './controls.jsx';
 import { settings, saveSettingsNow } from './settings.js';
-import { windows, wm, getApp, isLiveSystem, workAreaOf, setLinuxPlacement, SNAP_ZONES } from './windows.js';
+import { windows, wm, getApp, isLiveSystem, workAreaOf, setLinuxPlacement, SNAP_ZONES, activeDesktop, setActiveDesktop } from './windows.js';
+import { desktopAt, indexOfDesktop, activeIndex } from './desktops.js';
+import { cleanIndex } from './desktopmodel.js';
 import { dockIdOfWindow, launchDockItem } from './dock.js';
 import { parseDockId } from './dockmodel.js';
 import { useLauncherApps, shortAppName } from './apps.js';
@@ -61,6 +63,8 @@ function entryOf(w) {
   if (w.maximized) e.max = 1;
   if (w.minimized) e.min = 1;
   if (w.snapped) e.snap = w.snapped;
+  const desk = indexOfDesktop(w.desktop);
+  if (desk) e.desk = desk;
   const args = isLinux ? null : cleanArgs(app.id, w.args);
   if (args) e.args = args;
   return e;
@@ -70,13 +74,13 @@ const snapshot = () => windows.get().map(entryOf).filter(Boolean).slice(-MAX_WIN
 // ---- autosave ----
 
 function write(list, clean) {
-  settings.set({ sessionSaved: { clean, windows: list } });
+  settings.set({ sessionSaved: { clean, windows: list, active: activeIndex() } });
   saveSettingsNow(true);
 }
 function fire() {
   timer = 0;
   if (!armed || hold || frozen || restoreMode() === 'off') return;
-  const list = snapshot(), json = JSON.stringify(list);
+  const list = snapshot(), json = JSON.stringify([list, activeIndex()]);
   if (json === lastJson) return;
   lastJson = json;
   write(list, false);
@@ -130,7 +134,7 @@ export function markThemeSwitch() {
   if (!armed || frozen) return;
   clearTimeout(timer);
   timer = 0;
-  settings.set({ sessionSaved: { windows: savedList(), clean: 'theme' } });
+  settings.set({ sessionSaved: { windows: savedList(), clean: 'theme', active: activeIndex() } });
 }
 
 // ---- restoring ----
@@ -143,7 +147,7 @@ function afterOpen(id, e) {
   else if (e.max) wm.toggleMaximize(id);
   if (e.min) wm.minimize(id);
   if (e === topEntry) topWin = id;
-  else if (topWin && windows.get().some((w) => w.id === topWin)) wm.focus(topWin);   // the front window stays in front
+  else if (topWin && windows.get().some((w) => w.id === topWin)) wm.raise(topWin);   // the front window stays in front
 }
 const fit = (f) => fitFrame(f, screen.displays, (d) => workAreaOf(d), Math.max(0, screen.displays.findIndex((d) => d.main)));
 
@@ -154,7 +158,7 @@ setLinuxPlacement((dockId) => {
   const i = claims.findIndex((c) => c.id === dockId);
   if (i < 0) return null;
   const [c] = claims.splice(i, 1);
-  return { frame: fit(c.entry.f), then: (id) => afterOpen(id, c.entry) };
+  return { frame: fit(c.entry.f), desktop: desktopAt(c.entry.desk || 0), then: (id) => afterOpen(id, c.entry) };
 });
 
 // Launched by a restore: Open at Login leaves these alone (sdk/dock.js).
@@ -169,12 +173,15 @@ const runsOnce = (id) => {
   return isBrowser(id) && restoreBrowsers();
 };
 
-function restore(list) {
+function restore(list, active = 0) {
   hold = true;
+  // the desktops first: a window that comes back never takes the front of a desktop it isn't on
+  for (const e of list) desktopAt(e.desk || 0);
+  setActiveDesktop(desktopAt(cleanIndex(active)));
   const open = new Map();
   for (const w of windows.get()) { const k = dockIdOfWindow(w); open.set(k, (open.get(k) || 0) + 1); }
   const steps = planRestore(list, open, runsOnce);
-  topEntry = [...steps].reverse().find((s) => !s.entry.min)?.entry || null;
+  topEntry = [...steps].reverse().find((s) => !s.entry.min && (s.entry.desk || 0) === activeIndex())?.entry || null;
   topWin = null;
   const finish = () => { hold = false; lastJson = ''; schedule(); };
   if (!steps.length) { finish(); return; }
@@ -188,7 +195,7 @@ function restore(list) {
       if (a && !a.isolated && !a.package) {
         if (!a.builtin && !a.hidden && !a.live) {
           const first = !windows.get().some((w) => w.app === p.key);
-          const id = wm.open(p.key, { ...(first ? null : { new: true }), ...(e.args ? { args: e.args } : null), frame: fit(e.f) });
+          const id = wm.open(p.key, { ...(first ? null : { new: true }), ...(e.args ? { args: e.args } : null), frame: fit(e.f), desktop: desktopAt(e.desk || 0) });
           if (id) afterOpen(id, e);
         }
       } else if (a || p.kind === 'desktop') {
@@ -211,7 +218,7 @@ function answer(yes) {
   const a = askStore.get();
   askStore.set(null);
   if (!a) return;
-  if (yes) { restore(a.list); return; }
+  if (yes) { restore(a.list, a.active); return; }
   hold = false;
   lastJson = '';
   write(snapshot(), false);
@@ -281,6 +288,7 @@ export function startSessionRestore() {
   const mode = restoreMode();
   armed = true;
   windows.subscribe(schedule);
+  activeDesktop.subscribe(schedule);
   if (mode === 'off') { if (saved) settings.set({ sessionSaved: null }); hold = false; return; }
   const switched = saved?.clean === 'theme';           // the same session in a new theme (themeReopen)
   const list = cleanList(saved?.windows, SNAP_ZONES);
@@ -289,6 +297,6 @@ export function startSessionRestore() {
   // the restore itself is an unclean end and asks next time
   write(now === 'none' && !switched ? [] : list, false);
   if (now === 'none') { hold = false; schedule(); return; }
-  if (now === 'run') setTimeout(() => restore(list), START_MS);
-  else setTimeout(() => askStore.set({ list, unclean: saved?.clean !== true }), START_MS);
+  if (now === 'run') setTimeout(() => restore(list, saved?.active), START_MS);
+  else setTimeout(() => askStore.set({ list, active: saved?.active, unclean: saved?.clean !== true }), START_MS);
 }

@@ -519,6 +519,7 @@ export function toggleHotkeyWindow() {
   const w = wm.get(id);
   if (w && !w.minimized && wm.focused() === id) { wm.minimize(id); return; }
   const a = workArea();
+  if (w) wm.moveToDesktop(id, wm.desktop());      // it comes to the desktop in view, not the other way round
   wm.open('terminal', { instance: 'hotkey', frame: { x: a.x + 40, y: a.y, w: a.w - 80, h: Math.round(a.h * 0.45) } });
   wm.focus(id);
 }

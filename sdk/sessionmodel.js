@@ -2,11 +2,13 @@
 // with node: server/tests/session_model_test.mjs). The runtime part is sdk/sessionrestore.jsx.
 //
 // settings.json keeps what was open as a list of entries:
-//   { id: <typed Dock id>, f: { x, y, w, h }, max?: 1, min?: 1, snap?: <zone>, args?: {…} }
+//   { id: <typed Dock id>, f: { x, y, w, h }, max?: 1, min?: 1, snap?: <zone>, desk?: n, args?: {…} }
+// (desk: the window's position in the list of desktops, left out for the first).
 // Nothing else ever enters it: no Exec line, argv, environment, pid, title or Linux document path.
 // args exist only for LordOS apps, only the fields below, and never "nonce" (wm.open adds a new one).
 // The file can be edited by any program the user runs, so all of it is checked again when it is read.
 import { parseDockId } from './dockmodel.js';
+import { MAX_DESKTOPS } from './desktopmodel.js';
 
 export const RESTORE_MODES = ['off', 'ask', 'always'];
 export const RESTORE_DEFAULT = 'always';
@@ -61,6 +63,7 @@ export function cleanEntry(e, zones = []) {
   if (e.max) out.max = 1;
   if (e.min) out.min = 1;
   if (zones.includes(e.snap)) out.snap = e.snap;
+  if (Number.isInteger(e.desk) && e.desk > 0 && e.desk < MAX_DESKTOPS) out.desk = e.desk;
   const args = p.kind === 'app' ? cleanArgs(p.key, e.args) : null;
   if (args) out.args = args;
   return out;

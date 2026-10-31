@@ -2,7 +2,7 @@
 // (the SDK's AppHost); the theme only decides how the frame looks. Moving and resizing (invisible
 // borders on all 4 sides and 4 corners, <WindowShell>) is done by lord-server in C
 // (docs/WINDOWS.md); the JS drag below is only kept for a maximized window.
-import { View, Text, addListener, wm, AppHost, windowTitle, WindowShell, t as tr, solidOver } from '@lordos/sdk';
+import { View, Text, addListener, wm, AppHost, windowTitle, WindowShell, moveToDesktopItems, t as tr, solidOver } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -48,6 +48,7 @@ export function Window({ win, app, t, focused, fx }) {
           <Menu x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={[
             { label: tr('shell.window.minimize'), onClick: () => wm.minimize(win.id) },
             { label: tr('shell.window.maximize'), checked: !!win.maximized, onClick: () => wm.toggleMaximize(win.id) },
+            { label: tr('shell.desktops.moveTo'), submenu: moveToDesktopItems(win.id) },
             '-',
             { label: tr('shell.window.close'), onClick: () => wm.close(win.id) },
           ]} />

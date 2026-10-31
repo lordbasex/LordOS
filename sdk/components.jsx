@@ -3,7 +3,8 @@
 import { View, Text, addListener, displayFor } from '@lordos/runtime';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
-import { getApp, windows, openedAt } from './windows.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
+import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
@@ -256,6 +257,18 @@ addListener('keydown', (e) => { if (focused && handlers.has(focused)) handlers.g
 
 export const hasTextFocus = () => focused !== null;
 
+// A field on a hidden desktop must not keep the keys: its window stays mounted (desktopmodel.js), so
+// when the window that was in front leaves the desktop in view, the text focus goes with it.
+export const clearTextFocus = () => { if (focused !== null) setFocus(null); };
+let frontWas = null;
+function checkFront() {
+  const w = frontWas && wm.get(frontWas);
+  if (w && !onActiveDesktop(w)) clearTextFocus();
+  frontWas = wm.focused();
+}
+windows.subscribe(checkFront);
+activeDesktop.subscribe(checkFront);
+
 // For a custom text field (for example, a note edited on the desktop): while it has
 // focus it receives the keys, and useKeyboard/the apps don't (as with a TextInput). Call from the
 // field's onMouseDown; it is released by a click elsewhere or with releaseTextFocus.
@@ -448,8 +461,11 @@ export function AppHost({ id, focused }) {
 
 // Fullscreen and picture-in-picture windows (wm.setFullscreen / wm.setPip): above the
 // theme, without its frame. startShell places them; the theme doesn't have to do anything.
+// Fullscreen belongs to its desktop: on a hidden one it stays mounted and display: none, so the app
+// keeps its state. Picture-in-picture is on all of them.
 export function FloatingWindows() {
   const list = useStore(windows);
+  const desktop = useStore(activeDesktop);
   const fs = list.filter((w) => w.fullscreen && !w.minimized);
   const pips = list.filter((w) => w.pip && !w.minimized && !w.fullscreen);
   const drag = useRef(null);
@@ -464,7 +480,7 @@ export function FloatingWindows() {
     const offUp = addListener('pointerup', () => { drag.current = null; });
     const offKey = addListener('keydown', (e) => {
       if (e.key !== 'Escape' || hasTextFocus()) return;
-      const top = windows.get().filter((w) => w.fullscreen).pop();
+      const top = windows.get().filter((w) => w.fullscreen && onActiveDesktop(w)).pop();
       if (top) windows.set((ws) => ws.map((w) => (w.id === top.id ? { ...w, fullscreen: false } : w)));
     });
     return () => { offMove(); offUp(); offKey(); };
@@ -483,9 +499,10 @@ export function FloatingWindows() {
       ))}
       {fs.map((w) => {
         const d = displayFor(w);              // the display the window was on (docs/DISPLAYS.md)
+        const here = onDesktop(w, desktop);
         return (
-        <View key={w.id} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000' }}>
-          <AppHost id={w.id} focused />
+        <View key={w.id} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000', display: here ? 'flex' : 'none' }}>
+          <AppHost id={w.id} focused={here} />
         </View>
         );
       })}

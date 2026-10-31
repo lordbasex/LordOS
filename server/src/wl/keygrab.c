@@ -24,6 +24,22 @@ static const Grab flow[] = {
     { KG_META | KG_ALT, 'h', 0, KG_TAKE },
     { KG_META | KG_ALT, 'd', 0, KG_TAKE },
     { KG_META, 0, KEY_COMMA, KG_TAKE },
+    { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
+};
+
+/* Lord Flow with Settings → Keyboard's Desktops arrows on (the default): ⌃ arrows are word movement in
+ * a Linux app, so the person chooses. Kept together with `flow` by being a second table. */
+static const Grab flow_desktops[] = {
+    { KG_META, 0, KEY_TAB, KG_HOLD },
+    { KG_META | KG_SHIFT, 0, KEY_TAB, KG_HOLD },
+    { KG_META, 'm', 0, KG_TAKE },
+    { KG_META, 'h', 0, KG_TAKE },
+    { KG_META | KG_ALT, 'h', 0, KG_TAKE },
+    { KG_META | KG_ALT, 'd', 0, KG_TAKE },
+    { KG_META, 0, KEY_COMMA, KG_TAKE },
+    { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
+    { KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
+    { KG_CTRL, 0, KEY_UP, KG_TAKE }, { KG_CTRL, 0, KEY_DOWN, KG_TAKE },
 };
 
 static const Grab classic[] = {
@@ -43,6 +59,8 @@ static const Grab classic[] = {
     { KG_META, 0, KEY_1, KG_TAKE }, { KG_META, 0, KEY_2, KG_TAKE }, { KG_META, 0, KEY_3, KG_TAKE },
     { KG_META, 0, KEY_4, KG_TAKE }, { KG_META, 0, KEY_5, KG_TAKE }, { KG_META, 0, KEY_6, KG_TAKE },
     { KG_META, 0, KEY_7, KG_TAKE }, { KG_META, 0, KEY_8, KG_TAKE }, { KG_META, 0, KEY_9, KG_TAKE },
+    { KG_META | KG_CTRL, 'd', 0, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_F4, KG_TAKE },
+    { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
 };
 
 static const Grab *table;
@@ -53,6 +71,7 @@ int keygrab_set(const char *profile) {
     if (!profile) return 0;
     if (!profile[0]) { table = NULL; count = 0; remaps = 0; return 1; }
     if (!strcmp(profile, "flow")) { table = flow; count = sizeof flow / sizeof flow[0]; remaps = 1; return 1; }
+    if (!strcmp(profile, "flow-desktops")) { table = flow_desktops; count = sizeof flow_desktops / sizeof flow_desktops[0]; remaps = 1; return 1; }
     if (!strcmp(profile, "classic")) { table = classic; count = sizeof classic / sizeof classic[0]; remaps = 0; return 1; }
     return 0;
 }

@@ -424,5 +424,9 @@
   "osk.auto": "Automático",
   "osk.always": "Siempre",
   "osk.show": "Mostrar teclado",
-  "osk.hint": "Automático lo abre cuando un campo de texto toma el foco y no hay un teclado físico conectado. Las pantallas de inicio de sesión y de bloqueo siempre siguen Automático, así nadie queda afuera. Su botón en la barra de menús, o ❖⌃K, lo abre en cualquier momento."
+  "osk.hint": "Automático lo abre cuando un campo de texto toma el foco y no hay un teclado físico conectado. Las pantallas de inicio de sesión y de bloqueo siempre siguen Automático, así nadie queda afuera. Su botón en la barra de menús, o ❖⌃K, lo abre en cualquier momento.",
+  "kb.shortcuts.desktops": "Escritorios",
+  "kb.desktopArrows.title": "Escritorios",
+  "kb.desktopArrows.label": "Usar Ctrl + flechas para los escritorios",
+  "kb.desktopArrows.hint": "Ctrl+Arriba abre la vista general, Ctrl+Izquierda y Derecha cambian de escritorio, Ctrl+Abajo muestra las ventanas de la app. Apagalo para dejar estas teclas al movimiento por palabras en las apps; Super+Ctrl+Izquierda y Derecha siguen cambiando de escritorio."
 }

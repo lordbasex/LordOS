@@ -12,7 +12,7 @@
 // wakes it (it does so on a real display; a viewer's video keeps a headless session awake). Slots make such frames
 // common, so a timer is kept pending while anything runs. It does nothing: firing is enough for the frame to follow,
 // and with the screen off, when no frame runs, it fires once and stops.
-import { View, Text, Image, MenuButton, addListener, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, t as tr, formatBytes, typeScale, spacing } from '@lordos/sdk';
+import { View, Text, Image, MenuButton, addListener, useAppWindow, useStore, useTheme, useWindowHidden, settings, windows, wm, cleanerPalette, t as tr, formatBytes, typeScale, spacing } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const Pal = createContext(null);
@@ -77,7 +77,7 @@ export function useFrame(pick) {
 
 export function useLive() {
   const w = useAppWindow() || {};
-  const hidden = useStore(windows, (ws) => !!ws.find((x) => x.id === w.id)?.minimized);
+  const hidden = useWindowHidden(w.id);
   const still = useStore(settings, (s) => !!s.reduceMotion);
   return !still && !hidden && !!w.focused;
 }
