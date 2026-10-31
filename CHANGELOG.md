@@ -31,8 +31,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   memory, on 1, 2, 4 and all cores, with a verdict. It ran on VM 116 on llvmpipe only, which proves the tool, not the
   cause; the Raspberry Pi 5 run is pending.
 - **The player leaves a failing hardware decoder** (`lm_hwfall.h`, `docs/MEDIA.md`): 8 decoder failures in a row, or
-  frames that can't be read back from the hardware, switch that file to software at the current position. Tested
-  with a decoder made to fail (`build/lord-media-hwfall`, software decoding on VM 116) and `build/hwfall-test`; **not run on real VA-API
+  8 frames in a row that can't be read back from the hardware, switch that file to software at the current position,
+  as a seek: with sound, about 0.6 s and what was left in the audio ring are lost. Tested with both failures faked on a software decoder
+  (`build/lord-media-hwfall`, VM 116, with and without sound) and `build/hwfall-test`; **not run on real VA-API
   hardware**. No change to the sandbox and none to FFmpeg.
 
 - **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13

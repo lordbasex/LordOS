@@ -112,11 +112,15 @@ We took the way the apps of popular desktop systems work, never their logos or t
   - `v4l2request` (Raspberry Pi 5 HEVC) is prepared: it needs the Raspberry Pi FFmpeg and creating
     the device over fds (TODO in `lm_io.c`).
   - If there is no driver, the decoder carries on in software without interruption.
-  - (0.8.7, in development) If the hardware decoder fails during a file, 8 failures in a row (`lm_hwfall.h`; a frame
-    clears them, so one damaged packet changes nothing) or frames that can't be read back from the hardware make the
-    player open a software decoder and seek to where it was. Tested with a decoder made to fail after 30 frames
-    (`build/lord-media-hwfall`, `build/media-test play`, 640 × 360 H.264 on VM 116): 119 frames received in 4 s, the largest gap
-    41 ms, against 38 ms without the failure. That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
+  - (0.8.7, in development) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
+    that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
+    hand over none; a frame clears its own count, so one damaged packet changes nothing) make the player open a software
+    decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames
+    (`build/lord-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
+    load from other jobs): a 640 × 360 H.264 clip with no audio, five runs of each, 119 frames received in 4 s and a largest gap
+    of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, one run of each, 6 s), the switch
+    is a seek: the audio left in the ring is dropped, the largest gap was 229 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended about
+    0.6 s behind the run without a failure, and audio and video stayed in step (mean offset about 2 ms). That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
 
 ### Video frames: a single copy
 

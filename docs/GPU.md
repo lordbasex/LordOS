@@ -424,7 +424,8 @@ On the Pi 5 a frame's GPU time goes from about 1.5 ms alone to 14–16 ms under 
 `gpu/gcontend.c`, tested in `build/engine-test`) separates the causes. On a render node, beside a running session, it
 repeats a fixed frame at 60 Hz (about 1 Mpx uploaded, a 1920 × 1080 texture composed into a framebuffer) with worker threads pinned
 to 1, 2, 4… and all cores that spin in the caches (`spin`), read (`read`) or write (`write`) 64 MB each, and without
-load at the start and the end. One JSON line a phase: GPU and upload times (p50, p99), the workers' last-level misses
+load at the start and the end. One JSON line a phase: GPU times (p50, p99; from the flush to the native fence's timestamp,
+so a render thread waiting for a core is not counted, or draw and `glFinish` without a fence), upload times, the workers' last-level misses
 × 64 bytes as MB/s (CPU side only, `null` without such a counter), the temperature. The last line is the verdict:
 
 | Verdict | Meaning |
@@ -438,9 +439,10 @@ load at the start and the end. One JSON line a phase: GPU and upload times (p50,
 On the Pi: `make -C server build/gpu-contention`, then `build/gpu-contention --node /dev/dri/renderD<v3d's> --cores 4`, with
 `vcgencmd measure_clock v3d` and `get_throttled` read during the run, since it reads neither. A bandwidth counter on V3D's side is still missing.
 
-**Checked** only as a tool: VM 116, llvmpipe, 120 frames a phase on 4 cores: GPU p50 3.6 ms alone, 11.8 spinning, 14.1
-reading, 14.5 writing, verdict `cpu`, as it must be when the "GPU" is the CPU. No GPU has been measured with it, and
-the cause on the Pi remains unproven.
+**Checked** only as a tool: VM 116, llvmpipe, 120 frames a phase on 4 cores, with other jobs on that CPU: GPU p50 9.9–12.3 ms
+alone, 18.5 spinning, 22.8 reading, 22.2 writing, verdict `unclear` (spinning reached 1.5×, not 2×); `busMBs` was null. An earlier run on a
+quieter machine, timed from the end of the upload, gave 3.6, 11.8, 14.1 and 14.5, verdict `cpu`. So on a shared CPU the verdict moves: run it on an idle machine.
+No GPU has been measured with it, and the cause on the Pi remains unproven.
 
 ## The CPU path on several threads (0.8.5)
 
