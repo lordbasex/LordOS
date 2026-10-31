@@ -333,7 +333,13 @@ export const wm = {
   // Closes the window; if the app set a guard and it returns false, it doesn't close.
   close(id, force = false) {
     const guard = guards.get(id);
-    if (!force && guard && guard() === false) return false;
+    if (!force && guard && guard() === false) {
+      // it stays, and it may be asking something (unsaved changes): on another desktop that must be seen.
+      // A Linux window always answers false here: its app closes it, or asks in a window of its own.
+      const w = windows.get().find((x) => x.id === id);
+      if (w && !w.args?.surface && !onActiveDesktop(w)) wm.focus(id);
+      return false;
+    }
     guards.delete(id);
     appMenus.set((m) => { if (!(id in m)) return m; const n = { ...m }; delete n[id]; return n; });
     windows.set((ws) => ws.filter((w) => w.id !== id));

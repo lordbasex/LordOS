@@ -306,6 +306,8 @@ card lent to a session has not been tested on real hardware yet.
 
 ### Session restore
 
+Each window comes back on its desktop, with the desktop that was in view ([DESKTOPS.md](DESKTOPS.md), "What is kept").
+
 The apps open at the end of a session come back at the next login, each window where it was.
 Settings → Session → **Reopen windows when you log in**: Always (the default), Ask first or Off.
 

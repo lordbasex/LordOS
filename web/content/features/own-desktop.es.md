@@ -71,6 +71,10 @@ Estos números salen de máquinas virtuales y de una sola placa, no de una varie
 
 [[shot:2]]
 
+## Escritorios
+
+En desarrollo para la 0.8.7 (la última versión publicada es la 0.8.6): varios escritorios en Lord Flow y Lord Classic, con una vista general de las ventanas en vivo, una tira de escritorios y arrastre de una ventana de uno a otro. Cada ventana vuelve a su escritorio después de reiniciar, y una ventana de un escritorio oculto nunca tiene el teclado, ni siquiera si pide pantalla completa desde ahí. Probado en una sesión aislada en una máquina virtual; todavía no en un monitor físico ni con apps X11.
+
 ## Muchas pantallas, texto nítido
 
 El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja cada una con su propia escala: 100, 125, 150, 175 o 200 %. Texto, vectores e imágenes se rasterizan a la resolución real de cada pantalla, así que un panel 4K al 150 % al lado de uno 1080p al 100 % se ve nítido en los dos. Las apps de Linux reciben un `wl_output` por pantalla y el protocolo de escala fraccionaria, así que GTK 4, Qt 6 y Chromium también se ven nítidos. Desde 0.8.5, Ajustes → Pantallas numera cada pantalla, Identificar muestra ese número en grande en el propio monitor, y una pantalla arrastrada se pega borde con borde sin superponerse. El menú Ventana puede mover una ventana a otra pantalla, y el Dock puede asignar una app a una.

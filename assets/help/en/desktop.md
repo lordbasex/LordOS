@@ -43,5 +43,5 @@ settings and files; right click an app there to pin it to Start or to the taskba
 volume icons open quick settings, the clock opens the notifications and a calendar. Drag a window to
 the left or right edge to fill half the screen, to a corner for a quarter, or to the top to maximize
 it; hover over the maximize button for more layouts. Super+arrows do the same from the keyboard,
-Super+Tab shows every window (task view), Super+A opens quick settings, Super+N the notifications
+Super+Tab shows the [Overview](help:desktops), Super+A opens quick settings, Super+N the notifications
 and Alt+F4 closes the window in front.

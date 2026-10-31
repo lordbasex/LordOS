@@ -949,8 +949,8 @@ left for after 0.8.6, and the new native app:
     search, tray, quick settings, notification panel, snapping (halves, thirds, quarters, by drag,
     layouts and Super+arrows), task view and the live switch; screenshots of every app in both
     themes, light and dark, in `docs/classic/`. Left for later: snap groups (a pair of snapped
-    windows that move together), window thumbnails over the taskbar buttons, virtual desktops in
-    the task view, and a typography scale token (apps still set their own font sizes).
+    windows that move together), window thumbnails over the taskbar buttons, and a typography
+    scale token (apps still set their own font sizes).
 - [ ] **Mail: sign in with Google and Microsoft (OAuth2)**, so nobody needs an app password. The
   pieces are prepared and disabled today (`sdk/mail.js` `OAUTH_PROVIDERS`, `lord-maild` answers
   `oauth-disabled`; see `MAIL.md`, "OAuth"):

@@ -36,6 +36,8 @@ quick press goes back to the previous app.
 |---|---|
 | ❖ alone · F4 | Apps (the app launcher) |
 | ❖Tab · ❖⇧Tab | Switch apps |
+| ⌃↑ · ⌃↓ | Overview · windows of the app ([Desktops](help:desktops)) |
+| ⌃← ⌃→ | Previous or next desktop |
 | ❖\` · ❖⇧\` | Next or previous window of the app |
 | ❖M | Minimize the window |
 | ❖H · ❖⌥H | Hide the app · hide the other apps |
@@ -55,7 +57,9 @@ LordOS app inside the session ❖V pastes too; ❖⇧V is the clipboard.
 |---|---|
 | ❖ alone | Start menu |
 | ⌥Tab · ⌥⇧Tab | Switch apps |
-| ❖Tab | Task view |
+| ❖Tab | Overview ([Desktops](help:desktops)) |
+| ❖⌃← ❖⌃→ | Previous or next desktop |
+| ❖⌃D · ❖⌃F4 | New desktop · close this desktop |
 | ❖←→↑↓ | Snap the window |
 | ⌥F4 | Close the window |
 | ❖D | Show the desktop, and back |

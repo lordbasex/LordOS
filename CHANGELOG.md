@@ -12,6 +12,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Desktops** (in development; `docs/DESKTOPS.md`), in Lord Flow and Lord Classic, from one to nine, all displays together.
+  Each window has `w.desktop`; `useWindows`, `wm.focused` and the Wayland keyboard follow the desktop in view, and
+  bringing forward a window on another desktop switches to it. **A window on a hidden desktop never has the keyboard:**
+  `sync()` in `sdk/wayland.js` decides through `keyboardSurface` (`sdk/desktopmodel.js`), a Linux app's move, resize and
+  window-menu requests are refused from a hidden desktop, and because fullscreen keeps the keyboard in the compositor,
+  `lord.wayland.state` gained a fifth argument, `parked` (`wl_set_parked`): the window can't take the keyboard or fullscreen until
+  its desktop returns, and a fullscreen it had comes back with it. X11 windows go iconic through the minimized path. LordOS apps on a hidden
+  desktop stay mounted with `display: none` and keep their state; their text fields lose the focus. Picture-in-picture is sticky.
+  The app switcher lists every desktop and jumps; the Dock prefers a window on this desktop and otherwise jumps; Show Desktop,
+  Hide Others, Bring All to Front, window cycling and swipes work on this desktop. The window menu has **Move to Desktop**, and
+  closing a desktop moves its windows to the next. Session restore and live theme switches keep each window's desktop. A short
+  switch animation on cached rasters with no render per frame, none with Reduce motion, and no timer when idle.
+  `server/tests/desktop_model_test.mjs` (with the regression that focus never lands on a hidden desktop).
+- **Overview** (`sdk/overview.jsx`), shared by both themes, built from Lord Classic's task view, which it replaces: the live windows of
+  the desktop, including minimized ones, and a strip of desktops with miniatures; add and remove desktops, drag a window to a desktop.
+  With a Linux app in front its keys are now the shell's while it is open, which the task view lacked. Lord Flow: ⌃↑, ⌃↓ for the
+  windows of the app, ⌃← ⌃→ (also ❖⌃← ❖⌃→). Lord Classic: ❖Tab, ❖⌃D, ❖⌃← ❖⌃→, ❖⌃F4. Sideways swipes switch desktops, four fingers up
+  opens it. **Settings → Keyboard** turns Lord Flow's ⌃ arrows off, since they mean word movement in apps, with the new
+  key table `flow-desktops` in `keygrab.c`. Left and Right follow the layout in right-to-left languages.
+
 - **Files → Network** (in development; `docs/FILES.md`, "Network"). A Network place in the sidebar shows what is on the
   local network by itself: computers, SMB shared folders, NFS exports, other network storage and services, with
   name, address, kind and what can be done with each. Off until the page opens; one bounded pass (mDNS, then ports 445
@@ -29,6 +49,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Shortcuts: a key pressed with no Linux app in front and released with one left the dispatcher waiting for its release, and the next
+  press of that key did nothing (`sdk/shortcuts.js`). Seen with the key that switches to a desktop holding a Linux window.
 - **A network mount that stops answering no longer freezes the interface.** `lord.fs` asks the server from a thread of
   its own first (`fsops_share_down`, at most 800 ms, once), `fs_volumes` doesn't `statvfs` shares and the Trash skips them;
   measured before: 30 s on SMB and over 100 s on NFSv4 with the thread blocked, after: never blocked in 24 samples.

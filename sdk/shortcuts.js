@@ -133,7 +133,9 @@ function filter(e) {
   if (SUPER(e.code)) { if (!e.repeat) superAlone = true; return false; }
   superAlone = false;
   if (e.forwarded) return true;                    // a Linux app got it as Ctrl
-  if (taken.has(e.code)) return e.repeat;          // the repeats of a key held down
+  // The repeats of a key held down. A new press of a key still marked lost its release: pressed with no
+  // Linux app in front, released with one (the key that switched to its desktop), it went to the app.
+  if (taken.has(e.code)) { if (e.repeat) return true; taken.delete(e.code); }
   const entries = (lookup = lookup || index()).get(`${e.mods}:${keyName(e).toLowerCase()}`);
   const entry = entries?.find((x) => !x.when || x.when(e));
   if (!entry) return false;
