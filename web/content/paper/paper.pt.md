@@ -533,6 +533,8 @@ A 0.8.0 Beta foi o primeiro lançamento público (18 de outubro de 2026); a 0.7.
 
 **Em desenvolvimento para 0.8.7 (a versão mais recente é 0.8.6-beta):** Limpeza, um app de armazenamento e limpeza. As análises rodam em um helper isolado só de leitura, `lord-clean`; os planos ficam no `lord-server`; cada objeto é verificado de novo logo antes de agir. Só ela pode excluir arquivos de cache regeneráveis sob raízes fixas, como o usuário da sessão, e `lord.fs` continua sem uma exclusão geral. Três ações administrativas fechadas limpam os arquivos do sistema.
 
+**Também em desenvolvimento para 0.8.7 (a versão mais recente é 0.8.6-beta):** uma opção, desligada por padrão, que compõe na GPU só o que mudou em cada quadro, verificada em simulação e com um renderizador por software, ainda em nenhuma GPU; uma ferramenta para descobrir o que atrasa a GPU sob carga de CPU, que só rodou com um renderizador por software, portanto a causa no Raspberry Pi 5 continua sem prova; e um reprodutor que passa o arquivo para decodificação por software se o decodificador por hardware falhar no meio, testado com uma falha simulada, não em hardware real.
+
 ### 10.2 Limitações conhecidas
 
 - Hardware real: GPUs AMD e Nvidia, monitores reais em PCs, notebooks (bateria, brilho da tela, tampa), controladoras Bluetooth, impressoras e scanners, chaves FIDO2 e provedores de e-mail reais não foram testados.

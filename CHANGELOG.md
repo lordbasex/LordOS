@@ -18,6 +18,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **The buffer-age scissor, off by default** (`server/src/gpu/gscissor.c`, `LORD_GPU_SCISSOR=1`, `docs/GPU.md`): a frame
+  with only the UI (no app window, menu or cursor drawn by the GPU) composes the rectangle that changed plus what
+  changed since its buffer was last shown (`EGL_EXT_buffer_age`), instead of the whole output. A buffer of unknown age,
+  a frame not swapped and a direct scanout make the next frame whole. `build/engine-test` runs the same code over a
+  simulated three-buffer chain with undefined buffers: 7,567 frames (the GPU drag runs, the damage pipeline and the
+  fuzz), 0 differ; without the history it fails. A real EGL chain on llvmpipe (VM 116, a scratch driver, 1920 × 1080): 600
+  frames, every 20th read back, 0 pixels differ, 3.77 ms of composition against 8.80, on the CPU. **Not run on any GPU**:
+  no number for the Raspberry Pi 5 yet, which is why it stays off.
+- **`build/gpu-contention`, an experiment for what slows the GPU under CPU load** (`tests/gpu_contention.c`, the rules in
+  `src/gpu/gcontend.c`, tested in `build/engine-test`): a fixed frame under loads that stay in the caches, read or write
+  memory, on 1, 2, 4 and all cores, with a verdict. It ran on VM 116 on llvmpipe only, which proves the tool, not the
+  cause; the Raspberry Pi 5 run is pending.
+- **The player leaves a failing hardware decoder** (`lm_hwfall.h`, `docs/MEDIA.md`): 8 decoder failures in a row, or
+  frames that can't be read back from the hardware, switch that file to software at the current position. Tested
+  with a decoder made to fail (`build/lord-media-hwfall`, software decoding on VM 116) and `build/hwfall-test`; **not run on real VA-API
+  hardware**. No change to the sandbox and none to FFmpeg.
+
 - **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13
   virtual machine). The Store then refused everything with "<user> is not an administrator", and LordOS has no way to
   name an administrator from inside. `install.sh` now picks the user who logged in, or the only regular user, when it

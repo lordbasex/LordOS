@@ -533,6 +533,8 @@ There are no measurements on real PCs in the repository yet. The ISO is tested o
 
 **In development for 0.8.7 (the latest release is 0.8.6-beta):** Cleaner, a storage and cleanup app. Scans run in a sandboxed read-only helper, `lord-clean`; plans stay in `lord-server`; each object is checked again right before acting. It alone may delete regenerable cache files beneath fixed roots, as the session user, and `lord.fs` still has no general delete. Three closed admin actions clean the system's own files.
 
+**Also in development for 0.8.7 (the latest release is 0.8.6-beta):** an option, off by default, that composes only what changed in a frame on the GPU, checked in simulation and on a software renderer but not yet on any GPU; a tool to find out what slows the GPU under CPU load, which has only been run on a software renderer, so the cause on the Raspberry Pi 5 remains unproven; and a player that moves a file to software decoding if the hardware decoder fails partway, tested with a simulated failure, not on real hardware.
+
 ### 10.2 Known limitations
 
 - Real hardware: AMD and Nvidia GPUs, real monitors on PCs, laptops (battery, backlight, lid), Bluetooth controllers, printers and scanners, FIDO2 keys and real mail providers are untested.

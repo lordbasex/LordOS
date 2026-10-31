@@ -746,7 +746,8 @@ and the upload (a copy of about 1 Mpx) from 1.4 to about 4 ms. `vcgencmd`, every
 GPU and the four busy cores; that is not proven (no memory-bandwidth counter was read). The next step is fewer pixels
 uploaded and composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load,
 moved to 0.8.7 with GPU drag for the whole drag (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release
-0.8.7 (planned)").
+0.8.7 (planned)"). Both tools for that are written, off by default and not yet run on a GPU (`docs/GPU.md`, "The
+buffer-age scissor" and "What slows the GPU under CPU load").
 
 **What was run on the Pi 5** (2026-10-29; the package from this work installed, the monitor on, an autologin
 session, the variables set in the session's environment; the results above):

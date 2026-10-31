@@ -390,6 +390,58 @@ memory-bandwidth counter was read). The pointer reached the screen 17 ms later a
 So the pipeline is **off by default**; the code stays, with `LORD_PIPELINE=1` (while frames are heavy) and `2`
 (always) to turn it on.
 
+## The buffer-age scissor (0.8.7, in development, off by default)
+
+Every frame on the GPU path clears and composes the whole output, even when a few pixels changed. On a tiling GPU that
+is memory traffic the frame doesn't need. `LORD_GPU_SCISSOR=1` turns on the alternative (`gpu/gscissor.c`, no GL, and
+`gpu_frame_ex`); the session log says `gpu: buffer-age scissor on`, or why it is off, and at the end
+`gpu: buffer-age scissor: N frames, K of them partial, composed X Mpx of Y`.
+
+- **What it redraws:** `EGL_BUFFER_AGE_EXT` says how many swaps ago the back buffer was shown. The scissor is the
+  frame's changes (the UI's rectangles and GPU drag's window) joined with those of the age − 1 frames before it, one
+  box. Age 0 (undefined) or older than the 5 frames remembered: the whole output.
+- **When it applies:** only frames with nothing but the UI (`gpu_scissor_quiet`: no app window, fullscreen surface or
+  menu in the layers, and the cursor on its own plane). Those others are composed whole, as is the frame after them.
+- **What forgets the history:** a frame drawn and not swapped (`gpu_frame_ex`'s -2) and a direct scanout; the next frame
+  is whole.
+- **Checked:** `build/engine-test` keeps a chain of three buffers of undefined content beside the damage pipeline, the
+  fuzz and the GPU drag runs, with frames dropped at random as -2 does: 7,567 frames (5,774 in the GPU drag runs, 1,793
+  in the others), 0 differ from a whole composition; 3,604 were partial. With the history ignored, 1,359 of the drag
+  runs' frames differ, so the test sees it. A scratch driver with a real `gbm_surface` and EGL chain on llvmpipe (VM 116,
+  `/dev/dri/card0` without master, 1920 × 1080, a 400 × 300 rectangle moving at random, age 2 in 598 of 600 frames):
+  every 20th frame read back, 0 pixels differ, 24 % of the pixels composed, 3.77 ms a frame against 8.80.
+- **Not checked:** `gpu_frame_ex` itself has not run with it on (no card to flip on VM 116), and no GPU has. Whether V3D
+  saves anything is unknown: a scissor still loads the tiles it touches, and llvmpipe's numbers say nothing about a tiler.
+  So it is off until the Raspberry Pi 5 run below; PBO uploads or a linear canvas are still not done.
+
+**On the Raspberry Pi 5:** LordBench's Desktop impact with and without `LORD_GPU_SCISSOR=1`, comparing `gpuMs` alone and
+under load, and the log line above.
+
+## What slows the GPU under CPU load (the experiment, 0.8.7)
+
+On the Pi 5 a frame's GPU time goes from about 1.5 ms alone to 14–16 ms under an all-core load with no clock change
+("The frame pipeline"). `build/gpu-contention` (`tests/gpu_contention.c`, never installed; the plan and verdict in
+`gpu/gcontend.c`, tested in `build/engine-test`) separates the causes. On a render node, beside a running session, it
+repeats a fixed frame at 60 Hz (about 1 Mpx uploaded, a 1920 × 1080 texture composed into a framebuffer) with worker threads pinned
+to 1, 2, 4… and all cores that spin in the caches (`spin`), read (`read`) or write (`write`) 64 MB each, and without
+load at the start and the end. One JSON line a phase: GPU and upload times (p50, p99), the workers' last-level misses
+× 64 bytes as MB/s (CPU side only, `null` without such a counter), the temperature. The last line is the verdict:
+
+| Verdict | Meaning |
+|---|---|
+| `memory` | reading or writing on all the cores slows the GPU 2× or more, spinning less than 1.5× |
+| `cpu` | spinning alone slows it 2× or more: not memory alone |
+| `none` | no load reached 1.5× |
+| `drift` | the two runs without load differ by 1.5× or more: the run proves nothing |
+| `unclear` | anything else |
+
+On the Pi: `make -C server build/gpu-contention`, then `build/gpu-contention --node /dev/dri/renderD<v3d's> --cores 4`, with
+`vcgencmd measure_clock v3d` and `get_throttled` read during the run, since it reads neither. A bandwidth counter on V3D's side is still missing.
+
+**Checked** only as a tool: VM 116, llvmpipe, 120 frames a phase on 4 cores: GPU p50 3.6 ms alone, 11.8 spinning, 14.1
+reading, 14.5 writing, verdict `cpu`, as it must be when the "GPU" is the CPU. No GPU has been measured with it, and
+the cause on the Pi remains unproven.
+
 ## The CPU path on several threads (0.8.5)
 
 Without a GPU (a virtual machine like VM 116, a board without a working driver) the CPU path paints
@@ -555,10 +607,11 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 ## Pending
 
 - GPU drag also where the menu bar or the Dock overlap the window (step 12); it is off by default after the Pi 5 run.
-  Moved to 0.8.7 (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release 0.8.7 (planned)").
-- Fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU composes only the damage, PBO uploads)
-  and finding what slows V3D under an all-core CPU load (14–16 ms of GPU a frame instead of 1.5). Moved to 0.8.7
-  (2026-10-30).
+  Moved to 0.8.7 (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release 0.8.7 (planned)"). **Not built:** the
+  rule was to build it only if a measurement on VM 116 showed a gain, and VM 116 has no 3D (`virgl: no`, EGL gives
+  llvmpipe), so nothing there can show one. On the Pi 5, GPU drag gave no measurable gain where it already applies.
+- Run the buffer-age scissor and `build/gpu-contention` on the Pi 5 (both above); PBO uploads or a linear canvas.
+  Moved to 0.8.7 (2026-10-30).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
