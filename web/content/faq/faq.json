@@ -195,9 +195,9 @@
             "pt": "Posso experimentar sem instalar?"
           },
           "a": {
-            "en": "Yes. Boot the ISO from a USB stick and LordOS starts in live mode, without touching your disk; changes are kept in memory and disappear when you turn it off. The boot menu also offers Spanish and Portuguese, a safe mode without the GPU and a copy-to-RAM option.",
-            "es": "Sí. Arrancá la ISO desde un pendrive y LordOS inicia en modo live, sin tocar tu disco; los cambios quedan en memoria y se pierden al apagar. El menú de arranque también ofrece español y portugués, un modo seguro sin GPU y la opción de copiar todo a la RAM.",
-            "pt": "Sim. Inicie a ISO a partir de um pendrive e o LordOS abre no modo live, sem mexer no seu disco; as mudanças ficam na memória e somem ao desligar. O menu de inicialização também oferece espanhol e português, um modo seguro sem GPU e a opção de copiar tudo para a RAM."
+            "en": "Yes. Boot the ISO from a USB stick and LordOS starts in live mode, without touching your disk; changes are kept in memory and disappear when you turn it off. The boot menu also offers Spanish and Portuguese, a safe mode without the GPU and a copy-to-RAM option. In development for 0.8.7 (the latest release is 0.8.6): a Check this computer entry that opens System Information instead of the installer.",
+            "es": "Sí. Arrancá la ISO desde un pendrive y LordOS inicia en modo live, sin tocar tu disco; los cambios quedan en memoria y se pierden al apagar. El menú de arranque también ofrece español y portugués, un modo seguro sin GPU y la opción de copiar todo a la RAM. En desarrollo para la 0.8.7 (la última publicada es la 0.8.6): una entrada Check this computer que abre Información del Sistema en lugar del instalador.",
+            "pt": "Sim. Inicie a ISO a partir de um pendrive e o LordOS abre no modo live, sem mexer no seu disco; as mudanças ficam na memória e somem ao desligar. O menu de inicialização também oferece espanhol e português, um modo seguro sem GPU e a opção de copiar tudo para a RAM. Em desenvolvimento para a 0.8.7 (a mais recente é a 0.8.6): uma entrada Check this computer que abre as Informações do Sistema em vez do instalador."
           }
         },
         {
