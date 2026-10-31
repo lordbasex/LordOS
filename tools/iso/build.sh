@@ -114,6 +114,7 @@ in_ch apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/
 # the browsers' defaults (their own bar with LordOS's window buttons), shared with the Pi image
 sh tools/iso/browser-defaults.sh "$CH"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
+install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$CH/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
 rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
 
