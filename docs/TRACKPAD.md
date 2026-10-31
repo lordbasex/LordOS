@@ -169,6 +169,9 @@ on):
 - the theme chooses with `registerGestureActions({ up, down, left, right })`:
   - `default` theme: up opens the app launcher, down closes it;
   - `classic` theme: the same with the start menu;
+- left and right switch desktops (`desktopSwipe`, [DESKTOPS.md](DESKTOPS.md)); swiping left brings the next one, and
+  with only one desktop they switch windows;
+- four fingers up (with four-finger swipes on) opens the Overview;
 - without a theme action, left and right switch windows (the rearmost comes to the front, or the
   front one goes to the back).
 

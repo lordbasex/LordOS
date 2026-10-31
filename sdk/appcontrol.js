@@ -12,7 +12,7 @@
 // Lord Flow shows the app menu under the app's name in its menu bar and the rest in the crown menu;
 // Lord Classic offers About in each window's Help menu. About <app> and Force Quit are system windows
 // of their own (apps/appabout, apps/forcequit), the same in every theme.
-import { windows, wm, getApp, appMenus } from './windows.js';
+import { windows, wm, getApp, appMenus, onActiveDesktop, activeDesktop } from './windows.js';
 import { launcherIdOf, quitApp } from './dock.js';
 import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { openFileWithApps } from './sysopen.js';
@@ -49,24 +49,26 @@ function settingsItemOf(winId) {
   return null;
 }
 
-// Hide <app>: every window of the app goes away; Hide Others: every other app's.
+// Hide <app>: every window of the app goes away; Hide Others: every other app's on this desktop.
 export function hideApp(winId) { appGroup(winId)?.windows.forEach((w) => wm.minimize(w.id)); }
 export function hideOthers(winId) {
   const g = appGroup(winId);
   if (!g) return;
   const mine = new Set(g.windows.map((w) => w.id));
-  windows.get().forEach((w) => { if (!mine.has(w.id) && !isShellPanel(w)) wm.minimize(w.id); });
+  windows.get().forEach((w) => { if (!mine.has(w.id) && !isShellPanel(w) && onActiveDesktop(w)) wm.minimize(w.id); });
 }
 // The app's own Settings… item, if it has one (❖,).
 export const appSettingsItem = settingsItemOf;
 
-// Show desktop: everything visible goes away, and the next time what it took away comes back.
-let hiddenByDesktop = [];
+// Show desktop: everything visible on this desktop goes away, and the next time what it took away
+// comes back (each desktop remembers its own).
+const hiddenByDesktop = new Map();
 export function toggleShowDesktop() {
-  const vis = windows.get().filter((w) => !w.minimized && !isShellPanel(w));
-  if (vis.length) { hiddenByDesktop = vis.map((w) => w.id); vis.forEach((w) => wm.minimize(w.id)); return; }
-  hiddenByDesktop.forEach((id) => wm.focus(id));
-  hiddenByDesktop = [];
+  const desk = activeDesktop.get();
+  const vis = windows.get().filter((w) => !w.minimized && !w.pip && !isShellPanel(w) && onActiveDesktop(w));
+  if (vis.length) { hiddenByDesktop.set(desk, vis.map((w) => w.id)); vis.forEach((w) => wm.minimize(w.id)); return; }
+  (hiddenByDesktop.get(desk) || []).forEach((id) => { if (wm.get(id)?.desktop === desk) wm.raise(id); });
+  hiddenByDesktop.delete(desk);
 }
 
 export function appMenuItems(winId) {
@@ -80,7 +82,7 @@ export function appMenuItems(winId) {
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },
     { label: t('shell.app.hideOthers'), hint: '❖⌥H', onClick: () => hideOthers(winId) },
-    { label: t('shell.app.showAll'), onClick: () => windows.get().forEach((w) => { if (w.minimized) wm.focus(w.id); }) },
+    { label: t('shell.app.showAll'), onClick: () => windows.get().forEach((w) => { if (w.minimized) wm.raise(w.id); }) },
     '-',
     { label: t('shell.app.quit', { app: g.name }), hint: '❖Q', onClick: () => quitApp(g.windows) },
   ];

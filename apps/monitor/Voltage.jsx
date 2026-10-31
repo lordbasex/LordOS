@@ -3,7 +3,7 @@
 // and adapters (lord.monitor.voltage(), world-readable sysfs read on the Monitor's thread). The tab only exists on
 // machines with something to show (the sample's "volt"). It is read about every 2 s, only while this view is mounted
 // and its window is not minimized.
-import { View, Text, admin, monitor, useAppWindow, useLocale, useStore, useTheme, windows, formatNumber } from '@lordos/sdk';
+import { View, Text, admin, monitor, useAppWindow, useLocale, useStore, useTheme, useWindowHidden, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Card, Big, Stat, useCardStyle } from './index.jsx';
 import { Chart } from './Chart.jsx';
@@ -24,7 +24,7 @@ function Hint({ children }) {
 
 function useVoltage() {
   const { id } = useAppWindow() || {};
-  const hidden = useStore(windows, (ws) => !!ws.find((w) => w.id === id)?.minimized);
+  const hidden = useWindowHidden(id);
   const [st, setSt] = useState({ d: null, pmic: null, err: '', seen: false, hist: [], key: null });
   const seen = useRef(false);
   useEffect(() => {

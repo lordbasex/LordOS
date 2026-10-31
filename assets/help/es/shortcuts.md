@@ -36,6 +36,8 @@ Una pulsación rápida vuelve a la app anterior.
 |---|---|
 | ❖ solo · F4 | Apps (el lanzador de apps) |
 | ❖Tab · ❖⇧Tab | Cambiar de app |
+| ⌃↑ · ⌃↓ | Vista general · ventanas de la app ([Escritorios](help:desktops)) |
+| ⌃← ⌃→ | Escritorio anterior o siguiente |
 | ❖\` · ❖⇧\` | Ventana siguiente o anterior de la app |
 | ❖M | Minimizar la ventana |
 | ❖H · ❖⌥H | Ocultar la app · ocultar las demás apps |
@@ -55,7 +57,9 @@ propio Ctrl+L: con una app Linux al frente la pantalla se bloquea con ❖⌃Q y 
 |---|---|
 | ❖ solo | Menú Inicio |
 | ⌥Tab · ⌥⇧Tab | Cambiar de app |
-| ❖Tab | Vista de tareas |
+| ❖Tab | Vista general ([Escritorios](help:desktops)) |
+| ❖⌃← ❖⌃→ | Escritorio anterior o siguiente |
+| ❖⌃D · ❖⌃F4 | Nuevo escritorio · cerrar este escritorio |
 | ❖←→↑↓ | Acoplar la ventana |
 | ⌥F4 | Cerrar la ventana |
 | ❖D | Mostrar el escritorio, y volver |

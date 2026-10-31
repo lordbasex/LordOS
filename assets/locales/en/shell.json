@@ -43,7 +43,6 @@
   "classic.noNotifications": "No new notifications",
   "classic.noPins": "Right-click an app in All apps to pin it here.",
   "classic.noResults": "No results for “{query}”",
-  "classic.noWindows": "No open windows",
   "classic.notifications": "Notifications",
   "classic.personalize": "Personalize",
   "classic.pinStart": "Pin to Start",
@@ -57,7 +56,6 @@
   "classic.snapLeft": "Snap to the left half",
   "classic.snapRight": "Snap to the right half",
   "classic.start": "Start",
-  "classic.taskView": "Task view",
   "classic.trash": "Trash",
   "classic.unpinStart": "Unpin from Start",
   "clipboard.chars": {
@@ -286,7 +284,6 @@
   "shortcuts.files": "Files",
   "shortcuts.settings": "Settings",
   "shortcuts.monitor": "Monitor",
-  "shortcuts.taskView": "Task view",
   "shortcuts.snap": "Snap the window",
   "shortcuts.closeWindow": "Close the window",
   "shortcuts.taskbarItem": "Open the app at that place in the bar",
@@ -299,5 +296,15 @@
   "osk.space": "space",
   "osk.return": "return",
   "osk.tab": "tab",
-  "osk.esc": "esc"
+  "osk.esc": "esc",
+  "desktops.name": "Desktop {n}",
+  "desktops.overview": "Overview",
+  "desktops.moveTo": "Move to Desktop",
+  "desktops.new": "New Desktop",
+  "desktops.empty": "No windows on this desktop",
+  "shortcuts.overview": "Overview",
+  "shortcuts.appWindows": "App windows",
+  "shortcuts.switchDesktop": "Switch desktop",
+  "shortcuts.newDesktop": "New desktop",
+  "shortcuts.closeDesktop": "Close desktop"
 }

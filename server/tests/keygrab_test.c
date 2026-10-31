@@ -12,7 +12,24 @@ int main(void) {
     CHECK(!keygrab_is_remap('c', KG_META));
 
     /* only the fixed names, and a refused name keeps the table */
+    /* Desktops: ⌃ arrows are kept only with the option on, and never with another modifier */
+    CHECK(keygrab_set("flow"));
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
+    CHECK(keygrab_match(KEY_UP, 0, KG_CTRL) == KG_PASS);
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_META | KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_set("flow-desktops"));
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_RIGHT, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_UP, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_DOWN, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL | KG_SHIFT) == KG_PASS);      /* selecting by word */
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
+    CHECK(keygrab_is_remap('c', KG_META));
     CHECK(keygrab_set("classic"));
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_META | KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_F4, 0, KG_META | KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_D, 'd', KG_META | KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
     CHECK(!keygrab_set("flow "));
     CHECK(!keygrab_set("alt+x"));
     CHECK(!keygrab_set(NULL));

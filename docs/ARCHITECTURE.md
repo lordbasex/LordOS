@@ -34,7 +34,7 @@ like React Native but on top of our display server.
 | `server/src/ui/js_sys.c` | **M3 done** | System APIs: fs (writes in the home folder and the user's mounts; since 0.8.5 reads the whole tree except `/proc`, `/sys`, `/dev`, `/run`), /proc, settings, themes, session |
 | `sdk/` | **M3 done** | `@lordos/sdk`: windows, settings, tokens, controls, system hooks |
 | `apps/` | **M3 done** | Apps as packages (`manifest.json` + `index.jsx`), independent of the theme |
-| `themes/classic/` | **0.8.3 done** | Lord Classic (named Classic until 0.8.5): second full appearance (taskbar, start menu, snapping, task view, menus inside the window since 0.8.5) and a base for new themes (`THEMES-GUIDE.md`) |
+| `themes/classic/` | **0.8.3 done** | Lord Classic (named Classic until 0.8.5): second full appearance (taskbar, start menu, snapping, menus inside the window since 0.8.5) and a base for new themes (`THEMES-GUIDE.md`) |
 | `server/src/term/` | **M4 done** | Our own terminal: xterm emulator, PTY, drawing, session holders (see `TERMINAL.md`) |
 | `server/src/ui/otf.c`, `fonts.c` | **M4 done** | Our own OpenType (GSUB substitutions, CBDT emoji) and catalog of installed fonts: no HarfBuzz or fontconfig |
 | `apps/terminal/` | **M4 done** | Native Terminal app (tabs, panes, profiles…) |

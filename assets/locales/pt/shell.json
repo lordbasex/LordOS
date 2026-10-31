@@ -43,7 +43,6 @@
   "classic.noNotifications": "Nenhuma notificação nova",
   "classic.noPins": "Clique com o botão direito em um app em Todos os apps para fixá-lo aqui.",
   "classic.noResults": "Nenhum resultado para “{query}”",
-  "classic.noWindows": "Nenhuma janela aberta",
   "classic.notifications": "Notificações",
   "classic.personalize": "Personalizar",
   "classic.pinStart": "Fixar em Iniciar",
@@ -57,7 +56,6 @@
   "classic.snapLeft": "Encaixar na metade esquerda",
   "classic.snapRight": "Encaixar na metade direita",
   "classic.start": "Iniciar",
-  "classic.taskView": "Visão de tarefas",
   "classic.trash": "Lixeira",
   "classic.unpinStart": "Desafixar de Iniciar",
   "clipboard.chars": {
@@ -286,7 +284,6 @@
   "shortcuts.files": "Arquivos",
   "shortcuts.settings": "Ajustes",
   "shortcuts.monitor": "Monitor",
-  "shortcuts.taskView": "Visão de tarefas",
   "shortcuts.snap": "Encaixar a janela",
   "shortcuts.closeWindow": "Fechar a janela",
   "shortcuts.taskbarItem": "Abrir o app nessa posição da barra",
@@ -299,5 +296,15 @@
   "osk.space": "espaço",
   "osk.return": "enter",
   "osk.tab": "tab",
-  "osk.esc": "esc"
+  "osk.esc": "esc",
+  "desktops.name": "Área de trabalho {n}",
+  "desktops.overview": "Visão geral",
+  "desktops.moveTo": "Mover para área de trabalho",
+  "desktops.new": "Nova área de trabalho",
+  "desktops.empty": "Nenhuma janela nesta área de trabalho",
+  "shortcuts.overview": "Visão geral",
+  "shortcuts.appWindows": "Janelas do app",
+  "shortcuts.switchDesktop": "Trocar de área de trabalho",
+  "shortcuts.newDesktop": "Nova área de trabalho",
+  "shortcuts.closeDesktop": "Fechar área de trabalho"
 }

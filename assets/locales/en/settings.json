@@ -424,5 +424,9 @@
   "osk.auto": "Automatic",
   "osk.always": "Always",
   "osk.show": "Show Keyboard",
-  "osk.hint": "Automatic opens it when a text field takes focus and no physical keyboard is attached. The login and lock screens always follow Automatic, so nobody is locked out. Its button in the menu bar, or ❖⌃K, opens it at any time."
+  "osk.hint": "Automatic opens it when a text field takes focus and no physical keyboard is attached. The login and lock screens always follow Automatic, so nobody is locked out. Its button in the menu bar, or ❖⌃K, opens it at any time.",
+  "kb.shortcuts.desktops": "Desktops",
+  "kb.desktopArrows.title": "Desktops",
+  "kb.desktopArrows.label": "Use Ctrl + arrow keys for Desktops",
+  "kb.desktopArrows.hint": "Ctrl+Up opens the Overview, Ctrl+Left and Right switch desktops, Ctrl+Down shows the windows of the app. Turn this off to keep these keys for moving by word in apps; Super+Ctrl+Left and Right still switch desktops."
 }

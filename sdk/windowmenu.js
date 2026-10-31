@@ -3,18 +3,22 @@
 //   Minimize · Zoom · Fill · Center
 //   Move & Resize ›  halves, quarters, thirds, arrangements of two or four windows, previous size
 //   Move to <display>  (one item per other display)
+//   Move to Desktop ›  the other desktops and a new one
+//   Overview
 //   Bring All to Front
 //   the open windows, the one in front checked
 //
 // Lord Flow shows it under Window in its menu bar; Lord Classic in each window's Window menu.
-import { windows, wm, getApp, windowTitle } from './windows.js';
+import { windows, wm, getApp, windowTitle, onActiveDesktop } from './windows.js';
 import { screen, displayFor } from '@lordos/runtime';
 import { t } from './i18n.js';
+import { moveToDesktopItems, desktopSuffix } from './desktops.js';
+import { openOverview } from './overview.jsx';
 
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));   // not the theme's panels
 
-// the visible app windows, the front one last (windows.get() is in stacking order)
-const stack = () => windows.get().filter((w) => own(w) && !w.minimized);
+// the visible app windows of this desktop, the front one last (windows.get() is in stacking order)
+const stack = () => windows.get().filter((w) => own(w) && !w.minimized && onActiveDesktop(w));
 
 function displayName(d, i) {
   return screen.displays.length > 1 ? t('shell.window.displayN', { n: i + 1, name: d.name || '' }).trim() : d.name;
@@ -59,12 +63,14 @@ export function windowMenuItems(id, { close = true } = {}) {
       if (d.id !== here?.id) items.push({ label: t('shell.window.moveTo', { display: displayName(d, i) }), onClick: () => wm.moveToDisplay(id, d.id) });
     });
   }
-  items.push('-', { label: t('shell.window.bringAll'), onClick: () => { for (const x of windows.get().filter(own)) wm.focus(x.id); if (id) wm.focus(id); } });
+  items.push('-', { label: t('shell.desktops.moveTo'), disabled: !w, submenu: w ? moveToDesktopItems(id) : [] },
+    { label: t('shell.desktops.overview'), onClick: () => openOverview() });
+  items.push('-', { label: t('shell.window.bringAll'), onClick: () => { for (const x of stack()) wm.raise(x.id); if (id) wm.raise(id); } });
   if (close) items.push('-', { label: t('shell.window.close'), hint: 'Alt+F4', disabled: !w, onClick: () => wm.close(id) });
   const list = windows.get().filter(own);
   if (list.length) {
     items.push('-');
-    for (const x of list) items.push({ label: windowTitle(x) || x.app, checked: x.id === id, onClick: () => wm.focus(x.id) });
+    for (const x of list) items.push({ label: `${windowTitle(x) || x.app}${desktopSuffix(x)}`, checked: x.id === id, onClick: () => wm.focus(x.id) });
   }
   return items;
 }

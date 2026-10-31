@@ -158,6 +158,9 @@ EOF
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)
+    if have node; then run "desktop-model-test (sdk/desktopmodel.js)" node tests/desktop_model_test.mjs
+    else skip "desktop-model-test" "node"; fi
     # session restore's data rules (sdk/sessionmodel.js)
     if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
     else skip "session-model-test" "node"; fi

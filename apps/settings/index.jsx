@@ -475,6 +475,13 @@ function Keyboard() {
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
+      {themes.current() === 'default' && (
+        <Section title={tr('settings.kb.desktopArrows.title')} footer={tr('settings.kb.desktopArrows.hint')}>
+          <SettingRow label={tr('settings.kb.desktopArrows.label')}>
+            <Toggle value={s.desktopArrows !== false} onChange={(v) => set({ desktopArrows: v })} />
+          </SettingRow>
+        </Section>
+      )}
       <ShortcutsList />
     </Stack>
   );

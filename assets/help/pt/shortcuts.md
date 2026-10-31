@@ -36,6 +36,8 @@ volta ao app anterior.
 |---|---|
 | ❖ sozinho · F4 | Apps (o lançador de apps) |
 | ❖Tab · ❖⇧Tab | Alternar entre apps |
+| ⌃↑ · ⌃↓ | Visão geral · janelas do app ([Áreas de trabalho](help:desktops)) |
+| ⌃← ⌃→ | Anterior ou seguinte |
 | ❖\` · ❖⇧\` | Janela seguinte ou anterior do app |
 | ❖M | Minimizar a janela |
 | ❖H · ❖⌥H | Ocultar o app · ocultar os outros apps |
@@ -55,7 +57,9 @@ app do LordOS dentro da sessão ❖V também cola; ❖⇧V é a área de transfe
 |---|---|
 | ❖ sozinho | Menu Iniciar |
 | ⌥Tab · ⌥⇧Tab | Alternar entre apps |
-| ❖Tab | Visão de tarefas |
+| ❖Tab | Visão geral ([Áreas de trabalho](help:desktops)) |
+| ❖⌃← ❖⌃→ | Anterior ou seguinte |
+| ❖⌃D · ❖⌃F4 | Nova área de trabalho · fechar esta |
 | ❖←→↑↓ | Encaixar a janela |
 | ⌥F4 | Fechar a janela |
 | ❖D | Mostrar a área de trabalho, e voltar |

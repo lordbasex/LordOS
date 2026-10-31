@@ -366,7 +366,7 @@ function Panel() {
   useEffect(() => {
     wm.setMenus(win.id, [{ label: tr('screenshots.menu.window'), items: [
       { label: tr('screenshots.menu.protect'), onClick: () => {
-        const others = windows.get().filter((w) => w.app !== APP && !w.minimized);
+        const others = windows.get().filter((w) => w.app !== APP && !w.minimized && w.desktop === wm.desktop());
         const front = others[others.length - 1];
         if (front) wm.setProtected(front.id, !front.protected);
       } },

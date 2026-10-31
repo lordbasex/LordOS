@@ -12,7 +12,9 @@ import { View, Text, mainDisplay } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { useTheme } from './theme.js';
 import { Layer } from './layers.js';
-import { windows, wm, getApp } from './windows.js';
+import { windows, wm, getApp, activeDesktop, onActiveDesktop } from './windows.js';
+import { pickWindow } from './desktopmodel.js';
+import { desktopSuffix } from './desktops.js';
 import { dockIdOfWindow } from './dock.js';
 import { runningApps } from './appcontrol.js';
 import { windowIcon } from './apps.js';
@@ -34,10 +36,10 @@ function trackRecent() {
 }
 windows.subscribe(trackRecent);
 
-// the window an app comes back with: its top one, a visible one before a minimized one
+// the window an app comes back with: on this desktop if it has one, a visible one before a minimized
+// one. The switcher lists the apps of every desktop; choosing one elsewhere jumps there (wm.focus).
 function windowOf(group) {
-  const list = windows.get().filter((w) => group.windows.some((x) => x.id === w.id));
-  return [...list].reverse().find((w) => !w.minimized) || list[list.length - 1];
+  return pickWindow(windows.get().filter((w) => group.windows.some((x) => x.id === w.id)), activeDesktop.get());
 }
 
 function listApps() {
@@ -45,7 +47,7 @@ function listApps() {
   const rank = (k) => { const i = recent.indexOf(k); return i >= 0 ? i : recent.length + Math.max(0, stacked.indexOf(k)); };
   return runningApps().map((g) => {
     const win = windowOf(g);
-    return { key: keyOf(win), name: g.name, win: win.id, Icon: windowIcon(win, getApp) };
+    return { key: keyOf(win), name: `${g.name}${desktopSuffix(win)}`, win: win.id, Icon: windowIcon(win, getApp) };
   }).sort((a, b) => rank(a.key) - rank(b.key));
 }
 
@@ -87,7 +89,7 @@ export function cycleAppWindows(back = false) {
   const top = wm.get(wm.focused());
   if (!top) return;
   const key = keyOf(top);
-  const mine = windows.get().filter((w) => keyOf(w) === key && !w.minimized);
+  const mine = windows.get().filter((w) => keyOf(w) === key && !w.minimized && onActiveDesktop(w));
   if (mine.length < 2) return;
   if (!back) { wm.focus(mine[0].id); return; }           // the app's rearmost window comes up
   windows.set((ws) => [top, ...ws.filter((w) => w !== top)]);   // the front one goes under everything

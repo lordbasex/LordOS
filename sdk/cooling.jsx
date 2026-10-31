@@ -19,7 +19,7 @@ import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatNumber } from './i18n.js';
-import { windows } from './windows.js';
+import { useWindowHidden } from './windows.js';
 import { useAppWindow } from './components.jsx';
 
 const has = () => typeof lord !== 'undefined' && lord.fan && typeof lord.fan.status === 'function';
@@ -88,7 +88,7 @@ export function heatColor(temp, alpha = 1) {
 // lord.setStyle on their nodes (no React render per frame): lord-server repaints a cached raster.
 function useSpin(pct) {
   const { id } = useAppWindow() || {};
-  const hidden = useStore(windows, (ws) => !!ws.find((w) => w.id === id)?.minimized);
+  const hidden = useWindowHidden(id);
   const motion = useStore(settings, (s) => !s.reduceMotion);
   const st = useRef(null);
   if (!st.current) st.current = { v: 0, a: 0, rotors: new Map() };

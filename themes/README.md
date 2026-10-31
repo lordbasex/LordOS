@@ -7,7 +7,7 @@ their own. `lord-server` runs the theme with QuickJS and paints it with its C en
 | Theme | Style |
 |---|---|
 | `default` | Lord Flow: menu bar, dock with magnification, app launcher, Control Center |
-| `classic` | Lord Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and a task view (0.8.3) |
+| `classic` | Lord Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and the SDK's Overview (0.8.3) |
 
 ```sh
 npm install           # once (React + esbuild)

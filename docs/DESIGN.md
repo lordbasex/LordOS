@@ -187,7 +187,7 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
 | ![search](classic/shell-search-dark.png) | ![quick](classic/shell-quick-light.png) |
 | Typing in the start menu searches like the system search | Quick settings, light mode |
 | ![notifications](classic/shell-notifications-dark.png) | ![task view](classic/shell-taskview-dark.png) |
-| Notifications and the calendar, from the clock | Task view (Super+Tab): live windows, smaller |
+| Notifications and the calendar, from the clock | The Overview before Desktops (Super+Tab): live windows, smaller ([DESKTOPS.md](DESKTOPS.md)) |
 | ![layouts](classic/shell-snap-layouts-dark.png) | ![preview](classic/shell-snap-preview-dark.png) |
 | Snap layouts, from the maximize button | Dragging to the left edge: the preview |
 | ![rtl](classic/shell-rtl-dark.png) | ![switch](classic/shell-switch-dark.png) |
@@ -219,7 +219,7 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
 - **Quick settings tiles:** 48 px high, accent fill when on, a chevron segment that opens the
   matching Settings page.
 - **Shortcuts:** Super alone opens the start menu; Super+arrows snap the window in front; Super+Tab
-  is the task view; Super+A quick settings; Super+N notifications; Alt+F4 closes the window in front.
+  is the Overview; Super+A quick settings; Super+N notifications; Alt+F4 closes the window in front.
 
 Every app in both themes, dark and light, is in [`docs/classic/`](classic/) (`<app>-classic-dark.png`,
 `<app>-classic-light.png`, `<app>-default-dark.png`, `<app>-default-light.png`; 28 apps), with

@@ -18,6 +18,8 @@ const DEFAULTS = {
   language: null,        // interface language ('es', 'en', 'pt'…); null = the region's
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)
+  desktopCount: 1,            // 0.8.7, how many desktops (sdk/desktops.js)
+  desktopArrows: true,        // 0.8.7, Settings → Keyboard: Lord Flow's ⌃ arrows are the Desktops keys
   sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
   sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
   sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only

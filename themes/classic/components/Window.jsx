@@ -7,7 +7,7 @@
 // Lord Classic has no global menu bar: an app that declares menus (File, Edit, View, Go…; the same
 // ones Lord Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useAppMenus, getApp, appGroup, windowMenuItems, solidOver, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, WindowShell, windowIcon, snapZoneAt, screen, useAppMenus, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -103,8 +103,7 @@ function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, o
   );
 }
 
-// tv: the task view's place for this window ({ x, y, scale, onPick, onClose }), or null.
-export function Window({ win, t, focused, app, tv }) {
+export function Window({ win, t, focused, app }) {
   const drag = useRef(null);
   const geo = wm.frame(win);
   const maxRef = useRef(null);
@@ -135,12 +134,6 @@ export function Window({ win, t, focused, app, tv }) {
   }, [win.id, win.w, geo.y]);
 
   const shadow = focused ? t.shadow : (t.mode === 'dark' ? '0 8px 22px rgba(0,0,0,0.4)' : '0 8px 22px rgba(0,0,0,0.16)');
-  const tvStyle = tv ? { transform: `translate(${tv.x - geo.x}px, ${tv.y - geo.y}px) scale(${tv.scale})`, transformOrigin: 'left top' } : null;
-  const tvCover = tv ? (
-    <View onClick={tv.onPick} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, cursor: 'pointer',
-      borderRadius: flat ? 0 : 8, border: tv.hover ? `${Math.round(3 / tv.scale)}px solid ${t.accent}` : '0 solid transparent' }}
-      onMouseEnter={tv.onEnter} onMouseLeave={tv.onLeave} />
-  ) : null;
 
   // closes the snap layouts a moment after the pointer leaves (or `ms` after opening them from a menu)
   const leaveMax = (ms = 300) => { clearTimeout(hoverTimer.current); clearTimeout(leaveTimer.current); leaveTimer.current = setTimeout(() => setLayouts(null), ms); };
@@ -150,6 +143,7 @@ export function Window({ win, t, focused, app, tv }) {
     { label: tr('shell.classic.restore'), disabled: !win.maximized && !win.snapped, onClick: () => wm.snap(win.id, 'restore') },
     { label: tr('shell.classic.minimize'), onClick: () => wm.minimize(win.id) },
     { label: tr('shell.classic.maximize'), disabled: win.maximized, onClick: () => wm.snap(win.id, 'max') },
+    { label: tr('shell.desktops.moveTo'), submenu: moveToDesktopItems(win.id) },
     '-',
     ...(extra || []),
     { label: tr('shell.classic.snapLeft'), onClick: () => wm.snap(win.id, 'left') },
@@ -161,34 +155,33 @@ export function Window({ win, t, focused, app, tv }) {
   // Linux app with its own frame (GTK, Chromium and Firefox with their own bar): only the content,
   // with the theme's shadow. A right click on its bar asks for the window menu (w.windowMenu).
   if (win.args?.csd || app.ownFrame) {
-    const wmenu = !tv && win.windowMenu;
+    const wmenu = win.windowMenu;
     return (
-      <WindowShell win={win} resizable={!tv} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow, ...tvStyle }}>
-        <AppHost id={win.id} focused={focused && !tv} />
-        {tvCover}
+      <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
+        <AppHost id={win.id} focused={focused} />
         {wmenu && (
           <Menu t={t} x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={windowMenuItems([
             { label: tr('shell.classic.snapLayouts'), onClick: () => { setLayouts({ left: wmenu.x, y: wmenu.y }); leaveMax(3000); } },
           ])} />
         )}
-        {layouts && !tv && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
+        {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       </WindowShell>
     );
   }
 
   const Icon = windowIcon(win);
   const openLayouts = () => {
-    if (!maxRef.current || tv) return;
+    if (!maxRef.current) return;
     const [x, y, w, h] = lord.getLayout(maxRef.current.id);
     setLayouts({ x: x + w / 2 - BTN_W / 2, y: y + h + 4 });
   };
   const enterMax = () => { clearTimeout(leaveTimer.current); clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(openLayouts, 550); };
   const titleMenu = (e) => setMenu({ x: e.x, y: e.y });
   return (
-    <WindowShell win={win} resizable={!tv} onMouseDown={() => wm.focus(win.id)} style={{
+    <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{
       borderRadius: flat ? 0 : 8, backgroundColor: app.transparent ? 'transparent' : t.windowBg, overflow: 'hidden',
       // a transparent app (the Terminal) has nothing behind its border: the border is drawn opaque
-      border: `1px solid ${app.transparent ? solidOver(focused ? t.windowBorder : t.separator, t.titleBg) : (focused ? t.windowBorder : t.separator)}`, boxShadow: shadow, ...tvStyle,
+      border: `1px solid ${app.transparent ? solidOver(focused ? t.windowBorder : t.separator, t.titleBg) : (focused ? t.windowBorder : t.separator)}`, boxShadow: shadow,
     }}>
       <View onMouseDown={(e) => {
         if (e.button) return;
@@ -206,9 +199,8 @@ export function Window({ win, t, focused, app, tv }) {
         <FrameButton t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
       </View>
       {appMenus.length ? <MenuStrip t={t} win={win} focused={focused} menus={appMenus} /> : null}
-      <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused && !tv} /></View>
-      {tvCover}
-      {layouts && !tv && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
+      <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
+      {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       {menu && (
         <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={windowMenuItems()} />
       )}

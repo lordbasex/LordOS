@@ -120,6 +120,7 @@ struct Surf {
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
+    int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
      * enter/leave, bit = output slot) and the scale it should render at (fractional-scale-v1,
      * preferred_buffer_scale) */
@@ -1681,6 +1682,11 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
+    if (s->parked) {                 /* a hidden window is presented on nothing: it waits for its desktop */
+        s->fs_resume = 1;
+        send_toplevel_configure(s);
+        return;
+    }
     if (fs_surf) { fs_surf->fullscreen = 0; send_toplevel_configure(fs_surf); }
     fs_surf = s;
     s->fullscreen = 1;
@@ -1700,6 +1706,7 @@ static void enter_fullscreen(Surf *s) {
 }
 
 static void leave_fullscreen(Surf *s) {
+    if (s) s->fs_resume = 0;
     if (!s || s != fs_surf) return;
     fs_surf = NULL;
     s->fullscreen = 0;
@@ -3143,6 +3150,7 @@ void wl_set_focus(int id) {
     if (!dpy) return;
     Surf *s = id ? find(id) : NULL;
     if (s && s->role != R_TOPLEVEL) s = NULL;
+    if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (fs_surf && fs_surf->content) s = fs_surf;      /* in fullscreen the keyboard is its own */
     if (s == key_focus) return;
     struct wl_resource *kb;
@@ -3244,6 +3252,28 @@ void wl_set_state(int id, int maximized, int fullscreen) {
 void wl_set_minimized(int id, int minimized) {
     Surf *s = find(id);
     if (s && s->xw) { s->xmin = minimized; xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized); }
+}
+
+/* On a hidden desktop (sdk/desktopmodel.js surfaceState; C knows nothing else about desktops). The window
+ * has no node there, so it can't be painted or reached with the pointer; this takes what doesn't depend
+ * on the node: the keyboard, and fullscreen, which is presented above everything and would keep both.
+ * Fullscreen comes back with the window, and one the app asks for meanwhile waits for it. */
+void wl_set_parked(int id, int parked) {
+    Surf *s = find(id);
+    if (!s || (!s->top && !s->xw) || s->parked == !!parked) return;
+    s->parked = !!parked;
+    if (parked) {
+        int was_fs = s == fs_surf;
+        if (was_fs) leave_fullscreen(s);
+        s->fs_resume = was_fs;
+        if (s == key_focus) wl_set_focus(0);
+        for (int i = npopups - 1; i >= 0; i--)
+            if (toplevel_of(popups[i]) == s && popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
+    } else if (s->fs_resume) {
+        s->fs_resume = 0;
+        enter_fullscreen(s);
+    }
+    if (dpy) wl_display_flush_clients(dpy);
 }
 
 /* The screen changed size (headless session, docs/SESSIONS.md): new mode for the apps

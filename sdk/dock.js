@@ -22,7 +22,9 @@ import { useEffect } from 'react';
 import { addListener } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
-import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem } from './windows.js';
+import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
+import { pickWindow } from './desktopmodel.js';
+import { desktopSuffix } from './desktops.js';
 import { screen, onScreenChange } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
@@ -221,13 +223,15 @@ export function launchDockItem(id) {
 }
 
 // Click on the icon: with no windows it opens the app; with windows it brings up the most recent one (if it
-// was already in front and there are several, it moves to the next, like ❖`).
+// was already in front and there are several, it moves to the next, like ❖`). A window on this desktop
+// comes first; with none here it jumps to the desktop of the app's latest window.
 export function dockActivate(e) {
   if (e.launcher) { e.onOpen?.(); return; }
   if (!e.windows.length) { if (!launchDockItem(e.id) && e.launcherId) launchApp(e.launcherId); return; }
   const top = wm.focused();
-  const idx = e.windows.findIndex((w) => w.id === top);
-  const next = idx >= 0 && e.windows.length > 1 ? e.windows[(idx + e.windows.length - 1) % e.windows.length] : e.windows[e.windows.length - 1];
+  const here = e.windows.filter(onActiveDesktop);
+  const idx = here.findIndex((w) => w.id === top);
+  const next = idx >= 0 && here.length > 1 ? here[(idx + here.length - 1) % here.length] : pickWindow(e.windows, activeDesktop.get());
   wm.focus(next.id);
 }
 
@@ -287,7 +291,7 @@ export function dockMenu(e, opts = {}) {
   if (quick.length) items.push(...quick, '-');
   if (e.windows.length) {
     for (const w of [...e.windows].reverse()) {
-      items.push({ label: windowTitle(w) || e.name, checked: w.id === top, hint: w.minimized ? '–' : '', onClick: () => wm.focus(w.id) });
+      items.push({ label: `${windowTitle(w) || e.name}${desktopSuffix(w)}`, checked: w.id === top, hint: w.minimized ? '–' : '', onClick: () => wm.focus(w.id) });
     }
     items.push('-');
   }

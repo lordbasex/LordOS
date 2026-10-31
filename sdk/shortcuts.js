@@ -16,7 +16,8 @@
 // An entry: { id, keys: ['Meta+Shift+V', …], run, label?, group?, when?, repeat? }. `run` is always a
 // function, called with the key event, and `when(e)` says whether the entry applies now: when it
 // does not, the key goes on to the app. Without `repeat`, a held key runs once and its repeats are
-// still taken. `label` (a locale key) lists it in Settings; `show` replaces its keys there.
+// still taken. `label` (a locale key) lists it in Settings; `show` replaces its keys there; `listed`
+// keeps it out of the list while it returns false.
 // Letters follow the keyboard layout; other keys their position, in every layout.
 import { useEffect, useRef } from 'react';
 import { setKeyFilter } from '@lordos/runtime';
@@ -132,7 +133,9 @@ function filter(e) {
   if (SUPER(e.code)) { if (!e.repeat) superAlone = true; return false; }
   superAlone = false;
   if (e.forwarded) return true;                    // a Linux app got it as Ctrl
-  if (taken.has(e.code)) return e.repeat;          // the repeats of a key held down
+  // The repeats of a key held down. A new press of a key still marked lost its release: pressed with no
+  // Linux app in front, released with one (the key that switched to its desktop), it went to the app.
+  if (taken.has(e.code)) { if (e.repeat) return true; taken.delete(e.code); }
   const entries = (lookup = lookup || index()).get(`${e.mods}:${keyName(e).toLowerCase()}`);
   const entry = entries?.find((x) => !x.when || x.when(e));
   if (!entry) return false;
@@ -164,6 +167,8 @@ export function useShortcuts({ grabs = '', table = [], onSuperTap: tap = null, a
     changed();
     return () => { themeTable = []; onSuperTap = null; changed(); };
   }, []);
+  // a setting can change the table of keys while the theme runs (Lord Flow's ⌃ arrows)
+  useEffect(() => { setGrabs(grabs); changed(); }, [grabs]);
 }
 
 // Runs a module's entry by its id (Lord Classic's ❖⇧S is Screenshots' area capture).
@@ -189,9 +194,9 @@ function comboLabel(combo) {
 // [{ group, items: [{ id, label, keys: '❖Space · ⌃Space' }] }], groups in a fixed order. Entries with
 // the same label become one row.
 export function shortcutList() {
-  const groups = new Map([['system', []], ['windows', []], ['apps', []]]);
+  const groups = new Map([['system', []], ['windows', []], ['desktops', []], ['apps', []]]);
   for (const entry of [...added, ...themeTable, ...BASE]) {
-    if (!entry.label) continue;
+    if (!entry.label || (entry.listed && !entry.listed())) continue;
     const keys = entry.show || entry.keys.map(comboLabel);
     const list = groups.get(entry.group) || groups.get('system');
     const same = list.find((x) => x.labelKey === entry.label);
