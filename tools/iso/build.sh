@@ -214,6 +214,10 @@ menuentry "LordOS $VERSION (live)" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=en
     initrd /live/initrd.img
 }
+menuentry "Check this computer (nothing is installed)" {
+    linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.check=1 lordos.lang=en
+    initrd /live/initrd.img
+}
 menuentry "LordOS $VERSION (safe mode: no GPU)" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 nosplash lordos.gpu=0 lordos.lang=en
     initrd /live/initrd.img

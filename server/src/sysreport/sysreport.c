@@ -827,7 +827,7 @@ static void boot_classify(SrSoftware *s, const char *root, const char *link, int
 }
 
 /* Whether the kernel command line holds the word w (or w=… when w ends in '='). Nothing of it is kept. */
-static int cmdline_has(const char *cmdline, const char *w) {
+int sysreport_cmdline_has(const char *cmdline, const char *w) {
     size_t n = strlen(w);
     for (const char *p = cmdline; (p = strstr(p, w)); p += n) {
         int start = p == cmdline || p[-1] == ' ';
@@ -843,8 +843,8 @@ static void collect_boot(SrSoftware *s, const char *root) {
     char p[1024];
     snprintf(p, sizeof p, "%s/proc/cmdline", root);
     char *cmd = read_file(p, 4096, NULL);
-    if (s->live && cmd) s->boot_toram = cmdline_has(cmd, "toram") || cmdline_has(cmd, "toram=");
-    int fetched = s->live && cmd && (cmdline_has(cmd, "fetch=") || cmdline_has(cmd, "netboot="));
+    if (s->live && cmd) s->boot_toram = sysreport_cmdline_has(cmd, "toram") || sysreport_cmdline_has(cmd, "toram=");
+    int fetched = s->live && cmd && (sysreport_cmdline_has(cmd, "fetch=") || sysreport_cmdline_has(cmd, "netboot="));
     free(cmd);
 
     const char *want = s->live ? "/run/live/medium" : "/";

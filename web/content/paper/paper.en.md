@@ -553,7 +553,7 @@ There are no measurements on real PCs in the repository yet. The ISO is tested o
 
 ### 10.3 Next
 
-Next, as planned in `docs/ROADMAP.md` and `docs/BENCHMARK.md`: **0.8.7, community hardware reports**, published from System Information with the user's consent, with LordBench's x86 PC reference, hardware video decoding and the work on the Raspberry Pi 5 under load moved from 0.8.6; and a connection refused by the per-app firewall checked on the user's own computer. LordBench's first part shipped in 0.8.6. Xwayland and the Lord Classic theme, planned here for 1.0 in 0.8.0, shipped in 0.8.3. Flatpak and Flathub are not planned for any release: a design review is kept in `docs/FLATPAK.md` for the future, but to keep the system stable it is not being built.
+Next, as planned in `docs/ROADMAP.md` and `docs/BENCHMARK.md`: **0.8.7, community hardware reports**, published from System Information with the user's consent (in development, with a live ISO boot entry, Check this computer, that opens System Information; tested in a virtual machine only), with LordBench's x86 PC reference, hardware video decoding and the work on the Raspberry Pi 5 under load moved from 0.8.6; and a connection refused by the per-app firewall checked on the user's own computer. LordBench's first part shipped in 0.8.6. Xwayland and the Lord Classic theme, planned here for 1.0 in 0.8.0, shipped in 0.8.3. Flatpak and Flathub are not planned for any release: a design review is kept in `docs/FLATPAK.md` for the future, but to keep the system stable it is not being built.
 
 After 1.0: a desktop virtualization app built on KVM and QEMU; an Android container with LineageOS and apps from LordOS's Store; the firewall's ask mode; accessibility; and a full demo video.
 

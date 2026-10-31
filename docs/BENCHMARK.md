@@ -1014,6 +1014,10 @@ are per LordOS version and it shows only its own.
   so a newer package shows in the panel without a restart, and a missing package (or folder) is `state: "missing"`
   ("no community data"), checked by `build/hwsnap-test`. A snapshot update is listed in Store → Updates with the
   other packages and announced by the daily check as "1 update is available".
+  On screen it is *Tested hardware list* with the snapshot's date in the user's region, in the list and in the *Update
+  all* plan (below, in a test copy of the theme with `lord.pkg`'s answers faked, so nothing was installed):
+
+  ![Store → Updates with a faked snapshot update](hwreport-store-updates.png)
 - **Tests:** `build/pkg-test` (8 new checks, 112 in all): updating a 0.8.5 system's `lordos` to one that depends on
   `lordos-hwdata` brings it in at its newest version, with *Update* (`pkg-install lordos`) and *Update all*
   (`pkg-upgrade`); on a 0.8.7 system a newer snapshot alone is one upgrade and nothing else; the date versions sort
@@ -1030,9 +1034,9 @@ are per LordOS version and it shows only its own.
 - **Not run yet:** the staging test on a VM with the real repository (publish to `apt-staging`, see the
   notification, update, see the panel's footer change), which needs the maintainer's archive and release keys.
 
-Left for 0.8.7: creating the labels in the repository (the template's `hardware-report` label must exist for the
-form to apply it), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
-one, the rest of "From the live USB" (the boot menu entry, live references, the overlay's size), the staging test of
+Left for 0.8.7: creating the labels in the repository, a maintainer's step (the template's `hardware-report` label
+must exist for the form to apply it; the steps are in [RELEASING.md](RELEASING.md), "The labels of hardware reports"), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
+one, the rest of "From the live USB" (live references, the overlay's size; the boot menu entry is done), the staging test of
 `lordos-hwdata` above, and deciding whether Default Apps should fall back to an installed app
 that declares a type when the user chose none (so a fresh account's Share on GitHub opens the page without a visit
 to Settings).
@@ -1045,7 +1049,8 @@ the main source of PC reports: it costs the tester nothing and answers "will Lor
 before installing.
 
 - **A boot menu entry**, *Check this computer*, starts the live session straight into System
-  Information (0.8.5) and its Performance tab (0.8.6). The normal live session has it in the Dock.
+  Information (0.8.5) and its Performance tab (0.8.6). Built in 0.8.7, see below. In the normal live session the app
+  is in the launcher and in About LordOS, not in the Dock (its manifest says `"dock": false`).
 - **The report says it was live**: boot medium (USB, its link speed), the overlay in RAM, no
   persistence. (Built in 0.8.7: the live flag, the boot medium's class, a USB link speed and the copy to memory;
   the overlay's size is not.) Live and installed results are kept apart in comparisons and in the catalogue.
@@ -1065,6 +1070,35 @@ before installing.
   missing") so the user knows before replacing their system.
 - **Limit:** machines with Secure Boot on can't start the stick until LordOS is signed for it
   (paper §10.2); the website's download page says so next to the *Check this computer* guide.
+
+### The boot entry (0.8.7, in development; checked 2026-10-30)
+
+GRUB passes `lordos.check=1`. `lord.system.info().liveCheck` is a yes or no: `true` only on a live system and only for
+that whole word in `/proc/cmdline` (`sysreport_cmdline_has`; nothing else of the command line reaches JS).
+`sdk/livestart.js` then opens System Information with `args: { tab: 'perf' }` instead of the installer, which stays in
+the launcher. The app takes only that one value and starts no measurement. No root work, no new power, no path from JS.
+
+![The boot menu with the new entry](hwreport-boot-menu.png)
+
+![A real live boot with lordos.check=1](hwreport-boot-check.png)
+
+**Checked on VM 116, in QEMU with KVM, legacy BIOS:**
+
+- **The menu:** `tools/iso/build.sh`'s own `grub.cfg` with the theme, in a small ISO made by `grub-mkrescue`:
+  `grub-script-check` passes and the six lines show at 1024×768 and 800×600 (the first try, with a height of 300, hid
+  the last line, which is how the count above was found). At 640×480, BIOS's last resort, also six, but the sixth
+  line overlaps the keys hint at the bottom (both stay readable; the five lines above it don't overlap anything).
+- **The entry:** Down and Enter on that menu boot the 0.8.6 kernel with `lordos.check=1` on its command line (from the
+  kernel's first line on the serial port; the test `grub.cfg` swapped `quiet loglevel=3` for a serial console, and the
+  ISO has no system on it, so that run stops in the initramfs).
+- **The whole session:** the 0.8.6 live ISO, booted with that command line (QEMU's `-kernel`) and this branch's
+  `lord-server`, bundles and an unsigned code manifest laid over it from an extra initramfs, reached the desktop with
+  System Information on Performance and no installer window.
+- **In an isolated headless session** (a private mount namespace with a fake `/proc/cmdline` and `/run/live`): the same
+  with the flag; without it, and with `lordos.check=10`, the installer opens as always. With the flag and no live
+  system, it changes nothing: the first-login tour opens as on any new account, no System Information.
+- **Not tested:** a real ISO built from this branch (VM 116 has no room for a build), UEFI, the arm64 ISO, a USB stick, a
+  real PC. The windows behind System Information (Files, About LordOS) are the default theme's, as on every live boot.
 
 ## New interfaces, all under the rules of `AGENTS.md`
 

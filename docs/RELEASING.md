@@ -141,6 +141,32 @@ The releases page is the project's public changelog: every release is documented
    run `curl -fsSL https://lordos.org/install.sh | sh` on a clean Debian 13; update the website if
    it names the current version.
 
+## The labels of hardware reports
+
+The `hardware-report` issue form and its workflow (`.github/workflows/hardware-report.yml`, on `main`) label each
+report from fixed lists (`ALL_LABELS` in `tools/hwreport/lib.mjs`, 33 labels). Create them once, by hand, before the
+workflow reaches `main`: the form can only apply `hardware-report` if the repository already has it. It takes an
+account with write access to the repository and `gh auth login` done; `gh label create --force` updates a label
+that already exists, so it can be run again. `server/tests/hwreport_test.mjs` fails if this list and the code differ.
+
+<!-- hardware labels -->
+```sh
+R=lordbasex/LordOS
+for l in hardware-report \
+    report:valid report:check report:invalid report:missing \
+    kind:vm kind:board kind:laptop kind:server kind:desktop \
+    gpu:intel gpu:amd gpu:nvidia gpu:virtual gpu:broadcom gpu:arm gpu:vivante gpu:qualcomm gpu:other gpu:none \
+    cpu:intel cpu:amd cpu:arm cpu:riscv cpu:other \
+    live installed \
+    boot:internal boot:usb boot:sd boot:emmc boot:optical boot:network; do
+  gh label create "$l" --repo "$R" --force
+done
+```
+
+Check with `gh label list --repo lordbasex/LordOS --limit 100`. Not run yet: creating them changes the public
+repository and is the maintainer's step. The workflow itself has only run against test events (`validate.mjs`
+with a fake fetch), never on a real issue, because workflows for `issues` events run from the default branch.
+
 ## A newer hardware snapshot between releases
 
 (0.8.7; [BENCHMARK.md](BENCHMARK.md), "Newer snapshots between releases".) System Information's Compatibility panel

@@ -12,7 +12,7 @@ import { validate } from '../../tools/hwreport/jsonschema.mjs';
 import { pick, buildShareReport, summaryRows, summaryText, issueTitle, issueUrl, shareFileNames, sharePage, reportKind, gpuVendor, cpuVendor, TITLE_MAX } from '../../apps/sysinfo/share.js';
 import { deviceKeys, communityFor, communitySummary } from '../../apps/sysinfo/community.js';
 import { compatibility } from '../../apps/sysinfo/model.js';
-import { findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, MARKER } from '../../tools/hwreport/lib.mjs';
+import { findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
 import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -191,6 +191,14 @@ eq('check: an extra field → invalid', checkReport(variant(badCases['a serial n
 eq('check: a MAC in an allowed text → invalid', checkReport(variant((r) => { r.system.cpu.model = 'cpu 3c:22:fb:12:34:56'; }), schema, today).status, 'invalid');
 eq('check: a reference can\'t come from an issue', checkReport(vm, schema, today).errors.map((e) => e.path), ['/source']);
 eq('labels for an invalid report', labelsFor('invalid', null), ['hardware-report', 'report:invalid']);
+{ // the steps that create the labels (docs/RELEASING.md) name exactly the labels the workflow sets
+  const doc = fs.readFileSync(path.join(ROOT, 'docs/RELEASING.md'), 'utf8');
+  const block = /<!-- hardware labels -->\n```sh\n([\s\S]*?)```/.exec(doc)?.[1] || '';
+  const words = new Set(block.split(/[\s;]+/));
+  eq('every label is in the steps', ALL_LABELS.filter((l) => !words.has(l)), []);
+  eq('no extra label in the steps', [...words].filter((w) => w.includes(':') && !ALL_LABELS.includes(w)), []);
+  eq('33 labels', ALL_LABELS.length, 33);
+}
 const evil = variant((r) => { r.system.machine.vendor = '@everyone `x` [link](https://evil)'; r.system.machine.product = 'A B'; });
 const cm = commentBody(checkReport(evil, schema, today), { fileName: 'a`b.json' });
 ok('the comment starts with its marker', cm.startsWith(MARKER));

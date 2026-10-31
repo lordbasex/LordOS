@@ -200,7 +200,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `apps/store/syspkg.js` (`sysPkgKey`, `snapshotDate`; the `lordos` package keeps its own card), the text from
     `store.updates.hwdata.name`/`.summary` (en, es, pt). Test: `tests/store_syspkg_test.mjs` (36 checks: only that
     package gets a label, versions with and without `.N`, impossible dates and other formats refused, the three
-    languages), run by `run_suites.sh`. Not checked on screen: the Store has no fixture for a fake update.
+    languages), run by `run_suites.sh`. Checked on screen on 2026-10-30 in en, es and pt, list and *Update all* plan, in
+    an isolated session of a test copy of the theme with `lord.pkg`'s answers faked (the renderer, the Store and the
+    translations are the real ones; there was no real update, and nothing was installed).
   - **Tests:** `build/pkg-test` (8 new checks: the new dependency on update and *Update all*, a snapshot-only
     upgrade, the date versions' order; 112 passed). Both packages built on VM 116 and checked with `dpkg-deb
     --info`/`--contents`; `make -C server test` passed (23 suites, 0 failed). In a `debian:trixie` container: apt
@@ -252,6 +254,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and Store → Updates, with the snapshot's own Ed25519 signature still checked in C, so no component gets a new
   network power. Not implemented: it changes the release steps, the published repository and the ISO and Pi image
   builds, and waits for the maintainer's approval.
+
+### Community hardware reports, the live USB
+
+- **A *Check this computer* boot entry on the live ISO.** It boots the live system into System Information on its
+  Performance tab, instead of the installer, so a PC can be checked without installing. The entry passes
+  `lordos.check=1`; `lord.system.info().liveCheck` tells the desktop (only a yes or no, only on a live system, only for
+  that whole word), and `sdk/livestart.js` picks the window. No measurement starts by itself, and the installer stays in
+  the launcher. The entry is in English like the rest of the menu. The other entries behave as before. The boot menu's
+  theme grew from 290 to 344 pixels high: GRUB takes padding and the selection band from that height, so at 290 the
+  sixth line didn't show, and the theme has no scrollbar. That height is the installed systems' theme too, with the
+  same position and item sizes; no installed system was booted with it.
+- **Tests:** `tests/livestart_test.mjs` (14 checks: what opens, the entry's options, the theme's room, worked out with
+  GRUB's own count), `build/sysreport-test` (6 more, whole words on the command line).
+- **Checked:** in QEMU with KVM and legacy BIOS, the build's `grub.cfg` shows the six lines at 1024×768, 800×600 and
+  640×480 (at 640×480, the BIOS fallback, the sixth line overlaps the keys hint), and Enter on the entry starts the kernel with the flag. The
+  0.8.6 live ISO booted with that command line and this branch's `lord-server` and bundles laid over it reached System
+  Information on Performance. On a system that isn't live the flag changes nothing (isolated session). Not tested: an ISO built from this branch, UEFI, the arm64 ISO, a USB stick or a real PC.
+- **The repository's labels:** `docs/RELEASING.md`, "The labels of hardware reports", lists the 33 labels and the steps
+  to create them; a test keeps the list equal to the code. They aren't created yet.
+- **lordos.org/hardware** was built and checked in en, es and pt (in a browser, also at phone width with no sideways
+  scroll): the *in development* note, the two reference machines, the form's link. It isn't published.
 
 ### Release
 

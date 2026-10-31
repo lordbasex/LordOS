@@ -884,6 +884,17 @@ static void test_boot(void) {
     boot_check(r, "usb no speed", 0, "usb", -1, 0);
 }
 
+/* The kernel command line, by whole words (the live ISO's "Check this computer": lordos.check=1). */
+static void test_cmdline_has(void) {
+    const char *w = "lordos.check=1";
+    CHECK(sysreport_cmdline_has("boot=live lordos.check=1 lordos.lang=en\n", w), "cmdline: in the middle");
+    CHECK(sysreport_cmdline_has("boot=live lordos.check=1\n", w), "cmdline: at the end");
+    CHECK(sysreport_cmdline_has("lordos.check=1", w), "cmdline: alone");
+    CHECK(!sysreport_cmdline_has("boot=live lordos.lang=en\n", w), "cmdline: not there");
+    CHECK(!sysreport_cmdline_has("xlordos.check=1 lordos.check=10 lordos.check=0\n", w), "cmdline: only the whole word");
+    CHECK(sysreport_cmdline_has("fetch=http://x/y boot=live", "fetch="), "cmdline: a word that ends in =");
+}
+
 int main(int argc, char **argv) {
     if (argc == 2 && !strcmp(argv[1], "smbios")) {
         for (int i = 0; i < 64; i++) {
@@ -920,6 +931,7 @@ int main(int argc, char **argv) {
     test_pi_firmware();
     test_empty();
     test_boot();
+    test_cmdline_has();
     printf("sysreport-test: %d ok, %d failed\n", n_ok, n_bad);
     return n_bad ? 1 : 0;
 }
