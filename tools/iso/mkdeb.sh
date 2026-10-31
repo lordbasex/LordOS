@@ -1,5 +1,5 @@
 #!/bin/sh
-# mkdeb.sh — builds lordos_<version>_amd64.deb from the already compiled tree.
+# mkdeb.sh — builds lordos_<version>_<arch>.deb from the already compiled tree.
 # Usage: tools/iso/mkdeb.sh <output.deb>     (from the repository root; needs dpkg-deb)
 #
 # Contents:
@@ -26,7 +26,7 @@
 #                                         from /usr/lib/lordos/assets/wallpapers
 #   /usr/share/plymouth/themes/lordos/    the boot splash theme (selected by the ISO, the Raspberry Pi
 #                                         image or install.sh; the package never selects it)
-#   /usr/share/grub/themes/lordos/        the boot menu theme (amd64; the ISO and the disk installer)
+#   /usr/share/grub/themes/lordos/        the boot menu theme (the ISO's disk installer and install.sh; unused on a Pi)
 #   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
 #   (not here: /usr/lib/lordos/assets/hwreport/, the signed tested-hardware snapshot, is the lordos-hwdata
 #   package from tools/iso/mkdeb-hwdata.sh, which this one Depends on; docs/BENCHMARK.md)
@@ -128,7 +128,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner "$L/assets/"
 # the wallpaper collection (assets/wallpapers/README.md): once, in the standard place for desktop
 # backgrounds; lord-server reaches it as asset:wallpapers/… through the link. Only the JPEGs, the
 # thumbnails and the README (index.json is bundled into the SDK at build time).
@@ -201,12 +201,11 @@ install -D -m 644 tools/boot/systemd/plymouth-quit.service.d/lordos.conf "$PKG/u
 install -d "$PKG/usr/share/plymouth/themes/lordos"
 install -m 644 tools/boot/plymouth/lordos/lordos.plymouth tools/boot/plymouth/lordos/lordos.script \
     tools/boot/plymouth/lordos/*.png "$PKG/usr/share/plymouth/themes/lordos/"
-# boot menu theme (GRUB: x86-64 only; the Raspberry Pi boots without GRUB)
-if [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
-    install -d "$PKG/usr/share/grub/themes/lordos"
-    install -m 644 tools/iso/grub/lordos/theme.txt tools/iso/grub/lordos/*.png tools/iso/grub/lordos/*.pf2 \
-        "$PKG/usr/share/grub/themes/lordos/"
-fi
+# boot menu theme: both architectures, the arm64 ISO and Debian on arm64 boot with GRUB (the same arm64
+# package goes on the Raspberry Pi, which boots without GRUB and doesn't use it)
+install -d "$PKG/usr/share/grub/themes/lordos"
+install -m 644 tools/iso/grub/lordos/theme.txt tools/iso/grub/lordos/*.png tools/iso/grub/lordos/*.pf2 \
+    "$PKG/usr/share/grub/themes/lordos/"
 # LordOS GTK3 themes (the settings portal picks them by light/dark)
 install -d "$PKG/usr/share/themes"
 cp -r assets/gtk/LordOS assets/gtk/LordOS-dark "$PKG/usr/share/themes/"

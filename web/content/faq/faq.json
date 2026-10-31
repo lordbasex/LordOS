@@ -143,9 +143,9 @@
             "pt": "Quais processadores são suportados?"
           },
           "a": {
-            "en": "On PCs, 64-bit x86 processors (amd64) from Intel and AMD. On ARM, only the Raspberry Pi 5 is supported. There are no 32-bit images.",
-            "es": "En PC, procesadores x86 de 64 bits (amd64) de Intel y AMD. En ARM, solo la Raspberry Pi 5. No hay imágenes de 32 bits.",
-            "pt": "No PC, processadores x86 de 64 bits (amd64) da Intel e da AMD. Em ARM, só o Raspberry Pi 5. Não há imagens de 32 bits."
+            "en": "On PCs, 64-bit x86 processors (amd64) from Intel and AMD. On ARM, only the Raspberry Pi 5 is supported; an arm64 ISO for UEFI machines and virtual machines is in development for 0.8.7, so far run only on emulated QEMU. There are no 32-bit images.",
+            "es": "En PC, procesadores x86 de 64 bits (amd64) de Intel y AMD. En ARM, solo la Raspberry Pi 5; una ISO arm64 para máquinas y máquinas virtuales con UEFI está en desarrollo para 0.8.7, por ahora probada solo en QEMU emulado. No hay imágenes de 32 bits.",
+            "pt": "No PC, processadores x86 de 64 bits (amd64) da Intel e da AMD. Em ARM, só o Raspberry Pi 5; uma ISO arm64 para máquinas e máquinas virtuais com UEFI está em desenvolvimento para a 0.8.7, por enquanto testada só em QEMU emulado. Não há imagens de 32 bits."
           }
         },
         {

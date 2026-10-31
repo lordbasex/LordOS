@@ -49,6 +49,7 @@
   "summary.lang": "Idioma, região e hora",
   "summary.layout": "Partições",
   "summary.layoutValue": "GPT: boot BIOS 1 MB · EFI 512 MB (FAT32) · sistema (ext4) no resto",
+  "summary.layoutValueEfi": "GPT: EFI 512 MB (FAT32) · sistema (ext4) no resto",
   "summary.login": "Ao iniciar aparece a tela de login: entre com este usuário e a senha. O login automático pode ser ativado em Ajustes → Usuários. A senha também é usada para sudo e tarefas de administração.",
   "summary.swap": "Swap",
   "summary.user": "Usuário",

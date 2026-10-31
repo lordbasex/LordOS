@@ -4,7 +4,7 @@
 import { View, Text, Button, useTheme, useLocale, typeScale, spacing } from '@lordos/sdk';
 import { platform } from '../platform.js';
 import { app, set, run, cancel, isBusy } from '../state.js';
-import { deviceById, COOLERS } from '../core/catalog.js';
+import { deviceById, deviceLabel, COOLERS } from '../core/catalog.js';
 import { Group, KeyValue, Notice, ProgressBar, Badge, useTick, Press } from './kit.jsx';
 import { DriveArt } from './art.jsx';
 import { StepHeader } from './StepDevice.jsx';
@@ -35,7 +35,7 @@ function Review({ s }) {
     <View>
       <StepHeader title={tr('imager.review.title')} text={tr('imager.review.text')} />
       <Group>
-        <KeyValue label={tr('imager.step.device')} value={dev.name || tr('imager.device.pc')} />
+        <KeyValue label={tr('imager.step.device')} value={deviceLabel(dev, tr)} />
         <KeyValue label={tr('imager.step.image')} value={img.official ? `LordOS ${img.release.version} · ${formatSize(img.size)}` : `${img.name} · ${formatSize(img.size)}`} />
         <KeyValue label={tr('imager.step.storage')} value={`${s.drive.model} · ${formatSize(s.drive.size)} (${s.drive.name})`} />
         <KeyValue label={tr('imager.review.check')} value={tr(img.official ? 'imager.review.checkOfficial' : 'imager.review.checkCustom')} />

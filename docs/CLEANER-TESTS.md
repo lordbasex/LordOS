@@ -46,5 +46,18 @@ on-screen frame times are **not** measured.
 
 ## Not automated
 
-The admin actions' own entry points run as root and need a machine to clean: their folder rules are tested, the actions weren't run on the VM. On-screen checks are by hand in an
+The admin actions ran as root once, on 2026-10-30, in a real session of an installed arm64 system in a throwaway emulated machine (`ISO.md`, "The arm64 ISO"), from Cleanup's system card with files planted first:
+
+| Action | Result |
+|---|---|
+| `clean-status` | answered: system log 16 MB, packages 4.8 MB, temporary files 8.6 MB; the sizes changed after each action |
+| `clean-journal` | "done", exit 0; 16 MB stayed, under its 200 MB limit, so no journal was over the limit in this run |
+| `clean-apt-cache` | removed `t1.deb` and `partial/t2.part`; kept `keep.txt`, the symbolic link `link.deb` and `lock` |
+| `clean-var-tmp` | removed only the old root file; kept a file open in a process, a hard-linked pair, a user's file, a new file and a folder |
+
+`/sys/fs/cgroup/system.slice/lordos.service/lordos-session-1000/lordos-cleaner.scope` appeared in both a live and an installed session.
+
+Found in that run: **a scan finds nothing in a live session.** On the live system's overlay a regular file's device differs from its folder's (`1f`, `1e` here), and the walker (`lcmain.c`, `other_dev`) counts it as another mount, so "This scan found nothing". An installed system on ext4 isn't affected. **The system card is unreachable when a scan finds nothing**: `CleanupList` renders it only with rule rows. Both open.
+
+On-screen checks are by hand in an
 isolated headless session. In that session a moving screen leaves the mirror's lossless stills stale, so screenshots are taken with Reduce motion on.

@@ -8,7 +8,7 @@ import { View, Text, ScrollView, Button, Lumo, useTheme, useLocale, useStore, ty
 import { useEffect } from 'react';
 import { platform } from './platform.js';
 import { app, set, STEPS, loadReleases, isBusy } from './state.js';
-import { deviceById } from './core/catalog.js';
+import { deviceById, deviceLabel } from './core/catalog.js';
 import { Press, Helper, useFocusKeys } from './ui/kit.jsx';
 import { ImagerIcon } from './ui/art.jsx';
 import { DeviceStep } from './ui/StepDevice.jsx';
@@ -56,7 +56,7 @@ function back() {
 }
 
 function stepDetail(s, id, tr) {
-  if (id === 'device') return deviceById(s.device)?.name || tr('imager.device.pc');
+  if (id === 'device') return deviceLabel(deviceById(s.device), tr);
   if (id === 'image') return s.image ? (s.image.official ? `LordOS ${s.image.release.version}` : s.image.name) : '';
   if (id === 'storage') return s.drive ? `${s.drive.model} · ${formatSize(s.drive.size)}` : '';
   if (id === 'customise') return s.customise ? (s.cfg.hostname || tr('imager.custom.on')) : tr('imager.custom.skipped');

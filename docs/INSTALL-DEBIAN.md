@@ -21,7 +21,7 @@ this works even though the script itself comes through a pipe.
 | | |
 |---|---|
 | System | Debian 13 (trixie). A derivative based on trixie (`ID_LIKE=debian`) works, with a warning: only Debian itself is tested. |
-| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. |
+| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. An arm64 virtual machine won't need this page once 0.8.7's [arm64 live ISO](ISO.md) is released. |
 | Rights | root, or a user who can use `sudo` |
 | Disk | at least 2 GB free on `/var` (the package plus the dependencies apt pulls in) |
 | Init | systemd running (Debian's default) |
@@ -50,7 +50,10 @@ this works even though the script itself comes through a pipe.
    - adds your user (the one who ran `sudo`, or `--user NAME`) to whichever of these groups exist:
      `audio video input render lpadmin pipewire plugdev`. If the system has no administrator at all (a Debian
      installed with a root password), it also offers to make that user one, by adding them to `sudo`: the Store
-     can't install or update without an administrator. Otherwise it does **not** add anyone to `sudo`;
+     can't install or update without an administrator. Otherwise it does **not** add anyone to `sudo`.
+     A system installed before this (the Store refuses with "<user> is not an administrator" and nobody is one)
+     is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
+     the session user to `sudo`, effective after a reboot;
    - generates the `en_US`, `es_ES` and `pt_BR` UTF-8 locales (the languages the interface ships).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
@@ -126,7 +129,7 @@ At the end the installer asks whether to show the LordOS boot splash (the crown 
   (`/etc/default/grub` and `/etc/default/grub.d/*.cfg`) don't already have `splash`/`nosplash` or a
   `GRUB_THEME`, and the terminal isn't `console`/`serial`, it writes its own drop-in
   `/etc/default/grub.d/lordos.cfg` (`splash` added to `GRUB_CMDLINE_LINUX_DEFAULT`,
-  `GRUB_GFXPAYLOAD_LINUX=keep` and, on amd64, the LordOS boot menu as `GRUB_THEME`) and runs
+  `GRUB_GFXPAYLOAD_LINUX=keep` and the LordOS boot menu as `GRUB_THEME`, on arm64 too since 0.8.7) and runs
   `update-grub`. `/etc/default/grub` itself is never edited. Without GRUB (systemd-boot, a
   Raspberry Pi), only the theme is set and the final message says to add `quiet splash` to the kernel
   command line.
@@ -238,7 +241,7 @@ sudo reboot
 | `LordOS needs Debian 13 (trixie)` | Debian 12 and testing/unstable are not supported: the package depends on trixie's library versions. |
 | Black screen or back to text after the reboot | Switch to tty2 (Ctrl+Alt+F2), log in, and look at `journalctl -b -u lordos`. To go back to your desktop meanwhile, see "Switching back" above. |
 | The previous desktop still appears | The display manager was kept (`--keep-display-manager` or "no" to the question). Disable it as shown in the final message. |
-| No sound | Log out and in again (the new groups and linger apply on the next login), and check `systemctl --user status pipewire wireplumber`. |
+| No sound | Reboot (the new groups and linger apply on the next boot; a logout was not enough on a reported machine), and check `systemctl --user status pipewire wireplumber`. |
 | Network changed | It shouldn't: interfaces managed by NetworkManager, ifupdown or systemd-networkd are left alone. If an interface nobody managed now has a DHCP address, that is LordOS's DHCP (`NETWORK.md`); Settings → Network turns it off. |
 
 ## For maintainers

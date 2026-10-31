@@ -2,15 +2,19 @@
 // only (labels are i18n keys); shared by the native and desktop apps. docs/IMAGER.md.
 
 // Devices. Only the Raspberry Pi 5 is supported (docs/RASPBERRY.md); the others are listed so
-// people see why their board isn't there. `pc` writes the amd64 live ISO to a USB stick.
+// people see why their board isn't there. `pc` and `pc-arm64` write a live ISO to a USB stick: the
+// amd64 one, and the arm64 one for generic UEFI arm64 machines (no first-boot settings on either).
 export const DEVICES = [
   { id: 'rpi5', name: 'Raspberry Pi 5', kind: 'pi', supported: true, image: /^lordos-[0-9][\w.~+-]*-rpi5-arm64\.img\.xz$/, customise: true },
   { id: 'pc', kind: 'pc', supported: true, image: /^lordos-live-[0-9][\w.~+-]*-amd64\.iso$/, customise: false },
+  { id: 'pc-arm64', kind: 'pc', supported: true, image: /^lordos-live-[0-9][\w.~+-]*-arm64\.iso$/, customise: false },
   { id: 'rpi500', name: 'Raspberry Pi 500 / CM5', kind: 'pi', supported: false },
   { id: 'rpi4', name: 'Raspberry Pi 4 / 400', kind: 'pi', supported: false },
   { id: 'rpi3', name: 'Raspberry Pi 3 / Zero 2', kind: 'pi', supported: false, never: true },
 ];
 export const deviceById = (id) => DEVICES.find((d) => d.id === id) || null;
+// The name to show: a board's own, or the i18n key of a live ISO's card
+export const deviceLabel = (d, tr) => (d && d.name) || tr(`imager.device.${d && d.id === 'pc-arm64' ? 'pcArm64' : 'pc'}`);
 
 // RAM advice for the Pi 5 (docs/RASPBERRY.md, "Recommended equipment")
 export const RAM_ADVICE = [

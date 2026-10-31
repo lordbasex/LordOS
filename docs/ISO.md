@@ -1,6 +1,7 @@
 # LordOS live ISO
 
-An image to boot LordOS from a USB stick or a CD on any 64-bit PC, without installing anything. It
+An image to boot LordOS from a USB stick or a CD on any 64-bit PC (and, in development for 0.8.7, on
+UEFI arm64 virtual machines: "The arm64 ISO" below), without installing anything. It
 is the LordOS distribution itself (a minimal Debian 13 with the LordOS desktop environment) and
 it boots straight into the desktop. It's for testing real hardware: the GPU (AMD or Nvidia),
 sound, Wi-Fi and displays. It is the first step of M8 (the
@@ -105,6 +106,67 @@ Tested with the rebuilt ISO on VM 123 (Proxmox, q35, 4 vCPUs, emulated HD Audio)
 
 Not tested: installing to disk on a BIOS machine with this ISO (no free test disk; the installer
 writes both BIOS and UEFI GRUB, as tested on VM 117 in 0.7.0).
+
+## The arm64 ISO
+
+`lordos-live-<version>-arm64.iso` (in development for 0.8.7, not in a release yet) is the same live system and disk
+installer for generic UEFI arm64 machines and virtual machines. `tools/iso/build.sh` takes the architecture from the
+host (`dpkg --print-architecture`); amd64 keeps every step as it was. On arm64:
+
+- `linux-image-arm64` and `grub-efi-arm64-bin`; UEFI only, with no BIOS boot and no `grub-pc-bin`.
+- `mksquashfs` without a BCJ filter (squashfs-tools has none for 64-bit ARM; its `arm` is the 32-bit instruction set).
+- The disk installer's differences are under "Installing to disk". The firmware packages are `all`, the same list.
+- The `lordos` package carries the GRUB theme on both architectures (before, amd64 only). The Pi doesn't use it.
+
+**Building on x86-64** (VM 116): `sudo tools/iso/build-arm64.sh [work folder]` runs `build.sh` in an arm64 chroot under
+qemu-user. The chroot (`/var/tmp/lordos-arm64-br`, see `RASPBERRY.md`) is only read: an overlay in a private mount
+namespace takes every change. It compiles `server/build` for aarch64 in the tree it's given, so use a separate copy. On
+an arm64 host, run `build.sh` itself. It needs about 6 GB free: `xorriso` checks the space for the whole ISO before it starts, with the chroot still there.
+
+Measured on VM 116 (8 vCPUs, 4 GB) for an unsigned development build of the 0.8.6 version string, 2026-10-30:
+
+| | |
+|---|---|
+| Build | about 75 min, shared with other work (the first run: 63 min for `build.sh`), all emulated |
+| ISO | 980 MB (1,028,743,168 bytes), sha256 `5bb77915…31637584` |
+| squashfs | 853 MB |
+| uncompressed system | 2.6 GB |
+| `lordos_0.8.6_arm64.deb` | 12.8 MB |
+
+**Tested** with `qemu-system-aarch64` on VM 116 under TCG (no KVM: the host is x86-64): `virt` machine, `-cpu max`, 6
+vCPUs, 2.2 GB, edk2 2025.02 (`AAVMF_CODE.no-secboot.fd`, Secure Boot off), `virtio-gpu-pci` at 1280×800 without 3D,
+xHCI keyboard and tablet, the ISO on virtio-scsi, a 16 GB qcow2 on virtio-blk.
+
+| What | Result |
+|---|---|
+| ISO boot through GRUB | menu with the theme ([screenshot](boot/arm64-grub-menu.png)) on GOP; the menu's timeout boots the kernel; live desktop about 3 minutes after power on, with the installer open ([screenshot](boot/arm64-live-desktop.png)) |
+| Live session | `lordos`, `lord-netperm` and `lord-fand` active, no failed unit; network by LordOS's own DHCP on `enp0s1` |
+| Composition | CPU path, on its own: `gpu: the card (virtio_gpu) has no 3D acceleration: CPU composition`; the KMS driver is `virtio_gpu` (features `-virgl`) |
+| Safe mode (`lordos.gpu=0`) | the menu's "safe mode" entry: `LORD_GPU=0` in the session (`gpu: off (LORD_GPU=0), CPU composition`), desktop and installer |
+| Disk installer, through the wizard | installed onto the qcow2 in about 17 minutes ([screenshot](boot/arm64-installed.png)): GPT with `vda1` EFI and `vda2` of type "Linux root (ARM-64)", no BIOS partition; the Summary step shows that layout |
+| The installer's Restart | the machine restarts into the firmware |
+| Installed system, ISO removed | boots from `EFI/BOOT/BOOTAA64.EFI` (fresh firmware variables) to the login screen, first frame 60.4 s after power on under TCG; login, the desktop ([screenshot](boot/arm64-installed-desktop.png)), Store, Cleaner; root on ext4, ESP on vfat, no failed unit |
+
+The disk installer and the installed system ran on the first build; the final one differs only by Cleaner's images in the package (below), and was booted to the desktop and in safe mode.
+
+**Kernel and firmware findings on virtual machines.**
+
+- Debian's arm64 kernel (6.12.113) has `virtio_gpu`, `vmwgfx`, `bochs`, `qxl`, `nouveau`, `amdgpu`, `radeon`, `msm` and
+  `panfrost` as modules, and `virtio_blk`, `virtio_scsi`, `nvme`, `virtio_input` and `snd_virtio`. It has no `simpledrm`, as on
+  amd64: **a machine with only a firmware framebuffer has no KMS device**, so no desktop (lord-sessiond says so on the
+  text console). A virtual machine needs a virtio or similar KMS display; a headless one has nothing to show.
+- Landlock, Yama, BPF LSM (in `CONFIG_LSM`) and BTF are in the kernel, with 4K pages, so the sandbox and the firewall have what
+  they need; on the virtual machine `lord-netperm` is active.
+- **The disk's boot entry.** The installer writes the removable path with `--no-nvram`, so a firmware finds it by itself. On
+  edk2 with variables kept from the live boot and the disk at another PCI slot (the ISO's controller removed), the firmware
+  did not add the disk: PXE, HTTP, then its shell. With fresh variables it booted. If that happens, run
+  `FS0:\EFI\BOOT\BOOTAA64.EFI` in the shell, or reset the machine's firmware variables.
+- `update-initramfs` says "No zstd" and uses gzip, because the list has no `zstd` (amd64 too): the initramfs is 82 MB.
+- The installer's disk list shows a virtio disk's model as `0x1af4` (sysfs's vendor file on virtio). Only the text.
+
+**Not tested:** real arm64 hardware, a USB stick, any hypervisor with hardware acceleration (KVM on arm64, or desktop hypervisors on ARM
+laptops), a virtual GPU with 3D, sound, the browsers, a signed release build, and
+Secure Boot, which has to be off as on amd64.
 
 ## Boot splash and boot menu
 
@@ -225,6 +287,10 @@ How the disk ends up:
 | 1 `biosboot` (EF02) | 1 MiB | grub for BIOS on a GPT disk |
 | 2 `EFI` (EF00) | 512 MiB, FAT32 | grub for UEFI, at the removable path (`EFI/BOOT/BOOTX64.EFI`: boots on any firmware without an NVRAM entry) |
 | 3 `LordOS` (8304) | the rest, ext4 | the system; swap is `/swapfile` |
+
+On **arm64** (UEFI only) there is no BIOS partition: 1 `EFI` (EF00, 512 MiB, FAT32, `EFI/BOOT/BOOTAA64.EFI`) and
+2 `LordOS` (8305, the Linux ARM64 root type). `grub-install --target=arm64-efi` is the only grub target, and the wizard's
+Summary shows that layout.
 
 The installed system is a copy of the live system with these changes:
 
@@ -362,9 +428,9 @@ previous one is kept with its date: `lordos-live-0.7.0-amd64-20261016-1529.iso` 
    - `/etc/network/interfaces` with only `lo`;
    - `net.ipv4.ping_group_range`, so `ping` works without root.
 5. Cleanup: apt lists, caches and `machine-id`.
-6. `mksquashfs` (xz, BCJ x86).
+6. `mksquashfs` (xz, BCJ x86 on amd64, no BCJ on arm64).
 7. `grub-mkrescue`: a single ISO with El Torito for BIOS and an EFI image (`efi.img`) for UEFI, with
-   the hybrid MBR for USB.
+   the hybrid MBR for USB. On arm64, the EFI image only.
 
 lord-server is compiled with `make -C server GPU=1` (it needs `libgbm-dev libegl-dev libgles-dev`) so
 the ISO ships GPU compositing (Mesa; see `GPU.md`).
@@ -399,7 +465,7 @@ sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorri
 | `clang` | compiling `lord-netperm`'s BPF programs (per-app network permissions); without it the build still works, but no rules are applied |
 | `debootstrap` | the Debian base system |
 | `squashfs-tools` | `mksquashfs` |
-| `xorriso`, `grub-pc-bin`, `grub-efi-amd64-bin`, `grub-common`, `mtools`, `dosfstools` | `grub-mkrescue`: the hybrid BIOS + UEFI ISO |
+| `xorriso`, `grub-pc-bin`, `grub-efi-amd64-bin`, `grub-common`, `mtools`, `dosfstools` | `grub-mkrescue`: the hybrid BIOS + UEFI ISO. On an arm64 host, `grub-efi-arm64-bin` instead of the two grub binaries (`build-arm64.sh` installs them in its overlay) |
 | `lintian` | checking the `.deb` |
 
 ### lintian

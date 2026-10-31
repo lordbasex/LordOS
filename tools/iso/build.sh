@@ -1,13 +1,14 @@
 #!/bin/sh
-# build.sh — builds the LordOS live ISO (Debian 13 + LordOS), hybrid for USB and CD,
-# with BIOS and UEFI boot. See docs/ISO.md.
+# build.sh — builds the LordOS live ISO (Debian 13 + LordOS), hybrid for USB and CD. The architecture
+# is the build host's (dpkg --print-architecture): amd64 boots with BIOS and UEFI, arm64 with UEFI only
+# (on an x86-64 machine, tools/iso/build-arm64.sh runs this script in an arm64 chroot). See docs/ISO.md.
 #
 # Usage (as root, on Debian 13, from the root of the already built repository):
 #   make -C server -j"$(nproc)"          # lord-server and lord-sessiond (needs libssl-dev, libsrtp2-dev and libusrsctp-dev: the remote desktop is WebRTC only; clang for lord-netperm's BPF)
 #   (the themes: npm run build on the development machine; the .bundle.js files travel with the tree)
 #   sudo tools/iso/build.sh [work folder]   # default /var/tmp/lordos-iso
 #
-# Result: <work>/out/lordos-live-<version>-amd64.iso, lordos_<version>_amd64.deb and
+# Result: <work>/out/lordos-live-<version>-<arch>.iso, lordos_<version>_<arch>.deb and
 # lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
 set -eu
 
@@ -21,16 +22,24 @@ SUITE=trixie
 CH="$WORK/chroot"
 IMG="$WORK/image"
 OUT="$WORK/out"
-ISO="$OUT/lordos-live-$VERSION-amd64.iso"
-DEB="$OUT/lordos_${VERSION}_amd64.deb"
+ARCH=$(dpkg --print-architecture)
+case "$ARCH" in
+    amd64) PKG_KERNEL=linux-image-amd64; PKGS_GRUB="grub-efi-amd64-bin grub-pc-bin"; GRUB_DIR=x86_64-efi; SQUASHFS_BCJ="-Xbcj x86" ;;
+    # UEFI only. mksquashfs has no BCJ filter for 64-bit ARM ("arm" is the 32-bit instruction set)
+    arm64) PKG_KERNEL=linux-image-arm64; PKGS_GRUB="grub-efi-arm64-bin"; GRUB_DIR=arm64-efi; SQUASHFS_BCJ="" ;;
+    *) echo "build.sh: LordOS builds a live ISO for amd64 and arm64, not $ARCH" >&2; exit 1 ;;
+esac
+ISO="$OUT/lordos-live-$VERSION-$ARCH.iso"
+DEB="$OUT/lordos_${VERSION}_$ARCH.deb"
 T0=$(date +%s)
 
 for t in debootstrap mksquashfs xorriso grub-mkrescue mformat dpkg-deb; do
     command -v "$t" >/dev/null || { echo "build.sh: missing $t (see docs/ISO.md, build packages)" >&2; exit 1; }
 done
+[ -d "/usr/lib/grub/$GRUB_DIR" ] || { echo "build.sh: missing /usr/lib/grub/$GRUB_DIR (see docs/ISO.md, build packages)" >&2; exit 1; }
 
 # Live system packages. LordOS does not use GNOME or KDE: only what is below (xwayland only for X11 apps).
-PKGS_BASE="linux-image-amd64 initramfs-tools live-boot live-boot-initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
+PKGS_BASE="$PKG_KERNEL initramfs-tools live-boot live-boot-initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
  iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps"
 # gsettings-desktop-schemas: without it GTK 3 apps can't read gtk-theme from the keyfile backend
 # lord-server writes, and they draw light Adwaita instead of LordOS / LordOS-dark (docs/WAYLAND.md)
@@ -46,8 +55,8 @@ PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firm
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
-# the disk installer (server/src/install): partition, format, copy and grub for UEFI and BIOS
-PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common grub-efi-amd64-bin grub-pc-bin"
+# the disk installer (server/src/install): partition, format, copy and grub (UEFI and BIOS on amd64, UEFI on arm64)
+PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common $PKGS_GRUB"
 # the boot splash (the LordOS Plymouth theme comes in the lordos package; plymouth-label draws the
 # password prompt's text for encrypted disks)
 PKGS_SPLASH="plymouth plymouth-label"
@@ -167,9 +176,11 @@ KVER=$(ls "$CH/boot" | sed -n 's/^vmlinuz-//p' | sort -V | tail -1)
 cp "$CH/boot/vmlinuz-$KVER" "$IMG/live/vmlinuz"
 cp "$CH/boot/initrd.img-$KVER" "$IMG/live/initrd.img"
 rm -f "$IMG/live/filesystem.squashfs"
-mksquashfs "$CH" "$IMG/live/filesystem.squashfs" -comp xz -Xbcj x86 -b 1M -noappend -quiet > /dev/null
+# shellcheck disable=SC2086 # $SQUASHFS_BCJ: empty, or an option and its value
+mksquashfs "$CH" "$IMG/live/filesystem.squashfs" -comp xz $SQUASHFS_BCJ -b 1M -noappend -quiet > /dev/null
 
-# 5. grub (BIOS + UEFI in the same hybrid ISO). GRUB menus are English; the entries with a
+# 5. grub (BIOS + UEFI in the same hybrid ISO on amd64; UEFI on arm64: grub-mkrescue builds for the
+# platforms it finds in /usr/lib/grub). GRUB menus are English; the entries with a
 # language name pass lordos.lang to lordos-live-prep (English is the default).
 # The LordOS boot menu theme (dark, small crown, rounded selection); "safe mode" boots
 # without the splash (text), the other entries with it.

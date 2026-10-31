@@ -18,12 +18,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **An arm64 live ISO** (2026-10-30; `docs/ISO.md`, "The arm64 ISO"): `lordos-live-<version>-arm64.iso` for generic UEFI arm64 machines and virtual machines, with the live desktop and the disk installer.
+  - **Build:** `tools/iso/build.sh` takes the architecture from the host; amd64 keeps its steps (`linux-image-amd64`, both grub platforms, BCJ x86). arm64 uses `linux-image-arm64`, `grub-efi-arm64-bin`, UEFI only, no BCJ. `tools/iso/build-arm64.sh` runs it from x86-64 in the arm64 chroot under qemu-user, through an overlay in a private mount namespace, so the chroot isn't changed.
+  - **Installer:** on arm64 no BIOS partition, ESP first, root with the Linux ARM64 partition type, `grub-install --target=arm64-efi` only; the wizard's Summary shows that layout (en, es, pt). The amd64 steps are the same.
+  - **Elsewhere:** the `lordos` package carries the GRUB theme on arm64 too, so `install.sh` also offers it on arm64 Debian; the Imager lists "Generic arm64 (USB stick)" with only the releases that have that ISO; the release notes list it. The site's download card stays amd64 until a release has the file.
+  - **Tested:** an unsigned development build on emulated QEMU (`virt`, edk2, virtio-gpu without 3D, CPU composition): reached the live desktop, installed through the wizard to a virtio disk and booted the result to a login and a desktop. Not tested: real hardware, a USB stick, a hypervisor with hardware acceleration, a 3D virtual GPU, sound, the browsers, a signed build.
+
+- **Cleaner's images were missing from the package** (2026-10-30, found booting the arm64 ISO): `mkdeb.sh` didn't copy `assets/cleaner`, so on any installed `.deb` or ISO Cleaner drew without its background, tiles and hero art, and the windows behind showed through. Fixed; checked by adding the folder on the installed test system.
+
+- **Cleaner's root actions and scope ran for the first time** (2026-10-30), in a throwaway emulated arm64 installed system: `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp` did what their rules say on planted files, and `lordos-cleaner.scope` appeared under the session (`docs/CLEANER-TESTS.md`). Two open bugs came out: a scan finds nothing in a live session (the overlay's file devices), and the system card can't be reached when a scan finds nothing.
+
 - **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13
   virtual machine). The Store then refused everything with "<user> is not an administrator", and LordOS has no way to
   name an administrator from inside. `install.sh` now picks the user who logged in, or the only regular user, when it
   runs as plain root; when the system has no member of `sudo`, `admin` or `wheel` it offers to make that user an
-  administrator; and it installs `sudo`. Uninstalling removes what it added. The helpers were tested with stubs; the
-  whole install on a clean Debian was not run.
+  administrator; and it installs `sudo`. Uninstalling removes what it added. Tested with the 0.8.6 release on a clean
+  amd64 Debian 13 virtual machine with a root password, one regular user and no `sudo`: the user became an administrator,
+  and their services had the new group after a reboot (a logout was not enough on the reported machine). The login
+  screen then appeared; logging in on it was not part of this run.
+- **A system that already has nobody as an administrator can now get out of it from the Store** (2026-10-30, approved by the
+  maintainer). Fixing `install.sh` doesn't help a machine that already went through it: LordOS gave no way to name an
+  administrator from inside. When the Store is told "<user> is not an administrator" and no non-root account is in `sudo`,
+  `admin` or `wheel`, it now asks for the root password under the refusal (en, es, pt) and adds the session user to `sudo`,
+  effective after a restart, which it says.
+  - **Closed actions:** `admin-rescue` (the root password on the request, never a user name; the UI calls it with
+    `{ quiet: true }`) and the read-only `admin-rescue-status`, both open to non-administrators, since they are the only ones who
+    need them. Each decides again as root, with `src/users/admin_rescue.c` (`build/admin-rescue-test`).
+  - **Refused:** when any administrator exists, when the session account isn't a person's, when `sudo` (group or program) is
+    missing, and when root is locked or has no password. A wrong password costs 2 s, and a machine-wide lock allows one try at
+    a time. Runs only `/usr/sbin/usermod --append --groups sudo <session user>`.
+  - **Tested:** on an installed amd64 virtual machine with a throwaway root password: the whole path through the Store's form
+    (the refusal, a wrong password, the right one, Restart Now, and the refused action working after the restart); each refusal
+    above on the real system files; the form in a right-to-left session. The Store's "Check for updates" with no catalog showed no error at all before; it does now. Not tested: real hardware, arm64, a remote desktop session, the
+    missing-sudo and locked-root cards on screen (their helper answers were), and the audit log line of a wrong password.
+
+- **`install.sh` said SSH was left as it was, yet root can no longer log in over it.** The package's `PermitRootLogin no`
+  applies from the next sshd restart. The installer now says so, and warns of a lockout when the system has no
+  administrator. The warning with an administrator was seen on that virtual machine; the one without was not.
 
 - **`lord.fs` refuses a parent of a protected path** (2026-10-30, a bug found by Cleaner's audit): `trash`, `rename` and a
   move of a folder that holds a protected path (`~/.config/lordos`, `~/.config`, `~/.local/share/lordos`) took the settings,

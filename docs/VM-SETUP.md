@@ -1693,3 +1693,16 @@ it from a terminal) and run from there as `lord`; nothing was installed over `/u
 package was added. The build uses `xz` (xz-utils, already installed: `dpkg-deb` depends on it) to compress the
 xz workload's fixed text (`build/gen/lb_corpus.h`). The app was checked in an isolated headless session of that
 tree (own `HOME`, `XDG_RUNTIME_DIR` and bus, driven over its `remote.sock`), removed afterwards.
+
+## Step — 0.8.7 in development: the arm64 live ISO on VM 116 (2026-10-30)
+
+`tools/iso/build-arm64.sh` and booting the result under emulation (`docs/ISO.md`, "The arm64 ISO"):
+
+```sh
+sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
+```
+
+`qemu-system-x86` was also installed on VM 116 earlier and was not recorded then:
+`sudo apt-get install -y --no-install-recommends qemu-system-x86`. The packages `build-arm64.sh` adds (debootstrap,
+squashfs-tools, xorriso, grub-common, grub-efi-arm64-bin, mtools, dosfstools) go into an overlay over the arm64 chroot,
+not on the VM and not into the chroot itself.

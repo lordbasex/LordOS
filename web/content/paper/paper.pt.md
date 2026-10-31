@@ -243,7 +243,7 @@ O LordOS inclui seu próprio interpretador WebAssembly em C (`server/src/wasm`),
 
 ### 5.6 Instalar o LordOS
 
-- **ISO live** para PCs de 64 bits, com instalador gráfico (UEFI e BIOS).
+- **ISO live** para PCs de 64 bits, com instalador gráfico (UEFI e BIOS). Uma ISO arm64 para máquinas e máquinas virtuais com UEFI está em desenvolvimento para a 0.8.7; por enquanto só rodou em QEMU emulado (`docs/ISO.md`).
 - **Imagem para Raspberry Pi 5**, para cartão SD ou NVMe (§7.4), gravada e preparada com o LordOS Imager, que também grava um arquivo de primeira execução que a placa aplica uma única vez no primeiro boot (validado de forma rígida; nada é aplicado se alguma parte estiver errada).
 - **Num Debian 13 já instalado**: `curl -fsSL https://lordos.org/install.sh | sh`. O script pergunta antes de mudar qualquer coisa, baixa o `SHA256SUMS` e verifica sua assinatura Ed25519 com a chave de release embutida no script, recusa continuar sem uma assinatura válida, confere o SHA-256 do `.deb`, instala com o apt e configura o sistema como a ISO. Os arquivos do release são publicados no GitHub Releases.
 

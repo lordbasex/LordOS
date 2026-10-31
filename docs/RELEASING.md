@@ -12,7 +12,7 @@ The releases page is the project's public changelog: every release is documented
 - `package.json` carries the version without the suffix (`"version": "0.8.0"`) and the channel
   separately (`"lordos": {"channel": "beta"}`; empty for a stable release). The file names use
   that version: `lordos_0.8.0_amd64.deb`, `lordos-live-0.8.0-amd64.iso`,
-  `lordos-0.8.0-rpi5-arm64.img.xz`.
+  `lordos-0.8.0-rpi5-arm64.img.xz` and, since 0.8.7, `lordos-live-0.8.7-arm64.iso`.
 - **An update of a published version** that only fixes it or completes it (no features planned for
   the next version) adds a fourth number: `0.8.4.1-beta` after `0.8.4-beta`, package `0.8.4.1`. dpkg
   sorts it after `0.8.4` and before `0.8.5`, so Store → Updates and apt offer it like any version.
@@ -61,6 +61,10 @@ The releases page is the project's public changelog: every release is documented
      `make -C server RELEASE=1` (it only runs code signed with the release key, with no development
      mode).
    - Build the ISO on the build VM (`sudo REQUIRE_SIGNED_CODE=1 tools/iso/build.sh`, [ISO.md](ISO.md)),
+     the arm64 ISO (0.8.7; `sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/iso/build-arm64.sh`, in a copy of the same
+     signed tree, because it compiles `server/build` for aarch64),
+     (the first release that ships it also adds arm64 to the ISO card in `web/src/home.html` and the file name in
+     `web/lib/imager-guide.mjs`, and to README's downloads; they stay amd64 until the file exists)
      the Raspberry Pi 5 image (`sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/rpi/build-img.sh`,
      [RASPBERRY.md](RASPBERRY.md)) and the `.deb` for amd64 and arm64
      (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh`), plus (0.8.7) the one `lordos-hwdata_<date>_all.deb` for both

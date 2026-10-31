@@ -49,4 +49,4 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 
 ## Tested
 
-See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root, paint cost and on-screen frame times.
+See `CLEANER-TESTS.md`. On 2026-10-30, in a throwaway emulated arm64 machine (`ISO.md`, "The arm64 ISO"), the scope appeared under `lord-sessiond` in a real session and the four admin actions ran as root (`CLEANER-TESTS.md`). Not tested: the Raspberry Pi, a real desktop computer, paint cost and on-screen frame times.

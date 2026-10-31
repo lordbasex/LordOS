@@ -243,6 +243,7 @@ our own code using Landlock and seccomp-bpf directly). Vendored = copied as sour
 |---|---|---|---|
 | x86-64 (amd64) | PC with UEFI or BIOS; AMD, Intel or Nvidia GPU, or no 3D GPU (CPU) | primary, tested on VM | live ISO with installer (`ISO.md`) |
 | ARM64 (aarch64) | **Raspberry Pi 5** (the only supported board) | tested on the board (`RASPBERRY.md`, release tests in `ISO.md`) | SD/NVMe image, `tools/rpi/build-img.sh` (`RASPBERRY.md`) |
+| ARM64 (aarch64) | generic UEFI machines and virtual machines | in development for 0.8.7: tested on emulated QEMU only (`ISO.md`, "The arm64 ISO") | live ISO with installer |
 
 The code is the same. The differences:
 

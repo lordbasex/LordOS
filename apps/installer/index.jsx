@@ -4,7 +4,7 @@
 // (validates everything again on the root side) and install-reboot. See docs/ISO.md.
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, useTheme, useLocale, useStore, createStore,
-  admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, typeScale, statusText, Lumo,
+  admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, Lumo,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 
@@ -275,9 +275,10 @@ function Summary() {
   const { t: tr } = useLocale();
   const s = useStore(wiz);
   const p = plan(s);
+  const arm64 = useSystemInfo(60000).arch === 'aarch64';     // UEFI only: no BIOS boot partition (install.c)
   const rows = [
     [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr('installer.summary.erased')}`],
-    [tr('installer.summary.layout'), tr('installer.summary.layoutValue')],
+    [tr('installer.summary.layout'), tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
     [tr('installer.summary.swap'), s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
     [tr('installer.summary.lang'), `${p.lang} · ${p.region}.UTF-8 · ${p.zone}`],
     [tr('installer.summary.keyboard'), kbName(p.kb)],

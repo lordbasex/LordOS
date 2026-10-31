@@ -49,6 +49,7 @@
   "summary.lang": "Language, region and time",
   "summary.layout": "Partitions",
   "summary.layoutValue": "GPT: BIOS boot 1 MB · EFI 512 MB (FAT32) · system (ext4) on the rest",
+  "summary.layoutValueEfi": "GPT: EFI 512 MB (FAT32) · system (ext4) on the rest",
   "summary.login": "At boot the login screen appears: sign in with this user and password. Automatic login can be turned on in Settings → Users. The password is also used for sudo and administration tasks.",
   "summary.swap": "Swap",
   "summary.user": "User",

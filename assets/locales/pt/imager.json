@@ -49,6 +49,8 @@
   "device.otherTitle": "Outras placas",
   "device.pc": "PC (pendrive USB)",
   "device.pc.text": "O sistema ao vivo num pendrive: experimente o LordOS e instale a partir dele.",
+  "device.pc-arm64.text": "O sistema ao vivo para máquinas arm64 com UEFI num pendrive: experimente o LordOS e instale a partir dele.",
+  "device.pcArm64": "arm64 genérico (pendrive USB)",
   "device.pcFooter": "Os ajustes do primeiro boot são para o Raspberry Pi; o sistema ao vivo pergunta por eles na instalação.",
   "device.pcText": "A imagem para PC é o sistema ao vivo: ela inicia pelo pendrive e pode instalar o LordOS no disco do computador.",
   "device.ram.comfortable": "Confortável para o dia a dia.",

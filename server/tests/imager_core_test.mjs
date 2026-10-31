@@ -109,6 +109,10 @@ ok('newest first', list[0].tag === 'v0.8.3-beta' && list[0].image.name === 'lord
 ok('signature files', list.every((r) => r.sums.name === 'SHA256SUMS' && r.sig.name === 'SHA256SUMS.sig'));
 const pc = rel.parseReleases(fs.readFileSync(path.join(here, 'imager/releases.json'), 'utf8'), 'pc');
 ok('pc iso', pc[0].image.name === 'lordos-live-0.8.3-amd64.iso');
+const armAssets = (v) => [{ name: `lordos-live-${v}-amd64.iso`, size: 7 }, { name: 'SHA256SUMS', size: 5 }, { name: 'SHA256SUMS.sig', size: 5 }];
+ok('arm64 iso: no image, no release', rel.parseReleases([{ tag_name: 'v0.8.6-beta', assets: armAssets('0.8.6') }], 'pc-arm64').length === 0);
+const armIso = rel.parseReleases([{ tag_name: 'v0.8.7-beta', assets: [...armAssets('0.8.7'), { name: 'lordos-live-0.8.7-arm64.iso', size: 9 }] }], 'pc-arm64');
+ok('arm64 iso: its own image', armIso.length === 1 && armIso[0].image.name === 'lordos-live-0.8.7-arm64.iso');
 ok('garbage list', rel.parseReleases('nope', 'rpi5').length === 0 && rel.parseReleases('{}', 'rpi5').length === 0);
 ok('hostile names dropped', rel.parseReleases([{ tag_name: 'v1.0.0', assets: [{ name: '../lordos-1.0.0-rpi5-arm64.img.xz', size: 5 }, { name: 'SHA256SUMS', size: 5 }, { name: 'SHA256SUMS.sig', size: 5 }] }], 'rpi5').length === 0);
 const point = rel.parseReleases([{ tag_name: 'v0.8.4.1-beta', published_at: '2026-10-25T20:00:00Z', assets: [{ name: 'lordos-0.8.4.1-rpi5-arm64.img.xz', size: 5 }, { name: 'SHA256SUMS', size: 5 }, { name: 'SHA256SUMS.sig', size: 5 }] }], 'rpi5');
