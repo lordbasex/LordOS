@@ -937,6 +937,7 @@ static void display_detach(void) {
     gpu_shutdown();
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
+    kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
     for (int i = OUT_MAX - 1; i >= 0; i--) {        /* the second displays first: out[0] owns the fd */
         Out *o = &s->out[i];
         if (!o->on && i) continue;
