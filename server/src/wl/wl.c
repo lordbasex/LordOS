@@ -51,6 +51,7 @@
 #include "xwayland.h"
 #include "../outputs.h"
 #include "../cursor.h"
+#include "ptrlock.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include <drm/drm_fourcc.h>
@@ -185,8 +186,10 @@ static unsigned cursor_gen;
 
 /* zwp_pointer_constraints / zwp_relative_pointer */
 static struct wl_list rel_pointers;
-typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot; } Constraint;
+typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot, spent; } Constraint;
 static Constraint *constraint;      /* the only active (or pending) one */
+static void constraint_update(void);
+static void constraint_escape(void);
 static dev_t drm_dev;
 /* linux-dmabuf feedback objects (re-sent when the GPU comes or goes), the signature of the table
  * last sent, and the formats the last GPU context imported (accepted off the GPU, see dmabuf_usable) */
@@ -623,6 +626,7 @@ static void surface_gone(struct wl_resource *r) {
     if (fs_surf == s) { fs_surf = NULL; ui.dirty = 1; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (cursor_surf == s) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
     if (constraint && constraint->surf == s) { constraint->surf = NULL; constraint->active = 0; }
+    constraint_update();                /* s may have been the window with the keyboard */
     if (s->dmabuf) queue_release(s->dmabuf);
     gpu_tex_free(s->tex);
     free(s->px);
@@ -2359,7 +2363,6 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
     return NULL;
 }
 
-static void constraint_update(void);
 static void pointer_enter(Surf *s, float lx, float ly) {
     if (pointer_focus == s) return;
     if (!s || !pointer_focus || s->client != pointer_focus->client) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
@@ -2521,6 +2524,7 @@ static int system_meta_key(int code, const KeyInfo *k) {
 
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
+    if (k->meta && code == KEY_ESC && wl_pointer_locked()) { if (value == 1) constraint_escape(); if (!fs_surf) return 1; }
     if (k->meta && code == KEY_ESC && fs_surf) { if (value == 1) leave_fullscreen(fs_surf); return 1; }   /* ❖Esc exits */
     if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     if (!key_focus) return 0;
@@ -2948,19 +2952,25 @@ static void constraint_send(Constraint *k, int on) {
     else { if (on) zwp_confined_pointer_v1_send_confined(k->res); else zwp_confined_pointer_v1_send_unconfined(k->res); }
 }
 
-/* Activated when the pointer enters its surface and released when it leaves. */
+/* Holds while the pointer is on its surface and the keyboard on its app (ptrlock.h). */
 static void constraint_update(void) {
     Constraint *k = constraint;
     if (!k || !k->surf) return;
     Surf *top = pointer_focus;
-    int want = top && (top == k->surf || top->parent == k->surf);
-    if (want && !k->active && k->oneshot >= 0) { k->active = 1; constraint_send(k, 1); cursor_gen++; }
-    else if (!want && k->active) {
-        k->active = 0;
-        constraint_send(k, 0);
-        if (k->oneshot) k->oneshot = -1;          /* oneshot: does not activate again */
-        cursor_gen++;
-    }
+    int on = top && (top == k->surf || top->parent == k->surf);
+    int kb = key_focus && key_focus->client == k->surf->client;
+    int what = ptrlock_step(&k->active, &k->spent, k->oneshot, on, kb);
+    if (what == PTRLOCK_SAME) return;
+    constraint_send(k, what == PTRLOCK_ON);
+    cursor_gen++;
+}
+
+/* ❖Esc: the way out that doesn't depend on the app. */
+static void constraint_escape(void) {
+    Constraint *k = constraint;
+    if (!k || ptrlock_escape(&k->active, &k->spent) == PTRLOCK_SAME) return;
+    constraint_send(k, 0);
+    cursor_gen++;
 }
 
 static void cons_gone(struct wl_resource *r) {
@@ -3072,6 +3082,7 @@ void wl_set_focus(int id) {
     }
     /* X11: the X focus follows (and with it whether X apps may read LordOS's clipboard) */
     xwm_focus(s && s->xw ? s->xw : NULL);
+    constraint_update();                /* a pointer lock holds only with the keyboard (ptrlock.h) */
     wl_display_flush_clients(dpy);
 }
 

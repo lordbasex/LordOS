@@ -13,7 +13,8 @@
  *   - the Wayland globals the compositor advertises, with their versions.
  *
  *   lordos-testbench                    interactive (F5 runs the protocol checklist again, Pause freezes
- *                                       the picture: one still frame to compare or capture)
+ *                                       the picture: one still frame to compare or capture, Ctrl+L
+ *                                       locks the pointer for 10 s)
  *   lordos-testbench --auto [seconds]   runs for a while (default 5 s), prints a JSON report and exits
  *   --gl                                 also starts the 3D view (G does it interactively)
  *
@@ -25,6 +26,7 @@
 #include "draw.h"
 #include "tb.h"
 #include "gl3d.h"
+#include "lockkey.h"
 #include "../bench/bench.h"
 
 #include <errno.h>
@@ -82,6 +84,7 @@ static struct wl_subcompositor *subcomp;
 static struct zwp_pointer_constraints_v1 *constraints;
 static struct zwp_locked_pointer_v1 *locked;
 static int lock_on;
+static double lock_t;
 struct wl_surface *surf;
 struct xdg_surface *xsurf;
 struct xdg_toplevel *top;
@@ -290,7 +293,7 @@ static void draw_panel(Surf *s, int x0) {
     stat_line(s, x, &y, "INPUT TO SCREEN", v, lat.n ? (bench_latency_avg(&lat) > 50 ? C_WARN : C_GOOD) : C_DIM);
     y += 8;
     /* graphics: the 3D view (G) */
-    d_text(s, x, y, 1, C_HEAD, "GRAPHICS  (G: 3D  V: VIDEO  L: LOCK POINTER)");
+    d_text(s, x, y, 1, C_HEAD, "GRAPHICS  (G: 3D  V: VIDEO  CTRL+L: LOCK)");
     y += 14;
     if (gl3d_on()) {
         stat_line(s, x, &y, "RENDERER", gl3d.renderer, C_TEXT);
@@ -304,7 +307,7 @@ static void draw_panel(Surf *s, int x0) {
         snprintf(v, sizeof v, "%d FPS: HELD 1X %lu  2X %lu  3X %lu  4X %lu  5+ %lu", video_fps, video_hold[0], video_hold[1], video_hold[2], video_hold[3], video_hold[4]);
         stat_line(s, x, &y, "VIDEO CADENCE", v, C_TEXT);
     }
-    if (locked) stat_line(s, x, &y, "POINTER LOCK", lock_on ? "LOCKED (L TO RELEASE)" : "ASKED, NOT LOCKED YET", lock_on ? C_GOOD : C_WARN);
+    if (locked) stat_line(s, x, &y, "POINTER LOCK", lock_on ? "LOCKED (CTRL+L OR 10 S)" : "ASKED, NOT LOCKED YET", lock_on ? C_GOOD : C_WARN);
     y += 8;
     /* pointer */
     d_text(s, x, y, 1, C_HEAD, "POINTER");
@@ -581,7 +584,8 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t t, 
     if (pressed) { lat_ev = t; lat_pending = 1; }
     if (pressed && key == KEY_G) { if (gl3d_on()) gl3d_stop(); else if (subcomp) gl3d_start(dpy, comp, subcomp, surf, card_x, card_y, card.w, card.h); }
     if (pressed && key == KEY_V) { video_fps = video_fps == 0 ? 24 : video_fps == 24 ? 30 : video_fps == 30 ? 60 : 0; memset(video_hold, 0, sizeof video_hold); video_last = -1; video_run = 0; }
-    if (pressed && key == KEY_L) toggle_lock();
+    int ctrl = kstate && xkb_state_mod_name_is_active(kstate, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0;
+    if (tb_lock_key(key, pressed, ctrl, locked != NULL, ptr_in)) toggle_lock();
     if (pressed && !seen[key]) {
         seen[key] = 1;
         if (on_map((int)key)) nseen++;
@@ -660,7 +664,7 @@ static void p_value120(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) 
 static void p_reldir(void *d, struct wl_pointer *p, uint32_t axis, uint32_t dir) { (void)d; (void)p; (void)axis; (void)dir; }
 static const struct wl_pointer_listener p_listener = { p_enter, p_leave, p_motion, p_button, p_axis, p_frame, p_source, p_stop, p_discrete, p_value120, p_reldir };
 
-/* pointer lock (L): the pointer stays put and only relative motion arrives (games, 3D viewers) */
+/* pointer lock (Ctrl+L, lockkey.h): the pointer stays put and only relative motion arrives (games, 3D viewers) */
 static void lk_locked(void *d, struct zwp_locked_pointer_v1 *l) { (void)d; (void)l; lock_on = 1; }
 static void lk_unlocked(void *d, struct zwp_locked_pointer_v1 *l) { (void)d; (void)l; lock_on = 0; }
 static const struct zwp_locked_pointer_v1_listener lk_l = { lk_locked, lk_unlocked };
@@ -668,6 +672,7 @@ static void toggle_lock(void) {
     if (locked) { zwp_locked_pointer_v1_destroy(locked); locked = NULL; lock_on = 0; return; }
     if (!constraints || !pointer) return;
     locked = zwp_pointer_constraints_v1_lock_pointer(constraints, surf, pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+    lock_t = now_ms();
     zwp_locked_pointer_v1_add_listener(locked, &lk_l, NULL);
 }
 
@@ -778,6 +783,7 @@ int main(int argc, char **argv) {
     double start = now_ms();
     int ran = 0;
     while (!closed && wl_display_dispatch(dpy) != -1) {
+        if (tb_lock_over(locked != NULL, lock_t, now_ms())) toggle_lock();
         if ((!ran && ft.frames > 2) || rerun_checks) {
             ran = 1;
             rerun_checks = 0;

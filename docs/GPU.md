@@ -519,7 +519,7 @@ re-import of an EGL-imported buffer was checked by reading the code path, not on
 | `wp_presentation` | 1 | Time and vblank number of the flip that showed each frame (KMS's `flip_ns`/`flip_seq`) |
 | `wp_viewporter` | 1 | Cropping and scaling of a surface (GPU path; the CPU path scales with a bilinear blit since `DISPLAYS.md`) |
 | `zwp_relative_pointer_manager_v1` | 1 | Raw mouse motion, without edges (first-person games) |
-| `zwp_pointer_constraints_v1` | 1 | Lock or confine the pointer to the window; locked: no `motion`, fixed cursor |
+| `zwp_pointer_constraints_v1` | 1 | Lock or confine the pointer to the window; locked: no `motion`, fixed hidden cursor. Holds only with the pointer on the surface and the keyboard on its app (`wl/ptrlock.h`); **❖Esc** releases it |
 | `xdg_toplevel.set_fullscreen` | — | Now real fullscreen: it takes the output, above everything, with the keyboard; **❖Esc** exits |
 | `wl_pointer.set_cursor` | — | The app's cursor (image or **hidden**, as games do) while the pointer is over it |
 
