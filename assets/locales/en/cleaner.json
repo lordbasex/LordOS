@@ -343,5 +343,8 @@
   "review.more": "and {n} more",
   "map.share": "{pct}%",
   "map.noneSelected": "Nothing selected",
+  "look.noche": "Noche",
+  "look.aurora": "Aurora",
+  "look.cristal": "Cristal",
   "large.allFolders": "All folders"
 }

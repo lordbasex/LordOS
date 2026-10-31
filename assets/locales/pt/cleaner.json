@@ -343,5 +343,8 @@
   "review.more": "e mais {n}",
   "map.share": "{pct}%",
   "map.noneSelected": "Nada selecionado",
+  "look.noche": "Noite",
+  "look.aurora": "Aurora",
+  "look.cristal": "Cristal",
   "large.allFolders": "Todas as pastas"
 }
