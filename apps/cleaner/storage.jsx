@@ -83,13 +83,13 @@ function Treemap({ data, onOpen }) {
 
 // what a folder is, by its name: the icon and the colour of its bubble. In the home folder its own folders count too,
 // under whatever name the user's language gave them.
-const NAMED = { '.cache': 'cache', '.config': 'config', '.local': 'data', '.var': 'data', Downloads: 'downloads', Trash: 'trash', '.Trash': 'trash',
+const NAMED = { __proto__: null, '.cache': 'cache', '.config': 'config', '.local': 'data', '.var': 'data', Downloads: 'downloads', Trash: 'trash', '.Trash': 'trash',
   node_modules: 'code', '.git': 'code', '.npm': 'code', '.cargo': 'code', '.rustup': 'code', '.gradle': 'code', '.m2': 'code', go: 'code', src: 'code', Projects: 'code', projects: 'code' };
 const HUE = { documents: 'blue', pictures: 'pink', music: 'violet', videos: 'rose', downloads: 'teal', desktop: 'indigo', code: 'orange', cache: 'rose', config: 'indigo', data: 'teal', trash: 'orange', others: 'indigo' };
 const CYCLE = ['sky', 'violet', 'teal', 'blue', 'orange', 'pink', 'indigo', 'rose'];
 
 export function folderKinds() {
-  const u = userDirs(), kinds = {};
+  const u = userDirs(), kinds = Object.create(null);     // a folder may be called "constructor"
   for (const k of ['documents', 'pictures', 'music', 'videos', 'desktop']) if (u[k]) kinds[u[k].split('/').pop()] = k;
   return kinds;
 }
@@ -130,10 +130,14 @@ function Bubbles({ data, W, H, onOpen, selected, onSelect, kinds }) {
   const p = usePal();
   const circles = useMemo(() => {
     const kids = data.children.filter((c) => c.allocated > 0);
-    const items = kids.slice(0, 13).map((c) => ({ ...c, v: c.allocated }));
-    const rest = kids.slice(13).reduce((a, c) => a + c.allocated, 0) + Math.max(0, data.ownAllocated);
-    if (rest > 0) items.push({ id: -2, name: tr('cleaner.map.others'), v: rest, allocated: rest, logical: rest });
-    return pack(items, W, H);
+    for (let n = 13; n > 0; n -= 2) {         // fewer bubbles when they don't fit a small window, never none
+      const items = kids.slice(0, n).map((c) => ({ ...c, v: c.allocated }));
+      const rest = kids.slice(n).reduce((a, c) => a + c.allocated, 0) + Math.max(0, data.ownAllocated);
+      if (rest > 0) items.push({ id: -2, name: tr('cleaner.map.others'), v: rest, allocated: rest, logical: rest });
+      const placed = pack(items, W, H);
+      if (placed.length) return placed;
+    }
+    return [];
   }, [data, W, H]);
   const whole = data.node.allocated || 1;
   return (
@@ -241,6 +245,7 @@ export function StorageView({ scan, onScan, volume, onReview }) {
   const redo = () => { setBack([...back, node]); setNode(ahead[0]); setAhead(ahead.slice(1)); setSel(null); };
   if (!data) return <Label dim>{tr('cleaner.map.empty')}</Label>;
   const rel = (name) => [...data.trail.map((t) => t.name), name].join('/');
+  const real = !!sel && sel.id >= 0;           // "Others" is no folder: it can be looked at, not opened or reviewed
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.m }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -274,8 +279,8 @@ export function StorageView({ scan, onScan, volume, onReview }) {
       {view === 'bubbles' ? (
         <Glass style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{sel ? tr('cleaner.map.selectedShort', { name: sel.name, size: formatBytes(sel.allocated) }) : tr('cleaner.map.noneSelected')}</Label></View>
-          <GlassButton small label={tr('cleaner.map.review')} disabled={!sel} onClick={() => onReview(rel(sel.name))} />
-          <GlassButton small label={tr('cleaner.show')} disabled={!sel} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${rel(sel.name)}/.`)} />
+          <GlassButton small label={tr('cleaner.map.review')} disabled={!real} onClick={() => onReview(rel(sel.name))} />
+          <GlassButton small label={tr('cleaner.show')} disabled={!real} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${rel(sel.name)}/.`)} />
         </Glass>
       ) : null}
     </View>
