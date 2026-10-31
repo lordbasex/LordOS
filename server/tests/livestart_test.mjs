@@ -43,7 +43,10 @@ const theme = fs.readFileSync(path.join(root, 'tools/iso/grub/lordos/theme.txt')
 const num = (k) => Number(new RegExp(`^\\s*${k} = (\\d+)\\s*$`, 'm').exec(theme)?.[1]);
 const menu = theme.slice(theme.indexOf('+ boot_menu'));
 const height = Number(/height = (\d+)/.exec(menu)[1]);
-const fit = Math.floor((height + num('item_spacing')) / (num('item_height') + num('item_spacing')));
+// GRUB's own count (gui_list.c, get_num_shown_items): padding on both ends, and the selection band's top
+// and bottom edges are taken from the height too. PNG height: bytes 20–23 of the header.
+const edge = (f) => fs.readFileSync(path.join(root, 'tools/iso/grub/lordos', f)).readUInt32BE(20);
+const fit = Math.floor((height + num('item_spacing') - 2 * num('item_padding') - edge('select_n.png') - edge('select_s.png')) / (num('item_height') + num('item_spacing')));
 eq('the theme shows every entry', fit >= entries.length, true);
 
 console.log(`livestart_test: ${n - bad}/${n} checks`);
