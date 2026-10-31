@@ -10,10 +10,10 @@ The rule is **analyse, review, plan, confirm, execute, verify**. A scan only rea
 
 | Section | What it does |
 |---|---|
-| Scan | Disk usage and the last scan; a full scan runs Cleanup, Storage and Duplicates one after the other on a dashboard of tiles, then a review board of what was really found |
+| Scan | Disk usage and the last scan; a full scan runs Cleanup, Storage and Duplicates one after the other on a dashboard of tiles, then a review board: the total, a bar of what it is made of, and a card per module with its real rules, files or folders |
 | Cleanup | The rules' findings by category, each with its reason, risk, action, count and size; the system's own files |
 | Large files | Files found by a tree scan, filtered by size, age by modification time and type |
-| Storage | Volumes (`/`, the home folder, the user's mounts); bubbles of the largest folders (the default, 14 at most, the rest grouped), a map, a folder list with logical and allocated sizes, a summary by type. A selected folder goes to Large files to be reviewed |
+| Storage | Volumes (`/`, the home folder, the user's mounts); bubbles of the largest folders (the default, 14 at most, the rest grouped), each a glass sphere with an icon and colour for what the folder is, a map, a folder list with logical and allocated sizes, a summary by type. A selected folder goes to Large files to be reviewed |
 | Duplicates | Exact copies in chosen folders; nothing is selected for the user |
 | Activity | What ran: counts and sizes, never a path |
 | Settings | Excluded folders, the large file threshold, the look, the item by the clock |
@@ -70,9 +70,28 @@ Each section tints the window, crossfading over 700 ms. During a full scan the s
 What differs from the mockup: the engine has no radial or conic gradient, so the night sky is a stretched image and the progress ring is an `Image pixels`; the
 storage map is up to 28 views rather than one image, so its areas can rise in. A scan has no known total, so it shows real counters, the real path and a spinner; a
 percentage appears only while a plan runs. Selecting a folder in Storage doesn't remove the folder: it opens its large files for review, as no action on whole folders
-exists outside AI models. Previews are real thumbnails for images and the file's extension otherwise.
+exists outside AI models. Previews are real thumbnails for images and a type icon with the extension otherwise. The hero's rings stay still and only their dots turn, the round
+button sits 24 px higher, its glow is still and only its inside breathes, and busy it is circled by two dots: all for the repaint rules below. The bubble view and the review board
+are not in the mockup.
 
-Motion uses one timer and `lord.setStyle`, runs only while the window is in front, and stops entirely with Reduce motion.
+A section's opening draws its pane and its object as two images (`glass-*.png`, `object-*.png`), so the object floats over the pane with a soft shadow under it. Scan screens and the
+dashboard use the two together, `hero-*.png`. A folder's icon comes from its name, `folderKind` in `apps/cleaner/storage.jsx`: in the home folder the user's own folders count under their
+translated names; anything else is a plain folder.
+
+## Motion
+
+One frame callback (`requestAnimationFrame`, `apps/cleaner/ui.jsx`) and `lord.setStyle`, no React render per frame. It runs only while the window is in front and not minimized, and
+stops entirely with Reduce motion.
+
+The engine repaints one box around all of a frame's changes, and a box that reaches a blurred surface, within 49 px of the Dock or the menu bar, grows to all of it. Stars in the
+corners of the window, the hero and the round button moving in one frame repainted 87 % of the screen on every frame. So:
+
+- Each loop has its own frames in a cycle of six (`SLOT`): the far dot, then the near dot with the object, then the button, then a star. Never two far-apart things in one frame.
+- One star per update, not all of them.
+- What barely moves sets a value only when a whole pixel changes.
+- Nothing that moves reaches the Dock's margin in the default window position: the button's pulse is limited for that. Moved next to the Dock, the window pays for the Dock's repaint.
+
+Keep these when adding motion. `docs/CLEANER-TESTS.md` has the numbers.
 
 ## Files
 
