@@ -40,5 +40,6 @@
   "tagline": "Um desktop GNU/Linux livre, rápido e seguro, construído sobre Debian e Wayland.",
   "uptime": "Ligado há",
   "version": "Versão {v}",
-  "versionChannel": "Versão {v} · {channel}"
+  "versionChannel": "Versão {v} · {channel}",
+  "case": "Caixa"
 }
