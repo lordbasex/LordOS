@@ -25,6 +25,9 @@ typedef struct {
     int unit_depth;                 /* > 0: an entry this deep is one candidate as a whole (a model's folder) */
     int explicit_only;              /* never in a cleanup by category: chosen one by one, with its own confirmation */
     int on_mounts;                  /* root is relative to each of the user's mounts, with $ the user id: measured only */
+    int downloads;                  /* root is the user's download folder (XDG_DOWNLOAD_DIR), with its name in their language */
+    int leftover;                   /* a folder per app, offered only when that app is no longer installed */
+    int system_root;                /* root is under `/`, not the home folder: the session user's own files, measured only */
 } CleanRule;
 
 const CleanRule *clean_rules(int *n);

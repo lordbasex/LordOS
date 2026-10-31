@@ -36,7 +36,7 @@ enum { JOB_NONE, JOB_SCAN, JOB_PLAN, JOB_EXEC, JOB_EMPTY };
 enum { ST_IDLE, ST_RUNNING, ST_DONE, ST_FAILED, ST_CANCELLED };
 static const char *const job_name[] = { "none", "scan", "plan", "execute", "emptyTrash" };
 static const char *const st_name[] = { "idle", "running", "done", "failed", "cancelled" };
-static const char *const kind_name[] = { "rules", "tree", "dups" };
+static const char *const kind_name[] = { "rules", "tree", "dups", "images" };
 
 /* a plan item's state; after ready, the results an item can end with */
 enum { I_READY, I_DONE, I_SKIPPED, I_CHANGED, I_DENIED, I_FAILED, I_CANCELLED, I_UNSUPPORTED, I_RESTORED, I_COUNT };
@@ -55,6 +55,8 @@ typedef struct {
     uint32_t group;                         /* duplicates: group + 1 */
     uint16_t src;
     uint8_t type, dir;                      /* dir: a whole folder (a rule's unit) */
+    uint32_t w, h;                          /* images: pixels */
+    uint64_t ph;                            /* images: the difference hash */
     char *rel;
 } Cand;
 
@@ -81,7 +83,7 @@ typedef struct {
     uint32_t *ht;                           /* (dev, ino) → index + 1, open addressing */
     size_t htcap;
     uint32_t *order;                        /* tree: candidates by size, largest first */
-    long seen, dirs, hashed, symlinks, special, mounts, unreadable, protect, names, nomatch, refused, foreign, excluded;
+    long seen, dirs, hashed, symlinks, special, mounts, unreadable, protect, names, nomatch, refused, foreign, excluded, undecoded;
     char limit[8];
     char now[CLEAN_PATH_MAX + 1];           /* the path being read, validated */
     int now_src;
@@ -132,6 +134,7 @@ long clean_test_max_files = CLEAN_MAX_FILES;
 int  clean_test_plan_ttl = CLEAN_PLAN_TTL_S;
 int  clean_test_stop_helper;
 void (*clean_test_before_trash)(const char *real);
+const char *clean_test_tmp = "/nonexistent-clean-tmp";
 int clean_test_helper_pid(void) { pthread_mutex_lock(&mu); int p = child; pthread_mutex_unlock(&mu); return p; }
 #define MAX_FILES clean_test_max_files
 #define PLAN_TTL  clean_test_plan_ttl
@@ -211,6 +214,22 @@ static void job_end(int st, const char *why) {
     pthread_mutex_unlock(&mu);
 }
 
+/* a leftover's folder is offered only if no app of that name exists: the system's own or an installed one */
+static char sysapps[PATH_MAX];
+void clean_set_sysapps(const char *assets) { snprintf(sysapps, sizeof sysapps, "%s", assets ? assets : ""); }
+
+static int app_exists(const char *id) {
+    size_t n = strlen(id);
+    if (n < 2 || n > 40 || !sysapps[0]) return 1;       /* not an app's folder, or nothing to tell by: not offered */
+    for (const char *p = id; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return 1;
+    char p[PATH_MAX * 2];
+    struct stat st;
+    snprintf(p, sizeof p, "%s/.local/share/lordos/apps/%s", fsops_home(), id);
+    if (!lstat(p, &st) || errno != ENOENT) return 1;
+    snprintf(p, sizeof p, "%s/sysapps/%s", sysapps, id);
+    return !lstat(p, &st) || errno != ENOENT;
+}
+
 /* ---- the helper's fixed path, next to lord-server (as lord-bench and lord-doc) ---- */
 
 static int helper_path(char *out, size_t n) {
@@ -278,6 +297,49 @@ static const CleanRule *src_rule(const Src *src) {
     return src->rule >= 0 && src->rule < n ? &t[src->rule] : NULL;
 }
 
+/* The user's download folder, relative to the home folder, from ~/.config/user-dirs.dirs: only a
+ * "$HOME/…" value that would pass as a rule's root. 0, or -1 for the rule's own name. */
+static int user_downloads(const CleanRule *r, char *out, size_t n) {
+    int home = open(fsops_home(), O_PATH | O_DIRECTORY | O_CLOEXEC);
+    int fd = home < 0 ? -1 : clean_open(home, ".config/user-dirs.dirs", O_RDONLY);
+    if (home >= 0) close(home);
+    if (fd < 0) return -1;
+    static const char key[] = "XDG_DOWNLOAD_DIR=\"$HOME/";
+    char t[8192];
+    ssize_t k = read(fd, t, sizeof t - 1);
+    close(fd);
+    if (k <= 0) return -1;
+    t[k] = 0;
+    for (char *line = t; line;) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = 0;
+        if (!strncmp(line, key, sizeof key - 1)) {
+            const char *v = line + sizeof key - 1;
+            const char *q = strchr(v, '"');
+            if (!q || q[1] || q == v || (size_t)(q - v) >= n) return -1;
+            memcpy(out, v, (size_t)(q - v));
+            out[q - v] = 0;
+            CleanRule c = *r;
+            c.root = out;
+            return clean_rule_check(&c, NULL, 0) ? -1 : 0;
+        }
+        line = nl ? nl + 1 : NULL;
+    }
+    return -1;
+}
+
+/* where a rule's root is now */
+static int rule_base(const CleanRule *r, char *out, size_t n) {
+#ifdef CLEAN_TEST
+    if (r->system_root) return (size_t)snprintf(out, n, "%s", clean_test_tmp) >= n ? -1 : 0;
+#else
+    if (r->system_root) return (size_t)snprintf(out, n, "/%s", r->root) >= n ? -1 : 0;
+#endif
+    char rel[256];
+    const char *root = r->downloads && !user_downloads(r, rel, sizeof rel) ? rel : r->root;
+    return (size_t)snprintf(out, n, "%s/%s", fsops_home(), root) >= n ? -1 : 0;
+}
+
 static int src_action(const Src *src) {
     if (src->rule < 0) return src->writable ? CLEAN_ACT_TRASH : CLEAN_ACT_NONE;
     const CleanRule *r = src_rule(src);
@@ -305,6 +367,7 @@ static int covered(const Src *src, const char *name, double mtime) {
     const CleanRule *r = src_rule(src);
     if (src->rule < 0) return 1;
     if (!r || !clean_glob(r->pattern, name)) return 0;
+    if (r->leftover && app_exists(name)) return 0;
     for (const char *const *e = r->exclude; e && *e; e++) if (clean_glob(*e, name)) return 0;
     return !r->min_age_days || (double)time(NULL) - mtime >= r->min_age_days * 86400.0;
 }
@@ -338,7 +401,7 @@ static int src_now(const Src *src, Src *now) {
     const CleanRule *r = src_rule(src);
     *now = *src;
     if (!r || r->on_mounts) return 0;
-    if (!strchr(r->root, '*')) { snprintf(now->base, sizeof now->base, "%s/%s", fsops_home(), r->root); return 0; }
+    if (!strchr(r->root, '*')) return rule_base(r, now->base, sizeof now->base);
     size_t n = strlen(fsops_home());
     return strncmp(src->base, fsops_home(), n) || src->base[n] != '/' || !clean_root_fits(r->root, src->base + n + 1, NULL, 0) ? -1 : 0;
 }
@@ -432,9 +495,19 @@ static int take_record(Scan *s, const JVal *rec) {
         first = link_lookup(s, dev, ino, (uint32_t)s->n);
         if (!s->ht) { free(copy); return -1; }
     }
+    double w = 0, h = 0;
+    uint64_t ph = 0;
+    if (s->kind == CLEAN_KIND_IMAGES) {
+        const char *hex = json_str(rec, "ph");
+        char *end = NULL;
+        if (json_count(rec, "W", &w) || json_count(rec, "H", &h) || w < CLEAN_IMAGE_MIN_DIM || h < CLEAN_IMAGE_MIN_DIM || w > 16384 || h > 16384 ||
+            !hex || strlen(hex) != 16) { free(copy); return -1; }
+        ph = strtoull(hex, &end, 16);
+        if (*end) { free(copy); return -1; }
+    }
     Cand *c = &s->c[s->n];
     *c = (Cand){ .ino = ino, .dev = dev, .size = (int64_t)size, .alloc = (int64_t)alloc, .mtime = (int64_t)mt, .nsec = (uint32_t)ns,
-                 .nlink = (uint32_t)nl, .links = 1, .src = (uint16_t)r, .type = (uint8_t)clean_type(base), .dir = (uint8_t)json_bool(rec, "d", 0), .rel = copy };
+                 .nlink = (uint32_t)nl, .links = 1, .src = (uint16_t)r, .type = (uint8_t)clean_type(base), .dir = (uint8_t)json_bool(rec, "d", 0), .w = (uint32_t)w, .h = (uint32_t)h, .ph = ph, .rel = copy };
     if (first) {                                /* a hard link: one file, counted once */
         c->first = (uint32_t)(first - s->c) + 1;
         first->links++;
@@ -488,7 +561,10 @@ static int close_group(Scan *s) {
         s->n = a;
         return 0;
     }
-    for (size_t i = a + 1; i < b; i++) if (s->c[i].size != s->c[a].size) return -1;
+    for (size_t i = a + 1; i < b; i++) {
+        const Cand *x = &s->c[a], *y = &s->c[i];
+        if (s->kind == CLEAN_KIND_DUPS ? y->size != x->size : !clean_similar(x->ph, y->ph, x->w, x->h, y->w, y->h)) return -1;
+    }
     if (s->ngrp == s->grp_cap) {
         size_t cap = s->grp_cap ? s->grp_cap * 2 : 256;
         Group *g = realloc(s->grp, cap * sizeof *g);
@@ -525,7 +601,7 @@ static int take_batch(Scan *s, const JVal *root) {
     if (now && !json_count(root, "r", &src) && src < s->nsrc && (!*now || clean_relpath_ok(now, CLEAN_MAX_DEPTH))) { snprintf(s->now, sizeof s->now, "%s", now); s->now_src = (int)src; }
     for (const JVal *v = items->kid; v && r >= 0; v = v->next) if (take_record(s, v) < 0) r = -1;
     for (const JVal *v = nodes->kid; v && r >= 0; v = v->next) if (take_node(s, v) < 0) r = -1;
-    if (r >= 0 && s->kind == CLEAN_KIND_DUPS && json_bool(root, "group", 0)) r = close_group(s);
+    if (r >= 0 && (s->kind == CLEAN_KIND_DUPS || s->kind == CLEAN_KIND_IMAGES) && json_bool(root, "group", 0)) r = close_group(s);
     pthread_mutex_unlock(&mu);
     return r;
 }
@@ -534,6 +610,8 @@ static int take_done(Scan *s, const JVal *root) {
     double v[10];
     static const char *const key[] = { "seen", "dirs", "symlinks", "special", "mounts", "unreadable", "protected", "names", "nomatch", "excluded" };
     for (int i = 0; i < 10; i++) if (json_count(root, key[i], &v[i])) return -1;
+    double undecoded = 0;
+    if (json_get(root, "undecoded") && json_count(root, "undecoded", &undecoded)) return -1;
     const char *limit = json_str(root, "limit");
     if (!limit || (*limit && strcmp(limit, "files") && strcmp(limit, "depth") && strcmp(limit, "nodes") && strcmp(limit, "results"))) return -1;
     const JVal *ty = json_get(root, "types");
@@ -556,6 +634,7 @@ static int take_done(Scan *s, const JVal *root) {
     s->names = (long)v[7];
     s->nomatch += (long)v[8];
     s->excluded += (long)v[9];
+    s->undecoded = (long)undecoded;
     memcpy(s->types, types, sizeof types);
     snprintf(s->limit, sizeof s->limit, "%s", limit);
     s->complete = !*limit && !s->unreadable && !s->names;
@@ -585,6 +664,34 @@ int clean_test_record(const char *json, int nrules) {
     for (size_t i = 0; i < s.n; i++) free(s.c[i].rel);
     free(s.c);
     free(s.ht);
+    return r;
+}
+
+/* a group of two image records as the helper would send it: 0 kept or dropped, -1 refused */
+int clean_test_group(const char *a, const char *b) {
+    static Scan s;
+    memset(&s, 0, sizeof s);
+    s.kind = CLEAN_KIND_IMAGES;
+    s.nsrc = 1;
+    s.src[0].rule = -1;
+    s.src[0].writable = 1;
+    struct stat st;
+    if (stat(fsops_home(), &st)) return -1;
+    s.src[0].dev = st.st_dev;
+    snprintf(s.src[0].base, sizeof s.src[0].base, "%s", fsops_home());
+    const char *const recs[] = { a, b };
+    int r = 0;
+    for (int i = 0; i < 2 && r >= 0; i++) {
+        JDoc d = { 0 };
+        if (json_parse(recs[i], strlen(recs[i]), &d, NULL, 0)) return -1;
+        r = take_record(&s, d.root);
+        json_free(&d);
+    }
+    if (r >= 0) r = close_group(&s);
+    for (size_t i = 0; i < s.n; i++) free(s.c[i].rel);
+    free(s.c);
+    free(s.ht);
+    free(s.grp);
     return r;
 }
 #endif
@@ -727,7 +834,7 @@ static void *scan_thread(void *arg) {
         src->dev = sb.st_dev;
         fds[nfd++] = fd;
         const CleanRule *r = src_rule(src);
-        jb_printf(&go, "%s{\"rule\":%d,\"unit\":%d,\"pattern\":", nfd > 1 ? "," : "", i, r ? r->unit_depth : 0);
+        jb_printf(&go, "%s{\"rule\":%d,\"unit\":%d,\"own\":%d,\"pattern\":", nfd > 1 ? "," : "", i, r ? r->unit_depth : 0, r ? r->system_root : 0);
         jb_str(&go, r ? r->pattern : "*");
         jb_raw(&go, ",\"base\":");
         jb_str(&go, src->base);
@@ -853,7 +960,7 @@ static int fill_sources(Scan *s, const CleanOpts *o) {
         s->nsrc = nrules > CLEAN_MAX_RULES ? CLEAN_MAX_RULES : nrules;
         for (int i = 0; i < s->nsrc; i++) {
             s->src[i].rule = i;
-            if ((size_t)snprintf(s->src[i].base, sizeof s->src[i].base, "%s/%s", fsops_home(), t[i].root) >= sizeof s->src[i].base) return -1;
+            if (rule_base(&t[i], s->src[i].base, sizeof s->src[i].base)) return -1;
         }
         return 0;
     }
@@ -1006,7 +1113,8 @@ static int item_check(const Scan *s, const Cand *c, const int *rootfd, const int
 
 /* ---- the plan ---- */
 
-/* Duplicates: every item needs a file that stays, of another inode. None: the group is left alone. */
+/* Duplicates and similar images: every item needs a file that stays, of another inode. None: the group is
+ * left alone. */
 static void pick_keepers(Plan *p, Scan *s) {
     for (size_t i = 0; i < p->n; i++) if (p->it[i].status == I_READY) s->c[p->it[i].cand].selected = (uint32_t)i + 1;
     for (size_t i = 0; i < p->n; i++) {
@@ -1048,7 +1156,7 @@ static void *plan_thread(void *arg) {
     }
     close_roots(s, rootfd);
     pthread_mutex_lock(&mu);
-    if (!cancelled && s->kind == CLEAN_KIND_DUPS) pick_keepers(p, s);
+    if (!cancelled && (s->kind == CLEAN_KIND_DUPS || s->kind == CLEAN_KIND_IMAGES)) pick_keepers(p, s);
     for (size_t i = 0; i < p->n && !cancelled; i++) {
         const CleanRule *r = src_rule(&s->src[s->c[p->it[i].cand].src]);
         if (r && r->explicit_only) p->named = 1;
@@ -1224,13 +1332,14 @@ static int same_bytes(int a, int b) {
 }
 
 /* Duplicates: right before the action, the copy that stays is the file the scan saw and byte for byte the
- * same as the one that goes. */
+ * same as the one that goes. Similar images: the image that stays is the file the scan saw. */
 static int keeper_check(const Scan *s, const Item *it, int fd, const char *name, const int *rootfd, const int *root_err) {
     const Cand *k = &s->c[it->keeper - 1];
     int kfd = -1;
     const char *kname;
     int st = item_check(s, k, rootfd, root_err, &kfd, &kname);
     if (st != I_READY) return I_CHANGED;
+    if (s->kind == CLEAN_KIND_IMAGES) { close(kfd); return I_READY; }   /* similar, not equal: that it is still there is the check */
     int a = openat(fd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC), b = openat(kfd, kname, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
     int same = a >= 0 && b >= 0 && same_bytes(a, b);
     if (a >= 0) close(a);
@@ -1488,8 +1597,8 @@ static void scan_json(JBuf *b, const Scan *s, int running) {
     for (size_t i = 0; i < s->ngrp; i++) reclaim += s->grp[i].reclaim;
     jb_raw(b, ",\"reclaim\":"); jb_num(b, reclaim);
     jb_printf(b, ",\"skipped\":{\"symlinks\":%ld,\"special\":%ld,\"mounts\":%ld,\"unreadable\":%ld,\"protected\":%ld,"
-                 "\"names\":%ld,\"nomatch\":%ld,\"refused\":%ld,\"foreign\":%ld,\"excluded\":%ld},\"rules\":[",
-              s->symlinks, s->special, s->mounts, s->unreadable, s->protect, s->names, s->nomatch, s->refused, s->foreign, s->excluded);
+                 "\"names\":%ld,\"nomatch\":%ld,\"refused\":%ld,\"foreign\":%ld,\"excluded\":%ld,\"undecoded\":%ld},\"rules\":[",
+              s->symlinks, s->special, s->mounts, s->unreadable, s->protect, s->names, s->nomatch, s->refused, s->foreign, s->excluded, s->undecoded);
     int nrules, k = 0;
     const CleanRule *t = clean_rules(&nrules);
     for (int i = 0; s->kind == CLEAN_KIND_RULES && i < nrules; i++) {      /* a rule may have several sources */
@@ -1638,6 +1747,7 @@ static void cand_json(JBuf *b, const Scan *s, const Cand *c) {
     jb_raw(b, ",\"mtime\":");
     jb_num(b, (double)c->mtime);
     jb_printf(b, ",\"links\":%u,\"linked\":%s,\"folder\":%s", c->nlink, c->first ? "true" : "false", c->dir ? "true" : "false");
+    if (c->w) jb_printf(b, ",\"width\":%u,\"height\":%u", c->w, c->h);
 }
 
 static int passes(const Scan *s, const Cand *c, const CleanFilter *f) {

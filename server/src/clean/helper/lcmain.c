@@ -14,7 +14,9 @@
  *
  * Three modes: "rules" reports the files a rule covers; "tree" keeps totals per folder and reports the
  * folders and the files of at least minSize; "dups" reads the files that share a size and reports
- * groups with equal SHA-256 (a partial hash of the first and last 16 KB first). */
+ * groups with equal SHA-256 (a partial hash of the first and last 16 KB first); "images" decodes
+ * the image files (lcimage.c) and reports groups of similar ones. */
+#include "lcimage.h"
 #include "../cleanfs.h"
 #include "../cleanproto.h"
 #include "../../doc/wire.h"
@@ -41,10 +43,10 @@
 #define PARTIAL 16384
 #define MAX_LINKS 1000000                   /* inodes with several links remembered by a tree */
 
-enum { M_RULES, M_TREE, M_DUPS };
+enum { M_RULES, M_TREE, M_DUPS, M_IMAGES };
 
 typedef struct {
-    int fd, index, unit;
+    int fd, index, unit, own;
     const char *pattern, *base;
     unsigned dev_major, dev_minor;
 } Root;
@@ -56,13 +58,15 @@ typedef struct {
     int root;
     struct statx sx;
     uint8_t hash[32];
+    uint64_t ph;                            /* images: the difference hash */
+    int w, h;
     int bad;
 } File;
 
 static int mode;
 static long max_files, min_size;
 static int max_depth;
-static long seen, dirs, hashed, nsym, nspecial, nmount, nunread, nprot, nname, nnomatch, nexcl;
+static long seen, dirs, hashed, nsym, nspecial, nmount, nunread, nprot, nname, nnomatch, nexcl, nundecoded;
 static const char *limit_hit = "";
 static int stop;
 static const char *exclude[CLEAN_MAX_EXCLUDE + 1];
@@ -141,6 +145,14 @@ static void emit(int root, const char *rel, const struct statx *sx) {
     nitems++;
 }
 
+/* an image's record: the common fields and what lord-server checks a group against */
+static void emit_image(const File *f) {
+    emit(f->root, f->rel, &f->sx);
+    items.n--;                              /* over the closing brace */
+    items.p[items.n] = 0;
+    jb_printf(&items, ",\"W\":%d,\"H\":%d,\"ph\":\"%016llx\"}", f->w, f->h, (unsigned long long)f->ph);
+}
+
 /* a tree counts an inode once: 1 the first time it is seen */
 static int first_link(const struct statx *sx) {
     if (sx->stx_nlink < 2) return 1;
@@ -174,7 +186,8 @@ static void on_file(const Root *r, const char *rel, const char *name, const stru
                 if (nitems >= CLEAN_BATCH) flush_batch(0);
             }
         }
-    } else if (sx->stx_size > 0) {
+    } else if (mode == M_DUPS ? sx->stx_size > 0 : clean_type(name) == CLEAN_TYPE_IMAGE && sx->stx_size >= CLEAN_IMAGE_MIN) {
+        if (mode == M_IMAGES && nfiles >= CLEAN_MAX_IMAGES) { limit("results"); stop = 1; return; }
         if (nfiles == files_cap) {
             size_t cap = files_cap ? files_cap * 2 : 4096;
             File *f = realloc(files, cap * sizeof *f);
@@ -231,7 +244,8 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
                   STATX_INO | STATX_SIZE | STATX_BLOCKS | STATX_MTIME, &sx)) { nunread++; goto next; }
         int mountroot = (sx.stx_attributes_mask & STATX_ATTR_MOUNT_ROOT) && (sx.stx_attributes & STATX_ATTR_MOUNT_ROOT);
         int other_dev = sx.stx_dev_major != r->dev_major || sx.stx_dev_minor != r->dev_minor;
-        if (S_ISLNK(sx.stx_mode)) nsym++;
+        if (r->own && sx.stx_uid != getuid()) nnomatch++;  /* another user's: neither read nor reported */
+        else if (S_ISLNK(sx.stx_mode)) nsym++;
         else if (S_ISDIR(sx.stx_mode)) {
             if (mountroot || other_dev) nmount++;
             else if (depth >= max_depth) limit("depth");
@@ -399,6 +413,59 @@ static void find_duplicates(const Root *list) {
     }
 }
 
+/* ---- similar images ---- */
+
+static int by_pixels(const void *a, const void *b) {
+    const File *x = a, *y = b;
+    long long p = (long long)x->w * x->h, q = (long long)y->w * y->h;
+    if (p != q) return p > q ? -1 : 1;
+    if (x->sx.stx_size != y->sx.stx_size) return x->sx.stx_size > y->sx.stx_size ? -1 : 1;
+    return strcmp(x->rel, y->rel);
+}
+
+/* Each image joins the largest one it resembles, so everything in a group resembles its first image:
+ * a chain of slightly different images never ends up as one group. Nothing here decides what goes. */
+static void find_similar(const Root *list) {
+    size_t ok = 0;
+    for (size_t i = 0; i < nfiles; i++) {
+        File *f = &files[i];
+        int fd = open_file(f, list);
+        if (fd < 0) { nunread++; continue; }
+        int r = lc_image_hash(fd, f->sx.stx_size, &f->ph, &f->w, &f->h);
+        close(fd);
+        hashed++;
+        if (now_ms() - last_flush > 200) flush_batch(0);
+        if (r) { nundecoded++; continue; }
+        if (ok != i) { File t = files[ok]; files[ok] = *f; *f = t; }
+        ok++;
+    }
+    qsort(files, ok, sizeof *files, by_pixels);
+    size_t *members = malloc(CLEAN_MAX_GROUP * sizeof *members);
+    unsigned char *used = calloc(ok ? ok : 1, 1);
+    if (!members || !used) { limit("results"); free(members); free(used); return; }
+    for (size_t i = 0; i < ok; i++) {
+        if (used[i]) continue;
+        size_t n = 1;
+        int two = 0;
+        members[0] = i;
+        for (size_t j = i + 1; j < ok; j++) {
+            if (used[j] || !clean_similar(files[i].ph, files[j].ph, (unsigned)files[i].w, (unsigned)files[i].h, (unsigned)files[j].w, (unsigned)files[j].h)) continue;
+            if (n >= CLEAN_MAX_GROUP) { limit("results"); break; }
+            used[j] = 1;
+            members[n++] = j;
+            if (files[j].sx.stx_ino != files[i].sx.stx_ino) two = 1;
+        }
+        if (!two) continue;
+        for (size_t k = 0; k < n; k++) {
+            emit_image(&files[members[k]]);
+            if ((k + 1) % CLEAN_BATCH == 0 && k + 1 < n) flush_batch(0);
+        }
+        flush_batch(1);
+    }
+    free(members);
+    free(used);
+}
+
 static void reply_err(const char *code) {
     char j[48];
     int n = snprintf(j, sizeof j, "{\"error\":\"%s\"}", code);
@@ -428,7 +495,7 @@ int main(void) {
     max_depth = (int)json_num(d.root, "maxDepth", 0);
     min_size = (long)json_num(d.root, "minSize", 0);
     int nroots = roots && roots->type == J_ARR ? (int)roots->len : -1;
-    mode = m && !strcmp(m, "tree") ? M_TREE : m && !strcmp(m, "dups") ? M_DUPS : M_RULES;
+    mode = m && !strcmp(m, "tree") ? M_TREE : m && !strcmp(m, "dups") ? M_DUPS : m && !strcmp(m, "images") ? M_IMAGES : M_RULES;
     if (!home || nroots < 0 || nroots > CLEAN_MAX_ROOTS || nroots != nfds || max_files < 1 || max_files > CLEAN_TREE_MAX_FILES ||
         max_depth < 0 || max_depth > CLEAN_MAX_DEPTH) { reply_err("request"); return 1; }
     const JVal *ex = json_get(d.root, "exclude");
@@ -446,7 +513,7 @@ int main(void) {
     for (const JVal *v = roots->kid; v; v = v->next, i++) {
         struct statx sx;
         double rule = json_num(v, "rule", -1);
-        list[i] = (Root){ .fd = rootfds[i], .index = (int)rule, .unit = (int)json_num(v, "unit", 0), .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
+        list[i] = (Root){ .fd = rootfds[i], .index = (int)rule, .unit = (int)json_num(v, "unit", 0), .own = (int)json_num(v, "own", 0), .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
         if (rule < 0 || rule >= CLEAN_MAX_ROOTS || !list[i].pattern || !list[i].base || statx(rootfds[i], "", AT_EMPTY_PATH, STATX_TYPE, &sx) || !S_ISDIR(sx.stx_mode)) {
             reply_err("request");
             return 1;
@@ -474,16 +541,17 @@ int main(void) {
         walk(&list[i], fd, rel, 0, 0, mode == M_TREE ? 0 : -1, -1, &total);
     }
     flush_batch(0);
-    if (mode == M_DUPS) {
+    if (mode == M_DUPS || mode == M_IMAGES) {
         static Root by_rule[CLEAN_MAX_ROOTS];
         for (i = 0; i < nroots; i++) by_rule[list[i].index] = list[i];
-        find_duplicates(by_rule);
+        if (mode == M_DUPS) find_duplicates(by_rule);
+        else find_similar(by_rule);
     }
     JBuf b;
     jb_init(&b);
     jb_printf(&b, "{\"seen\":%ld,\"dirs\":%ld,\"limit\":\"%s\",\"symlinks\":%ld,\"special\":%ld,\"mounts\":%ld,"
-                  "\"unreadable\":%ld,\"protected\":%ld,\"names\":%ld,\"nomatch\":%ld,\"excluded\":%ld,\"types\":[",
-              seen, dirs, limit_hit, nsym, nspecial, nmount, nunread, nprot, nname, nnomatch, nexcl);
+                  "\"unreadable\":%ld,\"protected\":%ld,\"names\":%ld,\"nomatch\":%ld,\"excluded\":%ld,\"undecoded\":%ld,\"types\":[",
+              seen, dirs, limit_hit, nsym, nspecial, nmount, nunread, nprot, nname, nnomatch, nexcl, nundecoded);
     for (i = 0; i < CLEAN_TYPES; i++) jb_printf(&b, "%s{\"s\":%.0f,\"a\":%.0f,\"f\":%ld}", i ? "," : "", types[i].s, types[i].a, types[i].f);
     jb_raw(&b, "]}");
     doc_send(SOCK, CR_DONE, 0, b.p, b.n, NULL, 0);

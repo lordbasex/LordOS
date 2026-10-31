@@ -10,7 +10,12 @@
 #include "fsops.h"
 #include "sec/json.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO
+#include "stb_image_write.h"
+
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
@@ -21,6 +26,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/sysmacros.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -1376,6 +1382,372 @@ static void test_dups(void) {
     clean_cancel(1);
 }
 
+/* ---- similar images ---- */
+
+/* the same picture at any size: blobs of light from sines, plus fine noise so the files aren't tiny */
+static double picture(int seed, double x, double y) {
+    double a = 1.3 + seed * 2.17, b = 2.9 + seed * 1.31, c = 0.7 + seed * 3.3;
+    return 128 + 60 * sin(a * x * 6.28 + c) * cos(b * y * 6.28) + 50 * sin((b + a) * (x + y) * 3.14 + a);
+}
+
+static void write_cb(void *ctx, void *data, int size) { if (write(*(int *)ctx, data, (size_t)size) != size) abort(); }
+
+static void put_image(const char *rel, int seed, int w, int h, int jpeg_q, int light) {
+    unsigned char *px = malloc((size_t)w * h * 3);
+    if (!px) abort();
+    unsigned rng = 12345;
+    for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+        rng = rng * 1103515245 + 12345;
+        double v = picture(seed, (double)x / w, (double)y / h) + light + (double)(rng >> 28) - 8;
+        unsigned char g = v < 0 ? 0 : v > 255 ? 255 : (unsigned char)v;
+        px[(size_t)(y * w + x) * 3] = g;
+        px[(size_t)(y * w + x) * 3 + 1] = (unsigned char)(255 - g);
+        px[(size_t)(y * w + x) * 3 + 2] = g / 2;
+    }
+    char p[PATH_MAX * 2];
+    mkparents(rel);
+    path_of(p, sizeof p, rel);
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) abort();
+    if (jpeg_q) stbi_write_jpg_to_func(write_cb, &fd, w, h, 3, px, jpeg_q);
+    else stbi_write_png_to_func(write_cb, &fd, w, h, 3, px, w * 3);
+    close(fd);
+    free(px);
+}
+
+/* a PNG whose header claims a size and whose body is padding */
+static void put_claiming_png(const char *rel, unsigned w, unsigned h) {
+    static const unsigned char head[] = { 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0, 0, 13, 'I', 'H', 'D', 'R' };
+    unsigned char dims[13] = { (unsigned char)(w >> 24), (unsigned char)(w >> 16), (unsigned char)(w >> 8), (unsigned char)w,
+                               (unsigned char)(h >> 24), (unsigned char)(h >> 16), (unsigned char)(h >> 8), (unsigned char)h, 8, 2, 0, 0, 0 };
+    char p[PATH_MAX * 2];
+    mkparents(rel);
+    path_of(p, sizeof p, rel);
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0 || write(fd, head, sizeof head) < 0 || write(fd, dims, sizeof dims) < 0 || ftruncate(fd, 20000)) abort();
+    close(fd);
+}
+
+static void make_images(void) {
+    wipe();
+    put_image("P/a/original.png", 1, 640, 480, 0, 0);
+    put_image("P/b/half.png", 1, 320, 240, 0, 0);
+    put_image("P/c/recompressed.jpg", 1, 640, 480, 50, 0);
+    put_image("P/d/brighter.png", 1, 640, 480, 0, 12);
+    put_image("P/other.png", 2, 640, 480, 0, 0);          /* another picture */
+    put_image("P/cropped.png", 1, 640, 240, 0, 0);        /* other proportions */
+    put_image("P/same-inode.png", 0, 640, 480, 0, 0);     /* only hard links: one file */
+    hardlink("P/same-inode.png", "P/same-inode2.png");
+    put_size("P/flat.png", 0, 'x');                       /* replaced below */
+    put_size("P/text.jpg", 20000, 'x');                   /* a name, not an image */
+    put_claiming_png("P/huge.png", 60000, 60000);         /* past the decoder's limit */
+    put_claiming_png("P/many.png", 8000, 8000);           /* past ours: never allocated */
+    put_size("P/icon.png", 100, 'i');                     /* too small to look at */
+    link_to("a/original.png", "P/link.png");
+    /* a blank page, with nothing to compare */
+    unsigned char *px = malloc(640 * 480 * 3);
+    if (!px) abort();
+    unsigned rng = 7;
+    for (size_t i = 0; i < 640 * 480 * 3; i++) { rng = rng * 1103515245 + 12345; px[i] = (unsigned char)(200 + (rng >> 29)); }
+    char p[PATH_MAX * 2];
+    path_of(p, sizeof p, "P/flat.png");
+    int fd = open(p, O_WRONLY | O_TRUNC);
+    if (fd < 0) abort();
+    stbi_write_png_to_func(write_cb, &fd, 640, 480, 3, px, 640 * 3);
+    close(fd);
+    free(px);
+}
+
+static void test_images(void) {
+    make_images();
+    const CleanOpts o = { .folders = { "P" }, .nfolders = 1 };
+    int scan = clean_start_kind(CLEAN_KIND_IMAGES, &o);
+    CHECK(scan > 0);
+    Poll p;
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(num(p.scan, "groups") == 1);
+    CHECK(num(p.scan, "candidates") == 4);
+    CHECK(skipped(p.scan, "undecoded") == 4);           /* flat, text, huge, many */
+    CHECK(num(p.scan, "hashed") == 12);                 /* everything but the icon and the link */
+    poll_free(&p);
+    /* the largest picture comes first, with its size in pixels */
+    char *g = clean_groups(scan, 0, 10);
+    JDoc d = { 0 };
+    CHECK(g && !json_parse(g, strlen(g), &d, NULL, 0));
+    const JVal *grp = json_get(d.root, "groups")->kid;
+    const JVal *m0 = json_get(grp, "members")->kid;
+    CHECK(json_num(m0, "width", 0) == 640 && json_num(m0, "height", 0) == 480);
+    json_free(&d);
+    free(g);
+    CHECK(member_id(scan, "other.png") == 0 && member_id(scan, "cropped.png") == 0 && member_id(scan, "same-inode.png") == 0 && member_id(scan, "link.png") == 0);
+
+    /* nothing is chosen by itself; the whole group is refused, an image stays */
+    uint32_t all[4] = { (uint32_t)member_id(scan, "original.png"), (uint32_t)member_id(scan, "half.png"), (uint32_t)member_id(scan, "recompressed.jpg"), (uint32_t)member_id(scan, "brighter.png") };
+    CHECK(all[0] && all[1] && all[2] && all[3]);
+    int plan = clean_plan(scan, all, 4);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 0 && count(p.plan, "skipped") == 4);
+    poll_free(&p);
+
+    /* the rest go to the Trash and come back; bytes differ, so no byte comparison stops them */
+    plan = clean_plan(scan, all + 1, 3);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 3 && num(p.plan, "deleteItems") == 0 && num(p.plan, "trashItems") == 3);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 3);
+    poll_free(&p);
+    CHECK(exists("P/a/original.png") && !exists("P/b/half.png") && exists(".local/share/Trash/files/half.png"));
+    CHECK(!clean_restore(plan, all[1]) && exists("P/b/half.png"));
+
+    /* the image that stays is gone by the time of the action: nothing else goes */
+    make_images();
+    scan = clean_start_kind(CLEAN_KIND_IMAGES, &o);
+    wait_job(&p);
+    poll_free(&p);
+    uint32_t two[1] = { (uint32_t)member_id(scan, "half.png") };
+    plan = clean_plan(scan, two, 1);
+    wait_job(&p);
+    poll_free(&p);
+    char f[PATH_MAX * 2];
+    static const char *const others[] = { "P/a/original.png", "P/c/recompressed.jpg", "P/d/brighter.png" };
+    for (int i = 0; i < 3; i++) { path_of(f, sizeof f, others[i]); CHECK(!unlink(f)); }
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "changed") == 1 && count(p.plan, "done") == 0);
+    poll_free(&p);
+    CHECK(exists("P/b/half.png"));
+
+    /* a folder of no images */
+    wipe();
+    put("P/notes.txt", "nothing");
+    scan = clean_start_kind(CLEAN_KIND_IMAGES, &o);
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "done") && num(p.scan, "groups") == 0 && num(p.scan, "candidates") == 0);
+    poll_free(&p);
+
+    /* what lord-server refuses from the helper */
+    struct stat st;
+    CHECK(!stat(H, &st));
+    char dev[64];
+    snprintf(dev, sizeof dev, "%u,\"m\":%u", major(st.st_dev), minor(st.st_dev));
+    char a[320], b[320];
+    const char *fmt = "{\"r\":0,\"p\":\"%s\",\"M\":%s,\"i\":\"%s\",\"l\":1,\"s\":%d,\"a\":12288,\"t\":1,\"n\":0,\"u\":0,\"W\":%d,\"H\":%d,\"ph\":\"%s\"}";
+    snprintf(a, sizeof a, fmt, "one.png", dev, "1", 10000, 640, 480, "00000000000000ff");
+    snprintf(b, sizeof b, fmt, "two.png", dev, "2", 20000, 320, 240, "00000000000000fe");
+    CHECK(clean_test_group(a, b) == 0);
+    snprintf(b, sizeof b, fmt, "two.png", dev, "2", 20000, 320, 240, "ffffffff00000000");
+    CHECK(clean_test_group(a, b) < 0);                  /* a group of different pictures */
+    snprintf(b, sizeof b, fmt, "two.png", dev, "2", 20000, 640, 240, "00000000000000fe");
+    CHECK(clean_test_group(a, b) < 0);                  /* of other proportions */
+    snprintf(b, sizeof b, fmt, "two.png", dev, "2", 20000, 320, 240, "nothexnothexnoth");
+    CHECK(clean_test_group(a, b) < 0);
+    snprintf(b, sizeof b, fmt, "two.png", dev, "2", 20000, 5, 5, "00000000000000fe");
+    CHECK(clean_test_group(a, b) < 0);                  /* smaller than anything decoded */
+    snprintf(b, sizeof b, "{\"r\":0,\"p\":\"two.png\",\"M\":%s,\"i\":\"2\",\"l\":1,\"s\":1,\"a\":0,\"t\":1,\"n\":0,\"u\":0}", dev);
+    CHECK(clean_test_group(a, b) < 0);                  /* no pixels at all */
+    CHECK(clean_similar(0, 0x3f, 4, 3, 8, 6) && !clean_similar(0, 0x7f, 4, 3, 8, 6) && !clean_similar(0, 0, 4, 3, 16, 9) && !clean_similar(0, 0, 0, 3, 4, 3));
+    clean_cancel(1);
+}
+
+/* ---- the rules added for translated folders, leftovers and /tmp ---- */
+
+static void set_old(const char *rel) {
+    char f[PATH_MAX * 2];
+    struct timespec tm[2] = { { 1000000000, 0 }, { 1000000000, 0 } };
+    path_of(f, sizeof f, rel);
+    CHECK(!utimensat(AT_FDCWD, f, tm, AT_SYMLINK_NOFOLLOW));
+}
+
+static void test_downloads(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    put("Descargas/film.part", "x");
+    put("Downloads/other.part", "x");
+    set_old("Descargas/film.part");
+    set_old("Downloads/other.part");
+    /* no user-dirs.dirs: the English name */
+    Poll p;
+    run_scan(&p);
+    CHECK(has_candidate("Downloads/other.part") && !has_candidate("Descargas"));
+    poll_free(&p);
+    /* the user's folder, a value with quotes and comments around it */
+    put(".config/user-dirs.dirs", "# written by xdg-user-dirs\nXDG_DESKTOP_DIR=\"$HOME/Escritorio\"\nXDG_DOWNLOAD_DIR=\"$HOME/Descargas\"\n");
+    int scan = run_scan(&p);
+    CHECK(has_candidate("Descargas/film.part") && !has_candidate("other.part"));
+    poll_free(&p);
+    const char *const names[] = { "partial-downloads" };
+    int plan = clean_plan_rules(scan, names, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 1);
+    poll_free(&p);
+    /* the folder's setting moves between the plan and the action: nothing goes */
+    put(".config/user-dirs.dirs", "XDG_DOWNLOAD_DIR=\"$HOME/Downloads\"\n");
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 0);
+    poll_free(&p);
+    CHECK(exists("Descargas/film.part"));
+    /* a real run */
+    put(".config/user-dirs.dirs", "XDG_DOWNLOAD_DIR=\"$HOME/Descargas\"\n");
+    scan = run_scan(&p);
+    poll_free(&p);
+    plan = clean_plan_rules(scan, names, 1);
+    wait_job(&p);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(!exists("Descargas/film.part") && exists(".local/share/Trash/files/film.part"));
+    /* a value that couldn't be a rule's root falls back to the English name, never a wider place */
+    static const char *const bad[] = { "XDG_DOWNLOAD_DIR=\"$HOME/../other\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/.cache\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/\"\n",
+                                       "XDG_DOWNLOAD_DIR=\"$HOME/.config/lordos/mail\"\n", "XDG_DOWNLOAD_DIR=\"/etc\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/a\"b\"\n", NULL };
+    put(".cache/x.part", "x");
+    put(".config/lordos/mail/x.part", "x");
+    set_old(".cache/x.part");
+    set_old(".config/lordos/mail/x.part");
+    for (int i = 0; bad[i]; i++) {
+        put(".config/user-dirs.dirs", bad[i]);
+        run_scan(&p);
+        CHECK(has_candidate("Downloads/other.part") && !has_candidate(".cache/x.part") && !has_candidate("mail/x.part"));
+        poll_free(&p);
+    }
+    /* the settings file as a link is not read */
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, ".config/user-dirs.dirs");
+    unlink(f);
+    put("elsewhere", "XDG_DOWNLOAD_DIR=\"$HOME/Descargas\"\n");
+    link_to("../elsewhere", ".config/user-dirs.dirs");
+    put("Descargas/again.part", "x");
+    set_old("Descargas/again.part");
+    run_scan(&p);
+    CHECK(has_candidate("Downloads/other.part") && !has_candidate("Descargas"));
+    poll_free(&p);
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+static void test_leftovers(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    char sys[PATH_MAX * 2];
+    path_of(sys, sizeof sys, "assets");
+    clean_set_sysapps(sys);
+    put("assets/sysapps/passwords/manifest.json", "{}");
+    put_size(".local/share/lordos/appdata/gone-app/data.bin", 30000, 'a');
+    put(".local/share/lordos/appdata/gone-app/sub/more", "x");
+    put(".local/share/lordos/appdata/installed-app/data", "keep");
+    put(".local/share/lordos/apps/installed-app/manifest.json", "{}");
+    put(".local/share/lordos/appdata/passwords/state", "keep");
+    put(".local/share/lordos/appdata/Not_An_Id/data", "keep");
+    put(".local/share/lordos/appdata/loose-file", "keep");
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(has_candidate("appdata/gone-app") && !has_candidate("installed-app") && !has_candidate("passwords") && !has_candidate("Not_An_Id") && !has_candidate("loose-file"));
+    poll_free(&p);
+    /* never by category; only by name */
+    const char *const names[] = { "app-leftovers" };
+    CHECK(clean_plan_rules(scan, names, 1) == CLEAN_E_BADID);
+    uint32_t ids[8];
+    int n = all_ids(ids, 8);
+    uint32_t want = 0;
+    char *j = clean_results(0, 0, CLEAN_PAGE_MAX);
+    JDoc d = { 0 };
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0));
+    for (const JVal *v = json_get(d.root, "items")->kid; v; v = v->next) if (strstr(json_str(v, "path"), "gone-app")) { want = (uint32_t)json_num(v, "id", 0); CHECK(json_bool(v, "folder", 0) == 1); }
+    json_free(&d);
+    free(j);
+    CHECK(want && n >= 1);
+    int plan = clean_plan(scan, &want, 1);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 1 && json_bool(p.plan, "named", 0) == 1 && num(p.plan, "deleteItems") == 0);
+    poll_free(&p);
+    /* the app comes back between the plan and the action: its folder stays */
+    put(".local/share/lordos/apps/gone-app/manifest.json", "{}");
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 0 && count(p.plan, "skipped") == 1);
+    poll_free(&p);
+    CHECK(exists(".local/share/lordos/appdata/gone-app/data.bin"));
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, ".local/share/lordos/apps/gone-app/manifest.json");
+    CHECK(!unlink(f));
+    path_of(f, sizeof f, ".local/share/lordos/apps/gone-app");
+    CHECK(!rmdir(f));
+    /* to the Trash, whole, and back */
+    scan = run_scan(&p);
+    poll_free(&p);
+    n = all_ids(ids, 8);
+    plan = clean_plan(scan, &want, 1);
+    wait_job(&p);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(!exists(".local/share/lordos/appdata/gone-app") && exists(".local/share/Trash/files/gone-app/sub/more") && exists(".local/share/lordos/appdata/passwords/state"));
+    CHECK(!clean_restore(plan, want) && exists(".local/share/lordos/appdata/gone-app/data.bin"));
+    /* without knowing where the system's apps are, nothing is offered */
+    clean_set_sysapps(NULL);
+    run_scan(&p);
+    CHECK(!has_candidate("gone-app"));
+    poll_free(&p);
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+static void test_system_tmp(void) {
+    clean_rules_override(NULL, 0);
+    wipe();
+    char tmp[PATH_MAX * 2];
+    path_of(tmp, sizeof tmp, "faketmp");
+    clean_test_tmp = tmp;
+    put("faketmp/old.dat", "x");
+    put("faketmp/new.dat", "x");
+    put("faketmp/dir/old2.dat", "x");
+    set_old("faketmp/old.dat");
+    set_old("faketmp/dir/old2.dat");
+    link_to("old.dat", "faketmp/link");
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(has_candidate("faketmp/old.dat") && has_candidate("faketmp/dir/old2.dat") && !has_candidate("new.dat"));
+    poll_free(&p);
+    /* measured only: no plan can take it, by rule or by id */
+    const char *const names[] = { "system-tmp" };
+    int plan = clean_plan_rules(scan, names, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "unsupported") == 2 && count(p.plan, "ready") == 0);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 0);
+    poll_free(&p);
+    CHECK(exists("faketmp/old.dat") && exists("faketmp/dir/old2.dat"));
+    clean_test_tmp = "/nonexistent-clean-tmp";
+    clean_cancel(1);
+    /* the table refuses any other system root, and any action on one */
+    CleanRule r = good();
+    r.root = "tmp"; r.system_root = 1; r.action = CLEAN_ACT_NONE; r.risk = CLEAN_RISK_REVIEW;
+    char why[160];
+    CHECK(!clean_rule_check(&r, why, sizeof why));
+    r.action = CLEAN_ACT_TRASH;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r.action = CLEAN_ACT_NONE; r.root = "etc";
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    CleanRule l = good();
+    l.leftover = 1;
+    CHECK(clean_rule_check(&l, why, sizeof why));
+    clean_rules_override(&base, 1);
+}
+
 int main(void) {
     if (syscall(SYS_landlock_create_ruleset, NULL, 0U, 1U) < 1) { printf("clean-test: skipped: needs Landlock\n"); return 0; }
     char tmpl[] = "/tmp/clean-test.XXXXXX";
@@ -1411,6 +1783,10 @@ int main(void) {
     test_tree();
     test_tree_limits();
     test_dups();
+    test_images();
+    test_downloads();
+    test_leftovers();
+    test_system_tmp();
     wipe();
     rmdir(H);
     printf("clean-test: %d checks, %d failed\n", checks, fails);

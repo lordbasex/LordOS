@@ -2,6 +2,8 @@
 #ifndef LORD_CLEAN_FS_H
 #define LORD_CLEAN_FS_H
 
+#include <stdint.h>
+
 /* openat2 beneath dirfd: no symlink, no mount crossed, no `..` above dirfd. An fd or -1 with errno. */
 int clean_open(int dirfd, const char *rel, int flags);
 /* A file name that can be shown and carried in JSON: valid UTF-8, no control characters, not
@@ -17,5 +19,7 @@ int clean_type(const char *name);
 const char *clean_type_name(int type);
 /* path is ex or under it */
 int clean_under(const char *path, const char *ex);
+/* Two images whose difference hashes are within CLEAN_SIMILAR_BITS and whose proportions match. */
+int clean_similar(uint64_t a, uint64_t b, unsigned aw, unsigned ah, unsigned bw, unsigned bh);
 
 #endif
