@@ -1468,7 +1468,7 @@ static void test_gcontend(void) {
     GcResult cpu[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 14), GR(GC_READ, 4, 14), GR(GC_WRITE, 4, 14), GR(GC_NONE, 0, 1.5) };
     CHECK(gc_verdict(cpu, 5) == GC_V_CPU, "load in the caches slows it too: not memory alone");
     GcResult none[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 1.6), GR(GC_READ, 4, 1.7), GR(GC_WRITE, 4, 1.8), GR(GC_NONE, 0, 1.5) };
-    CHECK(gc_verdict(none, 5) == GC_V_NONE, "nothing reached 2x");
+    CHECK(gc_verdict(none, 5) == GC_V_NONE, "nothing reached 1.5x");
     GcResult drift[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 14), GR(GC_READ, 4, 14), GR(GC_WRITE, 4, 14), GR(GC_NONE, 0, 3) };
     CHECK(gc_verdict(drift, 5) == GC_V_DRIFT, "the runs without load disagree");
     GcResult mid[] = { GR(GC_NONE, 0, 1.5), GR(GC_SPIN, 4, 2.5), GR(GC_READ, 4, 4), GR(GC_WRITE, 4, 4), GR(GC_NONE, 0, 1.5) };

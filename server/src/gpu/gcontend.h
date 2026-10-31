@@ -11,7 +11,7 @@ typedef struct { int kind, workers; } GcPhase;
 typedef struct {
     GcPhase ph;
     int frames;
-    double gpu_p50, gpu_p99;            /* ms from the end of the upload to the GPU's finish */
+    double gpu_p50, gpu_p99;            /* ms from the flush to the GPU's finish; without a fence, draw and glFinish */
     double up_p50, up_p99;              /* ms of the texture upload (a CPU copy) */
     double bus_mb_s;                    /* the workers' last-level misses × 64 bytes, MB/s; < 0 no counter */
     int temp_mc;                        /* the first thermal zone, m°C; < 0 none */
@@ -28,7 +28,7 @@ int gc_plan(GcPhase *p, int max, int cores);
 double gc_quantile(double *v, int n, double q);
 /* GC_V_MEMORY: memory load at most cores slows the GPU (≥ 2× alone) and a load that stays in the cores'
  * caches doesn't (< 1.5×). GC_V_CPU: that load in the caches slows it as well, so the cause is not memory alone.
- * GC_V_NONE: no load reached 2×. GC_V_DRIFT: the two runs without load differ by 1.5× or more, so the run
+ * GC_V_NONE: no load reached 1.5×. GC_V_DRIFT: the two runs without load differ by 1.5× or more, so the run
  * proves nothing. GC_V_UNCLEAR: anything else. */
 int gc_verdict(const GcResult *r, int n);
 /* r as one JSON object, no newline; returns its length, 0 if it didn't fit */

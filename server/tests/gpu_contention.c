@@ -7,12 +7,13 @@
  * cores that either spin inside their caches, read or write a large buffer. A load that only spins uses the CPU and
  * hardly the memory; a load that reads or writes uses both. Comparing them is the experiment (gc_verdict).
  *
- *   build/gpu-contention [--node /dev/dri/renderD128] [--frames 240] [--cores N] [--quiet]
+ *   build/gpu-contention [--node /dev/dri/renderD128] [--frames 240] [--cores N]
  *
  * One JSON object a line on stdout, one per phase and a last one with the verdict. It uses a render node and no
  * display, so it runs beside a session. busMBs is each worker's last-level misses (perf_event_open, its own
  * thread) × 64 bytes: the CPU side of the traffic only, null if the kernel gives no such counter. The GPU's time is
- * the native fence's timestamp when the driver has one, else the time glFinish took. */
+ * the flush to the native fence's timestamp when the driver has one, as LordBench's gpuMs starts at the flip queued, so
+ * a render thread waiting for a core under load doesn't count as GPU time; else, the draw and glFinish together. */
 #include "gpu/gcontend.h"
 
 #include <EGL/egl.h>
@@ -192,7 +193,7 @@ static void frame(int f, double *up_ms, double *gpu_ms) {
     glEnableVertexAttribArray(0);
     glClear(GL_COLOR_BUFFER_BIT);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    uint64_t t2 = t1, done = 0;
+    uint64_t t2 = t1, done = 0, start = t1;
     if (G.fence) {
         EGLSyncKHR s = G.create_sync(G.dpy, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
         glFlush();
@@ -201,9 +202,10 @@ static void frame(int f, double *up_ms, double *gpu_ms) {
         if (s != EGL_NO_SYNC_KHR) G.destroy_sync(G.dpy, s);
         if (fd >= 0) { done = fence_done(fd); close(fd); }
     }
-    if (done <= t2) { glFinish(); done = now_ns(); }    /* no fence, or one that was signalled from the start */
+    if (done > t2) start = t2;
+    else { glFinish(); done = now_ns(); }               /* no fence, or one that was signalled from the start */
     *up_ms = (double)(t1 - t0) / 1e6;
-    *gpu_ms = (double)(done - t1) / 1e6;
+    *gpu_ms = (double)(done - start) / 1e6;
 }
 
 static int read_temp(void) {
@@ -217,6 +219,7 @@ static void run_phase(GcPhase ph, int frames, GcResult *r) {
     Worker w[MAX_WORKERS];
     memset(w, 0, sizeof w);
     atomic_store(&stop_workers, 0);
+    uint64_t t_start = now_ns();           /* the workers count from when they start, their setup included */
     for (int i = 0; i < ph.workers; i++) {
         w[i].cpu = i;
         w[i].kind = ph.kind;
@@ -224,7 +227,7 @@ static void run_phase(GcPhase ph, int frames, GcResult *r) {
     }
     if (ph.workers) usleep(600000);        /* their buffers are touched and they are running */
     double *up = malloc(sizeof *up * (size_t)frames), *gpu = malloc(sizeof *gpu * (size_t)frames);
-    uint64_t t0 = now_ns(), next = t0;
+    uint64_t next = now_ns();
     for (int f = 0; f < frames; f++) {
         frame(f, &up[f], &gpu[f]);
         next += 16666667u;
@@ -232,7 +235,6 @@ static void run_phase(GcPhase ph, int frames, GcResult *r) {
         if (n < next) { struct timespec d = { 0, (long)(next - n) }; nanosleep(&d, NULL); }
         else next = n;
     }
-    double secs = (double)(now_ns() - t0) / 1e9;
     atomic_store(&stop_workers, 1);
     long long misses = 0;
     int counted = ph.workers > 0;
@@ -241,6 +243,7 @@ static void run_phase(GcPhase ph, int frames, GcResult *r) {
         if (w[i].misses < 0) counted = 0;
         else misses += w[i].misses;
     }
+    double secs = (double)(now_ns() - t_start) / 1e9;
     *r = (GcResult){ .ph = ph, .frames = frames, .bus_mb_s = counted ? (double)misses * 64 / 1e6 / secs : -1, .temp_mc = read_temp() };
     r->gpu_p50 = gc_quantile(gpu, frames, 0.5);
     r->gpu_p99 = gc_quantile(gpu, frames, 0.99);
@@ -253,7 +256,8 @@ static void run_phase(GcPhase ph, int frames, GcResult *r) {
 int main(int argc, char **argv) {
     const char *node = "/dev/dri/renderD128";
     int frames = 240, cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    for (int i = 1; i + 1 < argc; i += 2) {
+    for (int i = 1; i < argc; i += 2) {
+        if (i + 1 >= argc) { fprintf(stderr, "usage: gpu-contention [--node path] [--frames n] [--cores n]\n"); return 2; }
         if (!strcmp(argv[i], "--node")) node = argv[i + 1];
         else if (!strcmp(argv[i], "--frames")) frames = atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--cores")) cores = atoi(argv[i + 1]);
