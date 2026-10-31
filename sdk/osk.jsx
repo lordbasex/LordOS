@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, mainDisplay, addListener } from '@lordos/runtime';
 import { useStore } from './store.js';
-import { useTheme } from './theme.js';
+import { shellTokens, useTheme } from './theme.js';
 import { t as tr } from './i18n.js';
 import { keyboard } from './keyboard.js';
 import { osk, oskState } from './osk.js';
@@ -53,7 +53,8 @@ function Key({ flex = 1, h, radius, label, icon, onPress, repeat, tone, c, size 
 
 export function OskPanel() {
   const st = useStore(oskState);
-  const t = useTheme();
+  const own = useTheme();
+  const t = useStore(shellTokens) || own;   // mounted outside the theme's tree (sdk/theme.js)
   const lastShift = useRef(0);
   if (!st.visible || !st.labels) return null;
   const box = st.box || (() => { const m = mainDisplay(); return { x: m.x, y: m.y, w: m.w, h: m.h }; })();

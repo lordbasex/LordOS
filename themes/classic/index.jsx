@@ -20,7 +20,7 @@ import {
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
-import { Window, TITLE_H } from './components/Window.jsx';
+import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Taskbar, BAR_H, barSize, taskbarEntries } from './components/Taskbar.jsx';
 import { StartMenu, startBox } from './components/StartMenu.jsx';
 import { QuickSettings } from './components/QuickSettings.jsx';
@@ -57,7 +57,7 @@ function trayPanel(pos, width, height, m = mainDisplay()) {
 }
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2 }, snap: true });
+configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true });
 
 // What is being dragged (from the bar or the start menu), and the remove cue.
 function DragGhost({ t }) {

@@ -13,7 +13,7 @@ import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } f
 import { Menu } from './Menu.jsx';
 
 export const TITLE_H = 34;
-const MENU_H = 26;
+export const MENU_H = 26;
 const BTN_W = 44;
 
 // The window's menu strip: the app's menus, then Window and Help. One menu open at a time, under its

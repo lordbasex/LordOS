@@ -79,7 +79,8 @@ app that doesn't report one:
 1. The field is above the keyboard: nothing moves.
 2. A window rises as much as needed, and then shrinks. It goes back when the keyboard closes, unless the
    person moved it meanwhile. `wm.liftForKeyboard`, `wm.dropFromKeyboard`.
-3. No window to move (Search, a sheet): the keyboard goes to the top of the display.
+3. No window to move (Search, a sheet), or a window that keeps a larger minimum size: the keyboard goes to
+   the top of the display.
 
 It re-checks after each key, because the caret may have moved to another line. The login screen moves
 its own column up.

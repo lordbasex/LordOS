@@ -80,6 +80,8 @@ eq('no field known, no window', planAvoid({ caret: null, frame: null, area: null
 const tall = { x: 0, y: 30, w: 1280, h: 450 };
 eq('already as far as it goes: the keyboard goes up', planAvoid({ caret: { y: 470, h: 20 }, frame: tall, area, top }), { dock: 'top' });
 eq('as far as it goes, unknown caret: stays', planAvoid({ caret: null, frame: { ...tall, h: 455 }, area, top }).frame, { ...tall });
+eq('a window that kept its size: the keyboard goes up', planAvoid({ caret: { y: 500, h: 20 }, frame: { x: 0, y: 30, w: 800, h: 696 }, area, top, refused: true }), { dock: 'top' });
+eq('kept its size, unknown caret: stays', planAvoid({ caret: null, frame: { x: 0, y: 30, w: 800, h: 696 }, area, top, refused: true }), { dock: 'bottom' });
 
 console.log(bad ? `osk-model-test: ${bad} of ${n} failed` : `osk-model-test: ${n} ok`);
 process.exit(bad ? 1 : 0);

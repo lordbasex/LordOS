@@ -2,6 +2,7 @@
 // with useTheme() and so look right with any theme.
 import { createContext, createElement, useContext, useEffect } from 'react';
 import { settings } from './settings.js';
+import { createStore } from './store.js';
 
 // Minimal tokens every theme must provide (see themes/README.md).
 export const DEFAULT_TOKENS = {
@@ -35,6 +36,10 @@ export const DEFAULT_TOKENS = {
 export const popupBg = (t) => t.popupBg || (t.mode === 'dark' ? '#2c2c31' : '#ffffff');
 
 const ThemeContext = createContext(DEFAULT_TOKENS);
+
+// The tokens of the outermost provider, the theme's. The on-screen keyboard is mounted beside the
+// theme's tree, not inside it (startShell's layers), and reads them here so it follows the mode and accent.
+export const shellTokens = createStore(null);
 
 // Isolated .lpk apps (another process) receive these same tokens live through the broker
 // (lord.broker.publish, see docs/PRIVACY.md). Only the theme publishes them, not the app host.
@@ -75,7 +80,8 @@ function settingTokens() {
 
 export function ThemeProvider({ tokens, children }) {
   const value = { ...DEFAULT_TOKENS, ...settingTokens(), ...tokens };
-  useEffect(() => { publishTokens(value); syncPortal(value); });
+  const outermost = useContext(ThemeContext) === DEFAULT_TOKENS;
+  useEffect(() => { publishTokens(value); syncPortal(value); if (outermost) shellTokens.set(value); });
   return createElement(ThemeContext.Provider, { value }, children);
 }
 

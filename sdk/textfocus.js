@@ -14,7 +14,7 @@ export function onTextField(fn) { subs.add(fn); return () => subs.delete(fn); }
 const inApp = () => typeof lord !== 'undefined' && typeof lord.appId === 'string' && !!lord.broker?.textFocus;
 let sent = '';
 let timer = 0;
-function tellSession() {
+function tellSession(again = true) {
   if (timer) return;
   // the caret is drawn after the render that gives the focus
   timer = setTimeout(() => {
@@ -23,6 +23,8 @@ function tellSession() {
     const on = textFieldActive(), y = c ? Math.round(c.y) : -1, h = c ? Math.round(c.h) : 0;
     const now = `${on}|${y}|${h}`;
     if (now !== sent) { sent = now; lord.broker.textFocus(on, y, h); }
+    // a field focused while its window opens has no place yet: once more, after the layout settles
+    if (again) setTimeout(() => tellSession(false), 250);
   }, 30);
 }
 
