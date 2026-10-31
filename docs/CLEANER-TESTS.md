@@ -69,7 +69,19 @@ the figure this section used to give, 100 ms of CPU in 10 s, had none, so nothin
 | Screen repainted per frame, p50 | 87 % | 0.1 % |
 | Screen repainted per frame, mean | 86 % | 3.8 % |
 
-After: 845 frames in 12 s. Before: 423. These are the CPU path's numbers. **Not measured: a Raspberry Pi 5, a real display, the GPU path.**
+After: 845 frames in 12 s. Before: 423. These are the CPU path's numbers.
+
+**On the Raspberry Pi 5** (2026-10-31, v087.22, its monitor at 1920×1080 and 60 Hz, GPU composition, the Scan hero in the default window position with System Information behind it; real input through uinput). CPU is the whole session's cgroup in percent of one core. "Flips" are the display's real page flips, polled from the KMS state, so a pause means nothing changed on the screen or a frame came late: the two can't be told apart from flips. Two runs of 15 s idle and 8 s scanning for each cell, a real scan, reopening the app each time:
+
+| | Session CPU | Flips | Gap p50 / p99 | Longest gap |
+|---|---|---|---|---|
+| Cleaner closed | 0.1 % | none | | |
+| Noche, idle hero (dark, light) | 6.8–7.2 % | 59.8–60.0 fps | 17.0 / 19.2–19.4 ms | 19.7–31.1 ms |
+| Noche, scanning (dark, light) | 12.2–13.7 % | 39.6–42.0 fps | 19.5–20.6 / 36.4–102.9 ms | 67.8–297.3 ms |
+| Aurora, idle hero (dark, light) | 4.5–5.0 % | 24.7–27.5 fps | 33.2 / 102.4–312.7 ms | 267.5–736.9 ms |
+| Aurora, scanning (dark, light) | 15.8–18.0 % | 21.7–25.0 fps | 31.8–32.9 / 298.0–415.5 ms | 343.5–984.7 ms |
+
+`lord-clean`'s scope took 0.6–1.2 % of that while scanning. Light and dark don't differ beyond the noise; the look does. Scanning costs about 8 to 13 points of a core over idle, under a fifth of one core of four. Aurora flips about half as often as Noche and shows gaps of up to a second while scanning, which is worth a look: this run doesn't say whether those are a calm moment of the animation or late frames. Cristal was not measured, nor the window next to the Dock, nor a home folder larger than this one's 570 MB, nor the review board or Storage's bubbles.
 
 - Reduce motion: 9 repaints in the whole session after opening the app, 80 ms of CPU in 8 s.
 - Minimized: 60 ms of CPU in 8 s.

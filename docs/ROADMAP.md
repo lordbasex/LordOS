@@ -639,14 +639,13 @@ left for after 0.8.6, and the new native app:
   FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In development: the
   player leaves a failing hardware decoder (`MEDIA.md`), not run on real hardware. Waiting for the maintainer: the
   sandbox of LordBench's video job, and another FFmpeg for the Pi.
-- [ ] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window (moved from 0.8.6
-  on 2026-10-30). Not built: it needs a measured gain, and VM 116 has no 3D (`GPU.md`, "Pending").
+- [x] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window (moved from 0.8.6
+  on 2026-10-30). Built and measured on the Pi 5 on 2026-10-31, and on by default since (`GPU.md`, "The whole drag").
 - [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
   composes only the damage, PBO uploads or a linear canvas) and finding what slows V3D under an all-core CPU load
   (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention measured as the cause on 2026-10-31, `GPU.md`:
   read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5 (moved from 0.8.6 on 2026-10-30).
-  In development, tested without a GPU and waiting for a Pi 5 run: the scissor (`LORD_GPU_SCISSOR=1`, off by default)
-  and `build/gpu-contention` (`GPU.md`).
+  The scissor was run on the Pi 5 on 2026-10-31: slower on V3D, it stays off (`LORD_GPU_SCISSOR=1`, `GPU.md`).
 
 ## Before 1.0
 

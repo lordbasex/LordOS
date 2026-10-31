@@ -140,7 +140,7 @@ the layer is not valid or would be painted whole this frame, has another opacity
 or has a pixel with a colour above its alpha (`layer.premul_bad`: there `blit_row`'s C and NEON versions
 differ from each other); W is empty; an ancestor of the window paints over W after it (a border, the
 restore of rounded corners); an app window of layer 0 is drawn into W (`wl_draws_meet`); the paint order
-around the window is unknown, or a node painted after the window that paints anything meets D (a view
+around the window is unknown, or a node painted after the window cuts W away entirely (a node painted after the window that meets D otherwise only shortens W, "The whole drag" below; a view
 with `overflow: hidden` and rounded corners counts even when it has no colour: the save and restore of its
 corners around its children change what is below them; with a backdrop blur's reach: it would read the stale W, and a blur or a turned image paints differently when
 D is cut into strips); or something changed while the strips were painted, and then W is painted by the
@@ -152,7 +152,7 @@ joins W to its damage; a frame with no UI damage (the cursor, an app's new frame
 from the textures while they are still that display's, else paints W on the CPU; direct scanout, a
 failed frame and the GPU going away (`cpu_takeover`) paint it again; the frame after the drag ends
 (`paint_layer_end` damages the window's box) paints it on the CPU. When the quad cannot be drawn (an
-upload failed, or the layer or output is larger than the self-test covered: GPU drag turns off) `gpu_frame_ex`
+upload failed, or the output is larger than the self-test covered: GPU drag turns off; a layer larger than that is refused earlier, for that window only: `size`) `gpu_frame_ex`
 returns -2 before presenting: no frame is shown with a stale W, the display keeps the one before, and
 `main.c` paints W on the CPU in the next frame without trying GPU drag (`gdragcpu`). `LORD_PAINT_VERIFY` leaves W
 out of its count on GPU drag frames.
@@ -183,7 +183,7 @@ on the CPU inside the call, so the first GPU drag frame after such a change miss
 frame has, so a pixel the slices missed shows): every frame matches, and it checks that no GPU drag frame has more than
 `GDRAG_FEED_PX` of the copy left to send.
 
-**Off by default** since the Raspberry Pi 5 run of 2026-10-29 (below): `LORD_GPU_DRAG=1` turns it on.
+**On by default** since the Raspberry Pi 5 run of 2026-10-31 ("The whole drag" below): `LORD_GPU_DRAG=0` turns it off. It was off from 2026-10-29, when it reached too few frames to matter. The login screen sets `LORD_GPU_DRAG=0`: it has no windows to drag and skips the self-test.
 **Then off unless it proves itself:** with it, `gpu_init` sets GPU drag up. It needs a fragment shader with at least 24-bit
 `highp` floats (`glGetShaderPrecisionFormat`) and then a self-test, drawn into a framebuffer, read back
 and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
@@ -199,13 +199,13 @@ and compared with `canvas_blit` on the CPU (the NEON row on the Pi):
 One differing pixel turns it off. The outcome is kept per GL renderer and version across contexts, so a
 GPU restart doesn't run it again. The log says `gpu: GPU drag on: … self-test: N pixels, every valid
 premultiplied combination and a WxH placement pass, the same as the CPU's, T ms` or `gpu: GPU drag off: …`
-with the reason; without `LORD_GPU_DRAG=1`, `gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is
+with the reason; with `LORD_GPU_DRAG=0`, `gpu: GPU drag off (LORD_GPU_DRAG=0): the dragged window is
 composed by the CPU`, and no self-test runs.
 
 | Switch | Effect |
 |---|---|
-| unset, `LORD_GPU_DRAG=0` or anything but `1` | GPU drag off (the default): the dragged window is painted by the CPU as before |
-| `LORD_GPU_DRAG=1` | GPU drag on wherever its self-test passes |
+| `LORD_GPU_DRAG=0` | GPU drag off: the dragged window is painted by the CPU as before |
+| unset or anything else | GPU drag on wherever its self-test passes (the default) |
 | `LORD_GPU_VERIFY=N` | every N-th GPU drag frame W is also painted on the CPU (a walk clipped to W on a scratch canvas) and compared with the framebuffer read back: `gpu-verify: frame N W=wxh differ=K worst=D` |
 
 The `drag: …` and `drag (scripted): …` lines end with `GPU drag: N of M frames (Q quads), strips … Mpx,
@@ -390,7 +390,44 @@ memory-bandwidth counter was read). The pointer reached the screen 17 ms later a
 So the pipeline is **off by default**; the code stays, with `LORD_PIPELINE=1` (while frames are heavy) and `2`
 (always) to turn it on.
 
-## The buffer-age scissor (0.8.7, in development, off by default)
+## The whole drag (0.8.7, on by default)
+
+Up to 0.8.6 a node painted after the window (the menu bar, the Dock) that met the damaged box refused the frame, and nearly
+every frame of a real drag has one, because the box reaches them. Now W loses the rows such a node meets (`gdrag_gate`,
+the side that keeps the larger W), so the node falls in the strip above or below W, which is as wide as the box and is
+painted by the CPU as in any frame. The session's `drag:` line and `build/engine-test` count those frames as "cut around
+later nodes"; 781 of the golden runs' 1,024 GPU drag frames are, and every hash matches.
+
+A layer past the self-test's size is refused with `size` for that window (`paint_gdrag_limit`, `gpu_gdrag_max`). It used to
+switch GPU drag off for the rest of the session, which is what a run with System Information's long Performance tab did.
+
+**On the Raspberry Pi 5** (2026-10-31, v087.22, its monitor at 1920 × 1080 and 60 Hz; 4 real 16 s drags of System
+Information's Summary tab by each setting, alone and under a memory load of four `dd`, a reboot for each set, the whole
+path through uinput, over the Dock and under the menu bar):
+
+| Pi 5, real drag | Frames | Work per frame | Session CPU (of one core) | Frames GPU drag composed |
+|---|---|---|---|---|
+| Off, alone | 56.9 fps | 7.01–7.05 ms | 58.1–60.6 % | |
+| **On, alone** | 56.8–56.9 fps | **5.02–5.06 ms** | **27.2–28.4 %** | 893–895 of 905–907 |
+| Off, under load | 28.8–29.1 fps | 20.19–20.41 ms | 66.7–67.8 % | |
+| **On, under load** | **34.4–35.1 fps** | **13.03–13.39 ms** | **44.9–45.9 %** | 536–547 of 548–559 |
+
+The 57 fps is the test's: its path stands still for 165 ms in the middle ("Measuring a drag", `docs/BENCHMARK.md`).
+The window reached 60 fps either way. `LORD_GPU_VERIFY=1` compared all 1,662 frames of a LordBench run and four real drags
+through the service's environment: every line `differ=0 worst=0`. The read-back is what slows that run (29.3 fps alone).
+LordBench's Desktop impact doesn't see the gain (5 runs each): alone 60.0 fps both ways, the build's p50 falls from 8.1 to 6.9
+ms and the GPU's part rises from 1.51 to 2.12 ms; under load 30.1–31.8 fps off and 30.2–31.7 on, the build's p50 falls from
+13.1 to 9.7 ms and the GPU's part rises from about 13.5 to about 16 ms. Pointer to screen doesn't change.
+
+So it is **on by default**: half the CPU in a drag alone, a fifth more frames under load, no loss in the frames it refuses,
+and the read-back clean. The price is the self-test at the start of each user session, 339–365 ms on the Pi, and 0.6 ms more of
+GPU a frame during a drag. It has run on V3D only: on any other GPU only the self-test guards it. 
+
+On v087.23 with no switch set, so with the default as it now stands (2 runs of each): 4.96–4.99 ms a frame and 27.0–27.6 % alone, 35.3–36.5 fps, 12.28–12.71 ms
+and 44.0–44.4 % under load; LordBench 60.0 and 30.8–30.9 fps. A drag on the Performance tab composed 0 of 906 frames (refused: `size`) at the old cost, and the next
+drag in the same session composed 893 of 905. `LORD_GPU_VERIFY` was not repeated on that build; v087.23 differs from v087.22 in the `size` refusal and the default.
+
+## The buffer-age scissor (0.8.7, measured on the Pi 5, off by default)
 
 Every frame on the GPU path clears and composes the whole output, even when a few pixels changed. On a tiling GPU that
 is memory traffic the frame doesn't need. `LORD_GPU_SCISSOR=1` turns on the alternative (`gpu/gscissor.c`, no GL, and
@@ -412,10 +449,19 @@ is memory traffic the frame doesn't need. `LORD_GPU_SCISSOR=1` turns on the alte
   every 20th frame read back, 0 pixels differ, 24 % of the pixels composed, 3.77 ms a frame against 8.80.
 - **Not checked:** `gpu_frame_ex` itself has not run with it on (no card to flip on VM 116), and no GPU has. Whether V3D
   saves anything is unknown: a scissor still loads the tiles it touches, and llvmpipe's numbers say nothing about a tiler.
-  So it is off until the Raspberry Pi 5 run below; PBO uploads or a linear canvas are still not done.
+  That was the state before the Raspberry Pi 5 run below; PBO uploads or a linear canvas are still not done.
 
-**On the Raspberry Pi 5:** LordBench's Desktop impact with and without `LORD_GPU_SCISSOR=1`, comparing `gpuMs` alone and
-under load, and the log line above.
+**On the Raspberry Pi 5 (2026-10-31, v087.22, LordBench's Desktop impact, 3 runs with `LORD_GPU_SCISSOR=1`, 5 without, a
+reboot for each set, the sets without it taken before and after it):** it costs more than it saves, so it **stays off**.
+
+| Pi 5, monitor | GPU's part alone | Frames under load | GPU's part under load | Pointer to screen p99 under load |
+|---|---|---|---|---|
+| Scissor off | 1.51 ms | 30.1–31.8 fps | 13.0–14.7 ms | 63.0–66.5 ms |
+| `LORD_GPU_SCISSOR=1` | 2.58–2.59 ms | 28.4–29.9 fps | 16.6–16.9 ms | 82.7–95.0 ms |
+
+Alone both hold 60.0 fps. v087.20 gave the same picture (3 runs each: 2.6 against 1.5 ms alone, 24.5–29.9 against
+30.0–31.2 fps under load). A scissor still loads the tiles it touches, so on V3D the partial frame is slower than the
+whole one. The code stays, off, for other tilers.
 
 ## What slows the GPU under CPU load (the experiment, 0.8.7)
 
@@ -613,12 +659,11 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 
 ## Pending
 
-- GPU drag also where the menu bar or the Dock overlap the window (step 12); it is off by default after the Pi 5 run.
-  Moved to 0.8.7 (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release 0.8.7 (planned)"). **Not built:** the
-  rule was to build it only if a measurement on VM 116 showed a gain, and VM 116 has no 3D (`virgl: no`, EGL gives
-  llvmpipe), so nothing there can show one. On the Pi 5, GPU drag gave no measurable gain where it already applies.
-- Run the buffer-age scissor and `build/gpu-contention` on the Pi 5 (both above); PBO uploads or a linear canvas.
-  Moved to 0.8.7 (2026-10-30).
+- GPU drag for a layer past the self-test's size: refused for that window (`size`); on the Pi 5 a tall scrolled page
+  makes one (the layer of System Information's Performance tab is about 4.5 Mpx). Why that layer is taller than the
+  window was not looked into.
+- GPU drag measured with another GPU than V3D: only the self-test guards those.
+- PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

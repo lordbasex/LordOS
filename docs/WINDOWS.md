@@ -152,9 +152,9 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
     of the damaged box around the window's rectangle, and the GPU writes the rectangle from the layer
     and the copy (two textures uploaded only where they changed) with `blit_row`'s own arithmetic, so
     the pixels are the same. Not when an ancestor paints over the window, an app window is under it,
-    a node painted after it (the menu bar, the Dock) meets the box, or the layer has an app window or
-    would be painted whole; then the frame is painted as before. Off by default since the Pi 5 run
-    of 2026-10-29 (right on V3D, no measurable gain there); `LORD_GPU_DRAG=1` turns it on,
+    or the layer has an app window, would be painted whole or is past the self-test's size; then the frame is
+    painted as before. A node painted after it (the menu bar, the Dock) only shortens the rectangle. On by default
+    since the Pi 5 run of 2026-10-31; `LORD_GPU_DRAG=0` turns it off,
     `LORD_GPU_VERIFY=N` compares it with the CPU every N-th frame. `engine-test`'s `gpu-drag` path checks it
     against the GPU path's golden hashes.
 - **There's no layer** if there is a backdrop blur inside (`backdropFilter`), or a video on the GPU

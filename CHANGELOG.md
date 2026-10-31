@@ -10,6 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+- **GPU drag is on by default, and now covers the whole drag** (2026-10-31, Raspberry Pi 5; `docs/GPU.md`, "The whole drag"): the menu bar or the Dock in the damaged box used to refuse nearly every frame of a real drag; now they only shorten the window's rectangle. In 4 real 16 s drags each, on v087.22: alone the session's CPU fell from 58.1–60.6 % to 27.2–28.4 % of a core and the work per frame from 7.0 to 5.0 ms; under memory load 28.8–29.1 fps became 34.4–35.1 fps, 20.3 ms became 13.2 ms and 67 % became 45 %. `LORD_GPU_VERIFY=1` compared 1,662 frames, all `differ=0`. It costs a self-test of about 350 ms at the start of each user session (none at the login screen) and 0.6 ms more of GPU a frame in a drag. LordBench's Desktop impact doesn't see the gain. `LORD_GPU_DRAG=0` turns it off. It has run on V3D only.
+- **A layer past GPU drag's self-test no longer turns it off for the session**: that window is refused (`size`) and the next one uses it.
+- **The buffer-age scissor stays off** after its Raspberry Pi 5 run (5 runs without, 3 with, v087.22): the GPU's part rises from 1.51 to 2.58 ms alone, and under load 30.1–31.8 fps fall to 28.4–29.9 fps, pointer p99 from 63–66 ms to 83–95 ms (`docs/GPU.md`).
+- `lord-sessiond` passes `LORD_GPU_SCISSOR`, `LORD_GPU_DRAG`, `LORD_PIPELINE` and `LORD_GPU_VERIFY` from its service to user sessions, never to the login screen.
+- Cleaner measured on the Raspberry Pi 5 (`docs/CLEANER-TESTS.md`): 4.5–7.2 % of a core with the hero idle, 12.2–18.0 % scanning, 0.1 % closed.
+
 - **A Linux window no longer keeps the size of a maximize just undone** (2026-10-31, found on the Raspberry Pi 5): a commit the app made before it read the compositor's last configure counted as a resize of its own, so the Test Bench's first launch of a session ended 1920 wide and ran off the screen. `wl.c` now waits for the ack of the last configure.
 - About names the case once and shows the whole board name up to the revision; Settings shows it whole; Files → Network's long lines end in an ellipsis.
 

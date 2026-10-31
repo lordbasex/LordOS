@@ -694,6 +694,32 @@ and the pointer reached the screen 17 ms later alone (42 against 25.5 ms) and 29
 ms). Two to five frames a second do not pay for that latency, so the pipeline is **off by default** and the code
 stays for `LORD_PIPELINE=1`/`2`.
 
+#### The 0.8.7 run on the Pi 5 (2026-10-31)
+
+v087.22, the same Pi and monitor, a reboot for each set, 48–52 °C at the end of each set and `get_throttled=0x0`. The sets with neither switch and with GPU drag were each taken twice, one before and one
+after the others, so the ranges below include that drift. Earlier numbers in this file are other builds.
+
+| LordBench → Desktop impact | Runs | Alone | Build p50 / p99 alone | GPU's part alone | Under load | Build p50 under load | GPU's part under load | Pointer p99 under load |
+|---|---|---|---|---|---|---|---|---|
+| Neither (`A`, `A2`) | 5 | 60.0 fps | 8.04–8.12 / 11.47–11.61 ms | 1.51 ms | 30.1–31.8 fps | 12.75–13.28 ms | 12.98–14.73 ms | 63.0–66.5 ms |
+| GPU drag (`D`, `D2`) | 5 | 60.0 fps | 6.78–6.94 / 11.27–11.63 ms | 2.11–2.12 ms | 30.2–31.7 fps | 9.49–9.90 ms | 15.46–17.28 ms | 64.8–66.5 ms |
+| Scissor (`S`) | 3 | 60.0 fps | 7.91–8.18 / 11.53–11.74 ms | 2.58–2.59 ms | 28.4–29.9 fps | 13.21–13.57 ms | 16.61–16.86 ms | 82.7–95.0 ms |
+
+Real drags with and without GPU drag are in `docs/GPU.md`, "The whole drag". GPU drag composed 357–377 of 600 frames in
+LordBench alone. Decisions: GPU drag on, the scissor off (`docs/GPU.md` has why). The frame rate under load stays near
+30 fps in this test whatever the switch, because the GPU's part, not the build, passes the period.
+
+**Measuring a drag.** LordBench's scripted drag and a real drag differ: a real one, by `uinput`, reached the Dock and the menu
+bar in nearly every frame, and only that showed what GPU drag is worth. Two figures from that test look like stalls and are not:
+
+- A longest gap between flips of 1.2 to 2.1 s, in every run that counts flips: it comes before the press (it starts as polling starts in nearly every run), while the screen does nothing and the test sets up its
+  input device. Inside the drag the session's own `max gap` shows what is left.
+- That `max gap`, 134–172 ms on every run: the test's path stops. Its X and Y turn at the same moment 4.1 s in, so the
+  pointer doesn't move for 165 ms (the model of the path gives 165; measured, at 3.6–4.0 s after the press). No move, no frame. A circular path with no stop, on v087.23: 60.0 fps and a longest gap of 22.9 ms.
+
+The longest frame's work is another matter: 16–18 ms alone, and 27–30 ms with System Information's long Performance tab,
+whose layer is about 4.5 Mpx.
+
 #### Frame phases (0.8.6)
 
 Without the frame pipeline a frame is started only after the last flip completed (one frame in flight), so any

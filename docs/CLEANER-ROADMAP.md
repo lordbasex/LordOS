@@ -29,7 +29,7 @@ Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.
 | Item by the clock and panel | Built | Still item; reads only while open |
 | Looks | Built | Aurora (default), Noche, Cristal |
 | Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn; the board's cards show real parts |
-| Motion budget | Built | Frame times on VM 116 in `CLEANER-TESTS.md`; not measured on a Pi 5 |
+| Motion budget | Built | Frame times on VM 116 and a Raspberry Pi 5 in `CLEANER-TESTS.md`: 5 to 7 % of a core idle, 12 to 18 % scanning. Aurora's pauses of up to a second while scanning are not explained yet |
 | Bubble view | Built | Glass spheres with an icon per kind of folder. Selecting a folder reviews its large files; no folder action |
 | Similar images | Built | Decoded only in `lord-clean`; JPEG, PNG, GIF and BMP; 20,000 images at most; to the Trash, one image of each group always stays |
 | Apps | Built | Installed apps by size, removed by the package engine or `.lpk` removal; leftovers of removed LordOS apps. A real removal was not run: the test session has no admin helper |
