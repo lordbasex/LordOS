@@ -41,5 +41,6 @@
   "uptime": "Uptime",
   "version": "Version {v}",
   "versionChannel": "Version {v} · {channel}",
-  "case": "Case"
+  "case": "Case",
+  "caseArgonV5": "Argon ONE V5"
 }

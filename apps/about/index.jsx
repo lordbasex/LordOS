@@ -44,7 +44,7 @@ export default function About() {
   const t = useTheme();
   const info = useSystemInfo(5000);
   const st = useServerStats(2000);
-  const cpu = info.cpu.replace(/\(R\)|\(TM\)|CPU|Processor/g, '').replace(/\s+/g, ' ').trim();
+  const cpu = info.cpu.replace(/\(R\)|\(TM\)|CPU|Processor/g, '').replace(/ Rev [\d.]+$/, '').replace(/\s+/g, ' ').trim();
   const ver = lordosVersion(info);
   const code = useMemo(() => codeStatus(), []);
   const caseId = useMemo(() => { try { return lord.fan.caseConfig(); } catch (e) { return null; } }, []);
@@ -67,9 +67,9 @@ export default function About() {
         <InfoRow k={tr('about.os')} v={info.os} />
         <InfoRow k={tr('about.kernel')} v={`${info.kernel} (${info.arch})`} />
         <InfoRow k={tr('about.host')} v={tr('about.hostValue', { host: info.hostname, user: info.user })} />
-        <InfoRow k={tr('about.cpu')} v={tr('about.cpuValue', { cpu: cpu.slice(0, 34) || tr('about.cpuUnknown'), count: info.cores })} />
+        <InfoRow k={tr('about.cpu')} v={tr('about.cpuValue', { cpu: cpu.slice(0, 36) || tr('about.cpuUnknown'), count: info.cores })} />
         <InfoRow k={tr('about.memory')} v={tr('shell.cc.memDetail', { used: formatBytes((info.memTotalKB - info.memAvailableKB) * 1024), total: formatBytes(info.memTotalKB * 1024) })} />
-        {caseId === 'argon-one-v5' ? <InfoRow k={tr('about.case')} v={tr('cooling.caseArgonV5')} /> : null}
+        {caseId === 'argon-one-v5' ? <InfoRow k={tr('about.case')} v={tr('about.caseArgonV5')} /> : null}
         <InfoRow k={tr('about.uptime')} v={formatDuration(info.uptime)} />
         {info.bootSeconds > 0 ? (
           <InfoRow k={tr('about.bootTime')} v={tr(info.bootShown === 'session' ? 'about.bootToDesktop' : 'about.bootToLogin', { s: formatNumber(info.bootSeconds, 3) })} />

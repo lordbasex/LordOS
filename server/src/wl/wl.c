@@ -120,6 +120,7 @@ struct Surf {
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
+    uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
      * enter/leave, bit = output slot) and the scale it should render at (fractional-scale-v1,
@@ -336,7 +337,8 @@ static void send_toplevel_configure(Surf *s) {
     }
     xdg_toplevel_send_configure(s->top, s->conf_w, s->conf_h, &states);
     wl_array_release(&states);
-    xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));
+    s->conf_serial = wl_display_next_serial(dpy);
+    xdg_surface_send_configure(s->xdg, s->conf_serial);
     s->sent_configure = 1;
 }
 
@@ -1809,7 +1811,11 @@ static void xs_geometry(struct wl_client *c, struct wl_resource *r, int32_t x, i
     s->p_gx = x; s->p_gy = y; s->p_gw = w; s->p_gh = h;
     s->p_geom = 1;
 }
-static void xs_ack(struct wl_client *c, struct wl_resource *r, uint32_t serial) { (void)c; (void)r; (void)serial; }
+static void xs_ack(struct wl_client *c, struct wl_resource *r, uint32_t serial) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) s->acked_serial = serial;
+}
 static const struct xdg_surface_interface xdg_surface_impl = {
     .destroy = xs_destroy, .get_toplevel = xs_toplevel, .get_popup = xs_popup,
     .set_window_geometry = xs_geometry, .ack_configure = xs_ack,
@@ -2016,7 +2022,9 @@ static void surface_commit_role(Surf *s) {
         } else if (!s->content && s->mapped) {
             s->mapped = 0;
             emit(s, "unmap", "{}");
-        } else if (s->mapped && (w != s->conf_w || h != s->conf_h)) {
+        } else if (s->mapped && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
+            /* a commit made before the app read our last configure is its old size on the way out, not a
+             * resize of its own: taken as one, the window kept the size of a maximize just undone */
             emit(s, "geometry", "{\"width\":%d,\"height\":%d}", w, h);
             s->conf_w = w;
             s->conf_h = h;

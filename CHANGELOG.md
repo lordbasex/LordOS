@@ -10,6 +10,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+- **A Linux window no longer keeps the size of a maximize just undone** (2026-10-31, found on the Raspberry Pi 5): a commit the app made before it read the compositor's last configure counted as a resize of its own, so the Test Bench's first launch of a session ended 1920 wide and ran off the screen. `wl.c` now waits for the ack of the last configure.
+- About names the case once and shows the whole board name up to the revision; Settings shows it whole; Files → Network's long lines end in an ellipsis.
+
 ### Added
 
 - **Desktops** (in development; `docs/DESKTOPS.md`), in Lord Flow and Lord Classic, from one to nine, all displays together.

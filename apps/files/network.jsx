@@ -55,10 +55,10 @@ function Row({ t, depth = 0, icon, name, sub, kind, children, onClick, chevron }
       <Text style={{ width: 12, fontSize: 11, color: t.textDim }}>{chevron || ''}</Text>
       <View style={{ width: 20, alignItems: 'center' }}>{icon}</View>
       <View style={{ flex: 2, minWidth: 0 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{name}</Text>
+        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
         {sub ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{sub}</Text> : null}
       </View>
-      {kind ? <Text style={{ flex: 2, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{kind}</Text> : null}
+      {kind ? <Text style={{ flex: 2, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{kind}</Text> : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs }}>{children}</View>
     </View>
   );

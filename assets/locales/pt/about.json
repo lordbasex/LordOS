@@ -41,5 +41,6 @@
   "uptime": "Ligado há",
   "version": "Versão {v}",
   "versionChannel": "Versão {v} · {channel}",
-  "case": "Caixa"
+  "case": "Caixa",
+  "caseArgonV5": "Argon ONE V5"
 }

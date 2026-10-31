@@ -41,5 +41,6 @@
   "uptime": "Encendido hace",
   "version": "Versión {v}",
   "versionChannel": "Versión {v} · {channel}",
-  "case": "Caja"
+  "case": "Caja",
+  "caseArgonV5": "Argon ONE V5"
 }
