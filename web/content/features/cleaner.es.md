@@ -13,11 +13,15 @@ Pensalo como vaciar una casa con cuidado. Alguien la recorre y hace una lista, s
 ## Qué hace
 
 - **Analizar** corre Limpieza, Almacenamiento y Duplicados uno tras otro y después muestra un tablero con lo que encontró de verdad: una tarjeta por cada cosa encontrada, con sus tamaños reales y los archivos reales detrás.
-- **Limpieza** lista cachés, descargas de herramientas de desarrollo, cachés de navegadores, temporales viejos y la Papelera, cada uno con su motivo, su riesgo y lo que le va a pasar.
+- **Limpieza** lista cachés, descargas de herramientas de desarrollo, cachés de navegadores, temporales viejos, instaladores antiguos y la Papelera, cada uno con su motivo, su riesgo y lo que le va a pasar. Mientras corre un análisis ves las tres reglas que más encontraron hasta ese momento, con sus tamaños.
+- **Proyectos de código** en tu carpeta personal: compilados de Node, Rust, Maven, JavaScript, Python, Gradle y Dart. El nombre de una carpeta no prueba nada, así que cada una se prueba con los archivos que tiene al lado o adentro, y las dependencias de Node se ofrecen solo cuando el proyecto entero lleva 60 días sin cambios. Los elegís uno por uno y van a la Papelera.
+- **Videos grandes** de 100 MiB o más en el Escritorio y en tus grabaciones de pantalla también se eligen uno por uno.
 - **Archivos grandes** filtra por tamaño, antigüedad y tipo.
-- **Almacenamiento** muestra las carpetas más grandes como burbujas, un mapa, una lista de carpetas y un resumen por tipo. Cada carpeta se dibuja con lo que es, así videos, música y código se distinguen de un vistazo.
+- **Almacenamiento** muestra las carpetas más grandes como burbujas, un mapa, una lista de carpetas y un resumen por tipo. Cada carpeta se dibuja con lo que es, así videos, música y código se distinguen de un vistazo. En el mapa, unas bandas en cada mosaico muestran lo que se regenera solo y lo que conviene revisar antes, y una línea da el espacio libre, las dos cantidades y lo que quedó sin escanear.
 - **Duplicados** encuentra copias exactas en las carpetas que elijas. No se selecciona nada por vos.
 - **Actividad** registra lo que se ejecutó: cantidades y tamaños, nunca una ruta.
+
+Una cosa sí queda en el disco con nombres adentro: el mapa de almacenamiento se guarda entre sesiones, en `~/.cache/lordos/cleaner-map.txt`, legible solo por tu usuario. Tiene nombres y tamaños de carpetas, y se queda en esta computadora. Viene activado: lo apagás en Ajustes o lo borrás con Borrar en Actividad. Un mapa guardado no tiene nada sobre lo que se pueda actuar; para limpiar, analizás otra vez.
 
 [[shot:1]]
 
@@ -27,12 +31,14 @@ Las reglas de limpieza nunca alcanzan cookies, sesiones, historial ni contraseñ
 
 ## Cómo se mantiene seguro
 
-El análisis corre en `lord-clean`, un helper aislado que solo puede leer. Los planes se arman en `lord-server`, no en la app, y la app solo tiene identificadores de candidatos, nunca la autoridad para tocar una ruta. Todo se comprueba otra vez justo antes de actuar.
+El análisis corre en `lord-clean`, un helper aislado que solo puede leer. Los planes se arman en `lord-server`, no en la app, y la app solo tiene identificadores de candidatos, nunca la autoridad para tocar una ruta. Todo se comprueba otra vez justo antes de actuar, incluidos los archivos que probaron una carpeta de proyecto.
 
-Los archivos de caché regenerables bajo carpetas fijas se pueden borrar de verdad, como tu propio usuario, y solo por este camino: `lord.fs` sigue sin tener un borrado general. Todo lo demás va a la Papelera, desde donde se puede restaurar. Tres acciones de administración cerradas limpian los archivos del sistema, cada una confirmada; son la única parte que todavía no se ejecutó en una máquina de prueba.
+Los archivos de caché regenerables bajo carpetas fijas se pueden borrar de verdad, como tu propio usuario, y solo por este camino: `lord.fs` sigue sin tener un borrado general. Todo lo demás, incluidas las carpetas de proyectos, va a la Papelera, desde donde se puede restaurar. Tres acciones de administración cerradas limpian los archivos del sistema, cada una confirmada; son la única parte que todavía no se ejecutó en una máquina de prueba.
 
 ## Lo que cuesta su movimiento
 
 La app viene con tres aspectos, sigue el modo claro y oscuro, y funciona en inglés, español y portugués. Su diseño se invierte para los idiomas de derecha a izquierda, comprobado por ahora con un idioma de prueba con texto en inglés. Su movimiento corre solo con la ventana al frente y se detiene por completo con Reducir movimiento. Las partes que se mueven van en cuadros separados para que la pantalla se repinte lo menos posible; los números están en `docs/CLEANER-TESTS.md`. Se midieron en una máquina virtual, no en una Raspberry Pi.
 
 [[shot:2]]
+
+Cada página de resultados tiene Empezar de nuevo y Analizar de nuevo, las listas tienen Seleccionar todo y Duplicados tiene Seleccionar copias, que deja una copia de cada grupo.

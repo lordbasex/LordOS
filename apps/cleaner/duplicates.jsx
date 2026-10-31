@@ -1,8 +1,16 @@
-// Duplicates: exact copies in the folders the user chose. Nothing is selected by itself, and lord-server keeps
+// Duplicates: exact copies in the folders the user chose. Nothing is selected by itself; the selection menu picks
+// copies by group. lord-server keeps
 // at least one independent copy of every group and compares bytes right before acting.
 import { View, cleaner, t as tr, formatBytes, formatNumber, formatDate, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, ORB_SPACE } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, SelectBar, ORB_SPACE } from './ui.jsx';
+
+// which copies to pick; lord-server keeps one of each group whatever is picked
+export const picks = (groups) => {
+  const by = (keep) => groups.flatMap((g) => { const k = keep(g); return g.filter((m) => m !== k).map((m) => m.id); });
+  const newest = (g) => g.reduce((a, m) => (m.mtime > a.mtime ? m : a)), oldest = (g) => g.reduce((a, m) => (m.mtime < a.mtime ? m : a));
+  return [{ key: 'smart', ids: by((g) => g[0]) }, { key: 'older', ids: by(newest) }, { key: 'newer', ids: by(oldest) }, { key: 'all', ids: groups.flat().map((m) => m.id) }];
+};
 
 export function DupHero({ folders, chosen, toggle }) {
   return (
@@ -17,7 +25,7 @@ export function DupHero({ folders, chosen, toggle }) {
 export function DupList({ scan, selected, setSelected }) {
   const fetch = useMemo(() => {
     // groups flattened into rows, a fixed height each
-    const rows = [];
+    const rows = [], groups = [];
     let total = 0;
     for (let off = 0; off < scan.groups; off += 100) {
       const r = cleaner.groups(scan.id, off, 100);
@@ -25,9 +33,10 @@ export function DupList({ scan, selected, setSelected }) {
       for (const g of r.groups) {
         rows.push({ head: true, id: `g${g.id}`, g });
         for (const m of g.members) rows.push({ ...m, gid: g.id });
+        groups.push(g.members);
       }
     }
-    return { rows, total };
+    return { rows, total, options: picks(groups), size: new Map(groups.flat().map((m) => [m.id, m.allocated])) };
   }, [scan.id]);
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
@@ -41,6 +50,7 @@ export function DupList({ scan, selected, setSelected }) {
           <CountUp value={scan.reclaim} format={formatBytes} />
         </View>
       </View>
+      {fetch.rows.length ? <SelectBar selected={selected} options={fetch.options} onPick={(ids) => setSelected(new Set(ids))} size={[...selected].reduce((a, i) => a + (fetch.size.get(i) || 0), 0)} /> : null}
       {!fetch.rows.length ? <Label dim>{tr('cleaner.dups.none')}</Label> : (
         <Glass style={{ flex: 1, minHeight: 0, padding: spacing.xs }}>
           <PagedList rowH={34} reset={scan.id} fetch={(o, l) => ({ items: fetch.rows.slice(o, o + l), total: fetch.rows.length })} render={(r) => (r.head ? (

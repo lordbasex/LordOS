@@ -3,7 +3,7 @@ import {
   View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, oldKernels, kernelPlanOk, systemInfo, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, ORB_SPACE, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, SelectBar, ORB_SPACE, usePal } from './ui.jsx';
 
 const n = (v) => formatNumber(v);
 const when = (sec) => { const d = new Date(sec * 1000); return `${formatDate(d, 'short')} ${formatTime(d)}`; };
@@ -34,6 +34,9 @@ export function ScanHero({ status, last }) {
   );
 }
 
+// what a rules scan has found so far, largest first
+export const foundSoFar = (scan) => (scan && scan.rules ? scan.rules.filter((r) => r.files > 0 && r.action !== 'none').sort((a, b) => b.allocated - a.allocated).slice(0, 3) : []);
+
 // no total is known while walking: real counters and the real path; a percentage only once a plan runs
 export function Working({ info, art }) {
   const scan = info.scan, plan = info.plan;
@@ -41,16 +44,27 @@ export function Working({ info, art }) {
     return <ProgressRing progress={plan.items ? plan.processed / plan.items : 0} big={`${Math.round((plan.processed / (plan.items || 1)) * 100)} %`} small={tr('cleaner.workingCount', { done: n(plan.processed), total: n(plan.items) })} />;
   }
   if (info.job === 'plan') return <ProgressRing big="…" small={tr('cleaner.preparing')} />;
-  return <SectionScan art={art} verb={tr('cleaner.scanning')} path={scan ? scan.now : ''} counter={scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.seen : 0), dirs: n(scan ? scan.dirs : 0) })} />;
+  return <SectionScan art={art} verb={tr('cleaner.scanning')} path={scan ? scan.now : ''} counter={scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.seen : 0), dirs: n(scan ? scan.dirs : 0) })}
+    found={foundSoFar(scan).map((r) => <Label key={r.id} size={typeScale.callout} lines={1}>{`${tr(`cleaner.ruleName.${r.id}`)}  ${formatBytes(r.allocated)}`}</Label>)} />;
 }
 
 // ---- Cleanup: categories, each with its reason, what will happen, and its files on request ----
+
+// every id a filter matches, a page at a time
+export function allIds(scanId, filter, sizes) {
+  const ids = [];
+  for (let off = 0; ; off += 500) {
+    const r = cleaner.results(scanId, off, 500, filter);
+    for (const it of r.items) { ids.push(it.id); if (sizes) sizes.set(it.id, it.allocated); }
+    if (!r.items.length || ids.length >= r.total) return ids;
+  }
+}
 
 const ACTION_KEY = { delete: 'cleaner.action.delete', trash: 'cleaner.action.trash', none: 'cleaner.action.none' };
 
 function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, setModels }) {
   const [open, setOpen] = useState(false);
-  const selectable = rule.action !== 'none' && !blocked && !rule.explicit;
+  const selectable = rule.action !== 'none' && !blocked;
   return (
     <Enter delay={delay} x={0} y={14} ms={500}>
       <Glass lift style={{ padding: spacing.m, gap: spacing.s }}>
@@ -75,7 +89,7 @@ function RuleRow({ rule, scanId, on, onToggle, onEmpty, delay, blocked, models, 
           <View style={{ height: 170 }}>
             <PagedList rowH={28} reset={scanId} fetch={(o, l) => cleaner.results(scanId, o, l, { rule: rule.id })} render={(it) => (
               <View key={it.id} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
-                {rule.explicit && rule.action !== 'none' ? <Check on={models.has(it.id)} onClick={() => setModels((o) => { const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })} /> : null}
+                {rule.explicit && rule.action !== 'none' && !on ? <Check on={models.has(it.id)} onClick={() => setModels((o) => { const x = new Set(o); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })} /> : null}
                 <View style={{ flex: 1, minWidth: 0 }}><Label mono size={typeScale.callout} lines={1}>{it.path}</Label></View>
                 <Label dim size={typeScale.callout}>{formatBytes(it.allocated)}</Label>
               </View>
@@ -96,11 +110,12 @@ function Tag({ label }) {
   );
 }
 
-export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels, onRemoveModels }) {
+export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, models, setModels }) {
   const pal = usePal();
   const rows = scan.rules.filter((r) => (r.files > 0 || r.root === 'busy') && r.category !== 'apps');   // leftovers are reviewed in Apps
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
+  const offered = rows.filter((r) => r.action !== 'none' && !blockedOf(r) && r.files > 0).map((r) => r.id);
   let i = 0;
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
@@ -115,6 +130,8 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
         </View>
       </View>
       {incomplete ? <Label>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
+      {offered.length ? <SelectBar selected={chosen} onPick={(ids) => setChosen(new Set(ids))} size={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.allocated : 0), 0)} count={rows.reduce((a, r) => a + (chosen.has(r.id) ? r.files : 0), 0) + models.size}
+        options={[{ key: 'smart', ids: rows.filter((r) => offered.includes(r.id) && r.risk === 'regenerable' && !r.explicit).map((r) => r.id) }, { key: 'all', ids: offered }]} /> : null}
       {!rows.length ? <Label dim>{tr('cleaner.emptyHint')}</Label> : (
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: spacing.s }}>
           {cats.map((c) => (
@@ -125,7 +142,6 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
                 return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r)} onEmpty={onEmpty} models={models} setModels={setModels}
                   onToggle={() => setChosen((o) => { const x = new Set(o); if (x.has(r.id)) x.delete(r.id); else x.add(r.id); return x; })} />;
               })}
-              {c === 'ai' && models.size ? <GlassButton label={tr('cleaner.models.remove', { count: models.size })} onClick={onRemoveModels} /> : null}
             </View>
           ))}
           <SystemCard />
@@ -224,6 +240,7 @@ export function LargeList({ scan, prefs, selected, setSelected, under, clearUnde
   const filter = useMemo(() => ({ minSize: minMB * 1048576, ...(days ? { olderThanDays: days } : null), ...(type ? { type } : null), ...(under ? { under } : null) }), [minMB, days, type, under]);
   const reset = `${scan.id}.${minMB}.${days}.${type}.${under}`;
   const total = useMemo(() => cleaner.results(scan.id, 0, 1, filter).total, [reset]);
+  const sizes = useRef(new Map());
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <Label size={32} weight={300}>{tr('cleaner.large.title')}</Label>
@@ -236,10 +253,14 @@ export function LargeList({ scan, prefs, selected, setSelected, under, clearUnde
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
         {['', 'video', 'image', 'audio', 'document', 'archive', 'code', 'other'].map((k) => <Pill key={k} label={tr(`cleaner.type.${k || 'all'}`)} on={type === k} onClick={() => setType(k)} />)}
       </View>
-      <Label dim size={typeScale.callout}>{tr('cleaner.large.count', { count: total })}{scan.limit === 'results' ? ` ${tr('cleaner.incomplete.results')}` : ''}</Label>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+        <View style={{ flex: 1, minWidth: 0 }}><Label dim size={typeScale.callout}>{tr('cleaner.large.count', { count: total })}{scan.limit === 'results' ? ` ${tr('cleaner.incomplete.results')}` : ''}</Label></View>
+      </View>
+      {total ? <SelectBar selected={selected} onPick={(ids) => setSelected(new Set(ids))} size={[...selected].reduce((a, i) => a + (sizes.current.get(i) || 0), 0)}
+        options={[{ key: 'all', n: total, ids: () => allIds(scan.id, filter, sizes.current) }]} /> : null}
       <Glass style={{ flex: 1, minHeight: 0, padding: spacing.xs }}>
         <PagedList rowH={38} reset={reset} fetch={(o, l) => cleaner.results(scan.id, o, l, filter)} render={(it) => (
-          <View key={it.id} onClick={() => setSelected((old) => { const x = new Set(old); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; })}
+          <View key={it.id} onClick={() => { sizes.current.set(it.id, it.allocated); setSelected((old) => { const x = new Set(old); if (x.has(it.id)) x.delete(it.id); else x.add(it.id); return x; }); }}
             style={{ height: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.s }}>
             <Check on={selected.has(it.id)} />
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -321,11 +342,18 @@ export function Preferences() {
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.look')}</Label></View>
-          {CLEANER_THEMES.map((id) => <Pill key={id} label={tr(`cleaner.look.${id}`)} on={(p.theme || 'noche') === id} onClick={() => save({ theme: id })} />)}
+          {CLEANER_THEMES.map((id) => <Pill key={id} label={tr(`cleaner.look.${id}`)} on={(p.theme || 'aurora') === id} onClick={() => save({ theme: id })} />)}
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.menuItem')}</Label></View>
           <Pill label={tr(p.menuItem === false ? 'cleaner.prefs.off' : 'cleaner.prefs.on')} on={p.menuItem !== false} onClick={() => save({ menuItem: p.menuItem === false })} />
+        </Glass>
+        <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Label weight={600}>{tr('cleaner.prefs.rememberMap')}</Label>
+            <Label dim size={typeScale.callout}>{tr('cleaner.prefs.rememberMapHint')}</Label>
+          </View>
+          <Pill label={tr(p.rememberMap === false ? 'cleaner.prefs.off' : 'cleaner.prefs.on')} on={p.rememberMap !== false} onClick={() => { const off = p.rememberMap !== false; if (off) cleaner.forgetSaved(); save({ rememberMap: !off }); }} />
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s }}>
           <Label weight={600}>{tr('cleaner.prefs.large')}</Label>

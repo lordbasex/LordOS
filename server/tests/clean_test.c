@@ -14,6 +14,7 @@
 #define STBI_WRITE_NO_STDIO
 #include "stb_image_write.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <math.h>
 #include <fcntl.h>
@@ -1763,6 +1764,359 @@ static void test_system_tmp(void) {
     clean_rules_override(&base, 1);
 }
 
+/* ---- build outputs of projects ---- */
+
+#define PROJECT_RULE(i, pat, k, age) { .id = i, .version = 1, .category = "projects", .root = ".", .pattern = pat, .risk = CLEAN_RISK_REVIEW, \
+                                       .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule." i, .explicit_only = 1, .project = k, .min_age_days = age }
+
+static const CleanRule project_rules[] = {
+    PROJECT_RULE("project-node", "node_modules", 1, 60), PROJECT_RULE("project-rust", "target", 2, 0), PROJECT_RULE("project-maven", "target", 3, 0),
+    PROJECT_RULE("project-js", ".next", 4, 0), PROJECT_RULE("project-python-tools", ".pytest_cache", 5, 0), PROJECT_RULE("project-venv", ".venv", 6, 0),
+    PROJECT_RULE("project-gradle", "build", 7, 0), PROJECT_RULE("project-dart", "build", 8, 0),
+};
+
+static void set_age(const char *rel, int days) {
+    char f[PATH_MAX * 2];
+    time_t t = time(NULL) - (time_t)days * 86400;
+    struct timespec tm[2] = { { t, 0 }, { t, 0 } };
+    path_of(f, sizeof f, rel);
+    CHECK(!utimensat(AT_FDCWD, f, tm, AT_SYMLINK_NOFOLLOW));
+}
+
+/* the folder, every file and every folder in it */
+static void age_all(const char *rel, int days) {
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, rel);
+    DIR *d = opendir(f);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            char sub[PATH_MAX];
+            if ((size_t)snprintf(sub, sizeof sub, "%s/%s", rel, e->d_name) >= sizeof sub) abort();
+            age_all(sub, days);
+        }
+        closedir(d);
+    }
+    set_age(rel, days);
+}
+
+/* the id of the candidate whose path ends in tail, 0 if none */
+static uint32_t candidate_id(const char *tail) {
+    char *j = clean_results(0, 0, CLEAN_PAGE_MAX);
+    JDoc d = { 0 };
+    uint32_t id = 0;
+    if (!j || json_parse(j, strlen(j), &d, NULL, 0)) abort();
+    for (const JVal *v = json_get(d.root, "items")->kid; v; v = v->next) {
+        const char *q = json_str(v, "path");
+        size_t a = strlen(q), b = strlen(tail);
+        if (a >= b && !strcmp(q + a - b, tail)) id = (uint32_t)json_num(v, "id", 0);
+    }
+    json_free(&d);
+    free(j);
+    return id;
+}
+
+static void make_node_project(const char *dir) {
+    char f[256];
+    snprintf(f, sizeof f, "%s/package.json", dir);
+    put(f, "{}");
+    snprintf(f, sizeof f, "%s/node_modules/dep/index.js", dir);
+    put(f, "x");
+    snprintf(f, sizeof f, "%s/src/a/b/main.js", dir);
+    put(f, "x");
+}
+
+static void test_projects(void) {
+    clean_rules_override(project_rules, (int)(sizeof project_rules / sizeof *project_rules));
+    wipe();
+    make_node_project("idle");
+    make_node_project("recent");
+    make_node_project("edited");
+    age_all("idle", 90);
+    age_all("edited", 90);
+    set_age("edited/src/a/b/main.js", 0);           /* edited in place: its folders keep their old time */
+    put("rusty/Cargo.toml", "x");
+    put("rusty/target/debug/app", "x");
+    put("bare/target/thing", "x");
+    put("tagged/target/CACHEDIR.TAG", "x");
+    put(".hidden/deep/Cargo.toml", "x");
+    put(".hidden/deep/target/thing", "x");
+    put("go/src/Cargo.toml", "x");
+    put("go/src/target/thing", "x");
+    put("py-good/pyproject.toml", "x");
+    put("py-good/.venv/pyvenv.cfg", "x");
+    put("py-nocfg/requirements.txt", "x");
+    put("py-nocfg/.venv/lib/x", "x");
+    put("py-nomanifest/.venv/pyvenv.cfg", "x");
+    Poll p;
+    int scan = run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    poll_free(&p);
+    CHECK(has_candidate("idle/node_modules"));
+    CHECK(!has_candidate("recent/node_modules"));
+    CHECK(!has_candidate("edited/node_modules"));
+    CHECK(has_candidate("rusty/target"));
+    CHECK(!has_candidate("bare/target"));
+    CHECK(has_candidate("tagged/target"));
+    CHECK(!has_candidate(".hidden/") && !has_candidate("go/src"));
+    CHECK(has_candidate("py-good/.venv"));
+    CHECK(!has_candidate("py-nocfg") && !has_candidate("py-nomanifest"));
+    /* chosen one by one, never by category */
+    const char *const names[] = { "project-node" };
+    CHECK(clean_plan_rules(scan, names, 1) == CLEAN_E_BADID);
+    /* what proved it is gone after the scan */
+    uint32_t id = candidate_id("idle/node_modules");
+    CHECK(id > 0);
+    put("idle/keep.txt", "x");
+    age_all("idle/keep.txt", 90);
+    char f[PATH_MAX * 2];
+    path_of(f, sizeof f, "idle/package.json");
+    CHECK(!unlink(f));
+    int plan = clean_plan(scan, &id, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "changed") == 1 && count(p.plan, "ready") == 0);
+    poll_free(&p);
+    CHECK(exists("idle/node_modules/dep/index.js"));
+    /* or between the plan and the action */
+    put("idle/package.json", "{}");
+    plan = clean_plan(scan, &id, 1);
+    CHECK(plan > 0);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 1);
+    poll_free(&p);
+    CHECK(!unlink(f));
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 0);
+    poll_free(&p);
+    CHECK(exists("idle/node_modules/dep/index.js"));
+    /* a real run: to the Trash, whole, and back */
+    put("idle/package.json", "{}");
+    plan = clean_plan(scan, &id, 1);
+    wait_job(&p);
+    CHECK(count(p.plan, "ready") == 1);
+    poll_free(&p);
+    CHECK(clean_execute(plan) == plan);
+    wait_job(&p);
+    CHECK(count(p.plan, "done") == 1);
+    poll_free(&p);
+    CHECK(!exists("idle/node_modules") && exists(".local/share/Trash/files/node_modules/dep/index.js"));
+    CHECK(!clean_restore(plan, id) && exists("idle/node_modules/dep/index.js"));
+    clean_cancel(1);
+
+    /* the table */
+    char why[160];
+    CleanRule r = project_rules[0];
+    CHECK(!clean_rule_check(&r, why, sizeof why));
+    r.action = CLEAN_ACT_DELETE;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r = project_rules[0];
+    r.explicit_only = 0;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r = project_rules[0];
+    r.min_age_days = 59;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r = project_rules[0];
+    r.project = CLEAN_PROJECT_KINDS + 1;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r.project = -1;
+    CHECK(clean_rule_check(&r, why, sizeof why));
+    r = project_rules[0];
+    r.pattern = "target";                           /* a name that kind doesn't have */
+    CHECK(clean_rule_check(&r, why, sizeof why));
+
+    /* the home folder's walk doesn't use up what the other roots get, and a kind no rule takes is left alone */
+    static const CleanRule both[] = {
+        PROJECT_RULE("project-node", "node_modules", 1, 60),
+        { .id = "app-cache", .version = 1, .category = "cache", .root = ".var/app/*/cache", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule.app-cache" },
+    };
+    clean_rules_override(both, 2);
+    wipe();
+    for (int i = 0; i < 60; i++) { char n[64]; snprintf(n, sizeof n, "big/f%d", i); put(n, "x"); }
+    put("rusty/Cargo.toml", "x");
+    put("rusty/target/app", "x");
+    put(".var/app/one/cache/blob", "x");
+    clean_test_max_files = 40;
+    run_scan(&p);
+    CHECK(!strcmp(p.state, "done") && !*json_str(p.scan, "limit") && json_bool(p.scan, "complete", 0) == 1);
+    CHECK(has_candidate("one/cache/blob") && !has_candidate("rusty/target"));
+    poll_free(&p);
+    clean_test_max_files = CLEAN_MAX_FILES;
+    /* more folders than a scan takes: said, and nothing else goes wrong */
+    for (int i = 0; i < CLEAN_MAX_ROOTS + 8; i++) { char n[64]; snprintf(n, sizeof n, ".var/app/a%d/cache/blob", i); put(n, "x"); }
+    run_scan(&p);
+    CHECK(!strcmp(p.state, "done") && json_bool(p.scan, "complete", 1) == 0);
+    CHECK(num(p.scan, "candidates") > 0 && num(p.scan, "candidates") < CLEAN_MAX_ROOTS);
+    poll_free(&p);
+    clean_cancel(1);
+
+    /* more names, and a size */
+    clean_rules_override(NULL, 0);
+    wipe();
+    put("Downloads/old.iso", "x");
+    put("Downloads/young.iso", "x");
+    put("Downloads/other.txt", "x");
+    set_age("Downloads/old.iso", 40);
+    set_age("Downloads/young.iso", 5);
+    set_age("Downloads/other.txt", 40);
+    put("Desktop/small.mkv", "x");
+    set_age("Desktop/small.mkv", 10);
+    put("Desktop/big.mkv", "");
+    path_of(f, sizeof f, "Desktop/big.mkv");
+    CHECK(!truncate(f, 120 << 20));
+    set_age("Desktop/big.mkv", 10);
+    run_scan(&p);
+    poll_free(&p);
+    CHECK(has_candidate("Downloads/old.iso") && !has_candidate("young.iso") && !has_candidate("other.txt"));
+    CHECK(has_candidate("Desktop/big.mkv") && !has_candidate("small.mkv"));
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
+/* ---- the storage map: what can be given back, and what is kept between sessions ---- */
+
+static double allocated_of(const char *rel) {
+    char f[PATH_MAX * 2];
+    struct stat st;
+    path_of(f, sizeof f, rel);
+    CHECK(!stat(f, &st));
+    return (double)st.st_blocks * 512;
+}
+
+/* a folder of the tree: its node and the id of its child of that name, or -1 */
+static long tree_node(int scan, long id, const char *child, double *safe, double *review, double *alloc) {
+    char *j = clean_tree(scan, id, CLEAN_PAGE_MAX);
+    JDoc d = { 0 };
+    long found = -1;
+    if (!j || json_parse(j, strlen(j), &d, NULL, 0)) abort();
+    const JVal *n = json_get(d.root, "node");
+    *safe = json_num(n, "safe", -1);
+    *review = json_num(n, "review", -1);
+    if (alloc) *alloc = json_num(n, "allocated", -1);
+    for (const JVal *k = json_get(d.root, "children")->kid; k; k = k->next)
+        if (child && !strcmp(json_str(k, "name"), child)) found = (long)json_num(k, "id", -1);
+    json_free(&d);
+    free(j);
+    return found;
+}
+
+static int tree_scan(const CleanOpts *o, Poll *p) {
+    int id = clean_start_kind(CLEAN_KIND_TREE, o);
+    CHECK(id > 0);
+    wait_job(p);
+    return id;
+}
+
+static void test_map(void) {
+    static const CleanRule rules[] = {
+        { .id = "thumbs", .version = 1, .category = "cache", .root = T, .pattern = "*.png", .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule.thumbs" },
+        { .id = "temporary", .version = 1, .category = "temporary", .root = ".cache/tmp", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH, .text_key = "cleaner.rule.temporary" },
+        { .id = "measured", .version = 1, .category = "info", .root = "Measured/only", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE, .text_key = "cleaner.rule.measured" },
+    };
+    clean_rules_override(rules, 3);
+    wipe();
+    put_size(T "/a.png", 40000, 'a');
+    put_size(T "/sub/b.png", 90000, 'b');
+    put_size(".cache/tmp/c.bin", 70000, 'c');
+    put_size("Measured/only/d.bin", 50000, 'd');
+    double safe = allocated_of(T "/a.png") + allocated_of(T "/sub/b.png"), review = allocated_of(".cache/tmp/c.bin");
+    CHECK(safe > 0 && review > 0);
+    Poll p;
+    run_scan(&p);
+    poll_free(&p);
+    int tree = tree_scan(&(CleanOpts){ 0 }, &p);
+    poll_free(&p);
+    double s = -1, r = -1;
+    long cache = tree_node(tree, 0, ".cache", &s, &r, NULL);
+    CHECK(s == safe && r == review);
+    CHECK(cache > 0);
+    long tmp = tree_node(tree, cache, "tmp", &s, &r, NULL);
+    CHECK(s == safe && r == review && tmp > 0);
+    tree_node(tree, tmp, NULL, &s, &r, NULL);
+    CHECK(s == 0 && r == review);
+    long measured = tree_node(tree, 0, "Measured", &s, &r, NULL);
+    tree_node(tree, measured, NULL, &s, &r, NULL);
+    CHECK(measured > 0 && s == 0 && r == 0);        /* nothing offered there */
+    /* the other order: the rules scan after the tree */
+    int scan2 = run_scan(&p);
+    poll_free(&p);
+    CHECK(scan2 > 0);
+    tree_node(tree, 0, NULL, &s, &r, NULL);
+    CHECK(s == safe && r == review);
+    clean_cancel(1);
+
+    /* a map kept between sessions */
+    wipe();
+    char *j = clean_saved();
+    CHECK(j && !strcmp(j, "null"));
+    free(j);
+    put_size("Docs/a/file.bin", 60000, 'a');
+    put_size("Docs/ b space/file.bin", 30000, 'b');
+    tree = tree_scan(&(CleanOpts){ .remember = 1, .min_size = 1 }, &p);
+    CHECK(!strcmp(p.state, "done") && num(p.scan, "candidates") == 2);
+    poll_free(&p);
+    double total = -1, sa = -1, re = -1, kept = -1;
+    long docs = tree_node(tree, 0, "Docs", &sa, &re, &total);
+    CHECK(total > 0 && docs > 0);
+    char f[PATH_MAX * 2];
+    struct stat st;
+    path_of(f, sizeof f, ".cache/lordos/cleaner-map.txt");
+    CHECK(!stat(f, &st) && (st.st_mode & 07777) == 0600);
+    time_t before = time(NULL);
+    j = clean_saved();
+    JDoc d = { 0 };
+    CHECK(j && !json_parse(j, strlen(j), &d, NULL, 0));
+    CHECK(json_num(d.root, "at", 0) > 0 && json_num(d.root, "at", 0) <= (double)before);
+    CHECK(json_str(d.root, "volume") && !strcmp(json_str(d.root, "volume"), "home"));
+    json_free(&d);
+    free(j);
+    int back = tree_scan(&(CleanOpts){ .saved = 1 }, &p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(num(p.scan, "savedAt") > 0 && num(p.scan, "candidates") == 0);
+    poll_free(&p);
+    long docs2 = tree_node(back, 0, "Docs", &sa, &re, &kept);
+    CHECK(kept == total && docs2 == docs);
+    CHECK(tree_node(back, docs2, " b space", &sa, &re, &kept) > 0);  /* a name stays as it was */
+    uint32_t any = 1;
+    CHECK(clean_plan(back, &any, 1) == CLEAN_E_BADID);
+    /* damaged: the same as none, never partly read */
+    static const char *const bad[] = {
+        "lordos-cleaner-map 1 100 1 home\n/home/x\n0 -1 1 1 1 \n1 0 1 1 1 a/b\n",     /* a name that can't be one */
+        "lordos-cleaner-map 1 100 1 home\n/home/x\n0 -1 1 1 1 \n1 5 1 1 1 name\n",    /* up >= id */
+        "lordos-cleaner-map 1 100 1 home\n/home/x\n0 -1 1 1 1 \n1 1 1 1 1 name\n",
+        "lordos-cleaner-map 1 100 1 home\n/home/x\n1 0 1 1 1 name\n",                 /* no root */
+        "lordos-cleaner-map 1 100 1 home\n/home/x\n0 -1 1 1 1 \n3 0 1 1 1 name\nnot a line\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        put(".cache/lordos/cleaner-map.txt", bad[i]);
+        clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .saved = 1 });
+        wait_job(&p);
+        CHECK(!strcmp(p.state, "failed") && p.error && !strcmp(p.error, "nosaved"));
+        poll_free(&p);
+    }
+    put(".cache/lordos/cleaner-map.txt", "something else\n");
+    j = clean_saved();
+    CHECK(j && !strcmp(j, "null"));
+    free(j);
+    clean_forget_saved();
+    CHECK(!exists(".cache/lordos/cleaner-map.txt"));
+    clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .saved = 1 });
+    wait_job(&p);
+    CHECK(!strcmp(p.state, "failed") && p.error && !strcmp(p.error, "nosaved"));
+    poll_free(&p);
+    /* the setting is off: nothing stays */
+    tree_scan(&(CleanOpts){ .remember = 1 }, &p);
+    poll_free(&p);
+    CHECK(exists(".cache/lordos/cleaner-map.txt"));
+    tree_scan(&(CleanOpts){ 0 }, &p);
+    poll_free(&p);
+    CHECK(!exists(".cache/lordos/cleaner-map.txt"));
+    clean_cancel(1);
+    clean_rules_override(&base, 1);
+}
+
 int main(void) {
     if (syscall(SYS_landlock_create_ruleset, NULL, 0U, 1U) < 1) { printf("clean-test: skipped: needs Landlock\n"); return 0; }
     char tmpl[] = "/tmp/clean-test.XXXXXX";
@@ -1802,6 +2156,8 @@ int main(void) {
     test_downloads();
     test_leftovers();
     test_system_tmp();
+    test_projects();
+    test_map();
     wipe();
     rmdir(H);
     printf("clean-test: %d checks, %d failed\n", checks, fails);

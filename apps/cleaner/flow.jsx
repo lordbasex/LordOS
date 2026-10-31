@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Label, Glass, GlassButton, PagedList, Enter, CountUp, useLoop, usePal } from './ui.jsx';
 
 const n = (v) => formatNumber(v);
+const SHOWN = 5;     // names in a confirmation; the dialog must fit the window
 const REASONS = ['changed', 'skipped', 'denied', 'failed', 'cancelled', 'unsupported'];
 
 function Dialog({ title, rows, note, okLabel, onOk, onCancel, danger }) {
@@ -39,9 +40,10 @@ export function PlanConfirm({ plan, onOk, onCancel }) {
   if (plan.trashItems) rows.push([tr('cleaner.confirm.rowTrash', { n: n(plan.trashItems) }), formatBytes(plan.trashAllocated)]);
   if (left > 0) rows.push([tr('cleaner.confirm.rowLeft', { n: n(left) }), '']);
   const named = plan.named ? cleaner.results('plan', 0, 30).items.filter((i) => i.status === 'ready') : [];
-  for (const i of named) rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
-  const leftovers = named.some((i) => i.rule === 'app-leftovers');
-  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : 'cleaner.models.warn') : '',
+  for (const i of named.slice(0, SHOWN)) rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
+  if (plan.counts.ready > SHOWN && named.length) rows.push([tr('cleaner.confirm.more', { n: n(plan.counts.ready - Math.min(SHOWN, named.length)) }), '']);
+  const leftovers = named.some((i) => i.rule === 'app-leftovers'), projects = named.some((i) => i.rule.startsWith('project-'));
+  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : projects ? 'cleaner.projects.warn' : 'cleaner.models.warn') : '',
     ...plan.warnings.filter((w) => w === 'linksElsewhere' || w === 'scanIncomplete' || w === 'keepOneCopy').map((w) => tr(`cleaner.warn.${w}`))].filter(Boolean);
   if (!plan.counts.ready) return <Dialog title={tr('cleaner.noneReady')} rows={rows} note={notes.join(' ')} onCancel={onCancel} />;
   return <Dialog title={tr(plan.deleteItems ? 'cleaner.confirm.titleDelete' : 'cleaner.confirm.title', { count: plan.counts.ready })} rows={rows} note={notes.join(' ')} danger={plan.deleteItems > 0}

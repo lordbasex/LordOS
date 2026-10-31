@@ -112,7 +112,7 @@ export function ToolbarDivider() {
 }
 
 // "More" button that opens a small menu: items = [{ label, onClick, checked, disabled, destructive } | '-'].
-export function MenuButton({ icon = '⋯', title, items, small }) {
+export function MenuButton({ icon = '⋯', label, title, items, small }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const [open, setOpen] = useState(false);
@@ -129,7 +129,7 @@ export function MenuButton({ icon = '⋯', title, items, small }) {
   // comes after the button, and not clipped by a scrolling parent
   return (
     <View ref={btn}>
-      <ToolbarButton icon={icon} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />
+      <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <Overlay anchor={btn}>
           <View ref={menu} style={{ position: 'absolute', top: (small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,

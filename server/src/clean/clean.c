@@ -47,7 +47,7 @@ static const char *const root_name[] = { "ok", "absent", "denied", "changed", "b
 
 typedef struct {
     uint64_t ino, dev;
-    int64_t size, alloc, mtime;
+    int64_t size, alloc, mtime, newest;     /* newest: what a rule's age is judged by */
     uint32_t nsec, nlink;
     uint32_t links;                         /* first link of an inode: how many the scan saw */
     uint32_t selected;                      /* first link of an inode: how many the plan holds */
@@ -73,11 +73,14 @@ typedef struct {
     Tot tot;
 } Src;
 
-typedef struct { int32_t up; uint32_t files; double logical, allocated; char *name; } Node;
+typedef struct { int32_t up; uint32_t files; double logical, allocated, safe, review; char *name; } Node;
 typedef struct { uint32_t first, count; double reclaim; } Group;
 
 typedef struct {
-    int id, kind, complete;
+    int id, kind, complete, remember, saved;
+    int roots_full;                         /* more folders than CLEAN_MAX_ROOTS: the rest wasn't looked at */
+    char saved_volume[32];
+    double saved_at;
     Cand *c;
     size_t n, cap;
     uint32_t *ht;                           /* (dev, ino) → index + 1, open addressing */
@@ -220,7 +223,7 @@ void clean_set_sysapps(const char *assets) { snprintf(sysapps, sizeof sysapps, "
 
 static int app_exists(const char *id) {
     size_t n = strlen(id);
-    if (n < 2 || n > 40 || !sysapps[0]) return 1;       /* not an app's folder, or nothing to tell by: not offered */
+    if (n < 2 || n > 40 || !sysapps[0] || id[0] < 'a' || id[0] > 'z') return 1;   /* not an app's folder, or nothing to tell by: not offered */
     for (const char *p = id; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return 1;
     char p[PATH_MAX * 2];
     struct stat st;
@@ -299,14 +302,15 @@ static const CleanRule *src_rule(const Src *src) {
     return src->rule >= 0 && src->rule < n ? &t[src->rule] : NULL;
 }
 
-/* The user's download folder, relative to the home folder, from ~/.config/user-dirs.dirs: only a
+/* The user's download or desktop folder, relative to the home folder, from ~/.config/user-dirs.dirs: only a
  * "$HOME/…" value that would pass as a rule's root. 0, or -1 for the rule's own name. */
-static int user_downloads(const CleanRule *r, char *out, size_t n) {
+static int user_folder(const CleanRule *r, char *out, size_t n) {
     int home = open(fsops_home(), O_PATH | O_DIRECTORY | O_CLOEXEC);
     int fd = home < 0 ? -1 : clean_open(home, ".config/user-dirs.dirs", O_RDONLY | O_NONBLOCK);
     if (home >= 0) close(home);
     if (fd < 0) return -1;
-    static const char key[] = "XDG_DOWNLOAD_DIR=\"$HOME/";
+    const char *key = r->desktop ? "XDG_DESKTOP_DIR=\"$HOME/" : "XDG_DOWNLOAD_DIR=\"$HOME/";
+    size_t keylen = strlen(key);
     char t[8192];
     ssize_t k = read(fd, t, sizeof t - 1);      /* this runs on the desktop's thread: a pipe here must not wait */
     close(fd);
@@ -315,8 +319,8 @@ static int user_downloads(const CleanRule *r, char *out, size_t n) {
     for (char *line = t; line;) {
         char *nl = strchr(line, '\n');
         if (nl) *nl = 0;
-        if (!strncmp(line, key, sizeof key - 1)) {
-            const char *v = line + sizeof key - 1;
+        if (!strncmp(line, key, keylen)) {
+            const char *v = line + keylen;
             const char *q = strchr(v, '"');
             if (!q || q[1] || q == v || (size_t)(q - v) >= n) return -1;
             memcpy(out, v, (size_t)(q - v));
@@ -337,8 +341,9 @@ static int rule_base(const CleanRule *r, char *out, size_t n) {
 #else
     if (r->system_root) return (size_t)snprintf(out, n, "/%s", r->root) >= n ? -1 : 0;
 #endif
+    if (r->project) return (size_t)snprintf(out, n, "%s", fsops_home()) >= n ? -1 : 0;
     char rel[256];
-    const char *root = r->downloads && !user_downloads(r, rel, sizeof rel) ? rel : r->root;
+    const char *root = (r->downloads || r->desktop) && !user_folder(r, rel, sizeof rel) ? rel : r->root;
     return (size_t)snprintf(out, n, "%s/%s", fsops_home(), root) >= n ? -1 : 0;
 }
 
@@ -365,10 +370,13 @@ static int refused_path(const Scan *s, const Src *src, const char *rel, int *exc
     return fsops_protected(abs);
 }
 
-static int covered(const Src *src, const char *name, double mtime) {
+static int covered(const Src *src, const char *name, double mtime, double size) {
     const CleanRule *r = src_rule(src);
     if (src->rule < 0) return 1;
-    if (!r || !clean_glob(r->pattern, name)) return 0;
+    if (!r) return 0;
+    int named = r->project ? clean_project_named(r->project - 1, name) : clean_glob(r->pattern, name);
+    for (const char *const *a = r->also; a && *a && !named; a++) named = clean_glob(*a, name);
+    if (!named || size < r->min_size) return 0;
     if (r->leftover && app_exists(name)) return 0;
     for (const char *const *e = r->exclude; e && *e; e++) if (clean_glob(*e, name)) return 0;
     return !r->min_age_days || (double)time(NULL) - mtime >= r->min_age_days * 86400.0;
@@ -478,8 +486,10 @@ static int take_record(Scan *s, const JVal *rec) {
     int excl = 0;
     if (refused_path(s, src, rel, &excl)) { if (excl) s->excluded++; else { s->protect++; s->refused++; } return 1; }
     const CleanRule *rule = src_rule(src);
-    if (json_bool(rec, "d", 0) && (!rule || !rule->unit_depth)) return -1;      /* a folder only where a rule asks for one */
-    if (!covered(src, base, mt)) { s->refused++; return 1; }
+    if (json_bool(rec, "d", 0) && (!rule || (!rule->unit_depth && !rule->project))) return -1;      /* a folder only where a rule asks for one */
+    double newest = mt;
+    if (rule && rule->project && (!json_bool(rec, "d", 0) || json_count(rec, "N", &newest))) return -1;
+    if (!covered(src, base, newest, size)) { s->refused++; return 1; }
     if ((uid_t)uid != getuid() && s->kind == CLEAN_KIND_RULES) { s->foreign++; return 1; }
     if (s->n >= (size_t)CLEAN_MAX_FILES) return -1;
 
@@ -508,7 +518,7 @@ static int take_record(Scan *s, const JVal *rec) {
         if (*end) { free(copy); return -1; }
     }
     Cand *c = &s->c[s->n];
-    *c = (Cand){ .ino = ino, .dev = dev, .size = (int64_t)size, .alloc = (int64_t)alloc, .mtime = (int64_t)mt, .nsec = (uint32_t)ns,
+    *c = (Cand){ .ino = ino, .dev = dev, .size = (int64_t)size, .alloc = (int64_t)alloc, .mtime = (int64_t)mt, .newest = (int64_t)newest, .nsec = (uint32_t)ns,
                  .nlink = (uint32_t)nl, .links = 1, .src = (uint16_t)r, .type = (uint8_t)clean_type(base), .dir = (uint8_t)json_bool(rec, "d", 0), .w = (uint32_t)w, .h = (uint32_t)h, .ph = ph, .rel = copy };
     if (first) {                                /* a hard link: one file, counted once */
         c->first = (uint32_t)(first - s->c) + 1;
@@ -516,6 +526,8 @@ static int take_record(Scan *s, const JVal *rec) {
     } else {
         s->logical += size;
         s->allocated += alloc;
+    }
+    if (!first || first->src != (uint16_t)r) {  /* one file under two rules: each shows it, the scan's total counts it once */
         src->tot.logical += size;
         src->tot.allocated += alloc;
     }
@@ -639,7 +651,7 @@ static int take_done(Scan *s, const JVal *root) {
     s->undecoded = (long)undecoded;
     memcpy(s->types, types, sizeof types);
     snprintf(s->limit, sizeof s->limit, "%s", limit);
-    s->complete = !*limit && !s->unreadable && !s->names;
+    s->complete = !*limit && !s->unreadable && !s->names && !s->roots_full;
     for (int i = 0; i < s->nsrc; i++) if (s->src[i].state == ROOT_DENIED || s->src[i].state == ROOT_CHANGED) s->complete = 0;
     pthread_mutex_unlock(&mu);
     return 0;
@@ -755,7 +767,7 @@ static void add_mount(void *ud, const char *path, const char *fstype, double tot
     MountAdd *m = ud;
     Scan *s = m->s;
     (void)fstype; (void)total; (void)avail;
-    if (s->nsrc >= CLEAN_MAX_ROOTS) return;
+    if (s->nsrc >= CLEAN_MAX_ROOTS) { s->roots_full = 1; return; }
     int n;
     const CleanRule *r = &clean_rules(&n)[m->rule];
     const char *d = strchr(r->root, '$');
@@ -776,12 +788,13 @@ static void expand_rule(Scan *s, int home, int rule, const CleanRule *r) {
     DIR *d = fd >= 0 ? fdopendir(fd) : NULL;
     if (!d) { if (fd >= 0) close(fd); return; }
     struct dirent *e;
-    while ((e = readdir(d)) && s->nsrc < CLEAN_MAX_ROOTS) {
+    while ((e = readdir(d))) {
         if (e->d_name[0] == '.' || !clean_name_ok(e->d_name) || strlen(e->d_name) >= sizeof s->src[0].star) continue;
         char rel[PATH_MAX];
         if ((size_t)snprintf(rel, sizeof rel, "%s/%s%s", prefix, e->d_name, st + 1) >= sizeof rel) continue;
         struct stat sb;
         if (fstatat(home, rel, &sb, AT_SYMLINK_NOFOLLOW) || !S_ISDIR(sb.st_mode)) continue;
+        if (s->nsrc >= CLEAN_MAX_ROOTS) { s->roots_full = 1; break; }
         Src *src = &s->src[s->nsrc];
         memset(src, 0, sizeof *src);
         src->rule = rule;
@@ -804,6 +817,170 @@ static void expand_sources(Scan *s, int home) {
     }
 }
 
+/* ---- what the storage map saw, between sessions ---- */
+
+#define SAVED_MAGIC "lordos-cleaner-map 1"
+
+static void saved_path(char *out, size_t n) { snprintf(out, n, "%s/.cache/lordos/cleaner-map.txt", fsops_home()); }
+
+/* Folder names and totals, for the user alone. Nothing can be acted on from it: a saved map has no candidates. */
+static void save_tree(const Scan *s) {
+    char p[PATH_MAX + 64], tmp[PATH_MAX + 80], dir[PATH_MAX + 32];
+    saved_path(p, sizeof p);
+    snprintf(dir, sizeof dir, "%s/.cache", fsops_home());
+    mkdir(dir, 0700);
+    snprintf(dir, sizeof dir, "%s/.cache/lordos", fsops_home());
+    mkdir(dir, 0700);
+    snprintf(tmp, sizeof tmp, "%s.%d", p, (int)getpid());
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    FILE *f = fd >= 0 ? fdopen(fd, "w") : NULL;
+    if (!f) { if (fd >= 0) close(fd); return; }
+    int bad = fprintf(f, SAVED_MAGIC " %lld %d %s\n%s\n", (long long)time(NULL), s->complete, s->saved_volume, s->src[0].base) < 0;
+    for (size_t i = 0; i < s->nnode && !bad; i++)
+        if (s->node[i].name) bad = fprintf(f, "%zu %d %u %.0f %.0f %s\n", i, s->node[i].up, s->node[i].files, s->node[i].logical, s->node[i].allocated, s->node[i].name) < 0;
+    if (fclose(f) || bad || rename(tmp, p)) unlink(tmp);
+}
+
+/* the saved map's header, or -1; a damaged file is the same as none */
+static int saved_header(FILE *f, double *at, int *complete, char *volume, size_t vn, char *base, size_t bn) {
+    char line[PATH_MAX + 2], magic[32], vol[32];
+    int ver = 0;
+    long long when = 0;
+    if (!fgets(line, sizeof line, f) || sscanf(line, "%18s %d %lld %d %31s", magic, &ver, &when, complete, vol) != 5) return -1;
+    if (strcmp(magic, "lordos-cleaner-map") || ver != 1 || when <= 0 || (strcmp(vol, "home") && strcmp(vol, "root"))) return -1;
+    if (!fgets(line, sizeof line, f)) return -1;
+    line[strcspn(line, "\n")] = 0;
+    if (line[0] != '/' || strlen(line) >= bn) return -1;
+    *at = (double)when;
+    snprintf(volume, vn, "%s", vol);
+    snprintf(base, bn, "%s", line);
+    return 0;
+}
+
+static FILE *saved_open(void) {
+    char p[PATH_MAX + 64];
+    saved_path(p, sizeof p);
+    int fd = open(p, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_uid != getuid()) { if (fd >= 0) close(fd); return NULL; }
+    FILE *f = fdopen(fd, "r");
+    if (!f) close(fd);
+    return f;
+}
+
+char *clean_saved(void) {
+    FILE *f = saved_open();
+    double at = 0;
+    int complete = 0;
+    char vol[32], base[PATH_MAX];
+    int bad = !f || saved_header(f, &at, &complete, vol, sizeof vol, base, sizeof base);
+    if (f) fclose(f);
+    JBuf b;
+    jb_init(&b);
+    if (bad) jb_raw(&b, "null");
+    else { jb_printf(&b, "{\"at\":%.0f,\"volume\":", at); jb_str(&b, vol); jb_raw(&b, "}"); }
+    if (b.oom) { jb_free(&b); return NULL; }
+    return b.p;
+}
+
+void clean_forget_saved(void) {
+    char p[PATH_MAX + 64];
+    saved_path(p, sizeof p);
+    unlink(p);
+}
+
+/* takes the nodes from the file, each held to what a scan's nodes must be */
+static int load_tree(Scan *s) {
+    FILE *f = saved_open();
+    if (!f) return -1;
+    char vol[32];
+    int complete = 0, r = saved_header(f, &s->saved_at, &complete, vol, sizeof vol, s->src[0].base, sizeof s->src[0].base);
+    char *line = NULL;
+    size_t cap = 0;
+    long want = 0;
+    while (!r && getline(&line, &cap, f) > 0) {
+        long id = 0;
+        int up = 0, name = 0;
+        unsigned files = 0;
+        double lo = 0, al = 0;
+        line[strcspn(line, "\n")] = 0;
+        if (sscanf(line, "%ld %d %u %lf %lf%n", &id, &up, &files, &lo, &al, &name) != 5 || line[name] != ' ') { r = -1; break; }
+        const char *nm = line + name + 1;           /* as it was: a name may start with a space */
+        if (id < want || id >= CLEAN_MAX_NODES || up >= id || (id && up < 0) || !(lo >= 0) || !(al >= 0) || (id ? !clean_name_ok(nm) : !!*nm)) { r = -1; break; }
+        want = id + 1;
+        if ((size_t)id >= s->nnode) {
+            Node *n = realloc(s->node, (size_t)(id + 1) * sizeof *n);
+            if (!n) { r = -1; break; }
+            memset(n + s->nnode, 0, ((size_t)id + 1 - s->nnode) * sizeof *n);
+            s->node = n;
+            s->nnode = (size_t)id + 1;
+        }
+        s->node[id] = (Node){ .up = up, .files = files, .logical = lo, .allocated = al, .name = strdup(nm) };
+        if (!s->node[id].name) r = -1;
+    }
+    free(line);
+    fclose(f);
+    if (!r && (!s->nnode || !s->node[0].name)) r = -1;
+    for (size_t i = 1; !r && i < s->nnode; i++) if (s->node[i].name && !s->node[s->node[i].up].name) r = -1;
+    if (r) return -1;
+    s->complete = complete;
+    s->saved = 1;
+    return 0;
+}
+
+/* ---- what can be given back, on the storage map ---- */
+
+/* The rules' candidates laid over the tree: bytes per folder, regenerable and to review. Both scans stay still: this
+ * runs inside a scan's job. Only the result goes in under the lock, so the desktop never waits for the walk. */
+static void mark_reclaim(void) {
+    Scan *r = scans[CLEAN_KIND_RULES], *t = scans[CLEAN_KIND_TREE];
+    if (!r || !t || !t->node || !t->kid_start || t->saved) return;
+    double *safe = calloc(t->nnode, sizeof *safe), *review = calloc(t->nnode, sizeof *review);
+    if (!safe || !review) { free(safe); free(review); return; }
+    const char *tb = strcmp(t->src[0].base, "/") ? t->src[0].base : "";
+    size_t tl = strlen(tb);
+    char last[PATH_MAX * 2] = "";
+    size_t lastn = 0;
+    long lastid = -1;
+    for (size_t i = 0; i < r->n; i++) {
+        const Cand *c = &r->c[i];
+        const Src *src = &r->src[c->src];
+        double est = estimated(c);
+        char abs[PATH_MAX * 2];
+        if (est <= 0 || src_action(src) == CLEAN_ACT_NONE || src_path(src, c->rel, abs, sizeof abs) || strncmp(abs, tb, tl) || abs[tl] != '/') continue;
+        const char *p = abs + tl + 1, *end = c->dir ? p + strlen(p) : strrchr(p, '/');
+        if (!end) end = p;
+        size_t n = (size_t)(end - abs);
+        long id = 0;
+        if (lastid >= 0 && n == lastn && !memcmp(abs, last, n)) id = lastid;
+        else {
+            while (p < end) {                       /* down the names, as far as the tree kept them */
+                const char *sl = memchr(p, '/', (size_t)(end - p));
+                size_t k = sl ? (size_t)(sl - p) : (size_t)(end - p);
+                long found = -1;
+                for (uint32_t a = t->kid_start[id]; a < t->kid_start[id + 1]; a++) {
+                    const char *nm = t->node[t->kid[a]].name;
+                    if (!strncmp(nm, p, k) && !nm[k]) { found = t->kid[a]; break; }
+                }
+                if (found < 0) break;
+                id = found;
+                p += k + (sl ? 1 : 0);
+            }
+            memcpy(last, abs, n);
+            lastn = n;
+            lastid = id;
+        }
+        if (src_risk(src) == CLEAN_RISK_REGENERABLE) safe[id] += est;
+        else review[id] += est;
+    }
+    for (size_t i = t->nnode; i-- > 1;) if (t->node[i].name) { safe[t->node[i].up] += safe[i]; review[t->node[i].up] += review[i]; }
+    pthread_mutex_lock(&mu);
+    for (size_t i = 0; i < t->nnode; i++) { t->node[i].safe = safe[i]; t->node[i].review = review[i]; }
+    pthread_mutex_unlock(&mu);
+    free(safe);
+    free(review);
+}
+
 static void *scan_thread(void *arg) {
     Scan *s = arg;
     int st = ST_FAILED, sock = -1, fds[CLEAN_MAX_ROOTS], nfd = 0, home = -1, finished = 0;
@@ -812,6 +989,13 @@ static void *scan_thread(void *arg) {
     char path[PATH_MAX];
     JBuf go;
     jb_init(&go);
+    if (s->saved) {                                 /* the map of an earlier session: no helper, nothing to act on */
+        s->saved = 0;
+        if (load_tree(s)) { why = "nosaved"; goto end; }
+        st = ST_DONE;
+        why = NULL;
+        goto end;
+    }
     if (helper_path(path, sizeof path)) goto end;
     home = open(fsops_home(), O_PATH | O_DIRECTORY | O_CLOEXEC);
     if (home < 0) goto end;
@@ -836,8 +1020,8 @@ static void *scan_thread(void *arg) {
         src->dev = sb.st_dev;
         fds[nfd++] = fd;
         const CleanRule *r = src_rule(src);
-        jb_printf(&go, "%s{\"rule\":%d,\"unit\":%d,\"own\":%d,\"pattern\":", nfd > 1 ? "," : "", i, r ? r->unit_depth : 0, r ? r->system_root : 0);
-        jb_str(&go, r ? r->pattern : "*");
+        jb_printf(&go, "%s{\"rule\":%d,\"unit\":%d,\"own\":%d,\"project\":%d,\"pattern\":", nfd > 1 ? "," : "", i, r ? r->unit_depth : 0, r ? r->system_root || r->project : 0, r ? r->project : 0);
+        jb_str(&go, !r || r->also ? "*" : r->pattern);        /* several names: judged here, as every record is */
         jb_raw(&go, ",\"base\":");
         jb_str(&go, src->base);
         jb_raw(&go, "}");
@@ -904,7 +1088,14 @@ end:
         waitpid(pid, NULL, 0);
     }
     if (sock >= 0) close(sock);
-    if (st == ST_DONE && s->kind == CLEAN_KIND_TREE) finish_tree(s);
+    if (st == ST_DONE && s->kind == CLEAN_KIND_TREE) {
+        finish_tree(s);
+        if (!s->saved) {
+            if (s->remember) save_tree(s);
+            else if (strncmp(s->saved_volume, "mount:", 6)) clean_forget_saved();  /* a disk's scan says nothing about the kept map */
+        }
+    }
+    if (st == ST_DONE && (s->kind == CLEAN_KIND_TREE || s->kind == CLEAN_KIND_RULES)) mark_reclaim();
     if (st != ST_DONE) {                            /* nothing from a failed or cancelled scan is offered */
         pthread_mutex_lock(&mu);
         scan_clear(s);
@@ -971,6 +1162,9 @@ static int fill_sources(Scan *s, const CleanOpts *o) {
         const char *v = o && o->volume ? o->volume : "home";
         s->nsrc = 1;
         src->rule = -1;
+        s->saved = o && o->saved;
+        s->remember = o && o->remember && (!strcmp(v, "home") || !strcmp(v, "root"));
+        snprintf(s->saved_volume, sizeof s->saved_volume, "%s", v);
         if (!strcmp(v, "home")) snprintf(src->base, sizeof src->base, "%s", fsops_home());
         else if (!strcmp(v, "root")) snprintf(src->base, sizeof src->base, "/");
         else {
@@ -1106,7 +1300,11 @@ static int item_check(const Scan *s, const Cand *c, const int *rootfd, const int
     int st = I_READY;
     if (!same_identity(&sx, c)) st = I_CHANGED;
     else if (sx.stx_uid != getuid()) st = I_DENIED;
-    else if (!covered(src, base, (double)c->mtime)) st = I_SKIPPED;
+    else if (!covered(src, base, (double)c->newest, (double)c->size)) st = I_SKIPPED;
+    else {
+        const CleanRule *r = src_rule(src);
+        if (r && r->project && clean_project_kind(fd, base) != r->project - 1) st = I_CHANGED;   /* what proved it is gone */
+    }
     if (st != I_READY) { close(fd); return st; }
     *parent = fd;
     *name = base;
@@ -1421,6 +1619,7 @@ void clean_history_clear(void) {
     char p[PATH_MAX + 64];
     history_path(p, sizeof p);
     unlink(p);
+    clean_forget_saved();
 }
 
 static void history_plan(const Plan *p, int cancelled) {
@@ -1583,10 +1782,12 @@ static void scan_json(JBuf *b, const Scan *s, int running) {
     double est = 0;
     for (size_t i = 0; i < s->n && !running; i++) {
         const CleanRule *r = src_rule(&s->src[s->c[i].src]);
-        if (!r || !r->system_root) est += estimated(&s->c[i]);      /* /tmp is only shown: it gives nothing back */
+        /* what is only shown gives nothing back; the Trash does, through its own empty */
+        if (!r || (!r->system_root && (r->action != CLEAN_ACT_NONE || !strcmp(r->category, "trash")))) est += estimated(&s->c[i]);
     }
     jb_printf(b, "{\"id\":%d,\"kind\":\"%s\",\"running\":%s,\"complete\":%s,\"limit\":\"%s\",\"seen\":%ld,\"dirs\":%ld,\"hashed\":%ld,\"candidates\":%zu,\"groups\":%zu,",
               s->id, kind_name[s->kind], running ? "true" : "false", s->complete ? "true" : "false", s->limit, s->seen < 0 ? 0 : s->seen, s->dirs, s->hashed, s->n, s->ngrp);
+    if (s->saved) { jb_raw(b, "\"savedAt\":"); jb_num(b, s->saved_at); jb_raw(b, ","); }
     if (running) {
         char abs[PATH_MAX * 2];
         src_path(&s->src[s->now_src], s->now, abs, sizeof abs);
@@ -1820,6 +2021,10 @@ static void node_json(JBuf *b, const Node *n, long id) {
     jb_num(b, n->logical);
     jb_raw(b, ",\"allocated\":");
     jb_num(b, n->allocated);
+    jb_raw(b, ",\"safe\":");
+    jb_num(b, n->safe);
+    jb_raw(b, ",\"review\":");
+    jb_num(b, n->review);
     jb_raw(b, "}");
 }
 

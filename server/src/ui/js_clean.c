@@ -1,6 +1,6 @@
 /* js_clean.c — lord.clean: Cleaner's native API (docs/CLEANER-ARCHITECTURE.md, clean/clean.h).
  *
- *   start(kind, opts)             a new scan: 'rules' (the default, no options), 'tree' ({ volume, minSize, exclude }),
+ *   start(kind, opts)             a new scan: 'rules' (the default, no options), 'tree' ({ volume, minSize, exclude, remember, saved }),
  *                                 'dups' or 'images' ({ folders, exclude }). Options only name folders relative to the home
  *                                 folder or a volume id from volumes(): what to read, never what to change
  *   poll(kind)                    { job, state, error, scan, plan, emptied }: real counters, never a percentage
@@ -9,6 +9,7 @@
  *   groups(scanId, offset, limit) a page of groups of duplicates or similar images
  *   restore(planId, id)           back from the Trash, for an item that plan moved
  *   history() / clearHistory()    what ran: counts and bytes, never a path
+ *   saved() / forgetSaved()       the storage map kept between sessions: { at, volume } or null; its folder names stay in C
  *   cancel(forget)                stops the job; forget (boolean) also drops the results
  *   results(scanId | 'plan', offset, limit, filter)  a page of { id, rule, path, size, allocated, … };
  *                                 filter: { rule, minSize, olderThanDays, type, under }
@@ -97,6 +98,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     const char *volume = NULL;
     if (argc == 2) {
         bad = read_strs(c, argv[1], "folders", o.folders, CLEAN_MAX_FOLDERS, &o.nfolders) | read_strs(c, argv[1], "exclude", o.exclude, 32, &o.nexclude);
+        JSValue flag = JS_GetPropertyStr(c, argv[1], "remember");
+        o.remember = JS_ToBool(c, flag) == 1;
+        JS_FreeValue(c, flag);
+        flag = JS_GetPropertyStr(c, argv[1], "saved");
+        o.saved = JS_ToBool(c, flag) == 1;
+        JS_FreeValue(c, flag);
         JSValue v = JS_GetPropertyStr(c, argv[1], "volume");
         if (JS_IsString(v)) o.volume = volume = JS_ToCString(c, v);
         else if (!JS_IsUndefined(v)) bad = 1;
@@ -111,6 +118,17 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     free_strs(c, o.exclude, o.nexclude);
     if (volume) JS_FreeCString(c, volume);
     return result(c, r);
+}
+
+static JSValue f_saved(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_value(c, clean_saved());
+}
+
+static JSValue f_forget_saved(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    clean_forget_saved();
+    return JS_UNDEFINED;
 }
 
 static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -291,6 +309,8 @@ void js_clean_register(JSContext *c, JSValue lord) {
     F("restore", f_restore, 2);
     F("history", f_history, 0);
     F("clearHistory", f_clear_history, 0);
+    F("saved", f_saved, 0);
+    F("forgetSaved", f_forget_saved, 0);
 #undef F
     JS_SetPropertyStr(c, lord, "clean", o);
 }

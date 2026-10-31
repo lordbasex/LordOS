@@ -30,9 +30,9 @@ for (const t of [NOCHE, AURORA]) t.tints = TINT_DARK;
 for (const t of [NOCHE_LIGHT, CRISTAL]) t.tints = TINT_LIGHT;
 for (const t of [NOCHE, NOCHE_LIGHT, AURORA, CRISTAL]) t.module = MODULE;
 
-export const CLEANER_THEMES = ['noche', 'aurora', 'cristal'];
+export const CLEANER_THEMES = ['aurora', 'noche', 'cristal'];
 export function cleanerPalette(settings, mode) {
-  const id = (settings && settings.cleaner && settings.cleaner.theme) || 'noche';
+  const id = (settings && settings.cleaner && settings.cleaner.theme) || 'aurora';
   if (id === 'aurora') return AURORA;
   if (id === 'cristal') return CRISTAL;
   return mode === 'light' ? NOCHE_LIGHT : NOCHE;

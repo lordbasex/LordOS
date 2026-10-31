@@ -12,7 +12,7 @@
 // wakes it (it does so on a real display; a viewer's video keeps a headless session awake). Slots make such frames
 // common, so a timer is kept pending while anything runs. It does nothing: firing is enough for the frame to follow,
 // and with the screen off, when no frame runs, it fires once and stops.
-import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
+import { View, Text, Image, MenuButton, addListener, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, t as tr, formatBytes, typeScale, spacing } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const Pal = createContext(null);
@@ -292,12 +292,29 @@ export function Hero({ art, title, line, features = [], children }) {
 // the whole Dock), its glow is still and only its inside breathes, and busy it is circled by two dots.
 const ORB = 96, ORB_R = ORB / 2 + 6, ORB_BOTTOM = 40;
 export const ORB_SPACE = 148;                // what a section leaves free for it
+// the arc that runs around the round button while it works: solid at its head, fading along a tail
+const SNAKE = 132, SNAKE_PX = SNAKE * 2;
+function snakeArc(colour) {
+  const c = /^#[0-9a-f]{6}$/i.test(colour) ? hex(colour) : [255, 255, 255];
+  const data = new Uint8Array(SNAKE_PX * SNAKE_PX * 4), mid = SNAKE_PX / 2, R = SNAKE_PX / 2 - 8, W = 5;
+  for (let y = 0; y < SNAKE_PX; y++) for (let x = 0; x < SNAKE_PX; x++) {
+    const dx = x + 0.5 - mid, dy = y + 0.5 - mid, edge = W - Math.abs(Math.hypot(dx, dy) - R);
+    if (edge <= 0) continue;
+    const along = ((Math.atan2(dy, dx) / (Math.PI * 2)) + 1) % 1, a = along < 0.3 ? 0 : (along - 0.3) / 0.7;
+    if (!a) continue;
+    const o = (y * SNAKE_PX + x) * 4;
+    data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = Math.round(255 * a * a * Math.min(1, edge));
+  }
+  return { width: SNAKE_PX, height: SNAKE_PX, data };
+}
+
 export function Orb({ label, onClick, disabled, busy }) {
   const p = usePal();
-  const glow = useRef(null), ring = useRef(null), press = useRef(null), dot = useRef(null), tail = useRef(null);
+  const glow = useRef(null), ring = useRef(null), press = useRef(null), snake = useRef(null);
+  const arc = useMemo(() => snakeArc(p.ringLine), [p.ringLine]);
   useLoop((t) => {
     if (busy) {
-      for (const [d, back] of [[dot, 0], [tail, 28]]) if (d.current) { const [x, y] = onOrbit(ORB_R, t * 260 - back); set(d.current.id, 'translateX', x); set(d.current.id, 'translateY', y); }
+      if (snake.current) set(snake.current.id, 'rotate', (t * 300) % 360);
       return;
     }
     if (glow.current) set(glow.current.id, 'opacity', 0.16 * (0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5));
@@ -306,7 +323,7 @@ export function Orb({ label, onClick, disabled, busy }) {
   const hit = () => { if (press.current) tween(press.current, { scaleX: [0.95, 1], scaleY: [0.95, 1] }, { ms: 240 }); if (onClick) onClick(); };
   return (
     <View style={{ position: 'absolute', left: '50%', marginLeft: -80, bottom: ORB_BOTTOM, width: 160, height: 112, alignItems: 'center', justifyContent: 'center', direction: 'ltr', opacity: disabled ? 0.55 : 1 }}>
-      {busy ? [[dot, 1], [tail, 0.5]].map(([d, o], i) => <View key={i} ref={d} style={{ position: 'absolute', left: 75, top: 51, width: 10, height: 10, borderRadius: 5, backgroundColor: p.ringLine, opacity: o }} />)
+      {busy ? <Image ref={snake} pixels={arc} style={{ position: 'absolute', left: 80 - SNAKE / 2, top: 56 - SNAKE / 2, width: SNAKE, height: SNAKE, pointerEvents: 'none' }} />
         : <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: ORB, height: ORB, borderRadius: ORB / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />}
       <View ref={press} onClick={disabled ? undefined : hit} style={{ width: ORB, height: ORB, borderRadius: ORB / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         border: `3px solid ${p.ringLine}`, background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})`, boxShadow: `0 0 30px 6px ${p.glow}` }}>
@@ -318,7 +335,29 @@ export function Orb({ label, onClick, disabled, busy }) {
 }
 
 // A section scanning: its object large and centred, the verb, and the real path going by.
-export function SectionScan({ art, verb, path, counter }) {
+// How a list gets selected, and what is selected so far. An option's ids are an array, or a function when listing them
+// costs (with n, their count). The current one is the option that matches the selection.
+export function SelectBar({ options, selected, onPick, size, count }) {
+  const same = (o) => (typeof o.ids === 'function' ? o.n > 0 && selected.size === o.n : o.ids.length === selected.size && o.ids.every((i) => selected.has(i)));
+  const now = !selected.size ? 'none' : (options.find(same) || { key: 'custom' }).key;
+  const items = [...options.map((o) => ({ label: tr(`cleaner.select.${o.key}`), checked: now === o.key, onClick: () => onPick(typeof o.ids === 'function' ? o.ids() : o.ids) })),
+    '-', { label: tr('cleaner.select.none'), checked: now === 'none', onClick: () => onPick([]) }];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <Label dim size={typeScale.callout}>{tr('cleaner.select.label')}</Label>
+      <MenuButton small icon={null} label={`${tr(`cleaner.select.${now}`)} ▾`} items={items} />
+      <View style={{ flex: 1 }} />
+      {selected.size ? <Label dim size={typeScale.callout}>{`${tr('cleaner.select.count', { count: count || selected.size })}${size > 0 ? ` · ${formatBytes(size)}` : ''}`}</Label> : null}
+    </View>
+  );
+}
+
+// one toggle for a whole list: what it selects, or clearing what is selected
+export function SelectAll({ count, label, onAll, onNone }) {
+  return <GlassButton small label={count ? tr('cleaner.selectNone', { count }) : label || tr('cleaner.selectAll')} onClick={count ? onNone : onAll} />;
+}
+
+export function SectionScan({ art, verb, path, counter, found }) {
   const img = useRef(null);
   useLoop((t) => { if (img.current) { const s = 1 + Math.sin(t * 2.4) * 0.03; set(img.current.id, 'scaleX', s); set(img.current.id, 'scaleY', s); } });
   return (
@@ -327,6 +366,7 @@ export function SectionScan({ art, verb, path, counter }) {
       <Label size={28} weight={300}>{verb}</Label>
       <Label size={typeScale.callout} mono dim lines={1}>{midTrim(path)}</Label>
       <Label size={typeScale.callout} dim>{counter}</Label>
+      {found}
     </View>
   );
 }
@@ -406,10 +446,27 @@ export function PagedList({ fetch, rowH = 34, render, reset, style }) {
     if (it) rows.push(render(it, i));
   }
   const bar = full > h ? Math.max(28, h * (h / full)) : 0;
+  const drag = useRef(null);
+  useEffect(() => {
+    const a = addListener('pointermove', (e) => {
+      const d = drag.current;
+      if (!d || !box.current) return;
+      const oy = lord.getLayout(box.current.id)[1];
+      setY(Math.max(0, Math.min(d.max, ((e.y - oy - d.grab) / d.room) * d.max)));
+    });
+    const b = addListener('pointerup', () => { drag.current = null; });
+    return () => { a(); b(); };
+  }, []);
+  const barTop = (h - bar) * (top / (max || 1));
   return (
     <View ref={box} onWheel={(e) => setY(Math.max(0, Math.min(max, top + e.deltaY)))} style={{ flex: 1, minHeight: 0, overflow: 'hidden', ...style }}>
       <View style={{ position: 'absolute', left: 0, right: bar ? 10 : 0, top: first * rowH - top }}>{rows}</View>
-      {bar ? <View style={{ position: 'absolute', end: 2, width: 5, borderRadius: 3, height: bar, top: (h - bar) * (top / (max || 1)), backgroundColor: p.sub, opacity: 0.6 }} /> : null}
+      {bar ? (
+        <View onMouseDown={(e) => { e.stopPropagation(); drag.current = { grab: e.y - lord.getLayout(box.current.id)[1] - barTop, room: Math.max(1, h - bar), max }; }}
+          style={{ position: 'absolute', end: 0, width: 14, height: bar, top: barTop }}>
+          <View style={{ position: 'absolute', end: 2, top: 0, width: 5, borderRadius: 3, height: bar, backgroundColor: p.sub, opacity: 0.6 }} />
+        </View>
+      ) : null}
     </View>
   );
 }

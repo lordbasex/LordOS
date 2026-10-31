@@ -1,9 +1,10 @@
 // Storage: a volume's bounded tree, drawn as a squarified treemap in an Image, a folder tree with logical and
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
-import { View, Image, cleaner, useAppWindow, useStore, windows, wm, userDirs, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
+import { View, Image, cleaner, useAppWindow, useStore, windows, wm, userDirs, t as tr, formatBytes, formatDate, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, usePal } from './ui.jsx';
 
+const SAFE = '#35c98f', REVIEW = '#f0b13c';
 const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
 
 // squarified layout of values (largest first) in x, y, w, h
@@ -39,12 +40,33 @@ export function squarify(items, x, y, w, h) {
 }
 
 // One view per area, 28 at most: the rest are shown together, so areas can rise in and stay crisp.
+// bands rising from the bottom of a tile: its share that can go, regenerable first
+function Bands({ item, h }) {
+  const whole = item.allocated || 1, safe = Math.min(1, (item.safe || 0) / whole), review = Math.min(1 - safe, (item.review || 0) / whole);
+  return (
+    <>
+      {safe > 0 ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.max(3, h * safe), backgroundColor: SAFE, opacity: 0.6 }} /> : null}
+      {review > 0 ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: safe > 0 ? Math.max(3, h * safe) : 0, height: Math.max(3, h * review), backgroundColor: REVIEW, opacity: 0.55 }} /> : null}
+    </>
+  );
+}
+
+function Legend() {
+  const dot = (c, key) => (
+    <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
+      <Label dim size={typeScale.callout}>{tr(key)}</Label>
+    </View>
+  );
+  return <View style={{ flexDirection: 'row', gap: spacing.m }}>{dot(SAFE, 'cleaner.map.legendSafe')}{dot(REVIEW, 'cleaner.map.legendReview')}</View>;
+}
+
 function Treemap({ data, onOpen }) {
   const [sel, setSel] = useState(null);
   const { id } = useAppWindow() || {};
   const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
   const geo = win ? wm.frame(win) : null;
-  const W = geo ? Math.max(240, Math.round(geo.w - 236 - 76)) : 0, H = geo ? Math.max(160, Math.round(geo.h - 194)) : 0;
+  const W = geo ? Math.max(240, Math.round(geo.w - 236 - 76)) : 0, H = geo ? Math.max(160, Math.round(geo.h - 230)) : 0;
   const rects = useMemo(() => {
     const kids = data.children.filter((c) => c.allocated > 0);
     const items = kids.slice(0, 26).map((c) => ({ ...c, v: c.allocated }));
@@ -61,6 +83,7 @@ function Treemap({ data, onOpen }) {
           <Enter key={r.item.id} delay={Math.min(i * 40, 360)} x={0} y={14} ms={500} style={{ position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, padding: 1 }}>
             <View onClick={() => setSel(r.item)} style={{ flex: 1, borderRadius: 12, backgroundColor: COLOURS[i % COLOURS.length], padding: r.w > 70 && r.h > 34 ? 10 : 0, overflow: 'hidden',
               opacity: sel && sel.id !== r.item.id ? 0.7 : 1, border: sel && sel.id === r.item.id ? '2px solid #ffffff' : 'none' }}>
+              <Bands item={r.item} h={r.h} />
               {r.w > 70 && r.h > 34 ? <Label size={typeScale.callout} weight={600} lines={1} style={{ color: '#ffffff' }}>{r.item.name}</Label> : null}
               {r.w > 70 && r.h > 50 ? <Label size={typeScale.caption} lines={1} style={{ color: '#ffffff' }}>{formatBytes(r.item.allocated)}</Label> : null}
             </View>
@@ -73,7 +96,7 @@ function Treemap({ data, onOpen }) {
             <View style={{ flex: 1, minWidth: 0 }}><Label lines={1}>{tr('cleaner.map.selected', { name: sel.name, logical: formatBytes(sel.logical), allocated: formatBytes(sel.allocated) })}</Label></View>
             {sel.id >= 0 && sel.hasKids ? <GlassButton small label={tr('cleaner.map.open')} onClick={() => { const i = sel.id; setSel(null); onOpen(i); }} /> : null}
           </>
-        ) : <Label dim size={typeScale.callout}>{tr('cleaner.map.hint')}</Label>}
+        ) : rects.some((r) => r.item.safe > 0 || r.item.review > 0) ? <Legend /> : <Label dim size={typeScale.callout}>{tr('cleaner.map.hint')}</Label>}
       </View>
     </View>
   );
@@ -228,7 +251,7 @@ export function StorageHero({ volumes, volume, setVolume }) {
   );
 }
 
-export function StorageView({ scan, onScan, volume, onReview }) {
+export function StorageView({ scan, volume, onReview }) {
   const [node, setNode] = useState(0);
   const [back, setBack] = useState([]);
   const [ahead, setAhead] = useState([]);
@@ -237,13 +260,17 @@ export function StorageView({ scan, onScan, volume, onReview }) {
   const { id } = useAppWindow() || {};
   const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
   const geo = win ? wm.frame(win) : null;
-  const W = geo ? Math.max(260, Math.round(geo.w - 236 - 76 - 228)) : 400, H = geo ? Math.max(200, Math.round(geo.h - 196)) : 300;
+  const W = geo ? Math.max(260, Math.round(geo.w - 236 - 76 - 228)) : 400, H = geo ? Math.max(200, Math.round(geo.h - 232)) : 300;
   const data = useMemo(() => cleaner.tree(scan.id, node, 500), [scan.id, node]);
   const kinds = useMemo(() => (data && !data.trail.length && volume && volume.id === 'home' ? folderKinds() : null), [data, volume]);
   const go = (n) => { setBack([...back, node]); setAhead([]); setNode(n); setSel(null); };
   const undo = () => { setAhead([node, ...ahead]); setNode(back[back.length - 1]); setBack(back.slice(0, -1)); setSel(null); };
   const redo = () => { setBack([...back, node]); setNode(ahead[0]); setAhead(ahead.slice(1)); setSel(null); };
+  const top = useMemo(() => cleaner.tree(scan.id, 0, 1), [scan.id]);
   if (!data) return <Label dim>{tr('cleaner.map.empty')}</Label>;
+  // what isn't under this scan: the disk's used space past what was walked
+  const whole = top ? top.node : data.node;
+  const summary = volume && volume.total > 0 ? tr('cleaner.map.summary', { free: formatBytes(volume.free), safe: formatBytes(whole.safe || 0), review: formatBytes(whole.review || 0), other: formatBytes(Math.max(0, volume.total - volume.free - whole.allocated)) }) : '';
   const rel = (name) => [...data.trail.map((t) => t.name), name].join('/');
   const real = !!sel && sel.id >= 0;           // "Others" is no folder: it can be looked at, not opened or reviewed
   return (
@@ -254,9 +281,9 @@ export function StorageView({ scan, onScan, volume, onReview }) {
         <View style={{ flex: 1, minWidth: 0, paddingHorizontal: spacing.s }}>
           <Label size={20} weight={300} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : tr('cleaner.section.storage')}</Label>
         </View>
-        {[['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ['types', 'cleaner.map.viewTypes']].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
-        <GlassButton small label={tr('cleaner.scan')} onClick={onScan} />
+        {[['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ...(scan.savedAt ? [] : [['types', 'cleaner.map.viewTypes']])].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
       </View>
+      <Label dim size={typeScale.callout} lines={1}>{scan.savedAt ? tr('cleaner.map.savedAt', { when: formatDate(new Date(scan.savedAt * 1000), 'short') }) : summary}</Label>
       {!scan.complete ? <Label size={typeScale.callout}>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
       <View style={{ flex: 1, minHeight: 0, flexDirection: 'row', gap: spacing.m }}>
         {view === 'bubbles' ? (
@@ -279,7 +306,7 @@ export function StorageView({ scan, onScan, volume, onReview }) {
       {view === 'bubbles' ? (
         <Glass style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{sel ? tr('cleaner.map.selectedShort', { name: sel.name, size: formatBytes(sel.allocated) }) : tr('cleaner.map.noneSelected')}</Label></View>
-          <GlassButton small label={tr('cleaner.map.review')} disabled={!real} onClick={() => onReview(rel(sel.name))} />
+          <GlassButton small label={tr('cleaner.map.review')} disabled={!real || !!scan.savedAt} onClick={() => onReview(rel(sel.name))} />
           <GlassButton small label={tr('cleaner.show')} disabled={!real} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${rel(sel.name)}/.`)} />
         </Glass>
       ) : null}

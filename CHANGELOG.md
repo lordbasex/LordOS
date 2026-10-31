@@ -18,6 +18,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **Cleaner: code projects, more rules, a clearer map, and a map that stays** (2026-10-31; `docs/CLEANER.md`, `docs/CLEANER-ARCHITECTURE.md`, `docs/CLEANER-SECURITY.md`). The table now has 61 rules, 18 more.
+  - **Build outputs of code projects:** the sandboxed `lord-clean` walks the home folder for Node (`node_modules`, idle 60 days, judged over the whole project), Rust, Maven, JavaScript, Python tool caches, Python virtual environments, Gradle and Dart. Each is proved by evidence next to or inside the folder, and `lord-server` checks that evidence again at the plan and right before acting (`clean_project_kind`). They are chosen one by one and go to the Trash, not the real delete, whose approval covers fixed roots only. Dot folders and `~/go`, `~/snap`, `~/Android` and `~/flutter` aren't entered.
+  - **New fixed rules:** Playwright, Puppeteer, the Go module download cache (only `cache/download`: extracted modules are read-only), JetBrains, Dart pub, the Maven repository and Flatpak app caches.
+  - **Your own files, reviewed:** installers in Downloads over 30 days, to the Trash; and videos of 100 MiB or more on the Desktop (over 7 days, following `XDG_DESKTOP_DIR`) and in `Videos/Screencasts`, to the Trash and chosen one by one.
+  - **Storage map:** bands in each tile for what rebuilds by itself and what to check first, and a line with free space, both amounts and what wasn't scanned.
+  - **During a scan** the three rules with the most found so far appear, with their sizes, and each step stays on screen a minimum time (2.6 s in a full scan, 1.8 s from a section) so its animation finishes on a nearly empty disk.
+  - **The storage map is kept between sessions:** `~/.cache/lordos/cleaner-map.txt`, mode 0600, folder names and sizes, on by default, with a switch in Settings and cleared with Clear in Activity. This changes the earlier claim of no history of paths: the Activity history still holds no path, but folder names now stay on disk. A saved map holds no candidates, so nothing can be acted on from it. A scan of another disk removes it.
+  - **Credit:** These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were reimplemented from scratch after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
+  - **Tests:** `clean-test` has no case for these yet (`docs/CLEANER-TESTS.md`).
+
 - **What slows the Pi 5's GPU under load: memory** (2026-10-31, measured with `build/gpu-contention` on the Pi 5 16 GB, build 0.8.6+v087.4, two runs; `docs/GPU.md`): GPU time per frame
   stays at about 1.4 ms with all four cores spinning, and goes to 28 ms with four cores reading memory (3.7 ms writing), with the V3D clock at 1.15 GHz, no throttling and at most 44 °C.
   No desktop change comes with this measurement; it says where the work on the desktop under load has to go.
@@ -111,7 +121,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     folders, skipped while the profile's lock names a live process), temporary files, crash reports, logs, and shown-only items. AI models from Hugging Face and LM Studio move whole to the
     Trash, one by one, named in the confirmation; Ollama is measured only, as its models share files.
   - **System files:** closed admin actions `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp`, with no arguments.
-  - **Looks:** Noche, following the system's mode, and Aurora and Cristal, as data; animated without a React render per frame, stopped when the window isn't in front and with Reduce motion.
+  - **Looks:** Aurora by default, following the system's mode, and Noche and Cristal, as data; animated without a React render per frame, stopped when the window isn't in front and with Reduce motion.
     Built-in apps can draw their own window frame (`"ownFrame"` in the manifest).
   - **Item by the clock:** a still item with a panel of real readings, read only while it is open.
   - **Full scan:** a dashboard of tiles with the real path being read, a sidebar rail, a tint per section, then a review board; Storage opens on bubbles of the largest folders.
@@ -1096,6 +1106,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Settings move to version 0.8.6.
 
 ### Fixed
+- **Cleaner, scan again and select all:** every result page (Cleanup, Large files, Storage, Duplicates) has "Start over", which returns to that section's first page without losing anything on disk, and "Scan again"; the full scan's board has both too. Select all covers a filtered list of large files, the categories of Cleanup and app leftovers. Duplicates and similar images have "Select copies", every copy but the first of each group, and lord-server still keeps one copy. A selection menu on each list offers smart selection, select all and deselect all, plus older or newer copies for duplicates, and shows how many items and bytes are selected. Categories chosen by name (AI models, project outputs) have a checkbox of their own, are never picked by smart selection, and the confirmation names the first five items and how many more. The round button now shows a running arc while it works, and the scroll bar of long lists can be dragged.
+- **Fixed:** `doc_recv` read uninitialized control data when `recvmsg` failed, which crashed intermittently when a scan was cancelled on arm64 (Raspberry Pi 5). It affected every helper on that channel.
 
 - **`lordos-sysreport bench --full` ran no sustained load** (2026-10-30; `server/src/sysreport/cli.c`): it passed
   no sustained time to `lbrun_start`, so the sustained part was skipped (`"skipped": {"sustained.start": "mode"}`) and

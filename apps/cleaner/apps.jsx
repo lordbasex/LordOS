@@ -3,7 +3,8 @@
 // packages.remove. Leftovers are candidates of one rule, whole folders chosen by name, to the Trash.
 import { View, Image, ScrollView, ConfirmDialog, admin, cleaner, packages, t as tr, formatBytes, locale, typeScale, spacing } from '@lordos/sdk';
 import { useMemo, useState } from 'react';
-import { Label, Glass, GlassButton, Check, Enter, PagedList, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Check, Enter, PagedList, SelectAll, usePal } from './ui.jsx';
+import { allIds } from './sections.jsx';
 
 const pkgReady = () => { try { return lord.pkg.available(); } catch (e) { return false; } };
 
@@ -43,6 +44,7 @@ function Leftovers({ scan, onFind, selected, setSelected }) {
           <Label weight={600}>{tr('cleaner.leftovers.title')}</Label>
           <Label dim size={typeScale.callout}>{tr('cleaner.rule.app-leftovers')}</Label>
         </View>
+        {rule && rule.files ? <SelectAll count={selected.size} onAll={() => setSelected(new Set(allIds(scan.id, { rule: 'app-leftovers' })))} onNone={() => setSelected(new Set())} /> : null}
         <GlassButton small label={tr(scan ? 'cleaner.leftovers.again' : 'cleaner.leftovers.find')} onClick={onFind} />
       </View>
       {scan && !(rule && rule.files) ? <Label dim size={typeScale.callout}>{tr('cleaner.leftovers.none')}</Label> : null}

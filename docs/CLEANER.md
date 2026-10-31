@@ -10,27 +10,32 @@ The rule is **analyse, review, plan, confirm, execute, verify**. A scan only rea
 
 | Section | What it does |
 |---|---|
-| Scan | Disk usage and the last scan; a full scan runs Cleanup, Storage and Duplicates one after the other on a dashboard of tiles, then a review board: the total, a bar of what it is made of, and a card per module with its real rules, files or folders |
+| Scan | Disk usage and the last scan; a full scan runs Cleanup, Storage and Duplicates one after the other on a dashboard of tiles, then a review board: the total, a bar of what it is made of, and a card per module with its real rules, files or folders. During a scan the three rules with the most found so far appear, each with its size. Each step of a full scan stays on screen at least 2.6 s, and a scan started from a section at least 1.8 s, so its animation finishes on a nearly empty disk |
 | Cleanup | The rules' findings by category, each with its reason, risk, action, count and size; the system's own files |
 | Large files | Files found by a tree scan, filtered by size, age by modification time and type |
-| Storage | Volumes (`/`, the home folder, the user's mounts); bubbles of the largest folders (the default, 14 at most, the rest grouped), each a glass sphere with an icon and colour for what the folder is, a map, a folder list with logical and allocated sizes, a summary by type. A selected folder goes to Large files to be reviewed |
+| Storage | Volumes (`/`, the home folder, the user's mounts); bubbles of the largest folders (the default, 14 at most, the rest grouped), each a glass sphere with an icon and colour for what the folder is, a map, a folder list with logical and allocated sizes, a summary by type. A selected folder goes to Large files to be reviewed. In the map, bands in each tile show what rebuilds by itself and what to check first, and a line above gives free space, both amounts and what wasn't scanned (`Storage map` below) |
 | Duplicates | Exact copies in chosen folders, or similar images: resized and recompressed versions of a picture. Nothing is selected for the user |
 | Apps | Installed apps, largest first, each removed by the package engine with its plan shown first; what removed LordOS apps left behind |
 | Activity | What ran: counts and sizes, never a path |
-| Settings | Excluded folders, the large file threshold, the look, the item by the clock |
+| Settings | Excluded folders, the large file threshold, the look, the item by the clock, whether the storage map is kept |
 
 ## Rules
 
-Compiled in `server/src/clean/rules.c`. Every rule applies only if its folder exists.
+Compiled in `server/src/clean/rules.c`: 61 rules. Every rule applies only if its folder exists.
 
 | Category | Rules | Risk | Action |
 |---|---|---|---|
 | Caches | image thumbnails, LordOS thumbnails, font cache, shader cache and database, media plugin list | regenerable | deleted |
-| Developer tools | pip, npm, yarn, Go build cache | regenerable | deleted |
+| Caches | Flatpak app caches (`.var/app/*/cache`) | review | Trash: no lock of the running app can be read |
+| Developer tools | pip, npm, yarn, Go build cache, browsers kept by Playwright and Puppeteer, Go module download cache (only `go/pkg/mod/cache/download`: extracted modules are read-only) | regenerable | deleted |
 | Developer tools | pnpm store | review | Trash: projects hard-link into it |
+| Developer tools | JetBrains caches, Dart pub packages, Maven repository | review | Trash: no lock can be read for the first, and a repository can hold the only copy of what you built |
 | Browsers | Firefox and Chromium based browsers: disk cache, startup, script, GPU and shader caches | regenerable | deleted, never while that browser runs |
 | Temporary | `.cache/tmp` over 7 days; `*.part` and `*.crdownload` in Downloads over 7 days | review | Trash |
 | Reports and logs | crash reports over 7 days; npm logs and old display logs over 30 days | review | Trash |
+| Old installers and recordings | installers and disk images in Downloads over 30 days (`*.deb`, `*.rpm`, `*.AppImage`, `*.iso`, `*.dmg`, `*.pkg`, `*.exe`, `*.msi`) | review | Trash |
+| Old installers and recordings | videos of 100 MiB or more (`*.mp4`, `*.mov`, `*.mkv`, `*.webm`) on the Desktop, over 7 days, and in `Videos/Screencasts`, at any age | review | Trash, chosen one by one and named in the confirmation |
+| Code projects | build outputs found in the home folder, eight kinds (below) | review | Trash, chosen one by one and named in the confirmation |
 | AI models | Hugging Face and LM Studio models, a folder each | review | Trash, chosen one by one and named in the confirmation |
 | AI models | unfinished Hugging Face downloads | regenerable | deleted, chosen one by one |
 | AI models | Ollama | review | shown only: models share their blobs, so moving files can't remove one model |
@@ -41,7 +46,29 @@ Compiled in `server/src/clean/rules.c`. Every rule applies only if its folder ex
 
 Rules never cover `~/.cache` as a whole, cookies, sessions, history or passwords. The download rules follow the user's
 folder: `XDG_DOWNLOAD_DIR` in `~/.config/user-dirs.dirs`, so `~/Descargas` on a Spanish system. Only a `$HOME/…` value that
-would pass as a rule's root counts; anything else, or no such file, means `~/Downloads`.
+would pass as a rule's root counts; anything else, or no such file, means `~/Downloads`. The Desktop rule follows
+`XDG_DESKTOP_DIR` the same way, falling back to `~/Desktop`. `Videos/Screencasts` is a fixed name.
+
+## Code projects
+
+A folder's name proves nothing, so a rules scan walks the home folder, in the sandboxed `lord-clean`, for build outputs that prove themselves by what is next to them or inside them.
+
+| Kind | Folders | Evidence |
+|---|---|---|
+| Node dependencies | `node_modules` | `package.json` next to it, and no change in the project for 60 days |
+| Rust | `target` | `Cargo.toml` next to it, or `CACHEDIR.TAG` inside |
+| Maven | `target` | `pom.xml` next to it |
+| JavaScript | `.next`, `.turbo`, `.parcel-cache`, `.nuxt`, `.svelte-kit` | `package.json` next to it |
+| Python tool caches | `.pytest_cache`, `.mypy_cache`, `.ruff_cache` | `CACHEDIR.TAG` inside |
+| Python environments | `.venv`, `venv` | `pyvenv.cfg` inside, and `pyproject.toml`, `requirements.txt`, `setup.py` or `Pipfile` next to it |
+| Gradle | `build`, `.gradle` | `build.gradle`, `build.gradle.kts`, `settings.gradle` or `settings.gradle.kts` next to it |
+| Dart | `build`, `.dart_tool` | `pubspec.yaml` next to it |
+
+Node's 60 days are judged over the whole project: the newest change in any file or folder of it, leaving build outputs, `.git`, `dist`, `coverage` and `__pycache__` out. A project with nothing else in it proves nothing and is not offered.
+
+Each folder is one candidate, moved whole. They are chosen one by one, never by category, and go to the Trash and not to the real delete, because that approval covers fixed roots only. The confirmation names them and says the project needs its install or build step again. `lord-server` checks the evidence again at the plan and right before acting.
+
+The walk doesn't enter folders starting with a dot, an unproved `node_modules`, or `go`, `snap`, `Android` and `flutter` directly in the home folder, where tools unpack other people's sources. It stops at a proved output and at 5,000,000 entries, then marks the scan incomplete.
 
 ## Similar images
 
@@ -54,6 +81,16 @@ are counted on the page. A scan reads 20,000 images at most.
 
 Similar isn't equal, so the images are shown with thumbnails, sizes and paths, nothing is selected, and one image of each group
 always stays.
+
+## Storage map
+
+The map view colours a band rising from the bottom of each tile: what rebuilds by itself first, what to check first above it, each in proportion to the folder. They come from the rule scan's candidates laid over the tree, so they need a Cleanup scan and a Storage scan in the same session, as a full scan does. Rules that are only measured count for neither.
+
+The line above the views gives the free space, both amounts, and what wasn't scanned: the disk's used space minus what this scan walked, so other folders, other users' files and what the system reserves. Space that goes to the Trash isn't free until the Trash is emptied, so it is never added to the free space.
+
+**Kept between sessions.** A tree scan of the home folder or `/` writes `~/.cache/lordos/cleaner-map.txt`, mode 0600: folder names and sizes, for the session user. It is on by default. Turning off the switch in Settings removes the file, and Clear in Activity removes it with the history. Opening Storage with no scan yet shows it with its date. It holds no candidates, so nothing can be acted on from it: Large files, the summary by type, the bands, the line above the views (its date takes that place) and Review are not there until a new scan. Files in Show still opens the folder.
+
+The file is replaced at each scan. A scan of another disk doesn't save a map, and removes the one there was.
 
 ## Apps
 
@@ -93,15 +130,15 @@ SMART is not part of it: reading it needs the admin helper and can wake a restin
 
 ## Looks
 
-Themes are data, one token object each (`sdk/cleanertheme.js`). Noche is the default and follows the system's light or dark mode live.
+Themes are data, one token object each (`sdk/cleanertheme.js`). Aurora is the default and follows the system's light or dark mode live.
 Aurora and Cristal, chosen in Settings, have one fixed look. The app and its panel use the same one.
 
 Each section tints the window, crossfading over 700 ms. During a full scan the sidebar narrows to a rail with a step badge.
 
 What differs from the mockup: the engine has no radial or conic gradient, so the night sky is a stretched image and the progress ring is an `Image pixels`; the
 storage map is up to 28 views rather than one image, so its areas can rise in. A scan has no known total, so it shows real counters, the real path and a spinner; a
-percentage appears only while a plan runs. Selecting a folder in Storage doesn't remove the folder: it opens its large files for review, as no action on whole folders
-exists outside AI models. Previews are real thumbnails for images and a type icon with the extension otherwise. The hero's rings stay still and only their dots turn, the round
+percentage appears only while a plan runs. Selecting a folder in Storage doesn't remove the folder: it opens its large files for review, as no action on a folder
+you point at exists: the whole-folder candidates are AI models, leftovers and project outputs, each found by its rule. Previews are real thumbnails for images and a type icon with the extension otherwise. The hero's rings stay still and only their dots turn, the round
 button sits 24 px higher, its glow is still and only its inside breathes, and busy it is circled by two dots: all for the repaint rules below. The bubble view and the review board
 are not in the mockup.
 
