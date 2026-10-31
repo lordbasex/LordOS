@@ -34,6 +34,8 @@
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 
+#include "lm_hwfall.h"
+
 #define VQ_MAX   6                   /* decoded frames waiting */
 #define AQ_MS    1000                /* decoded PCM waiting */
 #define PKTQ_MAX (24u << 20)         /* bytes of undecoded packets */
@@ -78,6 +80,8 @@ typedef struct {
     AVCodecContext *vdec, *adec, *sdec;
     AVBufferRef *hw;
     int hw_active;
+    LmHwFall hwf;                   /* consecutive decoding failures (lm_hwfall.h) */
+    int hw_resume;                  /* it went to software: seek to the clock */
     SwrContext *swr;
     int out_ch;
     int64_t start_ms, dur_ms;
@@ -216,6 +220,36 @@ static void pq_push_front(PktQ *q, AVPacket *p) {
     q->bytes += (size_t)p->size;
 }
 
+/* The hardware decoder failed mid-file (a driver's error, a stream it took and can't follow): this file goes on in
+ * software, from the keyframe before what is on screen. Under P.mu, on the decoding thread, which owns
+ * P.vdec; frames still queued keep their own reference to the hardware's. */
+#ifdef LM_HWFALL_TEST
+static int hwf_tested;
+#endif
+static void hw_to_software(void) {
+    AVCodecContext *old = P.vdec;
+    AVBufferRef *hw = P.hw;
+    int active = P.hw_active;
+    P.hw = NULL;
+    P.hw_active = 0;
+    AVCodecContext *sw = open_dec(P.vi, 1);
+    if (!sw) {                              /* no software decoder: as it was */
+        P.hw = hw;
+        P.hw_active = active;
+        lm_hwfall_reset(&P.hwf);
+        LM_LOG("hardware decoder failing and no software decoder to take over");
+        return;
+    }
+    P.vdec = sw;
+    pthread_mutex_unlock(&P.mu);
+    avcodec_free_context(&old);
+    av_buffer_unref(&hw);
+    pthread_mutex_lock(&P.mu);
+    lm_hwfall_reset(&P.hwf);
+    P.hw_resume = 1;                        /* the main loop seeks to what is on screen (seek_to) */
+    LM_LOG("hardware decoder failed: going on in software");
+}
+
 static int decode_video(void) {
     if (!P.vdec || P.cover) return 0;
     int serial = P.serial, progress = 0;
@@ -226,7 +260,19 @@ static int decode_video(void) {
         int r = avcodec_receive_frame(P.vdec, f);
         double dt = lm_now_ms() - t0;
         pthread_mutex_lock(&P.mu);
-        if (r < 0) break;
+#ifdef LM_HWFALL_TEST                       /* build/lord-media-hwfall: a decoder that fails after 30 frames */
+        if (r >= 0 && P.decoded >= 30 && P.decoded < 1000 && !hwf_tested) {
+            P.hw_active = 1;
+            av_frame_unref(f);
+            r = AVERROR_EXTERNAL;
+            if (P.hwf.fails == LM_HWFALL_ERRS - 1) hwf_tested = 1;
+        }
+#endif
+        if (r < 0) {
+            if (r != AVERROR(EAGAIN) && r != AVERROR_EOF) lm_hwfall_note(&P.hwf, 1);
+            break;
+        }
+        lm_hwfall_note(&P.hwf, 0);
         progress = 1;
         P.dec_ms += dt;
         P.decoded++;
@@ -238,6 +284,7 @@ static int decode_video(void) {
         pthread_cond_broadcast(&P.cv);
     }
     av_frame_free(&f);
+    if (P.hw_active && lm_hwfall_due(&P.hwf)) { hw_to_software(); return 1; }
     if (P.vq_n >= VQ_MAX || serial != P.serial) return progress;
     AVPacket *pkt = pq_pop(&P.vq_pkt);
     if (!pkt) {
@@ -256,6 +303,7 @@ static int decode_video(void) {
     P.dec_ms += dt;
     if (r == AVERROR(EAGAIN) && serial == P.serial) pq_push_front(&P.vq_pkt, pkt);   /* comes back later */
     else av_packet_free(&pkt);
+    if (r < 0 && r != AVERROR(EAGAIN) && r != AVERROR_EOF) lm_hwfall_note(&P.hwf, 1);
     return 1;
 }
 
@@ -667,6 +715,11 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (late && !seek_wait) { P.dropped++; av_frame_free(&vf.f); continue; }
             int64_t clk = clock_ms();
             int r = lm_out_present(vf.f, vf.pts);
+            if (r < 0 && vf.f->format == AV_PIX_FMT_VAAPI) {   /* the frame could not be read back */
+                pthread_mutex_lock(&P.mu);
+                lm_hwfall_note(&P.hwf, 1);
+                pthread_mutex_unlock(&P.mu);
+            }
             if (r == 1) P.dropped++;
             else if (r == 0) {
                 P.shown++;
@@ -678,6 +731,11 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (!C.playing) break;
         }
         /* subtitles: sent as soon as they're decoded (the JS clock shows them) */
+        pthread_mutex_lock(&P.mu);
+        int resume = P.hw_resume;
+        P.hw_resume = 0;
+        pthread_mutex_unlock(&P.mu);
+        if (resume) { seek_to(clock_ms()); seek_wait = 1; }
         pthread_mutex_lock(&P.mu);
         for (int i = 0; i < P.sub_n; i++) {
             if (P.subs[i].serial != P.serial) continue;
