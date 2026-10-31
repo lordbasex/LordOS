@@ -89,6 +89,7 @@ corners of the window, the hero and the round button moving in one frame repaint
 - Each loop has its own frames in a cycle of six (`SLOT`): the far dot, then the near dot with the object, then the button, then a star. Never two far-apart things in one frame.
 - One star per update, not all of them.
 - What barely moves sets a value only when a whole pixel changes.
+- A frame callback that changes nothing brings no flip, and with no flip the compositor sleeps until something else wakes it. So a do-nothing timer stays pending while any job runs. Don't remove it because a headless run looks fine: there a viewer's video wakes the loop.
 - Nothing that moves reaches the Dock's margin in the default window position: the button's pulse is limited for that. Moved next to the Dock, the window pays for the Dock's repaint.
 
 Keep these when adding motion. `docs/CLEANER-TESTS.md` has the numbers.

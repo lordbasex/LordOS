@@ -31,8 +31,8 @@ A análise roda no `lord-clean`, um auxiliar isolado que só pode ler. Os planos
 
 Arquivos de cache regeneráveis sob pastas fixas podem ser apagados de verdade, como o seu próprio usuário, e só por este caminho: o `lord.fs` continua sem uma exclusão geral. Todo o resto vai para a Lixeira, de onde pode ser restaurado. Três ações administrativas fechadas limpam os arquivos do sistema, cada uma confirmada; são a única parte que ainda não foi executada numa máquina de teste.
 
-## Leve num computador modesto
+## O que seu movimento custa
 
-O app vem em três visuais, segue o modo claro e escuro e funciona em inglês, espanhol e português, também da direita para a esquerda. Seu movimento só roda com a janela em primeiro plano e para por completo com Reduzir movimento. As partes que se movem ficam em quadros separados para que a tela seja repintada o mínimo possível; os números estão em `docs/CLEANER-TESTS.md`. Foram medidos numa máquina virtual, não num Raspberry Pi.
+O app vem em três visuais, segue o modo claro e escuro e funciona em inglês, espanhol e português. Seu layout se inverte para idiomas da direita para a esquerda, verificado por enquanto com um idioma de teste com texto em inglês. Seu movimento só roda com a janela em primeiro plano e para por completo com Reduzir movimento. As partes que se movem ficam em quadros separados para que a tela seja repintada o mínimo possível; os números estão em `docs/CLEANER-TESTS.md`. Foram medidos numa máquina virtual, não num Raspberry Pi.
 
 [[shot:2]]

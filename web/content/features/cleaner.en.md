@@ -31,8 +31,8 @@ Scanning runs in `lord-clean`, a sandboxed helper that can only read. Plans are 
 
 Regenerable cache files beneath fixed folders can be deleted for real, as your own user, and only by this path: `lord.fs` still has no general delete. Anything else goes to the Trash, where you can restore it. Three closed administrator actions clean the system's own files, each confirmed; they are the one part not yet run on a test machine.
 
-## Easy on a modest computer
+## What its motion costs
 
-Cleaner comes in three looks, follows light and dark mode, and works in English, Spanish and Portuguese, right to left too. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine, not on a Raspberry Pi.
+Cleaner comes in three looks, follows light and dark mode, and works in English, Spanish and Portuguese. Its layout turns for right-to-left languages, checked so far with a test language in English text. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine, not on a Raspberry Pi.
 
 [[shot:2]]
