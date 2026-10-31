@@ -206,7 +206,7 @@ keyboard test can't light them; the bench should list them as taken by the syste
   measurable": no frame is presented there.
 - **Generated video (V):** content at 24, 30 or 60 fps with a square that steps once per content frame,
   and how many refreshes each content frame stayed (24 on 60 Hz should be 2 and 3 alternating).
-- **Pointer lock (L):** `zwp_pointer_constraints_v1.lock_pointer`, shown as locked or not.
+- **Pointer lock (Ctrl+L, 10 s at most):** `zwp_pointer_constraints_v1.lock_pointer`, shown as locked or not. Not plain L: every key of the drawn keyboard is there to be pressed.
 - Built without EGL the bench still runs and the 3D row says so.
 
 ![3D on VM 116 (software renderer)](testbench-3d.png)
