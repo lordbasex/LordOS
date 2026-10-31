@@ -23,6 +23,8 @@ Runs against the real `build/lord-clean`, with a home folder made by `mkdtemp` u
 - **Leftovers:** a removed app's folder is offered; an installed app's, a system app's, a name no app can have and a loose file aren't. Refused by category, skipped if the app comes back after the plan, moved whole, restored, and not offered when the system's apps can't be located.
 - **`/tmp`:** age, a link, no plan by rule or by id can act, and the table refuses any other system root and any action on one. It runs on a throwaway stand-in; another user's files were only seen in the session below.
 
+Checked by breaking the code on purpose on 2026-10-30, 823 checks each time: without the installed-app check 6 fail; without lord-server's check of a group of images 2 fail; taking any `XDG_DOWNLOAD_DIR` value 3 fail.
+
 ## `oldkernels_test.mjs` (in `run_suites.sh`)
 
 Which kernels are offered: the running one, the newest and one below stay; numbers compare as numbers; other flavours, meta packages and an unknown running kernel offer nothing. Plans that take the meta package, the running kernel, `lordos` or anything but a removal are refused.
