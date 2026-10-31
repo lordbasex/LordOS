@@ -7,6 +7,11 @@
 // The engine repaints one box around everything that changed in a frame, and a box that reaches a blurred surface
 // grows to all of it. So things that move far apart never move in the same frame: each loop has its own frames in a
 // cycle of six (SLOT), and what barely moves only sets a value when its whole pixel changes.
+//
+// A frame callback that changes nothing brings no flip, and with no flip the compositor sleeps until something else
+// wakes it (it does so on a real display; a viewer's video keeps a headless session awake). Slots make such frames
+// common, so a timer is kept pending while anything runs. It does nothing: firing is enough for the frame to follow,
+// and with the screen off, when no frame runs, it fires once and stops.
 import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -19,9 +24,15 @@ export function PalProvider({ children }) {
 }
 
 // bits of a cycle of six frames: at 60 Hz one bit is 10 updates a second
-export const SLOT = { all: 0b010101, a: 0b001001, b: 0b010010, c: 0b000100, d: 0b100000, spin: 0b101010 };
+export const SLOT = { all: 0b010101, a: 0b001001, b: 0b010010, c: 0b000100, d: 0b100000, spin: 0b001010 };
 const jobs = new Map();
-let waiting = false, frame = 0, ran = 0;
+let waiting = false, frame = 0, ran = 0, nudge = 0;
+function ask() {
+  waiting = true;
+  requestAnimationFrame(tick);
+  clearTimeout(nudge);
+  nudge = setTimeout(() => {}, 17);
+}
 function tick() {
   waiting = false;
   const now = Date.now();
@@ -30,11 +41,11 @@ function tick() {
     const bit = 1 << (frame++ % 6);
     for (const [j, mask] of [...jobs]) if ((mask & bit) && j(now) === false) jobs.delete(j);
   }
-  if (jobs.size) { waiting = true; requestAnimationFrame(tick); }
+  if (jobs.size) ask();
 }
 function run(fn, mask = SLOT.all) {
   jobs.set(fn, mask);
-  if (!waiting) { waiting = true; requestAnimationFrame(tick); }
+  if (!waiting) ask();
   return () => jobs.delete(fn);
 }
 
@@ -56,6 +67,12 @@ export function tween(node, props, { ms = 320, delay = 0, done } = {}) {
     if (x >= 1) { end(); return false; }
     return true;
   });
+}
+
+// a number or a yes/no from the window's frame: a window that moves renders nothing unless this changes
+export function useFrame(pick) {
+  const { id } = useAppWindow() || {};
+  return useStore(windows, (ws) => { const w = ws.find((x) => x.id === id); return w ? pick(wm.frame(w)) : null; });
 }
 
 export function useLive() {
@@ -173,10 +190,9 @@ export function Sky() {
   // the stars breathe out of step, one star per update: a few pixels, and never in a frame with something else
   const next = useRef(0);
   useLoop((t) => {
-    if (!p.stars) return;
     const i = next.current++ % STARS.length, d = dots.current[i];
     if (d) set(d.id, 'opacity', 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.85 + i * 2.1)));
-  }, true, SLOT.d);
+  }, !!p.stars, SLOT.d);
   return (
     <>
       {p.sky ? <Image src={`asset:cleaner/${p.sky}.png`} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} />
@@ -222,10 +238,7 @@ export function Hero({ art, title, line, features = [], children }) {
   const obj = useRef(null), shade = useRef(null), outer = useRef(null), inner = useRef(null), sheen = useRef(null), sparkA = useRef(null), sparkB = useRef(null);
   const whole = useRef(99);
   const [ix, iy] = onOrbit(ORBIT_B, INNER_START);
-  const { id } = useAppWindow() || {};
-  const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
-  const geo = win ? wm.frame(win) : null;
-  const small = !!geo && (geo.w < 1040 || geo.h < 660);   // a small window: everything still has to fit above the button
+  const small = !!useFrame((g) => g.w < 1040 || g.h < 660);   // a small window: everything still has to fit above the button
   // the two dots and the object move in frames of their own; the rings don't turn, only their dots do
   useLoop((t) => {
     if (outer.current) { const [x, y] = onOrbit(ORBIT_A, t * 40); set(outer.current.id, 'translateX', x); set(outer.current.id, 'translateY', y + ORBIT_A); }
