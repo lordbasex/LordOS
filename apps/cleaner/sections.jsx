@@ -34,6 +34,9 @@ export function ScanHero({ status, last }) {
   );
 }
 
+// what a rules scan has found so far, largest first
+export const foundSoFar = (scan) => (scan && scan.rules ? scan.rules.filter((r) => r.files > 0 && r.action !== 'none').sort((a, b) => b.allocated - a.allocated).slice(0, 3) : []);
+
 // no total is known while walking: real counters and the real path; a percentage only once a plan runs
 export function Working({ info, art }) {
   const scan = info.scan, plan = info.plan;
@@ -41,7 +44,8 @@ export function Working({ info, art }) {
     return <ProgressRing progress={plan.items ? plan.processed / plan.items : 0} big={`${Math.round((plan.processed / (plan.items || 1)) * 100)} %`} small={tr('cleaner.workingCount', { done: n(plan.processed), total: n(plan.items) })} />;
   }
   if (info.job === 'plan') return <ProgressRing big="…" small={tr('cleaner.preparing')} />;
-  return <SectionScan art={art} verb={tr('cleaner.scanning')} path={scan ? scan.now : ''} counter={scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.seen : 0), dirs: n(scan ? scan.dirs : 0) })} />;
+  return <SectionScan art={art} verb={tr('cleaner.scanning')} path={scan ? scan.now : ''} counter={scan && scan.hashed ? tr('cleaner.hashing', { n: n(scan.hashed) }) : tr('cleaner.foundCount', { n: n(scan ? scan.seen : 0), dirs: n(scan ? scan.dirs : 0) })}
+    found={foundSoFar(scan).map((r) => <Label key={r.id} size={typeScale.callout} lines={1}>{`${tr(`cleaner.ruleName.${r.id}`)}  ${formatBytes(r.allocated)}`}</Label>)} />;
 }
 
 // ---- Cleanup: categories, each with its reason, what will happen, and its files on request ----
@@ -101,6 +105,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
   const rows = scan.rules.filter((r) => (r.files > 0 || r.root === 'busy') && r.category !== 'apps');   // leftovers are reviewed in Apps
   const cats = [...new Set(rows.map((r) => r.category))];
   const incomplete = !scan.complete;
+  const lastChosen = cats.filter((c) => rows.some((r) => r.category === c && r.explicit)).pop();
   let i = 0;
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
@@ -125,7 +130,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
                 return <RuleRow key={r.id} rule={r} scanId={scan.id} delay={Math.min(k * 45, 360)} on={chosen.has(r.id)} blocked={blockedOf(r)} onEmpty={onEmpty} models={models} setModels={setModels}
                   onToggle={() => setChosen((o) => { const x = new Set(o); if (x.has(r.id)) x.delete(r.id); else x.add(r.id); return x; })} />;
               })}
-              {c === 'ai' && models.size ? <GlassButton label={tr('cleaner.models.remove', { count: models.size })} onClick={onRemoveModels} /> : null}
+              {c === lastChosen && models.size ? <GlassButton label={tr('cleaner.models.remove', { count: models.size })} onClick={onRemoveModels} /> : null}
             </View>
           ))}
           <SystemCard />
@@ -326,6 +331,13 @@ export function Preferences() {
         <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}><Label weight={600}>{tr('cleaner.prefs.menuItem')}</Label></View>
           <Pill label={tr(p.menuItem === false ? 'cleaner.prefs.off' : 'cleaner.prefs.on')} on={p.menuItem !== false} onClick={() => save({ menuItem: p.menuItem === false })} />
+        </Glass>
+        <Glass style={{ padding: spacing.m, gap: spacing.s, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Label weight={600}>{tr('cleaner.prefs.rememberMap')}</Label>
+            <Label dim size={typeScale.callout}>{tr('cleaner.prefs.rememberMapHint')}</Label>
+          </View>
+          <Pill label={tr(p.rememberMap === false ? 'cleaner.prefs.off' : 'cleaner.prefs.on')} on={p.rememberMap !== false} onClick={() => { const off = p.rememberMap !== false; if (off) cleaner.forgetSaved(); save({ rememberMap: !off }); }} />
         </Glass>
         <Glass style={{ padding: spacing.m, gap: spacing.s }}>
           <Label weight={600}>{tr('cleaner.prefs.large')}</Label>

@@ -30,6 +30,8 @@ typedef struct {
     const char *exclude[32];                /* relative to the home folder: never walked, never offered */
     int nexclude;
     double min_size;                        /* tree: files of at least this many bytes are kept */
+    int remember;                           /* tree of "home" or "root": keep its folder totals for the next session */
+    int saved;                              /* tree: the kept map instead of a scan; nothing can be acted on from it */
 } CleanOpts;
 
 typedef struct {
@@ -57,7 +59,9 @@ int   clean_execute(int plan);
 int   clean_restore(int plan, uint32_t id); /* back from the Trash, for an item that plan moved there */
 int   clean_empty_trash(void);              /* the real emptyTrash, on the thread; can't be undone */
 char *clean_history(void);                  /* what ran, without paths, as JSON (malloc) */
-void  clean_history_clear(void);
+void  clean_history_clear(void);           /* and the kept map */
+char *clean_saved(void);                    /* the kept map: { at, volume } or null, as JSON (malloc) */
+void  clean_forget_saved(void);
 
 #ifdef CLEAN_TEST
 /* tests only: not in lord-server */

@@ -1,5 +1,5 @@
 /* rules.h — Cleaner's compiled rule table (rules.c). There are no rule files and no commands: a rule
- * names a fixed location and picks from the fixed list of actions. */
+ * names a fixed location, or a project output proved by what is around it, and picks from the fixed list of actions. */
 #ifndef LORD_CLEAN_RULES_H
 #define LORD_CLEAN_RULES_H
 
@@ -28,6 +28,11 @@ typedef struct {
     int downloads;                  /* root is the user's download folder (XDG_DOWNLOAD_DIR), with its name in their language */
     int leftover;                   /* a folder per app, offered only when that app is no longer installed */
     int system_root;                /* root is under `/`, not the home folder: the session user's own files, measured only */
+    const char *const *also;        /* more file name patterns, NULL-terminated; NULL = pattern alone */
+    double min_size;                /* bytes: smaller files aren't covered; 0 = any size */
+    int desktop;                    /* root is the user's desktop folder (XDG_DESKTOP_DIR) */
+    int project;                    /* kind + 1 (cleanfs.h): the home folder is searched for that kind's output folders, each
+                                     * one proved by the files around it. Root is unused; to the Trash, chosen one by one */
 } CleanRule;
 
 const CleanRule *clean_rules(int *n);

@@ -6,7 +6,9 @@
 #include <fcntl.h>
 #include <linux/openat2.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -69,6 +71,53 @@ int clean_glob(const char *pattern, const char *name) {
     size_t head = (size_t)(star - pattern), tail = strlen(star + 1), n = strlen(name);
     return n >= head + tail && !strncmp(name, pattern, head) && !strcmp(name + n - tail, star + 1);
 }
+
+/* What proves a kind: a file next to the folder (sibling), one inside it (inner), or both where a name is too common */
+static const struct {
+    const char *name[6], *sibling[5], *inner;
+    int both, idle_days;
+} project[CLEAN_PROJECT_KINDS] = {
+    { { "node_modules" }, { "package.json" }, NULL, 0, 60 },
+    { { "target" }, { "Cargo.toml" }, "CACHEDIR.TAG", 0, 0 },
+    { { "target" }, { "pom.xml" }, NULL, 0, 0 },
+    { { ".next", ".turbo", ".parcel-cache", ".nuxt", ".svelte-kit" }, { "package.json" }, NULL, 0, 0 },
+    { { ".pytest_cache", ".mypy_cache", ".ruff_cache" }, { NULL }, "CACHEDIR.TAG", 0, 0 },
+    { { ".venv", "venv" }, { "pyproject.toml", "requirements.txt", "setup.py", "Pipfile" }, "pyvenv.cfg", 1, 0 },
+    { { "build", ".gradle" }, { "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts" }, NULL, 0, 0 },
+    { { "build", ".dart_tool" }, { "pubspec.yaml" }, NULL, 0, 0 },
+};
+
+static int has_file(int dir, const char *rel) {
+    struct statx sx;
+    return !statx(dir, rel, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE, &sx) && S_ISREG(sx.stx_mode);
+}
+
+int clean_project_named(int kind, const char *name) {
+    if (kind < 0 || kind >= CLEAN_PROJECT_KINDS) return 0;
+    for (int i = 0; i < 6 && project[kind].name[i]; i++) if (!strcmp(project[kind].name[i], name)) return 1;
+    return 0;
+}
+
+int clean_project_kind(int parent, const char *name) {
+    for (int k = 0; k < CLEAN_PROJECT_KINDS; k++) {
+        if (!clean_project_named(k, name)) continue;
+        int near = 0, in = 0;
+        for (int i = 0; i < 5 && project[k].sibling[i] && !near; i++) near = has_file(parent, project[k].sibling[i]);
+        if (project[k].inner) {
+            char rel[300];
+            if ((size_t)snprintf(rel, sizeof rel, "%s/%s", name, project[k].inner) < sizeof rel) in = has_file(parent, rel);
+        }
+        if (project[k].both ? near && in : near || in) return k;
+    }
+    return -1;
+}
+
+int clean_project_output(const char *name) {
+    for (int k = 0; k < CLEAN_PROJECT_KINDS; k++) if (clean_project_named(k, name)) return 1;
+    return !strcmp(name, ".git") || !strcmp(name, "dist") || !strcmp(name, "coverage") || !strcmp(name, "__pycache__");
+}
+
+int clean_project_idle_days(int kind) { return kind >= 0 && kind < CLEAN_PROJECT_KINDS ? project[kind].idle_days : 0; }
 
 int clean_type(const char *name) {
     static const struct { int type; const char *ext; } t[] = {

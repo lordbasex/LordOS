@@ -318,7 +318,7 @@ export function Orb({ label, onClick, disabled, busy }) {
 }
 
 // A section scanning: its object large and centred, the verb, and the real path going by.
-export function SectionScan({ art, verb, path, counter }) {
+export function SectionScan({ art, verb, path, counter, found }) {
   const img = useRef(null);
   useLoop((t) => { if (img.current) { const s = 1 + Math.sin(t * 2.4) * 0.03; set(img.current.id, 'scaleX', s); set(img.current.id, 'scaleY', s); } });
   return (
@@ -327,6 +327,7 @@ export function SectionScan({ art, verb, path, counter }) {
       <Label size={28} weight={300}>{verb}</Label>
       <Label size={typeScale.callout} mono dim lines={1}>{midTrim(path)}</Label>
       <Label size={typeScale.callout} dim>{counter}</Label>
+      {found}
     </View>
   );
 }

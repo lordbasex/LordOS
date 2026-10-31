@@ -1,7 +1,7 @@
 # Cleaner: architecture
 
 **Status: design for 0.8.7, with Phase 1 built (`CLEANER-ROADMAP.md`).**
-Checked against the code on branch `v087` on 2026-10-30. Each feature's real state lives in `CLEANER-ROADMAP.md`; a line
+Checked against the code on branch `v087` on 2026-10-31. Each feature's real state lives in `CLEANER-ROADMAP.md`; a line
 here is a plan, not a claim.
 
 Cleaner is a native app that explains what uses the disk and helps remove what can safely go. The rule is
@@ -67,6 +67,8 @@ The helper reports records with a kind, a rule id, the path relative to a root, 
 allocated bytes and modification time. lord-server validates each one and keeps them in memory for that scan. JS gets
 pages with a `candidate id` and a display path, never anything it can use as authority.
 
+Nothing of a scan outlives it except one thing: the folder names and sizes of the last tree scan of the home folder or `/`, in `~/.cache/lordos/cleaner-map.txt` (Storage map below). That file holds no candidates.
+
 Hard links count once. Sizes come in two columns: logical and allocated. What a cleanup will free is always an estimate:
 reflinks, compression, snapshots and open files change it.
 
@@ -79,6 +81,10 @@ only pick from the fixed list of actions.
 
 Only well-known locations are rules. `~/.cache` as a whole is not one, since applications keep sessions and databases
 there. A name like `.tmp` or a folder called `cache` proves nothing by itself.
+
+The one exception to fixed locations is a project output (`project` in `CleanRule`, `clean_project_kind` in `clean/cleanfs.c`). Eight kinds, each with its folder names and what proves it: a file next to the folder, one inside it, or both where a name is too common. `lord-clean` walks the home folder once for all kinds, reports each proved folder whole with its totals, and for a kind with an idle time adds the newest modification time in the project, build outputs apart. `clean_rule_check` refuses a project rule that isn't `review`, to the Trash, `explicit_only` and without any other location. Project outputs are in `CLEANER.md`.
+
+The same evidence is read again in lord-server at the plan and right before acting (`item_check`). A candidate whose evidence is gone ends as *changed*.
 
 ### Plans and actions
 
@@ -109,7 +115,7 @@ Actions:
 - The same operation does not exist in `lord.fs`, `admin.c` or the broker.
 - The confirmation says it can't be undone.
 
-Other rules (`review`) use the Trash. A rule with `system_root` (`/tmp`) has no action at all, which the table's check enforces.
+Other rules (`review`) use the Trash. Project outputs are `review` for that reason: the approval covers fixed roots, and they have none. A rule with `system_root` (`/tmp`) has no action at all, which the table's check enforces.
 
 ## Security
 
@@ -148,6 +154,23 @@ Thumbnails on the page are `media.thumb`, made by `lord-media`.
 ## Storage map
 
 One scan builds a bounded tree, drawn three ways: a directory tree, a treemap (squarified, up to 28 views a level so areas can rise in, the rest grouped) and a summary by type. Selecting a rectangle does nothing but select it.
+
+**Bands.** When a tree and a rule scan are both in memory, `mark_reclaim` walks the rule candidates down the tree by name and adds their estimated bytes to each folder, split into `safe` (regenerable) and `review`, then up to its parents. A rule that is only measured counts for neither. It runs inside a scan's job, with only the result written under the lock, so the desktop never waits for it.
+
+**Summary.** Free space, the root's two amounts, and what wasn't scanned: the volume's used space minus the allocated bytes walked, never below zero.
+
+**The kept map.** `save_tree` writes the nodes to a temporary name with `O_EXCL | O_NOFOLLOW`, mode 0600, and renames it over `cleaner-map.txt`. A later `lord.clean.start('tree', { saved: true })` loads them with no helper (`load_tree`): ids must rise, a parent must exist and come first, a name must pass `clean_name_ok`, and sizes can't be negative. Anything else counts as no file. The scan that results has `savedAt` and no candidates, so no plan can be built from it, and it has no bands. `lord.clean.saved()` gives only `{ at, volume }`: folder names stay in C until the tree is paged as usual. On by default (`rememberMap`); a scan with it off removes the file, as does turning it off and clearing the history.
+
+## Where the 2026-10-31 additions came from
+
+These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were reimplemented from scratch after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
+
+Deliberate differences:
+
+- Free space isn't counted for the Trash: what goes there is shown as an amount to check, and is free only once the Trash is emptied.
+- Container storage gets no action. It is measured only, as what a container engine keeps can't be shown to be safe.
+- The pnpm store stays reviewed, to the Trash, since projects hard-link into it.
+- Idleness looks at the whole project, not at the output folder's own date, which says only that its entries changed.
 
 ## Phases
 

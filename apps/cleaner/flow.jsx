@@ -40,8 +40,8 @@ export function PlanConfirm({ plan, onOk, onCancel }) {
   if (left > 0) rows.push([tr('cleaner.confirm.rowLeft', { n: n(left) }), '']);
   const named = plan.named ? cleaner.results('plan', 0, 30).items.filter((i) => i.status === 'ready') : [];
   for (const i of named) rows.push([i.path.split('/').pop(), formatBytes(i.allocated)]);
-  const leftovers = named.some((i) => i.rule === 'app-leftovers');
-  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : 'cleaner.models.warn') : '',
+  const leftovers = named.some((i) => i.rule === 'app-leftovers'), projects = named.some((i) => i.rule.startsWith('project-'));
+  const notes = [plan.deleteItems ? tr('cleaner.confirm.noteDelete') : '', plan.trashItems ? tr('cleaner.confirm.noteTrash') : '', plan.named ? tr(leftovers ? 'cleaner.leftovers.warn' : projects ? 'cleaner.projects.warn' : 'cleaner.models.warn') : '',
     ...plan.warnings.filter((w) => w === 'linksElsewhere' || w === 'scanIncomplete' || w === 'keepOneCopy').map((w) => tr(`cleaner.warn.${w}`))].filter(Boolean);
   if (!plan.counts.ready) return <Dialog title={tr('cleaner.noneReady')} rows={rows} note={notes.join(' ')} onCancel={onCancel} />;
   return <Dialog title={tr(plan.deleteItems ? 'cleaner.confirm.titleDelete' : 'cleaner.confirm.title', { count: plan.counts.ready })} rows={rows} note={notes.join(' ')} danger={plan.deleteItems > 0}

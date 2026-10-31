@@ -25,6 +25,10 @@ Runs against the real `build/lord-clean`, with a home folder made by `mkdtemp` u
 
 Checked by breaking the code on purpose on 2026-10-30, 823 checks each time: without the installed-app check 6 fail; without lord-server's check of a group of images 2 fail; taking any `XDG_DOWNLOAD_DIR` value 3 fail.
 
+## The additions of 2026-10-31
+
+At the time of writing `server/tests/clean_test.c` has no case for project outputs, the new rules, bands, the kept map or the minimum times. The figure of 823 checks above is from 2026-10-30 and was left as it was: no new result was available for this page.
+
 ## `oldkernels_test.mjs` (in `run_suites.sh`)
 
 Which kernels are offered: the running one, the newest and one below stay; numbers compare as numbers; other flavours, meta packages and an unknown running kernel offer nothing. Plans that take the meta package, the running kernel, `lordos` or anything but a removal are refused.

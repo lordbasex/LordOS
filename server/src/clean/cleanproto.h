@@ -9,9 +9,11 @@
  *
  *   CQ_FDS    {}                                 + up to CLEAN_FDS_MSG root fds, in the order of "roots"
  *   CQ_GO     {"mode":"rules"|"tree"|"dups"|"images","home","maxFiles","maxDepth","minSize","exclude":[paths],
- *              "roots":[{"rule","pattern","base","unit","own"}]}   unit > 0: entries at that depth are reported whole
+ *              "roots":[{"rule","pattern","base","unit","own","project"}]}   unit > 0: entries at that depth are reported whole
  *              as one folder record ("d":true, s and a its contents' totals); own: only what the session
- *              user owns is looked at, for a root other users write in
+ *              user owns is looked at, for a root other users write in; project > 0: the root is the home folder,
+ *              walked once for every project kind, and each output folder that proves itself is one "d" record of
+ *              that kind's root, with N the newest modification time the rule's age is judged by
  *   CR_BATCH  {"seen","dirs","hashed","items":[{"r","p","M","m","i","l","s","a","t","n","u"}],
  *              "nodes":[{"id","up","name","s","a","f"}],"group":bool}
  *             r the source, p path relative to it, M/m device major and minor, i inode (decimal text: it
@@ -26,7 +28,7 @@
 #ifndef LORD_CLEAN_PROTO_H
 #define LORD_CLEAN_PROTO_H
 
-#define CLEAN_MAX_ROOTS 64
+#define CLEAN_MAX_ROOTS 96
 #define CLEAN_MAX_DEPTH 32          /* folders below a root */
 #define CLEAN_MAX_FILES 200000      /* entries examined in one scan: past this the scan is incomplete */
 #define CLEAN_PATH_MAX  1024        /* bytes of a path relative to its root */
@@ -50,7 +52,7 @@
 
 enum { CLEAN_TYPE_OTHER, CLEAN_TYPE_IMAGE, CLEAN_TYPE_VIDEO, CLEAN_TYPE_AUDIO, CLEAN_TYPE_DOCUMENT, CLEAN_TYPE_ARCHIVE, CLEAN_TYPE_CODE, CLEAN_TYPES };
 
-#define CLEAN_MAX_RULES 64
+#define CLEAN_MAX_RULES 96
 #define CLEAN_FDS_MSG   12         /* root fds in one CQ_FDS */
 
 enum { CQ_GO = 1, CR_BATCH = 2, CR_DONE = 3, CR_ERR = 4, CQ_FDS = 5 };

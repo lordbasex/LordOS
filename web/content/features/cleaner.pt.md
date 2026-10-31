@@ -13,11 +13,15 @@ Pense em esvaziar uma casa com cuidado. Alguém percorre tudo e faz uma lista, s
 ## O que ele faz
 
 - **Analisar** executa Limpeza, Armazenamento e Duplicados um após o outro e depois mostra um painel do que foi realmente encontrado: um cartão para cada coisa encontrada, com os tamanhos reais e os arquivos reais por trás.
-- **Limpeza** lista caches, downloads de ferramentas de desenvolvimento, caches de navegadores, temporários antigos e a Lixeira, cada um com seu motivo, seu risco e o que vai acontecer com ele.
+- **Limpeza** lista caches, downloads de ferramentas de desenvolvimento, caches de navegadores, temporários antigos, instaladores antigos e a Lixeira, cada um com seu motivo, seu risco e o que vai acontecer com ele. Durante uma análise você vê o que cada regra está encontrando.
+- **Projetos de código** na sua pasta pessoal: compilados de Node, Rust, Maven, JavaScript, Python, Gradle e Dart. O nome de uma pasta não prova nada, então cada uma é provada pelos arquivos ao lado ou dentro dela, e as dependências Node só são oferecidas quando o projeto inteiro está há 60 dias sem alterações. Você os escolhe um a um e eles vão para a Lixeira.
+- **Vídeos grandes** de 100 MiB ou mais na Área de Trabalho e nas suas gravações de tela também são escolhidos um a um.
 - **Arquivos grandes** filtra por tamanho, idade e tipo.
-- **Armazenamento** mostra as maiores pastas como bolhas, um mapa, uma lista de pastas e um resumo por tipo. Cada pasta é desenhada com o que ela é, para que vídeos, músicas e código se distingam de relance.
+- **Armazenamento** mostra as maiores pastas como bolhas, um mapa, uma lista de pastas e um resumo por tipo. Cada pasta é desenhada com o que ela é, para que vídeos, músicas e código se distingam de relance. No mapa, faixas em cada bloco mostram o que é refeito sozinho e o que convém rever antes, e uma linha dá o espaço livre, as duas quantidades e o que não foi verificado.
 - **Duplicados** encontra cópias exatas nas pastas que você escolher. Nada é selecionado por você.
 - **Atividade** registra o que foi executado: quantidades e tamanhos, nunca um caminho.
+
+Uma coisa fica no disco com nomes dentro: o mapa de armazenamento é guardado entre sessões, em `~/.cache/lordos/cleaner-map.txt`, legível só pelo seu usuário. Ele tem nomes e tamanhos de pastas, e fica neste computador. Vem ativado: desligue em Ajustes ou remova com Apagar em Atividade. Um mapa guardado não tem nada sobre o que se possa agir; para limpar, analise de novo.
 
 [[shot:1]]
 
@@ -27,7 +31,7 @@ As regras de limpeza nunca alcançam cookies, sessões, histórico ou senhas, ne
 
 ## Como ele se mantém seguro
 
-A análise roda no `lord-clean`, um auxiliar isolado que só pode ler. Os planos são montados no `lord-server`, não no app, e o app só guarda identificadores de candidatos, nunca a autoridade para tocar um caminho. Tudo é conferido de novo logo antes de agir.
+A análise roda no `lord-clean`, um auxiliar isolado que só pode ler. Os planos são montados no `lord-server`, não no app, e o app só guarda identificadores de candidatos, nunca a autoridade para tocar um caminho. Tudo é conferido de novo logo antes de agir, inclusive os arquivos que provaram uma pasta de projeto.
 
 Arquivos de cache regeneráveis sob pastas fixas podem ser apagados de verdade, como o seu próprio usuário, e só por este caminho: o `lord.fs` continua sem uma exclusão geral. Todo o resto vai para a Lixeira, de onde pode ser restaurado. Três ações administrativas fechadas limpam os arquivos do sistema, cada uma confirmada; são a única parte que ainda não foi executada numa máquina de teste.
 

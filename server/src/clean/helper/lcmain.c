@@ -12,6 +12,10 @@
  * exclusions are rules of the walk, and lord-server applies them again to every record. It changes
  * nothing: it only reports.
  *
+ * A project root is the home folder, walked once for all kinds: folders starting with a dot and the places tools
+ * unpack sources into are not entered, and an output folder that proves itself (clean_project_kind) is reported
+ * whole, with the newest change in its project when its kind has an idle time.
+ *
  * Three modes: "rules" reports the files a rule covers; "tree" keeps totals per folder and reports the
  * folders and the files of at least minSize; "dups" reads the files that share a size and reports
  * groups with equal SHA-256 (a partial hash of the first and last 16 KB first); "images" decodes
@@ -46,7 +50,7 @@
 enum { M_RULES, M_TREE, M_DUPS, M_IMAGES };
 
 typedef struct {
-    int fd, index, unit, own;
+    int fd, index, unit, own, project;
     const char *pattern, *base;
     unsigned dev_major, dev_minor;
 } Root;
@@ -81,6 +85,8 @@ static long next_node, large;
 static Ag types[CLEAN_TYPES];
 static uint64_t *link_table;
 static size_t link_used;
+
+static int kind_src[CLEAN_PROJECT_KINDS];
 
 static File *files;
 static size_t nfiles, files_cap;
@@ -122,6 +128,7 @@ static void sum_tree(int fd, double *s, double *a) {
         if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
         if (seen >= max_files) { limit("files"); stop = 1; break; }
         seen++;
+        if ((seen & 4095) == 0) flush_batch(0);    /* a long silence would look like a dead helper */
         struct statx sx;
         if (statx(dirfd(d), e->d_name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_SIZE | STATX_BLOCKS, &sx)) { nunread++; continue; }
         if (S_ISREG(sx.stx_mode)) { *s += (double)sx.stx_size; *a += (double)sx.stx_blocks * 512; }
@@ -133,6 +140,31 @@ static void sum_tree(int fd, double *s, double *a) {
         }
     }
     closedir(d);
+}
+
+/* The newest change in a project, its build outputs apart: 0 when nothing else is there, which proves nothing.
+ * Takes fd. A folder's time says only that its entries changed, so the walk goes all the way down. */
+static int64_t newest_in(int fd, int depth) {
+    DIR *d = fdopendir(fd);
+    if (!d) { close(fd); nunread++; return 0; }
+    int64_t best = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || clean_project_output(e->d_name)) continue;
+        if (seen >= max_files) { limit("files"); stop = 1; break; }
+        seen++;
+        if ((seen & 4095) == 0) flush_batch(0);
+        struct statx sx;
+        if (statx(dirfd(d), e->d_name, AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT, STATX_TYPE | STATX_MTIME, &sx)) { nunread++; continue; }
+        if (S_ISLNK(sx.stx_mode) || !(S_ISREG(sx.stx_mode) || S_ISDIR(sx.stx_mode))) continue;
+        if (sx.stx_mtime.tv_sec > best) best = sx.stx_mtime.tv_sec;
+        if (S_ISDIR(sx.stx_mode) && depth < max_depth) {
+            int sub = clean_open(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY);
+            if (sub >= 0) { int64_t t = newest_in(sub, depth + 1); if (t > best) best = t; }
+        }
+    }
+    closedir(d);
+    return best;
 }
 
 static void emit(int root, const char *rel, const struct statx *sx) {
@@ -213,6 +245,39 @@ static int excluded(const char *abs) {
     return 0;
 }
 
+/* What a project walk does with a folder. 1 when it isn't entered: an output that proved itself is reported (when its
+ * project has been left long enough) and everything in it stays out of the walk, proved or not. */
+static int project_entry(int parent, const char *rel, const char *name, const struct statx *sx) {
+    int k = clean_project_kind(parent, name);
+    if (k < 0) return name[0] == '.' || !strcmp(name, "node_modules");
+    int64_t newest = sx->stx_mtime.tv_sec;
+    int idle = clean_project_idle_days(k);
+    if (idle) {
+        int top = clean_open(parent, ".", O_RDONLY | O_DIRECTORY);
+        newest = top >= 0 ? newest_in(top, 0) : 0;
+        if (!newest || (double)time(NULL) - (double)newest < idle * 86400.0) { nnomatch++; return 1; }
+    }
+    int sub = clean_open(parent, name, O_RDONLY | O_DIRECTORY);
+    if (sub < 0) { nunread++; return 1; }
+    double total = 0, alloc = 0;
+    sum_tree(sub, &total, &alloc);
+    if (stop) return 1;
+    jb_printf(&items, "%s{\"r\":%d,\"d\":true,\"p\":", nitems ? "," : "", kind_src[k]);
+    jb_str(&items, rel);
+    jb_printf(&items, ",\"M\":%u,\"m\":%u,\"i\":\"%llu\",\"l\":1,\"s\":%.0f,\"a\":%.0f,\"t\":%lld,\"n\":%u,\"u\":%u,\"N\":%lld}",
+              sx->stx_dev_major, sx->stx_dev_minor, (unsigned long long)sx->stx_ino, total, alloc,
+              (long long)sx->stx_mtime.tv_sec, sx->stx_mtime.tv_nsec, sx->stx_uid, (long long)newest);
+    if (++nitems >= CLEAN_BATCH) flush_batch(0);
+    return 1;
+}
+
+/* folders of the home folder that hold other people's sources, unpacked by a tool */
+static int tool_folder(const char *name) {
+    static const char *const t[] = { "go", "snap", "Android", "flutter", NULL };
+    for (int i = 0; t[i]; i++) if (!strcmp(name, t[i])) return 1;
+    return 0;
+}
+
 /* takes fd; rel is the folder's path below the root ("" for the root), in a buffer of CLEAN_PATH_MAX + 1.
  * Tree: id is this folder's node (-1 past the limit), up its parent's, and its totals join *total. */
 static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id, long up, Ag *total) {
@@ -248,6 +313,7 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
         else if (S_ISLNK(sx.stx_mode)) nsym++;
         else if (S_ISDIR(sx.stx_mode)) {
             if (mountroot || other_dev) nmount++;
+            else if (r->project && ((!depth && tool_folder(e->d_name)) || project_entry(dirfd(d), rel, e->d_name, &sx))) {}
             else if (depth >= max_depth) limit("depth");
             else if (r->unit && depth + 1 == r->unit) {
                 if (!clean_glob(r->pattern, e->d_name)) nnomatch++;
@@ -281,7 +347,7 @@ static void walk(const Root *r, int fd, char *rel, size_t rl, int depth, long id
             }
         } else if (!S_ISREG(sx.stx_mode)) nspecial++;
         else if (mountroot || other_dev) nmount++;
-        else if (r->unit) nnomatch++;             /* only whole folders here */
+        else if (r->unit || r->project) nnomatch++;   /* only whole folders here */
         else on_file(r, rel, e->d_name, &sx, &here);
     next:
         rel[rl] = 0;
@@ -513,11 +579,12 @@ int main(void) {
     for (const JVal *v = roots->kid; v; v = v->next, i++) {
         struct statx sx;
         double rule = json_num(v, "rule", -1);
-        list[i] = (Root){ .fd = rootfds[i], .index = (int)rule, .unit = (int)json_num(v, "unit", 0), .own = (int)json_num(v, "own", 0), .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
-        if (rule < 0 || rule >= CLEAN_MAX_ROOTS || !list[i].pattern || !list[i].base || statx(rootfds[i], "", AT_EMPTY_PATH, STATX_TYPE, &sx) || !S_ISDIR(sx.stx_mode)) {
+        list[i] = (Root){ .fd = rootfds[i], .index = (int)rule, .unit = (int)json_num(v, "unit", 0), .own = (int)json_num(v, "own", 0), .project = (int)json_num(v, "project", 0), .pattern = json_str(v, "pattern"), .base = json_str(v, "base") };
+        if (rule < 0 || rule >= CLEAN_MAX_ROOTS || !list[i].pattern || !list[i].base || statx(rootfds[i], "", AT_EMPTY_PATH, STATX_TYPE, &sx) || !S_ISDIR(sx.stx_mode) || list[i].project < 0 || list[i].project > CLEAN_PROJECT_KINDS) {
             reply_err("request");
             return 1;
         }
+        if (list[i].project) kind_src[list[i].project - 1] = list[i].index;
         list[i].dev_major = sx.stx_dev_major;
         list[i].dev_minor = sx.stx_dev_minor;
         rofd[i] = rootfds[i];
@@ -536,7 +603,11 @@ int main(void) {
     jb_init(&nodes);
     last_flush = now_ms();
     static char rel[CLEAN_PATH_MAX + 1];
+    int walked_projects = 0;
+    long rule_files = max_files;
     for (i = 0; i < nroots && !stop; i++) {
+        if (list[i].project && walked_projects++) continue;     /* one walk finds every kind */
+        max_files = list[i].project ? seen + CLEAN_TREE_MAX_FILES : rule_files;  /* it keeps totals, as a tree does */
         int fd = fcntl(list[i].fd, F_DUPFD_CLOEXEC, 0);    /* fdopendir takes it; the fd keeps its read position */
         if (fd < 0) { nunread++; continue; }
         rel[0] = 0;

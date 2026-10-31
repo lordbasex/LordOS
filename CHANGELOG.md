@@ -18,6 +18,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### 0.8.7, in development (the latest release is 0.8.6-beta)
 
+- **Cleaner: code projects, more rules, a clearer map, and a map that stays** (2026-10-31; `docs/CLEANER.md`, `docs/CLEANER-ARCHITECTURE.md`, `docs/CLEANER-SECURITY.md`). The table now has 61 rules, 18 more.
+  - **Build outputs of code projects:** the sandboxed `lord-clean` walks the home folder for Node (`node_modules`, idle 60 days, judged over the whole project), Rust, Maven, JavaScript, Python tool caches, Python virtual environments, Gradle and Dart. Each is proved by evidence next to or inside the folder, and `lord-server` checks that evidence again at the plan and right before acting (`clean_project_kind`). They are chosen one by one and go to the Trash, not the real delete, whose approval covers fixed roots only. Dot folders and `~/go`, `~/snap`, `~/Android` and `~/flutter` aren't entered.
+  - **New fixed rules:** Playwright, Puppeteer, the Go module download cache (only `cache/download`: extracted modules are read-only), JetBrains, Dart pub, the Maven repository and Flatpak app caches.
+  - **Your own files, reviewed:** installers in Downloads over 30 days, and videos of 100 MiB or more on the Desktop (over 7 days, following `XDG_DESKTOP_DIR`) and in `Videos/Screencasts`, chosen one by one.
+  - **Storage map:** bands in each tile for what rebuilds by itself and what to check first, and a line with free space, both amounts and what wasn't scanned.
+  - **During a scan** the three rules with the most found so far appear, with their sizes, and each step stays on screen a minimum time (2.6 s in a full scan, 1.8 s from a section) so its animation finishes on a nearly empty disk.
+  - **The storage map is kept between sessions:** `~/.cache/lordos/cleaner-map.txt`, mode 0600, folder names and sizes, on by default, with a switch in Settings and cleared with Clear in Activity. This changes the earlier claim of no history of paths: the Activity history still holds no path, but folder names now stay on disk. A saved map holds no candidates, so nothing can be acted on from it. A scan of another disk removes it.
+  - **Credit:** These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were reimplemented from scratch after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
+  - **Tests:** `clean-test` has no case for these yet (`docs/CLEANER-TESTS.md`).
+
 - **What slows the Pi 5's GPU under load: memory** (2026-10-31, measured with `build/gpu-contention` on the Pi 5 16 GB, build 0.8.6+v087.4, two runs; `docs/GPU.md`): GPU time per frame
   stays at about 1.4 ms with all four cores spinning, and goes to 28 ms with four cores reading memory (3.7 ms writing), with the V3D clock at 1.15 GHz, no throttling and at most 44 °C.
   No desktop change comes with this measurement; it says where the work on the desktop under load has to go.

@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 
+static const char *const installer_types[] = { "*.rpm", "*.AppImage", "*.iso", "*.dmg", "*.pkg", "*.exe", "*.msi", NULL };
+static const char *const video_types[] = { "*.mov", "*.mkv", "*.webm", NULL };
+
 static const CleanRule table[] = {
     /* caches anything rebuilds by itself */
     { .id = "thumbnails", .version = 1, .category = "cache", .root = ".cache/thumbnails", .pattern = "*.png", .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE,
@@ -75,6 +78,29 @@ static const CleanRule table[] = {
       .text_key = "cleaner.rule.logs-npm", .min_age_days = 30 },
     { .id = "logs-display", .version = 1, .category = "logs", .root = ".local/share/xorg", .pattern = "*.old", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
       .text_key = "cleaner.rule.logs-display", .min_age_days = 30 },
+    /* downloaded by tools that fetch them again; extracted Go modules are read-only, so only its download cache */
+    { .id = "playwright", .version = 1, .category = "developer", .root = ".cache/ms-playwright", .pattern = "*", .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE,
+      .text_key = "cleaner.rule.playwright" },
+    { .id = "puppeteer", .version = 1, .category = "developer", .root = ".cache/puppeteer", .pattern = "*", .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE,
+      .text_key = "cleaner.rule.puppeteer" },
+    { .id = "go-modules", .version = 1, .category = "developer", .root = "go/pkg/mod/cache/download", .pattern = "*", .risk = CLEAN_RISK_REGENERABLE, .action = CLEAN_ACT_DELETE,
+      .text_key = "cleaner.rule.go-modules" },
+    /* no process lock can be read for these, or a project may hold the only copy: reviewed, to the Trash */
+    { .id = "jetbrains", .version = 1, .category = "developer", .root = ".cache/JetBrains", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.jetbrains" },
+    { .id = "dart-pub", .version = 1, .category = "developer", .root = ".pub-cache/hosted", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.dart-pub" },
+    { .id = "maven", .version = 1, .category = "developer", .root = ".m2/repository", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.maven" },
+    { .id = "flatpak-cache", .version = 1, .category = "cache", .root = ".var/app/*/cache", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.flatpak-cache" },
+    /* old installers and big recordings: the user's own files, reviewed */
+    { .id = "installers", .version = 1, .category = "old-files", .root = "Downloads", .pattern = "*.deb", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.installers", .also = installer_types, .min_age_days = 30, .downloads = 1 },
+    { .id = "recordings-desktop", .version = 1, .category = "old-files", .root = "Desktop", .pattern = "*.mp4", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.recordings-desktop", .also = video_types, .min_size = 104857600, .min_age_days = 7, .explicit_only = 1, .desktop = 1 },
+    { .id = "recordings", .version = 1, .category = "old-files", .root = "Videos/Screencasts", .pattern = "*.mp4", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.recordings", .also = video_types, .min_size = 104857600, .explicit_only = 1 },
     /* AI models: chosen one by one, named in the confirmation, never in a cleanup by category. A folder per
      * model. Ollama shares blobs between models, so a model can't be removed by moving files: it is measured only */
     { .id = "ai-huggingface", .version = 1, .category = "ai", .root = ".cache/huggingface/hub", .pattern = "models--*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
@@ -107,6 +133,23 @@ static const CleanRule table[] = {
       .text_key = "cleaner.rule.trash" },
     { .id = "trash-disks", .version = 1, .category = "trash", .root = ".Trash-$/files", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
       .text_key = "cleaner.rule.trash-disks", .on_mounts = 1 },
+    /* build outputs in the home folder's projects, each proved by the files around it (clean_project_kind) */
+    { .id = "project-node", .version = 1, .category = "projects", .root = ".", .pattern = "node_modules", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-node", .explicit_only = 1, .project = 1, .min_age_days = 60 },
+    { .id = "project-rust", .version = 1, .category = "projects", .root = ".", .pattern = "target", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-rust", .explicit_only = 1, .project = 2 },
+    { .id = "project-maven", .version = 1, .category = "projects", .root = ".", .pattern = "target", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-maven", .explicit_only = 1, .project = 3 },
+    { .id = "project-js", .version = 1, .category = "projects", .root = ".", .pattern = ".next", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-js", .explicit_only = 1, .project = 4 },
+    { .id = "project-python-tools", .version = 1, .category = "projects", .root = ".", .pattern = ".pytest_cache", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-python-tools", .explicit_only = 1, .project = 5 },
+    { .id = "project-venv", .version = 1, .category = "projects", .root = ".", .pattern = ".venv", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-venv", .explicit_only = 1, .project = 6 },
+    { .id = "project-gradle", .version = 1, .category = "projects", .root = ".", .pattern = "build", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-gradle", .explicit_only = 1, .project = 7 },
+    { .id = "project-dart", .version = 1, .category = "projects", .root = ".", .pattern = "build", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.project-dart", .explicit_only = 1, .project = 8 },
 };
 #define TABLE_N ((int)(sizeof table / sizeof *table))
 
@@ -152,6 +195,16 @@ int clean_rule_check(const CleanRule *r, char *why, size_t n) {
     if (!word_ok(r->id, 32)) return say(why, n, r->id, "bad id");
     if (r->version < 1) return say(why, n, r->id, "bad version");
     if (!word_ok(r->category, 32)) return say(why, n, r->id, "bad category");
+    if (r->project) {                               /* no fixed root: only an output a project proves, chosen, to the Trash */
+        if (r->project < 1 || r->project > CLEAN_PROJECT_KINDS) return say(why, n, r->id, "bad project kind");
+        if (r->action != CLEAN_ACT_TRASH || r->risk != CLEAN_RISK_REVIEW || !r->explicit_only) return say(why, n, r->id, "a project output is chosen, to the Trash");
+        if (r->also || r->lock || r->unit_depth || r->downloads || r->desktop || r->leftover || r->on_mounts || r->system_root) return say(why, n, r->id, "a project rule has no other location");
+        if (r->min_age_days < clean_project_idle_days(r->project - 1)) return say(why, n, r->id, "younger than the kind's idle time");
+        if (!pattern_ok(r->pattern) || !clean_project_named(r->project - 1, r->pattern)) return say(why, n, r->id, "bad pattern");
+        char want[64];
+        snprintf(want, sizeof want, "cleaner.rule.%s", r->id);
+        return r->text_key && !strcmp(r->text_key, want) ? 0 : say(why, n, r->id, "bad text key");
+    }
     if (!r->root || !clean_relpath_ok(r->root, CLEAN_MAX_DEPTH)) return say(why, n, r->id, "bad root");
     /* a folder of the user's own, like Downloads: only a narrow name, or nothing offered */
     if (!strchr(r->root, '/') && r->action != CLEAN_ACT_NONE && (!strcmp(r->pattern ? r->pattern : "*", "*") || !r->min_age_days)) return say(why, n, r->id, "root is a top-level folder");
@@ -172,6 +225,9 @@ int clean_rule_check(const CleanRule *r, char *why, size_t n) {
     if (fsops_protected(abs)) return say(why, n, r->id, "root is protected");
     if (fsops_protected_below(abs)) return say(why, n, r->id, "root holds a protected path");
     if (!pattern_ok(r->pattern)) return say(why, n, r->id, "bad pattern");
+    for (const char *const *e = r->also; e && *e; e++) if (!pattern_ok(*e) || !strcmp(*e, "*")) return say(why, n, r->id, "bad extra pattern");
+    if (r->min_size < 0) return say(why, n, r->id, "bad size");
+    if (r->downloads && r->desktop) return say(why, n, r->id, "one user folder");
     if (r->min_age_days < 0 || r->min_age_days > 3650) return say(why, n, r->id, "bad age");
     for (const char *const *e = r->exclude; e && *e; e++) if (!pattern_ok(*e)) return say(why, n, r->id, "bad exclusion");
     if (r->risk != CLEAN_RISK_REGENERABLE && r->risk != CLEAN_RISK_REVIEW && r->risk != CLEAN_RISK_PROTECTED) return say(why, n, r->id, "bad risk");
@@ -190,7 +246,7 @@ int clean_rules_check(const CleanRule *t, int n, char *why, size_t wn) {
         if (clean_rule_check(&t[i], why, wn)) return -1;
         for (int j = 0; j < i; j++) {
             if (!strcmp(t[i].id, t[j].id)) return say(why, wn, t[i].id, "duplicate id");
-            if (!strcmp(t[i].root, t[j].root) && !strcmp(t[i].pattern, t[j].pattern)) return say(why, wn, t[i].id, "duplicate root");
+            if (!t[i].project && !strcmp(t[i].root, t[j].root) && !strcmp(t[i].pattern, t[j].pattern)) return say(why, wn, t[i].id, "duplicate root");
         }
     }
     return 0;

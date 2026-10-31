@@ -35,6 +35,8 @@ export function Icon({ size }) {
 }
 
 const TICK_MS = 200;
+// a scan of a nearly empty disk ends at once: each step still stays long enough for its animation to be seen
+const MIN_SCAN_MS = 1800, MIN_STEP_MS = 2600;
 const ART = { cleanup: 'cleanup', large: 'large', storage: 'storage', duplicates: 'duplicates' };
 const SECTIONS = ['scan', 'cleanup', 'large', 'storage', 'duplicates', 'apps'];
 const BOTTOM = ['activity', 'settings'];
@@ -91,6 +93,9 @@ function Body() {
   const [board, setBoard] = useState(false);
   const [under, setUnder] = useState('');
   const side = useRef(null);
+  const [hold, setHold] = useState(false);
+  const holdTimer = useRef(0), stepAt = useRef(0);
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
   const volumes = useMemo(() => cleaner.volumes(), [gen]);
   const dirs = useMemo(() => {
     const u = userDirs();
@@ -129,16 +134,24 @@ function Body() {
         if (q && p && p.job === 'scan' && p.state === 'done') {
           const results = { ...q.results, [MODULES[q.step].id]: moduleResult(MODULES[q.step].id, p.scan) };
           const step = q.step + 1;
-          if (step < MODULES.length) {
-            pipeRef.current = { step, results };
-            setPipe(pipeRef.current);
-            startModule(step);
-            t = setTimeout(tick, TICK_MS);
-            return;
-          }
-          pipeRef.current = null;
-          setPipe(null);
-          setBoard(true);
+          pipeRef.current = { step: q.step, results };
+          setPipe(pipeRef.current);
+          t = setTimeout(() => {
+            if (!pipeRef.current) { setPolling(false); return; }      // stopped while the step was still showing
+            if (step < MODULES.length) {
+              pipeRef.current = { step, results };
+              setPipe(pipeRef.current);
+              stepAt.current = Date.now();
+              startModule(step);
+              t = setTimeout(tick, TICK_MS);
+              return;
+            }
+            pipeRef.current = null;
+            setPipe(null);
+            setBoard(true);
+            setPolling(false);
+          }, Math.max(0, MIN_STEP_MS - (Date.now() - stepAt.current)));
+          return;
         } else if (q) { pipeRef.current = null; setPipe(null); }
         setPolling(false);
       }
@@ -158,7 +171,7 @@ function Body() {
   const startModule = (step) => {
     const m = MODULES[step];
     if (m.kind === 'rules') cleaner.start('rules', { exclude: prefs.exclude });
-    else if (m.kind === 'tree') cleaner.start('tree', { volume: 'home', exclude: prefs.exclude });
+    else if (m.kind === 'tree') cleaner.start('tree', { volume: 'home', exclude: prefs.exclude, remember: prefs.rememberMap !== false });
     else cleaner.start('dups', { folders: dirs.slice(0, 8), exclude: prefs.exclude });
   };
   const startAll = () => attempt(() => {
@@ -167,6 +180,7 @@ function Body() {
     planShown.current = 0;
     pipeRef.current = { step: 0, results: {} };
     setPipe(pipeRef.current);
+    stepAt.current = Date.now();
     startModule(0);
     setPolling(true);
   });
@@ -180,9 +194,12 @@ function Body() {
     setResultOf('');
     planShown.current = 0;
     if (kind === 'rules') cleaner.start('rules', { exclude: prefs.exclude });
-    else if (kind === 'tree') cleaner.start('tree', { volume, exclude: prefs.exclude });
+    else if (kind === 'tree') cleaner.start('tree', { volume, exclude: prefs.exclude, remember: prefs.rememberMap !== false });
     else if (kind === 'images') cleaner.start('images', { folders: [...imageFolders], exclude: prefs.exclude });
     else cleaner.start('dups', { folders: [...folders], exclude: prefs.exclude });
+    setHold(true);
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => setHold(false), MIN_SCAN_MS);
     watch();
   });
   const stop = () => { cleaner.cancel(false); setGen((g) => g + 1); };
@@ -202,6 +219,17 @@ function Body() {
     if (info.job === 'emptyTrash' && info.state === 'done' && !polling && section === 'cleanup') attempt(() => { cleaner.start('rules', { exclude: prefs.exclude }); watch(); });
   }, [info.job, info.state]);
 
+  // the map of an earlier session, once, only until a real scan replaces it
+  const triedSaved = useRef(false);
+  useEffect(() => {
+    if (section !== 'storage' || triedSaved.current || ready || running || prefs.rememberMap === false) return;
+    triedSaved.current = true;
+    const kept = cleaner.saved();
+    if (!kept) return;
+    setVolume(kept.volume);
+    attempt(() => { cleaner.start('tree', { volume: kept.volume, saved: true }); watch(); });
+  }, [section]);
+
   const showResult = planHere && resultOf === plan.id && plan.state === 'finished';
   const showing = (() => {
     if (section === 'activity') return <Activity gen={gen} />;
@@ -212,12 +240,12 @@ function Body() {
       const g = win ? wm.frame(win) : { w: 1100, h: 700 };
       return <Dashboard W={g.w - 76 - 76} H={g.h - 150} step={pipe.step} results={pipe.results} scan={l.job === 'scan' ? l.scan : null} />;
     }
-    if (running && info.job !== 'emptyTrash') return <Working info={cleaner.poll()} art={ART[section] || 'scan'} />;
+    if ((running || hold) && info.job !== 'emptyTrash') return <Working info={cleaner.poll()} art={ART[section] || 'scan'} />;
     if (section === 'scan' && board) return <ReviewBoard rules={cleaner.poll('rules').scan} tree={cleaner.poll('tree').scan} dups={cleaner.poll('dups').scan} go={go} />;
     if (section === 'scan' || (section === 'cleanup' && !ready)) return <ScanHero key={section} status={status} last={prefs.lastScan} />;
     if (section === 'cleanup') return <CleanupList key={scan.id} scan={scan} chosen={chosen} setChosen={setChosen} onEmpty={() => setEmptyAsk(true)} blockedOf={(r) => (r.root === 'busy' ? 'busy' : '')} models={models} setModels={setModels}
       onRemoveModels={() => attempt(() => { cleaner.plan(scan.id, [...models]); setModels(new Set()); setResultOf(''); watch(); })} />;
-    if (section === 'large') return ready ? <LargeList key={`${scan.id}.${under}`} scan={scan} prefs={prefs} selected={picked} setSelected={setPicked} under={under} clearUnder={() => setUnder('')} /> : <LargeHero />;
+    if (section === 'large') return ready && !scan.savedAt ? <LargeList key={`${scan.id}.${under}`} scan={scan} prefs={prefs} selected={picked} setSelected={setPicked} under={under} clearUnder={() => setUnder('')} /> : <LargeHero />;
     if (section === 'storage') return ready ? <StorageView key={scan.id} scan={scan} onScan={start} volume={volumes.find((v) => v.id === volume)} onReview={(rel) => { setSection('large'); setUnder(rel); }} /> : <StorageHero volumes={volumes} volume={volume} setVolume={setVolume} />;
     if (section === 'apps') return <AppsView scan={ready ? scan : null} onFind={start} selected={picked} setSelected={setPicked} />;
     if (kind === 'images') return ready ? <SimilarList key={scan.id} scan={scan} selected={picked} setSelected={setPicked} /> : <SimilarHero folders={dirs} chosen={imageFolders} toggle={pickFrom(setImageFolders)} />;
@@ -228,6 +256,7 @@ function Body() {
   // what the round button does here
   const orb = (() => {
     if (section === 'activity' || section === 'settings' || showResult) return null;
+    if (hold && !running) return null;
     if (running) return info.job === 'scan' ? { label: tr('cleaner.stop'), onClick: () => { pipeRef.current = null; setPipe(null); stop(); }, busy: true } : null;
     if (section === 'scan' && board) return null;
     if (section === 'scan') return { label: tr('cleaner.scan'), onClick: startAll, disabled: !status.available };
