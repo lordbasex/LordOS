@@ -8,18 +8,20 @@
  * kills the helper.
  *
  *   CQ_FDS    {}                                 + up to CLEAN_FDS_MSG root fds, in the order of "roots"
- *   CQ_GO     {"mode":"rules"|"tree"|"dups","home","maxFiles","maxDepth","minSize","exclude":[paths],
- *              "roots":[{"rule","pattern","base","unit"}]}   unit > 0: entries at that depth are reported whole
- *              as one folder record ("d":true, s and a its contents' totals)
+ *   CQ_GO     {"mode":"rules"|"tree"|"dups"|"images","home","maxFiles","maxDepth","minSize","exclude":[paths],
+ *              "roots":[{"rule","pattern","base","unit","own"}]}   unit > 0: entries at that depth are reported whole
+ *              as one folder record ("d":true, s and a its contents' totals); own: only what the session
+ *              user owns is looked at, for a root other users write in
  *   CR_BATCH  {"seen","dirs","hashed","items":[{"r","p","M","m","i","l","s","a","t","n","u"}],
  *              "nodes":[{"id","up","name","s","a","f"}],"group":bool}
  *             r the source, p path relative to it, M/m device major and minor, i inode (decimal text: it
  *             may not fit a JSON number exactly), l links, s size, a allocated bytes, t/n modification
  *             time, u owner. "tree": a node is a folder, reported after its contents, with id > up;
  *             items are files of at least minSize. "dups": each batch with "group" is one group of
- *             files with equal SHA-256.
+ *             files with equal SHA-256. "images": each batch with "group" is one group of similar images,
+ *             largest first, and each item adds W and H (pixels) and ph (the difference hash, 16 hex digits).
  *   CR_DONE   {"seen","dirs","limit":""|"files"|"depth"|"nodes"|"results","symlinks","special","mounts",
- *              "unreadable","protected","names","nomatch","excluded","types":[{"s","a","f"}]}
+ *              "unreadable","protected","names","nomatch","excluded","undecoded","types":[{"s","a","f"}]}
  *   CR_ERR    {"error":"sandbox"|"request"}                                                        */
 #ifndef LORD_CLEAN_PROTO_H
 #define LORD_CLEAN_PROTO_H
@@ -35,6 +37,16 @@
 #define CLEAN_MAX_LARGE  50000      /* large files kept from a tree */
 #define CLEAN_MAX_GROUP  1024       /* files shown in one group of duplicates */
 #define CLEAN_MAX_EXCLUDE 32
+
+/* similar images: what is decoded, in lord-clean only (helper/lcimage.c) */
+#define CLEAN_MAX_IMAGES   20000    /* images read in one scan: past this the scan is incomplete */
+#define CLEAN_IMAGE_MIN    8192     /* bytes: smaller files are icons, not photos */
+#define CLEAN_IMAGE_MAX    (64u << 20)    /* bytes of a file read into memory */
+#define CLEAN_IMAGE_PIXELS 40000000LL     /* pixels of an image decoded */
+#define CLEAN_IMAGE_AS     (480ull << 20) /* address space while decoding, under the scope's 512 MB: a picture that needs more is left out */
+#define CLEAN_IMAGE_MIN_DIM 32      /* pixels of the shorter side */
+#define CLEAN_SIMILAR_BITS 6        /* bits of 64 two similar images may differ in */
+#define CLEAN_SIMILAR_ASPECT 0.02   /* how far their proportions may differ */
 
 enum { CLEAN_TYPE_OTHER, CLEAN_TYPE_IMAGE, CLEAN_TYPE_VIDEO, CLEAN_TYPE_AUDIO, CLEAN_TYPE_DOCUMENT, CLEAN_TYPE_ARCHIVE, CLEAN_TYPE_CODE, CLEAN_TYPES };
 

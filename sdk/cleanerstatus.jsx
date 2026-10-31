@@ -14,6 +14,7 @@ import { Overlay } from './layers.js';
 import { registerStatusItem } from './statusitems.js';
 import { cleaner } from './cleaner.js';
 import { cleanerPalette } from './cleanertheme.js';
+import { lordosUpdateWaiting } from './updates.js';
 
 
 // The rule, documented in docs/CLEANER.md: under 10 % of the disk free is "low"; with a LordOS update waiting,
@@ -49,13 +50,14 @@ function Card({ p, name, value, pct }) {
 
 function Panel({ p, onClose }) {
   const [d, setD] = useState(() => read(null));
+  const [waiting] = useState(() => call(lordosUpdateWaiting, false));   // read once, as the panel opens
   useEffect(() => {
     const id = setInterval(() => setD((o) => read(o)), 2000);
     return () => clearInterval(id);
   }, []);
   const c = settings.get().cleaner || {};
   const open = (section) => { onClose(); wm.open('cleaner', { args: { section } }); };
-  const word = statusWord(d.st.free, d.st.total, false);   // the update check is not read here yet: no word says so
+  const word = statusWord(d.st.free, d.st.total, waiting);
   const host = call(() => systemInfo().hostname, '') || '';
   const rate = (v) => (v == null ? '…' : `${formatBytes(v)}/s`);
   const memAvail = d.mem ? (d.mem.available != null ? d.mem.available : d.mem.free) : null;

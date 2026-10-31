@@ -346,5 +346,52 @@
   "look.noche": "Noche",
   "look.aurora": "Aurora",
   "look.cristal": "Cristal",
-  "large.allFolders": "Todas las carpetas"
+  "large.allFolders": "Todas las carpetas",
+  "section.apps": "Apps",
+  "category.apps": "Lo que dejaron apps eliminadas",
+  "rule.app-leftovers": "Carpetas que dejaron apps de LordOS que ya no están instaladas. Revisalas primero: van a la Papelera.",
+  "ruleName.app-leftovers": "Lo que dejaron las apps eliminadas",
+  "rule.system-tmp": "Tus propios archivos en la carpeta temporal del sistema, con más de una semana. Solo se miden: otros programas pueden estar usándolos.",
+  "ruleName.system-tmp": "Carpeta temporal del sistema",
+  "dups.exact": "Copias exactas",
+  "similar.tab": "Imágenes parecidas",
+  "hero.similar.title": "Encontrá imágenes que se parecen",
+  "hero.similar.line": "Elegí carpetas. Se juntan las versiones de una foto con otro tamaño o recomprimidas.",
+  "hero.similar.f1": "Funciona con JPEG, PNG, GIF y BMP",
+  "hero.similar.f2": "No se selecciona nada por vos",
+  "hero.similar.f3": "Siempre queda al menos una imagen de cada grupo",
+  "similar.title": "Imágenes parecidas",
+  "similar.hint": "Se parecen, pero no son el mismo archivo. Comparalas y elegí qué eliminar.",
+  "similar.reclaim": {
+    "one": "{count} grupo podría devolver",
+    "other": "{count} grupos podrían devolver"
+  },
+  "similar.group": {
+    "one": "{count} imagen",
+    "other": "{count} imágenes parecidas"
+  },
+  "similar.none": "No hay imágenes parecidas en estas carpetas.",
+  "similar.undecoded": {
+    "one": "{count} imagen no se pudo comparar: su formato no es compatible, o está en blanco o es muy grande.",
+    "other": "{count} imágenes no se pudieron comparar: su formato no es compatible, o están en blanco o son muy grandes."
+  },
+  "apps.title": "Apps",
+  "apps.hint": "Las apps instaladas, de mayor a menor. Quitar una app del sistema pide permisos de administrador.",
+  "apps.none": "No se encontraron apps que se puedan quitar.",
+  "apps.remove": "Quitar",
+  "apps.removeTitle": "¿Quitar {name}?",
+  "apps.confirmLpk": "Se quita la app. Sus datos quedan, y después podés revisarlos acá.",
+  "apps.refused": "{name} no se puede quitar desde acá: otras partes del sistema la necesitan.",
+  "apps.failed": "{name} no se pudo quitar.",
+  "leftovers.title": "Lo que dejaron apps eliminadas",
+  "leftovers.find": "Buscar",
+  "leftovers.again": "Buscar de nuevo",
+  "leftovers.none": "No quedó nada.",
+  "leftovers.warn": "Estas carpetas pueden tener datos que creaste en esas apps.",
+  "kernels.title": "Kernels viejos",
+  "kernels.text": {
+    "one": "{count} kernel que ya no usás. Quedan el actual, el más nuevo y uno para volver atrás.",
+    "other": "{count} kernels que ya no usás. Quedan el actual, el más nuevo y uno para volver atrás."
+  },
+  "kernels.refused": "El plan de paquetes quitaría más que kernels viejos, así que no se ofrece nada."
 }

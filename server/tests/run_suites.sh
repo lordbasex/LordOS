@@ -150,6 +150,9 @@ EOF
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
+    # which installed kernels Cleaner may offer (sdk/oldkernels.js)
+    if have node; then run "oldkernels-test (sdk/oldkernels.js)" node tests/oldkernels_test.mjs
+    else skip "oldkernels-test" "node"; fi
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi

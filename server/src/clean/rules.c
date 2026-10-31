@@ -62,9 +62,9 @@ static const CleanRule table[] = {
     { .id = "temporary", .version = 1, .category = "temporary", .root = ".cache/tmp", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
       .text_key = "cleaner.rule.temporary", .min_age_days = 7 },
     { .id = "partial-downloads", .version = 1, .category = "temporary", .root = "Downloads", .pattern = "*.part", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
-      .text_key = "cleaner.rule.partial-downloads", .min_age_days = 7 },
+      .text_key = "cleaner.rule.partial-downloads", .min_age_days = 7, .downloads = 1 },
     { .id = "partial-downloads-chromium", .version = 1, .category = "temporary", .root = "Downloads", .pattern = "*.crdownload", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
-      .text_key = "cleaner.rule.partial-downloads-chromium", .min_age_days = 7 },
+      .text_key = "cleaner.rule.partial-downloads-chromium", .min_age_days = 7, .downloads = 1 },
     { .id = "crash-system", .version = 1, .category = "logs", .root = ".local/share/apport", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
       .text_key = "cleaner.rule.crash-system", .min_age_days = 7 },
     { .id = "crash-firefox", .version = 1, .category = "logs", .root = ".mozilla/firefox/Crash Reports", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
@@ -87,9 +87,15 @@ static const CleanRule table[] = {
       .text_key = "cleaner.rule.ai-lmstudio-old", .unit_depth = 2, .explicit_only = 1 },
     { .id = "ai-ollama", .version = 1, .category = "ai", .root = ".ollama/models", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
       .text_key = "cleaner.rule.ai-ollama" },
+    /* what a removed LordOS app left: its folder, whole, chosen by name. An installed app's folder is never offered */
+    { .id = "app-leftovers", .version = 1, .category = "apps", .root = ".local/share/lordos/appdata", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_TRASH,
+      .text_key = "cleaner.rule.app-leftovers", .unit_depth = 1, .explicit_only = 1, .leftover = 1 },
     /* shown and measured, nothing offered */
     { .id = "old-downloads", .version = 1, .category = "info", .root = "Downloads", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
-      .text_key = "cleaner.rule.old-downloads", .min_age_days = 90 },
+      .text_key = "cleaner.rule.old-downloads", .min_age_days = 90, .downloads = 1 },
+    /* the system's temporary folder: who else uses a file there can't be shown, so it is never offered */
+    { .id = "system-tmp", .version = 1, .category = "info", .root = "tmp", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
+      .text_key = "cleaner.rule.system-tmp", .min_age_days = 7, .system_root = 1 },
     { .id = "cargo-registry", .version = 1, .category = "info", .root = ".cargo/registry", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
       .text_key = "cleaner.rule.cargo-registry" },
     { .id = "gradle", .version = 1, .category = "info", .root = ".gradle/caches", .pattern = "*", .risk = CLEAN_RISK_REVIEW, .action = CLEAN_ACT_NONE,
@@ -157,6 +163,8 @@ int clean_rule_check(const CleanRule *r, char *why, size_t n) {
     if (stars > 1) return say(why, n, r->id, "more than one * in the root");
     if (r->unit_depth < 0 || r->unit_depth > 4) return say(why, n, r->id, "bad unit depth");
     if (r->on_mounts && r->action != CLEAN_ACT_NONE) return say(why, n, r->id, "a root on mounts is only measured");
+    if (r->system_root && (r->action != CLEAN_ACT_NONE || strcmp(r->root, "tmp"))) return say(why, n, r->id, "a system root is /tmp, only measured");
+    if (r->leftover && (r->action != CLEAN_ACT_TRASH || r->unit_depth != 1 || !r->explicit_only)) return say(why, n, r->id, "a leftover is one folder, chosen, to the Trash");
     if (r->lock && (!*r->lock || r->lock[0] == '/' || strstr(r->lock, ".."))) return say(why, n, r->id, "bad lock");
     for (int i = 0; too_wide[i]; i++) if (!strcmp(r->root, too_wide[i])) return say(why, n, r->id, "root is too wide");
     char abs[PATH_MAX + CLEAN_PATH_MAX + 2];

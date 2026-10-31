@@ -23,8 +23,8 @@ const CRISTAL = {
 };
 
 // the window's tint per section, and each module's own colour (Noche keeps its sky under the tint)
-const TINT_DARK = { cleanup: 'rgba(255,95,162,0.17)', large: 'rgba(247,168,27,0.13)', storage: 'rgba(47,130,255,0.2)', duplicates: 'rgba(30,200,190,0.17)' };
-const TINT_LIGHT = { cleanup: 'rgba(255,95,162,0.13)', large: 'rgba(247,168,27,0.13)', storage: 'rgba(47,130,255,0.13)', duplicates: 'rgba(30,200,190,0.15)' };
+const TINT_DARK = { cleanup: 'rgba(255,95,162,0.17)', large: 'rgba(247,168,27,0.13)', storage: 'rgba(47,130,255,0.2)', duplicates: 'rgba(30,200,190,0.17)', apps: 'rgba(124,92,255,0.17)' };
+const TINT_LIGHT = { cleanup: 'rgba(255,95,162,0.13)', large: 'rgba(247,168,27,0.13)', storage: 'rgba(47,130,255,0.13)', duplicates: 'rgba(30,200,190,0.15)', apps: 'rgba(124,92,255,0.13)' };
 const MODULE = { cleanup: '#c2316f', storage: '#1f6fd0', duplicates: '#0f8f86' };
 for (const t of [NOCHE, AURORA]) t.tints = TINT_DARK;
 for (const t of [NOCHE_LIGHT, CRISTAL]) t.tints = TINT_LIGHT;

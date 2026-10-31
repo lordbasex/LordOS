@@ -1,12 +1,12 @@
 /* js_clean.c — lord.clean: Cleaner's native API (docs/CLEANER-ARCHITECTURE.md, clean/clean.h).
  *
- *   start(kind, opts)             a new scan: 'rules' (the default, no options), 'tree' ({ volume, minSize, exclude }) or
- *                                 'dups' ({ folders, exclude }). Options only name folders relative to the home
+ *   start(kind, opts)             a new scan: 'rules' (the default, no options), 'tree' ({ volume, minSize, exclude }),
+ *                                 'dups' or 'images' ({ folders, exclude }). Options only name folders relative to the home
  *                                 folder or a volume id from volumes(): what to read, never what to change
  *   poll(kind)                    { job, state, error, scan, plan, emptied }: real counters, never a percentage
  *   volumes()                     [{ id, path, total, free }]
  *   tree(scanId, node, limit)     a folder of a tree and its largest children
- *   groups(scanId, offset, limit) a page of groups of duplicates
+ *   groups(scanId, offset, limit) a page of groups of duplicates or similar images
  *   restore(planId, id)           back from the Trash, for an item that plan moved
  *   history() / clearHistory()    what ran: counts and bytes, never a path
  *   cancel(forget)                stops the job; forget (boolean) also drops the results
@@ -24,6 +24,7 @@
 #include "../clean/clean.h"
 #include "../clean/cleanfs.h"
 #include "../clean/cleanproto.h"
+#include "js_sys.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +62,7 @@ static int exact_int(JSContext *c, JSValueConst v, double min, double max, doubl
 static int kind_of(JSContext *c, JSValueConst v, int *kind) {
     const char *k = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
     if (!k) return -1;
-    *kind = !strcmp(k, "rules") ? CLEAN_KIND_RULES : !strcmp(k, "tree") ? CLEAN_KIND_TREE : !strcmp(k, "dups") ? CLEAN_KIND_DUPS : -1;
+    *kind = !strcmp(k, "rules") ? CLEAN_KIND_RULES : !strcmp(k, "tree") ? CLEAN_KIND_TREE : !strcmp(k, "dups") ? CLEAN_KIND_DUPS : !strcmp(k, "images") ? CLEAN_KIND_IMAGES : -1;
     JS_FreeCString(c, k);
     return *kind < 0 ? -1 : 0;
 }
@@ -104,6 +105,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!JS_IsUndefined(m) && exact_int(c, m, 1, 1e15, &o.min_size)) bad = 1;
         JS_FreeValue(c, m);
     }
+    clean_set_sysapps(js_sys_assets());
     int r = bad ? CLEAN_E_BADFOLDER : clean_start_kind(kind, &o);
     free_strs(c, o.folders, o.nfolders);
     free_strs(c, o.exclude, o.nexclude);

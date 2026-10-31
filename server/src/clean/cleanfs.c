@@ -101,3 +101,9 @@ int clean_under(const char *path, const char *ex) {
     size_t n = strlen(ex);
     return n > 1 && !strncmp(path, ex, n) && (!path[n] || path[n] == '/');
 }
+
+int clean_similar(uint64_t a, uint64_t b, unsigned aw, unsigned ah, unsigned bw, unsigned bh) {
+    if (!aw || !ah || !bw || !bh || __builtin_popcountll(a ^ b) > CLEAN_SIMILAR_BITS) return 0;
+    double x = (double)aw / ah, y = (double)bw / bh;
+    return (x > y ? x / y : y / x) <= 1.0 + CLEAN_SIMILAR_ASPECT;
+}

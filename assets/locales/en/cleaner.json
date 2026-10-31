@@ -346,5 +346,52 @@
   "look.noche": "Noche",
   "look.aurora": "Aurora",
   "look.cristal": "Cristal",
-  "large.allFolders": "All folders"
+  "large.allFolders": "All folders",
+  "section.apps": "Apps",
+  "category.apps": "Left by removed apps",
+  "rule.app-leftovers": "Folders left by LordOS apps that are no longer installed. Check them first: they go to the Trash.",
+  "ruleName.app-leftovers": "What removed apps left",
+  "rule.system-tmp": "Your own files in the system's temporary folder, older than a week. Only measured: other programs may still be using them.",
+  "ruleName.system-tmp": "System temporary folder",
+  "dups.exact": "Exact copies",
+  "similar.tab": "Similar images",
+  "hero.similar.title": "Find images that look alike",
+  "hero.similar.line": "Choose folders. Resized and recompressed versions of a picture are put together.",
+  "hero.similar.f1": "Works with JPEG, PNG, GIF and BMP",
+  "hero.similar.f2": "Nothing is selected for you",
+  "hero.similar.f3": "At least one image of each group stays",
+  "similar.title": "Similar images",
+  "similar.hint": "These look alike but aren't the same file. Compare them and choose what to remove.",
+  "similar.reclaim": {
+    "one": "{count} group could give back",
+    "other": "{count} groups could give back"
+  },
+  "similar.group": {
+    "one": "{count} image",
+    "other": "{count} similar images"
+  },
+  "similar.none": "No similar images in these folders.",
+  "similar.undecoded": {
+    "one": "{count} image couldn't be compared: its format isn't supported, or it's a blank or very large picture.",
+    "other": "{count} images couldn't be compared: their format isn't supported, or they're blank or very large pictures."
+  },
+  "apps.title": "Apps",
+  "apps.hint": "Installed apps, largest first. Removing a system app asks for administrator rights.",
+  "apps.none": "No removable apps were found.",
+  "apps.remove": "Remove",
+  "apps.removeTitle": "Remove {name}?",
+  "apps.confirmLpk": "The app is removed. Its data stays, and you can review it here afterwards.",
+  "apps.refused": "{name} can't be removed here: other parts of the system need it.",
+  "apps.failed": "{name} could not be removed.",
+  "leftovers.title": "Left by removed apps",
+  "leftovers.find": "Look for them",
+  "leftovers.again": "Look again",
+  "leftovers.none": "Nothing was left behind.",
+  "leftovers.warn": "These folders may hold data you made in those apps.",
+  "kernels.title": "Old kernels",
+  "kernels.text": {
+    "one": "{count} kernel you no longer boot. The current one, the newest and one to go back to stay.",
+    "other": "{count} kernels you no longer boot. The current one, the newest and one to go back to stay."
+  },
+  "kernels.refused": "The package plan would remove more than old kernels, so nothing is offered."
 }

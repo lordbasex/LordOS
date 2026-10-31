@@ -1098,17 +1098,17 @@
     "features": {
       "en": [
         "A scan only reads; nothing changes until you confirm",
-        "Caches, large files, a storage map and exact duplicates",
+        "Caches, large files, a storage map, exact duplicates and similar images",
         "Each file is checked again right before acting"
       ],
       "es": [
         "Un análisis solo lee; nada cambia hasta que confirmes",
-        "Cachés, archivos grandes, mapa del disco y copias exactas",
+        "Cachés, archivos grandes, mapa del disco, copias exactas e imágenes parecidas",
         "Cada archivo se comprueba otra vez antes de actuar"
       ],
       "pt": [
         "Uma análise só lê; nada muda até você confirmar",
-        "Caches, arquivos grandes, mapa do disco e cópias exatas",
+        "Caches, arquivos grandes, mapa do disco, cópias exatas e imagens parecidas",
         "Cada arquivo é verificado de novo antes de agir"
       ]
     }

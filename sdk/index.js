@@ -105,6 +105,7 @@ export { backup, useBackup, backupStatus } from './backup.js';   // Backups (doc
 export { cleaner } from './cleaner.js';   // Cleaner (docs/CLEANER-ARCHITECTURE.md)
 export { statusWord } from './cleanerstatus.jsx';
 export { cleanerPalette, CLEANER_THEMES } from './cleanertheme.js';
+export { oldKernels, kernelPlanOk } from './oldkernels.js';
 export { lordosUpdate, restartNeeded, updatePrefs, setUpdatePrefs, UPDATE_DEFAULTS } from './updates.js';   // updating LordOS in place (docs/UPDATES.md)
 // Store → Discover, "Suggested for your computer": packages for the detected hardware (docs/PACKAGES.md)
 export { suggestions, refreshSuggestions, reevaluate as reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen, unseenSuggestions } from './suggestions.js';

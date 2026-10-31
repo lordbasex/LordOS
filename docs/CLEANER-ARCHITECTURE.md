@@ -109,7 +109,7 @@ Actions:
 - The same operation does not exist in `lord.fs`, `admin.c` or the broker.
 - The confirmation says it can't be undone.
 
-Other rules (`review`) use the Trash.
+Other rules (`review`) use the Trash. A rule with `system_root` (`/tmp`) has no action at all, which the table's check enforces.
 
 ## Security
 
@@ -133,6 +133,18 @@ Regular files in the folders the user chose. Group by size, then a SHA-256 of th
 SHA-256. Hard links are one file, not two copies. Before acting, the file is checked again, and a byte comparison against
 the copy being kept confirms it. At least one independent copy always stays, and nothing is selected automatically.
 
+## Similar images
+
+The same walk, kept to image names of at least 8 KiB, then `helper/lcimage.c` inside `lord-clean`: the file is read whole, up to
+64 MiB, its size in pixels is read from the header and refused past 40 megapixels before anything is allocated for it, and it is
+decoded to grey with the `stb_image` the project already carries, set up as `lord-maild`'s. Nothing is decoded in `lord-server`. The
+image's cells give a 64-bit difference hash. The helper sends one group at a time, largest image first, with sizes and hashes;
+lord-server checks that every member really is within reach of the first (`clean_similar`, shared with the helper) and throws away a
+scan that lies. The plan is the duplicates' plan: one image of each group stays, as another inode. Right before acting, the image
+that stays is checked to be the file the scan saw; there is no byte comparison, as the bytes differ.
+
+Thumbnails on the page are `media.thumb`, made by `lord-media`.
+
 ## Storage map
 
 One scan builds a bounded tree, drawn three ways: a directory tree, a treemap (squarified, up to 28 views a level so areas can rise in, the rest grouped) and a summary by type. Selecting a rectangle does nothing but select it.
@@ -142,7 +154,7 @@ One scan builds a bounded tree, drawn three ways: a directory tree, a treemap (s
 | Phase | Contents |
 |---|---|
 | 1, the core | Overview, the system scan, rules, caches, temporary files, Trash, large and old files, duplicates, storage map, plan, history, preferences, en/es/pt |
-| 2, system care | Apps and their leftovers, performance page reusing Monitor and Disks, similar images, developer and AI caches, privacy recommendations |
+| 2, system care | Apps and their leftovers, performance page reusing Monitor and Disks, similar images, developer and AI caches, privacy recommendations. Built and pending rows are in `CLEANER-ROADMAP.md` |
 | 3, optional modules | Optional malware scanner, configuration audit, browser, mail and cloud modules, scheduled scans that only notify |
 
 Build order for Phase 1: `lord-clean` and one safe rule end to end, then the rest of the rules, then large files and the

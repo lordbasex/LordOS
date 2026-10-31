@@ -26,6 +26,13 @@ to lord-server, which validates every record with `sec/json.c`: types, ranges, t
 `fsops_protected`. A malformed record discards the whole scan. A lying helper can make lord-server hold a false candidate, but acting on it
 needs the real object to match.
 
+**Decoding:** similar images are the one place Cleaner reads the *contents* of files as anything but bytes to hash, and it happens only in `lord-clean`, never in
+`lord-server`. It uses the vendored `stb_image`, limited to PNG, JPEG, GIF and BMP, with the same sandbox as the walk and no new syscall or folder. A hostile image is a
+reason to expect a crash, which fails the scan: a decoder bug reaches what the list above says and no more. Files over 64 MiB and pictures over 40 megapixels are not
+decoded, and a similar-images scan runs with 480 MiB of address space, so a small file that asks for more (a 311 KB 16-bit PNG asked for 588 MB) is left out instead of bringing the scope's limit of 512 MB down on the whole scan. A group whose members aren't within reach of the first image is a protocol error.
+
+**A root other users write in:** `/tmp` is walked with `"own":1`, so the helper neither enters nor reports anything of another user, by owner, before opening it.
+
 ## Plans
 
 Built in C from ids of a scan, kept in lord-server, valid ten minutes, run once. Category plans refuse rules marked `explicit_only`.
@@ -51,6 +58,19 @@ for byte with the one that goes.
 
 **Browsers:** only named cache folders. A live process behind the profile's lock (`lock` for Firefox, `SingletonLock` for Chromium) blocks the
 rule at scan and at action; a link that can't be read blocks it too; a stale pid doesn't.
+
+**Similar images:** to the Trash only, never a real delete. A plan refuses to take every image of a group, and the image that stays is checked right before acting.
+
+**What removed apps left:** the folder must belong to no installed package and no system app. That is checked at the scan and again right before acting, so an app installed in
+between keeps its folder. If lord-server doesn't know where the system's apps are, or that folder isn't there, nothing is offered. It goes whole to the Trash, one by one, named in the confirmation, never
+in a cleanup by category.
+
+**The download folder's name** comes from a file the user owns, and it can only move rules that keep their narrow patterns and the Trash. A value is taken only if it would pass
+as a rule's root, so `.cache` or a protected folder isn't, and a change after the plan makes the items *changed*.
+
+**`/tmp`** is measured only: `clean_rule_check` refuses any action on a `system_root` rule, and any root but `tmp`.
+
+**Old kernels and apps** add nothing here: `lord.pkg.plan` and the admin helper's existing `pkg-remove`, with no new root power.
 
 **AI models:** moved whole to the Trash, one by one, named in the confirmation, never in a cleanup by category. Whether another app uses a model can't be known in
 general, so the confirmation says so for every model.

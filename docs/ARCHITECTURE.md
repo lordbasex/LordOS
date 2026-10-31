@@ -95,7 +95,7 @@ Besides the kernel and libc, only these are allowed:
 | `libxkbcommon`       | XKB keyboard layouts (M5) and what Wayland apps require (M6) | system    |
 | Mesa: `libgbm`, `libEGL`, `libGLESv2` | GPU composition and dmabuf buffers from apps (games); optional: without a 3D GPU or without the `-dev` packages it builds and runs without Mesa (approved by the user on 2026-10-16, see `GPU.md`) | system |
 | QuickJS              | ES2023 JavaScript engine, ~1 MB, written in C                  | vendored|
-| `stb_truetype`, `stb_image` | fonts and images; public domain, a single header    | vendored|
+| `stb_truetype`, `stb_image` | fonts and images (`lord-server`, `lord-doc`, `lord-maild`, and `lord-clean` for similar images); public domain, a single header | vendored|
 | `stb_image_write`    | PNG for the remote desktop's lossless refresh of still areas and cursor images (`lord-sessiond`), and images written by the `lord-doc` and `lord-maild` helpers; public domain | vendored|
 | OpenSSL (`libssl`, `libcrypto`) | TLS. **Only four binaries link it**: `lord-sessiond` (remote desktop on the LAN, `REMOTE.md`), `lord-maild` (IMAP/SMTP/CalDAV/CardDAV, certificates checked against the system CA store, `MAIL.md`) and, since 0.8.5, `lord-fetch` (the blocklist downloads, sandboxed, no sockets of its own, `FIREWALL.md` "Blocklists") and `lord-tls` (the package engine's HTTPS, sandboxed, `PACKAGES.md` "HTTPS"). Never `lord-server` | system |
 | `libcrypt`           | verifying passwords against `/etc/shadow` (`lord-sessiond`, `admin.c`) | system |
@@ -171,7 +171,8 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
 - **`lord-clean`** (0.8.7, in development): Cleaner's read-only scanner. Same rules as `lord-doc` (fixed path, no
   arguments, minimal environment, `sandbox_apply_helper` in scope `lordos-cleaner` before reading anything, and it
   refuses to run without Landlock). It gets each root as an opened folder over SCM_RIGHTS, walks with `openat2` and
-  `statx`, and answers with records lord-server validates. It writes nothing. See `CLEANER-ARCHITECTURE.md`.
+  `statx`, and answers with records lord-server validates. It writes nothing. For similar images it also decodes pictures
+  (`stb_image`, PNG, JPEG, GIF and BMP), the only decoding in Cleaner and never in `lord-server`. See `CLEANER-ARCHITECTURE.md`.
 
 - **`lord-tls`** (0.8.5): the package engine's HTTPS. The Store's download child (as `nobody`, in
   `lordos-net-store.scope`) connects the TCP socket itself and execs only `<lord-server dir>/lord-tls`
