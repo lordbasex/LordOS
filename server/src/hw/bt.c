@@ -468,6 +468,8 @@ static void op_done(const DMsg *m, void *ctx) {
         const char *text = dr_str(&r, NULL);
         if (!r.err && text && *text) { snprintf(full, sizeof full, "%s: %s", err, text); err = full; }
     }
+    /* a code that was only shown has done its work, whether the pairing took or not: nothing else closes it */
+    if (!strcmp(o->op, "pair") && prompt.active && !strncmp(prompt.kind, "display-", 8)) prompt_drop();
     BtDevice *d = o->path[0] ? device(&model, o->path, 0) : NULL;
     if (!strcmp(o->op, "pair") && !err && d) {
         /* paired: trust it (reconnects without asking) and connect */
