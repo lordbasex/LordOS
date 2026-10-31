@@ -1617,6 +1617,14 @@ static void test_downloads(void) {
         CHECK(has_candidate("Downloads/other.part") && !has_candidate(".cache/x.part") && !has_candidate("mail/x.part"));
         poll_free(&p);
     }
+    /* a pipe as the settings file doesn't hold up the scan's start, which runs on the desktop's thread */
+    char fifo[PATH_MAX * 2];
+    path_of(fifo, sizeof fifo, ".config/user-dirs.dirs");
+    unlink(fifo);
+    CHECK(!mkfifo(fifo, 0600));
+    run_scan(&p);
+    CHECK(has_candidate("Downloads/other.part"));
+    poll_free(&p);
     /* the settings file as a link is not read */
     char f[PATH_MAX * 2];
     path_of(f, sizeof f, ".config/user-dirs.dirs");
@@ -1693,6 +1701,13 @@ static void test_leftovers(void) {
     poll_free(&p);
     CHECK(!exists(".local/share/lordos/appdata/gone-app") && exists(".local/share/Trash/files/gone-app/sub/more") && exists(".local/share/lordos/appdata/passwords/state"));
     CHECK(!clean_restore(plan, want) && exists(".local/share/lordos/appdata/gone-app/data.bin"));
+    /* a theme without the folder of system apps can't tell either, and passwords would look removed */
+    char empty[PATH_MAX * 2];
+    path_of(empty, sizeof empty, "no-such-assets");
+    clean_set_sysapps(empty);
+    run_scan(&p);
+    CHECK(!has_candidate("gone-app") && !has_candidate("passwords"));
+    poll_free(&p);
     /* without knowing where the system's apps are, nothing is offered */
     clean_set_sysapps(NULL);
     run_scan(&p);

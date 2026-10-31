@@ -226,6 +226,8 @@ static int app_exists(const char *id) {
     struct stat st;
     snprintf(p, sizeof p, "%s/.local/share/lordos/apps/%s", fsops_home(), id);
     if (!lstat(p, &st) || errno != ENOENT) return 1;
+    snprintf(p, sizeof p, "%s/sysapps", sysapps);
+    if (stat(p, &st) || !S_ISDIR(st.st_mode)) return 1;     /* a theme with no system apps can't tell either */
     snprintf(p, sizeof p, "%s/sysapps/%s", sysapps, id);
     return !lstat(p, &st) || errno != ENOENT;
 }
@@ -301,12 +303,12 @@ static const CleanRule *src_rule(const Src *src) {
  * "$HOME/…" value that would pass as a rule's root. 0, or -1 for the rule's own name. */
 static int user_downloads(const CleanRule *r, char *out, size_t n) {
     int home = open(fsops_home(), O_PATH | O_DIRECTORY | O_CLOEXEC);
-    int fd = home < 0 ? -1 : clean_open(home, ".config/user-dirs.dirs", O_RDONLY);
+    int fd = home < 0 ? -1 : clean_open(home, ".config/user-dirs.dirs", O_RDONLY | O_NONBLOCK);
     if (home >= 0) close(home);
     if (fd < 0) return -1;
     static const char key[] = "XDG_DOWNLOAD_DIR=\"$HOME/";
     char t[8192];
-    ssize_t k = read(fd, t, sizeof t - 1);
+    ssize_t k = read(fd, t, sizeof t - 1);      /* this runs on the desktop's thread: a pipe here must not wait */
     close(fd);
     if (k <= 0) return -1;
     t[k] = 0;
