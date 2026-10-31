@@ -337,7 +337,7 @@ enum { GDRAG_R_LAYER, GDRAG_R_CLIP, GDRAG_R_ANCESTOR, GDRAG_R_APP, GDRAG_R_AFTER
  * under the root, another opacity, a part that would make it paint whole */
 enum { GDRAG_L_GONE, GDRAG_L_INVALID, GDRAG_L_RESIZE, GDRAG_L_RENDERING, GDRAG_L_CAPTURE, GDRAG_L_VIEW, GDRAG_L_TRANSFORM, GDRAG_L_RAW,
        GDRAG_L_HOLES, GDRAG_L_SURFACES, GDRAG_L_PREMUL, GDRAG_L_NOBUF, GDRAG_L_TREE, GDRAG_L_OPACITY, GDRAG_L_PART, GDRAG_L_N };
-typedef struct { long frames, strip_px, tried, refused[GDRAG_R_N], layer[GDRAG_L_N]; } GdragStats;
+typedef struct { long frames, cut, strip_px, tried, refused[GDRAG_R_N], layer[GDRAG_L_N]; } GdragStats;
 void  paint_gdrag_stats(GdragStats *s);          /* since the last call */
 /* The last paint_root_* call: -1 GPU drag not tried (no copy used, or not a GPU drag call), 1 taken, 0 refused
  * (*why a GDRAG_R_*, *sub a GDRAG_L_* when it is GDRAG_R_LAYER, else -1) */

@@ -130,6 +130,8 @@ void sd_cgroup_tick(void);                          /* restarts it if it died */
 
 /* "LORD_GPU=0" with lordos.gpu=0 on the kernel command line (or the service's LORD_GPU), or empty */
 extern char sd_gpu_env[24];
+#define SD_TUNE_N 4
+extern char sd_tune_env[SD_TUNE_N][32]; /* the service's LORD_GPU_SCISSOR, LORD_GPU_DRAG, LORD_PIPELINE, LORD_GPU_VERIFY for user sessions */
 extern int sd_input_debug;              /* LORD_INPUT_DEBUG=1 for user sessions (keylag.h) */
 
 /* ---- conn.c: one remote desktop connection (in a child process) ---- */

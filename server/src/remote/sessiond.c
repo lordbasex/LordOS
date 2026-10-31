@@ -1363,6 +1363,16 @@ int main(int argc, char **argv) {
             if ((p == cmd || p[-1] == ' ') && (p[19] == 0 || p[19] == ' ' || p[19] == '\n')) sd_input_debug = 1;
         if (k && !strcmp(k, "1")) sd_input_debug = 1;
         if (sd_input_debug) sd_log("key latency trace on for user sessions (lordos.inputdebug=1)");
+        /* GPU switches that are off by default, for a measurement: only root sets the service's environment,
+         * and the login screen never gets them (docs/GPU.md) */
+        static const char *const tune[SD_TUNE_N] = { "LORD_GPU_SCISSOR", "LORD_GPU_DRAG", "LORD_PIPELINE", "LORD_GPU_VERIFY" };
+        for (int i = 0; i < SD_TUNE_N; i++) {
+            const char *v = getenv(tune[i]);
+            if (v && strlen(v) < 10) {
+                snprintf(sd_tune_env[i], sizeof sd_tune_env[i], "%s=%s", tune[i], v);
+                sd_log("user sessions get %s", sd_tune_env[i]);
+            }
+        }
     }
     sd_log("sessions with %s%s%s", rd_conf.server, sd_gpu_env[0] ? ", " : "", sd_gpu_env);
     int wk[2];

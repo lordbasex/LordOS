@@ -34,6 +34,7 @@
 static char log_prefix[96] = "lord-sessiond";
 char sd_gpu_env[24];
 int sd_input_debug;
+char sd_tune_env[SD_TUNE_N][32];
 
 void sd_log_prefix(const char *prefix) { snprintf(log_prefix, sizeof log_prefix, "%s", prefix); }
 
@@ -318,7 +319,7 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         if (chdir(rd_conf.workdir)) { /* paths are absolute */ }
         /* GPU: the session uses it while it's on the monitor; lordos.gpu=0 (or the service's LORD_GPU)
          * turns it off in all of them */
-        char *env[8];
+        char *env[8 + SD_TUNE_N];
         int ne = 0;
         env[ne++] = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/games";
         env[ne++] = (char *)lang;
@@ -327,6 +328,7 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         env[ne++] = "LORDOS_SESSIOND=1";
         if (sd_gpu_env[0]) env[ne++] = sd_gpu_env;
         if (sd_input_debug && !greeter) env[ne++] = "LORD_INPUT_DEBUG=1";   /* key latency trace, never the login screen */
+        for (int i = 0; i < SD_TUNE_N && !greeter; i++) if (sd_tune_env[i][0]) env[ne++] = sd_tune_env[i];
         env[ne] = NULL;
         if (!greeter) cgroup_delegate_session(uid, pw->pw_gid);   /* cgroup subtree for the apps (docs/SESSIONS.md) */
         /* real-time priority for the compositor's threads: lord-server takes it in par_init and lowers

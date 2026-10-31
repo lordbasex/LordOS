@@ -120,9 +120,9 @@ static void gdrag_stats_text(char *buf, size_t len) {
     long bpx, lpx, quads;
     paint_gdrag_stats(&g);
     gpu_gdrag_stats(&bpx, &lpx, &quads);
-    int k = snprintf(buf, len, "GPU drag: %ld of %ld frames (%ld quads), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
+    int k = snprintf(buf, len, "GPU drag: %ld of %ld frames (%ld quads, %ld of them cut around later nodes), strips %.2f Mpx, uploaded below %.2f Mpx, layer %.2f Mpx "
                                "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up",
-                     g.frames, g.tried, quads, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP],
+                     g.frames, g.tried, quads, g.cut, g.strip_px / 1e6, bpx / 1e6, lpx / 1e6, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP],
                      g.refused[GDRAG_R_ANCESTOR], g.refused[GDRAG_R_APP], g.refused[GDRAG_R_AFTER], g.refused[GDRAG_R_POST], g.refused[GDRAG_R_FEED]);
     /* the layer's refusals by cause (GDRAG_L_*) */
     for (int i = 0, first = 1; i < GDRAG_L_N && k > 0 && (size_t)k < len; i++)

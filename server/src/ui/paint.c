@@ -1833,6 +1833,7 @@ static int gdrag_bx, gdrag_by;                /* where the layer's pixel (0, 0) 
 /* W for this frame (-1), or why there is none (GDRAG_R_*): where layer_paint's blit lands, cut by the
  * ancestors' clips and by c->clip, the frame's box (inside the canvas). */
 static int gdrag_sub;                      /* the GDRAG_L_* of gdrag_gate's last GDRAG_R_LAYER */
+static int gdrag_cut;                      /* gdrag_gate's W lost rows to what is painted after the window */
 #define GDRAG_NO_LAYER(why) do { gdrag_sub = (why); return GDRAG_R_LAYER; } while (0)
 static int gdrag_gate(const Canvas *c, Node *root, Rect *wout) {
     Node *w = node_get(layer.node);
@@ -1879,10 +1880,17 @@ static int gdrag_gate(const Canvas *c, Node *root, Rect *wout) {
     if (!below_ancestors_ok(w, r)) return GDRAG_R_ANCESTOR;
     if (wl_draws_meet(r)) return GDRAG_R_APP;
     if (!ord_n || gdrag_after_over) return GDRAG_R_AFTER;
+    /* What is painted after the window and meets the frame's box (the menu bar, the Dock) stays on the CPU: W
+     * loses the rows it would meet, so the node falls wholly in the strip above or below W, which is as wide as
+     * the frame's box, and is painted over the window's own pixels there as in any frame (step 12, docs/GPU.md). */
+    gdrag_cut = 0;
     for (int i = 0; i < ngdrag_after; i++) {
         Box b = gdrag_after[i];
         Rect q = { (int)floorf(VX(b.x0)) - 1, (int)floorf(VY(b.y0)) - 1, (int)ceilf(VX(b.x1)) + 1, (int)ceilf(VY(b.y1)) + 1 };
-        if (rect_meets(q, c->clip)) return GDRAG_R_AFTER;
+        if (!rect_meets(q, c->clip) || q.y1 <= r.y0 || q.y0 >= r.y1) continue;
+        if (r.y1 - q.y1 >= q.y0 - r.y0) r.y0 = q.y1; else r.y1 = q.y0;
+        gdrag_cut = 1;
+        if (r.y1 <= r.y0) return GDRAG_R_AFTER;
     }
     gdrag_bx = bx;
     gdrag_by = by;
@@ -1969,6 +1977,7 @@ static int gdrag_paint(Canvas *c, Node *root, Rect w, GpuDrag *g) {
     g->frame = ++frames;
     g->ref = every && frames % every == 0 ? gdrag_reference(c, root, w) : NULL;
     gdragstat.frames++;
+    gdragstat.cut += gdrag_cut;
     for (int i = 0; i < ns; i++) gdragstat.strip_px += rect_area(st[i]);
     return 1;
 }
