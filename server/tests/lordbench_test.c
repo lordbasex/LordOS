@@ -261,8 +261,8 @@ int main(void) {
     lbf_phases_text(&ps, pt, sizeof pt);
     CHECK(strstr(pt, "CPU-late 1") && strstr(pt, "not layer 1 [invalid 1]") && strstr(pt, "not feed 1") && strstr(pt, "unshown 1"),
           "phases text: %s", pt);
-    CHECK(!strcmp(lbf_gdrag_r_name(6), "feed") && !lbf_gdrag_r_name(7) && !lbf_gdrag_r_name(-1) && !strcmp(lbf_gdrag_l_name(14), "part") &&
-          !lbf_gdrag_l_name(15), "GPU drag names");
+    CHECK(!strcmp(lbf_gdrag_r_name(6), "feed") && !lbf_gdrag_r_name(7) && !lbf_gdrag_r_name(-1) && !strcmp(lbf_gdrag_l_name(14), "part") && !strcmp(lbf_gdrag_l_name(15), "size") &&
+          !lbf_gdrag_l_name(16), "GPU drag names");
     char small[16];
     lbf_phases_text(&ps, small, sizeof small);
     CHECK(strlen(small) == 15, "a short buffer is cut, terminated");

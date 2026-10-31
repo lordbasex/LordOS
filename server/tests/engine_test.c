@@ -2496,6 +2496,30 @@ static void test_gdrag_extra(void) {
         CHECK(!bad, "drag-exact gpu-drag, run %s: %d of %d frames differ from the GPU path (the first: frame %d)", dc_name[dc], bad,
               dc_frames[dc] + 1, first);
     }
+    /* a layer past the self-test's size stays on the CPU, for this window only, with the same pixels */
+    {
+        DOut *one[1] = { &a };
+        long full;
+        int worst;
+        test_gpu = 1;
+        test_gdrag = 0;
+        test_compose = 1;
+        drag_run_n(DC_PAUSE, one, 1, h0, &full, &worst);
+        test_gdrag = 1;
+        GdragStats st;
+        paint_gdrag_stats(&st);
+        gdrag_quads = 0;
+        paint_gdrag_limit(8, 8);
+        drag_run_n(DC_PAUSE, one, 1, h1, &full, &worst);
+        paint_gdrag_limit(0, 0);
+        test_gdrag = test_compose = 0;
+        int bad = 0;
+        for (int f = 0; f <= dc_frames[DC_PAUSE]; f++) bad += h0[f] != h1[f];
+        paint_gdrag_stats(&st);
+        CHECK(st.frames == 0 && st.layer[GDRAG_L_SIZE] > 0 && !bad, "gpu-drag size limit: %ld frames composed, %ld refused for size, %d differ",
+              st.frames, st.layer[GDRAG_L_SIZE], bad);
+        gdrag_quads = gdrag_fed = gdrag_whole = gdrag_frame_max = 0;
+    }
 done:
     test_gpu = 0;
     dout_free(&a); dout_free(&b); dout_free(&c);

@@ -847,9 +847,12 @@ static long gdrag_backlog_one(const GdragDirty *d, int w, int h) {
 static long gdrag_backlog_now(void) {
     return gdrag_backlog_one(&gdrag_bd, layer.bw, layer.bh) + (layer.px ? gdrag_backlog_one(&gdrag_ld, layer.w, layer.h) : 0);
 }
+static int gdrag_max_w, gdrag_max_h;       /* paint_gdrag_limit */
+void paint_gdrag_limit(int w, int h) { gdrag_max_w = w; gdrag_max_h = h; }
+static int gdrag_too_big(void) { return gdrag_max_w > 0 && (layer.w > gdrag_max_w || layer.h > gdrag_max_h); }
 /* whether GPU drag could use the layer on display view soon: else sending it is wasted work */
 static int gdrag_feedable(int view) {
-    return gpu_active() && layer.want && layer.node && layer.view == view && !layer.resize && !layer.rendering &&
+    return gpu_active() && layer.want && layer.node && layer.view == view && !layer.resize && !layer.rendering && !gdrag_too_big() &&
            layer.below && !layer.bdmg_full && !layer.has_holes && !layer.premul_bad && !nlsurf && !lsurf_all;
 }
 long paint_gdrag_backlog(int view) { return gdrag_feedable(view) ? gdrag_backlog_now() : 0; }
@@ -1850,6 +1853,7 @@ static int gdrag_gate(const Canvas *c, Node *root, Rect *wout) {
     if (nlsurf || lsurf_all) GDRAG_NO_LAYER(GDRAG_L_SURFACES);
     if (layer.premul_bad) GDRAG_NO_LAYER(GDRAG_L_PREMUL);
     if (!layer.px || !layer.below) GDRAG_NO_LAYER(GDRAG_L_NOBUF);
+    if (gdrag_too_big()) GDRAG_NO_LAYER(GDRAG_L_SIZE);   /* this window only: the next one may fit */
     const Node *anc[SKIP_PATH_MAX];
     int na = 0;
     for (const Node *a = w->parent; a; a = a->parent) {

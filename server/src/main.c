@@ -1222,6 +1222,11 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     int gdrag = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
              !wl_fullscreen_active() && !o->gdragcpu && paint_layer_node() && gpu_gdrag_ready(o->gpu);
     o->gdragcpu = 0;
+    if (gdrag) {
+        int gmw, gmh;
+        gpu_gdrag_max(&gmw, &gmh);
+        paint_gdrag_limit(gmw, gmh);
+    }
     Box parts[DAMAGE_MAX];
     if (multi) memcpy(parts, l.r, sizeof(Box) * (size_t)nparts);
     else parts[0] = b;

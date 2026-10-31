@@ -90,11 +90,12 @@ typedef struct GpuDrag {
     const uint32_t *ref;                /* LORD_GPU_VERIFY: the CPU's pixels for w (w's width a row), or NULL */
     long frame;                         /* its number, for the log */
 } GpuDrag;
-/* 1 if GPU drag may be used on that output: LORD_GPU_DRAG is 1 (off by default), the shader has 24-bit floats, the self-test
+/* 1 if GPU drag may be used on that output: LORD_GPU_DRAG is not 0 (on by default), the shader has 24-bit floats, the self-test
  * (every valid premultiplied combination, and a placement pass at least as large as the output, drawn
  * into a framebuffer and read back) gave the CPU's pixels. gpu_init runs that test, once per GL renderer
  * and version. */
 int  gpu_gdrag_ready(int out);
+void gpu_gdrag_max(int *lw, int *lh);    /* the largest layer the self-test's placement covered (0 without GPU drag) */
 /* gpu_frame with several UI rectangles to upload and, with gdrag, the window composited over w (gdrag
  * without dirty rectangles redraws the last one: a frame with no UI damage while the scene's w is
  * stale). Returns -1 like gpu_frame; *gdrag_drawn says whether the GPU drag quad was drawn. -2: gdrag was given but

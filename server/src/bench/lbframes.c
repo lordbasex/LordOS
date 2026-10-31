@@ -219,7 +219,7 @@ void lbf_drag_end(LbPhaseStats *st) {
 
 static const char *const gdrag_r_names[LBF_GDRAG_R] = { "layer", "clip", "ancestor", "app", "after", "post", "feed", "" };
 static const char *const gdrag_l_names[LBF_GDRAG_L] = { "gone", "invalid", "resize", "rendering", "capture", "view", "transform", "raw",
-                                                "holes", "surfaces", "premul", "nobuf", "tree", "opacity", "part", "" };
+                                                "holes", "surfaces", "premul", "nobuf", "tree", "opacity", "part", "size", "" };
 const char *lbf_gdrag_r_name(int i) { return i >= 0 && i < LBF_GDRAG_R && gdrag_r_names[i][0] ? gdrag_r_names[i] : NULL; }
 const char *lbf_gdrag_l_name(int i) { return i >= 0 && i < LBF_GDRAG_L && gdrag_l_names[i][0] ? gdrag_l_names[i] : NULL; }
 

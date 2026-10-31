@@ -48,7 +48,7 @@ int  lbf_end(LbFrameStats *st);
  * LordBench's (lbf_begin/lbf_end, lbf_phases) and the scripted drag's (lbf_drag_begin/lbf_drag_end), for
  * its "drag (scripted):" line. Off, each call is one atomic read. */
 #define LBF_GDRAG_R 8                       /* GDRAG_R_N (ui/ui.h), checked in main.c */
-#define LBF_GDRAG_L 16                      /* GDRAG_L_N */
+#define LBF_GDRAG_L 17                      /* GDRAG_L_N */
 typedef struct {
     uint64_t prev_flip;                 /* the main display's presentation before this frame */
     uint64_t wake;                      /* poll() returned, before this frame was started */

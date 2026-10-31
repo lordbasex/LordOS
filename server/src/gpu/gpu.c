@@ -40,6 +40,7 @@ int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
+void gpu_gdrag_max(int *lw, int *lh) { *lw = *lh = 0; }
 void gpu_scissor_quiet(int out, int quiet) { (void)out; (void)quiet; }
 int  gpu_frame_ex(int out, const Canvas *s, const Rect *d, int n, const GpuDrag *g, int *drawn, void (*f)(int)) {
     (void)out; (void)s; (void)d; (void)n; (void)g; (void)f;
@@ -1084,8 +1085,8 @@ static void gdrag_teardown(void) {
 /* GPU drag's program and textures in this context, and the self-test (or its earlier outcome). 1 = on. */
 static int gdrag_setup(void) {
     const char *e = getenv("LORD_GPU_DRAG");
-    /* off by default since the Raspberry Pi 5 run of 2026-10-29: right on V3D but no measurable gain (docs/GPU.md) */
-    if (!e || strcmp(e, "1")) { fprintf(stderr, "gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is composed by the CPU\n"); return 0; }
+    /* on by default since the Raspberry Pi 5 run of 2026-10-31, where it applies to the whole drag (docs/GPU.md) */
+    if (e && !strcmp(e, "0")) { fprintf(stderr, "gpu: GPU drag off (LORD_GPU_DRAG=0): the dragged window is composed by the CPU\n"); return 0; }
     GOut *o = G.cur && G.cur->used ? G.cur : &G.out[0];
     if (!o->used || !eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) return 0;
     GLint range[2] = { 0, 0 }, prec = 0;
@@ -1177,6 +1178,11 @@ int gpu_gdrag_ready(int out) {
            G.out[out].H <= G.gdraglh;
 }
 
+void gpu_gdrag_max(int *lw, int *lh) {
+    int on = G.on && G.gdrag == 1;
+    *lw = on ? G.gdraglw - GDRAG_LX : 0;
+    *lh = on ? G.gdraglh - GDRAG_LY : 0;
+}
 int gpu_gdrag_holds(int out) { return G.on && G.gdrag == 1 && out >= 0 && G.gdragtout[0] == out && G.gdragtout[1] == out; }
 
 void gpu_gdrag_stats(long *below_px, long *layer_px, long *quads) {
