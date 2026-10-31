@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
 import Performance from './performance.jsx';
 import { Scene } from './scene.jsx';
-import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
+import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, piBoard, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
 import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
 import { communityFor, communitySummary } from './community.js';
 import HWREPORT_SCHEMA from './hwreport.schema.json';
@@ -295,18 +295,28 @@ function Computer({ r }) {
   const { t: tr } = useLocale();
   const m = r.machine || {}, pi = r.raspberryPi;
   const box = useMemo(chosenCase, [r]);
+  const board = pi ? piBoard(pi.revision) : null;
   const hasBoard = m.boardVendor || m.boardName || m.boardVersion;
   const kind = m.virtualization ? tr('sysinfo.kind.vm', { name: m.virtualization }) : m.chassis ? tr(`sysinfo.kind.${camel(m.chassis)}`) : pi ? tr('sysinfo.share.kind.board') : '';
   return (
     <View style={{ gap: spacing.xl }}>
       <GroupBox title={tr('sysinfo.group.computer')}>
-        {!pi || m.vendor ? <Row label={tr('sysinfo.f.vendor')} value={m.vendor} /> : null}
-        {!pi || m.product ? <Row label={tr('sysinfo.f.product')} value={[m.product, m.version].filter(Boolean).join(' ')} /> : null}
-        {m.model ? <Row label={tr('sysinfo.f.model')} value={m.model} /> : null}
+        <Row label={tr('sysinfo.f.vendor')} value={m.vendor || (pi ? 'Raspberry Pi Ltd' : '')} />
+        <Row label={tr('sysinfo.f.product')} value={[m.product || (board && board.product), m.version || (board && board.version)].filter(Boolean).join(' ')} />
+        {m.model && !board ? <Row label={tr('sysinfo.f.model')} value={m.model} /> : null}
         {pi ? <Row label={tr('sysinfo.f.revision')} value={pi.revision} /> : null}
+        {board && board.maker ? <Row label={tr('sysinfo.f.madeBy')} value={board.maker} /> : null}
         <Row label={tr('sysinfo.f.kind')} value={kind} />
         {box ? <Row label={tr('sysinfo.f.case')} value={tr(`sysinfo.case.${camel(box)}`)} /> : null}
       </GroupBox>
+      {board ? (
+        <GroupBox title={tr('sysinfo.group.board')}>
+          <Row label={tr('sysinfo.f.vendor')} value="Raspberry Pi Ltd" />
+          <Row label={tr('sysinfo.f.product')} value={board.product} />
+          <Row label={tr('sysinfo.f.chip')} value={board.chip} />
+          <Row label={tr('sysinfo.f.boardMemory')} value={board.memoryGB ? formatBytes(board.memoryGB * 1e9) : ''} />
+        </GroupBox>
+      ) : null}
       {hasBoard ? (
         <GroupBox title={tr('sysinfo.group.board')}>
           <Row label={tr('sysinfo.f.vendor')} value={m.boardVendor} />

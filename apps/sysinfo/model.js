@@ -118,6 +118,23 @@ export function hardwareSections(r) {
   return Object.keys(has).filter((k) => has[k]);
 }
 
+// What a Raspberry Pi says about itself in its revision code, read from the board and needing no network: the new style
+// sets bit 23, then memory (bits 20-22), maker (16-19), processor (12-15), type (4-11) and revision (0-3).
+const PI_TYPES = { 0x04: 'Raspberry Pi 2 Model B', 0x08: 'Raspberry Pi 3 Model B', 0x09: 'Raspberry Pi Zero', 0x0c: 'Raspberry Pi Zero W', 0x0d: 'Raspberry Pi 3 Model B+', 0x0e: 'Raspberry Pi 3 Model A+',
+  0x11: 'Raspberry Pi 4 Model B', 0x12: 'Raspberry Pi Zero 2 W', 0x13: 'Raspberry Pi 400', 0x14: 'Raspberry Pi Compute Module 4', 0x15: 'Raspberry Pi Compute Module 4S', 0x17: 'Raspberry Pi 5 Model B',
+  0x18: 'Raspberry Pi Compute Module 5', 0x19: 'Raspberry Pi 500', 0x1a: 'Raspberry Pi Compute Module 5 Lite' };
+const PI_CHIPS = ['BCM2835', 'BCM2836', 'BCM2837', 'BCM2711', 'BCM2712'];
+const PI_MAKERS = ['Sony UK', 'Egoman', 'Embest', 'Sony Japan', 'Embest', 'Stadium'];
+const PI_MEMORY = [0.25, 0.5, 1, 2, 4, 8, 16];
+
+export function piBoard(revision) {
+  const code = parseInt(String(revision || ''), 16);
+  if (!Number.isFinite(code) || !((code >> 23) & 1)) return null;
+  const type = PI_TYPES[(code >> 4) & 0xff];
+  return { product: type || '', chip: PI_CHIPS[(code >> 12) & 15] || '', maker: PI_MAKERS[(code >> 16) & 15] || '',
+    memoryGB: PI_MEMORY[(code >> 20) & 7] || 0, version: `1.${code & 15}` };
+}
+
 // Raspberry Pi get_throttled bits: what happened now and since boot.
 export function throttleFlags(v) {
   if (v == null || v < 0) return null;

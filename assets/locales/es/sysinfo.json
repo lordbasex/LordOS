@@ -667,5 +667,8 @@
   "usbSpeed": "USB · {mbps} Mbit/s",
   "withSwap": "más {size} de intercambio",
   "withZram": "más {size} de memoria comprimida (zram)",
-  "yes": "Sí"
+  "yes": "Sí",
+  "f.madeBy": "Fabricado por",
+  "f.chip": "Chip",
+  "f.boardMemory": "Memoria de la placa"
 }

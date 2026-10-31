@@ -2,7 +2,7 @@
 // the reasons for CPU composition, the Compatibility panel and the Hardware sections. Run by
 // tests/run_suites.sh (needs node).
 import { evaluate, evaluateProbe, evaluateBench, LIMITS } from '../../apps/sysinfo/checks.js';
-import { compositionReason, cardLayers, sessionLayers, compatibility, hardwareSections, throttleFlags, piStatus, machineName, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from '../../apps/sysinfo/model.js';
+import { compositionReason, cardLayers, sessionLayers, compatibility, hardwareSections, piBoard, throttleFlags, piStatus, machineName, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from '../../apps/sysinfo/model.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => {
@@ -191,6 +191,10 @@ eq('a failing check is named', evaluateBench({ ...bench, checks: [...bench.check
 eq('software renderer warns, headless presents nothing', st(evaluateBench({ ...bench, presented: 0, discarded: 9, gl: { renderer: 'llvmpipe', kind: 'SOFTWARE (CPU)' }, latency: {} })),
   { wayland: 'pass', renderer3d: 'warn', presented: 'warn' });
 eq('not a bench report', [evaluateBench(null), evaluateBench({ tool: 'x' }), evaluateBench({ tool: 'lordos-testbench' })], [null, null, null]);
+
+// ---- a Raspberry Pi's revision code ----
+eq('a Pi 5, 16 GB, from Sony UK', piBoard('e04171'), { product: 'Raspberry Pi 5 Model B', chip: 'BCM2712', maker: 'Sony UK', memoryGB: 16, version: '1.1' });
+eq('an old-style or unreadable code says nothing', [piBoard('a02082x'.slice(0, 0)), piBoard('000e'), piBoard(null)], [null, null, null]);
 
 console.log(`sysinfo-model-test: ${n - bad} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);
