@@ -15,7 +15,7 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 | Feature | State | Notes |
 |---|---|---|
 | `lord-clean` scanner | Built | Rules, tree and duplicates modes |
-| Compiled rule table | Built | 41 rules; `CLEANER.md` lists them |
+| Compiled rule table | Built | 43 rules; `CLEANER.md` lists them |
 | `lord.clean` | Built | No history of paths, by design |
 | Plan in C with expiry | Built | Ten minutes, runs once |
 | Execution to the Trash | Built | Restore per item in the result |
@@ -30,12 +30,24 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 | Looks | Built | Noche, Aurora, Cristal |
 | Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn |
 | Bubble view | Built | Selecting a folder reviews its large files; no folder action |
-| Similar images | Not started | Phase 2 |
-| Apps | Not started | Phase 2 |
+| Similar images | Built | Decoded only in `lord-clean`; JPEG, PNG, GIF and BMP; 20,000 images at most; to the Trash, one image of each group always stays |
+| Apps | Built | Installed apps by size, removed by the package engine or `.lpk` removal; leftovers of removed LordOS apps. A real removal was not run: the test session has no admin helper |
 | System files | Built | Three closed admin actions, not run on the VM |
-| Status word: updates | Partly | The rule exists; the panel doesn't read the update state |
-| Translated Downloads folders | Not started | Only `Downloads` is covered |
-| Old kernels | Not started | Goes through `lord.pkg.plan`, never custom logic |
+| Status word: updates | Built | The panel reads the `lordos` package's state when it opens. The word itself was seen only with that state stubbed: `lordos` isn't a package on the VM |
+| Translated Downloads folders | Built | From `XDG_DOWNLOAD_DIR`, only a `$HOME/…` value that passes as a rule's root |
+| Old kernels | Built | Chosen in `sdk/oldkernels.js`, shown through `lord.pkg.plan`, run by `pkg-remove`. The real plan was read on the VM; the removal was not run |
+| System temporary folder | Built | Your own files over a week old, measured only |
+
+## Phases 2 and 3: what has no row above
+
+| Feature | State | Notes |
+|---|---|---|
+| Performance page reusing Monitor and Disks | Not started | |
+| Privacy recommendations | Not started | Needs a written list of what is recommended first |
+| Scheduled scans that only notify | Waiting for approval | A timer in the session; nothing resident exists today |
+| Configuration audit | Waiting for approval | |
+| Browser, mail and cloud modules | Waiting for approval | |
+| Optional malware scanner | Waiting for approval | Would be a new dependency; Cleaner makes no such claim today |
 
 ## Limits of what exists
 
@@ -43,10 +55,14 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 - A candidate is a regular file, or a whole folder for a model. Empty folders left behind stay.
 - A name that isn't valid UTF-8 or holds control characters is never offered, and marks the scan incomplete.
 - A root that is a symbolic link or a mount is not read: someone with `~/.cache` on another disk gets nothing from those rules.
-- Lists draw a fixed window of rows and don't yet know the box's real height, so the last screenful of a long list needs a little extra scrolling room.
+- Similar images doesn't cover WebP, HEIC or camera raw files, and ignores EXIF rotation, so a turned copy isn't found. Different screenshots of the same desktop can group together: that is why nothing is selected and every image is shown.
+- A full scan doesn't include similar images: it reads every picture, so it is started on its own.
+- A leftover is only a removed LordOS app's data folder. What a Linux app leaves in `~/.config` or `~/.cache` can't be tied to the app with certainty, so it isn't offered.
+- `/tmp` is measured, never offered: which of the files there a program still uses can't be shown, and the Trash can't take them from another disk.
+- An absolute `XDG_DOWNLOAD_DIR` isn't followed: those rules then use `~/Downloads`.
 - A `.deb` cache is often empty on LordOS: the package engine deletes its own downloads.
 - Closing the app cancels a running job and drops its results.
 
 ## Tested
 
-See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root, paint cost and on-screen frame times.
+See `CLEANER-TESTS.md`. Not tested: the `lordos-cleaner` scope under `lord-sessiond`, a real installed session, the Raspberry Pi, the admin actions as root, removing an app or a kernel for real, paint cost and on-screen frame times.

@@ -630,7 +630,7 @@ left for after 0.8.6, and the new native app:
 - [ ] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
   are read-only, and every change goes through a reviewed plan the user confirms. Nothing is copied from other
   projects. Design: `CLEANER-ARCHITECTURE.md`, in phases: the core, then system care, then the optional modules. The
-  first slice exists (one rule, end to end to the Trash); each feature's state is in `CLEANER-ROADMAP.md`.
+  Phase 1 and the rows of Phase 2 are built in development; each feature's state is in `CLEANER-ROADMAP.md`.
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
   FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29).

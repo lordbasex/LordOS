@@ -32,6 +32,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
   before (`fsops-test`).
 
+- **Cleaner: similar images, Apps, translated Downloads, old kernels, the update word** (2026-10-30; `docs/CLEANER.md`, states in `docs/CLEANER-ROADMAP.md`).
+  - **Similar images**, from the Duplicates section: pictures that look alike in chosen folders, with thumbnails. `lord-clean` decodes PNG, JPEG, GIF and BMP with the `stb_image` the project already carries, inside the same sandbox, never in `lord-server`, and a 64-bit difference hash decides. Within 6 bits and 2 % in proportions; each image joins the largest it resembles. lord-server checks every group and refuses one that doesn't hold together. Nothing is selected, it goes only to the Trash, and one image of each group stays. Limits: 20,000 images, 64 MiB, 40 megapixels. Not covered: WebP, HEIC, raw files and EXIF rotation.
+  - **Apps:** installed apps by size, removed by the package engine with `lord.pkg.plan` shown first, as in the Store, or `.lpk` removal. What removed LordOS apps left is a new rule, `app-leftovers`: the whole folder, named, to the Trash, only while no installed or system app has that id.
+  - **Translated Downloads folders:** the download rules follow `XDG_DOWNLOAD_DIR`, so `~/Descargas` works, and only a `$HOME/…` value that would pass as a rule's root counts. `userDirs()` now also gives `downloads`, so Duplicates offers that folder too.
+  - **Old kernels**, in Cleanup, for administrators: chosen in `sdk/oldkernels.js`, keeping the running kernel, the newest and one to go back to, through `lord.pkg.plan` and `pkg-remove`, with no new root action.
+  - **The update word:** the panel by the clock reads whether a newer `lordos` package is known, once, as it opens.
+  - **`/tmp`:** a new rule shows your own files there over a week old. Measured only, left out of the estimate: another program's use of them can't be ruled out.
+  - **Lists** know their box's real height, so a long list ends with its last row at the bottom.
+  - **Tested on VM 116:** `clean-test` 823 checks, `oldkernels-test`, measurements in `docs/CLEANER-TESTS.md`, and an isolated session driving the real app. **Not tested:** removing an app or a kernel (that session has no admin helper), the update word from a real pending update, an installed session, the Raspberry Pi.
+
 - **Cleaner, Phase 1** (2026-10-30; `docs/CLEANER.md`, `docs/CLEANER-SECURITY.md`, `docs/CLEANER-TESTS.md`): on top of the entries below.
   - **Sections:** Scan, Cleanup, Large files, Storage, Duplicates, Activity and Settings. Large and old files filter by size, age and type. Storage covers `/`, the home folder and
     the user's mounts, with a map, a folder list with logical and allocated sizes, and a summary by type, from a bounded tree in `lord-clean`. Duplicates are found by size, partial and
