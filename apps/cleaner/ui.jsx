@@ -274,7 +274,7 @@ export function Hero({ art, title, line, features = [], children }) {
 // The large round button: it sits high enough for its pulse never to reach the Dock's blur (a box that does repaints
 // the whole Dock), its glow is still and only its inside breathes, and busy it is circled by two dots.
 const ORB = 96, ORB_R = ORB / 2 + 6, ORB_BOTTOM = 40;
-export const ORB_SPACE = 136;                // what a section leaves free for it
+export const ORB_SPACE = 148;                // what a section leaves free for it
 export function Orb({ label, onClick, disabled, busy }) {
   const p = usePal();
   const glow = useRef(null), ring = useRef(null), press = useRef(null), dot = useRef(null), tail = useRef(null);

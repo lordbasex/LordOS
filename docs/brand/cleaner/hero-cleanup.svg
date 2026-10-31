@@ -13,7 +13,7 @@
 <radialGradient id="lens" cx=".4" cy=".35"><stop offset="0" stop-color="#e6fbff" stop-opacity=".85"/><stop offset="1" stop-color="#39c5ff" stop-opacity=".35"/></radialGradient>
 <linearGradient id="pane" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".34"/><stop offset=".5" stop-color="#9fd8ff" stop-opacity=".16"/><stop offset="1" stop-color="#8a6bff" stop-opacity=".3"/></linearGradient>
 <radialGradient id="back" cx=".5" cy=".5"><stop offset="0" stop-color="#bfeeff" stop-opacity=".75"/><stop offset=".55" stop-color="#7a7dff" stop-opacity=".3"/><stop offset="1" stop-color="#7a7dff" stop-opacity="0"/></radialGradient>
-<radialGradient id="well" cx=".5" cy=".42"><stop offset="0" stop-color="#2a2f8c" stop-opacity=".1"/><stop offset="1" stop-color="#050828" stop-opacity=".62"/></radialGradient>
+<radialGradient id="well" cx=".5" cy=".42"><stop offset="0" stop-color="#2a2f8c" stop-opacity=".1"/><stop offset="1" stop-color="#050828" stop-opacity=".46"/></radialGradient>
 <linearGradient id="edgelit" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#bfeeff" stop-opacity=".25"/><stop offset="1" stop-color="#8a6bff" stop-opacity=".7"/></linearGradient>
 <filter id="contact" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="7"/></filter>
 <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>

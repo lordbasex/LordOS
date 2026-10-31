@@ -2,7 +2,7 @@
 // at least one independent copy of every group and compares bytes right before acting.
 import { View, cleaner, t as tr, formatBytes, formatNumber, formatDate, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, ORB_SPACE } from './ui.jsx';
 
 export function DupHero({ folders, chosen, toggle }) {
   return (
