@@ -25,6 +25,7 @@ export const COMPONENTS = {
   'lordos:store': { label: 'monitor.comp.store', icon: 'store', hint: 'monitor.comp.storeHint', warn: 'monitor.comp.storeWarn' },
   'lordos:print': { label: 'monitor.comp.print', glyph: 'printer', hint: 'monitor.comp.printHint' },
   'lordos:terminal': { label: 'monitor.comp.terminal', icon: 'terminal', hint: 'monitor.comp.terminalHint' },
+  'lordos:lan': { label: 'monitor.comp.lan', glyph: 'network', hint: 'monitor.comp.lanHint' },
   'lordos:lists': { label: 'monitor.comp.lists', glyph: 'shield', hint: 'monitor.comp.listsHint' },
   'lordos:vpn': { label: 'monitor.comp.vpn', glyph: 'tunnel', hint: 'monitor.comp.vpnHint', system: true },
   'system:dns': { label: 'monitor.comp.dns', glyph: 'dns', hint: 'monitor.comp.dnsHint', system: true },

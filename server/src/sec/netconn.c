@@ -18,7 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists" };
+static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists", "lan" };
 
 const char *netconn_name(NcComponent c) { return (unsigned)c < NC_COUNT ? NAMES[c] : NULL; }
 
@@ -87,7 +87,7 @@ int netconn_serve_one(const NcReq *r) {
 
 /* ---- lord-server's side ---- */
 
-static struct { int fd; pid_t pid; } conn[NC_COUNT] = { { -1, 0 }, { -1, 0 }, { -1, 0 } };
+static struct { int fd; pid_t pid; } conn[NC_COUNT] = { { -1, 0 }, { -1, 0 }, { -1, 0 }, { -1, 0 } };
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 
 static void drop(NcComponent c) {

@@ -123,7 +123,7 @@ int fw_app_canon(const char *in, char *out, size_t n);
 /* (0.8.5) LordOS's own components that use the network, each in its own scope
  * lordos-net-<name>.scope so the kernel enforces their rules (docs/MONITOR.md, "Native apps as
  * their own rows"): their firewall id is "lordos:<name>". 1 if name is one of them. */
-#define FW_COMPONENTS { "mail", "store", "print", "terminal", "lists", NULL }
+#define FW_COMPONENTS { "mail", "store", "print", "terminal", "lists", "lan", NULL }
 int fw_component_ok(const char *name);
 /* "lordos-net-<name>.scope" of a known component → "lordos:<name>" in app. 0 ok, -1 otherwise. */
 int fw_component_scope(const char *scope, char *app, size_t n);

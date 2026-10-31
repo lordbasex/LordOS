@@ -454,5 +454,7 @@
   "volt.rail.3V3_DAC": "3.3 V DAC",
   "volt.rail.3V3_ADC": "3.3 V ADC",
   "volt.rail.HDMI": "HDMI 5 V",
-  "volt.rail.BATT": "Clock battery"
+  "volt.rail.BATT": "Clock battery",
+  "comp.lan": "Network search in Files",
+  "comp.lanHint": "Files → Network: computers and shares on the local network."
 }

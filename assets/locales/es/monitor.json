@@ -454,5 +454,7 @@
   "volt.rail.3V3_DAC": "3,3 V DAC",
   "volt.rail.3V3_ADC": "3,3 V ADC",
   "volt.rail.HDMI": "HDMI 5 V",
-  "volt.rail.BATT": "Batería del reloj"
+  "volt.rail.BATT": "Batería del reloj",
+  "comp.lan": "Búsqueda en la red de Archivos",
+  "comp.lanHint": "Archivos → Red: computadoras y recursos compartidos en la red local."
 }

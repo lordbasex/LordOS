@@ -7,6 +7,7 @@
 #include "../doc/wire.h"
 #include "../print/mdns.h"
 #include "../sec/json.h"
+#include "../sec/netconn.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -75,18 +76,8 @@ static long long now_ms(void) {
 static void set_state(const char *s) { pthread_mutex_lock(&mu); state = s; pthread_mutex_unlock(&mu); }
 
 /* ---- sockets ----
- * A LordOS session's components get their sockets from a connector, so the kernel counts and decides
- * them as that component (sec/netconn.h). A connector name needs the maintainer's review (AGENTS.md)
- * and this one has not had it, so inside a session there are no sockets at all and the page says
- * so, rather than borrowing the printers' connector or counting this as lord-server's own traffic.
- * Outside a session (development, tests) the socket is made here, exactly as netconn_socket does. */
-static int lan_socket(int type, const struct sockaddr *to, socklen_t tolen) {
-    if (getenv("LORDOS_SESSIOND")) { errno = ENOTSUP; return -1; }
-    int fd = socket(AF_INET, type | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    if (fd < 0) return -1;
-    if (to && connect(fd, to, tolen) && errno != EINPROGRESS) { int e = errno; close(fd); errno = e; return -1; }
-    return fd;
-}
+ * Made by the component's connector, so the kernel counts and decides them as lordos:lan (sec/netconn.h). */
+static int lan_socket(int type, const struct sockaddr *to, socklen_t tolen) { return netconn_socket(NC_LAN, AF_INET, type, to, tolen); }
 
 static int lan_tcp(uint32_t a, int port) {
     struct sockaddr_in to = { .sin_family = AF_INET, .sin_port = htons((uint16_t)port), .sin_addr.s_addr = htonl(a) };
@@ -580,7 +571,6 @@ static void *pass(void *arg) {
     load_ifaces();
     denied = 0;
     if (!nifs) { set_state("no-lan"); goto out; }
-    if (getenv("LORDOS_SESSIOND")) { set_state("no-connector"); goto out; }
     if (helper_start()) { set_state("no-helper"); goto out; }
     set_state("mdns");
     mdns_pass();
