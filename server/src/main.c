@@ -31,6 +31,7 @@
 #include "drmcard.h"
 #include "term/term.h"
 #include "ui/js.h"
+#include "ui/js_input.h"
 #include "ui/ui.h"
 #include "wl/wl.h"
 #include "gpu/gpu.h"
@@ -538,8 +539,19 @@ static void remote_wheel(int steps) {
     remote_settle(s);
 }
 
+/* Is there a keyboard to type on (the on-screen keyboard's Automatic mode)? A viewer who typed on the
+ * remote desktop has one too, until the session is back on the monitor. */
+static int remote_typed;
+static void keyboards_check(Server *s) {
+    static int last = -1;
+    int now = input_has_keyboard(&s->input) || remote_typed;
+    js_input_set_keyboard(now);
+    if (now != last) { last = now; js_keyboards_event(now); }
+}
+
 static void remote_key(int code, int value) {
     Server *s = remote_server;
+    if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
     if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
     js_key(code, value);
@@ -834,6 +846,7 @@ static void remote_input_add(const int *fds, int n) {
     Server *s = remote_server;
     if (s->headless) { for (int i = 0; i < n; i++) close(fds[i]); return; }
     if (input_add_fds(&s->input, fds, n)) wl_input_devices_changed();
+    keyboards_check(s);
 }
 
 /* A lent card with no monitor connected (a Raspberry Pi booted headless, a laptop lid closed on a
@@ -888,6 +901,8 @@ static void display_attach(const int *fds, int n, int flags) {
     struct stat st;
     if (fstat(o0->kms.fd, &st) == 0) wl_set_drm_device(st.st_rdev);
     display_attached();                 /* Night Light, idle timers, the list in Settings; queues a resync */
+    remote_typed = 0;
+    keyboards_check(s);
     display_take_resync();
     outputs_apply(s);                   /* the other displays, saved modes, scales and arrangement */
     /* the pointer where it is (an absolute tablet does not report if it does not move) or in the middle of the main display */
@@ -933,6 +948,7 @@ static void display_detach(void) {
     s->gpu_paused = 0;
     s->headless = 1;
     display_detached();
+    js_input_drop();
     set_size(s, s->W & ~1, s->H & ~1);  /* a frame in memory of the same size */
     fprintf(stderr, "monitor: the session leaves the screen\n");
 }
@@ -2360,6 +2376,7 @@ int main(int argc, char **argv) {
                 if (delay < 0 || left < delay) delay = left;
             }
         }
+        js_input_flush();                   /* the on-screen keyboard's taps (js_input.c), as physical keys */
         /* the frame pipeline (fpipe.h): a prepared frame whose flip is done is submitted, and the next one may
          * be painted while every display waits for its flip */
         int ahead = !unseen && can_prepare(&s);
@@ -2471,6 +2488,7 @@ int main(int argc, char **argv) {
          * solo ese. Dejar el monitor lo decide únicamente lord-sessiond (RP_UNDISPLAY), nunca un error */
         for (int k = nlost - 1; k >= 0; k--) input_remove(&s.input, lost[k]);
         if (nlost) wl_input_devices_changed();
+        if (s.input.count || nlost) keyboards_check(&s);
         /* la GPU vuelve cuando ya nadie mira desde la red */
         if (s.gpu_paused && !s.headless && !any_flip_pending(&s) && gpu_allowed(&s)) {
             s.gpu_paused = 0;

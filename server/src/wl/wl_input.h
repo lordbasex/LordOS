@@ -28,6 +28,11 @@ void wl_input_devices_changed(void);    /* a touchscreen was connected or remove
 /* called by wl.c */
 void wl_input_globals(struct wl_display *dpy);
 void wl_input_get_touch(struct wl_client *c, struct wl_resource *seat, uint32_t id);
+/* zwp_text_input_v3 (wl_textinput.c): fn(on, x, y, w, h) when the focused client's field takes or
+ * loses focus, or its caret moves (surface coordinates). */
+void wl_textinput_globals(struct wl_display *dpy, void (*fn)(int on, int x, int y, int w, int h));
+void wl_textinput_focus(struct wl_client *client, struct wl_resource *surface);    /* NULL: nobody */
+void wl_textinput_gone(void);           /* the surface with the keyboard is being destroyed */
 void wl_input_seat_caps(struct wl_resource *seat);
 /* regular mouse wheel (wl_pointer in wl.c): axis + axis_source wheel + value120 */
 void wl_input_wheel(struct wl_resource *pointer, uint32_t time, int steps);

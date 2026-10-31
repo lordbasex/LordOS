@@ -528,6 +528,13 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
         }
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
+    case BOP_TEXT_FOCUS: {
+        int on = 0, y = 0, fh = 0;
+        if (sscanf(payload, "%d %d %d", &on, &y, &fh) == 3 && y >= -1 && y <= 32767 && fh >= 0 && fh <= 32767)
+            queue_evt("textfocus", "{\"app\":\"%s\",\"on\":%s,\"y\":%d,\"h\":%d}", a->id, on ? "true" : "false", y, fh);
+        send_reply(fd, h->reqid, BST_OK, NULL, 0);
+        break;
+    }
     case BOP_STATE: {
         static char st[STATE_MAX + 8192];
         size_t n = state_json(st, sizeof st);

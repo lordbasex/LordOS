@@ -596,7 +596,7 @@ static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->parent) {
@@ -1729,7 +1729,7 @@ static void top_gone(struct wl_resource *r) {
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
 }
 
 /* ---- xdg_popup ---- */
@@ -3122,6 +3122,12 @@ int wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *g
 
 /* ---- from JS ---- */
 
+/* A text field of the app with the keyboard took or lost focus: the on-screen keyboard's hint. */
+static void text_field_report(int on, int x, int y, int w, int h) {
+    if (!key_focus) return;
+    emit(key_focus, "textinput", "{\"on\":%s,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", on ? "true" : "false", x, y, w, h);
+}
+
 void wl_set_focus(int id) {
     if (!dpy) return;
     Surf *s = id ? find(id) : NULL;
@@ -3136,6 +3142,7 @@ void wl_set_focus(int id) {
         dismiss_popups();
     }
     key_focus = s;
+    wl_textinput_focus(s ? s->client : NULL, s ? s->res : NULL);
     if (s) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);
         s->activated = 1;
@@ -3261,6 +3268,7 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
+    wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
@@ -3357,7 +3365,7 @@ void wlx_detach(int sid) {
     if (!s) return;
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->role == R_POPUP) unmap_popup(s);
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (fs_surf == s) { fs_surf = NULL; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (s->node) damage_node(s);

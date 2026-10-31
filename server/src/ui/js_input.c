@@ -5,9 +5,26 @@
  *   lord.input.devices()      → [{ name, kind: 'touchpad'|'touchscreen', clickpad, width, height, fingers }]
  *   lord.input.config()       → { speed, tap, tapDrag, natural, secondary, threeDrag, dwt, scroll,
  *                                 kinetic, pinch, swipe3, swipe4 }
- *   lord.input.configure(obj) → applies the valid fields (the rest stay as they are); true */
+ *   lord.input.configure(obj) → applies the valid fields (the rest stay as they are); true
+ *
+ * The on-screen keyboard (docs/ON-SCREEN-KEYBOARD.md). The theme's and the login screen's context
+ * only: an isolated app's process has the broker's `lord`, without any of these.
+ *
+ *   lord.input.hasKeyboard()  → is a keyboard someone can type on attached?
+ *   lord.input.keyLabels()    → { altgr, keys: { code: [plain, shift, altgr, altgr + shift] } } of the
+ *                               active layout, or null without XKB
+ *   lord.input.tap(code, level) → queues one press and release of a key from a closed list; the main
+ *                               loop sends it down js_key, the path of a physical key, so it goes
+ *                               to the focused client or field, through the layout and the input
+ *                               method. level: 1 Shift, 2 AltGr. No Ctrl, Alt or Super: a tap
+ *                               can't be a shortcut. Nothing here logs or keeps what is typed. */
 #include "js_input.h"
+#include "js.h"
+#include "../keyboard.h"
+#include "../osk.h"
 #include "../tp/tp.h"
+
+#include <linux/input.h>
 
 #include <stddef.h>
 #include <string.h>
@@ -63,10 +80,64 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     return JS_TRUE;
 }
 
+static int keyboard_present;
+void js_input_set_keyboard(int present) { keyboard_present = present; }
+
+static JSValue f_has_keyboard(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
+    (void)this; (void)argc; (void)argv;
+    return JS_NewBool(c, keyboard_present);
+}
+
+static JSValue f_key_labels(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
+    (void)this; (void)argc; (void)argv;
+    if (!kb_labels_begin()) return JS_NULL;
+    JSValue o = JS_NewObject(c), keys = JS_NewObject(c);
+    for (size_t i = 0; i < osk_label_count; i++) {
+        JSValue row = JS_NewArray(c);
+        for (int l = 0; l < 4; l++) {
+            char s[32];
+            kb_label(osk_label_codes[i], l, s, sizeof s);
+            JS_SetPropertyUint32(c, row, (uint32_t)l, JS_NewString(c, s));
+        }
+        JS_SetPropertyUint32(c, keys, osk_label_codes[i], row);
+    }
+    kb_labels_end();
+    JS_SetPropertyStr(c, o, "altgr", JS_NewBool(c, kb_has_altgr()));
+    JS_SetPropertyStr(c, o, "keys", keys);
+    return o;
+}
+
+static JSValue f_tap(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
+    (void)this;
+    int32_t code = 0, level = 0;
+    if (argc < 1 || JS_ToInt32(c, &code, argv[0])) return JS_FALSE;
+    if (argc > 1 && JS_ToInt32(c, &level, argv[1])) return JS_FALSE;
+    /* without a third level Right Alt is plain Alt: that would be a shortcut */
+    if ((level & OSK_LEVEL_ALTGR) && !kb_has_altgr()) return JS_FALSE;
+    return JS_NewBool(c, osk_push(code, level));
+}
+
+void js_input_flush(void) {
+    OskTap t;
+    while (osk_pop(&t)) {
+        if (t.level & OSK_LEVEL_ALTGR) js_key(KEY_RIGHTALT, 1);
+        if (t.level & OSK_LEVEL_SHIFT) js_key(KEY_LEFTSHIFT, 1);
+        js_key(t.code, 1);
+        js_key(t.code, 0);
+        if (t.level & OSK_LEVEL_SHIFT) js_key(KEY_LEFTSHIFT, 0);
+        if (t.level & OSK_LEVEL_ALTGR) js_key(KEY_RIGHTALT, 0);
+    }
+}
+
+void js_input_drop(void) { osk_clear(); }
+
 static const JSCFunctionListEntry input_funcs[] = {
     JS_CFUNC_DEF("devices", 0, f_devices),
     JS_CFUNC_DEF("config", 0, f_config),
     JS_CFUNC_DEF("configure", 1, f_configure),
+    JS_CFUNC_DEF("hasKeyboard", 0, f_has_keyboard),
+    JS_CFUNC_DEF("keyLabels", 0, f_key_labels),
+    JS_CFUNC_DEF("tap", 2, f_tap),
 };
 
 void js_input_register(JSContext *c, JSValue lord) {

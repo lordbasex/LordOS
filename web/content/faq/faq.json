@@ -765,9 +765,9 @@
             "pt": "O LordOS é acessível?"
           },
           "a": {
-            "en": "Partly, for now. There is a Reduce motion setting, per-display scaling and keyboard shortcuts, but a screen reader, screen zoom and a high-contrast theme are not available yet; they are on the roadmap. The website's accessibility is described in the [Accessibility statement](/legal/accessibility/).",
-            "es": "En parte, por ahora. Hay una opción para reducir el movimiento, escala por pantalla y atajos de teclado, pero un lector de pantalla, la lupa y un tema de alto contraste todavía no están; están en la hoja de ruta. La accesibilidad del sitio está descrita en la [Declaración de accesibilidad](/legal/accessibility/).",
-            "pt": "Em parte, por enquanto. Há uma opção para reduzir o movimento, escala por tela e atalhos de teclado, mas um leitor de tela, a lupa e um tema de alto contraste ainda não estão disponíveis; estão no roteiro. A acessibilidade do site está descrita na [Declaração de acessibilidade](/legal/accessibility/)."
+            "en": "Partly, for now. There is a Reduce motion setting, per-display scaling, keyboard shortcuts and, in development for 0.8.7, an on-screen keyboard that also works at the login and lock screens, but a screen reader, screen zoom and a high-contrast theme are not available yet; they are on the roadmap. The website's accessibility is described in the [Accessibility statement](/legal/accessibility/).",
+            "es": "En parte, por ahora. Hay una opción para reducir el movimiento, escala por pantalla, atajos de teclado y, en desarrollo para 0.8.7, un teclado en pantalla que también funciona en las pantallas de inicio de sesión y de bloqueo, pero un lector de pantalla, la lupa y un tema de alto contraste todavía no están; están en la hoja de ruta. La accesibilidad del sitio está descrita en la [Declaración de accesibilidad](/legal/accessibility/).",
+            "pt": "Em parte, por enquanto. Há uma opção para reduzir o movimento, escala por tela, atalhos de teclado e, em desenvolvimento para 0.8.7, um teclado na tela que também funciona nas telas de login e de bloqueio, mas um leitor de tela, a lupa e um tema de alto contraste ainda não estão disponíveis; estão no roteiro. A acessibilidade do site está descrita na [Declaração de acessibilidade](/legal/accessibility/)."
           }
         }
       ]

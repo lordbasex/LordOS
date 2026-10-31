@@ -289,5 +289,10 @@
   "shortcuts.captureArea": "Screenshot of an area",
   "shortcuts.capturePanel": "Screenshots panel and screen recording",
   "shortcuts.space": "Space",
-  "shortcuts.printScreen": "Print Screen"
+  "shortcuts.printScreen": "Print Screen",
+  "osk.name": "On-Screen Keyboard",
+  "osk.space": "space",
+  "osk.return": "return",
+  "osk.tab": "tab",
+  "osk.esc": "esc"
 }

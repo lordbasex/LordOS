@@ -410,5 +410,12 @@
   "kb.shortcuts.system": "Atajos: sistema",
   "kb.shortcuts.windows": "Atajos: ventanas",
   "kb.shortcuts.apps": "Atajos: apps",
-  "kb.shortcuts.note": "Cada app agrega los suyos: consultá su artículo de Ayuda. Ctrl+Q solo siempre queda para la app."
+  "kb.shortcuts.note": "Cada app agrega los suyos: consultá su artículo de Ayuda. Ctrl+Q solo siempre queda para la app.",
+  "osk.title": "Teclado en pantalla",
+  "osk.open": "Abrir solo",
+  "osk.off": "Desactivado",
+  "osk.auto": "Automático",
+  "osk.always": "Siempre",
+  "osk.show": "Mostrar teclado",
+  "osk.hint": "Automático lo abre cuando un campo de texto toma el foco y no hay un teclado físico conectado. Las pantallas de inicio de sesión y de bloqueo siempre siguen Automático, así nadie queda afuera. Su botón en la barra de menús, o ❖⌃K, lo abre en cualquier momento."
 }

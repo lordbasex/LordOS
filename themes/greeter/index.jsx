@@ -14,7 +14,7 @@
 import { render, screen, mainBox, onScreenChange } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
-  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER,
+  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -85,11 +85,11 @@ function RoundButton({ children, onClick, label }) {
   );
 }
 
-function Pill({ label, onClick }) {
+function Pill({ label, icon, onClick, keepFocus }) {
   return (
-    <View onClick={onClick} style={{ height: 26, paddingHorizontal: 10, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 5,
+    <View keepFocus={keepFocus} onClick={onClick} style={{ height: 26, paddingHorizontal: 10, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 5,
       backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
-      <Text style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+      {icon || <Text style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>}
     </View>
   );
 }
@@ -126,6 +126,7 @@ const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 function Greeter() {
   const { lang } = useStore(locale);
   const s = useStore(settings);
+  useStore(oskState);                   // the on-screen keyboard: nobody at this screen may have another
   const [now, setNow] = useState(() => new Date());
   // a display plugged in or out while it shows: lay it out again on the main one
   useEffect(() => onScreenChange(() => setNow(new Date())), []);
@@ -187,7 +188,7 @@ function Greeter() {
         if (Date.now() - chosen.current > 10000) chosen.current = 0;   // a click from an earlier showing
         send({ t: 'hello' });                       // who has an open session, again
         setIp(lanAddress());
-      } else if (m.t === 'ok') { setPass(''); setMsg(''); setBusy(false); chosen.current = 0; }
+      } else if (m.t === 'ok') { setPass(''); setMsg(''); setBusy(false); chosen.current = 0; osk.hide(); }
       else if (m.t === 'fail') {
         setPass(''); setBusy(false); doShake();
         setMsg(m.wait > 0 ? t('greeter.wait', { count: m.wait }) : t('greeter.wrong'));
@@ -223,10 +224,13 @@ function Greeter() {
   const kbIdx = Math.min(s.keyboardIndex || 0, kbs.length - 1);
   const langs = languages().filter((l) => ['es', 'en', 'pt'].includes(l.id));
   const locked = info.mode === 'lock' && user && user.name === info.user;
+  // the column rises so the password stays above the on-screen keyboard
+  const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);
 
   return (
     <ThemeProvider tokens={{ mode: 'dark', accent: '#ffffff', text: '#ffffff', textDim: 'rgba(255,255,255,0.55)',
-      inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)' }}>
+      inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)',
+      panelBg: 'rgba(30,22,40,0.94)', control: 'rgba(255,255,255,0.18)', sidebarBg: 'rgba(255,255,255,0.09)' }}>
       <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
         <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
           style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
@@ -251,7 +255,7 @@ function Greeter() {
         ) : null}
 
         {/* selected user and password */}
-        <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize, width: W, alignItems: 'center' }}>
+        <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize - lift, width: W, alignItems: 'center' }}>
           {user ? <Avatar user={user} size={avatarSize} /> : null}
           <Text style={{ marginTop: 14, fontSize: 16, fontWeight: 600, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
             {user ? user.full || user.name : t('greeter.noUsers')}</Text>
@@ -295,6 +299,7 @@ function Greeter() {
         <View style={{ position: 'absolute', right: 20, bottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pill label={lang.toUpperCase()} onClick={() => setMenu(menu === 'lang' ? null : 'lang')} />
           {kbs.length > 1 ? <Pill label={keyboard.label(kbs[kbIdx])} onClick={() => setMenu(menu === 'kb' ? null : 'kb')} /> : null}
+          <Pill keepFocus icon={<OskIcon color="rgba(255,255,255,0.85)" size={14} />} onClick={osk.toggle} />
           <RoundButton label={t('greeter.restart')} onClick={() => power('reboot')}>
             <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)' }}>↻</Text>
           </RoundButton>
@@ -315,6 +320,7 @@ function Greeter() {
         {menu === 'kb' ? <PopupList right={20 + 100} onClose={() => setMenu(null)} onPick={(i) => settings.set({ keyboardIndex: Number(i) })}
           items={kbs.map((k, i) => [String(i), keyboard.list().find((x) => x.id === k.layout)?.name || k.layout, i === kbIdx])} /> : null}
         </View>
+        <OskPanel />
       </View>
     </ThemeProvider>
   );
@@ -326,4 +332,5 @@ function Root() {
   return createElement(Greeter, { key: lang });
 }
 
+startOsk();
 render(createElement(Root));

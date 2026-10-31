@@ -19,7 +19,7 @@
 //   drag          drag images and the «poof»
 //   system        system prompts: permissions, passwords and the keyring, Bluetooth pairing,
 //                 «keep this display?», the file chooser
-//   input         the input method's candidate window (it serves the field below it)
+//   input         the input method's candidate window and the on-screen keyboard (they serve the field below)
 //
 // Inside one layer, what opened last is on top. The lock screen and the login screen are another
 // session (lord-sessiond), above all of this.

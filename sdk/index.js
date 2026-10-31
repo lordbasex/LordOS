@@ -14,12 +14,17 @@ export { keyboard } from './keyboard.js';
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev } from './shortcuts.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows } from './appswitcher.jsx';
+export { osk, oskState, startOsk } from './osk.js';
+export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, APP_CATEGORIES, appCategory } from './apps.js';
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
+import { startOsk } from './osk.js';
+import { OskPanel, OskStatus } from './osk.jsx';
+import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
@@ -213,6 +218,8 @@ export function startShell(element) {
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
   startCleanerStatus();                 // Cleaner's still item by the clock; its panel reads only while open
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
+  startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
+  registerStatusItem('osk', OskStatus, 6);
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
 }
 
@@ -250,7 +257,7 @@ function LocaleRoot({ children }) {
     at('modal', PrintDialog),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, DisplayIdentify),
     at('system', PermissionPrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
-    at('input', ImeOverlay));
+    at('input', OskPanel, ImeOverlay));
 }
 export { lordosWallpapers, wallpaperSrc, wallpaperThumb, findWallpaper, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem } from './appcontrol.js';

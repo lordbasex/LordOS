@@ -49,6 +49,8 @@ enum BrokerOp {
                          * with these args (Mail → Calendar for an invitation, Contacts → a new message) */
     BOP_PROBE,          /* (the system package `sysprobe` only, app/probe.c) payload: JSON of what its sandbox
                          * refused; lord-server adds the process's own status and keeps it for lord.sysinfo */
+    BOP_TEXT_FOCUS,     /* payload "on y h": a text field of the app took or lost focus (window coordinates).
+                         * Only a hint for the on-screen keyboard: no text, and no way to press a key */
     BOP_EVENT = 100,    /* server → app, unrequested (reqid 0): payload "type\0json" */
 };
 

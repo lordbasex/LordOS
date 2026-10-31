@@ -14,6 +14,7 @@ const DEFAULTS = {
   keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,
+  osk: 'auto',           // on-screen keyboard: 'off' | 'auto' (no physical keyboard) | 'always' (osk.js)
   language: null,        // interface language ('es', 'en', 'pt'…); null = the region's
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)

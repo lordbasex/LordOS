@@ -15,6 +15,7 @@ LordOS handles language across the whole system, not just in the interface. It s
 | Complex scripts | right to left (bidi), Arabic forms, marks, CJK, per-script font fallback | `server/src/ui/bidi.c`, `shape.c`, `otf.c`, `textlayout.c` |
 | Mirrored interface | with Arabic, Hebrew, Persian… the whole interface runs right to left | `direction` in `layout.c`, `sdk/i18n.js` |
 | Input methods | Korean (hangul), Japanese (kana + SKK), Chinese (pinyin) | `server/src/ime.c`, `sdk/ime.js` |
+| On-screen keyboard | shows the active XKB layout and sends real key codes, so layouts, dead keys and input methods work on it | `sdk/osk.js`, `ON-SCREEN-KEYBOARD.md` |
 
 Everything is managed from **Settings → Language & Region** and **Settings → Keyboard**.
 

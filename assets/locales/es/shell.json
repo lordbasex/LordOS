@@ -289,5 +289,10 @@
   "shortcuts.captureArea": "Captura de un área",
   "shortcuts.capturePanel": "Panel de capturas y grabación de pantalla",
   "shortcuts.space": "Espacio",
-  "shortcuts.printScreen": "Impr Pant"
+  "shortcuts.printScreen": "Impr Pant",
+  "osk.name": "Teclado en pantalla",
+  "osk.space": "espacio",
+  "osk.return": "intro",
+  "osk.tab": "tab",
+  "osk.esc": "esc"
 }

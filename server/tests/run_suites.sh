@@ -154,6 +154,8 @@ EOF
     if have node; then run "oldkernels-test (sdk/oldkernels.js)" node tests/oldkernels_test.mjs
     else skip "oldkernels-test" "node"; fi
     # the Dock's pinned-list model (sdk/dockmodel.js)
+    if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
+    else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows

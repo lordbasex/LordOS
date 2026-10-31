@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm, Segmented, osk,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -460,6 +460,15 @@ function Keyboard() {
         ))}
       </Section>
       {keyboard.active()?.ime && keyboard.missingDictionary() && <Note tone="warn">{tr('settings.ime.noDict')}</Note>}
+      <Section title={tr('settings.osk.title')} footer={tr('settings.osk.hint')}>
+        <SettingRow label={tr('settings.osk.open')}>
+          <Segmented small value={s.osk || 'auto'} onChange={(v) => set({ osk: v })}
+            options={[['off', tr('settings.osk.off')], ['auto', tr('settings.osk.auto')], ['always', tr('settings.osk.always')]]} />
+        </SettingRow>
+        <Actions style={{ paddingVertical: spacing.s }}>
+          <Button small label={tr('settings.osk.show')} onClick={() => osk.show()} />
+        </Actions>
+      </Section>
       <Section title={tr('settings.kb.test')} footer={tr('settings.kb.testHint')}>
         <View style={{ paddingVertical: spacing.s }}>
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
