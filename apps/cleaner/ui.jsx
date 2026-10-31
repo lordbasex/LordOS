@@ -1,9 +1,18 @@
 // Cleaner's look, "Noche": a night sky in the dark theme and its day version in the light one, with slowly
 // twinkling stars, orbits around the hero, glass cards and cyan-to-violet accents. Colours follow the system's
-// mode. Motion goes through one timer and lord.setStyle on nodes (no React render per frame); it runs only while
-// the window is in front, and with Reduce motion nothing moves. Timing: entrances 320-500 ms with a decelerating
+// mode. Motion goes through one frame callback and lord.setStyle on nodes (no React render per frame); it runs only
+// while the window is in front, and with Reduce motion nothing moves. Timing: entrances 320-500 ms with a decelerating
 // curve, ambient loops on slow sines, staggers under 400 ms in all.
-import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
+//
+// The engine repaints one box around everything that changed in a frame, and a box that reaches a blurred surface
+// grows to all of it. So things that move far apart never move in the same frame: each loop has its own frames in a
+// cycle of six (SLOT), and what barely moves only sets a value when its whole pixel changes.
+//
+// A frame callback that changes nothing brings no flip, and with no flip the compositor sleeps until something else
+// wakes it (it does so on a real display; a viewer's video keeps a headless session awake). Slots make such frames
+// common, so a timer is kept pending while anything runs. It does nothing: firing is enough for the frame to follow,
+// and with the screen off, when no frame runs, it fires once and stops.
+import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const Pal = createContext(null);
@@ -14,18 +23,29 @@ export function PalProvider({ children }) {
   return <Pal.Provider value={cleanerPalette(s, th.mode)}>{children}</Pal.Provider>;
 }
 
-const FPS = 30;
-const jobs = new Set();
-let timer = 0;
-function tick() {
-  timer = 0;
-  const now = Date.now();
-  for (const j of [...jobs]) if (j(now) === false) jobs.delete(j);
-  if (jobs.size) timer = setTimeout(tick, 1000 / FPS);
+// bits of a cycle of six frames: at 60 Hz one bit is 10 updates a second
+export const SLOT = { all: 0b010101, a: 0b001001, b: 0b010010, c: 0b000100, d: 0b100000, spin: 0b001010 };
+const jobs = new Map();
+let waiting = false, frame = 0, ran = 0, nudge = 0;
+function ask() {
+  waiting = true;
+  requestAnimationFrame(tick);
+  clearTimeout(nudge);
+  nudge = setTimeout(() => {}, 17);
 }
-function run(fn) {
-  jobs.add(fn);
-  if (!timer) timer = setTimeout(tick, 0);
+function tick() {
+  waiting = false;
+  const now = Date.now();
+  if (now - ran >= 14) {                  // a faster display doesn't run them faster
+    ran = now;
+    const bit = 1 << (frame++ % 6);
+    for (const [j, mask] of [...jobs]) if ((mask & bit) && j(now) === false) jobs.delete(j);
+  }
+  if (jobs.size) ask();
+}
+function run(fn, mask = SLOT.all) {
+  jobs.set(fn, mask);
+  if (!waiting) ask();
   return () => jobs.delete(fn);
 }
 
@@ -49,6 +69,12 @@ export function tween(node, props, { ms = 320, delay = 0, done } = {}) {
   });
 }
 
+// a number or a yes/no from the window's frame: a window that moves renders nothing unless this changes
+export function useFrame(pick) {
+  const { id } = useAppWindow() || {};
+  return useStore(windows, (ws) => { const w = ws.find((x) => x.id === id); return w ? pick(wm.frame(w)) : null; });
+}
+
 export function useLive() {
   const w = useAppWindow() || {};
   const hidden = useStore(windows, (ws) => !!ws.find((x) => x.id === w.id)?.minimized);
@@ -56,20 +82,20 @@ export function useLive() {
   return !still && !hidden && !!w.focused;
 }
 
-export function useLoop(fn, on = true) {
+export function useLoop(fn, on = true, mask = SLOT.all) {
   const live = useLive();
   const f = useRef(fn);
   f.current = fn;
   useEffect(() => {
     if (!live || !on) return undefined;
     const t0 = Date.now();
-    return run((now) => { f.current((now - t0) / 1000); return true; });
-  }, [live, on]);
+    return run((now) => { f.current((now - t0) / 1000); return true; }, mask);
+  }, [live, on, mask]);
 }
 
-export function Enter({ children, style, delay = 0, y = 0, x = 12, ms = 420 }) {
+export function Enter({ children, style, delay = 0, y = 0, x = 12, ms = 420, scale = 1 }) {
   const r = useRef(null);
-  useEffect(() => tween(r.current, { opacity: [0, 1], translateX: [x, 0], translateY: [y, 0] }, { delay, ms }), []);
+  useEffect(() => tween(r.current, { opacity: [0, 1], translateX: [x, 0], translateY: [y, 0], ...(scale !== 1 ? { scaleX: [scale, 1], scaleY: [scale, 1] } : null) }, { delay, ms }), []);
   return <View ref={r} style={style}>{children}</View>;
 }
 
@@ -161,13 +187,12 @@ const STARS = [[18, 22, 3], [42, 12, 2], [66, 32, 3], [84, 18, 2], [30, 72, 2], 
 export function Sky() {
   const p = usePal();
   const dots = useRef([]);
-  // stars breathe out of step; ten updates a second, a few pixels each
-  const last = useRef(0);
+  // the stars breathe out of step, one star per update: a few pixels, and never in a frame with something else
+  const next = useRef(0);
   useLoop((t) => {
-    if (t - last.current < 0.1 || !p.stars) return;
-    last.current = t;
-    dots.current.forEach((d, i) => { if (d) set(d.id, 'opacity', 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.85 + i * 2.1))); });
-  });
+    const i = next.current++ % STARS.length, d = dots.current[i];
+    if (d) set(d.id, 'opacity', 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.85 + i * 2.1)));
+  }, !!p.stars, SLOT.d);
   return (
     <>
       {p.sky ? <Image src={`asset:cleaner/${p.sky}.png`} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} />
@@ -204,33 +229,56 @@ export function midTrim(path, max = 64) {
 
 // ---- a section's opening ----
 
+const ORBIT_A = 162, ORBIT_B = 120;
+const onOrbit = (r, deg) => { const a = deg * Math.PI / 180; return [Math.sin(a) * r, -Math.cos(a) * r]; };
+const INNER_START = 205;
+
 export function Hero({ art, title, line, features = [], children }) {
   const p = usePal();
-  const img = useRef(null), outer = useRef(null), inner = useRef(null), sheen = useRef(null);
+  const obj = useRef(null), shade = useRef(null), outer = useRef(null), inner = useRef(null), sheen = useRef(null), sparkA = useRef(null), sparkB = useRef(null);
+  const whole = useRef(99);
+  const [ix, iy] = onOrbit(ORBIT_B, INNER_START);
+  const small = !!useFrame((g) => g.w < 1040 || g.h < 660);   // a small window: everything still has to fit above the button
+  // the two dots and the object move in frames of their own; the rings don't turn, only their dots do
   useLoop((t) => {
-    if (img.current) set(img.current.id, 'translateY', -7 + Math.sin(t * 1.05) * 7);
-    if (outer.current) set(outer.current.id, 'rotate', (t * 40) % 360);
-    if (inner.current) set(inner.current.id, 'rotate', -(t * 25.7) % 360);
+    if (outer.current) { const [x, y] = onOrbit(ORBIT_A, t * 40); set(outer.current.id, 'translateX', x); set(outer.current.id, 'translateY', y + ORBIT_A); }
+  }, !!p.orbit, SLOT.a);
+  useLoop((t) => {
+    if (inner.current) { const [x, y] = onOrbit(ORBIT_B, INNER_START - t * 25.7); set(inner.current.id, 'translateX', x - ix); set(inner.current.id, 'translateY', y - iy); }
+    const float = Math.round(-7 + Math.sin(t * 1.05) * 7);
+    if (float !== whole.current) {
+      whole.current = float;
+      if (obj.current) set(obj.current.id, 'translateY', float);
+      if (shade.current) { set(shade.current.id, 'opacity', 0.85 + float * 0.04); set(shade.current.id, 'scaleX', 1 + float * 0.012); }
+    }
+    if (sparkA.current) set(sparkA.current.id, 'opacity', 0.15 + 0.85 * Math.max(0, Math.sin(t * 1.3)));
+    if (sparkB.current) set(sparkB.current.id, 'opacity', 0.15 + 0.85 * Math.max(0, Math.sin(t * 1.3 + 2.4)));
     if (sheen.current) { const x = (t % 5) / 5; set(sheen.current.id, 'translateX', x < 0.7 ? 0 : ((x - 0.7) / 0.3) * 420); }
-  });
+  }, true, SLOT.b);
   return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxl, paddingBottom: 96, minHeight: 0 }}>
-      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
-        {p.orbit ? <Image ref={outer} src={`asset:cleaner/orbit-outer-${p.orbit}.png`} style={{ position: 'absolute', left: 0, top: 0, width: 340, height: 340 }} /> : null}
-        {p.orbit ? <Image ref={inner} src={`asset:cleaner/orbit-inner-${p.orbit}.png`} style={{ position: 'absolute', left: 42, top: 42, width: 256, height: 256 }} /> : null}
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxl, paddingBottom: ORB_SPACE, minHeight: 0 }}>
+      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr', ...(small ? { transform: 'scale(0.62)', marginHorizontal: -64 } : null) }}>
+        {p.orbit ? <Image src={`asset:cleaner/orbit-outer-${p.orbit}.png`} style={{ position: 'absolute', left: 0, top: 0, width: 340, height: 340 }} /> : null}
+        {p.orbit ? <Image src={`asset:cleaner/orbit-inner-${p.orbit}.png`} style={{ position: 'absolute', left: 42, top: 42, width: 256, height: 256 }} /> : null}
         {p.pane ? <View style={{ position: 'absolute', left: 40, top: 40, right: 40, bottom: 40, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 30px 60px rgba(90,60,170,0.25)', transform: 'rotate(-6deg)', overflow: 'hidden' }}>
           <View ref={sheen} style={{ position: 'absolute', top: -60, bottom: -60, left: -90, width: 70, backgroundColor: 'rgba(255,255,255,0.75)', transform: 'rotate(18deg)' }} />
         </View> : null}
-        <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={{ width: 262, height: 250 }} />
+        <Image src={`asset:cleaner/glass-${art}.png`} style={{ position: 'absolute', left: 39, top: 45, width: 262, height: 250 }} />
+        <Image ref={shade} src="asset:cleaner/shadow.png" style={{ position: 'absolute', left: 80, top: 244, width: 180, height: 36, opacity: 0.6 }} />
+        <Image ref={obj} src={`asset:cleaner/object-${art}.png`} style={{ position: 'absolute', left: 39, top: 45, width: 262, height: 250 }} />
+        {p.orbit ? <Image ref={outer} src={`asset:cleaner/orbit-dot-${p.orbit}.png`} style={{ position: 'absolute', left: 156, top: -6, width: 28, height: 28 }} /> : null}
+        {p.orbit ? <View ref={inner} style={{ position: 'absolute', left: 165 + ix, top: 165 + iy, width: 10, height: 10, borderRadius: 5, backgroundColor: '#ffd36b' }} /> : null}
+        <Image ref={sparkA} src="asset:cleaner/spark.png" style={{ position: 'absolute', left: 58, top: 62, width: 20, height: 20 }} />
+        <Image ref={sparkB} src="asset:cleaner/spark.png" style={{ position: 'absolute', left: 262, top: 176, width: 14, height: 14 }} />
       </View>
       <Enter style={{ flex: 1, minWidth: 0, gap: spacing.s }} y={14} x={0} ms={500}>
-        <Label size={40} weight={300}>{title}</Label>
-        <Label size={15} dim>{line}</Label>
-        <View style={{ gap: spacing.m, marginTop: spacing.m }}>
+        <Label size={small ? 26 : 40} weight={300}>{title}</Label>
+        <Label size={small ? typeScale.callout : 15} dim>{line}</Label>
+        <View style={{ gap: small ? spacing.xs : spacing.m, marginTop: small ? spacing.xs : spacing.m }}>
           {features.map(([tile, text]) => (
             <View key={text} style={{ flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
-              <Tile name={tile} size={30} />
-              <View style={{ flex: 1, minWidth: 0 }}><Label size={15} weight={600}>{text}</Label></View>
+              <Tile name={tile} size={small ? 24 : 30} />
+              <View style={{ flex: 1, minWidth: 0 }}><Label size={small ? typeScale.callout : 15} weight={600}>{text}</Label></View>
             </View>
           ))}
         </View>
@@ -240,25 +288,29 @@ export function Hero({ art, title, line, features = [], children }) {
   );
 }
 
-// The large round button at the bottom edge: its glow breathes and its ring pulses.
+// The large round button: it sits high enough for its pulse never to reach the Dock's blur (a box that does repaints
+// the whole Dock), its glow is still and only its inside breathes, and busy it is circled by two dots.
+const ORB = 96, ORB_R = ORB / 2 + 6, ORB_BOTTOM = 40;
+export const ORB_SPACE = 148;                // what a section leaves free for it
 export function Orb({ label, onClick, disabled, busy }) {
   const p = usePal();
-  const glow = useRef(null), ring = useRef(null), press = useRef(null), arc = useRef(null);
+  const glow = useRef(null), ring = useRef(null), press = useRef(null), dot = useRef(null), tail = useRef(null);
   useLoop((t) => {
-    const b = 0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5;
-    if (glow.current) { const s = 1 + b * 0.16; set(glow.current.id, 'opacity', 0.35 + b * 0.5); set(glow.current.id, 'scaleX', s); set(glow.current.id, 'scaleY', s); }
-    if (arc.current) set(arc.current.id, 'rotate', (t * 260) % 360);
-    if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.55; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
-  });
+    if (busy) {
+      for (const [d, back] of [[dot, 0], [tail, 28]]) if (d.current) { const [x, y] = onOrbit(ORB_R, t * 260 - back); set(d.current.id, 'translateX', x); set(d.current.id, 'translateY', y); }
+      return;
+    }
+    if (glow.current) set(glow.current.id, 'opacity', 0.16 * (0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5));
+    if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.22; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
+  }, true, busy ? SLOT.spin : SLOT.c);
   const hit = () => { if (press.current) tween(press.current, { scaleX: [0.95, 1], scaleY: [0.95, 1] }, { ms: 240 }); if (onClick) onClick(); };
-  const SIZE = 96;
   return (
-    <View style={{ position: 'absolute', left: '50%', marginLeft: -80, bottom: 16, width: 160, height: 112, alignItems: 'center', justifyContent: 'center', direction: 'ltr', opacity: disabled ? 0.55 : 1 }}>
-      <View ref={glow} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, opacity: 0.5, boxShadow: `0 0 44px 14px ${p.glow}` }} />
-      {busy ? <Image ref={arc} src="asset:cleaner/ring.png" style={{ position: 'absolute', left: 24, top: 0, width: SIZE + 16, height: SIZE + 16 }} />
-        : <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: SIZE, height: SIZE, borderRadius: SIZE / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />}
-      <View ref={press} onClick={disabled ? undefined : hit} style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, alignItems: 'center', justifyContent: 'center',
-        border: `3px solid ${p.ringLine}`, background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})` }}>
+    <View style={{ position: 'absolute', left: '50%', marginLeft: -80, bottom: ORB_BOTTOM, width: 160, height: 112, alignItems: 'center', justifyContent: 'center', direction: 'ltr', opacity: disabled ? 0.55 : 1 }}>
+      {busy ? [[dot, 1], [tail, 0.5]].map(([d, o], i) => <View key={i} ref={d} style={{ position: 'absolute', left: 75, top: 51, width: 10, height: 10, borderRadius: 5, backgroundColor: p.ringLine, opacity: o }} />)
+        : <View ref={ring} style={{ position: 'absolute', left: 32, top: 8, width: ORB, height: ORB, borderRadius: ORB / 2, border: `2px solid ${p.ringLine}`, opacity: 0 }} />}
+      <View ref={press} onClick={disabled ? undefined : hit} style={{ width: ORB, height: ORB, borderRadius: ORB / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        border: `3px solid ${p.ringLine}`, background: `linear-gradient(160deg, ${p.btnA}, ${p.btnB})`, boxShadow: `0 0 30px 6px ${p.glow}` }}>
+        <View ref={glow} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#ffffff', opacity: 0, pointerEvents: 'none' }} />
         <Text style={{ fontSize: label && label.length > 9 ? typeScale.body : 15, fontWeight: 600, color: p.btnText, textAlign: 'center', paddingHorizontal: 6 }}>{label}</Text>
       </View>
     </View>
@@ -270,7 +322,7 @@ export function SectionScan({ art, verb, path, counter }) {
   const img = useRef(null);
   useLoop((t) => { if (img.current) { const s = 1 + Math.sin(t * 2.4) * 0.03; set(img.current.id, 'scaleX', s); set(img.current.id, 'scaleY', s); } });
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingBottom: 110 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <Image ref={img} src={`asset:cleaner/hero-${art}.png`} style={{ width: 300, height: 286 }} />
       <Label size={28} weight={300}>{verb}</Label>
       <Label size={typeScale.callout} mono dim lines={1}>{midTrim(path)}</Label>
@@ -311,7 +363,7 @@ export function ProgressRing({ progress, big, small, under }) {
     return { width: RING, height: RING, data };
   }, [progress == null ? -1 : Math.round(progress * 200), p]);
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.m, paddingBottom: 96 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.m, paddingBottom: ORB_SPACE }}>
       <View style={{ width: RING, height: RING, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
         <Image pixels={pixels} style={{ position: 'absolute', left: 0, top: 0, width: RING, height: RING }} />
         <Image ref={spin} src="asset:cleaner/ring.png" style={{ position: 'absolute', left: 24, top: 24, width: RING - 48, height: RING - 48 }} />

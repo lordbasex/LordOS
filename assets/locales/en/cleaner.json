@@ -324,22 +324,27 @@
   "reviewAll": "Review all",
   "startOver": "‹ Start over",
   "review.headline": "{size} could be freed",
-  "review.cleanup": {
-    "one": "{size} in {count} category",
-    "other": "{size} in {count} categories"
-  },
   "review.large": {
     "one": "{count} file over 10 MB",
     "other": "{count} files over 10 MB"
-  },
-  "review.dups": {
-    "one": "{size} in {count} group of exact copies",
-    "other": "{size} in {count} groups of exact copies"
   },
   "review.storage": "A map of {n} folders",
   "map.viewBubbles": "Bubbles",
   "map.review": "Review and remove",
   "map.selectedShort": "{name}: {size}",
+  "review.cats": {
+    "one": "{count} category",
+    "other": "{count} categories"
+  },
+  "review.groups": {
+    "one": "{count} group of exact copies",
+    "other": "{count} groups of exact copies"
+  },
+  "review.more": "and {n} more",
+  "map.share": "{pct}%",
   "map.noneSelected": "Nothing selected",
+  "look.noche": "Noche",
+  "look.aurora": "Aurora",
+  "look.cristal": "Cristal",
   "large.allFolders": "All folders"
 }

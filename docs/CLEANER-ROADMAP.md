@@ -28,8 +28,9 @@ Last updated 2026-10-30, branch `v087`, in development. The latest release is 0.
 | Preferences | Built | Exclusions, threshold, look, item by the clock |
 | Item by the clock and panel | Built | Still item; reads only while open |
 | Looks | Built | Noche, Aurora, Cristal |
-| Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn |
-| Bubble view | Built | Selecting a folder reviews its large files; no folder action |
+| Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn; the board's cards show real parts |
+| Motion budget | Built | Frame times on VM 116 in `CLEANER-TESTS.md`; not measured on a Pi 5 |
+| Bubble view | Built | Glass spheres with an icon per kind of folder. Selecting a folder reviews its large files; no folder action |
 | Similar images | Not started | Phase 2 |
 | Apps | Not started | Phase 2 |
 | System files | Built | Three closed admin actions, not run on the VM |

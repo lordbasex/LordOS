@@ -324,22 +324,27 @@
   "reviewAll": "Revisar tudo",
   "startOver": "‹ Recomeçar",
   "review.headline": "{size} poderiam ser liberados",
-  "review.cleanup": {
-    "one": "{size} em {count} categoria",
-    "other": "{size} em {count} categorias"
-  },
   "review.large": {
     "one": "{count} arquivo com mais de 10 MB",
     "other": "{count} arquivos com mais de 10 MB"
-  },
-  "review.dups": {
-    "one": "{size} em {count} grupo de cópias exatas",
-    "other": "{size} em {count} grupos de cópias exatas"
   },
   "review.storage": "Um mapa de {n} pastas",
   "map.viewBubbles": "Bolhas",
   "map.review": "Revisar e remover",
   "map.selectedShort": "{name}: {size}",
+  "review.cats": {
+    "one": "{count} categoria",
+    "other": "{count} categorias"
+  },
+  "review.groups": {
+    "one": "{count} grupo de cópias exatas",
+    "other": "{count} grupos de cópias exatas"
+  },
+  "review.more": "e mais {n}",
+  "map.share": "{pct}%",
   "map.noneSelected": "Nada selecionado",
+  "look.noche": "Noite",
+  "look.aurora": "Aurora",
+  "look.cristal": "Cristal",
   "large.allFolders": "Todas as pastas"
 }

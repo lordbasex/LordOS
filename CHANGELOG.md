@@ -63,6 +63,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
   before (`fsops-test`).
 
+- **Cleaner: its look and its cost** (2026-10-30; `docs/CLEANER.md`, numbers in `docs/CLEANER-TESTS.md`), in development, not in 0.8.6-beta:
+  - **Frame time.** The Scan hero repainted 87 % of the screen on every frame: the engine paints one box around a frame's changes, and the stars, the hero and the round button were far apart and reached the Dock's blur. Each now moves in frames of its own, on the frame callback. Measured on VM 116 on the CPU path with a viewer attached: `lord-server` 6,690 ms of CPU in 8 s before, 970 ms after; paint per frame p50 17.5 ms before, 0.61 ms after; p99 22.6 ms before, 9.6 ms after. Not measured on a Raspberry Pi 5 or a real display. An earlier figure of 100 ms in 10 s was wrong: a headless session paints only with a viewer, and that run had none.
+  - **Hero.** A redrawn crown with depth, pane and object as two layers, a shadow under the object, sparks. The rings stay still and their dots turn. The round button sits higher, its glow is still, and busy it is circled by two dots.
+  - **Bubbles.** Glass spheres with an icon and colour for what each folder is, their share of the level, a clearer check, and a matching icon in the side list. Folders are named by their real name and the user's own folder settings.
+  - **Review board.** It fills the window: the total, a bar of what it is made of, and cards with the real rules, files and folders behind each number, fitted to a small window.
+  - A small window keeps the hero above the round button. Seen in English, Spanish and Portuguese, right to left with a test language in English text, and in the three looks.
+  - **Fixed while reviewing this work:** motion kept its rate on frames that change nothing (in a session with a viewer it fell to about half; on a real display, by the code and not run, it could stall until something else woke the compositor); the bubbles view came out empty at the window's smallest size with many folders; the board's image previews stayed as icons until the board was opened again; "Others" offered review and show as if it were a folder; a folder named `constructor` got a broken icon; Settings showed the looks' raw keys.
+  - The site gets a Cleaner page and a FAQ entry, both marked in development.
 - **Cleaner, Phase 1** (2026-10-30; `docs/CLEANER.md`, `docs/CLEANER-SECURITY.md`, `docs/CLEANER-TESTS.md`): on top of the entries below.
   - **Sections:** Scan, Cleanup, Large files, Storage, Duplicates, Activity and Settings. Large and old files filter by size, age and type. Storage covers `/`, the home folder and
     the user's mounts, with a map, a folder list with logical and allocated sizes, and a summary by type, from a bounded tree in `lord-clean`. Duplicates are found by size, partial and

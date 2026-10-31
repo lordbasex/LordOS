@@ -2,7 +2,7 @@
 // at least one independent copy of every group and compares bytes right before acting.
 import { View, cleaner, t as tr, formatBytes, formatNumber, formatDate, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, ORB_SPACE } from './ui.jsx';
 
 export function DupHero({ folders, chosen, toggle }) {
   return (
@@ -30,7 +30,7 @@ export function DupList({ scan, selected, setSelected }) {
     return { rows, total };
   }, [scan.id]);
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <Label size={32} weight={300}>{tr('cleaner.dups.title')}</Label>

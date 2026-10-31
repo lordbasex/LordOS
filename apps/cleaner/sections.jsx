@@ -3,7 +3,7 @@ import {
   View, ScrollView, TextInput, ConfirmDialog, admin, cleaner, CLEANER_THEMES, t as tr, formatBytes, formatNumber, formatDate, formatTime, revealPath, useSettings, typeScale, spacing,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Check, Bar, Hero, Enter, Tile, PagedList, CountUp, ProgressRing, SectionScan, ORB_SPACE, usePal } from './ui.jsx';
 
 const n = (v) => formatNumber(v);
 const when = (sec) => { const d = new Date(sec * 1000); return `${formatDate(d, 'short')} ${formatTime(d)}`; };
@@ -103,7 +103,7 @@ export function CleanupList({ scan, chosen, setChosen, onEmpty, blockedOf, model
   const incomplete = !scan.complete;
   let i = 0;
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <View style={{ flexDirection: 'row', gap: spacing.l, alignItems: 'flex-end' }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Label size={32} weight={300}>{tr('cleaner.cleanup.title')}</Label>
@@ -188,7 +188,7 @@ export function LargeList({ scan, prefs, selected, setSelected, under, clearUnde
   const reset = `${scan.id}.${minMB}.${days}.${type}.${under}`;
   const total = useMemo(() => cleaner.results(scan.id, 0, 1, filter).total, [reset]);
   return (
-    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: 96 }}>
+    <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: ORB_SPACE }}>
       <Label size={32} weight={300}>{tr('cleaner.large.title')}</Label>
       {under ? <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}><Label dim size={typeScale.callout} mono lines={1}>{under}</Label><GlassButton small label={tr('cleaner.large.allFolders')} onClick={clearUnder} /></View> : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
