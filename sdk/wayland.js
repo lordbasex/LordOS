@@ -109,6 +109,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
   }
 };
 
+// A terminal emulator, from its .desktop: there ❖C reaches it as Ctrl+Shift+C (Ctrl+C is the signal).
+const isTerminalEmulator = (w) => String(linuxAppFor(w.args?.appId || '')?.categories || '').split(';').includes('TerminalEmulator');
+
 /* el teclado va a la app Linux del frente; maximizada o no, se le avisa */
 let lastFocus = -1;
 const lastState = new Map();
@@ -119,7 +122,7 @@ function sync() {
   const top = vis.length ? vis[vis.length - 1] : null;
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = top && !shellHasKeyboard() ? surfaceOf(top.id) : 0;
-  if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f); }
+  if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f, !!f && isTerminalEmulator(top)); }
   for (const w of list) {
     const s = surfaceOf(w.id);
     if (!s) continue;

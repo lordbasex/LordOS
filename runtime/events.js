@@ -20,6 +20,11 @@ export function addListener(type, fn) {
   return () => listeners[type].delete(fn);
 }
 
+// The shell's shortcut dispatcher (sdk/shortcuts.js): it sees each key first, and a key it takes
+// reaches no listener, so one key never fires twice.
+let keyFilter = null;
+export function setKeyFilter(fn) { keyFilter = fn; }
+
 function chainOf(id) {
   const out = [];
   for (let n = instances.get(id); n; n = n.parent) out.push(n);
@@ -105,6 +110,7 @@ globalThis.__lordKey = (code, value, key, chr, base, flags) => {
   const ev = key === undefined ? translate(code, value) : nativeKey(code, value, key, chr, base, flags);
   // each listener on its own: one that throws doesn't take the key from the others (a text field)
   run(DiscreteEventPriority, () => {
+    if (keyFilter) { try { if (keyFilter(ev)) return; } catch (e) { console.error('key filter:', e); } }
     for (const fn of listeners[ev.down ? 'keydown' : 'keyup']) { try { fn(ev); } catch (e) { console.error('key listener:', e); } }
   });
 };

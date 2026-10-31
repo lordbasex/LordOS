@@ -13,6 +13,7 @@ código, caminhos e imagens.
   você estava.
 - **❖⇧V:** o histórico completo, com filtros por tipo, pré-visualização e ações: fixar no topo,
   apagar ou copiar de novo.
+- No Lord Flow, ❖V cola no app à frente: nele use ❖⇧V. Veja [Atalhos de teclado](help:shortcuts).
 - **Fixar:** o que está fixado fica sempre no alto e não expira.
 
 ## Privacidade

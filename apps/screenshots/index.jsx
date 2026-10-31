@@ -10,7 +10,7 @@
 import {
   View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, GroupBox, FormRow,
   useTheme, useAppWindow, useKeyboard, useStore, useWindows, wm, windows, typeScale,
-  t as tr, media, userDirs, fs, addListener, createStore, windowTitle, settings, useSettings,
+  t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -122,15 +122,16 @@ export const capture = {
   },
 };
 
-// global shortcuts (evdev: KEY_3 = 4, KEY_4 = 5, KEY_5 = 6; Print Screen = 99)
-addListener('keydown', (e) => {
-  if (e.repeat || typeof lord === 'undefined' || !lord.media) return;
-  if (e.code === 99 && !e.meta) { capture.full(); return; }
-  if (!e.meta || !e.shift || e.ctrl || e.alt) return;
-  if (e.code === 4) capture.full();
-  else if (e.code === 5) capture.area('area');
-  else if (e.code === 6) { if (recording.get()) capture.record(); else wm.open(APP); }
-});
+// global shortcuts
+const hasMedia = () => typeof lord !== 'undefined' && !!lord.media;
+const captureFull = () => capture.full();
+const captureArea = () => capture.area('area');
+const openPanelOrStop = () => { if (recording.get()) capture.record(); else wm.open(APP); };
+addShortcuts([
+  { id: 'capture.full', keys: ['Meta+Shift+3', 'PrintScreen'], when: hasMedia, run: captureFull, label: 'shell.shortcuts.captureFull', group: 'system' },
+  { id: 'capture.area', keys: ['Meta+Shift+4'], when: hasMedia, run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
+  { id: 'capture.panel', keys: ['Meta+Shift+5'], when: hasMedia, run: openPanelOrStop, label: 'shell.shortcuts.capturePanel', group: 'system' },
+]);
 
 // ---- the app's windows ----
 

@@ -44,13 +44,14 @@ export const setLayout = (name) => { if (LAYOUTS[name]) layout = name; };
 export const getLayout = () => layout;
 export const layouts = Object.keys(LAYOUTS);
 
-// Event from what the server translated. flags: 1 Shift, 2 Ctrl, 4 Alt, 8 AltGr, 16 Super, 32 Caps Lock.
+// Event from what the server translated. flags: 1 Shift, 2 Ctrl, 4 Alt, 8 AltGr, 16 Super, 32 Caps Lock,
+// 128 forwarded (a Linux app already got this key as Ctrl: the shell only learns it happened).
 export function nativeKey(code, value, key, chr, base, flags) {
   const down = value !== 0;
   mods.shift = !!(flags & 1); mods.ctrl = !!(flags & 2); mods.alt = !!(flags & 4);
   mods.altgr = !!(flags & 8); mods.meta = !!(flags & 16); mods.caps = !!(flags & 32);
   return { code, down, repeat: value === 2, key: key || NAMES[code] || '', char: down ? chr : '', base: down ? base : '',
-    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, mods: modifiers() };
+    shift: mods.shift, ctrl: mods.ctrl, alt: mods.alt, altgr: mods.altgr, meta: mods.meta, mods: modifiers(), forwarded: !!(flags & 128) };
 }
 
 // Modifiers in use, as a mask: 1 Shift, 2 Alt, 4 Ctrl, 8 Super.

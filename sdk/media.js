@@ -201,16 +201,12 @@ export const useNowPlaying = () => useStore(nowPlaying);
 
 // Media keys (evdev): they work even if the window is not in front (also with a Linux
 // app focused: the compositor doesn't pass them on).
-const KEY_NEXT = 163, KEY_PLAYPAUSE = 164, KEY_PREV = 165, KEY_STOP = 166, KEY_PLAY = 200, KEY_PAUSE = 201;
-addListener('keydown', (e) => {
-  if (e.repeat) return;
-  const np = nowPlaying.get();
-  if (!np) return;
-  if (e.code === KEY_PLAYPAUSE || e.code === KEY_PLAY || e.code === KEY_PAUSE) np.toggle?.();
-  else if (e.code === KEY_NEXT) np.next?.();
-  else if (e.code === KEY_PREV) np.prev?.();
-  else if (e.code === KEY_STOP) np.stop?.();
-});
+// What the media keys do (their entries are in sdk/shortcuts.js): nothing without something playing.
+export const hasNowPlaying = () => !!nowPlaying.get();
+export const mediaToggle = () => nowPlaying.get()?.toggle?.();
+export const mediaNext = () => nowPlaying.get()?.next?.();
+export const mediaPrev = () => nowPlaying.get()?.prev?.();
+export const mediaStop = () => nowPlaying.get()?.stop?.();
 
 function Btn({ glyph, onClick, size = 16, color }) {
   return h(View, { onClick, style: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' } },

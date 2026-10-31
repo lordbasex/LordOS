@@ -313,9 +313,11 @@ There are no ready-made panels in the SDK: each theme draws its own from SDK sto
 - **Desktop widgets:** `<DesktopWidgets layer="below" />` between the wallpaper and the windows and
   `<DesktopWidgets layer="above" />` after them (the Notes app's notes, [NOTES.md](NOTES.md)).
 
-Keyboard shortcuts of the layout are the theme's own (`addListener('keydown', …)`): both bundled
-themes open their launcher or start menu with Super pressed and released alone, and Lord Classic
-adds Super+arrows, Super+Tab, Alt+F4. The SDK already handles ❖Space (search) and ❖L / ❖Ctrl+Q (lock).
+Keyboard shortcuts: a theme passes its own table to `useShortcuts({ grabs, table, onSuperTap })`, and the SDK
+adds the common ones (search, clipboard, lock, quit…) and runs them all from one dispatcher, so a key never
+also reaches an app ([SHORTCUTS.md](SHORTCUTS.md)). `grabs` names a fixed list of keys kept from Wayland
+apps. Mount `<AppSwitcher />` inside the `ThemeProvider` for the app switcher, and open it with
+`openSwitcher(modifierBit, back)`.
 
 ### The login and lock screen are not your theme
 

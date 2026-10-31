@@ -25,19 +25,6 @@ export const spotlight = {
   toggle() { if (spotlightOpen.get()) spotlight.close(); else spotlight.open(); },
 };
 
-// ❖Space and Ctrl+Space. With the Terminal in front, Ctrl+Space
-// is left to the program (in emacs it marks the start of a selection). Switching keyboard or
-// input method moved to ❖⌥Space / Ctrl+⌥Space (sdk/keyboard.js).
-addListener('keydown', (e) => {
-  if (e.key !== ' ' || e.repeat || e.alt || e.shift) return;
-  if (e.meta && !e.ctrl) spotlight.toggle();
-  else if (e.ctrl && !e.meta) {
-    const top = wm.focused();
-    if (!spotlightOpen.get() && top && String(top).split('#')[0] === 'terminal') return;
-    spotlight.toggle();
-  }
-});
-
 // ---- recent use (for ranking) ----
 
 const USE_FILE = '.local/share/lordos/spotlight.json';

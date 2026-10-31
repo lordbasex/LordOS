@@ -26,6 +26,7 @@
 #include "../app/app.h"
 #include "../ime.h"
 #include "../wl/wl.h"
+#include "../wl/keygrab.h"
 #include "../wl/xwayland.h"
 #include "../keyboard.h"
 #include "../fsops.h"
@@ -1431,6 +1432,7 @@ static JSValue f_wl_focus(JSContext *c, JSValueConst this_val, int argc, JSValue
     int32_t id = 0;
     JS_ToInt32(c, &id, argv[0]);
     wl_set_focus(id);
+    wl_focus_terminal(argc > 1 && JS_ToBool(c, argv[1]));
     return JS_UNDEFINED;
 }
 
@@ -1481,10 +1483,28 @@ static JSValue f_wl_has_focus(JSContext *c, JSValueConst this_val, int argc, JSV
     return JS_NewBool(c, wl_has_key_focus());
 }
 
+/* lord.wayland.grabKeys(name) → bool: which fixed table of keys the shell keeps from apps, by name
+ * only (wl/keygrab.c). There is no way to pass a key. lord.wayland exists only in the session. */
+static JSValue f_wl_grab_keys(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsString(argv[0])) return JS_FALSE;
+    const char *name = JS_ToCString(c, argv[0]);
+    if (!name) return JS_FALSE;
+    int ok = keygrab_set(name);
+    JS_FreeCString(c, name);
+    return JS_NewBool(c, ok);
+}
+static JSValue f_wl_fullscreen(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, wl_fullscreen_active());
+}
+
 static const JSCFunctionListEntry wayland_funcs[] = {
+    JS_CFUNC_DEF("grabKeys", 1, f_wl_grab_keys),
+    JS_CFUNC_DEF("fullscreen", 0, f_wl_fullscreen),
     JS_CFUNC_DEF("paste", 0, f_wl_paste),
     JS_CFUNC_DEF("hasKeyboard", 0, f_wl_has_focus),
-    JS_CFUNC_DEF("focus", 1, f_wl_focus),
+    JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
     JS_CFUNC_DEF("state", 4, f_wl_state),

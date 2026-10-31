@@ -406,5 +406,9 @@
   "wallpaperCategory.gradients": "Degradados",
   "wallpaperCategory.lumo": "Lumo",
   "wallpaperCategory.other": "Otros",
-  "wallpaperCategory.signature": "Signature"
+  "wallpaperCategory.signature": "Signature",
+  "kb.shortcuts.system": "Atajos: sistema",
+  "kb.shortcuts.windows": "Atajos: ventanas",
+  "kb.shortcuts.apps": "Atajos: apps",
+  "kb.shortcuts.note": "Cada app agrega los suyos: consultá su artículo de Ayuda. Ctrl+Q solo siempre queda para la app."
 }
