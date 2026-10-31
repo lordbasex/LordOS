@@ -48,8 +48,10 @@ const allowed = () => typeof lord !== 'undefined' && typeof lord.appId !== 'stri
 
 // ---- what is open now ----
 
-function entryOf(w) {
-  if (w.pip || !w.id) return null;
+function entryOf(open) {
+  if (open.pip || !open.id) return null;
+  // moved or shrunk for the on-screen keyboard: what is saved is the window as the person left it
+  const w = open.oskFrame ? { ...open, ...open.oskFrame } : open;
   const isLinux = String(w.id).startsWith('linux#');
   const app = isLinux ? (w.args?.pkg ? getApp(w.args.appId) : null) : getApp(w.id);
   if (!isLinux && (!app || app.builtin)) return null;

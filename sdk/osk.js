@@ -14,7 +14,7 @@ import { addListener, displayFor, mainDisplay, shellHasKeyboard } from '@lordos/
 import { createStore } from './store.js';
 import { settings } from './settings.js';
 import { keyboard } from './keyboard.js';
-import { wm, windows, workAreaOf, windowChrome, appIdOf } from './windows.js';
+import { wm, windows, workAreaOf, windowChrome, appIdOf, appMenus } from './windows.js';
 import { shellLayers } from './layers.js';
 import { onTextField, textFieldActive, textFieldCaret } from './textfocus.js';
 import { fallbackLabels, opensByItself, panelSize, planAvoid } from './oskmodel.js';
@@ -31,9 +31,12 @@ let appField = null;        // { id, y, h }: an isolated app's field
 let manual = false;         // opened by hand: stays open without a field
 let dismissed = false;      // hidden with its button: only a new field or a click brings it back
 let lifted = null;          // the window moved out of the way
+let liftAsked = 0;          // the height it was asked for: an app with a minimum size may keep its own
 let hideTimer = 0;
 
 const remoteField = () => linux || appField;
+// An isolated app is a Wayland window: its id is linux#<surface>, and args.appId says which app it is.
+const appOfWindow = (id) => { const w = id ? wm.get(id) : null; return w?.args?.pkg ? w.args.appId : appIdOf(id); };
 const fieldActive = () => textFieldActive() || !!remoteField();
 
 const refreshLabels = () => {
@@ -45,6 +48,7 @@ const refreshLabels = () => {
 function dropLift() {
   if (lifted) wm.dropFromKeyboard(lifted);
   lifted = null;
+  liftAsked = 0;
 }
 
 // The window with the field, unless a shell surface (Search, a sheet) has the keyboard.
@@ -54,6 +58,9 @@ function fieldWindow() {
   const w = id ? wm.get(id) : null;
   return w && !w.minimized ? w : null;
 }
+
+// From the window's top to its content: the title bar, and Lord Classic's menu strip when it has one.
+const contentTop = (w) => (w.args?.csd ? 0 : windowChrome().h + (appMenus.get()[w.id]?.length ? windowChrome().menu || 0 : 0));
 
 function boxFor(w) {
   const d = w ? displayFor(wm.frame(w)) : mainDisplay();
@@ -73,11 +80,17 @@ function avoid() {
   const frame = w ? wm.frame(w) : null;
   const area = w ? workAreaOf(displayFor(frame)) : null;
   const r = remoteField();
-  const caret = r ? (r.y >= 0 && w ? { y: frame.y + (w.args?.csd ? 0 : windowChrome().h) + r.y, h: r.h } : null) : textFieldCaret();
+  const caret = r ? (r.y >= 0 && w ? { y: frame.y + contentTop(w) + r.y, h: r.h } : null) : textFieldCaret();
   // opened by hand over a Linux app that doesn't report fields: the whole window stays in view
   const linuxWindow = !!w && String(w.id).startsWith('linux#');
-  const plan = fieldActive() || linuxWindow ? planAvoid({ caret, frame, area, top }) : { dock: 'bottom' };
-  if (plan.frame && w) { wm.liftForKeyboard(w.id, plan.frame); lifted = w.id; }
+  const refused = !!w && lifted === w.id && liftAsked > 0 && frame.h > liftAsked;
+  const plan = fieldActive() || linuxWindow ? planAvoid({ caret, frame, area, top, refused }) : { dock: 'bottom' };
+  if (plan.frame && w) {
+    wm.liftForKeyboard(w.id, plan.frame);
+    lifted = w.id;
+    liftAsked = plan.frame.h;
+    setTimeout(avoid, 400);                // did it take the size?
+  }
   if (plan.dock !== oskState.get().dock || oskState.get().box?.x !== box.x) oskState.set((s) => ({ ...s, dock: plan.dock, box }));
 }
 
@@ -136,7 +149,7 @@ export const osk = {
   },
   appField(app, on, y, h) {
     const id = wm.focused();
-    if (on && (!id || appIdOf(id) !== app)) return;
+    if (on && (!id || appOfWindow(id) !== app)) return;
     appField = on ? { id, y, h } : null;
     fieldChanged();
   },

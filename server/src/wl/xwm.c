@@ -663,6 +663,10 @@ static void on_map_request(const uint8_t *p) {
     if (!w->managed) {
         w->managed = 1;
         w->placed = 0;
+        /* Xwayland's surface includes the border, and the surface's size is what comes back as the
+         * window's: with a border, each configure would grow the window by twice its width */
+        int32_t no_border = 0;
+        configure(id, XCF_Border, &no_border, 1);
         uint32_t ext[4] = { 0, 0, 0, 0 };
         change_prop(id, AT(NET_FRAME_EXTENTS), XA_CARDINAL, 32, ext, 4);
         set_wm_state(w, 1);                                 /* NormalState */
