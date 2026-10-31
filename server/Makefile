@@ -501,11 +501,12 @@ build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h s
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
-# lord-media with a decoder that fails after 30 frames, to run the way out of it where there is no hardware
-# (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
+# lord-media with a decoder that fails after 30 frames (HWFALL=2: frames that can't be read back), to run the way
+# out of it where there is no hardware (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
+HWFALL ?= 1
 build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST=$(HWFALL) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
 MEDIA_TEST_SRC := tests/media_test.c src/media/proto.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c
 build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/media/media_int.h src/media/mpulse.h

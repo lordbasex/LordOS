@@ -19,6 +19,17 @@ int main(void) {
     CHECK(lm_hwfall_due(&s));
     lm_hwfall_reset(&s);
     CHECK(!lm_hwfall_due(&s));
+    /* every frame decodes and none can be read back, the two threads taking turns */
+    for (int i = 0; i < LM_HWFALL_ERRS - 1; i++) { lm_hwfall_note(&s, 0); lm_hwfall_note_rb(&s, 1); }
+    CHECK(!lm_hwfall_due(&s));
+    lm_hwfall_note(&s, 0);
+    lm_hwfall_note_rb(&s, 1);
+    CHECK(lm_hwfall_due(&s));                      /* frames decoded don't clear read-back failures */
+    lm_hwfall_reset(&s);
+    CHECK(s.rb_fails == 0 && !lm_hwfall_due(&s));
+    lm_hwfall_note_rb(&s, 1);
+    lm_hwfall_note_rb(&s, 0);
+    CHECK(s.rb_fails == 0);                        /* a frame read clears them */
     printf("hwfall-test: %s\n", fails ? "FAILED" : "ok");
     return fails != 0;
 }

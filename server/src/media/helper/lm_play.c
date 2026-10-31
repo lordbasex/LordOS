@@ -224,7 +224,7 @@ static void pq_push_front(PktQ *q, AVPacket *p) {
  * software, from the keyframe before what is on screen. Under P.mu, on the decoding thread, which owns
  * P.vdec; frames still queued keep their own reference to the hardware's. */
 #ifdef LM_HWFALL_TEST
-static int hwf_tested;
+static int hwf_tested;              /* build/lord-media-hwfall: the failure was faked once */
 #endif
 static void hw_to_software(void) {
     AVCodecContext *old = P.vdec;
@@ -251,7 +251,8 @@ static void hw_to_software(void) {
 }
 
 static int decode_video(void) {
-    if (!P.vdec || P.cover) return 0;
+    /* just gone to software: nothing more until the seek, the packets queued follow frames this decoder hasn't seen */
+    if (!P.vdec || P.cover || P.hw_resume) return 0;
     int serial = P.serial, progress = 0;
     AVFrame *f = av_frame_alloc();
     while (f && P.vq_n < VQ_MAX) {
@@ -260,7 +261,7 @@ static int decode_video(void) {
         int r = avcodec_receive_frame(P.vdec, f);
         double dt = lm_now_ms() - t0;
         pthread_mutex_lock(&P.mu);
-#ifdef LM_HWFALL_TEST                       /* build/lord-media-hwfall: a decoder that fails after 30 frames */
+#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 1  /* build/lord-media-hwfall: a decoder that fails after 30 frames */
         if (r >= 0 && P.decoded >= 30 && P.decoded < 1000 && !hwf_tested) {
             P.hw_active = 1;
             av_frame_unref(f);
@@ -715,9 +716,19 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (late && !seek_wait) { P.dropped++; av_frame_free(&vf.f); continue; }
             int64_t clk = clock_ms();
             int r = lm_out_present(vf.f, vf.pts);
-            if (r < 0 && vf.f->format == AV_PIX_FMT_VAAPI) {   /* the frame could not be read back */
+            int hwframe = vf.f->format == AV_PIX_FMT_VAAPI;
+#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 2  /* HWFALL=2: frames that can't be read back after 30 shown */
+            if (P.shown >= 30 && !hwf_tested) {
                 pthread_mutex_lock(&P.mu);
-                lm_hwfall_note(&P.hwf, 1);
+                P.hw_active = hwframe = 1;
+                r = -1;
+                if (P.hwf.rb_fails == LM_HWFALL_ERRS - 1) hwf_tested = 1;
+                pthread_mutex_unlock(&P.mu);
+            }
+#endif
+            if (hwframe) {                                 /* < 0: it could not be read back */
+                pthread_mutex_lock(&P.mu);
+                lm_hwfall_note_rb(&P.hwf, r < 0);
                 pthread_mutex_unlock(&P.mu);
             }
             if (r == 1) P.dropped++;
