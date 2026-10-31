@@ -2579,13 +2579,12 @@ int wl_key(int code, int value, const KeyInfo *k) {
         else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
         return 0;
     }
-    if (k->meta && code == KEY_ESC && !k->alt && fs_surf) {           /* ❖Esc exits; the shell learns ❖ was not alone */
+    if (k->meta && code == KEY_ESC && !k->alt && (fs_surf || wl_pointer_locked())) {   /* ❖Esc exits; the shell learns ❖ was not alone */
         if (value != 1) return 1;
-        leave_fullscreen(fs_surf);
+        if (wl_pointer_locked()) constraint_escape();
+        if (fs_surf) leave_fullscreen(fs_surf);
         return 2;
     }
-    if (k->meta && code == KEY_ESC && wl_pointer_locked()) { if (value == 1) constraint_escape(); if (!fs_surf) return 1; }
-    if (k->meta && code == KEY_ESC && fs_surf) { if (value == 1) leave_fullscreen(fs_surf); return 1; }   /* ❖Esc exits */
     if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     if (!key_focus) return 0;
     if (value == 1 && was_grabbed) {
