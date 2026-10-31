@@ -7,7 +7,7 @@
 // The engine repaints one box around everything that changed in a frame, and a box that reaches a blurred surface
 // grows to all of it. So things that move far apart never move in the same frame: each loop has its own frames in a
 // cycle of six (SLOT), and what barely moves only sets a value when its whole pixel changes.
-import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
+import { View, Text, Image, useAppWindow, useStore, useTheme, settings, windows, wm, cleanerPalette, typeScale, spacing } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const Pal = createContext(null);
@@ -222,6 +222,10 @@ export function Hero({ art, title, line, features = [], children }) {
   const obj = useRef(null), shade = useRef(null), outer = useRef(null), inner = useRef(null), sheen = useRef(null), sparkA = useRef(null), sparkB = useRef(null);
   const whole = useRef(99);
   const [ix, iy] = onOrbit(ORBIT_B, INNER_START);
+  const { id } = useAppWindow() || {};
+  const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
+  const geo = win ? wm.frame(win) : null;
+  const small = !!geo && (geo.w < 1040 || geo.h < 660);   // a small window: everything still has to fit above the button
   // the two dots and the object move in frames of their own; the rings don't turn, only their dots do
   useLoop((t) => {
     if (outer.current) { const [x, y] = onOrbit(ORBIT_A, t * 40); set(outer.current.id, 'translateX', x); set(outer.current.id, 'translateY', y + ORBIT_A); }
@@ -240,7 +244,7 @@ export function Hero({ art, title, line, features = [], children }) {
   }, true, SLOT.b);
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxl, paddingBottom: ORB_SPACE, minHeight: 0 }}>
-      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
+      <View style={{ width: 340, height: 340, flexShrink: 0, alignItems: 'center', justifyContent: 'center', direction: 'ltr', ...(small ? { transform: 'scale(0.62)', marginHorizontal: -64 } : null) }}>
         {p.orbit ? <Image src={`asset:cleaner/orbit-outer-${p.orbit}.png`} style={{ position: 'absolute', left: 0, top: 0, width: 340, height: 340 }} /> : null}
         {p.orbit ? <Image src={`asset:cleaner/orbit-inner-${p.orbit}.png`} style={{ position: 'absolute', left: 42, top: 42, width: 256, height: 256 }} /> : null}
         {p.pane ? <View style={{ position: 'absolute', left: 40, top: 40, right: 40, bottom: 40, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.9)', boxShadow: '0 30px 60px rgba(90,60,170,0.25)', transform: 'rotate(-6deg)', overflow: 'hidden' }}>
@@ -255,13 +259,13 @@ export function Hero({ art, title, line, features = [], children }) {
         <Image ref={sparkB} src="asset:cleaner/spark.png" style={{ position: 'absolute', left: 262, top: 176, width: 14, height: 14 }} />
       </View>
       <Enter style={{ flex: 1, minWidth: 0, gap: spacing.s }} y={14} x={0} ms={500}>
-        <Label size={40} weight={300}>{title}</Label>
-        <Label size={15} dim>{line}</Label>
-        <View style={{ gap: spacing.m, marginTop: spacing.m }}>
+        <Label size={small ? 26 : 40} weight={300}>{title}</Label>
+        <Label size={small ? typeScale.callout : 15} dim>{line}</Label>
+        <View style={{ gap: small ? spacing.xs : spacing.m, marginTop: small ? spacing.xs : spacing.m }}>
           {features.map(([tile, text]) => (
             <View key={text} style={{ flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
-              <Tile name={tile} size={30} />
-              <View style={{ flex: 1, minWidth: 0 }}><Label size={15} weight={600}>{text}</Label></View>
+              <Tile name={tile} size={small ? 24 : 30} />
+              <View style={{ flex: 1, minWidth: 0 }}><Label size={small ? typeScale.callout : 15} weight={600}>{text}</Label></View>
             </View>
           ))}
         </View>
@@ -284,7 +288,7 @@ export function Orb({ label, onClick, disabled, busy }) {
       return;
     }
     if (glow.current) set(glow.current.id, 'opacity', 0.16 * (0.5 - Math.cos((t / 3.6) * Math.PI * 2) * 0.5));
-    if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.25; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
+    if (ring.current) { const x = (t % 2.6) / 2.6, e = 1 - (1 - x) ** 2, s = 1 + e * 0.22; set(ring.current.id, 'scaleX', s); set(ring.current.id, 'scaleY', s); set(ring.current.id, 'opacity', 0.7 * (1 - x)); }
   }, true, busy ? SLOT.spin : SLOT.c);
   const hit = () => { if (press.current) tween(press.current, { scaleX: [0.95, 1], scaleY: [0.95, 1] }, { ms: 240 }); if (onClick) onClick(); };
   return (

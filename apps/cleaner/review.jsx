@@ -1,6 +1,6 @@
 // What a full scan found: one headline, what it is made of, "Review all", and a card per module with its real
 // number and the real things behind it. A card appears only for what the scan really found.
-import { View, Image, media, cleaner, t as tr, formatBytes, formatNumber, typeScale, spacing } from '@lordos/sdk';
+import { View, Image, media, cleaner, wm, windows, useAppWindow, useStore, t as tr, formatBytes, formatNumber, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
 import { Label, Glass, GlassButton, Enter, CountUp, Tile, Bar, usePal } from './ui.jsx';
 import { folderKinds, folderKind } from './storage.jsx';
@@ -8,20 +8,21 @@ import { folderKinds, folderKind } from './storage.jsx';
 const TYPE_ICON = { image: 'pictures', video: 'videos', audio: 'music', document: 'documents', code: 'code' };
 const ROWS = 4;
 
-function Preview({ items }) {
+function Preview({ items, small }) {
   const p = usePal();
+  const S = small ? 44 : 80;
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.s, height: 118, overflow: 'hidden' }}>
+    <View style={{ flexDirection: 'row', gap: spacing.s, height: small ? S : 118, overflow: 'hidden' }}>
       {items.slice(0, ROWS).map((it) => {
         const src = it.type === 'image' ? media.thumb(it.abs, 144) : null;
         return (
-          <View key={it.id} style={{ width: 80, gap: 3 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 12, overflow: 'hidden', backgroundColor: p.track, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-              {src ? <Image src={src} style={{ width: 80, height: 80 }} /> : <Image src={`asset:cleaner/folder-${TYPE_ICON[it.type] || 'folder'}.png`} style={{ width: 28, height: 28 }} />}
-              {src ? null : <Label size={typeScale.caption} dim lines={1} align="center" style={{ paddingHorizontal: 4 }}>{(it.path.split('.').pop() || '').slice(0, 6)}</Label>}
+          <View key={it.id} style={{ width: S, gap: 3 }}>
+            <View style={{ width: S, height: S, borderRadius: 12, overflow: 'hidden', backgroundColor: p.track, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+              {src ? <Image src={src} style={{ width: S, height: S }} /> : <Image src={`asset:cleaner/folder-${TYPE_ICON[it.type] || 'folder'}.png`} style={{ width: 28, height: 28 }} />}
+              {src || small ? null : <Label size={typeScale.caption} dim lines={1} align="center" style={{ paddingHorizontal: 4 }}>{(it.path.split('.').pop() || '').slice(0, 6)}</Label>}
             </View>
-            <Label size={typeScale.caption} lines={1} align="center">{it.path.split('/').pop()}</Label>
-            <Label size={typeScale.caption} dim lines={1} align="center">{formatBytes(it.allocated)}</Label>
+            {small ? null : <Label size={typeScale.caption} lines={1} align="center">{it.path.split('/').pop()}</Label>}
+            {small ? null : <Label size={typeScale.caption} dim lines={1} align="center">{formatBytes(it.allocated)}</Label>}
           </View>
         );
       })}
@@ -95,28 +96,32 @@ export function ReviewBoard({ rules, tree, dups, go }) {
   }, [dups && dups.id]);
   const home = useMemo(() => (tree ? cleaner.tree(tree.id, 0, ROWS) : null), [tree && tree.id]);
   const kinds = useMemo(folderKinds, []);
+  const { id } = useAppWindow() || {};
+  const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
+  const small = !!win && wm.frame(win).h < 660;
+  const shown = small ? 2 : ROWS;
   const cats = rules ? rules.rules.filter((r) => r.files > 0 && r.action !== 'none' && !r.explicit).sort((a, b) => b.allocated - a.allocated) : [];
   const cleanup = rules ? rules.estimated : 0, reclaim = dups ? dups.reclaim : 0, total = cleanup + reclaim;
   const parts = [{ id: 'cleanup', size: cleanup }, { id: 'duplicates', size: reclaim }].filter((m) => m.size > 0);
   const cards = [
     cats.length ? (d) => (
-      <Card key="cleanup" tile="cleanup" delay={d} title={tr('cleaner.section.cleanup')} big={formatBytes(cleanup)} line={tr('cleaner.review.cats', { count: cats.length })} more={cats.length > ROWS ? tr('cleaner.review.more', { n: formatNumber(cats.length - ROWS) }) : ''} onReview={() => go('cleanup')}>
-        {cats.slice(0, ROWS).map((r) => <Part key={r.id} name={tr(`cleaner.ruleName.${r.id}`)} size={r.allocated} share={cats[0].allocated ? r.allocated / cats[0].allocated : 0} />)}
+      <Card key="cleanup" tile="cleanup" delay={d} title={tr('cleaner.section.cleanup')} big={formatBytes(cleanup)} line={tr('cleaner.review.cats', { count: cats.length })} more={cats.length > shown ? tr('cleaner.review.more', { n: formatNumber(cats.length - shown) }) : ''} onReview={() => go('cleanup')}>
+        {cats.slice(0, shown).map((r) => <Part key={r.id} name={tr(`cleaner.ruleName.${r.id}`)} size={r.allocated} share={cats[0].allocated ? r.allocated / cats[0].allocated : 0} />)}
       </Card>
     ) : null,
     large && large.total ? (d) => (
       <Card key="large" tile="large" delay={d} title={tr('cleaner.section.large')} line={tr('cleaner.review.large', { count: large.total })} onReview={() => go('large')}>
-        <Preview items={large.items} />
+        <Preview items={large.items} small={small} />
       </Card>
     ) : null,
     dups && dups.groups ? (d) => (
       <Card key="duplicates" tile="duplicates" delay={d} title={tr('cleaner.section.duplicates')} big={formatBytes(reclaim)} line={tr('cleaner.review.groups', { count: dups.groups })} onReview={() => go('duplicates')}>
-        <Preview items={copies} />
+        <Preview items={copies} small={small} />
       </Card>
     ) : null,
     tree ? (d) => (
       <Card key="storage" tile="storage" delay={d} title={tr('cleaner.section.storage')} line={tr('cleaner.review.storage', { n: formatNumber(tree.dirs) })} onReview={() => go('storage')}>
-        {home ? home.children.slice(0, ROWS).map((c) => <Part key={c.id} icon={folderKind(c, kinds)} name={c.name} size={c.allocated} share={home.node.allocated ? c.allocated / home.node.allocated : 0} />) : null}
+        {home ? home.children.slice(0, shown).map((c) => <Part key={c.id} icon={folderKind(c, kinds)} name={c.name} size={c.allocated} share={home.node.allocated ? c.allocated / home.node.allocated : 0} />) : null}
       </Card>
     ) : null,
   ].filter(Boolean);
