@@ -4,8 +4,8 @@
   "name": "About LordOS",
   "description": "System and graphics server information",
   "size": [
-    440,
-    690
+    490,
+    730
   ],
   "dock": true,
   "permissions": [

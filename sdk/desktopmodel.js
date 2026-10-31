@@ -30,10 +30,10 @@ export function mountedOn(list, active, overview = false) {
   });
 }
 
-// In the overview a minimized window may have nothing to draw: it has no node until then, an X11 window
-// is iconic and a LordOS app mounts again. Its last buffer is only there for a Wayland app. So a
-// placeholder goes behind the body: what the window does have covers it, and otherwise it is seen.
-export const overviewPlaceholder = (w, inOverview) => !!inOverview && !!w.minimized;
+// In the overview a minimized Linux window may have nothing to draw: an X11 window is iconic, and only a
+// Wayland app has its last buffer. So a placeholder goes behind the body: the buffer covers it, and
+// otherwise it is seen. A LordOS app mounts again and its body is translucent: it gets none.
+export const overviewPlaceholder = (w, inOverview) => !!inOverview && !!w.minimized && !!w.args?.surface;
 
 // The front window of a desktop (windows are ordered bottom to top). Never a window of another
 // desktop, and never picture-in-picture, which floats over all of them with no keyboard.

@@ -103,7 +103,7 @@ function Measurement({ id, res, refs, change }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 32, paddingVertical: 4 }}>
       <Text style={{ width: 230, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.perf.m.${key(id)}`)}</Text>
-      <Text style={{ width: 130, fontSize: typeScale.body, fontWeight: 600, color: m ? t.text : t.textDim, textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}>
+      <Text style={{ width: 130, fontSize: typeScale.body, fontWeight: 600, color: m ? t.text : t.textDim, textAlign: 'end' }}>
         {m ? `${fmt(m.value)} ${m.unit}` : '—'}</Text>
       <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{m ? vs : skipped ? tr(`sysinfo.perf.skip.${skipped}`) : ''}</Text>
       <Text style={{ width: 110, fontSize: typeScale.callout, color: change > 0 ? '#30d158' : '#ff9f0a', textAlign: 'end' }}>{ch}</Text>

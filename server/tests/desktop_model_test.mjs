@@ -165,8 +165,9 @@ eq('index', [cleanIndex(3), cleanIndex(-1), cleanIndex(99), cleanIndex('1'), cle
   eq('nothing sends transform to setStyle', ['sdk', 'themes', 'apps', 'runtime'].flatMap((d) => sent(path.join(root, d))).map((p) => path.relative(root, p)), []);
 }
 
-// a minimized window has a placeholder behind its body in the overview, and only there
-eq('placeholder: minimized, in the overview', [overviewPlaceholder({ minimized: true }, true), overviewPlaceholder({ minimized: true }, false), overviewPlaceholder({}, true)], [true, false, false]);
+// a minimized Linux window has a placeholder behind its body in the overview, and only there; a LordOS app's body would show it through
+const lin = { minimized: true, args: { surface: 5 } };
+eq('placeholder: minimized Linux window, in the overview', [overviewPlaceholder(lin, true), overviewPlaceholder(lin, false), overviewPlaceholder({ args: { surface: 5 } }, true), overviewPlaceholder({ minimized: true }, true)], [true, false, false, false]);
 
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

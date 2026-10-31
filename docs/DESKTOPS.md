@@ -58,8 +58,8 @@ A parked X11 window goes iconic and to the bottom of X's stack through the path 
 Ctrl+Up in Lord Flow, Super+Tab or the taskbar button in Lord Classic, the Window menu or the desktop's menu in
 both, and a four-finger swipe up. The windows of the desktop in a grid, drawn smaller by a transform on their
 real frame (lord-server paints a cached raster, so no app redraws and Linux windows stay live), with
-minimized ones too: a minimized window that has nothing to draw, such as an iconic X11 window, shows its app
-icon and title (`OverviewPlaceholder`, behind the body, so what it does have covers it). Along the top, a strip with every desktop: a miniature of its windows' frames and icons
+minimized ones too: a minimized Linux window that has nothing to draw, such as an iconic X11 window, shows its app
+icon and title (`OverviewPlaceholder`, behind the body, so a last buffer covers it; a LordOS app gets none, its body is translucent). Along the top, a strip with every desktop: a miniature of its windows' frames and icons
 over the wallpaper, since the other desktops' windows aren't drawn. There is no capture of those.
 
 - Click a window to go to it; Esc, a click on the wallpaper or the same key closes. Tab, the arrows and Enter work.
