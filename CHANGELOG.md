@@ -32,7 +32,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   cause; the Raspberry Pi 5 run is pending.
 - **The player leaves a failing hardware decoder** (`lm_hwfall.h`, `docs/MEDIA.md`): 8 decoder failures in a row, or
   8 frames in a row that can't be read back from the hardware, switch that file to software at the current position,
-  as a seek: with sound, about 0.6 s and what was left in the audio ring are lost. Tested with both failures faked on a software decoder
+  as a seek: with sound, what was left in the audio ring is dropped and playback ended 0.2–0.6 s behind. Tested with both failures faked on a software decoder
   (`build/lord-media-hwfall`, VM 116, with and without sound) and `build/hwfall-test`; **not run on real VA-API
   hardware**. No change to the sandbox and none to FFmpeg.
 

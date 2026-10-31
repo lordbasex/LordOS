@@ -118,9 +118,9 @@ We took the way the apps of popular desktop systems work, never their logos or t
     decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames
     (`build/lord-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
     load from other jobs): a 640 × 360 H.264 clip with no audio, five runs of each, 119 frames received in 4 s and a largest gap
-    of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, one run of each, 6 s), the switch
-    is a seek: the audio left in the ring is dropped, the largest gap was 229 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended about
-    0.6 s behind the run without a failure, and audio and video stayed in step (mean offset about 2 ms). That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
+    of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, 6 s, two runs with the decoder failure, one with each other case), the switch
+    is a seek: the audio left in the ring is dropped, the largest gap was 229–272 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended 0.2–0.6 s
+    behind the run without a failure, and audio and video stayed in step (mean offset at most about 2 ms). That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
 
 ### Video frames: a single copy
 
