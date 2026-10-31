@@ -232,14 +232,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   that whole word), and `sdk/livestart.js` picks the window. No measurement starts by itself, and the installer stays in
   the launcher. The entry is in English like the rest of the menu. The other entries behave as before. The boot menu's
   theme grew from 290 to 344 pixels high: GRUB takes padding and the selection band from that height, so at 290 the
-  sixth line didn't show, and the theme has no scrollbar. That height is the installed systems' theme too, with no
-  visible change there.
+  sixth line didn't show, and the theme has no scrollbar. That height is the installed systems' theme too, with the
+  same position and item sizes; no installed system was booted with it.
 - **Tests:** `tests/livestart_test.mjs` (14 checks: what opens, the entry's options, the theme's room, worked out with
   GRUB's own count), `build/sysreport-test` (6 more, whole words on the command line).
 - **Checked:** in QEMU with KVM and legacy BIOS, the build's `grub.cfg` shows the six lines at 1024×768, 800×600 and
   640×480 (at 640×480, the BIOS fallback, the sixth line overlaps the keys hint), and Enter on the entry starts the kernel with the flag. The
   0.8.6 live ISO booted with that command line and this branch's `lord-server` and bundles laid over it reached System
-  Information on Performance. Not tested: an ISO built from this branch, UEFI, the arm64 ISO, a USB stick or a real PC.
+  Information on Performance. On a system that isn't live the flag changes nothing (isolated session). Not tested: an ISO built from this branch, UEFI, the arm64 ISO, a USB stick or a real PC.
 - **The repository's labels:** `docs/RELEASING.md`, "The labels of hardware reports", lists the 33 labels and the steps
   to create them; a test keeps the list equal to the code. They aren't created yet.
 - **lordos.org/hardware** was built and checked in en, es and pt (in a browser, also at phone width with no sideways

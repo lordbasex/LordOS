@@ -1014,6 +1014,10 @@ are per LordOS version and it shows only its own.
   so a newer package shows in the panel without a restart, and a missing package (or folder) is `state: "missing"`
   ("no community data"), checked by `build/hwsnap-test`. A snapshot update is listed in Store → Updates with the
   other packages and announced by the daily check as "1 update is available".
+  On screen it is *Tested hardware list* with the snapshot's date in the user's region, in the list and in the *Update
+  all* plan (below, in a test copy of the theme with `lord.pkg`'s answers faked, so nothing was installed):
+
+  ![Store → Updates with a faked snapshot update](hwreport-store-updates.png)
 - **Tests:** `build/pkg-test` (8 new checks, 112 in all): updating a 0.8.5 system's `lordos` to one that depends on
   `lordos-hwdata` brings it in at its newest version, with *Update* (`pkg-install lordos`) and *Update all*
   (`pkg-upgrade`); on a 0.8.7 system a newer snapshot alone is one upgrade and nothing else; the date versions sort
@@ -1083,7 +1087,7 @@ the launcher. The app takes only that one value and starts no measurement. No ro
 - **The menu:** `tools/iso/build.sh`'s own `grub.cfg` with the theme, in a small ISO made by `grub-mkrescue`:
   `grub-script-check` passes and the six lines show at 1024×768 and 800×600 (the first try, with a height of 300, hid
   the last line, which is how the count above was found). At 640×480, BIOS's last resort, also six, but the sixth
-  line overlaps the keys hint at the bottom (both stay readable; the five lines before it did not).
+  line overlaps the keys hint at the bottom (both stay readable; the five lines above it don't overlap anything).
 - **The entry:** Down and Enter on that menu boot the 0.8.6 kernel with `lordos.check=1` on its command line (from the
   kernel's first line on the serial port; the test `grub.cfg` swapped `quiet loglevel=3` for a serial console, and the
   ISO has no system on it, so that run stops in the initramfs).
@@ -1091,7 +1095,8 @@ the launcher. The app takes only that one value and starts no measurement. No ro
   `lord-server`, bundles and an unsigned code manifest laid over it from an extra initramfs, reached the desktop with
   System Information on Performance and no installer window.
 - **In an isolated headless session** (a private mount namespace with a fake `/proc/cmdline` and `/run/live`): the same
-  with the flag; without it, and with `lordos.check=10`, the installer opens as always.
+  with the flag; without it, and with `lordos.check=10`, the installer opens as always. With the flag and no live
+  system, it changes nothing: the first-login tour opens as on any new account, no System Information.
 - **Not tested:** a real ISO built from this branch (VM 116 has no room for a build), UEFI, the arm64 ISO, a USB stick, a
   real PC. The windows behind System Information (Files, About LordOS) are the default theme's, as on every live boot.
 
