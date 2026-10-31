@@ -10,14 +10,14 @@
 // Keys go through lord.input.tap, which exists only in this process and the login screen's, down the
 // same path as a physical key. Nothing here keeps what is typed, offers suggestions or remembers
 // keys; the panel is `protected`, so it is black in screenshots, recordings and remote desktop.
-import { addListener, displayFor, mainDisplay, shellHasKeyboard } from '@lordos/runtime';
+import { addListener, displayFor, mainDisplay, onCommit, shellHasKeyboard } from '@lordos/runtime';
 import { createStore } from './store.js';
 import { settings } from './settings.js';
 import { keyboard } from './keyboard.js';
 import { wm, windows, workAreaOf, windowChrome, appIdOf, appMenus } from './windows.js';
 import { shellLayers } from './layers.js';
 import { onTextField, textFieldActive, textFieldCaret } from './textfocus.js';
-import { fallbackLabels, opensByItself, panelSize, planAvoid } from './oskmodel.js';
+import { TOP_GAP, caretOnScreen, fallbackLabels, opensByItself, panelSize, planAvoid } from './oskmodel.js';
 
 const CLOSED = { visible: false, dock: 'bottom', page: 0, shift: 0, box: null };
 export const oskState = createStore({ ...CLOSED, hasKeyboard: true, labels: null });
@@ -26,15 +26,20 @@ const native = () => typeof lord !== 'undefined' && !!lord.input?.tap;
 const mode = () => settings.get().osk || 'auto';
 const hasKeyboard = () => (native() ? lord.input.hasKeyboard() : true);
 
-let linux = null;           // { id, y, h }: a Linux app's field, window coordinates
-let appField = null;        // { id, y, h }: an isolated app's field
+let linux = null;           // { id, y, h, fw, fh }: a Linux app's field, window coordinates (oskmodel.js)
+let appField = null;        // the same for an isolated app's field
 let manual = false;         // opened by hand: stays open without a field
 let dismissed = false;      // hidden with its button: only a new field or a click brings it back
 let lifted = null;          // the window moved out of the way
 let liftAsked = 0;          // the height it was asked for: an app with a minimum size may keep its own
 let hideTimer = 0;
+let replanTimer = 0;
 
 const remoteField = () => linux || appField;
+const hintFor = (id, y, h) => {
+  const w = wm.get(id), f = w ? wm.frame(w) : null;
+  return { id, y, h, fw: f?.w, fh: f?.h };
+};
 // An isolated app is a Wayland window: its id is linux#<surface>, and args.appId says which app it is.
 const appOfWindow = (id) => { const w = id ? wm.get(id) : null; return w?.args?.pkg ? w.args.appId : appIdOf(id); };
 const fieldActive = () => textFieldActive() || !!remoteField();
@@ -80,18 +85,28 @@ function avoid() {
   const frame = w ? wm.frame(w) : null;
   const area = w ? workAreaOf(displayFor(frame)) : null;
   const r = remoteField();
-  const caret = r ? (r.y >= 0 && w ? { y: frame.y + contentTop(w) + r.y, h: r.h } : null) : textFieldCaret();
+  const caret = r ? caretOnScreen(r, frame, w ? contentTop(w) : 0) : textFieldCaret();
   // opened by hand over a Linux app that doesn't report fields: the whole window stays in view
   const linuxWindow = !!w && String(w.id).startsWith('linux#');
   const refused = !!w && lifted === w.id && liftAsked > 0 && frame.h > liftAsked;
-  const plan = fieldActive() || linuxWindow ? planAvoid({ caret, frame, area, top, refused }) : { dock: 'bottom' };
+  const plan = fieldActive() || linuxWindow ? planAvoid({ caret, frame, area, top, panelBottom: box.y + TOP_GAP + size.height, refused }) : { dock: 'bottom' };
   if (plan.frame && w) {
-    wm.liftForKeyboard(w.id, plan.frame);
     lifted = w.id;
     liftAsked = plan.frame.h;
-    setTimeout(avoid, 400);                // did it take the size?
+    if (plan.frame.y !== frame.y || plan.frame.h !== frame.h) {
+      wm.liftForKeyboard(w.id, plan.frame);
+      setTimeout(avoid, 400);              // did it take the size?
+    }
   }
   if (plan.dock !== oskState.get().dock || oskState.get().box?.x !== box.x) oskState.set((s) => ({ ...s, dock: plan.dock, box }));
+}
+
+// The field may have moved: a row appeared above it, its window changed, the app gave a new place.
+// avoid() decides again from where it is now, at most once in REPLAN_MS and only with the panel open.
+const REPLAN_MS = 80;
+function replan() {
+  if (replanTimer || !oskState.get().visible) return;
+  replanTimer = setTimeout(() => { replanTimer = 0; avoid(); }, REPLAN_MS);
 }
 
 function show() {
@@ -144,14 +159,16 @@ export const osk = {
   // Hints from elsewhere. id: the window; rect: field position in it, y < 0 when unknown.
   linuxField(id, on, y, h) {
     if (id !== wm.focused()) return;
-    linux = on ? { id, y, h } : null;
-    fieldChanged();
+    const moved = on && linux?.id === id;       // the same field: this isn't a reason to open
+    linux = on ? hintFor(id, y, h) : null;
+    if (moved) replan(); else fieldChanged();
   },
   appField(app, on, y, h) {
     const id = wm.focused();
     if (on && (!id || appOfWindow(id) !== app)) return;
-    appField = on ? { id, y, h } : null;
-    fieldChanged();
+    const moved = on && appField?.id === id;    // the same field: this isn't a reason to open
+    appField = on ? hintFor(id, y, h) : null;
+    if (moved) replan(); else fieldChanged();
   },
 };
 
@@ -166,6 +183,7 @@ export function startOsk() {
     else if (!present) fieldChanged();
   };
   onTextField(fieldChanged);
+  onCommit(replan);                        // a commit is what moves a field
   settings.subscribe(() => { if (oskState.get().visible) setTimeout(refreshLabels, 0); });
   // hidden with its button: a click in the field that still has the focus brings it back
   addListener('pointerdown', () => setTimeout(() => { if (dismissed && fieldActive()) fieldChanged(); }, 0));

@@ -10,7 +10,7 @@
 import {
   View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, GroupBox, FormRow,
   useTheme, useAppWindow, useKeyboard, useStore, useWindows, wm, windows, typeScale,
-  t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings,
+  t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -91,10 +91,28 @@ function withTimer(fn) {
   setTimeout(() => { wm.close(id, true); setTimeout(fn, 180); }, secs * 1000);
 }
 
+// The screen permission is denied (no answer here means that) or the app is restricted (an exception):
+// nothing is captured, and the person who pressed the key is told why. Do Not Disturb or this app's
+// notification settings would hide a banner, so then it is a toast.
+function refused(err) {
+  const body = errorText(err || { code: 'media.denied.screen', params: { app: tr('apps.screenshots') } });
+  const banner = notify({ app: APP, label: tr('apps.screenshots'), title: tr('screenshots.refused'), body,
+    actions: [{ id: 'privacy', label: tr('screenshots.refused.open'), run: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) }] });
+  if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(body);
+}
+async function allowed(ask) {
+  try {
+    const got = await ask();
+    if (!got) refused();
+    return got;
+  } catch (e) { refused(e); return null; }
+}
+const grab = () => allowed(() => media.screenshot(APP));
+
 export const capture = {
-  full: () => afterHide(() => withTimer(async () => finish(await media.screenshot(APP)))),
+  full: () => afterHide(() => withTimer(async () => finish(await grab()))),
   area: (mode = 'area') => afterHide(() => withTimer(async () => {
-    const h = await media.screenshot(APP);
+    const h = await grab();
     if (!h) return;
     const id = wm.open(APP, { instance: 'overlay', args: { handle: h, mode } });
     wm.setFullscreen(id, true);
@@ -104,7 +122,7 @@ export const capture = {
     if (cur) { media.stop(cur.id); return; }
     afterHide(() => withTimer(async () => {
       const path = freeName(captureDir(), tr('screenshots.recName', { date: stamp() }), 'mp4');
-      const id = await media.screenRecord(APP, path, { mic: opts().mic, appName: tr('apps.screenshots') });
+      const id = await allowed(() => media.screenRecord(APP, path, { mic: opts().mic, appName: tr('apps.screenshots') }));
       if (!id) return;
       recording.set({ id, path, start: Date.now() });
       const off = media.on(id, (type, d) => {

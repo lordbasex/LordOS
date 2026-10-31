@@ -173,7 +173,7 @@ const host = {
   getChildHostContext: (ctx) => ctx,
   getPublicInstance: (inst) => inst,
   prepareForCommit: () => null,
-  resetAfterCommit() { layersCommitted(); },
+  resetAfterCommit() { layersCommitted(); for (const fn of commitWatchers) fn(); },
   preparePortalMount() {},
   setCurrentUpdatePriority(p) { updatePriority = p; },
   getCurrentUpdatePriority: () => updatePriority,
@@ -231,6 +231,10 @@ function layersCommitted() {
   for (const fn of keyboardWatchers) { try { fn(busy); } catch (e) { console.error(e); } }
 }
 export const shellHasKeyboard = () => keyboardBusy;
+// After each commit, so something that follows the layout needs no polling. Layout runs later, on the
+// next frame: a watcher reads it from a timer of its own, and has to be cheap when it has nothing to do.
+const commitWatchers = new Set();
+export function onCommit(fn) { commitWatchers.add(fn); return () => commitWatchers.delete(fn); }
 export function onShellKeyboard(fn) { keyboardWatchers.add(fn); return () => keyboardWatchers.delete(fn); }
 
 // ---- layers: one stacking order for the whole screen (sdk/layers.js, docs/LAYERS.md) ----

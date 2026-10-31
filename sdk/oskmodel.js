@@ -94,19 +94,33 @@ export function panelSize(box) {
 export const opensByItself = (mode, hasKeyboard) => mode === 'always' || (mode !== 'off' && !hasKeyboard);
 
 const MARGIN = 12;
+export const TOP_GAP = 30;      // docked at the top the panel starts this far down, below the menu bar
+
+// Where a hint from another process puts the field: hint { y, h, fw, fh }, y in the window and fw × fh
+// the window's size when it was given. A window that changed size since has moved its contents, and a
+// centered form by a lot, so that y is a place the field has left: null, as if it were never known,
+// until the app says where it is now. top: from the window's top to its content.
+export function caretOnScreen(hint, frame, top = 0) {
+  if (!hint || !frame || hint.y < 0 || hint.fw !== frame.w || hint.fh !== frame.h) return null;
+  return { y: frame.y + top + hint.y, h: hint.h };
+}
 
 // What to do so the field stays in view. caret: { y, h } on screen or null when only the window is
 // known (a Linux app that doesn't say where its caret is: then the whole window); frame: the window
 // with the field or null (a shell surface such as Search); area: its work area; top: the keyboard's
-// top edge. → { dock: 'bottom' | 'top', frame?: where the window goes }.
-export function planAvoid({ caret, frame, area, top, minHeight = 160, refused = false }) {
+// top edge docked at the bottom; panelBottom: its bottom edge docked at the top. → { dock: 'bottom' |
+// 'top', frame?: where the window goes }. It keeps nothing: each call decides from where the field is
+// now, so calling it again after the field moved also brings a panel back to the bottom. On a low
+// display the two places can overlap: the top is only worth it if it clears the field.
+export function planAvoid({ caret, frame, area, top, panelBottom = 0, minHeight = 160, refused = false }) {
   const need = (caret ? caret.y + caret.h + MARGIN : frame ? frame.y + frame.h : 0) - top;
   if (need <= 0) return { dock: 'bottom' };
-  if (!frame) return { dock: 'top' };                   // nothing to move: the keyboard goes up
-  if (refused) return { dock: caret ? 'top' : 'bottom' };   // a window with a larger minimum size kept it
+  const up = () => ({ dock: caret && caret.y < panelBottom ? 'bottom' : 'top' });
+  if (!frame) return up();                              // nothing to move: the keyboard goes up
+  if (refused) return caret ? up() : { dock: 'bottom' };    // a window with a larger minimum size kept it
   const room = frame.y - area.y;
   if (need <= room) return { dock: 'bottom', frame: { ...frame, y: frame.y - need } };
   const height = Math.max(minHeight, top - area.y);
-  if (height >= frame.h && !room) return caret ? { dock: 'top' } : { dock: 'bottom' };   // it can't do more
+  if (height >= frame.h && !room) return caret ? up() : { dock: 'bottom' };   // it can't do more
   return { dock: 'bottom', frame: { ...frame, y: area.y, h: Math.min(frame.h, height) } };
 }

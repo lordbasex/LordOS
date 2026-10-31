@@ -2,6 +2,8 @@
 // never the text. TextInput (components.jsx) and custom fields through the input method (ime.js)
 // report here; the on-screen keyboard listens (osk.js). In an isolated app's process there is no
 // keyboard: the hint goes to the session through the broker, which checks nothing else can come of it.
+import { onCommit, onScreenChange } from '@lordos/runtime';
+
 const sources = { input: null, ime: null };    // a function → the caret, or null without focus
 const subs = new Set();
 
@@ -27,6 +29,13 @@ function tellSession(again = true) {
     if (again) setTimeout(() => tellSession(false), 250);
   }, 30);
 }
+
+// The field can move and keep the focus: a row appears above it, or the window shrinks for the keyboard
+// and a centered form centers again. The session can't see into this process, so it is told. The caret
+// is read only while a field has the focus, and a position that didn't change sends nothing.
+const fieldMayHaveMoved = () => { if (inApp() && textFieldActive()) tellSession(); };
+onCommit(fieldMayHaveMoved);
+onScreenChange(fieldMayHaveMoved);
 
 export function noteTextField(kind, caret) {
   sources[kind] = caret || null;

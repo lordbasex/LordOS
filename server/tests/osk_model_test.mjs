@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { KEY, fallbackLabels, keyFor, letterRows, symbolRows, punctuation, panelSize, opensByItself, planAvoid } =
+const { KEY, TOP_GAP, fallbackLabels, keyFor, letterRows, symbolRows, punctuation, panelSize, opensByItself, planAvoid, caretOnScreen } =
   await import(path.join(here, '../../sdk/oskmodel.js'));
 
 let n = 0, bad = 0;
@@ -82,6 +82,38 @@ eq('already as far as it goes: the keyboard goes up', planAvoid({ caret: { y: 47
 eq('as far as it goes, unknown caret: stays', planAvoid({ caret: null, frame: { ...tall, h: 455 }, area, top }).frame, { ...tall });
 eq('a window that kept its size: the keyboard goes up', planAvoid({ caret: { y: 500, h: 20 }, frame: { x: 0, y: 30, w: 800, h: 696 }, area, top, refused: true }), { dock: 'top' });
 eq('kept its size, unknown caret: stays', planAvoid({ caret: null, frame: { x: 0, y: 30, w: 800, h: 696 }, area, top, refused: true }), { dock: 'bottom' });
+
+// Passwords at 1280x800: a centered form in a window the keyboard shrank
+const screen = { x: 0, y: 0, w: 1280, h: 800 }, size = panelSize(screen);
+const kbTop = screen.h - size.height, panelBottom = TOP_GAP + size.height;
+const shrunk = { x: 200, y: 30, w: 880, h: kbTop - 30 };
+const plan = (caret, f = shrunk, more = {}) => planAvoid({ caret, frame: f, area, top: kbTop, panelBottom, ...more });
+eq('panel docks at the top for a field the window cannot lift', plan({ y: 470, h: 34 }), { dock: 'top' });
+eq('the strength row moved the field under that panel: back to the bottom', plan({ y: 300, h: 34 }), { dock: 'bottom' });
+eq('every place it can move to is clear of the panel', [440, 400, 360, 340, 300, 200, 100].every((y) => {
+  const d = plan({ y, h: 34 }).dock;
+  return d === 'top' ? y >= panelBottom : y + 34 + 12 <= kbTop;
+}), true);
+eq('a window kept its size and the field rose: bottom', plan({ y: 300, h: 34 }, { ...shrunk, h: 696 }, { refused: true }), { dock: 'bottom' });
+eq('a window kept its size, field low: top', plan({ y: 600, h: 34 }, { ...shrunk, h: 696 }, { refused: true }), { dock: 'top' });
+eq('nothing to move and the field rose: bottom', plan({ y: 300, h: 34 }, null), { dock: 'bottom' });
+// a low display: docked at the top the panel reaches past where the bottom one starts
+const low = { w: 800, h: 480 }, lowS = panelSize(low), lowTop = low.h - lowS.height, lowBottom = TOP_GAP + lowS.height;
+eq('low display: the top panel would hide the field too, so it stays', planAvoid({ caret: { y: lowTop - 4, h: 20 }, frame: null, area: null, top: lowTop, panelBottom: lowBottom }), { dock: 'bottom' });
+eq('low display: top only when it clears the field', planAvoid({ caret: { y: lowBottom, h: 20 }, frame: null, area: null, top: lowTop, panelBottom: lowBottom }), { dock: 'top' });
+
+const hintAt = (f, y, h = 34) => ({ y, h, fw: f.w, fh: f.h });
+const full = { x: 200, y: 60, w: 880, h: 700 };
+eq('hint: on screen from the window', caretOnScreen(hintAt(full, 500), full, 40), { y: 600, h: 34 });
+eq('hint: a window that only moved keeps it valid', caretOnScreen(hintAt(full, 500), { ...full, y: 30 }, 40), { y: 570, h: 34 });
+eq('hint: place unknown', caretOnScreen(hintAt(full, -1), full), null);
+eq('hint: no window', caretOnScreen(hintAt(full, 100), null), null);
+eq('hint: window shrank since: stale', caretOnScreen(hintAt(full, 500), shrunk, 40), null);
+eq('hint: window narrower since: stale', caretOnScreen(hintAt(full, 500), { ...full, w: 700 }, 40), null);
+// the bug: a y from before the shrink kept the panel at the top; the shrunk window fits above it
+eq('a stale hint believed: top, over a field that is above it', plan({ y: shrunk.y + 40 + 500, h: 34 }), { dock: 'top' });
+eq('a stale hint dropped: the bottom fits', plan(caretOnScreen(hintAt(full, 500), shrunk, 40)), { dock: 'bottom' });
+eq('then the app says where it is', plan(caretOnScreen(hintAt(shrunk, 200), shrunk, 40)), { dock: 'bottom' });
 
 console.log(bad ? `osk-model-test: ${bad} of ${n} failed` : `osk-model-test: ${n} ok`);
 process.exit(bad ? 1 : 0);

@@ -82,8 +82,16 @@ app that doesn't report one:
 3. No window to move (Search, a sheet), or a window that keeps a larger minimum size: the keyboard goes to
    the top of the display.
 
-It re-checks after each key, because the caret may have moved to another line. The login screen moves
-its own column up.
+It decides again after each key, because the caret may have moved to another line, and whenever the field
+can have moved with no key: after a commit in this process (`onCommit`, at most once in 80 ms, only with the
+panel open) and when an app gives a new place. An isolated app's process tells the session itself after its
+own commits and resizes (`sdk/textfocus.js`), only while a field has the focus and only if the place changed.
+A place that arrives for the field that already has the focus never reopens a panel the person hid.
+
+A place an app gave is valid for the window size it was given at (`caretOnScreen`). If the window changed size
+since, the place is stale and counts as unknown until the app sends a new one, so the keyboard doesn't stay at
+the top for a field that has left. Docked at the top it must also clear the field: on a low display, where
+the two places overlap, it stays at the bottom. The login screen moves its own column up.
 
 ## Right to left
 

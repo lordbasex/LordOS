@@ -7,8 +7,10 @@
 #                              lord-sessiond can take the card.
 #   lordos-splash quit         (lordos-splash-quit.service) waits for the first LordOS frame on the
 #                              monitor (/run/lordos/first-frame, created by lord-sessiond), then ends
-#                              Plymouth keeping that frame (--retain-splash). After 30 s without it,
-#                              Plymouth is ended anyway.
+#                              Plymouth keeping that frame (--retain-splash). After 35 s without it,
+#                              Plymouth is ended anyway. With /run/lordos/no-display nothing will
+#                              replace the splash: it ends without keeping its frame, so the console
+#                              and lord-sessiond's message on it show.
 # Without Plymouth (not installed, or not running) both do nothing.
 set -u
 PLY=/usr/bin/plymouth
@@ -20,11 +22,16 @@ case "${1:-}" in
         ;;
     quit)
         i=0
-        while [ $i -lt 300 ] && [ ! -e /run/lordos/first-frame ]; do
+        # longer than lord-sessiond's 30 s for a late display driver, so this can tell which case it is
+        while [ $i -lt 350 ] && [ ! -e /run/lordos/first-frame ]; do
             sleep 0.1
             i=$((i + 1))
         done
-        [ -e /run/lordos/first-frame ] || echo "lordos-splash: no LordOS frame after 30 s; ending the splash" >&2
+        [ -e /run/lordos/first-frame ] || echo "lordos-splash: no LordOS frame after 35 s; ending the splash" >&2
+        if [ -e /run/lordos/no-display ]; then
+            echo "lordos-splash: no usable display; ending the splash for the text console" >&2
+            exec "$PLY" quit
+        fi
         exec "$PLY" quit --retain-splash
         ;;
     *)

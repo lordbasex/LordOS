@@ -3,6 +3,8 @@
   "fileName": "Captura de pantalla {date}",
   "recName": "Grabación de pantalla {date}",
   "annotated": "anotada",
+  "refused": "No se pudo capturar la pantalla",
+  "refused.open": "Abrir Privacidad",
   "mode.full": "Pantalla completa",
   "mode.window": "Ventana",
   "mode.area": "Área",
