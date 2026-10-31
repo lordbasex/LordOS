@@ -2446,17 +2446,19 @@ static int dout_init(DOut *o, OutView v) {
 }
 static void dout_free(DOut *o) { free(o->px); free(o->rpx); free(o->tex); free(o->fb); free(o->cmp); gc_free(&o->gc); }
 
-/* GPU drag's frames counted since the last call, printed for a run (some_gdrag: at least one is expected) */
+/* GPU drag's frames counted since the last call, printed for a run (some_gdrag: at least one is expected;
+ * 2: also one that cut W around a node painted after the window, whose pixels the golden hashes then check) */
 static void gdrag_report(const char *what, int some_gdrag) {
     GdragStats g;
     paint_gdrag_stats(&g);
-    printf("drag-exact %s: GPU drag composed %ld of %ld frames that used the copy (%ld presented), strips %ld px "
+    printf("drag-exact %s: GPU drag composed %ld of %ld frames that used the copy (%ld presented, %ld cut around later nodes), strips %ld px "
            "(not: %ld layer, %ld clip, %ld ancestor, %ld app, %ld after, %ld post, %ld catching up); %ld px sent between "
            "frames, %ld GPU drag frames sent a texture whole, the most one GPU drag frame sent %ld px\n", what, g.frames, g.tried, gdrag_quads,
-           g.strip_px, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP], g.refused[GDRAG_R_ANCESTOR], g.refused[GDRAG_R_APP],
+           g.cut, g.strip_px, g.refused[GDRAG_R_LAYER], g.refused[GDRAG_R_CLIP], g.refused[GDRAG_R_ANCESTOR], g.refused[GDRAG_R_APP],
            g.refused[GDRAG_R_AFTER], g.refused[GDRAG_R_POST], g.refused[GDRAG_R_FEED], gdrag_fed, gdrag_whole, gdrag_frame_max);
     CHECK((g.frames > 0 || !some_gdrag) && g.frames == gdrag_quads, "drag-exact %s: GPU drag frames %ld, presented %ld", what, g.frames,
           gdrag_quads);
+    CHECK(some_gdrag < 2 || g.cut > 0, "drag-exact %s: no GPU drag frame was cut around a later node", what);
     gdrag_quads = gdrag_fed = gdrag_whole = gdrag_frame_max = 0;
 }
 
@@ -2550,7 +2552,7 @@ static void test_drag_exact(int write) {
         if (!test_gdrag)
             CHECK(!paint_below_bad && paint_below_checked == bs.switched, "drag-exact %s: frames switched to the copy of what is below "
                   "differ from painting everything: %ld pixels in %ld frames", variant[g], paint_below_bad, paint_below_checked);
-        else gdrag_report(variant[g], 1);
+        else gdrag_report(variant[g], 2);
         printf("drag-exact %s: most pixels differing from a full repaint (largest difference):", variant[g]);
         for (int dc = 0; dc < DC_N; dc++) printf(" %s %ld (%d)", dc_name[dc], fullw[dc], worst[dc]);
         printf("\n");
