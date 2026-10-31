@@ -49,6 +49,10 @@ export function openingArea(appKey) {
   return workAreaOf(d || pointerDisplay());
 }
 const areaOfWindow = (w) => workAreaOf(displayFor(w));
+// Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
+let linuxPlacement = null;
+export function setLinuxPlacement(fn) { linuxPlacement = fn; }
+export const placeLinuxWindow = (dockId) => (linuxPlacement ? linuxPlacement(dockId) : null);
 let seq = 2;
 const guards = new Map();
 

@@ -11,6 +11,7 @@ keywords: menu bar, dock, launchpad, control center, wallpaper, widgets
 At the very top:
 
 - **The LordOS logo:** About, Settings, Apps, lock the screen, switch user and log out.
+- **Reopening windows:** the apps open when you log out, restart or shut down come back in place at the next login. After a power cut LordOS asks first. Choose Always, Ask first or Off in Settings → Session.
 - **The menus of the app in front** (for example File, Edit, View), plus the Window and Help menus.
 - **On the right:** status icons (like the Clock timer or next alarm), the privacy indicators
   (camera, microphone, screen), the keyboard layout, the Search magnifier, **Control Center**

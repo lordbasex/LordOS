@@ -17,7 +17,7 @@ export { wayland } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, APP_CATEGORIES, appCategory } from './apps.js';
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
-import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
+import { ClipboardPanel, ClipboardToast } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
@@ -32,6 +32,7 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, logOut } from './sessionrestore.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
 import { EmojiPanel } from './emoji.jsx';
@@ -68,6 +69,7 @@ import { reportRefusedCode } from './codesig.js';
 export { WindowShell, WINDOW_EDGE } from './windowshell.jsx';
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind } from './clipboard.js';
+export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
 export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightConvert } from './spotlight.js';
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
@@ -157,6 +159,7 @@ export const themes = {
         .map((w) => ({ app: w.app, id: w.id, args: w.args ? JSON.parse(JSON.stringify(w.args)) : null, minimized: !!w.minimized,
           frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized }));
     } catch (e) { reopen = []; }
+    markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
     return lord.themes.use(id);
@@ -168,7 +171,7 @@ export const themes = {
 // lord-sessiond (managed()); in a session viewed only from the browser, locking closes the
 // browser's access.
 export const session = {
-  quit: () => { clipboardApi.beforeLogout(); lord.quit(); },
+  quit: logOut,
   managed: () => typeof lord.session !== 'undefined' && lord.session.managed(),
   lock: () => typeof lord.session !== 'undefined' && lord.session.lock(),
   switchUser: () => typeof lord.session !== 'undefined' && lord.session.switchUser(),
@@ -214,6 +217,7 @@ export function startShell(element) {
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
   startCleanerStatus();                 // Cleaner's still item by the clock; its panel reads only while open
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
+  startSessionRestore();                // the apps that were open come back (sessionrestore.jsx, docs/SESSIONS.md)
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
 }
 
@@ -248,7 +252,7 @@ function LocaleRoot({ children }) {
     at('floating', FloatingWindows),
     at('overlay', SpotlightPanel),
     at('popover', ClipboardPanel, EmojiPanel),
-    at('modal', PrintDialog),
+    at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, DisplayIdentify),
     at('system', PermissionPrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
     at('input', ImeOverlay));

@@ -21,6 +21,7 @@ void   js_pointer(const char *type, int target, float x, float y, int button);
 void   js_gesture(const char *kind, const char *phase, int target, float x, float y, double a, double b, double c, double d);
 void   js_key(int code, int value);
 void   js_wl_event(int id, const char *type, const char *json);
+void   js_before_exit(void);             /* __lordBeforeExit(): the session's last word, once */
 void   js_media_event(int id, const char *type, const char *json);
 void   js_term_event(int id, const char *type, const char *data);
 void   js_sound_event(const char *type, const char *json);

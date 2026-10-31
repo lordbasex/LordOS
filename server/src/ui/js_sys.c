@@ -389,7 +389,7 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
 }
 
 static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)this_val; (void)argc;
+    (void)this_val;
     size_t len;
     const char *txt = JS_ToCStringLen(c, &len, argv[0]);
     if (!txt) return JS_EXCEPTION;
@@ -403,8 +403,15 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     settings_path(path, sizeof path, "");
     FILE *f = fopen(tmp, "wb");
     int ok = f && fwrite(txt, 1, len, f) == len;
+    /* second argument true: on the disk before this returns (session restore, sdk/sessionrestore.jsx) */
+    int durable = argc > 1 && JS_ToBool(c, argv[1]) == 1;
+    if (f && durable) ok = fflush(f) == 0 && fsync(fileno(f)) == 0 && ok;
     if (f) ok = (fclose(f) == 0) && ok;
     if (ok) ok = rename(tmp, path) == 0;
+    if (ok && durable) {
+        int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (d >= 0) { fsync(d); close(d); }
+    }
     JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);
 }

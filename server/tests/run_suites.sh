@@ -156,6 +156,9 @@ EOF
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # session restore's data rules (sdk/sessionmodel.js)
+    if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
+    else skip "session-model-test" "node"; fi
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi

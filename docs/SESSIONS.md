@@ -304,6 +304,59 @@ card lent to a session has not been tested on real hardware yet.
   to the login screen) and a real Restart (back to the login screen). The refusal with other users
   logged in was checked in the code path only: it needs a second account's password on the VM.
 
+### Session restore
+
+The apps open at the end of a session come back at the next login, each window where it was.
+Settings → Session → **Reopen windows when you log in**: Always (the default), Ask first or Off.
+
+| How the session ended | Always | Ask first | Off |
+|---|---|---|---|
+| Log out, Restart, Shut Down, `systemctl`, a signal to `lord-server` | reopens | asks | nothing |
+| Power cut, crash, `SIGKILL` | asks ("did not shut down properly") | asks | nothing |
+| Everything was closed | clean desktop | clean desktop | clean desktop |
+
+**What is saved.** `sdk/sessionrestore.jsx` keeps a debounced snapshot of the windows store (2 s, only when it
+changed) in `settings.sessionSaved`, in `settings.json`, which is already on `lord.fs`'s deny list; no new file.
+That write and the logout's are `lord.settings.save(text, true)`: fsynced, file and folder, because they must
+survive the power cut they are for. Each entry is a typed Dock id (`dockIdOfWindow`), a frame, maximized,
+minimized and the snap zone; never an Exec line, argv, environment, pid, title or a Linux app's document. A
+LordOS app's `args` are kept only for the fields listed per app in `sdk/sessionmodel.js`, without `nonce`. Left
+out: windows with no `.desktop`, hidden apps, Force Quit, About This App, the installer, the sandbox probe,
+Screenshots' editor, picture-in-picture. The file can be written by any program the user runs, so the list is
+validated again when it is read, the same rules (`server/tests/session_model_test.mjs`).
+
+**The marker.** `sessionSaved.clean` is false from the moment a session starts. It turns true in `flushSession()`
+(`session.quit`, Search's Log Out, the power dialog before it asks lord-sessiond; a refusal undoes it) or in
+`__lordBeforeExit`, which `main.c` calls after the main loop. A session that never gets there leaves it false,
+and that is what "unclean" means. Switching theme is not an end: the marker says `'theme'` and `themeReopen`
+does the work.
+
+Worker threads start before `main.c` blocks `SIGTERM`, so a signal used to end the process on one of them
+without leaving the loop (seen on VM 125: gone in under 300 ms, nothing written). A handler now forwards it to
+the main thread's signalfd, so every signal stop runs the normal end of a session, including `term_shutdown`.
+
+**Coming back.** Up to 12 windows, 450 ms apart, through the Dock's own path (`launchDockItem`: `launchApp`,
+`lord.apps.launchPackage`, `lord.apps.launch(desktop id)`). A LordOS app opens with `wm.open` and its frame. A
+Linux window is a new process, so its saved frame waits by Dock id and the first new window of that app takes it
+(90 s at most). What is already open is not opened twice (Open at Login, the Terminal's live sessions). The
+window that was in front ends in front. Nothing runs on a live system, the login screen or in an isolated app.
+
+**At the end of a session** `wl_close_all()` sends every window `xdg_toplevel.close` (or `WM_DELETE_WINDOW`) and
+waits up to 3 s for those apps to leave, before `wl_stop()`. Without it a browser records a crash. An app that
+doesn't answer (seen with a stopped one: 3.4 s in all) or asks something back is cut as before.
+
+**Browsers.** Settings → Session → **Browser tabs** runs the closed action `browser-restore on|off`
+(`hw_admin.c`), which writes fixed text only: `/etc/chromium/policies/recommended/lordos-session.json`
+(`RestoreOnStartup: 1`, recommended, so the user can still change it in the browser) and
+`/etc/firefox-esr/lordos-session.js` (`browser.startup.page` 3); `off` removes both, and so does `postrm`.
+These are machine-wide: the last session to apply its setting wins. On VM 125, Chromium and Firefox ESR
+brought their pages back after a logout and a reboot with no crash notice. After a forced power-off Firefox
+came back alone; Chromium shows its own "Restore pages?" and its button brought the tab back: LordOS can't
+answer that for it, and an app with no such feature loses what it had open (only the window returns).
+
+What doesn't come back: the state inside a Linux app, a Files window's current folder when it wasn't the one it
+opened with (only `args` are saved), a Terminal's shells after a reboot (a new one opens in its window).
+
 ## cgroups: one subtree per session
 
 Each app in a session goes into its own cgroup v2 (a «scope») so monitoring can attribute traffic

@@ -70,6 +70,7 @@
 #include <math.h>
 #include <poll.h>
 #include <pwd.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,6 +86,7 @@
 extern int paint_profile;
 
 #define MAX_BUTTONS 16
+#define LOGOUT_CLOSE_MS 3000             /* how long the apps get to close at the end of a session */
 
 typedef struct { int down, button; } ButtonEvent;
 
@@ -2104,6 +2106,10 @@ static void usage(const char *argv0) {
                     "          [--headless WIDTHxHEIGHT [--greeter]] [--timeout s] [--debug] [--profile]\n", argv0);
 }
 
+/* SIGINT or SIGTERM that reached a worker thread: to the main loop's signalfd */
+static pthread_t loop_thread;
+static void forward_stop(int sig) { pthread_kill(loop_thread, sig); }
+
 int main(int argc, char **argv) {
     struct sigaction pipe_sa = { .sa_handler = on_sigpipe };
     sigemptyset(&pipe_sa.sa_mask);
@@ -2270,6 +2276,13 @@ int main(int argc, char **argv) {
     sigaddset(&mask, SIGINT);
     sigaddset(&mask, SIGTERM);
     sigprocmask(SIG_BLOCK, &mask, NULL);
+    /* the worker threads started before this don't block them, and the default action there would
+     * end the process without leaving the loop: the end of a session must always run */
+    loop_thread = pthread_self();
+    struct sigaction stop_sa = { .sa_handler = forward_stop, .sa_flags = SA_RESTART };
+    sigemptyset(&stop_sa.sa_mask);
+    sigaction(SIGINT, &stop_sa, NULL);
+    sigaction(SIGTERM, &stop_sa, NULL);
     keylag_init(s.greeter);                 /* key latency trace, only with LORD_INPUT_DEBUG=1 (keylag.h) */
     fpipe_init(&fpipe, getenv("LORD_PIPELINE"));
     fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
@@ -2512,6 +2525,8 @@ int main(int argc, char **argv) {
         term_events(js_term_event);
     }
 
+    js_before_exit();                     /* what is open goes to settings.json, marked clean */
+    wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
     if (s.renders)
         fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);

@@ -6,6 +6,7 @@ import {
   View, Text, Image, useTheme, useSettings, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -455,8 +456,18 @@ function Keyboard() {
 
 function Session() {
   const { t: tr } = useLocale();
+  useSettings();
+  const mode = restoreMode();
   return (
     <Stack>
+      <Section footer={tr('settings.session.restoreHint')}>
+        <SettingRow label={tr('settings.session.restore')}>
+          <PopUp value={mode} onChange={setRestoreMode} options={['always', 'ask', 'off'].map((m) => [m, tr(`settings.session.restore.${m}`)])} />
+        </SettingRow>
+        <SettingRow label={tr('settings.session.browsers')} hint={tr('settings.session.browsersHint')} disabled={mode === 'off'}>
+          <Toggle small on={restoreBrowsers()} onChange={(v) => { if (mode !== 'off') setRestoreBrowsers(v); }} />
+        </SettingRow>
+      </Section>
       <Section footer={tr(session.managed() ? 'settings.session.hintManaged' : 'settings.session.hint')}>
         <SettingRow label={tr('shell.menu.logout')}>
           <Button small label={tr('shell.menu.logout')} onClick={() => session.quit()} />

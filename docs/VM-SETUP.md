@@ -439,6 +439,7 @@ sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/
 **VM 119** (172.17.0.54) as the client:
 
 - `chromium`, to test from a real browser;
+- on VM 125, `chromium` and `firefox-esr`, to test session restore's browser tabs (docs/SESSIONS.md);
 - the scratchpad's test clients (`ws_test.py`), which speak TLS and WebSocket with
   Python's standard library.
 

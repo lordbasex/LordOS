@@ -36,6 +36,7 @@ int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? *
 /* From JS (lord.wayland) */
 void wl_set_focus(int id);              /* 0: no Wayland app has the keyboard */
 void wl_close(int id);                  /* asks the app to close the window */
+void wl_close_all(int ms);              /* every app asked to close, then waits for them: at most ms */
 const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */

@@ -22,6 +22,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3080,6 +3081,45 @@ void wl_close(int id) {
     if (s && s->top) xdg_toplevel_send_close(s->top);
     else if (s && s->xw) xwm_close(s->xw);
     if (dpy) wl_display_flush_clients(dpy);
+}
+
+/* The session is ending: every window is asked to close as the user would, and the apps get up to
+ * ms to do it and leave. wl_stop() alone cuts their connection, which a browser records as a crash.
+ * An app that asks something back ("Save changes?") or doesn't answer is cut by wl_stop() as before. */
+void wl_close_all(int ms) {
+    if (!dpy) return;
+    struct wl_client *apps[MAX_SURF];
+    int napps = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !(s->xw || (s->top && s->mapped))) continue;
+        if (s->top) xdg_toplevel_send_close(s->top);
+        else xwm_close(s->xw);
+        if (s->client != xwl_client) {
+            int seen = 0;
+            for (int k = 0; k < napps && !seen; k++) seen = apps[k] == s->client;
+            if (!seen) apps[napps++] = s->client;
+        }
+    }
+    wl_display_flush_clients(dpy);
+    struct timespec t0, now;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (;;) {
+        /* what is left: X11 windows, and the processes of the Wayland ones */
+        int left = 0;
+        for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->xw) left++;
+        struct wl_client *c;
+        wl_client_for_each(c, wl_display_get_client_list(dpy))
+            for (int k = 0; k < napps; k++) if (apps[k] == c) left++;
+        if (!left) break;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        int spent = (int)((now.tv_sec - t0.tv_sec) * 1000 + (now.tv_nsec - t0.tv_nsec) / 1000000);
+        if (spent >= ms) break;
+        struct pollfd p = { wl_fd(), POLLIN, 0 };
+        poll(&p, 1, spent + 50 < ms ? 50 : ms - spent);
+        wl_dispatch();
+        wl_flush();
+    }
 }
 
 /* Force Quit (the crown menu): SIGKILL to the process that owns this Wayland window, for an app that

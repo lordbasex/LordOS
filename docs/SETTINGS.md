@@ -45,7 +45,7 @@ the time fields keep `direction: 'ltr'`.
         │
         ▼  root work: closed admin actions (hw/hw_admin.c)
  admin.c ─ display-brightness, power-profile, power-suspend, power-buttons, time-ntp, time-set,
-           bt-unblock, rpi-case, video-optimize, hw-firmware-missing (the Store's suggestions,
+           bt-unblock, rpi-case, video-optimize, browser-restore, hw-firmware-missing (the Store's suggestions,
            read-only), hw-memory-modules (System Information, read-only),
            rpi-eeprom-status (read-only), rpi-eeprom-update, boot-test, boot-test-cancel (LordBench's
            boot time test, docs/BENCHMARK.md)

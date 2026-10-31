@@ -380,7 +380,7 @@ cat > "$PKG/DEBIAN/postrm" <<'C'
 set -e
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lordos.sources; fi
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
-if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js; fi
+if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
 if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations; fi
 C
 chmod 755 "$PKG/DEBIAN/postrm"

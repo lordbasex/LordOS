@@ -18,6 +18,7 @@ import { spacing, typeScale, controlSize } from './controls.jsx';
 import { windows } from './windows.js';
 import { windowAppName } from './apps.js';
 import { remote } from './remote.js';
+import { flushSession, resumeSession } from './sessionrestore.jsx';
 
 export const POWER_SECONDS = 60;
 // null, or { action: 'reboot'|'poweroff', until (ms), state: 'ask'|'sent'|'denied'|'unavailable' }
@@ -39,7 +40,7 @@ if (typeof lord.greeter === 'undefined') {
   globalThis.__lordGreeter = (json) => {
     let m = null;
     try { m = JSON.parse(json); } catch (e) { return; }
-    if (m && m.t === 'power' && m.ok === false && powerAsk.get()) powerAsk.set((p) => (p ? { ...p, state: 'denied' } : p));
+    if (m && m.t === 'power' && m.ok === false && powerAsk.get()) { resumeSession(); powerAsk.set((p) => (p ? { ...p, state: 'denied' } : p)); }
   };
 }
 
@@ -86,7 +87,9 @@ export function PowerDialog() {
   const confirm = () => {
     const p = powerAsk.get();
     if (!p || p.state !== 'ask' || blocked) return;
+    flushSession();                                // what is open, before anything starts closing
     const sent = canPower() && lord.session.power(p.action);
+    if (!sent) resumeSession();
     powerAsk.set({ ...p, state: sent ? 'sent' : 'unavailable' });
   };
 

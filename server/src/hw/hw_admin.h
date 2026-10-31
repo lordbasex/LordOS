@@ -41,6 +41,10 @@
  *                                      Writes the browsers' video settings from fixed text:
  *                                      /etc/chromium/policies/managed/lordos-video.json and
  *                                      /etc/firefox-esr/lordos-video.js (docs/VIDEO.md)      anyone
+ *   browser-restore on|off             on: each browser continues where it left off, from fixed text:
+ *                                      /etc/chromium/policies/recommended/lordos-session.json and
+ *                                      /etc/firefox-esr/lordos-session.js; off: removes both
+ *                                      (docs/SESSIONS.md, "Session restore")                 anyone
  *   boot-test <n>                      LordBench's boot time test (bench/boottest.h): n restarts
  *                                      in a row, 2..10; writes only the fixed-format state file
  *                                      /var/lib/lordos/boot-test, which lord-sessiond follows at
@@ -76,6 +80,7 @@ int hw_eeprom_parse(const char *out, HwEeprom *e);
 int hw_is_bcm2712(const char *compat, size_t n);     /* device tree "compatible" (NUL-separated) */
 const char *hw_rpi_case_text(const char *id);   /* fixed file text of a known case, NULL otherwise */
 void hw_act_video(const AdminReq *r, const char *arg, size_t len);
+void hw_act_browser_restore(const AdminReq *r, const char *arg, size_t len);
 void hw_act_boot_test(const AdminReq *r, const char *arg, size_t len);          /* LordBench, bench/boottest.h */
 void hw_act_boot_test_cancel(const AdminReq *r, const char *arg, size_t len);
 /* The two files video-optimize writes, from its argument; 0 if the argument is valid. */
@@ -106,6 +111,7 @@ int hw_backlight_name_valid(const char *n);
     { "rpi-eeprom-status", hw_act_eeprom_status, A_ANYONE | A_FORK }, \
     { "rpi-eeprom-update", hw_act_eeprom_update, A_FORK }, \
     { "video-optimize", hw_act_video, A_ANYONE }, \
+    { "browser-restore", hw_act_browser_restore, A_ANYONE }, \
     { "boot-test", hw_act_boot_test, 0 }, \
     { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE },
 
