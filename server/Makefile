@@ -600,6 +600,9 @@ build/obj/sec/codesig.o: build/gen/codesig_build.h
 .PHONY: FORCE
 FORCE:
 
+# the action table is built from each module's list: a new action must reach admin.c
+build/obj/admin.o: $(wildcard src/*/*_admin.h)
+
 build/obj/%.o: src/%.c $(HDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
