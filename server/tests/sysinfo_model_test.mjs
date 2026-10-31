@@ -2,7 +2,7 @@
 // the reasons for CPU composition, the Compatibility panel and the Hardware sections. Run by
 // tests/run_suites.sh (needs node).
 import { evaluate, evaluateProbe, evaluateBench, LIMITS } from '../../apps/sysinfo/checks.js';
-import { compositionReason, cardLayers, sessionLayers, compatibility, hardwareSections, throttleFlags, piStatus, machineName, reportFileName, reportJson, parseMemoryLines } from '../../apps/sysinfo/model.js';
+import { compositionReason, cardLayers, sessionLayers, compatibility, hardwareSections, throttleFlags, piStatus, machineName, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from '../../apps/sysinfo/model.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => {
@@ -75,7 +75,36 @@ eq('no GPU at all', notes(compatibility({ ...vm, gpus: [] })).gpu, 'noGpu');
 eq('an empty report does not throw', compatibility({}).length, 10);
 
 // ---- sections, Pi flags, names ----
-eq('sections of a VM', hardwareSections({ ...vm, pci: [{}], usb: [] }), ['computer', 'cpu', 'memory', 'graphics', 'displays', 'storage', 'network', 'audio', 'pci', 'software']);
+eq('sections of a VM', hardwareSections({ ...vm, pci: [{}], usb: [] }), ['computer', 'cpu', 'memory', 'graphics', 'displays', 'storage', 'network', 'audio', 'peripherals', 'pci', 'software']);
+// ---- serial numbers: only what the action's format allows ----
+eq('serial lines', parseSerialLines(['serial system PF1ABC', 'serial board M1 2.3/x', 'serial device 10000000abcdef01']),
+  [{ kind: 'system', value: 'PF1ABC' }, { kind: 'board', value: 'M1 2.3/x' }, { kind: 'device', value: '10000000abcdef01' }]);
+eq('serial: other lines dropped', parseSerialLines(['mem 1|DDR4|1|1|a|b|c', 'serial chassis X1', 'serial system', 'serial system a|b', 'serial system a\nb', null]), []);
+eq('serial: one per kind', parseSerialLines(['serial system A1', 'serial system B2']), [{ kind: 'system', value: 'A1' }]);
+eq('serial: not a list', parseSerialLines(undefined), []);
+
+// ---- peripherals: on screen only, no address ----
+const btState = { devices: [
+  { path: '/org/bluez/hci0/dev_AA_BB_CC_DD_EE_01', address: 'AA:BB:CC:DD:EE:01', name: 'MX Master 3', icon: 'input-mouse', paired: true, connected: false, battery: -1 },
+  { path: '/org/bluez/hci0/dev_AA_BB_CC_DD_EE_02', address: 'AA:BB:CC:DD:EE:02', name: 'MX Keys', icon: 'input-keyboard', paired: true, connected: true, battery: 80 },
+  { path: '/org/bluez/hci0/dev_AA_BB_CC_DD_EE_03', address: 'AA:BB:CC:DD:EE:03', name: 'Nearby phone', icon: 'phone', paired: false, connected: false, battery: -1 },
+  { path: '/org/bluez/hci0/dev_AA_BB_CC_DD_EE_04', address: 'AA:BB:CC:DD:EE:04', name: 'AA-BB-CC-DD-EE-04', icon: '', paired: true, connected: false, battery: -1 },
+  { path: '/org/bluez/hci0/dev_AA_BB_CC_DD_EE_05', address: 'AA:BB:CC:DD:EE:05', name: 'AA:BB:CC:DD:EE:05', icon: 'audio-headset', paired: false, connected: true, battery: 40 },
+] };
+const usbList = [{ name: 'Logitech USB Receiver', kind: 'receiver', connection: 'usb', battery: -1 }, { name: 'Wireless Mouse', kind: 'mouse', connection: 'receiver', battery: 64 }];
+const merged = peripherals(usbList, btState);
+eq('peripherals: names, kinds and order', merged.map((p) => [p.name, p.kind, p.connection, p.connected, p.battery]), [
+  ['MX Keys', 'keyboard', 'bluetooth', true, 80], ['Wireless Mouse', 'mouse', 'receiver', true, 64], ['MX Master 3', 'mouse', 'bluetooth', false, null],
+  ['Logitech USB Receiver', 'receiver', 'usb', true, null], ['', 'audio', 'bluetooth', true, 40], ['', 'other', 'bluetooth', false, null]]);
+eq('peripherals: no address or path survives', /AA[:_-]BB|org\/bluez/.test(JSON.stringify(merged)), false);
+eq('peripherals: nothing known', peripherals(null, null), []);
+eq('peripherals: only the fields it builds', Object.keys(peripherals([{ name: 'x', kind: 'mouse', connection: 'usb', battery: -1, serial: 'S', address: 'A' }], null)[0]), ['name', 'kind', 'connection', 'battery', 'connected']);
+
+// ---- firmware dates ----
+eq('DMI date', firmwareDate('11/23/2023').toDateString(), new Date(2023, 10, 23).toDateString());
+eq('bootloader date', firmwareDate('2026-09-25').toDateString(), new Date(2026, 8, 25).toDateString());
+eq('not a date', [firmwareDate(''), firmwareDate('13/40/2023'), firmwareDate('2023'), firmwareDate(undefined)], [null, null, null, null]);
+
 eq('a Pi adds its section', hardwareSections({ raspberryPi: { model: 'Raspberry Pi 5' } }).includes('raspberryPi'), true);
 eq('throttle 0x50000', throttleFlags(0x50000), { underVoltageNow: false, cappedNow: false, throttledNow: false, softLimitNow: false,
   underVoltage: true, capped: false, throttled: true, softLimit: false });

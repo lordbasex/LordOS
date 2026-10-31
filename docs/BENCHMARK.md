@@ -69,6 +69,33 @@ LordOS services and their state, the code manifest).
 Serials, UUIDs, MAC addresses and EDID serials are shown only on screen, on request, and never
 enter a report.
 
+### Serial numbers and peripherals (0.8.7)
+
+Hardware → Computer shows the computer, the motherboard and the firmware (BIOS or UEFI vendor, version and date) from
+`/sys/class/dmi/id`; on a Raspberry Pi the model, the revision, and the bootloader's version and date from
+`/proc/device-tree/chosen/bootloader` (world-readable: the place `rpi-eeprom-update` itself looks first, so no
+`vcgencmd`, which needs root-only `/dev/vcio`); and the chosen case (`lord.fan.caseConfig()`).
+
+**Serial numbers** are on this screen only, on request. `product_serial` and `board_serial` are root-only, so the
+**Show** button runs the closed `hw-serial-numbers` action (no arguments, read-only, administrators; `docs/SETTINGS.md`),
+which also returns a Raspberry Pi's serial from the device tree. The reply reaches only the request that asked, is held
+in that one component while it is on screen, and goes when it closes or with **Hide**. There is no copy button, and the
+window is protected while they show (`wm.setProtected`), so screenshots, recordings and remote desktop see black.
+`SysReport` has no field for them, `apps/sysinfo` never adds them to the report object, and
+`tests/sysreport_test.c` fills every fake machine with them and checks that no report carries them.
+
+**Input and peripherals** lists keyboards, mice, receivers and the rest of USB, the devices behind a wireless receiver
+(with their HID++ battery) and a laptop's built-in keyboard and touchpad (`lord.sysinfo.peripherals()`,
+`sysreport/periph.c`), plus BlueZ's paired or connected devices (`lord.bt`, with Battery1 where BlueZ has it, which for
+an LE device usually means only while it is connected). This list is not in the report: a device names itself and
+that name can carry a person's, so `SysReport` has no place for these strings, `lordos-sysreport` and `lordos-fetch`
+don't link `periph.c`, and `apps/sysinfo/model.js` builds each row field by field, so no address or D-Bus path can come
+along. USB `serial`, an input device's `uniq` and `phys` and a power supply's `serial_number` are never read.
+
+**Audio** cards now have names in the report too, not ALSA's ids: a USB card by its `usb.ids` entry
+(`/proc/asound/cardN/usbid`) or, without that list (the Raspberry Pi image doesn't install it), by the start of ALSA's
+long name with the bus path dropped; a Raspberry Pi's HDMI outputs by port; anything else as ALSA calls it.
+
 ### The GPU as separate layers
 
 "Is the GPU used" is not one answer. For every card the app shows each layer on its own, with

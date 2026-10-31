@@ -34,6 +34,9 @@
  *                                               the system package `sysprobe`, app/probe.c), or null
  *   lord.sysinfo.markdown()                     the same report as Markdown, as lordos-sysreport prints it,
  *                                               with a "This session" section (System Information's Report tab)
+ *   lord.sysinfo.peripherals()                  (0.8.7) keyboards, mice, receivers and other devices on this machine's USB
+ *                                               and input buses (sysreport/periph.c), for the Hardware tab only: their
+ *                                               names can carry a person's, so it is not part of report() or markdown()
  *   lord.sysinfo.community()                    (0.8.7) the tested-hardware catalogue's snapshot for the Compatibility
  *                                               panel: { state, snapshot } where snapshot is given only when
  *                                               <assets>/hwreport/snapshot.json is signed with the key this build
@@ -68,6 +71,7 @@
 #include "../hw/hwscan.h"
 #include "../gpu/gpu.h"
 #include "../sysreport/sysreport.h"
+#include "../sysreport/periph.h"
 #include "../sysreport/facts.h"
 #include "../sysreport/hwsnap.h"
 #include "../sec/codesig.h"
@@ -635,11 +639,17 @@ static const JSCFunctionListEntry bench_funcs[] = {
     JS_CFUNC_DEF("bootTest", 0, f_bench_boot_test),
 };
 
+static JSValue f_sysinfo_peripherals(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_or_null(c, periph_json(hwscan_root(), NULL));
+}
+
 static const JSCFunctionListEntry sysinfo_funcs[] = {
     JS_CFUNC_DEF("report", 0, f_sysinfo_report),
     JS_CFUNC_DEF("probe", 0, f_sysinfo_probe),
     JS_CFUNC_DEF("facts", 0, f_sysinfo_facts),
     JS_CFUNC_DEF("markdown", 0, f_sysinfo_markdown),
+    JS_CFUNC_DEF("peripherals", 0, f_sysinfo_peripherals),
     JS_CFUNC_DEF("community", 0, f_sysinfo_community),
 };
 

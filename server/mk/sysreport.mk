@@ -12,12 +12,13 @@ SYSREPORT_BENCH_SRC := src/bench/lbrun.c src/bench/lbcond.c src/bench/lbproto.c 
 build/lordos-sysreport: src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(wildcard src/bench/*.h) build/gen/lord_version.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) -lm -lpthread
-# five fake machines full of serials, UUIDs, MACs and names that must not reach a report;
+# five fake machines full of serials, UUIDs, MACs and names that must not reach a report (periph.c is
+# lord.sysinfo.peripherals(): on screen only, so it is not in SYSREPORT_SRC and the commands can't print it);
 # `build/sysreport-test fixture <dir> amd|intel|nvidia|rpi5|vm` writes one for `--root`
 test: build/sysreport-test
-build/sysreport-test: tests/sysreport_test.c $(SYSREPORT_SRC) $(SYSREPORT_HDR)
+build/sysreport-test: tests/sysreport_test.c src/sysreport/periph.c $(SYSREPORT_SRC) $(SYSREPORT_HDR)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sysreport_test.c $(SYSREPORT_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sysreport_test.c src/sysreport/periph.c $(SYSREPORT_SRC)
 	./$@ || { rm -f $@; exit 1; }
 # (0.8.7) the catalogue's signed snapshot (src/sysreport/hwsnap.c, lord.sysinfo.community()): signature first,
 # structure, limits, no links; and the snapshot tools/hwreport/catalog.mjs wrote, signed with a test key

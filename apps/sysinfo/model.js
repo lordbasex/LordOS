@@ -107,6 +107,7 @@ export function hardwareSections(r) {
     network: (rep.network || []).length > 0,
     audio: (rep.audio || []).length > 0,
     bluetooth: (rep.bluetooth || []).length > 0,
+    peripherals: true,                  // read on the page itself, from this machine, never from the report
     power: (rep.power || []).length > 0,
     thermal: (rep.thermal || []).length > 0,
     pci: (rep.pci || []).length > 0,
@@ -150,6 +151,38 @@ export function piStatus(pi) {
   return { power, throttling };
 }
 
+// Bluetooth's kind of device, from BlueZ's icon name.
+const BT_KINDS = [[/keyboard/, 'keyboard'], [/mouse/, 'mouse'], [/tablet/, 'tablet'], [/gaming|joystick/, 'gamepad'], [/audio|headset|headphone/, 'audio'], [/phone/, 'phone']];
+const BT_ADDRESS = /^[0-9a-f]{2}([:-][0-9a-f]{2}){5}$/i;
+const KIND_ORDER = ['keyboard', 'mouse', 'touchpad', 'receiver', 'gamepad', 'tablet', 'input', 'audio'];
+const kindRank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
+
+// The Peripherals section: what lord.sysinfo.peripherals() found on USB and the input buses, plus BlueZ's paired or
+// connected devices (lord.bt). Built field by field, so an address or a D-Bus path can't come along; a device that
+// only has its address for a name gets no name. On screen only: this is never part of a report.
+export function peripherals(local, bt) {
+  const out = (Array.isArray(local) ? local : []).map((p) => ({
+    name: String(p.name || ''), kind: String(p.kind || 'other'), connection: String(p.connection || 'usb'),
+    battery: p.battery >= 0 ? p.battery : null, connected: true,
+  }));
+  for (const d of (bt && bt.devices) || []) {
+    if (!d.paired && !d.connected) continue;
+    const kind = (BT_KINDS.find(([re]) => re.test(d.icon || '')) || [null, 'other'])[1];
+    out.push({ name: BT_ADDRESS.test(d.name || '') ? '' : String(d.name || ''), kind, connection: 'bluetooth',
+      battery: d.battery >= 0 ? d.battery : null, connected: !!d.connected });
+  }
+  return out.map((p, i) => [p, i]).sort(([a, i], [b, j]) => kindRank(a.kind) - kindRank(b.kind) || i - j).map(([p]) => p);
+}
+
+// A firmware date as a Date: DMI's mm/dd/yyyy or the report's yyyy-mm-dd; null for anything else.
+export function firmwareDate(s) {
+  const us = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || ''), iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  if (!us && !iso) return null;
+  const [y, m, d] = us ? [+us[3], +us[1], +us[2]] : [+iso[1], +iso[2], +iso[3]];
+  const dt = new Date(y, m - 1, d, 12);
+  return dt.getMonth() === m - 1 && dt.getDate() === d ? dt : null;
+}
+
 // A machine's one-line name: vendor and product, the device tree model, or the hypervisor.
 export function machineName(r) {
   const m = (r && r.machine) || {};
@@ -168,6 +201,17 @@ export function reportFileName(date, ext, exists) {
 
 // The JSON a report is saved as: the collector's fields as they are, two-space indent.
 export const reportJson = (r) => `${JSON.stringify(r, null, 2)}\n`;
+
+// hw-serial-numbers' lines (hw/hw_admin.c): "serial <system|board|device> <value>". Held by the Hardware tab's
+// component while they are shown and nowhere else; anything else is dropped.
+export function parseSerialLines(lines) {
+  const out = [];
+  for (const l of Array.isArray(lines) ? lines : []) {
+    const m = /^serial (system|board|device) ([A-Za-z0-9 ._:/-]{1,63})$/.exec(String(l));
+    if (m && !out.some((x) => x.kind === m[1])) out.push({ kind: m[1], value: m[2] });
+  }
+  return out;
+}
 
 // hw-memory-modules' lines (hw/hw_admin.c, sysreport/smbios.c): "mem <size_mb>|<type>|<speed>|
 // <configured>|<slot>|<bank>|<maker>", one per slot. Anything else is dropped.

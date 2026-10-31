@@ -432,6 +432,8 @@ All in `server/src/hw/hw_admin.c`, in the `actions` table through `HW_ADMIN_ACTI
 | `hw-firmware-missing` | — | anyone | read-only: reads `/dev/kmsg` and returns only the validated names of firmware files a driver asked for and that are still missing (`LOG fw <file> <driver>`), for Store → Discover's suggestions (`hw/hwscan.c`, see `PACKAGES.md`) |
 | `hw-memory-modules` | — | anyone | read-only: parses the firmware's SMBIOS memory devices (`/sys/firmware/dmi/entries/17-<n>/raw`, root only) strictly in C (`sysreport/smbios.c`) and returns one `LOG mem <size_mb>\|<type>\|<speed>\|<configured>\|<slot>\|<bank>\|<maker>` line per slot; serials, asset tags and part numbers are never read (System Information → Hardware → Memory, see `BENCHMARK.md`) |
 
+| `hw-serial-numbers` | — | admin | read-only, for the Show button in System Information → Hardware → Computer: reads only `/sys/class/dmi/id/product_serial`, `/sys/class/dmi/id/board_serial` (root only) and `/proc/device-tree/serial-number`, passes each through `hw_serial_clean` (a closed character set, firmware placeholders dropped) and answers one `LOG serial <system\|board\|device> <value>` line to the request that asked. It writes nothing, logs nothing, and nothing in `sysreport/` can see it (see `BENCHMARK.md`, "Serial numbers") |
+
 The validators are unit-tested in `build/settings-hw-test`.
 
 ## Tests

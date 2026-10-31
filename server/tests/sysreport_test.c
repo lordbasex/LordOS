@@ -5,6 +5,9 @@
  * a MAC inside an interface name); the test checks what each report finds, that its JSON is valid,
  * and that none of those values reaches the JSON or the Markdown.
  *
+ * The computer's serial numbers (hw-serial-numbers) and the peripherals' names (sysreport/periph.c, including a
+ * person's name inside one) are on screen only: the trees hold them all, and no report may carry them.
+ *
  *   build/sysreport-test                       the tests (make test)
  * lordos-fetch's summary is checked on the same trees: with --share it carries none of those values
  * either, and without color it has no escape codes.
@@ -14,6 +17,7 @@
  *   build/sysreport-test fixture <dir> <kind>  writes a fake tree (amd, intel, nvidia, rpi5, vm), for
  *                                              `lordos-sysreport report --root <dir>` */
 #include "sysreport/sysreport.h"
+#include "sysreport/periph.h"
 #include "sysreport/ids.h"
 #include "sysreport/fetch.h"
 #include "sysreport/smbios.h"
@@ -129,6 +133,8 @@ static const char *PCI_IDS =
 static const char *USB_IDS =
     "046d  Logitech, Inc.\n"
     "\tc52b  Unifying Receiver\n"
+    "0d8c  C-Media Electronics, Inc.\n"
+    "\t0014  Audio Adapter (Unitek Y-247A)\n"
     "0bda  Realtek Semiconductor Corp.\n"
     "\t8153  RTL8153 Gigabit Ethernet Adapter\n"
     "C 00  (Defined at Interface level)\n";
@@ -253,6 +259,7 @@ static void fixture(const char *r, const char *kind) {
         put(r, "sys/class/dmi/id/product_version", "To be filled by O.E.M.\n");
         put(r, "sys/class/dmi/id/board_vendor", "Micro-Star International Co., Ltd.\n");
         put(r, "sys/class/dmi/id/board_name", "B450 TOMAHAWK MAX (MS-7C02)\n");
+        put(r, "sys/class/dmi/id/board_version", "1.0\n");
         put(r, "sys/class/dmi/id/chassis_type", "3\n");
         put(r, "sys/class/dmi/id/bios_vendor", "American Megatrends Inc.\n");
         put(r, "sys/class/dmi/id/bios_version", "3.J0\n");
@@ -288,6 +295,7 @@ static void fixture(const char *r, const char *kind) {
         put(r, "sys/class/dmi/id/sys_vendor", "LENOVO\n");
         put(r, "sys/class/dmi/id/product_name", "20XW0026US\n");
         put(r, "sys/class/dmi/id/product_version", "ThinkPad X1 Carbon Gen 9\n");
+        put(r, "sys/class/dmi/id/board_version", "Not Specified\n");
         put(r, "sys/class/dmi/id/chassis_type", "10\n");
         put(r, "sys/class/dmi/id/bios_vendor", "LENOVO\n");
         put(r, "sys/firmware/efi/x", "");
@@ -329,6 +337,15 @@ static void fixture(const char *r, const char *kind) {
     } else if (!strcmp(kind, "rpi5")) {
         putn(r, "proc/device-tree/model", "Raspberry Pi 5 Model B Rev 1.0", 31);
         putn(r, "proc/device-tree/compatible", "raspberrypi,5-model-b\0brcm,bcm2712\0", 36);
+        putn(r, "proc/device-tree/serial-number", "10000000deadbeef", 17);
+        putn(r, "proc/device-tree/chosen/bootloader/version", "1accd6659983613cd104973ce2432da14f1a7682", 41);
+        putn(r, "proc/device-tree/chosen/bootloader/build-timestamp", "\x6a\xb6\x9a\x4d", 4);
+        /* the cards of a Pi 5 in an Argon ONE V5 case, as ALSA lists them */
+        put(r, "proc/asound/cards", " 0 [vc4hdmi0       ]: vc4-hdmi - vc4-hdmi-0\n                      vc4-hdmi-0\n"
+                                    " 1 [vc4hdmi1       ]: vc4-hdmi - vc4-hdmi-1\n                      vc4-hdmi-1\n"
+                                    " 2 [Device         ]: USB-Audio - USB Audio Device\n"
+                                    "                      C-Media Electronics Inc. USB Audio Device at usb-1000480000.usb-1.4, full speed\n");
+        put(r, "proc/asound/card2/usbid", "0d8c:0014\n");
         put(r, "proc/cpuinfo", "processor\t: 0\nBogoMIPS\t: 108.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics\n"
                                "CPU implementer\t: 0x41\nCPU part\t: 0xd0b\n\nprocessor\t: 1\n\n"
                                "Revision\t: d04170\nSerial\t\t: 10000000deadbeef\nModel\t\t: Raspberry Pi 5 Model B Rev 1.0\n");
@@ -440,12 +457,14 @@ static void test_kind(const char *kind) {
         if (!strcmp(r->sw.kconf[i].name, "CONFIG_ZRAM")) zr = !strcmp(r->sw.kconf[i].value, "m");
     }
     CHECK(ll && bl && zr, "%s: kernel config", kind);
-    CHECK(r->naudio == 1 && !strcmp(r->audio[0], "HD-Audio Generic"), "%s: audio %s", kind, r->audio[0]);
+    if (strcmp(kind, "rpi5")) CHECK(r->naudio == 1 && !strcmp(r->audio[0], "HD-Audio Generic"), "%s: audio %s", kind, r->audio[0]);
     CHECK(contains(md, "# System report") && contains(md, "| LordOS | 0.8.5-beta |"), "%s: markdown head", kind);
 
     if (!strcmp(kind, "amd")) {
         CHECK(!strcmp(r->machine.vendor, "Micro-Star International Co., Ltd.") && !r->machine.version[0], "amd: dmi (placeholder dropped)");
         CHECK(!strcmp(r->machine.chassis, "desktop") && !strcmp(r->machine.firmware, "uefi") && r->machine.secure_boot == 1, "amd: chassis/firmware/sb");
+        CHECK(!strcmp(r->machine.board_version, "1.0") && contains(json, "\"boardVersion\":\"1.0\"") && contains(md, "(MS-7C02), 1.0 |"), "amd: board version");
+        CHECK(!strcmp(r->machine.bios_vendor, "American Megatrends Inc.") && !strcmp(r->machine.bios_version, "3.J0") && !strcmp(r->machine.bios_date, "11/23/2023"), "amd: firmware fields");
         CHECK(!r->machine.virt[0], "amd: bare metal");
         CHECK(r->cpu.threads == 16 && r->cpu.cores == 8 && r->cpu.sockets == 1, "amd: topology %d/%d/%d", r->cpu.sockets, r->cpu.cores, r->cpu.threads);
         CHECK(r->cpu.max_mhz == 4200 && r->cpu.min_mhz == 800 && !strcmp(r->cpu.governor, "schedutil"), "amd: freq");
@@ -469,6 +488,7 @@ static void test_kind(const char *kind) {
         CHECK(!r->pi.is_pi && !contains(json, "raspberryPi"), "amd: no Pi");
     } else if (!strcmp(kind, "intel")) {
         CHECK(!strcmp(r->machine.chassis, "laptop") && !strcmp(r->machine.version, "ThinkPad X1 Carbon Gen 9") && r->machine.secure_boot == -1, "intel: machine");
+        CHECK(!r->machine.board_version[0], "intel: a placeholder board version is dropped");
         CHECK(!strcmp(r->cpu.flags, "sse4_2 avx avx2 fma avx512f aes vaes"), "intel: flags %s", r->cpu.flags);
         CHECK(r->ndisplay == 1 && !r->display[0].name[0] && !strcmp(r->display[0].pnp, "AUO") && contains(md, "| eDP-1 | AUO, 2020 |"), "intel: panel");
         CHECK(r->nnet == 2 && !strcmp(r->net[0].kind, "ethernet") && !strcmp(r->net[0].driver, "r8152")
@@ -486,6 +506,16 @@ static void test_kind(const char *kind) {
         CHECK(r->pi.is_pi && !strcmp(r->pi.revision, "d04170") && r->pi.throttled == -1 && r->pi.uv_alarm == 0,
               "rpi5: pi %s %x %d", r->pi.revision, r->pi.throttled, r->pi.uv_alarm);
         CHECK(!strcmp(r->machine.firmware, "dt") && !strcmp(r->machine.model, "Raspberry Pi 5 Model B Rev 1.0"), "rpi5: machine");
+        CHECK(!strcmp(r->pi.bootloader_version, "1accd6659983613cd104973ce2432da14f1a7682") && !strcmp(r->pi.bootloader_date, "2026-09-25"),
+              "rpi5: bootloader %s %s", r->pi.bootloader_version, r->pi.bootloader_date);
+        CHECK(contains(json, "\"bootloaderDate\":\"2026-09-25\"") && contains(md, ", bootloader of 2026-09-25"), "rpi5: bootloader in the report");
+        CHECK(r->naudio == 3 && !strcmp(r->audio[0], "Raspberry Pi HDMI 0 audio") && !strcmp(r->audio[1], "Raspberry Pi HDMI 1 audio")
+              && !strcmp(r->audio[2], "C-Media Electronics, Inc. Audio Adapter (Unitek Y-247A)"), "rpi5: audio %s | %s | %s", r->audio[0], r->audio[1], r->audio[2]);
+        CHECK(!contains(json, "usb-1000480000"), "rpi5: no USB path in the audio names");
+        SysReport *no_ids = calloc(1, sizeof *no_ids);      /* the Pi image has no usb.ids */
+        sysreport_collect(no_ids, root, NULL, "/nonexistent/usb.ids");
+        CHECK(no_ids->naudio == 3 && !strcmp(no_ids->audio[2], "C-Media Electronics Inc. USB Audio Device"), "rpi5: audio without usb.ids: %s", no_ids->audio[2]);
+        free(no_ids);
         CHECK(!strcmp(r->cpu.vendor, "ARM") && !strcmp(r->cpu.model, "Cortex-A76") && !strcmp(r->cpu.arch, "aarch64"), "rpi5: cpu %s %s", r->cpu.vendor, r->cpu.model);
         CHECK(!strcmp(r->cpu.flags, "asimd aes sha2 crc32 atomics"), "rpi5: features %s", r->cpu.flags);
         CHECK(r->ngpu == 2 && !strcmp(r->gpu[0].bus, "platform") && !strcmp(r->gpu[0].driver, "v3d") && r->gpu[0].render_node
@@ -685,6 +715,112 @@ static void test_empty(void) {
     CHECK(r->sw.live && contains(json, "\"cgroup2\":false,\"live\":true"), "live session: live");
     free(json); free(md); free(r);
     rmtree(root);
+}
+
+/* An input node under /sys/class/input: a link into sysfs, as the real ones are. The address attributes are the
+ * things nobody may read. */
+static void input_node(const char *r, int n, const char *path, const char *bus, const char *name, const char *key, const char *rel) {
+    char rel_p[128], real[512], f[600];
+    snprintf(real, sizeof real, "sys/devices/%s/input/input%d", path, n);
+    snprintf(f, sizeof f, "%s/name", real); put(r, f, name);
+    snprintf(f, sizeof f, "%s/id/bustype", real); put(r, f, bus);
+    snprintf(f, sizeof f, "%s/uniq", real); put(r, f, "de:ad:be:ef:00:03\n");
+    snprintf(f, sizeof f, "%s/phys", real); put(r, f, "de:ad:be:ef:00:04\n");
+    snprintf(f, sizeof f, "%s/capabilities/key", real); put(r, f, key);
+    snprintf(f, sizeof f, "%s/capabilities/rel", real); put(r, f, rel);
+    snprintf(rel_p, sizeof rel_p, "sys/class/input/input%d", n);
+    snprintf(f, sizeof f, "../../devices/%s/input/input%d", path, n);
+    lnk(r, rel_p, f);
+}
+
+static void usb_dev(const char *r, const char *dev, const char *ven, const char *prod, const char *cls, const char *maker, const char *product) {
+    char f[256];
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/idVendor", dev); put(r, f, ven);
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/idProduct", dev); put(r, f, prod);
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/bDeviceClass", dev); put(r, f, cls);
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/serial", dev); put(r, f, "SECRET-USB\n");
+    if (maker) { snprintf(f, sizeof f, "sys/bus/usb/devices/%s/manufacturer", dev); put(r, f, maker); }
+    if (product) { snprintf(f, sizeof f, "sys/bus/usb/devices/%s/product", dev); put(r, f, product); }
+}
+
+static void usb_if(const char *r, const char *ifc, const char *cls, const char *proto) {
+    char f[256];
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/bInterfaceClass", ifc); put(r, f, cls);
+    snprintf(f, sizeof f, "sys/bus/usb/devices/%s/bInterfaceProtocol", ifc); put(r, f, proto);
+}
+
+/* (0.8.7) The peripherals, on screen only: what each device is and how it hangs off the machine, the battery of what
+ * sits behind a receiver, and none of it (nor a serial or an address) in a report. The bit masks are real ones. */
+static void test_periph(void) {
+    char root[] = "/tmp/sysreport-periph-XXXXXX";
+    if (!mkdtemp(root)) { printf("mkdtemp\n"); exit(2); }
+    common_secrets(root);
+    put(root, "usr/share/misc/usb.ids", USB_IDS);
+    usb_dev(root, "usb5", "1d6b", "0002", "09", "Linux xhci", "Root Hub");
+    usb_dev(root, "5-1", "1a86", "8091", "09", NULL, "USB HUB");
+    usb_dev(root, "5-1.2", "046d", "c534", "00", "Logitech", "USB Receiver");
+    usb_if(root, "5-1.2:1.0", "03", "01"); usb_if(root, "5-1.2:1.1", "03", "02");
+    usb_dev(root, "5-1.4", "0d8c", "0014", "00", "C-Media Electronics Inc.", "USB Audio Device");
+    usb_if(root, "5-1.4:1.0", "01", "00"); usb_if(root, "5-1.4:1.3", "03", "00");
+    usb_dev(root, "1-1", "04d9", "0024", "00", "secretuser", "secretuser's keyboard");
+    usb_if(root, "1-1:1.0", "03", "01");
+    usb_dev(root, "1-2", "046d", "c077", "00", "Logitech", "Logitech USB Optical Mouse");
+    usb_if(root, "1-2:1.0", "03", "02");
+    usb_dev(root, "1-3", "0781", "5583", "00", "SanDisk", "Ultra Fit");
+    usb_if(root, "1-3:1.0", "08", "50");
+    usb_dev(root, "1-4", "046d", "c52b", "00", NULL, NULL);          /* no strings: usb.ids; "Receiver" names it */
+    usb_if(root, "1-4:1.0", "03", "01");
+    /* behind the receiver: a mouse with a HID++ battery, and a keyboard without one */
+    const char *mouse = "platform/axi/1000480000.usb/usb5/5-1/5-1.2/5-1.2:1.1/0003:046D:C534.000C/0003:046D:4054.000D";
+    const char *keys = "platform/axi/1000480000.usb/usb5/5-1/5-1.2/5-1.2:1.1/0003:046D:C534.000C/0003:046D:408A.000E";
+    /* key: BTN_LEFT..BTN_TASK in the 5th word from the right; rel: X, Y, WHEEL */
+    input_node(root, 26, mouse, "0003\n", "Logitech Wireless Mouse\n", "ffff0000 0 0 0 0\n", "143\n");
+    input_node(root, 27, keys, "0003\n", "Logitech Wireless Keyboard PID:408a\n", "fffffffffffffffe\n", "0\n");
+    put(root, "sys/class/power_supply/hidpp_battery_0/scope", "Device\n");
+    put(root, "sys/class/power_supply/hidpp_battery_0/capacity", "64\n");
+    put(root, "sys/class/power_supply/hidpp_battery_0/model_name", "MX Master 3\n");
+    put(root, "sys/class/power_supply/hidpp_battery_0/serial_number", "SECRET-BAT\n");
+    lnk(root, "sys/class/power_supply/hidpp_battery_0/device", "../../../0003:046D:4054.000D");
+    /* a direct USB device's node, a laptop's keyboard and touchpad, a Bluetooth keyboard (BlueZ's), the rest */
+    input_node(root, 2, "pci0000:00/usb1/1-1/1-1:1.0/0003:04D9:0024.0001", "0003\n", "input-not-listed-twice\n", "fffffffffffffffe\n", "0\n");
+    input_node(root, 3, "platform/i8042/serio0", "0011\n", "AT Translated Set 2 keyboard\n", "fffffffffffffffe\n", "0\n");
+    input_node(root, 4, "pci0000:00/i2c-1/i2c-SYNA", "0018\n", "SYNA2B33:00 Touchpad\n", "420 0 0 0 0 0\n", "0\n");
+    input_node(root, 5, "virtual/misc/uhid/0005:046D:B35B.0009", "0005\n", "MX Keys\n", "fffffffffffffffe\n", "0\n");
+    input_node(root, 6, "platform/pwr_button", "0019\n", "pwr_button\n", "10000000000000 0\n", "0\n");
+    input_node(root, 7, "platform/soc/107c701400.hdmi", "001e\n", "vc4-hdmi-0\n", "fffffffffffffffe\n", "3\n");
+    char *j = periph_json(root, NULL);
+    JDoc doc;
+    char err[128] = "";
+    CHECK(j && !json_parse(j, strlen(j), &doc, err, sizeof err), "periph: JSON invalid: %s", err);
+    if (j && !err[0]) json_free(&doc);
+    CHECK(contains(j, "{\"name\":\"Logitech USB Receiver\",\"kind\":\"receiver\",\"connection\":\"usb\",\"battery\":-1}"), "periph: receiver: %s", j);
+    CHECK(contains(j, "{\"name\":\"Logitech, Inc. Unifying Receiver\",\"kind\":\"receiver\",\"connection\":\"usb\""), "periph: usb.ids names a device with no strings: %s", j);
+    CHECK(contains(j, "{\"name\":\"C-Media Electronics Inc. USB Audio Device\",\"kind\":\"audio\""), "periph: a sound card with buttons is audio");
+    CHECK(contains(j, "\"secretuser's keyboard\",\"kind\":\"keyboard\",\"connection\":\"usb\""), "periph: a keyboard");
+    CHECK(contains(j, "{\"name\":\"Logitech USB Optical Mouse\",\"kind\":\"mouse\""), "periph: a mouse, its maker not doubled");
+    CHECK(contains(j, "{\"name\":\"SanDisk Ultra Fit\",\"kind\":\"storage\""), "periph: storage");
+    CHECK(contains(j, "{\"name\":\"MX Master 3\",\"kind\":\"mouse\",\"connection\":\"receiver\",\"battery\":64}"), "periph: behind the receiver, with its battery: %s", j);
+    CHECK(contains(j, "{\"name\":\"Logitech Wireless Keyboard PID:408a\",\"kind\":\"keyboard\",\"connection\":\"receiver\",\"battery\":-1}"), "periph: a keyboard behind the receiver");
+    CHECK(contains(j, "{\"name\":\"AT Translated Set 2 keyboard\",\"kind\":\"keyboard\",\"connection\":\"internal\""), "periph: a laptop keyboard");
+    CHECK(contains(j, "{\"name\":\"SYNA2B33:00 Touchpad\",\"kind\":\"touchpad\",\"connection\":\"internal\""), "periph: a touchpad: %s", j);
+    static const char *const out[] = { "Root Hub", "USB HUB", "input-not-listed-twice", "MX Keys", "pwr_button", "vc4-hdmi", "Logitech Wireless Mouse" };
+    for (size_t i = 0; i < sizeof out / sizeof out[0]; i++) CHECK(!contains(j, out[i]), "periph: \"%s\" is listed", out[i]);
+    static const char *const never[] = { "SECRET", "de:ad:be:ef", "1000480000" };
+    for (size_t i = 0; i < sizeof never / sizeof never[0]; i++) CHECK(!contains(j, never[i]), "periph: carries \"%s\"", never[i]);
+    free(j);
+    /* the report of that same tree (run() also checks every secret): no device's own strings */
+    char *json, *md;
+    SysReport *r = run(root, &json, &md);
+    static const char *const shown[] = { "MX Master 3", "MX Keys", "secretuser", "USB Optical Mouse", "Wireless Keyboard" };
+    for (size_t i = 0; i < sizeof shown / sizeof shown[0]; i++) {
+        CHECK(!contains(json, shown[i]), "periph: the JSON report carries \"%s\"", shown[i]);
+        CHECK(!contains(md, shown[i]), "periph: the Markdown report carries \"%s\"", shown[i]);
+    }
+    free(json); free(md); free(r);
+    rmtree(root);
+    j = periph_json("/nonexistent", "/nonexistent/usb.ids");
+    CHECK(j && !strcmp(j, "[]"), "periph: an empty tree");
+    free(j);
 }
 
 /* (0.8.7) The boot medium: one fake tree per case, built from mountinfo, the /sys/dev/block links and the
@@ -929,6 +1065,7 @@ int main(int argc, char **argv) {
     setenv("COLORTERM", "truecolor", 1);
     CHECK(fetch_color_mode("auto", 1) == FETCH_TRUECOLOR && fetch_color_mode("auto", 0) == FETCH_PLAIN && fetch_color_mode("never", 1) == FETCH_PLAIN, "color modes");
     test_pi_firmware();
+    test_periph();
     test_empty();
     test_boot();
     test_cmdline_has();

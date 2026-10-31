@@ -2,17 +2,19 @@
 // makes of it. (0.8.7) Report → Share on GitHub (share.js) and community data in Compatibility (community.js). Overview, Hardware (a source list and a detail pane) and Compatibility. The report
 // comes from lord.sysinfo.report() (server/src/sysreport, the same collector as lordos-sysreport and
 // lordos-fetch), read once on open and again with Refresh; model.js works out the GPU layers and the
-// Compatibility panel; Performance (0.8.6, performance.jsx) runs LordBench. Nothing here holds serial numbers, addresses or names: the report has none.
+// Compatibility panel; Performance (0.8.6, performance.jsx) runs LordBench. The report holds no serial numbers, addresses or names.
+// Two things on the Hardware tab are not part of it and never go into it: the serial numbers (SerialNumbers, on request) and
+// the peripherals' names (Peripherals). Both live in their own component's state; nothing here hands them to `r`.
 import {
   View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
-  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow,
+  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
 } from '@lordos/sdk';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
 import Performance from './performance.jsx';
 import { Scene } from './scene.jsx';
-import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines } from './model.js';
+import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
 import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
 import { communityFor, communitySummary } from './community.js';
 import HWREPORT_SCHEMA from './hwreport.schema.json';
@@ -167,16 +169,7 @@ function Section({ id, r }) {
   const yesNo = (v) => (v ? tr('sysinfo.yes') : tr('sysinfo.no'));
   const m = r.machine || {}, c = r.cpu || {}, mem = r.memory || {}, sw = r.software || {};
   switch (id) {
-    case 'computer': return (
-      <GroupBox>
-        <Row label={tr('sysinfo.f.vendor')} value={m.vendor} />
-        <Row label={tr('sysinfo.f.product')} value={[m.product, m.version].filter(Boolean).join(' ')} />
-        <Row label={tr('sysinfo.f.model')} value={m.model} />
-        <Row label={tr('sysinfo.f.board')} value={[m.boardVendor, m.boardName].filter(Boolean).join(' ')} />
-        <Row label={tr('sysinfo.f.kind')} value={m.virtualization ? tr('sysinfo.kind.vm', { name: m.virtualization }) : m.chassis ? tr(`sysinfo.kind.${camel(m.chassis)}`) : ''} />
-        <Row label={tr('sysinfo.f.firmware')} value={[m.firmware ? tr(`sysinfo.firmware.${m.firmware}`) : '', m.biosVendor, m.biosVersion, m.biosDate].filter(Boolean).join(' · ')} />
-        <Row label={tr('sysinfo.f.secureBoot')} value={m.secureBoot == null ? '' : m.secureBoot ? tr('sysinfo.on') : tr('sysinfo.off')} />
-      </GroupBox>);
+    case 'computer': return <Computer r={r} />;
     case 'cpu': return (
       <GroupBox>
         <Row label={tr('sysinfo.f.model')} value={cpuName(c.model)} />
@@ -220,6 +213,7 @@ function Section({ id, r }) {
           value={[n.driver, n.up ? (n.speedMbps ? tr('sysinfo.upAt', { mbps: n.speedMbps }) : tr('sysinfo.up')) : tr('sysinfo.down')].filter(Boolean).join(' · ')} />)}
       </GroupBox>);
     case 'audio': return <GroupBox>{(r.audio || []).map((a, i) => <Row key={i} label={tr('sysinfo.f.card')} value={a} />)}</GroupBox>;
+    case 'peripherals': return <Peripherals r={r} />;
     case 'bluetooth': return <GroupBox>{(r.bluetooth || []).map((b, i) => <Row key={i} label={tr('sysinfo.f.controller')} value={b.driver} />)}</GroupBox>;
     case 'power': return <List items={r.power || []} render={(p, i) => (
       <GroupBox key={i} title={tr(`sysinfo.power.${p.kind}`)}>
@@ -252,6 +246,7 @@ function Section({ id, r }) {
         <GroupBox>
           <Row label={tr('sysinfo.f.model')} value={pi.model} />
           <Row label={tr('sysinfo.f.revision')} value={pi.revision} />
+          <BootloaderRows pi={pi} />
           {st.power && <Row label={tr('sysinfo.f.power')} value={tr(`sysinfo.pi.${st.power}`)} />}
           {st.throttling && <Row label={tr('sysinfo.f.throttling')} value={tr(`sysinfo.pi.${st.throttling}`)} />}
         </GroupBox>);
@@ -275,6 +270,114 @@ function Section({ id, r }) {
       </View>);
     default: return null;
   }
+}
+
+// The date of a firmware, in the user's format; as it came when it isn't a date.
+function firmwareDay(s) {
+  const d = firmwareDate(s);
+  return d ? formatDate(d, 'long') : s;
+}
+
+function BootloaderRows({ pi }) {
+  const { t: tr } = useLocale();
+  return [
+    <Row key="v" label={tr('sysinfo.f.bootloaderVersion')} value={(pi.bootloaderVersion || '').slice(0, 12)} />,
+    <Row key="d" label={tr('sysinfo.f.bootloaderDate')} value={firmwareDay(pi.bootloaderDate)} />,
+  ];
+}
+
+// The chosen case, as Settings → Cooling keeps it (lord.fan.caseConfig): null when this isn't a LordOS Raspberry Pi image.
+function chosenCase() {
+  try { return (typeof lord !== 'undefined' && lord.fan && lord.fan.caseConfig()) || null; } catch (e) { return null; }
+}
+
+function Computer({ r }) {
+  const { t: tr } = useLocale();
+  const m = r.machine || {}, pi = r.raspberryPi;
+  const box = useMemo(chosenCase, [r]);
+  const hasBoard = m.boardVendor || m.boardName || m.boardVersion;
+  const kind = m.virtualization ? tr('sysinfo.kind.vm', { name: m.virtualization }) : m.chassis ? tr(`sysinfo.kind.${camel(m.chassis)}`) : pi ? tr('sysinfo.share.kind.board') : '';
+  return (
+    <View style={{ gap: spacing.xl }}>
+      <GroupBox title={tr('sysinfo.group.computer')}>
+        {!pi || m.vendor ? <Row label={tr('sysinfo.f.vendor')} value={m.vendor} /> : null}
+        {!pi || m.product ? <Row label={tr('sysinfo.f.product')} value={[m.product, m.version].filter(Boolean).join(' ')} /> : null}
+        {m.model ? <Row label={tr('sysinfo.f.model')} value={m.model} /> : null}
+        {pi ? <Row label={tr('sysinfo.f.revision')} value={pi.revision} /> : null}
+        <Row label={tr('sysinfo.f.kind')} value={kind} />
+        {box ? <Row label={tr('sysinfo.f.case')} value={tr(`sysinfo.case.${camel(box)}`)} /> : null}
+      </GroupBox>
+      {hasBoard ? (
+        <GroupBox title={tr('sysinfo.group.board')}>
+          <Row label={tr('sysinfo.f.vendor')} value={m.boardVendor} />
+          <Row label={tr('sysinfo.f.product')} value={m.boardName} />
+          <Row label={tr('sysinfo.f.version')} value={m.boardVersion} />
+        </GroupBox>
+      ) : null}
+      {pi ? <GroupBox title={tr('sysinfo.group.bootloader')}><BootloaderRows pi={pi} /></GroupBox> : (
+        <GroupBox title={tr('sysinfo.group.firmware')}>
+          <Row label={tr('sysinfo.f.kind')} value={m.firmware ? tr(`sysinfo.firmware.${m.firmware}`) : ''} />
+          <Row label={tr('sysinfo.f.vendor')} value={m.biosVendor} />
+          <Row label={tr('sysinfo.f.version')} value={m.biosVersion} />
+          <Row label={tr('sysinfo.f.date')} value={firmwareDay(m.biosDate)} />
+          <Row label={tr('sysinfo.f.secureBoot')} value={m.secureBoot == null ? '' : m.secureBoot ? tr('sysinfo.on') : tr('sysinfo.off')} />
+        </GroupBox>
+      )}
+      <SerialNumbers />
+    </View>
+  );
+}
+
+// The serial numbers, on this screen and on request only. They aren't in the report and can't reach it: they come from
+// hw-serial-numbers (no arguments, read-only, administrators), stay in this component while shown, are gone when it
+// closes, and the window is protected meanwhile, so screenshots, recordings and remote desktop see black. No copy button.
+function SerialNumbers() {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const win = useAppWindow();
+  const winId = win && win.id;
+  const [state, setState] = useState({ busy: false, list: null, error: null });
+  const shown = !!state.list;
+  useEffect(() => (shown && winId ? () => wm.setProtected(winId, false) : undefined), [shown, winId]);
+  const allowed = !!systemInfo().admin && admin.available();
+  const show = () => {
+    const lines = [];
+    setState({ busy: true, list: null, error: null });
+    admin.run('hw-serial-numbers', '', (l) => lines.push(l), { quiet: true }).then(() => {
+      if (winId) wm.setProtected(winId, true);      // before the numbers are drawn
+      setState({ busy: false, list: parseSerialLines(lines), error: null });
+    }, (e) => setState({ busy: false, list: null, error: e.message }));
+  };
+  const hide = () => setState({ busy: false, list: null, error: null });
+  const list = state.list;
+  return (
+    <GroupBox title={tr('sysinfo.serial.title')} footer={tr('sysinfo.serial.footer')}>
+      {list && list.map((s) => <Row key={s.kind} label={tr(`sysinfo.serial.${s.kind}`)} value={s.value} />)}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 40, paddingVertical: 6 }}>
+        <Text style={{ flex: 1, fontSize: typeScale.callout, color: state.error ? '#ff453a' : t.textDim, textAlign: 'start' }}>
+          {state.error || (list ? (list.length ? '' : tr('sysinfo.serial.none')) : allowed ? tr('sysinfo.serial.hint') : tr('sysinfo.serial.adminOnly'))}</Text>
+        {list ? <Button small label={tr('sysinfo.serial.hide')} onClick={hide} />
+          : <Button small label={tr('sysinfo.serial.show')} disabled={state.busy || !allowed} onClick={show} />}
+      </View>
+    </GroupBox>
+  );
+}
+
+// Keyboards, mice, receivers and the rest: this machine's USB and input buses, and BlueZ's paired devices. On screen
+// only, with no address: a device's own name can carry a person's, so none of this goes into the report.
+function Peripherals({ r }) {
+  const { t: tr } = useLocale();
+  const bt = useBluetooth();
+  const local = useMemo(() => { try { return lord.sysinfo.peripherals() || []; } catch (e) { return []; } }, [r]);
+  const list = useMemo(() => peripherals(local, bt), [local, bt]);
+  return (
+    <GroupBox footer={tr('sysinfo.periph.footer')}>
+      {list.length ? list.map((p, i) => (
+        <Row key={i} label={tr(`sysinfo.periph.${p.kind}`)} value={[p.name || tr('sysinfo.periph.unnamed'), tr(`sysinfo.periph.via.${p.connection}`),
+          p.connected ? '' : tr('sysinfo.periph.notConnected'), p.battery != null ? tr('sysinfo.periph.battery', { pct: p.battery }) : ''].filter(Boolean).join(' · ')} />
+      )) : <Row label={tr('sysinfo.periph.none')} />}
+    </GroupBox>
+  );
 }
 
 // The memory modules come from the firmware's tables, which only root can read: the read-only

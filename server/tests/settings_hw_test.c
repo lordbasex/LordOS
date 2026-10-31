@@ -346,6 +346,26 @@ static void test_power(void) {
     if (system(cmd)) { /* best effort */ }
 }
 
+/* What leaves the hw-serial-numbers action: real serials only, one safe line. */
+static void test_serial_clean(void) {
+    char o[64];
+    CHECK(!hw_serial_clean("PF1ABCDE\n", 9, o, sizeof o) && !strcmp(o, "PF1ABCDE"));
+    CHECK(!hw_serial_clean("  VMware-56 4d 12.ab/x:1_2\n", 27, o, sizeof o) && !strcmp(o, "VMware-56 4d 12.ab/x:1_2"));
+    CHECK(!hw_serial_clean("10000000deadbeef\0", 17, o, sizeof o) && !strcmp(o, "10000000deadbeef"));     /* a device tree string */
+    static const char *const no[] = { "", "\n", "   ", "To Be Filled By O.E.M.", "Default string", "Not Specified", "NONE", "unknown\n",
+                                       "System Serial Number", "Base Board Serial Number", "0123456789", "0000000000", "XXXXXXXX", "0" };
+    for (size_t i = 0; i < sizeof no / sizeof no[0]; i++) CHECK(hw_serial_clean(no[i], strlen(no[i]), o, sizeof o) == -1 && !o[0]);
+    /* anything that could end the protocol line or carry text of another kind */
+    static const char *const bad[] = { "AB\nLOG serial x", "A|B", "A;rm", "A$(x)", "A\tB", "A\"B", "A\xc3\xa9" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(hw_serial_clean(bad[i], strlen(bad[i]), o, sizeof o) == -1 && !o[0]);
+    CHECK(hw_serial_clean("A\0B", 3, o, sizeof o) == -1);                                    /* a NUL inside */
+    char l[80];
+    memset(l, 'a', sizeof l);
+    l[0] = 'b';
+    CHECK(hw_serial_clean(l, 64, o, sizeof o) == -1);                                        /* too long */
+    CHECK(!hw_serial_clean(l, 63, o, sizeof o) && strlen(o) == 63);
+}
+
 /* the admin helper's functions hw_admin.c calls (not used by the validators) */
 void admin_say(const char *kind, const char *fmt, ...) { (void)kind; (void)fmt; }
 int admin_run(const char *const argv[]) { (void)argv; return -1; }
@@ -431,6 +451,7 @@ int main(void) {
     test_night();
     test_mimeapps();
     test_power();
+    test_serial_clean();
     printf("settings-hw: %d/%d passed\n", checks - fails, checks);
     return fails != 0;
 }
