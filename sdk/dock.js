@@ -239,16 +239,13 @@ export function quitApp(wins) {
   for (const w of [...wins]) wm.close(w.id);
 }
 
-// ❖Q quits the app in front (only in the session: an isolated app never receives ❖Q).
-addListener('keydown', (e) => {
-  if (!e.meta || e.ctrl || e.alt || e.shift || e.repeat) return;
-  if (String(e.base || e.key || '').toLowerCase() !== 'q') return;
-  if (typeof lord !== 'undefined' && typeof lord.appId === 'string') return;
+// ❖Q quits the app in front (sdk/shortcuts.js: only in the session, an isolated app never receives ❖Q).
+export function quitFrontApp() {
   const top = wm.get(wm.focused());
   if (!top) return;
   const key = launcherIdOf(top);
   quitApp(windows.get().filter((w) => launcherIdOf(w) === key));
-});
+}
 
 // ---- quick actions ----
 

@@ -28,13 +28,16 @@ int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, con
 /* While lord-server moves or resizes a window (ui/grab.c): no app receives the pointer
  * (they are sent leave) and only the button count is tracked. */
 void wl_pointer_grab(int nbuttons, const int *down);
-int  wl_key(int code, int value, const KeyInfo *k);   /* 1 if the key went to the focused app */
+/* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
+ * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
+int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
 
 /* From JS (lord.wayland) */
 void wl_set_focus(int id);              /* 0: no Wayland app has the keyboard */
+void wl_focus_terminal(int on);         /* the app with the keyboard is a terminal emulator: ❖C is Ctrl+Shift+C */
 void wl_close(int id);                  /* asks the app to close the window */
 const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);

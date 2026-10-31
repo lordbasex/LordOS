@@ -444,7 +444,7 @@ export function EditorView({ doc, lang, t, palette, settings, matches, onChange,
       if ((b === 'z' && sh) || b === 'y') return commands.redo();
       if (b === 'c') return copy();
       if (b === 'x') return cut();
-      if (b === 'v' && e.ctrl) return paste();
+      if (b === 'v' && (e.ctrl || e.meta)) return paste();
       if (b === 'a') return selectAll();
       if (b === 'd' && !sh) return selectNext();
       if (b === 'd' && sh) return duplicateLines();

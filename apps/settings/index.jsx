@@ -3,7 +3,7 @@
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
 import {
-  View, Text, Image, useTheme, useSettings, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm,
 } from '@lordos/sdk';
@@ -397,6 +397,22 @@ function KeyCap({ label, active }) {
   );
 }
 
+// The shortcuts in use with this theme (sdk/shortcuts.js): read only.
+function ShortcutsList() {
+  const { t: tr } = useLocale();
+  const t = useTheme();
+  useStore(shortcutsRev);
+  return shortcutList().map(({ group, items }) => (
+    <Section key={group} title={tr(`settings.kb.shortcuts.${group}`)} footer={group === 'apps' ? tr('settings.kb.shortcuts.note') : undefined}>
+      {items.map((it) => (
+        <SettingRow key={it.id} label={it.label}>
+          <Text style={{ fontSize: typeScale.body, color: t.textDim }}>{it.keys}</Text>
+        </SettingRow>
+      ))}
+    </Section>
+  ));
+}
+
 function Keyboard() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -449,6 +465,7 @@ function Keyboard() {
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
+      <ShortcutsList />
     </Stack>
   );
 }

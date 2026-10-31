@@ -11,6 +11,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 
 | Document | What it covers |
 |---|---|
+| [SHORTCUTS.md](SHORTCUTS.md) | The shortcut dispatcher, the keys kept from apps, ❖ as Ctrl and the app switcher |
 | [PAPER.md](PAPER.md) | The project paper: vision, architecture, security model, performance, roadmap |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Components, processes, dependencies and platforms |
 | [ROADMAP.md](ROADMAP.md) | Milestones, what is done and what comes next |

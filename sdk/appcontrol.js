@@ -7,6 +7,8 @@
 //   recentItems(n)         the recent files as menu items (Recent Items in the crown menu)
 //   storeUpdates()         how many package updates are waiting (the crown menu's Store item)
 //
+//   hideApp, hideOthers, toggleShowDesktop, appSettingsItem   what the keyboard shortcuts call too
+//
 // Lord Flow shows the app menu under the app's name in its menu bar and the rest in the crown menu;
 // Lord Classic offers About in each window's Help menu. About <app> and Force Quit are system windows
 // of their own (apps/appabout, apps/forcequit), the same in every theme.
@@ -16,6 +18,9 @@ import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { openFileWithApps } from './sysopen.js';
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
+
+// the theme's own panels; a Linux window also runs under a built-in app id, but it is an app
+const isShellPanel = (w) => !!getApp(w.id)?.builtin && !String(w.id).startsWith('linux#');
 
 function groupName(key, w) {
   const a = getApp(key);
@@ -29,7 +34,7 @@ export function appGroup(winId) {
   const w = wm.get(winId);
   if (!w) return null;
   const key = launcherIdOf(w);
-  const wins = windows.get().filter((x) => launcherIdOf(x) === key && !(getApp(x.id)?.builtin && !String(x.id).startsWith('linux#')));
+  const wins = windows.get().filter((x) => launcherIdOf(x) === key && !isShellPanel(x));
   return { key, name: groupName(key, w), windows: wins };
 }
 
@@ -44,18 +49,37 @@ function settingsItemOf(winId) {
   return null;
 }
 
+// Hide <app>: every window of the app goes away; Hide Others: every other app's.
+export function hideApp(winId) { appGroup(winId)?.windows.forEach((w) => wm.minimize(w.id)); }
+export function hideOthers(winId) {
+  const g = appGroup(winId);
+  if (!g) return;
+  const mine = new Set(g.windows.map((w) => w.id));
+  windows.get().forEach((w) => { if (!mine.has(w.id) && !isShellPanel(w)) wm.minimize(w.id); });
+}
+// The app's own Settings… item, if it has one (❖,).
+export const appSettingsItem = settingsItemOf;
+
+// Show desktop: everything visible goes away, and the next time what it took away comes back.
+let hiddenByDesktop = [];
+export function toggleShowDesktop() {
+  const vis = windows.get().filter((w) => !w.minimized && !isShellPanel(w));
+  if (vis.length) { hiddenByDesktop = vis.map((w) => w.id); vis.forEach((w) => wm.minimize(w.id)); return; }
+  hiddenByDesktop.forEach((id) => wm.focus(id));
+  hiddenByDesktop = [];
+}
+
 export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
-  const mine = new Set(g.windows.map((w) => w.id));
   const settingsItem = settingsItemOf(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
     '-',
-    { label: t('shell.app.hide', { app: g.name }), onClick: () => g.windows.forEach((w) => wm.minimize(w.id)) },
-    { label: t('shell.app.hideOthers'), onClick: () => windows.get().forEach((w) => { if (!mine.has(w.id) && !getApp(w.id)?.builtin) wm.minimize(w.id); }) },
+    { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },
+    { label: t('shell.app.hideOthers'), hint: '❖⌥H', onClick: () => hideOthers(winId) },
     { label: t('shell.app.showAll'), onClick: () => windows.get().forEach((w) => { if (w.minimized) wm.focus(w.id); }) },
     '-',
     { label: t('shell.app.quit', { app: g.name }), hint: '❖Q', onClick: () => quitApp(g.windows) },
@@ -65,7 +89,7 @@ export function appMenuItems(winId) {
 export function runningApps() {
   const groups = new Map();
   for (const w of windows.get()) {
-    if (getApp(w.id)?.builtin && !String(w.id).startsWith('linux#')) continue;   // the theme's own panels
+    if (isShellPanel(w)) continue;
     if (w.app === 'forcequit') continue;
     const key = launcherIdOf(w);
     if (!groups.has(key)) groups.set(key, { key, name: groupName(key, w), windows: [] });

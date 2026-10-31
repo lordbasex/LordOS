@@ -61,7 +61,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
       '-',
       { label: tr('shell.menu.recent'), submenu: recentItems(10) },
       '-',
-      ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), onClick: () => wm.open('forcequit') }, '-'] : []),
+      ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), hint: '❖⌥Esc', onClick: () => wm.open('forcequit') }, '-'] : []),
       ...(session.managed() ? [
         { label: tr('shell.menu.lock'), hint: '❖L', onClick: () => session.lock() },
         { label: tr('shell.menu.switchUser'), onClick: () => session.switchUser() },

@@ -1,6 +1,6 @@
 // @lordos/sdk — everything a LordOS theme or app needs.
 import { createElement, cloneElement, Fragment } from 'react';
-import { render, onScreenChange, addListener } from '@lordos/runtime';
+import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { locale, tOptional } from './i18n.js';
@@ -11,6 +11,9 @@ export { createStore, useStore } from './store.js';
 export { settings, useSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
+export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev } from './shortcuts.js';
+import { resetShortcuts } from './shortcuts.js';
+export { AppSwitcher, openSwitcher, cycleAppWindows } from './appswitcher.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland } from './wayland.js';
@@ -179,12 +182,6 @@ export const session = {
   shutdown: () => askPower('poweroff'),
 };
 
-// ❖L or ❖Ctrl+Q lock the screen.
-addListener('keydown', (e) => {
-  const k = String(e.base || e.key || '').toLowerCase();
-  if (e.meta && !e.alt && !e.repeat && ((k === 'l' && !e.ctrl && !e.shift) || (k === 'q' && e.ctrl)) && session.managed()) session.lock();
-});
-
 // The screen size changed: everything is redrawn with the new measurements.
 const screenRev = createStore(0);
 onScreenChange(() => screenRev.set((v) => v + 1));
@@ -196,6 +193,7 @@ export function startShell(element) {
   if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
   refreshPackages();                    // after the theme's configureWindows
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
+  resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();
   render(createElement(LocaleRoot, null, element));
   // live ISO: the installation assistant opens by itself, in front, or System Information for the
@@ -254,5 +252,5 @@ function LocaleRoot({ children }) {
     at('input', ImeOverlay));
 }
 export { lordosWallpapers, wallpaperSrc, wallpaperThumb, findWallpaper, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
-export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates } from './appcontrol.js';
+export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem } from './appcontrol.js';
 export { windowMenuItems, moveResizeItems } from './windowmenu.js';

@@ -13,6 +13,7 @@ código, rutas e imágenes.
   estabas.
 - **❖⇧V:** el historial completo, con filtros por tipo, vista previa y acciones: fijar arriba,
   borrar o volver a copiar.
+- En Lord Flow, ❖V pega en la app del frente: ahí usá ❖⇧V. Ver [Atajos de teclado](help:shortcuts).
 - **Fijar:** lo fijado queda siempre arriba y no se borra con el tiempo.
 
 ## Privacidad

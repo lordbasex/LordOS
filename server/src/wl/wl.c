@@ -16,6 +16,7 @@
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
  * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps). */
 #include "wl.h"
+#include "keygrab.h"
 #include "../keylag.h"
 
 #include <errno.h>
@@ -2519,11 +2520,84 @@ static int system_meta_key(int code, const KeyInfo *k) {
     }
 }
 
+/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Lord Flow. grabbed[code]: its press went to
+ * the shell, so its release does too. remapped[code]: its press went to the app as Ctrl+key.
+ * grab_hold: the modifier of a switcher in progress; until it is released every key is the shell's,
+ * while modifiers still reach the app too, so it never keeps one stuck. */
+#define KEY_SLOTS 256
+static unsigned char grabbed[KEY_SLOTS], remapped[KEY_SLOTS];
+static unsigned grab_hold;
+static int focus_terminal;
+
+void wl_focus_terminal(int on) { focus_terminal = !!on; }
+
+static int is_modifier_key(int code) {
+    return code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT || code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL ||
+           code == KEY_LEFTALT || code == KEY_RIGHTALT || code == KEY_LEFTMETA || code == KEY_RIGHTMETA;
+}
+
+/* Like wl_send_paste, for one key held down: the client repeats it on its own while Ctrl stays set.
+ * Super (core modifier 6, Mod4) is taken out so the app sees plain Ctrl. */
+static void send_remapped(int code, int press) {
+    unsigned t = now_ms();
+    uint32_t d, l, lk, g;
+    kb_mods(&d, &l, &lk, &g);
+    d &= ~(1u << 6);
+    uint32_t held = d | 1u << 2 | (focus_terminal ? 1u : 0);
+    struct wl_resource *kb;
+    FOR_CLIENT(&keyboards, key_focus->client, kb) {
+        if (press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), held, l, lk, g);
+        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+                             press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+        if (!press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
+    }
+    mods_sent[0] = press ? held : d; mods_sent[1] = l; mods_sent[2] = lk; mods_sent[3] = g;
+}
+
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
-    if (k->meta && code == KEY_ESC && fs_surf) { if (value == 1) leave_fullscreen(fs_surf); return 1; }   /* ❖Esc exits */
+    unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
+    unsigned char *was_remapped = code >= 0 && code < KEY_SLOTS ? &remapped[code] : NULL;
+    unsigned mods = (k->shift ? KG_SHIFT : 0u) | (k->ctrl ? KG_CTRL : 0u) | (k->alt ? KG_ALT : 0u) | (k->meta ? KG_META : 0u);
+    if (was_grabbed && *was_grabbed) {
+        if (!value) *was_grabbed = 0;
+        return 0;
+    }
+    if (was_remapped && *was_remapped) {
+        if (value) return 1;                    /* apps repeat on their own (repeat_info) */
+        *was_remapped = 0;
+        if (key_focus) send_remapped(code, 0);
+        return 1;
+    }
+    if (grab_hold) {
+        if (!(mods & grab_hold)) grab_hold = 0;
+        if (is_modifier_key(code)) { if (key_focus && value != 2) send_key_to_focus(code, value); }
+        else if (value && was_grabbed) *was_grabbed = 1;
+        else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
+        return 0;
+    }
+    if (k->meta && code == KEY_ESC && !k->alt && fs_surf) {           /* ❖Esc exits; the shell learns ❖ was not alone */
+        if (value != 1) return 1;
+        leave_fullscreen(fs_surf);
+        return 2;
+    }
     if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     if (!key_focus) return 0;
+    if (value == 1 && was_grabbed) {
+        char letter = keygrab_letter(code, k->base);
+        int how = keygrab_match(code, letter, mods);
+        if (how == KG_HOLD && fs_surf && fs_surf->content) how = KG_PASS;   /* presented above the switcher */
+        if (how != KG_PASS) {
+            *was_grabbed = 1;
+            if (how == KG_HOLD) grab_hold = mods & (KG_ALT | KG_META);
+            return 0;
+        }
+        if (keygrab_is_remap(letter, mods) && !focus_is_lord_app()) {
+            *was_remapped = 1;
+            send_remapped(code, 1);
+            return 2;
+        }
+    }
     int super = code == KEY_LEFTMETA || code == KEY_RIGHTMETA;
     if (k->meta || super) {
         /* ❖ + key: LordOS shortcuts. An isolated LordOS app also gets the ones that are not the

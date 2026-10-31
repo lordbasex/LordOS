@@ -14,12 +14,13 @@ import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
+  useShortcuts, runShortcut, AppSwitcher, openSwitcher, toggleShowDesktop, spotlight, launchApp, dockActivate,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
 import { Window, TITLE_H } from './components/Window.jsx';
-import { Taskbar, BAR_H, barSize } from './components/Taskbar.jsx';
+import { Taskbar, BAR_H, barSize, taskbarEntries } from './components/Taskbar.jsx';
 import { StartMenu, startBox } from './components/StartMenu.jsx';
 import { QuickSettings } from './components/QuickSettings.jsx';
 import { NotificationCenter } from './components/NotificationCenter.jsx';
@@ -105,6 +106,41 @@ function SnapPreview({ t }) {
   );
 }
 
+// Lord Classic's own shortcuts (the common ones are in sdk/shortcuts.js). `ui` is a ref to what the
+// shell's state offers at that moment.
+const switchApps = (e) => openSwitcher(2, e.shift);
+const openFiles = () => launchApp('files');
+const openSettings = () => launchApp('settings');
+const openMonitor = () => launchApp('monitor');
+const openSearch = () => spotlight.open();
+const captureArea = () => runShortcut('capture.area');
+function openTaskbarItem(e) {
+  const entry = taskbarEntries()[e.code - 2];
+  if (entry) dockActivate(entry);
+}
+const SNAP_DIRS = { 103: 'up', 105: 'left', 106: 'right', 108: 'down' };     // physical sides, also in right-to-left languages
+
+const classicTable = (ui) => {
+  const snapFront = (e) => { const f = ui.current.focused; if (f) wm.snapKey(f, SNAP_DIRS[e.code]); };
+  const closeFront = () => { const f = ui.current.focused; if (f) wm.close(f); };
+  return [
+    { id: 'start', keys: [], show: ['❖'], run: () => {}, label: 'shell.shortcuts.startMenu', group: 'system' },
+    { id: 'searchRun', keys: ['Meta+R'], run: openSearch, label: 'shell.shortcuts.search', group: 'system' },
+    { id: 'quick', keys: ['Meta+A'], run: () => ui.current.toggle('quick'), label: 'shell.shortcuts.quickSettings', group: 'system' },
+    { id: 'notif', keys: ['Meta+N'], run: () => ui.current.toggle('notif'), label: 'shell.shortcuts.notifications', group: 'system' },
+    { id: 'showDesktop', keys: ['Meta+D'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
+    { id: 'files', keys: ['Meta+E'], run: openFiles, label: 'shell.shortcuts.files', group: 'system' },
+    { id: 'settings', keys: ['Meta+I'], run: openSettings, label: 'shell.shortcuts.settings', group: 'system' },
+    { id: 'monitor', keys: ['Ctrl+Shift+Escape'], run: openMonitor, label: 'shell.shortcuts.monitor', group: 'system' },
+    { id: 'captureArea', keys: ['Meta+Shift+S'], run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
+    { id: 'switchApps', keys: ['Alt+Tab', 'Alt+Shift+Tab'], run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
+    { id: 'taskView', keys: ['Meta+Tab'], run: () => ui.current.toggleTaskView(), label: 'shell.shortcuts.taskView', group: 'windows' },
+    { id: 'snap', keys: ['Meta+ArrowLeft', 'Meta+ArrowRight', 'Meta+ArrowUp', 'Meta+ArrowDown'], show: ['❖←→↑↓'], run: snapFront, repeat: true, label: 'shell.shortcuts.snap', group: 'windows' },
+    { id: 'closeWindow', keys: ['Alt+F4'], run: closeFront, label: 'shell.shortcuts.closeWindow', group: 'windows' },
+    { id: 'taskbar', keys: ['Meta+1', 'Meta+2', 'Meta+3', 'Meta+4', 'Meta+5', 'Meta+6', 'Meta+7', 'Meta+8', 'Meta+9'], show: ['❖1…9'], run: openTaskbarItem, label: 'shell.shortcuts.taskbarItem', group: 'apps' },
+  ];
+};
+
 function App() {
   const [s] = useSettings();
   const t = makeTheme(s);
@@ -130,35 +166,12 @@ function App() {
   if (panel === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
   const unread = history.some((n) => n.id > seen.current);
 
-  // Super alone opens the start menu (only if released without being used in a shortcut);
-  // Super+arrows snap the window in front, Super+Tab is the task view, Super+A quick settings,
-  // Super+N the notifications, Alt+F4 closes the window in front, Escape closes what is open.
-  const st = useRef({});
-  st.current = { focused, taskView };
-  useEffect(() => {
-    let superAlone = false;
-    const offDown = addListener('keydown', (e) => {
-      const sup = e.code === 125 || e.code === 126;
-      if (sup) { if (!e.repeat) superAlone = true; return; }
-      superAlone = false;
-      const f = st.current.focused;
-      if (e.meta && !e.ctrl && !e.alt) {
-        const dir = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[e.key];
-        if (dir && f) { wm.snapKey(f, dir); return; }      // physical sides, also in right-to-left languages
-        if (e.key === 'Tab' && !e.repeat) { setPanel(null); setTaskView((v) => !v); return; }
-        const k = String(e.base || e.key || '').toLowerCase();
-        if (k === 'a' && !e.repeat) { toggle('quick'); return; }
-        if (k === 'n' && !e.repeat) { toggle('notif'); return; }
-      }
-      if (e.alt && !e.ctrl && !e.meta && e.code === 62 && f) { wm.close(f); return; }   // Alt+F4
-      if (e.key === 'Escape') { setPanel(null); setDesk(null); }
-    });
-    const offUp = addListener('keyup', (e) => {
-      if ((e.code === 125 || e.code === 126) && superAlone) { setTaskView(false); toggle('start'); }
-      superAlone = false;
-    });
-    return () => { offDown(); offUp(); };
-  }, []);
+  // ❖ alone opens the start menu (only if released without being used in a shortcut); Escape closes
+  // what is open. The rest of the keys are in classicTable.
+  const ui = useRef(null);
+  ui.current = { toggle, focused, toggleTaskView: () => { setPanel(null); setTaskView((v) => !v); } };
+  useShortcuts({ grabs: 'classic', table: classicTable(ui), onSuperTap: () => { setTaskView(false); toggle('start'); } });
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setPanel(null); setDesk(null); } }), []);
   // trackpad: a 3-finger swipe up opens the start menu, down closes it (docs/TRACKPAD.md)
   useEffect(() => registerGestureActions({ up: () => setPanel('start'), down: () => { setPanel(null); setTaskView(false); } }), []);
 
@@ -223,6 +236,7 @@ function App() {
         </Layer>
         {/* Restart…, Shut Down… (sdk/power.jsx) */}
         <Layer name="modal"><PowerDialog /></Layer>
+        <AppSwitcher />
         {askEmpty && (
           <Layer name="modal">
             <ConfirmDialog title={tr('shell.trash.confirmTitle')} detail={tr('shell.trash.confirmDetail')} okLabel={tr('shell.trash.empty')}

@@ -6,7 +6,8 @@ import {
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
-  findWallpaper, wallpaperSrc,
+  findWallpaper, wallpaperSrc, useShortcuts, AppSwitcher, openSwitcher, cycleAppWindows, hideApp, hideOthers,
+  toggleShowDesktop, appSettingsItem,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
@@ -73,6 +74,31 @@ function useMinimizing(windows) {
     .filter((x) => x.win && x.win.minimized);
 }
 
+// Lord Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
+const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
+const minimizeFront = onFront(wm.minimize);
+const hideFront = onFront(hideApp);
+const hideOtherApps = onFront(hideOthers);
+const openForceQuit = () => wm.open('forcequit');
+const toggleDockAutohide = () => settings.set({ dockAutohide: !dockPrefs(settings.get()).dockAutohide });
+const frontSettings = () => { const id = wm.focused(); return id ? appSettingsItem(id) : null; };
+const openFrontSettings = () => frontSettings()?.onClick();
+const switchApps = (e) => openSwitcher(8, e.shift);
+const cycleWindows = (e) => cycleAppWindows(e.shift);
+
+const flowTable = (toggleLauncher) => [
+  { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
+  { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
+  { id: 'dockAutohide', keys: ['Meta+Alt+D'], run: toggleDockAutohide, label: 'shell.shortcuts.dockAutohide', group: 'system' },
+  { id: 'switchApps', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
+  { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: cycleWindows, label: 'shell.shortcuts.cycleWindows', group: 'windows' },
+  { id: 'minimize', keys: ['Meta+M'], run: minimizeFront, label: 'shell.shortcuts.minimize', group: 'windows' },
+  { id: 'hide', keys: ['Meta+H'], run: hideFront, label: 'shell.shortcuts.hide', group: 'windows' },
+  { id: 'hideOthers', keys: ['Meta+Alt+H'], run: hideOtherApps, label: 'shell.shortcuts.hideOthers', group: 'windows' },
+  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: openForceQuit, label: 'shell.shortcuts.forceQuit', group: 'apps' },
+  { id: 'appSettings', keys: ['Meta+,'], run: openFrontSettings, when: frontSettings, label: 'shell.shortcuts.appSettings', group: 'apps' },
+];
+
 // The Dock's right-click menus open toward the inside of the screen, next to the icon.
 function DockMenu({ pos, at, items, onClose }) {
   return pos === 'bottom'
@@ -101,21 +127,10 @@ function App() {
   const all = screenDisplays();
   const bars = s.menuBarAllDisplays && !screen.mirror ? all : [main];
 
-  // F4 opens the app launcher; Super too, but only if released without being used in a shortcut
-  // (Super+T, Super+D... belong to the apps).
-  useEffect(() => {
-    let superAlone = false;
-    const offDown = addListener('keydown', (e) => {
-      if (e.code === 62 && !e.repeat) setLaunchpad((v) => !v);
-      if (e.code === 125 || e.code === 126) { if (!e.repeat) superAlone = true; } else superAlone = false;
-      if (e.key === 'Escape') { setControl(null); setContext(null); }
-    });
-    const offUp = addListener('keyup', (e) => {
-      if ((e.code === 125 || e.code === 126) && superAlone) setLaunchpad((v) => !v);
-      superAlone = false;
-    });
-    return () => { offDown(); offUp(); };
-  }, []);
+  // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
+  const toggleLauncher = () => setLaunchpad((v) => !v);
+  useShortcuts({ grabs: 'flow', table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setContext(null); } }), []);
 
   // Trackpad: a 3-finger swipe up opens the app launcher and down closes it;
   // left/right switch windows (the SDK does that). See docs/TRACKPAD.md.
@@ -167,6 +182,7 @@ function App() {
         )}
         {/* Restart… and Shut Down… (sdk/power.jsx): inside the ThemeProvider, so it takes the theme's colors */}
         <Layer name="modal"><PowerDialog /></Layer>
+        <AppSwitcher />
         {control && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={control} onClose={() => setControl(null)} /></Layer>}
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[

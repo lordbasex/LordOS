@@ -14,7 +14,7 @@ Firefox, Electron— abrem como mais uma janela da área de trabalho.
 - **Abrir um arquivo com um deles:** em [Arquivos](help:files), botão direito → “Abrir com”.
 - **Área de transferência:** o que você copia em um app Linux cola no LordOS e vice-versa, também
   imagens.
-- **Teclado e touchpad:** recebem as teclas (as combinações com ❖ continuam sendo do LordOS) e os
+- **Teclado e touchpad:** recebem as teclas (as combinações com ❖ continuam sendo do LordOS, exceto no Lord Flow, onde [❖C, ❖V e outras chegam como Ctrl](help:shortcuts)) e os
   gestos de pinça e deslizar.
 
 Os apps que desenham a própria moldura (por exemplo os do GNOME com libadwaita) aparecem sem a

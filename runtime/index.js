@@ -4,9 +4,9 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, currentPriority, addListener } from './events.js';
+import { register, unregister, currentPriority, addListener, setKeyFilter } from './events.js';
 
-export { addListener };
+export { addListener, setKeyFilter };
 export { setLayout, getLayout, layouts, modifiers } from './keymap.js';
 export const View = 'view';
 export const Text = 'text';

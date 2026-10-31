@@ -848,7 +848,9 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   (`brokersrv_app_of_pid`). That client also receives ❖ combinations (❖N, ❖C, ❖A, ❖W…) together
   with the ❖ key itself, as an app inside the theme would. The system keeps ❖L, ❖⌃Q, ❖Q,
   ❖Space, ❖⌥Space, ❖V, ❖., ❖Tab, ❖`, ❖Esc, ❖⇧3/4/5 and ❖F1–F12 (`system_meta_key` in
-  `wl/wl.c`); a Linux app still gets no ❖ combination.
+  `wl/wl.c`) and those of the theme's fixed table (`wl/keygrab.c`, [SHORTCUTS.md](SHORTCUTS.md)), which
+  isolated apps cannot change: `lord.wayland` does not exist in their process. A Linux app still gets no ❖
+  combination, except Lord Flow's ❖ as Ctrl, sent as Ctrl to that client only.
 - **Keyboard layout:** the app compiles the keymap that the compositor sends over
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`

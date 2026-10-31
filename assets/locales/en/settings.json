@@ -406,5 +406,9 @@
   "wallpaperCategory.gradients": "Gradients",
   "wallpaperCategory.lumo": "Lumo",
   "wallpaperCategory.other": "Other",
-  "wallpaperCategory.signature": "Signature"
+  "wallpaperCategory.signature": "Signature",
+  "kb.shortcuts.system": "Shortcuts: system",
+  "kb.shortcuts.windows": "Shortcuts: windows",
+  "kb.shortcuts.apps": "Shortcuts: apps",
+  "kb.shortcuts.note": "Each app adds its own: see its Help article. Plain Ctrl+Q always stays with the app."
 }

@@ -14,7 +14,7 @@ Firefox, Electron— se abren como ventanas más del escritorio.
 - **Abrirlas:** Aplicaciones, el Dock o Buscar, como cualquier app.
 - **Abrir un archivo con una de ellas:** en [Archivos](help:files), clic derecho → «Abrir con».
 - **Portapapeles:** lo que copiás en una app Linux se pega en LordOS y al revés, también imágenes.
-- **Teclado y touchpad:** reciben las teclas (las combinaciones con ❖ siguen siendo de LordOS) y
+- **Teclado y touchpad:** reciben las teclas (las combinaciones con ❖ siguen siendo de LordOS, salvo en Lord Flow, donde [❖C, ❖V y otras llegan como Ctrl](help:shortcuts)) y
   los gestos de pellizcar y deslizar.
 
 Las apps que dibujan su propio marco (por ejemplo las de GNOME con libadwaita) se muestran sin el

@@ -5,7 +5,7 @@
 // or ❖⌥Space). Any xkb-data layout works: keyboard.list() returns all of them with
 // their variants. With `ime` it is an input method (ime.c) on top of the Latin keyboard `layout`:
 // hangul (Korean), kana (Japanese), pinyin (Simplified Chinese).
-import { setLayout, addListener } from '@lordos/runtime';
+import { setLayout } from '@lordos/runtime';
 import { settings } from './settings.js';
 
 const native = () => typeof lord.keyboard !== 'undefined' && lord.keyboard.current().xkb;
@@ -54,12 +54,6 @@ export const keyboard = {
   // Is the active input method's dictionary missing? (install the language pack)
   missingDictionary: () => imeStatus === 1,
 };
-
-// ❖⌥Space or Ctrl+⌥Space switch to the next layout or input method.
-// ❖Space and Ctrl+Space belong to Search (sdk/spotlight.js).
-addListener('keydown', (e) => {
-  if ((e.meta || e.ctrl) && e.alt && !e.shift && e.key === ' ' && !e.repeat && configured().length > 1) keyboard.next();
-});
 
 apply();
 settings.subscribe(apply);

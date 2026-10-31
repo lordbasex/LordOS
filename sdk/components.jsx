@@ -305,9 +305,9 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       const p = latest.current;
       if (p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
       const all = allRef.current;
-      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || (e.ctrl && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
+      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || ((e.ctrl || e.meta) && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
       else if (all && /^Arrow|^Home$|^End$/.test(e.key || '')) { setAllSel(false); allRef.current = false; return; }
-      if (e.ctrl && e.base === 'v') { p.onChange(p.value + lord.clipboard.get().replace(/\n/g, ' ')); return; }
+      if ((e.ctrl || e.meta) && e.base === 'v') { p.onChange(p.value + lord.clipboard.get().replace(/\n/g, ' ')); return; }
       if (e.key === 'Backspace' || e.key === 'Delete') p.onChange(all ? '' : e.key === 'Delete' ? p.value : [...p.value].slice(0, -1).join(''));
       else if (e.key === 'Enter') p.onSubmit?.(p.value);
       else if (e.key === 'Escape') p.onCancel?.();
