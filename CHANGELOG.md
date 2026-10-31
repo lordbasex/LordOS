@@ -36,6 +36,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Changed
 
 - `MdnsCache` keeps 256 records of each kind (64 before) and `mdns_query` is public, for `lord-lan`; printing's use is the same.
+- **Session restore** (`docs/SESSIONS.md`): apps open at logout, Restart or Shut Down come back with their frames,
+  maximized, minimized and snapped states; an empty desktop stays empty; after a power cut or a crash LordOS asks
+  first. Settings → Session: Always, Ask first, Off. Saved continuously in `settings.json` as typed Dock ids, never
+  commands, titles or Linux document paths, and reopened only through the Dock's launch paths. Tested on VM 125 with
+  a logout, reboots, a real shutdown, a forced power-off and `SIGKILL`.
+- **Browser tabs on restore**: the closed admin action `browser-restore on|off` writes fixed policy files for
+  Chromium and Firefox ESR. Pages came back on VM 125; after a forced power-off Chromium needs its own "Restore pages?".
+
+### Fixed
+
+- `SIGTERM` or `SIGINT` could end `lord-server` on a worker thread without leaving the main loop, skipping the end of
+  the session. They now always reach the loop.
+- The end of a session asks Wayland and X11 apps to close (up to 3 s) before disconnecting them, so browsers no longer
+  record a crash at logout.
+- Search's Log Out now also clears the clipboard history when that option is on, like the other logouts.
 
 ### Planned
 

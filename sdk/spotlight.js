@@ -14,6 +14,7 @@ import { settings } from './settings.js';
 import { wm, getApp, windows } from './windows.js';
 import { useLauncherApps, launchApp } from './apps.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
+import { logOut } from './sessionrestore.jsx';
 import { TextInput, focusToken, restoreFocus } from './components.jsx';
 import * as fs from './fs.js';
 
@@ -284,7 +285,7 @@ function buildResults(raw, apps) {
   // system actions
   const actions = [
     { id: 'dark', name: t('shell.spotlight.action.dark'), run: () => settings.set({ mode: settings.get().mode === 'dark' ? 'light' : 'dark' }) },
-    { id: 'logout', name: t('shell.menu.logout'), run: () => lord.quit() },
+    { id: 'logout', name: t('shell.menu.logout'), run: () => logOut() },
   ];
   add('actions', actions.map((x) => ({ ...x, s: best(q, x.name) })).filter((x) => x.s >= 40)
     .map((x) => ({ key: `action:${x.id}`, score: x.s + 5, title: x.name, subtitle: t('shell.spotlight.action.hint'), glyph: '⏎', run: x.run })));

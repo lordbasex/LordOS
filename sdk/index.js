@@ -40,6 +40,7 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, logOut } from './sessionrestore.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
 import { EmojiPanel } from './emoji.jsx';
@@ -76,6 +77,7 @@ import { reportRefusedCode } from './codesig.js';
 export { WindowShell, WINDOW_EDGE } from './windowshell.jsx';
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind } from './clipboard.js';
+export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
 export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightConvert } from './spotlight.js';
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
@@ -166,6 +168,7 @@ export const themes = {
         .map((w) => ({ app: w.app, id: w.id, args: w.args ? JSON.parse(JSON.stringify(w.args)) : null, minimized: !!w.minimized,
           frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized }));
     } catch (e) { reopen = []; }
+    markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
     return lord.themes.use(id);
@@ -177,7 +180,7 @@ export const themes = {
 // lord-sessiond (managed()); in a session viewed only from the browser, locking closes the
 // browser's access.
 export const session = {
-  quit: () => { clipboardApi.beforeLogout(); lord.quit(); },
+  quit: logOut,
   managed: () => typeof lord.session !== 'undefined' && lord.session.managed(),
   lock: () => typeof lord.session !== 'undefined' && lord.session.lock(),
   switchUser: () => typeof lord.session !== 'undefined' && lord.session.switchUser(),
@@ -220,6 +223,7 @@ export function startShell(element) {
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
   startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
   registerStatusItem('osk', OskStatus, 6);
+  startSessionRestore();                // the apps that were open come back (sessionrestore.jsx, docs/SESSIONS.md)
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
 }
 
@@ -254,7 +258,7 @@ function LocaleRoot({ children }) {
     at('floating', FloatingWindows),
     at('overlay', SpotlightPanel),
     at('popover', ClipboardPanel, EmojiPanel),
-    at('modal', PrintDialog),
+    at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, DisplayIdentify),
     at('system', PermissionPrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));

@@ -26,6 +26,7 @@ import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssign
 import { screen, onScreenChange } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
+import { restoredIds } from './sessionrestore.jsx';
 import * as fs from './fs.js';
 import {
   parseDockId, toTypedId, normalizePinned, ensureItems, moveItem, pinItem, unpinItem, isLocked, isMovable, cleanActions,
@@ -454,5 +455,5 @@ setDisplayAssignment((key) => {
 // once per session, a few seconds after it starts (never in the live system's first run, never in an
 // isolated app's process), each through launchDockItem: the same safe paths as a Dock click
 if (typeof lord !== 'undefined' && typeof lord.appId !== 'string' && typeof lord.greeter === 'undefined' && !isLiveSystem()) {
-  setTimeout(() => { for (const id of loginApps()) { try { launchDockItem(id); } catch (e) { /* uninstalled */ } } }, 3000);
+  setTimeout(() => { for (const id of loginApps()) { if (restoredIds.has(id)) continue; try { launchDockItem(id); } catch (e) { /* uninstalled */ } } }, 3000);
 }

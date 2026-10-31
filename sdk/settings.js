@@ -18,6 +18,9 @@ const DEFAULTS = {
   language: null,        // interface language ('es', 'en', 'pt'…); null = the region's
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)
+  sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
+  sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
+  sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only
 };
 
 // Per-user settings migrations (docs/UPDATES.md, "Migrations"): when an update changes the shape or
@@ -54,6 +57,13 @@ settings.subscribe(() => {
   clearTimeout(pending);
   pending = setTimeout(() => lord.settings.save(JSON.stringify(settings.get(), null, 2)), 300);
 });
+
+// Now, not in 300 ms; durable: on the disk before this returns (session restore's marker must survive
+// a power cut). Blocks the frame for that write, so it's only for that.
+export function saveSettingsNow(durable = false) {
+  clearTimeout(pending);
+  return lord.settings.save(JSON.stringify(settings.get(), null, 2), durable);
+}
 
 export function useSettings() {
   return [useStore(settings), settings.set];

@@ -11,6 +11,7 @@ keywords: barra de menus, dock, launchpad, central de controle, fundo, widgets
 No alto da tela:
 
 - **O logotipo do LordOS:** Sobre, Ajustes, Aplicativos, bloquear a tela, trocar de usuário e sair
+- **Reabrir janelas:** os apps abertos ao sair, reiniciar ou desligar voltam ao lugar na próxima entrada. Depois de uma queda de energia, o LordOS pergunta antes. Escolha Sempre, Perguntar antes ou Desativado em Ajustes → Sessão.
   da sessão.
 - **Os menus do app em primeiro plano** (por exemplo Arquivo, Editar, Visualizar), e os menus
   Janela e Ajuda.

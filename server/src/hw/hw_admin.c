@@ -768,6 +768,31 @@ void hw_act_video(const AdminReq *r, const char *arg, size_t len) {
     admin_say("OK", "%s", a);   /* i18n-ok */
 }
 
+/* browser-restore on|off: session restore for the browsers themselves. Recommended, not mandatory: the
+ * default for a profile that hasn't chosen otherwise, which the user can still change in the browser. */
+void hw_act_browser_restore(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char a[8];
+    if (arg_copy(arg, len, a, sizeof a) || (strcmp(a, "on") && strcmp(a, "off"))) { admin_err("admin.invalidArgument", NULL); return; }
+    const char *cp = "/etc/chromium/policies/recommended/lordos-session.json";
+    const char *fp = "/etc/firefox-esr/lordos-session.js";
+    if (!strcmp(a, "off")) {
+        if ((unlink(cp) && errno != ENOENT) || (unlink(fp) && errno != ENOENT)) { admin_err("sys.writeFailed", "path", cp, NULL); return; }
+        admin_say("OK", "%s", a);   /* i18n-ok */
+        return;
+    }
+    mkdir("/etc/chromium", 0755);
+    mkdir("/etc/chromium/policies", 0755);
+    mkdir("/etc/chromium/policies/recommended", 0755);
+    if (write_atomic(cp, "{\n  \"RestoreOnStartup\": 1\n}\n")) { admin_err("sys.writeFailed", "path", cp, NULL); return; }
+    struct stat st;
+    if (stat("/etc/firefox-esr", &st) == 0 && S_ISDIR(st.st_mode) && write_atomic(fp, "// LordOS: Settings -> Session\npref(\"browser.startup.page\", 3);\n")) {
+        admin_err("sys.writeFailed", "path", fp, NULL);
+        return;
+    }
+    admin_say("OK", "%s", a);   /* i18n-ok */
+}
+
 /* ---- LordBench's boot time test (bench/boottest.h, docs/BENCHMARK.md "Boot") ---- */
 
 /* boot-test <n>: n restarts in a row (BT_MIN..BT_MAX), each boot's time recorded by lord-sessiond. Only

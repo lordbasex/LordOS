@@ -11,6 +11,7 @@ keywords: barra de menú, dock, launchpad, centro de control, fondo, widgets
 Arriba de todo:
 
 - **El logo de LordOS:** Acerca de, Ajustes, Aplicaciones, bloquear la pantalla, cambiar de usuario
+- **Reabrir ventanas:** las apps abiertas al cerrar sesión, reiniciar o apagar vuelven a su lugar en el próximo inicio de sesión. Después de un corte de luz, LordOS pregunta antes. Elegí Siempre, Preguntar antes o Desactivado en Ajustes → Sesión.
   y cerrar la sesión.
 - **Los menús de la app del frente** (por ejemplo Archivo, Edición, Ver), y los menús Ventana y
   Ayuda.

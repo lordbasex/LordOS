@@ -8,11 +8,12 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow } from './windows.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
 import { osk } from './osk.js';
+import { dockIdOfWindow } from './dock.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
 const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : linuxAppFor(appId)?.id || null);
@@ -70,11 +71,14 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       const n = windows.get().length;
       // cascaded, but always inside the work area (never under the Dock)
       const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
+      const args = { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) };
+      const saved = placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
       wm.open('linux', {
         instance: String(sid),
-        frame: { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) },
-        args: { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) },
+        frame: saved?.frame || { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) },
+        args,
       });
+      saved?.then(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
       { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || d.appId || null)); }
       // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures

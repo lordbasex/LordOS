@@ -737,6 +737,13 @@ void js_media_event(int id, const char *type, const char *json) {
     drain_jobs();
 }
 
+/* The main loop ended (logout, or a signal): the session's last word (sdk/sessionrestore.jsx). */
+void js_before_exit(void) {
+    if (!ctx) return;
+    JS_FreeValue(ctx, call_global("__lordBeforeExit", 0, NULL));
+    drain_jobs();
+}
+
 /* Wayland app windows (wl/wl.c) → __lordWayland(id, type, JSON data). */
 void js_wl_event(int id, const char *type, const char *json) {
     if (!ctx) return;
