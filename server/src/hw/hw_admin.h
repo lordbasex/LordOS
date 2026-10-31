@@ -31,6 +31,11 @@
  *                                      strictly in C (sysreport/smbios.c): one "LOG mem <size_mb>|
  *                                      <type>|<speed>|<configured>|<slot>|<bank>|<maker>" line per slot,
  *                                      never serials, asset tags or part numbers; read-only     anyone
+ *   hw-serial-numbers                  (no arguments) this computer's serial numbers, for the Show button in System
+ *                                      Information and nothing else: only the fixed files product_serial and
+ *                                      board_serial (/sys/class/dmi/id, root only) and the device tree's
+ *                                      serial-number, each validated (hw_serial_clean), one "LOG serial
+ *                                      <system|board|device> <value>" line; read-only                    admin
  *   video-optimize <mode> <lower> <vp9> <av1>   auto|always|never, on|off, yes|no, yes|no (the
  *                                      last two: hardware VP9/AV1 decoding found this boot).
  *                                      Writes the browsers' video settings from fixed text:
@@ -58,6 +63,7 @@ void hw_act_rpi_case(const AdminReq *r, const char *arg, size_t len);
 void hw_act_rpi_case_detect(const AdminReq *r, const char *arg, size_t len);
 void hw_act_firmware_missing(const AdminReq *r, const char *arg, size_t len);
 void hw_act_memory_modules(const AdminReq *r, const char *arg, size_t len);
+void hw_act_serial_numbers(const AdminReq *r, const char *arg, size_t len);
 void hw_act_eeprom_status(const AdminReq *r, const char *arg, size_t len);
 void hw_act_eeprom_update(const AdminReq *r, const char *arg, size_t len);
 /* rpi-eeprom-update's report, parsed (exposed for tests) */
@@ -77,6 +83,9 @@ int hw_video_files(const char *arg, char *chromium, size_t cn, char *firefox, si
 #define HW_VIDEO_EXT_ID "kadhcpnkalbaminbojfmbmlgoheicmjo"     /* assets/browser/video (manifest "key") */
 
 /* Validators, exposed for tests. */
+/* n bytes of a serial number file into out: trimmed, [A-Za-z0-9 ._:/-] only, under size bytes. 0 if it is a real
+ * serial; -1 for anything else, the placeholders firmware leaves in these fields included. */
+int hw_serial_clean(const char *raw, size_t n, char *out, size_t size);
 int hw_button_action_valid(const char *a, int lid);
 int hw_time_valid(const char *t);       /* "YYYY-MM-DD HH:MM:SS", a real date from 2000 to 2099 */
 int hw_backlight_name_valid(const char *n);
@@ -93,6 +102,7 @@ int hw_backlight_name_valid(const char *n);
     { "rpi-case-detect", hw_act_rpi_case_detect, A_FORK }, \
     { "hw-firmware-missing", hw_act_firmware_missing, A_ANYONE }, \
     { "hw-memory-modules", hw_act_memory_modules, A_ANYONE }, \
+    { "hw-serial-numbers", hw_act_serial_numbers, 0 }, \
     { "rpi-eeprom-status", hw_act_eeprom_status, A_ANYONE | A_FORK }, \
     { "rpi-eeprom-update", hw_act_eeprom_update, A_FORK }, \
     { "video-optimize", hw_act_video, A_ANYONE }, \

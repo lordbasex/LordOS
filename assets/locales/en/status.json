@@ -13,6 +13,7 @@
   "hw.memoryNoTables": "The firmware lists no memory modules",
   "hw.memoryRead": "Memory modules read",
   "hw.profileSet": "Power mode: {profile}",
+  "hw.serialsRead": "Serial numbers read",
   "hw.suspended": "Suspending",
   "hw.unblocked": "Unblocked",
   "imager.cacheCleared": "Downloads cleared",

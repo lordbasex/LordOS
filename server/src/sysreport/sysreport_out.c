@@ -32,7 +32,7 @@ char *sysreport_json(const SysReport *r) {
     const SrMachine *m = &r->machine;
     jkey(&b, &f, "machine"); hb_printf(&b, "{"); g = 1;
     js(&b, &g, "vendor", m->vendor); js(&b, &g, "product", m->product); js(&b, &g, "version", m->version);
-    js(&b, &g, "boardVendor", m->board_vendor); js(&b, &g, "boardName", m->board_name);
+    js(&b, &g, "boardVendor", m->board_vendor); js(&b, &g, "boardName", m->board_name); js(&b, &g, "boardVersion", m->board_version);
     js(&b, &g, "chassis", m->chassis); js(&b, &g, "model", m->model);
     js(&b, &g, "biosVendor", m->bios_vendor); js(&b, &g, "biosVersion", m->bios_version); js(&b, &g, "biosDate", m->bios_date);
     js(&b, &g, "firmware", m->firmware);
@@ -166,6 +166,7 @@ char *sysreport_json(const SysReport *r) {
     if (r->pi.is_pi) {
         jkey(&b, &f, "raspberryPi"); hb_printf(&b, "{"); g = 1;
         js(&b, &g, "model", r->pi.model); js(&b, &g, "revision", r->pi.revision);
+        js(&b, &g, "bootloaderVersion", r->pi.bootloader_version); js(&b, &g, "bootloaderDate", r->pi.bootloader_date);
         jn(&b, &g, "throttled", r->pi.throttled, -1);
         if (r->pi.uv_alarm >= 0) jb(&b, &g, "underVoltageAlarm", r->pi.uv_alarm);
         else { jkey(&b, &g, "underVoltageAlarm"); hb_printf(&b, "null"); }
@@ -230,6 +231,7 @@ char *sysreport_markdown(const SysReport *r) {
     hb_printf(&b, "| Computer |"); cell(&b, t); hb_printf(&b, "\n");
     hb_printf(&b, "| Kind |"); cell(&b, m->virt[0] ? m->virt : m->chassis); hb_printf(&b, "\n");
     two(t, sizeof t, m->board_vendor, m->board_name);
+    if (m->board_version[0] && strlen(t) + strlen(m->board_version) + 2 < sizeof t) { strcat(t, ", "); strcat(t, m->board_version); }
     hb_printf(&b, "| Board |"); cell(&b, t); hb_printf(&b, "\n");
     snprintf(t, sizeof t, "%s%s%s%s%s", m->firmware, m->bios_version[0] ? ", " : "", m->bios_version, m->bios_date[0] ? ", " : "", m->bios_date);
     hb_printf(&b, "| Firmware |"); cell(&b, t); hb_printf(&b, "\n");
@@ -350,6 +352,7 @@ char *sysreport_markdown(const SysReport *r) {
 
     if (r->pi.is_pi) {
         hb_printf(&b, "## Raspberry Pi\n\n%s, revision %s", r->pi.model, r->pi.revision[0] ? r->pi.revision : "unknown");
+        if (r->pi.bootloader_date[0]) hb_printf(&b, ", bootloader of %s", r->pi.bootloader_date);
         /* rpi_volt clears the sticky bits every 2 s, so with it they cover that window, not the time since boot */
         const char *since = r->pi.uv_alarm >= 0 ? "in the last 2 s" : "since boot";
         if (r->pi.throttled >= 0) {

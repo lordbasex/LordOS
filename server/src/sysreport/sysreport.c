@@ -219,11 +219,12 @@ static void collect_machine(SysReport *r, const char *root, const char *cpuinfo)
     attr(root, dmi, "product_version", m->version, sizeof m->version);
     attr(root, dmi, "board_vendor", m->board_vendor, sizeof m->board_vendor);
     attr(root, dmi, "board_name", m->board_name, sizeof m->board_name);
+    attr(root, dmi, "board_version", m->board_version, sizeof m->board_version);
     attr(root, dmi, "bios_vendor", m->bios_vendor, sizeof m->bios_vendor);
     attr(root, dmi, "bios_version", m->bios_version, sizeof m->bios_version);
     attr(root, dmi, "bios_date", m->bios_date, sizeof m->bios_date);
     drop_placeholder(m->vendor); drop_placeholder(m->product); drop_placeholder(m->version);
-    drop_placeholder(m->board_vendor); drop_placeholder(m->board_name);
+    drop_placeholder(m->board_vendor); drop_placeholder(m->board_name); drop_placeholder(m->board_version);
     snprintf(m->chassis, sizeof m->chassis, "%s", chassis_name((int)attr_num(root, dmi, "chassis_type", 2)));
 
     char p[1024];
@@ -591,7 +592,36 @@ static void collect_net(SysReport *r, const char *root) {
     free_list(e, n);
 }
 
-static void collect_audio(SysReport *r, const char *root) {
+/* A card's name for people. ALSA's short name is often just its id ("vc4-hdmi-0"), and a USB card's is the
+ * chip's generic string, so: a USB card by its IDs in usb.ids (/proc/asound/cardN/usbid) or, where that list isn't
+ * installed, by the start of ALSA's long name ("C-Media Electronics Inc. USB Audio Device at usb-1000…", the bus
+ * path dropped); the Raspberry Pi's two HDMI outputs by their port; anything else as ALSA calls it. */
+static void audio_name(const char *root, const IdsDb *usb, int card, const char *driver, const char *shortname, const char *longname, char *out) {
+    char d[64], id[16], vname[SR_NAME] = "", dname[SR_NAME] = "";
+    int port;
+    snprintf(d, sizeof d, "/proc/asound/card%d", card);
+    attr(root, d, "usbid", id, sizeof id);
+    if (strlen(id) == 9 && id[4] == ':') {
+        id[4] = 0;
+        ids_lookup(usb, id, id + 5, vname, sizeof vname, dname, sizeof dname);
+        if (dname[0]) { snprintf(out, SR_NAME, "%.40s %.54s", vname, dname); return; }
+        while (*longname == ' ') longname++;
+        const char *at = strstr(longname, " at ");
+        if (at && at != longname) {
+            size_t o = 0;
+            for (const char *s = longname; s < at && o + 1 < SR_NAME; s++) out[o++] = (*s >= 0x20 && *s < 0x7f) ? *s : '?';
+            out[o] = 0;
+            return;
+        }
+    }
+    if (!strcmp(driver, "vc4-hdmi") && sscanf(shortname, "vc4-hdmi-%d", &port) == 1) {
+        snprintf(out, SR_NAME, "Raspberry Pi HDMI %d audio", port);
+        return;
+    }
+    snprintf(out, SR_NAME, "%s", shortname);
+}
+
+static void collect_audio(SysReport *r, const char *root, const IdsDb *usb) {
     char p[1024];
     snprintf(p, sizeof p, "%s/proc/asound/cards", root);
     char *txt = read_file(p, 16384, NULL);
@@ -599,12 +629,18 @@ static void collect_audio(SysReport *r, const char *root) {
     for (char *l = txt; l && *l && r->naudio < SR_MAX_AUDIO; ) {
         char *nl = strchr(l, '\n');
         if (nl) *nl = 0;
-        char *b = strchr(l, '['), *dash = strstr(l, "]: ");
-        if (b && dash && (dash = strstr(dash, " - "))) {
-            char *dst = r->audio[r->naudio++];
+        char *b = strchr(l, '['), *end = strstr(l, "]: "), *dash = end ? strstr(end, " - ") : NULL;
+        if (b && dash) {
+            char name[SR_NAME], driver[32] = "";
             size_t o = 0;
-            for (const char *s = dash + 3; *s && o + 1 < SR_NAME; s++) dst[o++] = (*s >= 0x20 && *s < 0x7f) ? *s : '?';
-            dst[o] = 0;
+            for (const char *s = dash + 3; *s && o + 1 < sizeof name; s++) name[o++] = (*s >= 0x20 && *s < 0x7f) ? *s : '?';
+            name[o] = 0;
+            size_t dl = (size_t)(dash - end) - 3;
+            if (dl < sizeof driver) { memcpy(driver, end + 3, dl); driver[dl] = 0; }
+            char *next = nl ? nl + 1 : NULL, *next_nl = next ? strchr(next, '\n') : NULL;
+            if (next_nl) *next_nl = 0;
+            audio_name(root, usb, atoi(l), driver, name, next ? next : "", r->audio[r->naudio++]);
+            if (next_nl) *next_nl = '\n';
         }
         l = nl ? nl + 1 : NULL;
     }
@@ -696,6 +732,23 @@ static void collect_pi(SysReport *r, const char *root, const char *cpuinfo) {
     if (!r->pi.is_pi) return;
     snprintf(r->pi.model, sizeof r->pi.model, "%s", r->machine.model);
     field(cpuinfo, "Revision", r->pi.revision, sizeof r->pi.revision);
+    /* the bootloader that started this boot: the device tree the firmware hands over, world-readable, where
+     * rpi-eeprom-update itself looks first. version: a git hash; build-timestamp: big-endian seconds. */
+    char ver[64];
+    snprintf(p, sizeof p, "%s/proc/device-tree/chosen/bootloader/version", root);
+    read_attr(p, ver, sizeof ver);
+    size_t vl = strlen(ver);
+    if (vl >= 7 && vl < sizeof r->pi.bootloader_version && strspn(ver, "0123456789abcdef") == vl)
+        snprintf(r->pi.bootloader_version, sizeof r->pi.bootloader_version, "%s", ver);
+    snprintf(p, sizeof p, "%s/proc/device-tree/chosen/bootloader/build-timestamp", root);
+    char *ts = read_file(p, 8, &len);
+    if (ts && len == 4) {
+        const unsigned char *u = (const unsigned char *)ts;
+        time_t t = (time_t)(((uint32_t)u[0] << 24) | ((uint32_t)u[1] << 16) | ((uint32_t)u[2] << 8) | u[3]);
+        struct tm tm;
+        if (t >= 1000000000 && gmtime_r(&t, &tm)) strftime(r->pi.bootloader_date, sizeof r->pi.bootloader_date, "%Y-%m-%d", &tm);
+    }
+    free(ts);
     /* what the firmware says about power and throttling (hw/rpifw.c, shared with LordBench): rpi_volt's
      * under-voltage alarm (the only one the LordOS rpi-6.18.y kernel has) and get_throttled where an older
      * kernel has it; whatever the kernel doesn't show stays unknown */
@@ -973,7 +1026,7 @@ void sysreport_collect(SysReport *r, const char *root, const char *pci_ids, cons
     collect_pci(r, root, &pci);
     collect_usb(r, root, &usb);
     collect_net(r, root);
-    collect_audio(r, root);
+    collect_audio(r, root, &usb);
     collect_bt(r, root);
     collect_power(r, root);
     collect_thermal(r, root);

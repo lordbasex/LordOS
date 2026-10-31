@@ -32,7 +32,7 @@
 
 typedef struct {
     char vendor[SR_NAME], product[SR_NAME], version[SR_NAME];
-    char board_vendor[SR_NAME], board_name[SR_NAME];
+    char board_vendor[SR_NAME], board_name[SR_NAME], board_version[SR_NAME];
     char chassis[24];                   /* "desktop", "laptop", "server", "vm"…, "" unknown */
     char bios_vendor[SR_NAME], bios_version[SR_NAME], bios_date[24];
     char model[SR_NAME];                /* device tree model (ARM boards) */
@@ -151,6 +151,8 @@ typedef struct {
 
 typedef struct {
     char model[SR_NAME], revision[16];  /* /proc/cpuinfo "Revision" (the board code) */
+    char bootloader_version[44];        /* the running bootloader's git hash (device tree, chosen/bootloader), "" unknown */
+    char bootloader_date[12];           /* its build date, YYYY-MM-DD, "" unknown */
     int throttled;                      /* get_throttled bits (hw/rpifw.h), -1 unknown (no such file: the
                                          * LordOS rpi-6.18.y kernel has none) */
     int uv_alarm;                       /* rpi_volt's under-voltage alarm: 1 in the last 2 s, 0 none, -1 unknown */

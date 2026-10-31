@@ -13,6 +13,7 @@
   "hw.memoryNoTables": "O firmware não informa módulos de memória",
   "hw.memoryRead": "Módulos de memória lidos",
   "hw.profileSet": "Modo de energia: {profile}",
+  "hw.serialsRead": "Números de série lidos",
   "hw.suspended": "Suspendendo",
   "hw.unblocked": "Desbloqueado",
   "imager.cacheCleared": "Downloads apagados",

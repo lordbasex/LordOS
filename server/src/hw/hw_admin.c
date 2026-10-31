@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -512,6 +513,51 @@ void hw_act_memory_modules(const AdminReq *r, const char *arg, size_t len) {
     }
     closedir(d);
     admin_ok("hw.memoryRead", NULL);
+}
+
+/* ---- System Information's serial numbers (docs/BENCHMARK.md, "Serial numbers") ---- */
+
+int hw_serial_clean(const char *raw, size_t n, char *out, size_t size) {
+    static const char *const junk[] = { "To be filled by O.E.M.", "Default string", "Not Specified", "Not Applicable", "None", "Unknown",
+                                        "System Serial Number", "Base Board Serial Number", "0123456789", "123456789" };
+    out[0] = 0;
+    while (n && (raw[n - 1] == 0 || raw[n - 1] == '\n' || raw[n - 1] == ' ')) n--;     /* a device tree string ends in NUL */
+    while (n && *raw == ' ') { raw++; n--; }
+    if (!n || n >= size) return -1;
+    int all_same = 1;
+    for (size_t i = 0; i < n; i++) {
+        if (!isalnum((unsigned char)raw[i]) && !memchr(" ._:/-", raw[i], 6)) return -1;
+        if (raw[i] != raw[0]) all_same = 0;
+    }
+    if (all_same) return -1;                                /* "0000000000", "XXXXXXXX" */
+    for (size_t i = 0; i < sizeof junk / sizeof junk[0]; i++)
+        if (strlen(junk[i]) == n && !strncasecmp(raw, junk[i], n)) return -1;
+    memcpy(out, raw, n);
+    out[n] = 0;
+    return 0;
+}
+
+/* No arguments, read-only, and it answers only the request that asked: the kernel keeps product_serial and
+ * board_serial for root, so this stays with administrators. The list of files is this table; nothing here reaches
+ * sysreport/, and the app shows the answer and keeps it nowhere. */
+void hw_act_serial_numbers(const AdminReq *r, const char *arg, size_t len) {
+    static const struct { const char *kind, *path; } src[] = {
+        { "system", "/sys/class/dmi/id/product_serial" },
+        { "board", "/sys/class/dmi/id/board_serial" },
+        { "device", "/proc/device-tree/serial-number" },
+    };
+    (void)r; (void)arg;
+    if (len) { admin_err("admin.invalidArgument", NULL); return; }
+    for (size_t i = 0; i < sizeof src / sizeof src[0]; i++) {
+        char raw[128], clean[64];
+        int fd = open(src[i].path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (fd < 0) continue;
+        ssize_t got = read(fd, raw, sizeof raw);
+        close(fd);
+        if (got <= 0 || got == (ssize_t)sizeof raw || hw_serial_clean(raw, (size_t)got, clean, sizeof clean)) continue;
+        admin_say("LOG", "serial %s %s", src[i].kind, clean);  /* i18n-ok: protocol line parsed by apps/sysinfo/model.js */
+    }
+    admin_ok("hw.serialsRead", NULL);
 }
 
 /* ---- video in the browser (docs/VIDEO.md) ---- */
