@@ -55,7 +55,7 @@ MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/cap
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c \
+SRC := src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
@@ -406,7 +406,7 @@ build/nethist-test: tests/nethist_test.c src/monitor/nethist.c src/monitor/nethi
 # per-corner radii, logical edges, transforms and hit testing, and the dragged window's frames against
 # the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench` times a 2000-row
 # list and a window drag on one and two displays
-ENGINE_SRC := src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/image.c \
+ENGINE_SRC := src/gpu/gscissor.c src/gpu/gcontend.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/image.c \
               src/ui/paint.c src/ui/otf.c src/ui/fonts.c src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c \
               src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/canvas.c
 test: build/engine-test
@@ -478,6 +478,18 @@ build/seat-cycle: tests/seat_cycle.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/seat_cycle.c
 
+# what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
+GC_PKGS := gbm egl glesv2
+build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=gnu11 -D_GNU_SOURCE $(shell pkg-config --cflags $(GC_PKGS)) -Isrc -o $@ tests/gpu_contention.c src/gpu/gcontend.c $(shell pkg-config --libs $(GC_PKGS)) -lpthread
+
+# the player's way out of a failing hardware decoder (src/media/helper/lm_hwfall.h)
+test: build/hwfall-test
+build/hwfall-test: tests/hwfall_test.c src/media/helper/lm_hwfall.h
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hwfall_test.c
+	./$@ || { rm -f $@; exit 1; }
+
 MEDIA_PKGS := libavcodec libavformat libavutil libswscale libswresample
 MEDIA_VA := $(shell pkg-config --exists libva libva-drm 2>/dev/null && echo 1 || echo 0)
 ifeq ($(MEDIA_VA),1)
@@ -488,6 +500,12 @@ LM_SRC := $(wildcard src/media/helper/*.c) src/media/proto.c src/sec/sandbox.c s
 build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
+	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# lord-media with a decoder that fails after 30 frames, to run the way out of it where there is no hardware
+# (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
+build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
 MEDIA_TEST_SRC := tests/media_test.c src/media/proto.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c
 build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/media/media_int.h src/media/mpulse.h
