@@ -677,7 +677,13 @@ ssh_note() {
     if [ ! -x /usr/sbin/sshd ]; then
         ok "remote login (SSH): not installed (Settings > Sharing installs it and turns it on)"
     elif systemctl is-enabled -q ssh.service 2>/dev/null || systemctl is-enabled -q ssh.socket 2>/dev/null; then
-        ok "remote login (SSH): on, left as it was (Settings > Sharing turns it off)"
+        ok "remote login (SSH): on (Settings > Sharing turns it off)"
+        # the package's 10-lordos.conf says PermitRootLogin no, from the next sshd restart or reboot
+        if has_admin_user; then
+            warn "root can no longer log in over SSH: use an administrator's account and sudo (Settings > Sharing can allow root again)."
+        else
+            warn "root can no longer log in over SSH and this system has no administrator: without a local console you could be locked out. Create one before you reboot."
+        fi
     else
         ok "remote login (SSH): installed but off, left as it was (Settings > Sharing turns it on)"
     fi
