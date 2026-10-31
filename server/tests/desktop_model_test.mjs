@@ -166,7 +166,7 @@ eq('index', [cleanIndex(3), cleanIndex(-1), cleanIndex(99), cleanIndex('1'), cle
 }
 
 // a minimized window has a placeholder behind its body in the overview, and only there
-eq('placeholder: minimized, in the overview', [overviewPlaceholder({ minimized: true }, true), overviewPlaceholder({ minimized: true }, false), overviewPlaceholder({}, true)], [true, false, false]);
+eq('placeholder: minimized, in the overview', [overviewPlaceholder({ minimized: true, args: { surface: 7 } }, true), overviewPlaceholder({ minimized: true, args: { surface: 7 } }, false), overviewPlaceholder({ args: { surface: 7 } }, true), overviewPlaceholder({ minimized: true }, true)], [true, false, false, false]);
 
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);
