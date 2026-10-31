@@ -10,6 +10,7 @@ import { View, Text, Image, Button, LetterIcon, useTheme, useStore, useSystemInf
 import catalog from '../../apt/catalog.json';
 import { debian } from './debian.js';
 import { Card, CardGrid, Featured, FeaturedSkeleton, Pill, Shelf, nameColor } from './ui.js';
+import { AdminRescue, isNotAdmin } from './rescue.js';
 
 const lang2 = () => (locale.get().lang || 'en').split('-')[0];
 // the kernel's machine name as Debian names the architecture
@@ -44,10 +45,12 @@ function AddSource({ a, onDone }) {
   const th = useTheme();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [refused, setRefused] = useState(false);
   const add = () => {
     setBusy(true);
     setErr('');
-    admin.run('pkg-source-add', a.id).then(() => admin.run('pkg-update')).then(onDone, (e) => setErr(e.message)).finally(() => setBusy(false));
+    setRefused(false);
+    admin.run('pkg-source-add', a.id).then(() => admin.run('pkg-update')).then(onDone, (e) => { setErr(e.message); setRefused(isNotAdmin(e)); }).finally(() => setBusy(false));
   };
   return h(View, { style: { gap: spacing.l, maxWidth: 640 } },
     h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
@@ -56,6 +59,7 @@ function AddSource({ a, onDone }) {
     h(Text, { style: { fontSize: 11, color: th.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' } },
       `${(a.source && a.source.url) || ''}\n${(a.source && a.source.fingerprint) || ''}`),
     err ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff453a', textAlign: 'start' } }, err) : null,
+    refused ? h(AdminRescue) : null,
     h(View, { style: { flexDirection: 'row', gap: spacing.s } },
       h(Button, { primary: true, label: busy ? t('store.ai.adding') : t('store.ai.addSource'), disabled: busy || !admin.available(), onClick: add })));
 }
@@ -66,15 +70,18 @@ function NotListed({ a, onDone }) {
   const th = useTheme();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [refused, setRefused] = useState(false);
   const update = () => {
     setBusy(true);
     setErr('');
-    admin.run('pkg-update').then(onDone, (e) => setErr(e.message)).finally(() => setBusy(false));
+    setRefused(false);
+    admin.run('pkg-update').then(onDone, (e) => { setErr(e.message); setRefused(isNotAdmin(e)); }).finally(() => setBusy(false));
   };
   return h(View, { style: { gap: spacing.l, maxWidth: 640 } },
     h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
     h(Text, { style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start' } }, t('store.ai.notListed', { name: a.name })),
     err ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff453a', textAlign: 'start' } }, err) : null,
+    refused ? h(AdminRescue) : null,
     h(View, { style: { flexDirection: 'row', gap: spacing.s } },
       h(Button, { primary: true, label: busy ? t('store.ai.updating') : t('store.ai.updateLists'), disabled: busy || !admin.available(), onClick: update })));
 }

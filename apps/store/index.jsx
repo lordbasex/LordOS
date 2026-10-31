@@ -189,6 +189,7 @@ function InstallFile({ path, onDone }) {
       )}
       {isDeb && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
       <Message msg={msg} />
+      {!msg?.ok && <debian.Refused />}
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
         {(m || isDeb) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}

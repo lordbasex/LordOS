@@ -55,7 +55,7 @@ MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/cap
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c \
+SRC := src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
@@ -671,6 +671,12 @@ DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/smart.c src/disk/smartc
 build/disk-cli: $(DISKCLI_SRC) src/disk/disk.h src/imager/imager_admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(DISKCLI_SRC)
+# a system with no administrator (src/users/admin_rescue.c): who may become one
+test: build/admin-rescue-test
+build/admin-rescue-test: tests/admin_rescue_test.c src/users/admin_rescue.c src/users/admin_rescue.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/admin_rescue_test.c src/users/admin_rescue.c
+	./$@ || { rm -f $@; exit 1; }
 # user folders (src/users/homedirs.c): languages, user-dirs.dirs, no overwriting, no symlinks
 test: build/homedirs-test
 build/homedirs-test: tests/homedirs_test.c src/users/homedirs.c src/users/homedirs.h

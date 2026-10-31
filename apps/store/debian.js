@@ -11,6 +11,7 @@ import {
 import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
 import { sysPkgKey, snapshotDate } from './syspkg.js';
+import { AdminRescue, isNotAdmin } from './rescue.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -35,7 +36,7 @@ function runJob(action, arg, title) {
   };
   return admin.run(action, arg, onLog).then(
     (ok) => { state.set((s) => ({ ...s, job: null, msg: { ok: true, text: statusText(ok) } })); bump(); refreshApps(); return true; },
-    (e) => { state.set((s) => ({ ...s, job: null, msg: { ok: false, text: e.message } })); bump(); return false; },
+    (e) => { state.set((s) => ({ ...s, job: null, msg: { ok: false, text: e.message, notAdmin: isNotAdmin(e) } })); bump(); return false; },
   );
 }
 
@@ -82,7 +83,11 @@ function Progress() {
   const th = useTheme();
   const { job, msg } = useStore(state);
   if (!job && !msg) return null;
-  if (!job) return h(Text, { style: { fontSize: 12, color: msg.ok ? '#30d158' : '#ff453a', marginBottom: 10 } }, msg.text);
+  if (!job) {
+    return h(View, null,
+      h(Text, { style: { fontSize: 12, color: msg.ok ? '#30d158' : '#ff453a', marginBottom: 10, textAlign: 'start' } }, msg.text),
+      msg.notAdmin ? h(AdminRescue) : null);
+  }
   const f = job.total ? Math.min(1, job.done / job.total) : 0;
   const phase = job.phase ? t(`store.phase.${job.phase}`) : t('store.working');
   return h(View, { style: boxStyle(th, { gap: 6, marginBottom: 4 }) },
@@ -211,10 +216,11 @@ const categoryCounts = () => (ready() ? lord.pkg.categories() : {});
 
 // No index yet (or no engine): say so, with the button that fetches the lists.
 function NoIndex() {
+  const { job } = useStore(state);
   if (!available()) return h(EmptyState, { mascot: 'confused', title: t('store.debian.unavailable'), style: { minHeight: 360 } });
   return h(View, { style: { gap: 12 } }, h(Progress),
     h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.noIndexTitle'), hint: t('store.debian.noIndex'), style: { minHeight: 380 },
-      action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => runJob('pkg-update', '', t('store.job.update')) }) }));
+      action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => !job && runJob('pkg-update', '', t('store.job.update')) }) }));
 }
 
 // Search results: apps as cards, other packages as rows.
@@ -338,12 +344,7 @@ function Updates() {
   const [plan, setPlan] = useState(null);
   const [prefs, setPrefs] = useState(updatePrefs);
   void gen;
-  if (!ready()) {
-    return available()
-      ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.noIndexTitle'), hint: t('store.debian.noIndex'), style: { minHeight: 380 },
-        action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => !job && runJob('pkg-update', '', t('store.job.update')) }) })
-      : h(EmptyState, { mascot: 'confused', title: t('store.debian.unavailable'), style: { minHeight: 360 } });
-  }
+  if (!ready()) return h(NoIndex);
   const ups = lord.pkg.upgrades();
   const own = lordosUpdate(lang2());
   const others = ups.filter((u) => u.name !== 'lordos');
@@ -410,6 +411,8 @@ export const debian = {
   SuggestedPage,
   Updates,
   Status,
+  // the last job was refused with "not an administrator" (a page that shows the error itself)
+  Refused: () => (useStore(state).msg?.notAdmin ? h(AdminRescue) : null),
   installFile: (path) => runJob('pkg-install-file', path, t('store.job.installFile')).then((ok) => { if (!ok) throw new Error(state.get().msg?.text || ''); }),
   removeApp(a) {
     const name = packageOfApp(a);

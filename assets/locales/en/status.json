@@ -121,6 +121,8 @@
   "users.noLongerAdmin": "{name} is no longer an administrator",
   "users.nowAdmin": "{name} is now an administrator",
   "users.passwordChanged": "Password changed",
+  "users.rescueDone": "{name} will be an administrator after a restart",
+  "users.rescueState": "Administrator state: {state}",
   "users.unchanged": "No changes",
   "vpn.alreadyConnecting": "Already connecting",
   "vpn.alreadyInstalled": "Already installed",
