@@ -8,7 +8,8 @@
 #
 # Architecture "source" pins a source package by the SHA-256 of its .dsc: the .dsc and the files it
 # lists (checked against Raspberry Pi's signed Sources index) go to pool/rpi/source/, unindexed, so the
-# source of every copyleft package we mirror (MPL-2.0 kms++) is offered next to its binaries.
+# source of every copyleft package we mirror (MPL-2.0 kms++) is offered next to its binaries, and so is
+# the source of Raspberry Pi's FFmpeg, whose binaries are in the Pi 5 image.
 #
 # package            version                      arch   sha256 (of the .deb)                                             licence (debian/copyright)
 rpi-eeprom           28.34-1                      all    7c0be1a22e9fb6e947a3f438faa588222453ad1cf1b1c985d747a49187aa2a1f  scripts BSD-3; bootloader images: Raspberry Pi licence (unmodified binaries, for Raspberry Pi devices)
@@ -23,3 +24,4 @@ libdtovl0            20260626-1                   arm64  4b81f914be83ca68cba2da4
 kms++-utils          0~git20250807.1813ada-1      arm64  a4c2cfe1d6e9458d43c508344c2516b672033135d373392a646a3084fbcc7f11  MPL-2.0 (source: archive.raspberrypi.com deb-src kms++)
 libkms++0            0~git20250807.1813ada-1      arm64  1a22a36750d8133c1f30868c18c22ab3d5ac526f4183bfb050a34ee1c46da8db  MPL-2.0 (source: archive.raspberrypi.com deb-src kms++)
 kms++                0~git20250807.1813ada-1      source a450a5140a582b7d6c720af2b131b589f9a30064aa8529927b3feba69e028413  MPL-2.0 (the source of kms++-utils and libkms++0 above)
+ffmpeg               8:7.1.5-0+deb13u1+rpt2       source e19eb40b717da1ebdee3ed7aba72f19a7d01fd613cf75058ef20ab24334c022d  LGPL-2.1+ / GPL-2+ (Pi image, source offer)

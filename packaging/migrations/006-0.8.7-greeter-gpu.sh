@@ -9,9 +9,13 @@ if [ -z "$R" ] && getent passwd lordos-greeter >/dev/null 2>&1; then
     done
 fi
 P="$R/etc/apt/preferences.d/raspberrypi"
-if [ -f "$P" ] && ! grep -q 'libavcodec61' "$P"; then
+if [ -f "$P" ] && ! grep -q 'libpostproc58' "$P"; then
     t=$(mktemp "$P.XXXXXX")
-    sed 's/^Package: raspi-firmware /Package: raspi-firmware ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10 libavdevice61 /' "$P" > "$t"
+    if grep -q 'libavcodec61' "$P"; then    # a development build's list, without the last one
+        sed 's/ libavdevice61 / libavdevice61 libpostproc58 /' "$P" > "$t"
+    else
+        sed 's/^Package: raspi-firmware /Package: raspi-firmware ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10 libavdevice61 libpostproc58 /' "$P" > "$t"
+    fi
     chmod 644 "$t"
     mv "$t" "$P"
 fi

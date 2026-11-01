@@ -27,6 +27,11 @@ materials (SBOM) published with each release. The website summary is at
   at https://lordos.org/apt/pool/rpi/source/k/kms++/ (pinned in `rpi-mirror.list` with architecture
   `source`, verified against Raspberry Pi's signed `Sources` index, kept in the append-only pool);
   upstream is `https://github.com/tomba/kmsxx`. A new pinned kms++ version needs its `source` line too.
+- **Raspberry Pi's FFmpeg (0.8.7, Pi 5 image and updates on a Pi):** `ffmpeg` and its libraries come from Raspberry Pi's
+  archive, the only build that drives the Pi 5's HEVC decoder ([WALLPAPERS.md](WALLPAPERS.md)), with their own `copyright`
+  inside. Because the image carries the binaries, the source package of the same version is published at
+  https://lordos.org/apt/pool/rpi/source/f/ffmpeg/, pinned in `rpi-mirror.list` the same way. An image built with a newer
+  FFmpeg needs its new `source` line too.
 - **The app catalog (0.8.5, Store → Artificial Intelligence and Commercial;** `apt/catalog.json`,
   `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
   Apps delivered `direct` (Claude Code, Claude Desktop, Visual Studio Code, Cursor, Google Chrome,
