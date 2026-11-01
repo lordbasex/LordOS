@@ -666,7 +666,7 @@ export default function Files() {
   // columns only in folders; elsewhere, the list
   const view = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
   const entriesOf = (dir) => { try { return lord.fs.list(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
-  const freeSpace = useMemo(() => { try { return curDir ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
+  const freeSpace = useMemo(() => { try { return curDir && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
   const quickEntry = quick ? (first || flat[0]) : null;
   const infoEntry = info ? (first || (curDir ? { name: fs.basename(curDir), path: curDir, dir: true, size: 0 } : null)) : null;
   const job = jobs[0];
