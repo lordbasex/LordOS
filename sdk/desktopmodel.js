@@ -18,21 +18,22 @@ export const windowHidden = (w, active) => !w || !!w.minimized || !onDesktop(w, 
 // The windows the theme frames on this desktop (fullscreen and picture-in-picture are the SDK's).
 export const visibleOn = (list, active) => list.filter((w) => !w.minimized && !w.fullscreen && !w.pip && onDesktop(w, active));
 
-// What the theme keeps in its tree, in stacking order. A LordOS app on a hidden desktop stays mounted
-// (and display: none, WindowShell), so it keeps its state; a Linux window has its state in its own
-// process, and with no node it can't be reached or painted. In the overview, minimized windows of
-// this desktop are shown too.
+// What the theme keeps in its tree, in stacking order. A LordOS app minimized or on a hidden desktop
+// stays mounted (and display: none, WindowShell), so it keeps its state, unsaved text included. A Linux
+// window has its state in its own process, and with no node it can't be reached or painted. In the
+// overview, the minimized windows of this desktop are shown too.
 export function mountedOn(list, active, overview = false) {
   return list.filter((w) => {
     if (w.fullscreen || w.pip) return false;
-    if (onDesktop(w, active)) return overview || !w.minimized;
-    return !w.minimized && !w.args?.surface;
+    if (!w.args?.surface) return true;
+    return onDesktop(w, active) && (overview || !w.minimized);
   });
 }
 
-// In the overview a minimized Linux window may have nothing to draw: an X11 window is iconic, and only a
-// Wayland app has its last buffer. So a placeholder goes behind the body: the buffer covers it, and
-// otherwise it is seen. A LordOS app mounts again and its body is translucent: it gets none.
+// In the overview a minimized surface window may have nothing to draw: an X11 window is iconic, and only
+// a Wayland app keeps its last buffer. So a placeholder goes behind the body: what the window does have
+// covers it, and otherwise it is seen. A LordOS app in the session has its body, and the clear parts of
+// that body would show the placeholder through it.
 export const overviewPlaceholder = (w, inOverview) => !!inOverview && !!w.minimized && !!w.args?.surface;
 
 // The front window of a desktop (windows are ordered bottom to top). Never a window of another

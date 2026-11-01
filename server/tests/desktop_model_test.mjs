@@ -33,11 +33,13 @@ eq('a window without a desktop is on the first', ids(visibleOn([{ id: 'old' }], 
 eq('pip is sticky', [onDesktop(list[5], 1), onDesktop(list[5], 2), onDesktop(list[5], 3)], [true, true, true]);
 eq('hidden', [windowHidden(list[0], 2), windowHidden(list[0], 1), windowHidden(list[3], 1), windowHidden(null, 1)], [true, false, true, true]);
 
-// a LordOS app stays mounted on a hidden desktop, a Linux window doesn't
-eq('mounted on 1', ids(mountedOn(list, 1)), ['a', 'b']);
-eq('mounted on 2', ids(mountedOn(list, 2)), ['a', 'linux#5', 'b']);
-eq('overview brings the minimized of this desktop', ids(mountedOn(list, 1, true)), ['a', 'b', 'm']);
-eq('...not of another', ids(mountedOn(list, 2, true)), ['a', 'linux#5', 'b']);
+// a LordOS app stays mounted when it is minimized or on a hidden desktop, a Linux window doesn't
+eq('mounted on 1', ids(mountedOn(list, 1)), ['a', 'b', 'm']);
+eq('mounted on 2', ids(mountedOn(list, 2)), ['a', 'linux#5', 'b', 'm']);
+const iconic = [L(5, 1, { minimized: true }), L(6, 2, { minimized: true }), L(7, 1)];
+eq('a minimized Linux window has no node', ids(mountedOn(iconic, 1)), ['linux#7']);
+eq('overview brings the minimized of this desktop', ids(mountedOn(iconic, 1, true)), ['linux#5', 'linux#7']);
+eq('...not of another', ids(mountedOn(iconic, 2, true)), ['linux#6']);
 
 // the front window
 eq('front of 1', focusedOn(list, 1).id, 'fs');

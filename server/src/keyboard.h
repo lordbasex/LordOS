@@ -14,7 +14,7 @@ typedef struct {
 
 int  kb_set(const char *layouts, const char *variants);   /* "us,latam", ",abnt2" */
 int  kb_set_keymap_string(const char *text);              /* app mode: the compositor's keymap */
-void kb_reset_state(void);                                /* forget held keys (app mode) */
+void kb_reset_state(void);                                /* forget held keys (app mode, the monitor taken away) */
 int  kb_ready(void);
 const char *kb_layouts(void);
 const char *kb_variants(void);

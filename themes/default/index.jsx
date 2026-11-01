@@ -113,6 +113,7 @@ function App() {
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();
   const minimizing = useMinimizing(windows);
+  const minFx = (id) => { const m = minimizing.find((x) => x.win.id === id); return m ? { p: m.p, x: main.x + main.w / 2, y: main.y + main.h - 36 } : undefined; };
   const [launchpad, setLaunchpad] = useState(false);
   const [control, setControl] = useState(null);         // the display whose menu bar opened it
   const [context, setContext] = useState(null);
@@ -157,9 +158,8 @@ function App() {
         ))}
         <DesktopWidgets layer="below" />
         <OverviewBackdrop />
-        {mounted.map((w) => <Window key={w.id} win={w} app={getApp(w.id)} t={t} focused={w.id === focused} />)}
-        {minimizing.map(({ win, p }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false}
-          fx={{ p, x: main.x + main.w / 2, y: main.y + main.h - 36 }} />)}
+        {mounted.map((w) => <Window key={w.id} win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />)}
+        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
         <DesktopWidgets layer="above" />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the
             order is the layers', not this tree's, and clicks follow it. Menus go to «popover»

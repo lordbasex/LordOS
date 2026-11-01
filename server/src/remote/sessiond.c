@@ -768,7 +768,8 @@ static void boot_test_tick(void) {
 
 /* No card with KMS (0.8.1): before this, the boot ended on a silent black screen. The message goes
  * to the text console (tty1, drawn by the firmware framebuffer if there is one) a few seconds
- * later, once the boot splash has quit. A grandchild does it, so nothing waits and nothing has to be
+ * later, once the boot splash has quit; 80 columns at most, the size of a text console. A grandchild
+ * does it, so nothing waits and nothing has to be
  * reaped here. */
 static void tell_no_display(void) {
     pid_t p = fork();
@@ -782,11 +783,11 @@ static void tell_no_display(void) {
     ioctl(t, KDSETMODE, KD_TEXT);
     static const char msg[] =
         "\033[2J\033[H\r\n"
-        "  LordOS could not show its desktop: no display device with kernel modesetting (KMS)\r\n"
-        "  was found.\r\n\r\n"
-        "  In a virtual machine, choose another display device (VirtIO GPU or standard VGA;\r\n"
-        "  on VMware itself, its default SVGA display works). On a PC, check that the graphics\r\n"
-        "  card has a kernel driver.\r\n\r\n"
+        "  LordOS could not show its desktop: no display device with kernel\r\n"
+        "  modesetting (KMS) was found.\r\n\r\n"
+        "  In a virtual machine, choose another display device: VirtIO GPU,\r\n"
+        "  standard VGA or SVGA. On a PC, check that the graphics card has a\r\n"
+        "  kernel driver.\r\n\r\n"
         "  Press Ctrl+Alt+F2 for a text console.\r\n";
     ssize_t w = write(t, msg, sizeof msg - 1);
     (void)w;

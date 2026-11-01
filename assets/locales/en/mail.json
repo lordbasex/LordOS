@@ -16,7 +16,7 @@
   "unread": "Unread",
   "flagged": "Flagged",
   "addAccount": "Add Account",
-  "noAccounts": "Add a mail account to start. Any IMAP/SMTP account works; popular providers such as Gmail and Yahoo are set up for you.",
+  "noAccounts": "Add a mail account to start. Any IMAP/SMTP account works; popular providers are set up for you.",
   "unavailable": "Mail's helper (lord-maild) is not installed.",
   "empty": "No messages",
   "noSelection": "No message selected",

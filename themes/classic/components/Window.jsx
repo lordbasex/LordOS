@@ -103,6 +103,13 @@ function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, o
   );
 }
 
+// Subscribes on its own: the app's window must not redraw when its menus change. Notes and Mail set
+// them after every draw, and redrawing them here would never end.
+function AppMenuStrip({ t, win, focused }) {
+  const menus = useAppMenus(win.id) || [];
+  return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} /> : null;
+}
+
 export function Window({ win, t, focused, app }) {
   const drag = useRef(null);
   const geo = wm.frame(win);
@@ -111,7 +118,6 @@ export function Window({ win, t, focused, app }) {
   const [menu, setMenu] = useState(null);
   const hoverTimer = useRef(0), leaveTimer = useRef(0);
   const flat = win.maximized || !!win.snapped;
-  const appMenus = useAppMenus(win.id) || [];
   useEffect(() => {
     const offMove = addListener('pointermove', (e) => {
       const d = drag.current;
@@ -198,7 +204,7 @@ export function Window({ win, t, focused, app }) {
         </FrameButton>
         <FrameButton t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
       </View>
-      {appMenus.length ? <MenuStrip t={t} win={win} focused={focused} menus={appMenus} /> : null}
+      <AppMenuStrip t={t} win={win} focused={focused} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
       {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       {menu && (

@@ -464,5 +464,6 @@
     "other": "{count} itens"
   },
   "select.nothing": "Nada selecionado",
+  "activity.app": "App removido",
   "activity.system": "Limpeza do sistema: {name}"
 }
