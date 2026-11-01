@@ -117,7 +117,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
   useEffect(() => {
     const mv = addListener('pointermove', (e) => {
       const o = op.current;
-      if (!o) return;
+      if (!o || (o.k === 'name' && !o.grip)) return;       // Name stays first
       if (!o.moved && Math.abs(e.x - o.x) < 5) return;
       o.moved = true;
       const dx = (direction() === 'rtl' ? -1 : 1) * (e.x - o.x);
@@ -139,7 +139,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
     const a = addListener('pointerup', up);
     return () => { mv(); a(); };
   }, [nameW, columns]);
-  const start = (ev, k, grip) => { ev.stopPropagation(); if (ev.button) return; op.current = { k, grip, x: ev.x, w: cols.width[k], columns: cols }; };
+  const start = (ev, k, grip) => { ev.stopPropagation(); if (ev.button) return; op.current = { k, grip, x: ev.x, w: k === 'name' ? nameW : cols.width[k], columns: cols }; };
   const title = (k) => tr(`files.col.${k === 'kind' && ctx.showFolder ? 'where' : k}`);
   const label = (k) => (
     <>
@@ -149,7 +149,10 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
   );
   return (
     <View ref={row} onContextMenu={(ev) => { ev.stopPropagation(); ctx.onHeaderMenu(ev); }} style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: t.separator }}>
-      <View onClick={() => onSort('name')} style={{ width: nameW, height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20 }}>{label('name')}</View>
+      <View onMouseDown={(ev) => start(ev, 'name', false)} style={{ width: live?.columns?.nameWidth ?? nameW, height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20 }}>
+        {label('name')}
+        <View onMouseDown={(ev) => start(ev, 'name', true)} style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: 0, width: 8, cursor: 'ew-resize' }} />
+      </View>
       {visible(cols).map((k) => (
         <View key={k} onMouseDown={(ev) => start(ev, k, false)} style={{ width: cols.width[k], height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden',
           justifyContent: k === 'size' ? 'flex-end' : 'flex-start', paddingHorizontal: 8, opacity: live?.moving === k ? 0.5 : 1 }}>
@@ -201,7 +204,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
   const cols = ctx.columns;
   const need = totalWidth(cols) + NAME_MIN + SIDE_PAD;
   const room = ctx.contentW;
-  const nameW = Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
+  const nameW = cols.nameWidth || Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
   const over = Math.max(0, need - room);
   const x = Math.min(sx, over);
   const inner = { ...ctx, nameW };
