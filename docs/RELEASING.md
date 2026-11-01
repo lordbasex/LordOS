@@ -164,8 +164,7 @@ for l in hardware-report \
 done
 ```
 
-Check with `gh label list --repo lordbasex/LordOS --limit 100`. Not run yet: creating them changes the public
-repository and is the maintainer's step. The workflow itself has only run against test events (`validate.mjs`
+Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created.
 with a fake fetch), never on a real issue, because workflows for `issues` events run from the default branch.
 
 ## A newer hardware snapshot between releases

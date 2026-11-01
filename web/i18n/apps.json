@@ -1127,5 +1127,47 @@
         "Cada arquivo é verificado de novo antes de agir"
       ]
     }
+  },
+  "remote-desk": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/remote-desk/index.jsx",
+    "screenshot": "docs/remote-desk-computers.png",
+    "name": {
+      "en": "Remote Desk",
+      "es": "Remote Desk",
+      "pt": "Remote Desk"
+    },
+    "tagline": {
+      "en": "Another computer's screen over RDP or VNC, drawn by LordOS itself, with shared folders",
+      "es": "La pantalla de otra computadora por RDP o VNC, dibujada por LordOS, con carpetas compartidas",
+      "pt": "A tela de outro computador por RDP ou VNC, desenhada pelo LordOS, com pastas compartilhadas"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.7",
+        "RDP and VNC in one app",
+        "Saved computers on cards",
+        "Shared folders over RDP, read-only if you choose",
+        "Full screen with its own bar",
+        "No client window, X11 or toolkit"
+      ],
+      "es": [
+        "Nuevo en 0.8.7",
+        "RDP y VNC en una sola app",
+        "Computadoras guardadas en tarjetas",
+        "Carpetas compartidas por RDP, de solo lectura si querés",
+        "Pantalla completa con su propia barra",
+        "Sin ventana de cliente, X11 ni toolkit"
+      ],
+      "pt": [
+        "Novo no 0.8.7",
+        "RDP e VNC em um só app",
+        "Computadores salvos em cartões",
+        "Pastas compartilhadas por RDP, somente leitura se quiser",
+        "Tela cheia com barra própria",
+        "Sem janela de cliente, X11 ou toolkit"
+      ]
+    }
   }
 }

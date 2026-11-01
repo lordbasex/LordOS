@@ -160,11 +160,11 @@ function Configure({ start, password: pw0, remember: rem0, note, onCancel, onSav
         tab === 'general' ? [
           label('remotedesk.protocol'), h(Segmented, { key: 'p', small: true, options: [['rdp', 'RDP'], ['vnc', 'VNC']], value: draft.proto, onChange: (v) => set({ proto: v }) }),
           label('remotedesk.host'), h(TextInput, { key: 'h', value: draft.host, onChange: (v) => set({ host: v }), autoFocus: true }),
-          label('remotedesk.port'), h(TextInput, { key: 'o', value: draft.port ? String(draft.port) : '', onChange: (v) => set({ port: Number(v.replace(/\D/g, '').slice(0, 5)) || 0 }), placeholder: rdp ? '3389' : '5900' }),
           rdp ? label('remotedesk.user') : null, rdp ? h(TextInput, { key: 'u', value: draft.user, onChange: (v) => set({ user: v }) }) : null,
-          rdp ? label('remotedesk.domain') : null, rdp ? h(TextInput, { key: 'd', value: draft.domain, onChange: (v) => set({ domain: v }) }) : null,
           label('remotedesk.password'), h(TextInput, { key: 'w', secure: true, value: password, onChange: setPassword }),
           h(View, { key: 'r', style: { flexDirection: 'row', gap: 8, alignItems: 'center' } }, h(Toggle, { small: true, on: remember, onChange: setRemember }), h(Text, { style: { fontSize: 13, color: t.text } }, tr('remotedesk.remember'))),
+          label('remotedesk.port'), h(TextInput, { key: 'o', value: draft.port ? String(draft.port) : '', onChange: (v) => set({ port: Number(v.replace(/\D/g, '').slice(0, 5)) || 0 }), placeholder: rdp ? '3389' : '5900' }),
+          rdp ? label('remotedesk.domain') : null, rdp ? h(TextInput, { key: 'd', value: draft.domain, onChange: (v) => set({ domain: v }) }) : null,
           label('remotedesk.name'), h(TextInput, { key: 'n', value: draft.name, onChange: (v) => set({ name: v }), placeholder: tr('remotedesk.nameHint') }),
           !rdp ? h(Text, { key: 'v', style: { fontSize: 12, color: t.textDim, textAlign: 'start' } }, tr('remotedesk.vncPlain')) : null] : null,
         tab === 'display' ? [
