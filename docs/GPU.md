@@ -421,7 +421,9 @@ ms and the GPU's part rises from 1.51 to 2.12 ms; under load 30.1–31.8 fps off
 
 So it is **on by default**: half the CPU in a drag alone, a fifth more frames under load, no loss in the frames it refuses,
 and the read-back clean. The price is the self-test at the start of each user session, 339–365 ms on the Pi, and 0.6 ms more of
-GPU a frame during a drag. It has run on V3D only: on any other GPU only the self-test guards it. 
+GPU a frame during a drag. It is verified on V3D and SVGA3D only: on any other GPU only the self-test guards it.
+
+**On SVGA3D** (2026-10-31, a VMware virtual machine composing on the GPU, a development build, 14 s real drags): `LORD_GPU_VERIFY=1` compared 2,102 frames over four drags, every one `differ=0`. The session's CPU over a clear area went from 7.5–7.7 % to 3.9–4.3 % of a core and the work per frame from 1.3 to 0.5 ms, with 766 of about 771 frames composed; across the Dock from 13.0–13.1 % to 11.2–11.4 %, with 284 of about 770 frames composed and the rest refused as `after`; a tall window went 0 of about 773, refused as `after`, at the old cost. So the cut around later nodes reaches less there than on the Pi 5, and nothing is lost.
 
 On v087.23 with no switch set, so with the default as it now stands (2 runs of each): 4.96–4.99 ms a frame and 27.0–27.6 % alone, 35.3–36.5 fps, 12.28–12.71 ms
 and 44.0–44.4 % under load; LordBench 60.0 and 30.8–30.9 fps. A drag on the Performance tab composed 0 of 906 frames (refused: `size`) at the old cost, and the next
@@ -662,7 +664,7 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
 - GPU drag for a layer past the self-test's size: refused for that window (`size`); on the Pi 5 a tall scrolled page
   makes one (the layer of System Information's Performance tab is about 4.5 Mpx). Why that layer is taller than the
   window was not looked into.
-- GPU drag measured with another GPU than V3D: only the self-test guards those.
+- GPU drag measured with another GPU than V3D and SVGA3D: only the self-test guards those.
 - PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30).
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).

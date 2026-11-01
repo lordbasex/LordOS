@@ -36,7 +36,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
 - **Sharp at any scale.** Each display is a separate `wl_output`, and fractional scaling lets GTK 4, Qt 6 and Chromium render sharp at 125–175 %.
 - **Touchpad gestures.** LordOS's own touchpad driver passes pinch, swipe and hold gestures to Linux apps, so pinch-to-zoom works in browsers.
-- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion.
+- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion. In development for 0.8.7 (the latest release is 0.8.6), a lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it.
 - **Notifications** from Linux apps arrive through the standard notifications service, which `lord-server` provides, and can be configured per app in Settings.
 - **Passwords:** the standard Secret Service is served by LordOS's keyring, so browsers can keep their secrets there without another keyring daemon.
 - **Force Quit** (since 0.8.5): in Lord Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.

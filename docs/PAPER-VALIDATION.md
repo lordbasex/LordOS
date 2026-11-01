@@ -2,7 +2,7 @@
 
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
-0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30),
+0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in development for 0.8.7 (the latest release is 0.8.6-beta),
 so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
@@ -39,7 +39,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 |---|---|---|---|
 | 3.1 | Modesetting with our own DRM ioctls, the card with connectors | Design (`kms.c`, no libdrm) | Design |
 | 3.2 | CPU path without a 3D card; software OpenGL falls back to it | Check `gpu` names the reason (`no-3d`, `software`…) | Holds (VM 116 shows it) |
-| 3.2 | GPU path tested only with Mesa's software renderer | Untested on AMD/Nvidia/Intel | **Untested** |
+| 3.2 | GPU path tested only with Mesa's software renderer | Since corrected: it runs on V3D (Pi 5) and SVGA3D (VMware). Untested on AMD/Nvidia/Intel | **Untested** on those |
 | 3.3 | Touchpad gestures replayed in tests | Test (`tp-test`, `tests/touchpad-sim`) | Holds |
 | 3.4 | Only `libwayland-server` plus generated protocol code | Design | Design |
 | 3.4 | **Xwayland not supported** | Xwayland launches on demand since 0.8.3 | **Outdated → corrected in 0.8.5** |
@@ -108,6 +108,10 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 7.2 | — | New in 0.8.5: remote desktop CPU reference (`REMOTE.md`, "Measurements (0.8.5, CPU reference)") | Added in the 0.8.5 edition (§7.2) |
 | 7.2 | — | New in 0.8.6: dragged windows' rounded corners no longer turn black (the drag layer's corner restore mixes both pixels alpha included); a drag frame repaints only what changed, pixel-identical except an approved 1-level change at rounded corners below the window; GPU drag composes the window with the CPU's exact arithmetic after a self-test (`WINDOWS.md`, `GPU.md`) | Test (`engine-test`: `test_drag_corners` against a full repaint on both paths, `test_drag_exact`'s 2,417 golden frame hashes per path, the `gpu-drag` path; `canvas-test`: GPU drag's arithmetic over all 8,421,376 valid combinations, x86_64 only) | Holds on VM 116; on the Pi 5 (V3D, 2026-10-29) GPU drag's self-test passes (11,373,321 pixels, 341 ms), `LORD_GPU_VERIFY=1` compared 138 frames with 0 differences, and screenshots of the monitor show clean corners while dragging; GPU drag is off by default (no measurable gain) |
 | 7.3 | GPU benefits on real cards not measured | — | **Untested** |
+| 7.4 | In development for 0.8.7: GPU drag covers the whole drag and is on by default, verified on V3D and SVGA3D only (`GPU.md`, "The whole drag") | Pi 5 (V3D, v087.22, 4 real 16 s drags per setting): alone 58.1–60.6 % → 27.2–28.4 % of a core, 7.0 → 5.0 ms; under a memory load 28.8–29.1 → 34.4–35.1 fps, 20.3 → 13.2 ms, 67 % → 45 %; `LORD_GPU_VERIFY=1` 1,662 frames, all `differ=0`. VMware (SVGA3D, development build): 2,102 frames, all `differ=0`. Any other GPU: **Untested**, only the self-test guards it. Measured |
+| 7.4 | In development for 0.8.7: what slows the Pi 5's GPU under load is memory (`build/gpu-contention`, verdict `memory`, two runs: 1.4 ms spinning, 28 ms reading, 3.7 ms writing; no throttling) | Measured on the Pi 5 16 GB, build 0.8.6+v087.4. What a real desktop load reads, and what a compositor change can avoid, is open. Measured |
+| 7.4 | In development for 0.8.7: the buffer-age scissor stays off (GPU part 1.51 → 2.58 ms alone; under load 30.1–31.8 → 28.4–29.9 fps, pointer p99 63–66 → 83–95 ms) | Measured on the Pi 5 (5 runs without, 3 with, v087.22); `build/engine-test` over a simulated chain. Measured |
+| 10.1 | In development for 0.8.7: Cleaner on a Pi 5 with its monitor: 4.5–7.2 % of a core with the hero idle, 12.2–18.0 % scanning, 0.1 % closed (`CLEANER-TESTS.md`) | Measured (v087.22, two runs a cell). Aurora's pauses of up to a second are not explained. Measured |
 | 7.4 | Pi 5: build 1 min 02 s, tests 23/0/0, NEON 2.0–2.3×, idle 36 MB, fan behaviour | Measured once on the Pi (2026-10-18; the tests were not rerun on the Pi for 0.8.6) | Measured |
 | 7.4 | — | New in 0.8.6: with a 1920×1080 60 Hz monitor, login screen 5.99 s after the kernel starts; desktop 59.4 fps alone (p99 13.0 ms, 1 % late) and 24 fps under a low-priority all-core load (96.5 % late); 3 minutes sustained at 5.9 GFLOP/s, 55.6 °C; software video decoding per codec. LordBench on the Pi (`BENCHMARK.md`, "Built so far") | Measured with LordBench (one run each); the load result led to two fixes (compositor CPU weight: 31–33 % → 7–8 % late without the monitor; with the real-time priority, measured on the monitor: 24 → 28.9–30.5 fps, still 94–98 % late, the frame's build time under load still to explain) |
 | 7.4 | — | New in 0.8.6: LordBench's square now turns; with it, the frame-cost work took the Pi 5 with its monitor from 53–58 to 59.8–60 fps alone and from 24–25 to about 31 fps under load; the frame pipeline (+2–5 fps under load, 17–29 ms more pointer latency) and GPU drag (no measurable gain) were measured and are off by default; the remaining cost under load is the GPU's time per frame (1.5 → 14–16 ms, no clock or thermal throttling; memory contention likely, not proven); fewer pixels per frame, what slows the GPU and GPU drag for the whole drag moved to 0.8.7 (2026-10-30) (`BENCHMARK.md`, "The drag frame's cost") | Measured with LordBench on the Pi 5 (2–3 runs each, 2026-10-28; final run 2026-10-29: both off 59.9 / 30.5–31.1 fps, pointer to screen p50 25.7–25.9 / 48.5–49.0 ms; GPU drag on 59.9 / 30.8–31.6; the pipeline 60.0 / 33.0–36.2 fps, pointer 42 / 78 ms; `vcgencmd` every 2 s) | Measured (2026-10-29) |
@@ -126,6 +130,27 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 11.2 | (0.8.6) a blurred window hidden whole behind an opaque one is no longer repainted with every change near it (a translucent Terminal behind Monitor's moving map: 46 % of the screen per frame → 11–15 % in one box, 3–4 % in several rectangles) | `build/engine-test` (`test_hidden_blur_damage`); VM 116 `--profile` and the repaint check in both modes, before and after rebasing onto the frame-cost work (`docs/MONITOR.md`, "A blurred window hidden behind Monitor") | Holds (2026-10-29; rebased build: 11.2 % and 3.3 %) |
 | 11.2 | 30,953 parser checks with mutation fuzzing | Tests (`remote-fuzz`, mail, doc, imager fuzzers) | Holds; count to refresh |
 | 11.4 | Port 5673 closed until enabled | Check `remoteClosed` (effective) | Holds |
+
+## In development for 0.8.7 (the latest release is 0.8.6-beta)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 3.3 | One key dispatcher per theme; a fixed list of keys kept from Linux apps, by name | Test (`keygrab-test`) | Holds |
+| 3.3 | A pointer lock holds only with the pointer on the surface and the keyboard on its app; ❖Esc releases it | Test (`ptrlock-test`); reproduced on the Pi 5 with uinput and the kernel's cursor plane | Holds. The pointer speeding up by itself was not reproduced |
+| 3.3 | On-screen keyboard: closed key list, no Ctrl, Alt or Super, only the theme and login screen | Test (`osk-test`, `osk_model_test.mjs`); VM 125 end to end | Holds; a real touchscreen **Untested** |
+| 3.6 | Session restore after logout, restart, shutdown, forced power-off and `SIGKILL` | Manual on VM 125 | Measured once; after a forced power-off Chromium needs its own "Restore pages?" |
+| 3.6 | A card with no KMS counts as no display, with a message on the text console | Manual | Not automated |
+| 4.3 | `lord.fs` refuses a parent of a protected path | Test (`fsops-test`) | Holds |
+| 5.1 | Files → Network: one bounded pass, read by a sandboxed helper, JS names no address | Test (`lan-test` under ASan and UBSan, 40,000 damaged answers); a pass on the real LAN on VM 116 and VM 125, outside a session | Holds outside a session; no pass through the `lan` connector inside a session is recorded |
+| 5.1 | `share-mount`: guest and NFS 4.2 | VM 125 against a test server over a veth | Measured once; a real server **Untested** |
+| 5.1 | `share-mount`: SMB with a password | Worked only against that test server | **Not validated** |
+| 5.1 | A network mount that stops answering doesn't freeze the interface | VM 125: never blocked in 24 samples, against 30 s on SMB and over 100 s on NFSv4 | Measured once |
+| 5.1 | Monitor → Voltage | Test (`voltage-test`, `settings-hw-test`, `voltage_model_test.mjs`); an isolated session with the real board's values as a fixture | Holds on fixtures; a real under-voltage, sensor chip and battery **Untested** |
+| 5.6 | `install.sh` names an administrator on a Debian with a root password | A clean amd64 Debian 13 virtual machine | Measured once; logging in on the login screen not part of that run |
+| 6.3 | `admin-rescue` decides again as root and refuses when an administrator exists | Test (`admin-rescue-test`); an installed amd64 virtual machine | Holds; real hardware and arm64 **Untested** |
+| 6.3 | `hw-serial-numbers`, `rpi-pmic`: read-only, values validated in C | Test (`settings-hw-test`) | Holds |
+| 6.7 | `lord-clean` and `lord-lan` take the helpers' sandbox | Test (`clean-test`, `lan-test`) | Holds; `clean-test` has no case yet for what a scan shows per rule or for the minimum time per step |
+| 6.11 | The on-screen keyboard's panel and System Information with serials showing are protected | Design (`protected` node) | Partly tested |
 
 ## What the paper must change for 0.8.5
 
@@ -149,6 +174,7 @@ State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26)
 
 | Gap | Covers | Plan |
 |---|---|---|
+| SMB with a password against a real server | §5.1 | A real server on a test network, with signing |
 | A denied connection, tried on the user's machine | §6.6 effective | An app with network access and a temporary rule (Checks) |
 | Repeatable performance numbers | §7 | LordBench (0.8.6: CPU, memory, GPU offscreen, storage, sustained load, software video decoding and encoders, the desktop's frame times and pointer-to-screen latency alone and under load (and the compositor's CPU weight and real-time priority they led to), the boot time per version, the N-boot test, `lordos-sysreport bench`, the interface layout/paint and shaping workloads and the helper-sandbox self-test are built, with VM 116 and the Pi 5 as references, `BENCHMARK.md` "Built so far"; idle memory and CPU, hardware video decoding and app start are not; hardware video decoding and the x86 PC reference moved to 0.8.7 on 2026-10-29) |
 | Rendering, 3D and video on every GPU | §3.2, §7.2–7.3 | The visual test bench below |
