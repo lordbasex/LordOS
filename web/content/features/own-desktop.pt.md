@@ -80,7 +80,7 @@ Na 0.8.7 (a última versão publicada é a 0.8.6): várias áreas de trabalho no
 Tudo na 0.8.7.
 
 - **Conectar a um servidor.** Rede lista cada computador como uma pasta, e seus compartilhamentos se abrem ali mesmo. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ftp, ftps e WebDAV, e todos abrem como pastas no Arquivos, com chaves SSH e certificados verificados antes.
-- **Telas remotas.** Os apps de RDP e VNC vêm com o sistema e desenham com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit.
+- **Telas remotas.** Remote Desk, um só app para RDP e VNC, vem com o sistema e desenha com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit.
 - **Discos de outros sistemas.** Disk Formats, um único item da Loja, abre NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64 como parte opcional, APFS somente leitura. São formatos comerciais; os drivers são software livre e sem custo.
 - **Do seu jeito.** Escolha, reordene e ajuste as colunas da lista, use os Ajustes próprios do Arquivos e abra o Terminal na pasta onde você está.
 

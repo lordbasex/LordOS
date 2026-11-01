@@ -376,7 +376,7 @@ export default function Files() {
     if (a.kind === 'remote') {
       noteServer(a.text);
       setSheet(null);
-      wm.open(a.scheme, { new: true, args: { host: a.host, port: a.port, user: a.user } });
+      wm.open('remote-desk', { new: true, args: { proto: a.scheme, host: a.host, port: a.port, user: a.user } });
       return null;
     }
     const app = clientFor(a.scheme);
@@ -419,7 +419,7 @@ export default function Files() {
   // a computer: its best way in; connected shares open as folders
   const openWay = (w, h) => {
     if (w.volume) { navigate(dirLoc(w.volume.path)); return; }
-    if (w.mode === 'screen') { wm.open(w.app, { new: true, args: { host: h.addr, port: w.port, user: '' } }); return; }
+    if (w.mode === 'screen') { wm.open('remote-desk', { new: true, args: { proto: w.app, host: h.addr, port: w.port, user: '' } }); return; }
     if (w.mode === 'remote') { setRemoteAsk({ ...w.ask, ssh: w.ask.kind === 'sftp' ? `ssh ${h.addr}` : null }); return; }
     // a share open to guests, or an NFS export, mounts by itself; anything else asks who connects
     if (w.share && (w.kind === 'nfs' || ['anonymous', 'guest'].includes(h.session))) {

@@ -1,0 +1,16 @@
+{
+  "id": "remote-desk",
+  "version": "0.8.7",
+  "name": "Remote Desk",
+  "description": "Connects to the screen of another computer over RDP or VNC",
+  "size": [
+    760,
+    500
+  ],
+  "minSize": [
+    620,
+    440
+  ],
+  "dock": false,
+  "category": "Network"
+}

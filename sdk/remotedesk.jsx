@@ -4,7 +4,7 @@
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, MediaView, addListener } from '@lordos/runtime';
 import { useTheme } from './theme.js';
-import { useAppWindow } from './components.jsx';
+import { useAppWindow, Segmented } from './components.jsx';
 import { settings, useSettings } from './settings.js';
 import { lan } from './lan.js';
 import { certCheck } from './remotecert.js';
@@ -57,9 +57,10 @@ function Screen({ id, st, onEnd, focused }) {
     h(View, { style: { position: 'absolute', right: 8, top: 8 } }, h(Button, { small: true, label: tr('remotedesk.disconnect'), onClick: onEnd })));
 }
 
-export function RemoteDeskApp({ proto }) {
+export function RemoteDeskApp() {
   const t = useTheme();
   const { args, focused } = useAppWindow();
+  const [proto, setProto] = useState(args?.proto === 'vnc' ? 'vnc' : 'rdp');
   const [s] = useSettings();
   const saved = s.remoteDesks?.[proto] || [];
   const trusted = s.remoteDesks?.certs || {};
@@ -117,6 +118,7 @@ export function RemoteDeskApp({ proto }) {
         h(Text, { style: { fontSize: 13, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, x.port ? `${x.host}:${x.port}` : x.host)))),
     h(ScrollView, { style: { flex: 1 }, contentStyle: { padding: 24, gap: 8 } },
       h(Text, { style: { fontSize: 20, fontWeight: 600, color: t.text, textAlign: 'start' } }, tr(rdp ? 'remotedesk.titleRdp' : 'remotedesk.titleVnc')),
+      h(Segmented, { small: true, options: [['rdp', 'RDP'], ['vnc', 'VNC']], value: proto, onChange: (p) => { if (!id) { setProto(p); setError(''); } } }),
       label('remotedesk.host'), h(TextInput, { value: host, onChange: setHost, autoFocus: true, onSubmit: go }),
       label('remotedesk.port'), h(TextInput, { value: port, onChange: (v) => setPort(v.replace(/\D/g, '').slice(0, 5)), placeholder: rdp ? '3389' : '5900', onSubmit: go }),
       rdp ? label('remotedesk.user') : null, rdp ? h(TextInput, { value: user, onChange: setUser, onSubmit: go }) : null,
