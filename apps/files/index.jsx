@@ -21,7 +21,7 @@ import { archiveVersion, archiveState, extractEntry, extractHere, compress, isAr
 import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
-import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
+import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
 export function Icon({ size: s }) {
@@ -138,10 +138,10 @@ function locTitle(loc, dirs) {
 
 // Source-list row: 28 px, accent-colored icon, a soft highlight when selected and the
 // accent when something is dragged over it.
-function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail }) {
+function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext }) {
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
+    <View onClick={onClick} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
       style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, borderRadius: 6,
         backgroundColor: hot ? t.accent : selected ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover ? t.hover : 'transparent' }}>
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
@@ -559,6 +559,16 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: itemMenu(e) });
   };
+  // a server in Locations: stays there, dim, when it isn't connected; a click connects again
+  const pinMenu = (ev, v) => {
+    ev.stopPropagation?.();
+    const address = originOf(v.path, v.fs, v.name);
+    if (!address) return;
+    const pinned = prefs.pins.some((p) => p.path === v.path);
+    const at = local(ev);
+    setMenu({ x: at.x, y: at.y, items: [{ label: tr(pinned ? 'files.pin.remove' : 'files.pin.add'), onClick: () => togglePin({ address, path: v.path, name: v.name }) }] });
+  };
+  const reconnect = (p) => { const r = connectTo(p.address); if (r?.error) setMsg(r.error); };
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
@@ -768,9 +778,14 @@ export default function Files() {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
             <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
-              drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null} />
+              drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null}
+              onContext={isShareFs(v.fs) ? (ev) => pinMenu(ev, v) : undefined} />
           );
         })}
+        {side('volumes') && prefs.pins.filter((p) => !volumes.some((v) => v.path === p.path)).map((p) => (
+          <SideItem key={p.path} t={t} dim label={shareTitle(p.name)} icon={<DriveGlyph color={t.textDim} />} onClick={() => reconnect(p)}
+            onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.pin.remove'), onClick: () => togglePin(p) }] }); }} />
+        ))}
         {side('volumes') && unmountedDisks(diskList).map((p) => (
           <SideItem key={p.name} t={t} dim label={p.label || tr('files.disk.unnamed', { size: formatBytes(p.size) })} icon={<DriveGlyph color={t.textDim} />}
             onClick={() => mount(p)} />
@@ -910,8 +925,8 @@ export default function Files() {
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
       {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}
-      {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note) => { setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
-      {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
+      {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note, name) => { if (at.startsWith('/')) noteOrigin(at, `${connAsk.kind}://${connAsk.host || connAsk.addr}/${String(name).replace(/^\/+/, '')}`); setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
+      {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { const a = remoteAsk; noteOrigin(at, `${a.kind}://${a.user ? `${a.user}@` : ''}${a.host}${a.port ? `:${a.port}` : ''}${a.path ? `/${a.path.replace(/^\/+/, '')}` : ''}`); setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
         onStore={(pkg) => { setRemoteAsk(null); wm.open('store', { args: { search: pkg, package: pkg } }); }}
         onTerminal={remoteAsk.ssh ? () => { const typed = remoteAsk.ssh; setRemoteAsk(null); wm.open('terminal', { new: true, args: { typed } }); } : null} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={localKeys(menu.items)} onClose={() => setMenu(null)} bounds={bounds()} />}

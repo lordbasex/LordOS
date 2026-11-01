@@ -290,5 +290,7 @@
   "disk.formatsGet": "Abrir la Tienda",
   "settings.defaultView": "Las carpetas nuevas se muestran en",
   "net.shareOn": "{name} en {host}",
+  "pin.add": "Fijar en Ubicaciones",
+  "pin.remove": "Quitar de Ubicaciones",
   "net.offLink": "Este servidor está fuera de tu red local, así que LordOS no lista sus carpetas. Escribí el nombre de la carpeta."
 }

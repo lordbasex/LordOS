@@ -290,5 +290,7 @@
   "disk.formatsGet": "Open the Store",
   "settings.defaultView": "New folders show",
   "net.shareOn": "{name} on {host}",
+  "pin.add": "Pin to Locations",
+  "pin.remove": "Remove from Locations",
   "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name."
 }

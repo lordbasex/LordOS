@@ -62,7 +62,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
   const needName = nfs ? !ask.share : !ask.share && typed;
   useEffect(() => {
     if (nfs) return;
-    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
+    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => s || (ask.share ? lan.saved(ask.kind, ask.addr, '') : null)).then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
   }, []);
   // DOMAIN\user, as people write it
   const who = (g) => {
@@ -82,7 +82,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
         if (remember) { try { await lan.remember(ask.kind, ask.addr, key, user.trim(), password, tr('files.net.keyringLabel', { name: name, addr: ask.addr })); } catch (e) { note = tr('files.net.notRemembered'); } }
         else lan.forget(ask.kind, ask.addr, key, user.trim());
       }
-      onMounted(at, note);
+      onMounted(at, note, name);
     } catch (e) { setError(e.message); setBusy(false); }
   };
   const signIn = async (g) => {
