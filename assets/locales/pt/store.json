@@ -271,5 +271,13 @@
   "suggest.argonCase.title": "Caixa Argon ONE V5 encontrada",
   "suggest.argonCase.why": "Suas duas portas USB frontais e a placa de som já estão ativas até reiniciar.",
   "suggest.argonCase.detail": "Mantenha-as ativas a cada início. Nada é instalado.",
-  "suggest.keepOn": "Manter ativo"
+  "suggest.keepOn": "Manter ativo",
+  "formats.label": "Formato comercial",
+  "formats.intro": "Estes formatos são de seus fabricantes, mas cada driver abaixo é software livre e sem custo. Nada é instalado até você continuar.",
+  "formats.ntfs": "Lê e grava volumes NTFS.",
+  "formats.exfat": "Lê e grava volumes exFAT.",
+  "formats.fat": "Abre e formata volumes FAT na área de trabalho.",
+  "formats.hfs": "Lê volumes HFS+; um com diário, o habitual, é somente leitura.",
+  "formats.apfs": "Lê volumes APFS, somente leitura.",
+  "formats.allow": "Continuar"
 }

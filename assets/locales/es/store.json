@@ -271,5 +271,13 @@
   "suggest.argonCase.title": "Caja Argon ONE V5 detectada",
   "suggest.argonCase.why": "Sus dos USB frontales y su placa de sonido ya están activos hasta que reinicies.",
   "suggest.argonCase.detail": "Déjalos activos en cada inicio. No se instala nada.",
-  "suggest.keepOn": "Dejar activo"
+  "suggest.keepOn": "Dejar activo",
+  "formats.label": "Formato comercial",
+  "formats.intro": "Estos formatos son de sus fabricantes, pero cada controlador de abajo es software libre y sin costo. No se instala nada hasta que continúes.",
+  "formats.ntfs": "Lee y escribe volúmenes NTFS.",
+  "formats.exfat": "Lee y escribe volúmenes exFAT.",
+  "formats.fat": "Abre y formatea volúmenes FAT en el escritorio.",
+  "formats.hfs": "Lee volúmenes HFS+; uno con diario, lo habitual, es de solo lectura.",
+  "formats.apfs": "Lee volúmenes APFS, solo lectura.",
+  "formats.allow": "Continuar"
 }

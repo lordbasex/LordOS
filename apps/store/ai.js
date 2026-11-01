@@ -86,6 +86,22 @@ function NotListed({ a, onDone }) {
       h(Button, { primary: true, label: busy ? t('store.ai.updating') : t('store.ai.updateLists'), disabled: busy || !admin.available(), onClick: update })));
 }
 
+// An item of the Commercial group made of several parts: what is in it, each with its license and source, before anything
+// is installed. Nothing here installs: the person goes on to the usual package page.
+function Authorize({ a, onAllow }) {
+  const th = useTheme();
+  const here = useHere();
+  return h(View, { style: { gap: spacing.m, maxWidth: 680 } },
+    h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
+    h(Text, { style: { fontSize: typeScale.caption, fontWeight: 600, color: th.textDim, textAlign: 'start' } }, t('store.formats.label')),
+    h(Text, { style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start' } }, t('store.formats.intro')),
+    ...a.drivers.filter((d) => !d.arches || d.arches.includes(here)).map((d) => h(View, { key: d.name, style: { gap: 2 } },
+      h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start' } }, `${d.name} · ${d.license}`),
+      h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } }, t(`store.formats.${d.id}`)),
+      h(Text, { style: { fontSize: 11, color: th.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' } }, d.source))),
+    h(View, { style: { flexDirection: 'row', gap: spacing.s } }, h(Button, { primary: true, label: t('store.formats.allow'), onClick: onAllow })));
+}
+
 const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.arch] || info.arch || ''; };
 // The catalog's sections: "ai" (entries without a section) and "commercial" (free of charge, no
 // source code: the page says so before anything is installed).
@@ -98,8 +114,10 @@ export const catalogApp = (pkg) => (catalog.apps || []).find((x) => x.package ==
 export function AiDetail({ pkg }) {
   useStore(locale);
   const [, setTick] = useState(0);
+  const [allowed, setAllowed] = useState(false);
   const a = catalogApp(pkg);
   const direct = a && a.source && a.source.delivery === 'direct';
+  if (a?.drivers && !installed(pkg) && !allowed) return h(Authorize, { a, onAllow: () => setAllowed(true) });
   if (direct && !offered(pkg)) return h(AddSource, { a, onDone: () => setTick((x) => x + 1) });
   if (a && !direct && !offered(pkg)) return h(NotListed, { a, onDone: () => setTick((x) => x + 1) });
   // removing an app from its maker's repository also removes that repository, unless another

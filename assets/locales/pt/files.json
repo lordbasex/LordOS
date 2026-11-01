@@ -284,5 +284,8 @@
   "net.connectAs": "Conectar como",
   "net.nothing": "Nada neste computador pode ser aberto daqui.",
   "net.sharedFolder": "Pasta compartilhada",
-  "connect.err.tlsName": "O certificado deste servidor não nomeia {name}, então não pode ser verificado. Quem o administra pode adicionar esse nome ao certificado."
+  "connect.err.tlsName": "O certificado deste servidor não nomeia {name}, então não pode ser verificado. Quem o administra pode adicionar esse nome ao certificado.",
+  "disk.formatsTitle": "{name} usa um formato de disco comercial",
+  "disk.formatsDetail": "Formatos de disco, na Loja, o abre. Seus drivers são software livre e sem custo.",
+  "disk.formatsGet": "Abrir a Loja"
 }

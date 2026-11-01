@@ -271,5 +271,13 @@
   "suggest.argonCase.title": "Argon ONE V5 case found",
   "suggest.argonCase.why": "Its two front USB ports and its sound card are on now, until you restart.",
   "suggest.argonCase.detail": "Keep them on after each restart. Nothing is installed.",
-  "suggest.keepOn": "Keep on"
+  "suggest.keepOn": "Keep on",
+  "formats.label": "Commercial format",
+  "formats.intro": "These formats belong to their makers, but every driver below is free software, at no cost. Nothing is installed until you go on.",
+  "formats.ntfs": "Reads and writes NTFS volumes.",
+  "formats.exfat": "Reads and writes exFAT volumes.",
+  "formats.fat": "Opens and formats FAT volumes on the desktop.",
+  "formats.hfs": "Reads HFS+ volumes; a journaled one, the usual kind, is read-only.",
+  "formats.apfs": "Reads APFS volumes, read-only.",
+  "formats.allow": "Continue"
 }

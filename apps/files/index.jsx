@@ -368,11 +368,18 @@ export default function Files() {
   };
   const restore = (paths = selPaths) => { let n = 0; for (const p of paths) { try { fs.restore(p); n++; } catch (err) { report(err); } } if (n) { setMsg(tr('files.restored', { count: n })); bump(); } };
   // disks: the same closed actions as the Disks app (an internal disk asks for an administrator)
+  // these formats come with the Store's Disk Formats item
+  const FORMATS = ['vfat', 'exfat', 'ntfs', 'hfsplus', 'apfs'];
+  const formatsOn = () => { try { fs.stat('/usr/lib/lordos/disk-formats.enabled'); return true; } catch (e) { return false; } };
   const mount = (p) => {
+    if (FORMATS.includes(p.fstype) && !formatsOn()) {
+      setConfirm({ text: tr('files.disk.formatsTitle', { name: p.label || p.name }), detail: tr('files.disk.formatsDetail'), ok: tr('files.disk.formatsGet'), run: () => wm.open('store', { args: { page: 'commercial', app: 'lordos-disk-formats' } }) });
+      return;
+    }
     setMsg(tr('files.disk.mounting', { name: p.label || p.name }));
     admin.run('disk-mount', p.name, null, { quiet: true }).then(
       (path) => { setVolumes(fs.volumes()); setMsg(null); const at = String(path || '').trim(); if (at.startsWith('/')) navigate(dirLoc(at)); },
-      (e) => { setMsg(e.message); if (p.fstype === 'apfs') setConfirm({ text: e.message, ok: tr('files.connect.openStore'), run: () => wm.open('store', { args: { search: p.fstype === 'apfs' ? 'apfs-dkms' : p.fstype, package: p.fstype === 'apfs' ? 'apfs-dkms' : undefined } }) }); });
+      (e) => setMsg(e.message));
   };
   const release = (r, path) => {
     if (r.remote) { if (lan.disconnect(path)) { setVolumes(fs.volumes()); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); } return; }

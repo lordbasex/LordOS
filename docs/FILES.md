@@ -122,7 +122,11 @@ The RDP and VNC apps (`apps/rdp`, `apps/vnc`, `sdk/remotedesk.jsx`) draw the rem
 
 ## Disks' file systems (0.8.7)
 
-Tested on VM 125 from the sidebar: **NTFS** (kernel ntfs3), **exFAT** and **FAT32** read and write; **HFS+** read and write in the kernel, but a journaled volume, the usual kind, is read-only; **APFS** read-only through the open-source `apfs-dkms` driver, a module built for the running kernel: 323 MB with headers and compiler, a Recommends of the amd64 package, not on the Pi, whose kernel is LordOS's own. Without it the volume says so and offers the package. Writing to APFS isn't offered: the open driver's write support is experimental.
+NTFS, exFAT, FAT, HFS+ and APFS come as one Store item, **Disk Formats** (`lordos-disk-formats`, Commercial group, label "Commercial format"), installed and removed as one after a page lists each driver with its license and source. All of them are free software at no cost. The package adds a marker, `/usr/lib/lordos/disk-formats.enabled`, that `disk-mount` checks, and depends on ntfs-3g, exfatprogs and dosfstools, plus apfs-dkms and kernel headers on amd64 (323 MB, not on the Pi, whose kernel is LordOS's own).
+
+**What gating FAT means:** only that Files and Disks won't mount a FAT volume on the desktop without the item. The kernel's `vfat` stays, so the boot partition mounts through fstab; the installer and live USB call `mount` themselves and keep `dosfstools` from their own package lists; the Imager writes images and never mounts through this action. A phone or camera card formatted FAT is the visible effect.
+
+Tested on VM 125 from the sidebar with the drivers present: NTFS (ntfs3), exFAT and FAT32 read and write. HFS+ in a journaled volume, the usual kind, mounts read-only. APFS mounts read-only through the open driver, a volume made on another system and left empty.
 
 ## Network (0.8.7, in development)
 

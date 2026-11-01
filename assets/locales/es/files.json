@@ -284,5 +284,8 @@
   "net.connectAs": "Conectar como",
   "net.nothing": "Nada en esta computadora se puede abrir desde acá.",
   "net.sharedFolder": "Carpeta compartida",
-  "connect.err.tlsName": "El certificado de este servidor no nombra a {name}, así que no se puede verificar. Quien lo administra puede agregar ese nombre al certificado."
+  "connect.err.tlsName": "El certificado de este servidor no nombra a {name}, así que no se puede verificar. Quien lo administra puede agregar ese nombre al certificado.",
+  "disk.formatsTitle": "{name} usa un formato de disco comercial",
+  "disk.formatsDetail": "Formatos de disco, en la Tienda, lo abre. Sus controladores son software libre y sin costo.",
+  "disk.formatsGet": "Abrir la Tienda"
 }

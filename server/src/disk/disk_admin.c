@@ -237,6 +237,10 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     };
     int k = -1;
     for (size_t i = 0; i < sizeof kinds / sizeof *kinds; i++) if (!strcmp(fs, kinds[i].udev)) k = (int)i;
+    /* the Store's Disk Formats item gates the desktop's mount of these; the kernel's drivers, the boot partition, the
+     * installer and the live system don't come through here */
+    if (k >= 0 && (!strcmp(fs, "vfat") || !strcmp(fs, "exfat") || !strcmp(fs, "ntfs") || !strcmp(fs, "hfsplus") || !strcmp(fs, "apfs")) &&
+        access("/usr/lib/lordos/disk-formats.enabled", F_OK)) { admin_err("disk.formatsNeeded", "fs", fs, NULL); return; }
     if (k < 0) { { if (fs[0]) admin_err("disk.cannotMountFs", "fs", fs, NULL); else admin_err("disk.unknownFs", "name", t.name, NULL); } return; }
     char base[96], dir[PATH_MAX], leaf[200];
     mkdir("/media", 0755);

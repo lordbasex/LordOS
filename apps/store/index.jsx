@@ -322,6 +322,7 @@ export default function Store() {
   useEffect(() => {
     if (args?.install) setFile(args.install);
     if (args?.page) go(args.page);
+    if (args?.app) openAi(args.app);
     if (args?.search) { setQuery(args.search); go('discover'); }       // from Search
   }, [args?.nonce]);
   const sug = useStore(suggestions);

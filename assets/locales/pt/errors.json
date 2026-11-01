@@ -82,6 +82,7 @@
   "disk.cancelled": "Cancelado",
   "disk.cancelledPartial": "Cancelado: o disco ficou gravado pela metade",
   "disk.cannotMountFs": "Não é possível montar “{fs}”",
+  "disk.formatsNeeded": "Para abrir volumes {fs}, obtenha Formatos de disco na Loja.",
   "disk.noDriver": "Este computador não tem driver para {fs}. Ele pode ser instalado pela Loja.",
   "disk.cannotRenameFs": "Não é possível renomear “{fs}”",
   "disk.imageOnTarget": "A imagem está no mesmo disco que seria apagado",
