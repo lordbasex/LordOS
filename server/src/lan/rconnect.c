@@ -211,7 +211,13 @@ static int mounted_at(const char *dir) {
     if (!f) return 0;
     char line[4096], mnt[2048];
     int yes = 0;
-    while (fgets(line, sizeof line, f)) if (sscanf(line, "%*s %2047s", mnt) == 1 && !strcmp(mnt, dir)) yes = 1;
+    char want[PATH_MAX * 2];
+    size_t o = 0;
+    for (const char *p = dir; *p && o + 5 < sizeof want; p++) {        /* the table escapes spaces */
+        if (*p == ' ') { memcpy(want + o, "\\040", 4); o += 4; } else want[o++] = *p;
+    }
+    want[o] = 0;
+    while (fgets(line, sizeof line, f)) if (sscanf(line, "%*s %2047s", mnt) == 1 && !strcmp(mnt, want)) yes = 1;
     fclose(f);
     return yes;
 }
