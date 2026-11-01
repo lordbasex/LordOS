@@ -581,7 +581,7 @@ export default function Files() {
     if (mod && !e.shift && b === ',') { setSheet('settings'); return; }
     if (mod && e.key === 'Tab') { setActive((a) => (a + (e.shift ? tabs.length - 1 : 1)) % tabs.length); return; }
     if (mod && e.shift && b === 'n') { newFolder(null); return; }
-    if (mod && b === 'n') { wm.open('files', { new: true, args: { path: curDir || fs.home() } }); return; }
+    if (mod && b === 'n') { wm.open('files', { new: true }); return; }
     if (mod && b === 't') { newTabAt(); return; }
     if (mod && b === 'w') { closeTab(active); return; }
     if (mod && e.shift && (b === '.' || b === '>' || b === ':')) { setHidden((h) => !h); return; }
@@ -622,7 +622,7 @@ export default function Files() {
   useEffect(() => {
     wm.setMenus(wid, [
       { label: tr('files.menu.file'), items: [
-        { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true, args: { path: curDir || fs.home() } }) },
+        { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true }) },
         { label: tr('files.menu.newTab'), hint: '❖T', onClick: () => newTabAt() },
         { label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null), disabled: !wDir }, '-',
         { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(), disabled: !sel.length },
