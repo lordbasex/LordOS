@@ -16,6 +16,7 @@
  * Protocol: proto.h. */
 #include "mirror.h"
 #include "proto.h"
+#include "share.h"
 #include "../vault/vclient.h"
 #include "../media/mstream.h"
 #include "../par.h"
@@ -55,6 +56,7 @@ typedef struct {
     int vfps;                       /* the frame rate this viewer's screen shows (its refresh; 30 if unknown) */
     int vinfo_sent;                 /* RP_VINFO went to it at least once */
     int vmode;                      /* the video plays: lossless tiles once still, damage right away */
+    int busy;                       /* turned away: the session is shared through the API (RP_BUSY) */
 } Client;
 
 static int lfd = -1;
@@ -150,6 +152,12 @@ static void video_update(void) {
             if (!kbps || c->vkbps < kbps) kbps = c->vkbps;
             if (c->vfps > fps) fps = c->vfps;     /* the fastest screen: a slower one shows what it can */
         }
+        if (share_codec() == k) {               /* the holder of the API's door is one more viewer */
+            n++;
+            audio |= share_audio_on();
+            if (!kbps || share_kbps() < kbps) kbps = share_kbps();
+            if (share_fps() > fps) fps = share_fps();
+        }
         mstream_want(k, n, audio, kbps ? kbps : 4000, fps);
     }
 }
@@ -161,6 +169,8 @@ static void close_fds(Client *c) {
 
 static void drop(Client *c) {
     int had = c->who[0] != 0;
+    /* lord-sessiond went away from the monitor's session: nobody vouches for who is at the screen */
+    if (c->seat) share_session(SHARE_S_LEFT);
     close_fds(c);
     close(c->fd);
     free(c->in);
@@ -182,7 +192,7 @@ static void all_dirty(Client *c) {
 /* If the connection asked for a frame and there are pending tiles: sends them (runs per row) and RP_END. */
 static void pump(Client *c) {
     if (c->fd < 0) return;
-    if (c->seat) { flush(c); return; }         /* lord-sessiond: only the requests (send_json) */
+    if (c->seat || c->busy) { flush(c); return; }   /* lord-sessiond: only the requests (send_json) */
     if (c->need_size && W) {
         uint16_t s[2] = { (uint16_t)W, (uint16_t)H };
         msg(c, RP_SIZE, s, 4, NULL, 0);
@@ -239,6 +249,7 @@ static void pump(Client *c) {
 }
 
 static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
+    if (c->busy) return;
     switch (type) {
     case RP_READY: c->ready = 1; break;
     case RP_PTR:
@@ -270,6 +281,15 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         break;
     case RP_SETCLIP: if (cb.clipboard && n <= (1u << 20)) cb.clipboard((const char *)d, n); break;
     case RP_HELLO:
+        /* one door at a time: the share holds the session. The sign-in stays valid, this connection gets nothing */
+        if (c->uid == 0 && !c->seat && share_holder()) {
+            msg(c, RP_BUSY, share_holder(), strlen(share_holder()), NULL, 0);
+            c->busy = 1;
+            if (c->vcodec) { c->vcodec = 0; video_update(); }
+            c->vmode = 0;
+            flush(c);
+            break;
+        }
         snprintf(c->who, sizeof c->who, "%.*s", (int)(n < sizeof c->who - 1 ? n : sizeof c->who - 1), (const char *)d);
         for (char *p = c->who; *p; p++) if ((unsigned char)*p < 32) *p = ' ';
         notify_clients();
@@ -279,6 +299,7 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         break;
     case RP_DISPLAY:
         if (c->seat && c->nfds > 0 && cb.display) {
+            share_session(SHARE_S_SHOWN);           /* lent: the person is at this session, signed in */
             cb.display(c->fds, c->nfds, n >= 2 ? d[1] : 0);  /* the fds now belong to the session */
             c->nfds = 0;
         }
@@ -290,6 +311,7 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         }
         break;
     case RP_UNDISPLAY:
+        if (c->seat) share_session(SHARE_S_LEFT);   /* before anything else is composed */
         if (c->seat && cb.undisplay) cb.undisplay();
         break;
     case RP_VIDEO:
@@ -421,6 +443,7 @@ static void video_out(int codec, int key, uint32_t ms, const uint8_t *p, size_t 
         if (key) c->vneed_key = 0;
         flush(c);
     }
+    share_video(codec, key, ms, p, n);
 }
 
 static void audio_out(int codec, uint32_t samples, const uint8_t *p, size_t n) {
@@ -430,6 +453,7 @@ static void audio_out(int codec, uint32_t samples, const uint8_t *p, size_t n) {
         msg(c, RP_AFRAME, &samples, 4, p, n);
         flush(c);
     }
+    share_audio(codec, samples, p, n);
 }
 
 int mirror_start(int w, int h, const MirrorInput *in) {
@@ -441,6 +465,7 @@ int mirror_start(int w, int h, const MirrorInput *in) {
     H = h;
     TW = (W + TILE - 1) / TILE;
     TH = (H + TILE - 1) / TILE;
+    share_size(W, H);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return -1;
     char dir[200];
@@ -471,6 +496,7 @@ void mirror_stop(void) {
     lfd = -1;
     free(fb);
     fb = NULL;
+    share_shape(NULL, 0, 0, 0, 0);
     free(shape);
     shape = NULL;
     free(clip_text);
@@ -489,13 +515,34 @@ int mirror_clients(void) {
 int mirror_fps(void) {
     int f = 0;
     for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && !cl[i].seat && cl[i].vcodec && cl[i].vfps > f) f = cl[i].vfps;
+    if (share_fps() > f) f = share_fps();
     return f;
 }
 
 int mirror_watchers(void) {
     int n = 0;
     for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && !cl[i].seat && cl[i].vcodec) n++;
+    return n + share_watching();
+}
+
+int mirror_viewers(void) {
+    int n = 0;
+    for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && !cl[i].seat && !cl[i].busy && cl[i].uid == 0 && cl[i].who[0]) n++;
     return n;
+}
+
+/* The API's holder came or went, or changed its rate. Starting: a whole frame, as for a first viewer. */
+void mirror_share_changed(void) {
+    video_update();
+    if (!share_codec()) return;
+    if (fb) mstream_frame(fb, W, W, H, NULL);
+    else if (cb.refresh) cb.refresh();
+}
+void mirror_share_keyframe(int codec) { mstream_keyframe(codec); }
+
+int mirror_refresh(void) {
+    int f = mirror_fps();
+    return f ? f : 60;
 }
 
 int mirror_has_seat(void) {
@@ -513,9 +560,10 @@ static void send_json(int type, const char *json, int seat_only) {
 }
 
 void mirror_session(const char *json) {
-    /* locking the screen or switching user closes the Passwords vault (not the keyring) */
-    if (strstr(json, "\"lock\"")) vc_lock_all("screen");
-    else if (strstr(json, "\"switch\"")) vc_lock_all("switch");
+    /* locking the screen or switching user closes the Passwords vault (not the keyring); the API's share
+     * ends here, before anything else, because the session goes on drawing behind the lock (docs/SESSIONS.md) */
+    if (strstr(json, "\"lock\"")) { share_session(SHARE_S_LOCK); vc_lock_all("screen"); }
+    else if (strstr(json, "\"switch\"")) { share_session(SHARE_S_SWITCH); vc_lock_all("switch"); }
     send_json(RP_SESSION, json, 0);
 }
 void mirror_greeter(const char *json) { send_json(RP_GREETER, json, 1); }
@@ -613,6 +661,7 @@ void mirror_frame(const uint32_t *px, int stride, int w, int h, const int *dmg) 
         if (!fb) return;
         for (int j = 0; j < H; j++) memcpy(fb + (size_t)j * W, px + (size_t)j * stride, (size_t)W * 4);
         for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0) { if (new_size) cl[i].need_size = 1; all_dirty(&cl[i]); }
+        if (new_size) share_size(W, H);
         free(chg);
         chg = calloc((size_t)TW * TH, 1);
         if (chg) memset(chg, 1, (size_t)TW * TH);
@@ -639,7 +688,8 @@ void mirror_frame(const uint32_t *px, int stride, int w, int h, const int *dmg) 
     if (any) {
         last_change = now_ms();
         send_damage();
-        int video = 0;
+        share_changed();
+        int video = share_watching();
         for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].vcodec) video = 1;
         if (video) {
             /* the changed tiles' box: the encoder's slots copy only that */
@@ -712,6 +762,7 @@ static void vinfo_update(void) {
             c->vinfo_sent = 1;
             flush(c);
         }
+        share_vinfo(k, m, 6);
     }
 }
 
@@ -745,6 +796,7 @@ void mirror_cursor(int x, int y, int mode, const uint32_t *argb, int w, int h, i
     cur_x = x;
     cur_y = y;
     cur_mode = mode;
+    share_cursor(x, y, mode);
     if (mode == 1 && argb && gen != shape_gen && w > 0 && h > 0 && w <= 256 && h <= 256) {
         uint32_t *s = malloc((size_t)w * h * 4);
         if (s) {
@@ -753,6 +805,7 @@ void mirror_cursor(int x, int y, int mode, const uint32_t *argb, int w, int h, i
             shape = s;
             shape_w = w; shape_h = h; shape_hx = hx; shape_hy = hy;
             shape_gen = gen;
+            share_shape(shape, w, h, hx, hy);
             for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0) cl[i].need_shape = 1;
         }
     }

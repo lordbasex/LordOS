@@ -31,6 +31,7 @@
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../remote/mirror.h"
+#include "js_share.h"
 #include "../pkg/crypto.h"
 #include "../sysreport/sysreport.h"
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
@@ -2173,6 +2174,7 @@ void js_sys_register(JSContext *c, JSValue lord) {
     add_object(c, lord, "wayland", wayland_funcs, sizeof wayland_funcs / sizeof wayland_funcs[0]);
     add_object(c, lord, "apps", apps_funcs, sizeof apps_funcs / sizeof apps_funcs[0]);
     add_object(c, lord, "remote", remote_funcs, sizeof remote_funcs / sizeof remote_funcs[0]);
+    js_share_register(c, lord);
     add_object(c, lord, "ssh", ssh_funcs, sizeof ssh_funcs / sizeof ssh_funcs[0]);
     add_object(c, lord, "session", session_funcs, sizeof session_funcs / sizeof session_funcs[0]);
     add_object(c, lord, "users", users_funcs, sizeof users_funcs / sizeof users_funcs[0]);

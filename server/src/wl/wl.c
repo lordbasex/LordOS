@@ -2550,6 +2550,10 @@ void wl_pointer_grab(int nbuttons, const int *down) {
  * clipboard panel uses it after copying something again). Control is XKB core
  * modifier 2 in all keymaps. 1 if there was an app with the keyboard. */
 int wl_has_key_focus(void) { return dpy && key_focus; }
+int wl_focus_protected(void) {
+    Surf *top = dpy ? toplevel_of(key_focus) : NULL;
+    return top && node_protected(top->node);
+}
 
 int wl_send_paste(void) {
     if (!dpy || !key_focus) return 0;

@@ -36,6 +36,11 @@
 #include "wl/wl.h"
 #include "gpu/gpu.h"
 #include "remote/mirror.h"
+#include "remote/share.h"
+#include "remote/sharewire.h"
+#include "osk.h"
+#include "sec/restrict.h"
+#include "fw/rules.h"
 #include "remote/proto.h"
 #include "tp/tp.h"
 #include "tp/tp_route.h"
@@ -205,7 +210,7 @@ typedef struct {
     int cursor_tex_w, cursor_tex_h;
     /* session without a monitor (lord-sessiond shows it on the monitor or the remote desktop): it is
      * drawn in memory, without DRM or evdev; greeter = the login screen */
-    int headless, greeter;
+    int headless, greeter, shift;
     double last_render;
     /* GPU paused because someone is watching over the network: it comes back when nobody is left */
     int gpu_paused;
@@ -641,6 +646,61 @@ static void remote_resize(int w, int h) {
     set_size(s, w, h);
 }
 
+/* ---- the screen-sharing API (remote/share.c): the same injection as the remote desktop, with its own checks ---- */
+
+/* Text for SHARE_TEXT waits here and goes as on-screen keyboard taps, through the active layout: what no key of
+ * the layout can type is dropped. The queue is checked at each step, so it stops the moment a prompt opens. */
+static char share_text_buf[SW_TEXT_MAX];
+static unsigned share_text_len, share_text_off;
+static void share_no_taps(void) { share_text_len = share_text_off = 0; osk_clear(); }
+static void share_text(const char *t, unsigned n) {
+    if (share_text_len || n > sizeof share_text_buf) return;  /* one at a time */
+    memcpy(share_text_buf, t, n);
+    share_text_len = n;
+    share_text_off = 0;
+}
+static int share_surface_up(void) {
+    /* the overlay, modal and system layers (sdk/layers.js): root nodes with something in them */
+    for (const Node *n = ui.root ? ui.root->first : NULL; n; n = n->next) {
+        int z = (int)n->s.z_index;
+        if ((z == 40 || z == 60 || z == 100) && n->first) return 1;
+    }
+    return 0;
+}
+static int share_key_protected(void) { return wl_focus_protected() || (!wl_has_key_focus() && media_protected_count() > 0); }
+static int share_point_protected(void) {
+    Server *s = remote_server;
+    for (const Node *n = hit_test(ui.root, (float)s->cx, (float)s->cy); n; n = n->parent) if (n->protect) return 1;
+    return 0;
+}
+static void share_text_pump(void) {
+    if (!share_text_len) return;
+    if (share_surface_up() || share_key_protected()) { share_no_taps(); return; }
+    if (!kb_labels_begin()) { share_no_taps(); return; }
+    while (share_text_off < share_text_len) {
+        uint32_t cp = 0;
+        int l = sw_utf8_next(share_text_buf + share_text_off, share_text_len - share_text_off, &cp);
+        if (l <= 0) { share_text_off = share_text_len; break; }
+        char want[8] = "", got[32];
+        memcpy(want, share_text_buf + share_text_off, (size_t)l);
+        int found = 0, full = 0;
+        for (size_t i = 0; i < osk_label_count && !found; i++)
+            for (int lv = 0; lv < 3 && !found; lv++) {
+                kb_label(osk_label_codes[i], lv, got, sizeof got);
+                if (strcmp(got, want)) continue;
+                found = 1;
+                if (!osk_push(osk_label_codes[i], lv)) full = 1;
+            }
+        if (full) break;                /* the next pass of the loop */
+        share_text_off += (unsigned)l;
+    }
+    kb_labels_end();
+    if (share_text_off >= share_text_len) share_text_len = share_text_off = 0;
+}
+static int share_person(void) { return !remote_server->headless && !display_is_off(); }
+static void share_activity(void) { display_activity(now_ms()); }
+static int share_restricted(const char *id) { return restrict_blocks(id, FW_R_NO_SCREEN); }
+
 static void remote_greeter(const char *json) { js_greeter_event(json); }
 static void remote_notice(const char *json) { js_remote_notice(json); }
 
@@ -1001,7 +1061,11 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->value == 1 && ev->code < BTN_MISC) tp_key_activity(ev->code, now_ms());   /* ignorar el touchpad al escribir */
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
+        if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) s->quit = 1;
+        /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
+         * the remote desktop injects doesn't pass through on_input (docs/SHORTCUTS.md) */
+        if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
         /* Botones con la numeración del DOM: 0 izquierdo, 1 medio, 2 derecho. */
         int button = ev->code == BTN_LEFT ? 0 : ev->code == BTN_MIDDLE ? 1 : ev->code == BTN_RIGHT ? 2 : -1;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
@@ -2077,6 +2141,7 @@ static int switch_theme(const char *current) {
     snprintf(path, sizeof path, "%s", ui.theme_request);
     ui.theme_request[0] = 0;
     fprintf(stderr, "lord-server: cambiando a tema %s\n", path);
+    share_shell_gone();                 /* the indicator goes with the old shell */
     js_shutdown();
     ui_reset();
     term_detach_all();
@@ -2279,6 +2344,11 @@ int main(int argc, char **argv) {
                                            remote_refresh, remote_resize, remote_greeter, display_attach, display_detach,
                                            remote_scroll, remote_pinch, remote_input_add, remote_notice };
     if (ok && mirror_start(s.W, s.H, &mirror_in)) fprintf(stderr, "lord-server: no remote desktop (socket)\n");
+    /* never for the login screen: that session has no share socket at all */
+    static const ShareHost share_host = { remote_pointer, remote_button, remote_wheel, remote_scroll, remote_key, remote_clip, remote_resize, share_activity,
+                                          share_text, js_share_event, share_no_taps, share_person, share_surface_up, share_key_protected,
+                                          share_point_protected, share_restricted };
+    if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
     char current[sizeof ui.theme_request];
     if (ok) ok = start_theme(theme, s.greeter, current, sizeof current) == 0;
     if (ok && !s.greeter) {                  /* the app host as bytecode for isolated apps (app/apphost_bc.c) */
@@ -2377,6 +2447,11 @@ int main(int argc, char **argv) {
         if (nrd >= 0 && (delay < 0 || nrd < delay)) delay = nrd;
         double tpd = tp_timeout(now_ms());
         if (tpd >= 0 && (delay < 0 || tpd < delay)) delay = tpd;
+        share_tick();                       /* the API: its limits, the grant still holding */
+        share_text_pump();
+        if (share_text_len) delay = 0;
+        double shd = share_timeout();
+        if (shd >= 0 && (delay < 0 || shd < delay)) delay = shd;
         mirror_tick();                      /* remote desktop video: lossless tiles once still, the encoder */
         double mrd = mirror_timeout();
         if (mrd >= 0 && (delay < 0 || mrd < delay)) delay = mrd;
@@ -2435,7 +2510,8 @@ int main(int argc, char **argv) {
 
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
-        struct pollfd pfd[128 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
+        struct pollfd pfd[136 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -2463,6 +2539,8 @@ int main(int argc, char **argv) {
         if (lbibase >= 0) pfd[n++] = (struct pollfd){ lbi_fd(), POLLIN, 0 };
         int mbase = n, nm = mirror_pollfds(pfd + n, 12);
         n += nm;
+        int shbase = n, nsh = share_pollfds(pfd + n, 8);
+        n += nsh;
         int brkbase = n, nbrk = brokersrv_pollfds(pfd + n, 32);   /* apps .lpk aisladas (broker) */
         n += nbrk;
         int abr = n, nabr = brokersrv_audio_pollfds(pfd + n, 16);  /* micrófono de las apps aisladas (PipeWire) */
@@ -2528,6 +2606,7 @@ int main(int argc, char **argv) {
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
         if (nm) mirror_dispatch(pfd + mbase, nm);
+        if (nsh) share_dispatch(pfd + shbase, nsh);
         if (nbrk) brokersrv_dispatch(pfd + brkbase, nbrk);
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
@@ -2558,6 +2637,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);
     input_close(&s.input);
+    share_stop();
     mirror_stop();
     gpu_tex_free(s.cursor_tex);
     gpu_shutdown();

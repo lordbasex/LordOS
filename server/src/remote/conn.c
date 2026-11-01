@@ -71,6 +71,7 @@ static int sock = -1;
 static char peer[48];           /* address as shown */
 static char peer_key[48];       /* lockout key (IPv4, or the IPv6 /64) */
 static double deadline;
+static int busy_end;             /* the session is shared through the API: this bridge ends, the sign-in stays */
 static int lock_fd = -1;        /* bridge → root parent: "L" = the session was locked */
 static char *turn_pass;         /* read as root before the bridge drops root; the bridge's rtc.c owns it */
 static int ice_lfd = -1;        /* ICE-TCP handoff: root's /run/lordos/rtc/<route>, kept by the bridge */
@@ -747,6 +748,18 @@ static void from_session(int type, const unsigned char *d, uint32_t n) {
         }
         break;
     case RP_CLIP: ws_clip((const char *)d, n); break;
+    case RP_BUSY: {
+        /* the session is shared through the API: the page says who and tries again by itself; the
+         * sign-in stays valid. The name is an app id, but it comes across a socket: only safe characters pass */
+        char app[64];
+        size_t k = 0;
+        for (uint32_t i = 0; i < n && k < sizeof app - 1; i++)
+            if ((d[i] >= 'a' && d[i] <= 'z') || (d[i] >= 'A' && d[i] <= 'Z') || (d[i] >= '0' && d[i] <= '9') || strchr(":._-", d[i])) app[k++] = (char)d[i];
+        app[k] = 0;
+        ws_text("{\"t\":\"bye\",\"busy\":\"%s\"}", app);
+        busy_end = 1;
+        break;
+    }
     case RP_SESSION:
         /* the user locked their session: every browser of this user has to log in again */
         if (n >= 10 && memmem(d, n, "\"lock\"", 6)) {
@@ -1087,7 +1100,7 @@ static void bridge(const struct passwd *pw) {
             if (rtc_start() == 0) { ice_list(ice, sizeof ice); ws_text("{\"t\":\"rtc\",\"ready\":1,\"p\":%d,\"ice\":%s}", resets + 1, ice); }
             else { ws_text("{\"t\":\"rtc\",\"fail\":\"server\"}"); reset_at = 0; }
         }
-        if (locked) { ws_flush(); return; }
+        if (locked || busy_end) { ws_flush(); return; }
         if (rd_now() - last_input > 60) return;     /* the browser sends a ping every 2 s */
     }
 }

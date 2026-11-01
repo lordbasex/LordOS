@@ -41,6 +41,7 @@
 #include "hw/hw_admin.h"
 #include "clean/clean_admin.h"
 #include "lan/share_admin.h"
+#include "remote/sgrant_admin.h"
 #include "monitor/proc_admin.h"
 
 #include <ctype.h>
@@ -406,6 +407,7 @@ static const struct { const char *name; ActionFn fn; int flags; } actions[] = {
     CLEAN_ADMIN_ACTIONS
     PROC_ADMIN_ACTIONS
     SHARE_ADMIN_ACTIONS
+    SGRANT_ADMIN_ACTIONS
 #endif /* LORD_NETD: other modules' actions go above this line */
 };
 #define N_ACTIONS (sizeof actions / sizeof actions[0])

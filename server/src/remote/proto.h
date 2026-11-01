@@ -27,6 +27,8 @@ enum {
     RP_DAMAGE = 42,     /* video mode: u16 x, y, w, h per rectangle that changed in this frame */
     RP_VINFO = 43,      /* u8 encoder in hardware (VA-API), u8 composed on the GPU, u16 the encoder's frames a
                          * second, u16 encoding time per frame in 1/100 ms: shown in the page's top bar */
+    RP_BUSY = 44,       /* the app's id: after an RP_HELLO while the session is shared through the API (docs/SCREEN-SHARING.md).
+                         * This connection gets nothing else and what it sends doesn't count: the bridge says goodbye */
 };
 
 /* bridge → session */

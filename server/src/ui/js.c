@@ -848,6 +848,15 @@ void js_remote_event(const char *json) {
     drain_jobs();
 }
 
+/* The screen-sharing API (remote/share.c): its prompt and indicator → __lordShare(json), sdk/share.js. */
+void js_share_event(const char *json) {
+    if (!ctx) return;
+    JSValueConst args[1] = { JS_NewString(ctx, json) };
+    JS_FreeValue(ctx, call_global("__lordShare", 1, args));
+    JS_FreeValue(ctx, args[0]);
+    drain_jobs();
+}
+
 /* Remote desktop: lord-sessiond's notice for the user on the monitor (RP_NOTICE, e.g. a source blocked
  * after failed logins) → __lordRemoteNotice(object). sdk/remote.js shows it as a notification. */
 void js_remote_notice(const char *json) {

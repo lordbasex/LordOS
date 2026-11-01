@@ -41,6 +41,12 @@ int  mirror_clients(void);                            /* remote desktop connecti
  * encoded. A browser that is still connecting, or reconnecting its peer, costs nothing. */
 int  mirror_watchers(void);
 int  mirror_fps(void);              /* the fastest remote viewer screen's refresh, 0 without video viewers */
+/* 5673 viewers: root connections that said RP_HELLO and weren't refused. What keeps a share from starting. */
+int  mirror_viewers(void);
+/* From share.c: the holder started, stopped or changed its rate; a keyframe for it; the display's refresh. */
+void mirror_share_changed(void);
+void mirror_share_keyframe(int codec);
+int  mirror_refresh(void);
 int  mirror_has_seat(void);                           /* is lord-sessiond (monitor) connected? */
 /* Requests from the session to whoever shows it (short JSON): RP_SESSION to every connection
  * ({"a":"lock"}: lock; {"a":"switch"}: switch user) and RP_GREETER to the monitor. */
