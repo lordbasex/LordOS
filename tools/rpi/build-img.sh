@@ -182,8 +182,9 @@ if is_aarch64 server/build/lord-server && is_aarch64 server/build/lord-sessiond;
     DEB_ARCH=$ARCH sh tools/iso/mkdeb.sh "$DEB"
 else
     echo "== lord-server: building in an arm64 chroot ($BR)"
-    # (re)install the build packages when the chroot is new or lacks some (an older chroot without clang)
-    if [ ! -x "$BR/usr/bin/gcc" ] || [ ! -x "$BR/usr/bin/clang" ] || [ ! -d "$BR/usr/include/aarch64-linux-gnu/libavcodec" ]; then
+    # (re)install the build packages when the chroot is new or lacks some (an older chroot without clang or RDP's headers)
+    if [ ! -x "$BR/usr/bin/gcc" ] || [ ! -x "$BR/usr/bin/clang" ] || [ ! -d "$BR/usr/include/aarch64-linux-gnu/libavcodec" ] ||
+       [ ! -f "$BR/usr/include/freerdp3/freerdp/addin.h" ]; then
         [ -x "$BR/usr/bin/gcc" ] || bootstrap "$BR" "$WORK/buildroot-debootstrap.log"
         mount_ch "$BR"
         in_root "$BR" apt-get update -q > "$WORK/buildroot-apt.log" 2>&1
