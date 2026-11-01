@@ -580,6 +580,23 @@ A panel along the bottom of the window shows file name, size, a bar, speed, time
 
 Tool updates: Linux through guest's own updates, plus `lordos-guest` in our repository; virtio-win at the pinned version, offered by the app, with a snapshot first.
 
+### 7.1.1 Driver or agent, and what we would write ourselves
+
+Copy and paste, drag, resolution and shell are **agents**: ordinary programs in the guest with no kernel signature to obtain. Graphics, disk and network are **drivers**: on virtio-win guests, kernel code that the guest refuses to load unsigned.
+
+| Piece | Phase 1 | Our own later | Cost of our own |
+|---|---|---|---|
+| Linux disk, network, display, 3D | In the guest's kernel and Mesa, nothing to install | No reason to | None |
+| Linux clipboard, resolution, files | `spice-vdagent`, then `lordos-guest` | Yes: `lordos-guest` | Ours, ordinary packaging |
+| virtio-win disk, network, memory, 2D display, folders | The public virtio-win set | No: they are mature and free | Would add risk and nothing else |
+| virtio-win clipboard, resolution | SPICE agent | Yes: `lordos-guest` for virtio-win, user mode | Code signing certificate, to avoid warnings |
+| virtio-win file copy, shell, logs, Apps mode | Our agent, phase by phase | Yes | Same |
+| virtio-win 3D | None | Only by following or joining the open effort below | Very high |
+
+**3D on virtio-win guests.** No stable free driver exists. An open effort pairs a WDDM kernel driver with a Mesa user-mode driver over virgl; its Mesa and driver changes were still unmerged and described as glitchy and experimental when checked on 2026-11-01. Its driver also turns preemption off across the guest, which is a real limit. We don't ship it. We re-check it each phase, and it would come as an opt-in with a clear warning before it could be a default. Graphics passthrough of a whole GPU is a separate route, needing VFIO and a second GPU, and it isn't this.
+
+**Signing our own kernel driver.** A driver loaded by current virtio-win guests needs the system maker's signature: an organization account in its hardware portal, an EV certificate for that account, then attestation signing or, to reach its retail update channel, certification with the hardware lab kit. That is a yearly cost and a legal entity behind it, for every architecture. So own kernel drivers are out of scope unless 3D makes them worth it. Our work goes to the agent, which needs none of this.
+
 ### 7.2 Apps mode (seamless)
 
 **Linux guests:** apps speak Wayland to a small compositor proxy in the guest (`lordos-guest`), which forwards surfaces over vsock to the host, as `waypipe` does. On the host each surface is a native LordOS Wayland client, so it's a real window with its own Dock entry. Zero-copy with virtio-gpu cross-domain is the target; a first version copies. Guest X11 apps need the guest's Xwayland. Host keeps no X11.
