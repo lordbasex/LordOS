@@ -424,7 +424,7 @@ Each app reopens where it was: size, position, maximized and display, per app, i
 - **What wins:** session restore's frames first, then this; a Dock assignment chooses the display and keeps the size. What a Linux app asks for doesn't override a remembered place, except a dialog (a transient or dialog window, or an `xdg_toplevel` with a parent), which isn't remembered at all.
 - **Snapped, keyboard-lifted:** the normal frame is saved, not the snapped or lifted one. Fullscreen and picture-in-picture save nothing.
 - **Fixed size:** a Linux window with equal minimum and maximum keeps the size it asks for, and only its position is remembered. A second window of an app opens 30 px along from the first.
-- A hundred-odd apps are kept (200 at most), oldest out first. Not on a live system.
+- Up to 200 apps are kept, oldest out first. Not on a live system.
 
 ## The Window menu, the app menu and Force Quit (0.8.5)
 

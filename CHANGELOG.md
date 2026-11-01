@@ -12,7 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [0.8.7-beta] - 2026-11-01
 
-- **Windows reopen where they were:** size, position, maximized and display, per app, in both themes, for LordOS and Linux apps. A display is known by its monitor's name and connector; if it's gone or the place is off screen, the window opens somewhere visible. Session restore, snapping and Dock assignments keep their say, and dialogs aren't affected.
+- **App windows reopen where they were:** size, position, maximized and display, per app, in both themes, for LordOS and Linux apps. A display is known by its monitor's name and connector; if it's gone or the place is off screen, the window opens somewhere visible. Session restore, snapping and Dock assignments keep their say, and dialogs aren't affected.
 - **Files remembers:** each folder keeps its view and sort, with a default in Settings, and the sidebar's width is dragged from its edge and kept.
 
 - **Security review of the new connections (2026-11-01):** RDP refuses RDP's own security and sends no password to a server that asks for it; a changed RDP certificate shows both fingerprints, and an accepted TLS certificate outranks the system's list; every SSH key kept is one the person saw, and an answer counts only for the fingerprint on screen; `ssh-keyscan`, `openssl` and `rclone obscure` run read-only with a 15 s limit; VNC refuses a server that skips the password you gave and says it isn't encrypted; the SMB sign-in carries a target name and a MIC and needs the server's signature; HFS+ always mounts read-only; `.desktop` files can't take the helpers' firewall ids.
@@ -24,6 +24,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Files → Settings:** what a new window shows, folders in tabs, tag names and which show, the sidebar's items, extensions, warnings, removing Trash items after 30 days (checked when Files opens), folders first and where a search looks.
 - **List view columns:** right click the header to show or hide Date Created, Last Opened, Changed, Comments, Tags, Permissions and Owner; drag a title to reorder, drag an edge to resize; sort by any of them; a wide list scrolls sideways. Get Info takes a comment.
 - **Open in Terminal** from the toolbar and the menus starts the Terminal app in that folder, in a window of its own.
+- **Store cards:** the action no longer touches the card's bottom edge: the card has room for its summary and foot, and the same padding on every side.
 
 - **The on-screen keyboard opens only when asked for** (2026-11-01, maintainer's decision): its button is always next to the clock, and ❖⌃K and Settings open it too; on the login and lock screens, its button next to the language. A text field taking focus no longer opens it, and the Off, Automatic and Always setting is gone.
 - **Cleaner's window moves:** its drag area was under the sidebar and the main pane, so the window couldn't be moved. It now moves from the top edge and the sidebar's top row, and a double click there maximizes it.
