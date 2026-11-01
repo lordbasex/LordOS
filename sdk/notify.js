@@ -85,7 +85,7 @@ export function notify({ app = '', title = '', body = '', actions = [], sound: w
   const id = seq++;
   const n = { id, app, label: String(label), Icon: typeof icon === 'function' ? icon : null, title: String(title), body: String(body), actions: Array.isArray(actions) ? actions.slice(0, 3) : [],
     sticky: !!sticky || ap.style === 'alert', time: Date.now(), onClose };
-  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, title: n.title, body: n.body, time: n.time }, ...l].slice(0, HISTORY));
+  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
   // Do Not Disturb or "no banner": kept in the history only, without a sound
   if (dndActive() || ap.style === 'none') return id;
   notifications.set((l) => [n, ...l].slice(0, MAX_SHOWN));
