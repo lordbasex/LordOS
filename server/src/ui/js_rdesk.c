@@ -47,6 +47,41 @@ static int helper_path(char *bin, size_t n) {
     return stat(bin, &st) || !S_ISREG(st.st_mode) || (st.st_uid != 0 && st.st_uid != geteuid()) || (st.st_mode & 022) ? -1 : 0;
 }
 
+/* The session's size, and the folders it shares: real folders under the person's home, never the home itself nor a
+ * hidden one, so that keys and settings aren't one mistaken choice away. argv[6], [7]: width, height. argv[8]: an array
+ * of [name, path, readOnly]. What doesn't qualify isn't shared. */
+static void add_view(JSContext *c, JBuf *b, int argc, JSValueConst *argv) {
+    int w = 0, h = 0, n = 0;
+    if (argc > 7) { JS_ToInt32(c, &w, argv[6]); JS_ToInt32(c, &h, argv[7]); }
+    if (w >= 640 && h >= 480 && w <= RD_MAX_W && h <= RD_MAX_H) jb_printf(b, ",\"w\":%d,\"h\":%d", w, h);
+    if (argc < 9 || !JS_IsArray(c, argv[8])) return;
+    const char *home = getenv("HOME");
+    char root[PATH_MAX];
+    if (!home || !realpath(home, root)) return;
+    size_t rl = strlen(root);
+    for (uint32_t i = 0; i < 8; i++) {
+        JSValue row = JS_GetPropertyUint32(c, argv[8], i);
+        JSValue vn = JS_GetPropertyUint32(c, row, 0), vp = JS_GetPropertyUint32(c, row, 1), vr = JS_GetPropertyUint32(c, row, 2);
+        const char *name = JS_ToCString(c, vn), *path = JS_ToCString(c, vp);
+        int ro = JS_ToBool(c, vr);
+        char real[PATH_MAX];
+        struct stat st;
+        int ok = name && path && name[0] && strlen(name) < 32 && realpath(path, real) && !strncmp(real, root, rl) && real[rl] == '/' &&
+                 !strstr(real + rl, "/.") && !stat(real, &st) && S_ISDIR(st.st_mode);
+        for (const char *p = name; ok && *p; p++) if (!(((unsigned char)*p >= '0' && (unsigned char)*p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == ' ' || *p == '-' || *p == '_')) ok = 0;
+        if (ok) {
+            jb_printf(b, ",\"drive%dname\":", n); jb_str(b, name);
+            jb_printf(b, ",\"drive%dpath\":", n); jb_str(b, real);
+            jb_printf(b, ",\"drive%dro\":%d", n, ro > 0);
+            n++;
+        }
+        if (name) JS_FreeCString(c, name);
+        if (path) JS_FreeCString(c, path);
+        JS_FreeValue(c, vn); JS_FreeValue(c, vp); JS_FreeValue(c, vr); JS_FreeValue(c, row);
+    }
+    jb_printf(b, ",\"drives\":%d", n);
+}
+
 static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 6) return JS_NewInt32(c, 0);
@@ -84,6 +119,7 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             jb_printf(&b, ",\"port\":%d,\"user\":", port); jb_str(&b, user);
             jb_raw(&b, ",\"domain\":"); jb_str(&b, dom);
             jb_raw(&b, ",\"password\":"); jb_str(&b, pw);
+            add_view(c, &b, argc, argv);
             jb_raw(&b, "}");
             if (p > 0 && !b.oom && send(sv[0], b.p, b.n, MSG_NOSIGNAL) == (ssize_t)b.n) {
                 sess[slot] = (Sess){ .used = 1, .sock = sv[0], .pid = p, .state = RS_CONNECTING };

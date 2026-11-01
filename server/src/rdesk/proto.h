@@ -24,6 +24,9 @@ typedef struct {
 
 #define RD_MAX_W 7680
 #define RD_MAX_H 4320
+/* what a session asks for: its size (0: the default) and the folders it shares as { name, path } */
+typedef struct { int w, h, drives; const char *drive[8][2]; } RdView;
+
 #define RD_POLL_MAX 256                 /* messages taken per poll: a flood from the helper doesn't hold the UI thread */
 
 /* The shared picture, its size sealed: the helper can't shrink it under lord-server's mapping. */

@@ -8,6 +8,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -23,7 +24,7 @@
 
 #define CH 3
 
-int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password);   /* rdeskrdp.c */
+int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password, const RdView *view);   /* rdeskrdp.c */
 
 void rd_send(uint32_t type, int a, int b, int c, const char *text) {
     RdMsg m = { type, a, b, c, "" };
@@ -124,10 +125,24 @@ int main(void) {
     int sock = dial(host, port ? port : rdp ? 3389 : 5900);
     if (sock < 0) { rd_send(RD_STATE, RS_UNREACHABLE, 0, 0, NULL); return 1; }
     /* it stays in the scope lord-server placed it in, with that scope's memory limits. connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
+    RdView view = { .w = (int)json_num(d.root, "w", 0), .h = (int)json_num(d.root, "h", 0) };
+    int rofds[9], rwfds[9], nro = 0, nrw = 0;
+    int drives = rdp ? (int)json_num(d.root, "drives", 0) : 0;
+    for (int i = 0; i < drives && i < 8; i++) {
+        char k[16];
+        snprintf(k, sizeof k, "drive%dname", i); const char *name = json_str(d.root, k);
+        snprintf(k, sizeof k, "drive%dpath", i); const char *path = json_str(d.root, k);
+        snprintf(k, sizeof k, "drive%dro", i); int only = (int)json_num(d.root, k, 1);
+        int fd = name && path ? open(path, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+        if (fd < 0) continue;
+        if (only) rofds[nro++] = fd; else rwfds[nrw++] = fd;     /* read-only is the sandbox's rule, not a promise of the library */
+        view.drive[view.drives][0] = name; view.drive[view.drives][1] = path; view.drives++;
+    }
+    rofds[nro] = -1; rwfds[nrw] = -1;
     static const char *const ro[] = { "/etc/ssl", "/usr/lib", "/usr/share/ca-certificates", NULL };
-    SandboxHelperCfg cfg = { .name = NULL, .ro_paths = rdp ? ro : NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .ro_dir_fds = NULL, .rw_dir_fds = NULL };
+    SandboxHelperCfg cfg = { .name = NULL, .ro_paths = rdp ? ro : NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .ro_dir_fds = nro ? rofds : NULL, .rw_dir_fds = nrw ? rwfds : NULL };
     sandbox_apply_helper(&cfg);
-    int rc = rdp ? rdesk_rdp(sock, host, user, dom, pw) : run_vnc(sock, (char *)pw);
+    int rc = rdp ? rdesk_rdp(sock, host, user, dom, pw, &view) : run_vnc(sock, (char *)pw);
     explicit_bzero((char *)pw, strlen(pw));
     json_free(&d);
     explicit_bzero(job, sizeof job);
