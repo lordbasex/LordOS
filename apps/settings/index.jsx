@@ -462,10 +462,6 @@ function Keyboard() {
       </Section>
       {keyboard.active()?.ime && keyboard.missingDictionary() && <Note tone="warn">{tr('settings.ime.noDict')}</Note>}
       <Section title={tr('settings.osk.title')} footer={tr('settings.osk.hint')}>
-        <SettingRow label={tr('settings.osk.open')}>
-          <Segmented small value={s.osk || 'auto'} onChange={(v) => set({ osk: v })}
-            options={[['off', tr('settings.osk.off')], ['auto', tr('settings.osk.auto')], ['always', tr('settings.osk.always')]]} />
-        </SettingRow>
         <Actions style={{ paddingVertical: spacing.s }}>
           <Button small label={tr('settings.osk.show')} onClick={() => osk.show()} />
         </Actions>

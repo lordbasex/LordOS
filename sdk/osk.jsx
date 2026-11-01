@@ -108,10 +108,8 @@ export function OskPanel() {
   );
 }
 
-// In the theme's bar, when there is no keyboard or this one is open: opens and closes it.
+// In the theme's bar, next to the clock: the way to open and close it.
 export function OskStatus({ color, height }) {
-  const st = useStore(oskState);
-  if (st.hasKeyboard && !st.visible) return null;
   return (
     <View keepFocus onClick={osk.toggle} title={tr('shell.osk.name')}
       style={{ height, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>

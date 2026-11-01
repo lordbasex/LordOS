@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { KEY, TOP_GAP, fallbackLabels, keyFor, letterRows, symbolRows, punctuation, panelSize, opensByItself, planAvoid, caretOnScreen } =
+const { KEY, TOP_GAP, fallbackLabels, keyFor, letterRows, symbolRows, punctuation, panelSize, planAvoid, caretOnScreen } =
   await import(path.join(here, '../../sdk/oskmodel.js'));
 
 let n = 0, bad = 0;
@@ -62,9 +62,6 @@ for (const [w, h] of [[1280, 800], [800, 480], [1920, 1080], [3840, 2160], [1024
   eq(`${w}x${h} rows add up`, s.pad * 2 + s.keyH * 4 + s.gap * 3 <= s.height, true);
 }
 
-eq('off never', [opensByItself('off', false), opensByItself('off', true)], [false, false]);
-eq('automatic: only without a keyboard', [opensByItself('auto', false), opensByItself('auto', true)], [true, false]);
-eq('always', [opensByItself('always', false), opensByItself('always', true)], [true, true]);
 
 const area = { x: 0, y: 30, w: 1280, h: 770 };
 const top = 480;

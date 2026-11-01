@@ -294,18 +294,22 @@ function Body() {
 
   const failed = info.state === 'failed' && info.error ? tr(`cleaner.error.${info.error}`) : '';
 
+  // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Lord Classic
+  // draws its own buttons at the end of the top edge (themes/classic/components/Window.jsx), so that edge is taller.
+  const classic = s.theme === 'classic', topEdge = classic ? 34 : 14;
+  const move = () => wm.beginMove(winId), zoom = () => wm.toggleMaximize(winId);
+
   return (
     <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden', borderRadius: 12 }}>
       <Sky />
       <Tints section={section} />
-      <View onMouseDown={() => wm.beginMove(winId)} onDoubleClick={() => wm.toggleMaximize(winId)} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 34 }} />
       <View ref={side} style={{ width: 236, flexShrink: 0, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14, gap: 4, overflow: 'hidden', backgroundColor: p.side, borderInlineEnd: `1px solid ${p.line}` }}>
-        <View style={{ paddingHorizontal: 6, marginBottom: spacing.m }}><Lights id={winId} /></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, marginBottom: spacing.m }}>{classic ? null : <Lights id={winId} />}<View onMouseDown={move} onDoubleClick={zoom} style={{ flex: 1, alignSelf: 'stretch', minHeight: 16 }} /></View>
         {SECTIONS.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} badge={pipe && id === 'scan' ? `${pipe.step + 1}/${MODULES.length}` : ''} />)}
         <View style={{ flex: 1 }} />
         {BOTTOM.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} />)}
       </View>
-      <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 38, paddingTop: 34 }}>
+      <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 38, paddingTop: classic ? 52 : 34 }}>
         {board && section === 'scan' && !pipe ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.s, marginTop: -18 }}>
             <View onClick={() => setBoard(false)} style={{ width: 170 }}><Label size={13} lines={1} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View>
@@ -331,6 +335,7 @@ function Body() {
       </View>
       {confirm && plan && plan.state === 'ready' ? <PlanConfirm plan={plan} onOk={execute} onCancel={() => setConfirm(false)} /> : null}
       {emptyAsk ? <AskDialog title={tr('cleaner.empty.title')} note={tr('cleaner.empty.detail')} okLabel={tr('cleaner.empty.ok')} onOk={emptyTrash} onCancel={() => setEmptyAsk(false)} /> : null}
+      <View onMouseDown={move} onDoubleClick={zoom} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: topEdge }} />
     </View>
   );
 }

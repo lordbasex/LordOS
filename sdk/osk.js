@@ -1,11 +1,10 @@
 // osk.js — the on-screen keyboard's state (docs/ON-SCREEN-KEYBOARD.md). The panel is sdk/osk.jsx, the
 // logic without a screen sdk/oskmodel.js.
 //
-// It opens by itself when a text field takes focus, depending on Settings → Keyboard (settings.osk:
-// 'off', 'auto' with no physical keyboard, 'always'), and by hand from the status item, ❖⌃K or
-// Settings. The fields come from three places: this process (textfocus.js), a Linux app
-// (zwp_text_input_v3, sdk/wayland.js) and an isolated app (a broker hint, sdk/privacy.js). A hint
-// from an app is only obeyed for the window in front, and all it can do is show the keyboard.
+// It opens only by hand: the status item, ❖⌃K, Settings, or the login screen's button. A text field
+// taking focus never opens it. Once open, it keeps the field in view; the fields come from three places:
+// this process (textfocus.js), a Linux app (zwp_text_input_v3, sdk/wayland.js) and an isolated app (a
+// broker hint, sdk/privacy.js). A hint from an app is only obeyed for the window in front.
 //
 // Keys go through lord.input.tap, which exists only in this process and the login screen's, down the
 // same path as a physical key. Nothing here keeps what is typed, offers suggestions or remembers
@@ -17,22 +16,18 @@ import { keyboard } from './keyboard.js';
 import { wm, windows, workAreaOf, windowChrome, appIdOf, appMenus } from './windows.js';
 import { shellLayers } from './layers.js';
 import { onTextField, textFieldActive, textFieldCaret } from './textfocus.js';
-import { TOP_GAP, caretOnScreen, fallbackLabels, opensByItself, panelSize, planAvoid } from './oskmodel.js';
+import { TOP_GAP, caretOnScreen, fallbackLabels, panelSize, planAvoid } from './oskmodel.js';
 
 const CLOSED = { visible: false, dock: 'bottom', page: 0, shift: 0, box: null };
 export const oskState = createStore({ ...CLOSED, hasKeyboard: true, labels: null });
 
 const native = () => typeof lord !== 'undefined' && !!lord.input?.tap;
-const mode = () => settings.get().osk || 'auto';
 const hasKeyboard = () => (native() ? lord.input.hasKeyboard() : true);
 
 let linux = null;           // { id, y, h, fw, fh }: a Linux app's field, window coordinates (oskmodel.js)
 let appField = null;        // the same for an isolated app's field
-let manual = false;         // opened by hand: stays open without a field
-let dismissed = false;      // hidden with its button: only a new field or a click brings it back
 let lifted = null;          // the window moved out of the way
 let liftAsked = 0;          // the height it was asked for: an app with a minimum size may keep its own
-let hideTimer = 0;
 let replanTimer = 0;
 
 const remoteField = () => linux || appField;
@@ -110,8 +105,6 @@ function replan() {
 }
 
 function show() {
-  clearTimeout(hideTimer);
-  hideTimer = 0;
   const w = fieldWindow();
   if (!oskState.get().visible) {
     refreshLabels();
@@ -121,29 +114,19 @@ function show() {
 }
 
 function close() {
-  clearTimeout(hideTimer);
-  hideTimer = 0;
   dropLift();
-  manual = false;
   oskState.set((s) => ({ ...s, ...CLOSED }));
 }
 
+// Open, it stays open until it's closed by hand; a field only moves it.
 function fieldChanged() {
-  if (fieldActive()) {
-    dismissed = false;
-    if (opensByItself(mode(), hasKeyboard()) || manual || oskState.get().visible) show();
-    return;
-  }
-  // moving from one field to another passes through "no field": wait a moment before closing
-  if (oskState.get().visible && !manual && !hideTimer) {
-    hideTimer = setTimeout(() => { hideTimer = 0; if (!fieldActive() && !manual) close(); }, 180);
-  }
+  if (oskState.get().visible) show();
 }
 
 export const osk = {
   available: native,
-  show() { manual = true; dismissed = false; show(); },
-  hide() { dismissed = true; close(); },
+  show,
+  hide: close,
   toggle() { if (oskState.get().visible) osk.hide(); else osk.show(); },
   setPage: (page) => oskState.set((s) => ({ ...s, page, shift: 0 })),
   setShift: (shift) => oskState.set((s) => ({ ...s, shift })),
@@ -179,14 +162,10 @@ export function startOsk() {
   refreshLabels();
   globalThis.__lordKeyboards = (present) => {
     oskState.set((s) => ({ ...s, hasKeyboard: !!present }));
-    if (present && !manual && oskState.get().visible && mode() === 'auto') close();     // plugged in: not needed
-    else if (!present) fieldChanged();
   };
   onTextField(fieldChanged);
   onCommit(replan);                        // a commit is what moves a field
   settings.subscribe(() => { if (oskState.get().visible) setTimeout(refreshLabels, 0); });
-  // hidden with its button: a click in the field that still has the focus brings it back
-  addListener('pointerdown', () => setTimeout(() => { if (dismissed && fieldActive()) fieldChanged(); }, 0));
   // the field's window changed: a focus hint belongs to the window that gave it
   windows.subscribe(() => {
     const id = wm.focused();

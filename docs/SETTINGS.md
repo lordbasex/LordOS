@@ -394,9 +394,8 @@ and the Linux apps whose `.desktop` `MimeType` covers the category (terminals: `
 
 ## Keyboard: On-Screen Keyboard
 
-Off, Automatic (the default: it opens when a text field takes focus and no physical keyboard is attached)
-or Always (`settings.osk`), plus **Show Keyboard**. See [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md). The
-login and lock screens always behave as Automatic.
+**Show Keyboard**, and how to open it: the button next to the clock or ❖⌃K. It never opens by itself. See
+[ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md).
 
 ## Appearance: «Browsers: tabs in the title bar»
 

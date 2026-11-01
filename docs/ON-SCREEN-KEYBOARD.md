@@ -13,26 +13,20 @@ switches layouts. Colors come from the theme, so it follows light and dark mode 
 
 ## Opening it
 
-Settings → Keyboard → On-Screen Keyboard, stored as `settings.osk`:
+It opens only when someone asks for it; a text field taking focus never opens it, with or without a physical
+keyboard (decided by the maintainer on 2026-11-01, replacing the Off, Automatic and Always setting).
 
-| Value | Opens by itself when a text field takes focus |
-|---|---|
-| `off` | never |
-| `auto` (default) | only with no physical keyboard attached |
-| `always` | always |
+The ways to open it: the keyboard button next to the clock (`OskStatus`, always in the bar), the shortcut ❖⌃K, and
+**Show Keyboard** in Settings → Keyboard. It stays open until it's closed with one of those or its hide button.
 
-In every mode it can be opened by hand: the keyboard button in the menu bar (`OskStatus`, shown while
-there is no physical keyboard or the on-screen one is open), the shortcut ❖⌃K, and **Show Keyboard** in
-Settings. The hide button keeps it closed until a new field takes focus or the person clicks again.
-
-The login and lock screens are another user's session (`lordos-greeter`) and can't read `settings.osk`:
-they always behave as Automatic and have a keyboard button next to the language. Off can't lock anyone out.
+The login and lock screens are another user's session (`lordos-greeter`): there it opens only with the keyboard
+button next to the language, which is always there, so someone with no physical keyboard can still log in.
 
 ### Is a keyboard attached?
 
 `lord.input.hasKeyboard()` answers from the devices `lord-server` has really opened (`input.c`,
 `server/src/osk.c`, the fds `lord-sessiond` lends it), and a change arrives as `__lordKeyboards(present)`
-with no polling: plugging a keyboard in closes the panel in Automatic, and unplugging it lets the panel open.
+with no polling. Neither plugging a keyboard in nor unplugging it opens or closes the panel.
 
 - A keyboard is a device with all the letters, space, Enter, Backspace and Shift. Power buttons, media
   keys and remotes don't count, nor do security tokens that type by themselves (matched by name).

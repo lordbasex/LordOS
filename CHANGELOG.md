@@ -12,6 +12,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [0.8.7-beta] - 2026-11-01
 
+- **The on-screen keyboard opens only when asked for** (2026-11-01, maintainer's decision): its button is always next to the clock, and ❖⌃K and Settings open it too; on the login and lock screens, its button next to the language. A text field taking focus no longer opens it, and the Off, Automatic and Always setting is gone.
+- **Cleaner's window moves:** its drag area was under the sidebar and the main pane, so the window couldn't be moved. It now moves from the top edge and the sidebar's top row, and a double click there maximizes it.
+- **Cleaner in Lord Classic** has the theme's minimize, maximize and close buttons at the end of the top edge, instead of Lord Flow's on the left.
+
 - **Release pass fixes** (2026-11-01): an unpinned Dock icon keeps its place when its window is raised or restored; Text Editor's Go to file panel takes the keyboard again after a minimize; the launcher finds Mail by its localized word; the Notes hint no longer names ❖N, which is Notifications in Lord Classic; Cleaner's confirmation no longer promises a password prompt that an administrator's session doesn't show.
 - **Lord Classic no longer loses a window's state when another window comes to the front** (2026-10-31, VM 125): the windows were in a list of unkeyed arrays since the snap preview went in, so a raise mounted the moved windows again, and unsaved text, tabs and scroll were gone.
 - **Lord Classic's Start menu has the keyboard over a Linux or isolated app** (2026-10-31, VM 125): it was in the popover layer, which doesn't take the keyboard, so with Mail, an X11 or a Wayland app in front its search stayed empty, Esc and Enter did nothing and the keys went to the app. It is in the overlay layer now, like Lord Flow's launcher.

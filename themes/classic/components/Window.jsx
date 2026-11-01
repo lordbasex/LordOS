@@ -165,6 +165,14 @@ export function Window({ win, t, focused, app }) {
     return (
       <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
+        {app.ownFrame ? (
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: TITLE_H, flexDirection: 'row', pointerEvents: 'box-none' }}>
+            <View style={{ flex: 1, pointerEvents: 'none' }} />
+            <FrameButton t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
+            <FrameButton t={t} focused={focused} onClick={() => wm.toggleMaximize(win.id)}>{(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}</FrameButton>
+            <FrameButton t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+          </View>
+        ) : null}
         {wmenu && (
           <Menu t={t} x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={windowMenuItems([
             { label: tr('shell.classic.snapLayouts'), onClick: () => { setLayouts({ left: wmenu.x, y: wmenu.y }); leaveMax(3000); } },

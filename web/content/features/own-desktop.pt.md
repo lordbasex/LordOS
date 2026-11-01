@@ -81,7 +81,7 @@ Tudo na 0.8.7 (a última versão publicada é a 0.8.6).
 
 - **Atalhos por tema.** Um único despachante roda antes de qualquer ouvinte de teclas, então uma tecla que ele toma não chega a mais ninguém, e os dois temas têm um alternador de apps com ícones grandes. Sobre um app Linux a área de trabalho guarda só uma lista fixa de teclas, escolhida por nome. Ajustes → Teclado lista os atalhos do tema em uso.
 - **Captura do ponteiro.** Uma captura vale só com o ponteiro sobre a janela e o teclado no seu app, e ❖Esc sempre a libera, então uma janela de fundo não pode esconder o ponteiro quando ele passa por cima.
-- **Teclado na tela.** Para um computador sem teclado físico, em campos do LordOS, apps Linux, apps isolados e nas telas de entrada e de bloqueio. Recebe uma lista fechada de teclas, então não pode ser um atalho, nada guarda o que é digitado, e seu painel sai preto em capturas e gravações. Não há registro de teste numa tela de toque real.
+- **Teclado na tela.** Abre-se manualmente pelo botão ao lado do relógio, para um computador sem teclado físico, em campos do LordOS, apps Linux, apps isolados e nas telas de entrada e de bloqueio. Recebe uma lista fechada de teclas, então não pode ser um atalho, nada guarda o que é digitado, e seu painel sai preto em capturas e gravações. Não há registro de teste numa tela de toque real.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
 ## Várias telas, texto nítido

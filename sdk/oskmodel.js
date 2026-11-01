@@ -91,7 +91,6 @@ export function panelSize(box) {
 }
 
 // mode: Settings → Keyboard ('off' | 'auto' | 'always').
-export const opensByItself = (mode, hasKeyboard) => mode === 'always' || (mode !== 'off' && !hasKeyboard);
 
 const MARGIN = 12;
 export const TOP_GAP = 30;      // docked at the top the panel starts this far down, below the menu bar
