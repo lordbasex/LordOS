@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, MOTION_SECTIONS, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -207,7 +207,18 @@ function Appearance() {
 // A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
 const wallpaperName = (w) => (w.nameKey && tOptional(w.nameKey)) || w.name;
 
-function MotionTile({ it, on, avail, percent, onClick }) {
+// While a chosen wallpaper is starting; it turns only then.
+function TileSpinner() {
+  const [a, setA] = useState(0);
+  useEffect(() => { const id = setInterval(() => setA((x) => (x + 30) % 360), 80); return () => clearInterval(id); }, []);
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <Text style={{ fontSize: 22, color: '#fff', transform: `rotate(${a}deg)` }}>⟳</Text>
+    </View>
+  );
+}
+
+function MotionTile({ it, on, avail, percent, busy, onClick }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
@@ -216,6 +227,7 @@ function MotionTile({ it, on, avail, percent, onClick }) {
       <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
         <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
           <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {busy || percent != null ? <TileSpinner /> : null}
           {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
         </View>
       </View>
@@ -231,6 +243,7 @@ function MotionWallpapers() {
   const [s, set] = useSettings();
   const codecs = useCodecs();
   const downloads = useStore(motionDownloads);
+  const busy = useStore(motionBusy);
   const [scope, setScope] = useState('*');
   const [msg, setMsg] = useState('');
   const [pick, setPick] = useState(false);
@@ -278,6 +291,7 @@ function MotionWallpapers() {
             <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).catch((e) => setMsg(errorText(e)))} />
             <Button small label={tr('settings.motion.remove')} disabled={!curItem} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} />
             <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
+            <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
           </Actions>
         ) : null}
       </Section>
@@ -285,7 +299,7 @@ function MotionWallpapers() {
         <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {motionItems.filter((it) => it.section === sec).map((it) => (
-              <MotionTile key={it.id} it={it} avail={can} on={cur === it.id} percent={downloads[it.id]} onClick={() => select(it)} />
+              <MotionTile key={it.id} it={it} avail={can} on={cur === it.id} percent={downloads[it.id]} busy={busy && cur === it.id} onClick={() => select(it)} />
             ))}
           </View>
         </Section>
@@ -334,7 +348,7 @@ function Wallpapers() {
           {/* 108 px items with 10 px gaps: a category of five fits on one row in the default window */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {ws.map((w) => (
-              <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ alignItems: 'center', gap: 6, width: 108 }}>
+              <View key={w.id} onClick={() => set({ wallpaper: w.id, motion: {} })} style={{ alignItems: 'center', gap: 6, width: 108 }}>
                 <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
                   <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
                     <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

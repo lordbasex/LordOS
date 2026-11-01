@@ -126,7 +126,7 @@ static const char *basename_of(const char *p) { const char *s = strrchr(p, '/');
 
 /* ---- playback ---- */
 
-/* play(app, path, { loop, native, autoplay, audio, hw, hwOnly, volume, music, appName }) → id */
+/* play(app, path, { loop, native, autoplay, audio, hw, hwOnly, rate, volume, music, appName }) → id */
 static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 2) return JS_EXCEPTION;
@@ -147,8 +147,8 @@ static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     int hw = opt_int(c, o, "hw", 1, 0, 1);
     if (hw) render = media_render_fd();
     char params[256];
-    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
-             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), media_hwaccel());
+    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
+             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), opt_int(c, o, "rate", 100, 10, 100), media_hwaccel());
     int fds[3] = { in, ring, render };
     s->sock = media_spawn(MK_PLAY, params, fds, 3, &s->pid);
     close(in);

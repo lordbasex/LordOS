@@ -82,6 +82,7 @@ typedef struct {
     int hw_active;
     LmHwFall hwf;                   /* consecutive decoding failures (lm_hwfall.h) */
     int hw_resume;                  /* it went to software: seek to the clock */
+    int rate;                       /* percent of normal speed, moving wallpapers only: fewer frames to decode */
     int hw_only;                    /* a moving wallpaper: no software decoding, the still image stays */
     SwrContext *swr;
     int out_ch;
@@ -117,7 +118,7 @@ static Player P;
 static int64_t frame_ms(AVStream *st, const AVFrame *f) {
     int64_t ts = f->best_effort_timestamp != AV_NOPTS_VALUE ? f->best_effort_timestamp : f->pts;
     if (ts == AV_NOPTS_VALUE) return AV_NOPTS_VALUE;
-    return av_rescale_q(ts, st->time_base, (AVRational){ 1, 1000 }) - P.start_ms;
+    return (av_rescale_q(ts, st->time_base, (AVRational){ 1, 1000 }) - P.start_ms) * 100 / P.rate;
 }
 
 /* ---- decoders ---- */
@@ -568,6 +569,8 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     int autoplay = (int)mp_param_int(params, "autoplay", 1);
     int want_audio = (int)mp_param_int(params, "audio", 1);
     P.hw_only = (int)mp_param_int(params, "hwonly", 0);
+    P.rate = (int)mp_param_int(params, "rate", 100);
+    if (P.rate < 10 || P.rate > 100) P.rate = 100;
 
     /* VA-API before seccomp (it loads the driver from /usr/lib) */
     char accel[24];

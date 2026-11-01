@@ -3,7 +3,7 @@
 //
 // One video per file, whatever the number of displays showing it. Files live in /var/lib/lordos/wallpapers, fetched by
 // the closed action wallpaper-get from the catalog in the package (lord-server only keeps a file with the catalog's hash).
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, useEffect, useRef, useState } from 'react';
 import { Image, MediaView, addListener } from '@lordos/runtime';
 import catalog from '../assets/wallpapers/motion.json';
 import { media } from './media.js';
@@ -15,6 +15,7 @@ import { battery } from './hardware.jsx';
 import { displayCovered, motionCodecs, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
 
 const STORE = '/var/lib/lordos/wallpapers';
+export const MOTION_RATES = [100, 75, 50, 25];
 export const MOTION_SECTIONS = ['dynamic', 'landscape', 'urban', 'underwater', 'earth'];
 export const motionItems = catalog.items;
 export const motionThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
@@ -120,37 +121,52 @@ function startTicking() {
   addListener('pointermove', seen);
 }
 
-function acquire(path, key, display) {
-  let p = players.get(path);
+// A new player can start while the last one still holds the decoder, and a moving wallpaper never falls back to software:
+// its helper stops. So a stop that nobody asked for is tried again, a few times, before the still image stays.
+export const motionBusy = createStore(false);       // a chosen wallpaper is starting
+const RETRIES = 4, RETRY_MS = 500;
+
+function acquire(file, rate, key, display, onLost) {
+  const tag = `${file}|${rate}`;
+  let p = players.get(tag);
   if (!p) {
     let id = 0;
-    try { id = media.play('wallpaper', path, { loop: true, audio: 0, hwOnly: 1, appName: 'LordOS' }); } catch (e) { return null; }
-    if (!id) return null;
-    p = { id, views: new Map(), paused: false, playing: createStore(false) };
+    motionBusy.set(true);
+    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS' }); } catch (e) { motionBusy.set(false); return null; }
+    if (!id) { motionBusy.set(false); return null; }
+    p = { id, tag, views: new Map(), paused: false, playing: createStore(false) };
     media.on(id, (type, d) => {
-      if (type === 'state' && d.state === 'playing') p.playing.set(true);
-      else if (type === 'error' || type === 'closed') { p.playing.set(false); players.delete(path); }
+      if (type === 'state' && d.state === 'playing') { p.playing.set(true); motionBusy.set(false); }
+      else if (type === 'error' || type === 'closed') { p.playing.set(false); if (players.get(tag) === p) { players.delete(tag); p.onLost?.(); } }
     });
-    players.set(path, p);
+    players.set(tag, p);
     startTicking();
   }
+  p.onLost = onLost;
   p.views.set(key, display);
   return p;
 }
-function release(path, key) {
-  const p = players.get(path);
-  if (!p) return;
+function release(p, key) {
   p.views.delete(key);
-  if (!p.views.size) { players.delete(path); media.close(p.id); }
+  if (!p.views.size && players.get(p.tag) === p) { players.delete(p.tag); media.close(p.id); }
 }
 
-function Layer({ path, display, style }) {
+function Layer({ path, rate, display, style }) {
   const [p, setP] = useState(null);
+  const [turn, setTurn] = useState(0);
+  const tries = useRef(0);
+  useEffect(() => { tries.current = 0; }, [path, rate]);
   useEffect(() => {
     const key = {};
-    setP(acquire(path, key, display));
-    return () => { setP(null); release(path, key); };
-  }, [path, display.x, display.y, display.w, display.h]);
+    let timer = 0;
+    const lost = () => {
+      if (tries.current++ < RETRIES) timer = setTimeout(() => setTurn((n) => n + 1), RETRY_MS);
+      else motionBusy.set(false);
+    };
+    const mine = acquire(path, rate, key, display, lost);
+    setP(mine);
+    return () => { clearTimeout(timer); setP(null); if (mine) release(mine, key); };
+  }, [path, rate, turn, display.x, display.y, display.w, display.h]);
   const on = useStore(p ? p.playing : idle);
   return on && p ? h(MediaView, { media: p.id, style }) : null;
 }
@@ -168,7 +184,7 @@ export function MotionWallpaper({ display }) {
     // chosen, but this machine can't play it: its still poster
     return it && !codecs.length ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover' } }) : null;
   }
-  return h(Layer, { path, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h } });
+  return h(Layer, { path, rate: MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h } });
 }
 
 export const variantFor = (it, codecs, display) => pickVariant(it, codecs, display.w, display.h);
