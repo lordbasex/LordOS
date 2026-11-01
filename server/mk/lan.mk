@@ -46,10 +46,10 @@ build/lan-list: tests/lan_list.c src/doc/wire.c build/lord-lan
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lan_list.c src/doc/wire.c
 
 # lord-rdesk (docs/FILES.md, "Remote desktop"): one RDP or VNC connection, sandboxed, drawing into a picture the engine
-# shows. Our own RFB client; libfreerdp's core for RDP, no client library, no display, no toolkit.
+# shows. Our own RFB client; libfreerdp for RDP, its client library for shared folders only, no display, no toolkit.
 RDESK_SRC := src/rdesk/rdeskhelper.c src/rdesk/rdeskrdp.c src/rdesk/rfb.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
-RDP_CFLAGS := $(shell pkg-config --cflags freerdp3 winpr3)
-RDP_LIBS := -lfreerdp3 -lwinpr3
+RDP_CFLAGS := $(shell pkg-config --cflags freerdp3 freerdp-client3 winpr3)
+RDP_LIBS := -lfreerdp-client3 -lfreerdp3 -lwinpr3
 all: build/lord-rdesk
 build/lord-rdesk: $(RDESK_SRC) $(wildcard src/rdesk/*.h) src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
