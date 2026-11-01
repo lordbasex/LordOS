@@ -1684,7 +1684,7 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
-    if (s->parked) {                 /* a hidden window is presented on nothing: it waits for its desktop */
+    if (s->parked || s->xmin) {      /* a hidden or minimized window is presented on nothing: it waits to come back */
         s->fs_resume = 1;
         send_toplevel_configure(s);
         return;
@@ -3318,10 +3318,21 @@ void wl_set_state(int id, int maximized, int fullscreen) {
 }
 
 /* Minimized by the theme: an X11 window goes to the bottom of X's stack (it never catches the
- * pointer there) and is marked iconic. Wayland apps aren't told (xdg-shell has no such event). */
+ * pointer there) and is marked iconic. Wayland apps aren't told (xdg-shell has no such event).
+ * Fullscreen is presented above everything, so it would stay on screen with the keyboard: it stops
+ * here and comes back with the window, as on a hidden desktop (wl_set_parked). */
 void wl_set_minimized(int id, int minimized) {
     Surf *s = find(id);
-    if (s && s->xw) { s->xmin = minimized; xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized); }
+    if (!s) return;
+    s->xmin = minimized;
+    if (minimized && s == fs_surf) {
+        leave_fullscreen(s);
+        s->fs_resume = 1;
+    } else if (!minimized && s->fs_resume && !s->parked) {
+        s->fs_resume = 0;
+        enter_fullscreen(s);
+    }
+    if (s->xw) xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized);
 }
 
 /* On a hidden desktop (sdk/desktopmodel.js surfaceState; C knows nothing else about desktops). The window
@@ -3333,13 +3344,13 @@ void wl_set_parked(int id, int parked) {
     if (!s || (!s->top && !s->xw) || s->parked == !!parked) return;
     s->parked = !!parked;
     if (parked) {
-        int was_fs = s == fs_surf;
-        if (was_fs) leave_fullscreen(s);
-        s->fs_resume = was_fs;
+        int resume = s == fs_surf || s->fs_resume;      /* wl_set_minimized runs first and may have kept it */
+        if (s == fs_surf) leave_fullscreen(s);
+        s->fs_resume = resume;
         if (s == key_focus) wl_set_focus(0);
         for (int i = npopups - 1; i >= 0; i--)
             if (toplevel_of(popups[i]) == s && popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
-    } else if (s->fs_resume) {
+    } else if (s->fs_resume && !s->xmin) {
         s->fs_resume = 0;
         enter_fullscreen(s);
     }

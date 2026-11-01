@@ -213,7 +213,7 @@ function App() {
               onEmptyTrash={() => setAskEmpty(true)} />
           </View>
         </Layer>
-        {panel === 'start' && <Layer name="popover"><StartMenu t={t} box={startBox(pos, align, m)} onClose={close} isOnBar={isOnBar} /></Layer>}
+        {panel === 'start' && <Layer name="overlay"><StartMenu t={t} box={startBox(pos, align, m)} onClose={close} isOnBar={isOnBar} /></Layer>}
         {panel === 'quick' && <Layer name="popover"><QuickSettings t={t} at={qsAt} onClose={close} isOnBar={isOnBar} /></Layer>}
         {panel === 'notif' && <Layer name="popover"><NotificationCenter t={t} at={ncAt} onClose={close} isOnBar={isOnBar} /></Layer>}
         {desk && (
