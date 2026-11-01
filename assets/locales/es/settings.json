@@ -435,12 +435,12 @@
   "motion.needsGpu": "Los fondos en movimiento necesitan una GPU compatible.",
   "motion.display": "Pantalla",
   "motion.allDisplays": "Todas las pantallas",
-  "motion.none": "Fondo fijo",
+  "motion.none": "Volver a fondo fijo",
   "motion.random": "Aleatorio",
   "motion.add": "Agregar video…",
   "motion.onLogin": "Usar en el inicio de sesión",
-  "motion.loginDefault": "Inicio de sesión predeterminado",
-  "motion.remove": "Quitar",
+  "motion.loginDefault": "Video de inicio predeterminado",
+  "motion.remove": "Borrar descarga",
   "motion.credits": "Créditos",
   "motion.problem.tooLong": "El video dura más de 10 segundos.",
   "motion.problem.format": "Esta GPU no puede decodificar ese formato de video.",
@@ -466,5 +466,8 @@
   "motion.item.underwater-surface": "Superficie del mar",
   "motion.item.underwater-jellyfish": "Medusas",
   "motion.item.underwater-jellyfish-2": "Medusas a la deriva",
-  "motion.item.underwater-stream": "Arroyo"
+  "motion.item.underwater-stream": "Arroyo",
+  "motion.speed": "Velocidad",
+  "motion.loginDone": "La pantalla de inicio de sesión va a usar este video.",
+  "motion.loginReset": "La pantalla de inicio de sesión volvió a su video predeterminado."
 }

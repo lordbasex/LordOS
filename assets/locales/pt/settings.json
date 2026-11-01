@@ -435,12 +435,12 @@
   "motion.needsGpu": "Os fundos em movimento precisam de uma GPU compatível.",
   "motion.display": "Tela",
   "motion.allDisplays": "Todas as telas",
-  "motion.none": "Fundo fixo",
+  "motion.none": "Voltar ao fundo fixo",
   "motion.random": "Aleatório",
   "motion.add": "Adicionar vídeo…",
   "motion.onLogin": "Usar na tela de login",
-  "motion.loginDefault": "Login padrão",
-  "motion.remove": "Remover",
+  "motion.loginDefault": "Vídeo de login padrão",
+  "motion.remove": "Apagar download",
   "motion.credits": "Créditos",
   "motion.problem.tooLong": "O vídeo dura mais de 10 segundos.",
   "motion.problem.format": "Esta GPU não decodifica esse formato de vídeo.",
@@ -466,5 +466,8 @@
   "motion.item.underwater-surface": "Superfície do mar",
   "motion.item.underwater-jellyfish": "Águas-vivas",
   "motion.item.underwater-jellyfish-2": "Águas-vivas à deriva",
-  "motion.item.underwater-stream": "Riacho"
+  "motion.item.underwater-stream": "Riacho",
+  "motion.speed": "Velocidade",
+  "motion.loginDone": "A tela de login vai usar este vídeo.",
+  "motion.loginReset": "A tela de login voltou ao vídeo padrão."
 }

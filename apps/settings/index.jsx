@@ -283,16 +283,26 @@ function MotionWallpapers() {
           </SettingRow>
         ) : null}
         {can ? (
-          <Actions style={{ paddingVertical: spacing.s }}>
-            <Button small label={tr('settings.motion.none')} disabled={!cur} onClick={() => choose(null)} />
-            <Button small label={tr('settings.motion.random')} onClick={() => choose('random')} />
-            <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />
-            <Button small label={tr('settings.motion.onLogin')} disabled={!curItem} onClick={() => setLoginMotion(curItem).catch((e) => setMsg(errorText(e)))} />
-            <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).catch((e) => setMsg(errorText(e)))} />
-            <Button small label={tr('settings.motion.remove')} disabled={!curItem} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} />
-            <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
-            <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
-          </Actions>
+          <>
+            <SettingRow label={tr('settings.motion.speed')}>
+              <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
+            </SettingRow>
+            {cur ? (
+              <SettingRow label={curItem ? (tOptional(`settings.motion.item.${curItem.id}`) || curItem.name) : tr('settings.motion.random')}>
+                <Actions>
+                  {curItem ? <Button small label={tr('settings.motion.onLogin')} onClick={() => setLoginMotion(curItem).then(() => setMsg(tr('settings.motion.loginDone')), (e) => setMsg(errorText(e)))} /> : null}
+                  {curItem ? <Button small label={tr('settings.motion.remove')} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} /> : null}
+                  <Button small label={tr('settings.motion.none')} onClick={() => choose(null)} />
+                </Actions>
+              </SettingRow>
+            ) : null}
+            <Actions style={{ paddingVertical: spacing.s }}>
+              <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />
+              <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />
+              <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => setMsg(tr('settings.motion.loginReset')), (e) => setMsg(errorText(e)))} />
+              <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
+            </Actions>
+          </>
         ) : null}
       </Section>
       {MOTION_SECTIONS.map((sec) => (

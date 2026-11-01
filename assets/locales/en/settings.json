@@ -435,12 +435,12 @@
   "motion.needsGpu": "Moving wallpapers need a compatible GPU.",
   "motion.display": "Display",
   "motion.allDisplays": "All displays",
-  "motion.none": "Still wallpaper",
+  "motion.none": "Back to still wallpaper",
   "motion.random": "Random",
   "motion.add": "Add video…",
   "motion.onLogin": "Use on login screen",
-  "motion.loginDefault": "Default login",
-  "motion.remove": "Remove",
+  "motion.loginDefault": "Default login video",
+  "motion.remove": "Delete download",
   "motion.credits": "Credits",
   "motion.problem.tooLong": "The video lasts more than 10 seconds.",
   "motion.problem.format": "This GPU can't decode that video format.",
@@ -466,5 +466,8 @@
   "motion.item.underwater-surface": "Ocean surface",
   "motion.item.underwater-jellyfish": "Jellyfish",
   "motion.item.underwater-jellyfish-2": "Drifting jellyfish",
-  "motion.item.underwater-stream": "Stream"
+  "motion.item.underwater-stream": "Stream",
+  "motion.speed": "Speed",
+  "motion.loginDone": "The login screen will use this video.",
+  "motion.loginReset": "The login screen is back to its default video."
 }
