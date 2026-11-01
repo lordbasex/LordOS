@@ -271,7 +271,7 @@ No claim on a screen until stage 5 has numbers per machine.
 
 The app is called **Desk go-link**. It has nothing to do with Remote Desk, LordOS's RDP and VNC client: separate app, separate icon, separate
 code. It's a complete native copy of go-link's window: every view of the Fyne interface (`backend-device/internal/gui`, about 6,500 lines of
-Go) rebuilt in React with `@lordos/sdk`, keeping go-link's look, layout and texts rather than LordOS's: the bar with the 9-digit code,
+Go) rebuilt in React with `@lordos/sdk`, pixel-faithful to go-link's window on the desktop systems it runs on, in layout, colors, sizes, spacing and texts, drawn natively by LordOS's engine, rather than LordOS's own style: the bar with the 9-digit code,
 Session selector, Connect and the demo; the tabs; this computer's card with its code, link, copy, new code and status; My devices, Favorites
 and Recent sessions with their thumbnails and views; Settings; the connection request with its scam warning; the session panel, chat,
 calls, files, remote panels, network test and About. Texts come from go-link's catalogs.
@@ -386,16 +386,12 @@ fullscreen, direct scanout included; x264 on the Pi.
 
 ## 13. Open decisions
 
-- **D1. Packaged apps with a companion (blocks stage 2 and the app).** Accept 3.2: a third read-only app root, a Verified-author check at
-  load, and a fourth exception to "the server doesn't run commands". The alternative is an unsandboxed Linux app, which has no native UI.
+- **D1. Packaged apps with a companion (decided: yes).** 3.2 as proposed: a third read-only app root, a Verified-author check at load, and a fourth exception to "the server doesn't run commands".
 - **D2. Files (decided by the maintainer).** Every function of go-link stays, files included, as on Linux. The sandbox must give the engine the
   access that takes; a compromised engine would reach what that access covers. The exact paths go with stage 2.
-- **D3. Unattended access.** Keep as on Linux, off by default (proposed), or leave it out at first. With it on and no monitor, nobody sees
-  the indicator.
-- **D4. Open at login.** Without it, no code and no knocks until the app is opened, and unattended access only works while it's open.
-  Is a per-app "open at login" through the broker wanted?
-- **D5. Short verification code** against the residual DTLS risk: it changes go-link's website and the panel on every platform, so it's
-  go-link's call. Proposed as an option.
+- **D3. Unattended access (decided).** Stays as on Linux, off by default.
+- **D4. Open at login (decided).** Optional, per app, through the broker.
+- **D5. Short verification code (decided).** Optional, defined on go-link's side.
 - **D6. Close the same-uid door on `remote.sock`.** Every real client connects as root: the bridge connects before dropping root
   (`server/src/remote/conn.c:1246`, `:1278`), and the only tests that use it run with `sudo` (`server/tests/gpu_cycle.sh:50`). Refusing other uids
   looks free and doesn't change what 5673 does, but it touches 5673's socket, so it's for the maintainer to approve. Until it's done, the
