@@ -1072,7 +1072,7 @@ left for after 0.8.6, and the new native app:
     Ubuntu, Debian, Fedora, Android, «Install from an ISO file», «Migrate from another PC»;
   - **VM window** with its bar (Actions, Devices: USB, CD, folders, network, sound) and
     the **Window, Full Screen, Seamless and Picture in Picture** modes;
-  - **Configuration** in tabs: General, Options (startup and shutdown,
+  - **Configuration** on one screen, its sections down the side with a summary of each: General, Options (startup and shutdown,
     optimization, sharing, applications, Seamless), Hardware (CPU and memory, graphics,
     mouse and keyboard, network, sound, USB, disks, printers, TPM, boot), Security, Backup;
   - **profiles** when creating the VM (Productivity, Software Development, Testing, Design, Games)
