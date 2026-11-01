@@ -7,8 +7,8 @@
    "section": "dynamic",
    "name": "Crystal Crown",
    "author": "Federico Pereira, LordOS",
-   "license": "Made for LordOS",
-   "licenseUrl": "",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
    "source": "https://lordos.org",
    "variants": [
     {
