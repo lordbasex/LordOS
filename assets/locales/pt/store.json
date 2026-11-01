@@ -278,6 +278,7 @@
   "formats.exfat": "Lê e grava volumes exFAT.",
   "formats.fat": "Abre e formata volumes FAT na área de trabalho.",
   "formats.hfs": "Lê volumes HFS+, somente leitura.",
-  "formats.apfs": "Lê volumes APFS, somente leitura.",
-  "formats.allow": "Continuar"
+  "formats.apfs": "Opcional. Lê volumes APFS, somente leitura.",
+  "formats.allow": "Continuar",
+  "formats.optional": "Adicionar também APFS. Compila um driver para o seu kernel e soma cerca de 500 MB de compiladores e headers."
 }
