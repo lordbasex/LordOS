@@ -31,7 +31,7 @@ exec unshare --mount --propagation private sh -eu -c '
     chroot "$M" env DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin \
         RELEASE="$REL" REQUIRE_SIGNED_CODE="$SIGNED" J="$J" sh -eu -c "
         apt-get update -q
-        apt-get install -y -q --no-install-recommends debootstrap squashfs-tools xorriso grub-common \
+        apt-get install -y -q --no-install-recommends debootstrap squashfs-tools xorriso grub-common openssl \
             grub-efi-arm64-bin mtools dosfstools
         cd /tree
         make -C server -j\$J GPU=1 RELEASE=\$RELEASE
