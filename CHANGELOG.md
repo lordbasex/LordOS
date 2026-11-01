@@ -12,6 +12,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [0.8.7-beta] - 2026-11-01
 
+- **Store cards:** the action no longer touches the card's bottom edge: the card has room for its summary and foot, and the same padding on every side.
+
 - **The on-screen keyboard opens only when asked for** (2026-11-01, maintainer's decision): its button is always next to the clock, and ❖⌃K and Settings open it too; on the login and lock screens, its button next to the language. A text field taking focus no longer opens it, and the Off, Automatic and Always setting is gone.
 - **Cleaner's window moves:** its drag area was under the sidebar and the main pane, so the window couldn't be moved. It now moves from the top edge and the sidebar's top row, and a double click there maximizes it.
 - **Cleaner in Lord Classic** has the theme's minimize, maximize and close buttons at the end of the top edge, instead of Lord Flow's on the left.
