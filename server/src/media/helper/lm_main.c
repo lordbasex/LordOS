@@ -52,6 +52,8 @@ int main(int argc, char **argv) {
         LM_LOG("the job didn't arrive");
         return 1;
     }
+    /* mp_send skips missing descriptors: a silent video has no audio ring, and its render node comes in the ring's place */
+    if (m.v[0] == MK_PLAY && mp_param_int(payload, "hw", 0) && fds[2] < 0 && fds[1] >= 0) { fds[2] = fds[1]; fds[1] = -1; }
     /* The shared sandbox (sec/sandbox.c, the same as lord-doc's), before reading a byte
      * of the file and before initializing VA-API: no network, nothing opened outside the system's libraries and
      * data (read-only), no /dev (devices arrive as fds) and with the
