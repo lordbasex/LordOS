@@ -11,7 +11,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password);
+int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password, const RdView *view);
 void rd_send(uint32_t type, int a, int b, int c, const char *text) { (void)type; (void)a; (void)b; (void)c; (void)text; }
 uint32_t *rd_picture(int w, int h) { (void)w; (void)h; return NULL; }
 
@@ -45,7 +45,8 @@ int main(void) {
     dup2(ch[0], 3);
     pthread_t th;
     pthread_create(&th, NULL, stub, &sv[1]);
-    int rc = rdesk_rdp(sv[0], "h", "user", "", "hunter2");
+    RdView view = { 0 };
+    int rc = rdesk_rdp(sv[0], "h", "user", "", "hunter2", &view);
     close(sv[0]);
     pthread_join(th, NULL);
     int fails = 0;
