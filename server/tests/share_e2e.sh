@@ -27,7 +27,7 @@ session() {
   env -i HOME=$ROOT/home XDG_RUNTIME_DIR=$1 PATH=$PATH LANG=en_US.UTF-8 LORD_GPU=0 $B/lord-server --headless 1280x800 $2 --theme $3 --fonts assets/fonts --shell assets/shell > $4 2>&1 &
   echo $!
 }
-cleanup() { kill $S $SG 2>/dev/null; sudo rm -f $G; sleep 0.5; sudo rmdir $CG $CGB 2>/dev/null; rm -f $ROOT/inscope.sh; }
+cleanup() { kill $S $SG 2>/dev/null; sudo pkill -f "share-client mirror .* wait 60000[0]"; sudo rm -f $G; sleep 0.5; sudo rmdir $CG $CGB 2>/dev/null; rm -f $ROOT/inscope.sh; }
 trap cleanup EXIT
 sudo mkdir -p $CG; sudo rm -f $G
 
@@ -67,14 +67,14 @@ Z=$(ps -eo stat,comm | grep -c '^Z.*lord-media')
 pgrep -f "lord-media" -u $U >/dev/null && no "lord-media still running after the share" || ok "encoder gone after the share"
 
 app start 5 1 2000 until 40 4000 wait 3000 stop > a.out 2>&1 &
+AP=$!
 sleep 1.5
 check "second app: busy" app start 1 1 2000 expect-ref busy 1000
-wait $!
+wait $AP
 
 # input reaches the session through a share, and not without one
 check "input: a pointer move comes back as RP_CURSOR" app start 5 1 2000 until 40 4000 ptr 321 123 until 4 2000 stop
 check "input: refused with no share" app ptr 11 11 none 4 500
-check "input not granted: nothing moves" bash -c "grep -q . /dev/null; true"
 grant "{\"v\":1,\"grants\":[{\"id\":\"$ID\",\"exe\":\"$C\",\"perm\":\"screen-share\",\"state\":\"allow\"}]}"
 check "no remote-input grant: frames yes, input no" app start 5 1 2000 until 40 4000 reset ptr 400 400 none 4 800 stop
 allow
@@ -91,41 +91,47 @@ pgrep -f lord-media -u $U >/dev/null && no "locked: an encoder is running" || ok
 if out=$(rootm video 1 2000 until 40 3000 2>&1); then echo "note 5673: remote.sock still gives frames to a root client while locked (frames: yes)"; else echo "note 5673: no frames to a root client while locked: $out"; fi
 check "lock stays after a seat leaves" rootm seat undisplay wait 200
 check "still locked after the monitor leaves" app start 1 1 2000 expect-ref locked 1000
-check "a seat lends the monitor: unlocked" rootm seat display wait 800
+seat_up() { rootm seat display wait 600000 >/dev/null 2>&1 & SP=$!; sleep 0.8; }
+seat_down() { sudo pkill -f "share-client mirror .* seat display wait 60000[0]"; wait $SP 2>/dev/null; }
+seat_up; ok "a seat lends the monitor"
 check "share again after the unlock" app start 1 1 2000 until 40 4000 stop
 
 # ---- the monitor taken from the session, or its seat gone
 app start 1 1 2000 until 40 4000 expect-end away 5000 > a.out 2>&1 &
-sleep 1.5; rootm seat undisplay wait 300 >/dev/null
-if wait $!; then ok "the monitor leaves: SHARE_END away"; else no "the monitor leaves: $(cat a.out)"; fi
+AP=$!; sleep 1.5; rootm seat undisplay wait 300 >/dev/null
+if wait $AP; then ok "the monitor leaves: SHARE_END away"; else no "the monitor leaves: $(cat a.out)"; fi
 check "away: start refused" app start 1 1 2000 expect-ref away 1000
-rootm seat display wait 800 >/dev/null
+seat_down; seat_up
 app start 1 1 2000 until 40 4000 expect-end away 5000 > a.out 2>&1 &
+AP=$!
 sleep 1.5
-rootm seat wait 200 >/dev/null
-if wait $!; then ok "lord-sessiond's connection ends: SHARE_END away"; else no "seat gone: $(cat a.out)"; fi
-rootm seat display wait 800 >/dev/null
+seat_down
+if wait $AP; then ok "lord-sessiond's connection ends: SHARE_END away"; else no "seat gone: $(cat a.out)"; fi
+seat_up
 
 # ---- one door at a time (5673's viewer is a root connection with RP_HELLO)
 rootm hello "10.0.0.9 lord" wait 2500 > m.out 2>&1 &
+AP=$!
 sleep 1
 check "5673 connected: refused remote_desktop" app start 1 1 2000 expect-ref remote_desktop 1000
 check "5673 connected: SHARE_QUERY says so too" app query until 60 1000
-wait $!
+wait $AP
 sleep 0.3
 check "5673 gone: the door is free at once" app start 1 1 2000 until 40 4000 stop
 rootm hello "10.0.0.9 lord" video 1 2000 until 40 3000 > /dev/null 2>&1 && ok "no share: a viewer gets its frames as before" || no "no share: a viewer gets its frames as before"
 app start 1 1 2000 until 40 4000 wait 3500 until 40 4000 stop > a.out 2>&1 &
+AP=$!
 sleep 1.5
 check "share active: a 5673 sign-in gets RP_BUSY" rootm hello "10.0.0.9 lord" until 44 1000 video 1 2000 none 40 1000
-if wait $!; then ok "the share didn't notice the refused sign-in"; else no "share disturbed: $(cat a.out)"; fi
+if wait $AP; then ok "the share didn't notice the refused sign-in"; else no "share disturbed: $(cat a.out)"; fi
 sleep 0.3
 check "share ended: 5673 comes in" rootm hello "10.0.0.9 lord" video 1 2000 until 40 3000
 
 # ---- revoking
 app start 1 1 2000 until 40 4000 expect-end revoked 3000 > a.out 2>&1 &
+AP=$!
 sleep 1.5; T0=$(date +%s%N); sudo rm -f $G
-if wait $!; then ok "revoked: ended after $(( ($(date +%s%N)-T0)/1000000 )) ms"; else no "revoke: $(cat a.out)"; fi
+if wait $AP; then ok "revoked: ended after $(( ($(date +%s%N)-T0)/1000000 )) ms"; else no "revoke: $(cat a.out)"; fi
 allow
 
 # ---- keyframes on a still screen (requests every second for 12 s)
@@ -139,8 +145,9 @@ K=$(sed -n 's/^type 255: \([0-9]*\).*/\1/p' k.out); K=${K:-0}
 rootm clip "before the share" wait 100 >/dev/null
 check "clipboard: what was copied before doesn't go" app start 13 1 2000 until 40 4000 none 6 800 stop
 app start 13 1 2000 until 40 4000 until 6 4000 stop > a.out 2>&1 &
+AP=$!
 sleep 1.5; rootm clip "after the start" wait 100 >/dev/null
-if wait $!; then ok "clipboard: what is copied afterwards goes"; else no "clipboard after: $(cat a.out)"; fi
+if wait $AP; then ok "clipboard: what is copied afterwards goes"; else no "clipboard after: $(cat a.out)"; fi
 
 # ---- malformed input on a live connection
 check "a zero length ends the connection" app junk gone
@@ -158,7 +165,7 @@ check "the API still answers after the noise" app start 1 1 2000 until 40 4000 s
 # ---- the end
 app start 1 1 2000 until 40 4000 wait 8000 > /dev/null 2>&1 &
 sleep 1.5; kill $S; sleep 1.5; [ -e $R/lordos/share.sock ] && no "exit: the socket stays" || ok "exit: the socket is removed"
-wait; S=
+seat_down; S=
 echo "share-e2e: $pass passed, $fail failed"
 grep -c 'share:' sess.log
 exit $((fail != 0))

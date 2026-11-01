@@ -449,7 +449,7 @@ int share_start(const ShareHost *host) {
     mode_t old = umask(077);
     int r = bind(lfd, (struct sockaddr *)&a, sizeof a);
     umask(old);
-    if (r || listen(lfd, 4)) { close(lfd); lfd = -1; return -1; }
+    if (r || chmod(sock_path, 0600) || listen(lfd, 4)) { close(lfd); lfd = -1; return -1; }
     return 0;
 }
 
