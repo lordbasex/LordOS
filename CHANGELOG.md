@@ -92,7 +92,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (no sockets, no files, libc only; our own SMB2, NTLMSSP, DCE/RPC, ONC RPC parsers, `build/lan-test` under ASan/UBSan with
   40,000 damaged answers). JS names no address: `lord.lan` is `start`, `stop`, `poll`.
   Inside a session its sockets come from the `lan` connector, approved by the maintainer on 2026-10-31 (`docs/FIREWALL.md`,
-  "Files → Network and the connectors"). **SMB with a password is not validated:** it has only worked against one test server.
+  "Files → Network and the connectors"). **SMB with a password** passed against one Windows 11 share and one test server.
 - **Connecting to a share** from Files: the closed admin actions `share-mount` and `share-unmount` (approved in the
   roadmap on 2026-10-25) mount SMB and NFS with the kernel's clients through `fsconfig()`, one call per option, with no
   program, shell or extra package, only private IPv4 addresses, only under `/media/<user>`; the password can be
@@ -494,7 +494,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - GPU drag is verified on V3D (Raspberry Pi 5) and SVGA3D (a VMware guest) only; on any other GPU only its self-test
   guards it. It is declined while a Linux window is on screen. The VMware guest ran v087.27 in the last pass, not the
   final v087.28, whose changes are in the shell, not in GPU drag.
-- Files → Network: SMB with a password is not validated, and no real SMB or NFS server has been tried.
+- Files → Network: SMB with a password passed against one Windows 11 share and one test server, no others. No real NFS
+  server has been tried. Listing the shares of an SMB server outside the local network is refused.
+- Remote Desk: VNC and RDP were closed against a throwaway test machine. RDP to a real Windows session and RDP's shared
+  folders have not been verified in a real session.
+- A self-signed certificate on a connection must name the host it's used for.
+- Moving wallpapers copy each frame on its way to the screen: on the Raspberry Pi 5 at the login screen, 1080p at 60
+  fps, `lord-media` used 41 % of a core and `lord-server` 147 %. A zero-copy path is planned for 0.8.8. The Pi 5's
+  hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
+- Window memory across two displays is not tested.
+- HFS+ and APFS disks are read-only.
 - Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
 - A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries.
 - An X11 app started from the launcher on a system without `xwayland` (a Recommends, so `apt` installs it) fails with
@@ -504,7 +513,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   stays silent.
 - Volume keys had no effect in a VMware guest. Session restore doesn't reopen a Files folder.
 - The on-screen keyboard opened once on an empty desktop with no text field, not reproduced.
-- Pi 5 HEVC hardware decoding moved to 0.8.8. LordBench's x86 PC reference is still to be chosen.
+- LordBench's x86 PC reference is still to be chosen.
 
 ### Upgrading
 
