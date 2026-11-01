@@ -167,5 +167,5 @@ app start 1 1 2000 until 40 4000 wait 8000 > /dev/null 2>&1 &
 sleep 1.5; kill $S; sleep 1.5; [ -e $R/lordos/share.sock ] && no "exit: the socket stays" || ok "exit: the socket is removed"
 seat_down; S=
 echo "share-e2e: $pass passed, $fail failed"
-grep -c 'share:' sess.log
+grep 'share:' home/.cache/lordos/session.log | tail -3
 exit $((fail != 0))

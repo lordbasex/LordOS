@@ -14,7 +14,6 @@
 #include "remote/proto.h"
 #include "remote/sharewire.h"
 
-#define _GNU_SOURCE
 #include <errno.h>
 #include <grp.h>
 #include <fcntl.h>
