@@ -197,7 +197,7 @@
   "system.aptText": "Arquivos de pacotes na pasta de downloads do sistema.",
   "system.vartmp": "Temporários antigos do sistema",
   "system.vartmpText": "Arquivos do sistema com mais de 30 dias e sem uso.",
-  "system.confirm": "Isso pede permissão de administrador e não pode ser desfeito.",
+  "system.confirm": "Isso altera o sistema e não pode ser desfeito.",
   "system.done": "{name}: concluído",
   "ruleName.lordos-thumbnails": "Miniaturas do LordOS",
   "rule.lordos-thumbnails": "Prévias que o LordOS fez para Arquivos e Fotos. São criadas de novo ao exibir.",
@@ -372,7 +372,7 @@
     "other": "{count} imagens não puderam ser comparadas: o formato não é compatível, ou estão em branco ou são muito grandes."
   },
   "apps.title": "Apps",
-  "apps.hint": "Os apps instalados, do maior ao menor. Remover um app do sistema pede permissão de administrador.",
+  "apps.hint": "Os apps instalados, do maior ao menor. Remover um app do sistema precisa de permissão de administrador.",
   "apps.none": "Nenhum app removível foi encontrado.",
   "apps.remove": "Remover",
   "apps.removeTitle": "Remover {name}?",

@@ -197,7 +197,7 @@
   "system.aptText": "Archivos de paquetes en la carpeta de descargas del sistema.",
   "system.vartmp": "Temporales viejos del sistema",
   "system.vartmpText": "Archivos del sistema de más de 30 días y sin usar.",
-  "system.confirm": "Esto pide permisos de administrador y no se puede deshacer.",
+  "system.confirm": "Esto cambia el sistema y no se puede deshacer.",
   "system.done": "{name}: listo",
   "ruleName.lordos-thumbnails": "Miniaturas de LordOS",
   "rule.lordos-thumbnails": "Vistas previas que LordOS hizo para Archivos y Fotos. Se crean de nuevo al mostrarse.",
@@ -372,7 +372,7 @@
     "other": "{count} imágenes no se pudieron comparar: su formato no es compatible, o están en blanco o son muy grandes."
   },
   "apps.title": "Apps",
-  "apps.hint": "Las apps instaladas, de mayor a menor. Quitar una app del sistema pide permisos de administrador.",
+  "apps.hint": "Las apps instaladas, de mayor a menor. Quitar una app del sistema necesita permisos de administrador.",
   "apps.none": "No se encontraron apps que se puedan quitar.",
   "apps.remove": "Quitar",
   "apps.removeTitle": "¿Quitar {name}?",

@@ -65,6 +65,7 @@ const launcherKey = (id) => {
 // ---- pinned (in ~/.config/lordos/settings.json → dockPinned) ----
 
 let themeDefaults = [FIRST, LAUNCHER];
+const dockOpened = new Map();         // running unpinned and pinned groups, in the order they opened
 let shownFn = () => true;            // which pinned ids the Dock shows (installed), from the last render
 const fromSettings = () => {
   const raw = settings.get().dockPinned;
@@ -202,7 +203,10 @@ export function useDockEntries(defaults = [], opts = {}) {
     if (!a) continue;                          // pinned but uninstalled: hidden, keeps its place
     out.push(entry(id, a, groups.get(id) || []));
   }
-  for (const [id, ws] of groups) if (!pinned.includes(id)) out.push(entry(id, appFor(id), ws));
+  // an unpinned app keeps its place in the order it opened: wins is the stacking order, which every raise changes
+  for (const id of dockOpened.keys()) if (!groups.has(id)) dockOpened.delete(id);
+  for (const id of groups.keys()) if (!dockOpened.has(id)) dockOpened.set(id, true);
+  for (const id of dockOpened.keys()) if (!pinned.includes(id)) out.push(entry(id, appFor(id), groups.get(id)));
   if (opts.recents) {
     const have = new Set(out.map((e) => e.id));
     const rec = (s.dockRecentApps || []).map((x) => dockIdOf(x)).filter((x) => x && !have.has(x) && appFor(x)).slice(0, opts.recents);

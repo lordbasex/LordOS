@@ -271,7 +271,7 @@ function buildResults(raw, apps) {
   }
 
   // apps
-  add('apps', apps.map((a) => ({ a, s: best(q, a.name, a.genericName, a.keywords, a.id, a.comment) }))
+  add('apps', apps.map((a) => ({ a, s: best(q, a.name, a.genericName, a.keywords, tOptional(`shell.spotlight.keywords.${a.id}`), a.id, a.comment) }))
     .filter((x) => x.s > 0).map((x) => ({ ...x, s: x.s + usageBoost(`app:${x.a.id}`) })).sort((x, y) => y.s - x.s).slice(0, 6)
     .map(({ a, s }) => ({ key: `app:${a.id}`, score: s, title: a.name, subtitle: a.comment || a.genericName || t(`store.kind.${a.kind}`),
       Icon: a.Icon, preview: { kind: 'app', app: a }, run: () => launchApp(a.id) })));

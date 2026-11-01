@@ -185,6 +185,7 @@
   "restore.yes": "Reopen",
   "spotlight.action.dark": "Toggle dark / light mode",
   "spotlight.action.hint": "System action",
+  "spotlight.keywords.mail": "email",
   "spotlight.copy": "Enter copies the result",
   "spotlight.folder": "Folder",
   "spotlight.fromClipboard": "Clipboard",

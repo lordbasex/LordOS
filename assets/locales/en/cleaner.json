@@ -197,7 +197,7 @@
   "system.aptText": "Package files left in the system's download folder.",
   "system.vartmp": "Old system temporary files",
   "system.vartmpText": "Files of the system over 30 days old and not in use.",
-  "system.confirm": "This asks for administrator rights and can't be undone.",
+  "system.confirm": "This changes the system and can't be undone.",
   "system.done": "{name}: done",
   "ruleName.lordos-thumbnails": "LordOS thumbnails",
   "rule.lordos-thumbnails": "Previews LordOS made for Files and Photos. They're made again when shown.",
@@ -372,7 +372,7 @@
     "other": "{count} images couldn't be compared: their format isn't supported, or they're blank or very large pictures."
   },
   "apps.title": "Apps",
-  "apps.hint": "Installed apps, largest first. Removing a system app asks for administrator rights.",
+  "apps.hint": "Installed apps, largest first. Removing a system app needs administrator rights.",
   "apps.none": "No removable apps were found.",
   "apps.remove": "Remove",
   "apps.removeTitle": "Remove {name}?",
