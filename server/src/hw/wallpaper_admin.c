@@ -2,6 +2,7 @@
  *
  *   wallpaper-get "<id> <variant>"     downloads one file of the catalog to /var/lib/lordos/wallpapers/<sha256>.mp4
  *   wallpaper-remove "<id> <variant>"  deletes it
+ *   wallpaper-login "still <id>"       the login screen shows that still wallpaper, with no video
  *   wallpaper-login "<id> <variant>"   the login screen plays it; "default" goes back to the built-in one
  *
  * What is fetched comes only from the catalog in the package, read here as root: JS names an entry, never a URL or
@@ -90,8 +91,18 @@ void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len) {
 
 void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
-    const char *dst = STORE "/login.mp4", *tmp = STORE "/.login.part";
+    const char *dst = STORE "/login.mp4", *tmp = STORE "/.login.part", *still = STORE "/login-still";
+    if (len > 6 && len < 60 && !strncmp(arg, "still ", 6)) {            /* a still wallpaper by its id, never a path */
+        for (size_t i = 6; i < len; i++) if (!((arg[i] >= 'a' && arg[i] <= 'z') || (arg[i] >= '0' && arg[i] <= '9') || arg[i] == '-')) { admin_err("admin.invalidArgument", NULL); return; }
+        mkdir(STORE, 0755);
+        int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+        if (fd < 0 || write(fd, arg + 6, len - 6) != (ssize_t)(len - 6) || close(fd) || rename(tmp, still)) { unlink(tmp); admin_err("wallpaper.removeFailed", NULL); return; }
+        unlink(dst);
+        admin_say("OK", "%s", "still");                 /* i18n-ok: parsed by sdk/motion.js */
+        return;
+    }
     if (len == 7 && !strncmp(arg, "default", 7)) {
+        unlink(still);
         if (unlink(dst) && errno != ENOENT) { admin_err("wallpaper.removeFailed", NULL); return; }
         admin_say("OK", "%s", "default");               /* i18n-ok: parsed by sdk/motion.js */
         return;
@@ -104,5 +115,6 @@ void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len) {
     if (lstat(p, &st) || !S_ISREG(st.st_mode) || (unsigned long long)st.st_size != size) { admin_err("wallpaper.notDownloaded", NULL); return; }
     unlink(tmp);
     if (link(p, tmp) || rename(tmp, dst)) { unlink(tmp); admin_err("wallpaper.removeFailed", NULL); return; }
+    unlink(still);
     admin_say("OK", "%s", sha);                         /* i18n-ok: parsed by sdk/motion.js */
 }

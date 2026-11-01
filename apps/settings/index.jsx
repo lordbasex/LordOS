@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -237,7 +237,7 @@ function MotionTile({ it, on, avail, percent, busy, onClick }) {
 }
 
 // Moving wallpapers: downloaded on demand, played only with a compatible GPU.
-function MotionWallpapers() {
+function MotionWallpapers({ login }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -256,10 +256,11 @@ function MotionWallpapers() {
   const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m }); };
   const select = (it) => {
     setMsg('');
-    if ((s.motionFiles || {})[it.id]) { choose(it.id); return; }
+    const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
+    if ((s.motionFiles || {})[it.id]) { apply(); return; }
     const v = variantFor(it, codecs, main);
     if (!v) return;
-    downloadMotion(it, v).then(() => choose(it.id), (e) => setMsg(errorText(e)));
+    downloadMotion(it, v).then(apply, (e) => setMsg(errorText(e)));
   };
   const curItem = motionItems.find((x) => x.id === cur);
   const addFile = (path) => {
@@ -284,22 +285,21 @@ function MotionWallpapers() {
         ) : null}
         {can ? (
           <>
-            <SettingRow label={tr('settings.motion.speed')}>
+            {login ? null : <><SettingRow label={tr('settings.motion.speed')}>
               <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
-            </SettingRow>
-            {cur ? (
+            </SettingRow></>}
+            {!login && cur ? (
               <SettingRow label={curItem ? (tOptional(`settings.motion.item.${curItem.id}`) || curItem.name) : tr('settings.motion.random')}>
                 <Actions>
-                  {curItem ? <Button small label={tr('settings.motion.onLogin')} onClick={() => setLoginMotion(curItem).then(() => setMsg(tr('settings.motion.loginDone')), (e) => setMsg(errorText(e)))} /> : null}
                   {curItem ? <Button small label={tr('settings.motion.remove')} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} /> : null}
                   <Button small label={tr('settings.motion.none')} onClick={() => choose(null)} />
                 </Actions>
               </SettingRow>
             ) : null}
             <Actions style={{ paddingVertical: spacing.s }}>
-              <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />
-              <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />
-              <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => setMsg(tr('settings.motion.loginReset')), (e) => setMsg(errorText(e)))} />
+              {login ? <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setMsg(tr('settings.motion.loginReset')); }, (e) => setMsg(errorText(e)))} /> : null}
+              {login ? null : <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />}
+              {login ? null : <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />}
               <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
             </Actions>
           </>
@@ -309,7 +309,7 @@ function MotionWallpapers() {
         <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {motionItems.filter((it) => it.section === sec).map((it) => (
-              <MotionTile key={it.id} it={it} avail={can} on={cur === it.id} percent={downloads[it.id]} busy={busy && cur === it.id} onClick={() => select(it)} />
+              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} />
             ))}
           </View>
         </Section>
@@ -335,12 +335,22 @@ function Wallpapers() {
   const [s, set] = useSettings();
   const list = t.wallpapers || [];
   if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;
-  const cur = findWallpaper(list, s.wallpaper);
+  const [target, setTarget] = useState('desktop');
+  const login = target === 'login';
+  const [note, setNote] = useState('');
+  const shown = login ? s.loginWallpaper : s.wallpaper;
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
+  const stillPick = (id) => {
+    if (!login) { set({ wallpaper: id, motion: {} }); return; }
+    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.motion.loginDone')); }, (e) => setNote(errorText(e)));
+  };
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
     .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
   const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
   return (
     <Stack>
+      <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
+      {note ? <Note>{note}</Note> : null}
       <Section>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
           <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
@@ -352,13 +362,13 @@ function Wallpapers() {
           </View>
         </View>
       </Section>
-      <MotionWallpapers />
+      <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
         <Section key={c} title={catName(c)}>
           {/* 108 px items with 10 px gaps: a category of five fits on one row in the default window */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {ws.map((w) => (
-              <View key={w.id} onClick={() => set({ wallpaper: w.id, motion: {} })} style={{ alignItems: 'center', gap: 6, width: 108 }}>
+              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: 108 }}>
                 <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
                   <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
                     <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

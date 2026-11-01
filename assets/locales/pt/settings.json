@@ -469,5 +469,7 @@
   "motion.item.underwater-stream": "Riacho",
   "motion.speed": "Velocidade",
   "motion.loginDone": "A tela de login vai usar este vídeo.",
-  "motion.loginReset": "A tela de login voltou ao vídeo padrão."
+  "motion.loginReset": "A tela de login voltou ao vídeo padrão.",
+  "wallpaperFor.desktop": "Área de trabalho",
+  "wallpaperFor.login": "Tela de login"
 }

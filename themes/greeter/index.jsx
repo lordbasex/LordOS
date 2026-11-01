@@ -14,7 +14,7 @@
 import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
-  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
+  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, fs, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -35,6 +35,8 @@ const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#2
 // covers the wallpaper once it plays: no file, no helper or a crash leave the still image, with nothing on screen.
 const LOGIN_PICKED = '/var/lib/lordos/wallpapers/login.mp4';      // chosen in Settings (wallpaper-login)
 const LOGIN_BUILTIN = '/usr/share/backgrounds/lordos/motion/crown';
+const LOGIN_STILL = '/var/lib/lordos/wallpapers/login-still';     // a still wallpaper's id: no video at all
+const loginStill = () => { try { return String(fs.read(LOGIN_STILL)).trim(); } catch (e) { return ''; } };
 const IDLE_MS = 300000;
 function LoginVideo({ box, stop }) {
   const [id, setId] = useState(0);
@@ -275,14 +277,15 @@ function Greeter() {
   // the column rises so the password stays above the on-screen keyboard
   const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);
 
+  const still = loginStill();
   return (
     <ThemeProvider tokens={{ mode: 'dark', accent: '#ffffff', text: '#ffffff', textDim: 'rgba(255,255,255,0.55)',
       inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)',
       panelBg: 'rgba(30,22,40,0.94)', control: 'rgba(255,255,255,0.18)', sidebarBg: 'rgba(255,255,255,0.09)' }}>
       <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
-        <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
+        <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
           style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
-        <LoginVideo box={M} stop={entered} />
+        {still ? null : <LoginVideo box={M} stop={entered} />}
         <View style={{ position: 'absolute', left: M.left, top: M.top, width: W, height: H }}>
 
         {/* date and clock */}

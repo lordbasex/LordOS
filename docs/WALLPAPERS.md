@@ -82,6 +82,8 @@ reads `/sys/class`, `/sys/bus` and `/run/udev`, and gets the V4L2 and media cont
 
 Decoding is in hardware; each frame is then read back and converted to BGRA in `lord-media`, and `lord-server` paints it. That copy is why the total stays high. Showing the decoder's buffer directly on the GPU is the next step, in 0.8.8.
 
+Settings → Wallpaper has a switch at the top, Desktop or Login screen, and the same tiles choose for that target: a video (`wallpaper-login "<id> <variant>"`) or a still wallpaper (`wallpaper-login "still <id>"`, kept in `/var/lib/lordos/wallpapers/login-still`, shown with no video at all).
+
 Settings offers 1×, 0.75×, 0.5× and 0.25×. A slower speed decodes fewer frames per second, and it applies to the desktop, not to the login screen.
 
 Choosing a still wallpaper turns the moving one off, since it would stay in front. A new player can start while the last one still holds the decoder, so a stop nobody asked for is retried four times, half a second apart; the tile shows a spinner until the video plays.

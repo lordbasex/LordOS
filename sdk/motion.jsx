@@ -62,6 +62,7 @@ export async function removeMotion(it) {
   settings.set({ motionFiles: files, motion });
 }
 
+export const setLoginStill = (id) => admin.run('wallpaper-login', `still ${id}`, null, { quiet: true });
 export const setLoginMotion = (it) => admin.run('wallpaper-login', it ? `${it.id} ${settings.get().motionFiles?.[it.id]}` : 'default', null, { quiet: true });
 
 // The file behind a chosen id, or null.

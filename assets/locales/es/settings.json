@@ -469,5 +469,7 @@
   "motion.item.underwater-stream": "Arroyo",
   "motion.speed": "Velocidad",
   "motion.loginDone": "La pantalla de inicio de sesión va a usar este video.",
-  "motion.loginReset": "La pantalla de inicio de sesión volvió a su video predeterminado."
+  "motion.loginReset": "La pantalla de inicio de sesión volvió a su video predeterminado.",
+  "wallpaperFor.desktop": "Escritorio",
+  "wallpaperFor.login": "Pantalla de inicio de sesión"
 }

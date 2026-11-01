@@ -469,5 +469,7 @@
   "motion.item.underwater-stream": "Stream",
   "motion.speed": "Speed",
   "motion.loginDone": "The login screen will use this video.",
-  "motion.loginReset": "The login screen is back to its default video."
+  "motion.loginReset": "The login screen is back to its default video.",
+  "wallpaperFor.desktop": "Desktop",
+  "wallpaperFor.login": "Login screen"
 }
