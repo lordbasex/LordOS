@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Security
+
+- **The session's remote socket takes only root:** `lord-sessiond` and its bridge connect as root, so a process of the same user can no longer read the screen or send input through `remote.sock`.
+
 ## [0.8.7-beta] - 2026-11-01
 
 - **Moving wallpapers** ([docs/WALLPAPERS.md](docs/WALLPAPERS.md)): short loops behind the desktop and the login screen, in Lord Flow and Lord Classic, chosen in Settings → Wallpaper by section (Dynamic, Landscape, Urban, Underwater, Earth, Random), per display, downloaded on demand and checked against a SHA-256 in the package. You can add your own video of up to 10 s. They need a compatible GPU: GPU composition and hardware decoding of the file's format, with no software mode. They pause when nobody sees them, in full screen, with no input, on low battery and under load. The collection is public domain, CC0, CC BY and CC BY-SA, with credits in Settings and in its repository.

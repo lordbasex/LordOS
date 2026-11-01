@@ -551,7 +551,7 @@ void mirror_dispatch(const struct pollfd *p, int n) {
             struct ucred cr;
             socklen_t cl_len = sizeof cr;
             Client *slot = by_fd(-1);
-            if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &cl_len) || (cr.uid != 0 && cr.uid != getuid()) || !slot) { close(fd); continue; }
+            if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &cl_len) || cr.uid != 0 || !slot) { close(fd); continue; }
             memset(slot, 0, sizeof *slot);
             slot->fd = fd;
             slot->uid = cr.uid;
