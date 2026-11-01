@@ -288,6 +288,8 @@ permission and the indicator.
 | Keep the display awake | `SHARE_AWAKE`; `pkg/awake`'s D-Bus services aren't ours, and only while a viewer is accepted |
 | Lock when a session ends | `SHARE_LOCK`, because `loginctl` can't work here: LordOS sessions have no logind seat (`docs/SESSIONS.md:465`, go-link:`internal/services/session_end.go:98`) |
 | Open at login | not available to this app today, D4 |
+| Icon in the top bar, by the clock | same menu as on the other platforms: the code, Disconnect, Open, Settings, Check for updates (opens the Store), Test my connection, About, Quit; red while a session lasts. Third-party top-bar icons need an API of their own: to design |
+| Visible as an app | in Applications and the Dock, with go-link's icon |
 | Update | off, by APT |
 | Connect to another computer | native, in the same window, as in go-link: the viewer's tabs and panels, with the picture shown through the engine's MediaView path. Not designed yet |
 | MCP for assistants, terminal | their views are copied too; what they run are other programs, which the sandbox's write rule doesn't allow today. Open: D9 |
