@@ -271,5 +271,6 @@
   "attr.a232": "Espacio de reserva libre",
   "attr.a240": "Horas de vuelo del cabezal",
   "attr.a254": "Caídas detectadas",
-  "notChecked": "Todavía sin revisar"
+  "notChecked": "Todavía sin revisar",
+  "formatsGet": "Abrir la Tienda"
 }

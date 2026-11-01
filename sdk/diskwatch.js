@@ -14,6 +14,7 @@ import { notify } from './notify.js';
 import { t } from './i18n.js';
 import { wm } from './windows.js';
 import { smart, diskTempLimit, diskAlertPrefs } from './smart.js';
+import { disks, needsDiskFormats, openDiskFormats } from './disks.js';
 import { HEALTH_RANK } from './smartparse.js';
 
 const TEMP_EVERY = 30 * 1000, HEALTH_EVERY = 6 * 3600 * 1000, HEALTH_FIRST = 3 * 60 * 1000;
@@ -83,10 +84,30 @@ async function checkHealth() {
   }
 }
 
+// A disk plugged in with a format that needs Disk Formats: one offer per volume while this session lasts.
+const offered = new Set();
+function volumesOf() {
+  const out = [];
+  try { for (const d of lord.disks.list() || []) if (!d.system) out.push(d, ...(d.partitions || d.children || [])); } catch (e) { /* none */ }
+  return out.filter((v) => v.fstype && !v.mountpoint);
+}
+function offerFormats(first) {
+  for (const v of volumesOf()) {
+    const key = v.uuid || v.name;
+    if (offered.has(key) || !needsDiskFormats(v.fstype)) continue;
+    offered.add(key);
+    if (first) continue;                  // what was already here at login isn't news
+    notify({ app: 'store', title: t('files.disk.formatsTitle', { name: v.label || v.name }), body: t('files.disk.formatsDetail'),
+      actions: [{ id: 'store', label: t('files.disk.formatsGet'), run: openDiskFormats }] });
+  }
+}
+
 export function startDiskWatch() {
   if (started || typeof lord === 'undefined' || !lord.monitor?.watchDisks || !lord.disks || typeof lord.greeter !== 'undefined') return;
   started = true;
   checkTemps();                       // turns the background reading on (or leaves it off)
   setInterval(checkTemps, TEMP_EVERY);
   setTimeout(() => { checkHealth(); setInterval(checkHealth, HEALTH_EVERY); }, HEALTH_FIRST);
+  offerFormats(true);
+  disks.watch(() => offerFormats(false));
 }

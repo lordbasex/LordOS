@@ -390,6 +390,32 @@
           }
         },
         {
+          "id": "connect-to-server",
+          "q": {
+            "en": "Can Files connect to a server by address?",
+            "es": "¿Archivos se conecta a un servidor por dirección?",
+            "pt": "O Arquivos conecta a um servidor pelo endereço?"
+          },
+          "a": {
+            "en": "Yes, since 0.8.7. Go → Connect to Server takes smb, nfs, sftp, ssh, ftp, ftps, webdav and davs addresses and opens them as a folder in Files; for SMB you sign in and then pick a shared folder from a list. vnc and rdp addresses open LordOS's own remote screen apps, which come with the system. A new SSH key or an untrusted certificate shows its fingerprint and asks you, and a changed key is refused. Plain ftp, webdav and vnc aren't encrypted.",
+            "es": "Sí, desde la 0.8.7. Ir → Conectarse al servidor acepta direcciones smb, nfs, sftp, ssh, ftp, ftps, webdav y davs y las abre como una carpeta en Archivos; en SMB iniciás sesión y elegís la carpeta compartida de una lista. Las direcciones vnc y rdp abren las apps de pantalla remota propias de LordOS, que vienen con el sistema. Una clave SSH nueva o un certificado no confiable muestra su huella y te pregunta, y una clave cambiada se rechaza. ftp, webdav y vnc sin TLS no van cifrados.",
+            "pt": "Sim, desde a 0.8.7. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ssh, ftp, ftps, webdav e davs e os abre como uma pasta no Arquivos; no SMB você entra e escolhe a pasta compartilhada numa lista. Endereços vnc e rdp abrem os apps de tela remota do próprio LordOS, que vêm com o sistema. Uma chave SSH nova ou um certificado não confiável mostra a impressão digital e pergunta, e uma chave alterada é recusada. ftp, webdav e vnc sem TLS não são criptografados."
+          }
+        },
+        {
+          "id": "disk-formats",
+          "q": {
+            "en": "Can LordOS open disks formatted on other systems?",
+            "es": "¿LordOS abre discos formateados en otros sistemas?",
+            "pt": "O LordOS abre discos formatados em outros sistemas?"
+          },
+          "a": {
+            "en": "Yes, with Disk Formats, one item in the Store: NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64, APFS read-only. They are commercial formats, and their drivers are free software at no cost, listed with their licenses before you install. Until it's installed, Files and Disks offer it when you open such a disk. Booting and the LordOS installer don't need it.",
+            "es": "Sí, con Disk Formats, un solo ítem de la Tienda: NTFS, exFAT y FAT en lectura y escritura, HFS+ con journal en solo lectura y, en amd64, APFS en solo lectura. Son formatos comerciales y sus controladores son software libre y sin costo, listados con sus licencias antes de instalar. Hasta que lo instales, Archivos y Discos te lo ofrecen al abrir uno de esos discos. El arranque y el instalador de LordOS no lo necesitan.",
+            "pt": "Sim, com Disk Formats, um único item da Loja: NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64, APFS somente leitura. São formatos comerciais e seus drivers são software livre e sem custo, listados com suas licenças antes de instalar. Até instalar, Arquivos e Discos o oferecem ao abrir um desses discos. A inicialização e o instalador do LordOS não precisam dele."
+          }
+        },
+        {
           "id": "session-restore",
           "q": {
             "en": "Does LordOS reopen my apps after a restart?",

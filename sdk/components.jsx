@@ -260,6 +260,12 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
 let focused = null;          // token of the active TextInput
 let focusedNow = false;      // it got focus during the mouse event in progress
 const handlers = new Map();
+// A form: Tab and Shift+Tab go round its text fields, in the order they mounted. Without one, Tab does nothing.
+const FieldOrder = createContext(null);
+export function FormFields({ children }) {
+  const order = useRef([]).current;
+  return <FieldOrder.Provider value={order}>{children}</FieldOrder.Provider>;
+}
 const focusSubs = new Set();
 const carets = new Map();    // token → where its caret is (also for password fields, off the input method)
 const setFocus = (tok) => {
@@ -327,6 +333,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const allRef = useRef(selectAll);
   allRef.current = allSel;
   latest.current = { value, onChange, onSubmit, onCancel, onKeyDown };
+  const order = useContext(FieldOrder);
 
   useEffect(() => {
     // with focus, keys go through the input method (Korean, Japanese, Chinese)
@@ -340,6 +347,11 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     handlers.set(token, (e) => {
       const p = latest.current;
       if (p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
+      if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
+        const i = order.indexOf(token);
+        setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
+        return;
+      }
       const all = allRef.current;
       if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || ((e.ctrl || e.meta) && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
       else if (all && /^Arrow|^Home$|^End$/.test(e.key || '')) { setAllSel(false); allRef.current = false; return; }
@@ -350,8 +362,9 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       else if (e.char) p.onChange(p.value + e.char);
       setBlink(true);
     });
+    order?.push(token);
     if (autoFocus) setFocus(token);
-    return () => { focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+    return () => { if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   const imeSt = useIme();
   const preedit = isFocused ? imeSt.preedit : '';

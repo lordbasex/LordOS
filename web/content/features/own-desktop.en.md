@@ -75,6 +75,15 @@ These numbers come from virtual machines and one board, not from a range of real
 
 In 0.8.7: several desktops in both Lord Flow and Lord Classic, with an Overview of live windows, a strip of desktops and dragging a window from one to another. Each window comes back on its desktop after a restart, and a window on a hidden desktop never has the keyboard, not even one that asks for fullscreen from there. Checked in an isolated session on a virtual machine, with X11 apps in a full session on another, and the Overview on a Raspberry Pi 5's monitor; a right-to-left language on screen and real trackpad swipes are still to check.
 
+## Files, servers and other disks
+
+All in 0.8.7.
+
+- **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
+- **Remote screens.** RDP and VNC apps come with the system and draw with LordOS's own engine: no client window, no X11 session, no toolkit.
+- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64, APFS read-only. These are commercial formats; the drivers are free software at no cost.
+- **Your way of working.** Choose, reorder and resize list columns, set Files' own Settings, and open Terminal in the folder you're in.
+
 ## Keys, the on-screen keyboard and coming back
 
 All in 0.8.7.

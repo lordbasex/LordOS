@@ -271,5 +271,6 @@
   "attr.a232": "Reserved space left",
   "attr.a240": "Head flying hours",
   "attr.a254": "Free fall events",
-  "notChecked": "Not checked yet"
+  "notChecked": "Not checked yet",
+  "formatsGet": "Open the Store"
 }

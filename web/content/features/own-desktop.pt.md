@@ -75,6 +75,15 @@ Esses números vêm de máquinas virtuais e de uma placa, não de uma variedade 
 
 Na 0.8.7 (a última versão publicada é a 0.8.6): várias áreas de trabalho no Lord Flow e no Lord Classic, com uma visão geral das janelas ao vivo, uma faixa de áreas de trabalho e arrastar uma janela de uma para outra. Cada janela volta à sua área de trabalho depois de reiniciar, e uma janela de uma área de trabalho oculta nunca tem o teclado, nem se pedir tela cheia de lá. Testado em uma sessão isolada em uma máquina virtual, com apps X11 numa sessão completa em outra, e a visão geral no monitor de um Raspberry Pi 5; falta conferir um idioma da direita para a esquerda na tela e gestos reais de trackpad.
 
+## Arquivos, servidores e outros discos
+
+Tudo na 0.8.7.
+
+- **Conectar a um servidor.** Rede lista cada computador como uma pasta, e seus compartilhamentos se abrem ali mesmo. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ftp, ftps e WebDAV, e todos abrem como pastas no Arquivos, com chaves SSH e certificados verificados antes.
+- **Telas remotas.** Os apps de RDP e VNC vêm com o sistema e desenham com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit.
+- **Discos de outros sistemas.** Disk Formats, um único item da Loja, abre NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64, APFS somente leitura. São formatos comerciais; os drivers são software livre e sem custo.
+- **Do seu jeito.** Escolha, reordene e ajuste as colunas da lista, use os Ajustes próprios do Arquivos e abra o Terminal na pasta onde você está.
+
 ## Teclas, teclado na tela e voltar para onde você estava
 
 Tudo na 0.8.7 (a última versão publicada é a 0.8.6).

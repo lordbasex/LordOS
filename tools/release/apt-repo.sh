@@ -42,6 +42,9 @@
 # (LORDOS_HWDATA_PUB=<public.pem> names a throwaway test key, for the staging target only). A lordos that
 # depends on it is refused while the pool has no lordos-hwdata.
 #
+# lordos-disk-formats (0.8.7, docs/FILES.md): the Store's Disk Formats item, from tools/iso/mkdeb-diskformats.sh, one
+# package per architecture, added like any .deb with the release. Its entry in apt/catalog.json has "section": "commercial".
+#
 # --notes VERSION=SECTION takes the notes of lordos VERSION from CHANGELOG.md section SECTION (for
 # example 0.8.1~staging1=Unreleased). By default the section is "VERSION" or "VERSION-<suffix>".
 #
