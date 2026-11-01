@@ -87,6 +87,10 @@ check "locked: nothing reaches a client that keeps sending" app query until 60 1
 check "locked: viewing and input stay refused 2 s later" app start 5 1 2000 expect-ref locked 1000 none 40 2000
 sleep 1
 pgrep -f lord-media -u $U >/dev/null && no "locked: an encoder is running" || ok "locked: the encoder stopped"
+# a root viewer watches the session's cursor while the API's client tries to move it behind the lock
+rootm video 1 2000 until 40 3000 wait 1500 cursor > m.out 2>&1 &
+AP=$!; sleep 0.8; app ptr 777 444 btn 0 1 btn 0 0 wait 200 >/dev/null 2>&1; wait $AP
+grep -q 'cursor 777 444' m.out && no "locked: API input moved the pointer" || ok "locked: API input doesn't reach the session"
 # what a 5673 viewer would see behind the lock: the socket itself keeps giving frames to root
 if out=$(rootm video 1 2000 until 40 3000 2>&1); then echo "note 5673: remote.sock still gives frames to a root client while locked (frames: yes)"; else echo "note 5673: no frames to a root client while locked: $out"; fi
 check "lock stays after a seat leaves" rootm seat undisplay wait 200
@@ -119,7 +123,7 @@ wait $AP
 sleep 0.3
 check "5673 gone: the door is free at once" app start 1 1 2000 until 40 4000 stop
 rootm hello "10.0.0.9 lord" video 1 2000 until 40 3000 > /dev/null 2>&1 && ok "no share: a viewer gets its frames as before" || no "no share: a viewer gets its frames as before"
-app start 1 1 2000 until 40 4000 wait 3500 until 40 4000 stop > a.out 2>&1 &
+app start 1 1 2000 until 40 4000 none 62 3500 stop > a.out 2>&1 &
 AP=$!
 sleep 1.5
 check "share active: a 5673 sign-in gets RP_BUSY" rootm hello "10.0.0.9 lord" until 44 1000 video 1 2000 none 40 1000
@@ -140,6 +144,13 @@ A="start 1 1 2000 until 40 4000 wait 1500 reset"; for i in 1 2 3 4 5 6 7 8 9 10 
 app $A stop > k.out 2>&1
 K=$(sed -n 's/^type 255: \([0-9]*\).*/\1/p' k.out); K=${K:-0}
 [ "$K" -le 3 ] && ok "still screen: 12 requests, $K keyframes" || no "still screen: $K keyframes in 12 s"
+
+# ---- system surfaces: while the search is open (injected as the person, through the root socket) API input is dropped
+app start 5 1 2000 until 40 4000 wait 1500 reset ptr 700 300 none 4 800 wait 1200 ptr 720 320 until 4 2000 stop > a.out 2>&1 &
+AP=$!; sleep 1.2; rootm key 125 1 key 57 1 key 57 0 key 125 0 wait 300 >/dev/null
+sleep 1.6; rootm key 1 1 key 1 0 wait 200 >/dev/null
+if wait $AP; then ok "search open: pointer dropped; closed: it moves again"; else no "system surface: $(cat a.out)"; fi
+check "SHARE_TEXT with nothing focused: no harm" app start 5 1 2000 until 40 4000 text "héllo" wait 300 stop
 
 # ---- the clipboard
 rootm clip "before the share" wait 100 >/dev/null
