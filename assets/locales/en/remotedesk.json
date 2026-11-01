@@ -42,5 +42,7 @@
   "fullscreen": "Full screen",
   "exitFullscreen": "Leave full screen",
   "connectingTo": "Connecting to {name}",
-  "needPassword": "Enter the password to connect."
+  "needPassword": "Enter the password to connect.",
+  "sendCad": "Send Ctrl+Alt+Del",
+  "foldersNone": "No shared folders"
 }

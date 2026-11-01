@@ -42,5 +42,7 @@
   "fullscreen": "Pantalla completa",
   "exitFullscreen": "Salir de pantalla completa",
   "connectingTo": "Conectando con {name}",
-  "needPassword": "Escribí la contraseña para conectarte."
+  "needPassword": "Escribí la contraseña para conectarte.",
+  "sendCad": "Enviar Ctrl+Alt+Supr",
+  "foldersNone": "Sin carpetas compartidas"
 }

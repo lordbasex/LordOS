@@ -4,7 +4,7 @@
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, MediaView, addListener } from '@lordos/runtime';
 import { useTheme } from './theme.js';
-import { useAppWindow, Segmented } from './components.jsx';
+import { useAppWindow, useWindowState, Segmented } from './components.jsx';
 import { useStore } from './store.js';
 import { windows, wm } from './windows.js';
 import { home as fsHome, stat as fsStat } from './fs.js';
@@ -13,6 +13,7 @@ import { lan } from './lan.js';
 import { certCheck } from './remotecert.js';
 import { t as tr } from './i18n.js';
 import { Button, ScrollView, TextInput, Toggle } from './components.jsx';
+import { MenuButton, ToolbarButton } from './controls.jsx';
 
 // keys with a name in X11's keysyms; printable ones are their code point, Latin-1 or 0x01000000 + code
 const SYMS = { Backspace: 0xff08, Tab: 0xff09, Enter: 0xff0d, Escape: 0xff1b, Delete: 0xffff, Home: 0xff50, ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54,
@@ -28,7 +29,7 @@ const scanOf = (e) => EXT[e.code] || e.code || 0;
 
 const bit = (b) => (b === 2 ? 4 : b === 1 ? 2 : 1);
 
-function Screen({ id, st, onEnd, focused, name, winId }) {
+function Screen({ id, st, onEnd, focused, name, winId, folders }) {
   const box = useRef(null);
   const buttons = useRef(0);
   const down = useRef(new Map());
@@ -51,25 +52,34 @@ function Screen({ id, st, onEnd, focused, name, winId }) {
   const last = useRef([0, 0]);          // a release has no position of its own
   const ptr = (e, extra = 0) => { if (e) last.current = at(e); lord.rdesk.pointer(id, last.current[0], last.current[1], buttons.current | extra); };
   useEffect(() => addListener('pointerup', (e) => { if (buttons.current) { buttons.current &= ~bit(e.button); ptr(null); } }), [id]);
-  const inset = (windows.get().find((w) => w.id === winId)?.fullscreen) ? 0 : 36;
+  const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
+  const inset = full ? 0 : 36;
   return h(View, { style: { flex: 1, backgroundColor: '#000' } },
     h(View, { ref: box, style: { flex: 1, marginTop: inset },
       onMouseDown: (e) => { buttons.current |= bit(e.button); ptr(e); },
       onMouseMove: (e) => ptr(e),
       onWheel: (e) => { const x = e.deltaY < 0 ? 8 : 16; ptr(e, x); ptr(e); } },
     st.media ? h(MediaView, { media: st.media, style: { flex: 1 } }) : null),
-    h(SessionBar, { name, winId, onEnd }));
+    h(SessionBar, { id, name, winId, folders, onEnd }));
 }
 
 // The strip above a session: always there in a window, and at the top edge when the session fills the screen.
-function SessionBar({ name, winId, onEnd }) {
-  const all = useStore(windows);
+function SessionBar({ id, name, winId, folders, onEnd }) {
+  const t = useTheme();
+  const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
   const [near, setNear] = useState(false);
-  const full = !!all.find((w) => w.id === winId)?.fullscreen;
-  const bar = h(View, { onMouseLeave: () => setNear(false), style: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: 'rgba(28,30,34,0.92)' } },
-    h(Text, { style: { flex: 1, fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, name),
-    h(Button, { small: true, label: tr(full ? 'remotedesk.exitFullscreen' : 'remotedesk.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) }),
-    h(Button, { small: true, label: tr('remotedesk.disconnect'), onClick: onEnd }));
+  const cad = () => {
+    const keys = [[0xffe3, 29], [0xffe9, 56], [0xffff, 0x153]];
+    keys.forEach(([sym, scan]) => lord.rdesk.key(id, sym, scan, 1));
+    keys.reverse().forEach(([sym, scan]) => lord.rdesk.key(id, sym, scan, 0));
+  };
+  const shared = folders.length ? folders.map((x) => ({ label: `${x.name}${x.ro ? ` · ${tr('remotedesk.readOnly')}` : ''}`, disabled: true })) : [{ label: tr('remotedesk.foldersNone'), disabled: true }];
+  const bar = h(View, { onMouseLeave: () => setNear(false), style: { height: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, backgroundColor: t.windowBg } },
+    h(Text, { style: { flex: 1, fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, name),
+    h(ToolbarButton, { label: '⌃⌥⌦', title: tr('remotedesk.sendCad'), onClick: cad }),
+    h(MenuButton, { icon: '▤', title: tr('remotedesk.tabFolders'), items: shared }),
+    h(ToolbarButton, { icon: '⛶', title: tr(full ? 'remotedesk.exitFullscreen' : 'remotedesk.fullscreen'), active: full, onClick: () => wm.setFullscreen(winId, !full) }),
+    h(ToolbarButton, { icon: '✕', title: tr('remotedesk.disconnect'), onClick: onEnd }));
   if (!full) return h(View, { style: { position: 'absolute', left: 0, right: 0, top: 0 } }, bar);
   return h(View, { onMouseEnter: () => setNear(true), style: { position: 'absolute', left: 0, right: 0, top: 0, height: near ? 36 : 3 } }, near ? bar : null);
 }
@@ -176,12 +186,14 @@ export function RemoteDeskApp() {
   const root = useRef(null);
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState(args?.host ? { start: { ...BLANK, proto: args.proto === 'vnc' ? 'vnc' : 'rdp', host: args.host, port: args.port || 0, user: args.user || '' } } : null);
-  const [active, setActive] = useState(null);
+  // going to full screen moves the app in the tree and remounts it: the session belongs to the window
+  const [active, setActive] = useWindowState('remote.active', null);
   const [error, setError] = useState('');
-  const [id, setId] = useState(0);
-  const [st, setSt] = useState(null);
-  const end = () => { if (id) lord.rdesk.close(id); setId(0); setSt(null); setActive(null); wm.setFullscreen(winId, false); };
-  useEffect(() => () => { if (id) lord.rdesk.close(id); }, [id]);
+  const [id, setId] = useWindowState('remote.id', 0);
+  const [st, setSt] = useWindowState('remote.state', null);
+  const [entered, setEntered] = useWindowState('remote.entered', false);
+  const end = () => { if (id) lord.rdesk.close(id); setId(0); setSt(null); setActive(null); setEntered(false); wm.setFullscreen(winId, false); };
+  useEffect(() => () => { if (id && !windows.get().some((w) => w.id === winId)) lord.rdesk.close(id); }, [id]);
   useEffect(() => {
     if (!id) return undefined;
     const timer = setInterval(() => {
@@ -190,9 +202,13 @@ export function RemoteDeskApp() {
       if (p.cert && certCheck(trusted, keyOf(active), p.cert).kind === 'known') lord.rdesk.cert(id, 1);
       else setSt(p);
       if (p.state === 'connected') {
-        const list = devicesOf(settings.get());
-        if (!list.some((x) => idOf(x) === idOf(active))) putDevices([active, ...list].slice(0, 50));
-        if (active.full) wm.setFullscreen(winId, true);
+        setEntered((was) => {
+          if (was) return was;
+          const list = devicesOf(settings.get());
+          if (!list.some((x) => idOf(x) === idOf(active))) putDevices([active, ...list].slice(0, 50));
+          if (active.full) wm.setFullscreen(winId, true);
+          return true;
+        });
       }
       if (['denied', 'failed', 'ended', 'unreachable'].includes(p.state)) { setError(p.state === 'ended' ? '' : tr(`remotedesk.err.${p.state}`)); end(); }
     }, 33);
@@ -227,7 +243,7 @@ export function RemoteDeskApp() {
     lord.rdesk.cert(id, ok ? 1 : 0);
     setSt({ ...st, cert: '' });
   };
-  if (st?.state === 'connected' && st.media) return h(Screen, { id, st, focused, onEnd: end, name: titleOf(active), winId });
+  if (st?.state === 'connected' && st.media) return h(Screen, { id, st, focused, onEnd: end, name: titleOf(active), winId, folders: active.folders || [] });
   const q = query.trim().toLowerCase();
   const shown = devices.filter((d) => !q || `${titleOf(d)} ${d.host} ${d.user}`.toLowerCase().includes(q));
   return h(View, { ref: root, style: { flex: 1, backgroundColor: t.windowBg } },

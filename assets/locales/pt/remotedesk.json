@@ -42,5 +42,7 @@
   "fullscreen": "Tela cheia",
   "exitFullscreen": "Sair da tela cheia",
   "connectingTo": "Conectando a {name}",
-  "needPassword": "Digite a senha para se conectar."
+  "needPassword": "Digite a senha para se conectar.",
+  "sendCad": "Enviar Ctrl+Alt+Del",
+  "foldersNone": "Sem pastas compartilhadas"
 }
