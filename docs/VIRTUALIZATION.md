@@ -501,7 +501,7 @@ Debian 13 has `passt` (**Measured**, 2025-05-03 snapshot); Phase 0 compares it w
 
 Clipboard through `org.qemu.Display1.Clipboard` (text, images), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the agent; out copies from the guest. Linux: our `lordos-guest`. virtio-win guests: SPICE agent, `spice-vdagent` with the dbus Clipboard path needs confirming: QEMU's clipboard needs `qemu-vdagent` chardev (**To test**).
 
-If the D-Bus clipboard turns out unworkable on a guest, QEMU's display clipboard carries text at least, which is reported to work.
+If the D-Bus clipboard turns out unworkable on a guest, the clipboard moves to the agent's own channel, `org.lordos.agent`: text, images and files, with the direction chosen for that machine. It's a private data channel inside the machine, so it needs no network, no port and no VNC. WebRTC's data channel solves reaching another computer, and 6.23 uses it there; inside one computer a virtio-serial port does the same job with no encryption layer to carry, since nothing leaves the host.
 
 ### 6.9 Sound, camera, microphone
 
@@ -625,7 +625,7 @@ An importer has three steps: **detect** a file or folder, show a **plan** of wha
 
 The plan states what's lost. **Snapshots in foreign formats are flattened to the current state.** Saved sessions can't move between engines, so a machine must be shut down first. Encrypted foreign disks need decrypting first. A guest that lacks virtio drivers starts on emulated SATA and an ordinary NIC; the assistant then installs the drivers and switches. A machine of another architecture imports fine and is marked Emulated: moving an arm64 machine to a Pi works natively, moving an amd64 one doesn't. Conversions run in the sandbox, because disk images are hostile input.
 
-## 6.23 Reaching a machine from another computer
+### 6.23 Reaching a machine from another computer
 
 On its own computer a machine's picture comes by dmabuf and its input, clipboard and sound through the D-Bus display and the agent: no network, no encoder, no VNC. Compressing it for WebRTC there would only add delay.
 
@@ -879,7 +879,7 @@ What people don't normally get from a desktop virtualization app, and the reason
 
 ## 17. Open questions
 
-Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the catalog, which will grow later; unattended install uses index selection first and the public generic key only as its fallback; a machine's picture never goes through VNC.
+Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the catalog, which will grow later; unattended install uses index selection first and the public generic key only as its fallback; no VNC: neither a machine's picture nor its clipboard goes through it.
 
 1. App name and icon.
 2. Default folder: `~/Machines`?
