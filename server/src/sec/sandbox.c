@@ -130,6 +130,11 @@ static int apply_landlock(const SandboxConfig *cfg, const int *ro_fds, const int
     /* read-only: runtime (fonts, assets) and the package folder */
     if (cfg->pkg_dir) ll_path(rs, cfg->pkg_dir, ro);
     for (const char *const *p = cfg->ro_extra; p && *p; p++) ll_path(rs, *p, ro);
+    uint64_t dev = (LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE) & fs_handled;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    if (abi >= 5) dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+    for (const char *const *p = cfg->dev_files; p && *p; p++) ll_path(rs, *p, dev);
     /* read and write: only the app's data folder */
     if (cfg->data_dir) ll_path(rs, cfg->data_dir, rw);
     /* folders passed as already open fds (helpers) */
@@ -508,10 +513,11 @@ static int build_filter(struct sock_filter *f, int cap, int net, const int *extr
     /* ioctl(2): only for decoding helpers, and only by device class
      * (type byte _IOC_TYPE = (request >> 8) & 0xff). Never a generic ioctl nor TIOCSTI. */
     if (ioctl_classes) {
-        int types[3], nt = 0;
+        int types[4], nt = 0;
         if (ioctl_classes & SANDBOX_IOCTL_DRM) types[nt++] = 'd';      /* DRM / VA-API */
         if (ioctl_classes & SANDBOX_IOCTL_V4L2) types[nt++] = 'V';     /* V4L2 (Pi 5) */
         if (ioctl_classes & SANDBOX_IOCTL_DMABUF) types[nt++] = 'b';   /* DMA-BUF sync */
+        if (ioctl_classes & SANDBOX_IOCTL_MEDIA) types[nt++] = '|';    /* media controller requests (Pi 5) */
         EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_ioctl), 0, (unsigned char)(nt + 4)));
         EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[1])));   /* request (low 32 bits) */
         EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, 0x0000ff00u));                             /* _IOC_TYPE << 8 */
@@ -642,7 +648,7 @@ int sandbox_apply_helper(const SandboxHelperCfg *cfg) {
     if (!drop_caps()) mask |= SB_NOCAPS;
     /* no network; read-only access to the declared folders, plus the folders that arrive as fds */
     SandboxConfig ro = { .id = cfg->name ? cfg->name : "helper", .pkg_dir = NULL, .data_dir = NULL,
-                         .runtime_dir = NULL, .ro_extra = cfg->ro_paths, .network = 0 };
+                         .runtime_dir = NULL, .ro_extra = cfg->ro_paths, .dev_files = cfg->dev_files, .network = 0 };
     int fs_ok = 0, net_ok = 0;
     if (!apply_landlock(&ro, cfg->ro_dir_fds, cfg->rw_dir_fds, &fs_ok, &net_ok)) { if (fs_ok) mask |= SB_LANDLOCK_FS; if (net_ok) mask |= SB_LANDLOCK_NET; }
     if (apply_seccomp_extra(0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1)) {

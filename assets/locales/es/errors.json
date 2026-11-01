@@ -653,5 +653,8 @@
   "share.notMounted": "No es un recurso conectado",
   "share.busy": "Está en uso: cerrá primero lo que tenga abierto",
   "share.unmountFailed": "No se pudo desconectar: {errno}",
-  "share.notResponding": "La computadora que comparte esto no responde"
+  "share.notResponding": "La computadora que comparte esto no responde",
+  "wallpaper.downloadFailed": "No se pudo descargar el fondo",
+  "wallpaper.removeFailed": "No se pudo cambiar el fondo",
+  "wallpaper.notDownloaded": "Ese fondo no está descargado"
 }

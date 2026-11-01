@@ -5,6 +5,7 @@ Package: *
 Pin: origin archive.raspberrypi.com
 Pin-Priority: 100
 
-Package: raspi-firmware linux-image-rpi-* linux-image-*-rpi-* linux-headers-rpi-* linux-headers-*-rpi-* linux-kbuild-* firmware-brcm80211 rpi-eeprom raspi-utils* raspberrypi-archive-keyring
+# (0.8.7) FFmpeg too: only Raspberry Pi's drives the Pi 5's HEVC decoder (docs/WALLPAPERS.md, docs/MEDIA.md).
+Package: raspi-firmware ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10 libavdevice61 linux-image-rpi-* linux-image-*-rpi-* linux-headers-rpi-* linux-headers-*-rpi-* linux-kbuild-* firmware-brcm80211 rpi-eeprom raspi-utils* raspberrypi-archive-keyring
 Pin: origin archive.raspberrypi.com
 Pin-Priority: 990

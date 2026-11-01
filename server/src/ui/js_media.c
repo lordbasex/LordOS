@@ -674,6 +674,13 @@ static JSValue f_hwaccel(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_NewString(c, media_hwaccel());
 }
 
+/* composition(): "gpu" when the GPU composes this session (main.c lord_composition). */
+const char *lord_composition(void);
+static JSValue f_composition(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewString(c, lord_composition());
+}
+
 /* hwDecode(): can this computer decode VP9/AV1 in hardware? The object from media/hwdec.c, or null
  * while it is being found out (the first call starts it; cached per boot). docs/VIDEO.md */
 static JSValue f_hwdecode(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -711,6 +718,7 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("protectedCount", 0, f_protected),
     JS_CFUNC_DEF("hwaccel", 0, f_hwaccel),
     JS_CFUNC_DEF("hwDecode", 0, f_hwdecode),
+    JS_CFUNC_DEF("composition", 0, f_composition),
 };
 
 /* A restriction was just added to the built-in apps: what it covers stops now, like revoking the

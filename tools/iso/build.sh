@@ -143,6 +143,7 @@ mkdir -p "$CH/etc/lordos"
 printf '# Live ISO: logs in automatically as the lordos user. The installed system uses the login screen.\nAUTOLOGIN=lordos\n' > "$CH/etc/lordos/session.conf"
 # the login screen's system user (lord-sessiond also creates it if missing)
 in_ch useradd --system --home-dir /var/lib/lordos-greeter --create-home --shell /usr/sbin/nologin --comment LordOS lordos-greeter
+in_ch usermod -aG render,video lordos-greeter
 install -m 440 tools/iso/rootfs/etc/sudoers.d/lordos-live "$CH/etc/sudoers.d/lordos-live"
 mkdir -p "$CH/var/lib/systemd/linger"; : > "$CH/var/lib/systemd/linger/lordos"
 # user PipeWire (the packages already enable the global units; just in case)

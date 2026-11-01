@@ -90,6 +90,7 @@ All in 0.8.7.
 
 - **Shortcuts per theme.** One dispatcher runs before every key listener, so a key it takes reaches nobody else, and both themes get an app switcher with large icons. Over a Linux app the desktop keeps only a fixed list of keys, chosen by name. Settings → Keyboard lists the shortcuts of the theme in use.
 - **Pointer lock.** A lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it, so a window in the background can't hide the pointer as it passes over.
+- **Moving wallpapers.** Short loops for the desktop and the login screen, by section, downloaded when you choose one, with credits for every clip. They need a compatible GPU and pause when nobody sees them.
 - **On-screen keyboard.** Opened by hand from the button next to the clock, for a computer with no physical keyboard, in LordOS fields, Linux apps, isolated apps and at the login and lock screens. It takes a closed list of keys, so it can't be a shortcut, nothing keeps what is typed, and its panel is black in screenshots and recordings. No run on a real touchscreen is recorded.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 

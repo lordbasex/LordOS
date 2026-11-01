@@ -57,8 +57,15 @@ void lm_hwprobe(const int *render, int n_render) {
     (void)render;
     (void)n_render;
 #endif
+    int drmprime = 0;
+    const AVCodec *hc = avcodec_find_decoder(AV_CODEC_ID_HEVC);
+    for (int i = 0; hc; i++) {
+        const AVCodecHWConfig *cfg = avcodec_get_hw_config(hc, i);
+        if (!cfg) break;
+        if (cfg->device_type == AV_HWDEVICE_TYPE_DRM) drmprime = 1;
+    }
     LmBuf b = { 0 };
-    lm_buf_printf(&b, "{\"vaapi\":%s,\"vendor\":", vaapi ? "true" : "false");
+    lm_buf_printf(&b, "{\"vaapi\":%s,\"drmprime\":%s,\"vendor\":", vaapi ? "true" : "false", drmprime ? "true" : "false");
     lm_buf_str(&b, vendor);
     lm_buf_printf(&b, ",\"vp9\":%s,\"av1\":%s,\"h264\":%s,\"hevc\":%s}", vp9 ? "true" : "false", av1 ? "true" : "false",
                   h264 ? "true" : "false", hevc ? "true" : "false");

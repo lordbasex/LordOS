@@ -123,7 +123,7 @@ static int64_t frame_ms(AVStream *st, const AVFrame *f) {
 
 static enum AVPixelFormat get_hw_format(AVCodecContext *c, const enum AVPixelFormat *fmts) {
     (void)c;
-    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == AV_PIX_FMT_VAAPI) return *p;
+    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == AV_PIX_FMT_VAAPI || *p == AV_PIX_FMT_DRM_PRIME) return *p;
     P.hw_active = 0;                /* the decoder can't use VA-API: software */
     return fmts[0];
 }
@@ -143,7 +143,7 @@ static AVCodecContext *open_dec(int idx, int video) {
             for (int i = 0;; i++) {
                 const AVCodecHWConfig *cfg = avcodec_get_hw_config(codec, i);
                 if (!cfg) break;
-                if (cfg->device_type == AV_HWDEVICE_TYPE_VAAPI && (cfg->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
+                if ((cfg->device_type == AV_HWDEVICE_TYPE_VAAPI || cfg->device_type == AV_HWDEVICE_TYPE_DRM) && (cfg->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
                     c->hw_device_ctx = av_buffer_ref(P.hw);
                     c->get_format = get_hw_format;
                     c->extra_hw_frames = VQ_MAX + 4;
@@ -716,7 +716,7 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (late && !seek_wait) { P.dropped++; av_frame_free(&vf.f); continue; }
             int64_t clk = clock_ms();
             int r = lm_out_present(vf.f, vf.pts);
-            int hwframe = vf.f->format == AV_PIX_FMT_VAAPI;
+            int hwframe = vf.f->format == AV_PIX_FMT_VAAPI || vf.f->format == AV_PIX_FMT_DRM_PRIME;
 #if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 2  /* HWFALL=2: frames that can't be read back after 30 shown */
             if (P.shown >= 30 && !hwf_tested) {
                 pthread_mutex_lock(&P.mu);

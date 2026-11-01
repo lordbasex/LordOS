@@ -514,6 +514,10 @@ setup_greeter_user() {
         --shell /usr/sbin/nologin --comment LordOS "$GREETER_USER"
     state_set GREETER_CREATED 1
     changed "system user $GREETER_USER created (the login screen's user)"
+    # the login screen composes on the GPU and may decode its wallpaper in hardware (docs/WALLPAPERS.md)
+    for g in render video; do
+        getent group "$g" >/dev/null 2>&1 && as_root usermod -aG "$g" "$GREETER_USER"
+    done
 }
 
 setup_groups() {

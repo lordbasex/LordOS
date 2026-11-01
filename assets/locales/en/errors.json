@@ -653,5 +653,8 @@
   "share.notMounted": "It is not a connected share",
   "share.busy": "It is in use: close what is open on it first",
   "share.unmountFailed": "Could not disconnect: {errno}",
-  "share.notResponding": "The computer sharing this does not answer"
+  "share.notResponding": "The computer sharing this does not answer",
+  "wallpaper.downloadFailed": "The wallpaper could not be downloaded",
+  "wallpaper.removeFailed": "The wallpaper could not be changed",
+  "wallpaper.notDownloaded": "That wallpaper is not downloaded"
 }

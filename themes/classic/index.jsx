@@ -13,7 +13,7 @@
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
-  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
+  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview,
 } from '@lordos/sdk';
@@ -196,6 +196,7 @@ function App() {
             onContextMenu={(e) => setDesk({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
+        {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}

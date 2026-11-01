@@ -326,6 +326,7 @@ mkdir -p "$CH/etc/lordos"
 # until first boot nobody logs in automatically; rpi/firstboot decides (login screen or lordos)
 printf '# Raspberry Pi: set by /usr/lib/lordos/rpi/firstboot on first boot.\nAUTOLOGIN=\n' > "$CH/etc/lordos/session.conf"
 in_root "$CH" useradd --system --home-dir /var/lib/lordos-greeter --create-home --shell /usr/sbin/nologin --comment LordOS lordos-greeter
+in_root "$CH" usermod -aG render,video lordos-greeter
 in_root "$CH" systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service > /dev/null 2>&1 || true
 
 # first boot and wait for vc4

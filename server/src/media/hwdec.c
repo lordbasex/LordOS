@@ -40,7 +40,7 @@ static struct {
     double deadline;
     char boot[40], vm[64], gpu[48], vendor[128];
     int virt;                   /* the only GPU is a virtual one */
-    int vaapi, va_vp9, va_av1, va_h264, va_hevc;
+    int vaapi, va_vp9, va_av1, va_h264, va_hevc, drmprime;
     int v4l2, v4_vp9, v4_av1, v4_h264, v4_hevc;
     char json[1024];
 } H = { .sock = -1 };
@@ -150,7 +150,8 @@ static void build_json(void) {
     media_json_str(gpu, sizeof gpu, H.gpu);
     media_json_str(vendor, sizeof vendor, H.vendor);
     int vp9 = !H.virt && (H.va_vp9 || H.v4_vp9), av1 = !H.virt && (H.va_av1 || H.v4_av1);
-    int h264 = !H.virt && (H.va_h264 || H.v4_h264), hevc = !H.virt && (H.va_hevc || H.v4_hevc);
+    /* a V4L2 decoder only counts for HEVC when this FFmpeg can drive it (lm_hwprobe.c) */
+    int h264 = !H.virt && (H.va_h264 || H.v4_h264), hevc = !H.virt && (H.va_hevc || (H.v4_hevc && H.drmprime));
     const char *why = H.virt ? "virtualGpu" : (vp9 && av1) ? "ok" : (!H.vaapi && !H.v4l2) ? "noDriver" : "noProfiles";
     snprintf(H.json, sizeof H.json,
              "{\"boot\":\"%s\",\"vm\":%s,\"gpu\":%s,\"virtualGpu\":%s,\"vaapi\":%s,\"vendor\":%s,\"v4l2\":%s,"
@@ -261,6 +262,7 @@ void hwdec_dispatch(void) {
         H.va_av1 = jbool(payload, "av1");
         H.va_h264 = jbool(payload, "h264");
         H.va_hevc = jbool(payload, "hevc");
+        H.drmprime = jbool(payload, "drmprime");
         const char *v = strstr(payload, "\"vendor\":\"");
         if (v) {
             v += 10;

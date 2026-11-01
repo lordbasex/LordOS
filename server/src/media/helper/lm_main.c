@@ -75,8 +75,21 @@ int main(int argc, char **argv) {
         if (st_render >= 0) ioctls |= SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF;
     }
     if (m.v[0] == MK_CAMERA) ioctls |= SANDBOX_IOCTL_V4L2 | (fds[1] >= 0 ? SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF : 0);
-    SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
-                             .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536 };
+    /* The Pi 5's HEVC decoder: the Raspberry Pi FFmpeg opens these by path, so only here is /dev reachable, and only
+     * the two exact files of that decoder, found from sysfs before the sandbox. */
+    static char dev_video[32], dev_media[32];
+    static const char *devs[3];
+    static const char *const ro_pi[] = { "/usr/lib", "/usr/lib64", "/lib", "/lib64", "/usr/share", "/etc/ld.so.cache",
+                                         "/sys/dev/char", "/sys/devices", "/sys/class/video4linux", "/sys/bus/media", "/run/udev", NULL };
+    int pi_hevc = m.v[0] == MK_PLAY && fds[2] >= 0 && lm_hwaccel_is(payload, "v4l2request") &&
+                  !lm_hevc_dec_paths(dev_video, sizeof dev_video, dev_media, sizeof dev_media);
+    if (pi_hevc) {
+        ioctls |= SANDBOX_IOCTL_V4L2 | SANDBOX_IOCTL_MEDIA;
+        devs[0] = dev_video;
+        devs[1] = dev_media;
+    }
+    SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = pi_hevc ? ro_pi : ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
+                             .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536, .dev_files = pi_hevc ? devs : NULL };
     if (m.v[0] == MK_WORKER) {                 /* thumbnails and probes: in the background (before the sandbox) */
         setpriority(PRIO_PROCESS, 0, 10);
         syscall(SYS_ioprio_set, 1, 0, (2 << 13) | 7);   /* IOPRIO_WHO_PROCESS, this process, best effort, lowest */

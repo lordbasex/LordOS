@@ -116,7 +116,14 @@ int hw_button_action_valid(const char *a, int lid);
 int hw_time_valid(const char *t);       /* "YYYY-MM-DD HH:MM:SS", a real date from 2000 to 2099 */
 int hw_backlight_name_valid(const char *n);
 
+void hw_act_wallpaper_get(const AdminReq *r, const char *arg, size_t len);
+void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len);
+void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len);
+
 #define HW_ADMIN_ACTIONS \
+    { "wallpaper-get", hw_act_wallpaper_get, A_ANYONE }, \
+    { "wallpaper-remove", hw_act_wallpaper_remove, 0 }, \
+    { "wallpaper-login", hw_act_wallpaper_login, 0 }, \
     { "display-brightness", hw_act_brightness, A_ANYONE }, \
     { "power-profile", hw_act_power_profile, A_ANYONE }, \
     { "power-suspend", hw_act_suspend, A_ANYONE }, \

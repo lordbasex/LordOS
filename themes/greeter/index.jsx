@@ -11,10 +11,10 @@
 //            bootTest?:{k, n, in}} (a boot time test restarts in `in` seconds; a login cancels it)
 //           (last: the user whose session was last shown on the monitor)
 //           {t:'mode', mode:'login'|'lock'|'switch', user} · {t:'ok'} · {t:'fail', wait} · {t:'error'} · {t:'busy'}
-import { render, screen, mainBox, onScreenChange } from '@lordos/runtime';
+import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
-  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, media, MediaView,
+  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -33,19 +33,46 @@ const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#2
 
 // A looping video behind the clock, on the main display, when the file is there. It has no sound, and it only
 // covers the wallpaper once it plays: no file, no helper or a crash leave the still image, with nothing on screen.
-const LOGIN_VIDEO = 'login-loop.mp4';     // in this user's home, /var/lib/lordos-greeter
+const LOGIN_PICKED = '/var/lib/lordos/wallpapers/login.mp4';      // chosen in Settings (wallpaper-login)
+const LOGIN_BUILTIN = '/usr/share/backgrounds/lordos/motion/crown';
+const IDLE_MS = 300000;
 function LoginVideo({ box, stop }) {
   const [id, setId] = useState(0);
   useEffect(() => {
     if (stop || settings.get().reduceMotion || !media.available()) return undefined;
-    let cur = 0;
-    try { cur = media.play('greeter', LOGIN_VIDEO, { loop: true, audio: 0, appName: 'LordOS' }); } catch (e) { return undefined; }
-    if (!cur) return undefined;
-    const off = media.on(cur, (type, d) => {
-      if (type === 'state' && d.state === 'playing') setId(cur);
-      else if (type === 'error' || type === 'closed') setId(0);
-    });
-    return () => { off(); setId(0); media.close(cur); };
+    let cur = 0, off = null, polls = 0, timer = 0, idle = 0, paused = false, last = Date.now();
+    const start = (codecs) => {
+      const files = [LOGIN_PICKED, ...codecs.map((c) => `${LOGIN_BUILTIN}.${c}.mp4`)];
+      for (const f of files) {
+        try { cur = media.play('greeter', f, { loop: true, audio: 0, appName: 'LordOS' }); } catch (e) { cur = 0; }
+        if (cur) break;
+      }
+      if (!cur) return;
+      off = media.on(cur, (type, d) => {
+        if (type === 'state' && d.state === 'playing') setId(cur);
+        else if (type === 'error' || type === 'closed') setId(0);
+      });
+      // nobody at the screen for five minutes: it stops decoding until someone is back
+      idle = setInterval(() => {
+        const away = Date.now() - last > IDLE_MS;
+        if (away !== paused) { paused = away; media.control(cur, away ? 'pause' : 'play'); }
+      }, 5000);
+    };
+    const poll = () => {
+      let c = [];
+      try { c = motionCodecs(lord.media.hwDecode(), lord.media.composition()); } catch (e) { c = []; }
+      if (c.length) start(c);                // hardware only: otherwise the still image stays
+      else if (++polls < 40) timer = setTimeout(poll, 250);
+    };
+    poll();
+    const seen = () => { last = Date.now(); };
+    const offs = ['pointerdown', 'pointermove', 'keydown'].map((e) => addListener(e, seen));
+    return () => {
+      clearTimeout(timer); clearInterval(idle); offs.forEach((x) => x && x());
+      if (off) off();
+      setId(0);
+      if (cur) media.close(cur);
+    };
   }, [stop]);
   if (!id) return null;
   return <MediaView media={id} style={{ position: 'absolute', left: box.left, top: box.top, width: box.width, height: box.height }} />;

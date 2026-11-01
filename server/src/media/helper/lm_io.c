@@ -2,6 +2,10 @@
  * lord-server passed (our own AVIOContext), sealed memfds for the frames, VA-API over the received render
  * node and a minimal JSON for the replies. */
 #include "lm.h"
+
+#include <ctype.h>
+#include <dirent.h>
+#include <libavutil/hwcontext_drm.h>
 #include "../aring.h"
 
 #include <errno.h>
@@ -174,18 +178,57 @@ static void va_free(AVHWDeviceContext *dc) {
 }
 #endif
 
+int lm_hwaccel_is(const char *params, const char *name) {
+    const char *p = params ? strstr(params, "hwaccel=") : NULL;
+    if (!p) return 0;
+    p += 8;
+    size_t n = strlen(name);
+    return !strncmp(p, name, n) && (p[n] == '\n' || !p[n]);
+}
+
+int lm_hevc_dec_paths(char *video, size_t vn, char *media, size_t mn) {
+    DIR *d = opendir("/sys/class/video4linux");
+    if (!d) return -1;
+    int found = -1;
+    struct dirent *e;
+    while (found && (e = readdir(d))) {
+        if (strncmp(e->d_name, "video", 5)) continue;
+        char p[320], name[64] = "";
+        snprintf(p, sizeof p, "/sys/class/video4linux/%.32s/name", e->d_name);
+        FILE *f = fopen(p, "r");
+        if (!f) continue;
+        char *ok = fgets(name, sizeof name, f);
+        fclose(f);
+        if (!ok || strncmp(name, "rpi-hevc-dec", 12)) continue;
+        snprintf(p, sizeof p, "/sys/class/video4linux/%.32s/device", e->d_name);
+        DIR *m = opendir(p);
+        struct dirent *x;
+        while (m && found && (x = readdir(m))) {
+            if (strncmp(x->d_name, "media", 5) || !isdigit((unsigned char)x->d_name[5])) continue;
+            snprintf(video, vn, "/dev/%.32s", e->d_name);
+            snprintf(media, mn, "/dev/%.16s", x->d_name);
+            found = 0;
+        }
+        if (m) closedir(m);
+    }
+    closedir(d);
+    return found;
+}
+
 /* Eligible acceleration: "vaapi" (Intel/AMD, render node), "v4l2request" (Raspberry Pi 5, HEVC
  * over V4L2 stateless; see docs/RASPBERRY.md) or "none". If it's not possible, NULL: software. */
 AVBufferRef *lm_hw_device(const char *accel, int fd) {
     if (!accel || !*accel || !strcmp(accel, "none") || fd < 0) return NULL;
     if (!strcmp(accel, "vaapi")) return lm_vaapi_device(fd);
     if (!strcmp(accel, "v4l2request")) {
-        /* TODO(RPi5): the v4l2-request hwaccel only exists in Raspberry Pi's FFmpeg (+rpt) and its
-         * device opens /dev/media* by path; lord-media doesn't open /dev: it has to be created over
-         * the fds lord-server passes (DRM PRIME NV12/SAND128). Meanwhile, software. */
-        if (av_hwdevice_find_type_by_name("v4l2request") == AV_HWDEVICE_TYPE_NONE) LM_LOG("este FFmpeg no tiene v4l2request: software");
-        else LM_LOG("v4l2request can't be created over fds yet: software");
-        return NULL;
+        /* The stateless decoder lives in Raspberry Pi's FFmpeg only: a DRM device over the render node lord-server
+         * sent, and the hwaccel opens the two device files the sandbox lets through (lm_main.c). */
+        AVBufferRef *ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_DRM);
+        if (!ref) return NULL;
+        AVDRMDeviceContext *drm = ((AVHWDeviceContext *)ref->data)->hwctx;
+        drm->fd = dup(fd);
+        if (drm->fd < 0 || av_hwdevice_ctx_init(ref) < 0) { LM_LOG("no DRM device: software"); av_buffer_unref(&ref); return NULL; }
+        return ref;
     }
     LM_LOG("unknown acceleration '%s': software", accel);
     return NULL;

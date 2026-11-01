@@ -90,6 +90,7 @@ Todo en la 0.8.7.
 
 - **Atajos por tema.** Un solo despachador corre antes que cualquier oyente de teclas, así que una tecla que toma no le llega a nadie más, y los dos temas tienen un selector de apps con íconos grandes. Sobre una app de Linux el escritorio se guarda solo una lista fija de teclas, elegida por nombre. Ajustes → Teclado lista los atajos del tema en uso.
 - **Bloqueo del puntero.** Un bloqueo vale solo con el puntero sobre la ventana y el teclado en su app, y ❖Esc siempre lo libera, así que una ventana de fondo no puede esconder el puntero cuando pasa por encima.
+- **Fondos en movimiento.** Bucles cortos para el escritorio y el inicio de sesión, por sección, descargados al elegirlos, con créditos de cada clip. Necesitan una GPU compatible y se pausan cuando nadie los ve.
 - **Teclado en pantalla.** Se abre a mano con el botón junto al reloj, para una computadora sin teclado físico, en campos de LordOS, apps de Linux, apps aisladas y en las pantallas de inicio de sesión y de bloqueo. Toma una lista cerrada de teclas, así que no puede ser un atajo, nada guarda lo que se escribe, y su panel sale negro en capturas y grabaciones. No hay registrada ninguna prueba en una pantalla táctil real.
 - **Restaurar la sesión.** Las apps abiertas al cerrar sesión, reiniciar o apagar vuelven con sus ventanas y su escritorio, y después de un corte de luz o un fallo LordOS pregunta primero. Se guardan solo identificadores de apps, nunca rutas de documentos. Probado en una máquina virtual, con reinicios, un apagado real y un apagado forzado.
 

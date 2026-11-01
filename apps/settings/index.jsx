@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, MOTION_SECTIONS, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -207,6 +207,103 @@ function Appearance() {
 // A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
 const wallpaperName = (w) => (w.nameKey && tOptional(w.nameKey)) || w.name;
 
+function MotionTile({ it, on, avail, percent, onClick }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
+  return (
+    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: 108, opacity: avail ? 1 : 0.45 }}>
+      <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
+        <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+          <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
+        </View>
+      </View>
+      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 108 }}>{name}</Text>
+    </View>
+  );
+}
+
+// Moving wallpapers: downloaded on demand, played only with a compatible GPU.
+function MotionWallpapers() {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const codecs = useCodecs();
+  const downloads = useStore(motionDownloads);
+  const [scope, setScope] = useState('*');
+  const [msg, setMsg] = useState('');
+  const [pick, setPick] = useState(false);
+  const [credits, setCredits] = useState(false);
+  const can = codecs.length > 0;
+  const displays = screenDisplays() || [];
+  const main = displays[0] || { w: 1920, h: 1080 };
+  const motion = s.motion || {};
+  const cur = motion[scope] || null;
+  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m }); };
+  const select = (it) => {
+    setMsg('');
+    if ((s.motionFiles || {})[it.id]) { choose(it.id); return; }
+    const v = variantFor(it, codecs, main);
+    if (!v) return;
+    downloadMotion(it, v).then(() => choose(it.id), (e) => setMsg(errorText(e)));
+  };
+  const curItem = motionItems.find((x) => x.id === cur);
+  const addFile = (path) => {
+    setPick(false);
+    media.probe(path).then((info) => {
+      const why = userVideoProblem(info, codecs);
+      if (why) { setMsg(tr(`settings.motion.problem.${why}`)); return; }
+      const id = `user:${Date.now()}`;
+      set({ motionUser: [...(s.motionUser || []), { id, name: path.split('/').pop(), path }] });
+      choose(id);
+    });
+  };
+  return (
+    <>
+      <Section title={tr('settings.motion.title')} footer={can ? tr('settings.motion.hint') : undefined}>
+        {!can ? <Note>{tr('settings.motion.needsGpu')}</Note> : null}
+        {msg ? <Note tone="warn">{msg}</Note> : null}
+        {can && displays.length > 1 ? (
+          <SettingRow label={tr('settings.motion.display')}>
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, d.name || String(d.id)])]} />
+          </SettingRow>
+        ) : null}
+        {can ? (
+          <Actions style={{ paddingVertical: spacing.s }}>
+            <Button small label={tr('settings.motion.none')} disabled={!cur} onClick={() => choose(null)} />
+            <Button small label={tr('settings.motion.random')} onClick={() => choose('random')} />
+            <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />
+            <Button small label={tr('settings.motion.onLogin')} disabled={!curItem} onClick={() => setLoginMotion(curItem).catch((e) => setMsg(errorText(e)))} />
+            <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).catch((e) => setMsg(errorText(e)))} />
+            <Button small label={tr('settings.motion.remove')} disabled={!curItem} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} />
+            <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
+          </Actions>
+        ) : null}
+      </Section>
+      {MOTION_SECTIONS.map((sec) => (
+        <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
+            {motionItems.filter((it) => it.section === sec).map((it) => (
+              <MotionTile key={it.id} it={it} avail={can} on={cur === it.id} percent={downloads[it.id]} onClick={() => select(it)} />
+            ))}
+          </View>
+        </Section>
+      ))}
+      {credits ? (
+        <Section title={tr('settings.motion.credits')}>
+          <View style={{ gap: 6, paddingVertical: spacing.s }}>
+            {motionItems.map((it) => (
+              <Text key={it.id} style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tOptional(`settings.motion.item.${it.id}`) || it.name} — ${it.author} — ${it.license} — ${it.source}`}</Text>
+            ))}
+          </View>
+        </Section>
+      ) : null}
+      {pick ? <FilePicker onPick={(p) => addFile(Array.isArray(p) ? p[0] : p)} onClose={() => setPick(false)} /> : null}
+    </>
+  );
+}
+
 // Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
 function Wallpapers() {
   const t = useTheme();
@@ -231,6 +328,7 @@ function Wallpapers() {
           </View>
         </View>
       </Section>
+      <MotionWallpapers />
       {cats.map(([c, ws]) => (
         <Section key={c} title={catName(c)}>
           {/* 108 px items with 10 px gaps: a category of five fits on one row in the default window */}

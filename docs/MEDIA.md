@@ -109,8 +109,8 @@ We took the way the apps of popular desktop systems work, never their logos or t
 - **Hardware acceleration:** `hwaccel=vaapi|v4l2request|none`, selectable with
   `LORD_MEDIA_HWACCEL`; `LORD_MEDIA_HW=0` turns it off.
   - With VA-API, the driver (radeonsi or iHD) decodes and the NV12 frame is downloaded to scale it.
-  - `v4l2request` (Raspberry Pi 5 HEVC) is prepared: it needs the Raspberry Pi FFmpeg and creating
-    the device over fds (TODO in `lm_io.c`).
+  - `v4l2request` (Raspberry Pi 5 HEVC, 0.8.7): Raspberry Pi's FFmpeg, a DRM device over the render node and two exact
+    device files for this job only (`docs/WALLPAPERS.md`).
   - If there is no driver, the decoder carries on in software without interruption.
   - (0.8.7, in development) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
     that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
@@ -359,8 +359,6 @@ something changes), 0 dropped frames.
   on the AMD PC.
 - **LordBench's video workloads with hardware decoding (maintainer's decision):** `MK_VBENCH` gets no fds and no ioctl
   classes; a hardware workload needs the render node and `SANDBOX_IOCTL_DRM` for that job, which widens its sandbox.
-- **Raspberry Pi 5:** HEVC through `v4l2request` over fds (Debian's FFmpeg doesn't have it; the maintainer's decision:
-  it needs another FFmpeg, and the device opens `/dev/media*` by path, which the sandbox doesn't allow).
 - **Image subtitles** (PGS, DVD): only text ones today.
 - **Playback speed** and saved **playlists**.
 - **Screenshots:** record only an area (today, the whole screen) and record system audio (today,

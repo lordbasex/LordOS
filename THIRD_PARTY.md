@@ -33,6 +33,12 @@ updated. Nothing else in `third_party/` differs from upstream.
 |---|---|---|---|---|
 | QuickJS 2025-04-26 (`third_party/quickjs/VERSION`) | Adds `size_t JS_GetMallocSize(JSRuntime *rt)`, which returns `rt->malloc_state.malloc_size`: the same `malloc_size` that `JS_ComputeMemoryUsage` reports, without walking every object, string and shape of the runtime. No existing function or structure changes. | `quickjs.c` (7 lines, just before `JS_ComputeMemoryUsage`), `quickjs.h` (its prototype, after `JS_ComputeMemoryUsage`'s) | `lord.stats()` (`f_stats` in `server/src/ui/js.c`) gives `jsKB` from it in O(1); About, Settings → General and System Information poll it while open, and the full walk grew with the number of objects. Checked equal to `JS_ComputeMemoryUsage`'s `malloc_size` on a runtime with 100,000 objects, a 50,000-entry Map and after GC | 0.8.6 |
 
+## Moving wallpapers
+
+Downloaded on demand, not in this repository; each clip's author, license and source are in Settings → Wallpaper → Credits
+and in the README of the `LordOS-wallpapers` repository. NASA material (public domain), CC0, CC BY 3.0 and CC BY-SA 4.0
+works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
+
 ## npm packages (bundled into the theme JavaScript at build time)
 
 | Package | License |

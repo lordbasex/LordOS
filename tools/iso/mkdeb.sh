@@ -137,9 +137,10 @@ done
 cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner "$L/assets/"
 # the wallpaper collection (assets/wallpapers/README.md): once, in the standard place for desktop
 # backgrounds; lord-server reaches it as asset:wallpapers/… through the link. Only the JPEGs, the
-# thumbnails and the README (index.json is bundled into the SDK at build time).
+# thumbnails and the README (index.json is bundled into the SDK at build time); motion.json and the built-in
+# moving wallpaper (docs/WALLPAPERS.md).
 install -d "$PKG/usr/share/backgrounds/lordos"
-( cd assets/wallpapers && find . -name '*.jpg' -o -name README.md ) | while read -r f; do
+( cd assets/wallpapers && find . -name '*.jpg' -o -name README.md -o -name motion.json -o -name '*.mp4' ) | while read -r f; do
     install -D -m 644 "assets/wallpapers/$f" "$PKG/usr/share/backgrounds/lordos/$f"
 done
 ln -s /usr/share/backgrounds/lordos "$L/assets/wallpapers"

@@ -111,6 +111,19 @@
             "es": "Todavía no: LordOS sigue en beta. La primera versión pública fue la 0.8.0 y la última es la 0.8.6, publicada el 30 de octubre de 2026. Casi todo funciona, pero algunas partes todavía no se probaron en hardware real (por ejemplo impresoras reales, placas NVIDIA, y dos monitores o 4K en la Raspberry Pi 5), y faltan cosas como las herramientas de accesibilidad. Probala en modo live o en una compu de repuesto, y hacé copias de seguridad.",
             "pt": "Ainda não: o LordOS continua em beta. A primeira versão pública foi a 0.8.0 e a mais recente é a 0.8.6, publicada em 30 de outubro de 2026. Quase tudo funciona, mas algumas partes ainda não foram testadas em hardware real (por exemplo impressoras reais, placas NVIDIA, e dois monitores ou 4K no Raspberry Pi 5), e recursos como as ferramentas de acessibilidade ainda estão por vir. Experimente no modo live ou num computador reserva, e faça backups."
           }
+        },
+        {
+          "id": "moving-wallpapers",
+          "q": {
+            "en": "Why can't I use moving wallpapers?",
+            "es": "¿Por qué no puedo usar fondos en movimiento?",
+            "pt": "Por que não consigo usar fundos em movimento?"
+          },
+          "a": {
+            "en": "They need a compatible GPU: the GPU must compose the desktop and decode the video in hardware, because a video behind everything would otherwise take CPU from your work. Without that, LordOS keeps a still image. Virtual machines don't qualify.",
+            "es": "Necesitan una GPU compatible: la GPU tiene que componer el escritorio y decodificar el video por hardware, porque si no un video detrás de todo le quitaría CPU a tu trabajo. Sin eso, LordOS deja una imagen fija. Las máquinas virtuales no califican.",
+            "pt": "Precisam de uma GPU compatível: a GPU deve compor a área de trabalho e decodificar o vídeo por hardware, porque senão um vídeo atrás de tudo tiraria CPU do seu trabalho. Sem isso, o LordOS mantém uma imagem fixa. Máquinas virtuais não se qualificam."
+          }
         }
       ]
     },

@@ -269,7 +269,7 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
     `tools/rpi/verify-board.sh` after flashing.
   - [x] Run `build-img.sh` and test on the 16 GB Pi 5 (test list in `RASPBERRY.md`; the image is
     a release file since 0.8.0; results in `RASPBERRY.md` and the release tests in `ISO.md`).
-  - [ ] Hardware video on the Pi 5 (HEVC via V4L2 stateless; H.264 in software) in
+  - [x] (0.8.7, unmeasured) Hardware video on the Pi 5 (HEVC via V4L2 stateless; H.264 in software) in
     `lord-media`.
   - [ ] A «create user» step on the login screen, instead of setup mode.
 
