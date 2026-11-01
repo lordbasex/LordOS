@@ -171,7 +171,7 @@ static int trust_tls(char *ca, size_t cn) {
     if (v < 0) { finish("failed", NULL, NULL); return -1; }
     snprintf(dir, sizeof dir, "%s/.config/lordos/remote_certs", fsops_home());
     mkparents(dir);
-    snprintf(ca, cn, "%s/%s_%d.pem", dir, q.host, port);
+    if ((size_t)snprintf(ca, cn, "%s/%s_%d.pem", dir, q.host, port) >= cn) { finish("failed", NULL, NULL); return -1; }
     int how = rconnect_tls_decide(slurp(ca), pem, v);
     if (how == RC_TLS_CHANGED) { finish("changed", NULL, NULL); return -1; }
     if (how == RC_TLS_PIN) return 0;
@@ -243,7 +243,7 @@ static void mount_job(void) {
     /* a port of its own is another server: ftps on 21 and on 990 are two folders */
     char ptxt[12] = "";
     if (q.port) snprintf(ptxt, sizeof ptxt, ":%d", q.port);
-    snprintf(dir, sizeof dir, "%s/%s on %s%s", remote_root(root, sizeof root), q.kind, q.host, ptxt);
+    if ((size_t)snprintf(dir, sizeof dir, "%s/%s on %s%s", remote_root(root, sizeof root), q.kind, q.host, ptxt) >= sizeof dir) { close(fd); finish("failed", NULL, NULL); return; }
     mkparents(dir);
     if (mounted_at(dir)) { close(fd); finish("done", NULL, dir); return; }
     char src[240] = "r:";
