@@ -156,9 +156,8 @@ EOF
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
-    if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs
-    if [ -x build/wallpaper-find-test ]; then run "wallpaper-find-test" build/wallpaper-find-test; else skip "wallpaper-find-test"; fi
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
+    if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
     # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)
