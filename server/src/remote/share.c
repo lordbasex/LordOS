@@ -19,6 +19,7 @@
 #include "mirror.h"
 #include "proto.h"
 #include "../sec/appid.h"
+#include "../sec/json.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -202,15 +203,18 @@ static void release_input(Conn *c) {
     if (h.no_taps) h.no_taps();
 }
 
+static int want_input(const Conn *c) { return (c->flags & (SW_F_INPUT | SW_F_CLIPBOARD)) != 0; }
+
 static void shell_event(const char *t, const Conn *c) {
     if (!h.event) return;
-    char j[SG_ID_MAX + SG_EXE_MAX + 128];
-    if (c) snprintf(j, sizeof j, "{\"t\":\"%s\",\"token\":%u,\"app\":\"%s\",\"exe\":\"%s\",\"input\":%s,\"ask\":[%s%s%s]}", t, c->token, c->id, c->exe,
-                    c->flags & (SW_F_INPUT | SW_F_CLIPBOARD) ? "true" : "false",
-                    sg_get(&store, c->id, c->exe, SG_SCREEN) == SG_ASK ? "\"screen-share\"" : "",
-                    sg_get(&store, c->id, c->exe, SG_SCREEN) == SG_ASK && (c->flags & (SW_F_INPUT | SW_F_CLIPBOARD)) &&
-                    sg_get(&store, c->id, c->exe, SG_INPUT) == SG_ASK ? "," : "",
-                    (c->flags & (SW_F_INPUT | SW_F_CLIPBOARD)) && sg_get(&store, c->id, c->exe, SG_INPUT) == SG_ASK ? "\"remote-input\"" : "");
+    char id[SG_ID_MAX * 6 + 3], exe[SG_EXE_MAX * 6 + 3], j[sizeof id + sizeof exe + 128];
+    if (c) {
+        json_quote(id, sizeof id, c->id);
+        json_quote(exe, sizeof exe, c->exe);
+        int ask_s = sg_get(&store, c->id, c->exe, SG_SCREEN) == SG_ASK, ask_i = want_input(c) && sg_get(&store, c->id, c->exe, SG_INPUT) == SG_ASK;
+        snprintf(j, sizeof j, "{\"t\":\"%s\",\"token\":%u,\"app\":%s,\"exe\":%s,\"input\":%s,\"ask\":[%s%s%s]}", t, c->token, id, exe,
+                 want_input(c) ? "true" : "false", ask_s ? "\"screen-share\"" : "", ask_s && ask_i ? "," : "", ask_i ? "\"remote-input\"" : "");
+    }
     else snprintf(j, sizeof j, "{\"t\":\"%s\"}", t);
     h.event(j);
 }
@@ -252,8 +256,6 @@ static void store_read(void) {
     sg_load(store_path, &store);
     store_mtime = st.st_mtim;
 }
-
-static int want_input(const Conn *c) { return (c->flags & (SW_F_INPUT | SW_F_CLIPBOARD)) != 0; }
 
 /* Would a start be refused now, whatever the app's grant? */
 static int blocked_now(void) {
@@ -648,9 +650,11 @@ int share_user_stop(void) {
 
 void share_status(char *json, size_t n) {
     const Conn *c = holder;
-    if (c && (c->st == C_BADGE || c->st == C_ACTIVE))
-        snprintf(json, n, "{\"app\":\"%s\",\"token\":%u,\"input\":%s}", c->id, c->token, c->granted & SW_F_INPUT ? "true" : "false");
-    else snprintf(json, n, "null");
+    if (c && (c->st == C_BADGE || c->st == C_ACTIVE)) {
+        char id[SG_ID_MAX * 6 + 3];
+        json_quote(id, sizeof id, c->id);
+        snprintf(json, n, "{\"app\":%s,\"token\":%u,\"input\":%s}", id, c->token, c->granted & SW_F_INPUT ? "true" : "false");
+    } else snprintf(json, n, "null");
 }
 
 /* The store as it is now against what is running: revoking ends it, losing input takes the input away. */

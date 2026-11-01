@@ -23,7 +23,7 @@ typedef struct { SgEntry e[SG_MAX]; int n; } SgStore;
 
 /* "desktop:<name>" or "lpk:<name>" with the characters of an app id: anything else is refused. */
 int sg_id_valid(const char *id);
-/* An absolute path, printable, no "..", no spaces (the action's argument is split on spaces). */
+/* An absolute path of letters, digits and /._-+@~, with no "..". */
 int sg_exe_valid(const char *exe);
 int sg_perm_of(const char *name);       /* "screen-share", "remote-input"; -1 else */
 int sg_state_of(const char *name);      /* "allow", "deny", "ask"; -1 else */

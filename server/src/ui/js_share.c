@@ -32,7 +32,7 @@ static JSValue f_reload(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 
 static JSValue f_status(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
-    char j[256];
+    char j[1024];
     share_status(j, sizeof j);
     return JS_ParseJSON(c, j, strlen(j), "<share>");
 }

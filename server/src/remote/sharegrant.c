@@ -25,9 +25,12 @@ int sg_id_valid(const char *id) {
     return 1;
 }
 
+/* Only what a path needs: the action's argument is split on spaces, and this text goes into JSON and in front
+ * of the person in a prompt. A program elsewhere has no valid path, so it gets no stored grant. */
 int sg_exe_valid(const char *e) {
     if (!e || e[0] != '/' || strlen(e) >= SG_EXE_MAX || strstr(e, "..")) return 0;
-    for (const unsigned char *p = (const unsigned char *)e; *p; p++) if (*p <= 0x20 || *p == 0x7f) return 0;
+    for (const unsigned char *p = (const unsigned char *)e; *p; p++)
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || strchr("/._-+@~", *p))) return 0;
     return 1;
 }
 
@@ -66,7 +69,10 @@ int sg_write(const SgStore *s, char *out, size_t n) {
     size_t o = (size_t)snprintf(out, n, "{\"v\":1,\"grants\":[");
     for (int i = 0; i < s->n && o < n; i++) {
         const SgEntry *e = &s->e[i];
-        o += (size_t)snprintf(out + o, n - o, "%s\n{\"id\":\"%s\",\"exe\":\"%s\",\"perm\":\"%s\",\"state\":\"%s\"}", i ? "," : "", e->id, e->exe,
+        char id[SG_ID_MAX * 6 + 3], exe[SG_EXE_MAX * 6 + 3];     /* room for every byte escaped */
+        json_quote(id, sizeof id, e->id);
+        json_quote(exe, sizeof exe, e->exe);
+        o += (size_t)snprintf(out + o, n - o, "%s\n{\"id\":%s,\"exe\":%s,\"perm\":\"%s\",\"state\":\"%s\"}", i ? "," : "", id, exe,
                               sg_perm_name(e->perm), sg_state_name(e->state));
     }
     if (o < n) o += (size_t)snprintf(out + o, n - o, "]}\n");

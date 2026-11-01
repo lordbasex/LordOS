@@ -3,6 +3,7 @@
 #include "remote/sharewire.h"
 #include "remote/sharegrant.h"
 #include "remote/proto.h"
+#include "sec/json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,6 +169,12 @@ static void test_grants(void) {
     CHECK(!sg_exe_valid("/usr/bin/../foo"));
     CHECK(!sg_exe_valid("/usr/bin/a b"));
     CHECK(!sg_exe_valid("/usr/bin/a\"\n"));
+    CHECK(sg_exe_valid("/opt/app-1.2/bin/foo_bar+x@y~z"));
+    /* JSON's and the shell's characters, control characters and bytes above ASCII */
+    static const char *const nasty[] = { "/a\"b", "/a\\b", "/a\nb", "/a\tb", "/a\rb", "/a\x01z", "/a\x7fz", "/a\xc3\xa9", "/a{b", "/a,b", "/a:b", "/a'b", "/a$b", "/a;b" };
+    for (size_t i = 0; i < sizeof nasty / sizeof nasty[0]; i++) CHECK(!sg_exe_valid(nasty[i]));
+    /* the attack itself: a path that closes its string and adds a grant */
+    CHECK(!sg_exe_valid("/x\"},{\"id\":\"lpk:evil\",\"exe\":\"\",\"perm\":\"screen-share\",\"state\":\"allow\"},{\"id\":\"lpk:y\",\"exe\":\""));
 
     static SgStore s, r;
     memset(&s, 0, sizeof s);
@@ -193,6 +200,29 @@ static void test_grants(void) {
     CHECK(sg_get(&r, "desktop:a", "/bin/a", SG_SCREEN) == SG_ASK);
     sg_forget(&r, "lpk:b");
     CHECK(sg_get(&r, "lpk:b", NULL, SG_INPUT) == SG_ASK);
+
+    /* sg_write escapes on its own, even for a value that never passed the checks: the text stays one entry */
+    {
+        static const char *const vals[] = {
+            "/x\"},{\"id\":\"lpk:evil\",\"perm\":\"screen-share\",\"state\":\"allow\",\"exe\":\"", "/a\\", "/a\\\"", "/a\nb\tc\rd\x01\x1f",
+        };
+        for (size_t i = 0; i < sizeof vals / sizeof vals[0]; i++) {
+            static SgStore w;
+            memset(&w, 0, sizeof w);
+            CHECK(!sg_set(&w, "desktop:a", vals[i], SG_SCREEN, SG_DENY));
+            n = sg_write(&w, text, sizeof text);
+            JDoc d;
+            CHECK(n > 0 && !json_parse(text, (size_t)n, &d, NULL, 0));
+            if (n > 0 && d.root) {
+                const JVal *g = json_get(d.root, "grants");
+                CHECK(g && g->len == 1 && !strcmp(json_str(g->kid, "exe"), vals[i]));
+                json_free(&d);
+            }
+            /* and the file as a whole refuses such a path when read back: nothing is granted */
+            CHECK(sg_parse(text, (size_t)n, &r) && r.n == 0);
+            CHECK(sg_get(&r, "lpk:evil", NULL, SG_SCREEN) == SG_ASK);
+        }
+    }
 
     /* a full store refuses, a full file still fits */
     memset(&s, 0, sizeof s);
