@@ -269,8 +269,12 @@ No claim on a screen until stage 5 has numbers per machine.
 
 ## 7. The app
 
-`go-link Desk` in React, using `@lordos/sdk`, with the same pages as the Linux window: Home with this computer's code, Settings, the
-connection request with its scam warning, the session panel, chat, files and the unattended pages. Texts come from go-link's catalogs.
+The app is called **Desk go-link**. It has nothing to do with Remote Desk, LordOS's RDP and VNC client: separate app, separate icon, separate
+code. It's a complete native copy of go-link's window: every view of the Fyne interface (`backend-device/internal/gui`, about 6,500 lines of
+Go) rebuilt in React with `@lordos/sdk`, keeping go-link's look, layout and texts rather than LordOS's: the bar with the 9-digit code,
+Session selector, Connect and the demo; the tabs; this computer's card with its code, link, copy, new code and status; My devices, Favorites
+and Recent sessions with their thumbnails and views; Settings; the connection request with its scam warning; the session panel, chat,
+calls, files, remote panels, network test and About. Texts come from go-link's catalogs.
 
 The acceptance is drawn by the app, not the system: it's the visitor's consent, and it belongs to go-link. The system's part is the
 permission and the indicator.
@@ -285,8 +289,8 @@ permission and the indicator.
 | Lock when a session ends | `SHARE_LOCK`, because `loginctl` can't work here: LordOS sessions have no logind seat (`docs/SESSIONS.md:465`, go-link:`internal/services/session_end.go:98`) |
 | Open at login | not available to this app today, D4 |
 | Update | off, by APT |
-| Connect to another computer | opens the website, as on Linux. An isolated app needs a broker op for it. To add |
-| MCP for assistants, terminal | not offered in the first version. They're other programs and would break the sandbox's write rule; asked for later if wanted |
+| Connect to another computer | native, in the same window, as in go-link: the viewer's tabs and panels, with the picture shown through the engine's MediaView path. Not designed yet |
+| MCP for assistants, terminal | their views are copied too; what they run are other programs, which the sandbox's write rule doesn't allow today. Open: D9 |
 
 ## 8. Changes in go-link, by package
 
@@ -395,3 +399,4 @@ fullscreen, direct scanout included; x264 on the Pi.
   system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
 - **D7. The numbers:** Stop's shortcut, the 2 s indicator wait, keyframe and input limits.
 - **D8. Scope limits** for a packaged app, if stage 2 shows one core or 512 MB isn't enough.
+- **D9. Assistants and the terminal.** Their views are part of the copy. Running them needs a wider sandbox than the rest of the app; how is to be decided.
