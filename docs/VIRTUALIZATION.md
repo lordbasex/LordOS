@@ -208,7 +208,7 @@ checked. Decision: `vm-enable`, asked the first time, one question with one sent
 ### 3.5 Files on disk
 
 ```
-~/Machines/<name>.lvm/
+~/Machines/<name>.lordvm/
   machine.json       settings, schema-versioned
   disks/system.qcow2
   disks/data-1.qcow2
@@ -439,7 +439,11 @@ Chosen when creating, changeable later. A profile only sets values shown in Conf
 
 Only what the host can do appears: a Pi has no Games profile, shows a "Light desktop" one instead, and a virtio-win guest has 2D only so Design and Games say so.
 
-### 5.7 Menus, shortcuts
+### 5.7 What this computer can run
+
+A screen in the app's Help and first run lists, per host, what's native, slow, limited or impossible, in the words of section 2 and with real values for this board: cores, memory, disk type. On a Pi it also warns about microSD and shows temperature, fan and voltage while machines run. It's generated from what the host reports, so it never claims more than the hardware gives.
+
+### 5.8 Menus, shortcuts
 
 Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination is shown in the bar and is configurable. In Lord Classic the same table.
 
@@ -447,7 +451,7 @@ Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app
 
 ### 6.1 Lifecycle
 
-Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (ACPI, then agent), force off. Host shutdown asks each running VM to suspend. A crashed VM shows its log and a "Start again" button. Devices that can't be saved (sound, for example) are disconnected on suspend and connected again on resume. A suspended VM may not resume after QEMU is updated: the Store warns before such an update, and the VM's state says so instead of failing silently.
+Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (ACPI, then agent), force off. Host shutdown asks each running VM to suspend. A machine that fails or crashes shows the machine log, a likely cause when one is known (not enough memory, a missing disk, a locked file) and a fix that fits it, such as starting with less memory or going back to a snapshot. Devices that can't be saved (sound, for example) are disconnected on suspend and connected again on resume. A suspended VM may not resume after QEMU is updated: the Store warns before such an update, and the VM's state says so instead of failing silently.
 
 ### 6.2 Snapshots
 
@@ -476,7 +480,7 @@ The app picks by file system and says which one it used. Templates are read-only
 - **Reflink** on btrfs and XFS: instant copies.
 - `io_uring` where seccomp and kernel allow; `virtio-blk` by default for speed, `virtio-scsi` for discard and many disks. `iothread` per disk.
 - TRIM from guest is passed to shrink. "Reclaim space" compacts offline.
-- Export: a `.lvm` bundle, or OVA. Import: 6.22.
+- Export, with the machine shut down: a `.lordvm` bundle with or without snapshots, OVA, or a bare disk image, optionally encrypted. Import: 6.22.
 
 ### 6.5 Network
 
@@ -488,6 +492,8 @@ The app picks by file system and says which one it used. Templates are read-only
 | **Isolated** | no NIC | Nothing | Testing |
 
 Debian 13 has `passt` (**Measured**, 2025-05-03 snapshot); Phase 0 compares it with QEMU's `-netdev user`. `vhost-net` for Bridged. Centinela sees each VM as an app: its traffic in Shared mode appears in the firewall, the map and Monitor as "Machine: name". A rule can block it. Bridged traffic bypasses this: Security says so.
+
+Each forwarded port has a scope: **Only this computer** by default, or **Your network**, which is a firewall rule the person sees.
 
 ### 6.6 USB
 
@@ -535,7 +541,7 @@ Inside a guest: amd64: on by default for Software Development (`kvm_intel nested
 
 ### 6.14 Monitor and system ties
 
-Monitor shows each VM as one row with a drill-in. Cleaner never touches `~/Machines` without explicit choice, and offers Reclaim space. Backups skip running VM disks unless consistent. Files shows `.lvm` as a bundle. Search finds VMs by name. Desktops treat each VM window normally. Power: laptops on battery get a notification with Pause All; a guest's load keeps the host awake while it runs, on purpose, and the battery warning says so.
+Monitor shows each VM as one row with a drill-in. Cleaner never touches `~/Machines` without explicit choice, and offers Reclaim space. Backups skip running VM disks unless consistent. Files shows `.lordvm` as a bundle. Search finds VMs by name. Desktops treat each VM window normally. Power: laptops on battery get a notification with Pause All; a guest's load keeps the host awake while it runs, on purpose, and the battery warning says so.
 
 ### 6.15 Command line and coding agents
 
@@ -614,7 +620,7 @@ A panel along the bottom of the window shows file name, size, a bar, speed, time
 
 ### 6.22 Import
 
-An importer has three steps: **detect** a file or folder, show a **plan** of what will happen, then **import** into a new `.lvm`, leaving the original alone.
+An importer has three steps: **detect** a file or folder, show a **plan** of what will happen, then **import** into a new `.lordvm`, leaving the original alone.
 
 | Source | Reads | Result |
 |---|---|---|
@@ -629,7 +635,7 @@ The plan states what's lost. **Snapshots in foreign formats are flattened to the
 
 On its own computer a machine's picture comes by dmabuf and its input, clipboard and sound through the D-Bus display and the agent: no network, no encoder, no VNC. Compressing it for WebRTC there would only add delay.
 
-From another computer, a running machine is offered by LordOS's own remote desktop over WebRTC, with video and a data channel for input, clipboard and files. It uses the same pairing, stays off by default, and no VNC or SPICE port is ever opened by a machine. Phase after the first public release: **To test**.
+From another computer, a running machine is offered by LordOS's own remote desktop over WebRTC, with video and a data channel for input, clipboard and files. It uses the same pairing, stays off by default per machine, shows who is connected, grants input, clipboard, files and sound one by one, and no VNC or SPICE port is ever opened by a machine. Phase 6: **To test**.
 
 ## 7. Guest tools
 
@@ -760,6 +766,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Capability | M | Linux today | Note |
 |---|---|---|---|
 | Native speed through KVM, amd64 and arm64 | 1 | Yes | Pi 5 details in 2.2 |
+| Reach a machine from another computer, over LordOS's remote | 6 | Work | WebRTC, paired, off by default; see 6.23 |
 | Other architecture by emulation, labelled | 1 | Yes | 2.4 |
 | Pause, saved sessions (suspend to disk), resume | 2 | Yes | May not resume across QEMU updates |
 | Keep running after closing the window, start with no window | 2 | Yes | |
