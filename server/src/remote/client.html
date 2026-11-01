@@ -60,7 +60,7 @@
 const L = {
   en: {
     full: 'Full screen', out: 'Disconnect', conn: 'Connecting…', reconn: 'Reconnecting…', retry: 'Try again', signout: 'Sign out',
-    sndOn: 'Turn sound on', sndOff: 'Turn sound off', video: 'Video', bye: 'The session ended.',
+    sndOn: 'Turn sound on', sndOff: 'Turn sound off', video: 'Video', bye: 'The session ended.', busy: '{app} is sharing this session. Try again when it ends.',
     hwEnc: 'hardware', swEnc: 'software', pinOn: 'Keep this bar shown', pinOff: 'Let this bar hide',
     vinfoTip: (comp, enc, ms) => `Screen composed on the ${comp}; video encoded in ${enc} (${ms} ms per frame). Frames a second: shown here / sent by the computer.`,
     unsupTitle: 'This browser can’t show the remote desktop',
@@ -80,7 +80,7 @@ const L = {
   },
   es: {
     full: 'Pantalla completa', out: 'Desconectar', conn: 'Conectando…', reconn: 'Reconectando…', retry: 'Reintentar', signout: 'Cerrar sesión',
-    sndOn: 'Activar el sonido', sndOff: 'Silenciar', video: 'Video', bye: 'La sesión terminó.',
+    sndOn: 'Activar el sonido', sndOff: 'Silenciar', video: 'Video', bye: 'La sesión terminó.', busy: '{app} está compartiendo esta sesión. Volvé a intentar cuando termine.',
     hwEnc: 'por hardware', swEnc: 'por software', pinOn: 'Dejar la barra fija', pinOff: 'Que la barra se esconda',
     vinfoTip: (comp, enc, ms) => `Pantalla compuesta en la ${comp}; video codificado ${enc} (${ms} ms por cuadro). Cuadros por segundo: mostrados aquí / enviados por la computadora.`,
     unsupTitle: 'Este navegador no puede mostrar el escritorio remoto',
@@ -100,7 +100,7 @@ const L = {
   },
   pt: {
     full: 'Tela cheia', out: 'Desconectar', conn: 'Conectando…', reconn: 'Reconectando…', retry: 'Tentar de novo', signout: 'Sair',
-    sndOn: 'Ativar o som', sndOff: 'Silenciar', video: 'Vídeo', bye: 'A sessão terminou.',
+    sndOn: 'Ativar o som', sndOff: 'Silenciar', video: 'Vídeo', bye: 'A sessão terminou.', busy: '{app} está compartilhando esta sessão. Tente de novo quando terminar.',
     hwEnc: 'por hardware', swEnc: 'por software', pinOn: 'Fixar a barra', pinOff: 'Deixar a barra se esconder',
     vinfoTip: (comp, enc, ms) => `Tela composta na ${comp}; vídeo codificado ${enc} (${ms} ms por quadro). Quadros por segundo: mostrados aqui / enviados pelo computador.`,
     unsupTitle: 'Este navegador não consegue mostrar a área de trabalho remota',
@@ -550,7 +550,13 @@ function onText(m) {
     if (navigator.clipboard && document.hasFocus()) navigator.clipboard.writeText(m.text).catch(() => {});
     lastSent = m.text;
   } else if (m.t === 'bye' && m.lock) { wantedClose = true; location.href = '/?e=3'; }     // the session got locked: sign in again
-  else if (m.t === 'bye') {
+  else if (m.t === 'bye' && m.busy) {                // the session is shared through the API: the sign-in stays, retried by itself
+    wantedClose = true;
+    closePeer();
+    const again = () => { wantedClose = false; hideCard(); retryAll(); };
+    card((c) => { c.append(el('h1', T.busy.replace('{app}', String(m.busy).replace(/^(desktop|lpk):/, '')))); const b = el('div', '', 'btns'), a = el('button', T.retry); a.onclick = again; b.append(a); c.append(b); });
+    setTimeout(again, 30000);
+  } else if (m.t === 'bye') {
     wantedClose = true;
     closePeer();
     card((c) => { c.append(el('h1', T.bye)); const b = el('div', '', 'btns'), a = el('button', T.retry); a.onclick = () => { wantedClose = false; hideCard(); retryAll(); }; b.append(a); c.append(b); });

@@ -307,5 +307,13 @@
   "shortcuts.appWindows": "Ventanas de la app",
   "shortcuts.switchDesktop": "Cambiar de escritorio",
   "shortcuts.newDesktop": "Nuevo escritorio",
-  "shortcuts.closeDesktop": "Cerrar escritorio"
+  "shortcuts.closeDesktop": "Cerrar escritorio",
+  "share.sharing": "{app} está compartiendo tu pantalla",
+  "share.sharingInput": "{app} comparte y puede controlar tu pantalla",
+  "share.stop": "Detener",
+  "share.askScreen": "“{app}” quiere compartir tu pantalla con las personas que aceptes",
+  "share.askInput": "“{app}” quiere que esas personas usen tu mouse, teclado y portapapeles",
+  "share.notVerified": "Esta app no está verificada.",
+  "share.allow": "Permitir",
+  "share.deny": "No permitir"
 }

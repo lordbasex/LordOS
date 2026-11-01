@@ -456,5 +456,6 @@
   "volt.rail.HDMI": "HDMI 5 V",
   "volt.rail.BATT": "Clock battery",
   "comp.lan": "Network search in Files",
-  "comp.lanHint": "Files → Network: computers and shares on the local network."
+  "comp.lanHint": "Files → Network: computers and shares on the local network.",
+  "net.shareHolder": "{app} is sharing this session’s screen."
 }

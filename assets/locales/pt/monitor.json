@@ -456,5 +456,6 @@
   "volt.rail.HDMI": "HDMI 5 V",
   "volt.rail.BATT": "Bateria do relógio",
   "comp.lan": "Procura na rede de Arquivos",
-  "comp.lanHint": "Arquivos → Rede: computadores e compartilhamentos na rede local."
+  "comp.lanHint": "Arquivos → Rede: computadores e compartilhamentos na rede local.",
+  "net.shareHolder": "{app} está compartilhando a tela desta sessão."
 }

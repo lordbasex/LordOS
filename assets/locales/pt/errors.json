@@ -657,5 +657,7 @@
   "share.notResponding": "O computador que compartilha isto não responde",
   "wallpaper.downloadFailed": "Não foi possível baixar o fundo",
   "wallpaper.removeFailed": "Não foi possível alterar o fundo",
-  "wallpaper.notDownloaded": "Esse fundo não foi baixado"
+  "wallpaper.notDownloaded": "Esse fundo não foi baixado",
+  "share.badGrant": "Esse pedido de permissão não é válido.",
+  "share.grantFailed": "Não foi possível salvar a permissão."
 }

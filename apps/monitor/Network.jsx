@@ -23,7 +23,7 @@ import { MapView } from './MapView.jsx';
 import { TrafficChart, systemBuckets } from './TrafficChart.jsx';
 import { RuleSheet } from './RuleSheet.jsx';
 import { HistoryControls, HistoryChart, useHistory } from './History.jsx';
-import { REMOTE_KEY, RemoteDetail, remoteGroup, useRemoteDesktop } from './RemoteDesktop.jsx';
+import { REMOTE_KEY, RemoteDetail, ShareHolderLine, remoteGroup, useRemoteDesktop } from './RemoteDesktop.jsx';
 import { TokenSearch, ViewButton, useNetView, TreeChildren, Child } from './NetTree.jsx';
 
 const { COMPONENTS, isSystemId, filterFlows, groupFlows, sortTree } = netModel;
@@ -914,6 +914,7 @@ export function NetworkTab({ last, prefs }) {
     <View style={{ flex: 1, flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingVertical: 16 }}>
       {/* left */}
       <View style={{ ...column, width: 336, gap: 8 }}>
+        <ShareHolderLine tr={tr} />
         <TokenSearch chips={chips} setChips={setChips} text={text} setText={setText} tr={tr} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ViewButton view={view} setView={setView} extra={extra} tr={tr} />

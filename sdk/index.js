@@ -30,6 +30,8 @@ import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
+import { ShareBadge, SharePrompt } from './share.js';
+export { share, shareHolder, shareRev } from './share.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
 export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PrivacyIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel } from './privacy.js';
 import { PermissionPrompt } from './privacy.js';
@@ -267,8 +269,8 @@ function LocaleRoot({ children }) {
     at('overlay', SpotlightPanel),
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
-    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, DisplayIdentify),
-    at('system', PermissionPrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
+    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';

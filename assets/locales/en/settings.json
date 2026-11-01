@@ -471,5 +471,6 @@
   "motion.loginDone": "The login screen will use this video.",
   "motion.loginReset": "The login screen is back to its default video.",
   "wallpaperFor.desktop": "Desktop",
-  "wallpaperFor.login": "Login screen"
+  "wallpaperFor.login": "Login screen",
+  "sharing.inUseBy": "In use by {app}. Remote desktop can’t sign in to this session until it ends."
 }

@@ -657,5 +657,7 @@
   "share.notResponding": "The computer sharing this does not answer",
   "wallpaper.downloadFailed": "The wallpaper could not be downloaded",
   "wallpaper.removeFailed": "The wallpaper could not be changed",
-  "wallpaper.notDownloaded": "That wallpaper is not downloaded"
+  "wallpaper.notDownloaded": "That wallpaper is not downloaded",
+  "share.badGrant": "That permission request isn’t valid.",
+  "share.grantFailed": "The permission couldn’t be saved."
 }

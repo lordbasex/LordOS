@@ -307,5 +307,13 @@
   "shortcuts.appWindows": "Janelas do app",
   "shortcuts.switchDesktop": "Trocar de área de trabalho",
   "shortcuts.newDesktop": "Nova área de trabalho",
-  "shortcuts.closeDesktop": "Fechar área de trabalho"
+  "shortcuts.closeDesktop": "Fechar área de trabalho",
+  "share.sharing": "{app} está compartilhando sua tela",
+  "share.sharingInput": "{app} compartilha e pode controlar sua tela",
+  "share.stop": "Parar",
+  "share.askScreen": "“{app}” quer compartilhar sua tela com as pessoas que você aceitar",
+  "share.askInput": "“{app}” quer que essas pessoas usem seu mouse, teclado e área de transferência",
+  "share.notVerified": "Este app não está verificado.",
+  "share.allow": "Permitir",
+  "share.deny": "Não permitir"
 }

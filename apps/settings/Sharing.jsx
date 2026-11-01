@@ -3,7 +3,7 @@
 // connections goes through the administration helper (remote-* and ssh-* actions). The SSH
 // server is installed, the first time, with the package engine's own pkg-install action.
 import {
-  View, Text, Button, Toggle, Segmented, TextInput, useTheme, useLocale, useStore, admin, remote, remoteViewers, sshLogin, remoteCidr,
+  View, Text, Button, Toggle, Segmented, TextInput, useTheme, useLocale, useStore, admin, remote, remoteViewers, shareHolder, sshLogin, remoteCidr,
   remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, Layer, useAppWindow, wm,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -375,6 +375,7 @@ export function SharingSettings() {
   const { t: tr } = useLocale();
   const info = useSystemInfo(60000);
   const viewers = useStore(remoteViewers);
+  const holder = useStore(shareHolder);
   const [st, setSt] = useState(() => remote.status());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -423,6 +424,7 @@ export function SharingSettings() {
       </Section>
       {!isAdmin && <Note tone="warn">{tr('settings.admin.unavailable')}</Note>}
       {!st.installed && <Note tone="warn">{tr('settings.sharing.notInstalled')}</Note>}
+      {holder && <Note>{tr('settings.sharing.inUseBy', { app: holder.name })}</Note>}
       <Message msg={msg} />
       <AccessSection st={st} isAdmin={isAdmin} busy={busy} act={act} />
       <ConnectionSection st={st} isAdmin={isAdmin} busy={busy} run={run} />

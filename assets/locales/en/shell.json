@@ -307,5 +307,13 @@
   "shortcuts.appWindows": "App windows",
   "shortcuts.switchDesktop": "Switch desktop",
   "shortcuts.newDesktop": "New desktop",
-  "shortcuts.closeDesktop": "Close desktop"
+  "shortcuts.closeDesktop": "Close desktop",
+  "share.sharing": "{app} is sharing your screen",
+  "share.sharingInput": "{app} is sharing and may control your screen",
+  "share.stop": "Stop",
+  "share.askScreen": "“{app}” wants to share your screen with people you accept",
+  "share.askInput": "“{app}” wants those people to use your mouse, keyboard and clipboard",
+  "share.notVerified": "This app isn’t verified.",
+  "share.allow": "Allow",
+  "share.deny": "Don’t Allow"
 }

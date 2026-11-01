@@ -471,5 +471,6 @@
   "motion.loginDone": "La pantalla de inicio de sesión va a usar este video.",
   "motion.loginReset": "La pantalla de inicio de sesión volvió a su video predeterminado.",
   "wallpaperFor.desktop": "Escritorio",
-  "wallpaperFor.login": "Pantalla de inicio de sesión"
+  "wallpaperFor.login": "Pantalla de inicio de sesión",
+  "sharing.inUseBy": "En uso por {app}. El escritorio remoto no puede entrar a esta sesión hasta que termine."
 }

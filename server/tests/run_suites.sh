@@ -160,6 +160,8 @@ EOF
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
+    if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
+    else skip "share-model-test" "node"; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
     # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)

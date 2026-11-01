@@ -5,7 +5,7 @@
 // and, for administrators, the recent failed sign-ins through the fixed admin action
 // remote-failures (an address, the cleaned name that was typed, a count; never a password). Block and
 // Unblock use the same validated admin actions as Settings → Sharing (remoteAccess).
-import { View, Text, Button, TextInput, useTheme, useLocale, remote, remoteAccess, remoteCidr, remoteMinutesLeft, admin, formatBytes, formatNumber, useSystemInfo } from '@lordos/sdk';
+import { View, Text, Button, TextInput, useTheme, useLocale, useStore, shareHolder, remote, remoteAccess, remoteCidr, remoteMinutesLeft, admin, formatBytes, formatNumber, useSystemInfo } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
 export const REMOTE_KEY = 'remote-desktop';
@@ -52,6 +52,14 @@ export function useRemoteDesktop() {
     return () => { alive = false; clearInterval(a); clearInterval(b); };
   }, []);
   return { st, fails, rates: rates.current };
+}
+
+// Who holds the screen-sharing API now: a line above the list, with or without remote desktop on.
+export function ShareHolderLine({ tr }) {
+  const t = useTheme();
+  const c = useStore(shareHolder);
+  if (!c) return null;
+  return <Text style={{ fontSize: 12, color: t.textDim, paddingHorizontal: 12, paddingVertical: 4 }}>{tr('monitor.net.shareHolder', { app: c.name })}</Text>;
 }
 
 // The row in the app list (the same shape as Network.jsx's groups). Only while it's on.

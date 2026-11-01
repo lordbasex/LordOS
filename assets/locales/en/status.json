@@ -141,5 +141,6 @@
   },
   "wifi.connecting": "Connecting to {ssid}…",
   "wifi.disconnected": "Disconnected",
-  "wifi.forgotten": "Network forgotten"
+  "wifi.forgotten": "Network forgotten",
+  "share.granted": "Permission saved."
 }

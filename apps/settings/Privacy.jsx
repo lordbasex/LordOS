@@ -1,7 +1,7 @@
 // Settings → Privacy — per-app permissions («Privacy & Security»). Lists each
 // permission with the apps that requested it and lets you revoke it. The Monitor adds its own section
 // through registerPrivacySection (see sdk/privacy.js); this page does not know about the Monitor.
-import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, packages, appName, getApp, spacing, typeScale } from '@lordos/sdk';
+import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, share, shareRev, packages, appName, getApp, spacing, typeScale } from '@lordos/sdk';
 import { Stack, Section, SettingRow, Badge, Note, StatusDot, tint } from './ui.jsx';
 
 // Small monochrome pictures for the permissions whose usual symbols are color emoji.
@@ -82,6 +82,24 @@ function InUse() {
   );
 }
 
+// The screen-sharing API's two permissions: decisions in a root-owned file (sdk/share.js), so they aren't in perms.
+function ShareSection({ perm }) {
+  const { t: tr } = useLocale();
+  useStore(shareRev);
+  const list = share.grants().filter((g) => g.perm === perm);
+  if (!list.length) return null;
+  return (
+    <Section icon={<PermBadge glyph="▣" color="#ff453a" />} title={tr(`privacy.perm.${perm}`)} footer={tr(`privacy.permHint.${perm}`)}>
+      {list.map((g) => (
+        <SettingRow key={g.id} label={g.id.replace(/^(desktop|lpk):/, '')} hint={g.exe}>
+          <Segmented value={g.state} onChange={(v) => share.set(g.id, perm, v, g.exe)}
+            options={[['allow', tr('privacy.allowShort')], ['ask', tr('privacy.askShort')], ['deny', tr('privacy.denyShort')]]} />
+        </SettingRow>
+      ))}
+    </Section>
+  );
+}
+
 export function PrivacySettings() {
   const { t: tr } = useLocale();
   const sections = useStore(privacySections);
@@ -92,6 +110,8 @@ export function PrivacySettings() {
       {/* slots registered by other parts (e.g. the Monitor: its on/off switch and the apps' network) */}
       {sections.map((s) => <s.Component key={s.id} />)}
       {SHOWN.map(([perm, glyph, color]) => <PermSection key={perm} perm={perm} glyph={glyph} color={color} />)}
+      <ShareSection perm="screen-share" />
+      <ShareSection perm="remote-input" />
     </Stack>
   );
 }

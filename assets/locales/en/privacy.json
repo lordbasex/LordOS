@@ -42,5 +42,9 @@
   "permHint.apps": "Apps that asked to launch other apps.",
   "permHint.listen": "Apps that asked to accept network connections.",
   "permHint.usb": "Apps that asked to use USB devices.",
-  "permHint.bluetooth": "Apps that asked to use Bluetooth."
+  "permHint.bluetooth": "Apps that asked to use Bluetooth.",
+  "perm.screen-share": "Screen sharing",
+  "permHint.screen-share": "Apps that may show your screen and play your sound to people they connect you with. Revoking ends a running share.",
+  "perm.remote-input": "Remote control",
+  "permHint.remote-input": "Apps that may let those people use your mouse, keyboard and clipboard."
 }
