@@ -288,5 +288,6 @@
   "disk.formatsTitle": "{name} uses a commercial disk format",
   "disk.formatsDetail": "Disk Formats, in the Store, opens it. Its drivers are free software at no cost.",
   "disk.formatsGet": "Open the Store",
-  "settings.defaultView": "New folders show"
+  "settings.defaultView": "New folders show",
+  "net.shareOn": "{name} on {host}"
 }

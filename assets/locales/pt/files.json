@@ -288,5 +288,6 @@
   "disk.formatsTitle": "{name} usa um formato de disco comercial",
   "disk.formatsDetail": "Formatos de disco, na Loja, o abre. Seus drivers são software livre e sem custo.",
   "disk.formatsGet": "Abrir a Loja",
-  "settings.defaultView": "Pastas novas aparecem em"
+  "settings.defaultView": "Pastas novas aparecem em",
+  "net.shareOn": "{name} em {host}"
 }

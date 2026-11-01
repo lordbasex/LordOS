@@ -18,7 +18,7 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetGlyph, isShareFs, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
+import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
@@ -271,7 +271,7 @@ export default function Files() {
   // doesn't write): the actions that change it are left out
   const readOnly = useMemo(() => { if (!curDir) return false; try { return !fs.stat(curDir).writable; } catch (e) { return true; } }, [curDir, version]);
   const wDir = readOnly ? null : curDir;
-  const title = locTitle(loc, dirs);
+  const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
 
   const viewOf = (l) => { const k = viewKey(l); return { ...viewFor(filesPrefs(), l), sortChosen: !!k && !!filesPrefs().folderViews[k] }; };
   // what this place shows is kept for it, across windows and restarts
@@ -766,7 +766,7 @@ export default function Files() {
         {side('volumes') && volumes.map((v) => {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
-            <SideItem key={v.path} t={t} label={v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
+            <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
               drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null} />
           );
         })}

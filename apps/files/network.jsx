@@ -7,6 +7,8 @@ import { FolderGlyph } from './glyphs.jsx';
 
 const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone'];
 export const isShareFs = (fs) => SHARE_FS.includes(fs);
+// A mounted share's folder keeps its fixed name on disk (share_leaf, lan_connect); people read it in their language.
+export const shareTitle = (name) => { const m = /^(.+) on ([^ ]+)$/.exec(name); return m ? tr('files.net.shareOn', { name: m[1], host: m[2] }) : name; };
 
 // the folder share-mount makes under /media/<user> (share_leaf in server/src/lan/lanaddr.c)
 const leafOf = (kind, addr, share) => {

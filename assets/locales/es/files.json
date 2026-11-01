@@ -288,5 +288,6 @@
   "disk.formatsTitle": "{name} usa un formato de disco comercial",
   "disk.formatsDetail": "Formatos de disco, en la Tienda, lo abre. Sus controladores son software libre y sin costo.",
   "disk.formatsGet": "Abrir la Tienda",
-  "settings.defaultView": "Las carpetas nuevas se muestran en"
+  "settings.defaultView": "Las carpetas nuevas se muestran en",
+  "net.shareOn": "{name} en {host}"
 }
