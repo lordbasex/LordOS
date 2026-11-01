@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -124,8 +125,9 @@ int main(void) {
     int sock = dial(host, port ? port : rdp ? 3389 : 5900);
     if (sock < 0) { rd_send(RD_STATE, RS_UNREACHABLE, 0, 0, NULL); return 1; }
     /* connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
+    static int rdp_calls[] = { SYS_getsockname, SYS_getpeername, SYS_getsockopt, SYS_setsockopt, SYS_eventfd2, -1 };   /* on the socket it was handed */
     static const char *const ro[] = { "/etc/ssl", "/usr/lib", "/usr/share/ca-certificates", NULL };
-    SandboxHelperCfg cfg = { .name = "lordos-rdesk-helper", .ro_paths = rdp ? ro : NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .mem_max_mb = rdp ? 512 : 256, .ro_dir_fds = NULL, .rw_dir_fds = NULL };
+    SandboxHelperCfg cfg = { .name = "lordos-rdesk-helper", .ro_paths = rdp ? ro : NULL, .extra_syscalls = rdp ? rdp_calls : (int[]){ -1 }, .allow_ioctl_classes = 0, .mem_max_mb = rdp ? 512 : 256, .ro_dir_fds = NULL, .rw_dir_fds = NULL };
     sandbox_apply_helper(&cfg);
     int rc = rdp ? rdesk_rdp(sock, host, user, dom, pw) : run_vnc(sock, pw);
     explicit_bzero((char *)pw, strlen(pw));
