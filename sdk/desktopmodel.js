@@ -115,8 +115,9 @@ const PAD = 48, GAP = 28, LABEL = 30;
 export const OVERVIEW_LABEL = LABEL;
 
 // id → { x, y, scale, w, h } in screen coordinates of the scaled frame: a grid in `a`, the last row
-// centered, never larger than 85 %.
-export function gridLayout(list, a) {
+// centered, never larger than 85 %. frame gives the size a window is drawn at: a maximized one takes the
+// work area, not its own w and h, and scaling by those let it run off the screen.
+export function gridLayout(list, a, frame = (w) => w) {
   const out = new Map();
   const n = list.length;
   if (!n) return out;
@@ -127,8 +128,9 @@ export function gridLayout(list, a) {
     const col = i % c, row = Math.floor(i / c);
     const inRow = row === r - 1 ? n - row * c : c;
     const rowLeft = a.x + PAD + ((c - inRow) * (cw + GAP)) / 2;
-    const scale = Math.max(0.05, Math.min(0.85, cw / w.w, (ch - LABEL) / w.h));
-    const sw = w.w * scale, sh = w.h * scale;
+    const f = frame(w);
+    const scale = Math.max(0.05, Math.min(0.85, cw / f.w, (ch - LABEL) / f.h));
+    const sw = f.w * scale, sh = f.h * scale;
     out.set(w.id, {
       x: Math.round(rowLeft + col * (cw + GAP) + (cw - sw) / 2),
       y: Math.round(a.y + row * (ch + GAP) + LABEL + (ch - LABEL - sh) / 2),

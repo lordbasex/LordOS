@@ -39,7 +39,7 @@ function compute(app) {
   const d = mainDisplay();
   const strip = app ? null : stripLayout(desktopList.get(), area, { aspect: d.w / Math.max(1, d.h), canAdd: desktopList.get().length < MAX_DESKTOPS, rtl: direction() === 'rtl' });
   const top = strip ? strip.h : 14;
-  return { app, list, strip, area, places: gridLayout(list, { x: area.x, y: area.y + top, w: area.w, h: area.h - top }) };
+  return { app, list, strip, area, places: gridLayout(list, { x: area.x, y: area.y + top, w: area.w, h: area.h - top }, wm.frame) };
 }
 const refresh = () => {
   const o = overview.get();

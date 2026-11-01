@@ -297,7 +297,7 @@ static void tf_bounds(const Node *n, Affine rel, Box *b, int *ok, int *live) {
      * Dock's minimize), and much better than painting the subtree untransformed. Never cached. */
     if (n->s.backdrop_blur >= 1) *live = 1;
     if (n->type == NODE_MEDIA) *ok = 0;
-    if (n->type == NODE_SURFACE) { if (gpu_active()) *ok = 0; *live = 1; }
+    if (n->type == NODE_SURFACE) *live = 1;     /* GPU path: its quad goes at the scaled place (wl_tf_begin) */
     if (n->type == NODE_TERM) *live = 1;
     Affine r = n->own_tf ? affine_mul(rel, n->tf->own) : rel;
     Box v = affine_box(r, visual_box(n));
@@ -380,9 +380,14 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
         skip_until = 0;
         tf_self = tf_unit = n->id;
         depth++;
+        const Affine *own = &n->tf->own;
+        if (tf_nest) wl_tf_nested(1);
+        else wl_tf_begin(n->id, own->a, own->d, own->e, own->f, opacity * n->s.opacity, own->b != 0 || own->c != 0);
         tf_nest++;
         paint_node(&rc, n, 1);
         tf_nest--;
+        if (tf_nest) wl_tf_nested(-1);
+        else wl_tf_end();
         depth--;
         skip_until = ks; tf_self = kr_self; tf_unit = ku;
         paint_view = keep;
@@ -399,6 +404,7 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     if (!affine_invert(fwd, &inv)) return 1;
     float f6[6] = { fwd.a, fwd.b, fwd.c, fwd.d, fwd.e, fwd.f }, i6[6] = { inv.a, inv.b, inv.c, inv.d, inv.e, inv.f };
     if (below_collect && !tf_nest) below_note_affine(f6, e->w, e->h);
+    if (!tf_nest) wl_tf_open_holes(c);      /* GPU path: the raster has alpha 0 there, and blending opens nothing */
     canvas_blit_affine(c, e->px, e->w, e->h, i6, f6, opacity * n->s.opacity);
     tf_composites++;
     return 1;
@@ -1395,8 +1401,8 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         sig_node(walk_sig, n, 0);
         if (n->paint_dirty) walk_sig->dirty = 1;
         /* as tf_bounds */
-        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || (n->type == NODE_SURFACE && !gpu_active())) walk_sig->live |= 1;
-        if (n->type == NODE_MEDIA || (n->type == NODE_SURFACE && gpu_active())) walk_sig->live |= 2;
+        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || n->type == NODE_SURFACE) walk_sig->live |= 1;
+        if (n->type == NODE_MEDIA) walk_sig->live |= 2;
         walk_sig->area = box_or(walk_sig->area, cur);
     }
     if (vis && n->own_tf) {

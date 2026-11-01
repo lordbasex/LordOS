@@ -46,11 +46,15 @@ typedef struct { int id, node; float x, y, w, h, op; } WDraw;
 enum { WDRAW_MAX = 128 };
 static WDraw wdraw[WDRAW_MAX], wkept[WDRAW_MAX], wsaved[WDRAW_MAX];
 static int nwdraw, nwkept, nwsaved, wholes_off;
+/* wl.c's transformed windows (test_transform_surface): what paint.c tells it */
+static struct { int begins, ends, holes, painted; float sx, sy, tx, ty; } wtf;
+static int wtf_on;
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) {
     const float k = paint_view.k;
     Rect old = canvas_push_clip(c, (x - paint_view.x) * k + paint_view.dx, (y - paint_view.y) * k + paint_view.dy, w * k, h * k);
     if (!test_gpu) canvas_clear(c, 0xff406080u + (uint32_t)id);
     else {
+        if (wtf_on) wtf.painted++;
         if (nwdraw < WDRAW_MAX) wdraw[nwdraw++] = (WDraw){ id, node, x, y, w, h, op };
         if (!wholes_off) canvas_clear(c, 0);
     }
@@ -63,6 +67,10 @@ void wl_paint_begin(void) { nwdraw = 0; }
 void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
 void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) { (void)node; (void)op; (void)skip; wtf.begins++; wtf.sx = sx; wtf.sy = sy; wtf.tx = tx; wtf.ty = ty; wtf_on = 1; }
+void wl_tf_end(void) { wtf.ends++; wtf_on = 0; }
+void wl_tf_nested(int d) { (void)d; }
+void wl_tf_open_holes(Canvas *c) { (void)c; wtf.holes++; }
 /* GPU drag (paint_root_gdrag): an app window in the list is drawn below the UI where its box is, as wl.c's */
 int wl_draws_meet(Rect r) {
     const float k = paint_view.k;
@@ -1521,6 +1529,35 @@ static void test_grow_wrap_height(void) {
     CHECK(fabsf(words->h - 42) < 0.5f, "wrapped words: %g high, want 42", words->h);
     CHECK(row->h >= words->h - 0.5f, "the row (%g) is shorter than its wrapped text (%g)", row->h, words->h);
     CHECK(next->ay >= row->ay + words->h - 0.5f, "the next item (y %g) overlaps the wrapped text (ends at %g)", next->ay, row->ay + words->h);
+}
+
+/* GPU path: a Linux window in a scaled node goes through the raster like the rest of the subtree, with
+ * wl.c told the transform and asked to open the hole before the blend. It used to refuse the raster,
+ * and the whole window was painted at full size: past the screen's edge in the Overview (Pi 5, 0.8.7). */
+static void test_transform_surface(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *a = view(root);
+    ss(a, "position", "absolute");
+    sn(a, "left", 10); sn(a, "top", 10); sn(a, "width", 40); sn(a, "height", 40);
+    sn(a, "backgroundColor", 0xffff0000);
+    sn(a, "scaleX", 0.5); sn(a, "scaleY", 0.5);
+    Node *surf = node_new(NODE_SURFACE);
+    surf->term = 7;
+    node_append(a, surf);
+    ss(surf, "position", "absolute");
+    sn(surf, "left", 0); sn(surf, "top", 0); sn(surf, "width", 40); sn(surf, "height", 20);
+    test_gpu = 1;
+    memset(&wtf, 0, sizeof wtf);
+    render(root, 160, 100);
+    test_gpu = 0;
+    CHECK(wtf.begins == 1 && wtf.ends == 1 && wtf.painted == 1, "window not in the raster: %d %d %d", wtf.begins, wtf.ends, wtf.painted);
+    CHECK(wtf.holes == 1, "holes not opened before the blend: %d", wtf.holes);
+    CHECK(wtf.sx == 0.5f && wtf.sy == 0.5f && wtf.tx == 15 && wtf.ty == 15, "transform: %g %g %g %g", wtf.sx, wtf.sy, wtf.tx, wtf.ty);
+    CHECK(pix(15, 15) == 0xffffff && pix(45, 30) == 0xffffff, "painted at its layout size: %06x %06x", pix(15, 15), pix(45, 30));
+    CHECK(pix(30, 35) == 0xff0000, "frame not at the scaled box: %06x", pix(30, 35));
 }
 
 static void test_transform_paint_hit(void) {
@@ -3021,6 +3058,7 @@ int main(int argc, char **argv) {
     test_logical();
     test_transform_math();
     test_transform_paint_hit();
+    test_transform_surface();
     test_transform_self_restyle();
     test_layers();
     test_backdrop_band();

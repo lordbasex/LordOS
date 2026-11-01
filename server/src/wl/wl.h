@@ -67,6 +67,10 @@ void wl_paint_save(void);                /* keeps the frame's list of windows (L
 void wl_paint_restore(void);             /* and puts it back */
 void wl_paint_holes(int on);             /* 0: wl_paint only notes the window, without opening the hole */
 int  wl_draws_meet(Rect r);              /* GPU path: an app window noted below the UI (layer 0) meets r (physical px of the view being painted) */
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip);  /* GPU path: windows painted until wl_tf_end are in a transformed node's raster */
+void wl_tf_end(void);
+void wl_tf_nested(int d);                /* +1 / -1: inside another transform: no quad */
+void wl_tf_open_holes(Canvas *c);        /* in the canvas the raster goes to, before it is blended */
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op);
 void wl_paint_popups(Canvas *c);
 

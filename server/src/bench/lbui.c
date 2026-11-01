@@ -29,6 +29,10 @@ void wl_paint_restore(void) {}
 int  wl_draws_meet(Rect r) { (void)r; return 0; }
 void wl_paint_begin(void) {}
 void wl_paint_popups(Canvas *c) { (void)c; }
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) { (void)node; (void)sx; (void)sy; (void)tx; (void)ty; (void)op; (void)skip; }
+void wl_tf_end(void) {}
+void wl_tf_nested(int d) { (void)d; }
+void wl_tf_open_holes(Canvas *c) { (void)c; }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return 0; }

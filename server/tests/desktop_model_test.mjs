@@ -140,6 +140,9 @@ eq('index', [cleanIndex(3), cleanIndex(-1), cleanIndex(99), cleanIndex('1'), cle
   eq('every window fits', inside, true);
   eq('never larger than 85 %', [...g.values()].every((p) => p.scale <= 0.85), true);
   eq('empty', gridLayout([], a).size, 0);
+  // a maximized window is drawn at the work area's size: the grid scales by that, not by its own w and h
+  const big = gridLayout([{ id: 's', w: 960, h: 640 }, { id: 'm', w: 1280, h: 800, maximized: true }], a, (w) => (w.maximized ? { w: a.w, h: a.h } : w)).get('m');
+  eq('a maximized window stays in the area', big.x + big.w <= a.x + a.w && big.y + big.h <= a.y + a.h, true);
   const s = stripLayout([1, 2, 3], a, { canAdd: true });
   eq('cards', s.cards.map((c) => c.id), [1, 2, 3]);
   eq('in order', s.cards[0].x < s.cards[1].x && s.cards[1].x < s.add.x, true);

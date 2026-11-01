@@ -57,7 +57,8 @@ A parked X11 window goes iconic and to the bottom of X's stack through the path 
 
 Ctrl+Up in Lord Flow, Super+Tab or the taskbar button in Lord Classic, the Window menu or the desktop's menu in
 both, and a four-finger swipe up. The windows of the desktop in a grid, drawn smaller by a transform on their
-real frame (lord-server paints a cached raster, so no app redraws and Linux windows stay live), with
+real frame (lord-server paints a raster of it, so no app redraws; on the GPU path a Linux window's quad is drawn
+at the scaled box, with its hole opened there, so it stays live and can't overflow or reach the Dock), with
 minimized ones too: a minimized Linux window that has nothing to draw, such as an iconic X11 window, shows its app
 icon and title (`OverviewPlaceholder`, behind the body, so a last buffer covers it; a LordOS app gets none, its body is translucent). Along the top, a strip with every desktop: a miniature of its windows' frames and icons
 over the wallpaper, since the other desktops' windows aren't drawn. There is no capture of those.

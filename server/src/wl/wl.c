@@ -164,7 +164,7 @@ static Surf *popups[32];
 static int npopups;
 
 /* GPU path: what is drawn below (layer 0) and above (layer 1) the UI, in order */
-typedef struct { int sid; float x, y; Rect clip; float op; } Draw;
+typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; } Draw;   /* sx, sy: a transformed window's scale */
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
@@ -2077,7 +2077,7 @@ static Rect rect_and(Rect a, Rect b) {
 }
 
 static void add_draw(int layer, Surf *s, float x, float y, Rect clip, float op) {
-    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ s->id, x, y, clip, op };
+    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ s->id, x, y, clip, op, 1, 1 };
 }
 
 /* Is the node (or an ancestor) a protected window? (screenshots, media/capture.c) */
@@ -2110,6 +2110,46 @@ static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *s
     }
 }
 
+/* GPU path, a window inside a transformed node (the Overview, the minimize effect): ui/paint.c rasterizes
+ * the node and blends the raster at its place, so the app's quad and its hole can't be where layout says.
+ * While the raster is painted, each surface is noted at the transformed box. Its alpha 0 in the raster
+ * keeps what the subtree paints over it (the Overview's hover border), and blending leaves the canvas as
+ * it was, so wl_tf_open_holes clears the same box in the canvas before the raster goes over it. Quad and
+ * hole are rounded to the same physical pixels. A rotation or a transform inside another one has no quad:
+ * the frame is drawn at its place with nothing in the content, never the window at its full size. */
+#define TF_HOLES 32
+static struct { int on, skip; float sx, sy, tx, ty, op; Rect outer; } tfv;
+static struct { float x, y, w, h; Rect clip; } tf_holes[TF_HOLES];
+static int ntf_holes;
+
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) {
+    const Node *n = node_get(node);
+    tfv.on = 1; tfv.skip = skip; tfv.sx = sx; tfv.sy = sy; tfv.tx = tx; tfv.ty = ty; tfv.op = op;
+    tfv.outer = n && n->parent ? node_clip(n->parent->id) : (Rect){ -65536, -65536, 65536, 65536 };
+    ntf_holes = 0;
+}
+void wl_tf_end(void) { tfv.on = 0; }
+void wl_tf_nested(int d) { tfv.skip += d; }
+
+static Rect tf_map(Rect r) {
+    float x0 = r.x0 * tfv.sx + tfv.tx, y0 = r.y0 * tfv.sy + tfv.ty, x1 = r.x1 * tfv.sx + tfv.tx, y1 = r.y1 * tfv.sy + tfv.ty;
+    return rect_and(tfv.outer, (Rect){ (int)floorf(fminf(x0, x1)), (int)floorf(fminf(y0, y1)), (int)ceilf(fmaxf(x0, x1)), (int)ceilf(fmaxf(y0, y1)) });
+}
+
+static Rect tf_pixels(float x, float y, float w, float h) {
+    return (Rect){ (int)lroundf(PVX(x)), (int)lroundf(PVY(y)), (int)lroundf(PVX(x + w)), (int)lroundf(PVY(y + h)) };
+}
+
+void wl_tf_open_holes(Canvas *c) {
+    Rect old = c->clip;
+    for (int i = 0; i < ntf_holes; i++) {
+        canvas_set_clip(c, rect_and(old, rect_and(phys_rect(tf_holes[i].clip), tf_pixels(tf_holes[i].x, tf_holes[i].y, tf_holes[i].w, tf_holes[i].h))));
+        canvas_clear(c, 0);
+    }
+    canvas_set_clip(c, old);
+    ntf_holes = 0;
+}
+
 /* CPU path: the buffer into its logical box (x, y, lw × lh) at the display's resolution. A client
  * that rendered at exactly that size (fractional-scale) is copied 1:1; others are scaled. */
 static void blit_surface(Canvas *c, const Surf *s, float x, float y, float sxk, float syk, float op) {
@@ -2123,7 +2163,22 @@ static void blit_surface(Canvas *c, const Surf *s, float x, float y, float sxk, 
 
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
-        if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
+        if (tfv.on) {
+            if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
+                float X = x * tfv.sx + tfv.tx, Y = y * tfv.sy + tfv.ty, W = s->lw * tfv.sx, H = s->lh * tfv.sy;
+                Rect m = tf_map(clip);
+                add_draw(0, s, X, Y, m, op * tfv.op);
+                draws[0][ndraws[0] - 1].sx = tfv.sx;
+                draws[0][ndraws[0] - 1].sy = tfv.sy;
+                tf_holes[ntf_holes].x = X; tf_holes[ntf_holes].y = Y; tf_holes[ntf_holes].w = W; tf_holes[ntf_holes].h = H;
+                tf_holes[ntf_holes++].clip = m;
+                Rect old = c->clip;                     /* in the raster */
+                canvas_set_clip(c, rect_and(rect_and(old, phys_rect(clip)),
+                                            (Rect){ (int)floorf(PVX(x)), (int)floorf(PVY(y)), (int)ceilf(PVX(x + s->lw)), (int)ceilf(PVY(y + s->lh)) }));
+                canvas_clear(c, 0);
+                canvas_set_clip(c, old);
+            }
+        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
         else if (s->content) {
             add_draw(0, s, x, y, clip, op);
             /* hole in the UI: what was painted below shows the window */
@@ -2174,7 +2229,7 @@ int wl_draws_meet(Rect r) {
         const Surf *s = find(d->sid);
         if (!s) continue;
         Rect b = rect_and(phys_rect(d->clip), (Rect){ (int)floorf(PVX(d->x)) - 1, (int)floorf(PVY(d->y)) - 1,
-                                                      (int)ceilf(PVX(d->x + s->lw)) + 1, (int)ceilf(PVY(d->y + s->lh)) + 1 });
+                                                      (int)ceilf(PVX(d->x + s->lw * d->sx)) + 1, (int)ceilf(PVY(d->y + s->lh * d->sy)) + 1 });
         if (b.x0 < r.x1 && r.x0 < b.x1 && b.y0 < r.y1 && r.y0 < b.y1) return 1;
     }
     return 0;
@@ -2193,7 +2248,8 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
     }
     if (s->xw && s->mapped && s != fs_surf && !paint_capture_mode) xwm_place(s->xw, (int)lroundf(x), (int)lroundf(y));   /* X routes the pointer by it */
     if (s == fs_surf) return;                   /* presented by the compositor, on top of everything */
-    Rect clip = rect_and(node_clip(node), (Rect){ (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) });
+    Rect box = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
+    Rect clip = tfv.on ? box : rect_and(node_clip(node), box);  /* node_clip is the untransformed tree's */
     Rect old = canvas_push_clip(c, PVX(x), PVY(y), w * paint_view.k, h * paint_view.k);
     paint_tree(c, s, x - s->gx, y - s->gy, op, clip);
     canvas_set_clip(c, old);
@@ -2262,7 +2318,13 @@ void wl_gpu_draw_layer(int layer) {
         for (int i = 0; i < ndraws[0]; i++) {
             Draw *d = &draws[0][i];
             Surf *s = find(d->sid);
-            if (s && s->content) draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op);
+            if (!s || !s->content) continue;
+            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }
+            Rect p = tf_pixels(d->x, d->y, s->lw * d->sx, s->lh * d->sy);
+            GpuTex *t = surface_tex(s);
+            float sx, sy, sw, sh;
+            source_rect(s, &sx, &sy, &sw, &sh);
+            if (t) gpu_draw(t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), sx, sy, sw, sh, phys_rect(d->clip), d->op);
         }
         return;
     }
