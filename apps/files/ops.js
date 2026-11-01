@@ -87,8 +87,21 @@ export function toggleTag(paths, color) {
   tagStore.set(all);
   try { fs.mkdir('.local/share/lordos'); fs.write(TAGS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
 }
+// Comments, kept like tags (~/.local/share/lordos/comments.json: path → text).
+const COMMENTS_FILE = '.local/share/lordos/comments.json';
+export const commentStore = createStore((() => {
+  try { return JSON.parse(fs.read(COMMENTS_FILE)); } catch (e) { return {}; }
+})());
+export const commentOf = (path) => commentStore.get()[path] || '';
+export function setComment(path, text) {
+  const all = { ...commentStore.get() };
+  if (text.trim()) all[path] = text.slice(0, 500); else delete all[path];
+  commentStore.set(all);
+  try { fs.mkdir('.local/share/lordos'); fs.write(COMMENTS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
+}
 // Moving or renaming keeps the tags.
 export function moveTags(from, to) {
+  if (commentOf(from)) { const text = commentOf(from); setComment(from, ''); setComment(to, text); }
   const all = tagStore.get();
   if (!all[from]) return;
   const next = { ...all, [to]: all[from] };

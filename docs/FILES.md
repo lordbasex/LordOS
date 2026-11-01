@@ -102,6 +102,16 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   under the window's title bar). In a folder the user can't write (This Computer), the menus and the
   context menu leave out or disable the actions that would change it.
 
+## Settings (0.8.7)
+
+**Files → Settings** (❖,), kept in `settings.json` under `files` (`apps/files/prefs.js`). General: what a new window shows, and a double click opening a folder in a new tab. Tags: a name for each color and which show in the sidebar. Sidebar: each item. Advanced: show extensions (the name shown only; renaming still works on the real one), warn before changing an extension or emptying the Trash, remove items over 30 days old from the Trash when Files opens (there is no background job), folders first, and where a search looks. What the reference has and LordOS doesn't (desktop icons, cloud sync) isn't offered.
+
+**List columns** are data in `apps/files/columns.js`, tested without a screen. Extra columns read `lord.fs.stat`, once per file until something changes. Date Changed is the inode's. Comments live in `~/.local/share/lordos/comments.json`, like tags. There is no Version column, and no "date added", because Linux keeps neither.
+
+## Connect to Server (0.8.7)
+
+`apps/files/connect.js` reads an address strictly: shell metacharacters, a leading `-` and `..` are refused, and each part goes on as data. smb and nfs go to the sign-in sheet and `share-mount`, which takes private IPv4 addresses only, so a name works only if Network already saw it. ssh and sftp open a new Terminal with the line typed and **not run**: Terminal checks it against a fixed pattern, and an isolated app that opens Terminal this way can't run anything. vnc, rdp, http and https go to the app that declares `x-scheme-handler/<scheme>` through `lord.apps.launchUri` (`apps_launch_uri`: fixed schemes, strict characters, one argument, no shell). ftp, ftps and WebDAV have no client here: the kernel has none for them and a mount helper would be a new privileged path, so Files says so and offers the Store.
+
 ## Network (0.8.7, in development)
 
 **Files → Network** shows what is on the local network by itself: computers, SMB shared folders, NFS exports,
@@ -111,7 +121,7 @@ stays off until the page is opened and leaves when the page closes.
 **State of the feature:** the maintainer approved the `lan` connector on 2026-10-31, so inside a session
 `lan_socket` gets its sockets from it (`sec/netconn.h`, `NC_LAN`), counted and decided as the firewall app
 `lordos:lan` in `lordos-net-lan.scope` (`FIREWALL.md`, "Files → Network and the connectors"). The tests below come from
-before that, outside a session (see "What was tested"). **SMB with a password is not validated:** see "Not tested".
+before that, outside a session (see "What was tested"). **SMB with a password:** listing was run against a throwaway test server on the loopback; see "Not tested" for a real mount and desktop systems.
 
 **How a pass works** (`server/src/lan/lan.c`, on a thread of its own):
 
@@ -146,8 +156,20 @@ isolated apps.
 the computer's and domain's names, and if the server lets an anonymous session in, a `NetrShareEnum` over the
 `srvsvc` pipe lists its disk shares (printers, `IPC$` and names ending in `$` are left out). SMB 2.0 to 3.0.2 are
 offered; a server that only speaks SMB 1 doesn't answer and has no shares here, on purpose. A server that refuses
-anonymous sessions (most desktop systems by default) shows as "lists its folders only after signing in", and the
-share's name is typed in *Connect*. Listing with a password is not built: it needs NTLMv2 and signing in `lord-lan`.
+anonymous sessions (most desktop systems by default) shows as "lists its folders only after signing in".
+
+**Signing in shows the folders.** *Connect* asks who connects, not a share's name: the name of a folder is something
+the server knows and the person may not. `lord.lan.listShares` (`lan_list_start` in `lan/lan.c`) runs on a thread and a
+`lord-lan` of its own, only to an address on a local subnet (`on_link`), through the same `lan` connector and port 445,
+and hands the helper the connected socket and one request, `LQ_SMB_AUTH`, with the name and password. The helper
+(`lan/smbauth.c`) answers the NTLMv2 challenge, signs what follows as SMB 2.0.2 and 2.1 do, with HMAC-SHA256, reads
+`NetrShareEnum` over `srvsvc` as the anonymous path does, and wipes the password; it is in that request and nowhere
+else, never on a command line or in a log. Only dialects 2.0.2 and 2.1 are offered here, because 3.x signing needs
+AES-CMAC and key derivation for no gain in a list: a server that refuses both can't list, and the sheet says so and
+asks for the name. A session the server marks guest or anonymous after a password counts as refused. MD4, MD5 and RC4
+are in `smbauth.c` because NTLM requires them; they are used nowhere else. The answers are shown, not trusted: their
+signature isn't checked and they go through `lan_clean_text`, and the mount is the kernel's. A share chosen goes to the
+same `share-mount`. *Remember the password* keeps it for the server (service `smb://<address>/`).
 
 **Connecting** runs the closed `share-mount` action (`lan/share_admin.c`, table in `SYSTEM.md`). The kernel's own
 `cifs` and `nfs` clients do the work through the new mount API, one `fsconfig()` per option: no option string, no
@@ -159,7 +181,7 @@ resolves as root. SMB tries the password given, or the guest; NFS tries 4.2, 4.1
 
 The password goes from the sheet to the action with `{ quiet: true }` and from there to one `fsconfig()`, and is
 wiped; it was not in `/proc/mounts`, the session's log, the journal or any command line. *Remember the password*
-saves it in the keyring (owner `files`, service `smb://<address>/<share>`) and nowhere else; with a locked or
+saves it in the keyring (owner `files`, service `smb://<address>/` or, for a share known beforehand, `smb://<address>/<share>`) and nowhere else; with a locked or
 missing keyring the share still connects and the page says it wasn't remembered.
 
 **A server that goes away.** `lord.fs` runs on the interface's thread, and a call on a network mount blocks in

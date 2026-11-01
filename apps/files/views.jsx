@@ -1,10 +1,11 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
 // columns (Miller, with a preview) and gallery.
-import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, formatBytes, formatDate, formatTime, typeScale, t as tr } from '@lordos/sdk';
-import { useEffect, useState } from 'react';
+import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, formatDate, formatTime, typeScale, t as tr } from '@lordos/sdk';
+import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots } from './glyphs.jsx';
 import { kindOf, isImage, isTextual } from './kinds.js';
-import { tagsOf } from './ops.js';
+import { tagsOf, commentOf } from './ops.js';
+import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
 
 const when = (ms) => { if (!ms) return '—'; const d = new Date(ms); return `${formatDate(d, 'numeric')} ${formatTime(d)}`; };
@@ -24,7 +25,7 @@ function Name({ e, ctx, center, color, lines = 1 }) {
   }
   return (
     <Text style={{ fontSize: center ? 12 : 13, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
-      overflow: 'hidden', maxHeight: lines * 16, lineHeight: 16, textOverflow: 'ellipsis', numberOfLines: lines }}>{e.name}</Text>
+      overflow: 'hidden', maxHeight: lines * 16, lineHeight: 16, textOverflow: 'ellipsis', numberOfLines: lines }}>{ctx.shownName ? ctx.shownName(e) : e.name}</Text>
   );
 }
 
@@ -87,17 +88,74 @@ export function IconView({ groups, ctx }) {
 
 // ---- list ----
 
-const COLS = [['name', 'flex'], ['date', 150], ['size', 80], ['kind', 120]];
+const SIDE_PAD = 36;              // the rows' and the header's own padding
+const cellAlign = (k) => (k === 'size' ? 'end' : 'start');
+const longDate = (st, k) => when(st?.[k]);
 
-function Header({ sort, onSort, t, showFolder }) {
+function cellText(k, e, ctx) {
+  const st = ['created', 'opened', 'changed', 'perms', 'owner'].includes(k) ? ctx.statOf(e) : null;
+  switch (k) {
+    case 'date': return e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime);
+    case 'created': return longDate(st, 'btime');
+    case 'opened': return longDate(st, 'atime');
+    case 'changed': return longDate(st, 'ctime');
+    case 'size': return e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size);
+    case 'kind': return ctx.showFolder ? where(e.path) : kindLabel(e);
+    case 'comments': return commentOf(e.path);
+    case 'perms': return st?.mode || '—';
+    case 'owner': return st?.user || '—';
+    default: return '';
+  }
+}
+
+// Name stays first. A column moves by dragging its title, widens by dragging its edge, and its menu is a right click.
+function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
+  const row = useRef(null);
+  const op = useRef(null);
+  const [live, setLive] = useState(null);       // a resize or a move under way
+  const cols = live?.columns || columns;
+  useEffect(() => {
+    const mv = addListener('pointermove', (e) => {
+      const o = op.current;
+      if (!o) return;
+      if (!o.moved && Math.abs(e.x - o.x) < 5) return;
+      o.moved = true;
+      const dx = (direction() === 'rtl' ? -1 : 1) * (e.x - o.x);
+      if (o.grip) setLive({ columns: resize(o.columns, o.k, o.w + dx) });
+      else {
+        const [rx, , rw] = lord.getLayout(row.current.id);
+        const from = direction() === 'rtl' ? rx + rw - e.x : e.x - rx;
+        const before = dropBefore(o.columns, from - nameW - SIDE_PAD / 2);
+        setLive({ columns: moveColumn(o.columns, o.k, before), moving: o.k });
+      }
+    });
+    const up = () => {
+      const o = op.current;
+      op.current = null;
+      if (!o) return;
+      if (o.moved) setLive((l) => { if (l) onColumns(l.columns); return null; });
+      else if (!o.grip) onSort(o.k);
+    };
+    const a = addListener('pointerup', up);
+    return () => { mv(); a(); };
+  }, [nameW, columns]);
+  const start = (ev, k, grip) => { ev.stopPropagation(); if (ev.button) return; op.current = { k, grip, x: ev.x, w: cols.width[k], columns: cols }; };
+  const title = (k) => tr(`files.col.${k === 'kind' && ctx.showFolder ? 'where' : k}`);
+  const label = (k) => (
+    <>
+      <Text style={{ fontSize: typeScale.caption, fontWeight: sort.by === k ? 600 : 500, color: sort.by === k ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{title(k)}</Text>
+      {sort.by === k && <Text style={{ fontSize: 8, color: t.textDim }}>{sort.desc ? '▼' : '▲'}</Text>}
+    </>
+  );
   return (
-    <View style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: t.separator }}>
-      {COLS.map(([k, w], i) => (
-        <View key={k} onClick={() => onSort(k)} style={{ ...(w === 'flex' ? { flex: 1 } : { width: w }), height: 26, flexDirection: 'row', alignItems: 'center', gap: 4,
-          justifyContent: k === 'size' ? 'flex-end' : 'flex-start', paddingHorizontal: w === 'flex' ? 20 : 8 }}>
-          {i > 0 && <View style={{ position: 'absolute', top: 6, bottom: 6, insetInlineStart: 0, width: 1, backgroundColor: t.separator }} />}
-          <Text style={{ fontSize: typeScale.caption, fontWeight: sort.by === k ? 600 : 500, color: sort.by === k ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{tr(`files.col.${k === 'kind' && showFolder ? 'where' : k}`)}</Text>
-          {sort.by === k && <Text style={{ fontSize: 8, color: t.textDim }}>{sort.desc ? '▼' : '▲'}</Text>}
+    <View ref={row} onContextMenu={(ev) => { ev.stopPropagation(); ctx.onHeaderMenu(ev); }} style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: t.separator }}>
+      <View onClick={() => onSort('name')} style={{ width: nameW, height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20 }}>{label('name')}</View>
+      {visible(cols).map((k) => (
+        <View key={k} onMouseDown={(ev) => start(ev, k, false)} style={{ width: cols.width[k], height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden',
+          justifyContent: k === 'size' ? 'flex-end' : 'flex-start', paddingHorizontal: 8, opacity: live?.moving === k ? 0.5 : 1 }}>
+          <View style={{ position: 'absolute', top: 6, bottom: 6, insetInlineStart: 0, width: 1, backgroundColor: t.separator }} />
+          {label(k)}
+          <View onMouseDown={(ev) => start(ev, k, true)} style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: 0, width: 8, cursor: 'ew-resize' }} />
         </View>
       ))}
     </View>
@@ -114,7 +172,7 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
       <View key={e.path} {...itemHandlers(e, ctx)}
         style={{ flexDirection: 'row', alignItems: 'center', height: 24, paddingHorizontal: 10, borderRadius: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1,
           backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? t.accent : odd ? (t.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)') : 'transparent' }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
+        <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
           <View onMouseDown={(ev) => { ev.stopPropagation(); if (e.dir && !e.trash) ctx.onToggleExpand(e.path); }} style={{ width: 14, alignItems: 'center' }}>
             {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
           </View>
@@ -122,14 +180,14 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
           <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} color={sel ? '#fff' : t.text} /></View>
           <TagDots tags={tagsOf(e.path)} size={7} />
         </View>
-        <Text style={{ width: 150, paddingHorizontal: 8, fontSize: typeScale.callout, color: sel ? '#fff' : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime)}</Text>
-        <Text style={{ width: 80, paddingHorizontal: 8, fontSize: typeScale.callout, color: sel ? '#fff' : t.textDim, textAlign: 'end', whiteSpace: 'nowrap' }}>{e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size)}</Text>
-        <Text style={{ width: 120, paddingHorizontal: 8, fontSize: typeScale.callout, color: sel ? '#fff' : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ctx.showFolder ? where(e.path) : kindLabel(e)}</Text>
+        {visible(ctx.columns).map((k) => (k === 'tags'
+          ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
+          : <Text key={k} style={{ width: ctx.columns.width[k], paddingHorizontal: 8, fontSize: typeScale.callout, color: sel ? '#fff' : t.textDim, textAlign: cellAlign(k), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cellText(k, e, ctx)}</Text>))}
       </View>,
     );
     if (open) {
       let kids = [];
-      try { kids = sortEntries(lord.fs.list(e.path).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort); } catch (err) { /* no permission */ }
+      try { kids = sortEntries(lord.fs.list(e.path).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort, ctx.sortOpts); } catch (err) { /* no permission */ }
       rows.push(...ListRows({ items: kids, depth: depth + 1, ctx, t, sort, alt }));
     }
   }
@@ -139,20 +197,43 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
 export function ListView({ groups, ctx, sort, onSort }) {
   const t = useTheme();
   const alt = { n: 0 };
+  const [sx, setSx] = useState(0);
+  const cols = ctx.columns;
+  const need = totalWidth(cols) + NAME_MIN + SIDE_PAD;
+  const room = ctx.contentW;
+  const nameW = Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
+  const over = Math.max(0, need - room);
+  const x = Math.min(sx, over);
+  const inner = { ...ctx, nameW };
+  const thumb = over ? Math.max(40, room * (room / need)) : 0;
+  const bar = useRef(null);
+  useEffect(() => {
+    const mv = addListener('pointermove', (e) => { const b = bar.current; if (b) setSx(Math.max(0, Math.min(b.over, b.x0 + (e.x - b.at) * b.k))); });
+    const up = addListener('pointerup', () => { bar.current = null; });
+    return () => { mv(); up(); };
+  }, []);
   return (
-    <View style={{ flex: 1 }}>
-      <Header sort={sort} onSort={onSort} t={t} showFolder={ctx.showFolder} />
-      <ScrollView style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
-          {groups.map((g) => (
-            <View key={g.key}>
-              <GroupTitle g={g} t={t} />
-              {ListRows({ items: g.items, depth: 0, ctx, t, sort, alt })}
-            </View>
-          ))}
+    <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
+      <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
+        <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
+        <ScrollView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
+            {groups.map((g) => (
+              <View key={g.key}>
+                <GroupTitle g={g} t={t} />
+                {ListRows({ items: g.items, depth: 0, ctx: inner, t, sort, alt })}
+              </View>
+            ))}
             {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} style={{ minHeight: 240 }} />}
+          </View>
+        </ScrollView>
+      </View>
+      {over ? (
+        <View style={{ height: 10, justifyContent: 'center', paddingHorizontal: 2 }}>
+          <View onMouseDown={(ev) => { ev.stopPropagation(); bar.current = { at: ev.x, x0: x, over, k: over / Math.max(1, room - thumb) }; }}
+            style={{ width: thumb, height: 6, borderRadius: 3, backgroundColor: t.textDim, opacity: 0.5, [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: (x / over) * (room - thumb - 4) }} />
         </View>
-      </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -195,7 +276,7 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
   return (
     <View style={{ flex: 1, flexDirection: 'row', direction: 'ltr' }}>
       {shown.map((dir, ci) => {
-        const items = sortEntries(entriesOf(dir), sort);
+        const items = sortEntries(entriesOf(dir), sort, ctx.sortOpts);
         const level = offset + ci;
         return (
           <View key={dir} dropPath={dir} style={{ width: 220, flexDirection: 'row' }}>

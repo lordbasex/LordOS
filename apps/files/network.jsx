@@ -64,35 +64,59 @@ function Row({ t, depth = 0, icon, name, sub, kind, children, onClick, chevron }
   );
 }
 
-// Connecting: the share's name when it can't be listed, then who connects. The password goes to the
-// action and, only if asked, to the keyring.
-function ConnectSheet({ ask, onClose, onMounted }) {
+// Connecting: who connects, then the folders that server shows them, so nobody has to know a share's name. It's only
+// asked for when the server can't list them. The password goes to lord-lan for the list, to the action for the mount
+// and, only if asked, to the keyring.
+export function ConnectSheet({ ask, onClose, onMounted }) {
   const t = useTheme();
   const [share, setShare] = useState(ask.share || '');
-  const [user, setUser] = useState('');
+  const [user, setUser] = useState(ask.user || '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [list, setList] = useState(null);                 // the server's folders, once signed in
+  const [typed, setTyped] = useState(false);              // it couldn't list them: the name is typed
+  const [guest, setGuest] = useState(false);
   const nfs = ask.kind === 'nfs';
+  const needName = nfs ? !ask.share : !ask.share && typed;
   useEffect(() => {
-    if (!ask.share || nfs) return;
-    lan.saved(ask.kind, ask.addr, ask.share).then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
+    if (nfs) return;
+    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
   }, []);
-  const go = async (guest) => {
-    const name = share.trim();
+  // DOMAIN\user, as people write it
+  const who = (g) => {
+    if (g || nfs) return { user: '', domain: '', password: '' };
+    const m = /^([^\\]+)\\(.+)$/.exec(user.trim());
+    return { user: m ? m[2] : user.trim(), domain: m ? m[1] : '', password };
+  };
+  const mount = async (name, g) => {
     if (!name || busy) return;
     setBusy(true); setError('');
-    const who = guest || nfs ? { user: '', password: '' } : { user: user.trim(), password };
+    const w = who(g);
     try {
-      const at = await lan.mount({ kind: ask.kind, addr: ask.addr, share: name, ...who });
+      const at = await lan.mount({ kind: ask.kind, addr: ask.addr, share: name, ...w });
       let note = null;
-      if (!guest && !nfs && who.user) {
-        if (remember) { try { await lan.remember(ask.kind, ask.addr, name, who.user, who.password, tr('files.net.keyringLabel', { name, addr: ask.addr })); } catch (e) { note = tr('files.net.notRemembered'); } }
-        else lan.forget(ask.kind, ask.addr, name, who.user);
+      if (!g && !nfs && w.user) {
+        const key = ask.share || '';
+        if (remember) { try { await lan.remember(ask.kind, ask.addr, key, user.trim(), password, tr('files.net.keyringLabel', { name: name, addr: ask.addr })); } catch (e) { note = tr('files.net.notRemembered'); } }
+        else lan.forget(ask.kind, ask.addr, key, user.trim());
       }
       onMounted(at, note);
     } catch (e) { setError(e.message); setBusy(false); }
+  };
+  const signIn = async (g) => {
+    if (busy) return;
+    setGuest(g);
+    if (ask.share || nfs || typed) { mount((ask.share || share).trim(), g); return; }
+    setBusy(true); setError('');
+    const r = await lan.listShares({ addr: ask.addr, ...who(g) });
+    setBusy(false);
+    if (r.state === 'done' && r.shares.length) { setList(r.shares); return; }
+    if (r.state === 'denied') { setError(tr(g ? 'files.net.noGuest' : 'files.net.badLogin')); return; }
+    if (r.state === 'done') { setError(tr('files.net.noShares')); return; }
+    setTyped(true);                                       // an old server, another subnet, a refused dialect
+    setError(tr('files.net.cantList'));
   };
   const field = (label, input) => (
     <View style={{ gap: 3 }}>
@@ -100,27 +124,51 @@ function ConnectSheet({ ask, onClose, onMounted }) {
       {input}
     </View>
   );
+  const ready = nfs ? (ask.share || share.trim()) : user.trim() && (!needName || share.trim());
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: 380, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('files.net.connectTo', { name: ask.host })}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tr(`files.net.kind.${ask.kind}`)} · ${ask.addr}`}</Text>
-        {ask.share ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{ask.share}</Text>
-          : field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => go(false)} onCancel={onClose} />)}
-        {!nfs && field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus={!!ask.share} onSubmit={() => go(false)} onCancel={onClose} />)}
-        {!nfs && field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={() => go(false)} onCancel={onClose} />)}
-        {!nfs && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
-            <Toggle small on={remember} onChange={setRemember} />
-            <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.net.remember')}</Text>
-          </View>
+        {list ? (
+          <>
+            <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('files.net.pickShare')}</Text>
+            <ScrollView style={{ maxHeight: 220 }}>
+              {list.map((s) => (
+                <View key={s.name} onClick={() => mount(s.name, guest)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 34, paddingHorizontal: spacing.s, borderRadius: 6 }}>
+                  <FolderGlyph size={18} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{s.name}</Text>
+                    {s.comment ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{s.comment}</Text> : null}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            {error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
+              <Button label={tr('files.cancel')} onClick={onClose} disabled={busy} />
+            </View>
+          </>
+        ) : (
+          <>
+            {ask.share ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{ask.share}</Text> : null}
+            {needName ? field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => signIn(false)} onCancel={onClose} />) : null}
+            {!nfs && field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus={!needName} onSubmit={() => signIn(false)} onCancel={onClose} />)}
+            {!nfs && field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={() => signIn(false)} onCancel={onClose} />)}
+            {!nfs && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
+                <Toggle small on={remember} onChange={setRemember} />
+                <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.net.remember')}</Text>
+              </View>
+            )}
+            {error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
+              <Button label={tr('files.cancel')} onClick={onClose} disabled={busy} />
+              {!nfs && <Button label={tr('files.net.asGuest')} onClick={() => signIn(true)} disabled={busy || (needName && !share.trim())} />}
+              <Button primary label={busy ? tr('files.net.connecting') : tr('files.net.connect')} onClick={() => signIn(false)} disabled={busy || !ready} />
+            </View>
+          </>
         )}
-        {error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <Button label={tr('files.cancel')} onClick={onClose} disabled={busy} />
-          {!nfs && <Button label={tr('files.net.asGuest')} onClick={() => go(true)} disabled={busy || !share.trim()} />}
-          <Button primary label={busy ? tr('files.net.connecting') : tr('files.net.connect')} onClick={() => go(false)} disabled={busy || !share.trim() || (!nfs && !user.trim())} />
-        </View>
       </View>
     </View>
   );

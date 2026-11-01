@@ -105,7 +105,8 @@ function buildTree(n) {
   return { type: 'split', id: nextId('s'), dir: n.dir, ratio: n.ratio, a: buildTree(n.a), b: buildTree(n.b) };
 }
 
-export function ensureWin(wid) {
+// args from another app: { cwd } starts the shell there, { typed } leaves a line typed and not run
+export function ensureWin(wid, args) {
   if (getWin(wid)) return;
   let tabs;
   if (pendingLayouts.has(wid)) {
@@ -117,7 +118,11 @@ export function ensureWin(wid) {
   } else if (pendingTabs.has(wid)) {
     tabs = pendingTabs.get(wid);
     pendingTabs.delete(wid);
-  } else tabs = [newTab(null, null)];
+  } else {
+    const sid = args?.cwd || args?.typed ? createSession(null, null, typeof args.cwd === 'string' ? args.cwd : undefined) : null;
+    if (sid != null && /^(ssh|sftp)( -[pP] \d{1,5})? [A-Za-z0-9_][A-Za-z0-9._@-]{0,300}$/.test(String(args.typed || ''))) patchMeta(sid, { pendingText: args.typed });
+    tabs = [newTab(null, null, sid)];
+  }
   wins.set((w) => ({ ...w, [wid]: {
     tabs, active: tabs[0].id, find: null, prefs: false, toolbelt: false, popup: null, dialog: null,
     broadcast: false, timestamps: false, fontDelta: 0, toasts: [], composer: false, copyMode: null, replay: null,

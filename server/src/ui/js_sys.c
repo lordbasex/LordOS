@@ -1832,6 +1832,16 @@ static JSValue f_apps_launch_with(JSContext *c, JSValueConst this_val, int argc,
     return JS_NewBool(c, ok);
 }
 
+/* lord.apps.launchUri(id, uri): a vnc:// or rdp:// address for a Linux app that declares the scheme. */
+static JSValue f_apps_launch_uri(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    const char *id = JS_ToCString(c, argv[0]), *u = JS_ToCString(c, argv[1]);
+    int ok = id && u && apps_launch_uri(id, u) == 0;
+    if (id) JS_FreeCString(c, id);
+    if (u) JS_FreeCString(c, u);
+    return JS_NewBool(c, ok);
+}
+
 /* ---- lord.remote: state of the sessions and of remote desktop (lord-sessiond; read-only) ---- */
 
 static JSValue text_or_null(JSContext *c, const char *path, size_t max) {
@@ -2102,6 +2112,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("linux", 1, f_apps_linux),
     JS_CFUNC_DEF("launch", 1, f_apps_launch),
     JS_CFUNC_DEF("launchWith", 2, f_apps_launch_with),
+    JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),
     JS_CFUNC_DEF("actions", 2, f_apps_actions),
     JS_CFUNC_DEF("launchAction", 2, f_apps_launch_action),
     JS_CFUNC_DEF("lastError", 0, f_apps_last_error),

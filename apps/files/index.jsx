@@ -18,7 +18,11 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetworkView, NetGlyph, isShareFs } from './network.jsx';
+import { NetworkView, NetGlyph, isShareFs, ConnectSheet } from './network.jsx';
+import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
+import { parseAddress, sshLine, remoteUri, hostAddress } from './connect.js';
+import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer } from './prefs.js';
+import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
 export function Icon({ size: s }) {
   return (
@@ -42,6 +46,13 @@ const winStates = new Map();
 
 const homeLoc = () => ({ type: 'dir', path: fs.home() });
 const computerLoc = () => ({ type: 'dir', path: '/' });
+// Settings → General: what a new window shows
+function startLoc(k) {
+  if (k === 'recent') return { type: 'recent' };
+  if (k === 'computer') return computerLoc();
+  const d = userDirs().find((x) => x.label === k);
+  return d ? { type: 'dir', path: d.path } : homeLoc();
+}
 // This computer is named after the machine
 const computerName = () => { try { return systemInfo().hostname || tr('files.place.computer'); } catch (e) { return tr('files.place.computer'); } };
 // Partitions (or whole disks without a table) that hold a file system and aren't mounted, off the
@@ -93,13 +104,14 @@ registerDockActions('files', () => {
 // args.view ('icons' | 'list' | 'columns' | 'gallery') picks the view of the opened folder
 const argView = (args) => (VIEWS.includes(args?.view) ? args.view : null);
 
+const tagName = (color) => filesPrefs().tagNames[color]?.trim() || tr(`files.tag.${color}`);
 function locTitle(loc, dirs) {
   switch (loc.type) {
     case 'recent': return tr('files.place.recent');
     case 'apps': return tr('files.place.apps');
     case 'trash': return tr('files.place.trash');
     case 'network': return tr('files.place.network');
-    case 'tag': return tr(`files.tag.${loc.color}`);
+    case 'tag': return filesPrefs().tagNames[loc.color]?.trim() || tr(`files.tag.${loc.color}`);
     case 'search': return tr('files.searchTitle', { q: loc.query });
     case 'archive': return loc.inner ? fs.basename(loc.inner) : fs.basename(loc.path);
     default: {
@@ -173,7 +185,8 @@ export default function Files() {
   const jobs = useStore(jobState);
   const errs = useStore(jobErrors);
   const saved = winStates.get(wid);
-  const [tabs, setTabs] = useState(() => saved?.tabs || [{ ...newTab(argLoc(args) || homeLoc()), view: argView(args) || 'icons' }]);
+  const prefs = useFilesPrefs();
+  const [tabs, setTabs] = useState(() => saved?.tabs || [{ ...newTab(argLoc(args) || startLoc(prefs.newWindow)), view: argView(args) || 'icons' }]);
   const [active, setActive] = useState(() => saved?.active || 0);
   const tab = tabs[Math.min(active, tabs.length - 1)];
   useEffect(() => { winStates.set(wid, { tabs, active }); }, [tabs, active]);
@@ -188,7 +201,9 @@ export default function Files() {
   const [info, setInfo] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [query, setQuery] = useState('');
-  const [scope, setScope] = useState('here');
+  const [scope, setScope] = useState(() => (prefs.searchScope === 'last' ? prefs.lastScope : prefs.searchScope));
+  const [sheet, setSheet] = useState(null);               // 'goto' | 'connect' | 'settings'
+  const [connAsk, setConnAsk] = useState(null);           // Connect to Server's sign-in
   const [debounced, setDebounced] = useState('');
   const [hidden, setHidden] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set());
@@ -200,6 +215,7 @@ export default function Files() {
   const [msg, setMsg] = useState(null);
   const [netModal, setNetModal] = useState(false);        // Network's connect sheet has the keyboard
   const root = useRef(null);
+  const rootWidthRef = useRef(960);
   const press = useRef(null);
   const typed = useRef({ text: '', at: 0 });
 
@@ -211,7 +227,16 @@ export default function Files() {
   }, [loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
-  const sorted = useMemo(() => sortEntries(entries, sortBy), [entries, sortBy.by, sortBy.desc]);
+  // what the list's extra columns need, asked once per file until something changes
+  const stats = useRef({ v: -1, m: new Map() });
+  const statOf = (e) => {
+    if (stats.current.v !== version) stats.current = { v: version, m: new Map() };
+    const m = stats.current.m;
+    if (!m.has(e.path)) { let st = null; if (!e.trash && !e.app && !e.arc) { try { st = lord.fs.stat(e.path); } catch (err) { /* gone */ } } m.set(e.path, st); }
+    return m.get(e.path);
+  };
+  const sortOpts = { statOf, foldersFirst: prefs.foldersFirst };
+  const sorted = useMemo(() => sortEntries(entries, sortBy, sortOpts), [entries, sortBy.by, sortBy.desc, prefs.foldersFirst]);
   const groups = useMemo(() => groupEntries(sorted, tab.group, tr), [sorted, tab.group]);
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const byPath = useMemo(() => new Map(flat.map((e) => [e.path, e])), [flat]);
@@ -225,6 +250,7 @@ export default function Files() {
   function navigate(next, push = true) {
     if (sameLoc(next, tab.loc)) return;
     setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(new Set());
+    if (next.type === 'dir') noteFolder(next.path);
     patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [] }));
   }
   const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
@@ -269,14 +295,60 @@ export default function Files() {
     const name = r.value.trim();
     if (!name || name === fs.basename(r.path) || name.includes('/')) return;
     const to = `${fs.parent(r.path)}/${name}`;
-    try { fs.rename(r.path, to); moveTags(r.path, to); bump(); setSelected(new Set([to])); } catch (e) { report(e); }
+    const go = () => { try { fs.rename(r.path, to); moveTags(r.path, to); bump(); setSelected(new Set([to])); } catch (e) { report(e); } };
+    const ext = (n) => { const i = n.lastIndexOf('.'); return i > 0 ? n.slice(i + 1).toLowerCase() : ''; };
+    const entry = byPath.get(r.path);
+    if (prefs.warnExtension && entry && !entry.dir && ext(name) !== ext(entry.name)) {
+      setConfirm({ text: tr('files.confirm.extension', { from: `.${ext(entry.name)}`, to: ext(name) ? `.${ext(name)}` : tr('files.confirm.noExtension') }), detail: tr('files.confirm.extensionDetail'), ok: tr('files.confirm.extensionOk'), run: go });
+      return;
+    }
+    go();
   };
   // actions receive the paths to use (the context menu fixes them when it opens: the selection
   // at that moment, or the right-clicked item if it was not selected)
   const askDelete = (paths = selPaths) => setConfirm({ text: tr('files.confirm.delete', { count: paths.length }), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.deleteNow'),
     run: () => { for (const p of paths) { try { fs.removeFromTrash(p); } catch (err) { report(err); } } bump(); } });
-  const askEmpty = () => setConfirm({ text: tr('files.confirm.empty'), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.emptyTrash'),
-    run: () => { fs.emptyTrash(); bump(); } });
+  const askEmpty = () => {
+    const run = () => { fs.emptyTrash(); bump(); };
+    if (!prefs.warnEmptyTrash) { run(); return; }
+    setConfirm({ text: tr('files.confirm.empty'), detail: tr('files.confirm.cantUndo'), ok: tr('files.menu.emptyTrash'), run });
+  };
+  // Settings → Advanced: what has been in the Trash over 30 days goes when Files starts
+  useEffect(() => {
+    if (!prefs.trash30) return;
+    const limit = Date.now() - 30 * 86400000;
+    let n = 0;
+    for (const x of fs.trashList()) { const at = Date.parse(x.deleted); if (at && at < limit) { try { fs.removeFromTrash(x.id); n++; } catch (e) { /* stays */ } } }
+    if (n) bump();
+  }, []);
+  // Open in Terminal: the Terminal app in a window of its own, at this folder
+  const openTerminal = (path = curDir) => { if (path) wm.open('terminal', { new: true, args: { cwd: path } }); };
+  // Connect to Server: returns { error, store } to show, or nothing when it went on
+  const connectTo = (text) => {
+    const a = parseAddress(text);
+    if (a.error) return { error: tr(`files.connect.err.${a.error}`, { scheme: a.scheme || '' }) };
+    const store = (q) => () => { setSheet(null); wm.open('store', { args: { search: q } }); };
+    const clientFor = (scheme) => launcherApps.find((x) => x.kind === 'linux' && (x.mimeTypes || []).includes(`x-scheme-handler/${scheme}`));
+    if (a.kind === 'mount') {
+      if (a.port) return { error: tr('files.connect.err.port') };
+      const addr = hostAddress(lan.available() ? lan.poll().hosts : [], a.host);
+      if (!addr) return { error: tr('files.connect.err.name', { name: a.host }) };
+      noteServer(a.text);
+      setSheet(null);
+      setConnAsk({ kind: a.scheme, addr, host: a.host, user: a.user, share: a.scheme === 'smb' ? a.share : a.path });
+      return null;
+    }
+    if (a.kind === 'terminal') { noteServer(a.text); setSheet(null); wm.open('terminal', { new: true, args: { typed: sshLine(a) } }); return null; }
+    if (a.kind === 'remote' || a.kind === 'web') {
+      const app = clientFor(a.scheme);
+      if (!app) return { error: tr('files.connect.err.noClient', { scheme: a.scheme }), store: store(a.scheme === 'rdp' ? 'remote desktop' : a.scheme) };
+      noteServer(a.text);
+      if (!lord.apps.launchUri(app.desktopId, a.kind === 'web' ? a.text : remoteUri(a))) return { error: tr('files.connect.err.launch', { name: app.name }) };
+      setSheet(null);
+      return null;
+    }
+    return { error: tr('files.connect.err.noMount', { scheme: a.scheme }), store: store(a.scheme.startsWith('ftp') ? 'ftp' : 'webdav') };
+  };
   const toTrash = (paths = selPaths) => {
     if (!paths.length || readOnly) return;
     if (loc.type === 'trash') { askDelete(paths); return; }
@@ -302,7 +374,11 @@ export default function Files() {
   const ctx = { navigate, linuxApps: launcherApps, t: tr, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
-  const open = (e) => { if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; } openEntry(e, ctx); };
+  const open = (e) => {
+    if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; }
+    if (prefs.foldersInTabs && e.dir && !e.arc && !e.app) { newTabAt({ type: 'dir', path: e.path }); return; }
+    openEntry(e, ctx);
+  };
   const openSel = (list = sel) => { for (const e of list.slice(0, 8)) open(e); };
   const newTabAt = (l) => { setTabs((ts) => [...ts, newTab(l || tab.loc, tab)]); setActive(tabs.length); setSelected(new Set()); };
   const closeTab = (i) => {
@@ -372,7 +448,7 @@ export default function Files() {
     const openers = openersFor(e, launcherApps, tr);
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
-      ...(e.dir ? [{ label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }] : []),
+      ...(e.dir ? [{ label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
       ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
@@ -406,7 +482,7 @@ export default function Files() {
       { label: tr('files.menu.groupBy'), submenu: groupItems },
       '-',
       { label: tr('files.menu.showHidden'), hint: '❖⇧.', checked: hidden, onClick: () => setHidden((h) => !h) },
-      ...(curDir ? [{ label: tr('files.menu.getInfo'), onClick: () => { setSelected(new Set()); setInfo(true); } }] : []),
+      ...(curDir ? [{ label: tr('files.menu.getInfo'), onClick: () => { setSelected(new Set()); setInfo(true); } }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal() }] : []),
     ];
   }
   const onContext = (e, ev) => {
@@ -426,8 +502,11 @@ export default function Files() {
     if (ev?.shift && first) setSelected(new Set([...selected, p])); else setSelected(new Set([p]));
     anchor.current = p;
   };
+  const goDir = (label) => { const d = dirs.find((x) => x.label === label); if (d) navigate({ type: 'dir', path: d.path }); };
+  const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
+    f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
-    if (renaming || confirm || menu || netModal) return;
+    if (renaming || confirm || menu || netModal || sheet || connAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
     const space = e.char === ' ' || e.key === ' ' || b === ' ';
@@ -437,6 +516,11 @@ export default function Files() {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { moveSel(-1); return; }
       return;
     }
+    if (e.meta && e.ctrl) return;                 // ❖⌃K and the like belong to the shell
+    if (mod && e.shift && GO_KEYS[b]) { GO_KEYS[b](); return; }
+    if (mod && e.alt && b === 'l') { goDir('downloads'); return; }
+    if (mod && !e.shift && b === 'k') { setSheet('connect'); return; }
+    if (mod && !e.shift && b === ',') { setSheet('settings'); return; }
     if (mod && e.key === 'Tab') { setActive((a) => (a + (e.shift ? tabs.length - 1 : 1)) % tabs.length); return; }
     if (mod && e.shift && b === 'n') { newFolder(null); return; }
     if (mod && b === 'n') { wm.open('files', { new: true, args: { path: curDir || fs.home() } }); return; }
@@ -504,23 +588,35 @@ export default function Files() {
         { label: tr('files.menu.back'), hint: '❖[', onClick: goBack, disabled: !tab.back.length },
         { label: tr('files.menu.forward'), hint: '❖]', onClick: goForward, disabled: !tab.fwd.length },
         { label: tr('files.menu.up'), hint: '❖↑', onClick: goUp, disabled: !curDir || curDir === fs.home() }, '-',
-        { label: tr('files.place.recent'), onClick: () => navigate({ type: 'recent' }) },
-        { label: tr('files.place.home'), onClick: () => navigate(homeLoc()) },
-        { label: computerName(), onClick: () => navigate(computerLoc()) },
-        ...dirs.map((d) => ({ label: tr(`files.place.${d.label}`), onClick: () => navigate({ type: 'dir', path: d.path }) })),
-        ...(lan.available() ? [{ label: tr('files.place.network'), onClick: () => navigate({ type: 'network' }) }] : []),
-        { label: tr('files.place.apps'), onClick: () => navigate({ type: 'apps' }) },
-        { label: tr('files.place.trash'), onClick: () => navigate({ type: 'trash' }) },
+        { label: tr('files.place.recent'), hint: '❖⇧F', onClick: () => navigate({ type: 'recent' }) },
+        ...dirs.filter((d) => ['documents', 'desktop', 'downloads'].includes(d.label)).map((d) => ({ label: tr(`files.place.${d.label}`), hint: { documents: '❖⇧O', desktop: '❖⇧D', downloads: '❖⌥L' }[d.label], onClick: () => navigate({ type: 'dir', path: d.path }) })),
+        { label: tr('files.place.home'), hint: '❖⇧H', onClick: () => navigate(homeLoc()) },
+        { label: computerName(), hint: '❖⇧C', onClick: () => navigate(computerLoc()) },
+        ...(lan.available() ? [{ label: tr('files.place.network'), hint: '❖⇧K', onClick: () => navigate({ type: 'network' }) }] : []),
+        { label: tr('files.place.apps'), hint: '❖⇧A', onClick: () => navigate({ type: 'apps' }) },
+        { label: tr('files.place.trash'), onClick: () => navigate({ type: 'trash' }) }, '-',
+        { label: tr('files.menu.recentFolders'), disabled: !prefs.recentFolders.length, submenu: prefs.recentFolders.map((p) => ({ label: fs.basename(p) || '/', onClick: () => navigate({ type: 'dir', path: p }) })) }, '-',
+        { label: tr('files.menu.goToFolder'), hint: '❖⇧G', onClick: () => setSheet('goto') },
+        ...(lan.available() ? [{ label: tr('files.menu.connect'), hint: '❖K', onClick: () => setSheet('connect') }] : []),
       ] },
+      { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
     ]);
-  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length]);
+  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length]);
 
   // ---- view ----
+  const columns = columnsOf(prefs);
+  const onHeaderMenu = (ev) => {
+    const p = local(ev);
+    setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
+  };
+  const content = (rootWidthRef.current || 960) - SIDEBAR_W;
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   const viewCtx = {
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
-    onItemDown, onOpen: open, onContext,
+    onItemDown, onOpen: open, onContext, statOf, sortOpts, columns, contentW: content,
+    onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
+    shownName: prefs.showExtensions ? null : (e) => { if (e.dir || e.app) return e.name; const i = e.name.lastIndexOf('.'); return i > 0 ? e.name.slice(0, i) : e.name; },
     onRenameChange: (v) => setRenaming((r) => (r ? { ...r, value: v } : r)), onRenameCommit: commitRename, onRenameCancel: () => setRenaming(null),
     onToggleExpand: (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; }),
     isDir: (p) => { const e = byPath.get(p); if (e) return e.dir; try { return lord.fs.stat(p).dir; } catch (err) { return false; } },
@@ -557,9 +653,11 @@ export default function Files() {
     const rtl = direction() === 'rtl';
     setMenu({ x: rtl ? bx - rx : bx - rx + bw - 220, y: by - ry + bh + 4, items });
   };
+  const visibleSort = () => ALL_COLUMNS.filter((k) => columns.shown.includes(k));
+  const sortLabel = (k) => tr(['name', 'kind', 'date', 'size'].includes(k) ? `files.sort.${k}` : `files.col.${k}`);
   const groupSortItems = () => [
     { header: tr('files.menu.groupBy') }, ...['none', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.groupBy.${k}`), checked: tab.group === k, onClick: () => patchTab({ group: k }) })), '-',
-    { header: tr('files.menu.sortBy') }, ...['name', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.sort.${k}`), checked: tab.sort.by === k, onClick: () => setSort(k) })),
+    { header: tr('files.menu.sortBy') }, ...['name', ...visibleSort()].map((k) => ({ label: sortLabel(k), checked: tab.sort.by === k, onClick: () => setSort(k) })),
     { label: tab.sort.desc ? tr('files.sort.desc') : tr('files.sort.asc'), onClick: () => patchTab((x) => ({ sort: { ...x.sort, desc: !x.sort.desc } })) },
   ];
   const viewMenuItems = () => VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) }));
@@ -567,41 +665,42 @@ export default function Files() {
   const actionItems = () => (sel.length && first ? itemMenu(first) : bgMenu());
   // narrow windows: one view button with a menu, tags inside "⋯", a shorter search field
   const width = useWidth(root, 960);
-  const content = width - SIDEBAR_W;
+  rootWidthRef.current = width;
   const narrow = content < 600;
   const tight = content < 470;
   const viewBtn = useRef(null), sortBtn = useRef(null), tagBtn = useRef(null), moreBtn = useRef(null);
+  const side = (id) => !prefs.hiddenSide.includes(id);
   const sideScroll = (
     <ScrollView style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 10, paddingBottom: 12 }}>
         <SideTitle t={t} first>{tr('files.favorites')}</SideTitle>
-        <SideItem t={t} label={tr('files.place.recent')} icon={<Glyph ch="◷" t={t} />} selected={sideSel({ type: 'recent' })} onClick={() => navigate({ type: 'recent' })} />
-        <SideItem t={t} label={tr('files.place.apps')} icon={<Glyph ch="⌘" t={t} />} selected={sideSel({ type: 'apps' })} onClick={() => navigate({ type: 'apps' })} />
-        {dirs.map((d) => (
+        {side('recent') && <SideItem t={t} label={tr('files.place.recent')} icon={<Glyph ch="◷" t={t} />} selected={sideSel({ type: 'recent' })} onClick={() => navigate({ type: 'recent' })} />}
+        {side('apps') && <SideItem t={t} label={tr('files.place.apps')} icon={<Glyph ch="⌘" t={t} />} selected={sideSel({ type: 'apps' })} onClick={() => navigate({ type: 'apps' })} />}
+        {dirs.filter((d) => side(d.label)).map((d) => (
           <SideItem key={d.path} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
             onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} hot={dropTarget === d.path} />
         ))}
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
-        <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
-          drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />
-        <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />
-        {lan.available() && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
-        {volumes.map((v) => {
+        {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
+          drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
+        {side('computer') && <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />}
+        {lan.available() && side('network') && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
+        {side('volumes') && volumes.map((v) => {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
             <SideItem key={v.path} t={t} label={v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
               drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null} />
           );
         })}
-        {unmountedDisks(diskList).map((p) => (
+        {side('volumes') && unmountedDisks(diskList).map((p) => (
           <SideItem key={p.name} t={t} dim label={p.label || tr('files.disk.unnamed', { size: formatBytes(p.size) })} icon={<DriveGlyph color={t.textDim} />}
             onClick={() => mount(p)} />
         ))}
-        <SideItem t={t} label={tr('files.place.trash')} icon={<TrashGlyph color={t.accent} />} selected={sideSel({ type: 'trash' })} onClick={() => navigate({ type: 'trash' })}
-          drop={{ dropTrash: true }} hot={dropTarget === 'trash:'} />
-        <SideTitle t={t}>{tr('files.tags')}</SideTitle>
-        {Object.entries(TAG_COLORS).map(([color, hex]) => (
-          <SideItem key={color} t={t} label={tr(`files.tag.${color}`)} icon={<Dot color={hex} />} selected={sideSel({ type: 'tag', color })} onClick={() => navigate({ type: 'tag', color })} />
+        {side('trash') && <SideItem t={t} label={tr('files.place.trash')} icon={<TrashGlyph color={t.accent} />} selected={sideSel({ type: 'trash' })} onClick={() => navigate({ type: 'trash' })}
+          drop={{ dropTrash: true }} hot={dropTarget === 'trash:'} />}
+        {side('tags') && <SideTitle t={t}>{tr('files.tags')}</SideTitle>}
+        {side('tags') && Object.entries(TAG_COLORS).filter(([color]) => !prefs.hiddenTags.includes(color)).map(([color, hex]) => (
+          <SideItem key={color} t={t} label={tagName(color)} icon={<Dot color={hex} />} selected={sideSel({ type: 'tag', color })} onClick={() => navigate({ type: 'tag', color })} />
         ))}
       </View>
     </ScrollView>
@@ -634,6 +733,7 @@ export default function Files() {
           )}
           <View ref={sortBtn}><ToolbarButton icon="⇅" title={tr('files.groupSort')} onClick={() => menuUnder(sortBtn, groupSortItems())} /></View>
           {!narrow && <View ref={tagBtn}><ToolbarButton icon="●" iconSize={11} color={t.textDim} title={tr('files.menu.tags')} disabled={!sel.length} onClick={() => menuUnder(tagBtn, tagItems())} /></View>}
+          {!tight && <ToolbarButton icon=">_" iconSize={12} title={tr('files.menu.openTerminal')} disabled={!curDir} onClick={() => openTerminal()} />}
           <View ref={moreBtn}><ToolbarButton icon="⋯" title={tr('files.actions')} onClick={() => menuUnder(moreBtn, actionItems())} /></View>
           <SearchField value={query} onChange={setQuery} placeholder={tr('files.search')} width={tight ? 120 : narrow ? 150 : 180} />
         </Toolbar>
@@ -642,7 +742,7 @@ export default function Files() {
             <Hairline edge="bottom" />
             <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginHorizontal: spacing.xs }}>{tr('files.searchIn')}</Text>
             {(baseLoc.type === 'dir' ? ['home', 'here'] : ['home']).map((sc) => (
-              <ScopeChip key={sc} t={t} on={scope === sc || baseLoc.type !== 'dir'} onClick={() => setScope(sc)}
+              <ScopeChip key={sc} t={t} on={scope === sc || baseLoc.type !== 'dir'} onClick={() => { setScope(sc); setPrefs({ lastScope: sc }); }}
                 label={sc === 'here' ? `“${locTitle(baseLoc, dirs)}”` : tr('files.place.home')} />
             ))}
           </View>
@@ -728,6 +828,10 @@ export default function Files() {
       {quickEntry && <QuickLook e={quickEntry} index={flat.indexOf(quickEntry)} count={flat.length} onClose={() => setQuick(false)} />}
       {infoEntry && <InfoPanel e={infoEntry} onClose={() => setInfo(false)} openers={infoEntry.dir || infoEntry.app ? [] : openersFor(infoEntry, launcherApps, tr)} />}
       {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
+      {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
+      {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
+      {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}
+      {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note) => { setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} bounds={bounds()} />}
     </View>
   );

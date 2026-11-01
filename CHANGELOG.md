@@ -10,6 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+- **Files connects to a server by asking who you are, not what its folders are called:** the sign-in sheet takes a user and password (or Guest), then lists the folders that server shows that user and mounts the one chosen. `lord-lan` does NTLMv2 and SMB 2 signing (`lan/smbauth.c`) with the password in one request and nowhere else; a server that can't list falls back to typing the name. Tested with vectors from the specifications and a real sign-in against a throwaway test server on the loopback; not against a desktop system's own file sharing.
+- **Connect to Server and Go to Folder:** the Go menu has every place with its shortcut, Recent Folders, Go to Folder with completion, and Connect to Server with history, favorites, a list of services and help. smb and nfs mount; ssh and sftp open Terminal with the command typed and not run; vnc, rdp and http(s) open an installed app, or offer the Store; ftp and WebDAV say plainly that Files can't mount them yet.
+- **Files → Settings:** what a new window shows, folders in tabs, tag names and which show, the sidebar's items, extensions, warnings, removing Trash items after 30 days (checked when Files opens), folders first and where a search looks.
+- **List view columns:** right click the header to show or hide Date Created, Last Opened, Changed, Comments, Tags, Permissions and Owner; drag a title to reorder, drag an edge to resize; sort by any of them; a wide list scrolls sideways. Get Info takes a comment.
+- **Open in Terminal** from the toolbar and the menus starts the Terminal app in that folder, in a window of its own.
+
 ## [0.8.7-beta] - 2026-11-01
 
 - **The on-screen keyboard opens only when asked for** (2026-11-01, maintainer's decision): its button is always next to the clock, and ❖⌃K and Settings open it too; on the login and lock screens, its button next to the language. A text field taking focus no longer opens it, and the Off, Automatic and Always setting is gone.

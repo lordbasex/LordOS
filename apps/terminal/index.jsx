@@ -234,8 +234,8 @@ function menus(wid, w) {
 
 export default function TerminalApp() {
   const t = useTheme();
-  const { id: wid, focused } = useAppWindow();
-  if (!getWin(wid)) ensureWin(wid);
+  const { id: wid, focused, args } = useAppWindow();
+  if (!getWin(wid)) ensureWin(wid, args);
   const w = useStore(wins, (x) => x[wid]);
   const allMeta = useStore(meta);
   const root = useRef(null);

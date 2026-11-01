@@ -425,7 +425,7 @@ static int split_exec(const char *exec, const Entry *e, char **argv, char *buf, 
                 else if (file && !*used && strchr("fFuU", c)) {
                     char uri[PATH_MAX * 3];
                     const char *v = file;
-                    if (c == 'u' || c == 'U') { file_uri(file, uri, sizeof uri); v = uri; }
+                    if ((c == 'u' || c == 'U') && file[0] == '/') { file_uri(file, uri, sizeof uri); v = uri; }
                     size_t l = strlen(v);
                     if (o + l + 1 >= cap) return -1;
                     memcpy(buf + o, v, l);
@@ -746,6 +746,26 @@ int apps_launch_with(const char *id, const char *path) {
         id = def;
     }
     return launch(id, real, NULL);
+}
+
+/* A remote desktop or web address for the app that declares that scheme: vnc:// or rdp:// and a strict set of characters.
+ * It goes as ONE argument, never through a shell. */
+int apps_launch_uri(const char *id, const char *uri) {
+    static const char *const schemes[] = { "vnc", "rdp", "http", "https" };
+    size_t n = uri ? strlen(uri) : 0;
+    if (n < 7 || n > 300) return -1;
+    for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)uri[i]) && !strchr(":/.-_@[]", uri[i])) return -1;
+    for (size_t i = 0; i < 4; i++) {
+        size_t l = strlen(schemes[i]);
+        if (strncmp(uri, schemes[i], l) || strncmp(uri + l, "://", 3)) continue;
+        if (!uri[l + 3] || uri[l + 3] == '-') return -1;
+        const DesktopApp *a = find_app(id);
+        char mime[32];
+        snprintf(mime, sizeof mime, "x-scheme-handler/%s", schemes[i]);
+        if (!a || !list_has(a->mime, mime)) return -1;
+        return launch(id, uri, NULL);
+    }
+    return -1;
 }
 
 /* ---- the default app for a MIME type ---- */
