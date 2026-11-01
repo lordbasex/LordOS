@@ -163,6 +163,10 @@ export function FilesSettings({ onClose }) {
               {starts.map(([k, l]) => <Button key={k} small primary={p.newWindow === k} label={l} onClick={() => setPrefs({ newWindow: k })} />)}
             </View>
             <Line t={t} label={tr('files.settings.tabs')} on={p.foldersInTabs} onChange={(v) => setPrefs({ foldersInTabs: v })} />
+            <Dim t={t}>{tr('files.settings.defaultView')}</Dim>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+              {['icons', 'list', 'columns', 'gallery'].map((v) => <Button key={v} small primary={(p.defaultView?.view || 'icons') === v} label={tr(`files.view.${v}`)} onClick={() => setPrefs({ defaultView: { view: v, sort: p.defaultView?.sort || { by: 'name', desc: false } } })} />)}
+            </View>
           </View>
         )}
         {tab === 'tags' && (

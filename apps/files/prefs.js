@@ -2,6 +2,9 @@
 // "Settings").
 import { settings, useSettings } from '@lordos/sdk';
 import { normalColumns } from './columns.js';
+import { SIDE_DEFAULT } from './viewprefs.js';
+
+export { clampSide, viewFor, viewKey, folderViewsWith } from './viewprefs.js';
 
 export const SIDEBAR_ITEMS = ['recent', 'apps', 'desktop', 'documents', 'downloads', 'pictures', 'music', 'videos', 'home', 'computer', 'network', 'volumes', 'trash', 'tags'];
 const DEFAULTS = {
@@ -19,6 +22,9 @@ const DEFAULTS = {
   lastScope: 'here',
   columns: null,              // columns.js
   recentFolders: [],
+  sideWidth: SIDE_DEFAULT,
+  defaultView: null,          // { view, sort } for a folder with none of its own
+  folderViews: {},            // place → { view, sort }, the newest last
   servers: { history: [], favorites: [] },
 };
 

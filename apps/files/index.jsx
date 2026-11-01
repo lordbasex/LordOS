@@ -21,7 +21,7 @@ import { archiveVersion, archiveState, extractEntry, extractHere, compress, isAr
 import { NetGlyph, isShareFs, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
-import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer } from './prefs.js';
+import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
 export function Icon({ size: s }) {
@@ -38,7 +38,6 @@ export function Icon({ size: s }) {
 
 const VIEWS = ['icons', 'list', 'columns', 'gallery'];
 const VIEW_GLYPH = { icons: '▦', list: '≡', columns: '◫', gallery: '▣' };
-const SIDEBAR_W = 200;
 let tabSeq = 1;
 const newTab = (loc, from) => ({ id: tabSeq++, loc, back: [], fwd: [], view: from?.view || 'icons', sort: from?.sort || { by: 'name', desc: false }, group: from?.group || 'none', chain: [] });
 // State of each window: it survives the interface being remounted (a language change).
@@ -187,11 +186,23 @@ export default function Files() {
   const errs = useStore(jobErrors);
   const saved = winStates.get(wid);
   const prefs = useFilesPrefs();
-  const [tabs, setTabs] = useState(() => saved?.tabs || [{ ...newTab(argLoc(args) || startLoc(prefs.newWindow)), view: argView(args) || 'icons' }]);
+  const [tabs, setTabs] = useState(() => {
+    if (saved?.tabs) return saved.tabs;
+    const l = argLoc(args) || startLoc(prefs.newWindow), v = viewFor(prefs, l);
+    return [{ ...newTab(l), ...v, sortChosen: !!viewKey(l) && !!prefs.folderViews[viewKey(l)], view: argView(args) || v.view }];
+  });
   const [active, setActive] = useState(() => saved?.active || 0);
   const tab = tabs[Math.min(active, tabs.length - 1)];
   useEffect(() => { winStates.set(wid, { tabs, active }); }, [tabs, active]);
   useEffect(() => () => { if (!wm.get(wid)) winStates.delete(wid); }, []);
+  // the sidebar's width, dragged from its edge and kept
+  const [dragW, setDragW] = useState(null);
+  const sideW = clampSide(dragW ?? prefs.sideWidth);
+  const startSide = (e) => {
+    const x0 = e.x, w0 = sideW;
+    const off = [addListener('pointermove', (m) => setDragW(clampSide(w0 + (m.x - x0)))),
+      addListener('pointerup', (m) => { off.forEach((f) => f()); setDragW(null); setPrefs({ sideWidth: clampSide(w0 + (m.x - x0)) }); })];
+  };
   const patchTab = (p) => setTabs((ts) => ts.map((x, i) => (i === active ? { ...x, ...(typeof p === 'function' ? p(x) : p) } : x)));
 
   const [selected, setSelected] = useState(() => new Set());
@@ -251,15 +262,18 @@ export default function Files() {
   const wDir = readOnly ? null : curDir;
   const title = locTitle(loc, dirs);
 
+  const viewOf = (l) => { const k = viewKey(l); return { ...viewFor(filesPrefs(), l), sortChosen: !!k && !!filesPrefs().folderViews[k] }; };
+  // what this place shows is kept for it, across windows and restarts
+  const keepView = (view, sort) => { const k = viewKey(tab.loc); if (k) setPrefs({ folderViews: folderViewsWith(filesPrefs().folderViews, k, { view, sort }) }); };
   function navigate(next, push = true) {
     if (sameLoc(next, tab.loc)) return;
     if (tab.loc.type === 'network') netExpanded.current = expanded;      // back in Network, what was unfolded stays
     setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(next.type === 'network' ? netExpanded.current : new Set());
     if (next.type === 'dir') noteFolder(next.path);
-    patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [] }));
+    patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [], ...viewOf(next) }));
   }
-  const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
-  const goForward = () => { if (!tab.fwd.length) return; const nxt = tab.fwd[0]; setSelected(new Set()); patchTab((x) => ({ loc: nxt, back: [...x.back, x.loc], fwd: x.fwd.slice(1), chain: [] })); };
+  const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(prev), loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
+  const goForward = () => { if (!tab.fwd.length) return; const nxt = tab.fwd[0]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(nxt), loc: nxt, back: [...x.back, x.loc], fwd: x.fwd.slice(1), chain: [] })); };
   const goUp = () => {
     if (baseLoc.type === 'archive') { navigate(baseLoc.inner ? { type: 'archive', path: baseLoc.path, inner: baseLoc.inner.split('/').slice(0, -1).join('/') } : { type: 'dir', path: fs.parent(baseLoc.path) || '/' }); return; }
     if (curDir && curDir !== '/' && curDir !== fs.home()) navigate({ type: 'dir', path: fs.parent(curDir) || '/' });
@@ -419,8 +433,12 @@ export default function Files() {
     setTabs((ts) => ts.filter((_, j) => j !== i));
     setActive((a) => (a >= i && a > 0 ? a - 1 : a));
   };
-  const setView = (view) => patchTab({ view });
-  const setSort = (by) => patchTab((x) => ({ sortChosen: true, sort: { by, desc: x.sort.by === by ? !x.sort.desc : by === 'date' || by === 'size' } }));
+  const setView = (view) => { patchTab({ view }); keepView(view, tab.sort); };
+  const setSort = (by) => {
+    const sort = { by, desc: tab.sort.by === by ? !tab.sort.desc : by === 'date' || by === 'size' };
+    patchTab({ sortChosen: true, sort });
+    keepView(tab.view, sort);
+  };
 
   // ---- selection ----
   const onItemDown = (e, ev) => {
@@ -533,7 +551,7 @@ export default function Files() {
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
-  const cols = () => { const w = root.current ? lord.getLayout(root.current.id)[2] - SIDEBAR_W : 600; return Math.max(1, Math.floor((w - 24 + 8) / 108)); };
+  const cols = () => { const w = root.current ? lord.getLayout(root.current.id)[2] - sideW : 600; return Math.max(1, Math.floor((w - 24 + 8) / 108)); };
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -649,7 +667,7 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
   };
-  const content = (rootWidthRef.current || 960) - SIDEBAR_W;
+  const content = (rootWidthRef.current || 960) - sideW;
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   const viewCtx = {
@@ -707,7 +725,7 @@ export default function Files() {
   const groupSortItems = () => [
     { header: tr('files.menu.groupBy') }, ...['none', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.groupBy.${k}`), checked: tab.group === k, onClick: () => patchTab({ group: k }) })), '-',
     { header: tr('files.menu.sortBy') }, ...['name', ...visibleSort()].map((k) => ({ label: sortLabel(k), checked: tab.sort.by === k, onClick: () => setSort(k) })),
-    { label: tab.sort.desc ? tr('files.sort.desc') : tr('files.sort.asc'), onClick: () => patchTab((x) => ({ sort: { ...x.sort, desc: !x.sort.desc } })) },
+    { label: tab.sort.desc ? tr('files.sort.desc') : tr('files.sort.asc'), onClick: () => { const sort = { ...tab.sort, desc: !tab.sort.desc }; patchTab({ sort }); keepView(tab.view, sort); } },
   ];
   const viewMenuItems = () => VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) }));
   const tagItems = () => (sel.length ? [{ header: tr('files.menu.tags') }, tagSwatches(selPaths)] : [{ header: tr('files.menu.tags') }, { label: tr('files.noSelection'), disabled: true }]);
@@ -758,9 +776,10 @@ export default function Files() {
   return (
     <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       {/* sidebar (source list) */}
-      <View style={{ width: SIDEBAR_W, backgroundColor: t.sidebarBg }}>
+      <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
         {sideScroll}
+        <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, ...(direction() === 'rtl' ? { left: 0 } : { right: 0 }), width: 6, cursor: 'ew-resize' }} />
       </View>
 
       <View style={{ flex: 1 }}>

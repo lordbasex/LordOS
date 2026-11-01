@@ -415,6 +415,17 @@ window side in `sdk/windows.js`.
   the rate of the input. A drag that keeps crossing the top edge (the preview appearing and going)
   costs 9 ms per frame (JS 1.6). Without the preview polling, 6.3–6.6 ms.
 
+## Remembered places (0.8.7)
+
+Each app reopens where it was: size, position, maximized and display, per app, in `settings.windowPlaces` (`sdk/windowmemory.js`, the rules in `sdk/placemodel.js`, tests in `tests/place_model_test.mjs`). Flow and Classic share this, for LordOS apps and for Linux apps, whose position the compositor decides.
+
+- **Which display:** a place is kept relative to its display, and a display is known by its name from the EDID plus its connector, never by index. The same monitor on another port still matches, unless two identical monitors make that ambiguous. Monitors with the same name on the same connector can't be told apart.
+- **Display gone, or the place off screen:** the window goes to a visible area of a display that exists, sized to fit.
+- **What wins:** session restore's frames first, then this; a Dock assignment chooses the display and keeps the size. What a Linux app asks for doesn't override a remembered place, except a dialog (a transient or dialog window, or an `xdg_toplevel` with a parent), which isn't remembered at all.
+- **Snapped, keyboard-lifted:** the normal frame is saved, not the snapped or lifted one. Fullscreen and picture-in-picture save nothing.
+- **Fixed size:** a Linux window with equal minimum and maximum keeps the size it asks for, and only its position is remembered. A second window of an app opens 30 px along from the first.
+- A hundred-odd apps are kept (200 at most), oldest out first. Not on a live system.
+
 ## The Window menu, the app menu and Force Quit (0.8.5)
 
 The same menus in both themes, built by the SDK (`sdk/windowmenu.js`, `sdk/appcontrol.js`); Lord Flow

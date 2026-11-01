@@ -1109,6 +1109,9 @@ void xwm_surface_gone(XWin *w) {
     for (XWin *o = X.wins; o; o = o->next) if (o == w) { w->sid = 0; w->surface_res = 0; return; }
 }
 
+int xwm_is_dialog(const XWin *w) { return w->transient || w->wtype == AT(NET_WM_WINDOW_TYPE_DIALOG); }
+int xwm_is_fixed(const XWin *w) { return w->hints.min_w > 0 && w->hints.min_w == w->hints.max_w && w->hints.min_h > 0 && w->hints.min_h == w->hints.max_h; }
+
 void xwm_place(XWin *w, int x, int y) {
     if (!X.ready || !w->managed || w->minimized) return;
     if (w->placed && x == w->px && y == w->py) return;

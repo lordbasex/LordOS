@@ -49,6 +49,13 @@ export function openingArea(appKey) {
   const d = id != null ? screen.displays.find((x) => x.id === id) : null;
   return workAreaOf(d || pointerDisplay());
 }
+export function assignedDisplayOf(appKey) {
+  const id = appKey && assignHook ? assignHook(appKey) : null;
+  return id != null ? screen.displays.find((x) => x.id === id) || null : null;
+}
+// Where an app was the last time (sdk/windowmemory.js)
+let memory = null;
+export function setWindowMemory(fn) { memory = fn; }
 const areaOfWindow = (w) => workAreaOf(displayFor(w));
 // Window id → the node of its frame inside WindowShell (the Desktops animation, sdk/desktops.js).
 export const fxNodes = new Map();
@@ -160,6 +167,8 @@ export const workArea = (d) => workAreaOf(d);
 
 function place(appId, count, frame) {
   if (frame) return { ...frame, minimized: false, maximized: false };
+  const kept = memory && appId !== 'linux' ? memory(appId) : null;
+  if (kept) return { ...kept, minimized: false };
   const [sw, sh] = registry.get(appId)?.size || [640, 420];
   const offset = (count % 6) * 30;
   const area = openingArea(appId);                 // its assigned display, or where the pointer is (docs/DISPLAYS.md)

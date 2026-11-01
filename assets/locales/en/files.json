@@ -287,5 +287,6 @@
   "connect.err.tlsName": "This server’s certificate doesn’t name {name}, so it can’t be verified. Its administrator can add that name to the certificate.",
   "disk.formatsTitle": "{name} uses a commercial disk format",
   "disk.formatsDetail": "Disk Formats, in the Store, opens it. Its drivers are free software at no cost.",
-  "disk.formatsGet": "Open the Store"
+  "disk.formatsGet": "Open the Store",
+  "settings.defaultView": "New folders show"
 }

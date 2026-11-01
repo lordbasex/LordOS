@@ -149,6 +149,7 @@ EOF
     run "fan-test" build/fan-test
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
+    if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
     # which installed kernels Cleaner may offer (sdk/oldkernels.js)

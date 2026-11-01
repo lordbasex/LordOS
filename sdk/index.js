@@ -24,6 +24,7 @@ export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, short
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
 import { startOsk } from './osk.js';
+import { startWindowMemory } from './windowmemory.js';
 import { OskPanel, OskStatus } from './osk.jsx';
 import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
@@ -229,6 +230,7 @@ export function startShell(element) {
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
   startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
   registerStatusItem('osk', OskStatus, 6);
+  startWindowMemory();                  // each app reopens where it was (windowmemory.js, docs/WINDOWS.md)
   startSessionRestore();                // the apps that were open come back (sessionrestore.jsx, docs/SESSIONS.md)
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
 }

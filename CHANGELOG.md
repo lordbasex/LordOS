@@ -12,6 +12,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [0.8.7-beta] - 2026-11-01
 
+- **Windows reopen where they were:** size, position, maximized and display, per app, in both themes, for LordOS and Linux apps. A display is known by its monitor's name and connector; if it's gone or the place is off screen, the window opens somewhere visible. Session restore, snapping and Dock assignments keep their say, and dialogs aren't affected.
+- **Files remembers:** each folder keeps its view and sort, with a default in Settings, and the sidebar's width is dragged from its edge and kept.
+
 - **Security review of the new connections (2026-11-01):** RDP refuses RDP's own security and sends no password to a server that asks for it; a changed RDP certificate shows both fingerprints, and an accepted TLS certificate outranks the system's list; every SSH key kept is one the person saw, and an answer counts only for the fingerprint on screen; `ssh-keyscan`, `openssl` and `rclone obscure` run read-only with a 15 s limit; VNC refuses a server that skips the password you gave and says it isn't encrypted; the SMB sign-in carries a target name and a MIC and needs the server's signature; HFS+ always mounts read-only; `.desktop` files can't take the helpers' firewall ids.
 
 - **Files connects to a server by asking who you are, not what its folders are called:** the sign-in sheet takes a user and password (or Guest), then lists the folders that server shows that user and mounts the one chosen. `lord-lan` does NTLMv2 and SMB 2 signing (`lan/smbauth.c`) with the password in one request and nowhere else; a server that can't list falls back to typing the name. Tested with vectors from the specifications and a real sign-in against a throwaway test server on the loopback; not against a desktop system's own file sharing.
