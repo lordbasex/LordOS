@@ -41,6 +41,9 @@ right away, as before. It has two states:
   nobody is watching, it doesn't draw: it uses no CPU, but its programs, terminals and Linux apps
   keep running.
 
+A locked session is still a session that draws for anyone watching `remote.sock`, which only root can
+reach. The screen-sharing API keeps its own lock state for this reason ([SCREEN-SHARING.md](SCREEN-SHARING.md)).
+
 **The same user is the same session.** Everyone connects to its socket
 `$XDG_RUNTIME_DIR/lordos/remote.sock`: lord-sessiond, which lends it the monitor, and the
 browsers, which watch it (REMOTE.md). That's why the monitor and the web show the same thing, and

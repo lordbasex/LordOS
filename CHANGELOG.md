@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Screen-sharing API** ([docs/SCREEN-SHARING.md](docs/SCREEN-SHARING.md)): a separate door for an app the launcher started, with its own socket and parser, a system prompt on first use, grants in a root-owned file, an indicator with Stop on screen before any frame leaves, and ⌃⌥⇧Esc in C. It ends in `lord-server` the moment the session locks or leaves the monitor, delivers no picture and takes no input until the person signs in again, and doesn't exist on the login screen. One door at a time per session: while a share runs a remote desktop sign-in is told to wait, and a connected remote desktop viewer keeps a share from starting.
+
 ### Fixed
 
 - A stopped `lord-media` no longer stays a zombie until the next video or song: helpers are waited for on

@@ -6,7 +6,7 @@
  * A script is words, run in order; what arrives is counted and printed as "type count" at the end:
  *   start F C K | query | stop | lock | awake N | hear N | key CODE V | ptr X Y | btn B D | keyframe | rate K | resize W H
  *   text S | clip S | raw TYPE N (a message of N zero bytes) | junk (a wrong length)
- *   wait MS (reads for that long) | until TYPE MS (reads until that type arrives; exit 3 if it doesn't)
+ *   wait MS (reads for that long) | until TYPE MS (until that type has arrived since the last reset; exit 3 if it doesn't)
  *   none TYPE MS (exit 4 if that type arrives within MS) | reset (counters) | expect-end REASON MS | expect-ref REASON MS
  *   mirror only: seat | hello S | video C K | undisplay | display
  * The count of type 255 is the keyframes among RP_VFRAME.
@@ -88,9 +88,8 @@ static void wait_ms(int ms) {
 
 static int until(int type, int ms) {
     double end = now_ms() + ms;
-    long was = seen[type];
-    while (seen[type] == was && now_ms() < end && !closed) pump(20);
-    return seen[type] != was;
+    while (!seen[type] && now_ms() < end && !closed) pump(20);
+    return seen[type] != 0;
 }
 
 static int reason_of(const char *s) { for (int i = 0; i < SW_REASONS; i++) if (!strcmp(sw_reason_name(i), s)) return i; return -1; }

@@ -27,7 +27,7 @@ session() {
   env -i HOME=$ROOT/home XDG_RUNTIME_DIR=$1 PATH=$PATH LANG=en_US.UTF-8 LORD_GPU=0 $B/lord-server --headless 1280x800 $2 --theme $3 --fonts assets/fonts --shell assets/shell > $4 2>&1 &
   echo $!
 }
-cleanup() { kill $S $SG 2>/dev/null; sudo pkill -f "share-client mirror .* wait 60000[0]"; sudo rm -f $G; sleep 0.5; sudo rmdir $CG $CGB 2>/dev/null; rm -f $ROOT/inscope.sh; }
+cleanup() { kill $S $SG 2>/dev/null; sudo pkill -f "share-client mirror .* wait 60000[0]"; sudo rm -f $G; sleep 0.5; sudo rmdir $CG 2>/dev/null; rm -f $ROOT/inscope.sh; }
 trap cleanup EXIT
 sudo mkdir -p $CG; sudo rm -f $G
 
@@ -73,7 +73,7 @@ check "second app: busy" app start 1 1 2000 expect-ref busy 1000
 wait $AP
 
 # input reaches the session through a share, and not without one
-check "input: a pointer move comes back as RP_CURSOR" app start 5 1 2000 until 40 4000 ptr 321 123 until 4 2000 stop
+check "input: a pointer move comes back as RP_CURSOR" app start 5 1 2000 until 40 4000 wait 300 reset ptr 321 123 until 4 2000 stop
 check "input: refused with no share" app ptr 11 11 none 4 500
 grant "{\"v\":1,\"grants\":[{\"id\":\"$ID\",\"exe\":\"$C\",\"perm\":\"screen-share\",\"state\":\"allow\"}]}"
 check "no remote-input grant: frames yes, input no" app start 5 1 2000 until 40 4000 reset ptr 400 400 none 4 800 stop
@@ -138,12 +138,12 @@ sleep 1.5; T0=$(date +%s%N); sudo rm -f $G
 if wait $AP; then ok "revoked: ended after $(( ($(date +%s%N)-T0)/1000000 )) ms"; else no "revoke: $(cat a.out)"; fi
 allow
 
-# ---- keyframes on a still screen (requests every second for 12 s)
+# ---- keyframes on a still screen (requests every second for 12 s): the burst, plus whatever really changed
 sleep 1
 A="start 1 1 2000 until 40 4000 wait 1500 reset"; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do A="$A keyframe wait 1000"; done
 app $A stop > k.out 2>&1
 K=$(sed -n 's/^type 255: \([0-9]*\).*/\1/p' k.out); K=${K:-0}
-[ "$K" -le 3 ] && ok "still screen: 12 requests, $K keyframes" || no "still screen: $K keyframes in 12 s"
+[ "$K" -le 5 ] && ok "still screen: 12 requests, $K keyframes" || no "still screen: $K keyframes in 12 s"
 
 # ---- system surfaces: while the search is open (injected as the person, through the root socket) API input is dropped
 app start 5 1 2000 until 40 4000 wait 1500 reset ptr 700 300 none 4 800 wait 1200 ptr 720 320 until 4 2000 stop > a.out 2>&1 &

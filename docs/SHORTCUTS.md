@@ -56,6 +56,12 @@ state whichever window ends up in front. A key pressed before the switcher opene
 in the app. With a fullscreen Linux app the switcher does not open and ⌥Tab stays with the app: a
 fullscreen surface is presented above every layer.
 
+## Stopping a screen share
+
+⌃⌥⇧Esc ends a share of the screen-sharing API ([SCREEN-SHARING.md](SCREEN-SHARING.md)). `on_input` in `server/src/main.c` handles it
+in C, before any JavaScript, so it works with the shell hung. Only a physical key gets there: what the API, the remote desktop or the
+on-screen keyboard injects takes another path and can't press it. With no share running the key goes on as usual.
+
 ## ❖ as Ctrl in Linux apps (Lord Flow)
 
 With the `flow` table, ❖C, V, X, A, Z, F, T, W, N, L, R, P and S with no other modifier reach the focused Linux

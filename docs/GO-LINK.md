@@ -3,7 +3,7 @@
 The design of **go-link Desk for LordOS** and of the public **screen-sharing API** it needs. go-link Desk (desk.go-link.org) is the
 maintainer's own remote desktop project, MIT, in a separate repository. On LordOS it is an optional third-party app in the Store:
 recommended, not privileged, not part of LordOS. The person installs it or doesn't.
-**Nothing here is built, and nothing here has been tested.** This is the design.
+Stage 1, the screen-sharing API, is built and described in [SCREEN-SHARING.md](SCREEN-SHARING.md), with what was tested. The rest is design: it isn't built and it hasn't been tested.
 
 How to read it:
 
@@ -347,7 +347,7 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | A visitor presses Allow, or changes their own permissions | System surfaces take no API input | The app's own panel is an ordinary window: drop injected input to the app's own windows too. To decide in stage 3 |
 | Another app abuses the API | Scope identity, prompt, root-owned store, indicator, no frames without it, one holder, no resize on a monitor session, rate limits, never blocks the compositor | **An unsandboxed Linux app runs as the user.** It can attach to an approved app, or edit its files. The permission is consent, not a sandbox, for Linux apps. Their isolation is what it is (`docs/PRIVACY.md:40`) |
 | An app hides or fakes the indicator | Drawn by the shell, `notification` layer, frames only after it shows | A fullscreen surface's own drawing can imitate one; it can't remove the real one. `xdg_popup`s paint above everything (`docs/LAYERS.md`): to test that one can't sit on the badge |
-| Same-uid access to `remote.sock` | Unchanged today, section 2 | Open decision D6: refuse non-root there |
+| Same-uid access to `remote.sock` | Refused since `2825555c` (D6) | Root |
 | Links in `device.json` | Under the app's data folder, 0600 | An unsandboxed app of the same user can add one. D3 weighs this |
 | A forged package | Signature at desk.go-link.org, pinned hash, LordOS archive signature, Verified author check at each load, revocation | The go-link release computer, and the catalog's reviewer |
 | A locked session seen | Ended in `lord-server`, not by the client | A frame already in a socket or a viewer's decoder |
@@ -376,7 +376,7 @@ measured.
 
 ## 12. What has been tested
 
-**Tested:** nothing. No line of this has run.
+**Tested:** stage 1 only: [SCREEN-SHARING.md](SCREEN-SHARING.md), "What was tested". Nothing from stage 2 on has run.
 
 **Read, and relied on:** everything cited above, as of commit `a621d38e` of LordOS and `1203f15` of go-link Desk.
 
@@ -392,10 +392,10 @@ fullscreen, direct scanout included; x264 on the Pi.
 - **D3. Unattended access (decided).** Stays as on Linux, off by default.
 - **D4. Open at login (decided).** Optional, per app, through the broker.
 - **D5. Short verification code (decided).** Optional, defined on go-link's side.
-- **D6. Close the same-uid door on `remote.sock`.** Every real client connects as root: the bridge connects before dropping root
+- **D6. Close the same-uid door on `remote.sock` (done, commit `2825555c`; checked in stage 1).** Every real client connects as root: the bridge connects before dropping root
   (`server/src/remote/conn.c:1246`, `:1278`), and the only tests that use it run with `sudo` (`server/tests/gpu_cycle.sh:50`). Refusing other uids
   looks free and doesn't change what 5673 does, but it touches 5673's socket, so it's for the maintainer to approve. Until it's done, the
   system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
-- **D7. The numbers:** Stop's shortcut, the 2 s indicator wait, keyframe and input limits.
+- **D7. The numbers (set in stage 1, still the maintainer's to change):** Stop is ⌃⌥⇧Esc, the indicator wait 2 s, keyframes at most one per 500 ms and, on a still screen, a burst of 3 then one per 30 s; 1,000 pointer events and 200 keys a second.
 - **D8. Scope limits** for a packaged app, if stage 2 shows one core or 512 MB isn't enough.
 - **D9. Assistants and the terminal.** Their views are part of the copy. Running them needs a wider sandbox than the rest of the app; how is to be decided.
