@@ -12,6 +12,7 @@
 #define LORD_SEC_CGROUP_H
 
 #include <stddef.h>
+#include <string.h>
 
 typedef struct {
     long mem_high_mb;       /* memory.high in MB (0 = no limit) */
@@ -26,6 +27,9 @@ int cgroup_enter(const char *name, const CgroupLimits *lim);
 /* Shortcut for the child before execve: enters app-lordos-<id>.scope with loose limits. The
  * launcher refuses to exec when it fails inside a LordOS session. */
 int app_scope_enter(const char *id);   /* 0 placed; -1 not (invalid scope name, refused or no answer) */
+
+/* Scopes of LordOS's own helpers (desktop:<id> in the firewall): a .desktop with that id must not inherit their rules. */
+static inline int app_scope_reserved(const char *id) { return !strcmp(id, "lordos-rclone") || !strcmp(id, "lordos-rdesk"); }
 
 /* The cgroup v2 path of the current process, relative to /sys/fs/cgroup (e.g. ".../app.slice/..."),
  * so the monitor knows which scope it's in. "" if it couldn't be read. */

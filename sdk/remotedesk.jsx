@@ -7,6 +7,7 @@ import { useTheme } from './theme.js';
 import { useAppWindow } from './components.jsx';
 import { settings, useSettings } from './settings.js';
 import { lan } from './lan.js';
+import { certCheck } from './remotecert.js';
 import { t as tr } from './i18n.js';
 import { Button, ScrollView, TextInput, Toggle } from './components.jsx';
 
@@ -84,7 +85,7 @@ export function RemoteDeskApp({ proto }) {
     const timer = setInterval(() => {
       const p = lord.rdesk.poll(id);
       if (!p) return;
-      if (p.cert && trusted[key()] === p.cert) lord.rdesk.cert(id, 1);
+      if (p.cert && certCheck(trusted, key(), p.cert).kind === 'known') lord.rdesk.cert(id, 1);
       else setSt(p);
       if (p.state === 'connected') {
         const item = { host: host.trim(), port: Number(port) || 0, user: user.trim() };
@@ -122,7 +123,8 @@ export function RemoteDeskApp({ proto }) {
       rdp ? label('remotedesk.domain') : null, rdp ? h(TextInput, { value: domain, onChange: setDomain, onSubmit: go }) : null,
       label('remotedesk.password'), h(TextInput, { secure: true, value: password, onChange: setPassword, onSubmit: go }),
       h(View, { style: { flexDirection: 'row', gap: 8, alignItems: 'center' } }, h(Toggle, { small: true, on: remember, onChange: setRemember }), h(Text, { style: { fontSize: 13, color: t.text } }, tr('remotedesk.remember'))),
-      st?.cert ? h(View, { style: { gap: 6 } }, h(Text, { style: { fontSize: 13, color: t.text, textAlign: 'start' } }, tr('remotedesk.cert', { print: st.cert })),
+      !rdp ? h(Text, { style: { fontSize: 12, color: t.textDim, textAlign: 'start' } }, tr('remotedesk.vncPlain')) : null,
+      st?.cert ? h(View, { style: { gap: 6 } }, h(Text, { style: { fontSize: 13, color: t.text, textAlign: 'start' } }, certCheck(trusted, key(), st.cert).kind === 'changed' ? tr('remotedesk.certChanged', { old: trusted[key()], print: st.cert }) : tr('remotedesk.cert', { print: st.cert })),
         h(View, { style: { flexDirection: 'row', gap: 8 } }, h(Button, { label: tr('remotedesk.certNo'), onClick: () => acceptCert(false) }), h(Button, { primary: true, label: tr('remotedesk.certYes'), onClick: () => acceptCert(true) }))) : null,
       error ? h(Text, { style: { fontSize: 13, color: '#ff453a', textAlign: 'start' } }, error) : null,
       h(View, { style: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end' } },

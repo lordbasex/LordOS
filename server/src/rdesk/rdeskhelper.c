@@ -67,7 +67,7 @@ static int wr_all(void *ud, const void *buf, size_t n) { int fd = *(int *)ud; co
 static uint32_t *vnc_fb(void *ud, int w, int h) { (void)ud; return rd_picture(w, h); }
 static void vnc_frame(void *ud) { (void)ud; rd_send(RD_FRAME, 0, 0, 0, NULL); }
 
-static int run_vnc(int sock, const char *password) {
+static int run_vnc(int sock, char *password) {
     Rfb r = { rd_all, wr_all, vnc_fb, vnc_frame, &sock, NULL, 0, 0 };
     int h = rfb_handshake(&r, password);
     if (h) { rd_send(RD_STATE, h > 0 ? RS_DENIED : RS_FAILED, 0, 0, NULL); return 1; }
@@ -123,11 +123,11 @@ int main(void) {
     int rdp = !strcmp(proto, "rdp");
     int sock = dial(host, port ? port : rdp ? 3389 : 5900);
     if (sock < 0) { rd_send(RD_STATE, RS_UNREACHABLE, 0, 0, NULL); return 1; }
-    /* connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
+    /* it stays in the scope lord-server placed it in, with that scope's memory limits. connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
     static const char *const ro[] = { "/etc/ssl", "/usr/lib", "/usr/share/ca-certificates", NULL };
-    SandboxHelperCfg cfg = { .name = "lordos-rdesk-helper", .ro_paths = rdp ? ro : NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .mem_max_mb = rdp ? 512 : 256, .ro_dir_fds = NULL, .rw_dir_fds = NULL };
+    SandboxHelperCfg cfg = { .name = NULL, .ro_paths = rdp ? ro : NULL, .extra_syscalls = (int[]){ -1 }, .allow_ioctl_classes = 0, .ro_dir_fds = NULL, .rw_dir_fds = NULL };
     sandbox_apply_helper(&cfg);
-    int rc = rdp ? rdesk_rdp(sock, host, user, dom, pw) : run_vnc(sock, pw);
+    int rc = rdp ? rdesk_rdp(sock, host, user, dom, pw) : run_vnc(sock, (char *)pw);
     explicit_bzero((char *)pw, strlen(pw));
     json_free(&d);
     explicit_bzero(job, sizeof job);

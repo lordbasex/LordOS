@@ -69,7 +69,9 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 sigset_t none;
                 sigemptyset(&none);
                 sigprocmask(SIG_SETMASK, &none, NULL);
-                if (app_scope_enter("lordos-rdesk") && getenv("LORDOS_SESSIOND")) _exit(126);
+                /* the same limits for both protocols: libfreerdp is what needs them */
+                CgroupLimits lim = { .mem_high_mb = 256, .mem_max_mb = 512, .cpu_percent = 0 };
+                if (cgroup_enter("app-lordos-lordos-rdesk.scope", &lim) && getenv("LORDOS_SESSIOND")) _exit(126);
                 char *args[] = { "lord-rdesk", NULL };
                 execve(bin, args, environ);
                 _exit(127);
@@ -102,8 +104,8 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static void set_size(Sess *s, int w, int h) {
     if (w < 1 || h < 1 || w > RD_MAX_W || h > RD_MAX_H) { s->state = RS_FAILED; return; }
     size_t len = (size_t)w * h * 4;
-    int fd = (int)syscall(SYS_memfd_create, "lordos-rdesk", 1u);
-    if (fd < 0 || ftruncate(fd, (off_t)len)) { if (fd >= 0) close(fd); s->state = RS_FAILED; return; }
+    int fd = rd_picture_memfd(len);
+    if (fd < 0) { s->state = RS_FAILED; return; }
     uint8_t *map = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); s->state = RS_FAILED; return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : media_src_new(SK_IMAGE, "rdesk");
@@ -112,15 +114,7 @@ static void set_size(Sess *s, int w, int h) {
     free(m->cache); m->cache = NULL;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
     s->media = m->id; s->w = w; s->h = h;
-    RdMsg r = { RD_SHM, 0, 0, 0, "" };
-    struct iovec io = { &r, sizeof r };
-    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
-    memset(&cm, 0, sizeof cm);
-    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
-    struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
-    ch->cmsg_level = SOL_SOCKET; ch->cmsg_type = SCM_RIGHTS; ch->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(ch), &fd, sizeof fd);
-    sendmsg(s->sock, &mh, MSG_NOSIGNAL);
+    if (rd_send_picture(s->sock, fd)) s->state = RS_FAILED;
     close(fd);
 }
 
@@ -129,11 +123,12 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
     int frames = 0;
+    int budget = RD_POLL_MAX;
     for (;;) {
         RdMsg m;
-        ssize_t n = recv(s->sock, &m, sizeof m, MSG_DONTWAIT);
-        if (n == 0) { if (s->state < RS_DENIED) s->state = s->state == RS_CONNECTED ? RS_ENDED : RS_FAILED; break; }
-        if (n != (ssize_t)sizeof m) break;
+        int r = rd_take(s->sock, &m, &budget);
+        if (r < 0) { if (s->state < RS_DENIED) s->state = s->state == RS_CONNECTED ? RS_ENDED : RS_FAILED; break; }
+        if (!r) break;
         if (m.type == RD_SIZE) set_size(s, m.a, m.b);
         else if (m.type == RD_FRAME) frames++;
         else if (m.type == RD_STATE && m.a >= 0 && m.a <= RS_UNREACHABLE) s->state = m.a;

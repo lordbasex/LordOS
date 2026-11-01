@@ -17,5 +17,7 @@
   "err.unreachable": "That computer does not answer.",
   "cert": "First connection to this computer. Its certificate is {print}. Trust it?",
   "certYes": "Trust",
-  "certNo": "Cancel"
+  "certNo": "Cancel",
+  "vncPlain": "It is not encrypted: anyone on the network can see this session. Use it only on a network you trust.",
+  "certChanged": "This server's certificate CHANGED. It may be a different server. Before: {old}. Now: {print}"
 }

@@ -4,6 +4,8 @@
 #include "../src/lan/lanparse.h"
 #include "../src/lan/smbauth.h"
 #include "../src/lan/rconnect.h"
+#include "../src/disk/diskkinds.h"
+#include "../src/sec/cgroup.h"
 #include "../src/lan/lanservices.h"
 #include "../src/print/mdns.h"
 
@@ -69,12 +71,52 @@ static void t_smbauth(void) {
     CHECK(same(proof, "68cd0ab851e51c96aabc927bebef6a1c"));
     CHECK(same(base, "8de40ccadbc14a82f15cb0ad0de95ca3"));
     /* a challenge cut anywhere, or pointing outside itself, is refused */
-    uint8_t c[120] = { 0 }, a[1024], key[16], rnd[24] = { 0 };
+    uint8_t c[120] = { 0 }, a[1024], key[16], rnd[24] = { 0 }, neg[40];
     memcpy(c, "NTLMSSP", 8); p32(c + 8, 2); p32(c + 20, 0x40000000); p16(c + 40, 36); p16(c + 42, 36); p32(c + 44, 56); memcpy(c + 56, av, 36);
-    CHECK(ntlm_user_auth(a, sizeof a, c, 92, "ana", "", "x", rnd, key) > 64);
-    for (size_t l = 0; l < 92; l++) CHECK(!ntlm_user_auth(a, sizeof a, c, l, "ana", "", "x", rnd, key));
-    p32(c + 44, 0xfffffff0u); CHECK(!ntlm_user_auth(a, sizeof a, c, 92, "ana", "", "x", rnd, key));
+    CHECK(ntlm_user_negotiate(neg, sizeof neg) == 40);
+    size_t al = ntlm_user_auth(a, sizeof a, neg, 40, c, 92, "ana", "", "x", "cifs/10.0.0.9", rnd, key);
+    CHECK(al > 88);
+    /* the target name and "a MIC follows" are in the part the proof covers; the MIC covers the three messages */
+    uint8_t want[26]; size_t wl = text_utf16("cifs/10.0.0.9", want, sizeof want, 0);
+    int found = 0;
+    for (size_t i = 88; i + wl <= al; i++) found |= !memcmp(a + i, want, wl);
+    CHECK(found);
+    uint8_t all[1500], mic[16], zero[16] = { 0 };
+    memcpy(mic, a + 72, 16); CHECK(memcmp(mic, zero, 16));
+    memcpy(all, neg, 40); memcpy(all + 40, c, 92); memcpy(all + 132, a, al); memset(all + 132 + 72, 0, 16);
+    uint8_t m2[16]; hmac_md5(key, 16, all, 132 + al, m2); CHECK(!memcmp(m2, mic, 16));
+    a[100] ^= 1; memcpy(all + 132, a, al); memset(all + 132 + 72, 0, 16); hmac_md5(key, 16, all, 132 + al, m2); CHECK(memcmp(m2, mic, 16));
+    for (size_t l = 0; l < 92; l++) CHECK(!ntlm_user_auth(a, sizeof a, neg, 40, c, l, "ana", "", "x", "cifs/h", rnd, key));
+    p32(c + 44, 0xfffffff0u); CHECK(!ntlm_user_auth(a, sizeof a, neg, 40, c, 92, "ana", "", "x", "cifs/h", rnd, key));
     uint8_t msg[80] = { 0 }; smb_sign(msg, 80, key); CHECK(msg[16] & 8);
+    CHECK(smb_verify(msg, 80, key));
+    msg[70] ^= 1; CHECK(!smb_verify(msg, 80, key)); msg[70] ^= 1;
+    msg[50] ^= 1; CHECK(!smb_verify(msg, 80, key)); msg[50] ^= 1;
+    msg[16] &= (uint8_t)~8; CHECK(!smb_verify(msg, 80, key));       /* not signed at all */
+}
+
+static void t_review(void) {
+    /* every key stored is one shown */
+    char o[512];
+    CHECK(!rconnect_prints("256 SHA256:abc h (ED25519)\n3072 SHA256:def h (RSA)\n", o, sizeof o) && !strcmp(o, "ED25519 SHA256:abc · RSA SHA256:def"));
+    CHECK(rconnect_prints("", o, sizeof o) && rconnect_prints("garbage\n", o, sizeof o) && rconnect_prints("256 SHA256:abc h (ED25519)\n", o, 8));
+    /* an accepted certificate is checked first, even when the system would trust another */
+    CHECK(rconnect_tls_decide("A", "A", 1) == RC_TLS_PIN && rconnect_tls_decide("A", "B", 1) == RC_TLS_CHANGED && rconnect_tls_decide("A", "B", 0) == RC_TLS_CHANGED);
+    CHECK(rconnect_tls_decide(NULL, "A", 1) == RC_TLS_SYSTEM && rconnect_tls_decide(NULL, "A", 0) == RC_TLS_ASK);
+    /* a certificate can't fake the verdict with its own text */
+    char pem[256];
+    CHECK(rconnect_tls_parse("subject=Verify return code: 0 (ok)\n-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----\nVerify return code: 18 (self-signed)\n", pem, sizeof pem) == 0);
+    /* a host name holding NOT isn't taken for the negative */
+    CHECK(rconnect_name_ok("Hostname NOTES.local does match certificate\n") && rconnect_name_ok("IP address 10.0.0.1 does match certificate\n"));
+    CHECK(!rconnect_name_ok("Hostname h does NOT match certificate\n") && !rconnect_name_ok(""));
+    /* an answer is about the fingerprint on screen */
+    CHECK(rconnect_answer("SHA256:a", "SHA256:a", 1) == 1 && rconnect_answer("SHA256:a", "SHA256:a", 0) == -1);
+    CHECK(!rconnect_answer("SHA256:a", "SHA256:b", 1) && !rconnect_answer("", "", 1));
+    /* a .desktop can't take a helper's firewall identity; HFS+ never mounts for writing */
+    CHECK(app_scope_reserved("lordos-rclone") && app_scope_reserved("lordos-rdesk") && !app_scope_reserved("rclone-browser") && !app_scope_reserved("firefox"));
+    int ro = 0, seen = 0;
+    for (size_t i = 0; i < sizeof DISK_KINDS / sizeof *DISK_KINDS; i++) if (!strcmp(DISK_KINDS[i].udev, "hfsplus") || !strcmp(DISK_KINDS[i].udev, "apfs")) { seen++; ro += DISK_KINDS[i].ro; }
+    CHECK(seen == 2 && ro == 2);
 }
 
 static void t_rconnect(void) {
@@ -85,6 +127,7 @@ static void t_rconnect(void) {
     char c[600];
     CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "", "/k") > 0 && strstr(c, "port = 22") && strstr(c, "known_hosts_file = /k"));
     CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "", "") < 0);          /* never without a host key */
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "", "/k") > 0 && strstr(c, "shell_type = none"));
     CHECK(rconnect_config(c, sizeof c, "ftps", "h", 0, "", "x", "", "") > 0 && strstr(c, "explicit_tls = true") && strstr(c, "anonymous") && !strstr(c, "no_check"));
     CHECK(rconnect_config(c, sizeof c, "davs", "h", 8443, "u", "x", "/d", "") > 0 && strstr(c, "url = https://h:8443/d") && !strstr(c, "no_check"));
     CHECK(rconnect_config(c, sizeof c, "smb", "h", 0, "u", "x", "", "") < 0);
@@ -352,6 +395,7 @@ int main(void) {
     t_addr();
     t_smbauth();
     t_rconnect();
+    t_review();
     t_share();
     t_rpc();
     t_smb();

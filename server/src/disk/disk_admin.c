@@ -25,6 +25,7 @@
  *   - the image is opened with the user's permissions (setfsuid), only from their home or their
  *     mounts, and never from the disk being written. */
 #include "disk.h"
+#include "diskkinds.h"
 #include "../pkg/crypto.h"
 
 #include <ctype.h>
@@ -229,14 +230,8 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     disk_udev_prop(t.name, "ID_FS_TYPE", fs, sizeof fs);
     disk_fs_label(t.name, label, sizeof label);                      /* sanitize_dir removes / and control characters */
     disk_udev_prop(t.name, "ID_FS_UUID", uuid, sizeof uuid);
-    static const struct { const char *udev, *kernel; int owner, ro; } kinds[] = {
-        { "vfat", "vfat", 1, 0 }, { "exfat", "exfat", 1, 0 }, { "ntfs", "ntfs3", 1, 0 }, { "ext4", "ext4", 0, 0 },
-        { "ext3", "ext3", 0, 0 }, { "ext2", "ext2", 0, 0 }, { "btrfs", "btrfs", 0, 0 }, { "xfs", "xfs", 0, 0 },
-        { "f2fs", "f2fs", 0, 0 }, { "iso9660", "iso9660", 0, 1 }, { "udf", "udf", 0, 1 },
-        { "hfsplus", "hfsplus", 1, 0 }, { "apfs", "apfs", 1, 1 },
-    };
     int k = -1;
-    for (size_t i = 0; i < sizeof kinds / sizeof *kinds; i++) if (!strcmp(fs, kinds[i].udev)) k = (int)i;
+    for (size_t i = 0; i < sizeof DISK_KINDS / sizeof *DISK_KINDS; i++) if (!strcmp(fs, DISK_KINDS[i].udev)) k = (int)i;
     /* the Store's Disk Formats item gates the desktop's mount of these; the kernel's drivers, the boot partition, the
      * installer and the live system don't come through here */
     if (k >= 0 && (!strcmp(fs, "vfat") || !strcmp(fs, "exfat") || !strcmp(fs, "ntfs") || !strcmp(fs, "hfsplus") || !strcmp(fs, "apfs")) &&
@@ -255,15 +250,15 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
         snprintf(dir, sizeof dir, "%s/%s %d", base, leaf, i);
     }
     char opts[160] = "";
-    if (kinds[k].owner) snprintf(opts, sizeof opts, "uid=%u,gid=%u,%s", (unsigned)r->uid, (unsigned)r->gid,
+    if (DISK_KINDS[k].owner) snprintf(opts, sizeof opts, "uid=%u,gid=%u,%s", (unsigned)r->uid, (unsigned)r->gid,
                                  !strcmp(fs, "ntfs") ? "umask=022" : !strcmp(fs, "apfs") ? "" : !strcmp(fs, "hfsplus") ? "umask=022" : !strcmp(fs, "vfat") ? "fmask=0022,dmask=0022,shortname=mixed,utf8" : "fmask=0022,dmask=0022");
     char ro[8] = "0";
     char sp[PATH_MAX];
     snprintf(sp, sizeof sp, "/sys/class/block/%s/ro", t.name);
     FILE *f = fopen(sp, "re");
     if (f) { if (!fgets(ro, sizeof ro, f)) ro[0] = '0'; fclose(f); }
-    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME | ((kinds[k].ro || ro[0] == '1') ? MS_RDONLY : 0);
-    if (mount(t.dev, dir, kinds[k].kernel, flags, opts[0] ? opts : NULL)) {
+    unsigned long flags = MS_NOSUID | MS_NODEV | MS_RELATIME | ((DISK_KINDS[k].ro || ro[0] == '1') ? MS_RDONLY : 0);
+    if (mount(t.dev, dir, DISK_KINDS[k].kernel, flags, opts[0] ? opts : NULL)) {
         int e = errno;
         rmdir(dir);
         if (e == ENODEV) { admin_err("disk.noDriver", "fs", fs, NULL); return; }     /* Files offers the driver's package */
@@ -473,14 +468,14 @@ void disk_act_format(const AdminReq *r, const char *arg, size_t len) {
     if (strlen(f[1]) >= sizeof fsname || (f[2] && strlen(f[2]) >= sizeof lab)) { admin_err("admin.invalidArgument", NULL); free(buf); return; }
     snprintf(fsname, sizeof fsname, "%s", f[1]);
     snprintf(lab, sizeof lab, "%s", f[2] ? f[2] : "");
-    struct { const char *id, *prog; uint8_t type; } kinds[] = {
+    struct { const char *id, *prog; uint8_t type; } DISK_KINDS[] = {
         { "fat32", "/usr/sbin/mkfs.fat", 0x0c }, { "exfat", "/usr/sbin/mkfs.exfat", 0x07 },
         { "ext4", "/usr/sbin/mkfs.ext4", 0x83 }, { "ntfs", "/usr/sbin/mkfs.ntfs", 0x07 },
     };
     int k = -1;
-    for (int i = 0; i < 4; i++) if (!strcmp(fsname, kinds[i].id)) k = i;
+    for (int i = 0; i < 4; i++) if (!strcmp(fsname, DISK_KINDS[i].id)) k = i;
     if (k < 0) { admin_err("disk.unknownFsName", "fs", fsname, NULL); free(buf); return; }
-    if (access(kinds[k].prog, X_OK)) { admin_err("disk.missingTool", "program", kinds[k].prog, NULL); free(buf); return; }
+    if (access(DISK_KINDS[k].prog, X_OK)) { admin_err("disk.missingTool", "program", DISK_KINDS[k].prog, NULL); free(buf); return; }
     if (!valid_label(fsname, lab)) { admin_err("disk.badLabelFor", "fs", fsname, NULL); free(buf); return; }
     Target t;
     if (target(r, name, 0, 0, &t)) { free(buf); return; }
@@ -493,7 +488,7 @@ void disk_act_format(const AdminReq *r, const char *arg, size_t len) {
     if (!t.part) {
         admin_say("LOG", "progress phase=table");   /* i18n-ok */
         int e = wipe_ends(fd, t.size);
-        if (!e) e = write_mbr(fd, t.size, kinds[k].type);
+        if (!e) e = write_mbr(fd, t.size, DISK_KINDS[k].type);
         if (e) {
             close(fd);
             admin_err(e == -2 ? "disk.tooLargeForMbr" : e == -3 ? "disk.tooSmall" : "disk.tableFailed", NULL);
@@ -530,22 +525,22 @@ void disk_act_format(const AdminReq *r, const char *arg, size_t len) {
     snprintf(owner, sizeof owner, "root_owner=%u:%u", (unsigned)r->uid, (unsigned)r->gid);
     int rc;
     if (k == 0) {
-        const char *a[] = { kinds[k].prog, "-F", "32", "-I", "-n", lab[0] ? lab : "NO NAME", dev, NULL };
+        const char *a[] = { DISK_KINDS[k].prog, "-F", "32", "-I", "-n", lab[0] ? lab : "NO NAME", dev, NULL };
         rc = admin_run(a);
     } else if (k == 1) {
-        const char *a[] = { kinds[k].prog, "-L", lab, dev, NULL };
-        const char *b[] = { kinds[k].prog, dev, NULL };
+        const char *a[] = { DISK_KINDS[k].prog, "-L", lab, dev, NULL };
+        const char *b[] = { DISK_KINDS[k].prog, dev, NULL };
         rc = admin_run(lab[0] ? a : b);
     } else if (k == 2) {
-        const char *a[] = { kinds[k].prog, "-F", "-q", "-L", lab, "-E", owner, dev, NULL };
+        const char *a[] = { DISK_KINDS[k].prog, "-F", "-q", "-L", lab, "-E", owner, dev, NULL };
         rc = admin_run(a);
     } else {
-        const char *a[] = { kinds[k].prog, "-Q", "-F", "-L", lab, dev, NULL };
+        const char *a[] = { DISK_KINDS[k].prog, "-Q", "-F", "-L", lab, dev, NULL };
         rc = admin_run(a);
     }
     uevent_change(t.name);
     settle();
-    if (rc) admin_err("sys.programFailed", "program", kinds[k].prog, "code", lerr_int(rc), NULL);
+    if (rc) admin_err("sys.programFailed", "program", DISK_KINDS[k].prog, "code", lerr_int(rc), NULL);
     else admin_say("OK", "%s", t.name);   /* i18n-ok */
 }
 

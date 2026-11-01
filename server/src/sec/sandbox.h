@@ -69,6 +69,10 @@ typedef struct {
  * only works for comparing fds of the process itself (pid1 == pid2 == getpid()). */
 int sandbox_apply_helper(const SandboxHelperCfg *cfg);
 
+/* In a child right before execve of a system program that reads a server's bytes or a secret: only the system's folders,
+ * read-only, nothing to write but /dev/null; network 0 also means no TCP. Best effort on a kernel with no Landlock. */
+void sandbox_exec_child(int network);
+
 /* ---- "no access to your files" for Linux apps (the launcher, apps.c) ----
  * Landlock only: no seccomp, no capability changes, no network or scoping rules, so a normal
  * GTK/Qt app or browser keeps working; device ioctls are not handled (the device restrictions are

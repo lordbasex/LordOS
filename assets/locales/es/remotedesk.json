@@ -17,5 +17,7 @@
   "err.unreachable": "Esa computadora no responde.",
   "cert": "Primera conexión a esta computadora. Su certificado es {print}. ¿Confiar?",
   "certYes": "Confiar",
-  "certNo": "Cancelar"
+  "certNo": "Cancelar",
+  "vncPlain": "No va cifrado: cualquiera en la red puede ver esta sesión. Usalo solo en una red de confianza.",
+  "certChanged": "El certificado de este servidor CAMBIÓ. Puede ser otro servidor. Antes: {old}. Ahora: {print}"
 }

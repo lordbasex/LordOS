@@ -21,12 +21,15 @@ size_t ntlmv2_temp(uint8_t *temp, size_t cap, uint64_t filetime, const uint8_t c
 void ntlmv2_proof(const uint8_t hash[16], const uint8_t server[8], const uint8_t *temp, size_t tlen, uint8_t proof[16], uint8_t base[16]);
 
 size_t ntlm_user_negotiate(uint8_t *o, size_t cap);
-/* The AUTHENTICATE message for a CHALLENGE message. rnd: 24 random bytes (client challenge + exported key).
+/* The AUTHENTICATE message for a CHALLENGE message, with a MIC over the three messages (neg: what ntlm_user_negotiate wrote) and
+ * the target name spn ("cifs/<server>") in the signed part. rnd: 24 random bytes (client challenge + exported key).
  * key: the key that signs from here on. Returns its length, 0 for a challenge that can't be read. */
-size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *challenge, size_t clen, const char *user, const char *domain,
-                      const char *password, const uint8_t rnd[24], uint8_t key[16]);
+size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *neg, size_t nlen, const uint8_t *challenge, size_t clen, const char *user, const char *domain,
+                      const char *password, const char *spn, const uint8_t rnd[24], uint8_t key[16]);
 
 /* Signs an SMB2 message (without the transport header) as dialects 2.0.2 and 2.1 do. */
 void smb_sign(uint8_t *msg, size_t len, const uint8_t key[16]);
+/* 1: this message is signed, by whoever holds the key */
+int  smb_verify(const uint8_t *msg, size_t len, const uint8_t key[16]);
 
 #endif

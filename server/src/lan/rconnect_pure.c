@@ -35,7 +35,8 @@ int rconnect_config(char *o, size_t cap, const char *kind, const char *host, int
     if (!clean(host) || !clean(user) || !clean(ob) || !clean(path) || !clean(known)) return -1;
     if (!strcmp(kind, "sftp")) {
         if (!known[0]) return -1;       /* never without a host key to check against */
-        n = snprintf(o, cap, "[r]\ntype = sftp\nhost = %s\nuser = %s\nport = %d\npass = %s\nknown_hosts_file = %s\n", host, user, port ? port : 22, ob, known);
+        /* nothing is run on the server, and nothing is learned that rclone would try to save to a config it can't write */
+        n = snprintf(o, cap, "[r]\ntype = sftp\nhost = %s\nuser = %s\nport = %d\npass = %s\nknown_hosts_file = %s\nshell_type = none\nmd5sum_command = none\nsha1sum_command = none\n", host, user, port ? port : 22, ob, known);
     }
     else if (!strcmp(kind, "ftp") || !strcmp(kind, "ftps"))
         n = snprintf(o, cap, "[r]\ntype = ftp\nhost = %s\nuser = %s\nport = %d\npass = %s\n%s\n", host, user[0] ? user : "anonymous", port ? port : 21, ob,
@@ -86,6 +87,46 @@ int rconnect_tls_parse(const char *out, char *pem, size_t cap) {
     memcpy(pem, a, n);
     pem[n] = '\n';
     pem[n + 1] = 0;
-    const char *v = strstr(out, "Verify return code: ");
+    /* the last one: what comes before it includes text the server chose */
+    const char *v = NULL;
+    for (const char *f = out; (f = strstr(f, "Verify return code: ")); f++) v = f;
     return v && !strncmp(v + 20, "0 (ok)", 6) ? 1 : 0;
+}
+
+int rconnect_prints(const char *k, char *out, size_t cap) {
+    size_t o = 0;
+    out[0] = 0;
+    for (const char *p = k; p && *p;) {
+        const char *e = strchr(p, '\n');
+        size_t n = e ? (size_t)(e - p) : strlen(p);
+        const char *fp = memchr(p, ' ', n), *ty = NULL;
+        for (const char *q = p + n; q > p; q--) if (q[-1] == '(') { ty = q; break; }
+        if (!fp || !ty) return -1;
+        fp++;
+        const char *fe = memchr(fp, ' ', (size_t)(p + n - fp)), *te = memchr(ty, ')', (size_t)(p + n - ty));
+        if (!fe || !te) return -1;
+        int w = snprintf(out + o, cap - o, "%s%.*s %.*s", o ? " · " : "", (int)(te - ty), ty, (int)(fe - fp), fp);
+        if (w < 0 || (size_t)w >= cap - o) return -1;
+        o += (size_t)w;
+        p = e ? e + 1 : NULL;
+    }
+    return o ? 0 : -1;
+}
+
+int rconnect_tls_decide(const char *pin, const char *pem, int verified) {
+    if (pin) return strcmp(pin, pem) ? RC_TLS_CHANGED : RC_TLS_PIN;   /* an accepted certificate outranks the system's list */
+    return verified == 1 ? RC_TLS_SYSTEM : RC_TLS_ASK;
+}
+
+int rconnect_name_ok(const char *s) {
+    size_t n = strlen(s);
+    while (n && (s[n - 1] == '\n' || s[n - 1] == '\r' || s[n - 1] == ' ')) n--;
+    static const char yes[] = " does match certificate";
+    size_t y = sizeof yes - 1;
+    return n > y && !memcmp(s + n - y, yes, y);
+}
+
+int rconnect_answer(const char *shown, const char *print, int yes) {
+    if (!shown[0] || strcmp(shown, print)) return 0;
+    return yes ? 1 : -1;
 }
