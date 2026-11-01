@@ -603,8 +603,9 @@ export default function Files() {
     if (mod && b === 'x') { if (selPaths.length && !readOnly) cutFiles(selPaths); return; }
     if (e.ctrl && b === 'v') { doPaste(); return; }
     if (mod && b === 'a') { setSelected(new Set(flat.map((x) => x.path))); return; }
-    if (mod && b === '[') { goBack(); return; }
-    if (mod && b === ']') { goForward(); return; }
+    // [ and ] need a modifier on many layouts: the character itself counts, and ⌥← and ⌥→ work on all of them
+    if ((mod && (b === '[' || e.key === '[')) || (e.alt && e.key === 'ArrowLeft')) { goBack(); return; }
+    if ((mod && (b === ']' || e.key === ']')) || (e.alt && e.key === 'ArrowRight')) { goForward(); return; }
     if (mod && e.key === 'ArrowUp') { goUp(); return; }
     if (mod && e.key === 'ArrowDown') { openSel(); return; }
     if (mod && (e.key === 'Backspace' || e.key === 'Delete')) { toTrash(); return; }
@@ -654,8 +655,8 @@ export default function Files() {
         { label: tr('files.menu.showHidden'), hint: '❖⇧.', checked: hidden, onClick: () => setHidden((h) => !h) },
       ] },
       { label: tr('files.menu.go'), items: [
-        { label: tr('files.menu.back'), hint: '❖[', onClick: goBack, disabled: !tab.back.length },
-        { label: tr('files.menu.forward'), hint: '❖]', onClick: goForward, disabled: !tab.fwd.length },
+        { label: tr('files.menu.back'), hint: '⌥←', onClick: goBack, disabled: !tab.back.length },
+        { label: tr('files.menu.forward'), hint: '⌥→', onClick: goForward, disabled: !tab.fwd.length },
         { label: tr('files.menu.up'), hint: '❖↑', onClick: goUp, disabled: !curDir || curDir === fs.home() }, '-',
         { label: tr('files.place.recent'), hint: '❖⇧F', onClick: () => navigate({ type: 'recent' }) },
         ...dirs.filter((d) => ['documents', 'desktop', 'downloads'].includes(d.label)).map((d) => ({ label: tr(`files.place.${d.label}`), hint: { documents: '❖⇧O', desktop: '❖⇧D', downloads: '❖⌥L' }[d.label], onClick: () => navigate({ type: 'dir', path: d.path }) })),
