@@ -2,7 +2,7 @@
 // node. There is no client window: lord-rdesk paints a shared picture and takes the input from here. Addresses are in
 // settings; passwords only in the keyring. See docs/FILES.md, "Remote desktop".
 import { createElement as h, useEffect, useRef, useState } from 'react';
-import { View, Text, MediaView, addListener, getLayout } from '@lordos/runtime';
+import { View, Text, MediaView, addListener } from '@lordos/runtime';
 import { useTheme } from './theme.js';
 import { useAppWindow } from './components.jsx';
 import { settings, useSettings } from './settings.js';
@@ -40,7 +40,7 @@ function Screen({ id, st, onEnd, focused }) {
     return () => { a(); b(); };
   }, [focused, id]);
   const at = (e) => {
-    const [x, y, w, ht] = getLayout(box.current.id);
+    const [x, y, w, ht] = lord.getLayout(box.current.id);
     const k = Math.min(w / st.w, ht / st.h), ox = x + (w - st.w * k) / 2, oy = y + (ht - st.h * k) / 2;
     return [Math.max(0, Math.min(st.w - 1, Math.round((e.x - ox) / k))), Math.max(0, Math.min(st.h - 1, Math.round((e.y - oy) / k)))];
   };
