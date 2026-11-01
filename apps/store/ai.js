@@ -6,7 +6,7 @@
 // verified sources (docs/UPDATES.md, "Mirrored apps (catalog)"). Installing goes through the package
 // engine like any Debian package: the plan first, then pkg-install.
 import { createElement as h, useState } from 'react';
-import { View, Text, Image, Button, LetterIcon, useTheme, useStore, useSystemInfo, admin, locale, formatBytes, typeScale, spacing, t } from '@lordos/sdk';
+import { View, Text, Image, Button, Toggle, LetterIcon, useTheme, useStore, useSystemInfo, admin, locale, formatBytes, typeScale, spacing, t } from '@lordos/sdk';
 import catalog from '../../apt/catalog.json';
 import { debian } from './debian.js';
 import { Card, CardGrid, Featured, FeaturedSkeleton, Pill, Shelf, nameColor } from './ui.js';
