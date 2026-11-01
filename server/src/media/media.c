@@ -199,6 +199,11 @@ static void reap(void) {
     nzombies = k;
 }
 
+/* Called on every pass of the main loop: with no source left media_pollfds has nothing and media_dispatch
+ * doesn't run, so a helper that was just stopped would stay a zombie until the next video or song. */
+void media_reap(void) { if (nzombies) reap(); }
+double media_reap_timeout(void) { return nzombies ? 100 : -1; }
+
 /* ---- descriptors that are passed ---- */
 
 int media_pulse_fd(void) {

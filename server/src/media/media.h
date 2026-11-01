@@ -19,6 +19,10 @@ struct Node;
 /* main loop (main.c) */
 int  media_pollfds(struct pollfd *p, int max);
 void media_dispatch(const struct pollfd *p, int n);
+/* Helpers already told to stop are waited for here, on every pass of the loop, whether or not any source
+ * is left; media_reap_timeout: ms until the next look, -1 with none pending. */
+void media_reap(void);
+double media_reap_timeout(void);
 typedef void (*MediaEventFn)(int id, const char *type, const char *json);
 void media_events(MediaEventFn fn);
 int  media_wants_frame(void);           /* a recording is waiting for the next frame */

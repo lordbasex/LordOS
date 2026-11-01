@@ -10,6 +10,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- A stopped `lord-media` no longer stays a zombie until the next video or song: helpers are waited for on
+  every pass of the session's main loop, not only while another media source exists.
+
 ### Security
 
 - **The session's remote socket takes only root:** `lord-sessiond` and its bridge connect as root, so a process of the same user can no longer read the screen or send input through `remote.sock`.
