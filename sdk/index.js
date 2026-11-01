@@ -11,7 +11,7 @@ export { createStore, useStore } from './store.js';
 export { settings, useSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
-export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev } from './shortcuts.js';
+export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows } from './appswitcher.jsx';
 export { RemoteDeskApp } from './remotedesk.jsx';

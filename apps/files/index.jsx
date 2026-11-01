@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan,
+  useDisks, admin, systemInfo, lan, shortcutTaken,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -35,6 +35,17 @@ export function Icon({ size: s }) {
     </View>
   );
 }
+
+// A menu never shows a key the theme takes: Lord Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
+const ARROW_KEY = { '↑': 'ArrowUp', '↓': 'ArrowDown' };
+function localKey(hint) {
+  const m = /^❖([A-Z0-9,↑↓])$/.exec(hint || '');
+  if (!m) return hint;
+  const key = ARROW_KEY[m[1]] || m[1];
+  if (!shortcutTaken(`Meta+${key}`)) return hint;
+  return shortcutTaken(`Ctrl+${key}`) ? undefined : `Ctrl+${m[1]}`;
+}
+const localKeys = (items) => items.map((i) => (typeof i === 'string' ? i : { ...i, hint: localKey(i.hint), ...(i.items ? { items: localKeys(i.items) } : null), ...(Array.isArray(i.submenu) ? { submenu: localKeys(i.submenu) } : null) }));
 
 const VIEWS = ['icons', 'list', 'columns', 'gallery'];
 const VIEW_GLYPH = { icons: '▦', list: '≡', columns: '◫', gallery: '▣' };
@@ -620,7 +631,7 @@ export default function Files() {
 
   // ---- app menus (the theme's menu bar) ----
   useEffect(() => {
-    wm.setMenus(wid, [
+    wm.setMenus(wid, localKeys([
       { label: tr('files.menu.file'), items: [
         { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true }) },
         { label: tr('files.menu.newTab'), hint: '❖T', onClick: () => newTabAt() },
@@ -658,7 +669,7 @@ export default function Files() {
         ...(lan.available() ? [{ label: tr('files.menu.connect'), hint: '❖K', onClick: () => setSheet('connect') }] : []),
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
-    ]);
+    ]));
   }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length]);
 
   // ---- view ----
@@ -902,7 +913,7 @@ export default function Files() {
       {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
         onStore={(pkg) => { setRemoteAsk(null); wm.open('store', { args: { search: pkg, package: pkg } }); }}
         onTerminal={remoteAsk.ssh ? () => { const typed = remoteAsk.ssh; setRemoteAsk(null); wm.open('terminal', { new: true, args: { typed } }); } : null} />}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} bounds={bounds()} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={localKeys(menu.items)} onClose={() => setMenu(null)} bounds={bounds()} />}
     </View>
   );
 }
