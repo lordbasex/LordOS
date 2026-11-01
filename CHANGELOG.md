@@ -13,6 +13,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [0.8.7-beta] - 2026-11-01
 
 - **Files, from the pass on a real session:** menus show Ctrl for what Lord Classic takes (❖N, ❖D, ❖I, ❖A, ❖1 to ❖4); Network says it's looking instead of "empty folder"; a mounted share's name follows the interface's language; back and forward are ⌥← and ⌥→ on every layout; the Name column resizes; Lord Classic's notification panel keeps a notification's buttons; a server outside the local network explains why its folders aren't listed.
+- **Monitor, Voltage:** the first card draws the board with its power path in the color of the power state.
 - **Files, pinned servers:** the secondary click on a connected server in Locations pins it; it stays there, dim, and a click connects again. Passwords stay in the keyring. Folders and connected servers can be dragged to Favorites as shortcuts.
 - **Disk Formats:** APFS is an optional switch on its Store page, about 500 MB of compilers and headers; the item itself is about 2 MB. It can be added later from the same page; opening an APFS disk without it leads there. On arm64, which has no such driver, the error says so.
 

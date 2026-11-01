@@ -7,6 +7,7 @@ import { View, Text, admin, monitor, useAppWindow, useLocale, useStore, useTheme
 import { useEffect, useRef, useState } from 'react';
 import { Card, Big, Stat, useCardStyle } from './index.jsx';
 import { Chart } from './Chart.jsx';
+import { VoltageArt } from './VoltageArt.jsx';
 import { LOW_5V, parsePmic, boardWatts, powerState, voltSources, primaryRail, traceRange, afterBoot } from './voltmodel.js';
 
 const POLL_MS = 2000, HISTORY = 150;     // 5 minutes
@@ -134,7 +135,12 @@ export function VoltageTab() {
       {err ? <Hint>{err.startsWith('errors.') ? tr(err) : err}</Hint> : null}
       {(prime || state) && (
         <Card icon="activity" title={prime ? railName(tr, prime) : tr('monitor.volt.board')} right={state ? <StateRow state={state} /> : null}>
-          {prime && <Big value={tr('monitor.volt.volts', { v: formatNumber(prime.v, 3) })} />}
+          {prime && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <VoltageArt variant={d.board ? 'pi' : 'mother'} tone={TONE[state] || TONE.normal} />
+              <View style={{ flex: 1, minWidth: 0 }}><Big value={tr('monitor.volt.volts', { v: formatNumber(prime.v, 3) })} /></View>
+            </View>
+          )}
           {main ? <Trace rail={prime} hist={hist} mark={onBoard ? LOW_5V : null} /> : null}
           {state ? <Hint>{tr(`monitor.volt.explain.${state}`, { low: formatNumber(LOW_5V, 1) })}</Hint> : null}
         </Card>

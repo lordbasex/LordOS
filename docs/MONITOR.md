@@ -488,6 +488,8 @@ among the open files; no private parts when not the owner; "gone" for another st
 
 ## Voltage (0.8.7)
 
+The first card draws the machine's board, a small single-board computer on the Pi and a motherboard elsewhere, with the way from the power input to the processor in the color of the power state: green, amber or red. It is our own drawing, with no maker's marks, and it doesn't move.
+
 One view with several sources (`apps/monitor/voltmodel.js` turns them into one list). It shows only what the machine
 really reports: nothing is estimated except the board power, which says so. The tab itself exists only if there is
 something to show (each sample's `volt`, decided by `volt_read` when the Monitor's thread starts); in a virtual machine it
