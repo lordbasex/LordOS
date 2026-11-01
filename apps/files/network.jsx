@@ -183,13 +183,17 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pkg, setPkg] = useState('');
+  const [confirm, setConfirm] = useState(null);           // { print, res }: a key or certificate seen for the first time
+  const answer = (yes) => { confirm.res(yes); setConfirm(null); };
   const key = `${ask.host}:${ask.port || 0}${ask.path || ''}`;
   useEffect(() => { lan.saved(ask.kind, key, '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } }); }, []);
   const go = async () => {
     if (busy) return;
     setBusy(true); setError(''); setPkg('');
-    const r = await lan.connect({ kind: ask.kind, host: ask.host, port: ask.port, user: user.trim(), password, path: ask.path });
+    const r = await lan.connect({ kind: ask.kind, host: ask.host, port: ask.port, user: user.trim(), password, path: ask.path }, (print) => new Promise((res) => setConfirm({ print, res })));
     setBusy(false);
+    if (r.state === 'changed') { setError(tr('files.connect.err.changed')); return; }
+    if (r.state === 'refused') return;
     if (r.state === 'missing') { setPkg(r.package); setError(tr('files.connect.err.package', { name: r.package })); return; }
     if (r.state !== 'done') { setError(tr('files.connect.err.failed')); return; }
     if (user.trim()) { if (remember) lan.remember(ask.kind, key, '', user.trim(), password, tr('files.net.keyringLabel', { name: ask.kind, addr: ask.host })).catch(() => {}); else lan.forget(ask.kind, key, '', user.trim()); }
@@ -207,6 +211,16 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
           <Toggle small on={remember} onChange={setRemember} />
           <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.net.remember')}</Text>
         </View>
+        {ask.kind === 'ftp' || ask.kind === 'webdav' ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('files.connect.plain')}</Text> : null}
+        {confirm ? (
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.connect.firstKey', { print: confirm.print })}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+              <Button label={tr('files.cancel')} onClick={() => answer(false)} />
+              <Button primary label={tr('files.connect.trust')} onClick={() => answer(true)} />
+            </View>
+          </View>
+        ) : null}
         {error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
           {onTerminal ? <Button label={tr('files.menu.openTerminal')} onClick={onTerminal} disabled={busy} /> : null}

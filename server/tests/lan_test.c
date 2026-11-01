@@ -82,12 +82,33 @@ static void t_rconnect(void) {
     CHECK(!rconnect_host_ok("-oProxy") && !rconnect_host_ok("a b") && !rconnect_host_ok("a\nhost = x") && !rconnect_host_ok(""));
     CHECK(rconnect_user_ok("ana.b") && rconnect_user_ok("") && !rconnect_user_ok("-x") && !rconnect_user_ok("a\nb"));
     CHECK(rconnect_path_ok("") && rconnect_path_ok("/dav/files") && !rconnect_path_ok("/a/../b") && !rconnect_path_ok("/..") && !rconnect_path_ok("a") && !rconnect_path_ok("/a\nb"));
-    char c[400];
-    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "") > 0 && strstr(c, "port = 22"));
-    CHECK(rconnect_config(c, sizeof c, "ftps", "h", 0, "", "x", "") > 0 && strstr(c, "explicit_tls = true") && strstr(c, "anonymous"));
-    CHECK(rconnect_config(c, sizeof c, "davs", "h", 8443, "u", "x", "/d") > 0 && strstr(c, "url = https://h:8443/d"));
-    CHECK(rconnect_config(c, sizeof c, "smb", "h", 0, "u", "x", "") < 0);
-    CHECK(rconnect_config(c, 8, "sftp", "h", 0, "u", "x", "") < 0);
+    char c[600];
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "", "/k") > 0 && strstr(c, "port = 22") && strstr(c, "known_hosts_file = /k"));
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "", "") < 0);          /* never without a host key */
+    CHECK(rconnect_config(c, sizeof c, "ftps", "h", 0, "", "x", "", "") > 0 && strstr(c, "explicit_tls = true") && strstr(c, "anonymous") && !strstr(c, "no_check"));
+    CHECK(rconnect_config(c, sizeof c, "davs", "h", 8443, "u", "x", "/d", "") > 0 && strstr(c, "url = https://h:8443/d") && !strstr(c, "no_check"));
+    CHECK(rconnect_config(c, sizeof c, "smb", "h", 0, "u", "x", "", "") < 0);
+    CHECK(rconnect_config(c, 8, "sftp", "h", 0, "u", "x", "", "/k") < 0);
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h\nkey_file = /x", 0, "u", "x", "", "/k") < 0);
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u\r", "x", "", "/k") < 0);
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x\ny", "", "/k") < 0);
+    CHECK(rconnect_config(c, sizeof c, "davs", "h", 0, "u", "x", "/a\tb", "") < 0);
+    char tag[64];
+    rconnect_host_tag("h", 2222, tag, sizeof tag); CHECK(!strcmp(tag, "[h]:2222"));
+    rconnect_host_tag("h", 0, tag, sizeof tag); CHECK(!strcmp(tag, "h"));
+    const char *k1 = "h ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqm0000000000000000000000000000000000000000", *k2 = "h ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqm1111111111111111111111111111111111111111";
+    CHECK(rconnect_keyline_ok(k1, "h") && !rconnect_keyline_ok(k1, "other"));
+    CHECK(!rconnect_keyline_ok("h ssh-ed25519 short", "h") && !rconnect_keyline_ok("h ssh-rsa AAAA;rm -rf /AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "h"));
+    char f[300];
+    snprintf(f, sizeof f, "x y z\n%s\n", k1);
+    CHECK(rconnect_known(f, "h", k1) == 1);
+    CHECK(rconnect_known(f, "h", k2) == 0);             /* a changed key */
+    CHECK(rconnect_known(f, "new", "new ssh-rsa AAA") == -1);
+    char pem[200];
+    CHECK(rconnect_tls_parse("a\n-----BEGIN CERTIFICATE-----\nAB\n-----END CERTIFICATE-----\nVerify return code: 0 (ok)\n", pem, sizeof pem) == 1 && strstr(pem, "AB"));
+    CHECK(rconnect_tls_parse("-----BEGIN CERTIFICATE-----\nAB\n-----END CERTIFICATE-----\nVerify return code: 18 (self-signed certificate)\n", pem, sizeof pem) == 0);
+    CHECK(rconnect_tls_parse("connect: refused", pem, sizeof pem) == -1);
+    CHECK(rconnect_tls_parse("-----BEGIN CERTIFICATE-----\nAB\n-----END CERTIFICATE-----\n", pem, 8) == -1);
 }
 
 static int req(const char *s, ShareReq *r) { static char b[1024]; snprintf(b, sizeof b, "%s", s); return share_req_parse(b, r); }

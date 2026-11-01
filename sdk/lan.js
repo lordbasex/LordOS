@@ -29,11 +29,13 @@ export const lan = {
     }
   },
   // sftp, ftp, ftps and WebDAV as a folder, rdp and vnc as a window: { state, package, path }
-  async connect({ kind, host, port = 0, user = '', domain = '', password = '', path = '' }) {
+  // onConfirm(fingerprint) → Promise<bool>: a key or certificate seen for the first time
+  async connect({ kind, host, port = 0, user = '', domain = '', password = '', path = '' }, onConfirm) {
     if (!lord.lan.connect(kind, host, port, user, domain, password, path)) return { state: 'refused', package: '', path: '' };
     for (;;) {
       await new Promise((r) => setTimeout(r, 150));
       const s = JSON.parse(lord.lan.connectPoll());
+      if (s.state === 'confirm') { lord.lan.connectTrust(onConfirm ? await onConfirm(s.print) : false); await new Promise((r) => setTimeout(r, 200)); continue; }
       if (s.state !== 'running') return s;
     }
   },
