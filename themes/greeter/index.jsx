@@ -44,7 +44,7 @@ function LoginVideo({ box, stop }) {
     const start = (codecs) => {
       const files = [LOGIN_PICKED, ...codecs.map((c) => `${LOGIN_BUILTIN}.${c}.mp4`)];
       for (const f of files) {
-        try { cur = media.play('greeter', f, { loop: true, audio: 0, appName: 'LordOS' }); } catch (e) { cur = 0; }
+        try { cur = media.play('greeter', f, { loop: true, audio: 0, hwOnly: 1, appName: 'LordOS' }); } catch (e) { cur = 0; }
         if (cur) break;
       }
       if (!cur) return;

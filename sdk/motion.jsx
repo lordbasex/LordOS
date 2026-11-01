@@ -124,7 +124,7 @@ function acquire(path, key, display) {
   let p = players.get(path);
   if (!p) {
     let id = 0;
-    try { id = media.play('wallpaper', path, { loop: true, audio: 0, appName: 'LordOS' }); } catch (e) { return null; }
+    try { id = media.play('wallpaper', path, { loop: true, audio: 0, hwOnly: 1, appName: 'LordOS' }); } catch (e) { return null; }
     if (!id) return null;
     p = { id, views: new Map(), paused: false, playing: createStore(false) };
     media.on(id, (type, d) => {

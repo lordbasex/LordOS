@@ -82,6 +82,7 @@ typedef struct {
     int hw_active;
     LmHwFall hwf;                   /* consecutive decoding failures (lm_hwfall.h) */
     int hw_resume;                  /* it went to software: seek to the clock */
+    int hw_only;                    /* a moving wallpaper: no software decoding, the still image stays */
     SwrContext *swr;
     int out_ch;
     int64_t start_ms, dur_ms;
@@ -228,6 +229,7 @@ static void pq_push_front(PktQ *q, AVPacket *p) {
 static int hwf_tested;              /* build/lord-media-hwfall: the failure was faked once */
 #endif
 static void hw_to_software(void) {
+    if (P.hw_only) { LM_LOG("hardware decoder failed: stopping, this video is hardware only"); _exit(0); }
     AVCodecContext *old = P.vdec;
     AVBufferRef *hw = P.hw;
     int active = P.hw_active;
@@ -275,6 +277,7 @@ static int decode_video(void) {
             break;
         }
         lm_hwfall_note(&P.hwf, 0);
+        if (P.hw_only && f->format != AV_PIX_FMT_DRM_PRIME && f->format != AV_PIX_FMT_VAAPI) { LM_LOG("no hardware decoder: stopping, this video is hardware only"); _exit(0); }
         progress = 1;
         P.dec_ms += dt;
         P.decoded++;
@@ -564,6 +567,7 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     int loop = (int)mp_param_int(params, "loop", 0);
     int autoplay = (int)mp_param_int(params, "autoplay", 1);
     int want_audio = (int)mp_param_int(params, "audio", 1);
+    P.hw_only = (int)mp_param_int(params, "hwonly", 0);
 
     /* VA-API before seccomp (it loads the driver from /usr/lib) */
     char accel[24];
