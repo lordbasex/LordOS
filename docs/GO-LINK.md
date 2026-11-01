@@ -299,7 +299,7 @@ permission and the indicator.
 | Code, new code, acceptance, permissions live, session panel, chat | same |
 | Picture, sound, control, clipboard | through the API |
 | Unattended access, linked browsers, password | same code; see D3 |
-| Files | same as the Linux version, D2 |
+| Files | home folder only; what arrives goes to `~/Downloads`, D2 |
 | Sound, chat, voice and video calls | same. Sound through the API; the microphone and camera only during a call, through the system's permissions |
 | Keep the display awake | `SHARE_AWAKE`; `pkg/awake`'s D-Bus services aren't ours, and only while a viewer is accepted |
 | Lock when a session ends | `SHARE_LOCK`, because `loginctl` can't work here: LordOS sessions have no logind seat (`docs/SESSIONS.md:465`, go-link:`internal/services/session_end.go:98`) |
@@ -406,8 +406,7 @@ The stages run in order except where noted. Percentages are of what each stage's
 ## 13. Open decisions
 
 - **D1. Packaged apps with a companion (decided: yes).** 3.2 as proposed: a third read-only app root, a Verified-author check at load, and a fourth exception to "the server doesn't run commands".
-- **D2. Files (decided by the maintainer).** Every function of go-link stays, files included, as on Linux. The sandbox must give the engine the
-  access that takes; a compromised engine would reach what that access covers. The paths, set in stage 2: read in the home folder, write in `~/Downloads`, nothing else.
+- **D2. Files (decided by the maintainer).** A visitor browses only the user's home folder, nothing outside it. Whatever is sent to the computer is saved in `~/Downloads`, as in go-link's other clients. The sandbox gives the engine exactly that: read in the home folder, write in `~/Downloads`.
 - **D3. Unattended access (decided).** Stays as on Linux, off by default.
 - **D4. Open at login (decided).** Optional, per app, through the broker.
 - **D5. Short verification code (decided).** Optional, defined on go-link's side.
