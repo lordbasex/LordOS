@@ -26,6 +26,7 @@ const DEFAULTS = {
   defaultView: null,          // { view, sort } for a folder with none of its own
   folderViews: {},            // place → { view, sort }, the newest last
   servers: { history: [], favorites: [] },
+  favoriteFolders: [],        // { path, name, address }: folders dragged to Favorites; address when on a server
   pins: [],                   // { address, path, name }: servers kept in Locations; passwords stay in the keyring
 };
 
@@ -59,6 +60,11 @@ export function togglePin(pin) {
   const { pins } = filesPrefs();
   setPrefs({ pins: pins.some((p) => p.path === pin.path) ? pins.filter((p) => p.path !== pin.path) : [...pins, pin] });
 }
+export function addFavoriteFolder(fav) {
+  const list = filesPrefs().favoriteFolders;
+  if (!list.some((x) => x.path === fav.path)) setPrefs({ favoriteFolders: [...list, fav] });
+}
+export const removeFavoriteFolder = (path) => setPrefs({ favoriteFolders: filesPrefs().favoriteFolders.filter((x) => x.path !== path) });
 export function toggleFavorite(address) {
   const { servers } = filesPrefs();
   const has = servers.favorites.includes(address);

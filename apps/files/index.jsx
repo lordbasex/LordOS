@@ -21,7 +21,7 @@ import { archiveVersion, archiveState, extractEntry, extractHere, compress, isAr
 import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
-import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
+import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
 export function Icon({ size: s }) {
@@ -138,10 +138,10 @@ function locTitle(loc, dirs) {
 
 // Source-list row: 28 px, accent-colored icon, a soft highlight when selected and the
 // accent when something is dragged over it.
-function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext }) {
+function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext, onPress }) {
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={onClick} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
+    <View onClick={onClick} onMouseDown={onPress} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
       style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, borderRadius: 6,
         backgroundColor: hot ? t.accent : selected ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover ? t.hover : 'transparent' }}>
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
@@ -465,6 +465,18 @@ export default function Files() {
     if (!e.app && !e.netHost && !e.netWay && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
   };
 
+  // a shortcut, not a copy: a folder on a server remembers how to get back to it
+  const addFavorite = (path) => {
+    try { if (!fs.stat(path).dir) return; } catch (e) { return; }
+    const v = fs.volumes().find((x) => isShareFs(x.fs) && (path === x.path || path.startsWith(`${x.path}/`)));
+    addFavoriteFolder({ path, name: v && path === v.path ? v.name : fs.basename(path), address: v ? originOf(v.path, v.fs, v.name) : '' });
+  };
+  const offline = (f) => !!f.address && !volumes.some((v) => f.path === v.path || f.path.startsWith(`${v.path}/`));
+  const openFavorite = (f) => {
+    if (offline(f)) { reconnect(f); return; }
+    try { if (fs.stat(f.path).dir) { navigate(dirLoc(f.path)); return; } } catch (e) { /* below */ }
+    setMsg(tr('files.fav.gone', { name: f.name }));
+  };
   // ---- drag and drop (⌥ copies; otherwise it moves) ----
   const dropOf = (inst) => { for (let n = inst; n; n = n.parent) { if (n.props?.dropPath) return n.props.dropPath; if (n.props?.dropTrash) return 'trash:'; } return null; };
   useEffect(() => {
@@ -474,8 +486,8 @@ export default function Files() {
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
       p.moved = true;
       const target = dropOf(e.target);
-      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt });
-      setDropTarget(target && !p.paths.includes(target) ? target : null);
+      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly });
+      setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
       const p = press.current;
@@ -483,7 +495,8 @@ export default function Files() {
       if (!p || !p.moved) return;
       const target = dropOf(e.target);
       setDrag(null); setDropTarget(null);
-      if (!target || p.paths.includes(target)) return;
+      if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
+      if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { let n = 0; for (const x of p.paths) { try { fs.trash(x); n++; } catch (err) { setMsg(err.message); } } if (n) bump(); return; }
       transfer(p.paths, target, !e.alt);
     });
@@ -516,7 +529,7 @@ export default function Files() {
     const openers = openersFor(e, launcherApps, tr);
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
-      ...(e.dir ? [{ label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
+      ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
       ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
@@ -769,6 +782,12 @@ export default function Files() {
           <SideItem key={d.path} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
             onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} hot={dropTarget === d.path} />
         ))}
+        {prefs.favoriteFolders.map((f) => (
+          <SideItem key={f.path} t={t} dim={offline(f)} label={shareTitle(f.name)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(f.path))} onClick={() => openFavorite(f)}
+            drop={offline(f) ? undefined : { dropPath: f.path }} hot={dropTarget === f.path}
+            onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(f.path) }] }); }} />
+        ))}
+        {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<Glyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
         {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
           drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
@@ -779,7 +798,8 @@ export default function Files() {
           return (
             <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
               drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null}
-              onContext={isShareFs(v.fs) ? (ev) => pinMenu(ev, v) : undefined} />
+              onContext={isShareFs(v.fs) ? (ev) => pinMenu(ev, v) : undefined}
+              onPress={(ev) => { press.current = { paths: [v.path], x: ev.x, y: ev.y, favOnly: true }; }} />
           );
         })}
         {side('volumes') && prefs.pins.filter((p) => !volumes.some((v) => v.path === p.path)).map((p) => (
@@ -910,7 +930,7 @@ export default function Files() {
       {/* what is being dragged */}
       {dragLocal && (
         <View style={{ position: 'absolute', left: dragLocal.x - 20, top: dragLocal.y - 20, pointerEvents: 'none', opacity: 0.85 }}>
-          {dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
+          {drag.favOnly || dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
           {drag.paths.length > 1 && (
             <View style={{ position: 'absolute', right: -6, top: -6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{drag.paths.length}</Text>
