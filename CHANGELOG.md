@@ -12,6 +12,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [0.8.7-beta] - 2026-11-01
 
+- **Files, from the pass on a real session:** menus show Ctrl for what Lord Classic takes (❖N, ❖D, ❖I, ❖A, ❖1 to ❖4); Network says it's looking instead of "empty folder"; a mounted share's name follows the interface's language; back and forward are ⌥← and ⌥→ on every layout; the Name column resizes; Lord Classic's notification panel keeps a notification's buttons; a server outside the local network explains why its folders aren't listed.
+- **Disk Formats:** APFS is an optional switch on its Store page, about 500 MB of compilers and headers; the item itself is about 2 MB.
+
 - **App windows reopen where they were:** size, position, maximized and display, per app, in both themes, for LordOS and Linux apps. A display is known by its monitor's name and connector; if it's gone or the place is off screen, the window opens somewhere visible. Session restore, snapping and Dock assignments keep their say, and dialogs aren't affected.
 - **Files remembers:** each folder keeps its view and sort, with a default in Settings, and the sidebar's width is dragged from its edge and kept.
 
