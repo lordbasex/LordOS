@@ -283,5 +283,6 @@
   "net.kind.rdp": "Área de trabalho remota",
   "net.connectAs": "Conectar como",
   "net.nothing": "Nada neste computador pode ser aberto daqui.",
-  "net.sharedFolder": "Pasta compartilhada"
+  "net.sharedFolder": "Pasta compartilhada",
+  "connect.err.tlsName": "O certificado deste servidor não nomeia {name}, então não pode ser verificado. Quem o administra pode adicionar esse nome ao certificado."
 }

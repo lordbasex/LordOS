@@ -172,6 +172,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
     setBusy(false);
     if (r.state === 'changed') { setError(tr('files.connect.err.changed')); return; }
     if (r.state === 'refused') return;
+    if (r.state === 'tlsname') { setError(tr('files.connect.err.tlsName', { name: ask.host })); return; }
     if (r.state === 'missing') { setPkg(r.package); setError(tr('files.connect.err.package', { name: r.package })); return; }
     if (r.state !== 'done') { setError(tr('files.connect.err.failed')); return; }
     if (user.trim()) { if (remember) lan.remember(ask.kind, key, '', user.trim(), password, tr('files.net.keyringLabel', { name: ask.kind, addr: ask.host })).catch(() => {}); else lan.forget(ask.kind, key, '', user.trim()); }

@@ -283,5 +283,6 @@
   "net.kind.rdp": "Escritorio remoto",
   "net.connectAs": "Conectar como",
   "net.nothing": "Nada en esta computadora se puede abrir desde acá.",
-  "net.sharedFolder": "Carpeta compartida"
+  "net.sharedFolder": "Carpeta compartida",
+  "connect.err.tlsName": "El certificado de este servidor no nombra a {name}, así que no se puede verificar. Quien lo administra puede agregar ese nombre al certificado."
 }

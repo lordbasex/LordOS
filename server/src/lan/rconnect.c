@@ -5,6 +5,7 @@
 #include "../fsops.h"
 #include "../sec/cgroup.h"
 
+#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -183,6 +184,12 @@ static int trust_tls(char *ca, size_t cn) {
     char *x[] = { OPENSSL, "x509", "-noout", "-fingerprint", "-sha256", NULL };
     if (filter(x, pem, strlen(pem), fp, sizeof fp) <= 0) { finish("failed", NULL, NULL); return -1; }
     fp[strcspn(fp, "\n")] = 0;
+    /* the certificate must name this host: rclone's TLS checks that whatever is trusted */
+    struct in_addr ia;
+    int isip = inet_pton(AF_INET, q.host, &ia) == 1;
+    char *chk[] = { OPENSSL, "x509", "-noout", isip ? "-checkip" : "-checkhost", q.host, NULL };
+    char said[300] = "";
+    if (filter(chk, pem, strlen(pem), said, sizeof said) <= 0 || strstr(said, "NOT")) { finish("tlsname", NULL, NULL); return -1; }
     snprintf(dir, sizeof dir, "%s/.config/lordos/remote_certs", fsops_home());
     mkparents(dir);
     snprintf(ca, cn, "%s/%s_%d.pem", dir, q.host, port);
@@ -251,10 +258,11 @@ static void mount_job(void) {
     if (mounted_at(dir)) { close(fd); finish("done", NULL, dir); return; }
     char src[240] = "r:";
     if (strcmp(q.kind, "webdav") && strcmp(q.kind, "davs")) snprintf(src, sizeof src, "r:%s", q.path);
-    char *argv[] = { "rclone", "mount", src, dir, "--config", "/proc/self/fd/3", "--vfs-cache-mode", "writes", "--contimeout", "8s", "--low-level-retries", "2", "--retries", "1", ca[0] ? "--ca-cert" : NULL, ca, NULL };
+    char *argv[] = { "rclone", "mount", src, dir, "--config", "/proc/self/fd/3", "--vfs-cache-mode", "writes", "--contimeout", "8s", "--low-level-retries", "2", "--retries", "1", NULL };
     pid_t p = fork();
     if (!p) {
         child_fds(-1, fd);
+        if (ca[0]) setenv("SSL_CERT_FILE", ca, 1);       /* the one certificate accepted replaces the system's list */
         if (app_scope_enter("rclone") && getenv("LORDOS_SESSIOND")) _exit(126);
         execve(RCLONE, argv, environ);
         _exit(127);
