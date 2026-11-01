@@ -54,6 +54,10 @@ This document gathers what's needed to build the image, write it, develop on the
 >
 > **Not tested:** the `lordos-0.8.6-rpi5-arm64.img.xz` file itself was not written to a card or booted. Its package is
 > the one tested on the Pi above, built in the same run.
+>
+> **Update (2026-11-01, 0.8.7):** the image is `lordos-0.8.7-rpi5-arm64.img.xz`. FFmpeg now comes from Raspberry Pi's
+> archive, pinned in the image and by a migration on upgrades, and `lord-media` drives the Pi 5's HEVC decoder with it
+> (`WALLPAPERS.md`, `MEDIA.md`).
 
 ## Models
 
@@ -106,7 +110,8 @@ SD card or an NVMe, and the same image boots on the Pi 5 and the Pi 4.
   these packages (`/etc/apt/preferences.d/raspberrypi`):
   - `raspi-firmware`: the boot files, device trees and overlays in `/boot/firmware`;
   - `firmware-brcm80211`: Wi-Fi (CYW43455);
-  - `rpi-eeprom` and `raspi-utils` (`vcgencmd`, `pinctrl`), if available.
+  - `rpi-eeprom` and `raspi-utils` (`vcgencmd`, `pinctrl`), if available;
+  - (0.8.7) `ffmpeg` and its libraries, for the Pi 5's hardware HEVC (`WALLPAPERS.md`).
 
   Everything else comes from Debian, Mesa included. Since 0.8.4.1 `rpi-eeprom` and what it needs
   are also in the LordOS repository (`UPDATES.md`, "Raspberry Pi firmware packages"): the same
@@ -709,7 +714,7 @@ files weren't touched.
 
   Recommended: option 1. Add
   `ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10` to
-  `/etc/apt/preferences.d/raspberrypi` (verify the names with `apt-cache policy` on the board).
+  `/etc/apt/preferences.d/raspberrypi` (verify the names with `apt-cache policy` on the board). Done in 0.8.7 (`WALLPAPERS.md`).
 - **Decoded frames** are DRM PRIME:
   - **NV12 or P030 with the `BROADCOM_SAND128` modifier**: the Pi's "column" format;
   - `av_hwframe_map` / `AVDRMFrameDescriptor` give the fd, offset, pitch and modifier.
@@ -876,7 +881,7 @@ Notes for the image:
   ships the LordOS kernel with `CONFIG_SECURITY_LANDLOCK=y` ("The LordOS kernel").
 - The image takes Mesa (25.0.7) and FFmpeg (7.1.5) from Debian. Debian's FFmpeg has no V4L2-request
   decoding, so the hardware HEVC seen above needs the Raspberry Pi FFmpeg pinned (option 1 in
-  "Video").
+  "Video"). (Since 0.8.7 the image pins it.)
 
 Still to do on the board: everything in the checklist that needs a monitor (items 1, 2, 4–8, 10, 15
 with screenshots, 16 HDMI audio, 17), the desktop session, and booting the built image from a

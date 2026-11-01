@@ -108,7 +108,7 @@ listed. `isSystemApp(id)` from `@lordos/sdk` tells them apart.
 (`MAJOR.MINOR.PATCH`, optionally `-` or `~` and a suffix). Store → Installed shows it next to the app
 ("LordOS app · 0.8.5") and About <app> shows it too, so the apps can later be versioned and released
 apart from LordOS. A system app moves to a new version when it changes: in 0.8.6, System Information and
-Settings.
+Settings. A new app starts at the release it first ships in: Cleaner and Remote Desk at 0.8.7.
 
 ## Permissions and trust (M8)
 

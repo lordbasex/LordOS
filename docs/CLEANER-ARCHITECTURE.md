@@ -1,6 +1,6 @@
 # Cleaner: architecture
 
-**Status: design for 0.8.7, with Phase 1 built (`CLEANER-ROADMAP.md`).**
+**Status: design; Phase 1 was released in 0.8.7-beta (`CLEANER-ROADMAP.md`).**
 Checked against the code on branch `v087` on 2026-10-31. Each feature's real state lives in `CLEANER-ROADMAP.md`; a line
 here is a plan, not a claim.
 

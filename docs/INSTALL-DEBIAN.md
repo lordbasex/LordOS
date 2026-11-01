@@ -12,7 +12,7 @@ curl -fsSL https://lordos.org/install.sh | sh
 The script asks before changing anything. It reads the answers from the terminal (`/dev/tty`), so
 this works even though the script itself comes through a pipe.
 
-> **Status (2026-10-30):** the latest release is 0.8.6-beta, and the GitHub repository is now public, so
+> **Status (2026-11-01):** the latest release is 0.8.7-beta, and the GitHub repository is now public, so
 > the installer can look up and download its release files. Without access to GitHub, use `--deb` with a
 > package you already have (see [Testing](#testing)).
 
@@ -21,7 +21,7 @@ this works even though the script itself comes through a pipe.
 | | |
 |---|---|
 | System | Debian 13 (trixie). A derivative based on trixie (`ID_LIKE=debian`) works, with a warning: only Debian itself is tested. |
-| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. An arm64 virtual machine won't need this page once 0.8.7's [arm64 live ISO](ISO.md) is released. |
+| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. An arm64 virtual machine doesn't need this page: since 0.8.7 there is an [arm64 live ISO](ISO.md). |
 | Rights | root, or a user who can use `sudo` |
 | Disk | at least 2 GB free on `/var` (the package plus the dependencies apt pulls in) |
 | Init | systemd running (Debian's default) |

@@ -603,7 +603,7 @@
         "Color tags, search and Recents",
         "This computer: the whole system, read-only, as your user",
         "Every disk in the sidebar, mounted with a click; trash and archives",
-        "New in 0.8.7: Network, what is on your local network, and connecting to shares"
+        "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -611,7 +611,7 @@
         "Etiquetas de color, búsqueda y Recientes",
         "Este equipo: todo el sistema, solo lectura, como tu usuario",
         "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
-        "Nuevo en 0.8.7: Red, lo que hay en tu red local, y conectarse a recursos compartidos"
+        "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -619,7 +619,7 @@
         "Etiquetas de cor, busca e Recentes",
         "Este computador: todo o sistema, só leitura, como seu usuário",
         "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
-        "Novo na 0.8.7: Rede, o que há na sua rede local, e conexão a compartilhamentos"
+        "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização"
       ]
     }
   },
@@ -645,7 +645,7 @@
         "Appearance: desktop style (Lord Flow or Lord Classic), wallpaper and the Dock",
         "Privacy, app permissions, network access and blocklists",
         "Users, remote desktop and updates",
-        "New in 0.8.7: session restore and an on-screen keyboard"
+        "New in 0.8.7: moving wallpapers, session restore and an on-screen keyboard"
       ],
       "es": [
         "Red, Wi-Fi, VPN y Bluetooth",
@@ -653,7 +653,7 @@
         "Apariencia: estilo de escritorio (Lord Flow o Lord Classic), fondo de pantalla y el Dock",
         "Privacidad, permisos de apps, acceso a la red y listas de bloqueo",
         "Usuarios, escritorio remoto y actualizaciones",
-        "Nuevo en 0.8.7: restaurar la sesión y un teclado en pantalla"
+        "Nuevo en 0.8.7: fondos en movimiento, restaurar la sesión y un teclado en pantalla"
       ],
       "pt": [
         "Rede, Wi-Fi, VPN e Bluetooth",
@@ -661,7 +661,7 @@
         "Aparência: estilo da área de trabalho (Lord Flow ou Lord Classic), papel de parede e o Dock",
         "Privacidade, permissões de apps, acesso à rede e listas de bloqueio",
         "Usuários, área de trabalho remota e atualizações",
-        "Novo na 0.8.7: restauração da sessão e um teclado na tela"
+        "Novo na 0.8.7: fundos em movimento, restauração da sessão e um teclado na tela"
       ]
     }
   },
@@ -767,21 +767,24 @@
         "Artificial Intelligence and Commercial apps from their makers' signed repositories",
         "See exactly what changes before you install",
         "Install LordOS apps (.lpk) without root, or a .deb or .lpk from Files",
-        "All updates in one click, over HTTPS from https:// sources"
+        "All updates in one click, over HTTPS from https:// sources",
+        "New in 0.8.7: Disk Formats, one item for disks from other systems"
       ],
       "es": [
         "Apps de Debian por categoría, como tarjetas en una grilla, con búsqueda",
         "Apps de Inteligencia Artificial y Comerciales desde los repositorios firmados de sus fabricantes",
         "Mirá exactamente qué cambia antes de instalar",
         "Instalá apps de LordOS (.lpk) sin root, o un .deb o .lpk desde Archivos",
-        "Todas las actualizaciones con un clic, por HTTPS desde fuentes https://"
+        "Todas las actualizaciones con un clic, por HTTPS desde fuentes https://",
+        "Nuevo en 0.8.7: Disk Formats, un solo ítem para discos de otros sistemas"
       ],
       "pt": [
         "Apps do Debian por categoria, como cartões em uma grade, com busca",
         "Apps de Inteligência Artificial e Comerciais dos repositórios assinados dos fabricantes",
         "Veja exatamente o que muda antes de instalar",
         "Instale apps do LordOS (.lpk) sem root, ou um .deb ou .lpk pelo Arquivos",
-        "Todas as atualizações com um clique, por HTTPS de fontes https://"
+        "Todas as atualizações com um clique, por HTTPS de fontes https://",
+        "Novo na 0.8.7: Disk Formats, um único item para discos de outros sistemas"
       ]
     }
   },
@@ -1030,7 +1033,7 @@
         "Checks of LordOS's claims on this computer, with a Sandbox Probe that tries what an isolated app must not do",
         "Performance: LordBench, quick and full tests of the processor, memory, graphics, video and disk, shown against reference machines, never as one score",
         "Reports in Markdown or JSON, shown before you copy or save them; nothing is sent",
-        "New in 0.8.7: computer, motherboard, firmware and peripherals, and serial numbers only on request"
+        "New in 0.8.7: computer, motherboard, firmware and peripherals, serial numbers only on request, and sharing a hardware report on GitHub"
       ],
       "es": [
         "Se abre desde Acerca de LordOS → Informe del sistema…",
@@ -1039,7 +1042,7 @@
         "Verificaciones de lo que LordOS afirma, en esta computadora, con la Prueba del aislamiento, que intenta lo que una app aislada no debe poder hacer",
         "Rendimiento: LordBench, pruebas rápida y completa del procesador, la memoria, los gráficos, el video y el disco, frente a máquinas de referencia, nunca como un único puntaje",
         "Informes en Markdown o JSON, que ves antes de copiarlos o guardarlos; no se envía nada",
-        "Nuevo en 0.8.7: computadora, placa madre, firmware y periféricos, y números de serie solo si los pedís"
+        "Nuevo en 0.8.7: computadora, placa madre, firmware y periféricos, números de serie solo si los pedís, y compartir un reporte de hardware en GitHub"
       ],
       "pt": [
         "Abre em Sobre o LordOS → Relatório do sistema…",
@@ -1048,7 +1051,7 @@
         "Verificações do que o LordOS afirma, neste computador, com o Teste do isolamento, que tenta o que um app isolado não deve conseguir fazer",
         "Desempenho: o LordBench, testes rápido e completo do processador, da memória, dos gráficos, do vídeo e do disco, frente a máquinas de referência, nunca como uma única pontuação",
         "Relatórios em Markdown ou JSON, que você vê antes de copiar ou salvar; nada é enviado",
-        "Novo na 0.8.7: computador, placa-mãe, firmware e periféricos, e números de série só se você pedir"
+        "Novo na 0.8.7: computador, placa-mãe, firmware e periféricos, números de série só se você pedir, e compartilhar um relatório de hardware no GitHub"
       ]
     }
   },
@@ -1139,16 +1142,16 @@
       "pt": "Remote Desk"
     },
     "tagline": {
-      "en": "Another computer's screen over RDP or VNC, drawn by LordOS itself, with shared folders",
-      "es": "La pantalla de otra computadora por RDP o VNC, dibujada por LordOS, con carpetas compartidas",
-      "pt": "A tela de outro computador por RDP ou VNC, desenhada pelo LordOS, com pastas compartilhadas"
+      "en": "Another computer's screen over RDP or VNC, drawn by LordOS itself",
+      "es": "La pantalla de otra computadora por RDP o VNC, dibujada por LordOS",
+      "pt": "A tela de outro computador por RDP ou VNC, desenhada pelo LordOS"
     },
     "features": {
       "en": [
         "New in 0.8.7",
         "RDP and VNC in one app",
         "Saved computers on cards",
-        "Shared folders over RDP, read-only if you choose",
+        "Shared folders over RDP, read-only if you choose; not yet verified in a real session",
         "Full screen with its own bar",
         "No client window, X11 or toolkit"
       ],
@@ -1156,15 +1159,15 @@
         "Nuevo en 0.8.7",
         "RDP y VNC en una sola app",
         "Computadoras guardadas en tarjetas",
-        "Carpetas compartidas por RDP, de solo lectura si querés",
+        "Carpetas compartidas por RDP, de solo lectura si querés; todavía sin verificar en una sesión real",
         "Pantalla completa con su propia barra",
         "Sin ventana de cliente, X11 ni toolkit"
       ],
       "pt": [
-        "Novo no 0.8.7",
+        "Novo na 0.8.7",
         "RDP e VNC em um só app",
         "Computadores salvos em cartões",
-        "Pastas compartilhadas por RDP, somente leitura se quiser",
+        "Pastas compartilhadas por RDP, somente leitura se quiser; ainda sem verificar numa sessão real",
         "Tela cheia com barra própria",
         "Sem janela de cliente, X11 ou toolkit"
       ]

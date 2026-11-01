@@ -312,13 +312,14 @@ Tested on VM 119:
 | Package | For | In the ISO |
 |---|---|---|
 | `dosfstools` | FAT32 (`mkfs.fat`, `fatlabel`) | already there (the installer uses `mkfs.vfat` for the EFI partition) |
-| `exfatprogs` | exFAT (`mkfs.exfat`, `exfatlabel`) | added to the ISO list |
+| `exfatprogs` | exFAT (`mkfs.exfat`, `exfatlabel`) | no: comes with the Store's Disk Formats item (0.8.7) |
 | `e2fsprogs` | ext4 (`mkfs.ext4`, `e2label`) | already in Debian base |
-| `ntfs-3g` | NTFS (`mkfs.ntfs`, `ntfslabel`) | optional: without it, the app does not offer NTFS |
+| `ntfs-3g` | NTFS (`mkfs.ntfs`, `ntfslabel`) | no: comes with the Store's Disk Formats item (0.8.7); without it, the app does not offer NTFS |
 | `smartmontools` | the full SMART report and self-tests (`smartctl`) | no: installed from the app the first time (0.8.2) |
 
 Mounting needs no package: `vfat`, `exfat`, `ntfs3`, `ext4` and `iso9660` are Debian kernel
-modules.
+modules. Since 0.8.7 `disk-mount` refuses FAT, exFAT, NTFS, HFS+ and APFS without the Disk Formats item
+([FILES.md](FILES.md), "Disks' file systems").
 
 ### Pending
 

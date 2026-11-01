@@ -41,6 +41,9 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |
 | [DOCK.md](DOCK.md) | Dock and taskbar |
+| [DESKTOPS.md](DESKTOPS.md) | Desktops and Overview |
+| [WALLPAPERS.md](WALLPAPERS.md) | Moving wallpapers on the desktop and the login screen |
+| [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
 | [LAYERS.md](LAYERS.md) | The desktop's stacking order: what is drawn and clicked above what |
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Search and the advanced clipboard |
@@ -81,6 +84,13 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
 | [MONITOR.md](MONITOR.md) | Monitor: usage, processes, network map and connections, firewall, disk health, cooling |
 | [SYSTEM.md](SYSTEM.md) | Disks, Backups, Logs, Clock and Help |
+| [CLEANER.md](CLEANER.md) | Cleaner: storage and maintenance |
+| [CLEANER-ARCHITECTURE.md](CLEANER-ARCHITECTURE.md) | Cleaner's design |
+| [CLEANER-SECURITY.md](CLEANER-SECURITY.md) | Cleaner's safety model |
+| [CLEANER-TESTS.md](CLEANER-TESTS.md) | Cleaner's tests and measurements |
+| [CLEANER-ROADMAP.md](CLEANER-ROADMAP.md) | The state of each Cleaner feature |
+| [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: plan (MVP from 0.8.8) |
+| [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
 
 ## System and hardware
 

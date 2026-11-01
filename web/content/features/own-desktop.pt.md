@@ -27,7 +27,7 @@ Aqui a precisão importa, porque é fácil exagerar no "próprio".
 - o PipeWire, para o som;
 - o próprio protocolo Wayland, via `libwayland-server` e `libwayland-client`;
 - a `libxkbcommon`, para os layouts de teclado;
-- bibliotecas usadas só dentro de processos ajudantes em sandbox: FFmpeg (mídia), Poppler e libarchive (documentos), OpenSSL (TLS para e-mail e área de trabalho remota), Monocypher (a criptografia do cofre).
+- bibliotecas usadas só dentro de processos ajudantes em sandbox: FFmpeg (mídia), Poppler e libarchive (documentos), OpenSSL (TLS para e-mail e área de trabalho remota), o núcleo do FreeRDP (RDP no Remote Desk), Monocypher (a criptografia do cofre).
 
 A regra que o projeto segue está escrita em `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK e Qt não são usados dentro do próprio LordOS. Apps GTK e Qt continuam rodando, como clientes Wayland.
 
@@ -73,25 +73,26 @@ Esses números vêm de máquinas virtuais e de uma placa, não de uma variedade 
 
 ## Áreas de trabalho
 
-Na 0.8.7 (a última versão publicada é a 0.8.6): várias áreas de trabalho no Lord Flow e no Lord Classic, com uma visão geral das janelas ao vivo, uma faixa de áreas de trabalho e arrastar uma janela de uma para outra. Cada janela volta à sua área de trabalho depois de reiniciar, e uma janela de uma área de trabalho oculta nunca tem o teclado, nem se pedir tela cheia de lá. Testado em uma sessão isolada em uma máquina virtual, com apps X11 numa sessão completa em outra, e a visão geral no monitor de um Raspberry Pi 5; falta conferir um idioma da direita para a esquerda na tela e gestos reais de trackpad.
+Na 0.8.7: várias áreas de trabalho no Lord Flow e no Lord Classic, com uma visão geral das janelas ao vivo, uma faixa de áreas de trabalho e arrastar uma janela de uma para outra. Cada janela volta à sua área de trabalho depois de reiniciar, e uma janela de uma área de trabalho oculta nunca tem o teclado, nem se pedir tela cheia de lá. Testado em uma sessão isolada em uma máquina virtual, com apps X11 numa sessão completa em outra, e a visão geral no monitor de um Raspberry Pi 5; falta conferir um idioma da direita para a esquerda na tela e gestos reais de trackpad.
 
 ## Arquivos, servidores e outros discos
 
 Tudo na 0.8.7.
 
-- **Conectar a um servidor.** Rede lista cada computador como uma pasta, e seus compartilhamentos se abrem ali mesmo. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ftp, ftps e WebDAV, e todos abrem como pastas no Arquivos, com chaves SSH e certificados verificados antes.
-- **Telas remotas.** Remote Desk, um só app para RDP e VNC, vem com o sistema e desenha com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit.
+- **Conectar a um servidor.** Rede lista cada computador como uma pasta, e seus compartilhamentos se abrem ali mesmo; você entra com usuário e senha ou como convidado, o que passou contra uma pasta compartilhada real e um servidor de teste. Ir → Conectar ao servidor aceita endereços smb, nfs, sftp, ftp, ftps e WebDAV, e todos abrem como pastas no Arquivos, com chaves SSH e certificados verificados antes.
+- **Telas remotas.** Remote Desk, um só app para RDP e VNC, vem com o sistema e desenha com o motor do LordOS: sem janela de cliente, sem sessão X11, sem toolkit. Os dois protocolos foram testados contra uma máquina de teste descartável; RDP para uma sessão de desktop real e as pastas compartilhadas do RDP ainda não foram verificados.
 - **Discos de outros sistemas.** Disk Formats, um único item da Loja, abre NTFS, exFAT e FAT em leitura e escrita, HFS+ com journal somente leitura e, em amd64 como parte opcional, APFS somente leitura. São formatos comerciais; os drivers são software livre e sem custo.
 - **Do seu jeito.** Escolha, reordene e ajuste as colunas da lista, use os Ajustes próprios do Arquivos e abra o Terminal na pasta onde você está.
 
 ## Teclas, teclado na tela e voltar para onde você estava
 
-Tudo na 0.8.7 (a última versão publicada é a 0.8.6).
+Tudo na 0.8.7.
 
 - **Atalhos por tema.** Um único despachante roda antes de qualquer ouvinte de teclas, então uma tecla que ele toma não chega a mais ninguém, e os dois temas têm um alternador de apps com ícones grandes. Sobre um app Linux a área de trabalho guarda só uma lista fixa de teclas, escolhida por nome. Ajustes → Teclado lista os atalhos do tema em uso.
 - **Captura do ponteiro.** Uma captura vale só com o ponteiro sobre a janela e o teclado no seu app, e ❖Esc sempre a libera, então uma janela de fundo não pode esconder o ponteiro quando ele passa por cima.
-- **Fundos em movimento.** Laços curtos para a área de trabalho e a tela de login, por seção, baixados quando você escolhe, com créditos de cada clipe. Precisam de uma GPU compatível e pausam quando ninguém os vê.
+- **Fundos em movimento.** Laços curtos para a área de trabalho e a tela de login, por seção, baixados quando você escolhe, com créditos de cada clipe. Você pode adicionar seu próprio vídeo de até 10 segundos. Precisam de uma GPU compatível e pausam quando ninguém os vê.
 - **Teclado na tela.** Abre-se manualmente pelo botão ao lado do relógio, para um computador sem teclado físico, em campos do LordOS, apps Linux, apps isolados e nas telas de entrada e de bloqueio. Recebe uma lista fechada de teclas, então não pode ser um atalho, nada guarda o que é digitado, e seu painel sai preto em capturas e gravações. Não há registro de teste numa tela de toque real.
+- **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
 
 ## Várias telas, texto nítido
@@ -107,6 +108,8 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 - **Várias telas foram testadas com duas saídas virtuais**, não com monitores reais, painéis de notebook ou hubs DisplayPort (`docs/DISPLAYS.md`).
 - **O Raspberry Pi 5 só foi testado com um monitor HDMI.** Desde a 0.8.4.1 a imagem mostra a tela de login e o desktop num monitor HDMI desde o primeiro boot, e o LordBench o mediu assim; dois monitores e 4K ainda não foram testados na placa (`docs/RASPBERRY.md`).
 - **No Raspberry Pi 5 um app ocupado ainda reduz pela metade os quadros por segundo do desktop:** cerca de 31 em vez de 60 no teste de desktop do LordBench enquanto todos os núcleos estão ocupados. Com essa carga o chip gráfico leva 14–16 ms por quadro em vez de 1,5, sem reduzir a frequência nem por temperatura; na 0.8.7, uma medição apontou a causa na memória: 28 ms por quadro com quatro núcleos lendo memória, 1,4 ms com quatro núcleos só girando. Quanto disso o compositor pode evitar continua em aberto (`docs/GPU.md`).
+- **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para a 0.8.8. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
+- **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
 - **Os apps X11 rodam pelo Xwayland desde a 0.8.3,** nítidos só em 100 % de escala e podendo ver uns aos outros, como em qualquer desktop X11. Arrastar e soltar entre apps Linux e os métodos de entrada do LordOS dentro de apps Linux estão pendentes (`docs/WAYLAND.md`).
 - **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento"; leitor de tela, zoom e alto contraste estão no roadmap.
 

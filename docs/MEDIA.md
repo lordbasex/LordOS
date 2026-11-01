@@ -112,7 +112,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
   - `v4l2request` (Raspberry Pi 5 HEVC, 0.8.7): Raspberry Pi's FFmpeg, a DRM device over the render node and two exact
     device files for this job only (`docs/WALLPAPERS.md`).
   - If there is no driver, the decoder carries on in software without interruption.
-  - (0.8.7, in development) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
+  - (0.8.7) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
     that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
     hand over none; a frame clears its own count, so one damaged packet changes nothing) make the player open a software
     decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames

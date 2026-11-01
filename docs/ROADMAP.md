@@ -269,7 +269,7 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
     `tools/rpi/verify-board.sh` after flashing.
   - [x] Run `build-img.sh` and test on the 16 GB Pi 5 (test list in `RASPBERRY.md`; the image is
     a release file since 0.8.0; results in `RASPBERRY.md` and the release tests in `ISO.md`).
-  - [x] (0.8.7, unmeasured) Hardware video on the Pi 5 (HEVC via V4L2 stateless; H.264 in software) in
+  - [x] (0.8.7, `WALLPAPERS.md`) Hardware video on the Pi 5 (HEVC via V4L2 stateless; H.264 in software) in
     `lord-media`.
   - [ ] A «create user» step on the login screen, instead of setup mode.
 
@@ -570,7 +570,7 @@ LordBench and a desktop that stays smooth under load. Each item is described in 
   the sustained part: within 0.4 %). That run found `lordos-sysreport bench --full` passed no sustained time; it now
   runs the app's 180 s (`BENCHMARK.md`).
 - The x86 PC reference and hardware video decoding moved to 0.8.7 (decided by the maintainer on 2026-10-29;
-  "Release 0.8.7 (planned)" below).
+  "Release 0.8.7-beta" below).
 - [x] Detecting the Pi 5 firmware's throttling. *Built (2026-10-28/29), checked on the Pi 5 on 2026-10-29:* the
   LordOS kernel (`rpi-6.18.y`) only exposes the firmware's under-voltage alarm (`rpi_volt`'s `in0_lcrit_alarm`, the
   last 2 s), not its capped, throttled or soft-limit bits, so LordBench watches that alarm and `get_throttled` where
@@ -609,7 +609,7 @@ desktop fell to 24 fps under an all-core load:
 - [x] Decide GPU drag's default after that run: **off** (`LORD_GPU_DRAG=1` turns it on): correct on V3D, no
   measurable gain.
 - Step 12 of GPU drag and the next work on the Pi 5 under load (fewer pixels per frame, what slows V3D) moved to
-  0.8.7 (decided by the maintainer on 2026-10-30; "Release 0.8.7 (planned)" below).
+  0.8.7 (decided by the maintainer on 2026-10-30; "Release 0.8.7-beta" below).
 - [x] Merge `perf-frame` (2026-10-29), with CHANGELOG, `BENCHMARK.md`, `GPU.md`, `WINDOWS.md`, `FANS.md`, the paper,
   the FAQ, the features page and `THIRD_PARTY.md` (the QuickJS `JS_GetMallocSize` patch), with the final Pi 5 run's
   numbers and the frame pipeline and GPU drag off by default.
@@ -619,7 +619,12 @@ desktop fell to 24 fps under an all-core load:
   references stay tagged 0.8.5-beta until then).
 - [x] Release cleanup, packages, the Pi 5 image and the ISO, as for 0.8.5 (2026-10-30).
 
-## Release 0.8.7-beta (2026-11-01)
+## Release 0.8.7-beta ✅ (2026-11-01)
+
+Released 2026-11-01 (`CHANGELOG.md`, "0.8.7-beta"; ISOs `lordos-live-0.8.7-amd64.iso` and
+`lordos-live-0.8.7-arm64.iso`, and the Raspberry Pi 5 image `lordos-0.8.7-rpi5-arm64.img.xz`). It also has moving
+wallpapers (`WALLPAPERS.md`), Desktops and Overview (`DESKTOPS.md`), Remote Desk, Connect to Server and Files → Network
+(`FILES.md`), Disk Formats in the Store and the on-screen keyboard (`ON-SCREEN-KEYBOARD.md`).
 
 Decided by the maintainer on 2026-10-30: everything below goes in 0.8.7, with **Cleaner** added. Items still open below did not reach this release.
 
@@ -628,17 +633,18 @@ left for after 0.8.6, and the new native app:
 - [x] An arm64 live ISO (decided by the maintainer on 2026-10-30): generic UEFI arm64 machines and virtual machines, so
   they no longer need a Debian install plus the script. `tools/iso/build.sh` takes the architecture from the host and
   `tools/iso/build-arm64.sh` runs it from x86-64; an unsigned development build reached the live desktop, installed to disk
-  and booted the result on emulated QEMU (`ISO.md`, "The arm64 ISO"). Still to do: a hypervisor with hardware
-  acceleration, real hardware, and shipping it signed in the release.
+  and booted the result on emulated QEMU (`ISO.md`, "The arm64 ISO"). Not tested yet: a hypervisor with hardware
+  acceleration, real hardware.
 - [x] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
   are read-only, and every change goes through a reviewed plan the user confirms. Nothing is copied from other
   projects. Design: `CLEANER-ARCHITECTURE.md`, in phases: the core, then system care, then the optional modules. The
   Phase 1 and the rows of Phase 2 shipped in 0.8.7; each feature's state is in `CLEANER-ROADMAP.md`.
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
-  FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In development: the
-  player leaves a failing hardware decoder (`MEDIA.md`), not run on real hardware. Waiting for the maintainer: the
-  sandbox of LordBench's video job, and another FFmpeg for the Pi.
+  FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In 0.8.7: the Pi 5's
+  HEVC decoder in `lord-media` through Raspberry Pi's FFmpeg (`WALLPAPERS.md`), and the player leaves a failing hardware
+  decoder (`MEDIA.md`), not run on real hardware. Left: LordBench's video workloads, whose job's sandbox waits for the
+  maintainer.
 - [x] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window (moved from 0.8.6
   on 2026-10-30). Built and measured on the Pi 5 on 2026-10-31, and on by default since (`GPU.md`, "The whole drag").
 - [ ] Next on the Pi 5 under load: fewer pixels uploaded and composed per frame (a buffer-age scissor so the GPU
@@ -646,6 +652,14 @@ left for after 0.8.6, and the new native app:
   (14–16 ms of GPU a frame instead of 1.5 with no clock change; memory contention measured as the cause on 2026-10-31, `GPU.md`:
   read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5 (moved from 0.8.6 on 2026-10-30).
   The scissor was run on the Pi 5 on 2026-10-31: slower on V3D, it stays off (`LORD_GPU_SCISSOR=1`, `GPU.md`).
+
+## Release 0.8.8 (planned)
+
+Only what is already decided:
+- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; decided by the maintainer on 2026-11-01): the MVP starts in
+  0.8.8, with `lord-vm` and direct QMP.
+- [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
+  instead of reading each frame back and converting it.
 
 ## Before 1.0
 
@@ -754,19 +768,18 @@ left for after 0.8.6, and the new native app:
   would be generic root file access from the interface); "Open in Terminal here" for `sudo` work.
   *Implemented (not yet checked on screen):* the place, read-only `lord.fs` outside the writable
   roots (`fsops_readable`, without `/proc`, `/sys`, `/dev`, `/run`), the lock, unmounted disks that
-  mount on a click, ⏏ to eject or unmount. *Left:* "Open in Terminal here" would need a folder
-  argument for `lord.term.create()`, one of the approved launcher exceptions, so it waits for a
-  decision; size and free space per disk in the sidebar.
-- [ ] **Files: network shares (own release after 0.8.5, approved 2026-10-25)** — SMB and NFS shares
+  mount on a click, ⏏ to eject or unmount. "Open in Terminal" came in 0.8.7. *Left:* size and free
+  space per disk in the sidebar.
+- [x] **Files: network shares (released in 0.8.7-beta; approved 2026-10-25)** — SMB and NFS shares
   found with mDNS or typed ("Connect to server…", `smb://host/share`), mounted by the kernel through
   one new closed admin action, `share-mount` (host, share and user validated; the password on
   standard input, never in argv; fixed options `nosuid,nodev` and the user's uid; only under
   `/media/<user>/`), the password in the keyring, the mount's traffic as its own firewall app.
   *Built (0.8.7, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `lord-lan`, listing
-  shares and exports, `share-mount` and `share-unmount`, the keyring. *Waiting for the maintainer:* the connector name
-  for the search inside a session (`FIREWALL.md`, "Files → Network and the connectors"). *Can't be done as written:*
-  the mount's traffic as a firewall app (the kernel's client has no cgroup of an app). *Not built:* typing a server
-  ("Connect to server…"), listing shares with a password, IPv6.
+  shares and exports, `share-mount` and `share-unmount`, the keyring, the `lan` connector for the search inside a
+  session (`FIREWALL.md`, "Files → Network and the connectors"), Connect to Server and listing shares with a password.
+  *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
+  *Not built:* IPv6.
 
 - [ ] **Flatpak and Flathub (future, undecided; not planned for any release)** — a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak
@@ -825,12 +838,12 @@ left for after 0.8.6, and the new native app:
   ms under load, no throttling); the frame pipeline and GPU drag, measured on 2026-10-29, gave too little and are off
   by default: `BENCHMARK.md` "The desktop under load" and "The drag frame's cost"). The firmware throttling
   detection was checked on the Pi 5 (the under-voltage alarm present, reading 0). Hardware video decoding and the x86 PC
-  reference moved to 0.8.7 (2026-10-29, "Release 0.8.7 (planned)"), and so did GPU drag for the whole drag and the
+  reference moved to 0.8.7 (2026-10-29, "Release 0.8.7-beta"), and so did GPU drag for the whole drag and the
   rest of the Pi 5 under load (fewer pixels per frame, what slows V3D; 2026-10-30).
 - [ ] **Community hardware reports (0.8.7)** — `BENCHMARK.md`. Share on GitHub with the
   `hardware-report` template (the user submits it, LordOS sends nothing), schema validation and
   labels in a workflow, and a tested-hardware catalogue on lordos.org that the Compatibility panel
-  reads as a signed snapshot. In development on the branch `v087-hwreports`:
+  reads as a signed snapshot. Released in 0.8.7-beta, except the open items:
   - [x] The report format: a versioned JSON Schema that is an allow-list (`apps/sysinfo/hwreport.schema.json`),
     with the live session flag.
   - [x] The boot medium as a class (internal, USB, SD, eMMC, optical, network), a USB medium's link speed and the
@@ -847,8 +860,8 @@ left for after 0.8.6, and the new native app:
     reports, with the two reference machines as fixtures (`tools/hwreport/catalog.mjs`).
   - [x] The signed snapshot (release key, signed on the maintainer's machine), verified in C before the
     Compatibility panel shows it as community data (`lord.sysinfo.community()`).
-  - [ ] The repository's labels (steps in `RELEASING.md`, the maintainer's), the first community reports and a captured
-    Raspberry Pi 5 report.
+  - [x] The repository's labels (`RELEASING.md`).
+  - [ ] The first community reports and a captured Raspberry Pi 5 report.
   - [x] A newer snapshot between releases (approved 2026-10-29): the snapshot is its own `Architecture: all`
     package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`, version = the snapshot's date), which `lordos` depends
     on; the ISO, the Pi image and `install.sh` install it, `apt-repo.sh` checks its signature, and a newer one is
@@ -1063,7 +1076,7 @@ left for after 0.8.6, and the new native app:
   - **Off by default**, visible while working (menu bar indicator, every call in the Monitor), and
     reviewed like the MCP study before it ships.
 
-- [ ] **Virtual machines**: a **free desktop virtualization app**, with the polish and
+- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.8): a **free desktop virtualization app**, with the polish and
   way of working of the best commercial ones (not Proxmox's, which only contributes the pieces underneath: KVM, QEMU and drivers).
   A generic name and our own logo, icon and colors:
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,

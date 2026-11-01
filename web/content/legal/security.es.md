@@ -2,11 +2,11 @@ Nos tomamos en serio la seguridad de LordOS y agradecemos a cualquiera que nos a
 
 ## Cómo reportar una vulnerabilidad
 
-Escribinos por **[nuestro formulario de contacto](https://www.iperfex.com/contacto/?lang=es)**, con "Security" en el asunto. Cuando el repositorio sea público, también vas a poder usar el reporte privado de vulnerabilidades de GitHub. Por favor, no abras un issue público, no lo publiques en redes sociales ni des detalles hasta que salga una corrección.
+Escribinos por **[nuestro formulario de contacto](https://www.iperfex.com/contacto/?lang=es)**, con "Security" en el asunto. Por favor, no abras un issue público, no lo publiques en redes sociales ni des detalles hasta que salga una corrección.
 
 Incluí, en la medida de lo posible:
 
-- la versión de LordOS (la ves en la app Acerca de LordOS, por ejemplo "0.8.6 · Beta") y si es la ISO, la imagen para Raspberry Pi o el paquete para Debian;
+- la versión de LordOS (la ves en la app Acerca de LordOS, por ejemplo "0.8.7 · Beta") y si es la ISO, la imagen para Raspberry Pi o el paquete para Debian;
 - el componente afectado (por ejemplo el compositor, el aislamiento de apps, el firewall por app, el escritorio remoto, la bóveda de contraseñas, la Tienda, el script de instalación para Debian o el sitio);
 - los pasos para reproducirlo, una prueba de concepto si la tenés, y el impacto que ves;
 - cómo te gustaría que te mencionemos, si querés que lo hagamos.

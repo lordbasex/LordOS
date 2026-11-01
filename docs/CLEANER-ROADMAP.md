@@ -1,7 +1,7 @@
 # Cleaner: roadmap
 
 The real state of each feature. The design is in `CLEANER-ARCHITECTURE.md`; this file only says what exists.
-Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.8.6-beta and contains none of this.
+Last updated 2026-11-01. Released in 0.8.7-beta.
 
 ## State key
 

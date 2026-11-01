@@ -2,10 +2,9 @@ Found something that doesn't work, or have an idea that would make LordOS better
 
 ## Where to report
 
-- **Right now** the LordOS repository on GitHub is private, so bug reports and feature requests go through [our contact form](https://www.iperfex.com/contacto/?lang=en). Start the subject with "Bug" or "Feature request".
-- **Once the repository is public**, use [GitHub Issues](https://github.com/lordbasex/LordOS/issues). Choose the bug report or feature request template; blank issues are turned off so that every report has the information we need.
+Use [GitHub Issues](https://github.com/lordbasex/LordOS/issues). Choose the bug report or feature request template; blank issues are turned off so that every report has the information we need.
 
-Before you write, check the [FAQ](/faq/) and, once they are public, the existing issues: someone may have reported it already.
+Before you write, check the [FAQ](/faq/) and the existing issues: someone may have reported it already.
 
 ## Security problems are different
 
@@ -13,7 +12,7 @@ Before you write, check the [FAQ](/faq/) and, once they are public, the existing
 
 ## What to include in a bug report
 
-- **The LordOS version**, as shown in the About LordOS app (for example "0.8.6 · Beta").
+- **The LordOS version**, as shown in the About LordOS app (for example "0.8.7 · Beta").
 - **How you installed it:** the ISO (live or installed), the Raspberry Pi 5 image, or the `.deb` on Debian 13.
 - **Your hardware:** the computer or board model, the graphics card, the amount of memory, and any device involved (printer, touchpad, Wi-Fi adapter, monitor).
 - **Steps to reproduce:** what you did, one step per line, starting from a fresh start if you can.

@@ -191,6 +191,9 @@ computer** (below). Store → Installed shows each native LordOS app's own versi
   anything is installed that LordOS can't review or fix what they do. Tested on the VMware machine:
   the three sources added, the three apps installed, `apt update` and the engine's update clean
   afterwards. Steam needs i386 multiarch, which the engine doesn't do yet (see "Pending").
+- **Disk Formats** (0.8.7, `lordos-disk-formats`, `tools/iso/mkdeb-diskformats.sh`) is one item in the Commercial group,
+  from the LordOS repository: it depends on `ntfs-3g`, `exfatprogs` and `dosfstools`, and on amd64 suggests `apfs-dkms`,
+  offered as a switch on its page. Those drivers are free software ([FILES.md](FILES.md), "Disks' file systems").
 - **The featured banner** comes from the LordOS repository (`apt/featured/featured.json` and
   `banner.png`, published under `main/featured/` and listed in the signed InRelease). The engine takes
   them only from a source whose signed Release says `Origin: LordOS`, checks their hashes, that the
@@ -198,6 +201,10 @@ computer** (below). Store → Installed shows each native LordOS app's own versi
   them in `/var/lib/lordos/pkg/` (`lord.pkg.featured()`, read-only). Until the picture is there the
   Store draws a skeleton of the banner (it pulses, unless Reduce motion is on); a repository without a banner shows
   a catalog app instead.
+
+**What `lordos` depends on since 0.8.7.** `lordos-hwdata`, the signed tested-hardware snapshot
+([UPDATES.md](UPDATES.md), "The tested-hardware snapshot"); `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` for
+Remote Desk; `rclone`, `fuse3` and `openssh-client` for Connect to Server; `openssl`. An update brings them in.
 
 ## Suggested for your computer
 

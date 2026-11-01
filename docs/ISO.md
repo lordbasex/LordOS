@@ -1,7 +1,7 @@
 # LordOS live ISO
 
-An image to boot LordOS from a USB stick or a CD on any 64-bit PC (and, in development for 0.8.7, on
-UEFI arm64 virtual machines: "The arm64 ISO" below), without installing anything. It
+An image to boot LordOS from a USB stick or a CD on any 64-bit PC (and, since 0.8.7, on
+UEFI arm64 machines and virtual machines: "The arm64 ISO" below), without installing anything. It
 is the LordOS distribution itself (a minimal Debian 13 with the LordOS desktop environment) and
 it boots straight into the desktop. It's for testing real hardware: the GPU (AMD or Nvidia),
 sound, Wi-Fi and displays. It is the first step of M8 (the
@@ -21,8 +21,8 @@ erased.
 
 - **Linux and other Unix-like systems:**
   ```sh
-  sha256sum -c lordos-live-0.8.6-amd64.iso.sha256      # or: shasum -a 256 -c …
-  sudo dd if=lordos-live-0.8.6-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
+  sha256sum -c lordos-live-0.8.7-amd64.iso.sha256      # or: shasum -a 256 -c …
+  sudo dd if=lordos-live-0.8.7-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
   ```
   `/dev/sdX` is the whole USB stick (not a partition). On BSD-derived systems it is usually `/dev/rdiskN`: find
   it with the system disk tool and unmount it first.
@@ -38,7 +38,7 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 | Entry | What for |
 |---|---|
 | LordOS (live) | normal, in English (the default language) |
-| Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7, in development). Nothing is measured until the user asks. The interface is in English, like the first entry |
+| Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
 | LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
 | LordOS (Español) / LordOS (Português) | `lordos.lang=es` / `lordos.lang=pt`: the interface in Spanish or Portuguese the first time |
 | LordOS (copy to RAM) | `toram`: copies the system to memory (~1 GB free is needed) and the USB stick can be removed |
@@ -110,7 +110,7 @@ writes both BIOS and UEFI GRUB, as tested on VM 117 in 0.7.0).
 
 ## The arm64 ISO
 
-`lordos-live-<version>-arm64.iso` (in development for 0.8.7, not in a release yet) is the same live system and disk
+`lordos-live-<version>-arm64.iso` (released since 0.8.7-beta, tested on emulated QEMU only) is the same live system and disk
 installer for generic UEFI arm64 machines and virtual machines. `tools/iso/build.sh` takes the architecture from the
 host (`dpkg --print-architecture`); amd64 keeps every step as it was. On arm64:
 
@@ -182,8 +182,8 @@ text in between.
 - **Boot menu:** the GRUB theme `tools/iso/grub/lordos/` (`theme.txt`, images and Inter as GRUB
   fonts): the navy background, a small crown, the entries in the brand colours with the selected one
   on a rounded violet band,. The ISO copies it to
-  `/boot/grub/themes/lordos/`; the package installs it in `/usr/share/grub/themes/lordos/` (amd64
-  only) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português,
+  `/boot/grub/themes/lordos/`; the package installs it in `/usr/share/grub/themes/lordos/` (on arm64
+  too since 0.8.7) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português,
   safe mode, copy to RAM) are the same as before; *Check this computer* joined them in 0.8.7, and the menu's height
   went from 290 to 344 for its six lines. GRUB's theme has no scrollbar and takes the padding and the selection
   band's edges from that height (`get_num_shown_items`), so 290 shows five lines. `tests/livestart_test.mjs` works

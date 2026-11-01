@@ -38,7 +38,11 @@ Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside th
 | **[Mail, Calendar, Contacts](https://lordos.org/features/mail-calendar/)** | Native apps for your accounts, with remote images blocked until you say so. |
 | **[Your Linux apps too](https://lordos.org/features/linux-apps/)** | Chromium, Firefox and GTK apps fit right in, with the same window frame and dark mode. |
 | **AI apps in the Store** | A curated catalog: Claude Code, Claude Desktop, Visual Studio Code, Cursor, Codex CLI, goose, opencode, and llama.cpp and whisper.cpp to run models on your own computer, each from a pinned, verified source. The Store downloads over HTTPS. |
-| **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. |
+| **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. Community hardware reports: share yours on GitHub with your own account (LordOS sends nothing), and the Compatibility panel shows what others confirmed. |
+| **Cleaner** | See what uses the disk and remove what can safely go. A scan only reads, and nothing changes until you review and confirm a plan. |
+| **Remote Desk** | One app for RDP and VNC, drawn by LordOS itself, with no client window or toolkit. Files connects to servers too: SMB, NFS, SFTP, FTP and WebDAV open as folders. |
+| **Moving wallpapers** | Short loops behind the desktop and the login screen, for a compatible GPU with hardware decoding, with no software mode. They pause when nobody sees them. |
+| **Disk Formats** | One Store item opens NTFS, exFAT, FAT, HFS+ and APFS volumes on the desktop, with every driver's license and source shown first. HFS+ and APFS are read-only. |
 
 Measured, not promised: on the final ISO test before the first release (a 0.7.0 build, 2026-10-18) the
 whole system idled at **465–487 MB of RAM**, of which `lord-server` (the display server with the whole
@@ -50,12 +54,14 @@ started ([`results/0.8.5-beta/vmware-fusion`](results/0.8.5-beta/vmware-fusion))
 
 ## Get LordOS
 
-The latest release is **[0.8.6-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.6-beta)**
-(2026-10-30). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
+The latest release is **[0.8.7-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.7-beta)**
+(2026-11-01). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
 and on [lordos.org](https://lordos.org/#download).
 
-- **PC (64-bit):** a live and installable ISO, `lordos-live-0.8.6-amd64.iso`. Try it without installing.
-- **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.6-rpi5-arm64.img.xz`,
+- **PC (64-bit):** a live and installable ISO, `lordos-live-0.8.7-amd64.iso`. Try it without installing.
+- **Generic arm64 (UEFI):** a live and installable ISO for arm64 machines and virtual machines,
+  `lordos-live-0.8.7-arm64.iso`, new in 0.8.7. Tested on emulated QEMU only.
+- **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.7-rpi5-arm64.img.xz`,
   with fan control and our own kernel. The Raspberry Pi 5 is the only supported board.
 - **Already running LordOS?** It updates in place from the signed repository on lordos.org.
 - **Already on Debian 13?** Install LordOS on top of your current system with one command:
@@ -82,7 +88,8 @@ Status: **beta**. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/ROADMAP.md`](doc
 - `server/`: `lord-server` (display server and Wayland compositor: DRM/KMS and evdev straight
   from the kernel, without X11, libdrm or libinput) plus `lord-sessiond`, `lord-netd`,
   `lord-netperm`, `lord-fand` and the sandboxed helpers (`lord-media`, `lord-doc`, `lord-vault`,
-  `lord-maild`, `lord-fetch`, `lord-tls`, and LordBench's `lord-bench`).
+  `lord-maild`, `lord-fetch`, `lord-tls`, `lord-clean`, `lord-lan`, `lord-rdesk`, and LordBench's
+  `lord-bench`).
 - `runtime/`: `@lordos/runtime`, the React renderer for lord-server.
 - `sdk/`: `@lordos/sdk`, the API for themes and apps.
 - `apps/`: the native apps. See [`apps/README.md`](apps/README.md).

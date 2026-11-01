@@ -18,7 +18,7 @@ Pensalo como vaciar una casa con cuidado. Alguien la recorre y hace una lista, s
 - **Videos grandes** de 100 MiB o más en el Escritorio y en tus grabaciones de pantalla también se eligen uno por uno.
 - **Archivos grandes** filtra por tamaño, antigüedad y tipo.
 - **Almacenamiento** muestra las carpetas más grandes como burbujas, un mapa, una lista de carpetas y un resumen por tipo. Cada carpeta se dibuja con lo que es, así videos, música y código se distinguen de un vistazo. En el mapa, unas bandas en cada mosaico muestran lo que se regenera solo y lo que conviene revisar antes, y una línea da el espacio libre, las dos cantidades y lo que quedó sin escanear.
-- **Duplicados** encuentra copias exactas en las carpetas que elijas. No se selecciona nada por vos.
+- **Duplicados** encuentra copias exactas en las carpetas que elijas y, si lo pedís, imágenes parecidas. No se selecciona nada por vos.
 - **Actividad** registra lo que se ejecutó: cantidades y tamaños, nunca una ruta.
 
 Una cosa sí queda en el disco con nombres adentro: el mapa de almacenamiento se guarda entre sesiones, en `~/.cache/lordos/cleaner-map.txt`, legible solo por tu usuario. Tiene nombres y tamaños de carpetas, y se queda en esta computadora. Viene activado: lo apagás en Ajustes o lo borrás con Borrar en Actividad. Un mapa guardado no tiene nada sobre lo que se pueda actuar; para limpiar, analizás otra vez.
@@ -33,7 +33,7 @@ Las reglas de limpieza nunca alcanzan cookies, sesiones, historial ni contraseñ
 
 El análisis corre en `lord-clean`, un helper aislado que solo puede leer. Los planes se arman en `lord-server`, no en la app, y la app solo tiene identificadores de candidatos, nunca la autoridad para tocar una ruta. Todo se comprueba otra vez justo antes de actuar, incluidos los archivos que probaron una carpeta de proyecto.
 
-Los archivos de caché regenerables bajo carpetas fijas se pueden borrar de verdad, como tu propio usuario, y solo por este camino: `lord.fs` sigue sin tener un borrado general. Todo lo demás, incluidas las carpetas de proyectos, va a la Papelera, desde donde se puede restaurar. Tres acciones de administración cerradas limpian los archivos del sistema, cada una confirmada; son la única parte que todavía no se ejecutó en una máquina de prueba.
+Los archivos de caché regenerables bajo carpetas fijas se pueden borrar de verdad, como tu propio usuario, y solo por este camino: `lord.fs` sigue sin tener un borrado general. Todo lo demás, incluidas las carpetas de proyectos, va a la Papelera, desde donde se puede restaurar. Tres acciones de administración cerradas limpian los archivos del sistema, cada una confirmada; en un sistema de prueba descartable hicieron lo que dicen sus reglas.
 
 ## Lo que cuesta su movimiento
 
@@ -42,3 +42,5 @@ La app viene con tres aspectos, sigue el modo claro y oscuro, y funciona en ingl
 [[shot:2]]
 
 Cada página de resultados tiene Empezar de nuevo y Analizar de nuevo, las listas tienen Seleccionar todo y Duplicados tiene Seleccionar copias, que deja una copia de cada grupo.
+
+Un límite: en una sesión live un análisis no encuentra nada, por cómo el sistema live ordena sus archivos. Un sistema instalado no se ve afectado.

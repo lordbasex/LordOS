@@ -2,10 +2,9 @@ Encontrou algo que não funciona, ou tem uma ideia para melhorar o LordOS? Esta 
 
 ## Onde relatar
 
-- **Por enquanto** o repositório do LordOS no GitHub é privado, então os relatos de bugs e os pedidos de recursos vão pelo [nosso formulário de contato](https://www.iperfex.com/contacto/?lang=pt). Comece o assunto com "Bug" ou "Feature request".
-- **Quando o repositório for público**, use o [GitHub Issues](https://github.com/lordbasex/LordOS/issues). Escolha o modelo de relato de bug ou de pedido de recurso; as issues em branco ficam desativadas para que cada relato traga as informações de que precisamos.
+Use o [GitHub Issues](https://github.com/lordbasex/LordOS/issues). Escolha o modelo de relato de bug ou de pedido de recurso; as issues em branco ficam desativadas para que cada relato traga as informações de que precisamos.
 
-Antes de escrever, veja as [perguntas frequentes](/faq/) e, quando forem públicas, as issues que já existem: talvez alguém já tenha relatado.
+Antes de escrever, veja as [perguntas frequentes](/faq/) e as issues que já existem: talvez alguém já tenha relatado.
 
 ## Problemas de segurança são diferentes
 
@@ -13,7 +12,7 @@ Antes de escrever, veja as [perguntas frequentes](/faq/) e, quando forem públic
 
 ## O que incluir num relato de bug
 
-- **A versão do LordOS**, como aparece no app Sobre o LordOS (por exemplo "0.8.6 · Beta").
+- **A versão do LordOS**, como aparece no app Sobre o LordOS (por exemplo "0.8.7 · Beta").
 - **Como você instalou:** a ISO (live ou instalada), a imagem para Raspberry Pi 5 ou o `.deb` no Debian 13.
 - **O seu hardware:** o modelo do computador ou da placa, a placa de vídeo, a quantidade de memória e qualquer dispositivo envolvido (impressora, touchpad, adaptador Wi-Fi, monitor).
 - **Passos para reproduzir:** o que você fez, um passo por linha, a partir de uma inicialização limpa se possível.

@@ -63,6 +63,8 @@ like React Native but on top of our display server.
 | `server/src/testbench/` | **0.8.5** | Test Bench (`lordos-testbench`): a Wayland client that checks the display server from the outside (frame timing, presentation, keyboard, pointer, protocols, an optional GLES 3D view) (see `BENCHMARK.md`, `RESULTS.md`) |
 | `server/src/tls/`, `server/src/pkg/sources_admin.c`, `apt/catalog.json` | **0.8.5** | The package engine's HTTPS (the sandboxed relay `lord-tls`), the signed featured banner, and vendor APT repositories from LordOS's catalog added and removed by the closed `pkg-source-add`/`pkg-source-remove` actions (Store → Artificial Intelligence and Commercial; see `PACKAGES.md`, `UPDATES.md`) |
 | `server/src/lan/`, `js_lan.c`, `sdk/lan.js`, `apps/files/network.jsx` | **0.8.7** | Files → Network: a bounded pass over the LAN (mDNS, ports 445 and 2049 at most 30 connections a second) on a thread of lord-server, its answers read by the sandboxed helper `lord-lan`; SMB and NFS shares mounted by the kernel's clients through the closed `share-mount` action (see `FILES.md`) |
+| `server/src/clean/`, `js_clean.c`, `sdk/cleaner.js`, `apps/cleaner` | **0.8.7** | Cleaner: a read-only scan in the sandboxed helper `lord-clean`, then a plan the user confirms, run by lord-server (see `CLEANER-ARCHITECTURE.md`) |
+| `server/src/rdesk/`, `js_rdesk.c`, `sdk/remotedesk.jsx`, `apps/remote-desk` | **0.8.7** | Remote Desk: RDP and VNC in the sandboxed helper `lord-rdesk`, drawn by the engine as a media node (see `FILES.md`, "Remote desktop") |
 | `server/src/mail/`, `js_mail.c`, `sdk/{mail,calendar,contacts}.js`, `apps/{mail,calendar,contacts,reminders}` | **M9** | Mail, Calendar, Contacts and Reminders (each app an isolated process since 0.8.2): the sandboxed helper `lord-maild` (IMAP with IDLE/CONDSTORE, SMTP, CalDAV/CardDAV, OpenSSL) with no sockets of its own — `lord-server` connects only to configured servers and hands it the fd; own MIME, HTML sanitizer, iCalendar, vCard and XML parsers (see `MAIL.md`) |
 | `server/src/backup/`, `js_backup.c`, `sdk/backup.js`, `apps/backup` | **M9** | Backups: hard-link snapshots in a lord-server thread (nice 19, idle I/O), hourly/daily/weekly retention, optional encryption with the vendored Monocypher; no root and no `admin.c` actions (see `SYSTEM.md`) |
 | `server/src/logs/`, `js_logs.c`, `sdk/logs.js`, `apps/logs` | **M9** | Logs: our own systemd journal reader (no libsystemd), LordOS logs, system logs for admins through a closed action, live follow with inotify (see `SYSTEM.md`) |
@@ -98,7 +100,8 @@ Besides the kernel and libc, only these are allowed:
 | QuickJS              | ES2023 JavaScript engine, ~1 MB, written in C                  | vendored|
 | `stb_truetype`, `stb_image` | fonts and images (`lord-server`, `lord-doc`, `lord-maild`, and `lord-clean` for similar images); public domain, a single header | vendored|
 | `stb_image_write`    | PNG for the remote desktop's lossless refresh of still areas and cursor images (`lord-sessiond`), and images written by the `lord-doc` and `lord-maild` helpers; public domain | vendored|
-| OpenSSL (`libssl`, `libcrypto`) | TLS. **Only four binaries link it**: `lord-sessiond` (remote desktop on the LAN, `REMOTE.md`), `lord-maild` (IMAP/SMTP/CalDAV/CardDAV, certificates checked against the system CA store, `MAIL.md`) and, since 0.8.5, `lord-fetch` (the blocklist downloads, sandboxed, no sockets of its own, `FIREWALL.md` "Blocklists") and `lord-tls` (the package engine's HTTPS, sandboxed, `PACKAGES.md` "HTTPS"). Never `lord-server` | system |
+| OpenSSL (`libssl`, `libcrypto`) | TLS. **Only four binaries link it directly** (`lord-rdesk` also loads it, through libfreerdp): `lord-sessiond` (remote desktop on the LAN, `REMOTE.md`), `lord-maild` (IMAP/SMTP/CalDAV/CardDAV, certificates checked against the system CA store, `MAIL.md`) and, since 0.8.5, `lord-fetch` (the blocklist downloads, sandboxed, no sockets of its own, `FIREWALL.md` "Blocklists") and `lord-tls` (the package engine's HTTPS, sandboxed, `PACKAGES.md` "HTTPS"). Never `lord-server` | system |
+| FreeRDP (`libfreerdp3`, `libfreerdp-client3`, `libwinpr3`) | RDP in the sandboxed `lord-rdesk` (0.8.7, `FILES.md`, "Remote desktop"); its client library only for shared folders | system |
 | `libcrypt`           | verifying passwords against `/etc/shadow` (`lord-sessiond`, `admin.c`) | system |
 | `libsrtp2`, `usrsctp` | the remote desktop's video (WebRTC, 0.8.4): SRTP and the data channels' SCTP, in `lord-sessiond`'s bridge only (as the user, after it dropped root); with OpenSSL's DTLS and our own ICE-lite, SDP and RTP code (`remote/rtc.c`, `remote/rtcwire.c`) because Debian 13 packages no libdatachannel. Required for `lord-sessiond` since the remote desktop shows the screen only over WebRTC (the image path was removed in 0.8.4). Never `lord-server` | system |
 | FFmpeg (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`) and `libva` (+ `libva-drm`) | Decoding and encoding video, audio and images; VA-API for hardware decoding (M9, approved by the user). **Only `lord-media` links them**, the sandboxed helper; the player, synchronization and interface are our own. Never `lord-server` (`MEDIA.md`) | system |
@@ -169,17 +172,22 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   and one HTTP GET with a size limit, parses the list strictly and returns normalized lines in a
   sealed memfd. See `FIREWALL.md`, "Blocklists".
 
-- **`lord-clean`** (0.8.7, in development): Cleaner's read-only scanner. Same rules as `lord-doc` (fixed path, no
+- **`lord-clean`** (0.8.7): Cleaner's read-only scanner. Same rules as `lord-doc` (fixed path, no
   arguments, minimal environment, `sandbox_apply_helper` in scope `lordos-cleaner` before reading anything, and it
   refuses to run without Landlock). It gets each root as an opened folder over SCM_RIGHTS, walks with `openat2` and
   `statx`, and answers with records lord-server validates. It writes nothing. For similar images it also decodes pictures
   (`stb_image`, PNG, JPEG, GIF and BMP), the only decoding in Cleaner and never in `lord-server`. See `CLEANER-ARCHITECTURE.md`.
 
-- **`lord-lan`** (0.8.7, in development): reads what the local network answers for Files → Network. Same rules as
+- **`lord-lan`** (0.8.7): reads what the local network answers for Files → Network. Same rules as
   `lord-fetch` (fixed path, no arguments, minimal environment, `sandbox_apply_helper` before anything is read), no
   sockets or files; libc only. It gets mDNS datagrams and sockets lord-server already connected (SMB2 negotiate and an
   anonymous share list, portmapper and mountd), with our own parsers, and answers with text lord-server validates. See
   `FILES.md`, "Network".
+
+- **`lord-rdesk`** (0.8.7): one RDP or VNC connection for Remote Desk, in a scope of its own (firewall app
+  `desktop:lordos-rdesk`). It connects, applies `sandbox_apply_helper` (no new sockets, no exec) and paints into a memfd
+  lord-server shows, with no window or toolkit: our own RFB client for VNC, libfreerdp for RDP. See `FILES.md`, "Remote
+  desktop".
 
 - **`lord-tls`** (0.8.5): the package engine's HTTPS. The Store's download child (as `nobody`, in
   `lordos-net-store.scope`) connects the TCP socket itself and execs only `<lord-server dir>/lord-tls`
@@ -253,7 +261,7 @@ our own code using Landlock and seccomp-bpf directly). Vendored = copied as sour
 |---|---|---|---|
 | x86-64 (amd64) | PC with UEFI or BIOS; AMD, Intel or Nvidia GPU, or no 3D GPU (CPU) | primary, tested on VM | live ISO with installer (`ISO.md`) |
 | ARM64 (aarch64) | **Raspberry Pi 5** (the only supported board) | tested on the board (`RASPBERRY.md`, release tests in `ISO.md`) | SD/NVMe image, `tools/rpi/build-img.sh` (`RASPBERRY.md`) |
-| ARM64 (aarch64) | generic UEFI machines and virtual machines | in development for 0.8.7: tested on emulated QEMU only (`ISO.md`, "The arm64 ISO") | live ISO with installer |
+| ARM64 (aarch64) | generic UEFI machines and virtual machines | new in 0.8.7: tested on emulated QEMU only (`ISO.md`, "The arm64 ISO") | live ISO with installer |
 
 The code is the same. The differences:
 

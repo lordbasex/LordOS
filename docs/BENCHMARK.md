@@ -1,6 +1,6 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports (0.8.7) are in development (see "Built so far" under 0.8.7: the report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the Compatibility panel); a `checks` subcommand of `lordos-sysreport` is not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports were released in 0.8.7-beta (2026-11-01; see "Built so far" under 0.8.7: the report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the Compatibility panel); a `checks` subcommand of `lordos-sysreport` is not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -799,7 +799,7 @@ and the upload (a copy of about 1 Mpx) from 1.4 to about 4 ms. `vcgencmd`, every
 GPU and the four busy cores; that is not proven (no memory-bandwidth counter was read). The next step is fewer pixels
 uploaded and composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load,
 moved to 0.8.7 with GPU drag for the whole drag (decided by the maintainer on 2026-10-30; `ROADMAP.md`, "Release
-0.8.7 (planned)"). Both tools for that are written, off by default and not yet run on a GPU (`docs/GPU.md`, "The
+0.8.7-beta"). Both tools for that are written, off by default and not yet run on a GPU (`docs/GPU.md`, "The
 buffer-age scissor" and "What slows the GPU under CPU load").
 
 **What was run on the Pi 5** (2026-10-29; the package from this work installed, the monitor on, an autologin
@@ -846,7 +846,7 @@ code is 0 or 1 and the tries are in `sandboxTries`). On VM 116 a quick run took 
 
 Not built yet: detecting the Pi's firmware throttling during a run on kernels that don't expose it. The Pi 5's
 reference has the layout, paint and shaping workloads since a Full run on 2026-10-30 (above).
-Moved to 0.8.7 (decided by the maintainer on 2026-10-29; `ROADMAP.md`, "Release 0.8.7 (planned)"): hardware video
+Moved to 0.8.7 (decided by the maintainer on 2026-10-29; `ROADMAP.md`, "Release 0.8.7-beta"): hardware video
 decoding (no test machine has VA-API, and the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`) and the x86 PC
 reference. Also moved to 0.8.7 (decided on 2026-10-30): GPU drag for the whole drag (step 12, also where the Dock or
 the menu bar overlap the window) and the rest of the desktop under load on the Pi 5 (fewer pixels uploaded and
@@ -867,7 +867,7 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
   real LordOS performance per device. The app's Compatibility panel reads a signed snapshot of it
   (downloaded with the package engine's checks), so it works offline.
 
-### Built so far (branch `v087-hwreports`, 0.8.7 in development)
+### Built so far (released in 0.8.7-beta, 2026-11-01)
 
 - **The report format**: `apps/sysinfo/hwreport.schema.json`, a JSON Schema (`format: "lordos-hwreport"`,
   `version: 1`) that is an allow-list: every object closes its properties, and there is no field for serials,
@@ -1088,8 +1088,7 @@ are per LordOS version and it shows only its own.
 - **Not run yet:** the staging test on a VM with the real repository (publish to `apt-staging`, see the
   notification, update, see the panel's footer change), which needs the maintainer's archive and release keys.
 
-Left for 0.8.7: creating the labels in the repository, a maintainer's step (the template's `hardware-report` label
-must exist for the form to apply it; the steps are in [RELEASING.md](RELEASING.md), "The labels of hardware reports"), the first real community reports, a captured Raspberry Pi 5 report to replace the documented
+Left after 0.8.7: the first real community reports, a captured Raspberry Pi 5 report to replace the documented
 one, the rest of "From the live USB" (live references, the overlay's size; the boot menu entry is done), the staging test of
 `lordos-hwdata` above, and deciding whether Default Apps should fall back to an installed app
 that declares a type when the user chose none (so a fresh account's Share on GitHub opens the page without a visit
@@ -1125,7 +1124,7 @@ before installing.
 - **Limit:** machines with Secure Boot on can't start the stick until LordOS is signed for it
   (paper §10.2); the website's download page says so next to the *Check this computer* guide.
 
-### The boot entry (0.8.7, in development; checked 2026-10-30)
+### The boot entry (0.8.7; checked 2026-10-30)
 
 GRUB passes `lordos.check=1`. `lord.system.info().liveCheck` is a yes or no: `true` only on a live system and only for
 that whole word in `/proc/cmdline` (`sysreport_cmdline_has`; nothing else of the command line reaches JS).
@@ -1199,7 +1198,7 @@ Checked on VM 116 in an isolated headless session (own home, runtime folder and 
 **Report tab (2026-10-26):** the exact text that would be saved, as Markdown (`lord.sysinfo.markdown()`:
 `lordos-sysreport`'s text plus a "This session" section) or JSON (the report as `lord.sysinfo.report()`
 gives it); **Copy** and **Save to Documents** (`lordos-report-<date>.md|json`, `-2`, `-3`… never over an
-existing file), with **Show in Files**. Nothing is sent anywhere: publishing comes with 0.8.7.
+existing file), with **Show in Files**. Nothing is sent anywhere: publishing is Share on GitHub (0.8.7), and the user does it.
 
 ![The Report tab](sysinfo-report.png)
 

@@ -1,7 +1,6 @@
 # Cleaner
 
-Cleaner explains what uses the disk and helps remove what can safely go. In development for 0.8.7: the latest release,
-0.8.6-beta, contains none of it. The design is in `CLEANER-ARCHITECTURE.md`, the safety model in `CLEANER-SECURITY.md`, the
+Cleaner explains what uses the disk and helps remove what can safely go. Released in 0.8.7-beta. The design is in `CLEANER-ARCHITECTURE.md`, the safety model in `CLEANER-SECURITY.md`, the
 tests in `CLEANER-TESTS.md` and each feature's state in `CLEANER-ROADMAP.md`.
 
 The rule is **analyse, review, plan, confirm, execute, verify**. A scan only reads.

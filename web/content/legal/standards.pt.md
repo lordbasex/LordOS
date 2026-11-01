@@ -6,7 +6,7 @@ O LordOS é feito por uma equipe pequena, e tentamos trabalhar como fazem os pro
 
 **O que fazemos:** uma [Política de segurança](/legal/security/) pública com canal de relato, escopo, porto seguro e prazos de resposta (confirmação em 3 dias úteis, avaliação em 10, correção de problemas graves em geral em até 30, divulgação coordenada em 90 dias); um [security.txt](/.well-known/security.txt) legível por máquinas; créditos e avisos para as vulnerabilidades corrigidas; versões assinadas para que as correções sejam confiáveis.
 
-**O que falta:** um processo interno documentado de tratamento (triagem, pontuação de gravidade, etapas de correção e publicação); uma página pública de avisos de segurança; identificadores CVE, por meio de uma CVE Numbering Authority ou do GitHub; o relato privado de vulnerabilidades do GitHub, que vamos ativar quando o repositório for público.
+**O que falta:** um processo interno documentado de tratamento (triagem, pontuação de gravidade, etapas de correção e publicação); uma página pública de avisos de segurança; identificadores CVE, por meio de uma CVE Numbering Authority ou do GitHub; o relato privado de vulnerabilidades do GitHub, que ainda não está ativado.
 
 ## Conformidade de licenças de código aberto: ISO/IEC 5230 (OpenChain)
 

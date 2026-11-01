@@ -61,6 +61,9 @@ Estas conexões acontecem só depois de uma ação sua:
 - **Impressoras e scanners:** Ajustes → Impressoras e scanners pergunta à rede local (mDNS) quais impressoras e scanners existem nela, e só fala com endereços locais.
 - **Mail, Calendário e Contatos:** conectam-se apenas aos servidores das contas que você adiciona (IMAP, SMTP, CalDAV, CardDAV). As imagens remotas das mensagens ficam bloqueadas até você tocar em **Carregar imagens**, e os pixels de rastreamento são removidos.
 - **Listas de bloqueio** (desde a 0.8.5, todas desligadas por padrão): cada lista que você liga em Ajustes → Privacidade → Listas de bloqueio, ou adiciona pelo endereço https, é baixada por HTTPS uma vez por dia a partir do endereço https de quem a publica, por um baixador isolado. Nada sobre você é enviado no pedido além do que qualquer download leva.
+- **Arquivos → Rede e servidores** (desde a 0.8.7): Arquivos → Rede fica desligado até você abrir essa página. Então faz uma passada limitada pela rede local, com mDNS e tentando as portas SMB e NFS nas redes privadas deste computador, e só fala com endereços locais. Conectar ao servidor e o Remote Desk só se conectam aos servidores que você indicar.
+- **Fundos em movimento** (desde a 0.8.7): um clipe é baixado do repositório do projeto em `raw.githubusercontent.com` quando você o escolhe, e é conferido com um SHA-256 do pacote. O GitHub vê esse pedido como vê qualquer download.
+- **Relatórios de hardware** (desde a 0.8.7): o LordOS não envia nada por conta própria. Compartilhar no GitHub salva um relatório e uma página no seu computador; se você enviar o formulário do GitHub, com a sua própria conta, o relatório fica público lá. Ele não tem campos para números de série, endereços nem nomes de computador, de usuário ou de rede.
 - **Wi-Fi, Bluetooth e VPNs:** apenas as redes, os dispositivos e os servidores VPN que você escolhe.
 - **A área de trabalho remota** vem **desligada** por padrão (porta 5673 fechada). Ela só escuta depois que você a liga em Ajustes → Compartilhar. No Raspberry Pi, a área de trabalho remota e o servidor SSH também ficam desligados, a menos que você coloque um arquivo de ativação `remote-desktop` ou `ssh` na partição de boot.
 - **Navegadores e outros apps:** o Firefox ESR, o Chromium e qualquer app Linux que você instalar são programas separados, de seus próprios projetos. Eles fazem as conexões que as configurações deles permitem, sob as políticas de privacidade deles. Os apps `.lpk` isolados só acessam a rede se você der a permissão, e o firewall por app mostra e controla a que cada app se conecta.
@@ -69,6 +72,7 @@ Estas conexões acontecem só depois de uma ação sua:
 ### O que fica no seu computador
 
 - **O mapa-múndi do Monitor** usa um banco de dados offline de IP para país (DB-IP Lite) que vem com o LordOS. Descobrir para onde vai uma conexão nunca consulta um servidor.
+- **O mapa de armazenamento da Limpeza** guarda nomes e tamanhos de pastas entre sessões só neste computador, legível só pelo seu usuário. Você pode desligá-lo nos Ajustes da Limpeza ou apagá-lo na Atividade dele.
 - **Senhas:** o cofre fica criptografado no seu disco e o processo dele não tem acesso à rede. A verificação de "senha vazada" é apenas offline.
 - **Configurações, e-mails, arquivos e registros** ficam no seu computador. Os registros não são enviados para lugar nenhum.
 

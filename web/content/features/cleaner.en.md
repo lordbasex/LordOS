@@ -18,7 +18,7 @@ Think of a careful house clearance. Someone walks through and writes a list, tou
 - **Big videos** of 100 MiB or more on the Desktop and in your screen recordings are chosen one by one too.
 - **Large files** filters by size, age and type.
 - **Storage** shows the largest folders as bubbles, a map, a folder list and a summary by type. A folder is drawn with what it is, so videos, music and code are told apart at a glance. In the map, bands in each tile show what rebuilds by itself and what to check first, and one line gives the free space, both amounts and what wasn't scanned.
-- **Duplicates** finds exact copies in the folders you choose. Nothing is selected for you.
+- **Duplicates** finds exact copies in the folders you choose and, if you ask, similar images. Nothing is selected for you.
 - **Activity** records what ran: counts and sizes, never a path.
 
 One thing does stay on disk with names in it: the storage map is kept between sessions, in `~/.cache/lordos/cleaner-map.txt`, readable only by your user. It holds folder names and sizes, and it stays on this computer. It is on by default: turn it off in Settings, or remove it with Clear in Activity. A saved map holds nothing that can be acted on; to clean anything, you scan again.
@@ -33,7 +33,7 @@ Cleanup rules never cover cookies, sessions, history or passwords, or `~/.cache`
 
 Scanning runs in `lord-clean`, a sandboxed helper that can only read. Plans are built in `lord-server`, not in the app, and the app only holds candidate ids, never the authority to touch a path. Everything is checked again right before acting, including the files that proved a project folder.
 
-Regenerable cache files beneath fixed folders can be deleted for real, as your own user, and only by this path: `lord.fs` still has no general delete. Anything else, project folders included, goes to the Trash, where you can restore it. Three closed administrator actions clean the system's own files, each confirmed; they are the one part not yet run on a test machine.
+Regenerable cache files beneath fixed folders can be deleted for real, as your own user, and only by this path: `lord.fs` still has no general delete. Anything else, project folders included, goes to the Trash, where you can restore it. Three closed administrator actions clean the system's own files, each confirmed; on a throwaway test system they did what their rules say.
 
 ## What its motion costs
 
@@ -42,3 +42,5 @@ Cleaner comes in three looks, follows light and dark mode, and works in English,
 [[shot:2]]
 
 Every result page has Start over and Scan again, lists have Select all, and Duplicates has Select copies, which leaves one copy of each group.
+
+One limit: in a live session a scan finds nothing, because of how the live system lays out its files. An installed system isn't affected.

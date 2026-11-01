@@ -665,7 +665,7 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   makes one (the layer of System Information's Performance tab is about 4.5 Mpx). Why that layer is taller than the
   window was not looked into.
 - GPU drag measured with another GPU than V3D and SVGA3D: only the self-test guards those.
-- PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30).
+- PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30); not done in it.
 - Test on real AMD (live ISO) and on Nvidia.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

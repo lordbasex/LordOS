@@ -61,6 +61,9 @@ Estas conexiones se hacen solo después de una acción tuya:
 - **Impresoras y escáneres:** Ajustes → Impresoras y escáneres le pregunta a la red local (mDNS) qué impresoras y escáneres hay, y habla solo con direcciones locales.
 - **Mail, Calendario y Contactos:** se conectan solo a los servidores de las cuentas que agregues (IMAP, SMTP, CalDAV, CardDAV). Las imágenes remotas de los mensajes quedan bloqueadas hasta que tocás **Cargar imágenes**, y los píxeles de rastreo se quitan.
 - **Listas de bloqueo** (desde 0.8.5, todas apagadas por defecto): cada lista que encendés en Ajustes → Privacidad → Listas de bloqueo, o que agregás por su dirección https, se descarga por HTTPS una vez por día desde la dirección https de quien la publica, con un descargador aislado. Con el pedido no se envía nada sobre vos más allá de lo que lleva cualquier descarga.
+- **Archivos → Red y servidores** (desde 0.8.7): Archivos → Red está apagado hasta que abrís esa página. Entonces hace una pasada acotada por la red local, con mDNS y probando los puertos SMB y NFS en las redes privadas propias de esta computadora, y habla solo con direcciones locales. Conectarse al servidor y Remote Desk se conectan solo a los servidores que indicás.
+- **Fondos en movimiento** (desde 0.8.7): un clip se descarga del repositorio del proyecto en `raw.githubusercontent.com` cuando lo elegís, y se comprueba contra un SHA-256 del paquete. GitHub ve ese pedido como ve cualquier descarga.
+- **Reportes de hardware** (desde 0.8.7): LordOS no envía nada por su cuenta. Compartir en GitHub guarda un reporte y una página en tu computadora; si enviás el formulario de GitHub, con tu propia cuenta, el reporte queda público ahí. No tiene campos para números de serie, direcciones ni nombres de equipo, de usuario o de red.
 - **Wi-Fi, Bluetooth y VPN:** solo las redes, los dispositivos y los servidores VPN que elijas.
 - **El escritorio remoto** está **desactivado** por defecto (puerto 5673 cerrado). Solo escucha después de que lo activás en Ajustes → Compartir. En la Raspberry Pi, el escritorio remoto y el servidor SSH también quedan desactivados salvo que pongas un archivo interruptor `remote-desktop` o `ssh` en la partición de arranque.
 - **Navegadores web y otras apps:** Firefox ESR, Chromium y cualquier app de Linux que instales son programas aparte, de sus propios proyectos. Hacen las conexiones que permita su configuración, según sus propias políticas de privacidad. Las apps `.lpk` aisladas llegan a la red solo si les das el permiso, y el firewall por app muestra y controla a qué se conecta cada una.
@@ -69,6 +72,7 @@ Estas conexiones se hacen solo después de una acción tuya:
 ### Lo que queda en tu computadora
 
 - **El mapa del mundo de Monitor** usa una base de datos de IP a país sin conexión (DB-IP Lite) que viene con LordOS. Averiguar adónde va una conexión nunca le pregunta a un servidor.
+- **El mapa de almacenamiento de Limpieza** guarda nombres y tamaños de carpetas entre sesiones solo en esta computadora, legible solo por tu usuario. Lo podés apagar en los Ajustes de Limpieza o borrar en su Actividad.
 - **Contraseñas:** la bóveda está cifrada en tu disco y su proceso no tiene acceso a la red. La comprobación de "contraseñas filtradas" es solo sin conexión.
 - **Los ajustes, el correo, los archivos y los registros** quedan en tu computadora. Los registros no se suben a ningún lado.
 

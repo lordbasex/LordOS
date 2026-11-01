@@ -92,7 +92,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (no sockets, no files, libc only; our own SMB2, NTLMSSP, DCE/RPC, ONC RPC parsers, `build/lan-test` under ASan/UBSan with
   40,000 damaged answers). JS names no address: `lord.lan` is `start`, `stop`, `poll`.
   Inside a session its sockets come from the `lan` connector, approved by the maintainer on 2026-10-31 (`docs/FIREWALL.md`,
-  "Files → Network and the connectors"). **SMB with a password** passed against one Windows 11 share and one test server.
+  "Files → Network and the connectors"). **SMB with a password** passed against one real desktop file share and one test server.
 - **Connecting to a share** from Files: the closed admin actions `share-mount` and `share-unmount` (approved in the
   roadmap on 2026-10-25) mount SMB and NFS with the kernel's clients through `fsconfig()`, one call per option, with no
   program, shell or extra package, only private IPv4 addresses, only under `/media/<user>`; the password can be
@@ -485,7 +485,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   0.8.6 live ISO booted with that command line and this branch's `lord-server` and bundles laid over it reached System
   Information on Performance. On a system that isn't live the flag changes nothing (isolated session). Not tested: an ISO built from this branch, UEFI, the arm64 ISO, a USB stick or a real PC.
 - **The repository's labels:** `docs/RELEASING.md`, "The labels of hardware reports", lists the 33 labels and the steps
-  to create them; a test keeps the list equal to the code. They aren't created yet.
+  to create them; a test keeps the list equal to the code. All 33 exist.
 - **lordos.org/hardware** was built and checked in en, es and pt (in a browser, also at phone width with no sideways
   scroll): the *in development* note, the two reference machines, the form's link. It isn't published.
 
@@ -494,9 +494,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - GPU drag is verified on V3D (Raspberry Pi 5) and SVGA3D (a VMware guest) only; on any other GPU only its self-test
   guards it. It is declined while a Linux window is on screen. The VMware guest ran v087.27 in the last pass, not the
   final v087.28, whose changes are in the shell, not in GPU drag.
-- Files → Network: SMB with a password passed against one Windows 11 share and one test server, no others. No real NFS
+- Files → Network: SMB with a password passed against one real desktop file share and one test server, no others. No real NFS
   server has been tried. Listing the shares of an SMB server outside the local network is refused.
-- Remote Desk: VNC and RDP were closed against a throwaway test machine. RDP to a real Windows session and RDP's shared
+- Remote Desk: VNC and RDP were closed against a throwaway test machine. RDP to a real desktop system and RDP's shared
   folders have not been verified in a real session.
 - A self-signed certificate on a connection must name the host it's used for.
 - Moving wallpapers copy each frame on its way to the screen: on the Raspberry Pi 5 at the login screen, 1080p at 60
@@ -504,6 +504,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - Window memory across two displays is not tested.
 - HFS+ and APFS disks are read-only.
+- The live systems don't include Disk Formats: on them, mounting FAT, exFAT, NTFS, HFS+ or APFS from the desktop asks for it.
 - Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
 - A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries.
 - An X11 app started from the launcher on a system without `xwayland` (a Recommends, so `apt` installs it) fails with

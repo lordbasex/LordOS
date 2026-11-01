@@ -27,7 +27,7 @@ Being precise matters here, because "our own" is easy to overstate.
 - PipeWire, for sound;
 - the Wayland protocol itself, through `libwayland-server` and `libwayland-client`;
 - `libxkbcommon` for keyboard layouts;
-- libraries used only inside sandboxed helper processes: FFmpeg (media), Poppler and libarchive (documents), OpenSSL (TLS for mail and remote desktop), Monocypher (the vault's cryptography).
+- libraries used only inside sandboxed helper processes: FFmpeg (media), Poppler and libarchive (documents), OpenSSL (TLS for mail and remote desktop), FreeRDP's core (RDP in Remote Desk), Monocypher (the vault's cryptography).
 
 The rule the project follows is written down in `docs/ARCHITECTURE.md`: X11, wlroots, libdrm, libinput, WebKit, GTK and Qt are not used inside LordOS itself. GTK and Qt apps still run, as Wayland clients.
 
@@ -79,8 +79,8 @@ In 0.8.7: several desktops in both Lord Flow and Lord Classic, with an Overview 
 
 All in 0.8.7.
 
-- **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
-- **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit.
+- **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place; you sign in with a user and password or as a guest, which passed against one real shared folder and one test server. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
+- **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit. Both protocols were tried against a throwaway test machine; RDP to a real desktop session and RDP's shared folders are not verified yet.
 - **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost.
 - **Your way of working.** Choose, reorder and resize list columns, set Files' own Settings, and open Terminal in the folder you're in.
 
@@ -90,8 +90,9 @@ All in 0.8.7.
 
 - **Shortcuts per theme.** One dispatcher runs before every key listener, so a key it takes reaches nobody else, and both themes get an app switcher with large icons. Over a Linux app the desktop keeps only a fixed list of keys, chosen by name. Settings → Keyboard lists the shortcuts of the theme in use.
 - **Pointer lock.** A lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it, so a window in the background can't hide the pointer as it passes over.
-- **Moving wallpapers.** Short loops for the desktop and the login screen, by section, downloaded when you choose one, with credits for every clip. They need a compatible GPU and pause when nobody sees them.
+- **Moving wallpapers.** Short loops for the desktop and the login screen, by section, downloaded when you choose one, with credits for every clip. You can add your own video of up to 10 seconds. They need a compatible GPU and pause when nobody sees them.
 - **On-screen keyboard.** Opened by hand from the button next to the clock, for a computer with no physical keyboard, in LordOS fields, Linux apps, isolated apps and at the login and lock screens. It takes a closed list of keys, so it can't be a shortcut, nothing keeps what is typed, and its panel is black in screenshots and recordings. No run on a real touchscreen is recorded.
+- **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
 ## Many displays, sharp text
@@ -107,6 +108,8 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`).
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
 - **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
+- **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for 0.8.8. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
+- **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
 - **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
 - **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting; a screen reader, zoom and high contrast are on the roadmap.
 

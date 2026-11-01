@@ -39,7 +39,7 @@ SHA-256 and Ed25519 are **our own code**, small and readable. Ed25519 follows th
 (`ed25519_sign`/`ed25519_public`) was added on top of the verification the package engine already
 had. The JSON reader is our own and strict (`server/src/sec/json.c`).
 
-**No OpenSSL:** by policy only `lord-sessiond`, `lord-maild` and (0.8.5) `lord-fetch` and `lord-tls` link it, never
+**No OpenSSL:** by policy only `lord-sessiond`, `lord-maild` and (0.8.5) `lord-fetch` and `lord-tls` link it (`lord-rdesk` loads it through libfreerdp), never
 `lord-server`. `.lpk` verification happens in C, at
 install time (`lpk_check` in `js_sys.c`) and at load time (modification detection via
 `pkg_status`).
@@ -313,7 +313,7 @@ noise of the build without the check (727–870 ms against 745–855 ms).
    `code-manifest.json`, signs it with `~/.config/lordos-release/release-ed25519.key.pem` into
    `code-manifest.sig` and verifies it against `lordos-release.pub.pem`). The bundles don't depend on
    the architecture, so one signature serves amd64 and arm64.
-   (0.8.7, branch `v087-hwreports`) Then `tools/release/sign-hwsnapshot.sh`: it rebuilds
+   (0.8.7) Then `tools/release/sign-hwsnapshot.sh`: it rebuilds
    `assets/hwreport/snapshot.json` (the tested-hardware catalogue's snapshot, `tools/hwreport/catalog.mjs`) and
    signs it the same way into `assets/hwreport/snapshot.json.sig`. lord-server verifies it in C
    (`sysreport/hwsnap.c`) before System Information shows any of it ([BENCHMARK.md](BENCHMARK.md), "0.8.7").

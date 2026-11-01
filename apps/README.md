@@ -27,7 +27,8 @@ apps/quicknotes/
 `-beta.1` or `~rc1` suffix). The build refuses an app without one (`tools/build-theme.mjs`), and the
 Store shows it next to the app (Installed: "LordOS app · 0.8.5"). The native apps started at `0.8.5`,
 the LordOS version they first shipped in; from then on an app's version changes when the app changes,
-apart from LordOS's, so the apps can later live in repositories of their own.
+apart from LordOS's, so the apps can later live in repositories of their own. An app added later starts
+at the release it first ships in (`cleaner` and `remote-desk`, 0.8.7).
 
 Optional fields: `"transparent": true` (the theme paints no background under the content; the
 app draws its own, e.g. the Terminal with transparency) and `"minSize": [width, height]`.
@@ -105,12 +106,12 @@ time, not as module constants, because the UI is remounted when the language cha
 
 ## Permissions
 
-`permissions` in the manifest is **declarative** for now: it documents what the app uses, but
-all apps run in the same JS context as the theme. Real isolation (one context or process per
-app, with permissions checked by the server) is pending work. What is real today: the server
-runs without root, `fs` doesn't leave the home folder and there is no API to run commands (the
-terminal can only open the user's shell).
+For an app built into the theme, `permissions` in the manifest is **declarative**: it documents what
+the app uses, and the app runs in the same JS context as the theme. Apps with `"process": "isolated"`
+and installed `.lpk` apps run as their own process, with permissions checked by the server
+(`docs/NATIVE-APPS.md`, `docs/PRIVACY.md`). For all of them the server runs without root and there is
+no API to run commands (the terminal can only open the user's shell).
 
-`fs` only writes inside the home folder and never to the folders the system uses to launch or
+`fs` only writes inside the home folder and the user's mounts and never to the folders the system uses to launch or
 install things (`.desktop`, autostart, installed apps), so an app can't turn a write into
 running a command.

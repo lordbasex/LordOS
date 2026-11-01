@@ -41,7 +41,9 @@ const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'))
 // a package-only update (0.8.4.1) leaves the live ISO and the Imager on an earlier release: lordos.media
 const CHANNEL = PKG.lordos && PKG.lordos.channel ? '-' + PKG.lordos.channel : '';
 const MEDIA_VERSION = (PKG.lordos && PKG.lordos.media) || PKG.version;
-const IMAGER_DL = `${GITHUB}/releases/download/v${MEDIA_VERSION}${CHANNEL}/lordos_imager_${MEDIA_VERSION}`;
+// the Imager is released only when it changes: lordos.imager names the release that holds its downloads
+const IMAGER_VERSION = (PKG.lordos && PKG.lordos.imager) || MEDIA_VERSION;
+const IMAGER_DL = `${GITHUB}/releases/download/v${IMAGER_VERSION}${CHANNEL}/lordos_imager_${IMAGER_VERSION}`;
 
 const r = (...p) => path.join(REPO, ...p);
 const read = (f) => fs.readFileSync(f);

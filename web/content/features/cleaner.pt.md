@@ -18,7 +18,7 @@ Pense em esvaziar uma casa com cuidado. Alguém percorre tudo e faz uma lista, s
 - **Vídeos grandes** de 100 MiB ou mais na Área de Trabalho e nas suas gravações de tela também são escolhidos um a um.
 - **Arquivos grandes** filtra por tamanho, idade e tipo.
 - **Armazenamento** mostra as maiores pastas como bolhas, um mapa, uma lista de pastas e um resumo por tipo. Cada pasta é desenhada com o que ela é, para que vídeos, músicas e código se distingam de relance. No mapa, faixas em cada bloco mostram o que é refeito sozinho e o que convém rever antes, e uma linha dá o espaço livre, as duas quantidades e o que não foi verificado.
-- **Duplicados** encontra cópias exatas nas pastas que você escolher. Nada é selecionado por você.
+- **Duplicados** encontra cópias exatas nas pastas que você escolher e, se você pedir, imagens parecidas. Nada é selecionado por você.
 - **Atividade** registra o que foi executado: quantidades e tamanhos, nunca um caminho.
 
 Uma coisa fica no disco com nomes dentro: o mapa de armazenamento é guardado entre sessões, em `~/.cache/lordos/cleaner-map.txt`, legível só pelo seu usuário. Ele tem nomes e tamanhos de pastas, e fica neste computador. Vem ativado: desligue em Ajustes ou remova com Apagar em Atividade. Um mapa guardado não tem nada sobre o que se possa agir; para limpar, analise de novo.
@@ -33,7 +33,7 @@ As regras de limpeza nunca alcançam cookies, sessões, histórico ou senhas, ne
 
 A análise roda no `lord-clean`, um auxiliar isolado que só pode ler. Os planos são montados no `lord-server`, não no app, e o app só guarda identificadores de candidatos, nunca a autoridade para tocar um caminho. Tudo é conferido de novo logo antes de agir, inclusive os arquivos que provaram uma pasta de projeto.
 
-Arquivos de cache regeneráveis sob pastas fixas podem ser apagados de verdade, como o seu próprio usuário, e só por este caminho: o `lord.fs` continua sem uma exclusão geral. Todo o resto, inclusive as pastas de projetos, vai para a Lixeira, de onde pode ser restaurado. Três ações administrativas fechadas limpam os arquivos do sistema, cada uma confirmada; são a única parte que ainda não foi executada numa máquina de teste.
+Arquivos de cache regeneráveis sob pastas fixas podem ser apagados de verdade, como o seu próprio usuário, e só por este caminho: o `lord.fs` continua sem uma exclusão geral. Todo o resto, inclusive as pastas de projetos, vai para a Lixeira, de onde pode ser restaurado. Três ações administrativas fechadas limpam os arquivos do sistema, cada uma confirmada; num sistema de teste descartável elas fizeram o que suas regras dizem.
 
 ## O que seu movimento custa
 
@@ -42,3 +42,5 @@ O app vem em três visuais, segue o modo claro e escuro e funciona em inglês, e
 [[shot:2]]
 
 Cada página de resultados tem Recomeçar e Analisar de novo, as listas têm Selecionar tudo e Duplicados tem Selecionar cópias, que deixa uma cópia de cada grupo.
+
+Um limite: numa sessão live uma análise não encontra nada, por causa de como o sistema live organiza seus arquivos. Um sistema instalado não é afetado.

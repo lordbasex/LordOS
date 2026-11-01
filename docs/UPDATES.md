@@ -16,6 +16,7 @@ a server or VPS, and `apt` sees the same repository.
 | The Store's side | `apps/store/debian.js` (`Updates`), `sdk/updates.js`, `lord.pkg.releaseNotes` and `lord.pkg.rebootRequired` (`server/src/ui/js_pkg.c`) |
 | Version-to-version changes | `packaging/migrations/` (system, as root) and `MIGRATIONS` in `sdk/settings.js` (each user's settings) |
 | The tested-hardware snapshot (0.8.7) | the `lordos-hwdata` package (`tools/iso/mkdeb-hwdata.sh`), which `lordos` depends on; published with a release or alone between releases (below) |
+| The Store's Disk Formats item (0.8.7) | the `lordos-disk-formats` package (`tools/iso/mkdeb-diskformats.sh`, `FILES.md`, "Disks' file systems") |
 
 ## The repository
 
@@ -28,6 +29,7 @@ https://lordos.org/apt/
   dists/stable/main/notes/ReleaseNotes(.xz)   release notes of each lordos version (below)
   pool/main/l/lordos/lordos_<version>_<arch>.deb
   pool/main/l/lordos-hwdata/lordos-hwdata_<YYYY.MM.DD[.N]>_all.deb   (0.8.7) the signed tested-hardware snapshot
+  pool/main/l/lordos-disk-formats/lordos-disk-formats_<version>_<arch>.deb   (0.8.7) the Store's Disk Formats item
   lordos.sources                       the same file the package installs
 https://lordos.org/keys/lordos-archive-keyring.gpg (.asc)   the public key
 https://lordos.org/apt-staging/        the same layout, for tests before anything goes live
@@ -248,6 +250,7 @@ Today's migrations:
 | `003-0.8.2-drivetemp` | 0.8.2 ships `/usr/lib/modules-load.d/lordos-drivetemp.conf` (SATA disk temperatures in Monitor → Disks, read at boot). On a running system it loads `drivetemp` once, so the temperatures show without a restart. Does nothing without systemd (an image being built) or where the kernel has no `drivetemp`. |
 | `004-0.8.3-smartd-off` | 0.8.3 ships a drop-in that keeps Debian's smartd (`smartmontools.service`) off unless `/etc/lordos/smartd-enabled` exists ([SYSTEM.md](SYSTEM.md), "smartd"). A condition is only checked at start, so a smartd already running from an earlier smartmontools install is stopped once. Does nothing without systemd, without smartmontools or where an administrator opted in. |
 | `005-0.8.4-browser-frames` | 0.8.4 makes the preinstalled browsers draw their own bar with LordOS's window buttons (`WAYLAND.md`, "The browsers by default"). Where `/etc/chromium/master_preferences` still has the 0.8.3 ISO's `"custom_chrome_frame": false` it becomes `true` and the GTK theme is added (new Chromium profiles only); where `/etc/firefox-esr/lordos.js` is still exactly the 0.8.3 file it becomes `inTitlebar` 1 (every Firefox profile whose user didn't change «Title Bar»). Anything an administrator changed is kept; home folders are not touched. |
+| `006-0.8.7-greeter-gpu` | 0.8.7 composes the login screen on the GPU: `lordos-greeter` joins `render` and `video`. On a Raspberry Pi it adds FFmpeg to `/etc/apt/preferences.d/raspberrypi`, and the next update brings Raspberry Pi's build ([WALLPAPERS.md](WALLPAPERS.md)) |
 
 **Settings migrations** (each user), in `sdk/settings.js`: `MIGRATIONS` is a list of
 `[schema, (settings) => newSettings]` applied in order when the session loads
