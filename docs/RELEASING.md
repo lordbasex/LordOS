@@ -110,7 +110,7 @@ The releases page is the project's public changelog: every release is documented
    Then the same for the live repository:
 
    ```sh
-   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb
+   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb
    tools/release/apt-repo.sh publish live
    tools/release/apt-repo.sh verify live
    ```
