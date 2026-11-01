@@ -18,7 +18,7 @@ import {
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Taskbar, BAR_H, barSize, taskbarEntries } from './components/Taskbar.jsx';
@@ -198,10 +198,13 @@ function App() {
         ))}
         <DesktopWidgets layer="below" />
         <OverviewBackdrop />
-        {mounted.map((w) => [
-          preview && w === top ? <SnapPreview key="snap" t={t} /> : null,
-          <Window key={w.id} win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} />,
-        ])}
+        {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
+        {mounted.map((w) => (
+          <Fragment key={w.id}>
+            {preview && w === top ? <SnapPreview t={t} /> : null}
+            <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} />
+          </Fragment>
+        ))}
         <DesktopWidgets layer="above" />
         {/* the bar on the main display and the panels above it: each in its layer (sdk/layers.js,
             docs/LAYERS.md), so the order and the clicks are the layers' */}

@@ -10,6 +10,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+- **Lord Classic no longer loses a window's state when another window comes to the front** (2026-10-31, VM 125): the windows were in a list of unkeyed arrays since the snap preview went in, so a raise mounted the moved windows again, and unsaved text, tabs and scroll were gone.
 - **Lord Classic's Start menu has the keyboard over a Linux or isolated app** (2026-10-31, VM 125): it was in the popover layer, which doesn't take the keyboard, so with Mail, an X11 or a Wayland app in front its search stayed empty, Esc and Enter did nothing and the keys went to the app. It is in the overlay layer now, like Lord Flow's launcher.
 - **Minimizing a fullscreen Linux app works** (2026-10-31, VM 125): ❖M hid the window in the shell while the compositor kept presenting it with the keyboard. It leaves fullscreen as on a hidden desktop and comes back fullscreen when restored.
 - Overview: a window's full-size frame no longer catches the pointer in the grid, so a window whose cell lies under another window's real position can be hovered and picked.
