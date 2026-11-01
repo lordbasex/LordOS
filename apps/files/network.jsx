@@ -1,9 +1,9 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, Text, Button, ScrollView, TextInput, Toggle, Hairline, useTheme, clipboard, lan, wm, spacing, typeScale, t as tr } from '@lordos/sdk';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { DriveGlyph, FolderGlyph } from './glyphs.jsx';
+import { View, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr } from '@lordos/sdk';
+import { useEffect, useRef, useState } from 'react';
+import { FolderGlyph } from './glyphs.jsx';
 
 const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone'];
 export const isShareFs = (fs) => SHARE_FS.includes(fs);
@@ -13,6 +13,8 @@ const leafOf = (kind, addr, share) => {
   const base = kind === 'nfs' ? (share.split('/').pop() || 'export') : share;
   return `${base.replace(/^\./, '_')} on ${addr}`;
 };
+
+export { hostName };
 
 export function NetGlyph({ color, size = 16 }) {
   const dot = size * 0.26;
@@ -31,15 +33,6 @@ function hostName(h) {
   const v = h.services.find((s) => s.name && (s.kind === 'computer' || s.kind === 'smb')) || h.services.find((s) => s.name && s.kind !== 'printer');
   return v?.name || h.name || h.addr;
 }
-const isComputer = (h) => h.smb || h.nfs || h.name || h.services.length > 0;
-
-// a service that isn't mounted here: its address, to copy
-function serviceUrl(addr, s) {
-  const scheme = { webdav: 'http', webdavs: 'https', sftp: 'sftp', ssh: 'ssh', ftp: 'ftp', http: 'http', https: 'https', printer: 'ipp', afp: 'afp' }[s.kind];
-  const std = { http: 80, https: 443, ftp: 21, ssh: 22, sftp: 22, ipp: 631, afp: 548 }[scheme];
-  if (!scheme) return `${addr}:${s.port}`;
-  return `${scheme}://${addr}${s.port === std ? '' : `:${s.port}`}${s.path && s.path.startsWith('/') ? s.path : ''}`;
-}
 
 function kinds(h) {
   const k = [];
@@ -47,21 +40,6 @@ function kinds(h) {
   if (h.nfs) k.push(tr('files.net.kind.nfs'));
   for (const s of h.services) { const l = tr(`files.net.kind.${s.kind}`); if (s.kind !== 'smb' && s.kind !== 'nfs' && !k.includes(l)) k.push(l); }
   return k.length ? k.join(', ') : tr(h.name ? 'files.net.computer' : 'files.net.device');
-}
-
-function Row({ t, depth = 0, icon, name, sub, kind, children, onClick, chevron }) {
-  return (
-    <View onClick={onClick} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 34, paddingVertical: 4, paddingHorizontal: spacing.m, paddingStart: spacing.m + depth * 24 }}>
-      <Text style={{ width: 12, fontSize: 11, color: t.textDim }}>{chevron || ''}</Text>
-      <View style={{ width: 20, alignItems: 'center' }}>{icon}</View>
-      <View style={{ flex: 2, minWidth: 0 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
-        {sub ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{sub}</Text> : null}
-      </View>
-      {kind ? <Text style={{ flex: 2, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{kind}</Text> : null}
-      <View style={{ flexDirection: 'row', gap: spacing.xs }}>{children}</View>
-    </View>
-  );
 }
 
 // Connecting: who connects, then the folders that server shows them, so nobody has to know a share's name. It's only
@@ -233,14 +211,11 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
   );
 }
 
-export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setModal, onRemote }) {
-  const t = useTheme();
-  const [st, setSt] = useState(() => lan.poll());
-  const [open, setOpen] = useState(() => new Set());
-  const [ask, setAsk] = useState(null);
+// The local network as a place like any folder: one entry per computer, in the same views (index.jsx). lord.lan runs while
+// the place is open and stops when it closes.
+export function useLan(active, setMsg) {
+  const [st, setSt] = useState(() => (lan.available() ? lan.poll() : { hosts: [] }));
   const timer = useRef(null);
-  useEffect(() => { setModal(!!ask); }, [ask]);
-  useEffect(() => () => setModal(false), []);
   const watch = () => {
     if (timer.current) return;
     timer.current = setInterval(() => {
@@ -249,113 +224,53 @@ export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setMo
       if (!s.running) { clearInterval(timer.current); timer.current = null; }
     }, 700);
   };
-  const search = () => { const started = lan.start(true); setSt(lan.poll()); if (started || lan.poll().running) watch(); else setMsg(tr('files.net.tooSoon')); };
-  // the page being there is the only thing that starts it, and leaving it stops it
   useEffect(() => {
+    if (!active || !lan.available()) return undefined;
     lan.start();
     setSt(lan.poll());
     watch();
     return () => { if (timer.current) clearInterval(timer.current); timer.current = null; lan.stop(); };
-  }, []);
+  }, [active]);
+  const search = () => { const started = lan.start(true); setSt(lan.poll()); if (started || lan.poll().running) watch(); else setMsg(tr('files.net.tooSoon')); };
+  return [st, search];
+}
 
-  // machines with a name first
-  const hosts = useMemo(() => [...st.hosts].sort((a, b) => (hostName(a) === a.addr) - (hostName(b) === b.addr) || hostName(a).localeCompare(hostName(b), undefined, { numeric: true, sensitivity: 'base' })), [st]);
-  const computers = hosts.filter(isComputer), devices = hosts.filter((h) => !isComputer(h));
-  const toggle = (a) => setOpen((o) => { const n = new Set(o); if (n.has(a)) n.delete(a); else n.add(a); return n; });
-  const mountedAt = (kind, addr, share) => volumes.find((v) => isShareFs(v.fs) && v.name === leafOf(kind, addr, share));
-  const copy = (text) => { clipboard.set(text); setMsg(tr('files.net.copied', { text })); };
-  const disconnect = (v) => lan.unmount(v.path).then(() => { refreshVolumes(); setMsg(tr('disks.unmounted')); }, (e) => setMsg(e.message));
-  const connect = (h, kind, share) => {
-    // NFS has no sign-in: a listed export goes straight to it
-    if (kind === 'nfs' && share) {
-      setMsg(tr('files.net.connecting'));
-      lan.mount({ kind, addr: h.addr, share }).then((at) => { refreshVolumes(); setMsg(null); openFolder(at); }, (e) => setMsg(e.message));
-      return;
-    }
-    setAsk({ kind, addr: h.addr, share, host: hostName(h) });
-  };
-  const shareActions = (h, kind, share) => {
-    const v = mountedAt(kind, h.addr, share);
-    return v ? <><Button small label={tr('files.net.open')} onClick={() => openFolder(v.path)} /><Button small label={tr('files.net.disconnect')} onClick={() => disconnect(v)} /></>
-      : <Button small label={tr('files.net.connect')} onClick={() => connect(h, kind, share)} />;
-  };
+export function lanStatus(st, count) {
+  const status = { 'no-lan': 'files.net.noLan', 'no-connector': 'files.net.noConnector', 'no-helper': 'files.net.noHelper', denied: 'files.net.denied' }[st.state];
+  if (status) return tr(status);
+  if (st.running) return st.total ? tr('files.net.scanning', { done: st.probed, total: st.total }) : tr('files.net.listening');
+  return tr('files.net.found', { count });
+}
 
-  // what Files can mount is connected to; a remote screen opens its app; only the rest keeps its address to copy
-  const serviceAction = (h, s) => {
-    const kind = { ssh: 'sftp', sftp: 'sftp', ftp: 'ftp', ftps: 'ftps', webdav: 'webdav', webdavs: 'davs' }[s.kind];
-    if (kind) {
+// Every way into a computer, best first. What mounts comes before a remote screen.
+const ORDER = { smb: 0, nfs: 1, sftp: 2, ssh: 3, webdavs: 4, webdav: 5, ftps: 6, ftp: 7, screen: 8, rdp: 9 };
+export function hostWays(h, volumes) {
+  const ways = [];
+  const on = (kind, share) => volumes.find((v) => isShareFs(v.fs) && v.name === leafOf(kind, h.addr, share));
+  for (const s of h.shares) ways.push({ id: `smb:${s.name}`, order: 0, label: s.name, sub: s.comment, mode: 'share', kind: 'smb', share: s.name, volume: on('smb', s.name) });
+  if (h.smb && !h.shares.length) ways.push({ id: 'smb', order: 0, label: tr('files.net.kind.smb'), mode: 'share', kind: 'smb', share: '' });
+  for (const e of h.exports) ways.push({ id: `nfs:${e.path}`, order: 1, label: e.path, mode: 'share', kind: 'nfs', share: e.path, volume: on('nfs', e.path) });
+  if (h.nfs && !h.exports.length) ways.push({ id: 'nfs', order: 1, label: tr('files.net.kind.nfs'), mode: 'share', kind: 'nfs', share: '' });
+  const FOLDER = { ssh: 'sftp', sftp: 'sftp', ftp: 'ftp', ftps: 'ftps', webdav: 'webdav', webdavs: 'davs' };
+  const seen = new Set();
+  for (const s of h.services) {
+    if (ORDER[s.kind] === undefined || s.kind === 'smb' || s.kind === 'nfs') continue;
+    const label = tr(`files.net.kind.${s.kind}`);
+    if (FOLDER[s.kind]) {
+      const kind = FOLDER[s.kind];
+      if (seen.has(kind)) continue;
+      seen.add(kind);
       const std = { sftp: 22, ftp: 21, ftps: 21, webdav: 80, davs: 443 }[kind];
       const path = kind === 'webdav' || kind === 'davs' ? (s.path && s.path !== '/' ? s.path.replace(/\/+$/, '') : '') : '';
-      return <Button small label={tr('files.net.connect')} onClick={() => onRemote({ kind, host: h.addr, port: s.port === std ? 0 : s.port, user: '', path })} />;
-    }
-    if (s.kind === 'screen' || s.kind === 'rdp') return <Button small label={tr('files.net.open')} onClick={() => wm.open(s.kind === 'rdp' ? 'rdp' : 'vnc', { new: true, args: { host: h.addr, port: s.port, user: '' } })} />;
-    return <Button small label={tr('files.net.copyAddress')} onClick={() => copy(serviceUrl(h.addr, s))} />;
-  };
+      ways.push({ id: `${kind}`, order: ORDER[s.kind], label, mode: 'remote', ask: { kind, host: h.addr, port: s.port === std ? 0 : s.port, user: '', path } });
+    } else ways.push({ id: `${s.kind}${s.port}`, order: ORDER[s.kind], label, mode: 'screen', app: s.port === 3389 || s.kind === 'rdp' ? 'rdp' : 'vnc', port: s.port });
+  }
+  return ways.sort((a, b) => a.order - b.order);
+}
 
-  const status = {
-    'no-lan': 'files.net.noLan', 'no-connector': 'files.net.noConnector', 'no-helper': 'files.net.noHelper', denied: 'files.net.denied',
-  }[st.state];
-  const scanning = st.running;
-  const line = status ? tr(status)
-    : scanning ? (st.total ? tr('files.net.scanning', { done: st.probed, total: st.total }) : tr('files.net.listening'))
-      : tr('files.net.found', { count: hosts.length });
-
-  const body = (h) => (
-    <View>
-      {h.domain && h.domain !== h.name ? <Row t={t} depth={1} name={tr('files.net.workgroup', { name: h.domain })} /> : null}
-      {h.shares.map((s) => (
-        <Row key={`s${s.name}`} t={t} depth={1} icon={<FolderGlyph size={16} />} name={s.name} sub={s.comment} kind={tr('files.net.kind.smb')}>{shareActions(h, 'smb', s.name)}</Row>
-      ))}
-      {h.smb && !h.shares.length ? (
-        <Row t={t} depth={1} icon={<FolderGlyph size={16} />} name={tr(h.listed ? 'files.net.noShares' : 'files.net.signInToList')} kind={tr('files.net.kind.smb')}>
-          <Button small label={tr('files.net.connect')} onClick={() => connect(h, 'smb', '')} />
-        </Row>
-      ) : null}
-      {h.exports.map((e) => (
-        <Row key={`e${e.path}`} t={t} depth={1} icon={<FolderGlyph size={16} />} name={e.path} sub={e.open ? '' : tr('files.net.restricted')} kind={tr('files.net.kind.nfs')}>{shareActions(h, 'nfs', e.path)}</Row>
-      ))}
-      {h.nfs && !h.exports.length ? (
-        <Row t={t} depth={1} icon={<FolderGlyph size={16} />} name={tr('files.net.nfsUnlisted')} kind={tr('files.net.kind.nfs')}>
-          <Button small label={tr('files.net.connect')} onClick={() => connect(h, 'nfs', '')} />
-        </Row>
-      ) : null}
-      {h.services.filter((s) => s.kind !== 'smb' && s.kind !== 'nfs' && s.kind !== 'computer').map((s) => (
-        <Row key={`v${s.kind}${s.port}`} t={t} depth={1} name={s.model || s.name || tr(`files.net.kind.${s.kind}`)} sub={serviceUrl(h.addr, s)} kind={tr(`files.net.kind.${s.kind}`)}>
-          {serviceAction(h, s)}
-        </Row>
-      ))}
-    </View>
-  );
-  const hostRow = (h) => {
-    const has = h.smb || h.nfs || h.services.length > 0 || h.domain;
-    const on = open.has(h.addr);
-    return (
-      <View key={h.addr}>
-        <Row t={t} icon={<DriveGlyph color={t.accent} />} name={hostName(h)} sub={hostName(h) === h.addr ? '' : h.addr} kind={kinds(h)} chevron={has ? (on ? '⌄' : '›') : ''} onClick={has ? () => toggle(h.addr) : undefined}>
-          <Button small label={tr('files.net.copyAddress')} onClick={() => copy(h.addr)} />
-        </Row>
-        {on ? body(h) : null}
-      </View>
-    );
-  };
-  const heading = (k) => <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, marginHorizontal: spacing.m, marginTop: spacing.m, marginBottom: 2, textAlign: 'start' }}>{k}</Text>;
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, height: 38, paddingHorizontal: spacing.m }}>
-        <Hairline edge="bottom" />
-        <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{line}</Text>
-        <Button small label={tr('files.net.search')} onClick={search} disabled={scanning} />
-      </View>
-      <ScrollView style={{ flex: 1 }}>
-        <View style={{ paddingBottom: spacing.m }}>
-          {computers.length ? heading(tr('files.net.computers')) : null}
-          {computers.map(hostRow)}
-          {devices.length ? heading(tr('files.net.devices')) : null}
-          {devices.map(hostRow)}
-          {!hosts.length && !scanning && !status ? <Text style={{ margin: spacing.xl, fontSize: typeScale.body, color: t.textDim, textAlign: 'center' }}>{tr('files.net.empty')}</Text> : null}
-        </View>
-      </ScrollView>
-      {ask && <ConnectSheet ask={ask} onClose={() => setAsk(null)} onMounted={(at, note) => { setAsk(null); refreshVolumes(); setMsg(note); if (at.startsWith('/')) openFolder(at); }} />}
-    </View>
-  );
+export function hostEntries(st, volumes) {
+  return [...st.hosts].filter((h) => h.addr).map((h) => {
+    const ways = hostWays(h, volumes);
+    return { name: hostName(h), path: `net:${h.addr}`, dir: ways.length > 1, netHost: h, ways, size: 0, mtime: 0, sub: kinds(h), hasKids: ways.length > 1 };
+  });
 }

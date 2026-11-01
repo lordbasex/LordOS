@@ -280,5 +280,7 @@
   "connect.plain": "Esta conexión no está cifrada: la contraseña viaja legible.",
   "connect.firstKey": "Primera conexión a este servidor. Comprobá su huella con quien lo administra: {print}",
   "connect.trust": "Confiar",
-  "net.kind.rdp": "Escritorio remoto"
+  "net.kind.rdp": "Escritorio remoto",
+  "net.connectAs": "Conectar como",
+  "net.nothing": "Nada en esta computadora se puede abrir desde acá."
 }

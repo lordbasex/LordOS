@@ -11,7 +11,7 @@ import { sortEntries } from './locations.js';
 const when = (ms) => { if (!ms) return '—'; const d = new Date(ms); return `${formatDate(d, 'numeric')} ${formatTime(d)}`; };
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
-export const kindLabel = (e) => (e.app ? tr('files.kind.app') : tr(`files.kind.${kindOf(e)}`));
+export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : tr(`files.kind.${kindOf(e)}`));
 
 // Name, or the field for renaming in place.
 function Name({ e, ctx, center, color, lines = 1 }) {
@@ -34,7 +34,7 @@ function itemHandlers(e, ctx) {
     onMouseDown: (ev) => { ev.stopPropagation(); ctx.onItemDown(e, ev); },
     onDoubleClick: (ev) => { ev.stopPropagation(); ctx.onOpen(e); },
     onContextMenu: (ev) => { ev.stopPropagation(); ctx.onContext(e, ev); },
-    ...(e.dir && !e.trash && !e.arc ? { dropPath: e.path } : {}),
+    ...(e.dir && !e.trash && !e.arc && !e.netHost ? { dropPath: e.path } : {}),
   };
 }
 
@@ -95,11 +95,11 @@ const longDate = (st, k) => when(st?.[k]);
 function cellText(k, e, ctx) {
   const st = ['created', 'opened', 'changed', 'perms', 'owner'].includes(k) ? ctx.statOf(e) : null;
   switch (k) {
-    case 'date': return e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime);
+    case 'date': return e.netHost || e.netWay ? '' : e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime);
     case 'created': return longDate(st, 'btime');
     case 'opened': return longDate(st, 'atime');
     case 'changed': return longDate(st, 'ctime');
-    case 'size': return e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size);
+    case 'size': return e.netHost || e.netWay ? '' : e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size);
     case 'kind': return ctx.showFolder ? where(e.path) : kindLabel(e);
     case 'comments': return commentOf(e.path);
     case 'perms': return st?.mode || '—';
@@ -186,8 +186,8 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
       </View>,
     );
     if (open) {
-      let kids = [];
-      try { kids = sortEntries(lord.fs.list(e.path).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort, ctx.sortOpts); } catch (err) { /* no permission */ }
+      let kids = ctx.kidsOf(e) || [];
+      if (!e.netHost) try { kids = sortEntries(lord.fs.list(e.path).filter((x) => ctx.hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${e.path}/${x.name}` })), sort, ctx.sortOpts); } catch (err) { /* no permission */ }
       rows.push(...ListRows({ items: kids, depth: depth + 1, ctx, t, sort, alt }));
     }
   }

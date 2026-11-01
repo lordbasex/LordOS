@@ -18,7 +18,7 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetworkView, NetGlyph, isShareFs, ConnectSheet, RemoteSheet } from './network.jsx';
+import { NetGlyph, isShareFs, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer } from './prefs.js';
@@ -215,7 +215,6 @@ export default function Files() {
   const [diskList] = useDisks();
   useEffect(() => { setTimeout(warmDocs, 800); }, []);             // PDF Quick Preview without waiting for the helper
   const [msg, setMsg] = useState(null);
-  const [netModal, setNetModal] = useState(false);        // Network's connect sheet has the keyboard
   const root = useRef(null);
   const rootWidthRef = useRef(960);
   const press = useRef(null);
@@ -224,9 +223,11 @@ export default function Files() {
   const dirs = useMemo(() => userDirs(), []);
   const baseLoc = tab.loc;
   const loc = debounced ? { type: 'search', root: scope === 'home' || baseLoc.type !== 'dir' ? fs.home() : baseLoc.path, query: debounced } : baseLoc;
+  const [netState, searchLan] = useLan(baseLoc.type === 'network', (m) => setMsg(m));
   const [entries, error] = useMemo(() => {
+    if (loc.type === 'network') return [hostEntries(netState, volumes), null];
     try { return [loadEntries(loc, { hidden, launcherApps }), null]; } catch (e) { return [[], e.message]; }
-  }, [loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer]);
+  }, [netState, volumes, loc.type, loc.path, loc.color, loc.query, loc.root, loc.inner, hidden, version, tags, launcherApps, arcVer]);
   // Recents and the Trash go by date (newest first), unless another order is chosen
   const sortBy = (loc.type === 'recent' || loc.type === 'trash') && !tab.sortChosen ? { by: 'date', desc: true } : tab.sort;
   // what the list's extra columns need, asked once per file until something changes
@@ -384,7 +385,16 @@ export default function Files() {
   const ctx = { navigate, linuxApps: launcherApps, t: tr, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
+  // a computer: its best way in; connected shares open as folders
+  const openWay = (w, h) => {
+    if (w.volume) { navigate(dirLoc(w.volume.path)); return; }
+    if (w.mode === 'screen') { wm.open(w.app, { new: true, args: { host: h.addr, port: w.port, user: '' } }); return; }
+    if (w.mode === 'remote') { setRemoteAsk({ ...w.ask, ssh: w.ask.kind === 'sftp' ? `ssh ${h.addr}` : null }); return; }
+    setConnAsk({ kind: w.kind, addr: h.addr, host: hostName(h), user: '', share: w.share });
+  };
   const open = (e) => {
+    if (e.netWay) { openWay(e.netWay, e.netParent); return; }
+    if (e.netHost) { if (e.ways[0]) openWay(e.ways[0], e.netHost); else setMsg(tr('files.net.nothing')); return; }
     if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; }
     if (prefs.foldersInTabs && e.dir && !e.arc && !e.app) { newTabAt({ type: 'dir', path: e.path }); return; }
     openEntry(e, ctx);
@@ -410,7 +420,7 @@ export default function Files() {
       next = new Set(flat.slice(Math.min(a, b), Math.max(a, b) + 1).map((x) => x.path));
     } else { next = selected.has(e.path) ? selected : new Set([e.path]); anchor.current = e.path; }
     setSelected(next);
-    if (!e.app && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
+    if (!e.app && !e.netHost && !e.netWay && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
   };
 
   // ---- drag and drop (⌥ copies; otherwise it moves) ----
@@ -446,6 +456,12 @@ export default function Files() {
     if (loc.type === 'trash') {
       return [{ label: tr('files.menu.restore'), onClick: () => restore(paths) }, { label: tr('files.menu.deleteNow'), danger: true, onClick: () => askDelete(paths) }, '-',
         { label: tr('files.menu.quickLook'), hint: '␣', onClick: () => setQuick(true) }, { label: tr('files.menu.getInfo'), hint: '❖I', onClick: () => setInfo(true) }];
+    }
+    if (e.netWay) return [{ label: tr('files.net.connect'), onClick: () => open(e) }];
+    if (e.netHost) {
+      return [{ label: tr('files.net.connect'), onClick: () => open(e), disabled: !e.ways.length },
+        ...(e.ways.length > 1 ? [{ label: tr('files.net.connectAs'), submenu: e.ways.map((w) => ({ label: w.label, onClick: () => openWay(w, e.netHost) })) }] : []), '-',
+        { label: tr('files.net.copyAddress'), onClick: () => { clipboard.set(e.netHost.addr); setMsg(tr('files.net.copied', { text: e.netHost.addr })); } }];
     }
     if (e.app) return [{ label: tr('files.menu.open'), onClick: () => open(e) }];
     if (e.arc) {
@@ -484,6 +500,7 @@ export default function Files() {
     const viewItems = VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) }));
     const sortItems = ['name', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.sort.${k}`), checked: tab.sort.by === k, onClick: () => setSort(k) }));
     const groupItems = ['none', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.groupBy.${k}`), checked: tab.group === k, onClick: () => patchTab({ group: k }) }));
+    if (loc.type === 'network') return [{ label: tr('files.net.search'), onClick: searchLan, disabled: netState.running }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
     if (loc.type === 'trash') return [{ label: tr('files.menu.emptyTrash'), danger: true, onClick: askEmpty, disabled: !entries.length }, '-', { label: tr('files.menu.view'), submenu: viewItems }];
     return [
       ...(wDir ? [{ label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null) }, { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !clip }, '-'] : []),
@@ -516,7 +533,7 @@ export default function Files() {
   const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
     f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
-    if (renaming || confirm || menu || netModal || sheet || connAsk || remoteAsk) return;
+    if (renaming || confirm || menu || sheet || connAsk || remoteAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
     const space = e.char === ' ' || e.key === ' ' || b === ' ';
@@ -550,9 +567,9 @@ export default function Files() {
     if (mod && e.key === 'ArrowDown') { openSel(); return; }
     if (mod && (e.key === 'Backspace' || e.key === 'Delete')) { toTrash(); return; }
     if (e.key === 'Delete') { toTrash(); return; }
-    if (e.key === 'Enter') { startRename(); return; }
+    if (e.key === 'Enter') { if (first?.netHost || first?.netWay) open(first); else startRename(); return; }
     if (e.key === 'Escape') { setSelected(new Set()); setInfo(false); return; }
-    if (space) { if (sel.length) setQuick(true); return; }
+    if (space) { if (sel.length && !first?.netHost && !first?.netWay) setQuick(true); return; }
     const grid = tab.view === 'icons' ? cols() : 1;
     if (e.key === 'ArrowRight') { if (tab.view === 'list') { if (first?.dir) setExpanded((x) => new Set([...x, first.path])); } else moveSel(1, e); return; }
     if (e.key === 'ArrowLeft') { if (tab.view === 'list') { if (first?.dir) setExpanded((x) => { const n = new Set(x); n.delete(first.path); return n; }); } else moveSel(-1, e); return; }
@@ -624,7 +641,8 @@ export default function Files() {
   const viewCtx = {
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
-    onItemDown, onOpen: open, onContext, statOf, sortOpts, columns, contentW: content,
+    onItemDown, onOpen: open, onContext, statOf,
+    kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
     onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
     shownName: prefs.showExtensions ? null : (e) => { if (e.dir || e.app) return e.name; const i = e.name.lastIndexOf('.'); return i > 0 ? e.name.slice(0, i) : e.name; },
     onRenameChange: (v) => setRenaming((r) => (r ? { ...r, value: v } : r)), onRenameCommit: commitRename, onRenameCancel: () => setRenaming(null),
@@ -743,6 +761,7 @@ export default function Files() {
           )}
           <View ref={sortBtn}><ToolbarButton icon="⇅" title={tr('files.groupSort')} onClick={() => menuUnder(sortBtn, groupSortItems())} /></View>
           {!narrow && <View ref={tagBtn}><ToolbarButton icon="●" iconSize={11} color={t.textDim} title={tr('files.menu.tags')} disabled={!sel.length} onClick={() => menuUnder(tagBtn, tagItems())} /></View>}
+          {loc.type === 'network' && <ToolbarButton icon="↻" iconSize={13} title={tr('files.net.search')} disabled={netState.running} onClick={searchLan} />}
           {!tight && <ToolbarButton icon=">_" iconSize={12} title={tr('files.menu.openTerminal')} disabled={!curDir} onClick={() => openTerminal()} />}
           <View ref={moreBtn}><ToolbarButton icon="⋯" title={tr('files.actions')} onClick={() => menuUnder(moreBtn, actionItems())} /></View>
           <SearchField value={query} onChange={setQuery} placeholder={tr('files.search')} width={tight ? 120 : narrow ? 150 : 180} />
@@ -782,12 +801,10 @@ export default function Files() {
         {/* content */}
         <View style={{ flex: 1 }} onMouseDown={() => { if (renaming) commitRename(); setSelected(new Set()); }} onContextMenu={onBgContext}
           {...(curDir ? { dropPath: curDir } : {})}>
-          {loc.type === 'network' ? <NetworkView volumes={volumes} refreshVolumes={() => setVolumes(fs.volumes())} openFolder={(p) => navigate(dirLoc(p))} setMsg={setMsg} setModal={setNetModal} onRemote={setRemoteAsk} /> : <>
             {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
             {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
             {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort} />}
             {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
-          </>}
         </View>
         {/* path bar and status bar */}
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.m, overflow: 'hidden' }}>
@@ -816,7 +833,7 @@ export default function Files() {
             </View>
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {msg || (loc.type === 'network' ? '' : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+              {msg || (loc.type === 'network' ? lanStatus(netState, flat.length) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
                 freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(', '))}
             </Text>
           )}

@@ -122,9 +122,8 @@ The RDP and VNC apps (`apps/rdp`, `apps/vnc`, `sdk/remotedesk.jsx`) draw the rem
 
 ## Network (0.8.7, in development)
 
-**Files → Network** shows what is on the local network by itself: computers, SMB shared folders, NFS exports,
-other network storage and network services, each with its name, address, kind and what can be done with it. It
-stays off until the page is opened and leaves when the page closes.
+**Files → Network** shows the computers on the local network by itself, as a place like any folder: one entry per computer, in whichever view is chosen. Opening one connects with the best way it offers (SMB, NFS, SFTP, WebDAV, FTP, then a remote screen); with more than one, its row unfolds them, and a right click has Connect as and Copy address. RDP and VNC open their apps. It
+stays off until the place is opened and leaves when it closes.
 
 **State of the feature:** the maintainer approved the `lan` connector on 2026-10-31, so inside a session
 `lan_socket` gets its sockets from it (`sec/netconn.h`, `NC_LAN`), counted and decided as the firewall app

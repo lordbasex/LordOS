@@ -35,7 +35,20 @@ export function DocGlyph({ size: s, kind, ext, dark }) {
 }
 
 // Icon of an entry: folder, thumbnail (images) or document.
+// A computer on the network: a screen on its stand; a way into it, a small one.
+function ComputerGlyph({ size, way }) {
+  const w = size * (way ? 0.7 : 0.86), h = w * 0.62;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: w, height: h, borderRadius: size * 0.08, backgroundColor: '#7c8db5', border: `${Math.max(1, size * 0.05)}px solid #4b5a7d` }} />
+      <View style={{ width: w * 0.16, height: size * 0.08, backgroundColor: '#4b5a7d' }} />
+      <View style={{ width: w * 0.46, height: Math.max(1, size * 0.05), borderRadius: 1, backgroundColor: '#4b5a7d' }} />
+    </View>
+  );
+}
+
 export function EntryIcon({ e, size, dark, thumb = true }) {
+  if (e.netHost || e.netWay) return <ComputerGlyph size={size} way={!!e.netWay} />;
   if (e.Icon) return <e.Icon size={size} />;
   const kind = kindOf(e);
   if (kind === 'folder' && e.locked) {
