@@ -71,7 +71,7 @@ driver's attack surface; it already ran Mesa in software.
 Hardware HEVC needs Raspberry Pi's FFmpeg, pinned in `/etc/apt/preferences.d/raspberrypi` (migration 006 adds the pin on
 upgrades, and the next `apt` update brings the packages). That FFmpeg opens the decoder by path, so for this one job,
 `MK_PLAY` with `hwaccel=v4l2request`, `lord-media` may open two exact device files found from sysfs before the sandbox,
-reads `/sys/class/video4linux`, `/sys/bus/media` and `/run/udev`, and gets the V4L2 and media controller ioctl classes.
+reads `/sys/class`, `/sys/bus` and `/run/udev`, and gets the V4L2 and media controller ioctl classes.
 
 ## Measurements
 

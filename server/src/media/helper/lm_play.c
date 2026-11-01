@@ -122,8 +122,9 @@ static int64_t frame_ms(AVStream *st, const AVFrame *f) {
 /* ---- decoders ---- */
 
 static enum AVPixelFormat get_hw_format(AVCodecContext *c, const enum AVPixelFormat *fmts) {
-    (void)c;
-    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == AV_PIX_FMT_VAAPI || *p == AV_PIX_FMT_DRM_PRIME) return *p;
+    /* the format of the device we opened: a decoder can list both, and only one of them can start */
+    enum AVPixelFormat want = ((AVHWDeviceContext *)c->hw_device_ctx->data)->type == AV_HWDEVICE_TYPE_DRM ? AV_PIX_FMT_DRM_PRIME : AV_PIX_FMT_VAAPI;
+    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == want) return *p;
     P.hw_active = 0;                /* the decoder can't use VA-API: software */
     return fmts[0];
 }

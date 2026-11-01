@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     static char dev_video[32], dev_media[32];
     static const char *devs[3];
     static const char *const ro_pi[] = { "/usr/lib", "/usr/lib64", "/lib", "/lib64", "/usr/share", "/etc/ld.so.cache",
-                                         "/sys/dev/char", "/sys/devices", "/sys/class/video4linux", "/sys/bus/media", "/run/udev", NULL };
+                                         "/sys/dev/char", "/sys/devices", "/sys/class", "/sys/bus", "/run/udev", NULL };   /* udev lists these folders to find the decoder */
     int pi_hevc = m.v[0] == MK_PLAY && fds[2] >= 0 && lm_hwaccel_is(payload, "v4l2request") &&
                   !lm_hevc_dec_paths(dev_video, sizeof dev_video, dev_media, sizeof dev_media);
     if (pi_hevc) {
