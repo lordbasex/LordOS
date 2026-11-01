@@ -14,7 +14,7 @@
 import { render, screen, mainBox, onScreenChange } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
-  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift,
+  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, media, MediaView,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -30,6 +30,26 @@ globalThis.__lordGreeter = (json) => {
 
 const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#269653'], ['#e0609d', '#b83574'],
   ['#a77bf3', '#7a4fd6'], ['#4cc4d3', '#2391a3'], ['#f2c14e', '#d0961d']];
+
+// A looping video behind the clock, on the main display, when the file is there. It has no sound, and it only
+// covers the wallpaper once it plays: no file, no helper or a crash leave the still image, with nothing on screen.
+const LOGIN_VIDEO = 'login-loop.mp4';     // in this user's home, /var/lib/lordos-greeter
+function LoginVideo({ box, stop }) {
+  const [id, setId] = useState(0);
+  useEffect(() => {
+    if (stop || settings.get().reduceMotion || !media.available()) return undefined;
+    let cur = 0;
+    try { cur = media.play('greeter', LOGIN_VIDEO, { loop: true, audio: 0, appName: 'LordOS' }); } catch (e) { return undefined; }
+    if (!cur) return undefined;
+    const off = media.on(cur, (type, d) => {
+      if (type === 'state' && d.state === 'playing') setId(cur);
+      else if (type === 'error' || type === 'closed') setId(0);
+    });
+    return () => { off(); setId(0); media.close(cur); };
+  }, [stop]);
+  if (!id) return null;
+  return <MediaView media={id} style={{ position: 'absolute', left: box.left, top: box.top, width: box.width, height: box.height }} />;
+}
 
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
 
@@ -137,6 +157,7 @@ function Greeter() {
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
   const [menu, setMenu] = useState(null);         // 'lang' | 'kb'
+  const [entered, setEntered] = useState(false);  // the session is starting: the video stops
   const [confirm, setConfirm] = useState(null);   // 'reboot' | 'poweroff'
   const [ip, setIp] = useState(lanAddress());
   const timers = useRef([]);
@@ -188,7 +209,7 @@ function Greeter() {
         if (Date.now() - chosen.current > 10000) chosen.current = 0;   // a click from an earlier showing
         send({ t: 'hello' });                       // who has an open session, again
         setIp(lanAddress());
-      } else if (m.t === 'ok') { setPass(''); setMsg(''); setBusy(false); chosen.current = 0; osk.hide(); }
+      } else if (m.t === 'ok') { setEntered(true); setPass(''); setMsg(''); setBusy(false); chosen.current = 0; osk.hide(); }
       else if (m.t === 'fail') {
         setPass(''); setBusy(false); doShake();
         setMsg(m.wait > 0 ? t('greeter.wait', { count: m.wait }) : t('greeter.wrong'));
@@ -234,6 +255,7 @@ function Greeter() {
       <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
         <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
           style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
+        <LoginVideo box={M} stop={entered} />
         <View style={{ position: 'absolute', left: M.left, top: M.top, width: W, height: H }}>
 
         {/* date and clock */}
