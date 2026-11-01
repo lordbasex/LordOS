@@ -240,7 +240,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
 
 // ---- preview (columns, gallery, Quick Preview) ----
 
-export function Preview({ e, big = false }) {
+export function Preview({ e, big = false, name }) {
   const t = useTheme();
   const [text, setText] = useState(null);
   useEffect(() => {
@@ -257,7 +257,7 @@ export function Preview({ e, big = false }) {
             <Text style={{ fontFamily: 'monospace', fontSize: big ? 12 : 10, color: t.text, lineHeight: big ? 17 : 14 }}>{text.split('\n').slice(0, big ? 200 : 60).join('\n')}</Text>
           </View>
         ) : <EntryIcon e={e} size={big ? 160 : 96} dark={t.mode === 'dark'} />}
-      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'center', marginTop: 6 }}>{e.name}</Text>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'center', marginTop: 6 }}>{name || e.name}</Text>
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center' }}>{`${kindLabel(e)}${e.dir || e.app ? '' : ` · ${formatBytes(e.size)}`}${e.mtime ? ` · ${when(e.mtime)}` : ''}`}</Text>
     </View>
   );
@@ -318,7 +318,8 @@ export function GalleryView({ entries, ctx }) {
   const from = Math.max(0, idx - 4);
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big /> : <EmptyState title={ctx.emptyText} />}</View>
+      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} /> : <EmptyState title={ctx.emptyText} />}</View>
+      {cur && ctx.renaming?.path === cur.path ? <View style={{ alignItems: 'center', paddingBottom: 8 }}><Name e={cur} ctx={ctx} /></View> : null}
       <View style={{ height: 97, borderTopWidth: 1, borderTopColor: t.separator, flexDirection: 'row', gap: 8, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', direction: 'ltr', overflow: 'hidden' }}>
         {entries.slice(from, from + 9).map((e) => {
           const sel = e === cur;
