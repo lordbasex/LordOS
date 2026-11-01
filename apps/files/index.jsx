@@ -4,7 +4,7 @@
 // read-only outside the home folder and the user's disks) and every disk, mounted or not.
 // Disk operations go through lord.fs (server/src/fsops.c); see docs/FILES.md.
 import {
-  View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
+  needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan,
 } from '@lordos/sdk';
@@ -209,6 +209,7 @@ export default function Files() {
   const [debounced, setDebounced] = useState('');
   const [hidden, setHidden] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set());
+  const netExpanded = useRef(new Set());
   const [drag, setDrag] = useState(null);                 // { paths, x, y, alt }
   const [dropTarget, setDropTarget] = useState(null);
   const [volumes, setVolumes] = useState(() => fs.volumes());
@@ -252,7 +253,8 @@ export default function Files() {
 
   function navigate(next, push = true) {
     if (sameLoc(next, tab.loc)) return;
-    setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(new Set());
+    if (tab.loc.type === 'network') netExpanded.current = expanded;      // back in Network, what was unfolded stays
+    setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(next.type === 'network' ? netExpanded.current : new Set());
     if (next.type === 'dir') noteFolder(next.path);
     patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [] }));
   }
@@ -368,12 +370,9 @@ export default function Files() {
   };
   const restore = (paths = selPaths) => { let n = 0; for (const p of paths) { try { fs.restore(p); n++; } catch (err) { report(err); } } if (n) { setMsg(tr('files.restored', { count: n })); bump(); } };
   // disks: the same closed actions as the Disks app (an internal disk asks for an administrator)
-  // these formats come with the Store's Disk Formats item
-  const FORMATS = ['vfat', 'exfat', 'ntfs', 'hfsplus', 'apfs'];
-  const formatsOn = () => { try { fs.stat('/usr/lib/lordos/disk-formats.enabled'); return true; } catch (e) { return false; } };
   const mount = (p) => {
-    if (FORMATS.includes(p.fstype) && !formatsOn()) {
-      setConfirm({ text: tr('files.disk.formatsTitle', { name: p.label || p.name }), detail: tr('files.disk.formatsDetail'), ok: tr('files.disk.formatsGet'), run: () => wm.open('store', { args: { page: 'commercial', app: 'lordos-disk-formats' } }) });
+    if (needsDiskFormats(p.fstype)) {
+      setConfirm({ text: tr('files.disk.formatsTitle', { name: p.label || p.name }), detail: tr('files.disk.formatsDetail'), ok: tr('files.disk.formatsGet'), run: openDiskFormats });
       return;
     }
     setMsg(tr('files.disk.mounting', { name: p.label || p.name }));

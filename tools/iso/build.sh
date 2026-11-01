@@ -4,7 +4,7 @@
 # (on an x86-64 machine, tools/iso/build-arm64.sh runs this script in an arm64 chroot). See docs/ISO.md.
 #
 # Usage (as root, on Debian 13, from the root of the already built repository):
-#   make -C server -j"$(nproc)"          # lord-server and lord-sessiond (needs libssl-dev, libsrtp2-dev and libusrsctp-dev: the remote desktop is WebRTC only; clang for lord-netperm's BPF)
+#   make -C server -j"$(nproc)"          # lord-server and lord-sessiond (needs libssl-dev, freerdp3-dev, libsrtp2-dev and libusrsctp-dev: the remote desktop is WebRTC only; clang for lord-netperm's BPF)
 #   (the themes: npm run build on the development machine; the .bundle.js files travel with the tree)
 #   sudo tools/iso/build.sh [work folder]   # default /var/tmp/lordos-iso
 #
@@ -46,7 +46,7 @@ PKGS_BASE="$PKG_KERNEL initramfs-tools live-boot live-boot-initramfs-tools syste
 PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core
- libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon exfatprogs ntfs-3g
+ libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland"

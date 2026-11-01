@@ -1,7 +1,7 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr } from '@lordos/sdk';
+import { View, FormFields, Text, Button, ScrollView, TextInput, Toggle, useTheme, lan, spacing, typeScale, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { FolderGlyph } from './glyphs.jsx';
 
@@ -128,7 +128,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
             </View>
           </>
         ) : (
-          <>
+          <FormFields>
             {ask.share ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{ask.share}</Text> : null}
             {needName ? field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => signIn(false)} onCancel={onClose} />) : null}
             {!nfs && field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus={!needName} onSubmit={() => signIn(false)} onCancel={onClose} />)}
@@ -145,7 +145,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
               {!nfs && <Button label={tr('files.net.asGuest')} onClick={() => signIn(true)} disabled={busy || (needName && !share.trim())} />}
               <Button primary label={busy ? tr('files.net.connecting') : tr('files.net.connect')} onClick={() => signIn(false)} disabled={busy || !ready} />
             </View>
-          </>
+          </FormFields>
         )}
       </View>
     </View>
@@ -184,8 +184,10 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
       <View style={{ width: 380, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('files.net.connectTo', { name: ask.host })}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{ask.kind}</Text>
+        <FormFields>
         {field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus onSubmit={go} onCancel={onClose} />)}
         {field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={go} onCancel={onClose} />)}
+        </FormFields>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
           <Toggle small on={remember} onChange={setRemember} />
           <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.net.remember')}</Text>

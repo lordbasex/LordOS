@@ -8,7 +8,7 @@
 // actions, which validate again on the root side: never the system disk, and internal disks only
 // for an administrator.
 import {
-  View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
+  needsDiskFormats, openDiskFormats, View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
   Toolbar as Bar, ToolbarButton, ToolbarSpacer, MenuButton, Hairline, GroupBox, FormRow, EmptyState, spacing, typeScale,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -215,7 +215,7 @@ function Details({ disk, part, onDialog, autoCheck }) {
     setMsg(null);
     return admin.run(action, arg, null, { quiet: true }).then(
       (r) => { setMsg({ ok: true, text: action === 'disk-mount' ? tr('disks.mountedAt', { path: r }) : okText }); },
-      (e) => setMsg({ ok: false, text: e.message })).finally(() => setBusy(false));
+      (e) => setMsg({ ok: false, text: e.message, formats: action === 'disk-mount' && needsDiskFormats((part || disk).fstype) })).finally(() => setBusy(false));
   };
   const target = part || disk;
   const title = part ? partTitle(part, tr) : diskTitle(disk);
@@ -241,6 +241,7 @@ function Details({ disk, part, onDialog, autoCheck }) {
             <Text style={{ fontSize: typeScale.callout, color: busy ? t.textDim : msg.ok ? '#30d158' : '#ff453a', textAlign: 'start' }}>
               {busy ? tr('disks.working') : msg.text}</Text>
           ) : null}
+          {!busy && msg?.formats ? <View style={{ flexDirection: 'row' }}><Button small label={tr('disks.formatsGet')} onClick={openDiskFormats} /></View> : null}
           <GroupBox>
             {part ? [
               <Row key="dev" label={tr('disks.device')} value={`/dev/${part.name}`} />,
