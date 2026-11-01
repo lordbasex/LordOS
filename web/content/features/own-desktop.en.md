@@ -65,7 +65,7 @@ LordOS aims at modest machines. A few real measurements from the project's test 
 - When the machine has no 3D-capable card, `lord-server` doesn't even load Mesa and stays at about 32 MB of RSS (`docs/GPU.md`).
 - Since 0.8.5 the login screen no longer stays in memory behind your session: it closes 10 seconds after a session takes the screen and starts again in a few milliseconds when you lock or switch user. On a VMware VM the whole system went from **603 to 548 MB** in use, and locking the screen went from 903 ms to **141 ms**.
 - On virtual graphics cards that complete every page flip at once (VMware's `vmwgfx`), 0.8.5 paces frames to the display's refresh instead of drawing 500–580 frames a second: **59.8 frames a second** at 60 Hz, 99th percentile 18.4 ms. Every boot's time is shown in About LordOS → Startup time and kept for comparing versions (`docs/RESULTS.md`).
-- **In 0.8.6, measured on pre-release builds:** on a Raspberry Pi 5 with a 1920×1080 monitor, LordBench's desktop test moves a window with a turning square inside at **59.8–60 frames a second** (53–58 before the work on a dragged window's frame, which keeps every pixel the same), and at about 31 (30.5–31.1) while every core is busy with a low-priority load (24–25 before; `docs/BENCHMARK.md`). Drawing the dragged window on the graphics chip and painting the next frame while the previous one waits for the screen were measured there too and are off by default: the first is exact but gave no measurable gain, the second gave 33–36 frames a second under load but the pointer reached the screen 17–29 ms later.
+- **In 0.8.6, measured on pre-release builds:** on a Raspberry Pi 5 with a 1920×1080 monitor, LordBench's desktop test moves a window with a turning square inside at **59.8–60 frames a second** (53–58 before the work on a dragged window's frame, which keeps every pixel the same), and at about 31 (30.5–31.1) while every core is busy with a low-priority load (24–25 before; `docs/BENCHMARK.md`). Drawing the dragged window on the graphics chip and painting the next frame while the previous one waits for the screen were measured there too and were off by default in 0.8.6: the first was exact but gave no measurable gain, the second gave 33–36 frames a second under load but the pointer reached the screen 17–29 ms later. In development for 0.8.7 the first covers the whole drag and is on by default (see the limits below).
 
 These numbers come from virtual machines and one board, not from a range of real PCs. They are a starting point, not a promise for every machine.
 
@@ -73,7 +73,16 @@ These numbers come from virtual machines and one board, not from a range of real
 
 ## Desktops
 
-In development for 0.8.7 (the latest release is 0.8.6): several desktops in both Lord Flow and Lord Classic, with an Overview of live windows, a strip of desktops and dragging a window from one to another. Each window comes back on its desktop after a restart, and a window on a hidden desktop never has the keyboard, not even one that asks for fullscreen from there. Checked in an isolated session on a virtual machine; not yet on a physical monitor or with X11 apps.
+In development for 0.8.7 (the latest release is 0.8.6): several desktops in both Lord Flow and Lord Classic, with an Overview of live windows, a strip of desktops and dragging a window from one to another. Each window comes back on its desktop after a restart, and a window on a hidden desktop never has the keyboard, not even one that asks for fullscreen from there. Checked in an isolated session on a virtual machine, with X11 apps in a full session on another, and the Overview on a Raspberry Pi 5's monitor; a right-to-left language on screen and real trackpad swipes are still to check.
+
+## Keys, the on-screen keyboard and coming back
+
+All in development for 0.8.7 (the latest release is 0.8.6).
+
+- **Shortcuts per theme.** One dispatcher runs before every key listener, so a key it takes reaches nobody else, and both themes get an app switcher with large icons. Over a Linux app the desktop keeps only a fixed list of keys, chosen by name. Settings → Keyboard lists the shortcuts of the theme in use.
+- **Pointer lock.** A lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it, so a window in the background can't hide the pointer as it passes over.
+- **On-screen keyboard.** For a computer with no physical keyboard, in LordOS fields, Linux apps, isolated apps and at the login and lock screens. It takes a closed list of keys, so it can't be a shortcut, nothing keeps what is typed, and its panel is black in screenshots and recordings. No run on a real touchscreen is recorded.
+- **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
 ## Many displays, sharp text
 
@@ -83,10 +92,11 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 
 ## Honest limits
 
-- **Real GPUs are not verified yet.** The GPU path was exercised with Mesa's software renderer in virtual machines. Testing on real AMD and Nvidia cards is still pending (`docs/GPU.md`).
+- **Real PC GPUs are not verified yet.** The GPU path runs on the Raspberry Pi 5's V3D and on VMware's virtual GPU (SVGA3D), and was exercised with Mesa's software renderer in virtual machines. Testing on real AMD and Nvidia cards is still pending (`docs/GPU.md`).
+- **GPU drag, on by default in development for 0.8.7, is verified on V3D and SVGA3D only.** On a Raspberry Pi 5, in real drags, it halves the session's CPU alone and takes a memory load from 29 to 35 frames a second. On any other GPU only its self-test guards it, and `LORD_GPU_DRAG=0` turns it off (`docs/GPU.md`).
 - **Multiple displays were tested with two virtual heads**, not with real monitors, laptop panels or DisplayPort hubs (`docs/DISPLAYS.md`).
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
-- **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling (most likely the cores and the chip competing for memory, not proven yet); fewer pixels sent and composed per frame is the next step, planned for 0.8.7 (`docs/GPU.md`).
+- **On the Raspberry Pi 5 a busy app still halves the desktop's frame rate:** about 31 instead of 60 frames a second in LordBench's desktop test while every core is busy. Under that load the graphics chip takes 14–16 ms per frame instead of 1.5, with no clock or thermal throttling; in development for 0.8.7, a measurement put the cause on memory: 28 ms a frame with four cores reading memory, 1.4 ms with four cores only spinning. How much of that the compositor can avoid is still open (`docs/GPU.md`).
 - **X11 apps run through Xwayland since 0.8.3,** sharp only at 100 % scale and able to see each other, as on any X11 desktop. Drag and drop between Linux apps and LordOS input methods inside Linux apps are pending (`docs/WAYLAND.md`).
 - **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting; a screen reader, zoom and high contrast are on the roadmap.
 

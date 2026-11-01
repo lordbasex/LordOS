@@ -37,7 +37,7 @@ Arquivos de cache regeneráveis sob pastas fixas podem ser apagados de verdade, 
 
 ## O que seu movimento custa
 
-O app vem em três visuais, segue o modo claro e escuro e funciona em inglês, espanhol e português. Seu layout se inverte para idiomas da direita para a esquerda, verificado por enquanto com um idioma de teste com texto em inglês. Seu movimento só roda com a janela em primeiro plano e para por completo com Reduzir movimento. As partes que se movem ficam em quadros separados para que a tela seja repintada o mínimo possível; os números estão em `docs/CLEANER-TESTS.md`. Foram medidos numa máquina virtual, não num Raspberry Pi.
+O app vem em três visuais, segue o modo claro e escuro e funciona em inglês, espanhol e português. Seu layout se inverte para idiomas da direita para a esquerda, verificado por enquanto com um idioma de teste com texto em inglês. Seu movimento só roda com a janela em primeiro plano e para por completo com Reduzir movimento. As partes que se movem ficam em quadros separados para que a tela seja repintada o mínimo possível; os números estão em `docs/CLEANER-TESTS.md`. Foram medidos numa máquina virtual e num Raspberry Pi 5 com seu monitor, onde a sessão usou 4,5–7,2 % de um núcleo com a tela inicial parada, 12,2–18,0 % analisando e 0,1 % com o app fechado.
 
 [[shot:2]]
 

@@ -1144,15 +1144,14 @@ can't enter its scope refuses. Mail and the printers use the same connector as t
 which were tested live; Mail against a real server and a network printer were not (VM 118 has
 neither).
 
-### Files → Network and the connectors (0.8.7, needs the maintainer's review)
+### Files → Network and the connectors (0.8.7, approved 2026-10-31)
 
 Files → Network (`FILES.md`, "Network") uses the network for one thing: one bounded pass over the LAN while its page
-is open. By the rule above its sockets must come from a connector of its own, and a new name needs review, so
-**nothing was added**: `lan_socket` (`lan/lan.c`) refuses in a session and the page says the search isn't available.
+is open. By the rule above its sockets come from a connector of its own, approved by the maintainer on 2026-10-31.
 Borrowing `print` was rejected: file-share probes would show as "Printers and scanners" in the Monitor and follow that
 row's rules. Making the sockets in lord-server was rejected too: the traffic would be LordOS's own.
 
-**What is asked:** a component `lan` (firewall app `lordos:lan`, scope `lordos-net-lan.scope`): the same connector,
+**What was added:** a component `lan` (firewall app `lordos:lan`, scope `lordos-net-lan.scope`): the same connector,
 same fixed-size requests, no new request type, used by `lan.c` only for one unconnected UDP socket per link
 (`sendto` 224.0.0.251:5353, kept by lord-server) and TCP to ports 445, 2049, 111, 22 and mountd's on addresses
 `on_link` accepts. Connectors can't tell ports apart; `lan.c` is what bounds them. The change is `NC_LAN`, the name in

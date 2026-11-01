@@ -32,8 +32,8 @@ Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.
 | Motion budget | Built | Frame times on VM 116 and a Raspberry Pi 5 in `CLEANER-TESTS.md`: 5 to 7 % of a core idle, 12 to 18 % scanning. Aurora's pauses of up to a second while scanning are not explained yet |
 | Bubble view | Built | Glass spheres with an icon per kind of folder. Selecting a folder reviews its large files; no folder action |
 | Similar images | Built | Decoded only in `lord-clean`; JPEG, PNG, GIF and BMP; 20,000 images at most; to the Trash, one image of each group always stays |
-| Apps | Built | Installed apps by size, removed by the package engine or `.lpk` removal; leftovers of removed LordOS apps. A real removal was not run: the test session has no admin helper |
-| System files | Built | Three closed admin actions, not run on the VM |
+| Apps | Built | Installed apps by size, removed by the package engine or `.lpk` removal, with a row in Activity; leftovers of removed LordOS apps. A real removal is not recorded: the test session has no admin helper |
+| System files | Built | Three closed admin actions plus `clean-status`. Not run on the VM; all four ran as root in a throwaway emulated arm64 system on 2026-10-30 |
 | Status word: updates | Built | The panel reads the `lordos` package's state when it opens. The word itself was seen only with that state stubbed: `lordos` isn't a package on the VM |
 | Translated Downloads folders | Built | From `XDG_DOWNLOAD_DIR`, only a `$HOME/…` value that passes as a rule's root |
 | Old kernels | Built | Chosen in `sdk/oldkernels.js`, shown through `lord.pkg.plan`, run by `pkg-remove`. The real plan was read on the VM; the removal was not run |
@@ -75,4 +75,4 @@ Last updated 2026-10-31, branch `v087`, in development. The latest release is 0.
 
 ## Tested
 
-See `CLEANER-TESTS.md`. On 2026-10-30, in a throwaway emulated arm64 machine (`ISO.md`, "The arm64 ISO"), the scope appeared under `lord-sessiond` in a real session and the four admin actions ran as root (`CLEANER-TESTS.md`). Not tested: the Raspberry Pi, a real desktop computer, removing an app or a kernel for real, paint cost on those machines and on-screen frame times on a real display.
+See `CLEANER-TESTS.md`. On 2026-10-30, in a throwaway emulated arm64 machine (`ISO.md`, "The arm64 ISO"), the scope appeared under `lord-sessiond` in a real session and the four admin actions ran as root (`CLEANER-TESTS.md`). On 2026-10-31 a full test with a real pointer ran on VM 125, and the session's cost and the display's real flips were measured on a Raspberry Pi 5 with its monitor (`CLEANER-TESTS.md`). Not tested: a real desktop computer, removing an app or a kernel for real. Not explained yet: Aurora's pauses of up to a second.

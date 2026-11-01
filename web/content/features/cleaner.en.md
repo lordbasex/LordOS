@@ -37,7 +37,7 @@ Regenerable cache files beneath fixed folders can be deleted for real, as your o
 
 ## What its motion costs
 
-Cleaner comes in three looks, follows light and dark mode, and works in English, Spanish and Portuguese. Its layout turns for right-to-left languages, checked so far with a test language in English text. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine, not on a Raspberry Pi.
+Cleaner comes in three looks, follows light and dark mode, and works in English, Spanish and Portuguese. Its layout turns for right-to-left languages, checked so far with a test language in English text. Its motion runs only while its window is in front and stops entirely with Reduce motion. Moving parts are kept in separate frames so the screen repaints as little as possible; the numbers are in `docs/CLEANER-TESTS.md`. They were taken on a virtual machine and on a Raspberry Pi 5 with its monitor, where the session took 4.5–7.2 % of a core with the opening screen idle, 12.2–18.0 % scanning and 0.1 % with Cleaner closed.
 
 [[shot:2]]
 

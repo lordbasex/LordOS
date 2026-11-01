@@ -108,11 +108,10 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 other network storage and network services, each with its name, address, kind and what can be done with it. It
 stays off until the page is opened and leaves when the page closes.
 
-**State of the feature: inside a LordOS session the search is waiting for one decision.** Sockets of a
-component come from its connector (`sec/netconn.h`), and a new connector name needs the maintainer's review
-(`AGENTS.md`), which has not happened. Until then `lan_socket` makes no socket in a session, the page says the
-search isn't available, and everything below was tested outside a session (see "What was tested"). The proposal
-is in `FIREWALL.md`, "Files → Network and the connectors". Mounting doesn't depend on it.
+**State of the feature:** the maintainer approved the `lan` connector on 2026-10-31, so inside a session
+`lan_socket` gets its sockets from it (`sec/netconn.h`, `NC_LAN`), counted and decided as the firewall app
+`lordos:lan` in `lordos-net-lan.scope` (`FIREWALL.md`, "Files → Network and the connectors"). The tests below come from
+before that, outside a session (see "What was tested"). **SMB with a password is not validated:** see "Not tested".
 
 **How a pass works** (`server/src/lan/lan.c`, on a thread of its own):
 
@@ -136,7 +135,7 @@ The page opening keeps what a pass under 5 minutes old found; *Search again* nee
 
 **`lord-lan`** (`lan/lanhelper.c`, `lan/lanparse.c`, protocol in `lan/lanproto.h`) reads everything that comes back.
 Same rules as `lord-fetch`: fixed path next to lord-server (owned by root or the user, not writable by others), no
-arguments, `LANG` only, the channel on fd 3, `sandbox_apply_helper` before anything is read (no socket, connect,
+arguments, `LANG` and `LORDOS_SESSIOND` only, the channel on fd 3, `sandbox_apply_helper` before anything is read (no socket, connect,
 bind or exec, no files, 64 MB). It links libc only. It gets datagrams and sockets lord-server already connected and
 never chooses where to connect: the one port it names, mountd's, is connected by lord-server on that same host.
 Its answers are parsed again with `sec/json.c` and every text goes through `lan_clean_text`. `lord.lan`
@@ -177,7 +176,7 @@ Preview's helpers, thumbnails) opened right after it, can still block for the ke
 **The traffic of a mounted share isn't in the firewall.** The kernel's client opens its own sockets, outside any
 app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app as `ROADMAP.md` first said.
 
-**What was tested** (2026-10-31; everything outside a LordOS session, as said above):
+**What was tested** (2026-10-31; everything outside a LordOS session, before the connector, as said above):
 
 | What | Where | Seen |
 |---|---|---|
@@ -189,7 +188,11 @@ app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app
 
 **Not tested:** a real SMB or NFS server on the LAN (the only ones there refuse anonymous sessions, and the
 open test server was kept off the LAN), the keyring when it
-is unlocked, arm64, a server that isn't Samba, the connector inside a session.
+is unlocked, arm64, a server that isn't Samba. No pass through the connector inside a session is recorded here yet.
+
+**SMB with a password is not validated.** The password row above is one Samba test server over a veth, with a
+development build. It has not worked against a real server on a network, and listing a server's folders with a password
+isn't built, so treat signing in to a real SMB server as untested.
 
 ## Shortcuts
 
