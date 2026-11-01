@@ -282,5 +282,6 @@
   "connect.trust": "Trust",
   "net.kind.rdp": "Remote desktop",
   "net.connectAs": "Connect as",
-  "net.nothing": "Nothing on this computer can be opened from here."
+  "net.nothing": "Nothing on this computer can be opened from here.",
+  "net.sharedFolder": "Shared folder"
 }

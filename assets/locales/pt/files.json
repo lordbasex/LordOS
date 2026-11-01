@@ -282,5 +282,6 @@
   "connect.trust": "Confiar",
   "net.kind.rdp": "Área de trabalho remota",
   "net.connectAs": "Conectar como",
-  "net.nothing": "Nada neste computador pode ser aberto daqui."
+  "net.nothing": "Nada neste computador pode ser aberto daqui.",
+  "net.sharedFolder": "Pasta compartilhada"
 }

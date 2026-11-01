@@ -48,6 +48,7 @@ function ComputerGlyph({ size, way }) {
 }
 
 export function EntryIcon({ e, size, dark, thumb = true }) {
+  if (e.netWay?.mode === 'share') return <FolderGlyph size={size} />;
   if (e.netHost || e.netWay) return <ComputerGlyph size={size} way={!!e.netWay} />;
   if (e.Icon) return <e.Icon size={size} />;
   const kind = kindOf(e);

@@ -282,5 +282,6 @@
   "connect.trust": "Confiar",
   "net.kind.rdp": "Escritorio remoto",
   "net.connectAs": "Conectar como",
-  "net.nothing": "Nada en esta computadora se puede abrir desde acá."
+  "net.nothing": "Nada en esta computadora se puede abrir desde acá.",
+  "net.sharedFolder": "Carpeta compartida"
 }

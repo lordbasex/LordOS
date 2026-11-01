@@ -390,6 +390,13 @@ export default function Files() {
     if (w.volume) { navigate(dirLoc(w.volume.path)); return; }
     if (w.mode === 'screen') { wm.open(w.app, { new: true, args: { host: h.addr, port: w.port, user: '' } }); return; }
     if (w.mode === 'remote') { setRemoteAsk({ ...w.ask, ssh: w.ask.kind === 'sftp' ? `ssh ${h.addr}` : null }); return; }
+    // a share open to guests, or an NFS export, mounts by itself; anything else asks who connects
+    if (w.share && (w.kind === 'nfs' || ['anonymous', 'guest'].includes(h.session))) {
+      setMsg(tr('files.net.connecting'));
+      lan.mount({ kind: w.kind, addr: h.addr, share: w.share }).then((at) => { setMsg(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); },
+        () => { setMsg(null); setConnAsk({ kind: w.kind, addr: h.addr, host: hostName(h), user: '', share: w.share }); });
+      return;
+    }
     setConnAsk({ kind: w.kind, addr: h.addr, host: hostName(h), user: '', share: w.share });
   };
   const open = (e) => {
@@ -637,6 +644,7 @@ export default function Files() {
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
   };
   const content = (rootWidthRef.current || 960) - SIDEBAR_W;
+  const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   const viewCtx = {
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
@@ -646,7 +654,12 @@ export default function Files() {
     onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
     shownName: prefs.showExtensions ? null : (e) => { if (e.dir || e.app) return e.name; const i = e.name.lastIndexOf('.'); return i > 0 ? e.name.slice(0, i) : e.name; },
     onRenameChange: (v) => setRenaming((r) => (r ? { ...r, value: v } : r)), onRenameCommit: commitRename, onRenameCancel: () => setRenaming(null),
-    onToggleExpand: (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; }),
+    onToggleExpand: (p) => {
+      // a computer that shows its folders only after signing in: the chevron asks first
+      const e = p.startsWith('net:') ? byPath.get(p) : null;
+      if (e?.netHost?.smb && !e.netHost.shares.length && !expanded.has(p)) { openWay(e.ways[0], e.netHost); return; }
+      toggleExpanded(p);
+    },
     isDir: (p) => { const e = byPath.get(p); if (e) return e.dir; try { return lord.fs.stat(p).dir; } catch (err) { return false; } },
     entryAt: (p) => byPath.get(p) || (() => { try { const s = lord.fs.stat(p); return { name: s.name, path: s.path, dir: s.dir, size: s.size, mtime: s.mtime }; } catch (err) { return null; } })(),
   };
@@ -660,7 +673,9 @@ export default function Files() {
   const crumbs = (() => {
     if (loc.type !== 'dir') return [{ label: title, loc }];
     const home = fs.home();
-    const base = loc.path === home || loc.path.startsWith(`${home}/`) ? home
+    const remote = `${home}/.local/share/lordos/remote/`;
+    const base = loc.path.startsWith(remote) ? loc.path.split('/').slice(0, remote.split('/').length).join('/')
+      : loc.path === home || loc.path.startsWith(`${home}/`) ? home
       : loc.path.startsWith('/run/media/') ? loc.path.split('/').slice(0, 5).join('/') : loc.path.startsWith('/media/') ? loc.path.split('/').slice(0, 4).join('/') : '/';
     const rest = loc.path.slice(base.length).split('/').filter(Boolean);
     const out = [{ label: base === home ? tr('files.place.home') : fs.basename(base), loc: { type: 'dir', path: base } }];

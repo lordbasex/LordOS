@@ -247,9 +247,9 @@ const ORDER = { smb: 0, nfs: 1, sftp: 2, ssh: 3, webdavs: 4, webdav: 5, ftps: 6,
 export function hostWays(h, volumes) {
   const ways = [];
   const on = (kind, share) => volumes.find((v) => isShareFs(v.fs) && v.name === leafOf(kind, h.addr, share));
-  for (const s of h.shares) ways.push({ id: `smb:${s.name}`, order: 0, label: s.name, sub: s.comment, mode: 'share', kind: 'smb', share: s.name, volume: on('smb', s.name) });
+  for (const s of h.shares) ways.push({ id: `smb:${s.name}`, order: 0, label: s.name, sub: tr('files.net.sharedFolder'), mode: 'share', kind: 'smb', share: s.name, volume: on('smb', s.name) });
   if (h.smb && !h.shares.length) ways.push({ id: 'smb', order: 0, label: tr('files.net.kind.smb'), mode: 'share', kind: 'smb', share: '' });
-  for (const e of h.exports) ways.push({ id: `nfs:${e.path}`, order: 1, label: e.path, mode: 'share', kind: 'nfs', share: e.path, volume: on('nfs', e.path) });
+  for (const e of h.exports) ways.push({ id: `nfs:${e.path}`, order: 1, label: e.path, sub: tr('files.net.sharedFolder'), mode: 'share', kind: 'nfs', share: e.path, volume: on('nfs', e.path) });
   if (h.nfs && !h.exports.length) ways.push({ id: 'nfs', order: 1, label: tr('files.net.kind.nfs'), mode: 'share', kind: 'nfs', share: '' });
   const FOLDER = { ssh: 'sftp', sftp: 'sftp', ftp: 'ftp', ftps: 'ftps', webdav: 'webdav', webdavs: 'davs' };
   const seen = new Set();
@@ -271,6 +271,6 @@ export function hostWays(h, volumes) {
 export function hostEntries(st, volumes) {
   return [...st.hosts].filter((h) => h.addr).map((h) => {
     const ways = hostWays(h, volumes);
-    return { name: hostName(h), path: `net:${h.addr}`, dir: ways.length > 1, netHost: h, ways, size: 0, mtime: 0, sub: kinds(h), hasKids: ways.length > 1 };
+    return { name: hostName(h), path: `net:${h.addr}`, dir: ways.length > 1 || h.smb, netHost: h, ways, size: 0, mtime: 0, sub: kinds(h) };
   });
 }

@@ -95,11 +95,11 @@ const longDate = (st, k) => when(st?.[k]);
 function cellText(k, e, ctx) {
   const st = ['created', 'opened', 'changed', 'perms', 'owner'].includes(k) ? ctx.statOf(e) : null;
   switch (k) {
-    case 'date': return e.netHost || e.netWay ? '' : e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime);
+    case 'date': return e.netHost || e.netWay ? '—' : e.trash ? (e.deleted || '').replace('T', ' ') : when(e.mtime);
     case 'created': return longDate(st, 'btime');
     case 'opened': return longDate(st, 'atime');
     case 'changed': return longDate(st, 'ctime');
-    case 'size': return e.netHost || e.netWay ? '' : e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size);
+    case 'size': return e.netHost || e.netWay ? '—' : e.dir && !e.trash ? '—' : e.app ? '' : formatBytes(e.size);
     case 'kind': return ctx.showFolder ? where(e.path) : kindLabel(e);
     case 'comments': return commentOf(e.path);
     case 'perms': return st?.mode || '—';
