@@ -301,7 +301,7 @@ export function Activity({ gen }) {
             <Glass style={{ padding: spacing.m, flexDirection: 'row', gap: spacing.m, alignItems: 'center' }}>
               
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Label weight={600}>{e.action === 'system' ? tr('cleaner.activity.system', { name: e.name === 'kernels' ? tr('cleaner.kernels.title') : tr(`cleaner.system.${e.name}`) }) : e.action === 'emptyTrash' ? tr('cleaner.activity.emptied', { n: n(e.items) }) : e.trashed == null ? tr('cleaner.activity.cleaned', { n: n(e.counts.done) }) : tr('cleaner.activity.split', { deleted: n(e.deleted), trashed: n(e.trashed) })}</Label>
+                <Label weight={600}>{e.action === 'system' && e.name === 'apps' ? tr('cleaner.activity.app') : e.action === 'system' ? tr('cleaner.activity.system', { name: e.name === 'kernels' ? tr('cleaner.kernels.title') : tr(`cleaner.system.${e.name}`) }) : e.action === 'emptyTrash' ? tr('cleaner.activity.emptied', { n: n(e.items) }) : e.trashed == null ? tr('cleaner.activity.cleaned', { n: n(e.counts.done) }) : tr('cleaner.activity.split', { deleted: n(e.deleted), trashed: n(e.trashed) })}</Label>
                 <Label dim size={typeScale.callout}>{when(e.at)}</Label>
               </View>
               <Label dim size={typeScale.callout}>{tr('cleaner.result.free', { before: formatBytes(e.freeBefore), after: formatBytes(e.freeAfter) })}</Label>

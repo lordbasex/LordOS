@@ -125,7 +125,7 @@ static JSValue f_note_system(JSContext *c, JSValueConst t, int argc, JSValueCons
     (void)t;
     double before;
     const char *name = argc == 2 ? JS_ToCString(c, argv[0]) : NULL;
-    int ok = name && (!strcmp(name, "journal") || !strcmp(name, "apt") || !strcmp(name, "vartmp") || !strcmp(name, "kernels")) && !exact_int(c, argv[1], 0, 1e18, &before);
+    int ok = name && (!strcmp(name, "journal") || !strcmp(name, "apt") || !strcmp(name, "vartmp") || !strcmp(name, "kernels") || !strcmp(name, "apps")) && !exact_int(c, argv[1], 0, 1e18, &before);
     if (ok) clean_history_system(name, before);
     if (name) JS_FreeCString(c, name);
     return ok ? JS_UNDEFINED : js_throw_code(c, "sys.badArgument", NULL);

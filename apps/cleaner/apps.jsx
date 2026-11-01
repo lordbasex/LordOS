@@ -80,7 +80,8 @@ export function AppsView({ scan, onFind, selected, setSelected }) {
   const run = () => {
     const { app } = ask;
     setAsk(null);
-    const done = () => { setMsg(tr('cleaner.system.done', { name: app.name })); setGen((g) => g + 1); };
+    const before = cleaner.status().free;
+    const done = () => { cleaner.noteSystem('apps', Math.max(0, before)); setMsg(tr('cleaner.system.done', { name: app.name })); setGen((g) => g + 1); };
     if (app.lpk) { try { if (packages.remove(app.lpk)) done(); else setMsg(tr('cleaner.apps.failed', { name: app.name })); } catch (e) { setMsg(e.message); } return; }
     admin.run('pkg-remove', app.pkg).then(done).catch((e) => setMsg(e.message));
   };
