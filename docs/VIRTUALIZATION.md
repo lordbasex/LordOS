@@ -195,6 +195,7 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
 - No network sockets of its own: networking is an fd.
 - Files are opened by the supervisor and passed by descriptor wherever QEMU allows (`/dev/fdset`).
 - No shell, no `-readconfig` from the guest's folder: arguments are built from validated settings.
+- `-run-with exit-with-parent=on`, so that a machine can't outlive `lord-vm` after a crash; swtpm exits with QEMU.
 - One VM can't read another's folder: one process tree and one Landlock domain per VM.
 - A guest's disk file isn't encrypted by default; see 8.
 
@@ -225,9 +226,9 @@ Keys go to the keyring.
 
 ### 4.1 Linux
 
-Every current Linux has virtio drivers in its kernel. Download cards use verified images: each has a URL, checksum source and signing
-key in a signed catalog, as `apt/catalog.json` does for apps. arm64 images exist for Ubuntu, Debian and Fedora; on a Pi the UEFI
-arm64 ISO is the one to use, not the Pi's image. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
+Every current Linux has virtio drivers in its kernel. Cards: Ubuntu, Fedora, Debian, Kali and LordOS, each for the host's architecture, plus **any ISO of that architecture** from a file. arm64 images exist for all of them; on a Pi the UEFI arm64 ISO is the one to use, not the Pi's image.
+
+**Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key where one is published (**To confirm per system**). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
 Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart. The person gives a name and password once, in the assistant;
 it reaches the guest through a small seed disk that is deleted after the first boot, and is never stored.
@@ -279,6 +280,15 @@ Facts to keep in view:
   the person got, and links to the maker's own download. No activation tools, ever. Running a retail license in a VM may be restricted, and
   the app doesn't advise on it.
 
+**Unattended install**, a switch in the assistant, skips Setup and first-run questions: an answer file on a generated disk picks the edition, partitions, creates a local account with the given name and optional password, signs in once and installs drivers and agent. Read from working code in the wild and worth keeping in mind:
+
+- Selecting an edition unattended is usually done with the maker's public generic key, which installs and doesn't activate. Selecting the image by index in the answer file may avoid any key: **To test**.
+- On arm64, a reported working path is to put the installer on an NVMe device with no virtio driver loaded, since Setup can fail when handed drivers it doesn't want, and to install drivers once the system is on disk, from an answer-file step. This is an alternative to mounting virtio-win during install; Phase 3 tests both per release.
+- Skipping the network requirement of first-run setup uses the maker's own documented setup switch, which the maker may remove.
+- Where firmware lacks secure boot, Setup is told to skip that check. Our amd64 path has real secure boot, so it doesn't need that.
+
+Not feasible: promising this keeps working across future releases of a system we don't control. The switch is marked with the release it was last tested on.
+
 ### 4.4 Not offered
 
 Guests whose license restricts them to their maker's hardware. Guests needing a real GPU for their desktop on hardware without passthrough.
@@ -290,7 +300,24 @@ Name and icon: a generic name, ours (open decision 1). The icon is a screen hold
 
 ### 5.1 Control Center (main window)
 
-A grid of machines, each with a **live thumbnail** while running and the last picture when off.
+The library. A **summary header**, then a grid of machines, each with a **live picture** while running and the last picture when off. All in LordOS's own flat, modern style: real data in calm type, no imitation of physical equipment.
+
+**Header:** machines running of total, memory used of host total, free space on the library's volume, and two actions: **Disk** (the Storage window) and **New**.
+
+**Each card shows:**
+
+| Item | Source | Target refresh |
+|---|---|---|
+| Live picture | Same dmabuf, downscaled by the compositor | 1 fps visible, none hidden |
+| Power light | `lord-vm` state | On change |
+| Agent light | Agent connection (6.17) | On change |
+| Disk light, blinks with I/O | QMP `query-blockstats` | 2 Hz, visible only |
+| Name, system | `machine.json`; agent's report when connected | On change |
+| What it's doing | State: Installing, Starting, At desktop, Suspended, Shut down, No window | On change |
+| CPU and memory meters | The VM's cgroup scope | 1 Hz, visible only |
+| Disk space | Storage analyzer (6.16) | On open, then on change |
+
+A light never carries meaning by color alone: each has a tooltip and the state in text.
 
 - Sidebar: All, Running, Linux, Other, Snapshots, Templates. Tags as in Files.
 - Each tile: thumbnail, name, system icon, state (Running, Paused, Suspended, Off, Emulated badge), resource line (CPU, RAM) when running. Hover: Start or
@@ -312,7 +339,7 @@ Steps, each one screen, with Back always available:
    - Download: Ubuntu, Debian, Fedora, LordOS; Android (later).
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another PC" (6.11).
-   - "Import a machine" (`.lvm`, OVA, qcow2, vmdk, vdi, vhdx).
+   - "Import a machine": see 6.22.
    - "Other architecture…" (behind it, Emulated).
 2. **Detect:** reads the ISO's volume label and boot files to name the system and architecture. Wrong architecture: says so, before anything starts.
 3. **Profile:** see 5.6.
@@ -358,11 +385,21 @@ Quick actions stay on the bar itself, icons with tooltips, in this order: **agen
 | **Picture in Picture** | Small floating view, input optional; live control off by default | Our `setPip` |
 | **Thumbnail** | Paused at last frame, one click to resume | Suspend |
 
-### 5.5 Configuration (tabs)
+### 5.5 Configuration (one screen)
 
-Reachable from the bar and from `⋯`. Tabs with a form each; changes that need a power-off are marked and applied at the next boot.
+**Decision: one window with every section down the side, each with a one-line summary of its current values, and no tabs.** The roadmap says tabs. Its five groups stay, as headings in that side list, because they're a good order, but tabs lose:
 
-**General:** name, icon, description, tags, system, architecture (read only), folder, created, disk used, Reclaim space.
+- With tabs you have to open each to see what a machine has. A summary list answers "what is this machine?" at a glance: "3 cores, 8 GB", "Shared, 1 forwarded port", "1 folder, read-only".
+- Tabs plus sub-sections are two levels of navigation; this is one.
+- Search filters the same list, and the changed sections show a dot.
+- It works in a narrow window, where the list becomes the first page. A tab row doesn't fit.
+- It reads like Settings, so nothing new to learn.
+
+Summaries look like: General "Debian 13, arm64"; CPU and memory "3 cores, 8 GB"; Display "Follows window"; Network "Shared, 1 forwarded port"; Sharing "1 folder, clipboard both ways"; Disks "1 disk, 64 GB"; Security "Sandbox on"; Backup "Weekly, last Sunday".
+
+Reachable from the bar and from `⋯`. Changes that need a power-off are marked and applied at the next boot.
+
+**General** (summary: system, architecture). Name, icon, description, tags, system, architecture (read only), folder, created, disk used, Reclaim space.
 
 **Options:**
 - Startup and shutdown: start with session, delay, on window close, on host shutdown (Suspend, Shut down).
@@ -423,7 +460,14 @@ Two kinds, named for what they do:
 - **Clone:** can run beside the original. It gets a new MAC and, through the agent, a new `machine-id` and hostname, which avoids the usual trap of two VMs receiving one DHCP address. Virtio-win guests keep their computer name unless changed.
 - **Duplicate:** an exact copy with the same identity, the only kind that can resume a suspended session.
 
-Storage: reflink on btrfs and XFS (instant, shared until changed), else a qcow2 backing file, where the source locks read-only, or a full copy. The app picks by file system and says which one it used. Templates are read-only machines made to clone.
+A **linked clone runs alongside its original and takes only what changed**:
+
+- On btrfs and XFS, a reflink copy: instant, shared until changed, and both are independent.
+- On ext4, which has no reflink, the disk becomes a frozen read-only base, and both machines get a thin qcow2 overlay on it. A running source can do this live with QEMU's `blockdev-snapshot`, **To test**. Both then run together. The base lives in `~/Machines/.shared/` and is deleted when nothing uses it. Storage shows it.
+
+A machine with a saved session can't be cloned until it's resumed and shut down, since a RAM image holds its identity.
+
+The app picks by file system and says which one it used. Templates are read-only machines made to clone.
 
 ### 6.4 Storage
 
@@ -432,7 +476,7 @@ Storage: reflink on btrfs and XFS (instant, shared until changed), else a qcow2 
 - **Reflink** on btrfs and XFS: instant copies.
 - `io_uring` where seccomp and kernel allow; `virtio-blk` by default for speed, `virtio-scsi` for discard and many disks. `iothread` per disk.
 - TRIM from guest is passed to shrink. "Reclaim space" compacts offline.
-- Import: `qemu-img convert` from vmdk, vdi, vhdx, OVA unpack. Export: same, as a `.lvm` bundle or OVA.
+- Export: a `.lvm` bundle, or OVA. Import: 6.22.
 
 ### 6.5 Network
 
@@ -456,6 +500,8 @@ Debian 13 has `passt` (**Measured**, 2025-05-03 snapshot); Phase 0 compares it w
 ### 6.8 Clipboard and drag
 
 Clipboard through `org.qemu.Display1.Clipboard` (text, images), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the agent; out copies from the guest. Linux: our `lordos-guest`. virtio-win guests: SPICE agent, `spice-vdagent` with the dbus Clipboard path needs confirming: QEMU's clipboard needs `qemu-vdagent` chardev (**To test**).
+
+If the D-Bus clipboard turns out unworkable on a guest, QEMU's display clipboard carries text at least, which is reported to work.
 
 ### 6.9 Sound, camera, microphone
 
@@ -504,7 +550,7 @@ lordvm cp ./build "Debian Dev":~/          # with progress, in either direction
 
 Same rules as the app: one small tool over the same socket, no shortcut around sandbox or admin actions, reachable only by the person's own user.
 
-A local **MCP server** (`lordvm mcp`), off until turned on in Settings, lets a coding agent list, create, start, stop, clone, screenshot and run commands in VMs. It speaks only over stdin of a process the person started. It can't touch a VM marked **No automation**, which is the default for profiles with sensitive data, and every action it takes is written to the VM's log. Destructive tools (delete, revert) ask the person on screen.
+A local **MCP server** (`lordvm mcp`), off until turned on in Settings, lets a coding agent **build a machine**: "a Debian machine with 40 GB, user neil". Tools: `list_machines`, `requirements`, `create_machine` (card or ISO, profile, unattended), `wait_until_ready` (with progress), `machine_status`, `start`, `stop`, `clone`, `screenshot`, `run_command`, `get_logs`. A password it creates goes to the keyring and never into its replies. It speaks only over stdin of a process the person started. It can't touch a VM marked **No automation**, which is the default for profiles with sensitive data, and every action it takes is written to the VM's log. Destructive tools (delete, revert) ask the person on screen.
 
 ### 6.16 Storage window
 
@@ -565,6 +611,19 @@ A panel along the bottom of the window shows file name, size, a bar, speed, time
 - Names are sanitized for the guest's rules. Symbolic links aren't followed; permissions and dates carry over where the file system can.
 - **Out of the guest:** in Apps mode, windows are ours, so dragging out works. From a Linux guest's own desktop, no agent can see the drag, so the agent adds **Send to LordOS** to the guest's file manager, plus `lordvm cp`. The panel says this when someone tries. Virtio-win guests allow drag-out through the agent, **To test**.
 - Scanning: files coming out of a guest get the same quarantine marking as downloads.
+
+### 6.22 Import
+
+An importer has three steps: **detect** a file or folder, show a **plan** of what will happen, then **import** into a new `.lvm`, leaving the original alone.
+
+| Source | Reads | Result |
+|---|---|---|
+| Disk images: qcow2, VMDK, VDI, VHDX, raw | The image | New machine, settings from a profile |
+| OVA, OVF | Descriptor: CPU, memory, disks, networks | Machine with those settings |
+| Virtual machine bundles of other desktop tools | Their settings file and disks | Settings mapped where they mean the same; disks converted |
+| libvirt domain XML | Domain | Machine with those settings |
+
+The plan states what's lost. **Snapshots in foreign formats are flattened to the current state.** Saved sessions can't move between engines, so a machine must be shut down first. Encrypted foreign disks need decrypting first. A guest that lacks virtio drivers starts on emulated SATA and an ordinary NIC; the assistant then installs the drivers and switches. A machine of another architecture imports fine and is marked Emulated: moving an arm64 machine to a Pi works natively, moving an amd64 one doesn't. Conversions run in the sandbox, because disk images are hostile input.
 
 ## 7. Guest tools
 
@@ -696,8 +755,8 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 |---|---|---|---|
 | Native speed through KVM, amd64 and arm64 | 1 | Yes | Pi 5 details in 2.2 |
 | Other architecture by emulation, labelled | 1 | Yes | 2.4 |
-| Pause, suspend to disk, resume | 2 | Yes | |
-| Keep running with no window, start with no window | 2 | Yes | |
+| Pause, saved sessions (suspend to disk), resume | 2 | Yes | May not resume across QEMU updates |
+| Keep running after closing the window, start with no window | 2 | Yes | |
 | Start with the session, order and delay | 4 | Yes | |
 | Auto-pause when idle | 4 | Work | Needs an idle signal from the agent |
 | Memory ballooning, CPU and memory hotplug | 4 | Partly | Depends on guest |
@@ -709,25 +768,30 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 
 | Capability | M | Linux today | Note |
 |---|---|---|---|
-| Verified download cards | 2 | Yes | Signed catalog |
+| Cards for Ubuntu, Fedora, Debian, Kali, always the newest image of each release | 2 | Yes | 4.1 |
+| Any ISO of the host's architecture | 1 | Yes | |
 | Install from ISO with detection of system and architecture | 1 | Yes | |
 | Requirements check with one-click install | 2 | Yes | Through the Store |
 | Automatic install, Linux guests | 2 | Yes | |
-| Automatic install, virtio-win guests, local account | 3 | Yes | No activation of anything |
+| virtio-win guest with optional unattended install, skipping Setup | 3 | Partly | amd64 and arm64; can't be promised across releases; no activation (4.3) |
 | Drivers attached during install, tools at the end | 3 | Yes | Pinned versions |
 | Migrate from a physical PC | 5 | Work | Driver injection is delicate |
-| Import bundles and foreign disk formats | 4 | Yes | `qemu-img` |
+| Import qcow2, VMDK, VDI, VHDX, OVA, other tools' bundles | 4 | Yes | Snapshots flattened, saved sessions lost (6.22) |
 | Android guest | 5 | Partly | Own image needed |
-| Guests tied to one maker's hardware | never | No | Not offered |
+| Guests tied to one maker's hardware | never | No | Not offered: neither licensed nor possible on these hosts |
 
 ### Display and graphics
 
 | Capability | M | Linux today | Note |
 |---|---|---|---|
 | Picture in our compositor, no engine window | 1 | Yes | QEMU D-Bus display |
+| Library card: lights, live picture, what it's doing, CPU and memory meters, disk space | 2 | Yes | 5.1 |
+| Summary header: running, memory, free space, Disk, New | 2 | Yes | 5.1 |
+| Settings on one screen with a summary per section | 2 | Yes | 5.5, replaces the roadmap's tabs |
+| Window opens at the guest's size and keeps its shape | 2 | Work | Our window manager needs an aspect constraint |
+| Resolution menu in the toolbar | 2 | Yes | Hidden while it follows the window |
+| Start in full screen, in its own desktop | 2 | Work | Full screen exists; the start path is new |
 | Resolution follows the window, or chosen from a menu | 2 | Yes | |
-| Window keeps guest's shape | 2 | Yes | |
-| Full screen, one desktop per guest | 2 | Yes | |
 | Several displays | 4 | Partly | virtio-gpu heads; to test on our compositor |
 | Picture in Picture | 4 | Yes | Our `setPip` |
 | Apps mode, Linux guests | 5 | Work | Wayland forwarding |
@@ -741,10 +805,11 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 
 | Capability | M | Linux today | Note |
 |---|---|---|---|
-| Clipboard, by direction | 2 | Yes | |
-| Shared folders, read-only by default | 2 | Yes | virtiofs; arm64 virtio-win to test |
-| File copy with progress, speed and time left | 2 | Work | Our agent |
-| Drag out of a Linux guest's own desktop | none | No | Replaced by Send to LordOS |
+| Clipboard for all guests, by direction | 2 | Yes | Text first; images to test |
+| Shared folders for all guests, read-only by default | 2 | Yes | virtiofs; on arm64 virtio-win guests, a host-only SMB share if that fails |
+| Drag and drop into any guest, with progress, speed, time left | 2 | Work | Our agent |
+| Drag out of virtio-win guests | 3 | Work | To test |
+| Drag out of a Linux guest's own desktop | none | No | No agent can see the drag. Send to LordOS instead; Apps mode can |
 | USB attach, auto-connect rules | 2 | Yes | usbredir |
 | Sound | 2 | Yes | |
 | Microphone and camera on request | 3 | Yes | |
@@ -752,8 +817,9 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Guest apps in the launcher and Dock | 5 | Work | |
 | Open host files with a guest app | 5 | Work | |
 | Shell in a guest with no network | 2 | Work | Agent |
-| Run commands from host scripts | 4 | Work | `lordvm` |
-| Local MCP server for coding agents | 4 | Work | Off by default |
+| Run commands from the host | 4 | Work | `lordvm` |
+| Live logs | 2 | Work | Agent |
+| MCP server, a coding agent builds a machine | 4 | Work | Off by default |
 
 ### Storage, snapshots, safety
 
@@ -762,12 +828,13 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Thin disks, encryption, compaction | 2 | Yes | qcow2 |
 | Snapshots with timeline | 2 | Yes | |
 | Disposable sessions | 2 | Yes | |
-| Clones, linked or reflinked | 2 | Yes | By file system |
+| Linked clones running beside the original, only changed space | 2 | Yes | Reflink, or a frozen base with overlays on ext4; live freeze to test |
 | Duplicates with the same identity | 2 | Yes | |
 | Backup with schedule and consistency | 4 | Yes | Agent freeze |
 | UEFI, secure boot, TPM 2.0 | 3 | Partly | amd64 yes; arm64 secure boot to test |
 | Network: Shared, Bridged, Host only, Isolated | 2, 4 | Yes | Bridged needs Ethernet |
-| Screenshot and recording, from the VM's frame | 2 | Yes | |
+| Screenshot and recording with sound, from the VM's frame | 2 | Yes | |
+| Storage window | 2 | Yes | 6.16 |
 
 ### Beyond the usual
 
@@ -817,4 +884,7 @@ What people don't normally get from a desktop virtualization app, and the reason
 9. Does the catalog list only systems we can download freely, as recommended?
 10. Is Migrate worth its cost?
 11. Does `lordvm mcp` ship at all, given that it lets a coding agent run commands in guests? Off by default is the recommendation.
-12. Who may use the agent's shell: a root shell by default in Linux guests is convenient, and strong.
+12. Settings on one screen replaces the tabs of ROADMAP.md. The roadmap line needs changing if you agree.
+13. Kali in the catalog: it's a security toolkit, and the Store's rule is that what we list we stand behind.
+14. Unattended install may need the maker's public generic key to pick an edition. It activates nothing, but do we ship such a key in the catalog, or only use index selection if that works?
+15. Who may use the agent's shell: a root shell by default in Linux guests is convenient, and strong.
