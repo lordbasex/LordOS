@@ -1,4 +1,4 @@
-# LordOS on Raspberry Pi: from the Raspberry Pi archive only the kernel, the firmware and their utilities
+# LordOS on Raspberry Pi: from the Raspberry Pi archive only the kernel, the firmware, their utilities and FFmpeg (hardware HEVC)
 # (the Debian 13 kernel lacks RP1: no USB, Ethernet or HDMI on the Pi 5). Everything else, Mesa
 # included, comes from Debian. See docs/RASPBERRY.md.
 Package: *
@@ -6,6 +6,6 @@ Pin: origin archive.raspberrypi.com
 Pin-Priority: 100
 
 # (0.8.7) FFmpeg too: only Raspberry Pi's drives the Pi 5's HEVC decoder (docs/WALLPAPERS.md, docs/MEDIA.md).
-Package: raspi-firmware ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10 libavdevice61 linux-image-rpi-* linux-image-*-rpi-* linux-headers-rpi-* linux-headers-*-rpi-* linux-kbuild-* firmware-brcm80211 rpi-eeprom raspi-utils* raspberrypi-archive-keyring
+Package: raspi-firmware ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10 libavdevice61 libpostproc58 linux-image-rpi-* linux-image-*-rpi-* linux-headers-rpi-* linux-headers-*-rpi-* linux-kbuild-* firmware-brcm80211 rpi-eeprom raspi-utils* raspberrypi-archive-keyring
 Pin: origin archive.raspberrypi.com
 Pin-Priority: 990
