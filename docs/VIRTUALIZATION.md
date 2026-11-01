@@ -12,6 +12,9 @@ How to read it:
   ("other systems"), as [the brand rule](../tools/brand-check.mjs) requires; a guest's real name appears only as the label of its
   download or its installer.
 
+
+Mocks of every screen: https://claude.ai/artifact/WNiELGEazSqnr68SFWuyPz (private to the maintainer).
+
 ## 1. Goals
 
 The bar is section 15: the most complete desktop virtualization app, and visually the best, with every claim marked for what Linux allows today.
