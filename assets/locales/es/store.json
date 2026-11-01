@@ -277,7 +277,8 @@
   "formats.ntfs": "Lee y escribe volúmenes NTFS.",
   "formats.exfat": "Lee y escribe volúmenes exFAT.",
   "formats.fat": "Abre y formatea volúmenes FAT en el escritorio.",
-  "formats.hfs": "Lee volúmenes HFS+; uno con diario, lo habitual, es de solo lectura.",
-  "formats.apfs": "Lee volúmenes APFS, solo lectura.",
-  "formats.allow": "Continuar"
+  "formats.hfs": "Lee volúmenes HFS+, solo lectura.",
+  "formats.apfs": "Opcional. Lee volúmenes APFS, solo lectura.",
+  "formats.allow": "Continuar",
+  "formats.optional": "Agregar también APFS. Compila un controlador para tu kernel y suma unos 500 MB de compiladores y headers."
 }

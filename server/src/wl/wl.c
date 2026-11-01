@@ -94,6 +94,7 @@ struct Surf {
     int gx, gy, gw, gh, has_geom;
     char title[256], app_id[128];
     int maximized, fullscreen, activated, csd;
+    int dialog, min_w, min_h, max_w, max_h;     /* xdg_toplevel: a parent, and its size limits */
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
     struct wl_resource *kde;
     /* popup menu */
@@ -1640,7 +1641,11 @@ static void position_popup(Surf *s, const Positioner *p) {
 /* ---- xdg_toplevel ---- */
 
 static void top_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) { (void)c; (void)r; (void)p; }
+static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) s->dialog = !!p;
+}
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
@@ -1672,7 +1677,16 @@ static void top_resize(struct wl_client *c, struct wl_resource *r, struct wl_res
     Surf *s = wl_resource_get_user_data(r);
     if (s && s->mapped) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
 }
-static void top_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) { (void)c; (void)r; (void)w; (void)h; }
+static void top_max_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) { s->max_w = w; s->max_h = h; }
+}
+static void top_min_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) { s->min_w = w; s->min_h = h; }
+}
 static void top_maximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
     if (s && s->mapped) emit(s, "maximize", "{}");
@@ -1733,8 +1747,8 @@ static void top_minimize(struct wl_client *c, struct wl_resource *r) {
 }
 static const struct xdg_toplevel_interface toplevel_impl = {
     .destroy = top_destroy, .set_parent = top_parent, .set_title = top_title, .set_app_id = top_app_id,
-    .show_window_menu = top_menu, .move = top_move, .resize = top_resize, .set_max_size = top_size,
-    .set_min_size = top_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
+    .show_window_menu = top_menu, .move = top_move, .resize = top_resize, .set_max_size = top_max_size,
+    .set_min_size = top_min_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
     .set_fullscreen = top_fullscreen, .unset_fullscreen = top_unfullscreen, .set_minimized = top_minimize,
 };
 static void top_gone(struct wl_resource *r) {
@@ -1978,10 +1992,13 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s}",
-             t, a, alt, w, h, s->csd ? "true" : "false");
-    } else
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s}", t, a, w, h, s->csd ? "true" : "false");
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}",
+             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
+    } else {
+        int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}", t, a, w, h, s->csd ? "true" : "false",
+             s->dialog ? "true" : "false", fixed ? "true" : "false");
+    }
 }
 
 /* A new JS context (the theme was switched live): the windows that are still mapped are announced

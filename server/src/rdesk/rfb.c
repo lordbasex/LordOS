@@ -83,7 +83,7 @@ static int resize(Rfb *r, int w, int h) {
     return 0;
 }
 
-int rfb_handshake(Rfb *r, const char *password) {
+static int handshake(Rfb *r, const char *password) {
     uint8_t b[64];
     if (r->rd(r->ud, b, 12) || memcmp(b, "RFB 003.", 8)) return -1;
     if (r->wr(r->ud, "RFB 003.008\n", 12)) return -1;
@@ -94,14 +94,17 @@ int rfb_handshake(Rfb *r, const char *password) {
     if (r->rd(r->ud, types, (size_t)n)) return -1;
     int vnc = 0, none = 0;
     for (int i = 0; i < n; i++) { vnc |= types[i] == 2; none |= types[i] == 1; }
-    if (password[0] ? !vnc && !none : !none && !vnc) return -1;
+    if (!vnc && !none) return -1;
+    if (password[0] && !vnc) return 1;  /* a password was given: a server that doesn't ask for one isn't taken for the real one */
     uint8_t pick = vnc && (password[0] || !none) ? 2 : 1;
     if (r->wr(r->ud, &pick, 1)) return -1;
     if (pick == 2) {
         uint8_t c[16], o[16];
         if (r->rd(r->ud, c, 16)) return -1;
         rfb_challenge(password, c, o);
-        if (r->wr(r->ud, o, 16)) return -1;
+        int bad = r->wr(r->ud, o, 16);
+        explicit_bzero(o, sizeof o);
+        if (bad) return -1;
     }
     if (r->rd(r->ud, b, 4)) return -1;
     if (be32(b)) return 1;
@@ -116,6 +119,12 @@ int rfb_handshake(Rfb *r, const char *password) {
     uint8_t enc[4 + 16] = { 2, 0, 0, 4 };
     w32(enc + 4, 1); w32(enc + 8, 5); w32(enc + 12, 0); w32(enc + 16, (uint32_t)-223);
     return r->wr(r->ud, enc, sizeof enc) ? -1 : 0;
+}
+
+int rfb_handshake(Rfb *r, char *password) {
+    int h = handshake(r, password);
+    if (password[0]) explicit_bzero(password, strlen(password));
+    return h;
 }
 
 int rfb_update_request(Rfb *r, int inc) {

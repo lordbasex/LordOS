@@ -1,7 +1,11 @@
-/* rdeskrdp.c — RDP through libfreerdp's core alone: no client library, no display. Its software GDI draws into the
+/* rdeskrdp.c — RDP through libfreerdp, with its client library only for shared folders: no display. Its software GDI draws into the
  * shared picture. The connected socket is handed over as FreeRDP's "|fd" host, so the library makes no socket of its own. */
 #include "proto.h"
 
+#include <freerdp/addin.h>
+#include <freerdp/client.h>
+#include <freerdp/client/channels.h>
+#include <freerdp/client/cmdline.h>
 #include <freerdp/freerdp.h>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/input.h>
@@ -42,7 +46,8 @@ static BOOL post_connect(freerdp *in) {
     return TRUE;
 }
 
-/* the person decides on an unknown certificate: lord-server shows the fingerprint and answers */
+/* the person decides on an unknown certificate: the app compares it with the one it keeps (sdk/remotecert.js), shows the
+ * fingerprint and answers. The library's own store isn't used: a sandbox can't write it, so "changed" comes from the app. */
 static DWORD verify(freerdp *in, const char *host, UINT16 port, const char *cn, const char *sub, const char *iss, const char *fp, DWORD flags) {
     (void)in; (void)host; (void)port; (void)cn; (void)sub; (void)iss; (void)flags;
     rd_send(RD_CERT, 0, 0, 0, fp);
@@ -73,7 +78,7 @@ static void input(freerdp *in, const RdMsg *m) {
     }
 }
 
-int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password) {
+int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password, const RdView *view) {
     (void)host;
     freerdp *in = freerdp_new();
     if (!in) return 1;
@@ -91,10 +96,27 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
     if (user[0]) freerdp_settings_set_string(s, FreeRDP_Username, user);
     if (domain[0]) freerdp_settings_set_string(s, FreeRDP_Domain, domain);
     if (password[0]) freerdp_settings_set_string(s, FreeRDP_Password, password);
-    freerdp_settings_set_uint32(s, FreeRDP_DesktopWidth, 1280);
-    freerdp_settings_set_uint32(s, FreeRDP_DesktopHeight, 800);
+    freerdp_settings_set_uint32(s, FreeRDP_DesktopWidth, view->w ? (UINT32)view->w : 1280);
+    freerdp_settings_set_uint32(s, FreeRDP_DesktopHeight, view->h ? (UINT32)view->h : 800);
+    if (view->drives) {
+        freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
+        in->LoadChannels = freerdp_client_load_channels;
+        freerdp_settings_set_bool(s, FreeRDP_DeviceRedirection, TRUE);
+        for (int i = 0; i < view->drives; i++) {
+            const char *params[] = { "drive", view->drive[i][0], view->drive[i][1] };
+            if (!freerdp_client_add_device_channel(s, 3, params)) return 1;
+        }
+    }
     freerdp_settings_set_uint32(s, FreeRDP_ColorDepth, 32);
     freerdp_settings_set_bool(s, FreeRDP_SoftwareGdi, TRUE);
+    /* TLS or NLA only: RDP's own security has no certificate to check, and the password would go to whoever answered */
+    freerdp_settings_set_bool(s, FreeRDP_RdpSecurity, FALSE);
+    freerdp_settings_set_bool(s, FreeRDP_TlsSecurity, TRUE);
+    freerdp_settings_set_bool(s, FreeRDP_NlaSecurity, TRUE);
+    freerdp_settings_set_bool(s, FreeRDP_ExtSecurity, FALSE);
+    freerdp_settings_set_bool(s, FreeRDP_NegotiateSecurityLayer, TRUE);
+    freerdp_settings_set_bool(s, FreeRDP_IgnoreCertificate, FALSE);
+    freerdp_settings_set_bool(s, FreeRDP_AutoAcceptCertificate, FALSE);
     if (!freerdp_connect(in)) {
         UINT32 e = freerdp_get_last_error(in->context);
         rd_send(RD_STATE, e == FREERDP_ERROR_CONNECT_LOGON_FAILURE || e == FREERDP_ERROR_AUTHENTICATION_FAILED || e == FREERDP_ERROR_CONNECT_WRONG_PASSWORD ? RS_DENIED : RS_FAILED, 0, 0, NULL);

@@ -24,6 +24,8 @@ int  xwm_running(void);
 /* ---- xwm.c, called by wl.c ---- */
 void xwm_surface_created(uint32_t res_id);     /* Xwayland created a wl_surface (WL_SURFACE_ID may wait for it) */
 void xwm_surface_gone(XWin *w);                /* its wl_surface was destroyed */
+int  xwm_is_dialog(const XWin *w);             /* transient, or of type dialog */
+int  xwm_is_fixed(const XWin *w);              /* its minimum and maximum size are the same */
 void xwm_place(XWin *w, int x, int y);         /* where its content is on screen (logical, from wl_paint) */
 void xwm_resize(XWin *w, int width, int height);   /* the theme's frame gave it this size */
 void xwm_set_state(XWin *w, int maximized, int fullscreen, int minimized);

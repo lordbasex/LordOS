@@ -117,7 +117,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
   useEffect(() => {
     const mv = addListener('pointermove', (e) => {
       const o = op.current;
-      if (!o) return;
+      if (!o || (o.k === 'name' && !o.grip)) return;       // Name stays first
       if (!o.moved && Math.abs(e.x - o.x) < 5) return;
       o.moved = true;
       const dx = (direction() === 'rtl' ? -1 : 1) * (e.x - o.x);
@@ -139,7 +139,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
     const a = addListener('pointerup', up);
     return () => { mv(); a(); };
   }, [nameW, columns]);
-  const start = (ev, k, grip) => { ev.stopPropagation(); if (ev.button) return; op.current = { k, grip, x: ev.x, w: cols.width[k], columns: cols }; };
+  const start = (ev, k, grip) => { ev.stopPropagation(); if (ev.button) return; op.current = { k, grip, x: ev.x, w: k === 'name' ? nameW : cols.width[k], columns: cols }; };
   const title = (k) => tr(`files.col.${k === 'kind' && ctx.showFolder ? 'where' : k}`);
   const label = (k) => (
     <>
@@ -149,7 +149,10 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
   );
   return (
     <View ref={row} onContextMenu={(ev) => { ev.stopPropagation(); ctx.onHeaderMenu(ev); }} style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: t.separator }}>
-      <View onClick={() => onSort('name')} style={{ width: nameW, height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20 }}>{label('name')}</View>
+      <View onMouseDown={(ev) => start(ev, 'name', false)} style={{ width: live?.columns?.nameWidth ?? nameW, height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 20 }}>
+        {label('name')}
+        <View onMouseDown={(ev) => start(ev, 'name', true)} style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: 0, width: 8, cursor: 'ew-resize' }} />
+      </View>
       {visible(cols).map((k) => (
         <View key={k} onMouseDown={(ev) => start(ev, k, false)} style={{ width: cols.width[k], height: 26, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden',
           justifyContent: k === 'size' ? 'flex-end' : 'flex-start', paddingHorizontal: 8, opacity: live?.moving === k ? 0.5 : 1 }}>
@@ -201,7 +204,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
   const cols = ctx.columns;
   const need = totalWidth(cols) + NAME_MIN + SIDE_PAD;
   const room = ctx.contentW;
-  const nameW = Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
+  const nameW = cols.nameWidth || Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
   const over = Math.max(0, need - room);
   const x = Math.min(sx, over);
   const inner = { ...ctx, nameW };
@@ -240,7 +243,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
 
 // ---- preview (columns, gallery, Quick Preview) ----
 
-export function Preview({ e, big = false }) {
+export function Preview({ e, big = false, name }) {
   const t = useTheme();
   const [text, setText] = useState(null);
   useEffect(() => {
@@ -257,7 +260,7 @@ export function Preview({ e, big = false }) {
             <Text style={{ fontFamily: 'monospace', fontSize: big ? 12 : 10, color: t.text, lineHeight: big ? 17 : 14 }}>{text.split('\n').slice(0, big ? 200 : 60).join('\n')}</Text>
           </View>
         ) : <EntryIcon e={e} size={big ? 160 : 96} dark={t.mode === 'dark'} />}
-      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'center', marginTop: 6 }}>{e.name}</Text>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'center', marginTop: 6 }}>{name || e.name}</Text>
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center' }}>{`${kindLabel(e)}${e.dir || e.app ? '' : ` · ${formatBytes(e.size)}`}${e.mtime ? ` · ${when(e.mtime)}` : ''}`}</Text>
     </View>
   );
@@ -318,7 +321,8 @@ export function GalleryView({ entries, ctx }) {
   const from = Math.max(0, idx - 4);
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big /> : <EmptyState title={ctx.emptyText} />}</View>
+      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} /> : <EmptyState title={ctx.emptyText} />}</View>
+      {cur && ctx.renaming?.path === cur.path ? <View style={{ alignItems: 'center', paddingBottom: 8 }}><Name e={cur} ctx={ctx} /></View> : null}
       <View style={{ height: 97, borderTopWidth: 1, borderTopColor: t.separator, flexDirection: 'row', gap: 8, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', direction: 'ltr', overflow: 'hidden' }}>
         {entries.slice(from, from + 9).map((e) => {
           const sel = e === cur;

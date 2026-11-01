@@ -6,7 +6,7 @@
 // verified sources (docs/UPDATES.md, "Mirrored apps (catalog)"). Installing goes through the package
 // engine like any Debian package: the plan first, then pkg-install.
 import { createElement as h, useState } from 'react';
-import { View, Text, Image, Button, LetterIcon, useTheme, useStore, useSystemInfo, admin, locale, formatBytes, typeScale, spacing, t } from '@lordos/sdk';
+import { View, Text, Image, Button, Toggle, LetterIcon, useTheme, useStore, useSystemInfo, admin, locale, formatBytes, typeScale, spacing, t } from '@lordos/sdk';
 import catalog from '../../apt/catalog.json';
 import { debian } from './debian.js';
 import { Card, CardGrid, Featured, FeaturedSkeleton, Pill, Shelf, nameColor } from './ui.js';
@@ -91,15 +91,44 @@ function NotListed({ a, onDone }) {
 function Authorize({ a, onAllow }) {
   const th = useTheme();
   const here = useHere();
+  const [more, setMore] = useState(false);
+  const drivers = a.drivers.filter((d) => !d.arches || d.arches.includes(here));
+  const extras = more ? drivers.flatMap((d) => d.optional || []) : [];
   return h(View, { style: { gap: spacing.m, maxWidth: 680 } },
     h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
     h(Text, { style: { fontSize: typeScale.caption, fontWeight: 600, color: th.textDim, textAlign: 'start' } }, t('store.formats.label')),
     h(Text, { style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start' } }, t('store.formats.intro')),
-    ...a.drivers.filter((d) => !d.arches || d.arches.includes(here)).map((d) => h(View, { key: d.name, style: { gap: 2 } },
+    ...drivers.map((d) => h(View, { key: d.name, style: { gap: 2 } },
       h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start' } }, `${d.name} · ${d.license}`),
       h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } }, t(`store.formats.${d.id}`)),
-      h(Text, { style: { fontSize: 11, color: th.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' } }, d.source))),
-    h(View, { style: { flexDirection: 'row', gap: spacing.s } }, h(Button, { primary: true, label: t('store.formats.allow'), onClick: onAllow })));
+      h(Text, { style: { fontSize: 11, color: th.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' } }, d.source),
+      d.optional ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 } },
+        h(Toggle, { value: more, onChange: setMore }),
+        h(Text, { style: { flex: 1, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } }, t('store.formats.optional'))) : null)),
+    h(View, { style: { flexDirection: 'row', gap: spacing.s } }, h(Button, { primary: true, label: t('store.formats.allow'), onClick: () => onAllow(extras) })));
+}
+
+// The item is in and an optional part isn't: the same choice as on the page before installing, with its own plan.
+function MoreDrivers({ a }) {
+  const th = useTheme();
+  const here = useHere();
+  const { job } = useStore(debian.state);
+  const [plan, setPlan] = useState(null);
+  const missing = a.drivers.filter((d) => !d.arches || d.arches.includes(here)).flatMap((d) => d.optional || []).filter((p) => !installed(p));
+  if (!missing.length) return null;
+  const confirm = () => {
+    const extra = plan.items.some((i) => i.action === 'remove' && !i.requested);
+    debian.runJob('pkg-install', [...missing, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: a.name }));
+    setPlan(null);
+  };
+  return h(View, { style: { gap: spacing.s, maxWidth: 680 } },
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m } },
+      h(Text, { style: { flex: 1, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } }, t('store.formats.optional')),
+      h(Button, { label: t('store.install'), disabled: !admin.available() || !!job, onClick: () => setPlan(lord.pkg.plan({ install: missing })) })),
+    plan ? h(debian.PlanView, { plan }) : null,
+    plan ? h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' } },
+      h(Button, { label: t('store.cancel'), onClick: () => setPlan(null) }),
+      plan.ok ? h(Button, { primary: true, label: t('store.plan.confirm'), onClick: confirm }) : null) : null);
 }
 
 const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.arch] || info.arch || ''; };
@@ -114,10 +143,10 @@ export const catalogApp = (pkg) => (catalog.apps || []).find((x) => x.package ==
 export function AiDetail({ pkg }) {
   useStore(locale);
   const [, setTick] = useState(0);
-  const [allowed, setAllowed] = useState(false);
+  const [allowed, setAllowed] = useState(null);        // the optional packages chosen, once allowed
   const a = catalogApp(pkg);
   const direct = a && a.source && a.source.delivery === 'direct';
-  if (a?.drivers && !installed(pkg) && !allowed) return h(Authorize, { a, onAllow: () => setAllowed(true) });
+  if (a?.drivers && !installed(pkg) && !allowed) return h(Authorize, { a, onAllow: setAllowed });
   if (direct && !offered(pkg)) return h(AddSource, { a, onDone: () => setTick((x) => x + 1) });
   if (a && !direct && !offered(pkg)) return h(NotListed, { a, onDone: () => setTick((x) => x + 1) });
   // removing an app from its maker's repository also removes that repository, unless another
@@ -127,7 +156,8 @@ export function AiDetail({ pkg }) {
     const sameRepo = (catalog.apps || []).some((x) => x.id !== a.id && x.source && x.source.url === a.source.url && installed(x.package));
     if (!sameRepo) admin.run('pkg-source-remove', a.id).catch(() => {});
   };
-  return h(debian.Details, { name: pkg, onRemoved });
+  const details = h(debian.Details, { name: pkg, onRemoved, extras: allowed || [] });
+  return a?.drivers && installed(pkg) ? h(View, { style: { gap: spacing.l } }, h(MoreDrivers, { a }), details) : details;
 }
 
 // The Artificial Intelligence page: the catalog as cards (the search narrows it).

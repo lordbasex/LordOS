@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan,
+  useDisks, admin, systemInfo, lan, shortcutTaken,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -18,10 +18,10 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetGlyph, isShareFs, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
+import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hostEntries, lanStatus, hostName } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
-import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer } from './prefs.js';
+import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
 export function Icon({ size: s }) {
@@ -36,9 +36,19 @@ export function Icon({ size: s }) {
   );
 }
 
+// A menu never shows a key the theme takes: Lord Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
+const ARROW_KEY = { '↑': 'ArrowUp', '↓': 'ArrowDown' };
+function localKey(hint) {
+  const m = /^❖([A-Z0-9,↑↓])$/.exec(hint || '');
+  if (!m) return hint;
+  const key = ARROW_KEY[m[1]] || m[1];
+  if (!shortcutTaken(`Meta+${key}`)) return hint;
+  return shortcutTaken(`Ctrl+${key}`) ? undefined : `Ctrl+${m[1]}`;
+}
+const localKeys = (items) => items.map((i) => (typeof i === 'string' ? i : { ...i, hint: localKey(i.hint), ...(i.items ? { items: localKeys(i.items) } : null), ...(Array.isArray(i.submenu) ? { submenu: localKeys(i.submenu) } : null) }));
+
 const VIEWS = ['icons', 'list', 'columns', 'gallery'];
 const VIEW_GLYPH = { icons: '▦', list: '≡', columns: '◫', gallery: '▣' };
-const SIDEBAR_W = 200;
 let tabSeq = 1;
 const newTab = (loc, from) => ({ id: tabSeq++, loc, back: [], fwd: [], view: from?.view || 'icons', sort: from?.sort || { by: 'name', desc: false }, group: from?.group || 'none', chain: [] });
 // State of each window: it survives the interface being remounted (a language change).
@@ -128,10 +138,10 @@ function locTitle(loc, dirs) {
 
 // Source-list row: 28 px, accent-colored icon, a soft highlight when selected and the
 // accent when something is dragged over it.
-function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail }) {
+function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext, onPress }) {
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
+    <View onClick={onClick} onMouseDown={onPress} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
       style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, borderRadius: 6,
         backgroundColor: hot ? t.accent : selected ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover ? t.hover : 'transparent' }}>
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
@@ -187,11 +197,23 @@ export default function Files() {
   const errs = useStore(jobErrors);
   const saved = winStates.get(wid);
   const prefs = useFilesPrefs();
-  const [tabs, setTabs] = useState(() => saved?.tabs || [{ ...newTab(argLoc(args) || startLoc(prefs.newWindow)), view: argView(args) || 'icons' }]);
+  const [tabs, setTabs] = useState(() => {
+    if (saved?.tabs) return saved.tabs;
+    const l = argLoc(args) || startLoc(prefs.newWindow), v = viewFor(prefs, l);
+    return [{ ...newTab(l), ...v, sortChosen: !!viewKey(l) && !!prefs.folderViews[viewKey(l)], view: argView(args) || v.view }];
+  });
   const [active, setActive] = useState(() => saved?.active || 0);
   const tab = tabs[Math.min(active, tabs.length - 1)];
   useEffect(() => { winStates.set(wid, { tabs, active }); }, [tabs, active]);
   useEffect(() => () => { if (!wm.get(wid)) winStates.delete(wid); }, []);
+  // the sidebar's width, dragged from its edge and kept
+  const [dragW, setDragW] = useState(null);
+  const sideW = clampSide(dragW ?? prefs.sideWidth);
+  const startSide = (e) => {
+    const x0 = e.x, w0 = sideW;
+    const off = [addListener('pointermove', (m) => setDragW(clampSide(w0 + (m.x - x0)))),
+      addListener('pointerup', (m) => { off.forEach((f) => f()); setDragW(null); setPrefs({ sideWidth: clampSide(w0 + (m.x - x0)) }); })];
+  };
   const patchTab = (p) => setTabs((ts) => ts.map((x, i) => (i === active ? { ...x, ...(typeof p === 'function' ? p(x) : p) } : x)));
 
   const [selected, setSelected] = useState(() => new Set());
@@ -249,17 +271,20 @@ export default function Files() {
   // doesn't write): the actions that change it are left out
   const readOnly = useMemo(() => { if (!curDir) return false; try { return !fs.stat(curDir).writable; } catch (e) { return true; } }, [curDir, version]);
   const wDir = readOnly ? null : curDir;
-  const title = locTitle(loc, dirs);
+  const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
 
+  const viewOf = (l) => { const k = viewKey(l); return { ...viewFor(filesPrefs(), l), sortChosen: !!k && !!filesPrefs().folderViews[k] }; };
+  // what this place shows is kept for it, across windows and restarts
+  const keepView = (view, sort) => { const k = viewKey(tab.loc); if (k) setPrefs({ folderViews: folderViewsWith(filesPrefs().folderViews, k, { view, sort }) }); };
   function navigate(next, push = true) {
     if (sameLoc(next, tab.loc)) return;
     if (tab.loc.type === 'network') netExpanded.current = expanded;      // back in Network, what was unfolded stays
     setSelected(new Set()); setRenaming(null); setQuery(''); setDebounced(''); setExpanded(next.type === 'network' ? netExpanded.current : new Set());
     if (next.type === 'dir') noteFolder(next.path);
-    patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [] }));
+    patchTab((x) => ({ loc: next, back: push ? [...x.back, x.loc].slice(-50) : x.back, fwd: push ? [] : x.fwd, chain: [], ...viewOf(next) }));
   }
-  const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
-  const goForward = () => { if (!tab.fwd.length) return; const nxt = tab.fwd[0]; setSelected(new Set()); patchTab((x) => ({ loc: nxt, back: [...x.back, x.loc], fwd: x.fwd.slice(1), chain: [] })); };
+  const goBack = () => { if (!tab.back.length) return; const prev = tab.back[tab.back.length - 1]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(prev), loc: prev, back: x.back.slice(0, -1), fwd: [x.loc, ...x.fwd], chain: [] })); };
+  const goForward = () => { if (!tab.fwd.length) return; const nxt = tab.fwd[0]; setSelected(new Set()); patchTab((x) => ({ ...viewOf(nxt), loc: nxt, back: [...x.back, x.loc], fwd: x.fwd.slice(1), chain: [] })); };
   const goUp = () => {
     if (baseLoc.type === 'archive') { navigate(baseLoc.inner ? { type: 'archive', path: baseLoc.path, inner: baseLoc.inner.split('/').slice(0, -1).join('/') } : { type: 'dir', path: fs.parent(baseLoc.path) || '/' }); return; }
     if (curDir && curDir !== '/' && curDir !== fs.home()) navigate({ type: 'dir', path: fs.parent(curDir) || '/' });
@@ -351,7 +376,7 @@ export default function Files() {
     if (a.kind === 'remote') {
       noteServer(a.text);
       setSheet(null);
-      wm.open(a.scheme, { new: true, args: { host: a.host, port: a.port, user: a.user } });
+      wm.open('remote-desk', { new: true, args: { proto: a.scheme, host: a.host, port: a.port, user: a.user } });
       return null;
     }
     const app = clientFor(a.scheme);
@@ -394,7 +419,7 @@ export default function Files() {
   // a computer: its best way in; connected shares open as folders
   const openWay = (w, h) => {
     if (w.volume) { navigate(dirLoc(w.volume.path)); return; }
-    if (w.mode === 'screen') { wm.open(w.app, { new: true, args: { host: h.addr, port: w.port, user: '' } }); return; }
+    if (w.mode === 'screen') { wm.open('remote-desk', { new: true, args: { proto: w.app, host: h.addr, port: w.port, user: '' } }); return; }
     if (w.mode === 'remote') { setRemoteAsk({ ...w.ask, ssh: w.ask.kind === 'sftp' ? `ssh ${h.addr}` : null }); return; }
     // a share open to guests, or an NFS export, mounts by itself; anything else asks who connects
     if (w.share && (w.kind === 'nfs' || ['anonymous', 'guest'].includes(h.session))) {
@@ -419,8 +444,12 @@ export default function Files() {
     setTabs((ts) => ts.filter((_, j) => j !== i));
     setActive((a) => (a >= i && a > 0 ? a - 1 : a));
   };
-  const setView = (view) => patchTab({ view });
-  const setSort = (by) => patchTab((x) => ({ sortChosen: true, sort: { by, desc: x.sort.by === by ? !x.sort.desc : by === 'date' || by === 'size' } }));
+  const setView = (view) => { patchTab({ view }); keepView(view, tab.sort); };
+  const setSort = (by) => {
+    const sort = { by, desc: tab.sort.by === by ? !tab.sort.desc : by === 'date' || by === 'size' };
+    patchTab({ sortChosen: true, sort });
+    keepView(tab.view, sort);
+  };
 
   // ---- selection ----
   const onItemDown = (e, ev) => {
@@ -436,6 +465,18 @@ export default function Files() {
     if (!e.app && !e.netHost && !e.netWay && loc.type !== 'trash') press.current = { paths: next.has(e.path) ? [...next] : [e.path], x: ev.x, y: ev.y };
   };
 
+  // a shortcut, not a copy: a folder on a server remembers how to get back to it
+  const addFavorite = (path) => {
+    try { if (!fs.stat(path).dir) return; } catch (e) { return; }
+    const v = fs.volumes().find((x) => isShareFs(x.fs) && (path === x.path || path.startsWith(`${x.path}/`)));
+    addFavoriteFolder({ path, name: v && path === v.path ? v.name : fs.basename(path), address: v ? originOf(v.path, v.fs, v.name) : '' });
+  };
+  const offline = (f) => !!f.address && !volumes.some((v) => f.path === v.path || f.path.startsWith(`${v.path}/`));
+  const openFavorite = (f) => {
+    if (offline(f)) { reconnect(f); return; }
+    try { if (fs.stat(f.path).dir) { navigate(dirLoc(f.path)); return; } } catch (e) { /* below */ }
+    setMsg(tr('files.fav.gone', { name: f.name }));
+  };
   // ---- drag and drop (⌥ copies; otherwise it moves) ----
   const dropOf = (inst) => { for (let n = inst; n; n = n.parent) { if (n.props?.dropPath) return n.props.dropPath; if (n.props?.dropTrash) return 'trash:'; } return null; };
   useEffect(() => {
@@ -445,8 +486,8 @@ export default function Files() {
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
       p.moved = true;
       const target = dropOf(e.target);
-      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt });
-      setDropTarget(target && !p.paths.includes(target) ? target : null);
+      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly });
+      setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
       const p = press.current;
@@ -454,7 +495,8 @@ export default function Files() {
       if (!p || !p.moved) return;
       const target = dropOf(e.target);
       setDrag(null); setDropTarget(null);
-      if (!target || p.paths.includes(target)) return;
+      if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
+      if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { let n = 0; for (const x of p.paths) { try { fs.trash(x); n++; } catch (err) { setMsg(err.message); } } if (n) bump(); return; }
       transfer(p.paths, target, !e.alt);
     });
@@ -487,7 +529,7 @@ export default function Files() {
     const openers = openersFor(e, launcherApps, tr);
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
-      ...(e.dir ? [{ label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
+      ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
       ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
@@ -530,10 +572,20 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: itemMenu(e) });
   };
+  // a server in Locations: stays there, dim, when it isn't connected; a click connects again
+  const pinMenu = (ev, v) => {
+    ev.stopPropagation?.();
+    const address = originOf(v.path, v.fs, v.name);
+    if (!address) return;
+    const pinned = prefs.pins.some((p) => p.path === v.path);
+    const at = local(ev);
+    setMenu({ x: at.x, y: at.y, items: [{ label: tr(pinned ? 'files.pin.remove' : 'files.pin.add'), onClick: () => togglePin({ address, path: v.path, name: v.name }) }] });
+  };
+  const reconnect = (p) => { const r = connectTo(p.address); if (r?.error) setMsg(r.error); };
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
-  const cols = () => { const w = root.current ? lord.getLayout(root.current.id)[2] - SIDEBAR_W : 600; return Math.max(1, Math.floor((w - 24 + 8) / 108)); };
+  const cols = () => { const w = root.current ? lord.getLayout(root.current.id)[2] - sideW : 600; return Math.max(1, Math.floor((w - 24 + 8) / 108)); };
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -563,7 +615,7 @@ export default function Files() {
     if (mod && !e.shift && b === ',') { setSheet('settings'); return; }
     if (mod && e.key === 'Tab') { setActive((a) => (a + (e.shift ? tabs.length - 1 : 1)) % tabs.length); return; }
     if (mod && e.shift && b === 'n') { newFolder(null); return; }
-    if (mod && b === 'n') { wm.open('files', { new: true, args: { path: curDir || fs.home() } }); return; }
+    if (mod && b === 'n') { wm.open('files', { new: true }); return; }
     if (mod && b === 't') { newTabAt(); return; }
     if (mod && b === 'w') { closeTab(active); return; }
     if (mod && e.shift && (b === '.' || b === '>' || b === ':')) { setHidden((h) => !h); return; }
@@ -574,8 +626,9 @@ export default function Files() {
     if (mod && b === 'x') { if (selPaths.length && !readOnly) cutFiles(selPaths); return; }
     if (e.ctrl && b === 'v') { doPaste(); return; }
     if (mod && b === 'a') { setSelected(new Set(flat.map((x) => x.path))); return; }
-    if (mod && b === '[') { goBack(); return; }
-    if (mod && b === ']') { goForward(); return; }
+    // [ and ] need a modifier on many layouts: the character itself counts, and ⌥← and ⌥→ work on all of them
+    if ((mod && (b === '[' || e.key === '[')) || (e.alt && e.key === 'ArrowLeft')) { goBack(); return; }
+    if ((mod && (b === ']' || e.key === ']')) || (e.alt && e.key === 'ArrowRight')) { goForward(); return; }
     if (mod && e.key === 'ArrowUp') { goUp(); return; }
     if (mod && e.key === 'ArrowDown') { openSel(); return; }
     if (mod && (e.key === 'Backspace' || e.key === 'Delete')) { toTrash(); return; }
@@ -602,9 +655,9 @@ export default function Files() {
 
   // ---- app menus (the theme's menu bar) ----
   useEffect(() => {
-    wm.setMenus(wid, [
+    wm.setMenus(wid, localKeys([
       { label: tr('files.menu.file'), items: [
-        { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true, args: { path: curDir || fs.home() } }) },
+        { label: tr('files.menu.newWindow'), hint: '❖N', onClick: () => wm.open('files', { new: true }) },
         { label: tr('files.menu.newTab'), hint: '❖T', onClick: () => newTabAt() },
         { label: tr('files.menu.newFolder'), hint: '❖⇧N', onClick: () => newFolder(null), disabled: !wDir }, '-',
         { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(), disabled: !sel.length },
@@ -625,8 +678,8 @@ export default function Files() {
         { label: tr('files.menu.showHidden'), hint: '❖⇧.', checked: hidden, onClick: () => setHidden((h) => !h) },
       ] },
       { label: tr('files.menu.go'), items: [
-        { label: tr('files.menu.back'), hint: '❖[', onClick: goBack, disabled: !tab.back.length },
-        { label: tr('files.menu.forward'), hint: '❖]', onClick: goForward, disabled: !tab.fwd.length },
+        { label: tr('files.menu.back'), hint: '⌥←', onClick: goBack, disabled: !tab.back.length },
+        { label: tr('files.menu.forward'), hint: '⌥→', onClick: goForward, disabled: !tab.fwd.length },
         { label: tr('files.menu.up'), hint: '❖↑', onClick: goUp, disabled: !curDir || curDir === fs.home() }, '-',
         { label: tr('files.place.recent'), hint: '❖⇧F', onClick: () => navigate({ type: 'recent' }) },
         ...dirs.filter((d) => ['documents', 'desktop', 'downloads'].includes(d.label)).map((d) => ({ label: tr(`files.place.${d.label}`), hint: { documents: '❖⇧O', desktop: '❖⇧D', downloads: '❖⌥L' }[d.label], onClick: () => navigate({ type: 'dir', path: d.path }) })),
@@ -640,7 +693,7 @@ export default function Files() {
         ...(lan.available() ? [{ label: tr('files.menu.connect'), hint: '❖K', onClick: () => setSheet('connect') }] : []),
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
-    ]);
+    ]));
   }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length]);
 
   // ---- view ----
@@ -649,12 +702,12 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
   };
-  const content = (rootWidthRef.current || 960) - SIDEBAR_W;
+  const content = (rootWidthRef.current || 960) - sideW;
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   const viewCtx = {
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
-    emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
+    emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
     onItemDown, onOpen: open, onContext, statOf,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
     onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
@@ -707,7 +760,7 @@ export default function Files() {
   const groupSortItems = () => [
     { header: tr('files.menu.groupBy') }, ...['none', 'kind', 'date', 'size'].map((k) => ({ label: tr(`files.groupBy.${k}`), checked: tab.group === k, onClick: () => patchTab({ group: k }) })), '-',
     { header: tr('files.menu.sortBy') }, ...['name', ...visibleSort()].map((k) => ({ label: sortLabel(k), checked: tab.sort.by === k, onClick: () => setSort(k) })),
-    { label: tab.sort.desc ? tr('files.sort.desc') : tr('files.sort.asc'), onClick: () => patchTab((x) => ({ sort: { ...x.sort, desc: !x.sort.desc } })) },
+    { label: tab.sort.desc ? tr('files.sort.desc') : tr('files.sort.asc'), onClick: () => { const sort = { ...tab.sort, desc: !tab.sort.desc }; patchTab({ sort }); keepView(tab.view, sort); } },
   ];
   const viewMenuItems = () => VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) }));
   const tagItems = () => (sel.length ? [{ header: tr('files.menu.tags') }, tagSwatches(selPaths)] : [{ header: tr('files.menu.tags') }, { label: tr('files.noSelection'), disabled: true }]);
@@ -729,6 +782,12 @@ export default function Files() {
           <SideItem key={d.path} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
             onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} hot={dropTarget === d.path} />
         ))}
+        {prefs.favoriteFolders.map((f) => (
+          <SideItem key={f.path} t={t} dim={offline(f)} label={shareTitle(f.name)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(f.path))} onClick={() => openFavorite(f)}
+            drop={offline(f) ? undefined : { dropPath: f.path }} hot={dropTarget === f.path}
+            onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(f.path) }] }); }} />
+        ))}
+        {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<Glyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
         {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
           drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
@@ -737,10 +796,16 @@ export default function Files() {
         {side('volumes') && volumes.map((v) => {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
-            <SideItem key={v.path} t={t} label={v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
-              drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null} />
+            <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
+              drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null}
+              onContext={isShareFs(v.fs) ? (ev) => pinMenu(ev, v) : undefined}
+              onPress={(ev) => { press.current = { paths: [v.path], x: ev.x, y: ev.y, favOnly: true }; }} />
           );
         })}
+        {side('volumes') && prefs.pins.filter((p) => !volumes.some((v) => v.path === p.path)).map((p) => (
+          <SideItem key={p.path} t={t} dim label={shareTitle(p.name)} icon={<DriveGlyph color={t.textDim} />} onClick={() => reconnect(p)}
+            onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.pin.remove'), onClick: () => togglePin(p) }] }); }} />
+        ))}
         {side('volumes') && unmountedDisks(diskList).map((p) => (
           <SideItem key={p.name} t={t} dim label={p.label || tr('files.disk.unnamed', { size: formatBytes(p.size) })} icon={<DriveGlyph color={t.textDim} />}
             onClick={() => mount(p)} />
@@ -758,9 +823,10 @@ export default function Files() {
   return (
     <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       {/* sidebar (source list) */}
-      <View style={{ width: SIDEBAR_W, backgroundColor: t.sidebarBg }}>
+      <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
         {sideScroll}
+        <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, ...(direction() === 'rtl' ? { left: 0 } : { right: 0 }), width: 6, cursor: 'ew-resize' }} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -864,7 +930,7 @@ export default function Files() {
       {/* what is being dragged */}
       {dragLocal && (
         <View style={{ position: 'absolute', left: dragLocal.x - 20, top: dragLocal.y - 20, pointerEvents: 'none', opacity: 0.85 }}>
-          {dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
+          {drag.favOnly || dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
           {drag.paths.length > 1 && (
             <View style={{ position: 'absolute', right: -6, top: -6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{drag.paths.length}</Text>
@@ -879,11 +945,11 @@ export default function Files() {
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
       {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}
-      {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note) => { setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
-      {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
+      {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note, name) => { if (at.startsWith('/')) noteOrigin(at, `${connAsk.kind}://${connAsk.host || connAsk.addr}/${String(name).replace(/^\/+/, '')}`); setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
+      {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { const a = remoteAsk; noteOrigin(at, `${a.kind}://${a.user ? `${a.user}@` : ''}${a.host}${a.port ? `:${a.port}` : ''}${a.path ? `/${a.path.replace(/^\/+/, '')}` : ''}`); setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
         onStore={(pkg) => { setRemoteAsk(null); wm.open('store', { args: { search: pkg, package: pkg } }); }}
         onTerminal={remoteAsk.ssh ? () => { const typed = remoteAsk.ssh; setRemoteAsk(null); wm.open('terminal', { new: true, args: { typed } }); } : null} />}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} bounds={bounds()} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={localKeys(menu.items)} onClose={() => setMenu(null)} bounds={bounds()} />}
     </View>
   );
 }

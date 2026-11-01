@@ -1,4 +1,5 @@
 // Files without a screen: what an address means and how columns move. node server/tests/files_model_test.mjs
+import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith } from '../../apps/files/viewprefs.js';
 import { parseAddress, sshLine, remoteUri, hostAddress } from '../../apps/files/connect.js';
 import { normalColumns, visible, toggleColumn, moveColumn, resize, dropBefore, totalWidth, MIN_W, MAX_W } from '../../apps/files/columns.js';
 
@@ -34,4 +35,19 @@ eq('stored junk', visible(normalColumns({ order: ['x', 'size', 'size'], shown: [
 const d = normalColumns(null);
 eq('drop', [dropBefore(d, 10), dropBefore(d, 200), dropBefore(d, 900)], ['date', 'kind', null]);
 eq('total', totalWidth(d), 350);
+// each place keeps its view and sort; a place with none takes the default; odd values don't count
+{
+  const eq = (a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
+  const l = { view: 'list', sort: { by: 'date', desc: true } };
+  const p = { folderViews: folderViewsWith({}, '/a', l), defaultView: { view: 'columns', sort: { by: 'name', desc: false } } };
+  eq(viewFor(p, { type: 'dir', path: '/a' }), l);
+  eq(viewFor(p, { type: 'dir', path: '/b' }).view, 'columns');
+  eq(viewFor({ folderViews: {}, defaultView: null }, { type: 'dir', path: '/b' }).view, 'icons');
+  eq(viewFor({ folderViews: { '/a': { view: 'evil', sort: {} } }, defaultView: null }, { type: 'dir', path: '/a' }).view, 'icons');
+  eq(viewKey({ type: 'network' }), ':network'); eq(viewKey({ type: 'search' }), null);
+  let m = {};
+  for (let i = 0; i < 405; i++) m = folderViewsWith(m, `/f${i}`, l);
+  eq(Object.keys(m).length, 400); eq(!!m['/f0'], false);
+  eq([clampSide(10), clampSide(9999), clampSide(220), clampSide('x')], [SIDE_MIN, SIDE_MAX, 220, 200]);
+}
 console.log(`files-model-test: ${ok} ok`);

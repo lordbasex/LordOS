@@ -78,7 +78,8 @@ static JSValue f_connect_poll(JSContext *c, JSValueConst t, int argc, JSValueCon
 
 static JSValue f_trust(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    rconnect_trust(argc && JS_ToBool(c, argv[0]) > 0);
+    const char *p = argc > 1 ? JS_ToCString(c, argv[0]) : NULL;
+    if (p) { rconnect_trust(p, JS_ToBool(c, argv[1]) > 0); JS_FreeCString(c, p); }
     return JS_UNDEFINED;
 }
 
@@ -99,7 +100,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("connect", 7, f_connect),
     JS_CFUNC_DEF("connectPoll", 0, f_connect_poll),
     JS_CFUNC_DEF("disconnect", 1, f_disconnect),
-    JS_CFUNC_DEF("connectTrust", 1, f_trust),
+    JS_CFUNC_DEF("connectTrust", 2, f_trust),
 };
 
 void js_lan_register(JSContext *c, JSValue lord) {

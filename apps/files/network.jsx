@@ -7,6 +7,8 @@ import { FolderGlyph } from './glyphs.jsx';
 
 const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone'];
 export const isShareFs = (fs) => SHARE_FS.includes(fs);
+// A mounted share's folder keeps its fixed name on disk (share_leaf, lan_connect); people read it in their language.
+export const shareTitle = (name) => { const m = /^(.+) on ([^ ]+)$/.exec(name); return m ? tr('files.net.shareOn', { name: m[1], host: m[2] }) : name; };
 
 // the folder share-mount makes under /media/<user> (share_leaf in server/src/lan/lanaddr.c)
 const leafOf = (kind, addr, share) => {
@@ -60,7 +62,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
   const needName = nfs ? !ask.share : !ask.share && typed;
   useEffect(() => {
     if (nfs) return;
-    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
+    lan.saved(ask.kind, ask.addr, ask.share || '').then((s) => s || (ask.share ? lan.saved(ask.kind, ask.addr, '') : null)).then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } });
   }, []);
   // DOMAIN\user, as people write it
   const who = (g) => {
@@ -80,7 +82,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
         if (remember) { try { await lan.remember(ask.kind, ask.addr, key, user.trim(), password, tr('files.net.keyringLabel', { name: name, addr: ask.addr })); } catch (e) { note = tr('files.net.notRemembered'); } }
         else lan.forget(ask.kind, ask.addr, key, user.trim());
       }
-      onMounted(at, note);
+      onMounted(at, note, name);
     } catch (e) { setError(e.message); setBusy(false); }
   };
   const signIn = async (g) => {
@@ -93,6 +95,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
     if (r.state === 'done' && r.shares.length) { setList(r.shares); return; }
     if (r.state === 'denied') { setError(tr(g ? 'files.net.noGuest' : 'files.net.badLogin')); return; }
     if (r.state === 'done') { setError(tr('files.net.noShares')); return; }
+    if (r.state === 'off-link') { setTyped(true); setError(tr('files.net.offLink')); return; }   // lan.c only speaks to its own link
     setTyped(true);                                       // an old server, another subnet, a refused dialect
     setError(tr('files.net.cantList'));
   };

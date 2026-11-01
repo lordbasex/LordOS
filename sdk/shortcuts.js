@@ -117,6 +117,12 @@ function index() {
   return map;
 }
 
+// Is this combination the shell's right now? A menu shows another key for what the theme takes (Files in Lord Classic).
+export function shortcutTaken(combo) {
+  lookup = lookup || index();
+  return (lookup.get(parseCombo(combo)) || []).some((e) => !e.when || e.when());
+}
+
 const taken = new Set();      // keys whose press was taken: their repeats and release are too
 const repeating = new Set();  // the same, for an entry that runs again while held
 let superAlone = false;

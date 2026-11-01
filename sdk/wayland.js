@@ -15,6 +15,7 @@ import { useAppWindow } from './components.jsx';
 import { locale, appName } from './i18n.js';
 import { linuxAppFor } from './apps.js';
 import { osk } from './osk.js';
+import { rememberedFrame } from './windowmemory.js';
 import { dockIdOfWindow } from './dock.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
@@ -75,13 +76,18 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
       const args = { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) };
       const saved = placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
+      // a dialog goes where its app asks and isn't remembered; a fixed window keeps its size
+      if (d.dialog) args.dialog = true;
+      if (d.fixed) args.fixedLinux = true;
+      const kept = saved || d.dialog ? null : rememberedFrame(dockIdOfWindow({ id, args }), { fixed: !!d.fixed, size: [w, hh] });
       wm.open('linux', {
         instance: String(sid),
-        frame: saved?.frame || { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) },
+        frame: saved?.frame || (kept ? { x: kept.x, y: kept.y, w: kept.w, h: kept.h } : { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) }),
         args,
         desktop: saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
       saved?.then(id);
+      if (kept?.maximized) wm.toggleMaximize(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
       { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || d.appId || null)); }
       // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures

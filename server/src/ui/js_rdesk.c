@@ -47,6 +47,41 @@ static int helper_path(char *bin, size_t n) {
     return stat(bin, &st) || !S_ISREG(st.st_mode) || (st.st_uid != 0 && st.st_uid != geteuid()) || (st.st_mode & 022) ? -1 : 0;
 }
 
+/* The session's size, and the folders it shares: real folders under the person's home, never the home itself nor a
+ * hidden one, so that keys and settings aren't one mistaken choice away. argv[6], [7]: width, height. argv[8]: an array
+ * of [name, path, readOnly]. What doesn't qualify isn't shared. */
+static void add_view(JSContext *c, JBuf *b, int argc, JSValueConst *argv) {
+    int w = 0, h = 0, n = 0;
+    if (argc > 7) { JS_ToInt32(c, &w, argv[6]); JS_ToInt32(c, &h, argv[7]); }
+    if (w >= 640 && h >= 480 && w <= RD_MAX_W && h <= RD_MAX_H) jb_printf(b, ",\"w\":%d,\"h\":%d", w, h);
+    if (argc < 9 || !JS_IsArray(c, argv[8])) return;
+    const char *home = getenv("HOME");
+    char root[PATH_MAX];
+    if (!home || !realpath(home, root)) return;
+    size_t rl = strlen(root);
+    for (uint32_t i = 0; i < 8; i++) {
+        JSValue row = JS_GetPropertyUint32(c, argv[8], i);
+        JSValue vn = JS_GetPropertyUint32(c, row, 0), vp = JS_GetPropertyUint32(c, row, 1), vr = JS_GetPropertyUint32(c, row, 2);
+        const char *name = JS_ToCString(c, vn), *path = JS_ToCString(c, vp);
+        int ro = JS_ToBool(c, vr);
+        char real[PATH_MAX];
+        struct stat st;
+        int ok = name && path && name[0] && strlen(name) < 32 && realpath(path, real) && !strncmp(real, root, rl) && real[rl] == '/' &&
+                 !strstr(real + rl, "/.") && !stat(real, &st) && S_ISDIR(st.st_mode);
+        for (const char *p = name; ok && *p; p++) if (!(((unsigned char)*p >= '0' && (unsigned char)*p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == ' ' || *p == '-' || *p == '_')) ok = 0;
+        if (ok) {
+            jb_printf(b, ",\"drive%dname\":", n); jb_str(b, name);
+            jb_printf(b, ",\"drive%dpath\":", n); jb_str(b, real);
+            jb_printf(b, ",\"drive%dro\":%d", n, ro > 0);
+            n++;
+        }
+        if (name) JS_FreeCString(c, name);
+        if (path) JS_FreeCString(c, path);
+        JS_FreeValue(c, vn); JS_FreeValue(c, vp); JS_FreeValue(c, vr); JS_FreeValue(c, row);
+    }
+    jb_printf(b, ",\"drives\":%d", n);
+}
+
 static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 6) return JS_NewInt32(c, 0);
@@ -69,7 +104,9 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 sigset_t none;
                 sigemptyset(&none);
                 sigprocmask(SIG_SETMASK, &none, NULL);
-                if (app_scope_enter("lordos-rdesk") && getenv("LORDOS_SESSIOND")) _exit(126);
+                /* the same limits for both protocols: libfreerdp is what needs them */
+                CgroupLimits lim = { .mem_high_mb = 256, .mem_max_mb = 512, .cpu_percent = 0 };
+                if (cgroup_enter("app-lordos-lordos-rdesk.scope", &lim) && getenv("LORDOS_SESSIOND")) _exit(126);
                 char *args[] = { "lord-rdesk", NULL };
                 execve(bin, args, environ);
                 _exit(127);
@@ -82,6 +119,7 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             jb_printf(&b, ",\"port\":%d,\"user\":", port); jb_str(&b, user);
             jb_raw(&b, ",\"domain\":"); jb_str(&b, dom);
             jb_raw(&b, ",\"password\":"); jb_str(&b, pw);
+            add_view(c, &b, argc, argv);
             jb_raw(&b, "}");
             if (p > 0 && !b.oom && send(sv[0], b.p, b.n, MSG_NOSIGNAL) == (ssize_t)b.n) {
                 sess[slot] = (Sess){ .used = 1, .sock = sv[0], .pid = p, .state = RS_CONNECTING };
@@ -102,8 +140,8 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static void set_size(Sess *s, int w, int h) {
     if (w < 1 || h < 1 || w > RD_MAX_W || h > RD_MAX_H) { s->state = RS_FAILED; return; }
     size_t len = (size_t)w * h * 4;
-    int fd = (int)syscall(SYS_memfd_create, "lordos-rdesk", 1u);
-    if (fd < 0 || ftruncate(fd, (off_t)len)) { if (fd >= 0) close(fd); s->state = RS_FAILED; return; }
+    int fd = rd_picture_memfd(len);
+    if (fd < 0) { s->state = RS_FAILED; return; }
     uint8_t *map = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); s->state = RS_FAILED; return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : media_src_new(SK_IMAGE, "rdesk");
@@ -112,15 +150,7 @@ static void set_size(Sess *s, int w, int h) {
     free(m->cache); m->cache = NULL;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
     s->media = m->id; s->w = w; s->h = h;
-    RdMsg r = { RD_SHM, 0, 0, 0, "" };
-    struct iovec io = { &r, sizeof r };
-    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
-    memset(&cm, 0, sizeof cm);
-    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
-    struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
-    ch->cmsg_level = SOL_SOCKET; ch->cmsg_type = SCM_RIGHTS; ch->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(ch), &fd, sizeof fd);
-    sendmsg(s->sock, &mh, MSG_NOSIGNAL);
+    if (rd_send_picture(s->sock, fd)) s->state = RS_FAILED;
     close(fd);
 }
 
@@ -129,11 +159,12 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
     int frames = 0;
+    int budget = RD_POLL_MAX;
     for (;;) {
         RdMsg m;
-        ssize_t n = recv(s->sock, &m, sizeof m, MSG_DONTWAIT);
-        if (n == 0) { if (s->state < RS_DENIED) s->state = s->state == RS_CONNECTED ? RS_ENDED : RS_FAILED; break; }
-        if (n != (ssize_t)sizeof m) break;
+        int r = rd_take(s->sock, &m, &budget);
+        if (r < 0) { if (s->state < RS_DENIED) s->state = s->state == RS_CONNECTED ? RS_ENDED : RS_FAILED; break; }
+        if (!r) break;
         if (m.type == RD_SIZE) set_size(s, m.a, m.b);
         else if (m.type == RD_FRAME) frames++;
         else if (m.type == RD_STATE && m.a >= 0 && m.a <= RS_UNREACHABLE) s->state = m.a;

@@ -146,6 +146,10 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1 | Files → Network: one bounded pass, read by a sandboxed helper, JS names no address | Test (`lan-test` under ASan and UBSan, 40,000 damaged answers); a pass on the real LAN on VM 116 and VM 125, outside a session | Holds outside a session; no pass through the `lan` connector inside a session is recorded |
 | 5.1 | `share-mount`: guest and NFS 4.2 | VM 125 against a test server over a veth | Measured once; a real server **Untested** |
 | 5.1 | `share-mount`: SMB with a password | Worked only against that test server | **Not validated** |
+| 5.1 | RDP refuses RDP's own security before any credential | Test (`rdesk_rdp_test.c`, stub server; the old setting sent 395 bytes); xrdp over TLS on the test VM | Holds |
+| 5.1 | SMB sign-in carries a target name and MIC and needs the server's signature | Test (`lan-test`); `lan-list` against Samba on the test VM, right and wrong password | Holds on Samba; a Windows server **Untested** |
+| 5.1 | Programs that read a server's bytes run read-only with a 15 s limit | Test (`rconnect-run-test`, also `ssh-keyscan`, `openssl`, `rclone obscure` for real) | Holds with Landlock; without it only scope and deadline |
+| 3.3 | Windows reopen by display identity, clamped when it's gone | Test (`place_model_test.mjs`) | Model only so far; two real displays **Untested** |
 | 5.1 | A network mount that stops answering doesn't freeze the interface | VM 125: never blocked in 24 samples, against 30 s on SMB and over 100 s on NFSv4 | Measured once |
 | 5.1 | Monitor → Voltage | Test (`voltage-test`, `settings-hw-test`, `voltage_model_test.mjs`); an isolated session with the real board's values as a fixture | Holds on fixtures; a real under-voltage, sensor chip and battery **Untested** |
 | 5.6 | `install.sh` names an administrator on a Debian with a root password | A clean amd64 Debian 13 virtual machine | Measured once; logging in on the login screen not part of that run |

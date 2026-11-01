@@ -19,6 +19,16 @@ function Item({ t, n, onRemove }) {
         <Text style={{ fontSize: 11, color: t.textDim }}>{formatTime(new Date(n.time))}</Text>
       </View>
       {n.body ? <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.35, textAlign: 'start', numberOfLines: 3 }}>{n.body}</Text> : null}
+      {n.actions?.length ? (
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+          {n.actions.map((a) => (
+            <View key={a.id} onClick={() => { onRemove(); try { a.run?.(); } catch (e) { console.error('notify:', e); } }}
+              style={{ height: 26, paddingHorizontal: 10, borderRadius: 4, justifyContent: 'center', backgroundColor: t.hover }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{a.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {hover ? (
         <View onClick={onRemove} style={{ position: 'absolute', top: 8, insetInlineEnd: 6, width: 18, height: 18, borderRadius: 4, alignItems: 'center', justifyContent: 'center',
           backgroundColor: t.hover }}>

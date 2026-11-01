@@ -1,10 +1,16 @@
 /* rdesk_test.c — the RFB client: DES's published vector, the handshake, every encoding, and damaged servers. */
 #include "../src/rdesk/rfb.h"
+#include "../src/rdesk/proto.h"
+
+#include <errno.h>
+#include <poll.h>
+#include <sys/mman.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+static char nopw[1];
 static int pass, failc;
 #define CHECK(x) do { if (x) pass++; else { failc++; printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #x); } } while (0)
 
@@ -27,13 +33,48 @@ static void hello(int w, int h) {
     add(si, 24);
 }
 
+static void t_review(void) {
+    /* a password was given and the server offers only None: refused, no session, password wiped */
+    char pw[8] = "secret";
+    hello(16, 16); Rfb r = make();
+    CHECK(rfb_handshake(&r, pw) == 1 && !r.w && !pw[0] && !memchr(pw, 's', 6));
+    CHECK(ol == 12);                    /* it never picked a type */
+    /* the picture's size can't change under lord-server's mapping */
+    int fd = rd_picture_memfd(4096);
+    CHECK(fd >= 0 && ftruncate(fd, 0) && errno == EPERM && ftruncate(fd, 8192) && errno == EPERM);
+    void *m = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    CHECK(m != MAP_FAILED); ((char *)m)[4095] = 1; munmap(m, 4096);
+    /* a full socket doesn't block lord-server */
+    int sv[2];
+    CHECK(!socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv));
+    int sent = 0;
+    while (!rd_send_picture(sv[0], fd) && sent < 100000) sent++;
+    CHECK(sent > 0 && sent < 100000 && errno == EAGAIN);
+    close(sv[0]); close(sv[1]); close(fd);
+    /* a flood is taken in slices, and nothing queued never waits */
+    CHECK(!socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv));
+    RdMsg x = { RD_FRAME, 0, 0, 0, "" }, y;
+    int put = 0;
+    while (put < 200 && send(sv[1], &x, sizeof x, MSG_DONTWAIT) == (ssize_t)sizeof x) put++;
+    int budget = 50, got = 0;
+    while (rd_take(sv[0], &y, &budget) == 1) got++;
+    CHECK(put > 50 ? got == 50 : got == put);
+    for (budget = RD_POLL_MAX; rd_take(sv[0], &y, &budget) == 1;) {}
+    budget = RD_POLL_MAX;
+    CHECK(!rd_take(sv[0], &y, &budget));
+    close(sv[1]);
+    budget = RD_POLL_MAX;
+    CHECK(rd_take(sv[0], &y, &budget) < 0);
+    close(sv[0]);
+}
+
 int main(void) {
     uint8_t k[8] = { 0x13, 0x34, 0x57, 0x79, 0x9b, 0xbc, 0xdf, 0xf1 }, p[8] = { 1, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef }, c[8];
     des_encrypt(k, p, c);
     CHECK(!memcmp(c, "\x85\xe8\x13\x54\x0f\x0a\xb4\x05", 8));
     Rfb r = make();
     hello(16, 16);
-    CHECK(!rfb_handshake(&r, "") && r.w == 16 && r.px == pic);
+    CHECK(!rfb_handshake(&r, nopw) && r.w == 16 && r.px == pic);
     /* raw 1x1, hextile with a background, copyrect, then frames */
     static uint8_t m[256];
     size_t n = 0;
@@ -52,14 +93,14 @@ int main(void) {
     static const uint8_t bad[][16] = { { 0, 0, 0, 1, 0, 15, 0, 15, 0, 2, 0, 2, 0, 0, 0, 0 }, { 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 1 }, { 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 9 } };
     for (int i = 0; i < 3; i++) { il = ip = 0; add(bad[i], 16); add("\xff\xff\xff\xff\xff\xff\xff\xff", 8); CHECK(rfb_message(&r)); }
     /* a size it refuses */
-    hello(60000, 60000); r = make(); CHECK(rfb_handshake(&r, "") < 0);
+    hello(60000, 60000); r = make(); CHECK(rfb_handshake(&r, nopw) < 0);
     /* every cut, and noise */
     uint8_t keep[256];
     memcpy(keep, m, n);
-    for (size_t cut = 0; cut < n; cut++) { hello(16, 16); r = make(); rfb_handshake(&r, ""); il = ip = 0; add(keep, cut); CHECK(rfb_message(&r) || cut < 4 || 1); }
+    for (size_t cut = 0; cut < n; cut++) { hello(16, 16); r = make(); rfb_handshake(&r, nopw); il = ip = 0; add(keep, cut); CHECK(rfb_message(&r) || cut < 4 || 1); }
     srand(7);
     for (int i = 0; i < 20000; i++) {
-        hello(32, 32); r = make(); rfb_handshake(&r, "");
+        hello(32, 32); r = make(); rfb_handshake(&r, nopw);
         il = ip = 0;
         size_t l = (size_t)rand() % 600;
         for (size_t j = 0; j < l; j++) in[j] = (uint8_t)(j < 4 ? (j == 3 ? 1 : 0) : rand() & (rand() & 1 ? 3 : 255));
@@ -67,6 +108,7 @@ int main(void) {
         while (!rfb_message(&r)) { }
     }
     CHECK(1);
+    t_review();
     printf("rdesk-test: %d passed, %d failed\n", pass, failc);
     return failc != 0;
 }

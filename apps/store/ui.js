@@ -5,6 +5,7 @@ import { createElement as h, useEffect, useState } from 'react';
 import { View, Text, Image, useTheme, useStore, settings, typeScale, spacing } from '@lordos/sdk';
 
 export const CARD_BASIS = 250;
+const CARD_HEIGHT = 148;     // two lines of summary and the foot, so the action keeps the card's padding
 
 // Sidebar glyphs: monochrome symbols drawn in the accent color (docs/DESIGN.md, "Icons").
 export const GLYPH = {
@@ -42,7 +43,7 @@ export function Card({ icon, name, kind, summary, note, action, onClick, dim }) 
   const bg = th.mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.025)';
   return h(View, {
     onClick, onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
-    style: { flexGrow: 1, flexBasis: CARD_BASIS, minWidth: 220, padding: 14, gap: 8, borderRadius: 12, opacity: dim ? 0.55 : 1,
+    style: { flexGrow: 1, flexBasis: CARD_BASIS, minWidth: 220, minHeight: CARD_HEIGHT, flexShrink: 0, padding: spacing.m, gap: spacing.m, borderRadius: 12, opacity: dim ? 0.55 : 1,
       backgroundColor: hover ? th.hover : bg, border: `1px solid ${th.separator}` },
   },
   h(View, { style: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' } },
@@ -50,9 +51,9 @@ export function Card({ icon, name, kind, summary, note, action, onClick, dim }) 
     h(View, { style: { flex: 1, minWidth: 0, gap: 1 } },
       h(Text, { style: { fontSize: 14, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, name),
       kind ? h(Text, { style: { fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null,
-      summary ? h(Text, { style: { fontSize: 12, lineHeight: 1.42, color: th.textDim, marginTop: 5, numberOfLines: 2, overflow: 'hidden', textAlign: 'start' } }, summary) : null)),
+      summary ? h(Text, { style: { height: 34, fontSize: 12, lineHeight: 1.42, color: th.textDim, marginTop: 5, numberOfLines: 2, overflow: 'hidden', textAlign: 'start' } }, summary) : null)),
   h(View, { style: { flex: 1 } }),
-  h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24 } },
+  h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24, flexShrink: 0 } },
     h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, note || ''),
     action || null));
 }

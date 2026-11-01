@@ -160,6 +160,7 @@ static void mdns_end(uint32_t id) {
 /* ---- SMB: who it is and, if it lets an anonymous session in, what it shares ---- */
 
 static uint8_t rxbuf[MSG_MAX];
+static size_t rxlen;
 
 static int smb_exchange(int fd, const uint8_t *out, size_t n, SmbMsg *m, long long deadline) {
     if (!n || write_all(fd, out, n, deadline)) return -1;
@@ -168,6 +169,7 @@ static int smb_exchange(int fd, const uint8_t *out, size_t n, SmbMsg *m, long lo
         if (read_all(fd, h, 4, deadline) || h[0]) return -1;
         size_t l = (size_t)h[1] << 16 | (size_t)h[2] << 8 | h[3];
         if (l < SMB_HDR || l > sizeof rxbuf || read_all(fd, rxbuf, l, deadline) || smb_parse(rxbuf, l, m)) return -1;
+        rxlen = l;
         if (m->status != SMB_STATUS_PENDING) return 0;  /* an interim answer: the real one follows */
     }
 }
@@ -250,14 +252,18 @@ static void smb_auth_job(uint32_t id, const char *ip, const char *user, const ch
     uint8_t blob[4096], rnd[24], key[16];
     if (getrandom(rnd, sizeof rnd, 0) != sizeof rnd) { fail(id, "random"); return; }
     if (smb_exchange(fd, tx, smb_negotiate_signed(tx, sizeof tx, mid++), &m, deadline) || !smb_negotiate_reply(&m, &signing)) { fail(id, "smb-negotiate"); return; }
-    size_t bl = ntlm_user_negotiate(blob, sizeof blob);
+    size_t bl = ntlm_user_negotiate(blob, sizeof blob), nl = bl;
+    uint8_t neg[64];
+    memcpy(neg, blob, nl);
     const uint8_t *sb;
     size_t sl;
     unsigned flags;
     if (smb_exchange(fd, tx, smb_session_setup(tx, sizeof tx, mid++, 0, blob, bl), &m, deadline) || m.status != SMB_STATUS_MORE ||
         smb_session_reply(&m, &sb, &sl, &flags) || !sb) { fail(id, "smb-session"); return; }
     sid = m.session;
-    bl = ntlm_user_auth(blob, sizeof blob, sb, sl, user, domain, password, rnd, key);
+    char spn[80];
+    snprintf(spn, sizeof spn, "cifs/%s", ip);
+    bl = ntlm_user_auth(blob, sizeof blob, neg, nl, sb, sl, user, domain, password, spn, rnd, key);
     if (!bl) { fail(id, "smb-session"); return; }
     size_t n = smb_session_setup(tx, sizeof tx, mid++, sid, blob, bl);
     explicit_bzero(blob, sizeof blob);
@@ -265,6 +271,8 @@ static void smb_auth_job(uint32_t id, const char *ip, const char *user, const ch
     explicit_bzero(tx, sizeof tx);
     /* a server that takes a bad password as its guest says so with these flags */
     if (rc || m.status || smb_session_reply(&m, &sb, &sl, &flags) || (flags & 3)) { fail(id, "denied"); return; }
+    /* the server proves it knew the password: it signs this answer. Whoever can't is not the server the person signed in to */
+    if (!smb_verify(rxbuf, rxlen, key)) { fail(id, "denied"); return; }
     uint8_t fid[16], dce[256];
     const uint8_t *o;
     size_t ol;

@@ -470,7 +470,7 @@
         { "id": "exfat", "name": "exFAT (exfat, exfatprogs)", "license": "GPL-2.0", "source": "https://github.com/exfatprogs/exfatprogs" },
         { "id": "fat", "name": "FAT (vfat, dosfstools)", "license": "GPL-3.0", "source": "https://github.com/dosfstools/dosfstools" },
         { "id": "hfs", "name": "HFS+ (hfsplus)", "license": "GPL-2.0", "source": "https://kernel.org" },
-        { "id": "apfs", "name": "APFS (linux-apfs-rw)", "license": "GPL-2.0", "source": "https://github.com/linux-apfs/linux-apfs-rw", "arches": ["amd64"] }
+        { "id": "apfs", "name": "APFS (linux-apfs-rw)", "license": "GPL-2.0", "source": "https://github.com/linux-apfs/linux-apfs-rw", "arches": ["amd64"], "optional": ["apfs-dkms", "linux-headers-amd64"] }
       ]
     }
   ]

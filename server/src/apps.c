@@ -919,7 +919,7 @@ static int launch(const char *id, const char *file, const char *action) {
         /* its own app-lordos-<id>.scope cgroup: the firewall, the Monitor, the PipeWire guard and
          * the notification server know the app only by it. In a LordOS session a launch that can't
          * be placed there never runs (it would run as lord-server itself, with none of its rules). */
-        if (app_scope_enter(id) && getenv("LORDOS_SESSIOND")) {
+        if (app_scope_reserved(id) || (app_scope_enter(id) && getenv("LORDOS_SESSIOND"))) {
             static const char msg[] = "apps: could not place the app in its own scope: not launched\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}
             _exit(126);

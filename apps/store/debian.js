@@ -117,7 +117,7 @@ function PlanView({ plan }) {
 
 // ---- package page ----
 
-function Details({ name, onBack, onRemoved }) {
+function Details({ name, onBack, onRemoved, extras = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
@@ -130,11 +130,11 @@ function Details({ name, onBack, onRemoved }) {
   // the matching installed desktop app (for "Open")
   const desk = app && launcher.find((a) => a.kind === 'linux' && (`${a.desktopId}.desktop` === app.id || a.desktopId === app.id));
   const ask = (p) => setPlan(p);
-  const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name] }) });
+  const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name, ...extras] }) });
   const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name] }) });
   const confirm = () => {
     const extra = plan.p.items.some((i) => i.action === 'remove' && !i.requested);
-    if (plan.kind === 'install') runJob('pkg-install', extra ? `${name} --allow-remove` : name, t('store.job.install', { name: app?.name || name }));
+    if (plan.kind === 'install') runJob('pkg-install', [name, ...extras, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
     else runJob('pkg-remove', extra ? `${name} --cascade` : name, t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
     setPlan(null);
   };
@@ -420,4 +420,7 @@ export const debian = {
   },
   canRemove: (a) => !!packageOfApp(a),
   Progress,
+  PlanView,
+  state,
+  runJob,
 };

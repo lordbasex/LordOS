@@ -80,8 +80,8 @@ In 0.8.7: several desktops in both Lord Flow and Lord Classic, with an Overview 
 All in 0.8.7.
 
 - **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
-- **Remote screens.** RDP and VNC apps come with the system and draw with LordOS's own engine: no client window, no X11 session, no toolkit.
-- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64, APFS read-only. These are commercial formats; the drivers are free software at no cost.
+- **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit.
+- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost.
 - **Your way of working.** Choose, reorder and resize list columns, set Files' own Settings, and open Terminal in the folder you're in.
 
 ## Keys, the on-screen keyboard and coming back

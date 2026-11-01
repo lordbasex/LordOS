@@ -636,6 +636,13 @@ int sandbox_apply(const SandboxConfig *cfg) {
     return mask;
 }
 
+void sandbox_exec_child(int network) {
+    static const char *const ro[] = { "/usr/bin", "/usr/sbin", "/usr/share", "/etc", "/run/systemd/resolve", NULL };
+    SandboxConfig c = { .id = "exec", .ro_extra = ro, .network = network };
+    int fs_ok = 0, net_ok = 0;
+    if (apply_landlock(&c, NULL, NULL, &fs_ok, &net_ok)) apply_nopriv();   /* a kernel with no Landlock: the scope still holds */
+}
+
 int sandbox_apply_helper(const SandboxHelperCfg *cfg) {
     int mask = 0;
     if (cfg->name) {

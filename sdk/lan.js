@@ -35,7 +35,7 @@ export const lan = {
     for (;;) {
       await new Promise((r) => setTimeout(r, 150));
       const s = JSON.parse(lord.lan.connectPoll());
-      if (s.state === 'confirm') { lord.lan.connectTrust(onConfirm ? await onConfirm(s.print) : false); await new Promise((r) => setTimeout(r, 200)); continue; }
+      if (s.state === 'confirm') { lord.lan.connectTrust(s.print, onConfirm ? await onConfirm(s.print) : false); await new Promise((r) => setTimeout(r, 200)); continue; }
       if (s.state !== 'running') return s;
     }
   },

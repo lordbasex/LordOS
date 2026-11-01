@@ -69,8 +69,8 @@ void md5(const void *data, size_t len, uint8_t out[16]) { uint32_t s[4]; memcpy(
 
 /* key ≤ 64 bytes here, and data is short: everything fits a stack buffer */
 void hmac_md5(const void *key, size_t klen, const void *data, size_t len, uint8_t out[16]) {
-    uint8_t k[64] = { 0 }, b[64 + 4096], in[16];
-    if (klen > 64 || len > 4096) { memset(out, 0, 16); return; }
+    uint8_t k[64] = { 0 }, b[64 + 12288], in[16];
+    if (klen > 64 || len > 12288) { memset(out, 0, 16); return; }
     memcpy(k, key, klen);
     for (int i = 0; i < 64; i++) b[i] = k[i] ^ 0x36;
     memcpy(b + 64, data, len);
@@ -163,16 +163,18 @@ void ntlmv2_proof(const uint8_t hash[16], const uint8_t server[8], const uint8_t
 }
 
 /* unicode, request target, sign, NTLM, extended security, target info, 128, key exchange, 56 */
-#define FLAGS 0xe0880215u
+#define FLAGS 0xe2880215u               /* with version */
 #define F_KEYX 0x40000000u
+static const uint8_t VERSION[8] = { 10, 0, 0x61, 0x4a, 0, 0, 0, 15 };   /* 10.0, NTLMSSP revision 15: what the MIC's layout needs */
 
 size_t ntlm_user_negotiate(uint8_t *o, size_t cap) {
-    if (cap < 32) return 0;
-    memset(o, 0, 32);
+    if (cap < 40) return 0;
+    memset(o, 0, 40);
     memcpy(o, "NTLMSSP", 8);
     put32(o + 8, 1);
     put32(o + 12, FLAGS);
-    return 32;
+    memcpy(o + 32, VERSION, 8);
+    return 40;
 }
 
 static uint8_t *field(uint8_t *hdr, uint8_t *payload, const uint8_t *base, const void *data, size_t n) {
@@ -183,8 +185,26 @@ static uint8_t *field(uint8_t *hdr, uint8_t *payload, const uint8_t *base, const
     return payload + n;
 }
 
-size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *c, size_t clen, const char *user, const char *domain,
-                      const char *password, const uint8_t rnd[24], uint8_t key[16]) {
+/* The server's target info plus what the sign-in promises: a MIC follows (flags 2), and the service it's meant for. */
+static size_t av_extended(uint8_t *o, size_t cap, const uint8_t *av, size_t al, const char *spn) {
+    uint8_t name[520];
+    size_t nl = text_utf16(spn, name, sizeof name, 0), p = 0;
+    if (nl < 2 || al + 8 + 4 + nl + 4 > cap) return 0;
+    while (p + 4 <= al) {
+        uint32_t id = get16(av + p), l = get16(av + p + 2);
+        if (!id) break;
+        if (p + 4 + l > al) return 0;
+        p += 4 + (size_t)l;
+    }
+    memcpy(o, av, p);
+    put16(o + p, 6); put16(o + p + 2, 4); put32(o + p + 4, 2); p += 8;
+    put16(o + p, 9); put16(o + p + 2, (uint32_t)nl); memcpy(o + p + 4, name, nl); p += 4 + nl;
+    put32(o + p, 0);
+    return p + 4;
+}
+
+size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *neg, size_t nlen, const uint8_t *c, size_t clen, const char *user, const char *domain,
+                      const char *password, const char *spn, const uint8_t rnd[24], uint8_t key[16]) {
     if (clen < 48 || memcmp(c, "NTLMSSP", 8) || le32(c + 8) != 2) return 0;
     uint32_t sflags = le32(c + 20), al = get16(c + 40), ao = le32(c + 44);
     if (ao > clen || al > clen - ao || al > 2048) return 0;
@@ -198,21 +218,22 @@ size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *c, size_t clen, con
         if (id == 7 && l == 8) ft = (uint64_t)le32(av + p + 4) | (uint64_t)le32(av + p + 8) << 32;
         p += 4 + (size_t)l;
     }
-    uint8_t hash[16], temp[3072], proof[16], base[16], nt[3100], ub[512], db[512], wb[32];
-    size_t ul, dl, wl = text_utf16("LORDOS", wb, sizeof wb, 0);
-    if (ntlmv2_hash(user, domain, password, hash) || field16(user, ub, sizeof ub, 0, &ul) || field16(domain, db, sizeof db, 0, &dl)) return 0;
-    size_t tl = ntlmv2_temp(temp, sizeof temp, ft, rnd, av, al);
+    uint8_t hash[16], temp[3072], proof[16], base[16], nt[3100], ub[512], db[512], wb[32], ext[2600];
+    size_t ul, dl, wl = text_utf16("LORDOS", wb, sizeof wb, 0), el = av_extended(ext, sizeof ext, av, al, spn);
+    if (!el || ntlmv2_hash(user, domain, password, hash) || field16(user, ub, sizeof ub, 0, &ul) || field16(domain, db, sizeof db, 0, &dl)) return 0;
+    size_t tl = ntlmv2_temp(temp, sizeof temp, ft, rnd, ext, el);
     if (!tl) return 0;
     ntlmv2_proof(hash, c + 24, temp, tl, proof, base);
     memset(hash, 0, sizeof hash);
     memcpy(nt, proof, 16);
     memcpy(nt + 16, temp, tl);
-    size_t need = 64 + 24 + 16 + tl + ul + dl + wl + 16;
-    if (need > cap) return 0;
-    memset(o, 0, 64);
+    size_t need = 88 + 24 + 16 + tl + ul + dl + wl + 16;
+    if (need > cap || nlen + clen + need > 12288) return 0;
+    memset(o, 0, 88);
     memcpy(o, "NTLMSSP", 8);
     put32(o + 8, 3);
-    uint8_t zero[24] = { 0 }, enc[16], *p = o + 64;
+    memcpy(o + 64, VERSION, 8);
+    uint8_t zero[24] = { 0 }, enc[16], *p = o + 88;
     p = field(o + 12, p, o, zero, 24);
     p = field(o + 20, p, o, nt, 16 + tl);
     p = field(o + 28, p, o, db, dl);
@@ -223,7 +244,13 @@ size_t ntlm_user_auth(uint8_t *o, size_t cap, const uint8_t *c, size_t clen, con
     else { flags &= ~F_KEYX; memcpy(key, base, 16); p = field(o + 52, p, o, enc, 0); }
     put32(o + 60, flags);
     memset(base, 0, sizeof base);
-    return (size_t)(p - o);
+    size_t total = (size_t)(p - o);
+    /* the MIC covers all three messages, with its own place still zero */
+    static uint8_t all[12288];
+    memcpy(all, neg, nlen); memcpy(all + nlen, c, clen); memcpy(all + nlen + clen, o, total);
+    hmac_md5(key, 16, all, nlen + clen + total, o + 72);
+    memset(all, 0, nlen + clen + total);
+    return total;
 }
 
 void smb_sign(uint8_t *m, size_t len, const uint8_t key[16]) {
@@ -232,4 +259,16 @@ void smb_sign(uint8_t *m, size_t len, const uint8_t key[16]) {
     memset(m + 48, 0, 16);
     hmac_sha256(key, 16, m, len, mac);
     memcpy(m + 48, mac, 16);
+}
+
+int smb_verify(const uint8_t *m, size_t len, const uint8_t key[16]) {
+    static uint8_t b[12288];
+    if (len < 64 || len > sizeof b || !(m[16] & 8)) return 0;
+    uint8_t mac[32];
+    memcpy(b, m, len);
+    memset(b + 48, 0, 16);
+    hmac_sha256(key, 16, b, len, mac);
+    uint8_t diff = 0;
+    for (int i = 0; i < 16; i++) diff |= (uint8_t)(mac[i] ^ m[48 + i]);
+    return !diff;
 }

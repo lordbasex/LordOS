@@ -287,5 +287,13 @@
   "connect.err.tlsName": "El certificado de este servidor no nombra a {name}, así que no se puede verificar. Quien lo administra puede agregar ese nombre al certificado.",
   "disk.formatsTitle": "{name} usa un formato de disco comercial",
   "disk.formatsDetail": "Formatos de disco, en la Tienda, lo abre. Sus controladores son software libre y sin costo.",
-  "disk.formatsGet": "Abrir la Tienda"
+  "disk.formatsGet": "Abrir la Tienda",
+  "settings.defaultView": "Las carpetas nuevas se muestran en",
+  "net.shareOn": "{name} en {host}",
+  "fav.add": "Agregar a Favoritos",
+  "fav.remove": "Quitar de Favoritos",
+  "fav.gone": "{name} ya no está",
+  "pin.add": "Fijar en Ubicaciones",
+  "pin.remove": "Quitar de Ubicaciones",
+  "net.offLink": "Este servidor está fuera de tu red local, así que LordOS no lista sus carpetas. Escribí el nombre de la carpeta."
 }

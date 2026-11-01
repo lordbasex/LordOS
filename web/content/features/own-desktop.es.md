@@ -80,8 +80,8 @@ En la 0.8.7: varios escritorios en Lord Flow y Lord Classic, con una vista gener
 Todo en la 0.8.7.
 
 - **Conectarse a un servidor.** Red lista cada computadora como una carpeta, y sus recursos se despliegan ahí mismo. Ir → Conectarse al servidor acepta direcciones smb, nfs, sftp, ftp, ftps y WebDAV, y todas se abren como carpetas en Archivos, con las claves SSH y los certificados comprobados antes.
-- **Pantallas remotas.** Las apps de RDP y VNC vienen con el sistema y dibujan con el motor de LordOS: sin ventana de cliente, sin sesión X11, sin toolkit.
-- **Discos de otros sistemas.** Disk Formats, un solo ítem de la Tienda, abre NTFS, exFAT y FAT en lectura y escritura, HFS+ con journal en solo lectura y, en amd64, APFS en solo lectura. Son formatos comerciales; los controladores son software libre y sin costo.
+- **Pantallas remotas.** Remote Desk, una sola app para RDP y VNC, viene con el sistema y dibuja con el motor de LordOS: sin ventana de cliente, sin sesión X11, sin toolkit.
+- **Discos de otros sistemas.** Disk Formats, un solo ítem de la Tienda, abre NTFS, exFAT y FAT en lectura y escritura, HFS+ con journal en solo lectura y, en amd64 como parte opcional, APFS en solo lectura. Son formatos comerciales; los controladores son software libre y sin costo.
 - **Tu forma de trabajar.** Elegí, reordená y ajustá las columnas de la lista, usá la Configuración propia de Archivos y abrí Terminal en la carpeta donde estás.
 
 ## Teclas, teclado en pantalla y volver a donde estabas
