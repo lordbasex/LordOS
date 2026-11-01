@@ -22,6 +22,8 @@ const symOf = (e) => {
 const EXT = { 102: 0x147, 103: 0x148, 104: 0x149, 105: 0x14b, 106: 0x14d, 107: 0x14f, 108: 0x150, 109: 0x151, 110: 0x152, 111: 0x153, 125: 0x15b, 97: 0x11d, 100: 0x138 };
 const scanOf = (e) => EXT[e.code] || e.code || 0;
 
+const bit = (b) => (b === 2 ? 4 : b === 1 ? 2 : 1);
+
 function Screen({ id, st, onEnd, focused }) {
   const box = useRef(null);
   const buttons = useRef(0);
@@ -42,12 +44,12 @@ function Screen({ id, st, onEnd, focused }) {
     const k = Math.min(w / st.w, ht / st.h), ox = x + (w - st.w * k) / 2, oy = y + (ht - st.h * k) / 2;
     return [Math.max(0, Math.min(st.w - 1, Math.round((e.x - ox) / k))), Math.max(0, Math.min(st.h - 1, Math.round((e.y - oy) / k)))];
   };
-  const bit = (b) => (b === 2 ? 4 : b === 1 ? 2 : 1);
-  const ptr = (e, extra = 0) => { const [x, y] = at(e); lord.rdesk.pointer(id, x, y, buttons.current | extra); };
+  const last = useRef([0, 0]);          // a release has no position of its own
+  const ptr = (e, extra = 0) => { if (e) last.current = at(e); lord.rdesk.pointer(id, last.current[0], last.current[1], buttons.current | extra); };
+  useEffect(() => addListener('pointerup', (e) => { if (buttons.current) { buttons.current &= ~bit(e.button); ptr(null); } }), [id]);
   return h(View, { style: { flex: 1, backgroundColor: '#000' } },
     h(View, { ref: box, style: { flex: 1 },
       onMouseDown: (e) => { buttons.current |= bit(e.button); ptr(e); },
-      onMouseUp: (e) => { buttons.current &= ~bit(e.button); ptr(e); },
       onMouseMove: (e) => ptr(e),
       onWheel: (e) => { const x = e.deltaY < 0 ? 8 : 16; ptr(e, x); ptr(e); } },
     st.media ? h(MediaView, { media: st.media, style: { flex: 1 } }) : null),
