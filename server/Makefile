@@ -291,6 +291,24 @@ build/remote-fuzz: tests/remote_fuzz.c $(REMOTE_SEC_SRC) src/remote/rsec.h src/r
 	$(CC) $(CPPFLAGS) -Itests -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/remote_fuzz.c $(REMOTE_SEC_SRC)
 	./$@ 100000 || { rm -f $@; exit 1; }
+# the screen-sharing API (docs/SCREEN-SHARING.md): the wire format, the grants' file and the rate limits; then
+# the same parsers under ASan+UBSan with random and mutated inputs. tests/share_e2e.sh runs a real session.
+SHARE_SEC_SRC := src/remote/sharewire.c src/remote/sharegrant.c src/sec/json.c
+SHARE_SEC_HDR := src/remote/sharewire.h src/remote/sharegrant.h src/remote/proto.h src/sec/json.h
+test: build/share-test build/share-fuzz
+build/share-test: tests/share_test.c $(SHARE_SEC_SRC) $(SHARE_SEC_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -Isrc $(CFLAGS) $(WARN) -std=c11 -o $@ tests/share_test.c $(SHARE_SEC_SRC)
+	./$@ || { rm -f $@; exit 1; }
+build/share-fuzz: tests/share_fuzz.c $(SHARE_SEC_SRC) $(SHARE_SEC_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -Isrc -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/share_fuzz.c $(SHARE_SEC_SRC)
+	./$@ 200000 || { rm -f $@; exit 1; }
+# not part of make test: drives a real session on a test machine (tests/share_e2e.sh)
+build/share-client: tests/share_client.c src/remote/sharewire.c $(SHARE_SEC_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -Isrc $(CFLAGS) $(WARN) -std=c11 -o $@ tests/share_client.c src/remote/sharewire.c
 # journal reader (Logs): normal and compact synthetic files, LZ4 and XZ, broken and
 # truncated files; `build/journal-test dump <file>` dumps JSON to compare with journalctl
 test: build/journal-test
