@@ -5,6 +5,8 @@
  *   LQ_MDNS     4 bytes: the sender's IPv4 address, then one raw mDNS datagram; no reply
  *   LQ_MDNS_END {}: → LR_MDNS with every service gathered, and the table starts over
  *   LQ_SMB      the server's address as text + 1 fd: a TCP socket connected to port 445 → LR_SMB
+ *   LQ_SMB_AUTH {"addr","user","domain","password"} + 1 fd: connected to port 445 → LR_SMB with session
+ *               "user" and its shares, or LR_ERR "denied". The password lives in this one request and is wiped
  *   LQ_PORTMAP  {} + 1 fd: connected to port 111 → LR_PORTMAP
  *   LQ_EXPORTS  {} + 1 fd: connected to the port LR_PORTMAP named → LR_EXPORTS
  *   LQ_END      {}: the helper exits
@@ -23,7 +25,7 @@
 #ifndef LORD_LAN_PROTO_H
 #define LORD_LAN_PROTO_H
 
-enum { LQ_MDNS = 1, LQ_MDNS_END, LQ_SMB, LQ_PORTMAP, LQ_EXPORTS, LQ_END };
+enum { LQ_MDNS = 1, LQ_MDNS_END, LQ_SMB, LQ_PORTMAP, LQ_EXPORTS, LQ_END, LQ_SMB_AUTH };
 enum { LR_MDNS = 101, LR_SMB, LR_PORTMAP, LR_EXPORTS, LR_ERR };
 
 #endif

@@ -178,6 +178,17 @@ size_t smb_negotiate(uint8_t *out, size_t cap, uint64_t msgid) {
     return n;
 }
 
+/* Listing after signing in signs its messages, and these two dialects sign with HMAC-SHA256 alone. */
+size_t smb_negotiate_signed(uint8_t *out, size_t cap, uint64_t msgid) {
+    size_t n = smb_negotiate(out, cap, msgid);
+    if (!n) return 0;
+    uint8_t *b = out + 4 + SMB_HDR;
+    put16(b + 2, 2);
+    n -= 4;
+    transport(out, n - 4);
+    return n;
+}
+
 size_t smb_session_setup(uint8_t *out, size_t cap, uint64_t msgid, uint64_t session, const uint8_t *blob, size_t blen) {
     size_t n = 4 + SMB_HDR + 24 + blen;
     if (cap < n) return 0;

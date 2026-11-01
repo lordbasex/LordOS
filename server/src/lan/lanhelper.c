@@ -4,10 +4,12 @@
  * process down. */
 #include "lanaddr.h"
 #include "lanparse.h"
+#include "smbauth.h"
 #include "lanproto.h"
 #include "lanservices.h"
 #include "../doc/wire.h"
 #include "../print/mdns.h"
+#include "../sec/json.h"
 #include "../sec/sandbox.h"
 
 #include <arpa/inet.h>
@@ -17,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <strings.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
@@ -227,6 +230,70 @@ done:;
     jb_free(&b);
 }
 
+/* ---- SMB after signing in ---- */
+
+static int signed_exchange(int fd, uint8_t *tx, size_t n, const uint8_t key[16], SmbMsg *m, long long deadline) {
+    if (!n) return -1;
+    smb_sign(tx + 4, n - 4, key);
+    return smb_exchange(fd, tx, n, m, deadline);
+}
+
+/* The shares a user sees. What comes back is only shown, so answers aren't checked against the signature;
+ * the mount itself is the kernel's. */
+static void smb_auth_job(uint32_t id, const char *ip, const char *user, const char *domain, const char *password, int fd) {
+    static uint8_t tx[8192];
+    static LanShare shares[LAN_MAX_LIST];
+    long long deadline = now_ms() + JOB_MS;
+    SmbMsg m;
+    uint64_t mid = 0, sid = 0;
+    int signing = 0;
+    uint8_t blob[4096], rnd[24], key[16];
+    if (getrandom(rnd, sizeof rnd, 0) != sizeof rnd) { fail(id, "random"); return; }
+    if (smb_exchange(fd, tx, smb_negotiate_signed(tx, sizeof tx, mid++), &m, deadline) || !smb_negotiate_reply(&m, &signing)) { fail(id, "smb-negotiate"); return; }
+    size_t bl = ntlm_user_negotiate(blob, sizeof blob);
+    const uint8_t *sb;
+    size_t sl;
+    unsigned flags;
+    if (smb_exchange(fd, tx, smb_session_setup(tx, sizeof tx, mid++, 0, blob, bl), &m, deadline) || m.status != SMB_STATUS_MORE ||
+        smb_session_reply(&m, &sb, &sl, &flags) || !sb) { fail(id, "smb-session"); return; }
+    sid = m.session;
+    bl = ntlm_user_auth(blob, sizeof blob, sb, sl, user, domain, password, rnd, key);
+    if (!bl) { fail(id, "smb-session"); return; }
+    size_t n = smb_session_setup(tx, sizeof tx, mid++, sid, blob, bl);
+    explicit_bzero(blob, sizeof blob);
+    int rc = smb_exchange(fd, tx, n, &m, deadline);
+    explicit_bzero(tx, sizeof tx);
+    /* a server that takes a bad password as its guest says so with these flags */
+    if (rc || m.status || smb_session_reply(&m, &sb, &sl, &flags) || (flags & 3)) { fail(id, "denied"); return; }
+    uint8_t fid[16], dce[256];
+    const uint8_t *o;
+    size_t ol;
+    if (signed_exchange(fd, tx, smb_tree_connect(tx, sizeof tx, mid++, sid, ip), key, &m, deadline) || m.status) { fail(id, "smb-list"); return; }
+    uint32_t tree = m.tree;
+    if (signed_exchange(fd, tx, smb_create_pipe(tx, sizeof tx, mid++, sid, tree), key, &m, deadline) || smb_create_reply(&m, fid)) { fail(id, "smb-list"); return; }
+    if (signed_exchange(fd, tx, smb_pipe_ioctl(tx, sizeof tx, mid++, sid, tree, fid, dce, dce_bind(dce, sizeof dce)), key, &m, deadline) ||
+        smb_ioctl_reply(&m, &o, &ol) || dce_bind_ack(o, ol)) { fail(id, "smb-list"); return; }
+    if (signed_exchange(fd, tx, smb_pipe_ioctl(tx, sizeof tx, mid++, sid, tree, fid, dce, dce_share_enum(dce, sizeof dce, ip)), key, &m, deadline) ||
+        smb_ioctl_reply(&m, &o, &ol)) { fail(id, "smb-list"); return; }
+    int count = dce_share_reply(o, ol, shares, LAN_MAX_LIST);
+    explicit_bzero(key, sizeof key);
+    if (count < 0) { fail(id, "smb-list"); return; }
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"session\":\"user\",\"listed\":1,\"shares\":[");
+    for (int i = 0; i < count; i++) {
+        if (i) jb_raw(&b, ",");
+        jb_raw(&b, "{\"name\":");
+        jb_str(&b, shares[i].name);
+        jb_raw(&b, ",\"comment\":");
+        jb_str(&b, shares[i].comment);
+        jb_raw(&b, "}");
+    }
+    jb_raw(&b, "]}");
+    reply(LR_SMB, id, &b);
+    jb_free(&b);
+}
+
 /* ---- NFS ---- */
 
 /* The whole reply of one call: record fragments joined, at most MSG_MAX bytes. */
@@ -313,6 +380,18 @@ int main(void) {
             char ip[16] = "";
             if (fd >= 0 && m.json && m.len < sizeof ip) { memcpy(ip, m.json, m.len); ip[m.len] = 0; smb_job(m.h.id, ip, fd); }
             else fail(m.h.id, "bad-request");
+            break;
+        }
+        case LQ_SMB_AUTH: {
+            JDoc d;
+            if (fd >= 0 && m.json && !json_parse(m.json, m.len, &d, NULL, 0)) {
+                const char *ip = json_str(d.root, "addr"), *user = json_str(d.root, "user"), *dom = json_str(d.root, "domain"), *pw = json_str(d.root, "password");
+                if (ip && user && dom && pw && strlen(ip) < 16) smb_auth_job(m.h.id, ip, user, dom, pw, fd);
+                else fail(m.h.id, "bad-request");
+                if (pw) explicit_bzero((char *)pw, strlen(pw));
+                json_free(&d);
+            } else fail(m.h.id, "bad-request");
+            if (m.json) explicit_bzero(m.json, m.len);
             break;
         }
         case LQ_PORTMAP: if (fd >= 0) portmap_job(m.h.id, fd); else fail(m.h.id, "bad-request"); break;

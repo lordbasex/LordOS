@@ -2,6 +2,7 @@
  * actions, and every parser of lord-lan against crafted and damaged answers. Built with ASan and UBSan. */
 #include "../src/lan/lanaddr.h"
 #include "../src/lan/lanparse.h"
+#include "../src/lan/smbauth.h"
 #include "../src/lan/lanservices.h"
 #include "../src/print/mdns.h"
 
@@ -35,6 +36,44 @@ static void t_addr(void) {
     CHECK(lan_clean_text("\xff\xfe" "ok", t, sizeof t) && !strcmp(t, "ok"));
     CHECK(!lan_clean_text("\x01\x02", t, sizeof t));
     CHECK(lan_clean_text("áááááááááááááááááááá", t, 8) && strlen(t) == 6);      /* never cuts a character */
+}
+
+static void hex(const char *h, uint8_t *o) { for (; *h; h += 2) { unsigned v; sscanf(h, "%2x", &v); *o++ = (uint8_t)v; } }
+static int same(const uint8_t *a, const char *h) { uint8_t e[64]; hex(h, e); return !memcmp(a, e, strlen(h) / 2); }
+
+/* RFC 1320, RFC 1321, RFC 2202 and the worked example in the NTLM specification */
+static void t_smbauth(void) {
+    uint8_t o[32];
+    md4("", 0, o); CHECK(same(o, "31d6cfe0d16ae931b73c59d7e0c089c0"));
+    md4("abc", 3, o); CHECK(same(o, "a448017aaf21d8525fc10ae87aa6729d"));
+    const char *d80 = "12345678901234567890123456789012345678901234567890123456789012345678901234567890";
+    md4(d80, 80, o); CHECK(same(o, "e33b4ddc9c38f2199c3e7b164fcc0536"));
+    md5("", 0, o); CHECK(same(o, "d41d8cd98f00b204e9800998ecf8427e"));
+    md5("abc", 3, o); CHECK(same(o, "900150983cd24fb0d6963f7d28e17f72"));
+    md5(d80, 80, o); CHECK(same(o, "57edf4a22be3c955ac49da2e2107b67a"));
+    hmac_md5("Jefe", 4, "what do ya want for nothing?", 28, o); CHECK(same(o, "750c783e6ab0b503eaa86e310a5db738"));
+    hmac_sha256("Jefe", 4, "what do ya want for nothing?", 28, o); CHECK(same(o, "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"));
+    uint8_t u[32];
+    CHECK(text_utf16("añ", u, sizeof u, 1) == 4 && u[0] == 'A' && u[2] == 0xd1 && u[3] == 0);
+    CHECK(text_utf16("", u, sizeof u, 0) == 1);
+    CHECK(!text_utf16("\xff", u, sizeof u, 0));
+    uint8_t hash[16], client[8], server[8], temp[256], proof[16], base[16];
+    CHECK(!ntlmv2_hash("User", "Domain", "Password", hash) && same(hash, "0c868a403bfd7a93a3001ef22ef02e3f"));
+    memset(client, 0xaa, 8);
+    hex("0123456789abcdef", server);
+    uint8_t av[36];
+    hex("02000c0044006f006d00610069006e0001000c005300650072007600650072000000" "0000", av);
+    size_t tl = ntlmv2_temp(temp, sizeof temp, 0, client, av, 36);
+    ntlmv2_proof(hash, server, temp, tl, proof, base);
+    CHECK(same(proof, "68cd0ab851e51c96aabc927bebef6a1c"));
+    CHECK(same(base, "8de40ccadbc14a82f15cb0ad0de95ca3"));
+    /* a challenge cut anywhere, or pointing outside itself, is refused */
+    uint8_t c[120] = { 0 }, a[1024], key[16], rnd[24] = { 0 };
+    memcpy(c, "NTLMSSP", 8); p32(c + 8, 2); p32(c + 20, 0x40000000); p16(c + 40, 36); p16(c + 42, 36); p32(c + 44, 56); memcpy(c + 56, av, 36);
+    CHECK(ntlm_user_auth(a, sizeof a, c, 92, "ana", "", "x", rnd, key) > 64);
+    for (size_t l = 0; l < 92; l++) CHECK(!ntlm_user_auth(a, sizeof a, c, l, "ana", "", "x", rnd, key));
+    p32(c + 44, 0xfffffff0u); CHECK(!ntlm_user_auth(a, sizeof a, c, 92, "ana", "", "x", rnd, key));
+    uint8_t msg[80] = { 0 }; smb_sign(msg, 80, key); CHECK(msg[16] & 8);
 }
 
 static int req(const char *s, ShareReq *r) { static char b[1024]; snprintf(b, sizeof b, "%s", s); return share_req_parse(b, r); }
@@ -275,6 +314,7 @@ static void t_fuzz(void) {
 
 int main(void) {
     t_addr();
+    t_smbauth();
     t_share();
     t_rpc();
     t_smb();

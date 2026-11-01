@@ -18,4 +18,9 @@ int   lan_start(int asked);
 void  lan_stop(void);                   /* cancels the pass and ends the helper */
 char *lan_poll(void);                   /* JSON of what is known (malloc), NULL out of memory */
 
+/* The shares a server shows a user. One at a time, on a thread and a helper of its own, on a local subnet only;
+ * the password lives until the helper answered and is wiped. user "": what an anonymous session shows. */
+int   lan_list_start(const char *addr, const char *domain, const char *user, const char *password);
+char *lan_list_poll(void);              /* {"state":"running|done|denied|off-link|no-answer|denied-net|no-helper|failed","shares":[...]} */
+
 #endif

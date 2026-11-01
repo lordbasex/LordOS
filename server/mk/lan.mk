@@ -8,16 +8,16 @@ build/lord-server: $(LAN_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_lan.h
 build/obj/admin.o: src/lan/share_admin.h
 
-LAN_HELPER_SRC := src/lan/lanhelper.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
+LAN_HELPER_SRC := src/lan/lanhelper.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
 all: build/lord-lan
-build/lord-lan: $(LAN_HELPER_SRC) $(wildcard src/lan/*.h) src/doc/wire.h src/doc/proto.h src/print/mdns.h src/sec/sandbox.h src/sec/cgroup.h
+build/lord-lan: $(LAN_HELPER_SRC) $(wildcard src/lan/*.h) src/pkg/crypto.h src/doc/wire.h src/doc/proto.h src/print/mdns.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -DMDNS_PARSE_ONLY $(CFLAGS) $(WARN) -std=c11 -o $@ $(LAN_HELPER_SRC) -lpthread -lm
 	chmod g-w $@
 
 # the parsers against crafted and damaged answers, the address policy, the actions' arguments
 test: build/lan-test
-LAN_TEST_SRC := tests/lan_test.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c
+LAN_TEST_SRC := tests/lan_test.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c
 build/lan-test: $(LAN_TEST_SRC) $(wildcard src/lan/*.h) src/print/mdns.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -DMDNS_PARSE_ONLY $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ $(LAN_TEST_SRC)
@@ -32,3 +32,7 @@ build/lan-scan: tests/lan_scan.c src/lan/lan.c src/lan/lanaddr.c src/print/mdns.
 # the share-* actions alone, real mounts as root on a test machine (a tool, not part of make test)
 build/share-cli: tests/share_cli.c src/lan/share_admin.c src/lan/lanaddr.c src/lan/share_admin.h src/lan/lanaddr.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/share_cli.c src/lan/share_admin.c src/lan/lanaddr.c
+
+# lord-lan's sign-in against one test server (a tool, not part of make test)
+build/lan-list: tests/lan_list.c src/doc/wire.c build/lord-lan
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lan_list.c src/doc/wire.c

@@ -89,10 +89,11 @@ static int lan_tcp(uint32_t a, int port) {
 static Iface ifs[MAX_IF];
 static int nifs;
 
-static void load_ifaces(void) {
-    nifs = 0;
+/* into l: the pass's own table, or a sign-in's, which may run during a pass */
+static int ifaces_into(Iface *l) {
+    int nifs = 0;
     struct ifaddrs *all = NULL;
-    if (getifaddrs(&all)) return;
+    if (getifaddrs(&all)) return 0;
     for (struct ifaddrs *i = all; i && nifs < MAX_IF; i = i->ifa_next) {
         if (!i->ifa_addr || i->ifa_addr->sa_family != AF_INET || !i->ifa_netmask) continue;
         if (!(i->ifa_flags & IFF_UP) || !(i->ifa_flags & IFF_RUNNING) || i->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) continue;
@@ -104,25 +105,28 @@ static void load_ifaces(void) {
 #endif
         uint32_t a = ntohl(((struct sockaddr_in *)i->ifa_addr)->sin_addr.s_addr), m = ntohl(((struct sockaddr_in *)i->ifa_netmask)->sin_addr.s_addr);
         if (!lan_private(a)) continue;
-        ifs[nifs].addr = a;
-        ifs[nifs].mask = m;
-        snprintf(ifs[nifs].name, sizeof ifs[nifs].name, "%s", i->ifa_name);
+        l[nifs].addr = a;
+        l[nifs].mask = m;
+        snprintf(l[nifs].name, sizeof l[nifs].name, "%s", i->ifa_name);
         nifs++;
     }
     freeifaddrs(all);
+    return nifs;
 }
 
-static int is_mine(uint32_t a) { for (int i = 0; i < nifs; i++) if (ifs[i].addr == a) return 1; return 0; }
+static void load_ifaces(void) { nifs = ifaces_into(ifs); }
 
 /* on one of those subnets, private, and neither us, the network nor its broadcast */
-static int on_link(uint32_t a) {
-    if (!lan_private(a) || is_mine(a)) return 0;
-    for (int i = 0; i < nifs; i++) {
-        uint32_t m = ifs[i].mask;
-        if ((a & m) == (ifs[i].addr & m) && (a & ~m) != 0 && (a & ~m) != ~m) return 1;
+static int on_link_of(const Iface *l, int n, uint32_t a) {
+    if (!lan_private(a)) return 0;
+    for (int i = 0; i < n; i++) if (l[i].addr == a) return 0;
+    for (int i = 0; i < n; i++) {
+        uint32_t m = l[i].mask;
+        if ((a & m) == (l[i].addr & m) && (a & ~m) != 0 && (a & ~m) != ~m) return 1;
     }
     return 0;
 }
+static int on_link(uint32_t a) { return on_link_of(ifs, nifs, a); }
 
 static Host *host_of(uint32_t a) {
     for (int i = 0; i < nhosts; i++) if (hosts[i]->a == a) return hosts[i];
@@ -144,7 +148,7 @@ static void hosts_clear(void) {
 static int helper_fd = -1;
 static pid_t helper_pid;
 
-static int helper_start(void) {
+static int helper_spawn(int *out, pid_t *pid) {
     char bin[PATH_MAX];
     ssize_t n = readlink("/proc/self/exe", bin, sizeof bin - 16);
     if (n <= 0) return -1;
@@ -169,14 +173,15 @@ static int helper_start(void) {
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
     char *argv[] = { "lord-lan", NULL };
     char *envp[] = { "LANG=C.UTF-8", getenv("LORDOS_SESSIOND") ? "LORDOS_SESSIOND=1" : NULL, NULL };
-    int e = posix_spawn(&helper_pid, bin, &fa, &at, argv, envp);
+    int e = posix_spawn(pid, bin, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&at);
     close(sv[1]);
     if (e) { close(sv[0]); return -1; }
-    helper_fd = sv[0];
+    *out = sv[0];
     return 0;
 }
+static int helper_start(void) { return helper_spawn(&helper_fd, &helper_pid); }
 
 static void helper_stop(void) {
     if (helper_fd < 0) return;
@@ -562,6 +567,133 @@ static void ask_servers(void) {
         if (do_smb) smb_ask(h);
         if (do_nfs && !atomic_load(&cancel)) nfs_ask(h);
     }
+}
+
+/* ---- the shares a user sees, after signing in ---- */
+
+static pthread_mutex_t lmu = PTHREAD_MUTEX_INITIALIZER;
+static struct { char addr[16], user[64], domain[64], password[256]; } lq;
+static const char *lstate = "idle";
+static int lbusy, lcount;
+static LanShare *lshares;
+
+static void list_done(const char *st, LanShare *sh, int n) {
+    pthread_mutex_lock(&lmu);
+    lstate = st;
+    free(lshares);
+    lshares = sh;
+    lcount = n;
+    lbusy = 0;
+    explicit_bzero(&lq, sizeof lq);
+    pthread_mutex_unlock(&lmu);
+}
+
+/* A helper of its own, one request: a sign-in can happen during a pass, or with no pass at all. */
+static void *list_thread(void *arg) {
+    (void)arg;
+    Iface l[MAX_IF];
+    int nl = ifaces_into(l);
+    struct in_addr in;
+    if (inet_pton(AF_INET, lq.addr, &in) != 1 || !on_link_of(l, nl, ntohl(in.s_addr))) { list_done("off-link", NULL, 0); return NULL; }
+    int sock = -1;
+    pid_t pid = 0;
+    if (helper_spawn(&sock, &pid)) { list_done("no-helper", NULL, 0); return NULL; }
+    const char *st = "failed";
+    LanShare *sh = NULL;
+    int n = 0, fd = connected(ntohl(in.s_addr), 445);
+    if (fd < 0) st = errno == EACCES || errno == EPERM ? "denied-net" : "no-answer";
+    else {
+        JBuf b;
+        jb_init(&b);
+        int guest = !lq.user[0];
+        if (guest) jb_raw(&b, lq.addr);
+        else {
+            jb_raw(&b, "{\"addr\":");
+            jb_str(&b, lq.addr);
+            jb_raw(&b, ",\"user\":");
+            jb_str(&b, lq.user);
+            jb_raw(&b, ",\"domain\":");
+            jb_str(&b, lq.domain);
+            jb_raw(&b, ",\"password\":");
+            jb_str(&b, lq.password);
+            jb_raw(&b, "}");
+        }
+        int rc = b.oom ? -1 : doc_send(sock, guest ? LQ_SMB : LQ_SMB_AUTH, 1, b.p, b.n, &fd, 1);
+        if (b.p) explicit_bzero(b.p, b.cap);
+        jb_free(&b);
+        close(fd);
+        struct pollfd p = { sock, POLLIN, 0 };
+        DocMsg m;
+        JDoc d;
+        if (!rc && poll(&p, 1, JOB_MS + 1000) > 0 && !doc_recv(sock, &m)) {
+            if (m.json && !json_parse(m.json, m.len, &d, NULL, 0)) {
+                const char *e = json_str(d.root, "error");
+                if (m.h.op == LR_ERR) st = e && !strcmp(e, "denied") ? "denied" : "failed";
+                else if (m.h.op == LR_SMB && json_num(d.root, "listed", 0) == 1) {
+                    sh = calloc(LAN_MAX_LIST, sizeof *sh);
+                    const JVal *a = json_get(d.root, "shares");
+                    for (const JVal *s = sh && a && a->type == J_ARR ? a->kid : NULL; s && n < LAN_MAX_LIST; s = s->next) {
+                        if (!lan_clean_text(json_str(s, "name"), sh[n].name, sizeof sh[n].name) || strpbrk(sh[n].name, "/\\")) continue;
+                        lan_clean_text(json_str(s, "comment"), sh[n].comment, sizeof sh[n].comment);
+                        n++;
+                    }
+                    st = "done";
+                } else if (guest) st = "denied";
+                json_free(&d);
+            }
+            doc_msg_free(&m);
+        }
+    }
+    doc_send(sock, LQ_END, 0, "{}", 2, NULL, 0);
+    close(sock);
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+    list_done(st, sh, n);
+    return NULL;
+}
+
+int lan_list_start(const char *addr, const char *domain, const char *user, const char *password) {
+    pthread_mutex_lock(&lmu);
+    if (lbusy || strlen(addr) >= sizeof lq.addr || strlen(user) >= sizeof lq.user || strlen(domain) >= sizeof lq.domain || strlen(password) >= sizeof lq.password) {
+        pthread_mutex_unlock(&lmu);
+        return 0;
+    }
+    strcpy(lq.addr, addr); strcpy(lq.user, user); strcpy(lq.domain, domain); strcpy(lq.password, password);
+    lbusy = 1;
+    lstate = "running";
+    pthread_mutex_unlock(&lmu);
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&at, 1024 * 1024);
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, &old);
+    int r = pthread_create(&th, &at, list_thread, NULL);
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    pthread_attr_destroy(&at);
+    if (r) { list_done("no-helper", NULL, 0); return 0; }
+    return 1;
+}
+
+char *lan_list_poll(void) {
+    JBuf b;
+    jb_init(&b);
+    pthread_mutex_lock(&lmu);
+    jb_printf(&b, "{\"state\":\"%s\",\"shares\":[", lstate);
+    for (int k = 0; k < lcount; k++) {
+        if (k) jb_raw(&b, ",");
+        jb_raw(&b, "{\"name\":");
+        jb_str(&b, lshares[k].name);
+        jb_raw(&b, ",\"comment\":");
+        jb_str(&b, lshares[k].comment);
+        jb_raw(&b, "}");
+    }
+    pthread_mutex_unlock(&lmu);
+    jb_raw(&b, "]}");
+    if (b.oom) { jb_free(&b); return NULL; }
+    return b.p;
 }
 
 /* ---- one pass ---- */

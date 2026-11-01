@@ -19,6 +19,15 @@ export const lan = {
   start: (asked = false) => lord.lan.start(asked),
   stop: () => lord.lan.stop(),
   poll: () => { try { return JSON.parse(lord.lan.poll()); } catch (e) { return { state: 'idle', running: false, probed: 0, total: 0, hosts: [] }; } },
+  // the shares a server shows this user: { state: 'done' | 'denied' | 'off-link' | …, shares }
+  async listShares({ addr, user = '', domain = '', password = '' }) {
+    if (!lord.lan.listShares(addr, domain, user, password)) return { state: 'failed', shares: [] };
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 150));
+      const s = JSON.parse(lord.lan.listPoll());
+      if (s.state !== 'running') return s;
+    }
+  },
   mount: ({ kind, addr, share, user = '', domain = '', password = '' }) => admin.run('share-mount', [kind, addr, share, user, domain, password].join('\n'), null, { quiet: true }).then((p) => String(p || '').trim()),
   unmount: (path) => admin.run('share-unmount', path, null, { quiet: true }),
   // what was remembered for this share: { user, password }, or null (no keyring, locked, nothing saved)
