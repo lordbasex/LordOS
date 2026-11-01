@@ -420,4 +420,7 @@ export const debian = {
   },
   canRemove: (a) => !!packageOfApp(a),
   Progress,
+  PlanView,
+  state,
+  runJob,
 };

@@ -108,6 +108,29 @@ function Authorize({ a, onAllow }) {
     h(View, { style: { flexDirection: 'row', gap: spacing.s } }, h(Button, { primary: true, label: t('store.formats.allow'), onClick: () => onAllow(extras) })));
 }
 
+// The item is in and an optional part isn't: the same choice as on the page before installing, with its own plan.
+function MoreDrivers({ a }) {
+  const th = useTheme();
+  const here = useHere();
+  const { job } = useStore(debian.state);
+  const [plan, setPlan] = useState(null);
+  const missing = a.drivers.filter((d) => !d.arches || d.arches.includes(here)).flatMap((d) => d.optional || []).filter((p) => !installed(p));
+  if (!missing.length) return null;
+  const confirm = () => {
+    const extra = plan.items.some((i) => i.action === 'remove' && !i.requested);
+    debian.runJob('pkg-install', [...missing, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: a.name }));
+    setPlan(null);
+  };
+  return h(View, { style: { gap: spacing.s, maxWidth: 680 } },
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m } },
+      h(Text, { style: { flex: 1, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } }, t('store.formats.optional')),
+      h(Button, { label: t('store.install'), disabled: !admin.available() || !!job, onClick: () => setPlan(lord.pkg.plan({ install: missing })) })),
+    plan ? h(debian.PlanView, { plan }) : null,
+    plan ? h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' } },
+      h(Button, { label: t('store.cancel'), onClick: () => setPlan(null) }),
+      plan.ok ? h(Button, { primary: true, label: t('store.plan.confirm'), onClick: confirm }) : null) : null);
+}
+
 const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.arch] || info.arch || ''; };
 // The catalog's sections: "ai" (entries without a section) and "commercial" (free of charge, no
 // source code: the page says so before anything is installed).
@@ -133,7 +156,8 @@ export function AiDetail({ pkg }) {
     const sameRepo = (catalog.apps || []).some((x) => x.id !== a.id && x.source && x.source.url === a.source.url && installed(x.package));
     if (!sameRepo) admin.run('pkg-source-remove', a.id).catch(() => {});
   };
-  return h(debian.Details, { name: pkg, onRemoved, extras: allowed || [] });
+  const details = h(debian.Details, { name: pkg, onRemoved, extras: allowed || [] });
+  return a?.drivers && installed(pkg) ? h(View, { style: { gap: spacing.l } }, h(MoreDrivers, { a }), details) : details;
 }
 
 // The Artificial Intelligence page: the catalog as cards (the search narrows it).

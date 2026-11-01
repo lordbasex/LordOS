@@ -84,6 +84,7 @@
   "disk.cannotMountFs": "No se sabe montar «{fs}»",
   "disk.formatsNeeded": "Para abrir volúmenes {fs}, obtené Formatos de disco desde la Tienda.",
   "disk.noDriver": "Esta computadora no tiene controlador para {fs}. Se puede instalar desde la Tienda.",
+  "disk.noDriverHere": "Esta computadora no tiene controlador para {fs}.",
   "disk.cannotRenameFs": "No se sabe renombrar «{fs}»",
   "disk.imageOnTarget": "La imagen está en el mismo disco que se va a borrar",
   "disk.imageOpenFailed": "No se pudo abrir la imagen (tiene que ser un archivo de tu carpeta o de tus discos)",

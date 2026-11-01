@@ -16,6 +16,8 @@ T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/DEBIAN" "$T/usr/lib/lordos" "$T/usr/share/doc/lordos-disk-formats"
 echo "1" > "$T/usr/lib/lordos/disk-formats.enabled"
+# where the driver can be added later: the Store, Files and disk-mount read this instead of guessing the architecture
+[ "$ARCH" = amd64 ] && echo "1" > "$T/usr/lib/lordos/disk-formats.apfs"
 cat > "$T/usr/share/doc/lordos-disk-formats/copyright" <<C
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Files: *

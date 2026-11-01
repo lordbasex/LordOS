@@ -43,7 +43,10 @@ export const disks = {
 export const COMMERCIAL_FORMATS = ['vfat', 'exfat', 'ntfs', 'hfsplus', 'apfs'];
 const FORMATS_MARK = '/usr/lib/lordos/disk-formats.enabled';
 export const diskFormatsOn = () => { try { stat(FORMATS_MARK); return true; } catch (e) { return false; } };
-export const needsDiskFormats = (fstype) => COMMERCIAL_FORMATS.includes(fstype) && !diskFormatsOn();
+const there = (path) => { try { stat(path); return true; } catch (e) { return false; } };
+// APFS's driver is the item's optional part: the item can be in without it, and it can be added later on the same page
+const apfsMissing = () => there('/usr/lib/lordos/disk-formats.apfs') && !there('/usr/share/doc/apfs-dkms');
+export const needsDiskFormats = (fstype) => COMMERCIAL_FORMATS.includes(fstype) && (!diskFormatsOn() || (fstype === 'apfs' && apfsMissing()));
 export const openDiskFormats = () => wm.open('store', { args: { page: 'commercial', app: 'lordos-disk-formats' } });
 
 export function useDisks() {

@@ -261,7 +261,8 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     if (mount(t.dev, dir, DISK_KINDS[k].kernel, flags, opts[0] ? opts : NULL)) {
         int e = errno;
         rmdir(dir);
-        if (e == ENODEV) { admin_err("disk.noDriver", "fs", fs, NULL); return; }     /* Files offers the driver's package */
+        /* Files offers the driver's package; APFS has none on an architecture without the item's marker */
+        if (e == ENODEV) { admin_err(!strcmp(fs, "apfs") && access("/usr/lib/lordos/disk-formats.apfs", F_OK) ? "disk.noDriverHere" : "disk.noDriver", "fs", fs, NULL); return; }
         admin_err("disk.mountFailed", "name", t.name, "errno", lerr_errno(e), NULL);
         return;
     }
