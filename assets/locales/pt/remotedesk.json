@@ -1,0 +1,21 @@
+{
+  "titleRdp": "Área de trabalho remota",
+  "titleVnc": "Compartilhamento de tela",
+  "saved": "Salvas",
+  "host": "Computador",
+  "port": "Porta",
+  "user": "Usuário",
+  "domain": "Domínio",
+  "password": "Senha",
+  "remember": "Lembrar a senha",
+  "connect": "Conectar",
+  "connecting": "Conectando…",
+  "disconnect": "Desconectar",
+  "keyring": "Área de trabalho remota em {name}",
+  "err.denied": "Esse usuário ou senha não foi aceito.",
+  "err.failed": "Não foi possível conectar.",
+  "err.unreachable": "Esse computador não responde.",
+  "cert": "Primeira conexão a este computador. Seu certificado é {print}. Confiar?",
+  "certYes": "Confiar",
+  "certNo": "Cancelar"
+}

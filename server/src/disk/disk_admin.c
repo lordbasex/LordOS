@@ -233,6 +233,7 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
         { "vfat", "vfat", 1, 0 }, { "exfat", "exfat", 1, 0 }, { "ntfs", "ntfs3", 1, 0 }, { "ext4", "ext4", 0, 0 },
         { "ext3", "ext3", 0, 0 }, { "ext2", "ext2", 0, 0 }, { "btrfs", "btrfs", 0, 0 }, { "xfs", "xfs", 0, 0 },
         { "f2fs", "f2fs", 0, 0 }, { "iso9660", "iso9660", 0, 1 }, { "udf", "udf", 0, 1 },
+        { "hfsplus", "hfsplus", 1, 0 }, { "apfs", "apfs", 1, 1 },
     };
     int k = -1;
     for (size_t i = 0; i < sizeof kinds / sizeof *kinds; i++) if (!strcmp(fs, kinds[i].udev)) k = (int)i;
@@ -251,7 +252,7 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     }
     char opts[160] = "";
     if (kinds[k].owner) snprintf(opts, sizeof opts, "uid=%u,gid=%u,%s", (unsigned)r->uid, (unsigned)r->gid,
-                                 !strcmp(fs, "ntfs") ? "umask=022" : !strcmp(fs, "vfat") ? "fmask=0022,dmask=0022,shortname=mixed,utf8" : "fmask=0022,dmask=0022");
+                                 !strcmp(fs, "ntfs") ? "umask=022" : !strcmp(fs, "apfs") ? "" : !strcmp(fs, "hfsplus") ? "umask=022" : !strcmp(fs, "vfat") ? "fmask=0022,dmask=0022,shortname=mixed,utf8" : "fmask=0022,dmask=0022");
     char ro[8] = "0";
     char sp[PATH_MAX];
     snprintf(sp, sizeof sp, "/sys/class/block/%s/ro", t.name);
@@ -261,6 +262,7 @@ void disk_act_mount(const AdminReq *r, const char *arg, size_t len) {
     if (mount(t.dev, dir, kinds[k].kernel, flags, opts[0] ? opts : NULL)) {
         int e = errno;
         rmdir(dir);
+        if (e == ENODEV) { admin_err("disk.noDriver", "fs", fs, NULL); return; }     /* Files offers the driver's package */
         admin_err("disk.mountFailed", "name", t.name, "errno", lerr_errno(e), NULL);
         return;
     }

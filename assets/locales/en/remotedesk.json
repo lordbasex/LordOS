@@ -1,0 +1,21 @@
+{
+  "titleRdp": "Remote Desktop",
+  "titleVnc": "Screen Sharing",
+  "saved": "Saved",
+  "host": "Computer",
+  "port": "Port",
+  "user": "User",
+  "domain": "Domain",
+  "password": "Password",
+  "remember": "Remember the password",
+  "connect": "Connect",
+  "connecting": "Connecting…",
+  "disconnect": "Disconnect",
+  "keyring": "Remote desktop on {name}",
+  "err.denied": "That user or password was not accepted.",
+  "err.failed": "The connection could not be made.",
+  "err.unreachable": "That computer does not answer.",
+  "cert": "First connection to this computer. Its certificate is {print}. Trust it?",
+  "certYes": "Trust",
+  "certNo": "Cancel"
+}

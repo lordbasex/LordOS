@@ -1,0 +1,21 @@
+{
+  "titleRdp": "Escritorio remoto",
+  "titleVnc": "Compartir pantalla",
+  "saved": "Guardadas",
+  "host": "Computadora",
+  "port": "Puerto",
+  "user": "Usuario",
+  "domain": "Dominio",
+  "password": "Contraseña",
+  "remember": "Recordar la contraseña",
+  "connect": "Conectar",
+  "connecting": "Conectando…",
+  "disconnect": "Desconectar",
+  "keyring": "Escritorio remoto en {name}",
+  "err.denied": "No se aceptó ese usuario o contraseña.",
+  "err.failed": "No se pudo establecer la conexión.",
+  "err.unreachable": "Esa computadora no responde.",
+  "cert": "Primera conexión a esta computadora. Su certificado es {print}. ¿Confiar?",
+  "certYes": "Confiar",
+  "certNo": "Cancelar"
+}

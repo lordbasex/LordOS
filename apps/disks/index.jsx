@@ -18,7 +18,7 @@ import { HealthCard } from './health.jsx';
 
 export function Icon({ size }) { return <DisksIcon size={size} />; }
 
-const FS_NAMES = { vfat: 'FAT32', exfat: 'exFAT', ntfs: 'NTFS', ext4: 'ext4', ext3: 'ext3', ext2: 'ext2', btrfs: 'Btrfs', xfs: 'XFS',
+const FS_NAMES = { hfsplus: 'HFS+', apfs: 'APFS', vfat: 'FAT32', exfat: 'exFAT', ntfs: 'NTFS', ext4: 'ext4', ext3: 'ext3', ext2: 'ext2', btrfs: 'Btrfs', xfs: 'XFS',
   swap: 'swap', iso9660: 'ISO 9660', udf: 'UDF', crypto_LUKS: 'LUKS', f2fs: 'F2FS' };
 export const fsName = (fs) => FS_NAMES[fs] || fs;
 

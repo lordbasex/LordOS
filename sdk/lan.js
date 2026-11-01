@@ -28,6 +28,16 @@ export const lan = {
       if (s.state !== 'running') return s;
     }
   },
+  // sftp, ftp, ftps and WebDAV as a folder, rdp and vnc as a window: { state, package, path }
+  async connect({ kind, host, port = 0, user = '', domain = '', password = '', path = '' }) {
+    if (!lord.lan.connect(kind, host, port, user, domain, password, path)) return { state: 'refused', package: '', path: '' };
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 150));
+      const s = JSON.parse(lord.lan.connectPoll());
+      if (s.state !== 'running') return s;
+    }
+  },
+  disconnect: (path) => lord.lan.disconnect(path),
   mount: ({ kind, addr, share, user = '', domain = '', password = '' }) => admin.run('share-mount', [kind, addr, share, user, domain, password].join('\n'), null, { quiet: true }).then((p) => String(p || '').trim()),
   unmount: (path) => admin.run('share-unmount', path, null, { quiet: true }),
   // what was remembered for this share: { user, password }, or null (no keyring, locked, nothing saved)

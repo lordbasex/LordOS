@@ -5,7 +5,7 @@ import { View, Text, Button, ScrollView, TextInput, Toggle, Hairline, useTheme, 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DriveGlyph, FolderGlyph } from './glyphs.jsx';
 
-const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4'];
+const SHARE_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone'];
 export const isShareFs = (fs) => SHARE_FS.includes(fs);
 
 // the folder share-mount makes under /media/<user> (share_leaf in server/src/lan/lanaddr.c)
@@ -169,6 +169,51 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
             </View>
           </>
         )}
+      </View>
+    </View>
+  );
+}
+
+// sftp, ftp, ftps and WebDAV: who connects, then a folder in Files. A missing program goes to the Store.
+export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
+  const t = useTheme();
+  const [user, setUser] = useState(ask.user || '');
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [pkg, setPkg] = useState('');
+  const key = `${ask.host}:${ask.port || 0}${ask.path || ''}`;
+  useEffect(() => { lan.saved(ask.kind, key, '').then((s) => { if (s) { setUser(s.user); setPassword(s.password); setRemember(true); } }); }, []);
+  const go = async () => {
+    if (busy) return;
+    setBusy(true); setError(''); setPkg('');
+    const r = await lan.connect({ kind: ask.kind, host: ask.host, port: ask.port, user: user.trim(), password, path: ask.path });
+    setBusy(false);
+    if (r.state === 'missing') { setPkg(r.package); setError(tr('files.connect.err.package', { name: r.package })); return; }
+    if (r.state !== 'done') { setError(tr('files.connect.err.failed')); return; }
+    if (user.trim()) { if (remember) lan.remember(ask.kind, key, '', user.trim(), password, tr('files.net.keyringLabel', { name: ask.kind, addr: ask.host })).catch(() => {}); else lan.forget(ask.kind, key, '', user.trim()); }
+    onMounted(r.path);
+  };
+  const field = (label, input) => <View style={{ gap: 3 }}><Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{label}</Text>{input}</View>;
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 380, padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
+        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('files.net.connectTo', { name: ask.host })}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{ask.kind}</Text>
+        {field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus onSubmit={go} onCancel={onClose} />)}
+        {field(tr('files.net.password'), <TextInput secure value={password} onChange={setPassword} onSubmit={go} onCancel={onClose} />)}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: 4 }}>
+          <Toggle small on={remember} onChange={setRemember} />
+          <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('files.net.remember')}</Text>
+        </View>
+        {error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
+          {onTerminal ? <Button label={tr('files.menu.openTerminal')} onClick={onTerminal} disabled={busy} /> : null}
+          {pkg ? <Button label={tr('files.connect.openStore')} onClick={() => onStore(pkg)} /> : null}
+          <Button label={tr('files.cancel')} onClick={onClose} disabled={busy} />
+          <Button primary label={busy ? tr('files.net.connecting') : tr('files.net.connect')} onClick={go} disabled={busy} />
+        </View>
       </View>
     </View>
   );

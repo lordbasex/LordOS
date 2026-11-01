@@ -14,6 +14,7 @@ export { keyboard } from './keyboard.js';
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev } from './shortcuts.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows } from './appswitcher.jsx';
+export { RemoteDeskApp } from './remotedesk.jsx';
 export { osk, oskState, startOsk } from './osk.js';
 export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';

@@ -1,11 +1,11 @@
 # Files → Network (docs/FILES.md, "Network"): lord-lan, the sandboxed helper that reads what the local
 # network answers (mDNS, SMB2, ONC RPC), and lord-server's side (src/lan: one bounded pass on a thread,
 # lord.lan in ui/js_lan.c, the share-* actions). libc only; our own code, no libsmbclient or libnfs.
-LAN_SRV_SRC := src/lan/lan.c src/lan/lanaddr.c src/lan/share_admin.c src/ui/js_lan.c
+LAN_SRV_SRC := src/lan/lan.c src/lan/rconnect.c src/lan/rconnect_pure.c src/lan/lanaddr.c src/lan/share_admin.c src/ui/js_lan.c src/ui/js_rdesk.c
 LAN_SRV_OBJ := $(LAN_SRV_SRC:src/%.c=build/obj/%.o)
-$(LAN_SRV_OBJ): $(wildcard src/lan/*.h) src/doc/wire.h src/print/mdns.h src/sec/json.h src/ui/js_lan.h src/admin.h src/errcode.h
+$(LAN_SRV_OBJ): $(wildcard src/lan/*.h) src/rdesk/proto.h src/ui/js_rdesk.h src/doc/wire.h src/print/mdns.h src/sec/json.h src/ui/js_lan.h src/admin.h src/errcode.h
 build/lord-server: $(LAN_SRV_OBJ)
-build/obj/ui/js.o: src/ui/js_lan.h
+build/obj/ui/js.o: src/ui/js_lan.h src/ui/js_rdesk.h
 build/obj/admin.o: src/lan/share_admin.h
 
 LAN_HELPER_SRC := src/lan/lanhelper.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
@@ -17,7 +17,7 @@ build/lord-lan: $(LAN_HELPER_SRC) $(wildcard src/lan/*.h) src/pkg/crypto.h src/d
 
 # the parsers against crafted and damaged answers, the address policy, the actions' arguments
 test: build/lan-test
-LAN_TEST_SRC := tests/lan_test.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c
+LAN_TEST_SRC := tests/lan_test.c src/lan/rconnect_pure.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c
 build/lan-test: $(LAN_TEST_SRC) $(wildcard src/lan/*.h) src/print/mdns.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -DMDNS_PARSE_ONLY $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ $(LAN_TEST_SRC)
@@ -36,3 +36,21 @@ build/share-cli: tests/share_cli.c src/lan/share_admin.c src/lan/lanaddr.c src/l
 # lord-lan's sign-in against one test server (a tool, not part of make test)
 build/lan-list: tests/lan_list.c src/doc/wire.c build/lord-lan
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lan_list.c src/doc/wire.c
+
+# lord-rdesk (docs/FILES.md, "Remote desktop"): one RDP or VNC connection, sandboxed, drawing into a picture the engine
+# shows. Our own RFB client; libfreerdp's core for RDP, no client library, no display, no toolkit.
+RDESK_SRC := src/rdesk/rdeskhelper.c src/rdesk/rdeskrdp.c src/rdesk/rfb.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
+RDP_CFLAGS := $(shell pkg-config --cflags freerdp3 winpr3)
+RDP_LIBS := -lfreerdp3 -lwinpr3
+all: build/lord-rdesk
+build/lord-rdesk: $(RDESK_SRC) $(wildcard src/rdesk/*.h) src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(RDP_CFLAGS) $(WARN) -Wno-deprecated-declarations -std=c11 -o $@ $(RDESK_SRC) -lpthread -lm $(RDP_LIBS)
+	chmod g-w $@
+
+# the RFB client against crafted and damaged servers
+test: build/rdesk-test
+build/rdesk-test: tests/rdesk_test.c src/rdesk/rfb.c src/rdesk/rfb.h src/rdesk/proto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/rdesk_test.c src/rdesk/rfb.c
+	./$@ || { rm -f $@; exit 1; }

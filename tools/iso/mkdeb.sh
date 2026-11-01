@@ -111,6 +111,9 @@ ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
 # lord-lan (0.8.7): reads what the local network answers for Files → Network, sandboxed (docs/FILES.md, "Network")
 [ -x server/build/lord-lan ] && install -m 755 server/build/lord-lan "$L/bin/lord-lan"
 [ -x "$L/bin/lord-lan" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-lan" 2>/dev/null || true; }
+# lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
+install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
+"$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }
@@ -313,7 +316,7 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libwinpr3-3, rclone, fuse3, ntfs-3g, exfatprogs, dosfstools$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
 Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
 Section: x11
 Priority: optional

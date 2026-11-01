@@ -46,10 +46,11 @@ static int pathf(char *out, size_t n, const char *fmt, ...) {
     return r;
 }
 
-static char home[PATH_MAX], media1[PATH_MAX], media2[PATH_MAX];
+static char home[PATH_MAX], media1[PATH_MAX], media2[PATH_MAX], remote_root[PATH_MAX];
 
 void fsops_init(const char *h, const char *user) {
     pathf(home, sizeof home, "%s", h);
+    pathf(remote_root, sizeof remote_root, "%s/.local/share/lordos/remote", home);
     pathf(media1, sizeof media1, "/media/%s", user && *user ? user : "-");
     pathf(media2, sizeof media2, "/run/media/%s", user && *user ? user : "-");
 }
@@ -663,7 +664,7 @@ static void unescape_mount(char *s) {
     *o = 0;
 }
 
-int fsops_share_fs(const char *t) { return !strcmp(t, "cifs") || !strcmp(t, "smb3") || !strcmp(t, "nfs") || !strcmp(t, "nfs4"); }
+int fsops_share_fs(const char *t) { return !strcmp(t, "fuse.rclone") || !strcmp(t, "cifs") || !strcmp(t, "smb3") || !strcmp(t, "nfs") || !strcmp(t, "nfs4"); }
 
 /* ---- shares that stopped answering ----
  * lord.fs runs on the interface's thread, and a call on a network mount whose server went away
@@ -728,7 +729,8 @@ static void sh_reread(void) {
         char dev[1024], mnt[2048], fstype[64];
         if (sscanf(line, "%1023s %2047s %63s", dev, mnt, fstype) != 3 || !fsops_share_fs(fstype)) continue;
         unescape_mount(mnt);
-        if (!((!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/'))) continue;
+        size_t l3 = strlen(remote_root);
+        if (!((!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/') || (!strncmp(mnt, remote_root, l3) && mnt[l3] == '/'))) continue;
         memset(&fresh[n], 0, sizeof fresh[n]);
         snprintf(fresh[n].mnt, sizeof fresh[n].mnt, "%s", mnt);
         for (int i = 0; i < nsh; i++) if (!strcmp(sh[i].mnt, mnt)) fresh[n] = sh[i];    /* an answer on its way stays */
@@ -740,7 +742,7 @@ static void sh_reread(void) {
 }
 
 int fsops_share_down(const char *path) {
-    if (!under(path, media1) && !under(path, media2)) return 0;
+    if (!under(path, media1) && !under(path, media2) && !under(path, remote_root)) return 0;
     pthread_once(&sh_once, sh_init);
     pthread_mutex_lock(&sh_mu);
     long long now = mono_ms();
@@ -795,7 +797,8 @@ void fs_volumes(FsVolFn fn, void *ud) {
         if (sscanf(line, "%1023s %2047s %63s", dev, mnt, fstype) != 3) continue;
         unescape_mount(mnt);
         size_t l1 = strlen(media1), l2 = strlen(media2);
-        int ok = (!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/');
+        size_t l3 = strlen(remote_root);
+        int ok = (!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/') || (!strncmp(mnt, remote_root, l3) && mnt[l3] == '/');
         if (!ok) continue;
         struct statvfs vs;
         double total = 0, avail = 0;

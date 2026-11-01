@@ -82,6 +82,7 @@
   "disk.cancelled": "Cancelled",
   "disk.cancelledPartial": "Cancelled: the disk was left half written",
   "disk.cannotMountFs": "Don't know how to mount “{fs}”",
+  "disk.noDriver": "This computer has no driver for {fs}. It can be installed from the Store.",
   "disk.cannotRenameFs": "Don't know how to rename “{fs}”",
   "disk.imageOnTarget": "The image is on the same disk that would be erased",
   "disk.imageOpenFailed": "Could not open the image (it must be a file in your home folder or on your disks)",

@@ -18,9 +18,9 @@ import {
   openersFor, openEntry,
 } from './ops.js';
 import { archiveVersion, archiveState, extractEntry, extractHere, compress, isArchiveFile } from './archive.js';
-import { NetworkView, NetGlyph, isShareFs, ConnectSheet } from './network.jsx';
+import { NetworkView, NetGlyph, isShareFs, ConnectSheet, RemoteSheet } from './network.jsx';
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
-import { parseAddress, sshLine, remoteUri, hostAddress } from './connect.js';
+import { parseAddress, sshLine, hostAddress } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 
@@ -63,7 +63,7 @@ function unmountedDisks(list) {
   for (const d of list || []) {
     if (d.system) continue;
     for (const p of d.partitions?.length ? d.partitions : [d]) {
-      if (!NO_MOUNT.includes(p.fstype || '') && !p.mountpoint) out.push({ name: p.name, label: p.label, size: p.size, removable: d.removable });
+      if (!NO_MOUNT.includes(p.fstype || '') && !p.mountpoint) out.push({ name: p.name, label: p.label, size: p.size, removable: d.removable, fstype: p.fstype });
     }
   }
   return out;
@@ -71,6 +71,7 @@ function unmountedDisks(list) {
 // What ⏏ does for a mounted volume: a removable disk is ejected whole (disk-eject), another disk's
 // partition is unmounted (disk-unmount); nothing on the disk the system runs from.
 function volumeRelease(list, path, fstype) {
+  if (fstype === 'fuse.rclone') return { remote: true, name: path };
   if (isShareFs(fstype)) return { action: 'share-unmount', name: path };
   for (const d of list || []) {
     if (d.system) continue;
@@ -204,6 +205,7 @@ export default function Files() {
   const [scope, setScope] = useState(() => (prefs.searchScope === 'last' ? prefs.lastScope : prefs.searchScope));
   const [sheet, setSheet] = useState(null);               // 'goto' | 'connect' | 'settings'
   const [connAsk, setConnAsk] = useState(null);           // Connect to Server's sign-in
+  const [remoteAsk, setRemoteAsk] = useState(null);       // the same for sftp, ftp and WebDAV
   const [debounced, setDebounced] = useState('');
   const [hidden, setHidden] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set());
@@ -327,7 +329,6 @@ export default function Files() {
   const connectTo = (text) => {
     const a = parseAddress(text);
     if (a.error) return { error: tr(`files.connect.err.${a.error}`, { scheme: a.scheme || '' }) };
-    const store = (q) => () => { setSheet(null); wm.open('store', { args: { search: q } }); };
     const clientFor = (scheme) => launcherApps.find((x) => x.kind === 'linux' && (x.mimeTypes || []).includes(`x-scheme-handler/${scheme}`));
     if (a.kind === 'mount') {
       if (a.port) return { error: tr('files.connect.err.port') };
@@ -338,16 +339,24 @@ export default function Files() {
       setConnAsk({ kind: a.scheme, addr, host: a.host, user: a.user, share: a.scheme === 'smb' ? a.share : a.path });
       return null;
     }
-    if (a.kind === 'terminal') { noteServer(a.text); setSheet(null); wm.open('terminal', { new: true, args: { typed: sshLine(a) } }); return null; }
-    if (a.kind === 'remote' || a.kind === 'web') {
-      const app = clientFor(a.scheme);
-      if (!app) return { error: tr('files.connect.err.noClient', { scheme: a.scheme }), store: store(a.scheme === 'rdp' ? 'remote desktop' : a.scheme) };
+    if (a.kind === 'folder') {
       noteServer(a.text);
-      if (!lord.apps.launchUri(app.desktopId, a.kind === 'web' ? a.text : remoteUri(a))) return { error: tr('files.connect.err.launch', { name: app.name }) };
       setSheet(null);
+      setRemoteAsk({ kind: a.scheme === 'ssh' ? 'sftp' : a.scheme, host: a.host, port: a.port, user: a.user, path: a.path, ssh: a.scheme === 'ssh' ? sshLine(a) : null });
       return null;
     }
-    return { error: tr('files.connect.err.noMount', { scheme: a.scheme }), store: store(a.scheme.startsWith('ftp') ? 'ftp' : 'webdav') };
+    if (a.kind === 'remote') {
+      noteServer(a.text);
+      setSheet(null);
+      wm.open(a.scheme, { new: true, args: { host: a.host, port: a.port, user: a.user } });
+      return null;
+    }
+    const app = clientFor(a.scheme);
+    if (!app) return { error: tr('files.connect.err.noClient', { scheme: a.scheme }) };
+    noteServer(a.text);
+    if (!lord.apps.launchUri(app.desktopId, a.text)) return { error: tr('files.connect.err.launch', { name: app.name }) };
+    setSheet(null);
+    return null;
   };
   const toTrash = (paths = selPaths) => {
     if (!paths.length || readOnly) return;
@@ -362,9 +371,10 @@ export default function Files() {
     setMsg(tr('files.disk.mounting', { name: p.label || p.name }));
     admin.run('disk-mount', p.name, null, { quiet: true }).then(
       (path) => { setVolumes(fs.volumes()); setMsg(null); const at = String(path || '').trim(); if (at.startsWith('/')) navigate(dirLoc(at)); },
-      (e) => setMsg(e.message));
+      (e) => { setMsg(e.message); if (e.code === 'disk.noDriver' || /apfs|hfs/i.test(p.fstype || '')) setConfirm({ text: e.message, ok: tr('files.connect.openStore'), run: () => wm.open('store', { args: { search: p.fstype === 'apfs' ? 'apfs-dkms' : p.fstype, package: p.fstype === 'apfs' ? 'apfs-dkms' : undefined } }) }); });
   };
   const release = (r, path) => {
+    if (r.remote) { if (lan.disconnect(path)) { setVolumes(fs.volumes()); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); } return; }
     admin.run(r.action, r.name, null, { quiet: true }).then(
       () => { setVolumes(fs.volumes()); setMsg(tr(r.action === 'disk-eject' ? 'disks.ejected' : 'disks.unmounted')); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); },
       (e) => setMsg(e.message));
@@ -506,7 +516,7 @@ export default function Files() {
   const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
     f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
-    if (renaming || confirm || menu || netModal || sheet || connAsk) return;
+    if (renaming || confirm || menu || netModal || sheet || connAsk || remoteAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
     const space = e.char === ' ' || e.key === ' ' || b === ' ';
@@ -832,6 +842,9 @@ export default function Files() {
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
       {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}
       {connAsk && <ConnectSheet ask={connAsk} onClose={() => setConnAsk(null)} onMounted={(at, note) => { setConnAsk(null); setVolumes(fs.volumes()); setMsg(note); if (at.startsWith('/')) navigate(dirLoc(at)); }} />}
+      {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
+        onStore={(pkg) => { setRemoteAsk(null); wm.open('store', { args: { search: pkg, package: pkg } }); }}
+        onTerminal={remoteAsk.ssh ? () => { const typed = remoteAsk.ssh; setRemoteAsk(null); wm.open('terminal', { new: true, args: { typed } }); } : null} />}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} bounds={bounds()} />}
     </View>
   );

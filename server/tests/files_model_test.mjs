@@ -12,7 +12,8 @@ eq('vnc', [p('vnc://127.0.0.1:5969').kind, p('vnc://127.0.0.1:5969').port], ['re
 eq('rdp uri', remoteUri(p('rdp://ana@host:3390')), 'rdp://ana@host:3390');
 eq('ssh line', sshLine(p('ssh://ana@host:2222')), 'ssh -p 2222 ana@host');
 eq('sftp line', sshLine(p('sftp://host')), 'sftp host');
-eq('ftp no client', p('ftp://host').kind, 'noclient');
+eq('ftp folder', p('ftp://host').kind, 'folder');
+eq('ssh folder', p('ssh://ana@h').kind, 'folder');
 eq('web', p('https://host/a').kind, 'web');
 for (const bad of ['ssh://-oProxyCommand=x', 'ssh://a;rm@host', 'vnc://$(x)', 'smb://a b', 'nfs://h/../etc', 'ssh://host:99999', 'ssh://-x@host', 'smb://h/a\\b', 'x`y', 'smb://h/a|b']) eq(`refused ${bad}`, !!p(bad).error, true);
 eq('unknown scheme', p('gopher://h').error, 'scheme');

@@ -3,6 +3,7 @@
 #include "../src/lan/lanaddr.h"
 #include "../src/lan/lanparse.h"
 #include "../src/lan/smbauth.h"
+#include "../src/lan/rconnect.h"
 #include "../src/lan/lanservices.h"
 #include "../src/print/mdns.h"
 
@@ -74,6 +75,19 @@ static void t_smbauth(void) {
     for (size_t l = 0; l < 92; l++) CHECK(!ntlm_user_auth(a, sizeof a, c, l, "ana", "", "x", rnd, key));
     p32(c + 44, 0xfffffff0u); CHECK(!ntlm_user_auth(a, sizeof a, c, 92, "ana", "", "x", rnd, key));
     uint8_t msg[80] = { 0 }; smb_sign(msg, 80, key); CHECK(msg[16] & 8);
+}
+
+static void t_rconnect(void) {
+    CHECK(rconnect_host_ok("nas.local") && rconnect_host_ok("10.0.0.1"));
+    CHECK(!rconnect_host_ok("-oProxy") && !rconnect_host_ok("a b") && !rconnect_host_ok("a\nhost = x") && !rconnect_host_ok(""));
+    CHECK(rconnect_user_ok("ana.b") && rconnect_user_ok("") && !rconnect_user_ok("-x") && !rconnect_user_ok("a\nb"));
+    CHECK(rconnect_path_ok("") && rconnect_path_ok("/dav/files") && !rconnect_path_ok("/a/../b") && !rconnect_path_ok("/..") && !rconnect_path_ok("a") && !rconnect_path_ok("/a\nb"));
+    char c[400];
+    CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x", "") > 0 && strstr(c, "port = 22"));
+    CHECK(rconnect_config(c, sizeof c, "ftps", "h", 0, "", "x", "") > 0 && strstr(c, "explicit_tls = true") && strstr(c, "anonymous"));
+    CHECK(rconnect_config(c, sizeof c, "davs", "h", 8443, "u", "x", "/d") > 0 && strstr(c, "url = https://h:8443/d"));
+    CHECK(rconnect_config(c, sizeof c, "smb", "h", 0, "u", "x", "") < 0);
+    CHECK(rconnect_config(c, 8, "sftp", "h", 0, "u", "x", "") < 0);
 }
 
 static int req(const char *s, ShareReq *r) { static char b[1024]; snprintf(b, sizeof b, "%s", s); return share_req_parse(b, r); }
@@ -315,6 +329,7 @@ static void t_fuzz(void) {
 int main(void) {
     t_addr();
     t_smbauth();
+    t_rconnect();
     t_share();
     t_rpc();
     t_smb();
