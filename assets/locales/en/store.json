@@ -10,6 +10,7 @@
   "ai.kind.local-models": "Local models",
   "ai.kind.music": "Music",
   "ai.kind.speech": "Speech to text",
+  "ai.kind.system": "System",
   "ai.notForArch": "not available for {arch}",
   "ai.notListed": "{name} is in LordOS's catalog but not in this computer's package lists yet. Fetch the lists again to bring it.",
   "ai.refresh": "Some of these aren't in the package lists yet: check for updates in Updates to fetch them.",
