@@ -279,5 +279,6 @@
   "connect.err.changed": "La clave o el certificado de este servidor no es el que aceptaste, así que se rechazó la conexión. Puede ser un ataque.",
   "connect.plain": "Esta conexión no está cifrada: la contraseña viaja legible.",
   "connect.firstKey": "Primera conexión a este servidor. Comprobá su huella con quien lo administra: {print}",
-  "connect.trust": "Confiar"
+  "connect.trust": "Confiar",
+  "net.kind.rdp": "Escritorio remoto"
 }

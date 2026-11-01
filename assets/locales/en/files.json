@@ -279,5 +279,6 @@
   "connect.err.changed": "This server’s key or certificate is not the one you accepted, so the connection was refused. It may be an attack.",
   "connect.plain": "This connection is not encrypted: the password travels readable.",
   "connect.firstKey": "First connection to this server. Check its fingerprint with the server’s administrator: {print}",
-  "connect.trust": "Trust"
+  "connect.trust": "Trust",
+  "net.kind.rdp": "Remote desktop"
 }

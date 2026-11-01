@@ -279,5 +279,6 @@
   "connect.err.changed": "A chave ou o certificado deste servidor não é o que você aceitou, então a conexão foi recusada. Pode ser um ataque.",
   "connect.plain": "Esta conexão não é criptografada: a senha trafega legível.",
   "connect.firstKey": "Primeira conexão a este servidor. Confira a impressão digital com quem o administra: {print}",
-  "connect.trust": "Confiar"
+  "connect.trust": "Confiar",
+  "net.kind.rdp": "Área de trabalho remota"
 }
