@@ -93,6 +93,7 @@ static void t_rconnect(void) {
     CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u\r", "x", "", "/k") < 0);
     CHECK(rconnect_config(c, sizeof c, "sftp", "h", 0, "u", "x\ny", "", "/k") < 0);
     CHECK(rconnect_config(c, sizeof c, "davs", "h", 0, "u", "x", "/a\tb", "") < 0);
+    CHECK(rconnect_config(c, sizeof c, "ftps", "h", 990, "u", "x", "", "") > 0 && strstr(c, "tls = true") && !strstr(c, "explicit"));
     char tag[64];
     rconnect_host_tag("h", 2222, tag, sizeof tag); CHECK(!strcmp(tag, "[h]:2222"));
     rconnect_host_tag("h", 0, tag, sizeof tag); CHECK(!strcmp(tag, "h"));

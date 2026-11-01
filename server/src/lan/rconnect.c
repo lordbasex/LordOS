@@ -175,7 +175,7 @@ static int trust_tls(char *ca, size_t cn) {
     snprintf(conn, sizeof conn, "%s:%d", q.host, port);
     char *ftp[] = { OPENSSL, "s_client", "-connect", conn, "-servername", q.host, "-starttls", "ftp", "-verify_hostname", q.host, NULL };
     char *web[] = { OPENSSL, "s_client", "-connect", conn, "-servername", q.host, "-verify_hostname", q.host, NULL };
-    int n = filter_in("rclone", q.kind[0] == 'f' ? ftp : web, "", 0, out, 65536);
+    int n = filter_in("rclone", q.kind[0] == 'f' && port != 990 ? ftp : web, "", 0, out, 65536);
     int v = n > 0 ? rconnect_tls_parse(out, pem, sizeof pem) : -1;
     free(out);
     if (v < 0) { finish("failed", NULL, NULL); return -1; }

@@ -38,7 +38,8 @@ int rconnect_config(char *o, size_t cap, const char *kind, const char *host, int
         n = snprintf(o, cap, "[r]\ntype = sftp\nhost = %s\nuser = %s\nport = %d\npass = %s\nknown_hosts_file = %s\n", host, user, port ? port : 22, ob, known);
     }
     else if (!strcmp(kind, "ftp") || !strcmp(kind, "ftps"))
-        n = snprintf(o, cap, "[r]\ntype = ftp\nhost = %s\nuser = %s\nport = %d\npass = %s\nexplicit_tls = %s\n", host, user[0] ? user : "anonymous", port ? port : 21, ob, kind[3] ? "true" : "false");
+        n = snprintf(o, cap, "[r]\ntype = ftp\nhost = %s\nuser = %s\nport = %d\npass = %s\n%s\n", host, user[0] ? user : "anonymous", port ? port : 21, ob,
+                     !kind[3] ? "explicit_tls = false" : port == 990 ? "tls = true" : "explicit_tls = true");     /* 990: TLS from the first byte */
     else if (!strcmp(kind, "webdav") || !strcmp(kind, "davs")) {
         char pt[16] = "";
         if (port) snprintf(pt, sizeof pt, ":%d", port);
