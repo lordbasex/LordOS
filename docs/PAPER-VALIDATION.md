@@ -2,7 +2,7 @@
 
 The technical paper (https://lordos.org/paper/, `docs/PAPER.md`) makes claims about LordOS. This page was
 written against its 0.8.0 edition and lists each claim with how it is checked today and its state in 0.8.5, with rows added for the
-0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in development for 0.8.7 (the latest release is 0.8.6-beta),
+0.8.6 edition (published with the 0.8.6-beta release on 2026-10-30) and for what the paper marks in 0.8.7,
 so anyone can see what is proven, what was measured once and what is not tested. **The rows marked
 Outdated were corrected in the paper's 0.8.5 edition (2026-10-26; published with the 0.8.5-beta release on
 2026-10-27)**, which also separates whole-system
@@ -93,6 +93,8 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 6.10 | Vault: Argon2id, XChaCha20-Poly1305, 1,165 of 1,165 tamper tests | Test (`vault.mk` suites) | Holds |
 | 6.10 | FIDO2 keys untested on real hardware | — | **Untested** |
 | 6.11 | Protected windows black in screenshots, recordings, remote desktop | Test (`media-test` covers capture paths) | Partly tested |
+| 3–10 | Final pass of the released code (v087.28, the tree tagged as 0.8.7 apart from the version): unpinned Dock order, Go to file after a minimize, Mail found by "correo", Classic Start menu over Linux and isolated apps, ❖M and restore of fullscreen Linux apps (Wayland 7 of 7, X11 13 of 13), Overview clicks | Seen on screen on the Raspberry Pi 5 (arm64) and VM 125 (amd64), from installed packages; the VMware guest ran v087.27 (2,172 frames compared, 0 differ) | Holds. An X11 restore came back windowed once on the build before, cause unknown, not reproduced |
+| 10.1 | Cleaner's real removal of an installed Linux app, with its row in Activity | Seen on screen on VM 125 (v087.27) | Measured once |
 | 6.12 | Aligned with ISO/IEC 29147, 30111, 5230, 18974; no audit | Documents | Design |
 
 ## §7 Performance
@@ -108,10 +110,10 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 7.2 | — | New in 0.8.5: remote desktop CPU reference (`REMOTE.md`, "Measurements (0.8.5, CPU reference)") | Added in the 0.8.5 edition (§7.2) |
 | 7.2 | — | New in 0.8.6: dragged windows' rounded corners no longer turn black (the drag layer's corner restore mixes both pixels alpha included); a drag frame repaints only what changed, pixel-identical except an approved 1-level change at rounded corners below the window; GPU drag composes the window with the CPU's exact arithmetic after a self-test (`WINDOWS.md`, `GPU.md`) | Test (`engine-test`: `test_drag_corners` against a full repaint on both paths, `test_drag_exact`'s 2,417 golden frame hashes per path, the `gpu-drag` path; `canvas-test`: GPU drag's arithmetic over all 8,421,376 valid combinations, x86_64 only) | Holds on VM 116; on the Pi 5 (V3D, 2026-10-29) GPU drag's self-test passes (11,373,321 pixels, 341 ms), `LORD_GPU_VERIFY=1` compared 138 frames with 0 differences, and screenshots of the monitor show clean corners while dragging; GPU drag is off by default (no measurable gain) |
 | 7.3 | GPU benefits on real cards not measured | — | **Untested** |
-| 7.4 | In development for 0.8.7: GPU drag covers the whole drag and is on by default, verified on V3D and SVGA3D only (`GPU.md`, "The whole drag") | Pi 5 (V3D, v087.22, 4 real 16 s drags per setting): alone 58.1–60.6 % → 27.2–28.4 % of a core, 7.0 → 5.0 ms; under a memory load 28.8–29.1 → 34.4–35.1 fps, 20.3 → 13.2 ms, 67 % → 45 %; `LORD_GPU_VERIFY=1` 1,662 frames, all `differ=0`. VMware (SVGA3D, development build): 2,102 frames, all `differ=0`. Any other GPU: **Untested**, only the self-test guards it. Measured |
-| 7.4 | In development for 0.8.7: what slows the Pi 5's GPU under load is memory (`build/gpu-contention`, verdict `memory`, two runs: 1.4 ms spinning, 28 ms reading, 3.7 ms writing; no throttling) | Measured on the Pi 5 16 GB, build 0.8.6+v087.4. What a real desktop load reads, and what a compositor change can avoid, is open. Measured |
-| 7.4 | In development for 0.8.7: the buffer-age scissor stays off (GPU part 1.51 → 2.58 ms alone; under load 30.1–31.8 → 28.4–29.9 fps, pointer p99 63–66 → 83–95 ms) | Measured on the Pi 5 (5 runs without, 3 with, v087.22); `build/engine-test` over a simulated chain. Measured |
-| 10.1 | In development for 0.8.7: Cleaner on a Pi 5 with its monitor: 4.5–7.2 % of a core with the hero idle, 12.2–18.0 % scanning, 0.1 % closed (`CLEANER-TESTS.md`) | Measured (v087.22, two runs a cell). Aurora's pauses of up to a second are not explained. Measured |
+| 7.4 | In 0.8.7: GPU drag covers the whole drag and is on by default, verified on V3D and SVGA3D only (`GPU.md`, "The whole drag") | Pi 5 (V3D, v087.22, 4 real 16 s drags per setting): alone 58.1–60.6 % → 27.2–28.4 % of a core, 7.0 → 5.0 ms; under a memory load 28.8–29.1 → 34.4–35.1 fps, 20.3 → 13.2 ms, 67 % → 45 %; `LORD_GPU_VERIFY=1` 1,662 frames, all `differ=0`. VMware (SVGA3D, development build): 2,102 frames, all `differ=0`. Any other GPU: **Untested**, only the self-test guards it. Measured |
+| 7.4 | In 0.8.7: what slows the Pi 5's GPU under load is memory (`build/gpu-contention`, verdict `memory`, two runs: 1.4 ms spinning, 28 ms reading, 3.7 ms writing; no throttling) | Measured on the Pi 5 16 GB, build 0.8.6+v087.4. What a real desktop load reads, and what a compositor change can avoid, is open. Measured |
+| 7.4 | In 0.8.7: the buffer-age scissor stays off (GPU part 1.51 → 2.58 ms alone; under load 30.1–31.8 → 28.4–29.9 fps, pointer p99 63–66 → 83–95 ms) | Measured on the Pi 5 (5 runs without, 3 with, v087.22); `build/engine-test` over a simulated chain. Measured |
+| 10.1 | In 0.8.7: Cleaner on a Pi 5 with its monitor: 4.5–7.2 % of a core with the hero idle, 12.2–18.0 % scanning, 0.1 % closed (`CLEANER-TESTS.md`) | Measured (v087.22, two runs a cell). Aurora's pauses of up to a second are not explained. Measured |
 | 7.4 | Pi 5: build 1 min 02 s, tests 23/0/0, NEON 2.0–2.3×, idle 36 MB, fan behaviour | Measured once on the Pi (2026-10-18; the tests were not rerun on the Pi for 0.8.6) | Measured |
 | 7.4 | — | New in 0.8.6: with a 1920×1080 60 Hz monitor, login screen 5.99 s after the kernel starts; desktop 59.4 fps alone (p99 13.0 ms, 1 % late) and 24 fps under a low-priority all-core load (96.5 % late); 3 minutes sustained at 5.9 GFLOP/s, 55.6 °C; software video decoding per codec. LordBench on the Pi (`BENCHMARK.md`, "Built so far") | Measured with LordBench (one run each); the load result led to two fixes (compositor CPU weight: 31–33 % → 7–8 % late without the monitor; with the real-time priority, measured on the monitor: 24 → 28.9–30.5 fps, still 94–98 % late, the frame's build time under load still to explain) |
 | 7.4 | — | New in 0.8.6: LordBench's square now turns; with it, the frame-cost work took the Pi 5 with its monitor from 53–58 to 59.8–60 fps alone and from 24–25 to about 31 fps under load; the frame pipeline (+2–5 fps under load, 17–29 ms more pointer latency) and GPU drag (no measurable gain) were measured and are off by default; the remaining cost under load is the GPU's time per frame (1.5 → 14–16 ms, no clock or thermal throttling; memory contention likely, not proven); fewer pixels per frame, what slows the GPU and GPU drag for the whole drag moved to 0.8.7 (2026-10-30) (`BENCHMARK.md`, "The drag frame's cost") | Measured with LordBench on the Pi 5 (2–3 runs each, 2026-10-28; final run 2026-10-29: both off 59.9 / 30.5–31.1 fps, pointer to screen p50 25.7–25.9 / 48.5–49.0 ms; GPU drag on 59.9 / 30.8–31.6; the pipeline 60.0 / 33.0–36.2 fps, pointer 42 / 78 ms; `vcgencmd` every 2 s) | Measured (2026-10-29) |
@@ -131,7 +133,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 11.2 | 30,953 parser checks with mutation fuzzing | Tests (`remote-fuzz`, mail, doc, imager fuzzers) | Holds; count to refresh |
 | 11.4 | Port 5673 closed until enabled | Check `remoteClosed` (effective) | Holds |
 
-## In development for 0.8.7 (the latest release is 0.8.6-beta)
+## 0.8.7
 
 | § | Claim | How | State |
 |---|---|---|---|

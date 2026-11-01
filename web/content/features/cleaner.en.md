@@ -1,4 +1,4 @@
-**In development for 0.8.7. The latest release, 0.8.6-beta, does not include Cleaner.** This page describes the work on the development branch; it can still change before release.
+**New in 0.8.7.**
 
 ## The short version
 

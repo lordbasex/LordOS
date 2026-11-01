@@ -619,9 +619,9 @@ desktop fell to 24 fps under an all-core load:
   references stay tagged 0.8.5-beta until then).
 - [x] Release cleanup, packages, the Pi 5 image and the ISO, as for 0.8.5 (2026-10-30).
 
-## Release 0.8.7 (planned)
+## Release 0.8.7-beta (2026-11-01)
 
-Decided by the maintainer on 2026-10-30: everything below goes in 0.8.7, with **Cleaner** added.
+Decided by the maintainer on 2026-10-30: everything below goes in 0.8.7, with **Cleaner** added. Items still open below did not reach this release.
 
 Community hardware reports (the item under "Before 1.0", `BENCHMARK.md`), what LordBench and the desktop under load
 left for after 0.8.6, and the new native app:
@@ -630,10 +630,10 @@ left for after 0.8.6, and the new native app:
   `tools/iso/build-arm64.sh` runs it from x86-64; an unsigned development build reached the live desktop, installed to disk
   and booted the result on emulated QEMU (`ISO.md`, "The arm64 ISO"). Still to do: a hypervisor with hardware
   acceleration, real hardware, and shipping it signed in the release.
-- [ ] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
+- [x] **Cleaner** (`apps/cleaner/`): a native storage and maintenance app with its own engine and rule catalogue. Scans
   are read-only, and every change goes through a reviewed plan the user confirms. Nothing is copied from other
   projects. Design: `CLEANER-ARCHITECTURE.md`, in phases: the core, then system care, then the optional modules. The
-  Phase 1 and the rows of Phase 2 are built in development; each feature's state is in `CLEANER-ROADMAP.md`.
+  Phase 1 and the rows of Phase 2 shipped in 0.8.7; each feature's state is in `CLEANER-ROADMAP.md`.
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
   FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In development: the
@@ -762,7 +762,7 @@ left for after 0.8.6, and the new native app:
   one new closed admin action, `share-mount` (host, share and user validated; the password on
   standard input, never in argv; fixed options `nosuid,nodev` and the user's uid; only under
   `/media/<user>/`), the password in the keyring, the mount's traffic as its own firewall app.
-  *Built (0.8.7, in development, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `lord-lan`, listing
+  *Built (0.8.7, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `lord-lan`, listing
   shares and exports, `share-mount` and `share-unmount`, the keyring. *Waiting for the maintainer:* the connector name
   for the search inside a session (`FIREWALL.md`, "Files → Network and the connectors"). *Can't be done as written:*
   the mount's traffic as a firewall app (the kernel's client has no cgroup of an app). *Not built:* typing a server

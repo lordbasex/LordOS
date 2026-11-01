@@ -1,4 +1,4 @@
-**Em desenvolvimento para 0.8.7. A versão mais recente, 0.8.6-beta, não inclui o app Limpeza.** Esta página descreve o trabalho no ramo de desenvolvimento; ainda pode mudar antes do lançamento.
+**Novo na 0.8.7.**
 
 ## A versão curta
 

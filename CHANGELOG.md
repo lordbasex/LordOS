@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.7-beta] - 2026-11-01
+
 - **Release pass fixes** (2026-11-01): an unpinned Dock icon keeps its place when its window is raised or restored; Text Editor's Go to file panel takes the keyboard again after a minimize; the launcher finds Mail by its localized word; the Notes hint no longer names ❖N, which is Notifications in Lord Classic; Cleaner's confirmation no longer promises a password prompt that an administrator's session doesn't show.
 - **Lord Classic no longer loses a window's state when another window comes to the front** (2026-10-31, VM 125): the windows were in a list of unkeyed arrays since the snap preview went in, so a raise mounted the moved windows again, and unsaved text, tabs and scroll were gone.
 - **Lord Classic's Start menu has the keyboard over a Linux or isolated app** (2026-10-31, VM 125): it was in the popover layer, which doesn't take the keyboard, so with Mail, an X11 or a Wayland app in front its search stayed empty, Esc and Enter did nothing and the keys went to the app. It is in the overlay layer now, like Lord Flow's launcher.
@@ -96,13 +98,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   record a crash at logout.
 - Search's Log Out now also clears the clipboard history when that option is on, like the other logouts.
 
-### Planned
+### Decided
 
 - **The 0.8.7 plan** (2026-10-30, decided by the maintainer): the community hardware reports, LordBench's x86 PC
   reference, hardware video decoding, GPU drag for the whole drag and the Pi 5 work under load all stay in 0.8.7, and
   **Cleaner**, a new native storage and maintenance app, joins them (`docs/ROADMAP.md`).
 
-### 0.8.7, in development (the latest release is 0.8.6-beta)
+### The work on 0.8.7, in detail
 
 - **Argon ONE V5 case, found and offered:** Settings → Cooling never showed the case on a real image, because the boot partition is readable by root alone: the setting is now also kept in `/var/lib/lordos/case`. On a Raspberry Pi 5 with no case chosen, the new closed admin action `rpi-case-detect` turns the USB-C controller into a host until the next restart and looks for the case's hub and audio chip (seen on one Argon ONE V5: hub 1a86:8091, audio 0d8c:0014). If they are there, the front USB ports and sound work at once, and the Store's suggestions offer keeping them on; if not, the controller goes back. Nothing is installed and the vendor's script isn't used.
 - **Cleaner, from a full test with a real pointer on VM 125 (engine exact, reports fixed):** the result page shows what was freed and what went to the Trash together, and how much free space rose; emptying a large Trash reports what it freed; cancelling a confirmation keeps what was picked; selection size counts single items; Restore corrects the page; Select all is gone from duplicates, where one copy always stays; Smart keeps the oldest copy, and for similar images the largest picture; system cleanups appear in Activity; the system dialogs sit outside the list; the round button stops a full scan. The scroll thumb takes the pointer as soon as it is near the edge.
@@ -159,7 +161,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Storage map:** bands in each tile for what rebuilds by itself and what to check first, and a line with free space, both amounts and what wasn't scanned.
   - **During a scan** the three rules with the most found so far appear, with their sizes, and each step stays on screen a minimum time (2.6 s in a full scan, 1.8 s from a section) so its animation finishes on a nearly empty disk.
   - **The storage map is kept between sessions:** `~/.cache/lordos/cleaner-map.txt`, mode 0600, folder names and sizes, on by default, with a switch in Settings and cleared with Clear in Activity. This changes the earlier claim of no history of paths: the Activity history still holds no path, but folder names now stay on disk. A saved map holds no candidates, so nothing can be acted on from it. A scan of another disk removes it.
-  - **Credit:** These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were reimplemented from scratch after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
+  - **Credit:** These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were written anew after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
   - **Tests:** `clean-test` has no case for these yet (`docs/CLEANER-TESTS.md`).
 
 - **What slows the Pi 5's GPU under load: memory** (2026-10-31, measured with `build/gpu-contention` on the Pi 5 16 GB, build 0.8.6+v087.4, two runs; `docs/GPU.md`): GPU time per frame
@@ -459,13 +461,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **lordos.org/hardware** was built and checked in en, es and pt (in a browser, also at phone width with no sideways
   scroll): the *in development* note, the two reference machines, the form's link. It isn't published.
 
-### Release
+### Known issues and limitations
 
-- **0.8.6-beta published** (2026-10-30): the GitHub release carries the live ISO
-  (`lordos-live-0.8.6-amd64.iso`), the Raspberry Pi 5 image (`lordos-0.8.6-rpi5-arm64.img.xz`), the amd64 and arm64
-  packages with their SBOMs, **LordOS Imager 0.8.6** and `SHA256SUMS`, and the apt repository is updated. The site's
-  downloads (`lordos.media`) now point to 0.8.6, and the docs, README, paper (en/es/pt), FAQ, features, legal and apps
-  pages describe it as the current release; the engine references stay tagged 0.8.5-beta.
+- GPU drag is verified on V3D (Raspberry Pi 5) and SVGA3D (a VMware guest) only; on any other GPU only its self-test
+  guards it. It is declined while a Linux window is on screen. The VMware guest ran v087.27 in the last pass, not the
+  final v087.28, whose changes are in the shell, not in GPU drag.
+- Files → Network: SMB with a password is not validated, and no real SMB or NFS server has been tried.
+- Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
+- A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries.
+- An X11 app started from the launcher on a system without `xwayland` (a Recommends, so `apt` installs it) fails with
+  no message; the reason is in `session.log`.
+- On the Raspberry Pi 5 an app keeping every core busy still halves the desktop's frame rate.
+- A graphics driver that loads more than 30 s after boot needs the service restarted; a display with KMS that fails
+  stays silent.
+- Volume keys had no effect in a VMware guest. Session restore doesn't reopen a Files folder.
+- The on-screen keyboard opened once on an empty desktop with no text field, not reproduced.
+- Pi 5 HEVC hardware decoding moved to 0.8.8. LordBench's x86 PC reference is still to be chosen.
+
+### Upgrading
+
+- **From 0.8.6:** Store → Updates or `sudo apt update && sudo apt upgrade`, then a restart. `lordos` now depends on
+  `lordos-hwdata`, which comes from the same repository. Not yet tested against the signed repository when this was written.
 
 ## [0.8.6-beta] - 2026-10-30
 
@@ -1555,6 +1571,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   after that restart.
 - Default apps you chose in Settings stay as they are; automatic defaults apply only to file types you never chose
   an app for.
+
+### Release
+
+- **0.8.6-beta published** (2026-10-30): the GitHub release carries the live ISO
+  (`lordos-live-0.8.6-amd64.iso`), the Raspberry Pi 5 image (`lordos-0.8.6-rpi5-arm64.img.xz`), the amd64 and arm64
+  packages with their SBOMs, **LordOS Imager 0.8.6** and `SHA256SUMS`, and the apt repository is updated. The site's
+  downloads (`lordos.media`) now point to 0.8.6, and the docs, README, paper (en/es/pt), FAQ, features, legal and apps
+  pages describe it as the current release; the engine references stay tagged 0.8.5-beta.
 
 ## [0.8.5-beta] - 2026-10-27
 
@@ -3187,7 +3211,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...HEAD
+[0.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...v0.8.7-beta
 [0.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...v0.8.6-beta
 [0.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4.1-beta...v0.8.5-beta
 [0.8.4.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4-beta...v0.8.4.1-beta

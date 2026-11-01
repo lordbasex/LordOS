@@ -1,4 +1,4 @@
-**En desarrollo para 0.8.7. La última versión publicada, 0.8.6-beta, no incluye Limpieza.** Esta página describe el trabajo en la rama de desarrollo; todavía puede cambiar antes de publicarse.
+**Nueva en la 0.8.7.**
 
 ## La versión corta
 

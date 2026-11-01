@@ -36,7 +36,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
 - **Sharp at any scale.** Each display is a separate `wl_output`, and fractional scaling lets GTK 4, Qt 6 and Chromium render sharp at 125–175 %.
 - **Touchpad gestures.** LordOS's own touchpad driver passes pinch, swipe and hold gestures to Linux apps, so pinch-to-zoom works in browsers.
-- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion. In development for 0.8.7 (the latest release is 0.8.6), a lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it.
+- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion. In 0.8.7, a lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it.
 - **Notifications** from Linux apps arrive through the standard notifications service, which `lord-server` provides, and can be configured per app in Settings.
 - **Passwords:** the standard Secret Service is served by LordOS's keyring, so browsers can keep their secrets there without another keyring daemon.
 - **Force Quit** (since 0.8.5): in Lord Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.
@@ -48,7 +48,7 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 
 ## Which Wayland protocols are there
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in development for 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard.
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard.
 
 **Check it from the outside** (since 0.8.5): the **Test Bench** (`lordos-testbench`) is a test-pattern window that checks the display server as any app sees it: frame timing and when frames really reach the screen, every key of the keyboard, the mouse and wheel, and the Wayland protocols the system offers.
 

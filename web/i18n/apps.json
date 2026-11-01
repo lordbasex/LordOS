@@ -603,7 +603,7 @@
         "Color tags, search and Recents",
         "This computer: the whole system, read-only, as your user",
         "Every disk in the sidebar, mounted with a click; trash and archives",
-        "In development for 0.8.7: Network, what is on your local network, and connecting to shares"
+        "New in 0.8.7: Network, what is on your local network, and connecting to shares"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -611,7 +611,7 @@
         "Etiquetas de color, búsqueda y Recientes",
         "Este equipo: todo el sistema, solo lectura, como tu usuario",
         "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
-        "En desarrollo para 0.8.7: Red, lo que hay en tu red local, y conectarse a recursos compartidos"
+        "Nuevo en 0.8.7: Red, lo que hay en tu red local, y conectarse a recursos compartidos"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -619,7 +619,7 @@
         "Etiquetas de cor, busca e Recentes",
         "Este computador: todo o sistema, só leitura, como seu usuário",
         "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
-        "Em desenvolvimento para 0.8.7: Rede, o que há na sua rede local, e conexão a compartilhamentos"
+        "Novo na 0.8.7: Rede, o que há na sua rede local, e conexão a compartilhamentos"
       ]
     }
   },
@@ -645,7 +645,7 @@
         "Appearance: desktop style (Lord Flow or Lord Classic), wallpaper and the Dock",
         "Privacy, app permissions, network access and blocklists",
         "Users, remote desktop and updates",
-        "In development for 0.8.7: session restore and an on-screen keyboard"
+        "New in 0.8.7: session restore and an on-screen keyboard"
       ],
       "es": [
         "Red, Wi-Fi, VPN y Bluetooth",
@@ -653,7 +653,7 @@
         "Apariencia: estilo de escritorio (Lord Flow o Lord Classic), fondo de pantalla y el Dock",
         "Privacidad, permisos de apps, acceso a la red y listas de bloqueo",
         "Usuarios, escritorio remoto y actualizaciones",
-        "En desarrollo para 0.8.7: restaurar la sesión y un teclado en pantalla"
+        "Nuevo en 0.8.7: restaurar la sesión y un teclado en pantalla"
       ],
       "pt": [
         "Rede, Wi-Fi, VPN e Bluetooth",
@@ -661,7 +661,7 @@
         "Aparência: estilo da área de trabalho (Lord Flow ou Lord Classic), papel de parede e o Dock",
         "Privacidade, permissões de apps, acesso à rede e listas de bloqueio",
         "Usuários, área de trabalho remota e atualizações",
-        "Em desenvolvimento para 0.8.7: restauração da sessão e um teclado na tela"
+        "Novo na 0.8.7: restauração da sessão e um teclado na tela"
       ]
     }
   },
@@ -687,7 +687,7 @@
         "Each app's sites, addresses and ports as a tree, and on a world map",
         "Allow or block an app, or one destination, with a switch",
         "Temperatures and fans in the Cooling tab",
-        "In development for 0.8.7: a Voltage view on machines that report voltages"
+        "New in 0.8.7: a Voltage view on machines that report voltages"
       ],
       "es": [
         "Gráficos en vivo de CPU, memoria, red y disco",
@@ -695,7 +695,7 @@
         "Los sitios, direcciones y puertos de cada app en un árbol y en un mapa del mundo",
         "Permití o bloqueá una app, o un destino, con un interruptor",
         "Temperaturas y ventiladores en la pestaña Refrigeración",
-        "En desarrollo para 0.8.7: una vista Voltaje en las máquinas que informan voltajes"
+        "Nuevo en 0.8.7: una vista Voltaje en las máquinas que informan voltajes"
       ],
       "pt": [
         "Gráficos ao vivo de CPU, memória, rede e disco",
@@ -703,7 +703,7 @@
         "Os sites, endereços e portas de cada app em uma árvore e em um mapa-múndi",
         "Permita ou bloqueie um app, ou um destino, com um botão",
         "Temperaturas e ventoinhas na aba Resfriamento",
-        "Em desenvolvimento para 0.8.7: uma visão Tensão nas máquinas que informam tensões"
+        "Novo na 0.8.7: uma visão Tensão nas máquinas que informam tensões"
       ]
     }
   },
@@ -1030,7 +1030,7 @@
         "Checks of LordOS's claims on this computer, with a Sandbox Probe that tries what an isolated app must not do",
         "Performance: LordBench, quick and full tests of the processor, memory, graphics, video and disk, shown against reference machines, never as one score",
         "Reports in Markdown or JSON, shown before you copy or save them; nothing is sent",
-        "In development for 0.8.7: computer, motherboard, firmware and peripherals, and serial numbers only on request"
+        "New in 0.8.7: computer, motherboard, firmware and peripherals, and serial numbers only on request"
       ],
       "es": [
         "Se abre desde Acerca de LordOS → Informe del sistema…",
@@ -1039,7 +1039,7 @@
         "Verificaciones de lo que LordOS afirma, en esta computadora, con la Prueba del aislamiento, que intenta lo que una app aislada no debe poder hacer",
         "Rendimiento: LordBench, pruebas rápida y completa del procesador, la memoria, los gráficos, el video y el disco, frente a máquinas de referencia, nunca como un único puntaje",
         "Informes en Markdown o JSON, que ves antes de copiarlos o guardarlos; no se envía nada",
-        "En desarrollo para 0.8.7: computadora, placa madre, firmware y periféricos, y números de serie solo si los pedís"
+        "Nuevo en 0.8.7: computadora, placa madre, firmware y periféricos, y números de serie solo si los pedís"
       ],
       "pt": [
         "Abre em Sobre o LordOS → Relatório do sistema…",
@@ -1048,7 +1048,7 @@
         "Verificações do que o LordOS afirma, neste computador, com o Teste do isolamento, que tenta o que um app isolado não deve conseguir fazer",
         "Desempenho: o LordBench, testes rápido e completo do processador, da memória, dos gráficos, do vídeo e do disco, frente a máquinas de referência, nunca como uma única pontuação",
         "Relatórios em Markdown ou JSON, que você vê antes de copiar ou salvar; nada é enviado",
-        "Em desenvolvimento para 0.8.7: computador, placa-mãe, firmware e periféricos, e números de série só se você pedir"
+        "Novo na 0.8.7: computador, placa-mãe, firmware e periféricos, e números de série só se você pedir"
       ]
     }
   },
@@ -1098,9 +1098,9 @@
     "icon": "apps/cleaner/index.jsx",
     "screenshot": "docs/cleaner-review.png",
     "name": {
-      "en": "Cleaner (in development)",
-      "es": "Limpieza (en desarrollo)",
-      "pt": "Limpeza (em desenvolvimento)"
+      "en": "Cleaner",
+      "es": "Limpieza",
+      "pt": "Limpeza"
     },
     "tagline": {
       "en": "See what uses your disk and remove what can safely go",
@@ -1109,19 +1109,19 @@
     },
     "features": {
       "en": [
-        "In development for 0.8.7; the latest release, 0.8.6, does not include it",
+        "New in 0.8.7",
         "A scan only reads; nothing changes until you confirm",
         "Caches, large files, a storage map, exact duplicates and similar images",
         "Each file is checked again right before acting"
       ],
       "es": [
-        "En desarrollo para 0.8.7; la última versión, la 0.8.6, no lo incluye",
+        "Nuevo en 0.8.7",
         "Un análisis solo lee; nada cambia hasta que confirmes",
         "Cachés, archivos grandes, mapa del disco, copias exactas e imágenes parecidas",
         "Cada archivo se comprueba otra vez antes de actuar"
       ],
       "pt": [
-        "Em desenvolvimento para 0.8.7; a versão mais recente, 0.8.6, não inclui",
+        "Novo na 0.8.7",
         "Uma análise só lê; nada muda até você confirmar",
         "Caches, arquivos grandes, mapa do disco, cópias exatas e imagens parecidas",
         "Cada arquivo é verificado de novo antes de agir"

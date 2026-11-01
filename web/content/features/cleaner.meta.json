@@ -2,21 +2,21 @@
   "slug": "cleaner",
   "order": 7,
   "title": {
-    "en": "Cleaner (in development)",
-    "es": "Limpieza (en desarrollo)",
-    "pt": "Limpeza (em desenvolvimento)"
+    "en": "Cleaner",
+    "es": "Limpieza",
+    "pt": "Limpeza"
   },
   "tagline": {
-    "en": "See what takes up your disk and remove what can safely go. A scan only reads; nothing changes until you confirm. In development for 0.8.7.",
-    "es": "Mirá qué ocupa el disco y quitá lo que se puede quitar con seguridad. Un análisis solo lee; nada cambia hasta que confirmás. En desarrollo para 0.8.7.",
-    "pt": "Veja o que ocupa o disco e remova o que pode sair com segurança. Uma análise só lê; nada muda até você confirmar. Em desenvolvimento para 0.8.7."
+    "en": "See what takes up your disk and remove what can safely go. A scan only reads; nothing changes until you confirm. New in 0.8.7.",
+    "es": "Mirá qué ocupa el disco y quitá lo que se puede quitar con seguridad. Un análisis solo lee; nada cambia hasta que confirmás. Nueva en la 0.8.7.",
+    "pt": "Veja o que ocupa o disco e remova o que pode sair com segurança. Uma análise só lê; nada muda até você confirmar. Novo na 0.8.7."
   },
   "lumo": {
     "pose": "front",
     "intro": {
-      "en": "I only read while I look around. I'll show you what I found, you choose, and I check everything again before touching it. This one is still in development.",
-      "es": "Mientras miro, solo leo. Te muestro lo que encontré, vos elegís, y compruebo todo otra vez antes de tocarlo. Esto todavía está en desarrollo.",
-      "pt": "Enquanto olho, só leio. Mostro o que encontrei, você escolhe, e confiro tudo de novo antes de tocar. Isto ainda está em desenvolvimento."
+      "en": "I only read while I look around. I'll show you what I found, you choose, and I check everything again before touching it.",
+      "es": "Mientras miro, solo leo. Te muestro lo que encontré, vos elegís, y compruebo todo otra vez antes de tocarlo.",
+      "pt": "Enquanto olho, só leio. Mostro o que encontrei, você escolhe, e confiro tudo de novo antes de tocar."
     }
   },
   "screenshots": [
