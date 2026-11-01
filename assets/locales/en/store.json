@@ -277,7 +277,7 @@
   "formats.ntfs": "Reads and writes NTFS volumes.",
   "formats.exfat": "Reads and writes exFAT volumes.",
   "formats.fat": "Opens and formats FAT volumes on the desktop.",
-  "formats.hfs": "Reads HFS+ volumes; a journaled one, the usual kind, is read-only.",
+  "formats.hfs": "Reads HFS+ volumes, read-only.",
   "formats.apfs": "Reads APFS volumes, read-only.",
   "formats.allow": "Continue"
 }
