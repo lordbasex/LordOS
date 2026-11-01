@@ -289,5 +289,6 @@
   "disk.formatsDetail": "Formatos de disco, en la Tienda, lo abre. Sus controladores son software libre y sin costo.",
   "disk.formatsGet": "Abrir la Tienda",
   "settings.defaultView": "Las carpetas nuevas se muestran en",
-  "net.shareOn": "{name} en {host}"
+  "net.shareOn": "{name} en {host}",
+  "net.offLink": "Este servidor está fuera de tu red local, así que LordOS no lista sus carpetas. Escribí el nombre de la carpeta."
 }

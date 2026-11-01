@@ -289,5 +289,6 @@
   "disk.formatsDetail": "Disk Formats, in the Store, opens it. Its drivers are free software at no cost.",
   "disk.formatsGet": "Open the Store",
   "settings.defaultView": "New folders show",
-  "net.shareOn": "{name} on {host}"
+  "net.shareOn": "{name} on {host}",
+  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name."
 }

@@ -289,5 +289,6 @@
   "disk.formatsDetail": "Formatos de disco, na Loja, o abre. Seus drivers são software livre e sem custo.",
   "disk.formatsGet": "Abrir a Loja",
   "settings.defaultView": "Pastas novas aparecem em",
-  "net.shareOn": "{name} em {host}"
+  "net.shareOn": "{name} em {host}",
+  "net.offLink": "Este servidor está fora da sua rede local, então o LordOS não lista as pastas dele. Digite o nome da pasta."
 }

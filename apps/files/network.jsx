@@ -95,6 +95,7 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
     if (r.state === 'done' && r.shares.length) { setList(r.shares); return; }
     if (r.state === 'denied') { setError(tr(g ? 'files.net.noGuest' : 'files.net.badLogin')); return; }
     if (r.state === 'done') { setError(tr('files.net.noShares')); return; }
+    if (r.state === 'off-link') { setTyped(true); setError(tr('files.net.offLink')); return; }   // lan.c only speaks to its own link
     setTyped(true);                                       // an old server, another subnet, a refused dialect
     setError(tr('files.net.cantList'));
   };
