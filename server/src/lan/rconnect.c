@@ -253,7 +253,10 @@ static void mount_job(void) {
     int fd = memfd_with(cfg, (size_t)cl);
     explicit_bzero(cfg, sizeof cfg);
     if (fd < 0) { finish("failed", NULL, NULL); return; }
-    snprintf(dir, sizeof dir, "%s/%s on %s", remote_root(root, sizeof root), q.kind, q.host);
+    /* a port of its own is another server: ftps on 21 and on 990 are two folders */
+    char ptxt[12] = "";
+    if (q.port) snprintf(ptxt, sizeof ptxt, ":%d", q.port);
+    snprintf(dir, sizeof dir, "%s/%s on %s%s", remote_root(root, sizeof root), q.kind, q.host, ptxt);
     mkparents(dir);
     if (mounted_at(dir)) { close(fd); finish("done", NULL, dir); return; }
     char src[240] = "r:";

@@ -57,6 +57,8 @@ Note: `lord-doc` and `lord-media` are separate helper processes. Because they li
 Debian's FFmpeg build, those two binaries as distributed are covered by the GPL; the MIT-licensed
 LordOS source they are built from is GPL-compatible. `lord-server` itself does not link them.
 
+These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT), **fuse3** (LGPL-2.1, GPL-2.0), **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0), openssh-client (BSD), and, recommended on amd64, **apfs-dkms** (GPL-2.0). About 103 MB installed on a system that didn't have them, most of it rclone (60 MB) and libicu (37 MB, shared).
+
 ## Tools used to make website media (not shipped in LordOS)
 
 | Tool | Used for | License |

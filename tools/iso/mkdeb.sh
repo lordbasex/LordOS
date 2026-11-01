@@ -306,6 +306,9 @@ if [ -x "$L/bin/lord-media" ]; then MEDIADEPS=", libavcodec61, libavformat61, li
 # the remote desktop is WebRTC only (docs/REMOTE.md, "Video (WebRTC)"): lord-sessiond always links libsrtp2 and usrsctp
 RTCDEPS=", libsrtp2-1, libusrsctp2"
 if ! objdump -p "$L/bin/lord-sessiond" 2>/dev/null | grep -q "libsrtp2"; then echo "lord-sessiond is not linked with libsrtp2: rebuild it (make -C server)" >&2; exit 1; fi
+# APFS has only an out-of-tree open driver, built for the running kernel: amd64 with Debian's kernel. The Pi's kernel is ours.
+APFSREC=""
+[ "$(dpkg --print-architecture)" = amd64 ] && APFSREC="apfs-dkms, linux-headers-amd64,"
 # the signed tested-hardware snapshot, its own package (tools/iso/mkdeb-hwdata.sh): any version of format 1,
 # the first being the snapshot of 2026-10-27 (a format 2 is a Breaks in lordos-hwdata, not a change here)
 HWDATADEPS=", lordos-hwdata (>= 2026.10.27)"
@@ -317,7 +320,7 @@ Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libwinpr3-3, rclone, fuse3, openssh-client, openssl, ntfs-3g, exfatprogs, dosfstools$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
-Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
+Recommends: $APFSREC pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
 Section: x11
 Priority: optional
 Protected: yes

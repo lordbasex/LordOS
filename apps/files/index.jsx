@@ -372,7 +372,7 @@ export default function Files() {
     setMsg(tr('files.disk.mounting', { name: p.label || p.name }));
     admin.run('disk-mount', p.name, null, { quiet: true }).then(
       (path) => { setVolumes(fs.volumes()); setMsg(null); const at = String(path || '').trim(); if (at.startsWith('/')) navigate(dirLoc(at)); },
-      (e) => { setMsg(e.message); if (e.code === 'disk.noDriver' || /apfs|hfs/i.test(p.fstype || '')) setConfirm({ text: e.message, ok: tr('files.connect.openStore'), run: () => wm.open('store', { args: { search: p.fstype === 'apfs' ? 'apfs-dkms' : p.fstype, package: p.fstype === 'apfs' ? 'apfs-dkms' : undefined } }) }); });
+      (e) => { setMsg(e.message); if (p.fstype === 'apfs') setConfirm({ text: e.message, ok: tr('files.connect.openStore'), run: () => wm.open('store', { args: { search: p.fstype === 'apfs' ? 'apfs-dkms' : p.fstype, package: p.fstype === 'apfs' ? 'apfs-dkms' : undefined } }) }); });
   };
   const release = (r, path) => {
     if (r.remote) { if (lan.disconnect(path)) { setVolumes(fs.volumes()); if (curDir && (curDir === path || curDir.startsWith(`${path}/`))) navigate(homeLoc()); } return; }

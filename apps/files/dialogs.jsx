@@ -27,7 +27,7 @@ function completions(value) {
   const cut = p.lastIndexOf('/');
   const dir = p.slice(0, cut) || '/', head = p.slice(cut + 1).toLowerCase();
   try {
-    return lord.fs.list(dir).filter((e) => e.dir && (head.startsWith('.') || !e.name.startsWith('.')) && e.name.toLowerCase().startsWith(head)).map((e) => `${dir === '/' ? '' : dir}/${e.name}`).slice(0, 8);
+    return lord.fs.list(dir).filter((e) => e.dir && (head.startsWith('.') || !e.name.startsWith('.')) && e.name.toLowerCase().startsWith(head)).map((e) => `${dir === '/' ? '' : dir}/${e.name}`).sort((a, b) => a.localeCompare(b)).slice(0, 8);
   } catch (e) { return []; }
 }
 
