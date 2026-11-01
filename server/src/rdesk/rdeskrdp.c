@@ -87,6 +87,7 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
     char fdhost[32];
     snprintf(fdhost, sizeof fdhost, "|%d", sock);
     freerdp_settings_set_string(s, FreeRDP_ServerHostname, fdhost);
+    freerdp_settings_set_uint32(s, FreeRDP_ServerPort, (UINT32)sock);    /* with a "|" host, the port is the descriptor */
     if (user[0]) freerdp_settings_set_string(s, FreeRDP_Username, user);
     if (domain[0]) freerdp_settings_set_string(s, FreeRDP_Domain, domain);
     if (password[0]) freerdp_settings_set_string(s, FreeRDP_Password, password);
