@@ -8,7 +8,7 @@ import { useAppWindow } from './components.jsx';
 import { settings, useSettings } from './settings.js';
 import { lan } from './lan.js';
 import { t as tr } from './i18n.js';
-import { Button, TextInput, Toggle } from './components.jsx';
+import { Button, ScrollView, TextInput, Toggle } from './components.jsx';
 
 // keys with a name in X11's keysyms; printable ones are their code point, Latin-1 or 0x01000000 + code
 const SYMS = { Backspace: 0xff08, Tab: 0xff09, Enter: 0xff0d, Escape: 0xff1b, Delete: 0xffff, Home: 0xff50, ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54,
@@ -114,7 +114,7 @@ export function RemoteDeskApp({ proto }) {
       label('remotedesk.saved'),
       ...saved.map((x) => h(View, { key: `${x.host}:${x.port}`, onClick: () => { setHost(x.host); setPort(x.port ? String(x.port) : ''); setUser(x.user); }, style: { height: 28, justifyContent: 'center', paddingHorizontal: 6, borderRadius: 6 } },
         h(Text, { style: { fontSize: 13, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, x.port ? `${x.host}:${x.port}` : x.host)))),
-    h(View, { style: { flex: 1, padding: 24, gap: 8 } },
+    h(ScrollView, { style: { flex: 1 }, contentStyle: { padding: 24, gap: 8 } },
       h(Text, { style: { fontSize: 20, fontWeight: 600, color: t.text, textAlign: 'start' } }, tr(rdp ? 'remotedesk.titleRdp' : 'remotedesk.titleVnc')),
       label('remotedesk.host'), h(TextInput, { value: host, onChange: setHost, autoFocus: true, onSubmit: go }),
       label('remotedesk.port'), h(TextInput, { value: port, onChange: (v) => setPort(v.replace(/\D/g, '').slice(0, 5)), placeholder: rdp ? '3389' : '5900', onSubmit: go }),

@@ -49,7 +49,7 @@ static DWORD verify(freerdp *in, const char *host, UINT16 port, const char *cn, 
     for (;;) {
         RdMsg m;
         if (recv(CH, &m, sizeof m, 0) != (ssize_t)sizeof m || m.type == RD_CLOSE) return 0;
-        if (m.type == RD_CERT_OK) return m.a ? 1 : 0;
+        if (m.type == RD_CERT_OK) return m.a ? 2 : 0;       /* 2: for this session; the app keeps it, not the library */
     }
 }
 static DWORD verify_changed(freerdp *in, const char *host, UINT16 port, const char *cn, const char *sub, const char *iss, const char *fp,
