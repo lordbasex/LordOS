@@ -504,6 +504,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - Window memory across two displays is not tested.
 - HFS+ and APFS disks are read-only.
+- The session's remote socket accepts any process of the same user, so a program outside LordOS's app sandbox, running as
+  you, could read the screen and send input through it. Restricting it is planned for 0.8.7.1.
 - The live systems don't include Disk Formats: on them, mounting FAT, exFAT, NTFS, HFS+ or APFS from the desktop asks for it.
 - Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
 - A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries.
