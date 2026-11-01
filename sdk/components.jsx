@@ -273,13 +273,13 @@ addListener('keydown', (e) => { if (focused && handlers.has(focused)) handlers.g
 
 export const hasTextFocus = () => focused !== null;
 
-// A field on a hidden desktop must not keep the keys: its window stays mounted (desktopmodel.js), so
-// when the window that was in front leaves the desktop in view, the text focus goes with it.
+// A field out of sight must not keep the keys: its window stays mounted (desktopmodel.js), so when the
+// window that was in front is minimized or leaves the desktop in view, the text focus goes with it.
 export const clearTextFocus = () => { if (focused !== null) setFocus(null); };
 let frontWas = null;
 function checkFront() {
   const w = frontWas && wm.get(frontWas);
-  if (w && !onActiveDesktop(w)) clearTextFocus();
+  if (w && (w.minimized || !onActiveDesktop(w))) clearTextFocus();
   frontWas = wm.focused();
 }
 windows.subscribe(checkFront);

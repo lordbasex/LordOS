@@ -41,7 +41,7 @@ export function Window({ win, app, t, focused, fx }) {
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
-      <WindowShell win={win} onMouseDown={() => wm.focus(win.id)}
+      <WindowShell win={win} leaving={!!fx} onMouseDown={() => wm.focus(win.id)}
         style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: focused ? '0 24px 56px rgba(0,0,0,0.5)' : '0 10px 28px rgba(0,0,0,0.3)', ...fxs }}>
         <AppHost id={win.id} focused={focused} />
         {wmenu && (
@@ -58,7 +58,7 @@ export function Window({ win, app, t, focused, fx }) {
   }
 
   return (
-    <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{
+    <WindowShell win={win} leaving={!!fx} onMouseDown={() => wm.focus(win.id)} style={{
       borderRadius: win.maximized ? 0 : 12, backgroundColor: app.transparent ? 'transparent' : t.windowBg, overflow: 'hidden',
       // a transparent app (the Terminal) has nothing behind its border: the border is drawn opaque
       border: `1px solid ${app.transparent ? solidOver(t.windowBorder, t.titleBg) : t.windowBorder}`,
