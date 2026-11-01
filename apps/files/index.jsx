@@ -782,7 +782,7 @@ export default function Files() {
         {/* content */}
         <View style={{ flex: 1 }} onMouseDown={() => { if (renaming) commitRename(); setSelected(new Set()); }} onContextMenu={onBgContext}
           {...(curDir ? { dropPath: curDir } : {})}>
-          {loc.type === 'network' ? <NetworkView volumes={volumes} refreshVolumes={() => setVolumes(fs.volumes())} openFolder={(p) => navigate(dirLoc(p))} setMsg={setMsg} setModal={setNetModal} /> : <>
+          {loc.type === 'network' ? <NetworkView volumes={volumes} refreshVolumes={() => setVolumes(fs.volumes())} openFolder={(p) => navigate(dirLoc(p))} setMsg={setMsg} setModal={setNetModal} onRemote={setRemoteAsk} /> : <>
             {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
             {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
             {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab({ chain })} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort} />}

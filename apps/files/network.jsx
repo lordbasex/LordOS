@@ -1,7 +1,7 @@
 // network.jsx — Files → Network: what is on the local network, found by itself. lord.lan (sdk/lan.js)
 // does one bounded pass while this page is open; a share is mounted by the closed share-mount
 // action and then browsed like any disk. See docs/FILES.md, "Network".
-import { View, Text, Button, ScrollView, TextInput, Toggle, Hairline, useTheme, clipboard, lan, spacing, typeScale, t as tr } from '@lordos/sdk';
+import { View, Text, Button, ScrollView, TextInput, Toggle, Hairline, useTheme, clipboard, lan, wm, spacing, typeScale, t as tr } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DriveGlyph, FolderGlyph } from './glyphs.jsx';
 
@@ -233,7 +233,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
   );
 }
 
-export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setModal }) {
+export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setModal, onRemote }) {
   const t = useTheme();
   const [st, setSt] = useState(() => lan.poll());
   const [open, setOpen] = useState(() => new Set());
@@ -280,6 +280,18 @@ export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setMo
       : <Button small label={tr('files.net.connect')} onClick={() => connect(h, kind, share)} />;
   };
 
+  // what Files can mount is connected to; a remote screen opens its app; only the rest keeps its address to copy
+  const serviceAction = (h, s) => {
+    const kind = { ssh: 'sftp', sftp: 'sftp', ftp: 'ftp', ftps: 'ftps', webdav: 'webdav', webdavs: 'davs' }[s.kind];
+    if (kind) {
+      const std = { sftp: 22, ftp: 21, ftps: 21, webdav: 80, davs: 443 }[kind];
+      const path = kind === 'webdav' || kind === 'davs' ? (s.path && s.path !== '/' ? s.path.replace(/\/+$/, '') : '') : '';
+      return <Button small label={tr('files.net.connect')} onClick={() => onRemote({ kind, host: h.addr, port: s.port === std ? 0 : s.port, user: '', path })} />;
+    }
+    if (s.kind === 'screen' || s.kind === 'rdp') return <Button small label={tr('files.net.open')} onClick={() => wm.open(s.kind === 'rdp' ? 'rdp' : 'vnc', { new: true, args: { host: h.addr, port: s.port, user: '' } })} />;
+    return <Button small label={tr('files.net.copyAddress')} onClick={() => copy(serviceUrl(h.addr, s))} />;
+  };
+
   const status = {
     'no-lan': 'files.net.noLan', 'no-connector': 'files.net.noConnector', 'no-helper': 'files.net.noHelper', denied: 'files.net.denied',
   }[st.state];
@@ -309,7 +321,7 @@ export function NetworkView({ volumes, refreshVolumes, openFolder, setMsg, setMo
       ) : null}
       {h.services.filter((s) => s.kind !== 'smb' && s.kind !== 'nfs' && s.kind !== 'computer').map((s) => (
         <Row key={`v${s.kind}${s.port}`} t={t} depth={1} name={s.model || s.name || tr(`files.net.kind.${s.kind}`)} sub={serviceUrl(h.addr, s)} kind={tr(`files.net.kind.${s.kind}`)}>
-          <Button small label={tr('files.net.copyAddress')} onClick={() => copy(serviceUrl(h.addr, s))} />
+          {serviceAction(h, s)}
         </Row>
       ))}
     </View>
