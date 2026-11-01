@@ -2,17 +2,21 @@
  * A tool, not part of make test.
  *   share-client api    <sock> <script>   client of share.sock
  *   share-client mirror <sock> <script>   client of remote.sock
+ *   share-client bridge <sock> <uid>      as root: the order lord-sessiond's bridge uses
  * A script is words, run in order; what arrives is counted and printed as "type count" at the end:
  *   start F C K | query | stop | lock | awake N | hear N | key CODE V | ptr X Y | btn B D | keyframe | rate K | resize W H
  *   text S | clip S | raw TYPE N (a message of N zero bytes) | junk (a wrong length)
  *   wait MS (reads for that long) | until TYPE MS (reads until that type arrives; exit 3 if it doesn't)
  *   none TYPE MS (exit 4 if that type arrives within MS) | reset (counters) | expect-end REASON MS | expect-ref REASON MS
  *   mirror only: seat | hello S | video C K | undisplay | display
+ * The count of type 255 is the keyframes among RP_VFRAME.
  * "gone" as a word means: exit 0 only if the server closed the connection within 2 s. */
 #include "remote/proto.h"
 #include "remote/sharewire.h"
 
+#define _GNU_SOURCE
 #include <errno.h>
+#include <grp.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
@@ -66,6 +70,7 @@ static void pump(int ms) {
         seen_bytes[t] += l - 1;
         if (t == SHARE_END || t == SHARE_REFUSED) { last_type = t; last_reason = in[off + 5]; }
         if (t == SHARE_STATE) { last_type = t; last_reason = in[off + 5]; }
+        if (t == RP_VFRAME && l >= 3 && in[off + 6]) seen[255]++;       /* keyframes, counted apart */
         if (t == RP_CURSOR && l >= 6) { int16_t x, y; memcpy(&x, in + off + 5, 2); memcpy(&y, in + off + 7, 2); cur_x = x; cur_y = y; }
         off += 4 + (size_t)l;
     }
@@ -91,6 +96,18 @@ static int until(int type, int ms) {
 
 static int reason_of(const char *s) { for (int i = 0; i < SW_REASONS; i++) if (!strcmp(sw_reason_name(i), s)) return i; return -1; }
 
+/* What lord-sessiond's bridge does: connect as root, then give root up and go on with the same socket. */
+static int bridge(uid_t uid) {
+    out(RP_HELLO, "127.0.0.1 test", 14);
+    if (setgroups(0, NULL) || setresgid(uid, uid, uid) || setresuid(uid, uid, uid)) return 6;
+    uint8_t v = 0;
+    out(RP_VMODE, &v, 1);
+    wait_ms(300);
+    if (closed || !seen[RP_SIZE]) { printf("the bridge's connection failed\n"); return 3; }
+    printf("bridge: uid %u, connected\n", (unsigned)getuid());
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 3) return 2;
     in = malloc(64u << 20);
@@ -98,6 +115,7 @@ int main(int argc, char **argv) {
     struct sockaddr_un a = { .sun_family = AF_UNIX };
     snprintf(a.sun_path, sizeof a.sun_path, "%s", argv[2]);
     if (connect(fd, (struct sockaddr *)&a, sizeof a)) { printf("connect: %s\n", strerror(errno)); return 5; }
+    if (!strcmp(argv[1], "bridge") && argc > 3) return bridge((uid_t)atoi(argv[3]));
     int i = 3;
 #define W(n) (i + (n) < argc ? argv[i + (n)] : "0")
 #define N(n) atoi(W(n))
