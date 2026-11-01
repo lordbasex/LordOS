@@ -284,7 +284,8 @@ permission and the indicator.
 | Code, new code, acceptance, permissions live, session panel, chat | same |
 | Picture, sound, control, clipboard | through the API |
 | Unattended access, linked browsers, password | same code; see D3 |
-| Files | narrower, D2 |
+| Files | same as the Linux version, D2 |
+| Sound, chat, voice and video calls | same. Sound through the API; the microphone and camera only during a call, through the system's permissions |
 | Keep the display awake | `SHARE_AWAKE`; `pkg/awake`'s D-Bus services aren't ours, and only while a viewer is accepted |
 | Lock when a session ends | `SHARE_LOCK`, because `loginctl` can't work here: LordOS sessions have no logind seat (`docs/SESSIONS.md:465`, go-link:`internal/services/session_end.go:98`) |
 | Open at login | not available to this app today, D4 |
@@ -387,8 +388,8 @@ fullscreen, direct scanout included; x264 on the Pi.
 
 - **D1. Packaged apps with a companion (blocks stage 2 and the app).** Accept 3.2: a third read-only app root, a Verified-author check at
   load, and a fourth exception to "the server doesn't run commands". The alternative is an unsandboxed Linux app, which has no native UI.
-- **D2. Files.** `~/Downloads/go-link` only (proposed), or read access to the whole home folder as on Linux, which gives a compromised engine
-  `.ssh` and the rest.
+- **D2. Files (decided by the maintainer).** Every function of go-link stays, files included, as on Linux. The sandbox must give the engine the
+  access that takes; a compromised engine would reach what that access covers. The exact paths go with stage 2.
 - **D3. Unattended access.** Keep as on Linux, off by default (proposed), or leave it out at first. With it on and no monitor, nobody sees
   the indicator.
 - **D4. Open at login.** Without it, no code and no knocks until the app is opened, and unattended access only works while it's open.
