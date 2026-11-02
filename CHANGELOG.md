@@ -24,6 +24,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
 - Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
 - Terminal: ❖+click or Ctrl+click on a web address opens it in the default browser.
+- Install in free space: on a GPT disk with an EFI partition, booted through UEFI, the installer can add LordOS beside what is there, as one new partition, leaving every existing partition as it was ([#7](https://github.com/lordbasex/LordOS/issues/7)).
+- Broadcom Wi-Fi firmware on the ISOs, so the 2015 MacBook Pro's BCM43602 works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
 
 ### Added

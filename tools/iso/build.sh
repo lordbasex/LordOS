@@ -55,8 +55,9 @@ PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firm
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
-# the disk installer (server/src/install): partition, format, copy and grub (UEFI and BIOS on amd64, UEFI on arm64)
-PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common $PKGS_GRUB"
+# the disk installer (server/src/install): partition, format, copy and grub (UEFI and BIOS on amd64, UEFI on
+# arm64). efibootmgr and os-prober are for installing in free space: the boot entry and the other system's menu entry
+PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common efibootmgr os-prober $PKGS_GRUB"
 # the boot splash (the LordOS Plymouth theme comes in the lordos package; plymouth-label draws the
 # password prompt's text for encrypted disks)
 PKGS_SPLASH="plymouth plymouth-label"

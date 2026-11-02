@@ -6,16 +6,20 @@
  *   install-disks           one LOG with JSON per installable disk and finally OK <n>:
  *                           { name, path, size, model, vendor, transport, removable, parts: [...] }
  *                           (no loop, ram, zram, sr, dm or md, and not the disk the live system booted from)
- *   install-run <json>      installs (in a separate process): wipes the disk, GPT with BIOS boot
- *                           (1 MiB, x86-64 only), ESP (512 MiB, FAT32) and ext4 root; copies the live
- *                           system (unsquashfs), configures it and installs grub: UEFI and BIOS on
- *                           x86-64, UEFI only on arm64.
+ *                           and, read-only: ptable, esp, espPart, freeStart, freeEnd, freeBytes (the
+ *                           largest free GPT region), freeOk, freeWhy (an error code when not freeOk)
+ *   install-run <json>      installs (in a separate process). Mode "erase": wipes the disk, GPT with
+ *                           BIOS boot (1 MiB, x86-64 only), ESP (512 MiB, FAT32) and ext4 root; copies
+ *                           the live system (unsquashfs), configures it and installs grub: UEFI and BIOS
+ *                           on x86-64, UEFI only on arm64. Mode "free": see freepart.c: one new ext4
+ *                           partition in free space of a GPT disk, grub in EFI/LordOS on its ESP.
  *                           Progress: "LOG progress <phase> <done> <total>", phases partition,
  *                           copy, configure, bootloader.
  *   install-reboot          reboots (only on the live system, to finish the wizard)
  *
- * The install-run JSON: { disk, user, fullname, password, hostname, lang, locale, timezone,
- * kblayout, kbvariant, swap (MiB, 0 = no swap) }. Every field is validated here (root), without
+ * The install-run JSON: { mode ("erase", the default, or "free"), disk, user, fullname, password,
+ * hostname, lang, locale, timezone, kblayout, kbvariant, swap (MiB, 0 = no swap), and in mode free
+ * freeStart, freeEnd (the region install-disks reported, which has to still be it) }. Every field is validated here (root), without
  * trusting the UI: the disk has to be in the install-disks list, names
  * pass strict expressions, the region has to be in SUPPORTED, the zone in zoneinfo and
  * the layout in xkb. The password never goes into an argv: it's hashed here with crypt(3)
@@ -25,6 +29,7 @@
 #define _GNU_SOURCE
 #endif
 #include "install.h"
+#include "freepart.h"
 #include "../users/homedirs.h"
 
 #include <crypt.h>
@@ -51,16 +56,18 @@
 #define LIVE_MEDIUM "/run/live/medium"
 #define SQUASHFS    LIVE_MEDIUM "/live/filesystem.squashfs"
 #define TARGET      "/run/lordos-install/target"
-#define MIN_DISK    (8ull << 30)               /* 8 GiB */
+#define MIN_DISK    FSP_MIN_BYTES              /* 8 GiB */
 
 /* What the architecture decides. x86-64: a BIOS boot partition and grub for both firmwares; arm64 is
  * UEFI only. The root partition's GPT type is the architecture's own (Linux root, x86-64 or ARM64). */
 #if defined(__x86_64__)
 #define INSTALL_BIOS     1
 #define GRUB_EFI_TARGET  "--target=x86_64-efi"
+#define GRUB_EFI_FILE    "grubx64.efi"
 #elif defined(__aarch64__)
 #define INSTALL_BIOS     0
 #define GRUB_EFI_TARGET  "--target=arm64-efi"
+#define GRUB_EFI_FILE    "grubaa64.efi"
 #else
 #error "the disk installer knows x86-64 and arm64"
 #endif
@@ -243,7 +250,18 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
         fprintf(f, ",\"size\":%llu,\"model\":", k->size); json_str(f, k->model);
         fprintf(f, ",\"vendor\":"); json_str(f, k->vendor);
         fprintf(f, ",\"transport\":"); json_str(f, k->transport);
-        fprintf(f, ",\"removable\":%s,\"usable\":%s,\"parts\":[", k->removable ? "true" : "false", k->size >= MIN_DISK ? "true" : "false");
+        fprintf(f, ",\"removable\":%s,\"usable\":%s", k->removable ? "true" : "false", k->size >= MIN_DISK ? "true" : "false");
+        static FpProbe fp;
+        char espname[48] = "";
+        unsigned espnum = 0;
+        fp_probe(k->name, &fp);
+        if (fp.esps == 1) { fsp_esp_count(&fp.table, &espnum); fsp_part_path(k->name, espnum, espname, sizeof espname); }
+        fprintf(f, ",\"ptable\":"); json_str(f, fsp_mbr_name(fp.facts.mbr));
+        fprintf(f, ",\"esp\":%s,\"espPart\":", fp.esps > 0 ? "true" : "false"); json_str(f, espname);
+        fprintf(f, ",\"freeStart\":%llu,\"freeEnd\":%llu,\"freeBytes\":%llu,\"freeOk\":%s,\"freeWhy\":",
+                (unsigned long long)fp.region.start, (unsigned long long)fp.region.end, (unsigned long long)fp.region.bytes, fp.why ? "false" : "true");
+        json_str(f, fp.why ? fp.why : "");
+        fprintf(f, ",\"parts\":[");
         int first = 1;
         for (char *l = out, *next; l && *l; l = next) {
             next = strchr(l, '\n');
@@ -268,7 +286,7 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
 
 /* ---- flat JSON of install-run ---- */
 
-typedef struct { char disk[32], user[33], fullname[128], password[257], hostname[64], lang[16], locale[64], timezone[64], kblayout[24], kbvariant[40]; long swap; } Plan;
+typedef struct { char mode[16], disk[32], user[33], fullname[128], password[257], hostname[64], lang[16], locale[64], timezone[64], kblayout[24], kbvariant[40]; long swap; unsigned long long free_start, free_end; } Plan;
 
 /* Reads a JSON string (with escapes and \uXXXX → UTF-8). Returns the pointer past the closing quote. */
 static const char *jstring(const char *p, char *out, size_t n, int *ok) {
@@ -321,12 +339,14 @@ static int parse_plan(const char *s, Plan *pl) {
         while (isspace((unsigned char)*p)) p++;
         if (!ok || *p++ != ':') return -1;
         while (isspace((unsigned char)*p)) p++;
+        /* the mode decides whether a disk gets erased: it is a string, once, or the plan is refused */
+        if (!strcmp(key, "mode") && (*p != '"' || pl->mode[0])) return -1;
         if (*p == '"') {
             char val[300];
             p = jstring(p, val, sizeof val, &ok);
             if (!ok) return -1;
             struct { const char *k; char *dst; size_t n; } f[] = {
-                { "disk", pl->disk, sizeof pl->disk }, { "user", pl->user, sizeof pl->user },
+                { "mode", pl->mode, sizeof pl->mode }, { "disk", pl->disk, sizeof pl->disk }, { "user", pl->user, sizeof pl->user },
                 { "fullname", pl->fullname, sizeof pl->fullname }, { "password", pl->password, sizeof pl->password },
                 { "hostname", pl->hostname, sizeof pl->hostname }, { "lang", pl->lang, sizeof pl->lang },
                 { "locale", pl->locale, sizeof pl->locale }, { "timezone", pl->timezone, sizeof pl->timezone },
@@ -338,6 +358,13 @@ static int parse_plan(const char *s, Plan *pl) {
             char *end;
             long v = strtol(p, &end, 10);
             if (!strcmp(key, "swap")) pl->swap = v;
+            if (!strcmp(key, "freeStart") || !strcmp(key, "freeEnd")) {
+                char *e2;
+                errno = 0;
+                unsigned long long u = strtoull(p, &e2, 10);
+                if (*p == '-' || errno || e2 != end) return -1;
+                *(key[4] == 'S' ? &pl->free_start : &pl->free_end) = u;
+            }
             p = end;
         } else if (!strncmp(p, "true", 4) || !strncmp(p, "null", 4)) p += 4;
         else if (!strncmp(p, "false", 5)) p += 5;
@@ -379,6 +406,7 @@ static int locale_supported(const char *name) {
 }
 
 static const char *validate(Plan *pl) {
+    if (fsp_mode(pl->mode) < 0) return "install.badMode";
     Disk disks[32];
     int n = list_disks(disks, 32), found = 0;
     for (int i = 0; i < n; i++) if (!strcmp(disks[i].name, pl->disk)) { found = 1; if (disks[i].size < MIN_DISK) return "install.diskTooSmall"; }
@@ -404,6 +432,13 @@ static const char *validate(Plan *pl) {
     if (access(p, R_OK)) return "install.unknownKbLayout";
     if (!re_simple(pl->kbvariant, 36, "_-", 1)) return "install.badKbVariant";
     if (pl->swap < 0 || pl->swap > 16384) return "install.badSwap";
+    if (fsp_mode(pl->mode) == 1) {
+        /* every rule of the free space mode, from the disk itself (freespace.c) */
+        static FpProbe fp;
+        fp_probe(pl->disk, &fp);
+        if (fp.why) return fp.why;
+        if (!pl->free_start || pl->free_start != fp.choice.region.start || pl->free_end != fp.choice.region.end) return "install.free.diskChanged";
+    }
     return NULL;
 }
 
@@ -546,7 +581,21 @@ static int disk_busy(const char *disk) {
     return busy;
 }
 
-#define FAIL(...) do { admin_err(__VA_ARGS__, NULL); umount_target(); explicit_bzero(&pl, sizeof pl); return; } while (0)
+/* Mode free: what a failed install has to give back. Empty in mode erase. */
+static FpUndo undo;
+static int undo_boot_folder;
+
+static void free_abort(void) {
+    if (!undo.active) return;
+    if (undo_boot_folder) {                     /* EFI/LordOS didn't exist before (freespace.c): it's all ours */
+        const char *const a[] = { "/usr/bin/rm", "-rf", "--", TARGET "/boot/efi/EFI/" FP_BOOT_FOLDER, NULL };
+        run(a);
+    }
+    umount_target();
+    fp_undo(&undo);
+}
+
+#define FAIL(...) do { free_abort(); admin_err(__VA_ARGS__, NULL); umount_target(); explicit_bzero(&pl, sizeof pl); return; } while (0)
 
 void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     (void)r; (void)len;
@@ -557,14 +606,25 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     if (why) { explicit_bzero(&pl, sizeof pl); admin_err(why, NULL); return; }
     if (disk_busy(pl.disk)) { admin_err("install.diskBusy", "disk", pl.disk, NULL); explicit_bzero(&pl, sizeof pl); return; }
 
+    const int beside = fsp_mode(pl.mode) == 1;
     char dev[48], esp[48], root[48];
     snprintf(dev, sizeof dev, "/dev/%s", pl.disk);
+    if (!beside) {
     part_path(pl.disk, INSTALL_BIOS ? 2 : 1, esp, sizeof esp);
     part_path(pl.disk, INSTALL_BIOS ? 3 : 2, root, sizeof root);
-    admin_log("install.installingTo", "dev", dev, NULL);
+    }
+    admin_log(beside ? "install.free.installing" : "install.installingTo", "dev", dev, NULL);
 
-    /* 1. partition: GPT with BIOS boot (1 MiB, x86-64 only), ESP (512 MiB) and root */
+    /* 1. partition. Mode free: one new partition, nothing else (freepart.c) */
     progress("partition", 0, 4);
+    if (beside) {
+        const char *why2 = fp_create(pl.disk, pl.free_start, pl.free_end, &undo);
+        if (why2) FAIL(why2);
+        cpy(esp, sizeof esp, undo.esp);
+        cpy(root, sizeof root, undo.root);
+        progress("partition", 3, 4);
+    } else {
+    /* GPT with BIOS boot (1 MiB, x86-64 only), ESP (512 MiB) and root */
     { const char *const a[] = { "/usr/sbin/wipefs", "-a", dev, NULL }; if (run(a)) FAIL("install.wipeFailed"); }
     { const char *const a[] = { "/usr/sbin/sgdisk", "--zap-all", dev, NULL }; run(a); }
 #if INSTALL_BIOS
@@ -585,6 +645,7 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     progress("partition", 2, 4);
     { const char *const a[] = { "/usr/sbin/mkfs.ext4", "-F", "-q", "-L", "LordOS", root, NULL }; if (run(a)) FAIL("install.formatRootFailed"); }
     progress("partition", 3, 4);
+    }
     mkdir("/run/lordos-install", 0700);
     mkdir(TARGET, 0755);
     umount_target();
@@ -607,9 +668,12 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     if (uuid_of(root, ru, sizeof ru) || uuid_of(esp, eu, sizeof eu)) FAIL("install.uuidFailed");
     char swapline[64] = "";
     if (pl.swap > 0) snprintf(swapline, sizeof swapline, "/swapfile none swap sw 0 0\n");
+    /* a shared ESP is never checked or repaired at boot, and its absence doesn't stop this system */
     if (writef(TARGET "/etc/fstab", 0644,
-               "# /etc/fstab — generated by the LordOS installer\n"
-               "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n%s", ru, eu, swapline))
+               beside ? "# /etc/fstab — generated by the LordOS installer\n"
+                        "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077,nofail 0 0\n%s"
+                      : "# /etc/fstab — generated by the LordOS installer\n"
+                        "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n%s", ru, eu, swapline))
         FAIL("sys.writeFailed", "path", "/etc/fstab");
     writef(TARGET "/etc/hostname", 0644, "%s\n", pl.hostname);
     writef(TARGET "/etc/hosts", 0644, "127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n", pl.hostname);
@@ -695,32 +759,58 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
      * and Plymouth come in the copied system; without them, the plain menu and text boot as before */
     int splash = access(TARGET "/usr/bin/plymouth", X_OK) == 0 && access(TARGET "/usr/share/plymouth/themes/lordos/lordos.plymouth", R_OK) == 0;
     int theme = access(TARGET "/usr/share/grub/themes/lordos/theme.txt", R_OK) == 0;
+    /* beside another system: a menu with time to choose, and that system in it when os-prober came
+     * in the image */
+    int prober = beside && access(TARGET "/usr/bin/os-prober", X_OK) == 0;
     writef(TARGET "/etc/default/grub", 0644,
-           "# generated by the LordOS installer\nGRUB_DEFAULT=0\nGRUB_TIMEOUT=2\nGRUB_DISTRIBUTOR=LordOS\n"
-           "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet %sloglevel=3\"\nGRUB_CMDLINE_LINUX=\"\"\nGRUB_DISABLE_OS_PROBER=true\n"
+           "# generated by the LordOS installer\nGRUB_DEFAULT=0\nGRUB_TIMEOUT=%d\nGRUB_DISTRIBUTOR=LordOS\n"
+           "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet %sloglevel=3\"\nGRUB_CMDLINE_LINUX=\"\"\nGRUB_DISABLE_OS_PROBER=%s\n"
            "GRUB_GFXMODE=auto\nGRUB_GFXPAYLOAD_LINUX=keep\n%s",
+           beside ? 5 : 2,
            splash ? "splash vt.global_cursor_default=0 " : "",
+           prober ? "false" : "true",
            theme ? "GRUB_TERMINAL_OUTPUT=gfxterm\nGRUB_THEME=/usr/share/grub/themes/lordos/theme.txt\n" : "");
     progress("configure", ++step, steps);
     { const char *const a[] = { "/usr/sbin/update-initramfs", "-u", "-k", "all", NULL }; if (in_target(a)) FAIL("install.initramfsFailed"); }
     progress("configure", ++step, steps);
     progress("configure", steps, steps);
 
-    /* 4. boot: grub for UEFI (removable path, works on any firmware) and, on x86-64, for BIOS */
-    const int boot_steps = INSTALL_BIOS ? 3 : 2;
+    /* 4. boot: grub for UEFI (removable path, works on any firmware) and, on x86-64, for BIOS.
+     * Mode free: its own folder and its own firmware entry; never the removable path, which may be
+     * another system's, and never the disk's first sectors */
+    const int boot_steps = beside ? 3 : INSTALL_BIOS ? 3 : 2;
     int boot_step = 0;
     progress("bootloader", 0, boot_steps);
+    if (beside) {
+        undo_boot_folder = 1;
+        const char *const a[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--bootloader-id=" FP_BOOT_FOLDER, "--no-nvram", NULL };
+        if (in_target(a) || access(TARGET "/boot/efi/EFI/" FP_BOOT_FOLDER "/" GRUB_EFI_FILE, R_OK)) FAIL("install.grubEfiFailed");
+    } else {
     { const char *const a[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--removable", "--no-nvram", NULL };
       if (in_target(a)) FAIL("install.grubEfiFailed"); }
+    }
     progress("bootloader", ++boot_step, boot_steps);
 #if INSTALL_BIOS
+    if (!beside) {
     { const char *const a[] = { "/usr/sbin/grub-install", "--target=i386-pc", dev, NULL };
       if (in_target(a)) FAIL("install.grubBiosFailed"); }
     progress("bootloader", ++boot_step, boot_steps);
+    }
 #endif
     { const char *const a[] = { "/usr/sbin/grub-mkconfig", "-o", "/boot/grub/grub.cfg", NULL };
       if (in_target(a)) FAIL("install.grubConfigFailed"); }
     progress("bootloader", ++boot_step, boot_steps);
+    if (beside) {
+        /* last on purpose: after this nothing can fail, so no entry needs undoing. It only adds an
+         * entry: the others stay, this one goes first in the boot order */
+        char pn[16];
+        snprintf(pn, sizeof pn, "%u", undo.esp_num);
+        const char *const a[] = { "/usr/bin/efibootmgr", "-q", "-c", "-d", dev, "-p", pn, "-L", "LordOS",
+                                  "-l", "\\EFI\\" FP_BOOT_FOLDER "\\" GRUB_EFI_FILE, NULL };
+        if (run(a)) FAIL("install.free.bootEntryFailed");
+        progress("bootloader", ++boot_step, boot_steps);
+        fp_commit(&undo);
+    }
     umount_target();
     explicit_bzero(&pl, sizeof pl);
     admin_ok("install.done", "dev", dev, NULL);
