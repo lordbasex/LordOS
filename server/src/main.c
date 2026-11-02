@@ -1,3 +1,4 @@
+#include <dirent.h>
 /*
  * lord-server — servidor gráfico de LordOS, escrito desde cero.
  *
@@ -61,6 +62,7 @@
 #include "outputs.h"
 #include "monitor/netrec.h"
 #include "sec/codesig.h"
+#include "lpk.h"
 #include "sec/pkgapp.h"
 #include "sec/pkgstate.h"
 #include "sec/sign.h"
