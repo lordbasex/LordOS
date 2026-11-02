@@ -2,6 +2,7 @@
 # lordos-issue — what a bug report needs, ready to paste into a GitHub issue (CONTRIBUTING.md). It only reads. It runs as the
 # user, also on the live system; `sudo lordos-issue` adds the kernel log when the user can't read it. Addresses, the user's
 # and the computer's names, serial numbers and home paths are replaced. Nothing is sent anywhere.
+# It never includes serial numbers (lsblk's and lsusb's are left out), Wi-Fi names, or paired devices.
 # Usage: lordos-issue [--print]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
 LC_ALL=C; export LC_ALL
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
@@ -36,10 +37,20 @@ have() { command -v "$1" >/dev/null 2>&1; }
     if [ -d /run/live/medium ]; then echo "live system: yes"; else echo "live system: no"; fi
     if [ -d /sys/firmware/efi ]; then echo "firmware: UEFI"; elif [ -r /proc/device-tree/model ]; then echo "firmware: board"; else echo "firmware: BIOS"; fi
     echo "session: ${XDG_SESSION_TYPE:-unknown}"
+    sed -E 's/(root=|cryptdevice=|resume=|ip=|wpa-[a-z]+=)[^ ]*/\1<hidden>/g' /proc/cmdline 2>/dev/null
     end
 
-    section "Graphics and network devices"
-    if have lspci; then lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D|Display|Network|Ethernet' | grep -v -E '^--|Subsystem'; else echo "lspci isn't installed"; fi
+    section "PCI devices"
+    if have lspci; then lspci -nnk 2>/dev/null | grep -v 'Subsystem:'; else echo "lspci isn't installed (package pciutils)"; fi
+    end
+
+    section "USB devices"
+    if have lsusb; then lsusb 2>/dev/null; lsusb -t 2>/dev/null; else echo "lsusb isn't installed (package usbutils)"; fi
+    end
+
+    section "Memory and disks"
+    free -h 2>/dev/null
+    lsblk -o NAME,SIZE,TYPE,FSTYPE,TRAN,MODEL 2>/dev/null
     end
 
     section "Displays"
@@ -50,9 +61,25 @@ have() { command -v "$1" >/dev/null 2>&1; }
     grep -E '^(N:|H:)' /proc/bus/input/devices 2>/dev/null | sed -e 's/^N: Name=/ /' -e 's/^H: Handlers=/    /'
     end
 
-    section "Wi-Fi, firmware"
-    if have rfkill; then rfkill list 2>/dev/null | grep -E 'Wireless|Bluetooth|blocked' | grep -v 'Soft blocked: no\|Hard blocked: no'; fi
-    ls /sys/class/net 2>/dev/null | tr '\n' ' '; echo
+    section "Network"
+    if have rfkill; then rfkill list 2>/dev/null; fi
+    if have ip; then ip -br link 2>/dev/null; else ls /sys/class/net 2>/dev/null | tr '\n' ' '; echo; fi
+    end
+
+    section "Sound"
+    if [ -r /proc/asound/cards ]; then cat /proc/asound/cards; else echo "no sound cards"; fi
+    end
+
+    section "Drivers loaded"
+    if have lsmod; then lsmod 2>/dev/null | sed 1d | cut -d' ' -f1 | sort | tr '\n' ' '; echo; fi
+    end
+
+    section "Services that failed"
+    if have systemctl; then systemctl --failed --no-legend --plain 2>/dev/null; fi
+    end
+
+    section "Firmware messages"
+    { dmesg 2>/dev/null || journalctl -k -b --no-pager -o cat 2>/dev/null; } | grep -i -E 'firmware|direct firmware load' | grep -i -E 'fail|error|missing|unable|not found' | tail -n 30
     end
 
     section "This session's log (last 60 lines)"

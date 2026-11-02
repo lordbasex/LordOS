@@ -49,7 +49,7 @@ PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewi
  libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
- gsettings-desktop-schemas xwayland"
+ gsettings-desktop-schemas xwayland pciutils usbutils"
 PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firmware-realtek firmware-atheros
  firmware-brcm80211 firmware-sof-signed"
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"

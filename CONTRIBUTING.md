@@ -18,8 +18,8 @@ Open Terminal and run:
 lordos-issue
 ```
 
-It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your LordOS version, hardware, displays, input
-devices, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
+It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your LordOS version, PCI and USB devices (`lspci`, `lsusb`), memory, disks,
+displays, input devices, network, sound, drivers, failed services, firmware messages, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
 **Read the file before posting it**, since issues are public. Run `sudo lordos-issue` to add the complete kernel log. Paste it in the
 **Logs** box of the form.
 
