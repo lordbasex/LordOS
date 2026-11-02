@@ -80,7 +80,7 @@ PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse p
 # apps need to read LordOS's GTK theme).
 # Raspberry Pi: boot firmware (start*.elf are not used on the Pi 5: its firmware lives in the
 # EEPROM) and Wi-Fi (CYW43455, firmware-brcm80211); kernels below
-PKGS_RPI="raspi-firmware firmware-brcm80211 rsync pciutils usbutils"
+PKGS_RPI="raspi-firmware firmware-brcm80211 rsync pciutils usbutils wireless-regdb"
 # Bluetooth (the CYW43455 on a UART, brought up by the kernel; see docs/RASPBERRY.md, "Bluetooth"),
 # all from Debian: BlueZ (bluetoothd, plus hciconfig/hcitool for rpi/bt-uart), the chip's patch
 # (bluez-firmware: brcm/BCM4345C0.hcd), headset audio in PipeWire (libspa-0.2-bluetooth, with the

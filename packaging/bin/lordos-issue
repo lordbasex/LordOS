@@ -29,19 +29,21 @@ out="${HOME:-/tmp}/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 MAX=60000
 exec 3>&2 </dev/null                # nothing below may wait for the keyboard
 step() { printf '  %s\n' "$1" >&3; }
-echo "Collecting the report, it takes about half a minute:" >&2
+echo "Collecting the report, it takes under a minute:" >&2
 host=$(hostname 2>/dev/null)
 user=${SUDO_USER:-$(id -un)}
 
 clean() {
     sed -E \
         -e 's/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/<mac>/g' \
+        -e 's/([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)(\+|-beta)/\1~v~\2~v~\3~v~\4\5/g' \
+        -e 's/(V3D|OpenGL ES|Mesa|Version:?) ([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/\1 \2~v~\3~v~\4~v~\5/g' \
         -e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/<ip>/g' -e 's/\b[0-9a-f]*:[0-9a-f]*:[0-9a-f:]*:[0-9a-f]*\/[0-9]+\b/<ip>/g' \
         -e 's/\b([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b/<ip>/g' \
         -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/<email>/g' \
         -e 's#/home/[^/ :"]+#/home/<user>#g' \
         -e 's/([Ss]erial|SerialNumber|UUID|uuid)([ =:]+)[^ ,;]+/\1\2<hidden>/g' \
-        -e 's/(ssid|SSID)([ =:]+)[^ ,;]+/\1\2<hidden>/g' |
+        -e 's/(ssid|SSID)([ =:]+)[^ ,;]+/\1\2<hidden>/g' -e 's/~v~/./g' |
     { if [ -n "$host" ] && [ "$host" != localhost ]; then sed "s/$host/<host>/g"; else cat; fi; } |
     { if [ -n "$user" ] && [ "$user" != root ]; then sed "s/\b$user\b/<user>/g"; else cat; fi; }
 }
@@ -85,7 +87,6 @@ have() { command -v "$1" >/dev/null 2>&1; }
     uname -srm
     if [ -d /run/live/medium ]; then echo "live system: yes"; else echo "live system: no"; fi
     if [ -d /sys/firmware/efi ]; then echo "firmware: UEFI"; elif [ -r /proc/device-tree/model ]; then echo "firmware: board"; else echo "firmware: BIOS"; fi
-    echo "session: ${XDG_SESSION_TYPE:-unknown}"
     sed -E 's/(root=|cryptdevice=|resume=|ip=|wpa-[a-z]+=)[^ ]*/\1<hidden>/g' /proc/cmdline 2>/dev/null
     end
 
@@ -143,7 +144,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
         echo "-- LordOS's signed code"
         "$L" --check-code 2>&1 | grep -v -E '^ok +|^code: hash ok' | tail -n 15
         echo "-- installed apps"
-        "$L" --check-apps 2>&1 | tail -n 40
+        apps=$("$L" --check-apps 2>&1 | tail -n 40); echo "${apps:-no apps besides the built-in ones}"
     fi
     step "every installed file, this is the slow one"
     echo "-- files changed since their packages were installed (c: a setting)"
