@@ -3,6 +3,7 @@
 #include "lm_link.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -12,6 +13,7 @@
 void lm_link_init(LmLink *l, int fd) {
     memset(l, 0, sizeof *l);
     l->fd = fd;
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);    /* whatever the other side was given */
 }
 
 void lm_link_close(LmLink *l) {
