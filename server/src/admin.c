@@ -963,18 +963,20 @@ int admin_netd_serve(void) {
         if (f) fclose(f);
     }
     fprintf(stderr, "lord-netd: ready (%s)\n", NETD_SOCK);
+    int watch = net_watch_open();
 
     for (;;) {
-        struct pollfd pfd[1 + NETD_MAX_CLIENTS + MAX_KIDS];
-        int ref[1 + NETD_MAX_CLIENTS + MAX_KIDS];       /* >= 0: client; < 0: -(kid + 1) */
+        struct pollfd pfd[2 + NETD_MAX_CLIENTS + MAX_KIDS];
+        int ref[2 + NETD_MAX_CLIENTS + MAX_KIDS];       /* >= 0: client; < 0: -(kid + 1) */
         int n = 0;
         pfd[n] = (struct pollfd){ lfd, POLLIN, 0 }; ref[n++] = 0;
+        pfd[n] = (struct pollfd){ watch, POLLIN, 0 }; ref[n++] = 0;
         for (int i = 0; i < NETD_MAX_CLIENTS; i++)
             if (clients[i].fd >= 0) { pfd[n] = (struct pollfd){ clients[i].fd, POLLIN, 0 }; ref[n++] = i; }
         for (int i = 0; i < MAX_KIDS; i++)
             if (kids[i].pid) { pfd[n] = (struct pollfd){ kids[i].fd, POLLIN, 0 }; ref[n++] = -(i + 1); }
-        if (poll(pfd, (nfds_t)n, -1) < 0) { if (errno == EINTR) continue; return 1; }
-        for (int k = 1; k < n; k++) {
+        if (poll(pfd, (nfds_t)n, net_watch_timeout()) < 0) { if (errno == EINTR) continue; return 1; }
+        for (int k = 2; k < n; k++) {
             if (!pfd[k].revents) continue;
             if (ref[k] < 0) { kid_read(&kids[-ref[k] - 1]); continue; }
             NetdClient *c = &clients[ref[k]];
@@ -998,6 +1000,7 @@ int admin_netd_serve(void) {
             setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
             clients[slot] = (NetdClient){ .fd = fd, .in = in };
         }
+        net_watch_run(pfd[1].revents != 0);
     }
 }
 #endif /* LORD_NETD */

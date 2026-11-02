@@ -492,6 +492,30 @@ char *display_list_json(void) {
         first = 0;
     }
     if (d) closedir(d);
+    /* the keyboard's light: same reading; writing goes through the keyboard-light admin action */
+    hb_printf(&b, "],\"keyboardLight\":[");
+    d = opendir("/sys/class/leds");
+    first = 1;
+    for (struct dirent *e; d && (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l > 64 || l < 15 || strcmp(e->d_name + l - 15, "::kbd_backlight")) continue;
+        char p[160], v[32] = "", mx[32] = "";
+        const char *names[2] = { "brightness", "max_brightness" };
+        char *outs[2] = { v, mx };
+        for (int i = 0; i < 2; i++) {
+            snprintf(p, sizeof p, "/sys/class/leds/%s/%s", e->d_name, names[i]);
+            int fd = open(p, O_RDONLY | O_CLOEXEC);
+            if (fd < 0) continue;
+            ssize_t r = read(fd, outs[i], 31);
+            close(fd);
+            if (r > 0) { outs[i][r] = 0; outs[i][strcspn(outs[i], "\n")] = 0; }
+        }
+        hb_printf(&b, "%s{\"name\":", first ? "" : ",");
+        hb_str(&b, e->d_name);
+        hb_printf(&b, ",\"value\":%ld,\"max\":%ld}", atol(v), atol(mx));
+        first = 0;
+    }
+    if (d) closedir(d);
     hb_printf(&b, "]}");
     return hb_take(&b);
 }

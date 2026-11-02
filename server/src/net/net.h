@@ -52,6 +52,13 @@ void net_act_vpn_delete(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_status(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_enable(const AdminReq *r, const char *arg, size_t len);
 
+/* lord-netd: interfaces that appear after boot (a radio whose firmware is still loading, a USB adapter).
+ * net_watch_open returns the fd for poll; net_watch_timeout the poll timeout (-1: nothing is waiting);
+ * net_watch_run(fd was readable) goes after each poll. */
+int  net_watch_open(void);
+int  net_watch_timeout(void);
+void net_watch_run(int readable);
+
 /* Privileged helper (admin.c) actions this module adds. A_ANYONE: also a user who isn't
  * an administrator (connecting to a network or to an already configured VPN). */
 #define NET_ADMIN_ACTIONS \

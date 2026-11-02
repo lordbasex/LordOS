@@ -50,6 +50,14 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
   `lord-netd` runs `net-restore` by itself: the configs in `/etc/lordos/net/if`, DHCP on free
   physical NICs, Wi-Fi with the saved networks, and DNS. That is why there is an IP before anyone
   logs in.
+- **Interfaces that come later.** A radio whose driver is still loading its firmware at that moment
+  isn't there yet, and one udev has yet to rename would be configured under the wrong name. `lord-netd`
+  listens to link notifications (`net/ifwatch.c`) and gives each device its saved state once, when udev
+  has finished with it (`/run/udev/data/n<index>`, 30 s at most). A device that appears after boot
+  waits one more second so the system's network manager goes first, and is left alone if it took it.
+  A device is remembered by index, so a later notification never undoes `net-down`. The same path
+  serves a USB adapter plugged in later. Turning on an interface saved as `off`, or joining a Wi-Fi
+  network on it, changes the saved method to `dhcp`, so it stays on at the next boot.
 - **Sessions** bring nothing up. Each session's helper connects to `/run/lordos/netd.sock`
   (`SO_PEERCRED`: uid 0 only), introduces itself with `HELLO <user>` and forwards every `net-*`
   action as it is. `lord-netd` works out again whether that user is an administrator (groups sudo, admin or wheel)
@@ -246,6 +254,7 @@ All three use protocol 76 (`RTPROT_LORDOS`): they're deleted on disconnect, and 
 ```
 net dhcp <if> started | stopped | bound <ip>/<n> <gw|-> <seconds> | no-carrier | nak | expired | reboot-timeout | error <reason>
 net wifi <if> connected <ssid> | disconnected | wrong-key | no-sae | scan-results
+net link restored <count>      (interfaces that appeared after boot and were brought up)
 net vpn <name> connecting | connected [ip] | reconnecting | disconnected | need-auth | auth-failed | state <state> | error [reason] | log <openvpn error line>
 daemon <process> <line>        (wpa_supplicant output: "wpa:<if>")
 daemon <process> exit <code>   (end of "if:<if>", "wpa:<if>", "vpn:<name>")

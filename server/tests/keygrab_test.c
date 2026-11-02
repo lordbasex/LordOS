@@ -7,6 +7,14 @@ static int fails;
 #define CHECK(x) do { if (!(x)) { printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); fails++; } } while (0)
 
 int main(void) {
+    /* the media row stays with LordOS; the F keys and Esc are the app's */
+    static const int kept[] = { KEY_MUTE, KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_BRIGHTNESSDOWN, KEY_BRIGHTNESSUP, KEY_KBDILLUMDOWN,
+                                KEY_KBDILLUMUP, KEY_PLAYPAUSE, KEY_NEXTSONG, KEY_PREVIOUSSONG, KEY_SYSRQ };
+    for (size_t i = 0; i < sizeof kept / sizeof kept[0]; i++) CHECK(keygrab_system_key(kept[i]));
+    CHECK(!keygrab_system_key(KEY_ESC));
+    CHECK(!keygrab_system_key(KEY_F11));
+    CHECK(!keygrab_system_key(KEY_A));
+
     /* no table: nothing is taken */
     CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_PASS);
     CHECK(!keygrab_is_remap('c', KG_META));

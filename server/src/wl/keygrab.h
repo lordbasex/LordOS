@@ -21,4 +21,7 @@ int keygrab_match(int code, char letter, unsigned mods);
 /* Does this ❖ + letter reach Linux apps as Ctrl (Lord Flow's table)? */
 int keygrab_is_remap(char letter, unsigned mods);
 
+/* The keys on a keyboard's media row: always LordOS's, whatever has the keyboard. 1 if code is one. */
+int keygrab_system_key(int code);
+
 #endif

@@ -3,6 +3,7 @@
  * generated here, never user text passed to a shell. Listed in AGENTS.md and docs/SETTINGS.md.
  *
  *   display-brightness <name> <value>  /sys/class/backlight/<name>/brightness (0..max)     anyone
+ *   keyboard-light <name> <value>      /sys/class/leds/<name>/brightness, *::kbd_backlight only (0..max)  anyone
  *   power-profile <p>                  performance|balanced|power-saver: powerprofilesctl if
  *                                      installed, else the cpufreq governor (and EPP)         anyone
  *   power-suspend                      systemctl suspend                                      anyone
@@ -62,6 +63,7 @@
 #include "rpifw.h"
 
 void hw_act_brightness(const AdminReq *r, const char *arg, size_t len);
+void hw_act_keyboard_light(const AdminReq *r, const char *arg, size_t len);
 void hw_act_power_profile(const AdminReq *r, const char *arg, size_t len);
 void hw_act_suspend(const AdminReq *r, const char *arg, size_t len);
 void hw_act_buttons(const AdminReq *r, const char *arg, size_t len);
@@ -115,6 +117,7 @@ int hw_serial_clean(const char *raw, size_t n, char *out, size_t size);
 int hw_button_action_valid(const char *a, int lid);
 int hw_time_valid(const char *t);       /* "YYYY-MM-DD HH:MM:SS", a real date from 2000 to 2099 */
 int hw_backlight_name_valid(const char *n);
+int hw_kbdlight_name_valid(const char *n);
 
 void hw_act_wallpaper_get(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len);
@@ -125,6 +128,7 @@ void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len);
     { "wallpaper-remove", hw_act_wallpaper_remove, 0 }, \
     { "wallpaper-login", hw_act_wallpaper_login, 0 }, \
     { "display-brightness", hw_act_brightness, A_ANYONE }, \
+    { "keyboard-light", hw_act_keyboard_light, A_ANYONE }, \
     { "power-profile", hw_act_power_profile, A_ANYONE }, \
     { "power-suspend", hw_act_suspend, A_ANYONE }, \
     { "power-buttons", hw_act_buttons, 0 }, \

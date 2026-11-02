@@ -138,6 +138,7 @@ EOF
     fi
     run "net-test crypto" build/net-test crypto
     run "net-test errors" build/net-test errors
+    run "net-test ifwatch" build/net-test ifwatch
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "sign-test" build/sign-test
@@ -152,6 +153,7 @@ EOF
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
     # which installed kernels Cleaner may offer (sdk/oldkernels.js)
