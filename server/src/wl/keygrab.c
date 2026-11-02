@@ -53,7 +53,7 @@ static const Grab classic[] = {
     { KG_META, 'e', 0, KG_TAKE },
     { KG_META, 'i', 0, KG_TAKE },
     { KG_META, 'r', 0, KG_TAKE },
-    { KG_META | KG_SHIFT, 's', 0, KG_TAKE }, { KG_META, 'w', 0, KG_TAKE },
+    { KG_META | KG_SHIFT, 's', 0, KG_TAKE },
     { KG_META, 0, KEY_LEFT, KG_TAKE }, { KG_META, 0, KEY_RIGHT, KG_TAKE },
     { KG_META, 0, KEY_UP, KG_TAKE }, { KG_META, 0, KEY_DOWN, KG_TAKE },
     { KG_META, 0, KEY_1, KG_TAKE }, { KG_META, 0, KEY_2, KG_TAKE }, { KG_META, 0, KEY_3, KG_TAKE },
@@ -117,6 +117,7 @@ int keygrab_match(int code, char letter, unsigned mods) {
         if (m == KG_META) return tab_meta ? KG_HOLD : KG_PASS;
         if (m == KG_ALT) return tab_alt ? KG_HOLD : KG_PASS;
     }
+    if (tab_set && tab_meta && table == classic && letter == 'w' && mods == KG_META) return KG_TAKE;   /* the Overview moves here */
     for (size_t i = 0; i < count; i++) {
         const Grab *g = &table[i];
         if (g->mods != mods) continue;

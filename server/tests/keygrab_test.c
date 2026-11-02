@@ -43,6 +43,7 @@ int main(void) {
     CHECK(keygrab_match(0, 'w', KG_META) == KG_TAKE);
     CHECK(!keygrab_set("flow+tab-x"));
     CHECK(!keygrab_set("flow+x"));
+    CHECK(keygrab_set("classic"));
     CHECK(!keygrab_set("flow "));
     CHECK(!keygrab_set("alt+x"));
     CHECK(!keygrab_set(NULL));
