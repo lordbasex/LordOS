@@ -83,6 +83,26 @@ have() { command -v "$1" >/dev/null 2>&1; }
     if have lsmod; then lsmod 2>/dev/null | sed 1d | cut -d' ' -f1 | sort | tr '\n' ' '; echo; fi
     end
 
+    section "Integrity"
+    L=/usr/lib/lordos/bin/lord-server
+    if [ -x "$L" ]; then
+        echo "-- LordOS's signed code"
+        "$L" --check-code 2>&1 | grep -v -E '^ok +' | tail -n 15
+        echo "-- installed apps"
+        "$L" --check-apps 2>&1 | tail -n 40
+    fi
+    echo "-- files changed since their packages were installed (c: a setting)"
+    if have dpkg; then timeout 120 dpkg --verify 2>/dev/null | grep -E '^..5' | head -n 60; echo "check ended: $?"; fi
+    echo "-- kernel"
+    t=$(cat /proc/sys/kernel/tainted 2>/dev/null); echo "tainted: ${t:-unknown}"
+    for f in /sys/module/*/taint; do [ -s "$f" ] && read -r v < "$f" && [ -n "$v" ] && printf '%s: %s\n' "$(basename "$(dirname "$f")")" "$v"; done
+    if have mokutil; then mokutil --sb-state 2>/dev/null; fi
+    [ -r /sys/kernel/security/lockdown ] && echo "lockdown: $(cat /sys/kernel/security/lockdown)"
+    echo "-- software sources"
+    grep -h -E '^(deb |URIs:)' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null | sort -u
+    ls /etc/apt/sources.list.d 2>/dev/null | tr '\n' ' '; echo
+    end
+
     section "Services that failed"
     if have systemctl; then systemctl --failed --no-legend --plain 2>/dev/null; fi
     end

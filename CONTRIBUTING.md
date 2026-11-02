@@ -19,7 +19,7 @@ lordos-issue
 ```
 
 It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your LordOS version, PCI and USB devices (`lspci`, `lsusb`), CPU, memory, disks and partitions,
-displays, input devices, network, sound, drivers, failed services, firmware messages, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
+displays, input devices, network, sound, drivers, an integrity check (LordOS's signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware messages, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
 **Read the file before posting it**, since issues are public. Run `sudo lordos-issue` to add the complete kernel log. Paste it in the
 **Logs** box of the form.
 

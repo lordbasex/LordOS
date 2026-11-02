@@ -61,6 +61,9 @@
 #include "outputs.h"
 #include "monitor/netrec.h"
 #include "sec/codesig.h"
+#include "sec/pkgapp.h"
+#include "sec/pkgstate.h"
+#include "sec/sign.h"
 #include "sec/netconn.h"
 #include "bench/lbframes.h"
 #include "fpipe.h"
@@ -2105,6 +2108,41 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     return js_init_recovery(greeter);
 }
 
+/* lord-server --check-apps: what lord.sign.status says of each installed app, as text, for lordos-issue and a person at a
+ * terminal: a home app against its saved original, a packaged app against its signature. It changes nothing. */
+static int check_apps(void) {
+    int bad = 0;
+    struct dirent *e;
+    DIR *d = opendir(pkgapp_root());
+    while (d && (e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        PkgManifest m;
+        LpkSigInfo si;
+        char err[160] = "";
+        memset(&si, 0, sizeof si);
+        int r = pkgapp_verify(e->d_name, &m, &si, NULL, err, sizeof err);
+        printf("packaged %s: %s", e->d_name, r ? "REFUSED " : "signature ok");
+        if (r) { printf("%s", err); bad = 1; } else printf(" (%s, %s)", sig_trust_name(si.trust), si.signer);
+        putchar('\n');
+    }
+    if (d) closedir(d);
+    const char *home = getenv("HOME");
+    char dir[PATH_MAX];
+    d = home && (size_t)snprintf(dir, sizeof dir, "%s/.local/share/lordos/apps", home) < sizeof dir ? opendir(dir) : NULL;
+    static PkgStatus st;
+    while (d && (e = readdir(d))) {
+        if (!lpk_valid_id(e->d_name) || pkg_status(e->d_name, &st)) continue;
+        printf("home %s %s: ", e->d_name, st.version);
+        if (st.error[0]) { printf("ORIGINAL DOESN'T VERIFY %s", st.error); bad = 1; }
+        else if (!st.has_original) printf("no saved original");
+        else if (st.modified) { printf("MODIFIED, %d file(s) (%s)", st.nchanged, sig_trust_name(st.sig.trust)); bad = 1; }
+        else printf("as installed (%s, %s)", sig_trust_name(st.sig.trust), st.sig.signer);
+        putchar('\n');
+    }
+    if (d) closedir(d);
+    return bad;
+}
+
 /* lord-server --check-code [root]: checks the signed manifest and every file it lists, the way a
  * session would load them (docs/SIGNING.md, "Verified system code"). Used by tools/iso/mkdeb.sh
  * and for troubleshooting. Exit 0 when everything matches; 1 otherwise; with --require-signed, a
@@ -2215,6 +2253,7 @@ int main(int argc, char **argv) {
     /* (0.8.5) a component's network connector (sec/netconn.h): only creates sockets in its scope */
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-code")) return check_code(argc, argv);
+    if (argc > 1 && !strcmp(argv[1], "--check-apps")) return check_apps();
     /* a packaged app's companion (app/companion.c): checks the signed package, then becomes it, in its sandbox */
     if (argc > 1 && !strcmp(argv[1], "--companion")) return companion_main(argc, argv);
     /* «modo app»: lord-server --app <id> corre una app .lpk como cliente Wayland aislado
