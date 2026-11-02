@@ -151,9 +151,11 @@ static const DesktopApp *match(const DesktopApp *apps, int n, const char *exe, c
  * identity the firewall uses in the kernel (docs/FIREWALL.md): this way a curl running inside
  * foot counts as foot. A small /proc read per pid, with a cache of 64 pids. */
 static int scope_of(int pid, char *kind, char *id, size_t n) {
-    static struct { int pid; char kind; char id[160]; } cache[64];
+    static struct { int pid; char kind; char id[160]; time_t at; } cache[64];
     int slot = pid & 63;
-    if (cache[slot].pid == pid) { *kind = cache[slot].kind; snprintf(id, n, "%s", cache[slot].id); return *kind ? 0 : -1; }
+    time_t now = time(NULL);
+    /* "no scope" is only true for now: a companion joins its app's scope a moment after it starts */
+    if (cache[slot].pid == pid && (cache[slot].kind || now - cache[slot].at < 5)) { *kind = cache[slot].kind; snprintf(id, n, "%s", cache[slot].id); return *kind ? 0 : -1; }
     char path[64], line[512];
     snprintf(path, sizeof path, "/proc/%d/cgroup", pid);
     FILE *f = fopen(path, "re");
@@ -177,6 +179,7 @@ static int scope_of(int pid, char *kind, char *id, size_t n) {
     }
     cache[slot].pid = pid;
     cache[slot].kind = k;
+    cache[slot].at = now;
     snprintf(cache[slot].id, sizeof cache[slot].id, "%s", buf);
     *kind = k;
     snprintf(id, n, "%s", buf);
