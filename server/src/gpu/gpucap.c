@@ -27,25 +27,23 @@ static struct {
     pthread_cond_t cv;
     atomic_int state;
     GLuint tex, fbo;                    /* the compositor's context */
-    unsigned gen;                       /* the texture's size changed: the thread attaches it again */
     GLsync fence;
     uint32_t *px;
 } C = { .efd = -1, .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER };
 
-static void read_frame(unsigned *seen) {
+static void read_frame(void) {
     pthread_mutex_lock(&C.mu);
     GLsync f = C.fence;
     C.fence = NULL;
-    unsigned gen = C.gen;
     int w = C.w, h = C.h;
     uint32_t *px = C.px;
     GLuint tex = C.tex;
     pthread_mutex_unlock(&C.mu);
-    if (f) { glWaitSync(f, 0, GL_TIMEOUT_IGNORED); glDeleteSync(f); }
-    if (gen != *seen) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-        *seen = gen;
-    }
+    if (f) { glClientWaitSync(f, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000); glDeleteSync(f); }
+    /* attached again for every frame: V3D's driver keeps showing this context the first frames otherwise */
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    glFinish();
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     glReadPixels(0, 0, w, h, C.bgra ? GL_BGRA_EXT : GL_RGBA, GL_UNSIGNED_BYTE, px);
     if (!C.bgra)
@@ -62,7 +60,6 @@ static void *worker(void *u) {
     (void)u;
     if (!eglMakeCurrent(C.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, C.ctx)) return NULL;
     GLuint fbo;
-    unsigned seen = 0;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     for (;;) {
@@ -71,7 +68,7 @@ static void *worker(void *u) {
         int stop = C.stop;
         pthread_mutex_unlock(&C.mu);
         if (stop) break;
-        read_frame(&seen);
+        read_frame();
     }
     glDeleteFramebuffers(1, &fbo);
     eglMakeCurrent(C.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -145,7 +142,6 @@ static int size_for(int w, int h) {
     C.px = px;
     C.w = w;
     C.h = h;
-    C.gen++;
     pthread_mutex_unlock(&C.mu);
     return 0;
 }
