@@ -46,5 +46,8 @@
   "perm.screen-share": "Screen sharing",
   "permHint.screen-share": "Apps that may show your screen and play your sound to people they connect you with. Revoking ends a running share.",
   "perm.remote-input": "Remote control",
-  "permHint.remote-input": "Apps that may let those people use your mouse, keyboard and clipboard."
+  "permHint.remote-input": "Apps that may let those people use your mouse, keyboard and clipboard.",
+  "ask.status-item": "“{app}” wants an item next to the clock",
+  "perm.status-item": "Item by the clock",
+  "permHint.status-item": "Apps that show their own icon and menu next to the clock. The system draws them; an app can't reach anything else through them."
 }

@@ -16,6 +16,7 @@ import { createStore } from './store.js';
 import { locale } from './i18n.js';
 import { setPackageApps, windows, wm, appIdOf } from './windows.js';
 import { iconFromFile } from './apps.js';
+import { forgetShareGrants } from './share.js';
 
 const h = React.createElement;
 const shared = {
@@ -125,7 +126,7 @@ function read() {
       id: p.id, name, version: String(m.version || ''), description: localized(m.description, lang),
       permissions: Array.isArray(m.permissions) ? m.permissions.map(String) : [],
       size: Array.isArray(m.size) ? m.size : [640, 420], minSize: Array.isArray(m.minSize) ? m.minSize : undefined,
-      transparent: !!m.transparent, dock: false, package: true, dir: p.dir, category: typeof m.category === 'string' ? m.category : undefined,
+      transparent: !!m.transparent, dock: false, package: true, packaged: !!p.packaged, dir: p.dir, category: typeof m.category === 'string' ? m.category : undefined,
       Icon: iconFromFile(m.icon ? `${p.dir}/${m.icon}` : '', name), Component: lazyComponent(p.id),
     });
   }
@@ -153,6 +154,7 @@ export const packages = {
     const ok = lord.apps.removePackage(id);
     loaded.delete(id);
     refreshPackages();
+    if (ok) forgetShareGrants(id);      // a reinstalled app asks again
     return ok;
   },
 };

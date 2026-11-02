@@ -37,7 +37,7 @@ const SHOWN = [
   ['camera', CameraGlyph, '#30d158'], ['microphone', MicGlyph, '#ff9f0a'], ['screen', '▭', '#0a84ff'],
   ['files', FolderGlyph, '#30b0c7'], ['network', '⇅', '#0a84ff'], ['clipboard', '⎘', '#5e5ce6'],
   ['notifications', '◉', '#ff375f'], ['apps', '▦', '#8e8e93'], ['listen', '⇄', '#34c759'],
-  ['usb', '⇆', '#8e8e93'], ['bluetooth', 'ᛒ', '#0a84ff'],
+  ['usb', '⇆', '#8e8e93'], ['bluetooth', 'ᛒ', '#0a84ff'], ['status-item', '◔', '#8e8e93'],
 ];
 
 const PermBadge = ({ glyph: G, color }) => (typeof G === 'string' ? <Badge glyph={G} color={color} size={22} /> : <Badge color={color} size={22}><G /></Badge>);

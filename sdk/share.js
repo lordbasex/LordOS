@@ -15,7 +15,7 @@ import { t } from './i18n.js';
 import { admin } from './admin.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
-import { shareAppId, shareAskList } from './sharemodel.js';
+import { shareAppId, shareAskList, staleGrants } from './sharemodel.js';
 
 const api = () => typeof lord !== 'undefined' && lord.share;
 export const shareHolder = createStore(null);
@@ -26,6 +26,17 @@ const nameOf = (id) => {
   const bare = shareAppId(id);
   return appName(getApp(bare)) || bare;
 };
+
+// Uninstalling forgets: a grant never outlives its app, even if another app later takes the id.
+export function forgetShareGrants(bare) {
+  const id = `lpk:${bare}`;
+  if (share.grants().some((g) => g.id === id)) share.forget(id).catch(() => { /* shown as a stale grant at the next start */ });
+}
+
+// What was uninstalled behind the shell's back (dpkg, apt): at the session's start, against what is installed now.
+export function sweepShareGrants(lpkIds, desktopIds) {
+  for (const id of staleGrants(share.grants(), lpkIds, desktopIds)) share.forget(id).catch(() => { /* next session */ });
+}
 
 globalThis.__lordShare = (json) => {
   let e;

@@ -69,6 +69,8 @@ function AppMain() {
 }
 sdk.registerBuiltinApp({ id: APP, name: APP, builtin: true, size: Array.isArray(manifest.size) ? manifest.size : [640, 420], Component: AppMain });
 wm.open(APP);                             // the main window (surface key 0, created in C)
+// a packaged app's companion starts with it. In a home .lpk the same manifest is ignored: lord-server says no.
+if (manifest.companion) setTimeout(() => { sdk.companion.start(manifest); }, 0);
 
 // keep the C toplevels in step with the window store (open, close, title)
 function syncWindows() {
@@ -116,6 +118,8 @@ globalThis.__lordBrokerEvent = (kind, data) => {
     const args = data.args;
     if (data.new || Object.keys(args).length) wm.open(APP, data.new ? { new: true, args } : { args });
   }
+  else if (kind === 'companion') { try { sdk.companionEvent(data); } catch (e) { console.error('companion:', e?.message || e); } }
+  else if (kind === 'status') { try { sdk.statusItemEvent(data); } catch (e) { console.error('status item:', e?.message || e); } }
   else if (kind === 'quit') {
     // ❖Q or Dock → Quit: close every window; a close guard can still keep one open (unsaved
     // changes). The process ends when the last window closes (appclient.c).

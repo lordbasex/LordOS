@@ -216,7 +216,7 @@ function LordOSPage({ query }) {
         {shown.map((p) => (
           <AppRow key={p.id} icon={<p.Icon size={40} />} name={p.name} detail={p.description} extra={tr('store.version', { version: p.version })}
             below={<PkgManage pkg={p} onMsg={setMsg} />}>
-            <Button small label={tr('store.remove')} onClick={() => { packages.remove(p.id); setMsg({ ok: true, text: tr('store.lordos.removed', { name: p.name }) }); }} />
+            {!p.packaged && <Button small label={tr('store.remove')} onClick={() => { packages.remove(p.id); setMsg({ ok: true, text: tr('store.lordos.removed', { name: p.name }) }); }} />}
             <Button small label={tr('store.open')} onClick={() => launchApp(p.id)} />
           </AppRow>
         ))}

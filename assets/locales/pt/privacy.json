@@ -46,5 +46,8 @@
   "perm.screen-share": "Compartilhar tela",
   "permHint.screen-share": "Apps que podem mostrar sua tela e seu som às pessoas com quem conectam você. Revogar encerra o compartilhamento em andamento.",
   "perm.remote-input": "Controle remoto",
-  "permHint.remote-input": "Apps que podem deixar essas pessoas usar seu mouse, teclado e área de transferência."
+  "permHint.remote-input": "Apps que podem deixar essas pessoas usar seu mouse, teclado e área de transferência.",
+  "ask.status-item": "«{app}» quer um item ao lado do relógio",
+  "perm.status-item": "Item ao lado do relógio",
+  "permHint.status-item": "Apps que mostram seu próprio ícone e menu ao lado do relógio. O sistema os desenha; um app não alcança mais nada por meio deles."
 }

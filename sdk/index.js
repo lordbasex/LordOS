@@ -30,7 +30,8 @@ import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
-import { ShareBadge, SharePrompt } from './share.js';
+import { ShareBadge, SharePrompt, sweepShareGrants } from './share.js';
+import { linuxIds } from './apps.js';
 export { share, shareHolder, shareRev } from './share.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
 export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PrivacyIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel } from './privacy.js';
@@ -71,7 +72,7 @@ export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnectio
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule
 export * as netModel from './netmodel.js';        // (0.8.5) Monitor → Network: search tokens, filters, the tree
 export { packages, packageList, refreshPackages, packageFile, loadWasm } from './packages.js';
-import { refreshPackages } from './packages.js';
+import { refreshPackages, packageList as packageListOf } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList,
@@ -91,6 +92,7 @@ export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
 export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
+export { companion, statusItem, companionEvent, statusItemEvent } from './companion.js';
 export { clockAlarms, clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextAlarm, nextFire } from './alarms.js';
 export { help } from './help.js';
 import { NotificationBanner } from './notify.js';
@@ -228,6 +230,7 @@ export function startShell(element) {
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
   startVideo();                         // browser video without hardware decoding (video.js, docs/VIDEO.md)
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
+  setTimeout(sweepUninstalledGrants, 5000); // a screen-share grant doesn't outlive its app (share.js)
   startCleanerStatus();                 // Cleaner's still item by the clock; its panel reads only while open
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
   startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
@@ -235,6 +238,11 @@ export function startShell(element) {
   startWindowMemory();                  // each app reopens where it was (windowmemory.js, docs/WINDOWS.md)
   startSessionRestore();                // the apps that were open come back (sessionrestore.jsx, docs/SESSIONS.md)
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
+}
+
+// A screen-share grant doesn't outlive its app, even one removed with dpkg behind the shell's back.
+function sweepUninstalledGrants() {
+  try { sweepShareGrants(new Set(packageListOf.get().map((p) => p.id)), linuxIds()); } catch (e) { /* next session */ }
 }
 
 // After Settings → Appearance switched theme: the windows that were open replace the ones the new

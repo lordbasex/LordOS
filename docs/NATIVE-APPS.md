@@ -119,6 +119,7 @@ Since M8 there is **package signing** and a **permissions and isolation** model 
   signature in C at install time and detects modifications. The Store and the install dialog show
   the trust level (LordOS / Verified author / Signed by <name> / Unsigned), a revoked package
   doesn't install, and there are «Modified by you», «Restore original» and «Share my version».
+- **An item by the clock**: `statusItem.set({ icon, title, alert, menu })` with the `status-item` permission; see [PACKAGED-APPS.md](PACKAGED-APPS.md), which also covers what only a packaged app has.
 - **Permissions**: the manifest's `permissions` are declared and shown; the system asks the
   first time (a system-drawn prompt) and stores the decision where the app can't write it; they are
   reviewed in Settings → Privacy.

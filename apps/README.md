@@ -90,6 +90,7 @@ Store (see `docs/NATIVE-APPS.md`).
 | Markdown | `<Markdown source base width onLink onToggleTask />`, `markdownHeadings(text)`, `toggleTask` — see `docs/NOTES.md` |
 | Desktop | `registerWidgetType(type, Component)`, `setWidgets(type, [{ id, x, y, w, h, pinned }])`: widgets between the wallpaper and the windows |
 | Notifications (M9) | `notify({ app, title, body, actions: [{ id, label, primary, run }], sound, sticky, timeout, onClose })` → id, `dismissNotification(id)`, `useNotifications()`, `notifyHistory`; `registerStatusItem(id, Component)` (status icons in the theme's bar) — see `docs/SYSTEM.md` |
+| Packaged apps | `companion.on(fn)`, `companion.send(value)`; `statusItem.set({ icon, title, alert, menu })`, `.clear()`, `.onSelect(fn)` for any app with `status-item` — see `docs/PACKAGED-APPS.md` |
 | Clock and Help (M9) | `clockAlarms`, `clockTimer`/`timerStart…`, `stopwatch`/`swStart…` (keep running with the app closed); `lord.time.zoneOffset(zone, t)`; `help.list/read/search/open/startTour`; `registerSpotlightSource(id, fn)`; `weekdayName(d)` |
 | Documents (M9) | `pdf.open(path \| { blob })` (page, search, outline, links, forms, annotations, save a copy), `<DocImage image>`, `archive.list/extract/create`, `fontInfo/fontSample/fontGrid`, `pdfThumb`, `makeTextPdf`/`makeImagePdf`: all in the sandboxed helper `lord-doc` — see `docs/DOCUMENTS.md` |
 | Printing (M9) | `print.open({ title, path \| doc \| text \| image })` opens the system dialog; `print.printers/jobs/cancel/add/remove/setDefault/discover/scanCaps/scan` — see `docs/PRINTING.md` |

@@ -52,6 +52,8 @@ function readLinux() {
 // Re-reads the .desktop files (after installing or removing packages; it's cheap: the server
 // only re-reads if the folders changed).
 export function refreshApps() { linux.set(readLinux()); }
+// The installed Linux apps' ids, or null if the list can't be read or came back empty.
+export function linuxIds() { refreshApps(); const l = linux.get(); return l.length ? new Set(l.map((a) => a.desktopId)) : null; }
 locale.subscribe(refreshApps);
 
 export function useLauncherApps() {

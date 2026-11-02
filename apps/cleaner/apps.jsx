@@ -14,7 +14,7 @@ function listApps() {
   if (pkgReady()) for (const p of lord.pkg.installed({ lang })) {
     if (p.app && !p.essential && p.name !== 'lordos') out.push({ key: `deb:${p.name}`, name: p.app.name || p.name, icon: p.app.icon, detail: p.name, size: p.installedSize, pkg: p.name });
   }
-  for (const a of packages.list()) out.push({ key: `lpk:${a.id}`, name: a.name, icon: null, detail: a.id, size: 0, lpk: a.id });
+  for (const a of packages.list().filter((x) => !x.packaged)) out.push({ key: `lpk:${a.id}`, name: a.name, icon: null, detail: a.id, size: 0, lpk: a.id });
   return out.sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
 }
 

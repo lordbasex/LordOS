@@ -3,6 +3,9 @@
 //   node tools/lpk.mjs <folder> [output.lpk] [--key key.json | --unsigned]
 //       packages the app; signs it with --key, with $LPK_KEY or with ~/.config/lordos/lpk-key.json
 //       (if it exists). Without a key the result is «Unsigned» (still with contenido.json, to detect damage).
+//   node tools/lpk.mjs tree <folder> <output folder> --key key.json [--companion binary]
+//       a signed unpacked tree for /usr/lib/lordos-apps/<id>/ (a packaged app, installed by a .deb; docs/GO-LINK.md):
+//       the only form that may declare "companion", screen-share or remote-input. Its key must be a Verified author's.
 //   node tools/lpk.mjs keygen [--name "Name"] [--out file]
 //       creates an Ed25519 key pair (default ~/.config/lordos/lpk-key.json, mode 600).
 //   node tools/lpk.mjs sign <package.lpk> --key key.json [output.lpk]
@@ -108,18 +111,23 @@ function pickKey() {
 const write = (out, files) => fs.writeFileSync(out, zlib.gzipSync(tar(files), { level: 9 }));
 const trustLine = (key) => (key ? `signed by «${key.name}» (${key.public.slice(0, 16)}…)` : 'unsigned');
 
-async function pack() {
-  const key = pickKey();
-  const [dir, outArg] = argv;
-  if (!dir) die('usage: node tools/lpk.mjs <app folder> [output.lpk] [--key key.json | --unsigned]');
+const KNOWN = ['files', 'clipboard', 'notifications', 'network', 'camera', 'microphone', 'screen', 'listen', 'usb', 'bluetooth', 'apps', 'status-item'];
+const PACKAGED_ONLY = ['screen-share', 'remote-input'];
+
+// The bundle and the file list both forms share. packaged: the manifest may use what only a signed folder may.
+async function assemble(dir, packaged) {
   const { build } = await import('esbuild');
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
   if (!/^[a-z][a-z0-9-]{1,39}$/.test(manifest.id || '')) die('invalid manifest.id: a-z, 0-9 and -, 2 to 40 long');
   if (!/^[0-9][0-9A-Za-z.+~-]{0,31}$/.test(String(manifest.version || ''))) die('invalid manifest.version');
   if (!manifest.name) die('falta manifest.name');
   if (!manifest.icon || !/\.png$/.test(manifest.icon) || !fs.existsSync(path.join(dir, manifest.icon))) die('missing own icon: manifest.icon must point to a .png in the app (128×128 or larger recommended)');
-  const KNOWN = ['files', 'clipboard', 'notifications', 'network', 'camera', 'microphone', 'screen', 'listen', 'usb', 'bluetooth', 'apps'];
-  for (const p of manifest.permissions || []) if (!KNOWN.includes(p)) die(`unknown permission in manifest.permissions: ${p} (valid: ${KNOWN.join(', ')})`);
+  const allowed = packaged ? [...KNOWN, ...PACKAGED_ONLY] : KNOWN;
+  for (const p of manifest.permissions || []) {
+    if (PACKAGED_ONLY.includes(p) && !packaged) die(`${p} is only for a packaged app with a Verified author: use "tree" (docs/GO-LINK.md)`);
+    if (!allowed.includes(p)) die(`unknown permission in manifest.permissions: ${p} (valid: ${allowed.join(', ')})`);
+  }
+  if (manifest.companion !== undefined && !packaged) die('"companion" is only for a packaged app with a Verified author: use "tree" (docs/GO-LINK.md)');
 
   // Shared modules are taken from the theme (or from the app's process) at run time.
   const sharedPlugin = {
@@ -149,11 +157,40 @@ async function pack() {
   };
   for (const sub of ['locales', 'assets']) if (fs.existsSync(path.join(dir, sub))) walk(dir, sub);
   for (const [p] of files) if (!/^([A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(p)) die(`invalid path in the package: ${p}`);
+  return { manifest, files, appJs };
+}
+
+async function pack() {
+  const key = pickKey();
+  const [dir, outArg] = argv;
+  if (!dir) die('usage: node tools/lpk.mjs <app folder> [output.lpk] [--key key.json | --unsigned]');
+  const { manifest, files, appJs } = await assemble(dir, false);
   const out = outArg || `${manifest.id}-${manifest.version}.lpk`;
   const sealed = seal(files, manifest, key);
   write(out, sealed);
   const kb = (fs.statSync(out).size / 1024).toFixed(1);
   console.log(`${out}: ${sealed.length} files, ${kb} KB (app.js ${(appJs.length / 1024).toFixed(1)} KB), ${trustLine(key)}`);
+}
+
+async function signedTree() {
+  const bin = flag('--companion');
+  const key = pickKey();
+  const [dir, out] = argv.slice(1);
+  if (!dir || !out || !key) die('usage: node tools/lpk.mjs tree <app folder> <output folder> --key key.json [--companion binary]');
+  if (fs.existsSync(out)) die(`${out} already exists`);
+  const { manifest, files } = await assemble(dir, true);
+  const safe = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$/;
+  if (manifest.companion !== undefined) {
+    if (typeof manifest.companion !== 'string' || !safe.test(manifest.companion)) die('manifest.companion must be a path inside the package');
+    if (!bin) die('the manifest names a companion: give it with --companion');
+    files.push([manifest.companion, fs.readFileSync(bin)]);
+  } else if (bin) die('--companion, but the manifest has no "companion"');
+  for (const [p, data] of seal(files, manifest, key)) {
+    const full = path.join(out, p);
+    fs.mkdirSync(path.dirname(full), { recursive: true, mode: 0o755 });
+    fs.writeFileSync(full, data, { mode: p === manifest.companion ? 0o755 : 0o644 });
+  }
+  console.log(`${out}: ${manifest.id} ${manifest.version}, ${trustLine(key)}`);
 }
 
 function keygen() {
@@ -232,4 +269,5 @@ if (cmd === 'keygen') keygen();
 else if (cmd === 'sign') sign();
 else if (cmd === 'verify') verify();
 else if (cmd === 'catalog') catalog();
+else if (cmd === 'tree') await signedTree();
 else await pack();

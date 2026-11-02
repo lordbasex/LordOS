@@ -9,6 +9,7 @@
 //   - the camera (green dot) and microphone (orange) indicators in the menu bar;
 //   - registerPrivacySection(): a slot so other parts (e.g. the Monitor) can add their
 //     own section to the Privacy page, without touching its code.
+import { appStatusEvent } from './appstatus.jsx';
 import { createElement as h, Fragment } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -57,6 +58,8 @@ if (typeof globalThis !== 'undefined') {
       if (kind === 'prompt') {
         // perm 'keyring': the app asks for an item another app saved (owner); see docs/PASSWORDS.md
         queue.set((q) => [...q, { id: seq++, app: data.app, perm: data.perm, owner: data.owner, broker: data.reqid }]);
+      } else if (kind === 'status') {
+        appStatusEvent(data);                                   // an app's item by the clock; sdk/appstatus.jsx
       } else if (kind === 'textfocus') {
         osk.appField(data.app, !!data.on, data.y, data.h);      // only a hint; sdk/osk.js
       } else if (kind === 'menu') {
