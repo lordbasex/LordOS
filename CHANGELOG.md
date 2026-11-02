@@ -521,7 +521,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Upgrading
 
 - **From 0.8.6:** Store → Updates or `sudo apt update && sudo apt upgrade`, then a restart. `lordos` now depends on
-  `lordos-hwdata`, which comes from the same repository. Not yet tested against the signed repository when this was written.
+  `lordos-hwdata`, which comes from the same repository. Tested from a 0.8.6 package on an amd64 VM against the signed staging repository: migration 006 ran once, a reinstall ran none, and the system came back after a restart.
 
 ## [0.8.6-beta] - 2026-10-30
 

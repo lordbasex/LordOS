@@ -538,6 +538,8 @@ was installed in that repeat.
 | amd64 ISO in a new VM (Proxmox, q35, no network), 2.5 minutes | live desktop with the installer open; not installed from |
 | arm64 ISO on emulated QEMU (`virt`, edk2, virtio-gpu, no acceleration), 11 minutes | live desktop with the installer open; not installed from |
 | Raspberry Pi image | not booted: the board ran the same code in a development build |
+| Update 0.8.6 → 0.8.7 with `apt` against lordos.org/apt-staging, an installed amd64 VM | migration 006 ran once, a reinstall ran none, `lordos-greeter` in `render` and `video`; session back after a restart |
+| Raspberry Pi against apt-staging, temporary lists | arm64 index read; the board wasn't changed |
 
 ## Release test (0.8.6 Beta, October 30)
 
