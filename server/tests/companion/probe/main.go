@@ -44,6 +44,38 @@ func inherited() {
 	check("no inherited descriptor past 5", open == 0, open)
 }
 
+// fcntl: what would have the kernel send signals, or watch for us, refused; what the Go runtime uses, working.
+func fcntls() {
+	var p [2]int
+	if err := syscall.Pipe2(p[:], syscall.O_CLOEXEC); err != nil {
+		check("a pipe for fcntl", false, err)
+		return
+	}
+	fd := uintptr(p[0])
+	call := func(cmd, arg uintptr) error {
+		if _, _, e := syscall.Syscall(syscall.SYS_FCNTL, fd, cmd, arg); e != 0 {
+			return e
+		}
+		return nil
+	}
+	for _, c := range []struct {
+		name string
+		cmd  uintptr
+		arg  uintptr
+	}{
+		{"F_SETOWN", 8, uintptr(os.Getppid())}, {"F_GETOWN", 9, 0}, {"F_SETOWN_EX", 15, 0}, {"F_GETOWN_EX", 16, 0}, {"F_SETSIG", 10, 9}, {"F_GETSIG", 11, 0},
+		{"F_SETLEASE", 1024, 0}, {"F_GETLEASE", 1025, 0}, {"F_NOTIFY", 1026, 0x20000001}, {"F_SETPIPE_SZ", 1031, 8192}, {"F_GETPIPE_SZ", 1032, 0},
+		{"F_SETLK", 6, 0}, {"F_DUPFD", 0, 10}, {"F_SETFL with O_ASYNC", syscall.F_SETFL, syscall.O_ASYNC}, {"F_SETFL with O_ASYNC and O_NONBLOCK", syscall.F_SETFL, syscall.O_ASYNC | syscall.O_NONBLOCK},
+	} {
+		check("fcntl "+c.name+" refused", call(c.cmd, c.arg) == syscall.EPERM, call(c.cmd, c.arg))
+	}
+	works("fcntl F_GETFD", call(syscall.F_GETFD, 0))
+	works("fcntl F_SETFD", call(syscall.F_SETFD, syscall.FD_CLOEXEC))
+	works("fcntl F_GETFL", call(syscall.F_GETFL, 0))
+	works("fcntl F_SETFL", call(syscall.F_SETFL, syscall.O_NONBLOCK))
+	works("fcntl F_DUPFD_CLOEXEC", call(syscall.F_DUPFD_CLOEXEC, 10))
+}
+
 func files(home string) {
 	dl := filepath.Join(home, "Downloads")
 	_, err := os.ReadFile(filepath.Join(home, "probe-home.txt"))
@@ -266,6 +298,7 @@ func main() {
 	c, err := net.FileConn(app)
 	check("fd 3", err == nil, err)
 	files(home)
+	fcntls()
 	execs(home)
 	sockets()
 	processes()

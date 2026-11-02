@@ -723,12 +723,12 @@ static int companion_landlock(const SandboxCompanionCfg *cfg) {
 #endif
 }
 
-/* A static Go program's syscalls. Left out on purpose: socketpair, listen, accept, ioctl, memfd_create, execve, chmod and
+/* A static Go program's syscalls. fcntl has its own block in the filter. Left out on purpose: socketpair, listen, accept, ioctl, memfd_create, execve, chmod and
  * chown in every form, utimensat, symlink and link, setxattr, kill, ptrace, prctl, mount, unshare, setns, seccomp, bpf. */
 static const int allow_companion[] = {
     NR(SYS_read), NR(SYS_write), NR(SYS_readv), NR(SYS_writev), NR(SYS_pread64), NR(SYS_pwrite64),
     NR(SYS_close), NR(SYS_lseek), NR(SYS_fstat), NR(SYS_newfstatat), NR(SYS_statx), NR(SYS_fstatfs), NR(SYS_statfs),
-    NR(SYS_openat), NR(SYS_getdents64), NR(SYS_readlinkat), NR(SYS_faccessat), NR(SYS_faccessat2), NR(SYS_fcntl), NR(SYS_flock),
+    NR(SYS_openat), NR(SYS_getdents64), NR(SYS_readlinkat), NR(SYS_faccessat), NR(SYS_faccessat2), NR(SYS_flock),
     NR(SYS_dup), NR(SYS_dup3), NR(SYS_pipe2), NR(SYS_ppoll), NR(SYS_pselect6),
     NR(SYS_epoll_create1), NR(SYS_epoll_ctl), NR(SYS_epoll_pwait), NR(SYS_eventfd2),
     NR(SYS_mmap), NR(SYS_munmap), NR(SYS_mremap), NR(SYS_mprotect), NR(SYS_madvise), NR(SYS_brk),
@@ -786,6 +786,20 @@ static int companion_filter(struct sock_filter *f, int cap, const SandboxCompani
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AT_EMPTY_PATH, 1, 0));
     RET_ERR(EPERM);
     RET_OK();
+    LD_NR();
+    /* fcntl: what the Go runtime uses. F_SETOWN and its kin, F_SETSIG, F_SETLEASE, F_NOTIFY and O_ASYNC would have the kernel send signals for it.
+     * [0]jeq nr [1]ld cmd [2..5]jeq allowed [6]jeq setfl [7]ld flags [8]jset async [9]ALLOW [10]EPERM */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_fcntl), 0, 10));
+    LD_ARG(1);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, F_GETFD, 6, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, F_SETFD, 5, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, F_GETFL, 4, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, F_DUPFD_CLOEXEC, 3, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, F_SETFL, 0, 3));
+    LD_ARG(2);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K, O_ASYNC, 1, 0));
+    RET_OK();
+    RET_ERR(EPERM);
     LD_NR();
     /* threads only */
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_clone), 0, 4));
