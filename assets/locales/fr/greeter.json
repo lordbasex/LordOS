@@ -1,0 +1,19 @@
+{
+  "bootTest": "Mesure du temps de démarrage : démarrage {k} sur {n} effectué. Redémarrage dans {s} s. Se connecter arrête aussi le test.",
+  "bootTestCancel": "Arrêter le test",
+  "busy": "Un instant…",
+  "cancel": "Annuler",
+  "confirmRestart": "Des sessions sont ouvertes : le travail non enregistré sera perdu. Redémarrer quand même ?",
+  "confirmShutdown": "Des sessions sont ouvertes : le travail non enregistré sera perdu. Éteindre quand même ?",
+  "error": "La session n’a pas pu être ouverte.",
+  "locked": "Écran verrouillé",
+  "noUsers": "Aucun utilisateur",
+  "password": "Mot de passe",
+  "restart": "Redémarrer",
+  "shutdown": "Éteindre",
+  "wait": {
+    "one": "Trop de tentatives. Patientez {count} seconde.",
+    "other": "Trop de tentatives. Patientez {count} secondes."
+  },
+  "wrong": "Mot de passe incorrect."
+}
