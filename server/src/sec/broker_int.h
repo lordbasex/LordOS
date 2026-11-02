@@ -11,6 +11,9 @@ const char *brokersrv_conn_app(int conn);
 int  brokersrv_conn_event(int conn, const char *kind, const char *data, size_t len);
 /* Reply to request reqid on fd, optionally passing passfd (SCM_RIGHTS). */
 int  brokersrv_reply(int fd, uint32_t reqid, int status, const void *data, uint32_t len, int passfd);
+/* A live link's end to the companion of connection `conn`, with a line naming it. -1 if it has none running. */
+int  brokersrv_conn_has_link(int conn);
+int  brokersrv_conn_link(int conn, const char *msg, int passfd);
 /* Camera/microphone indicator for the menu bar (only the session's JS draws it). */
 void brokersrv_device(const char *app, const char *kind, int on);
 /* System save dialog (powerbox) for `app`; the answer comes back as brokersrv_pick_result(reqid). */

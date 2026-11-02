@@ -84,7 +84,7 @@ export function ShareBadge() {
   return h(View, { style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, list.map((d, i) => h(View, {
     key: i,
     style: {
-      position: 'absolute', left: (d.x || 0) + (d.w || screen.width) - 340, top: (d.y || 0) + 66, width: 328, flexDirection: 'row', alignItems: 'center', gap: 8,
+      position: 'absolute', left: (d.x || 0) + (d.w || screen.width) - 432, top: (d.y || 0) + 66, width: 420, flexDirection: 'row', alignItems: 'center', gap: 8,
       paddingHorizontal: 12, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,69,58,0.95)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
     },
   },

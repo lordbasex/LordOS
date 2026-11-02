@@ -40,7 +40,7 @@ compositor's:
 Any failure stops there: nothing of the package runs, and the app hears why on fd 3. A changed byte gives `sig.fileModified`.
 
 **Descriptors:** 3, a `SOCK_SEQPACKET` socket to the app, one JSON text per message, 64 KB at most. 4, a connection to the sharing API tied to `lpk:<id>`, only if the manifest declares
-`screen-share`. 5, the home folder, open for listing it. 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
+`screen-share`. 5, the home folder, open for listing it. 6, where live media links arrive ("Live media"). 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
 
 **It ends with the app:** when the app's broker connection goes, lord-server sends SIGKILL and reaps it; the end of fd 3 is there for a clean exit; and `PR_SET_PDEATHSIG` covers lord-server
 dying. A companion that keeps dying is started 5 times at most per run of the app.
@@ -73,6 +73,31 @@ out of Landlock's reach to run.
 
 **What it can do if compromised:** read the visible files of the home folder and send them out, write in Downloads and its own data, and, while a share runs, what fd 4 grants. It can't change anything else.
 
+## Live media
+
+A companion is a sandbox with no decoder of its own and an app has no way to run one, so a program that receives video would have nowhere to show it. The system does that part. It's general, and knows nothing about go-link. Code: `server/src/media/live.h`,
+`media/helper/lm_live.c`, `lm_link.c`, `sec/brokercam.c`, `ui/js_brokercam.c`, `pkg/lordlive` on the other side.
+
+```js
+const id = media.live('my-app', 7);        // what the companion hands over under tag 7
+<MediaView media={id} style={{ flex: 1 }} />
+await media.liveMic('my-app', id, true);   // asks for the microphone; lord-server checks it again
+const cam = await media.camera('my-app', dev, { width: 640, height: 480, link: 7, codec: 'h264', kbps: 600 });
+media.close(id);
+```
+
+- **The app asks, the companion gets its end.** `media.live` starts a `lord-media` of its own and makes a `SOCK_STREAM` pair. One end goes to that helper. The other goes to the companion over **fd 6**, a `SOCK_SEQPACKET` socket only `lord-server` writes to, as
+  `live <tag>` or `camera <tag>` with the descriptor beside it. Tags are the app's own numbers, 1 to 99999. Neither names a path or a process. An app with no companion running gets an error and no helper starts. At most 4 streams and cameras per app.
+- **What goes over a link** (`live.h`): a 16-byte header with a checked length, 8 MB at most. To the helper: the codec (`h264`, `vp8`), one encoded picture, one Opus packet, a keyframe request for a camera. From it: a request for a keyframe when the decoder loses the picture, Opus of the
+  microphone, encoded pictures of the camera. Both ends are nonblocking, neither trusts the other, and a length out of bounds ends the link.
+- **Pictures** go to the same frame slots as a camera: a read-only ring the app maps, drawn by the same `<MediaView>`, scaled in the helper to the box. `info` gives the picture's size and `stats` what was decoded, shown and dropped, every 2 seconds.
+- **Sound** goes to a ring whose PipeWire stream is `lord-server`'s, as a player's. It's a playback stream of the app, in Monitor and volume as any other. More than 200 ms waiting is dropped: late sound is worse than none.
+- **The microphone and the camera** ask the same permissions, with the same restrictions, as anywhere else, and light the same indicators. `lord-server` opens both. Revoking the camera kills that helper at once, and revoking the microphone stops the stream's, with an event for the app.
+- **The decoder** is `lord-media`'s software H.264 and VP8, in the helper's sandbox: no network, no files, no exec. It's what reads a stranger's data, so it's there and not in the compositor, the app or the engine. No hardware decoding on this path.
+- **Its cost isn't the app's.** The helper runs in `app-lordos-media.scope`, outside the app's one core and 512 MB.
+
+**Tested:** `server/tests/live_helper.py` runs the real helper in its real sandbox with no session, on VM 116 and a Raspberry Pi 5: H.264 and VP8 reach the slots, a damaged stream asks for a keyframe, bad lengths and unknown codecs, 40 damaged streams with no crash. On a real screen (VM 125 and the Pi): a session to another computer, and a two-way call on VM 125 with the system's prompts and indicators. **Not tested:** revoking either device during a call.
+
 ## An item by the clock
 
 For any app with the `status-item` permission, packaged or not. An isolated app has no code in the shell, so it describes the item:
@@ -97,12 +122,14 @@ On VM 116 (amd64, kernel 6.12, 2026-11-01), with a static Go binary built with `
 `build/lord-server-pkgtest`, a test binary that takes its official key and root from the environment, on a root-owned folder, with throwaway keys from `tests/companion/fixture.sh`.
 
 - `pkgapp-test`, 52 checks: every way the folder can differ from what was signed, keys, revocation, and status item descriptions, good and hostile.
-- `companion_e2e.sh`, 100 checks passed: the app opened by Open at Login. **65 checks from inside the sandbox:** every limit above tried, and what must work: files in Downloads, TLS roots, interfaces through netlink,
+- `companion_e2e.sh`, 132 checks passed at the last run, with fd 6 (2026-11-02): the app opened by Open at Login. **65 checks from inside the sandbox:** every limit above tried, and what must work: files in Downloads, TLS roots, interfaces through netlink,
   and a Pion data channel between two peers in the process over DTLS. A mistake in the seccomp filter's jumps that let everything through was found this way. fd 3 both ways, and H.264 frames through fd 4.
   Outside it: `no_new_privs`, seccomp, no capabilities, one process, killed with the app, no zombie. Refused with nothing run: one changed byte, no Verified author, a revoked key, no catalog, a folder of the user's, a
   group-writable folder, as root, Downloads as a link. No grant on fd 4 gives `no_person`. The same manifest in a home folder runs as an app with no companion. A Linux app in an `lpk-` scope gets `no_identity`.
 
-**Not tested:** arm64; a real `lord-sessiond` placing the companion in its scope (those sessions were refused placement, as a development session is, and it isn't fatal there); limits of one core and 512 MB with a real engine;
+**On arm64** (Raspberry Pi 5, 2026-11-02): the real engine ran in this sandbox, in its scope, with no capabilities, `no_new_privs` and the filter on, its picture and input working. `tests/companion_e2e.sh`'s own checks have not run on arm64.
+
+**Not tested:** a real `lord-sessiond` placing the companion in its scope (those sessions were refused placement, as a development session is, and it isn't fatal there); limits of one core and 512 MB with a real engine;
 a real `.deb`; a kernel below ABI 3; seen on screen: the item by the clock and its menu, whose choice reaching the app wasn't run; the first-use prompts for `network` and `status-item`; the admin action behind forgetting grants, from a real shell.
 
 **On a real screen** (VM 125, amd64, 2026-11-02, a development `lordos` and a real `.deb` of Desk go-link, signed with throwaway keys): the app in Applications and the Dock, the `network`, `status-item`, `screen-share` and `remote-input` prompts, the item by the clock and its menu, a visitor from the public website with picture, sound, control, chat and files, Stop, the lock ending a share, and uninstalling forgetting the grants at the next session start. A viewer on 5673 was a root test client, not the real bridge, and a visitor then got `in_use`. An app installed while a session runs shows in Applications at the next session.

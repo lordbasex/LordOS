@@ -35,6 +35,8 @@ void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
+const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
+const char *wl_node_app(int node);      /* the isolated app whose window that node is, or NULL */
 
 /* From JS (lord.wayland) */
 void wl_set_focus(int id);              /* 0: no Wayland app has the keyboard */
@@ -80,6 +82,7 @@ int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
+void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
 int  wl_wants_frame(void);                  /* an app changed its content */
 void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns);   /* a flip finished (wp_presentation) */

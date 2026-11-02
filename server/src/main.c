@@ -675,10 +675,16 @@ static int share_surface_up(void) {
     }
     return 0;
 }
-static int share_key_protected(void) { return wl_focus_protected() || (!wl_has_key_focus() && media_protected_count() > 0); }
+/* A visitor doesn't reach the windows of the app that let them in: there a person accepts, sets a password or changes
+ * what the visitor may do. Theirs to press, never the visitor's. */
+static int share_is_holder(const char *app) {
+    const char *id = share_holder();
+    return app && id && !strncmp(id, "lpk:", 4) && !strcmp(id + 4, app);
+}
+static int share_key_protected(void) { return wl_focus_protected() || share_is_holder(wl_focus_app()) || (!wl_has_key_focus() && media_protected_count() > 0); }
 static int share_point_protected(void) {
     Server *s = remote_server;
-    for (const Node *n = hit_test(ui.root, (float)s->cx, (float)s->cy); n; n = n->parent) if (n->protect) return 1;
+    for (const Node *n = hit_test(ui.root, (float)s->cx, (float)s->cy); n; n = n->parent) if (n->protect || share_is_holder(wl_node_app(n->id))) return 1;
     return 0;
 }
 static void share_text_pump(void) {
@@ -2504,6 +2510,7 @@ int main(int argc, char **argv) {
         double tpd = tp_timeout(now_ms());
         if (tpd >= 0 && (delay < 0 || tpd < delay)) delay = tpd;
         share_tick();                       /* the API: its limits, the grant still holding */
+        wl_fullscreen_allow(!share_holder());
         share_text_pump();
         if (share_text_len) delay = 0;
         double shd = share_timeout();

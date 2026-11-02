@@ -99,6 +99,13 @@ export const media = {
   },
   stop: (id) => !!call('stop', id),
   cameras: () => call('cameras') || [],
+  // A packaged app's live stream (docs/PACKAGED-APPS.md, "Live media"): what its companion hands over under `tag` shows in a <MediaView>.
+  live(app, tag) { const id = call('live', app, tag); if (id) track(id); return id; },
+  // The microphone of a live stream, for a call: asks for the permission, and lord-server checks it again.
+  async liveMic(app, id, on) {
+    if (on && !(await requestPermission(app, 'microphone'))) return false;
+    return !!call('liveMic', id, on);
+  },
   async camera(app, device, opts = {}) {
     if (!(await requestPermission(app, 'camera'))) return null;
     const id = call('camera', app, device, opts);

@@ -106,6 +106,7 @@ void lm_hwprobe(const int *render, int n_render);                       /* lm_hw
 void lm_stream(const char *params, int ring, int render);               /* lm_stream.c */
 /* the remote desktop's software encoder with its own settings (libx264, or libvpx for VP8), for LordBench */
 AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps);
+void lm_live(const char *params, int link, int ring);                   /* lm_live.c */
 void lm_vbench(const char *params);                                     /* lm_vbench.c */
 
 #endif

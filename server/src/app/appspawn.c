@@ -123,10 +123,12 @@ int app_spawn(const char *id) {
     return 0;
 }
 
-int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd) {
-    *app_fd = -1;
-    int sv[2];
+int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd, int *link_fd) {
+    *app_fd = *link_fd = -1;
+    int sv[2], lk[2];
     if (!lpk_valid_id(id) || socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) { if (share_fd >= 0) close(share_fd); return -1; }
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, lk)) { close(sv[0]); close(sv[1]); if (share_fd >= 0) close(share_fd); return -1; }
+    fcntl(lk[0], F_SETFL, O_NONBLOCK);
     pid_t pid = fork();
     if (pid == 0) {
         setsid();
@@ -136,17 +138,20 @@ int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd) 
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
-        int a = fcntl(sv[1], F_DUPFD, 16), b = share_fd >= 0 ? fcntl(share_fd, F_DUPFD, 16) : -1;
-        if (a < 0 || dup2(a, 3) != 3) _exit(127);
+        int a = fcntl(sv[1], F_DUPFD, 16), b = share_fd >= 0 ? fcntl(share_fd, F_DUPFD, 16) : -1, c = fcntl(lk[1], F_DUPFD, 16);
+        if (a < 0 || c < 0 || dup2(a, 3) != 3 || dup2(c, 6) != 6) _exit(127);
         if (b >= 0) { if (dup2(b, 4) != 4) _exit(127); } else close(4);
-        syscall(SYS_close_range, 5U, ~0U, 0U);  /* nothing of the compositor's follows */
+        close(5);
+        syscall(SYS_close_range, 7U, ~0U, 0U);  /* nothing of the compositor's follows */
         char *const argv[] = { (char *)"lord-companion", (char *)"--companion", (char *)id, (char *)(network ? "1" : "0"), NULL };
         execve("/proc/self/exe", argv, environ);
         _exit(127);
     }
     close(sv[1]);
+    close(lk[1]);
     if (share_fd >= 0) close(share_fd);
-    if (pid < 0) { close(sv[0]); return -1; }
+    if (pid < 0) { close(sv[0]); close(lk[0]); return -1; }
     *app_fd = sv[0];
+    *link_fd = lk[0];
     return (int)pid;
 }

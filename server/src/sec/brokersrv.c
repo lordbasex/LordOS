@@ -40,7 +40,7 @@
 
 typedef struct {
     int fd, pid, used, resync; char id[48]; MAudio *mic; int mic_ringfd; int vault, sys;
-    int packaged, comp_pid, comp_starts, status_on;
+    int packaged, comp_pid, comp_starts, status_on, comp_link;
     double status_at;
 } AppConn;
 static AppConn apps[MAX_APPS];
@@ -183,11 +183,20 @@ void brokersrv_revoke(const char *app, const char *perm) {
         queue_evt("device", "{\"app\":\"%s\",\"kind\":\"%s\",\"on\":false}", app, perm);
 }
 
+/* fd 6 of a companion: 0 means none, so a connection's zeroed slot is right as it is */
+static void comp_link_close(AppConn *a) {
+    if (a->comp_link > 0) close(a->comp_link);
+    a->comp_link = 0;
+}
+
 /* Companions are lord-server's children: gone ones are reaped here, never waited for. */
 static void comp_tick(void) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (comp_dying[i] > 0 && waitpid(comp_dying[i], NULL, WNOHANG) != 0) comp_dying[i] = 0;
-        if (apps[i].used && apps[i].comp_pid > 0 && waitpid(apps[i].comp_pid, NULL, WNOHANG) != 0) apps[i].comp_pid = 0;
+        if (apps[i].used && apps[i].comp_pid > 0 && waitpid(apps[i].comp_pid, NULL, WNOHANG) != 0) {
+            apps[i].comp_pid = 0;
+            comp_link_close(&apps[i]);
+        }
     }
 }
 
@@ -307,6 +316,24 @@ static void clip_secret_tick(void) {
     explicit_bzero(h, sizeof h);
 }
 
+/* Hands the companion of connection `conn` one end of a live link (media/live.h). Never waits: a companion that isn't
+ * reading loses the stream, nothing else. */
+int brokersrv_conn_has_link(int conn) { return conn >= 0 && conn < MAX_APPS && apps[conn].used && apps[conn].comp_link > 0; }
+
+int brokersrv_conn_link(int conn, const char *msg, int passfd) {
+    if (conn < 0 || conn >= MAX_APPS || !apps[conn].used || apps[conn].comp_link <= 0) return -1;
+    struct iovec iov = { (void *)msg, strlen(msg) };
+    char cmsg[CMSG_SPACE(sizeof(int))];
+    memset(cmsg, 0, sizeof cmsg);
+    struct msghdr m = { .msg_iov = &iov, .msg_iovlen = 1, .msg_control = cmsg, .msg_controllen = sizeof cmsg };
+    struct cmsghdr *c = CMSG_FIRSTHDR(&m);
+    c->cmsg_level = SOL_SOCKET;
+    c->cmsg_type = SCM_RIGHTS;
+    c->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(c), &passfd, sizeof(int));
+    return sendmsg(apps[conn].comp_link, &m, MSG_NOSIGNAL | MSG_DONTWAIT) < 0 ? -1 : 0;
+}
+
 int brokersrv_count(void) { int n = 0; for (int i = 0; i < MAX_APPS; i++) n += apps[i].used; return n; }
 
 static void drop(AppConn *a) {
@@ -326,6 +353,7 @@ static void drop(AppConn *a) {
         comp_dying[i] = a->comp_pid;
         a->comp_pid = 0;
     }
+    comp_link_close(a);
     status_off(a);
     /* los indicadores de esta app se apagan */
     queue_evt("device", "{\"app\":\"%s\",\"off\":true}", a->id);
@@ -450,9 +478,11 @@ static void companion_start(AppConn *a, uint32_t reqid) {
     if (a->comp_pid > 0 || a->comp_starts >= COMP_STARTS) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
     int share = -1;
     if (m.screen && (share = share_companion(a->id, m.input)) < 0) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
-    int appfd = -1, net = m.network && perm_get(a->id, PERM_NETWORK) == PERM_ALLOW;
-    int pid = app_companion_spawn(a->id, net, share, &appfd);
+    int appfd = -1, link = -1, net = m.network && perm_get(a->id, PERM_NETWORK) == PERM_ALLOW;
+    int pid = app_companion_spawn(a->id, net, share, &appfd, &link);
     if (pid < 0) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    comp_link_close(a);
+    a->comp_link = link;
     a->comp_pid = pid;
     a->comp_starts++;
     send_reply_fd(fd, reqid, BST_OK, NULL, 0, appfd);

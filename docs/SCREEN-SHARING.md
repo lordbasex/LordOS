@@ -86,8 +86,12 @@ The sign-in stays valid. Neither door can end the other. With no share, these pa
 
 Through the same functions as 5673, with this door's own rules. Dropped: anything with no running share or no `remote-input`; anything while the
 `overlay`, `modal` or `system` layers show something (read from the node tree in C, not from JavaScript); presses, clicks and wheels aimed at
-a protected window. A release always goes, so nothing stays held. So a visitor who opens the search can't type in it or close it: the person
+a protected window or at a window of the app holding the share, since those are where a person accepts, sets a password or changes what the visitor may do. A release always goes, so nothing stays held. So a visitor who opens the search can't type in it or close it: the person
 at the computer has to. Limits: 1,000 pointer events and 200 keys a second.
+
+## Fullscreen
+
+A fullscreen Wayland or X11 surface is drawn over every layer, the indicator's too, on the CPU path and the GPU path. So while an app holds a share there is none: a surface asking for it stays in its window, and one already fullscreen goes back to it. A LordOS window in fullscreen stays, because it's drawn under the `notification` layer. It was found by running one on VM 125: a fullscreen `xterm` covered the indicator whole.
 
 ## Keyframes
 

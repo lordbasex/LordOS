@@ -32,7 +32,7 @@ enum BrokerOp {
     BOP_STATE,          /* → JSON { theme, locale, keyboard }: the current state, at startup */
     BOP_MENU,           /* payload: JSON of the app's menus (for the system menu bar) */
     BOP_MIC,            /* payload "1"/"0": request/release the microphone. With permission, → read-only fd of the ring */
-    BOP_CAMERA,         /* payload "list" | "open dev w h" | "ring sid" (→ read-only ring fd) | "ack sid id" |
+    BOP_CAMERA,         /* payload "list" | "open dev w h [tag codec kbps]" | "live tag" | "mic sid 0|1" | "ring sid" (→ read-only ring fd) | "ack sid id" |
                          * "size sid w h" | "photo sid mirror name" | "record sid mirror mic name" |
                          * "recstop sid" | "close sid". See brokercam.c */
     BOP_VAULT_FIDO = 40,/* (Passwords only) open the FIDO2 key for lord-vault after the `usb` permission →

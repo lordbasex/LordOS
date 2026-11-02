@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -40,6 +41,7 @@ typedef struct {
     uint64_t sent[MP_RING_SLOTS], seq;      /* frames forwarded to the app and not acked yet */
     double tokens, tok_at;
     long bad;                   /* rejected ACKs (log only) */
+    int live;                   /* a live stream (MK_LIVE, media/live.h) rather than a camera */
     uint32_t pick_req;          /* powerbox pending for a photo/video */
     int pick_kind, pick_mirror, pick_mic;   /* 1 photo, 2 video */
     char out_name[256];         /* names of the saved files (never the folder) */
@@ -68,6 +70,7 @@ static void cam_event(Cam *c, const char *fmt, ...) {
 static void cam_free(Cam *c, int kill_helper) {
     MediaSrc *s = media_src_get(c->sid);
     const char *app = brokersrv_conn_app(c->conn);
+    int mic_on = s && s->mic;
     if (s) {
         if (kill_helper && s->pid > 0) kill(s->pid, SIGKILL);     /* revoked: the device is released now */
         s->bk = NULL;
@@ -77,7 +80,8 @@ static void cam_free(Cam *c, int kill_helper) {
         media_src_close(s);
     }
     if (c->ringfd >= 0) close(c->ringfd);
-    if (app) brokersrv_device(app, "camera", 0);
+    if (app && !c->live) brokersrv_device(app, "camera", 0);
+    if (app && c->live && mic_on) brokersrv_device(app, "microphone", 0);
     memset(c, 0, sizeof *c);
     c->ringfd = -1;
 }
@@ -143,10 +147,17 @@ static int on_helper_msg(void *src, const MediaMsg *m, const char *payload, int 
             if (!json_parse(payload, strlen(payload), &d, NULL, 0)) { json_free(&d); cam_event(c, "event %d info %s", c->sid, payload); }
         }
         return 1;
+    case MM_AUDIO:
+        return 0;                                    /* media.c serves the stream */
+    case MM_STATS:
+        if (c->live) cam_event(c, "event %d stats {\"decoded\":%lld,\"shown\":%lld,\"dropped\":%lld,\"decodeMs\":%.2f}", c->sid, (long long)m->v[0],
+                               (long long)m->v[1], (long long)m->v[2], m->v[3] / 100.0);
+        return 1;
     case MM_STATE: {
         static const char *const names[] = { "loading", "playing", "paused", "ended", "recording", "done", "failed" };
         int st = (int)m->v[0];
         s->state = st;
+        if (s->audio) maudio_playing(s->audio, st == MS_PLAYING);
         if (st >= 0 && st <= MS_FAILED) cam_event(c, "event %d state {\"state\":\"%s\"}", c->sid, names[st]);
         return 1;
     }
@@ -187,6 +198,68 @@ static void clean_name(const char *in, const char *def, char *out, size_t n) {
     if (!k || !strcmp(out, ".") || !strcmp(out, "..")) snprintf(out, n, "%s", def);
 }
 
+/* A socketpair for a live link; [0] goes to the companion, [1] to lord-media. Both ends are nonblocking: neither waits for the other. */
+static int link_pair(int sp[2]) { return socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, sp); }
+
+/* "live tag": the app shows, in a <MediaView>, what its companion receives. lord-media decodes it. The companion gets its
+ * end on fd 6 and the app names nothing but a number of its own, so neither can reach another app's stream. No
+ * permission: it plays what the app brought. */
+static void live_open(int conn, int fd, uint32_t reqid, const char *app, const char *payload) {
+    int tag = 0;
+    if (sscanf(payload, "%*s %d", &tag) != 1 || tag < 1 || tag > 99999) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+    Cam *c = NULL;
+    int mine = 0;
+    for (int i = 0; i < MAX_CAMS; i++) { if (cams[i].used && cams[i].conn == conn) mine++; if (!cams[i].used && !c) c = &cams[i]; }
+    int sp[2], ring = -1;
+    if (!c || mine >= 4 || !brokersrv_conn_has_link(conn) || link_pair(sp)) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+    MediaSrc *s = media_src_new(SK_CAMERA, app);
+    if (s) s->audio = maudio_open(0, app, "Remote computer", "video", &ring);
+    int fds[2] = { sp[1], ring };
+    if (s) s->sock = media_spawn(MK_LIVE, "", fds, ring >= 0 ? 2 : 1, &s->pid);
+    close(sp[1]);
+    char line[48];
+    snprintf(line, sizeof line, "live %d", tag);
+    if (!s || s->sock < 0 || brokersrv_conn_link(conn, line, sp[0])) {
+        close(sp[0]);
+        if (s) { if (s->pid > 0) kill(s->pid, SIGKILL); media_src_close(s); }
+        brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1);
+        return;
+    }
+    close(sp[0]);
+    memset(c, 0, sizeof *c);
+    c->used = 1;
+    c->live = 1;
+    c->conn = conn;
+    c->sid = s->id;
+    c->ringfd = -1;
+    c->tokens = ACK_BURST;
+    c->tok_at = now_s();
+    s->bk = c;
+    s->bk_msg = on_helper_msg;
+    char r[16];
+    int n = snprintf(r, sizeof r, "%d", c->sid);
+    fprintf(stderr, "broker[%s]: live stream %d (lord-media %d)\n", app, tag, (int)s->pid);
+    brokersrv_reply(fd, reqid, BST_OK, r, (uint32_t)n, -1);
+}
+
+/* "mic sid 0|1": the microphone of a live stream, with the permission checked here and not in the app. */
+static void live_mic(Cam *c, MediaSrc *s, int fd, uint32_t reqid, const char *app, int on) {
+    if (!c->live || !s || s->sock < 0) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+    if (!on) {
+        if (s->mic) { mp_send(s->sock, MM_RECORD, 0, NULL, NULL, 0, NULL, 0); maudio_close(s->mic); s->mic = NULL; brokersrv_device(app, "microphone", 0); }
+        brokersrv_reply(fd, reqid, BST_OK, NULL, 0, -1);
+        return;
+    }
+    if (restrict_perm_pkg(app, PERM_MICROPHONE) != PERM_ALLOW || restrict_blocks_pkg(app, FW_R_NO_MIC)) { brokersrv_reply(fd, reqid, BST_DENIED, NULL, 0, -1); return; }
+    if (!s->mic) {
+        int ring = -1;
+        s->mic = maudio_open(1, app, "Call", "", &ring);
+        if (!s->mic || mp_send(s->sock, MM_RECORD, 0, NULL, NULL, 0, &ring, 1)) { maudio_close(s->mic); s->mic = NULL; brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        brokersrv_device(app, "microphone", 1);
+    }
+    brokersrv_reply(fd, reqid, BST_OK, NULL, 0, -1);
+}
+
 void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uint32_t len) {
     (void)len;
     const char *app = brokersrv_conn_app(conn);
@@ -200,10 +273,15 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
         brokersrv_reply(fd, reqid, BST_OK, json, (uint32_t)strlen(json), -1);
         return;
     }
+    if (!strcmp(cmd, "live")) {
+        if (!app) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        live_open(conn, fd, reqid, app, payload);
+        return;
+    }
     if (!strcmp(cmd, "open")) {
-        char dev[32] = "";
-        int w = 1280, h = 720;
-        sscanf(payload, "%*s %31s %d %d", dev, &w, &h);
+        char dev[32] = "", codec[8] = "";
+        int w = 1280, h = 720, tag = 0, kbps = 0;
+        sscanf(payload, "%*s %31s %d %d %d %7s %d", dev, &w, &h, &tag, codec, &kbps);
         if (app && restrict_blocks_pkg(app, FW_R_NO_CAMERA)) {
             char line[160];
             lerr_set(line, sizeof line, restrict_code(FW_R_NO_CAMERA), "app", app, NULL);
@@ -241,6 +319,17 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
         c->tok_at = now_s();
         s->bk = c;
         s->bk_msg = on_helper_msg;
+        /* a call: the same camera, encoded, to the companion's end of a link */
+        int sp[2];
+        char line[48];
+        snprintf(line, sizeof line, "camera %d", tag);
+        if (tag > 0 && tag <= 99999 && !link_pair(sp)) {
+            int64_t v[6] = { !strcmp(codec, "vp8"), kbps, 0, 0, 0, 0 };
+            if (mp_send(s->sock, MM_LINK, 0, v, NULL, 0, &sp[1], 1) || brokersrv_conn_link(conn, line, sp[0]))
+                fprintf(stderr, "broker[%s]: the camera has no way to its companion\n", app);
+            close(sp[0]);
+            close(sp[1]);
+        }
         brokersrv_device(app, "camera", 1);
         char r[16];
         int n = snprintf(r, sizeof r, "%d", c->sid);
@@ -262,6 +351,13 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
             return;
         }
         self_ack(c, s, id);
+        return;
+    }
+    if (!strcmp(cmd, "mic")) {
+        int on = 0;
+        sscanf(payload, "%*s %*d %d", &on);
+        if (!c) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        live_mic(c, s, fd, reqid, app, on);
         return;
     }
     if (!strcmp(cmd, "size")) {                      /* no reply */
@@ -371,7 +467,7 @@ void brokercam_revoke(const char *app) {
     for (int i = 0; i < MAX_CAMS; i++) {
         Cam *c = &cams[i];
         const char *a = c->used ? brokersrv_conn_app(c->conn) : NULL;
-        if (!a || strcmp(a, app)) continue;
+        if (!a || strcmp(a, app) || c->live) continue;
         cam_event(c, "closed %d revoked", c->sid);
         fprintf(stderr, "broker[%s]: camera permission revoked: lord-media %d killed\n", app, (int)(media_src_get(c->sid) ? media_src_get(c->sid)->pid : 0));
         cam_free(c, 1);
@@ -389,6 +485,7 @@ void brokercam_revoke_mic(const char *app) {
         if (s->sock >= 0) mp_send(s->sock, MM_RECORD, 2, NULL, NULL, 0, NULL, 0);
         maudio_close(s->mic);
         s->mic = NULL;
+        if (c->live) { brokersrv_device(app, "microphone", 0); cam_event(c, "event %d mic {\"revoked\":true}", c->sid); }
         fprintf(stderr, "broker[%s]: microphone revoked: camera recording stopped\n", app);
     }
 }

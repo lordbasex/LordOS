@@ -32,16 +32,16 @@ func check(name string, ok bool, detail any) {
 func denied(name string, err error) { check(name, err != nil, err) }
 func works(name string, err error)  { check(name, err == nil, err) }
 
-// Nothing inherited past 5; the Go runtime's own epoll and eventfd have no file type.
+// Nothing inherited past 6, where live media links arrive; the Go runtime's own epoll and eventfd have no file type.
 func inherited() {
 	open := 0
-	for fd := 6; fd < 256; fd++ {
+	for fd := 7; fd < 256; fd++ {
 		var st syscall.Stat_t
 		if syscall.Fstat(fd, &st) == nil && st.Mode&syscall.S_IFMT != 0 {
 			open++
 		}
 	}
-	check("no inherited descriptor past 5", open == 0, open)
+	check("no inherited descriptor past 6", open == 0, open)
 }
 
 // fcntl: what would have the kernel send signals, or watch for us, refused; what the Go runtime uses, working.

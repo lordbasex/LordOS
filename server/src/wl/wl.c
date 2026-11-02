@@ -1726,8 +1726,20 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
     if (s && s->mapped) emit(s, "unmaximize", "{}");
 }
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
+static int fs_refused;                  /* wl_fullscreen_allow */
+static void leave_fullscreen(Surf *s);
+
+/* A fullscreen surface is drawn over every layer, the sharing indicator included, so a share and a fullscreen surface can't
+ * be on together: it goes back to its window, and no new one comes until the share ends. */
+void wl_fullscreen_allow(int on) {
+    if (fs_refused == !on) return;
+    fs_refused = !on;
+    if (fs_refused && dpy && fs_surf) leave_fullscreen(fs_surf);
+}
+
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
+    if (fs_refused) { send_toplevel_configure(s); return; }
     if (s->parked || s->xmin) {      /* a hidden or minimized window is presented on nothing: it waits to come back */
         s->fs_resume = 1;
         send_toplevel_configure(s);
@@ -2586,6 +2598,23 @@ int wl_has_key_focus(void) { return dpy && key_focus; }
 int wl_focus_protected(void) {
     Surf *top = dpy ? toplevel_of(key_focus) : NULL;
     return top && node_protected(top->node);
+}
+
+static const char *app_of_client(struct wl_client *cl) {
+    pid_t pid = 0;
+    uid_t uid;
+    gid_t gid;
+    if (!cl) return NULL;
+    wl_client_get_credentials(cl, &pid, &uid, &gid);
+    return brokersrv_app_of_pid((int)pid);
+}
+
+const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
+
+const char *wl_node_app(int node) {
+    if (!dpy || !node) return NULL;
+    for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->node == node) return app_of_client(surfs[i]->client);
+    return NULL;
 }
 
 int wl_send_paste(void) {

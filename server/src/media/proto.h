@@ -37,6 +37,8 @@ enum {
                            (or -1), render node (or -1); params codec=h264|vp8, width, height, fps, kbps */
     MK_VBENCH,          /* LordBench's video measurement (lm_vbench.c, docs/BENCHMARK.md): no fds; params full=0|1.
                            Clips generated in memory; answers MM_BENCH records, then MM_STATE MS_DONE */
+    MK_LIVE,            /* a packaged app's live stream (lm_live.c, live.h): fds = link to its companion, audio ring (or
+                           none). Encoded pictures and Opus in; frame slots, sound and, with MM_RECORD, the microphone out */
 };
 
 /* Jobs of the MK_WORKER helper (MM_JOB with v[0] = MW_*). */
@@ -65,10 +67,12 @@ enum {
     MM_INRING,          /* fd = memfd of input frames; v: slots, width, height */
     MM_INFRAME,         /* id = slot with a new frame; v[0] = ms since the start */
     MM_PHOTO,           /* camera: fd = jpeg output; v[0] = mirrored */
-    MM_RECORD,          /* camera: fds = mp4 output, microphone ring (or no fd); no fds: finish */
+    MM_RECORD,          /* camera: fds = mp4 output, microphone ring (or no fd); no fds: finish.
+                           live: fd = microphone ring; no fd: the microphone stops */
     MM_LOOP,            /* v[0] = 1: start over when it ends */
     MM_KEYFRAME,        /* live encoder: the next frame is a keyframe */
     MM_RATE,            /* live encoder: v[0] = target kbit/s */
+    MM_LINK,            /* camera: fd = live link (live.h); v[0] = 1 VP8, 0 H.264; v[1] = kbit/s. Its pictures also go there */
 
     /* lord-media → lord-server */
     MM_INFO = 64,       /* payload = JSON with the file's information */
