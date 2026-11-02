@@ -342,6 +342,11 @@ the lines a healthy GPT prints; and the two descriptions match, partition by par
 0 on a corrupt table, so its exit code means nothing here. An MBR disk never reaches sgdisk. Anything
 unknown is a refusal: at worst, erasing is the only option offered.
 
+When the disk has no room. The installer doesn't shrink partitions. It says why the choice isn't
+available; make room with the other system's own disk tool, by shrinking or deleting a partition, keep
+a copy of what matters, and search again. Reusing an existing empty partition is not supported either:
+delete it, so its space counts as unpartitioned.
+
 What it does, in `server/src/install/freepart.c`; the decisions are in `freespace.c`, tested by
 `tests/freespace_test.c` in `make test`:
 

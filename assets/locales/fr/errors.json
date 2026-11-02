@@ -690,7 +690,7 @@
   "install.free.needUefi": "cet ordinateur a démarré en mode BIOS, et cette option nécessite UEFI",
   "install.free.noBootTool": "cette image ne contient pas efibootmgr",
   "install.free.noEsp": "le disque n’a pas de partition EFI",
-  "install.free.noRoom": "il n’y a pas de zone non partitionnée d’au moins 8 Go ; une partition vide ne compte pas, supprimez-la d’abord",
+  "install.free.noRoom": "il n’y a pas de zone non partitionnée d’au moins 8 Go ; une partition vide ne compte pas, supprimez-la d’abord. Libérez de la place avec l’outil de disques de l’autre système (réduisez ou supprimez une partition), puis relancez la recherche",
   "install.free.noTable": "le disque n’a pas de table de partitions",
   "install.free.tableDamaged": "la table des partitions présente des problèmes, ou n’a pas pu être lue avec certitude",
   "install.free.tableFull": "la table des partitions est pleine",

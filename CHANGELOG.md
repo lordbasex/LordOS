@@ -34,6 +34,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - Copying from a native Wayland app with a long clipboard type name reached no other app: the name was cut at 63 characters and the app dropped its data.
 - Linux apps with no file dialog of their own can now open and save files: LordOS answers `org.freedesktop.portal.FileChooser` with its own dialog, inside the home folder ([#4](https://github.com/lordbasex/LordOS/issues/4)).
+- An app installed outside the Store, from a terminal or by another app's installer, now shows in search and in the app lists the next time they open.
 - Firefox looked frozen: tabs, the toolbar and pages ignored the mouse. The compositor ignored `wl_surface.set_input_region`, so the pointer went to Firefox's content surface, which has asked for no input, instead of the window below it ([#11](https://github.com/lordbasex/LordOS/issues/11)).
 - Wi-Fi stayed off after a reboot when its driver finished loading after the network service started, or udev renamed it late: an interface now gets its saved state whenever it appears, not only at the moment of boot. Turning on an interface saved as off keeps it on ([#8](https://github.com/lordbasex/LordOS/issues/8)).
 - The volume, mute, screen brightness and keyboard light keys did nothing, on any layout and in every theme, and went to the app in front: they now work, without Fn on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)).
@@ -75,6 +76,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Store: the package index gained French names, so its format changed. The old index is refused after the update and rebuilt by the next check for updates; until then package actions ask for an update check.
 - `/usr/bin/pkexec` is now diverted to `lord-pkexec`, a small unprivileged front for the real program. Going back to an older package leaves a dangling link: run `dpkg-divert --remove` by hand.
 - The go-link Desk package needs LordOS 0.8.8 or later.
+- A package update reaches the running session after a restart, as the Store says: the session and its network helper keep running through it, on purpose.
 
 ## [0.8.7-beta] - 2026-11-01
 

@@ -8,7 +8,7 @@
 //
 // Linux apps are launched with lord.apps.launch(id): the server only accepts the id of an
 // installed .desktop and runs its Exec line with no arguments and no shell (see server/src/apps.c).
-import { createElement as h } from 'react';
+import { createElement as h, useEffect } from 'react';
 import { View, Text, Image } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { locale, appName } from './i18n.js';
@@ -51,13 +51,18 @@ function readLinux() {
 
 // Re-reads the .desktop files (after installing or removing packages; it's cheap: the server
 // only re-reads if the folders changed).
-export function refreshApps() { linux.set(readLinux()); }
+export function refreshApps() {
+  const next = readLinux(), now = linux.get();
+  if (next.length === now.length && next.every((a, i) => a.id === now[i].id && a.name === now[i].name && a.icon === now[i].icon)) return;
+  linux.set(next);
+}
 // The installed Linux apps' ids, or null if the list can't be read or came back empty.
 export function linuxIds() { refreshApps(); const l = linux.get(); return l.length ? new Set(l.map((a) => a.desktopId)) : null; }
 locale.subscribe(refreshApps);
 
 export function useLauncherApps() {
   const lin = useStore(linux);
+  useEffect(refreshApps, []);    // an app installed outside the Store (a terminal, another app's installer) shows the next time a list opens
   useStore(locale);
   useStore(appRegistry);
   const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));

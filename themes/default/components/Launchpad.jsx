@@ -2,15 +2,16 @@
 // An app is pinned to the Dock by dragging it onto the Dock (the launcher steps aside as soon as the
 // drag starts, and the app lands where it is dropped) or with a right click → Keep in Dock. It works
 // the same for LordOS apps, .lpk packages and Linux apps (sdk/dock.js).
-import { View, Text, TextInput, ScrollView, screen, t as tr, appName, APP_CATEGORIES, appCategory, dock, dockIdOf, useStore, settings,
+import { View, Text, TextInput, ScrollView, screen, t as tr, appName, refreshApps, APP_CATEGORIES, appCategory, dock, dockIdOf, useStore, settings,
   beginDockDrag, dockDragJustEnded } from '@lordos/sdk';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
 const COLS = 6, CELL = 130, ICON = 72;
 
 // area: the display it covers (the main one; global coordinates)
 export function Launchpad({ t, apps, onOpen, onClose, area = { x: 0, y: 0, w: screen.width, h: screen.height } }) {
+  useEffect(refreshApps, []);
   const A = useRef(area);
   A.current = area;
   const [query, setQuery] = useState('');
