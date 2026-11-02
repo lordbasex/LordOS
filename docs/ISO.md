@@ -390,6 +390,7 @@ It adds three actions to the privileged helper (`server/src/install/install.c`, 
 |---|---|---|
 | `install-disks` | administrator | lists the installable disks (JSON via `LOG`), with each one's table type, EFI partition, largest free GPT region and whether it qualifies for free space. It only reads, mounting the EFI partition read-only to measure it |
 | `install-run <json>` | administrator, in a separate process | installs |
+| `install-account <json>` | administrator, in a separate process; only while `/etc/lordos/first-account` exists | the OVA's first boot: makes the person's account (see "OVA image") |
 | `install-reboot` | administrator | `systemctl reboot` |
 
 All three answer **ERR outside live mode**: `/run/live/medium/live/filesystem.squashfs` has to
@@ -426,6 +427,49 @@ What `install-run` validates on the root side, without trusting the interface:
   `blkid`, `fallocate`, `mkswap`, `efibootmgr`, `rm`, `chroot` (with `dpkg`, `userdel`, `useradd`, `locale-gen`,
   `systemd-machine-id-setup`, `update-initramfs`, `grub-install` and `grub-mkconfig` inside) and
   `systemctl`. `install.c` builds the arguments from the already validated values.
+
+## OVA image
+
+`lordos-<version>-amd64.ova` is a virtual machine that is already installed. Open it in VirtualBox or VMware (double click) and start it.
+
+It is a standard OVA, amd64 only: an OVF 1.0 descriptor, a SHA-256 manifest and a stream-optimized VMDK.
+
+| | |
+|---|---|
+| Machine | 2 CPUs, 4 GB of memory, a 32 GB dynamic disk (SCSI, LSI Logic), one E1000 network adapter on NAT |
+| Firmware | the descriptor leaves the hypervisor's default, BIOS. The disk has both boot paths, like an installed system, so UEFI works too |
+| Display on VirtualBox | VBoxSVGA, through the optional `vbox:Machine` section. Other hypervisors ignore that section (`ovf:required="false"`) and read only the standard ones |
+| Size | about 1.2 GB; the imported disk grows as it is used |
+
+### No default account
+
+The image has no account for a person and no password. The ISO's emergency root password is not in it: root is locked, as on an installed system.
+
+1. The first boot logs in by itself as `lordos`, the same setup account as the Raspberry Pi image. It exists only for this: no password, not offered by the login screen, and remote desktop refuses it. There is no SSH server in the image.
+2. `/etc/lordos/first-account` exists, so `lord.system.info().firstAccount` is true: the **Install LordOS** assistant opens by itself as **Set up LordOS**, without the disk step, and can't be closed until the account exists. Its steps are Language & region, Keyboard, User and Summary.
+3. **Create account** runs `install-account`, which does what `install-run` does for the person: the same validation and the same code (`setup_person` in `install.c`), on the running system. `lordos` as a user name is refused here.
+4. After **Restart**, `lordos-live-prep` removes `lordos`, and the login screen is what starts from then on.
+
+Each machine makes its own `machine-id` on its first boot. The image has no SSH host keys and no random seed. Imported copies do share the disk's UUIDs, as any clone does.
+
+### Building it
+
+```sh
+sudo tools/iso/build.sh                    # the ISO
+sudo tools/iso/build-ova.sh [work folder]  # the same folder; default /var/tmp/lordos-iso
+```
+
+The result is `<work>/out/lordos-<version>-amd64.ova` and its `.sha256`. It needs root and loop devices.
+
+`build-ova.sh` takes the ISO's own `filesystem.squashfs` and does what the installer does in mode "erase", minus the person's account: same partitions, same removal of the live-only parts, same `/etc/default/grub`, same `grub-install` for both firmwares. A change to those steps in `install.c` has to be made there too.
+
+**The same squashfs and script give the same bytes.** The clock is the squashfs's creation time and every id comes from its hash. After grub is installed the partitions are written again from a tar with those times, with `mke2fs -d`, `mkfs.vfat --invariant` and `mcopy`, because a mounted file system can't keep them. Two ISO builds are not the same squashfs, so they give different OVAs.
+
+The VMDK is cut at its end-of-stream marker. `qemu-img` pads the file after it, and VMware's reader stops at the marker, so it reported "SHA digest of file does not match manifest" and refused the image.
+
+### Test (November 2)
+
+@@OVATEST@@
 
 ## What it ships
 
@@ -539,6 +583,7 @@ sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorri
 | `squashfs-tools` | `mksquashfs` |
 | `xorriso`, `grub-pc-bin`, `grub-efi-amd64-bin`, `grub-common`, `mtools`, `dosfstools` | `grub-mkrescue`: the hybrid BIOS + UEFI ISO. On an arm64 host, `grub-efi-arm64-bin` instead of the two grub binaries (`build-arm64.sh` installs them in its overlay) |
 | `lintian` | checking the `.deb` |
+| `qemu-utils`, `libarchive13t64`, `gdisk`, `e2fsprogs` 1.47.1 or later | the OVA (`build-ova.sh`): `qemu-img` writes the VMDK, `mke2fs -d` reads a tar through libarchive |
 
 ### lintian
 
