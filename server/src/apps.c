@@ -754,7 +754,9 @@ int apps_launch_uri(const char *id, const char *uri) {
     static const char *const schemes[] = { "vnc", "rdp", "http", "https" };
     size_t n = uri ? strlen(uri) : 0;
     if (n < 7 || n > 300) return -1;
-    for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)uri[i]) && !strchr(":/.-_@[]", uri[i])) return -1;
+    /* a web address also has a query: it still goes as one argument, and quotes, spaces and backslashes stay out */
+    const char *chars = !strncmp(uri, "http", 4) ? ":/.-_@[]?=&%#+~,;" : ":/.-_@[]";
+    for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)uri[i]) && !strchr(chars, uri[i])) return -1;
     for (size_t i = 0; i < 4; i++) {
         size_t l = strlen(schemes[i]);
         if (strncmp(uri, schemes[i], l) || strncmp(uri + l, "://", 3)) continue;

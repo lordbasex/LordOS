@@ -23,6 +23,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.
 - French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
 - Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
+- Terminal: ❖+click or Ctrl+click on a web address opens it in the default browser.
 - App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
 
 ### Added

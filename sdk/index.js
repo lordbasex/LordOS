@@ -137,7 +137,7 @@ import { KeyringPrompt } from './vault.js';
 export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mailStatus, autoconfig, OAUTH_PROVIDERS, trackMailStatus, isolatedPim, pickFileFd, closeFileFd } from './mail.js';
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
-export { openFileWithApps, revealPath } from './sysopen.js';   // opening files/apps for the isolated system apps
+export { openFileWithApps, openUrl, revealPath } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
 import { startReminders } from './calendar.js';

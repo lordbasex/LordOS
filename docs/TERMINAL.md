@@ -127,7 +127,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Composer (write the command before sending it) | ✅ | ❖⇧. |
 | Marks: jump between prompts, add, select the last command's output | ✅ | |
 | Per-line timestamps | ✅ | ❖⇧E |
-| Ctrl/❖+click on paths and links | 🟡 | paths under `$HOME` open Files; URLs are copied (there is no browser) |
+| Ctrl/❖+click on paths and links | ✅ | paths under `$HOME` open Files; web addresses open in the default browser; anything else is copied |
 | Instant Replay | ✅ | ❖⌥B, up to 1200 frames / 6 MB per session |
 | Log the session to a file, save the contents | ✅ | `~/.local/share/lordos/terminal/`, the documents folder (`XDG_DOCUMENTS_DIR`, in the user's language) |
 | Broadcast input to all panes | ✅ | ❖⌥I |

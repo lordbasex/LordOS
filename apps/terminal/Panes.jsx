@@ -1,5 +1,5 @@
 // Panes.jsx — un panel de terminal y el árbol de paneles divididos.
-import { View, Text, Terminal, addListener, term, clipboard, useStore, wm, fs, ime, t as T } from '@lordos/sdk';
+import { View, Text, Terminal, addListener, term, clipboard, useStore, wm, fs, ime, openUrl, t as T } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { meta, setRatio, focusPane, toast } from './state.js';
 import { tmuxFocus } from './tmux.js';
@@ -10,6 +10,8 @@ export const paneNodes = new Map();     // sid → instancia del nodo (para nave
 // Ctrl/❖+clic: carpetas y archivos de la carpeta personal se abren en Archivos ("semantic
 // history"); web links are copied (LordOS has no browser yet).
 function openLink(wid, sid, url) {
+  const web = /^https?:\/\//i.test(url) ? url : url.startsWith('www.') ? `https://${url}` : '';
+  if (web && openUrl(web)) return;
   const home = fs.home();
   let path = url.startsWith('file://') ? decodeURIComponent(url.replace(/^file:\/\/[^/]*/, '')) : url;
   if (path.startsWith('~')) path = home + path.slice(1);

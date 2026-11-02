@@ -17,6 +17,14 @@ import { books as addressBooks, contacts } from './contacts.js';
 
 export const revealPath = (path) => wm.open('files', { new: true, args: { path: fs.parent(path), select: fs.basename(path), nonce: Date.now() } });
 
+// A web address, in the default browser. False if there isn't one, or the address has characters that aren't allowed.
+export function openUrl(url) {
+  try {
+    const def = defaultOpenerId('x-scheme-handler/https');
+    return !!def && lord.apps.launchUri(def.replace(/\.desktop$/, ''), url);
+  } catch (e) { return false; }
+}
+
 export function openFileWithApps(path, name) {
   const n = String(name || path).toLowerCase();
   if (/\.pdf$/.test(n) && getApp('pdf')) return wm.open('pdf', { new: true, args: { path } });
