@@ -48,6 +48,10 @@ void sandbox_scope_name(const char *id, char *out, size_t n) { snprintf(out, n, 
 
 /* ---- no_new_privs and capabilities ---- */
 
+#ifndef AT_EMPTY_PATH
+#define AT_EMPTY_PATH 0x1000
+#endif
+
 static int apply_nopriv(void) { return prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == 0 ? 0 : -1; }
 
 static int drop_caps(void) {
@@ -641,6 +645,171 @@ void sandbox_exec_child(int network) {
     SandboxConfig c = { .id = "exec", .ro_extra = ro, .network = network };
     int fs_ok = 0, net_ok = 0;
     if (apply_landlock(&c, NULL, NULL, &fs_ok, &net_ok)) apply_nopriv();   /* a kernel with no Landlock: the scope still holds */
+}
+
+/* ---- a packaged app's companion (sandbox.h) ---- */
+
+#ifdef HAVE_LANDLOCK
+/* A rule on an open folder or file: Landlock refuses folder rights on a file. All or nothing for the caller. */
+static int ll_any(int rs, int fd, uint64_t allow) {
+    struct stat st;
+    if (fstat(fd, &st)) return -1;
+    if (!S_ISDIR(st.st_mode))
+        allow &= LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
+    return ll_fd(rs, fd, allow);
+}
+#endif
+
+static int companion_landlock(const SandboxCompanionCfg *cfg) {
+#ifdef HAVE_LANDLOCK
+    int abi = ll_abi();
+    if (abi < 3) { fprintf(stderr, "sandbox-companion: Landlock ABI %d, 3 is needed (truncate): not started\n", abi); return -1; }
+    const uint64_t rd = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+    const uint64_t wr = rd | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_MAKE_DIR |
+                        LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_REFER;
+    struct landlock_ruleset_attr attr;
+    memset(&attr, 0, sizeof attr);
+    attr.handled_access_fs = wr | LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_MAKE_CHAR | LANDLOCK_ACCESS_FS_MAKE_SOCK |
+                             LANDLOCK_ACCESS_FS_MAKE_FIFO | LANDLOCK_ACCESS_FS_MAKE_BLOCK | LANDLOCK_ACCESS_FS_MAKE_SYM;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    if (abi >= 5) attr.handled_access_fs |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+#if defined(LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET) && defined(LANDLOCK_SCOPE_SIGNAL)
+    if (abi >= 6) attr.scoped = LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET | LANDLOCK_SCOPE_SIGNAL;
+#endif
+    int rs = ll_create(&attr, sizeof attr);
+    if (rs < 0) return -1;
+    int home = open(cfg->home, O_PATH | O_DIRECTORY | O_CLOEXEC);
+    int bad = home < 0 || ll_any(rs, home, rd) || ll_any(rs, cfg->downloads_fd, wr) || ll_any(rs, cfg->app_fd, rd) ||
+              ll_any(rs, cfg->bin_fd, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE);
+    if (home >= 0) close(home);
+    /* what a name lookup and TLS read; a system without one of them just doesn't have it */
+    static const char *const net_ro[] = { "/etc/ssl", "/etc/resolv.conf", "/run/systemd/resolve", NULL };
+    for (int i = 0; cfg->network && net_ro[i] && !bad; i++) {
+        int fd = open(net_ro[i], O_PATH | O_CLOEXEC);
+        if (fd < 0) continue;
+        bad = ll_any(rs, fd, rd);
+        close(fd);
+    }
+    if (bad || apply_nopriv() || ll_enforce(rs)) { close(rs); return -1; }
+    close(rs);
+    return 0;
+#else
+    (void)cfg;
+    return -1;
+#endif
+}
+
+/* A static Go program's syscalls. Left out on purpose: socketpair, listen, accept, ioctl, memfd_create, execve, chmod and
+ * chown in every form, utimensat, symlink and link, setxattr, kill, ptrace, prctl, mount, unshare, setns, seccomp, bpf. */
+static const int allow_companion[] = {
+    NR(SYS_read), NR(SYS_write), NR(SYS_readv), NR(SYS_writev), NR(SYS_pread64), NR(SYS_pwrite64),
+    NR(SYS_close), NR(SYS_lseek), NR(SYS_fstat), NR(SYS_newfstatat), NR(SYS_statx), NR(SYS_fstatfs), NR(SYS_statfs),
+    NR(SYS_openat), NR(SYS_getdents64), NR(SYS_readlinkat), NR(SYS_faccessat), NR(SYS_faccessat2), NR(SYS_fcntl),
+    NR(SYS_dup), NR(SYS_dup3), NR(SYS_pipe2), NR(SYS_ppoll), NR(SYS_pselect6),
+    NR(SYS_epoll_create1), NR(SYS_epoll_ctl), NR(SYS_epoll_pwait), NR(SYS_eventfd2),
+    NR(SYS_mmap), NR(SYS_munmap), NR(SYS_mremap), NR(SYS_mprotect), NR(SYS_madvise), NR(SYS_brk),
+    NR(SYS_rt_sigaction), NR(SYS_rt_sigprocmask), NR(SYS_rt_sigreturn), NR(SYS_rt_sigtimedwait), NR(SYS_sigaltstack),
+    NR(SYS_nanosleep), NR(SYS_clock_nanosleep), NR(SYS_clock_gettime), NR(SYS_clock_getres), NR(SYS_gettimeofday),
+    NR(SYS_getpid), NR(SYS_gettid), NR(SYS_getppid), NR(SYS_getuid), NR(SYS_geteuid), NR(SYS_getgid), NR(SYS_getegid),
+    NR(SYS_getrandom), NR(SYS_getrusage), NR(SYS_sysinfo), NR(SYS_uname), NR(SYS_sched_getaffinity), NR(SYS_sched_yield),
+    NR(SYS_futex), NR(SYS_set_robust_list), NR(SYS_get_robust_list), NR(SYS_set_tid_address), NR(SYS_rseq),
+    NR(SYS_exit), NR(SYS_exit_group), NR(SYS_restart_syscall),
+    NR(SYS_ftruncate), NR(SYS_truncate), NR(SYS_fallocate), NR(SYS_fsync), NR(SYS_fdatasync), NR(SYS_mkdirat), NR(SYS_unlinkat),
+    NR(SYS_renameat2), NR(SYS_renameat), NR(SYS_getcwd), NR(SYS_umask), NR(SYS_sendfile), NR(SYS_splice), NR(SYS_copy_file_range),
+#ifdef SYS_fadvise64
+    NR(SYS_fadvise64),
+#endif
+    NR(SYS_recvmsg), NR(SYS_sendmsg), NR(SYS_recvmmsg), NR(SYS_sendmmsg), NR(SYS_recvfrom), NR(SYS_sendto), NR(SYS_shutdown),
+    NR(SYS_getsockopt), NR(SYS_setsockopt), NR(SYS_getsockname), NR(SYS_getpeername), NR(SYS_bind), NR(SYS_connect),
+#ifdef SYS_arch_prctl
+    NR(SYS_arch_prctl),
+#endif
+#ifdef SYS_stat
+    NR(SYS_stat), NR(SYS_lstat), NR(SYS_access), NR(SYS_readlink), NR(SYS_open), NR(SYS_getdents), NR(SYS_dup2), NR(SYS_pipe), NR(SYS_poll),
+    NR(SYS_epoll_create), NR(SYS_epoll_wait), NR(SYS_eventfd), NR(SYS_getrlimit), NR(SYS_mkdir), NR(SYS_unlink), NR(SYS_rmdir), NR(SYS_rename),
+#endif
+};
+
+/* Each block: a jeq on the number that skips the whole block, or its answer falls through to the wrong syscall. Every
+ * forbidden thing below is tried from inside by tests/companion_e2e.sh. */
+static int companion_filter(struct sock_filter *f, int cap, const SandboxCompanionCfg *cfg, unsigned self) {
+    int n = 0;
+#define EMIT(stmt) do { if (n < cap) f[n] = (struct sock_filter)stmt; n++; } while (0)
+#define LD_NR() EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)))
+#define LD_ARG(i) EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[i])))
+#define RET_ERR(e) EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | ((e) & SECCOMP_RET_DATA)))
+#define RET_OK() EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW))
+    EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SB_AUDIT_ARCH, 1, 0));
+    EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    LD_NR();
+    /* socket: [0]jeq nr [1]ld domain [2]jeq inet [3]jeq inet6 [4]jeq netlink [5]ld protocol [6]jeq route [7]EACCES [8]ALLOW */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_socket), 0, 8));
+    LD_ARG(0);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET, cfg->network ? 5 : 4, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET6, cfg->network ? 4 : 3, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_NETLINK, 0, 2));
+    LD_ARG(2);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0 /* NETLINK_ROUTE */, cfg->network ? 1 : 0, 0));
+    RET_ERR(EACCES);
+    RET_OK();
+    LD_NR();
+    /* the one exec: this descriptor, by descriptor. Landlock decides what it may be */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_execveat), 0, 6));
+    LD_ARG(0);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (unsigned)cfg->bin_fd, 0, 2));
+    LD_ARG(4);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AT_EMPTY_PATH, 1, 0));
+    RET_ERR(EPERM);
+    RET_OK();
+    LD_NR();
+    /* threads only */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_clone), 0, 4));
+    LD_ARG(0);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K, (unsigned)CLONE_THREAD, 1, 0));
+    RET_ERR(EPERM);
+    RET_OK();
+    LD_NR();
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_clone3), 0, 1));
+    RET_ERR(ENOSYS);
+    /* a signal to itself; a limit on itself */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_tgkill), 0, 4));
+    LD_ARG(0);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, self, 1, 0));
+    RET_ERR(EPERM);
+    RET_OK();
+    LD_NR();
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_prlimit64), 0, 5));
+    LD_ARG(0);
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 2, 0));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, self, 1, 0));
+    RET_ERR(EPERM);
+    RET_OK();
+    LD_NR();
+    for (size_t i = 0; i < sizeof allow_companion / sizeof allow_companion[0]; i++) {
+        EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (unsigned)allow_companion[i], 0, 1));
+        RET_OK();
+    }
+    RET_ERR(EPERM);
+#undef RET_OK
+#undef RET_ERR
+#undef LD_ARG
+#undef LD_NR
+#undef EMIT
+    return n;
+}
+
+int sandbox_exec_companion(const SandboxCompanionCfg *cfg) {
+    if (!SB_AUDIT_ARCH || !cfg->home || cfg->home[0] != '/' || !cfg->home[1] || cfg->downloads_fd < 0 || cfg->app_fd < 0 || cfg->bin_fd < 0) return -1;
+    if (apply_nopriv() || drop_caps()) return -1;
+    if (companion_landlock(cfg)) return -1;
+    static struct sock_filter filt[512];
+    int n = companion_filter(filt, (int)(sizeof filt / sizeof filt[0]), cfg, (unsigned)getpid());
+    if (n > (int)(sizeof filt / sizeof filt[0])) return -1;
+    struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_TSYNC, &prog)) return -1;
+    return 0;
 }
 
 int sandbox_apply_helper(const SandboxHelperCfg *cfg) {

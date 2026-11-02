@@ -76,6 +76,24 @@ int sandbox_apply_helper(const SandboxHelperCfg *cfg);
  * read-only, nothing to write but /dev/null; network 0 also means no TCP. Best effort on a kernel with no Landlock. */
 void sandbox_exec_child(int network);
 
+/* ---- a packaged app's companion (app/companion.c, docs/GO-LINK.md 3.3) ----
+ * Right before execveat of the verified binary, in a process with one thread. Go can't apply this from inside, so it
+ * goes on before exec and stays on. Files: read in the home folder, write in ~/Downloads, execute only that binary,
+ * nothing else; with network, read the few system files that needs. Syscalls: its own allowlist. No new AF_UNIX
+ * socket, ever: Landlock doesn't filter connect on named sockets, and with one it could reach the session bus. No
+ * child processes, threads only. No ioctl, no chmod, chown or utimes (Landlock doesn't cover those, and they would
+ * reach the whole home folder). The exec left in the filter names this descriptor, and Landlock lets nothing else
+ * run; with no memfd_create there is no file outside Landlock's reach to run. Unlike every other sandbox here,
+ * this one fails closed as a whole: -1 means don't exec. */
+typedef struct {
+    const char *home;
+    int downloads_fd;       /* ~/Downloads, O_PATH, opened with no link followed */
+    int app_fd;             /* the package's folder */
+    int bin_fd;             /* the binary: the descriptor that was hashed */
+    int network;            /* AF_INET, AF_INET6, AF_NETLINK's route family: the manifest's `network`, allowed */
+} SandboxCompanionCfg;
+int sandbox_exec_companion(const SandboxCompanionCfg *cfg);
+
 /* ---- "no access to your files" for Linux apps (the launcher, apps.c) ----
  * Landlock only: no seccomp, no capability changes, no network or scoping rules, so a normal
  * GTK/Qt app or browser keeps working; device ioctls are not handled (the device restrictions are
