@@ -148,7 +148,7 @@ export {
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
-import { DisplayConfirm, BluetoothPrompt, startHardware } from './hardware.jsx';
+import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, startHardware } from './hardware.jsx';
 // Settings → Displays: numbering, Identify (a big number on each real display) and magnetic arrangement
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
 import { DisplayIdentify } from './displaysui.jsx';
@@ -294,7 +294,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, DisplayConfirm),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, DisplayConfirm),
     at('input', OskPanel, ImeOverlay));
 }
 export { setLoginStill, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';

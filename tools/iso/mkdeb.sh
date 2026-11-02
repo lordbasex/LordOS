@@ -7,6 +7,8 @@
 #   /usr/lib/lordos/bin/lord-netperm      per-app network permissions with cgroup BPF (root, own service)
 #   /usr/lib/lordos/bin/lord-netd         system networking (root; launched and watched by lord-sessiond)
 #   /usr/lib/lordos/bin/lord-fand         fan control by temperature (root, own service, enabled)
+#   /usr/lib/lordos/bin/lord-pkexec       /usr/bin/pkexec on LordOS, no privilege (docs/PRIVACY.md); the real one
+#                                         is diverted to /usr/bin/pkexec.distrib by postinst
 #   /usr/lib/lordos/bin/lord-server       each session's server (looks for ../themes and ../assets)
 #   /usr/bin/lordos-sysreport             System Information's report and LordBench as a command (user;
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
@@ -66,6 +68,8 @@ install -m 755 server/build/lord-sessiond "$L/bin/lord-sessiond"
 install -m 755 server/build/lord-netd "$L/bin/lord-netd"
 install -m 755 server/build/lord-netperm "$L/bin/lord-netperm"
 install -m 755 server/build/lord-fand "$L/bin/lord-fand"
+# /usr/bin/pkexec on LordOS: postinst diverts the real one and links this (docs/PRIVACY.md, "Authentication for Linux apps")
+install -m 755 server/build/lord-pkexec "$L/bin/lord-pkexec"
 # strip for the package's architecture: the host's strip can't read another architecture's binaries
 # (an aarch64 server/build packaged on x86-64 by tools/rpi/build-img.sh), and its errors are ignored below
 STRIP=strip
@@ -93,7 +97,7 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
-"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lordos-firstrun" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
@@ -319,7 +323,7 @@ Version: $VERSION
 Architecture: ${DEB_ARCH:-$(dpkg --print-architecture)}
 Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, rclone, fuse3, openssh-client, openssl$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
+Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, rclone, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$GPUDEPS$DOCDEPS$MEDIADEPS$RTCDEPS
 Recommends: pipewire-pulse, wireplumber, wpasupplicant, openvpn, fonts-noto-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids
 Section: x11
 Priority: optional
@@ -348,6 +352,12 @@ fi
 # conffile, so removing the package also removes it and apt keeps working (docs/UPDATES.md)
 if [ "$1" = configure ] && [ ! -e /etc/apt/sources.list.d/lordos.sources ] && [ -d /etc/apt/sources.list.d ]; then
     install -m 644 /usr/lib/lordos/apt/lordos.sources /etc/apt/sources.list.d/lordos.sources
+fi
+# pkexec reaches the session's authentication agent through lord-pkexec (docs/PRIVACY.md, "Authentication
+# for Linux apps"); the real one keeps its setuid bit under another name, and its updates land there
+if [ "$1" = configure ]; then
+    dpkg-divert --package lordos --quiet --rename --divert /usr/bin/pkexec.distrib --add /usr/bin/pkexec
+    ln -sfn ../lib/lordos/bin/lord-pkexec /usr/bin/pkexec
 fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then
@@ -391,6 +401,11 @@ if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lor
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
 if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations; fi
+# the real pkexec back in its place
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+    if [ -L /usr/bin/pkexec ]; then rm -f /usr/bin/pkexec; fi
+    dpkg-divert --package lordos --quiet --rename --remove /usr/bin/pkexec || true
+fi
 C
 chmod 755 "$PKG/DEBIAN/postrm"
 # files under /etc are conffiles (lintian: file-in-etc-not-marked-as-conffile)

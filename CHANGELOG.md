@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Linux apps that ask for administrator rights with pkexec, such as a launcher updating itself, no longer stop with error 127: LordOS now ships polkit and shows a system prompt that names the app and the command ([#4](https://github.com/lordbasex/LordOS/issues/4)).
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
