@@ -1,7 +1,7 @@
 # Language and region in LordOS
 
 LordOS handles language across the whole system, not just in the interface. It ships with
-**Spanish, English and Portuguese**, and more languages are added with packs, without touching code.
+**Spanish, English, Portuguese and French**, and more languages are added with packs, without touching code.
 
 | Layer | What it does | Where |
 |---|---|---|
@@ -30,7 +30,7 @@ Everything is managed from **Settings → Language & Region** and **Settings →
 | ![packages](language-pack-install.png) | ![xkb](keyboard-layouts.png) |
 | Installing the Debian packages for pt_BR (live apt output) | Brazilian layout (XKB): ´+a = á, ç, ~+a = ã |
 | ![fr](language-pack-french.png) | |
-| A new language pack (French) built with `i18n-pack` and added from Settings | |
+| A language pack built with `i18n-pack` and added from Settings (French, before it became a built-in language) | |
 
 ## Interface text
 
@@ -51,7 +51,7 @@ formatNumber(1234.5, 2)            // "1.234,50" (es_AR) / "1,234.50" (en_US)
 - App names come from `apps.json` (`appName(app)`); if there is no translation, from
   `manifest.json` (whose `name` and `description` are English).
 - **English is the default language** and the fallback: a new user, the greeter, the live system
-  (unless GRUB's Español/Português entry passes `lordos.lang`) and the installer start in English.
+  (unless GRUB's Español, Português or Français entry passes `lordos.lang`) and the installer start in English.
   A language saved in `settings.json` is always kept.
 - Changing the language remounts the whole interface. Windows, tabs and sessions live in stores
   and are kept. That's why lists containing text can't be module-level constants: they are built
@@ -112,18 +112,18 @@ The ones shipped with LordOS are in `assets/locales/`; the user's in
 To create one:
 
 ```sh
-node tools/i18n-pack.mjs new fr "Français" French zero-one-other fr_FR   # lordos-lang-fr.json, in English
+node tools/i18n-pack.mjs new it "Italiano" Italian one-other it_IT    # lordos-lang-it.json, in English
 # translate the file's strings…
-node tools/i18n-check.mjs lordos-lang-fr.json                           # missing keys and variables
+node tools/i18n-check.mjs lordos-lang-it.json                           # missing keys and variables
 ```
 
-Then copy `lordos-lang-fr.json` to your Downloads folder and use **Settings → Language & Region →
+Then copy `lordos-lang-it.json` to your Downloads folder and use **Settings → Language & Region →
 Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slavic`, `polish`,
 `czech-slovak`, `arabic`. `node tools/i18n-pack.mjs export pt` exports an existing language in
 the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en and pt, and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt and fr, and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its

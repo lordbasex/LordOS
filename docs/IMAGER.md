@@ -62,7 +62,7 @@ The interface imports only View, Text, Image, ScrollView, TextInput, Button, Lum
 useKeyboard, t, typeScale, spacing and a store from `@lordos/sdk`; in the desktop build those come
 from `web/sdk.jsx`, which draws them with HTML and Lord Flow's colors (light, dark or automatic).
 The texts are the same catalogs (`assets/locales/<lang>/imager.json`, plus errors, status, mascot
-and countries), so both apps speak English, Spanish and Portuguese identically.
+and countries), so both apps speak English, Spanish, Portuguese and French identically.
 
 The writing rules exist twice, in C for LordOS (`server/src/imager/`) and in Rust for the desktop
 (`desktop/imager/core/`), and are tested against the same fixtures (a real signed `SHA256SUMS`, the
@@ -160,7 +160,7 @@ user's folders). It writes nothing and runs nothing.
 |---|---|---|
 | `version` | `1` | first |
 | `hostname` | RFC 1123 label | `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`, not only digits, not `localhost` |
-| `lang` | `en` \| `es` \| `pt` | the languages LordOS ships |
+| `lang` | `en` \| `es` \| `pt` \| `fr` | the languages LordOS ships |
 | `timezone` | `Area/City` | `[A-Za-z0-9_+-/]`, starts with a capital, no `..`; must exist in the image's zoneinfo |
 | `keyboard`, `keyboard_variant` | xkb layout and variant | `[a-z]{2,10}`; variant `[A-Za-z0-9_-]{0,32}`; the layout must exist in the image |
 | `wifi_country` | two capital letters | `cfg80211.ieee80211_regdom=` in `cmdline.txt` |
@@ -262,7 +262,7 @@ The overclock warns that not every board is stable and how to undo it (delete ou
   In the desktop app the browser's own focus does the same and every control has a screen-reader
   label, role and state (`aria-label`, `aria-checked`, `aria-selected`, `role="progressbar"`…).
   LordOS itself has no screen reader yet; the labels are in place for when it does.
-- **Texts:** every string is in English, Spanish and Portuguese (`node tools/i18n-check.mjs`).
+- **Texts:** every string is in English, Spanish, Portuguese and French (`node tools/i18n-check.mjs`).
 - **Never color alone:** problems carry text, the steps carry numbers and checkmarks.
 
 ## Building the desktop downloads

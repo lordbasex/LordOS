@@ -493,7 +493,7 @@ Options in `cmdline.txt` (a single line), as on the ISO:
 | Option | What it does |
 |---|---|
 | `lordos.gpu=0` | safe mode: everything on the CPU |
-| `lordos.lang=es` / `pt` | first-boot language (English by default, like the ISO) |
+| `lordos.lang=es` / `pt` / `fr` | first-boot language (English by default, like the ISO) |
 | `video=HDMI-A-1:1920x1080@60` | pins the mode, for example on a 4K monitor (on the CPU, 4K is heavy: see below) |
 | remove `splash` (or add `nosplash`) | boots in text, without the boot splash |
 

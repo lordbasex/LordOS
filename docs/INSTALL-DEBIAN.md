@@ -54,7 +54,7 @@ this works even though the script itself comes through a pipe.
      A system installed before this (the Store refuses with "<user> is not an administrator" and nobody is one)
      is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
      the session user to `sudo`, effective after a reboot;
-   - generates the `en_US`, `es_ES` and `pt_BR` UTF-8 locales (the languages the interface ships).
+   - generates the `en_US`, `es_ES`, `pt_BR` and `fr_FR` UTF-8 locales (the languages the interface ships).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
      login (Settings → Users changes it). An existing file is kept;
