@@ -3,7 +3,7 @@
 The design of **go-link Desk for LordOS** and of the public **screen-sharing API** it needs. go-link Desk (desk.go-link.org) is the
 maintainer's own remote desktop project, MIT, in a separate repository. On LordOS it is an optional third-party app in the Store:
 recommended, not privileged, not part of LordOS. The person installs it or doesn't.
-Stage 1, the screen-sharing API, is built and described in [SCREEN-SHARING.md](SCREEN-SHARING.md), with what was tested. The rest is design: it isn't built and it hasn't been tested.
+Stages 1 and 2, the screen-sharing API and packaged apps with a companion, are built: [SCREEN-SHARING.md](SCREEN-SHARING.md) and [PACKAGED-APPS.md](PACKAGED-APPS.md), with what was tested. The rest is design: it isn't built and it hasn't been tested.
 
 How to read it:
 
@@ -64,9 +64,8 @@ Five findings shaped the rest. All **Read**.
 | `.deb` that adds a native app | Not possible: `app_package_dir` looks only in `assets/sysapps` and the home root (`server/src/app/appspawn.c:27-40`). |
 | `lord-rdesk` model | The right shape, but for LordOS's own binary, found next to `lord-server` (`server/src/ui/js_rdesk.c:39-47`). `sandbox_apply_helper` also forbids all sockets (`docs/PRIVACY.md:283`), which an engine can't live with. |
 
-**Answer: the rules don't allow it today.** The changes below are the smallest safe set found. They add a fourth kind of thing to
-LordOS, so this is **open decision D1**, and the new command exception must be approved and listed in `AGENTS.md` and
-`docs/PAPER.md:33`.
+**Answer: the rules didn't allow it.** The changes below are the smallest safe set found, and D1 approved them. They're built:
+[PACKAGED-APPS.md](PACKAGED-APPS.md) says what was built where it differs from this design. The new command exception is in `docs/PAPER.md`.
 
 ### 3.2 The proposed change: a packaged app with a companion
 
@@ -99,19 +98,18 @@ The sandbox is applied before exec, because Go can't apply ours from inside; `sa
 | Limit | Value |
 |---|---|
 | Identity | no capabilities, `no_new_privs`, the app's scope, dies with the app |
-| Landlock, read | the app's folder, `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
-| Landlock, write | `~/.local/share/lordos/appdata/<id>` only: `device.json` and the logs live here |
+| Landlock, read | the home folder, the app's folder, and with network `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
+| Landlock, write | `~/Downloads` only. As built, the home folder is readable (D2), and `device.json` and the logs go through the app (D10) |
 | Landlock, execute | only the engine, so an `execve` left in the filter can start nothing else |
 | seccomp | a new allowlist for a static Go program; `AF_INET` and `AF_INET6` only with the `network` permission, `AF_NETLINK` route for listing interfaces, **never `AF_UNIX`** |
 
 No `AF_UNIX` is the point: Landlock doesn't filter `connect` to named sockets (`docs/PRIVACY.md:189`), so with it the engine could
-reach `remote.sock` and the session bus. On a kernel without Landlock the app is shown as weaker, as Machines does; seccomp must still
-apply or the companion doesn't start. Pion's exact syscalls and its use of netlink are **To test**.
+reach `remote.sock` and the session bus. As built, a kernel without Landlock ABI 3 doesn't start the companion at all, stricter than this design
+first said. Pion's syscalls and netlink were tested on VM 116.
 
-**Files.** go-link's file service browses the home folder and writes to Downloads (go-link:`cmd/desk/main.go:394`). A sandboxed
-engine can't do that, and go-link's own filter for `.ssh` is code inside the process we're containing. Decision: the first version
-gets a `Shared with viewers` folder, `~/Downloads/go-link`, opened by `lord-server` and passed as a descriptor. This is less than the Linux
-version's function, so it is **open decision D2**.
+**Files.** go-link's file service browses the home folder and writes to Downloads (go-link:`cmd/desk/main.go:394`). D2 keeps that function, so
+the sandbox allows exactly that: read in the home folder, write in `~/Downloads`, nothing else. go-link's own filter for `.ssh` is code inside the process
+we're containing, so a compromised engine can read what the user can read in the home folder. It can't change it.
 
 ## 4. The screen-sharing API
 
@@ -289,7 +287,7 @@ permission and the indicator.
 | Keep the display awake | `SHARE_AWAKE`; `pkg/awake`'s D-Bus services aren't ours, and only while a viewer is accepted |
 | Lock when a session ends | `SHARE_LOCK`, because `loginctl` can't work here: LordOS sessions have no logind seat (`docs/SESSIONS.md:465`, go-link:`internal/services/session_end.go:98`) |
 | Open at login | not available to this app today, D4 |
-| Icon in the top bar, by the clock | same menu as on the other platforms: the code, Disconnect, Open, Settings, Check for updates (opens the Store), Test my connection, About, Quit; red while a session lasts. Third-party top-bar icons need an API of their own: to design |
+| Icon in the top bar, by the clock | same menu as on the other platforms: the code, Disconnect, Open, Settings, Check for updates (opens the Store), Test my connection, About, Quit; red while a session lasts. The API is `statusItem` with the `status-item` permission ([PACKAGED-APPS.md](PACKAGED-APPS.md)) |
 | Visible as an app | in Applications and the Dock, with go-link's icon |
 | Update | off, by APT |
 | Connect to another computer | native, in the same window, as in go-link: the viewer's tabs and panels, with the picture shown through the engine's MediaView path. Not designed yet |
@@ -311,11 +309,11 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | `pkg/awake` | Tagged to `SHARE_AWAKE`. |
 | `internal/services` | New `encoded_source.go`, a `MediaSource` for encoded frames, with an optional interface on the sink: `EncodedFrame(codec, key, pts, data)` writes to the viewer's `sampleWriter` (go-link:`internal/services/video.go:208`), and `EncodedAudio` to the Opus track, skipping `VideoFrame`'s encoder per viewer (go-link:`internal/services/stream_service.go:633`). PLI maps to `RP_KEYFRAME`, the bandwidth estimate to `RP_RATE`, and `Hearing` gates `RP_AFRAME`. `pickCodec` (go-link:`internal/services/video.go:166`) gets a variant that never picks High. |
 | `internal/services/consent.go` | A `SocketConsent`: sends the request to the app and waits. The app gone means `ErrUnavailable`, so it fails closed as `NobodyToAsk` does (go-link:`internal/services/consent.go:46`). `LockScreen` gets a hook. |
-| `internal/appsock` (new) | The app's protocol on fd 3: length-framed JSON, 64 KB at most, one message type per field of `uiOptions` (go-link:`cmd/desk/ui.go:14`): status, code, consent, permissions, chat, files, settings, links. |
+| `internal/appsock` (new) | The app's protocol on fd 3: one JSON text per `SOCK_SEQPACKET` message, 64 KB at most, one message type per field of `uiOptions` (go-link:`cmd/desk/ui.go:14`): status, code, consent, permissions, chat, files, settings, links. |
 | `cmd/desk` | `ui_lordos.go`, `runUI` over `appsock`; `ui_headless.go` gets `&& !lordos`. Under `lordos`, the `--test-*` flags aren't compiled, and `setConsent` is always set (go-link:`cmd/desk/main.go:533`). Configuration comes from the app's data folder. |
 | `internal/updater` | Nothing: only the GUI starts it (go-link:`internal/gui/update.go:53`), so a `lordos` build has none. Off by construction. |
 | `build/lordos` (new) | nFPM file, `go-link-desk-lordos`, installs to `/usr/lib/lordos-apps/go-link-desk/`, `Depends: lordos (>= 0.8.7.1)`, no maintainer scripts. It doesn't conflict with the Linux package. |
-| `lordos-app/` (new) | The React app, built with a pinned `tools/lpk.mjs`, which needs a small "sign an unpacked tree" mode. |
+| `lordos-app/` (new) | The React app, built with a pinned `tools/lpk.mjs` and its `tree` mode. |
 | `frontend` | The `in_use` reason, the `/privacy/lordos` page. |
 
 ## 9. Packaging, Store and updates
@@ -342,13 +340,13 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | Signaling server in the middle, rewriting the SDP on both sides | Linked devices are protected: the proofs cover the fingerprints (go-link:`docs/security.md:82`). The person sees the request and decides | **Residual DTLS risk:** a code session has no such proof. The visitor's name is only declared. A server that controls both sides can read a session the person accepted, believing it was someone else. Proposed fix: a short code from both fingerprints, read out by voice, D5 |
 | A fake visitor | Knock, 60-second question, one at a time, name shown as declared (go-link:`docs/security.md:26-31`) | The scammer on the phone, go-link's own warning and panel stand against it |
 | TURN relay | Only DTLS and SRTP | Size and timing |
-| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: no home folder, no `AF_UNIX`, no exec. The engine doesn't parse video | While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
+| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: nothing to write but Downloads, no `AF_UNIX`, no exec. The engine doesn't parse video | It can read the home folder and send it out (D2). While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
 | A visitor with control abuses the desktop | Permission boxes, the panel, Stop, 4.7's drops | They can do what the person can do in ordinary windows. That is what control means |
 | A visitor presses Allow, or changes their own permissions | System surfaces take no API input | The app's own panel is an ordinary window: drop injected input to the app's own windows too. To decide in stage 3 |
 | Another app abuses the API | Scope identity, prompt, root-owned store, indicator, no frames without it, one holder, no resize on a monitor session, rate limits, never blocks the compositor | **An unsandboxed Linux app runs as the user.** It can attach to an approved app, or edit its files. The permission is consent, not a sandbox, for Linux apps. Their isolation is what it is (`docs/PRIVACY.md:40`) |
 | An app hides or fakes the indicator | Drawn by the shell, `notification` layer, frames only after it shows | A fullscreen surface's own drawing can imitate one; it can't remove the real one. `xdg_popup`s paint above everything (`docs/LAYERS.md`): to test that one can't sit on the badge |
 | Same-uid access to `remote.sock` | Refused since `2825555c` (D6) | Root |
-| Links in `device.json` | Under the app's data folder, 0600 | An unsandboxed app of the same user can add one. D3 weighs this |
+| Links in `device.json` | Under the app's data folder, 0600, written by the app (D10) | An unsandboxed app of the same user can add one. D3 weighs this |
 | A forged package | Signature at desk.go-link.org, pinned hash, LordOS archive signature, Verified author check at each load, revocation | The go-link release computer, and the catalog's reviewer |
 | A locked session seen | Ended in `lord-server`, not by the client | A frame already in a socket or a viewer's decoder |
 | Secrets through the clipboard | Sensitive items and earlier copies never go | What the person copies during the session |
@@ -358,13 +356,13 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 
 ## 11. Staged plan
 
-Estimates are estimates, one person full time, not commitments. Nothing below has started. The stages run in order except where noted.
+Estimates are estimates, one person full time, not commitments. Stages 1 and 2 are built; the rest hasn't started. The stages run in order except where noted.
 
 | Stage | Work | Done when | Estimate |
 |---|---|---|---|
 | **0. Proof of concept** | `lord-desk`, a throwaway Go program on a test VM with a test session and no real data: connects to `remote.sock` as the same user (finding 2), sends `RP_VIDEO`, reads `RP_VFRAME`, feeds Pion through go-link's signaling, with the measurement build's auto-accept. No API, no app, no sandbox | A browser at desk.go-link.org shows the session live with the code, H.264 and VP8; a lost frame recovers through `RP_KEYFRAME`; a protected window is black; the encoder stops when the viewer leaves; latency, CPU and bit rate written down | 3–5 days |
 | **1. API** (LordOS 0.8.7.1) | `share.c`, `share.sock`, permissions, `share-grant`, indicator, stop shortcut, section 5, input rules; tests and fuzz run as for 5673 | A test client passes every state of 4.6; every row of section 5 on a VM, with the page's message; a browser on 5673 behaves as before when no share exists (the 5673 tests, and the same measurements before and after); revoke cuts within a second | 3–4 weeks |
-| **2. Companion** (LordOS 0.8.7.1, needs D1) | Third root, `BOP_COMPANION`, `sandbox_exec_companion`, catalog check | A test package with a Go binary runs with Pion working; `sandbox-test` style checks inside it: no home, no `AF_UNIX`, no exec; a changed byte refuses to start; the same manifest in a home `.lpk` is ignored | 2 weeks |
+| **2. Companion** (LordOS 0.8.7.1, needs D1) | Third root, `BOP_COMPANION`, `sandbox_exec_companion`, catalog check | A test package with a Go binary runs with Pion working; checks inside it: nothing written outside Downloads, nothing read outside the home folder, no `AF_UNIX`, no exec; a changed byte refuses to start; the same manifest in a home `.lpk` is ignored | 2 weeks |
 | **3. Engine** | Section 8's packages in go-link | `make check` passes for other platforms with no change in their files beyond build lines; go-link's tests pass; a headless run against the API serves a browser, with acceptance answered over the socket, and the app gone means refusal | 2–3 weeks |
 | **4. App** | React app and all pages | The go-link functions of section 7 work on amd64 and arm64, in all themes, right to left included | 2 weeks |
 | **5. Measurements and review** | VM 116, a real GPU with VA-API, Raspberry Pi 5; a security review of the API and companion; an attack run like `docs/REMOTE.md`'s | Numbers per machine in this document; findings fixed; go/no-go on claims for each machine | 1–2 weeks |
@@ -376,11 +374,11 @@ measured.
 
 ## 12. What has been tested
 
-**Tested:** stage 1 only: [SCREEN-SHARING.md](SCREEN-SHARING.md), "What was tested". Nothing from stage 2 on has run.
+**Tested:** stages 1 and 2: [SCREEN-SHARING.md](SCREEN-SHARING.md) and [PACKAGED-APPS.md](PACKAGED-APPS.md), "What was tested". Nothing from stage 3 on has run.
 
 **Read, and relied on:** everything cited above, as of commit `a621d38e` of LordOS and `1203f15` of go-link Desk.
 
-**To test first,** because the design leans on them: the pure-Go engine build; Pion under the seccomp list; UI and engine in one scope's
+**To test first,** because the design leans on them: the pure-Go engine build; UI and engine in one scope's
 limits; Baseline at the session's size against the `42e01f` line both sides offer; mono Opus in go-link's track; the indicator above every kind of
 fullscreen, direct scanout included; x264 on the Pi.
 
@@ -388,7 +386,7 @@ fullscreen, direct scanout included; x264 on the Pi.
 
 - **D1. Packaged apps with a companion (decided: yes).** 3.2 as proposed: a third read-only app root, a Verified-author check at load, and a fourth exception to "the server doesn't run commands".
 - **D2. Files (decided by the maintainer).** Every function of go-link stays, files included, as on Linux. The sandbox must give the engine the
-  access that takes; a compromised engine would reach what that access covers. The exact paths go with stage 2.
+  access that takes; a compromised engine would reach what that access covers. The paths, set in stage 2: read in the home folder, write in `~/Downloads`, nothing else.
 - **D3. Unattended access (decided).** Stays as on Linux, off by default.
 - **D4. Open at login (decided).** Optional, per app, through the broker.
 - **D5. Short verification code (decided).** Optional, defined on go-link's side.
@@ -398,4 +396,6 @@ fullscreen, direct scanout included; x264 on the Pi.
   system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
 - **D7. The numbers (set in stage 1, still the maintainer's to change):** Stop is ⌃⌥⇧Esc, the indicator wait 2 s, keyframes at most one per 500 ms and, on a still screen, a burst of 3 then one per 30 s; 1,000 pointer events and 200 keys a second.
 - **D8. Scope limits** for a packaged app, if stage 2 shows one core or 512 MB isn't enough.
+- **D10. The engine's own files.** With write in `~/Downloads` and nothing else, `device.json` and the logs can't live in the app's data folder as 3.3 first said,
+  unless that folder is added. Stage 2 didn't add it. Today the engine hands them to the app over fd 3, and the app keeps them with `lord.fs`.
 - **D9. Assistants and the terminal.** Their views are part of the copy. Running them needs a wider sandbox than the rest of the app; how is to be decided.

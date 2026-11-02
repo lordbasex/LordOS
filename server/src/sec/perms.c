@@ -13,7 +13,7 @@
 
 static const char *const names[PERM_COUNT] = {
     "files", "clipboard", "notifications", "network", "camera", "microphone",
-    "screen", "listen", "usb", "bluetooth", "apps",
+    "screen", "listen", "usb", "bluetooth", "apps", "status-item",
 };
 
 const char *perm_name(Perm p) { return (p >= 0 && p < PERM_COUNT) ? names[p] : "?"; }

@@ -164,10 +164,10 @@ void js_broker_poll(void) {
 
 /* ¿la app declaró `network` y lo tiene permitido? (se decide antes de la caja de arena) */
 int js_broker_wants_network(void) {
-    const char *home = getenv("HOME"), *root = lpk_root();
-    if (!home || !root || !app_id[0]) return 0;
-    char path[PATH_MAX];
-    snprintf(path, sizeof path, "%s/%s/manifest.json", root, app_id);
+    const char *home = getenv("HOME");
+    if (!home || !pkg_dir[0] || !app_id[0]) return 0;
+    char path[PATH_MAX + 32];
+    snprintf(path, sizeof path, "%s/manifest.json", pkg_dir);        /* the folder app_package_dir found, whichever root */
     int fd = open(path, O_RDONLY | O_CLOEXEC);
     if (fd < 0) return 0;
     char m[64 * 1024];
@@ -362,6 +362,65 @@ int js_broker_send(int op, const void *payload, uint32_t len) {
 }
 
 /* lord.broker.pick(save, nombreSugerido) → { fd, name } | null (el diálogo lo dibuja lord-server) */
+/* ---- the companion (a packaged app only; broker.h, app/companion.c) ----
+ * One socket message is one JSON text, 64 KB at most. What arrives goes to __lordBrokerEvent("companion", data). */
+#define COMPANION_MSG (64 * 1024)
+static int comp_fd = -1;
+
+int js_broker_companion_fd(void) { return comp_fd; }
+
+void js_broker_companion_read(void) {
+    static char buf[COMPANION_MSG + 1];
+    for (int i = 0; i < 16 && comp_fd >= 0; i++) {
+        ssize_t n = recv(comp_fd, buf, COMPANION_MSG, MSG_DONTWAIT | MSG_TRUNC);
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
+        if (n <= 0) {
+            close(comp_fd);
+            comp_fd = -1;
+            static const char gone[] = "{\"companion\":\"ended\",\"code\":\"\"}";
+            js_broker_app_event("companion", gone, sizeof gone - 1);
+            return;
+        }
+        if (n > COMPANION_MSG) continue;                  /* too long: not delivered in part */
+        buf[n] = 0;
+        js_broker_app_event("companion", buf, (size_t)n);
+    }
+}
+
+/* lord.broker.companion() → true if lord-server took the request; the answer comes as a companion event. */
+static JSValue f_broker_companion(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    if (comp_fd >= 0) return JS_TRUE;
+    char line[160] = "";
+    int fd = rpc_fd(BOP_COMPANION, NULL, 0, line, sizeof line);
+    if (fd < 0) return line[0] ? js_throw_line(c, line) : JS_FALSE;
+    comp_fd = fd;
+    return JS_TRUE;
+}
+
+/* lord.broker.companionSend(text) → false if it isn't running, or can't take it now. */
+static JSValue f_broker_companion_send(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    size_t n = 0;
+    const char *s = JS_ToCStringLen(c, &n, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    int ok = comp_fd >= 0 && n && n <= COMPANION_MSG && send(comp_fd, s, n, MSG_DONTWAIT | MSG_NOSIGNAL) == (ssize_t)n;
+    JS_FreeCString(c, s);
+    return JS_NewBool(c, ok);
+}
+
+/* lord.broker.statusItem(json) → false if refused; "" takes it off. lord-server validates and rewrites it. */
+static JSValue f_broker_status_item(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    size_t n = 0;
+    const char *s = JS_ToCStringLen(c, &n, argv[0]);
+    if (!s) return JS_EXCEPTION;
+    int st = BST_ERROR;
+    int r = rpc(BOP_STATUS, s, (uint32_t)n, &st, NULL, NULL);
+    JS_FreeCString(c, s);
+    return JS_NewBool(c, !r && st == BST_OK);
+}
+
 static JSValue f_broker_pick(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     int save = JS_ToBool(c, argv[0]);
@@ -731,6 +790,7 @@ static const JSCFunctionListEntry broker_funcs[] = {
     JS_CFUNC_DEF("request", 1, f_broker_request), JS_CFUNC_DEF("device", 2, f_broker_device), JS_CFUNC_DEF("state", 0, f_broker_state),
     JS_CFUNC_DEF("pick", 2, f_broker_pick), JS_CFUNC_DEF("fdRead", 1, f_fd_read), JS_CFUNC_DEF("fdWrite", 2, f_fd_write), JS_CFUNC_DEF("fdClose", 1, f_fd_close), JS_CFUNC_DEF("fdSize", 1, f_fd_size),
     JS_CFUNC_DEF("menus", 1, f_broker_menus), JS_CFUNC_DEF("textFocus", 3, f_broker_text_focus), JS_CFUNC_DEF("openApp", 3, f_broker_open_app),
+    JS_CFUNC_DEF("companion", 0, f_broker_companion), JS_CFUNC_DEF("companionSend", 1, f_broker_companion_send), JS_CFUNC_DEF("statusItem", 1, f_broker_status_item),
     JS_CFUNC_DEF("micStart", 0, f_mic_start), JS_CFUNC_DEF("micStop", 0, f_mic_stop), JS_CFUNC_DEF("micLevel", 0, f_mic_level),
 };
 static const JSCFunctionListEntry locale_funcs[] = {

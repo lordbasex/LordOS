@@ -51,6 +51,10 @@ enum BrokerOp {
                          * refused; lord-server adds the process's own status and keeps it for lord.sysinfo */
     BOP_TEXT_FOCUS,     /* payload "on y h": a text field of the app took or lost focus (window coordinates).
                          * Only a hint for the on-screen keyboard: no text, and no way to press a key */
+    BOP_COMPANION,      /* (a packaged app only) no payload, nothing taken from the app: the id is the connection's.
+                         * Starts the signed binary its manifest names (app/companion.c) → the socket to it */
+    BOP_STATUS,         /* (permission status-item) payload: JSON of its item by the clock, "" to take it off
+                         * (sec/statusitem.c); the shell draws it. A choice comes back as a "status" event */
     BOP_EVENT = 100,    /* server → app, unrequested (reqid 0): payload "type\0json" */
 };
 
@@ -85,6 +89,10 @@ void brokersrv_set_vault(int fd);
 /* The app on broker fd `fd` is a system package (assets/sysapps, verified by app_package_dir): it
  * keeps the keyring owner and lord-maild access it had in-process. */
 void brokersrv_set_system(int fd);
+/* The app on broker fd `fd` lives in the third root (sec/pkgapp.h), as lord-server found it, not as it says. */
+void brokersrv_set_packaged(int fd);
+/* The user chose an item of an app's status menu. */
+void brokersrv_status_click(const char *app, const char *item);
 /* Args for an isolated app (wm.open(id, { args }) in the session): sent now if it is running, or
  * kept and sent when it starts. `json` is a JSON object (≤ 16 KiB). 0 if sent or kept. */
 int  brokersrv_open_args(const char *id, const char *json, size_t len, int new_window);

@@ -659,5 +659,16 @@
   "wallpaper.removeFailed": "The wallpaper could not be changed",
   "wallpaper.notDownloaded": "That wallpaper is not downloaded",
   "share.badGrant": "That permission request isn’t valid.",
-  "share.grantFailed": "The permission couldn’t be saved."
+  "share.grantFailed": "The permission couldn’t be saved.",
+  "companion.badManifest": "The packaged app's manifest.json is not valid",
+  "companion.exec": "The companion could not be started",
+  "companion.noDownloads": "Downloads isn't a folder in the home folder",
+  "companion.noHome": "No home folder for the companion",
+  "companion.noScope": "The companion couldn't join its app's scope",
+  "companion.none": "This app has no companion",
+  "companion.notInstalled": "This packaged app isn't installed safely",
+  "companion.notListed": "The signature doesn't cover the companion",
+  "companion.notVerified": "This package isn't signed by a Verified author",
+  "companion.root": "A companion never runs as root",
+  "companion.sandbox": "The companion's sandbox couldn't be applied, so it wasn't started"
 }

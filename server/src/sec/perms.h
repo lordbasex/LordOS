@@ -23,6 +23,7 @@ typedef enum {
     PERM_USB,
     PERM_BLUETOOTH,
     PERM_APPS,          /* launch other apps */
+    PERM_STATUS,        /* an item by the clock (sec/statusitem.c) */
     PERM_COUNT,
 } Perm;
 

@@ -21,6 +21,7 @@
 #include "../apps.h"
 #include "../lpk.h"
 #include "../sec/sign.h"
+#include "../sec/pkgapp.h"
 #include "../sec/pkgstate.h"
 #include "../sec/perms.h"
 #include "../app/app.h"
@@ -1624,6 +1625,8 @@ static int lpk_reserved(const char *id) {
     return stat(path, &st) == 0;
 }
 
+int js_sys_reserved_id(const char *id) { return lpk_reserved(id); }
+
 static int valid_version(const char *v) {
     size_t n = strlen(v);
     if (!n || n > 32 || !isdigit((unsigned char)v[0])) return 0;
@@ -1689,10 +1692,10 @@ static JSValue lpk_check(JSContext *c, JSValueConst arg, int install) {
         lpk_free(&pk);
         return js_throw_code(c, "lpk.badManifest", NULL);
     }
-    char id[64], ver[48], name[128], icon[224];
+    char id[64], ver[48], name[128], icon[224], dir[PATH_MAX];
     const char *why = NULL;
     if (!str_prop(c, m, "id", id, sizeof id) || !lpk_valid_id(id)) why = "lpk.badId";
-    else if (lpk_reserved(id)) why = "lpk.reservedId";
+    else if (lpk_reserved(id) || !pkgapp_dir(id, dir, sizeof dir)) why = "lpk.reservedId";    /* a packaged app's id stays its own */
     else if (!str_prop_tr(c, m, "name", name, sizeof name, 1)) why = "lpk.noName";
     else if (!str_prop(c, m, "version", ver, sizeof ver) || !valid_version(ver)) why = "lpk.badVersion";
     else if (!str_prop(c, m, "icon", icon, sizeof icon) || !lpk_find(&pk, icon) || strlen(icon) < 5 || strcmp(icon + strlen(icon) - 4, ".png"))
@@ -1744,29 +1747,40 @@ static JSValue f_apps_remove(JSContext *c, JSValueConst this_val, int argc, JSVa
     return JS_NewBool(c, ok);
 }
 
-/* lord.apps.packages() → [{ id, dir, manifest (text) }] of the installed apps. */
+/* One app of a root, in the list; returns how many were added. */
+static uint32_t package_entry(JSContext *c, JSValue arr, uint32_t n, const char *root, const char *id, int packaged) {
+    char path[PATH_MAX * 2];
+    snprintf(path, sizeof path, "%s/%s/manifest.json", root, id);
+    size_t len;
+    char *txt = read_small(path, 256 * 1024, &len);
+    if (!txt) return 0;
+    JSValue o = JS_NewObject(c);
+    snprintf(path, sizeof path, "%s/%s", root, id);
+    JS_SetPropertyStr(c, o, "id", JS_NewString(c, id));
+    JS_SetPropertyStr(c, o, "dir", JS_NewString(c, path));
+    JS_SetPropertyStr(c, o, "manifest", JS_NewStringLen(c, txt, len));
+    if (packaged) JS_SetPropertyStr(c, o, "packaged", JS_TRUE);
+    free(txt);
+    JS_SetPropertyUint32(c, arr, n, o);
+    return 1;
+}
+
+/* lord.apps.packages() → [{ id, dir, manifest (text), packaged }] of the installed apps: the third root first, and a
+ * home folder of the same id doesn't count. Whether a packaged app really loads is checked when it starts. */
 static JSValue f_apps_packages(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
     JSValue arr = JS_NewArray(c);
-    const char *root = lpk_root();
-    DIR *d = root ? opendir(root) : NULL;
     uint32_t n = 0;
     struct dirent *e;
-    while (d && (e = readdir(d)) && n < 500) {
-        if (!lpk_valid_id(e->d_name)) continue;
-        char path[PATH_MAX * 2];
-        snprintf(path, sizeof path, "%s/%s/manifest.json", root, e->d_name);
-        size_t len;
-        char *txt = read_small(path, 256 * 1024, &len);
-        if (!txt) continue;
-        JSValue o = JS_NewObject(c);
-        snprintf(path, sizeof path, "%s/%s", root, e->d_name);
-        JS_SetPropertyStr(c, o, "id", JS_NewString(c, e->d_name));
-        JS_SetPropertyStr(c, o, "dir", JS_NewString(c, path));
-        JS_SetPropertyStr(c, o, "manifest", JS_NewStringLen(c, txt, len));
-        free(txt);
-        JS_SetPropertyUint32(c, arr, n++, o);
-    }
+    char dir[PATH_MAX];
+    DIR *d = opendir(pkgapp_root());
+    while (d && (e = readdir(d)) && n < 100)
+        if (!pkgapp_dir(e->d_name, dir, sizeof dir)) n += package_entry(c, arr, n, pkgapp_root(), e->d_name, 1);
+    if (d) closedir(d);
+    const char *root = lpk_root();
+    d = root ? opendir(root) : NULL;
+    while (d && (e = readdir(d)) && n < 500)
+        if (lpk_valid_id(e->d_name) && pkgapp_dir(e->d_name, dir, sizeof dir)) n += package_entry(c, arr, n, root, e->d_name, 0);
     if (d) closedir(d);
     return arr;
 }

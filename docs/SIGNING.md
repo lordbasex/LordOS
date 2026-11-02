@@ -70,6 +70,9 @@ They are shown in the Store and in the install dialog:
 | ![unsigned](signing-unsigned.png) | ![revoked](signing-revoked.png) |
 | An unsigned package warns before installing | A revoked package is not installed, with a clear message |
 
+A **packaged app** in `/usr/lib/lordos-apps/<id>/` must be a Verified author's: a key the catalog lists, not revoked, checked at every load over every file
+([PACKAGED-APPS.md](PACKAGED-APPS.md)). Signed by any other key, or by the official one, or with no catalog, it doesn't load.
+
 ## Rules
 
 - **Updates**: a new version must be signed with the **same key** as the installed one (like
@@ -354,7 +357,8 @@ See [RELEASING.md](RELEASING.md), step 3.
 | `server/src/sec/json.c` | strict JSON reader |
 | `server/src/sec/keys.h` | official public keys |
 | `server/src/ui/js_sec.c` | `lord.sign` for the SDK (status, restore, share, userKey) |
-| `tools/lpk.mjs` | package, sign, verify, keygen and catalog |
+| `server/src/sec/pkgapp.c` | the third app root: the same check on a folder, a Verified author's key |
+| `tools/lpk.mjs` | package, sign, verify, keygen, catalog and a signed tree for a packaged app |
 | `packaging/keys/lordos-dev.pub` | development public key |
 | `server/src/sec/codesig.c` | verified system code: the signed manifest and the check of each bundle at load time |
 | `tools/code-manifest.mjs` | writes `code-manifest.json` (run by `npm run build`) |

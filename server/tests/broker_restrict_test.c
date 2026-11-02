@@ -34,6 +34,14 @@ static int fails, total;
 static void check(int ok, const char *what) { total++; printf("%s: %s\n", ok ? "ok  " : "FAIL", what); if (!ok) fails++; }
 
 /* ---- stand-ins for the rest of lord-server ---- */
+/* packaged apps: nothing here is one, so a call that reaches these is a test failure */
+static int spawned;
+int pkgapp_dir(const char *id, char *out, size_t n) { (void)id; (void)out; (void)n; return -1; }
+int pkgapp_manifest(const char *dir, const char *id, void *m) { (void)dir; (void)id; (void)m; return -1; }
+int app_companion_spawn(const char *id, int net, int share, int *fd) { (void)id; (void)net; (void)share; (void)fd; spawned++; return -1; }
+int share_companion(const char *id, int may_input) { (void)id; (void)may_input; spawned++; return -1; }
+int statusitem_clean(const char *app, const char *json, size_t len, char *out, size_t n) { (void)app; (void)json; (void)len; snprintf(out, n, "{}"); return 0; }
+int statusitem_id_ok(const char *id) { (void)id; return 1; }
 const char *term_clipboard(void) { return "clipboard text"; }
 void term_set_clipboard(const char *s, size_t n) { (void)s; (void)n; }
 void term_clipboard_mark(const char *app, int secret) { (void)app; (void)secret; }
@@ -220,6 +228,8 @@ int main(void) {
     for (size_t i = 0; i < sizeof perms_on / sizeof *perms_on; i++) perm_set("game", (Perm)perm_from_name(perms_on[i]), PERM_ALLOW);
 
     /* ---- clipboard ---- */
+    check(call(BOP_COMPANION, NULL, 0) && got_status == BST_DENIED && !spawned, "companion: an app from the home folder is refused, nothing started");
+    check(call(BOP_STATUS, "{}", 2) && got_status == BST_DENIED, "status item: refused without the permission");
     check(call(BOP_CLIP_GET, NULL, 0) && got_status == BST_OK && !strcmp(got, "clipboard text"), "clipboard: read with the permission");
     restrict_app("lpk:game", FW_R_NO_CLIPBOARD);
     check(call(BOP_CLIP_GET, NULL, 0) && denied_with("fw.restricted.clipboard"), "clipboard: no-clipboard refuses it with fw.restricted.clipboard");

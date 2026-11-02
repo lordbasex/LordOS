@@ -6,6 +6,7 @@
 #include "app.h"
 #include "../lpk.h"
 #include "../sec/broker.h"
+#include "../sec/pkgapp.h"
 #include "../ui/js_sys.h"
 #include "../vault/vclient.h"
 #include "apphost_bc.h"
@@ -17,7 +18,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -34,6 +37,7 @@ int app_package_dir(const char *id, const char *assets, char *out, size_t n) {
             (size_t)snprintf(out, n, "%s", real) < n)
             return 1;
     }
+    if (!pkgapp_dir(id, out, n)) return 2;
     const char *root = lpk_root();
     if (root && (size_t)snprintf(out, n, "%s/%s", root, id) < n && !stat(out, &st) && S_ISDIR(st.st_mode)) return 0;
     return -1;
@@ -48,6 +52,7 @@ int app_spawn(const char *id) {
     char dir[PATH_MAX];
     int sys = app_package_dir(id, js_sys_assets(), dir, sizeof dir);
     if (sys < 0) return -1;
+    if (sys == 2 && js_sys_reserved_id(id)) return -1;    /* LordOS's own string namespaces, as for a home .lpk */
     /* one process per app: if it is already running, it opens another window instead */
     if (!brokersrv_new_window(id)) { fprintf(stderr, "lord-server: app '%s' already running: new window\n", id); return 0; }
 
@@ -112,7 +117,36 @@ int app_spawn(const char *id) {
     close(pp[0]);
     if (brokersrv_add(sv[0], id, (int)app)) { close(sv[0]); return -1; }
     if (vfd >= 0) brokersrv_set_vault(sv[0]);   /* this app may also ask for the FIDO2 device */
+    if (sys == 2) brokersrv_set_packaged(sv[0]);  /* may ask for its companion; the app process itself proves nothing */
     if (sys == 1) brokersrv_set_system(sv[0]);  /* a system package: its keyring owner, lord-maild (brokermail.c) */
     fprintf(stderr, "lord-server: app '%s' started as an isolated process (pid %d)\n", id, (int)app);
     return 0;
+}
+
+int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd) {
+    *app_fd = -1;
+    int sv[2];
+    if (!lpk_valid_id(id) || socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) { if (share_fd >= 0) close(share_fd); return -1; }
+    pid_t pid = fork();
+    if (pid == 0) {
+        setsid();
+        prctl(PR_SET_PDEATHSIG, SIGKILL);       /* it doesn't outlive lord-server */
+        signal(SIGTERM, SIG_DFL);
+        signal(SIGHUP, SIG_DFL);
+        sigset_t none;
+        sigemptyset(&none);
+        sigprocmask(SIG_SETMASK, &none, NULL);
+        int a = fcntl(sv[1], F_DUPFD, 16), b = share_fd >= 0 ? fcntl(share_fd, F_DUPFD, 16) : -1;
+        if (a < 0 || dup2(a, 3) != 3) _exit(127);
+        if (b >= 0) { if (dup2(b, 4) != 4) _exit(127); } else close(4);
+        syscall(SYS_close_range, 5U, ~0U, 0U);  /* nothing of the compositor's follows */
+        char *const argv[] = { (char *)"lord-companion", (char *)"--companion", (char *)id, (char *)(network ? "1" : "0"), NULL };
+        execve("/proc/self/exe", argv, environ);
+        _exit(127);
+    }
+    close(sv[1]);
+    if (share_fd >= 0) close(share_fd);
+    if (pid < 0) { close(sv[0]); return -1; }
+    *app_fd = sv[0];
+    return (int)pid;
 }

@@ -9,6 +9,8 @@
 int  js_broker_fd(void);              /* fd del broker para poll; -1 si no hay */
 void js_broker_poll(void);            /* mensajes del servidor sin pedir (indicadores, tema) */
 int  js_broker_pending(void);         /* events queued during an RPC, not dispatched yet */
+int  js_broker_companion_fd(void);       /* the socket to the companion, or -1 */
+void js_broker_companion_read(void);     /* it has something: → __lordBrokerEvent("companion", data) */
 void js_broker_set_pkgdir(const char *dir, int system);   /* before the sandbox; system: assets/sysapps */
 int  js_broker_code_refused(void);    /* the system app's app.js was refused (verified code) */
 int  js_broker_wants_network(void);   /* la app declaró `network` y lo tiene permitido */

@@ -53,9 +53,9 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
 MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/ui/js_media.c
-SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c
+SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
-APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
+APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
 SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
@@ -305,6 +305,18 @@ build/share-fuzz: tests/share_fuzz.c $(SHARE_SEC_SRC) $(SHARE_SEC_HDR)
 	$(CC) $(CPPFLAGS) -Isrc -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/share_fuzz.c $(SHARE_SEC_SRC)
 	./$@ 200000 || { rm -f $@; exit 1; }
+# Packaged apps: the check on an unpacked folder, a status item's description (docs/GO-LINK.md)
+test: build/pkgapp-test
+PKGAPP_TEST_SRC := src/sec/pkgapp.c src/sec/sign.c src/sec/statusitem.c src/sec/json.c src/lpk.c src/pkg/crypto.c
+build/pkgapp-test: tests/pkgapp_test.c $(PKGAPP_TEST_SRC) build/obj/ui/stb.o $(wildcard src/sec/*.h) src/lpk.h src/pkg/crypto.h
+	$(CC) $(CPPFLAGS) -Isrc $(CFLAGS) $(WARN) -std=c11 -DLORD_SIGN_TEST -o $@ tests/pkgapp_test.c $(PKGAPP_TEST_SRC) build/obj/ui/stb.o -lm
+	./$@
+# not part of any install: lord-server taking its official key and third app root from the environment, for
+# tests/companion_e2e.sh. Only sign.c and pkgapp.c differ.
+build/obj-pkgtest/%.o: src/sec/%.c $(HDR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DLORD_PKGAPP_TEST -c -o $@ $<
+
 # not part of make test: drives a real session on a test machine (tests/share_e2e.sh)
 build/share-client: tests/share_client.c src/remote/sharewire.c $(SHARE_SEC_HDR)
 	@mkdir -p build
@@ -697,6 +709,11 @@ build/doc-test: tests/doc_test.c src/doc/wire.c src/sec/json.c $(wildcard src/do
 
 # Passwords and the system keyring (docs/PASSWORDS.md): rules in mk/vault*.mk
 include $(sort $(wildcard mk/*.mk))
+# after the includes: everything build/lord-server links
+PKGTEST_OBJ := $(filter-out build/obj/sec/sign.o build/obj/sec/pkgapp.o,$(sort $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ) build/obj/vault/monocypher.o \
+               $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(LAN_SRV_OBJ) $(HW_OBJ) $(VC_OBJ) $(MAILC_OBJ) build/obj/outputs.o))
+build/lord-server-pkgtest: $(PKGTEST_OBJ) build/obj-pkgtest/sign.o build/obj-pkgtest/pkgapp.o
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 # lord-netd (docs/NETWORK.md, "The network belongs to the system"): admin.c with LORD_NETD (net-* actions
 # only) plus networking and the package engine (net-vpn-enable). libc only; lord-sessiond runs it.

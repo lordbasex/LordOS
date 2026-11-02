@@ -202,6 +202,8 @@ Our own code, without bubblewrap, flatpak or firejail. It uses kernel 6.12 featu
 If something is missing in the kernel (old Landlock, missing controller, no delegation), it is
 reported in the log and the sandbox goes on without that part; the app starts anyway.
 
+A packaged app's companion has a sandbox of its own, `sandbox_exec_companion`, which unlike this one fails closed as a whole: [PACKAGED-APPS.md](PACKAGED-APPS.md).
+
 ### The malicious app test (`tests/lpk-evil`, in its own process)
 
 The app declares **zero** permissions and tries everything when it opens. Session log (VM 122,

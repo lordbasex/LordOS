@@ -13,6 +13,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - **Screen-sharing API** ([docs/SCREEN-SHARING.md](docs/SCREEN-SHARING.md)): a separate door for an app the launcher started, with its own socket and parser, a system prompt on first use, grants in a root-owned file, an indicator with Stop on screen before any frame leaves, and ⌃⌥⇧Esc in C. It ends in `lord-server` the moment the session locks or leaves the monitor, delivers no picture and takes no input until the person signs in again, and doesn't exist on the login screen. One door at a time per session: while a share runs a remote desktop sign-in is told to wait, and a connected remote desktop viewer keeps a share from starting.
+- **Packaged apps with a companion** ([docs/PACKAGED-APPS.md](docs/PACKAGED-APPS.md)): a third, root-owned app root, `/usr/lib/lordos-apps/<id>/`, for a package a Verified author signed, checked at every load. Such an app may run one signed helper program in a strict sandbox, started with the app and stopped with it, and may use the screen-sharing API with `screen-share` and `remote-input`.
+- **An item by the clock for any app**, with the `status-item` permission: the app describes it, the system draws it.
 
 ### Fixed
 
@@ -21,6 +23,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Security
 
+- A Linux app can no longer take a package's identity: an id starting `lpk-` no longer starts in a scope that reads as that package's.
 - **The session's remote socket takes only root:** `lord-sessiond` and its bridge connect as root, so a process of the same user can no longer read the screen or send input through `remote.sock`.
 
 ## [0.8.7-beta] - 2026-11-01

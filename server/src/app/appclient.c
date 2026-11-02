@@ -19,6 +19,7 @@
 #include "../canvas.h"
 #include "../keyboard.h"
 #include "../lpk.h"
+#include "../sec/pkgapp.h"
 #include "../sec/sandbox.h"
 #include "probe.h"
 
@@ -489,6 +490,13 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
             return 2;
         }
     }
+    /* a packaged app: its whole signed folder and a Verified author's key, at every load (docs/SIGNING.md) */
+    if (sys == 2) {
+        PkgManifest pm;
+        LpkSigInfo si;
+        char err[200] = "";
+        if (pkgapp_verify(id, &pm, &si, NULL, err, sizeof err)) { fprintf(stderr, "lord-server --app: '%s' was refused: %s\n", id, err); return 2; }
+    }
     /* carpeta de datos de la app (la única que puede escribir) */
     const char *home = getenv("HOME");
     char data[PATH_MAX], parent[PATH_MAX - 48];
@@ -576,18 +584,21 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
             if (w->used && w->configured && w->need_render && !w->frame_pending) render(w);
         }
         wl_display_flush(dpy);
-        struct pollfd pfd[2];
+        struct pollfd pfd[3];
         int n = 0;
         pfd[n].fd = wfd; pfd[n].events = POLLIN; n++;
         int bfd = js_broker_fd();
         if (bfd >= 0) { pfd[n].fd = bfd; pfd[n].events = POLLIN; n++; }
+        int cfd = js_broker_companion_fd(), ci = -1;
+        if (cfd >= 0) { ci = n; pfd[n].fd = cfd; pfd[n].events = POLLIN; n++; }
         int wait = delay < 0 ? 100 : (int)ceil(delay);
         if (js_broker_pending()) wait = 0;       /* events that arrived during an RPC */
         if (wl_display_prepare_read(dpy) != 0) { wl_display_dispatch_pending(dpy); continue; }
         if (poll(pfd, (nfds_t)n, wait) < 0 && errno != EINTR) { wl_display_cancel_read(dpy); break; }
         if (pfd[0].revents & POLLIN) wl_display_read_events(dpy); else wl_display_cancel_read(dpy);
         wl_display_dispatch_pending(dpy);
-        if ((n > 1 && (pfd[1].revents & POLLIN)) || js_broker_pending()) js_broker_poll();
+        if ((bfd >= 0 && (pfd[1].revents & POLLIN)) || js_broker_pending()) js_broker_poll();
+        if (ci >= 0 && pfd[ci].revents) js_broker_companion_read();
         if (pfd[0].revents & (POLLHUP | POLLERR)) break;
     }
     js_shutdown();

@@ -659,5 +659,16 @@
   "wallpaper.removeFailed": "Não foi possível alterar o fundo",
   "wallpaper.notDownloaded": "Esse fundo não foi baixado",
   "share.badGrant": "Esse pedido de permissão não é válido.",
-  "share.grantFailed": "Não foi possível salvar a permissão."
+  "share.grantFailed": "Não foi possível salvar a permissão.",
+  "companion.badManifest": "O manifest.json do app empacotado não é válido",
+  "companion.exec": "Não foi possível iniciar o companheiro",
+  "companion.noDownloads": "Downloads não é uma pasta dentro da pasta pessoal",
+  "companion.noHome": "Não há pasta pessoal para o companheiro",
+  "companion.noScope": "O companheiro não pôde entrar no escopo do seu app",
+  "companion.none": "Este app não tem companheiro",
+  "companion.notInstalled": "Este app empacotado não está instalado de forma segura",
+  "companion.notListed": "A assinatura não cobre o companheiro",
+  "companion.notVerified": "Este pacote não está assinado por um autor verificado",
+  "companion.root": "Um companheiro nunca roda como root",
+  "companion.sandbox": "Não foi possível aplicar a sandbox do companheiro, então ele não foi iniciado"
 }

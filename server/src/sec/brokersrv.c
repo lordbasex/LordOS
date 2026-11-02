@@ -15,6 +15,10 @@
 #include "../keyboard.h"
 #include "../vault/vclient.h"
 #include "../pkg/crypto.h"
+#include "../app/app.h"
+#include "../remote/share.h"
+#include "pkgapp.h"
+#include "statusitem.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -25,15 +29,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 #define MAX_APPS 32
 #define MAX_PENDING 32
 
-typedef struct { int fd, pid, used, resync; char id[48]; MAudio *mic; int mic_ringfd; int vault, sys; } AppConn;
+typedef struct {
+    int fd, pid, used, resync; char id[48]; MAudio *mic; int mic_ringfd; int vault, sys;
+    int packaged, comp_pid, comp_starts, status_on;
+    double status_at;
+} AppConn;
 static AppConn apps[MAX_APPS];
+
+#define COMP_STARTS 5                   /* a companion that keeps dying isn't started forever */
+#define STATUS_GAP 0.1                  /* seconds between updates of a status item */
+static int comp_dying[MAX_APPS];        /* killed, not reaped yet */
 
 /* prompts waiting for the user's answer (ui id → app + fd + permission + the app's reqid) */
 typedef struct { int used; uint32_t ui, reqid; int fd; char id[48]; Perm perm; } Pending;
@@ -143,6 +157,19 @@ void brokersrv_menu_click(const char *app, const char *item) {
     for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && !strcmp(apps[i].id, app)) send_event(&apps[i], "menu", json, strlen(json));
 }
 
+static void status_off(AppConn *a) {
+    if (!a->status_on) return;
+    a->status_on = 0;
+    queue_evt("status", "{\"app\":\"%s\",\"off\":true}", a->id);
+}
+
+void brokersrv_status_click(const char *app, const char *item) {
+    if (!app || !item || !statusitem_id_ok(item)) return;
+    char json[64];
+    int n = snprintf(json, sizeof json, "{\"item\":\"%s\"}", item);
+    for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].status_on && !strcmp(apps[i].id, app)) send_event(&apps[i], "status", json, (size_t)n);
+}
+
 void brokersrv_revoke(const char *app, const char *perm) {
     char json[128];
     snprintf(json, sizeof json, "{\"perm\":\"%s\"}", perm);
@@ -151,11 +178,21 @@ void brokersrv_revoke(const char *app, const char *perm) {
         if (apps[i].used && !strcmp(apps[i].id, app) && apps[i].mic) { maudio_close(apps[i].mic); apps[i].mic = NULL; }
     if (!strcmp(perm, "microphone")) brokercam_revoke_mic(app);
     if (!strcmp(perm, "camera")) brokercam_revoke(app);     /* kills its lord-media: the stream stops now */
+    if (!strcmp(perm, "status-item")) for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && !strcmp(apps[i].id, app)) status_off(&apps[i]);
     if (!strcmp(perm, "camera") || !strcmp(perm, "microphone"))
         queue_evt("device", "{\"app\":\"%s\",\"kind\":\"%s\",\"on\":false}", app, perm);
 }
 
+/* Companions are lord-server's children: gone ones are reaped here, never waited for. */
+static void comp_tick(void) {
+    for (int i = 0; i < MAX_APPS; i++) {
+        if (comp_dying[i] > 0 && waitpid(comp_dying[i], NULL, WNOHANG) != 0) comp_dying[i] = 0;
+        if (apps[i].used && apps[i].comp_pid > 0 && waitpid(apps[i].comp_pid, NULL, WNOHANG) != 0) apps[i].comp_pid = 0;
+    }
+}
+
 void brokersrv_tick(void) {
+    comp_tick();
     brokercam_tick();
     brokerkr_tick();
     brokermail_tick();
@@ -225,6 +262,7 @@ int brokersrv_add(int fd, const char *id, int pid) {
     return -1;
 }
 
+void brokersrv_set_packaged(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].packaged = 1; }
 void brokersrv_set_system(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].sys = 1; }
 int brokersrv_conn_system(int conn) { return conn >= 0 && conn < MAX_APPS && apps[conn].used && apps[conn].sys; }
 void brokersrv_shell_event(const char *kind, const char *json) { queue_evt(kind, "%s", json); }
@@ -280,6 +318,15 @@ static void drop(AppConn *a) {
         if (pend[i].used && pend[i].fd == a->fd) pend[i].used = 0;
         if (picks[i].used && picks[i].fd == a->fd) picks[i].used = 0;
     }
+    /* the companion stops with its app: the end of its socket is a request, this isn't */
+    if (a->comp_pid > 0) {
+        kill(a->comp_pid, SIGKILL);
+        int i = (int)(a - apps);
+        if (comp_dying[i] > 0) waitpid(comp_dying[i], NULL, 0);    /* just killed: immediate */
+        comp_dying[i] = a->comp_pid;
+        a->comp_pid = 0;
+    }
+    status_off(a);
     /* los indicadores de esta app se apagan */
     queue_evt("device", "{\"app\":\"%s\",\"off\":true}", a->id);
     if (a->mic) { maudio_close(a->mic); a->mic = NULL; }
@@ -387,6 +434,44 @@ static void probe_store(int pid, const char *payload, uint32_t len) {
 }
 
 const char *brokersrv_probe_result(void) { return probe_have ? probe_json : NULL; }
+
+/* The app asks; everything else comes from what lord-server knows about this connection. The package is read here
+ * only for what it declares: checking it takes time, so that happens in the child, before anything of it runs. */
+static void companion_start(AppConn *a, uint32_t reqid) {
+    int fd = a->fd;
+    PkgManifest m;
+    char dir[PATH_MAX];
+    if (!a->packaged || pkgapp_dir(a->id, dir, sizeof dir) || pkgapp_manifest(dir, a->id, &m) || !m.companion[0]) {
+        send_reply(fd, reqid, BST_DENIED, NULL, 0);
+        return;
+    }
+    /* it reads the home folder: the same restriction as the file dialog */
+    if (deny_restricted(fd, reqid, a->id, FW_R_NO_FILES)) return;
+    if (a->comp_pid > 0 || a->comp_starts >= COMP_STARTS) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    int share = -1;
+    if (m.screen && (share = share_companion(a->id, m.input)) < 0) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    int appfd = -1, net = m.network && perm_get(a->id, PERM_NETWORK) == PERM_ALLOW;
+    int pid = app_companion_spawn(a->id, net, share, &appfd);
+    if (pid < 0) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    a->comp_pid = pid;
+    a->comp_starts++;
+    send_reply_fd(fd, reqid, BST_OK, NULL, 0, appfd);
+    close(appfd);
+}
+
+static void status_set(AppConn *a, uint32_t reqid, const char *payload, uint32_t len) {
+    int fd = a->fd;
+    if (!len) { status_off(a); send_reply(fd, reqid, BST_OK, NULL, 0); return; }
+    if (perm_get(a->id, PERM_STATUS) != PERM_ALLOW) { send_reply(fd, reqid, BST_DENIED, NULL, 0); return; }
+    double t = mono_s();
+    if (t - a->status_at < STATUS_GAP) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    static char out[3800];
+    if (statusitem_clean(a->id, payload, len, out, sizeof out)) { send_reply(fd, reqid, BST_ERROR, NULL, 0); return; }
+    a->status_at = t;
+    a->status_on = 1;
+    queue_evt("status", "%s", out);
+    send_reply(fd, reqid, BST_OK, NULL, 0);
+}
 
 static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) {
     int fd = a->fd;
@@ -606,6 +691,12 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
         else send_reply(fd, h->reqid, BST_OK, name, (uint32_t)strlen(name));
         break;
     }
+    case BOP_COMPANION:
+        companion_start(a, h->reqid);
+        break;
+    case BOP_STATUS:
+        status_set(a, h->reqid, payload, h->len);
+        break;
     case BOP_KEYRING:
         brokerkr_handle((int)(a - apps), fd, h->reqid, a->id, payload, h->len);
         break;

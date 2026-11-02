@@ -226,7 +226,17 @@ static JSValue f_broker_open_args(JSContext *c, JSValueConst t, int argc, JSValu
     if (json) JS_FreeCString(c, json);
     return JS_NewBool(c, ok);
 }
+static JSValue f_broker_status_click(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    const char *app = JS_ToCString(c, argv[0]), *item = JS_ToCString(c, argv[1]);
+    if (app && item) brokersrv_status_click(app, item);
+    if (app) JS_FreeCString(c, app);
+    if (item) JS_FreeCString(c, item);
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry broker_funcs[] = {
+    JS_CFUNC_DEF("statusClick", 2, f_broker_status_click),
     JS_CFUNC_DEF("openArgs", 3, f_broker_open_args),
     JS_CFUNC_DEF("resolve", 2, f_broker_resolve),
     JS_CFUNC_DEF("publish", 2, f_broker_publish),

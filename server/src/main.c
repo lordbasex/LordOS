@@ -2206,6 +2206,8 @@ int main(int argc, char **argv) {
     /* (0.8.5) a component's network connector (sec/netconn.h): only creates sockets in its scope */
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-code")) return check_code(argc, argv);
+    /* a packaged app's companion (app/companion.c): checks the signed package, then becomes it, in its sandbox */
+    if (argc > 1 && !strcmp(argv[1], "--companion")) return companion_main(argc, argv);
     /* «modo app»: lord-server --app <id> corre una app .lpk como cliente Wayland aislado
      * (app/appclient.c). El id ya viene validado del propio lord-server (no de JS). */
     if (argc >= 3 && !strcmp(argv[1], "--app")) {
