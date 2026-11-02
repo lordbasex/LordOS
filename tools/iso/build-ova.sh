@@ -52,8 +52,7 @@ id_of() {       # a UUID from the squashfs's hash: id_of <label>
 UUID_ROOT=$(id_of root)
 UUID_DISK=$(id_of disk)
 UUID_VM=$(id_of machine)
-ESP_ID=$(id_of esp | cut -c1-8)                 # mkfs.vfat wants it as 8 hex digits
-ESP_UUID=$(echo "$ESP_ID" | tr '[:lower:]' '[:upper:]' | sed 's/^\(....\)/\1-/')
+ESP_UUID=1234-ABCD                              # the id mkfs.vfat --invariant writes, whatever -i says
 VMDK_CID=$(id_of cid | cut -c1-8)
 
 echo "== LordOS $VERSION: OVA in $W (clock $EPOCH)"
@@ -77,7 +76,7 @@ sgdisk --disk-guid="$UUID_DISK" -n 1:0:+1M -t 1:ef02 -c 1:biosboot -u "1:$(id_of
 LOOP=$(losetup --find --show --partscan "$RAW")
 for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "${LOOP}p3" ] && break; sleep 1; done
 [ -b "${LOOP}p3" ] || { echo "build-ova.sh: no partitions on $LOOP" >&2; exit 1; }
-mkfs.vfat -F 32 -n EFI -i "$ESP_ID" "${LOOP}p2" > /dev/null
+mkfs.vfat -F 32 -n EFI --invariant "${LOOP}p2" > /dev/null
 mkfs.ext4 -F -q -L LordOS -U "$UUID_ROOT" "${LOOP}p3"
 mount "${LOOP}p3" "$T"
 
@@ -166,7 +165,7 @@ umount "$T"
 losetup -d "$LOOP"; LOOP=""
 find "$W/esp" -exec touch -h -d "@$EPOCH" {} +
 truncate -s "$ESP_B" "$W/esp.img"
-mkfs.vfat -F 32 -n EFI -i "$ESP_ID" --invariant "$W/esp.img" > /dev/null
+mkfs.vfat -F 32 -n EFI --invariant "$W/esp.img" > /dev/null
 SOURCE_DATE_EPOCH="$EPOCH" mcopy -s -m -i "$W/esp.img" "$W/esp/EFI" ::/
 truncate -s "$ROOT_B" "$W/root.img"
 E2FSPROGS_FAKE_TIME="$EPOCH" mke2fs -q -F -t ext4 -L LordOS -U "$UUID_ROOT" -E "hash_seed=$UUID_ROOT,lazy_itable_init=0,lazy_journal_init=0" \
