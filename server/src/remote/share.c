@@ -39,7 +39,7 @@
 #define MAX_CONN 6
 #define MAX_SOCK_CONN 4                 /* the rest are companions' (share_companion): sockets can't take them all */
 #define IN_MAX (SW_MAX_MSG + 64 * 1024)
-#define OUT_MAX (8u << 20)              /* a client this far behind is cut */
+#define OUT_MAX (8u << 20)              /* a client this far behind loses what comes next; a picture stops long before, at VIDEO_LIMIT */
 #define VIDEO_LIMIT (3u << 20)          /* this far behind it skips to the next keyframe, as a 5673 viewer */
 #define INDICATOR_MS 2000.0             /* no indicator within this: no_indicator */
 #define PROMPT_MS 60000.0

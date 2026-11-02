@@ -211,7 +211,7 @@ static void live_open(int conn, int fd, uint32_t reqid, const char *app, const c
     int mine = 0;
     for (int i = 0; i < MAX_CAMS; i++) { if (cams[i].used && cams[i].conn == conn) mine++; if (!cams[i].used && !c) c = &cams[i]; }
     int sp[2], ring = -1;
-    if (!c || mine >= 4 || link_pair(sp)) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+    if (!c || mine >= 4 || !brokersrv_conn_has_link(conn) || link_pair(sp)) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
     MediaSrc *s = media_src_new(SK_CAMERA, app);
     if (s) s->audio = maudio_open(0, app, "Remote computer", "video", &ring);
     int fds[2] = { sp[1], ring };

@@ -318,6 +318,8 @@ static void clip_secret_tick(void) {
 
 /* Hands the companion of connection `conn` one end of a live link (media/live.h). Never waits: a companion that isn't
  * reading loses the stream, nothing else. */
+int brokersrv_conn_has_link(int conn) { return conn >= 0 && conn < MAX_APPS && apps[conn].used && apps[conn].comp_link > 0; }
+
 int brokersrv_conn_link(int conn, const char *msg, int passfd) {
     if (conn < 0 || conn >= MAX_APPS || !apps[conn].used || apps[conn].comp_link <= 0) return -1;
     struct iovec iov = { (void *)msg, strlen(msg) };

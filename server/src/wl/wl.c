@@ -2555,6 +2555,23 @@ int wl_focus_protected(void) {
     return top && node_protected(top->node);
 }
 
+static const char *app_of_client(struct wl_client *cl) {
+    pid_t pid = 0;
+    uid_t uid;
+    gid_t gid;
+    if (!cl) return NULL;
+    wl_client_get_credentials(cl, &pid, &uid, &gid);
+    return brokersrv_app_of_pid((int)pid);
+}
+
+const char *wl_focus_app(void) { return dpy && key_focus ? app_of_client(key_focus->client) : NULL; }
+
+const char *wl_node_app(int node) {
+    if (!dpy || !node) return NULL;
+    for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->node == node) return app_of_client(surfs[i]->client);
+    return NULL;
+}
+
 int wl_send_paste(void) {
     if (!dpy || !key_focus) return 0;
     unsigned t = now_ms();
