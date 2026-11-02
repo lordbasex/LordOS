@@ -40,7 +40,7 @@ compositor's:
 Any failure stops there: nothing of the package runs, and the app hears why on fd 3. A changed byte gives `sig.fileModified`.
 
 **Descriptors:** 3, a `SOCK_SEQPACKET` socket to the app, one JSON text per message, 64 KB at most. 4, a connection to the sharing API tied to `lpk:<id>`, only if the manifest declares
-`screen-share`. 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
+`screen-share`. 5, the home folder, open for listing it. 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
 
 **It ends with the app:** when the app's broker connection goes, lord-server sends SIGKILL and reaps it; the end of fd 3 is there for a clean exit; and `PR_SET_PDEATHSIG` covers lord-server
 dying. A companion that keeps dying is started 5 times at most per run of the app.
@@ -54,18 +54,24 @@ Everything or it doesn't start: a kernel with Landlock below ABI 3, or any rule 
 | Limit | Value |
 |---|---|
 | Identity | no capabilities, `no_new_privs`, not root |
-| Read | the home folder, the app's folder; with network, `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
-| Write | `~/Downloads`: files and folders, rename, delete, truncate. No links, sockets or fifos |
+| Read | the home's visible entries, as they were at start; the app's folder; with network, `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
+| Write | `~/Downloads` and `~/.local/share/lordos/appdata/<id>`: files and folders, rename, delete, truncate. No links, sockets or fifos |
 | Execute | only the binary |
 | Network | with `network` declared and allowed: `AF_INET`, `AF_INET6` and netlink's route family. It connects and binds; `listen` and `accept` are refused |
 | Everything else | a syscall allowlist of its own, EPERM for the rest |
 
+**The home folder** has no Landlock rule of its own, because a rule covers a whole hierarchy. Each entry not starting with a dot gets one when the companion starts, 4,096 at most, and links get none (Landlock judges where
+they end). So no dot-file or dot-folder can be opened, read or listed, and nothing else in the home either until the next start if it's made later. Listing the home by name is refused too: that's what fd 5 is for. Landlock doesn't
+cover `stat`, so a hidden name can still be probed for existence and size, and fd 5 shows the names at the home's first level. The rest of the path is go-link's own filter, on the visitor's side.
+
+**`fcntl`** is filtered by command: `F_GETFD`, `F_SETFD`, `F_GETFL`, `F_DUPFD_CLOEXEC`, and `F_SETFL` without `O_ASYNC`. Everything else gets EPERM: `F_SETOWN` and the rest of the owner and signal family, leases, `F_NOTIFY`, locks, pipe sizes.
+
 **Never** a new `AF_UNIX` socket or `socketpair`: Landlock doesn't filter `connect` on named sockets. Refused too: `fork` and any `clone` that isn't a thread, `execve`, `memfd_create`, `ioctl`,
 `prctl`, `ptrace`, `unshare`, `kill`, signals and `prlimit` on another process, and `chmod`, `chown`, `utimensat` and `setxattr`, which Landlock doesn't cover and which would otherwise reach the
-whole home folder. `execveat` stays in the filter because the filter is on before the exec, and it names one descriptor. Landlock lets only the binary run, and without `memfd_create` there's no file
+whole home folder. `flock` is allowed, on what it can open. `execveat` stays in the filter because the filter is on before the exec, and it names one descriptor. Landlock lets only the binary run, and without `memfd_create` there's no file
 out of Landlock's reach to run.
 
-**What it can do if compromised:** read what the user can read in the home folder and send it out, write in Downloads, and, while a share runs, what fd 4 grants. It can't change anything else.
+**What it can do if compromised:** read the visible files of the home folder and send them out, write in Downloads and its own data, and, while a share runs, what fd 4 grants. It can't change anything else.
 
 ## An item by the clock
 

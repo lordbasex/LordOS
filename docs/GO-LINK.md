@@ -98,8 +98,8 @@ The sandbox is applied before exec, because Go can't apply ours from inside; `sa
 | Limit | Value |
 |---|---|
 | Identity | no capabilities, `no_new_privs`, the app's scope, dies with the app |
-| Landlock, read | the home folder, the app's folder, and with network `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
-| Landlock, write | `~/Downloads` only. As built, the home folder is readable (D2), and `device.json` and the logs go through the app (D10) |
+| Landlock, read | the home's visible entries (D10), the app's folder, and with network `/etc/ssl`, `/etc/resolv.conf`, `/run/systemd/resolve` |
+| Landlock, write | `~/Downloads` and the app's data folder (D10) |
 | Landlock, execute | only the engine, so an `execve` left in the filter can start nothing else |
 | seccomp | a new allowlist for a static Go program; `AF_INET` and `AF_INET6` only with the `network` permission, `AF_NETLINK` route for listing interfaces, **never `AF_UNIX`** |
 
@@ -108,8 +108,8 @@ reach `remote.sock` and the session bus. As built, a kernel without Landlock ABI
 first said. Pion's syscalls and netlink were tested on VM 116.
 
 **Files.** go-link's file service browses the home folder and writes to Downloads (go-link:`cmd/desk/main.go:394`). D2 keeps that function, so
-the sandbox allows exactly that: read in the home folder, write in `~/Downloads`, nothing else. go-link's own filter for `.ssh` is code inside the process
-we're containing, so a compromised engine can read what the user can read in the home folder. It can't change it.
+the sandbox allows that and D10's data folder. go-link's own filter for `.ssh` is code inside the process we're containing, so the sandbox holds the same line by itself: a compromised engine
+can read the home's visible files and send them out, not its hidden ones. It can't change them.
 
 ## 4. The screen-sharing API
 
@@ -340,13 +340,13 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | Signaling server in the middle, rewriting the SDP on both sides | Linked devices are protected: the proofs cover the fingerprints (go-link:`docs/security.md:82`). The person sees the request and decides | **Residual DTLS risk:** a code session has no such proof. The visitor's name is only declared. A server that controls both sides can read a session the person accepted, believing it was someone else. Proposed fix: a short code from both fingerprints, read out by voice, D5 |
 | A fake visitor | Knock, 60-second question, one at a time, name shown as declared (go-link:`docs/security.md:26-31`) | The scammer on the phone, go-link's own warning and panel stand against it |
 | TURN relay | Only DTLS and SRTP | Size and timing |
-| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: nothing to write but Downloads, no `AF_UNIX`, no exec. The engine doesn't parse video | It can read the home folder and send it out (D2). While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
+| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: nothing to write but Downloads and its own data, no `AF_UNIX`, no exec. The engine doesn't parse video | It can read the home's visible files and send them out (D2, D10). While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
 | A visitor with control abuses the desktop | Permission boxes, the panel, Stop, 4.7's drops | They can do what the person can do in ordinary windows. That is what control means |
 | A visitor presses Allow, or changes their own permissions | System surfaces take no API input | The app's own panel is an ordinary window: drop injected input to the app's own windows too. To decide in stage 3 |
 | Another app abuses the API | Scope identity, prompt, root-owned store, indicator, no frames without it, one holder, no resize on a monitor session, rate limits, never blocks the compositor | **An unsandboxed Linux app runs as the user.** It can attach to an approved app, or edit its files. The permission is consent, not a sandbox, for Linux apps. Their isolation is what it is (`docs/PRIVACY.md:40`) |
 | An app hides or fakes the indicator | Drawn by the shell, `notification` layer, frames only after it shows | A fullscreen surface's own drawing can imitate one; it can't remove the real one. `xdg_popup`s paint above everything (`docs/LAYERS.md`): to test that one can't sit on the badge |
 | Same-uid access to `remote.sock` | Refused since `2825555c` (D6) | Root |
-| Links in `device.json` | Under the app's data folder, 0600, written by the app (D10) | An unsandboxed app of the same user can add one. D3 weighs this |
+| Links in `device.json` | Under the app's data folder, 0600, written by the engine (D10) | An unsandboxed app of the same user can add one. D3 weighs this |
 | A forged package | Signature at desk.go-link.org, pinned hash, LordOS archive signature, Verified author check at each load, revocation | The go-link release computer, and the catalog's reviewer |
 | A locked session seen | Ended in `lord-server`, not by the client | A frame already in a socket or a viewer's decoder |
 | Secrets through the clipboard | Sensitive items and earlier copies never go | What the person copies during the session |
@@ -396,6 +396,6 @@ fullscreen, direct scanout included; x264 on the Pi.
   system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
 - **D7. The numbers (set in stage 1, still the maintainer's to change):** Stop is ⌃⌥⇧Esc, the indicator wait 2 s, keyframes at most one per 500 ms and, on a still screen, a burst of 3 then one per 30 s; 1,000 pointer events and 200 keys a second.
 - **D8. Scope limits** for a packaged app, if stage 2 shows one core or 512 MB isn't enough.
-- **D10. The engine's own files.** With write in `~/Downloads` and nothing else, `device.json` and the logs can't live in the app's data folder as 3.3 first said,
-  unless that folder is added. Stage 2 didn't add it. Today the engine hands them to the app over fd 3, and the app keeps them with `lord.fs`.
+- **D10. The engine's own files (decided).** The companion may write its own app-data folder (`device.json`, logs, settings) and `~/Downloads`, nothing else. It reads the home's
+  visible entries, as they were when it started: no dot-file and no dot-folder, in the sandbox as well as in the visitor's browser. [PACKAGED-APPS.md](PACKAGED-APPS.md) says what's enforced.
 - **D9. Assistants and the terminal.** Their views are part of the copy. Running them needs a wider sandbox than the rest of the app; how is to be decided.
