@@ -48,9 +48,18 @@ have() { command -v "$1" >/dev/null 2>&1; }
     if have lsusb; then lsusb 2>/dev/null; lsusb -t 2>/dev/null; else echo "lsusb isn't installed (package usbutils)"; fi
     end
 
-    section "Memory and disks"
+    section "CPU"
+    if have lscpu; then lscpu 2>/dev/null | grep -E '^(Architecture|CPU\(s\)|Vendor ID|Model name|Thread|Core|Socket|CPU max MHz|CPU min MHz|Virtualization|Hypervisor|L[23] cache)'; else grep -m1 'model name' /proc/cpuinfo; nproc; fi
+    end
+
+    section "Memory"
     free -h 2>/dev/null
-    lsblk -o NAME,SIZE,TYPE,FSTYPE,TRAN,MODEL 2>/dev/null
+    grep -E '^(Swap|Huge)' /proc/meminfo 2>/dev/null | head -n 3
+    end
+
+    section "Disks and partitions"
+    lsblk -o NAME,SIZE,TYPE,PTTYPE,FSTYPE,TRAN,ROTA,MODEL,MOUNTPOINT 2>/dev/null
+    df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null
     end
 
     section "Displays"
