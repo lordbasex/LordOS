@@ -27,6 +27,7 @@ fi
 out="${HOME:-/tmp}/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 [ -w "${HOME:-/nonexistent}" ] || out="/tmp/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 MAX=60000
+echo "Collecting the report. This can take up to two minutes..." >&2
 host=$(hostname 2>/dev/null)
 user=${SUDO_USER:-$(id -un)}
 
