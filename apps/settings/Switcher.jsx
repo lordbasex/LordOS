@@ -32,15 +32,15 @@ export function SwitcherSettings({ tr }) {
         <SettingRow label={tr('settings.kb.switcher.skin')}><Segmented small value={p.skin} onChange={(v) => put({ skin: v })} options={opts('skin', ['system', 'glass', 'solid', 'contrast', 'custom'])} /></SettingRow>
         {p.skin === 'custom' && <ColorRow label={tr('settings.kb.switcher.customBg')} value={p.customBg} onChange={(v) => put({ customBg: v })} />}
         {p.skin === 'custom' && <ColorRow label={tr('settings.kb.switcher.customAccent')} value={p.customAccent} onChange={(v) => put({ customAccent: v })} />}
-        <SettingRow label={tr('settings.kb.switcher.numbers')}><Toggle value={p.numbers} onChange={(v) => put({ numbers: v })} /></SettingRow>
-        <SettingRow label={tr('settings.kb.switcher.windows')}><Toggle value={p.windows} onChange={(v) => put({ windows: v })} /></SettingRow>
-        <SettingRow label={tr('settings.kb.switcher.hideMinimized')}><Toggle value={p.hideMinimized} onChange={(v) => put({ hideMinimized: v })} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.numbers')}><Toggle small on={p.numbers} onChange={(v) => put({ numbers: v })} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.windows')}><Toggle small on={p.windows} onChange={(v) => put({ windows: v })} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.hideMinimized')}><Toggle small on={p.hideMinimized} onChange={(v) => put({ hideMinimized: v })} /></SettingRow>
       </Section>
       {rows.length > 0 && (
         <Section title={tr('settings.kb.switcher.excluded')} footer={tr('settings.kb.switcher.excludedHint')}>
           {rows.map((r) => (
             <SettingRow key={r.key} label={r.name}>
-              <Toggle value={!p.excluded.includes(r.key)} onChange={(v) => put({ excluded: v ? p.excluded.filter((k) => k !== r.key) : [...p.excluded, r.key] })} />
+              <Toggle small on={!p.excluded.includes(r.key)} onChange={(v) => put({ excluded: v ? p.excluded.filter((k) => k !== r.key) : [...p.excluded, r.key] })} />
             </SettingRow>
           ))}
         </Section>
