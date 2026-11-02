@@ -32,7 +32,7 @@ static struct {
     uint32_t *px;
 } C = { .efd = -1, .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER };
 
-static void read_frame(GLuint fbo, unsigned *seen) {
+static void read_frame(unsigned *seen) {
     pthread_mutex_lock(&C.mu);
     GLsync f = C.fence;
     C.fence = NULL;
@@ -71,7 +71,7 @@ static void *worker(void *u) {
         int stop = C.stop;
         pthread_mutex_unlock(&C.mu);
         if (stop) break;
-        read_frame(fbo, &seen);
+        read_frame(&seen);
     }
     glDeleteFramebuffers(1, &fbo);
     eglMakeCurrent(C.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
