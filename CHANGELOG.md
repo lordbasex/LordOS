@@ -45,6 +45,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - `lordos-fetch` and the system report showed a 16 GB board as 17 GB: memory is now counted in binary sizes.
 - A stopped `lord-media` no longer stays a zombie until the next video or song: helpers are waited for on
   every pass of the session's main loop, not only while another media source exists.
+- A sandboxed helper lost name resolution at the first DHCP renewal: `/etc/resolv.conf` was replaced by a new file each time, even with the same contents. It is now written in place, and only when it changes.
 
 ### Security
 
