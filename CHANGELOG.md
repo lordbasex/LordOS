@@ -56,7 +56,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Known issues and limitations
 
-@@LIMITS@@
+- **Install in free space has never run to the end.** The wizard, the disk checks and the rollback were tested, and nothing outside the free space was touched, but the copy, the boot loader, the firmware entry and a reboot beside another system need a password and were not run ([#7](https://github.com/lordbasex/LordOS/issues/7)).
+- **Administrator rights for Linux apps:** the prompt opens and cancels, but a password was never typed into it, so success, a wrong password and the three-try limit are untested. Only `pkexec` is covered: programs that ask polkit over D-Bus still find no agent. The prompt takes a physical keyboard only ([#4](https://github.com/lordbasex/LordOS/issues/4)).
+- **The OVA's first account:** the setup screens open, but creating the account, the reboot and the removal of the setup account were not run. Until the account is made, a setup account with an empty password logs in on the console. The disk installer's account step shares this code and wasn't rerun either.
+- **Brightness and keyboard light keys** have never fired end to end: no test machine has either. Volume and mute were tested with a virtual keyboard, not on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)). Esc on a French Macintosh layout could not be reproduced, and nothing was changed for it.
+- **Wi-Fi after a reboot** was tested on a simulated radio, not on a real late-loading card ([#8](https://github.com/lordbasex/LordOS/issues/8)). Turning an interface off is still not remembered across a reboot.
+- **The pointer on Intel laptops** was tested with a simulated sensor, not on the reporter's machine ([#2](https://github.com/lordbasex/LordOS/issues/2)). The Broadcom firmware is on the ISO, but no such card was tested ([#3](https://github.com/lordbasex/LordOS/issues/3)).
+- **Firefox:** tested from the launcher on a virtual machine and on the Raspberry Pi 5, with tabs, typing, links and menus. Touch input and two displays were not tried. Input regions now apply to every app, and only Firefox, Chromium, Mousepad and xterm were exercised ([#11](https://github.com/lordbasex/LordOS/issues/11)).
+- **Windows of Linux apps during a share:** while an app shares the screen, Linux apps can't go full screen, so a game or video drops to a window while a visitor is connected.
+- **Your own wallpaper:** PNG and JPEG only. Not tried on a 4K or second display.
+- **French** is a first translation with no native review, and sizes still read GB and MB ([#5](https://github.com/lordbasex/LordOS/issues/5)).
+- **VirtualBox:** the ISO was tested on 7.2.22 on one host, on all three display controllers with BIOS and EFI. The arm64 ISO and the Raspberry Pi image of this version were not built.
 
 ### Upgrading
 
