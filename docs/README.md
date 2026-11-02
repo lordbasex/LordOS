@@ -89,8 +89,8 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [CLEANER-SECURITY.md](CLEANER-SECURITY.md) | Cleaner's safety model |
 | [CLEANER-TESTS.md](CLEANER-TESTS.md) | Cleaner's tests and measurements |
 | [CLEANER-ROADMAP.md](CLEANER-ROADMAP.md) | The state of each Cleaner feature |
-| [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: plan (MVP from 0.8.8) |
-| [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API from 0.8.7.1, nothing built yet |
+| [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: plan (MVP from 0.8.8-1) |
+| [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API from 0.8.7.1, status in the document |
 | [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
 
 ## System and hardware

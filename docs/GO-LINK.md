@@ -28,7 +28,7 @@ These are the maintainer's, final, and this document builds on them.
 | API | Public and general, not go-link-specific: permission prompt on first use, always-visible indicator with a stop control, encoded frames plus Opus, input, protected windows black. |
 | Two consents | The system permission (this app may use the API) and the acceptance of each visitor (this person may come in) are separate things. |
 | Delivery | `.deb` for amd64 and arm64 published first at desk.go-link.org with a signature, verified and mirrored byte for byte to the LordOS APT repository, a Store item, updates through APT, the app's own updater off, a published version never re-uploaded. |
-| Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.8. Live media came with 0.8.8, so the app requires 0.8.8 or later. |
+| Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.8-1. Live media came with 0.8.8, so the app requires 0.8.8 or later. |
 
 Non-goal: replacing 5673. Earlier versions of this document also left out a native viewer and the video call; the maintainer asked for both, and section 7 has them. A call is the visitor's to start, as on every platform: this viewer doesn't place calls.
 

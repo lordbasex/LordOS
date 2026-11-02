@@ -656,10 +656,13 @@ left for after 0.8.6, and the new native app:
 ## Release 0.8.8 (planned)
 
 Only what is already decided:
-- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; decided by the maintainer on 2026-11-01): the MVP starts in
-  0.8.8, with `lord-vm` and direct QMP.
 - [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
   instead of reading each frame back and converting it.
+
+## Release 0.8.8-1 (planned)
+
+- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; moved from 0.8.8 on 2026-11-02): with `lord-vm` and direct
+  QMP.
 
 ## Before 1.0
 
@@ -1076,7 +1079,7 @@ Only what is already decided:
   - **Off by default**, visible while working (menu bar indicator, every call in the Monitor), and
     reviewed like the MCP study before it ships.
 
-- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.8): a **free desktop virtualization app**, with the polish and
+- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.8-1): a **free desktop virtualization app**, with the polish and
   way of working of the best commercial ones (not Proxmox's, which only contributes the pieces underneath: KVM, QEMU and drivers).
   A generic name and our own logo, icon and colors:
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,

@@ -795,7 +795,7 @@ All text in en, es and pt from the first commit, a `machines.json` per language.
 
 ## 13. Phases
 
-**Decided on 2026-11-01:** after 0.8.7 ships, the MVP starts in **0.8.8**, with `lord-vm` and direct QMP, on this stack:
+**Decided on 2026-11-01, moved on 2026-11-02:** the MVP starts in **0.8.8-1**, with `lord-vm` and direct QMP, on this stack:
 
 ```
 Machines (React + LordOS SDK)

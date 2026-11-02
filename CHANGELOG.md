@@ -10,51 +10,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-### Fixed
-
-- Firefox looked frozen: tabs, the toolbar and pages ignored the mouse. The compositor ignored `wl_surface.set_input_region`, so the pointer went to Firefox's content surface, which has asked for no input, instead of the window below it ([#11](https://github.com/lordbasex/LordOS/issues/11)).
-- Files: the folder's name appeared twice, in the title bar and in the toolbar. It stays in the title bar and the toolbar keeps the space ([#10](https://github.com/lordbasex/LordOS/issues/10)).
-- Wi-Fi stayed off after a reboot when its driver finished loading after the network service started, or udev renamed it late: an interface now gets its saved state whenever it appears, not only at the moment of boot. Turning on an interface saved as off keeps it on ([#8](https://github.com/lordbasex/LordOS/issues/8)).
-- The volume, mute, screen brightness and keyboard light keys did nothing, on any layout and in every theme, and went to the app in front: they now work, without Fn on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)).
-- Linux apps that ask for administrator rights with pkexec, such as a launcher updating itself, no longer stop with error 127: LordOS now ships polkit and shows a system prompt that names the app and the command ([#4](https://github.com/lordbasex/LordOS/issues/4)).
-- VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
-- Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
-- Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
-- Install in free space: a partition ending off the 1 MiB alignment, as on a disk filled to its last sector, was reported as a damaged table.
-- `lordos-fetch` and the system report showed a 16 GB board as 17 GB: memory is now counted in binary sizes.
-- The pointer no longer jumps back to the middle of the screen on Intel laptops with a motion sensor: it was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).
-
-### Added
-
-- Settings → Wallpaper: your own PNG or JPEG picture on the desktop and on the login screen, in every theme. It is converted by a process running as you, and the login screen gets its own copy in a system folder, so it never reads your home ([#13](https://github.com/lordbasex/LordOS/issues/13)).
-- An OVA image for amd64 (`lordos-<version>-amd64.ova`, `tools/iso/build-ova.sh`): open it in VirtualBox or VMware. It has no default account or password: on its first boot the installer's screens ask you to create your own.
-- Screen sharing: a fullscreen Linux window no longer covers the sharing indicator, and a visitor can't click or type in the windows of the app that let them in.
-- Live media for packaged apps: a companion hands what it receives to a sandboxed decoder, and the app shows it in a `<MediaView>`, with sound. The camera and microphone of a call come back through the same link, behind the same permissions and indicators.
-- Store: a Remote access section, shown once the catalog has an app in it.
-- Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
-- `.local` names resolve: `libnss-mdns` on the images and in the `lordos` package's recommended list.
-- `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.
-- French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
-- Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
-- Terminal: ❖+click or Ctrl+click on a web address opens it in the default browser.
-- Install in free space: on a GPT disk with an EFI partition, booted through UEFI, the installer can add LordOS beside what is there, as one new partition, leaving every existing partition as it was ([#7](https://github.com/lordbasex/LordOS/issues/7)).
-- App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
+## [0.8.8-beta] - 2026-11-02
 
 ### Added
 
 - **Screen-sharing API** ([docs/SCREEN-SHARING.md](docs/SCREEN-SHARING.md)): a separate door for an app the launcher started, with its own socket and parser, a system prompt on first use, grants in a root-owned file, an indicator with Stop on screen before any frame leaves, and ⌃⌥⇧Esc in C. It ends in `lord-server` the moment the session locks or leaves the monitor, delivers no picture and takes no input until the person signs in again, and doesn't exist on the login screen. One door at a time per session: while a share runs a remote desktop sign-in is told to wait, and a connected remote desktop viewer keeps a share from starting.
 - **Packaged apps with a companion** ([docs/PACKAGED-APPS.md](docs/PACKAGED-APPS.md)): a third, root-owned app root, `/usr/lib/lordos-apps/<id>/`, for a package a Verified author signed, checked at every load. Such an app may run one signed helper program in a strict sandbox, started with the app and stopped with it, and may use the screen-sharing API with `screen-share` and `remote-input`.
+- Live media for packaged apps: a companion hands what it receives to a sandboxed decoder, and the app shows it in a `<MediaView>`, with sound. The camera and microphone of a call come back through the same link, behind the same permissions and indicators.
 - **An item by the clock for any app**, with the `status-item` permission: the app describes it, the system draws it.
+- Store: a Remote access section, shown once the catalog has an app in it.
+- Settings → Wallpaper: your own PNG or JPEG picture on the desktop and on the login screen, in every theme. It is converted by a process running as you, and the login screen gets its own copy in a system folder, so it never reads your home ([#13](https://github.com/lordbasex/LordOS/issues/13)).
+- Install in free space: on a GPT disk with an EFI partition, booted through UEFI, the installer can add LordOS beside what is there, as one new partition, leaving every existing partition as it was ([#7](https://github.com/lordbasex/LordOS/issues/7)).
+- An OVA image for amd64 (`lordos-<version>-amd64.ova`, `tools/iso/build-ova.sh`): open it in VirtualBox or VMware. It has no default account or password: on its first boot the installer's screens ask you to create your own.
+- French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
+- App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
+- Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
+- Terminal: ❖+click or Ctrl+click on a web address opens it in the default browser.
+- `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.
+- Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
+- `.local` names resolve: `libnss-mdns` on the images and in the `lordos` package's recommended list.
 
 ### Fixed
 
+- Firefox looked frozen: tabs, the toolbar and pages ignored the mouse. The compositor ignored `wl_surface.set_input_region`, so the pointer went to Firefox's content surface, which has asked for no input, instead of the window below it ([#11](https://github.com/lordbasex/LordOS/issues/11)).
+- Wi-Fi stayed off after a reboot when its driver finished loading after the network service started, or udev renamed it late: an interface now gets its saved state whenever it appears, not only at the moment of boot. Turning on an interface saved as off keeps it on ([#8](https://github.com/lordbasex/LordOS/issues/8)).
+- The volume, mute, screen brightness and keyboard light keys did nothing, on any layout and in every theme, and went to the app in front: they now work, without Fn on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)).
+- Linux apps that ask for administrator rights with pkexec, such as a launcher updating itself, no longer stop with error 127: LordOS now ships polkit and shows a system prompt that names the app and the command ([#4](https://github.com/lordbasex/LordOS/issues/4)).
+- VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
+- The pointer no longer jumps back to the middle of the screen on Intel laptops with a motion sensor: it was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).
+- Files: the folder's name appeared twice, in the title bar and in the toolbar. It stays in the title bar and the toolbar keeps the space ([#10](https://github.com/lordbasex/LordOS/issues/10)).
+- Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
+- Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
+- Install in free space: a partition ending off the 1 MiB alignment, as on a disk filled to its last sector, was reported as a damaged table.
+- `lordos-fetch` and the system report showed a 16 GB board as 17 GB: memory is now counted in binary sizes.
 - A stopped `lord-media` no longer stays a zombie until the next video or song: helpers are waited for on
   every pass of the session's main loop, not only while another media source exists.
 
 ### Security
 
+- Screen sharing: a fullscreen Linux window no longer covers the sharing indicator, and a visitor can't click or type in the windows of the app that let them in.
 - A Linux app can no longer take a package's identity: an id starting `lpk-` no longer starts in a scope that reads as that package's.
 - **The session's remote socket takes only root:** `lord-sessiond` and its bridge connect as root, so a process of the same user can no longer read the screen or send input through `remote.sock`.
+
+### Known issues and limitations
+
+@@LIMITS@@
+
+### Upgrading
+
+- Store: the package index gained French names, so its format changed. The old index is refused after the update and rebuilt by the next check for updates; until then package actions ask for an update check.
+- `/usr/bin/pkexec` is now diverted to `lord-pkexec`, a small unprivileged front for the real program. Going back to an older package leaves a dangling link: run `dpkg-divert --remove` by hand.
+- The go-link Desk package needs LordOS 0.8.8 or later.
 
 ## [0.8.7-beta] - 2026-11-01
 
@@ -3297,7 +3303,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...HEAD
+[0.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...v0.8.8-beta
 [0.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...v0.8.7-beta
 [0.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...v0.8.6-beta
 [0.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4.1-beta...v0.8.5-beta
