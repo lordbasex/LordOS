@@ -4,7 +4,7 @@
 // (validates everything again on the root side) and install-reboot. See docs/ISO.md.
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, useTheme, useLocale, useStore, createStore,
-  admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, Lumo,
+  admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 
@@ -27,7 +27,7 @@ export function Icon({ size: s }) {
 
 // Wizard state: it survives the UI remounting when the language changes.
 const wiz = createStore({
-  step: 0, lang: '', region: '', zone: '', kb: null, disk: null, confirmDisk: '', confirmBox: false, swap: 2048,
+  step: 0, lang: '', region: '', zone: '', kb: null, disk: null, mode: 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, swap: 2048,
   fullname: '', user: '', userEdited: false, host: '', hostEdited: false, pass: '', pass2: '',
   progress: null, log: [], error: null, done: false,
 });
@@ -165,7 +165,12 @@ function DiskStep() {
     const found = [];
     setDisks(null);
     admin.run('install-disks', '', (l) => { try { found.push(JSON.parse(l)); } catch (e) { /* plain text */ } }, { quiet: true })
-      .then(() => setDisks(found), (e) => { setErr(e.message); setDisks([]); });
+      .then(() => {
+        setDisks(found);
+        // a new look at the disk asks for a new confirmation: what was confirmed may have changed
+        const now = wiz.get().disk && found.find((d) => d.name === wiz.get().disk.name);
+        if (wiz.get().disk) set({ disk: now && now.usable ? now : null, mode: now?.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false });
+      }, (e) => { setErr(e.message); setDisks([]); });
   };
   useEffect(load, []);
   const content = (d) => (d.parts.length ? d.parts.map((p) => [p.label || p.name, p.fstype, formatBytes(p.size)].filter(Boolean).join(' ')).join(' · ')
@@ -176,7 +181,7 @@ function DiskStep() {
       {disks === null && <Text style={{ fontSize: 12, color: t.textDim }}>{tr('installer.disk.loading')}</Text>}
       {disks && disks.length === 0 && !err && <Text style={{ fontSize: 13, color: t.text }}>{tr('installer.disk.none')}</Text>}
       {(disks || []).map((d) => (
-        <View key={d.name} onClick={() => d.usable && set({ disk: d, confirmDisk: '', confirmBox: false })}
+        <View key={d.name} onClick={() => d.usable && set({ disk: d, mode: d.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false })}
           style={{ padding: 14, borderRadius: 10, gap: 4, opacity: d.usable ? 1 : 0.5,
             border: `2px solid ${s.disk?.name === d.name ? t.accent : t.separator}`, backgroundColor: t.hover }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -188,7 +193,32 @@ function DiskStep() {
           {!d.usable && <Text style={{ fontSize: 11, color: '#ff9f0a' }}>{tr('installer.disk.small')}</Text>}
         </View>
       ))}
-      {s.disk && (
+      {s.disk && !s.disk.freeOk && s.disk.freeWhy && s.disk.ptable !== 'none' && (
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35 }}>{tr('installer.disk.freeNo', { why: errorText(s.disk.freeWhy) })}</Text>
+      )}
+      {s.disk?.freeOk && (
+        <Field label={tr('installer.disk.modeLabel')}>
+          <Segmented value={s.mode} onChange={(mode) => set({ mode, confirmDisk: '', confirmBox: false, confirmFree: false })}
+            options={[['free', tr('installer.disk.modeFree')], ['erase', tr('installer.disk.modeErase')]]} />
+        </Field>
+      )}
+      {s.disk && s.mode === 'free' && (
+        <Card style={{ borderColor: t.accent }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text }}>{tr('installer.disk.freeTitle', { disk: s.disk.path })}</Text>
+          <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.disk.freeText', { size: formatBytes(s.disk.freeBytes) })}</Text>
+          <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.disk.freeKeep', { parts: content(s.disk), esp: s.disk.espPart })}</Text>
+          <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.4 }}>{tr('installer.disk.freeBoot')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Toggle on={s.confirmFree} onChange={(confirmFree) => set({ confirmFree })} />
+            <Text style={{ fontSize: 12, color: t.text }}>{tr('installer.disk.freeUnderstand')}</Text>
+          </View>
+          <Field label={tr('installer.disk.swap')} hint={tr('installer.disk.swapHint')}>
+            <Segmented value={String(s.swap)} onChange={(v) => set({ swap: Number(v) })}
+              options={[['0', tr('installer.disk.swapNone')], ['2048', '2 GB'], ['4096', '4 GB'], ['8192', '8 GB']]} />
+          </Field>
+        </Card>
+      )}
+      {s.disk && s.mode !== 'free' && (
         <Card style={{ borderColor: '#ff453a' }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#ff453a' }}>{tr('installer.disk.eraseTitle', { disk: s.disk.path })}</Text>
           <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.disk.eraseText')}</Text>
@@ -276,9 +306,10 @@ function Summary() {
   const s = useStore(wiz);
   const p = plan(s);
   const arm64 = useSystemInfo(60000).arch === 'aarch64';     // UEFI only: no BIOS boot partition (install.c)
+  const beside = s.mode === 'free';
   const rows = [
-    [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr('installer.summary.erased')}`],
-    [tr('installer.summary.layout'), tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
+    [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr(beside ? 'installer.summary.kept' : 'installer.summary.erased')}`],
+    [tr('installer.summary.layout'), beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
     [tr('installer.summary.swap'), s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
     [tr('installer.summary.lang'), `${p.lang} · ${p.region}.UTF-8 · ${p.zone}`],
     [tr('installer.summary.keyboard'), kbName(p.kb)],
@@ -343,6 +374,7 @@ function startInstall() {
   const p = plan(s);
   set({ step: STEPS.indexOf('install'), progress: null, log: [], error: null, done: false });
   const job = {
+    mode: s.mode, ...(s.mode === 'free' ? { freeStart: s.disk.freeStart, freeEnd: s.disk.freeEnd } : {}),
     disk: s.disk.name, user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
     lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '', swap: s.swap,
   };
@@ -364,7 +396,7 @@ export default function Installer() {
   const e = userErrors(s, tr);
   const canNext = {
     welcome: admin.available(), language: true, keyboard: true,
-    disk: !!s.disk && s.confirmBox && s.confirmDisk === s.disk.name,
+    disk: s.mode === 'free' ? !!s.disk?.freeOk && s.confirmFree : !!s.disk && s.confirmBox && s.confirmDisk === s.disk.name,
     user: !Object.values(e).some(Boolean), summary: true,
   }[name];
   const Body = { welcome: Welcome, language: Language, keyboard: Keyboard, disk: DiskStep, user: UserStep, summary: Summary, install: Install }[name];

@@ -142,5 +142,9 @@
   "wifi.connecting": "Connecting to {ssid}…",
   "wifi.disconnected": "Disconnected",
   "wifi.forgotten": "Network forgotten",
-  "share.granted": "Permission saved."
+  "share.granted": "Permission saved.",
+  "install.free.installing": "Installing in free space on {dev}",
+  "install.free.rollingBack": "Putting the partition table back",
+  "install.free.rolledBack": "The partition table is as it was",
+  "install.free.rollbackFailed": "The partition table could not be put back: a copy is at {path}. Do not restart: save it first"
 }

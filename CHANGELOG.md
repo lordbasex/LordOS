@@ -16,6 +16,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- Install in free space: on a GPT disk with an EFI partition, booted through UEFI, the installer can add LordOS beside what is there, as one new partition, leaving every existing partition as it was ([#7](https://github.com/lordbasex/LordOS/issues/7)).
 - Broadcom Wi-Fi firmware on the ISOs, so the 2015 MacBook Pro's BCM43602 works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
 

@@ -268,8 +268,11 @@ Assistant steps:
 2. **Language, region and time zone.** The language changes the interface live.
 3. **Keyboard.** The layout is applied live and there's a field to try it.
 4. **Disk.** Lists the disks (model, size, connection and what's on them), excluding the disk the
-   live system booted from. To continue you have to tick "I understand the whole disk will be
-   erased" and type the disk's name (`sda`). Optional: swap as a file, of 2, 4 or 8 GB.
+   live system booted from. When the disk qualifies (see "Installing in free space") a choice
+   appears between installing beside what's there and erasing the disk; otherwise the reason is
+   shown and erasing is the only way. To erase you have to tick "I understand the whole disk will be
+   erased" and type the disk's name (`sda`). To install beside, you read what stays untouched and tick
+   a confirmation of its own. Optional: swap as a file, of 2, 4 or 8 GB.
 5. **User.**
    - The user name is suggested from the full name.
    - The password is typed twice.
@@ -316,6 +319,68 @@ The installed system is a copy of the live system with these changes:
   - automatic login is turned on in Settings → Users;
   - the password is used for `sudo` and for administration actions.
 
+### Installing in free space
+
+The second mode (`"mode": "free"` in `install-run`) adds LordOS to a disk that already holds another
+system. It creates exactly **one** new partition and leaves the rest alone.
+
+What the disk needs. The root side checks each of these itself, and the wizard only shows the choice
+when `install-disks` says the disk qualifies:
+
+| Needs | Refused with |
+|---|---|
+| The live system booted through UEFI, and `efibootmgr` is in the image | `install.free.needUefi`, `install.free.noBootTool` |
+| A GPT with a plain protective MBR: not MBR, not a hybrid MBR, not a blank disk | `install.free.mbr`, `install.free.hybridMbr`, `install.free.noTable` |
+| A sound table (below) | `install.free.tableDamaged` |
+| Exactly one EFI partition, on FAT, with 32 MB free and no `EFI/LordOS` folder yet | `install.free.noEsp`, `manyEsps`, `espNotFat`, `espUnreadable`, `espFull`, `espHasLordOS` |
+| A free region of at least 8 GB (the size an erase install requires of the disk), after aligning it, and a free table slot | `install.free.noRoom`, `install.free.tableFull` |
+| Nothing mounted, swapped or held (device-mapper, md) on the disk | `install.free.busy` |
+
+A sound table means all of this agrees: both GPT headers and both entry arrays, read directly from
+the disk, with their CRCs; `sgdisk -v` says "No problems found." with no warning; `sgdisk -p` has only
+the lines a healthy GPT prints; and the two descriptions match, partition by partition. sgdisk answers
+0 on a corrupt table, so its exit code means nothing here. An MBR disk never reaches sgdisk. Anything
+unknown is a refusal: at worst, erasing is the only option offered.
+
+What it does, in `server/src/install/freepart.c`; the decisions are in `freespace.c`, tested by
+`tests/freespace_test.c` in `make test`:
+
+1. Reads everything again and requires the region to be the same one `install-disks` reported
+   (`freeStart`, `freeEnd`): a disk that changed behind the wizard gives `install.free.diskChanged`.
+2. Saves the table with `sgdisk --backup` to `/run/lordos-install` and takes a byte copy of the
+   first sector, both headers and both entry arrays. Compares them again right before writing.
+3. `sgdisk -n N:start:end -t N:8304 -c N:LordOS` (8305 on arm64), in the largest free region, aligned
+   to 1 MiB, by explicit sectors. N is the lowest free number: existing partitions are not renumbered.
+4. Proves the result on the raw disk: the first sector's boot code, each existing entry byte for byte,
+   and exactly one new entry with those sectors and that type. Then that the kernel sees it there.
+5. `mkfs.ext4` on the new partition, and nothing else is ever formatted.
+
+No existing partition is deleted, moved, resized or formatted, the EFI one included. The system is
+then copied and configured as in an erase install, except:
+
+- grub goes in `EFI/LordOS` on the existing EFI partition (`--bootloader-id=LordOS`, no `--removable`).
+  `EFI/BOOT` is another system's fallback loader and isn't touched, and nothing is written to the
+  disk's first sectors: no BIOS grub in this mode.
+- `efibootmgr -c` adds a `LordOS` entry, as the last step of all. The other entries stay; LordOS goes
+  first in the boot order.
+- `GRUB_DISABLE_OS_PROBER=false` and a 5 second menu; when `os-prober` is in the image, grub lists the
+  other system. **The ISO ships `os-prober` from this version on. In an image without it, the other
+  system is not in the LordOS menu**, and is reached from the firmware's boot menu.
+- `/etc/fstab` mounts the EFI partition with `nofail` and pass 0: a shared partition is not checked or
+  repaired at every boot.
+
+If a step fails after the write (partitioning, formatting, copying, configuring, grub or the boot
+entry), the installer deletes `EFI/LordOS`, which it knows is its own, restores the table with `sgdisk
+--load-backup` and compares it with the byte copy. If that comparison fails it says so, with the path of
+the backup: don't restart before saving it. A power cut in the middle can't be rolled back: the
+new partition stays in the table, unfinished, with the others untouched.
+
+To keep in mind: another system that is hibernated or was closed with a fast startup may have the
+EFI partition cached, so shut it down fully first. Secure Boot has to be off, as for any LordOS install.
+
+`build/freepart-cli` (`make -C server build/freepart-cli`, root, loop devices only, never installed) and
+`server/tests/freepart_loop.sh` run the real partitioning step on an image, with failures injected.
+
 ### Installer security
 
 It adds three actions to the privileged helper (`server/src/install/install.c`, macro
@@ -323,7 +388,7 @@ It adds three actions to the privileged helper (`server/src/install/install.c`, 
 
 | Action | Who | What it does |
 |---|---|---|
-| `install-disks` | administrator | lists the installable disks (JSON via `LOG`) |
+| `install-disks` | administrator | lists the installable disks (JSON via `LOG`), with each one's table type, EFI partition, largest free GPT region and whether it qualifies for free space. It only reads, mounting the EFI partition read-only to measure it |
 | `install-run <json>` | administrator, in a separate process | installs |
 | `install-reboot` | administrator | `systemctl reboot` |
 
@@ -348,6 +413,9 @@ What `install-run` validates on the root side, without trusting the interface:
 - **Keyboard:** the layout has to exist in `/usr/share/X11/xkb/symbols`; the variant,
   `[A-Za-z0-9_-]`.
 - **Swap:** from 0 to 16384 MiB.
+- **Mode:** `erase`, or absent as before, or `free`, which adds every rule of "Installing in free
+  space". Anything else is refused, and a `mode` that isn't a string, or comes twice, makes the plan
+  invalid: it can't fall through to an erase.
 - **The password:**
   - never goes into an argv: it arrives through the helper's socketpair;
   - it is hashed with `crypt(3)` yescrypt (`$y$`, like Debian, with `crypt_gensalt_ra`);
@@ -355,7 +423,7 @@ What `install-run` validates on the root side, without trusting the interface:
   - afterwards it is wiped from memory (`explicit_bzero`), and the interface also forgets it when
     starting.
 - **Fixed-path programs:** `wipefs`, `sgdisk`, `udevadm`, `mkfs.vfat`, `mkfs.ext4`, `unsquashfs`,
-  `blkid`, `fallocate`, `mkswap`, `chroot` (with `dpkg`, `userdel`, `useradd`, `locale-gen`,
+  `blkid`, `fallocate`, `mkswap`, `efibootmgr`, `rm`, `chroot` (with `dpkg`, `userdel`, `useradd`, `locale-gen`,
   `systemd-machine-id-setup`, `update-initramfs`, `grub-install` and `grub-mkconfig` inside) and
   `systemctl`. `install.c` builds the arguments from the already validated values.
 

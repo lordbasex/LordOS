@@ -142,5 +142,9 @@
   "wifi.connecting": "Conectando a {ssid}…",
   "wifi.disconnected": "Desconectado",
   "wifi.forgotten": "Red olvidada",
-  "share.granted": "Permiso guardado."
+  "share.granted": "Permiso guardado.",
+  "install.free.installing": "Instalando en el espacio libre de {dev}",
+  "install.free.rollingBack": "Restaurando la tabla de particiones",
+  "install.free.rolledBack": "La tabla de particiones quedó como estaba",
+  "install.free.rollbackFailed": "No se pudo restaurar la tabla de particiones: hay una copia en {path}. No reinicies: guardala primero"
 }
