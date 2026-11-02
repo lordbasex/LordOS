@@ -12,6 +12,7 @@
 
 #define LONG_BITS (8 * sizeof(long))
 #define NLONGS(n) (((n) + LONG_BITS - 1) / LONG_BITS)
+#include "inputkind.h"
 #define HAS(bits, n) (((bits)[(n) / LONG_BITS] >> ((n) % LONG_BITS)) & 1UL)
 
 /* Adds the device if it is a keyboard, mouse or tablet (and grabs it); otherwise closes it. */
@@ -22,10 +23,12 @@ static void add_device(Input *in, int fd, const char *path) {
     ioctl(fd, EVIOCGBIT(0, sizeof ev), ev);
     ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys), keys);
     ioctl(fd, EVIOCGBIT(EV_ABS, sizeof abs), abs);
+    unsigned long props[NLONGS(INPUT_PROP_MAX + 1)] = {0};
+    ioctl(fd, EVIOCGPROP(sizeof props), props);
 
     int keyboard = HAS(ev, EV_KEY) && HAS(keys, KEY_A) && HAS(keys, KEY_ENTER);
     int mouse    = HAS(ev, EV_REL) && HAS(keys, BTN_LEFT);
-    int tablet   = HAS(ev, EV_ABS) && HAS(abs, ABS_X) && HAS(abs, ABS_Y);
+    int tablet   = input_is_abs_pointer(ev, abs, keys, props);
     if ((!keyboard && !mouse && !tablet) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
 
     InputDevice *d = &in->dev[in->count++];

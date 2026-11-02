@@ -10,6 +10,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- The pointer no longer jumps back to the middle of the screen on Intel MacBooks: the motion sensor was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).
+
+### Added
+
+- Broadcom Wi-Fi firmware on the ISOs, so the 2015 MacBook Pro's BCM43602 works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
+- App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
+
 ### Added
 
 - **Screen-sharing API** ([docs/SCREEN-SHARING.md](docs/SCREEN-SHARING.md)): a separate door for an app the launcher started, with its own socket and parser, a system prompt on first use, grants in a root-owned file, an indicator with Stop on screen before any frame leaves, and ⌃⌥⇧Esc in C. It ends in `lord-server` the moment the session locks or leaves the monitor, delivers no picture and takes no input until the person signs in again, and doesn't exist on the login screen. One door at a time per session: while a share runs a remote desktop sign-in is told to wait, and a connected remote desktop viewer keeps a share from starting.

@@ -255,6 +255,11 @@ build/codesig-test: tests/codesig_test.c src/sec/codesig.c src/sec/json.c src/pk
 	./$@ ../tools/release/lordos-release.pub.pem || { rm -f $@; exit 1; }
 # Clock time zones: TZif and POSIX rules against glibc (docs/SYSTEM.md)
 # tests/xwm_test.c: the X11 wire helpers of the window manager (src/wl/x11wire.c, docs/WAYLAND.md)
+test: build/inputkind-test
+build/inputkind-test: tests/inputkind_test.c src/inputkind.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ tests/inputkind_test.c
+	./$@
 test: build/keygrab-test
 build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
 	@mkdir -p build
