@@ -1,11 +1,29 @@
 #!/bin/sh
 # lordos-issue — what a bug report needs, ready to paste into a GitHub issue (CONTRIBUTING.md). It only reads. It runs as the
-# user, also on the live system; `sudo lordos-issue` adds the kernel log when the user can't read it. Addresses, the user's
-# and the computer's names, serial numbers and home paths are replaced. Nothing is sent anywhere.
+# user or, if they give their password, as root, also on the live system: root adds the kernel log and every package file.
+# Addresses, the user's and the computer's names and home paths are replaced. Nothing is sent anywhere.
 # It never includes serial numbers (lsblk's and lsusb's are left out), Wi-Fi names, or paired devices.
-# Usage: lordos-issue [--print]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
-LC_ALL=C; export LC_ALL
+# Usage: lordos-issue [--print] [--no-root]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
+LC_ALL=C.UTF-8; export LC_ALL
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+print=0; noroot=0
+for a in "$@"; do case "$a" in --print) print=1;; --no-root) noroot=1;; esac; done
+
+# The complete report needs root. Asked only at a terminal; no password, or Ctrl+C, goes on with what the user can read.
+if [ "$(id -u)" != 0 ] && [ "$noroot" = 0 ] && [ -t 0 ] && command -v sudo >/dev/null 2>&1; then
+    echo "lordos-issue reads the kernel log and every package file as root. It changes nothing and sends nothing." >&2
+    echo "Enter your password, or press Ctrl+C or Enter to continue without it." >&2
+    trap : INT
+    if sudo -p 'Password for %p: ' -v 2>/dev/null; then trap - INT; exec sudo "$0" "$@"; fi
+    trap - INT
+    echo "Going on without root: the report will be shorter." >&2
+fi
+
+if [ -n "$SUDO_USER" ] && [ "$(id -u)" = 0 ]; then
+    h=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    [ -d "$h" ] && HOME=$h && export HOME
+fi
+
 out="${HOME:-/tmp}/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 [ -w "${HOME:-/nonexistent}" ] || out="/tmp/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 MAX=60000
@@ -87,7 +105,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
     L=/usr/lib/lordos/bin/lord-server
     if [ -x "$L" ]; then
         echo "-- LordOS's signed code"
-        "$L" --check-code 2>&1 | grep -v -E '^ok +' | tail -n 15
+        "$L" --check-code 2>&1 | grep -v -E '^ok +|^code: hash ok' | tail -n 15
         echo "-- installed apps"
         "$L" --check-apps 2>&1 | tail -n 40
     fi
@@ -120,12 +138,13 @@ have() { command -v "$1" >/dev/null 2>&1; }
     end
 
     section "Kernel errors in this boot (last 40)"
-    dmesg --level=err,warn 2>/dev/null | tail -n 40 || true
-    if ! dmesg -n 0 >/dev/null 2>&1 && [ "$(id -u)" != 0 ]; then echo "(run: sudo lordos-issue, for the complete kernel log)"; fi
+    if [ "$(id -u)" = 0 ]; then dmesg --level=err,warn 2>/dev/null | tail -n 40
+    else dmesg --level=err,warn 2>/dev/null | tail -n 40; echo "(without root this may be incomplete)"; fi
     end
 } 2>&1 | clean | head -c "$MAX" > "$out"
 chmod 600 "$out" 2>/dev/null
+[ -n "$SUDO_USER" ] && chown "$SUDO_USER" "$out" 2>/dev/null
 
-[ "$1" = --print ] && cat "$out"
+[ "$print" = 1 ] && cat "$out"
 printf '\nSaved to %s\n' "$out" >&2
 printf 'Read it first, then paste it in the Logs box of a new issue: https://github.com/lordbasex/LordOS/issues/new?template=bug_report.yml\n' >&2
