@@ -3,7 +3,7 @@
  *
  *   net-restore                 at startup: applies the configs in /etc/lordos/net/if and brings up DHCP
  *                               (and Wi-Fi) on the free interfaces. With lord-netd it runs it itself
- *                               at boot ("system"); see admin.c
+ *                               at boot ("system"), and for each one that appears later; see admin.c
  *   net-up / net-down <if>
  *   net-config <if>\n<lines>    method=dhcp|static|off, address=ip/prefix (several),
  *                               gateway=ip, dns=ip (several)
@@ -18,6 +18,7 @@
 #include "net.h"
 #include "netpriv.h"
 #include "vpn.h"
+#include "ifwatch.h"
 #include "../pkg/pkg.h"
 
 #include <net/if.h>                 /* before the linux/ ones */
@@ -25,12 +26,15 @@
 #include <dirent.h>
 #include <signal.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #define NETWORKCTL "/usr/bin/networkctl"
@@ -108,7 +112,8 @@ static int apply_config(const char *ifname, const char *t) {
         close(fd);
         return 0;
     }
-    rt_link_set(fd, idx, 1);
+    int up = rt_link_set(fd, idx, 1);
+    if (up && up != -ERFKILL) { close(fd); return -1; }  /* wpa_supplicant waits for a blocked radio by itself */
     if (!strcmp(method, "static")) {
         char d[40];
         snprintf(d, sizeof d, "if:%s", ifname);
@@ -144,6 +149,96 @@ static char *load_if_conf(const char *ifname) {
     return read_file(path, 8192, NULL);
 }
 
+/* The person turned on an interface saved as "off": that choice is gone, or the next boot takes it back
+ * down. Nothing else is lost, since "off" keeps no addresses. Returns the config to apply (malloc). */
+static char *load_if_conf_on(const char *ifname) {
+    char *t = load_if_conf(ifname), method[16] = "";
+    if (!t || !kv_get(t, "method", 0, method, sizeof method) || strcmp(method, "off")) return t;
+    free(t);
+    char path[128];
+    snprintf(path, sizeof path, NET_IF_DIR "/%s.conf", ifname);
+    write_file_atomic(path, "method=dhcp\n", 12, 0644);
+    return strdup("method=dhcp\n");
+}
+
+/* ---- each interface gets its saved state once, whenever it appears (ifwatch.c) ---- */
+
+static IfTable if_seen;
+static int if_watch_fd = -1, if_pending, if_force;
+static long if_next_ms;
+
+static long mono_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long)t.tv_sec * 1000 + t.tv_nsec / 1000000;
+}
+
+static int op_candidate(const char *name) {
+    if (!valid_ifname(name)) return 0;
+    char path[128];
+    snprintf(path, sizeof path, NET_IF_DIR "/%s.conf", name);
+    return access(path, F_OK) == 0 || is_physical(name);
+}
+
+/* udev keeps a record of a device once it has finished with it, renaming included. */
+static int op_initialized(int index) {
+    if (if_force || access("/run/udev/control", F_OK)) return 1;     /* nothing renames it: a container */
+    char path[48];
+    snprintf(path, sizeof path, "/run/udev/data/n%d", index);
+    return access(path, F_OK) == 0;
+}
+
+static int op_busy(const char *name) {
+    char d[40];
+    snprintf(d, sizeof d, "if:%s", name);
+    if (admin_daemon_running(d)) return 1;
+    snprintf(d, sizeof d, "wpa:%s", name);
+    return admin_daemon_running(d);
+}
+
+static int op_apply(const char *name) {
+    char *t = load_if_conf(name);
+    int r = apply_config(name, t ? t : "method=dhcp\n");
+    free(t);
+    return r;
+}
+
+static const IfOps if_ops = { op_candidate, op_initialized, managed_by_system, op_busy, op_apply, stop_if_daemons };
+
+static int if_scan(int booting, int *applied) {
+    IfNow now[IFW_MAX];
+    int n = 0;
+    struct if_nameindex *ifs = if_nameindex();
+    for (struct if_nameindex *i = ifs; i && i->if_index && n < IFW_MAX; i++) {
+        now[n].index = (int)i->if_index;
+        snprintf(now[n++].name, sizeof now[0].name, "%s", i->if_name);
+    }
+    if (ifs) if_freenameindex(ifs);
+    else return if_pending;         /* no list right now: says nothing about what left */
+    return ifwatch_step(&if_seen, now, n, &if_ops, mono_ms(), booting, applied);
+}
+
+int net_watch_open(void) {
+    if_watch_fd = nl_open(NETLINK_ROUTE, RTMGRP_LINK);
+    if (if_watch_fd >= 0) fcntl(if_watch_fd, F_SETFL, fcntl(if_watch_fd, F_GETFL) | O_NONBLOCK);
+    return if_watch_fd;
+}
+
+int net_watch_timeout(void) {
+    if (!if_pending) return -1;
+    long left = if_next_ms - mono_ms();
+    return left < 0 ? 0 : (int)left;
+}
+
+void net_watch_run(int readable) {
+    if (readable) { char junk[8192]; while (recv(if_watch_fd, junk, sizeof junk, MSG_DONTWAIT) > 0) {} }
+    if (!readable && (!if_pending || mono_ms() < if_next_ms)) return;
+    int applied = 0;
+    if_pending = if_scan(0, &applied);
+    if_next_ms = mono_ms() + 500;
+    if (applied) admin_event("net link restored %d", applied);
+}
+
 void net_act_restore(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     mkdir(NET_RUN_DIR, 0755);
@@ -164,17 +259,14 @@ void net_act_restore(const AdminReq *r, const char *arg, size_t len) {
     /* VPN routes left over from a session that was cut off (protocol RTPROT_LORDOS) */
     int rfd = nl_open(NETLINK_ROUTE, 0);
     if (rfd >= 0) { rt_flush_proto(rfd, RTPROT_LORDOS, AF_INET, NULL); rt_flush_proto(rfd, RTPROT_LORDOS, AF_INET6, NULL); close(rfd); }
-    struct if_nameindex *ifs = if_nameindex();
-    int n = 0;
-    for (struct if_nameindex *i = ifs; i && i->if_index; i++) {
-        const char *name = i->if_name;
-        if (!valid_ifname(name) || managed_by_system(name)) continue;
-        char *t = load_if_conf(name);
-        if (t) { if (!apply_config(name, t)) n++; free(t); continue; }
-        /* no config: the free physical ones use DHCP, like NetworkManager */
-        if (is_physical(name)) { if (!apply_config(name, "method=dhcp\n")) n++; }
-    }
-    if (ifs) if_freenameindex(ifs);
+    /* no config: the free physical ones use DHCP, like NetworkManager. Under lord-netd, one that isn't
+     * ready yet (or isn't there at all) is picked up by net_watch_run; a session has no such loop */
+    int n = 0, sys = len == 6 && !strcmp(arg, "system");
+    if_force = !sys;
+    if_seen.n = 0;
+    if_pending = if_scan(1, &n);
+    if_force = 0;
+    if_next_ms = mono_ms() + 500;
     admin_ok("net.restored", "count", lerr_int(n), NULL);
 }
 
@@ -184,7 +276,7 @@ void net_act_up(const AdminReq *r, const char *arg, size_t len) {
     int fd = nl_open(NETLINK_ROUTE, 0);
     int e = fd >= 0 ? rt_link_set(fd, rt_ifindex(arg), 1) : -1;
     if (fd >= 0) close(fd);
-    char *t = load_if_conf(arg);
+    char *t = load_if_conf_on(arg);
     if (!e) apply_config(arg, t ? t : (is_physical(arg) ? "method=dhcp\n" : "method=none\n"));
     free(t);
     if (e) admin_err("net.upFailed", "name", arg, "errno", lerr_errno(-e), NULL); else admin_ok("net.up", "name", arg, NULL);
@@ -317,7 +409,10 @@ void net_act_wifi_connect(const AdminReq *r, const char *arg, size_t len) {
     if (!copy) { admin_err("sys.outOfMemory", NULL); return; }
     int k = split_lines(copy, l, 3);
     if (k < 2) { admin_err("admin.invalidArgument", NULL); free(copy); return; }
-    if (!check_wifi(l[0])) wifi_act_connect(l[0], l[1], k > 2 ? l[2] : "");
+    if (!check_wifi(l[0])) {
+        free(load_if_conf_on(l[0]));                /* joining a network is turning the radio on */
+        wifi_act_connect(l[0], l[1], k > 2 ? l[2] : "");
+    }
     memset(copy, 0, len);
     free(copy);
 }

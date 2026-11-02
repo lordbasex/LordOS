@@ -5,6 +5,7 @@
  *   net-test monitor <seconds>       rtnetlink notifications
  *   net-test ovpn-inline <path>      the .ovpn with its files embedded (lord.net.prepareOvpn)
  *   net-test errors                  config errors are code lines (errcode.h), never prose
+ *   net-test ifwatch                 an interface gets its saved state once, whenever it appears
  *   sudo net-test act <action> <arg> runs a "net-*" action the way the helper would;
  *                                    "\n" in arg is a newline, "@file" reads it
  *   sudo net-test daemons            the tests' resident processes
@@ -16,6 +17,7 @@
 #include "net/net.h"
 #include "net/netpriv.h"
 #include "net/vpn.h"
+#include "net/ifwatch.h"
 #include "errcode.h"
 
 #include <dirent.h>
@@ -251,10 +253,75 @@ static void print_json(const char *what, char *j) {
 
 static void on_change(const char *what) { printf("change: %s\n", what); fflush(stdout); }
 
+/* ---- ifwatch: fakes for what actions.c supplies ---- */
+
+static int fw_init = 1, fw_managed, fw_busy, fw_fail, fw_applied, fw_stopped;
+static char fw_last[16];
+static int fw_candidate(const char *n) { return n[0] != 'v'; }             /* v…: virtual, no config */
+static int fw_initialized(int index) { (void)index; return fw_init; }
+static int fw_is_managed(const char *n) { (void)n; return fw_managed; }
+static int fw_is_busy(const char *n) { (void)n; return fw_busy; }
+static int fw_apply(const char *n) { snprintf(fw_last, sizeof fw_last, "%s", n); fw_applied++; return fw_fail ? -1 : 0; }
+static void fw_stop(const char *n) { (void)n; fw_stopped++; }
+
+static int test_ifwatch(void) {
+    static const IfOps o = { fw_candidate, fw_initialized, fw_is_managed, fw_is_busy, fw_apply, fw_stop };
+    IfTable t = {0};
+    int bad = 0, got = 0;
+#define IW(x) do { if (!(x)) { printf("FAIL ifwatch:%d: %s\n", __LINE__, #x); bad++; } } while (0)
+    /* boot: the wired NIC is there, the radio isn't yet */
+    IfNow boot[] = { { 1, "eth0" }, { 2, "veth0" } };
+    IW(ifwatch_step(&t, boot, 2, &o, 0, 1, &got) == 0 && got == 1 && fw_applied == 1);
+    /* the same interfaces: a notification changes nothing, also after net-down */
+    IW(ifwatch_step(&t, boot, 2, &o, 100, 0, &got) == 0 && fw_applied == 1);
+    /* the radio appears 9 s later: never at boot, not forgotten either */
+    IfNow late[] = { { 1, "eth0" }, { 2, "veth0" }, { 3, "wlan0" } };
+    fw_init = 0;
+    IW(ifwatch_step(&t, late, 3, &o, 9000, 0, &got) == 1 && fw_applied == 1);
+    /* udev renames it: the config of the final name is the one applied */
+    IfNow named[] = { { 1, "eth0" }, { 2, "veth0" }, { 3, "wlp3s0" } };
+    fw_init = 1;
+    IW(ifwatch_step(&t, named, 3, &o, 9500, 0, &got) == 1 && fw_applied == 1);     /* the grace second */
+    IW(ifwatch_step(&t, named, 3, &o, 10100, 0, &got) == 0 && fw_applied == 2 && !strcmp(fw_last, "wlp3s0"));
+    IW(ifwatch_step(&t, named, 3, &o, 10600, 0, &got) == 0 && fw_applied == 2);
+    /* it leaves (a driver reload): its daemons stop, and the new device waits for them */
+    IW(ifwatch_step(&t, boot, 2, &o, 11000, 0, &got) == 0 && fw_stopped == 1);
+    IfNow back[] = { { 1, "eth0" }, { 2, "veth0" }, { 4, "wlp3s0" } };
+    fw_busy = 1;
+    IW(ifwatch_step(&t, back, 3, &o, 12100, 0, &got) == 1 && fw_applied == 2);
+    fw_busy = 0;
+    IW(ifwatch_step(&t, back, 3, &o, 13200, 0, &got) == 0 && fw_applied == 3);
+    /* it belongs to the system's network manager: left alone */
+    IfNow sys[] = { { 1, "eth0" }, { 2, "veth0" }, { 4, "wlp3s0" }, { 5, "enx1" } };
+    fw_managed = 1;
+    IW(ifwatch_step(&t, sys, 4, &o, 13300, 0, &got) == 1);
+    IW(ifwatch_step(&t, sys, 4, &o, 14400, 0, &got) == 0 && fw_applied == 3);
+    fw_managed = 0;
+    /* a failure is retried a few times, then it stops trying */
+    IfNow bad6[] = { { 1, "eth0" }, { 2, "veth0" }, { 4, "wlp3s0" }, { 5, "enx1" }, { 6, "wlan1" } };
+    fw_fail = 1;
+    IW(ifwatch_step(&t, bad6, 5, &o, 20000, 0, &got) == 1);
+    IW(ifwatch_step(&t, bad6, 5, &o, 21100, 0, &got) == 1 && fw_applied == 4);
+    IW(ifwatch_step(&t, bad6, 5, &o, 22000, 0, &got) == 1 && fw_applied == 4);     /* not before its time */
+    IW(ifwatch_step(&t, bad6, 5, &o, 26200, 0, &got) == 1 && fw_applied == 5);
+    IW(ifwatch_step(&t, bad6, 5, &o, 31300, 0, &got) == 0 && fw_applied == 6);
+    IW(ifwatch_step(&t, bad6, 5, &o, 40000, 0, &got) == 0 && fw_applied == 6);
+    fw_fail = 0;
+    /* udev never finishes: not forever */
+    IfNow slow[] = { { 1, "eth0" }, { 2, "veth0" }, { 7, "wlan2" } };
+    fw_init = 0;
+    IW(ifwatch_step(&t, slow, 3, &o, 50000, 0, &got) == 1);
+    IW(ifwatch_step(&t, slow, 3, &o, 50000 + IFW_WAIT_MS, 0, &got) == 0 && !strcmp(fw_last, "wlan2"));
+#undef IW
+    printf("ifwatch: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: net-test crypto | errors | state | monitor <s> | act <action> <arg> | daemons\n"); return 2; }
     if (!strcmp(argv[1], "crypto")) return test_crypto() ? 1 : 0;
     if (!strcmp(argv[1], "errors")) return test_errors() ? 1 : 0;
+    if (!strcmp(argv[1], "ifwatch")) return test_ifwatch() ? 1 : 0;
     if (!strcmp(argv[1], "state")) {
         print_json("interfaces", net_interfaces_json());
         print_json("routes", net_routes_json());
