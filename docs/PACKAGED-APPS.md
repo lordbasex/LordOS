@@ -96,6 +96,8 @@ media.close(id);
 - **The decoder** is `lord-media`'s software H.264 and VP8, in the helper's sandbox: no network, no files, no exec. It's what reads a stranger's data, so it's there and not in the compositor, the app or the engine. No hardware decoding on this path.
 - **Its cost isn't the app's.** The helper runs in `app-lordos-media.scope`, outside the app's one core and 512 MB.
 
+**Tested:** `server/tests/live_helper.py` runs the real helper in its real sandbox with no session, on VM 116 and a Raspberry Pi 5: H.264 and VP8 reach the slots, a damaged stream asks for a keyframe, bad lengths and unknown codecs, 40 damaged streams with no crash. On a real screen (VM 125 and the Pi): a session to another computer, and a two-way call on VM 125 with the system's prompts and indicators. **Not tested:** revoking either device during a call.
+
 ## An item by the clock
 
 For any app with the `status-item` permission, packaged or not. An isolated app has no code in the shell, so it describes the item:
@@ -120,12 +122,14 @@ On VM 116 (amd64, kernel 6.12, 2026-11-01), with a static Go binary built with `
 `build/lord-server-pkgtest`, a test binary that takes its official key and root from the environment, on a root-owned folder, with throwaway keys from `tests/companion/fixture.sh`.
 
 - `pkgapp-test`, 52 checks: every way the folder can differ from what was signed, keys, revocation, and status item descriptions, good and hostile.
-- `companion_e2e.sh`, 100 checks passed: the app opened by Open at Login. **65 checks from inside the sandbox:** every limit above tried, and what must work: files in Downloads, TLS roots, interfaces through netlink,
+- `companion_e2e.sh`, 132 checks passed at the last run, with fd 6 (2026-11-02): the app opened by Open at Login. **65 checks from inside the sandbox:** every limit above tried, and what must work: files in Downloads, TLS roots, interfaces through netlink,
   and a Pion data channel between two peers in the process over DTLS. A mistake in the seccomp filter's jumps that let everything through was found this way. fd 3 both ways, and H.264 frames through fd 4.
   Outside it: `no_new_privs`, seccomp, no capabilities, one process, killed with the app, no zombie. Refused with nothing run: one changed byte, no Verified author, a revoked key, no catalog, a folder of the user's, a
   group-writable folder, as root, Downloads as a link. No grant on fd 4 gives `no_person`. The same manifest in a home folder runs as an app with no companion. A Linux app in an `lpk-` scope gets `no_identity`.
 
-**Not tested:** arm64; a real `lord-sessiond` placing the companion in its scope (those sessions were refused placement, as a development session is, and it isn't fatal there); limits of one core and 512 MB with a real engine;
+**On arm64** (Raspberry Pi 5, 2026-11-02): the real engine ran in this sandbox, in its scope, with no capabilities, `no_new_privs` and the filter on, its picture and input working. `tests/companion_e2e.sh`'s own checks have not run on arm64.
+
+**Not tested:** a real `lord-sessiond` placing the companion in its scope (those sessions were refused placement, as a development session is, and it isn't fatal there); limits of one core and 512 MB with a real engine;
 a real `.deb`; a kernel below ABI 3; seen on screen: the item by the clock and its menu, whose choice reaching the app wasn't run; the first-use prompts for `network` and `status-item`; the admin action behind forgetting grants, from a real shell.
 
 **On a real screen** (VM 125, amd64, 2026-11-02, a development `lordos` and a real `.deb` of Desk go-link, signed with throwaway keys): the app in Applications and the Dock, the `network`, `status-item`, `screen-share` and `remote-input` prompts, the item by the clock and its menu, a visitor from the public website with picture, sound, control, chat and files, Stop, the lock ending a share, and uninstalling forgetting the grants at the next session start. A viewer on 5673 was a root test client, not the real bridge, and a visitor then got `in_use`. An app installed while a session runs shows in Applications at the next session.

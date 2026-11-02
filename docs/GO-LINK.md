@@ -28,7 +28,7 @@ These are the maintainer's, final, and this document builds on them.
 | API | Public and general, not go-link-specific: permission prompt on first use, always-visible indicator with a stop control, encoded frames plus Opus, input, protected windows black. |
 | Two consents | The system permission (this app may use the API) and the acceptance of each visitor (this person may come in) are separate things. |
 | Delivery | `.deb` for amd64 and arm64 published first at desk.go-link.org with a signature, verified and mirrored byte for byte to the LordOS APT repository, a Store item, updates through APT, the app's own updater off, a published version never re-uploaded. |
-| Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.8. The app requires 0.8.7.1 or later. |
+| Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.8. Live media came with 0.8.8, so the app requires 0.8.8 or later. |
 
 Non-goal: replacing 5673. Earlier versions of this document also left out a native viewer and the video call; the maintainer asked for both, and section 7 has them. A call is the visitor's to start, as on every platform: this viewer doesn't place calls.
 
@@ -262,7 +262,25 @@ runs, whichever door uses it.
   (`docs/SESSIONS.md:40`). Those costs aren't measured for this case.
 - The picture is H.264 Constrained Baseline or VP8. A viewer that asks for High gets Baseline (section 8).
 
-No claim on a screen until stage 5 has numbers per machine.
+### Measured
+
+All on 2026-11-02, with software encoders and decoders, on test builds. No claim on a screen comes from this: they're a test card and a desktop, not a person's day.
+
+| | VM 116 / VM 125 (Xeon Silver 4108, 1.8 GHz, virtual, no GPU acceleration) | Raspberry Pi 5, 16 GB, HDMI monitor, GPU composition |
+|---|---|---|
+| H.264 encoder, LordBench's clip | 104.6 fps | 73.7 fps |
+| VP8 encoder, LordBench's clip | not run (quick mode) | 52.9 fps |
+| H.264 decoder, LordBench's 1080p clip | 381 fps | 250 fps |
+| x264 per frame in a real share | 7.00 ms, 1280×800, a mostly still desktop, 1,758 frames, VM 125 | 17.45 ms, 1920×1080, a moving card in a window, 534 frames |
+| A share running | `lord-server` 6.5 %, engine 3.7 %, `lord-media` 1.0 % of a core, still screen, VM 125 | `lord-server` 97 %, `lord-media` 52 %, engine 7 %, with a live session in a window on screen; the visitor got about 21 fps |
+| Viewing another computer, 640×480 at 30 fps in the window | `lord-media` 9 %, engine 9 %, 2.26 ms a picture, scaled, VM 125 | `lord-media` 22 %, `lord-server` 9 %, engine 3 %, 6.69 ms a picture, scaled |
+| One picture through `lord-media`, 1280×800 and 1920×1080, no scaling | 1.62 and 2.92 ms, VM 116 | 2.30 and 4.57 ms |
+| App and engine in their scope (512 MB, one core) | 44.9 MB at peak during a two-way call, VM 125 | 33.8 MB at peak while sharing and viewing |
+| `lord-media` of a share or a stream | 57 MB at peak | 49 MB at peak |
+
+So one core and 512 MB are plenty (D8 can stay closed), and the Pi at 1080p is limited by the compositor's read-back, not by x264: 97 % of a core there against 17 ms a frame, a ceiling near 57 fps. A share from a Pi with a moving picture isn't full rate. Standalone runs of `lord-media` showed more CPU in the process's total than its live threads add up to, when no box size is set; the cause wasn't found, the app always sets one, and those runs give times only.
+
+**VA-API:** not measured. The lab has no hardware with it: VM 116 and VM 125 have a virtio display, and the Pi 5 has no H.264 encoder.
 
 ## 7. The app
 
@@ -311,11 +329,13 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | `internal/appsock` (new) | The app's protocol on fd 3: one JSON text per `SOCK_SEQPACKET` message, 64 KB at most, one message type per field of `uiOptions` (go-link:`cmd/desk/ui.go:14`): status, code, consent, permissions, chat, files, settings, links. |
 | `cmd/desk` | `ui_lordos.go`, `runUI` over `appsock`; `ui_headless.go` gets `&& !lordos`. Under `lordos`, the `--test-*` flags aren't compiled, and `setConsent` is always set (go-link:`cmd/desk/main.go:533`). Configuration comes from the app's data folder. |
 | `internal/updater` | Nothing: only the GUI starts it (go-link:`internal/gui/update.go:53`), so a `lordos` build has none. Off by construction. |
-| `build/lordos` (new) | nFPM file, `go-link-desk-lordos`, installs to `/usr/lib/lordos-apps/go-link-desk/`, `Depends: lordos (>= 0.8.7.1)`, no maintainer scripts. It doesn't conflict with the Linux package. |
+| `build/lordos` (new) | nFPM file, `go-link-desk-lordos`, installs to `/usr/lib/lordos-apps/go-link-desk/`, `Depends: lordos (>= 0.8.8~)`, no maintainer scripts. It doesn't conflict with the Linux package. |
 | `lordos-app/` (new) | The React app, built with a pinned `tools/lpk.mjs` and its `tree` mode. |
 | `frontend` | The `in_use` reason, the `/privacy/lordos` page. |
 
 ## 9. Packaging, Store and updates
+
+What exists: `docs/drafts/go-link-desk-catalog-entry.json`, the entry ready to fill, and Store → Remote access, which appears once the catalog has an entry with that section. How it reaches a person: the maintainer builds both `.deb`s with `lordos/`'s recipe and go-link's author key, whose public half LordOS's signed catalog lists as a Verified author; they go up at desk.go-link.org; the entry gets the version, URLs and hashes and moves into `apt/catalog.json`; `apt/build.sh` fetches, checks the hash and control fields and adds them to the pool; the Store offers it. Without the author key in the catalog the app doesn't open: the local builds carry a catalog of their own for that reason, and it must not reach a release.
 
 1. **Published first at desk.go-link.org:** both `.deb` files with `SHA256SUMS` and its Ed25519 signature by the go-link update key
    (go-link:`docs/security.md:37`). Today releases live on the release host, so this is new hosting. Never re-uploaded: a fix is a new version.
@@ -326,7 +346,7 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
    (`docs/UPDATES.md:334-336`). Vendor packages are never modified (`apt/README.md:101`).
 4. **Store:** a new catalog section, `remote`, since it's neither AI nor commercial (`apps/store/ai.js:137`, `apps/store/index.jsx:345`), with
    the go-link name and vendor and a line saying it's a third-party app and how it differs from 5673. Recommended there and nowhere else: no
-   preinstall, no dependency of `lordos`, no first-run nudge. On a system below 0.8.7.1 the page says to update LordOS first.
+   preinstall, no dependency of `lordos`, no first-run nudge. On a system below 0.8.8 the page says to update LordOS first.
 5. **Updates:** through APT and Store → Updates, as for any catalog app.
 6. **Privacy policy:** its own page at desk.go-link.org, linked from the Store item and from the app's About. It says what signalhub
    and TURN see, what stays on the computer, and that the app has no analytics.
@@ -355,19 +375,33 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 
 ## 11. Status
 
-The stages run in order except where noted. Percentages are of what each stage's "done when" asks, as of @DATE@, and only count what ran. Details of each test are in section 12.
+The stages run in order except where noted. Percentages are of what each stage's "done when" asks, as of 2026-11-02, and only count what ran. Details of each test are in section 12.
 
-@TABLE@
+| Stage | Work | Now | What's left |
+|---|---|---|---|
+| **0. Proof of concept** | `remote.sock` to a browser through go-link's signaling | 90 % | A protected window on a real share: see stage 5 |
+| **1. API** | `share.c`, permissions, indicator, stop, section 5, input rules | 90 % | The 5673 refusal with a real bridge sign-in, which needs a person's sign-in |
+| **2. Companion** | Third root, `BOP_COMPANION`, sandbox, catalog check, live media | 95 % | The sandbox's own 132 checks on arm64: on the Pi only the real engine ran in it |
+| **3. Engine** | Section 8's packages in go-link | 85 % | `make check` for other platforms; five tests of `cmd/desk` fail the same way before these changes, with the cause unknown |
+| **4. App** | React app and all pages | 75 % | A terminal session's real output, Send files with a real file chooser, the record menu; every theme and right to left; the comparison on the maintainer's Mac |
+| **5. Measurements and review** | Section 6's numbers, review, attack run | 40 % | A real GPU with VA-API, which the lab hasn't got; an attack run like REMOTE.md's; a protected window; go/no-go on claims |
+| **6. Delivery** | Section 9, privacy page, Store text | 15 % | Everything that needs real keys and a release. Built locally: both `.deb`s with throwaway keys, the Store section, the catalog entry as a draft |
 
 ## 12. What has been tested
 
-**Tested:** stages 1 and 2: [SCREEN-SHARING.md](SCREEN-SHARING.md) and [PACKAGED-APPS.md](PACKAGED-APPS.md), "What was tested". Nothing from stage 3 on has run.
+**Tested** on 2026-11-02, with test builds signed by throwaway keys, against the public signaling server and website:
+
+- **Real screen, VM 125 (amd64):** the viewer in the same window, a test host's picture, keys, clicks and a stream of sound in PipeWire; a visitor from the website with Chromium's fake camera in a two-way call: their camera in the call window, this computer's camera (the `vivid` test driver) in their browser, each system prompt, both indicators, camera off turning its indicator off, hang up. A visitor's mouse: a click on the session panel's boxes and its Disconnect did nothing, and a click on another window went through. A name with a right-to-left mark came out clean.
+- **Real screen, Raspberry Pi 5 (arm64, monitor, GPU):** the app and engine started by the app host, its prompts, the viewer with keys and clicks, a share of the 1920×1080 screen to the website.
+- **Found by running it:** a fullscreen `xterm` covered the indicator. Fixed, and the same command now stays in its window under the indicator. The question for a call and the first connection request were cut off by their windows. Fixed.
+- `server/tests/live_helper.py`, on VM 116 and the Pi: real decoding in the real sandbox, H.264 and VP8, damage, bad lengths, 40 damaged streams with no crash. `companion_e2e.sh` 132 passed, `share_e2e.sh` 55 passed, on VM 116. `share-test`, `pkgapp-test`, `remote-sec-test` and the broker's tests passed; the full `make test` stopped at the time limit in `engine-test`, a long test this work doesn't touch, so it isn't a full pass.
+- `.deb`: install, `dpkg -r` leaving nothing, install again, VM 125.
+
+**Not tested:** a protected window through the share (the step was refused by a permission of the tool in this session, and no other way around it was tried); the sound the microphone sends, beyond the visitor's track carrying sound of unknown origin; revoking the camera or microphone during a call; a fullscreen surface already up when a share starts; a fullscreen surface on the Pi's GPU path; the viewer against a real computer rather than the test host, and VP8 in the viewer on screen; the viewer on a session that changes size; the audible sound of a session at speakers; arm64 in `companion_e2e.sh`.
+
+**Needs the maintainer:** the 5673 refusal with a real bridge sign-in; the pixel comparison on their Mac; signing with real keys; publishing; the website's `in_use` text.
 
 **Read, and relied on:** everything cited above, as of commit `a621d38e` of LordOS and `1203f15` of go-link Desk.
-
-**To test first,** because the design leans on them: the pure-Go engine build; UI and engine in one scope's
-limits; Baseline at the session's size against the `42e01f` line both sides offer; mono Opus in go-link's track; the indicator above every kind of
-fullscreen, direct scanout included; x264 on the Pi.
 
 ## 13. Open decisions
 
@@ -382,7 +416,7 @@ fullscreen, direct scanout included; x264 on the Pi.
   looks free and doesn't change what 5673 does, but it touches 5673's socket, so it's for the maintainer to approve. Until it's done, the
   system permission can be bypassed by any unsandboxed app of the user. Proposed for 0.8.7.1, after stage 0.
 - **D7. The numbers (set in stage 1, still the maintainer's to change):** Stop is ⌃⌥⇧Esc, the indicator wait 2 s, keyframes at most one per 500 ms and, on a still screen, a burst of 3 then one per 30 s; 1,000 pointer events and 200 keys a second.
-- **D8. Scope limits** for a packaged app, if stage 2 shows one core or 512 MB isn't enough.
+- **D8. Scope limits (closed: not needed).** One core and 512 MB held: section 6.
 - **D10. The engine's own files (decided).** The companion may write its own app-data folder (`device.json`, logs, settings) and `~/Downloads`, nothing else. It reads the home's
   visible entries, as they were when it started: no dot-file and no dot-folder, in the sandbox as well as in the visitor's browser. [PACKAGED-APPS.md](PACKAGED-APPS.md) says what's enforced.
 - **D9. Assistants and the terminal.** Their views are part of the copy. Running them needs a wider sandbox than the rest of the app; how is to be decided.
