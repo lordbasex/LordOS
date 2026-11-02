@@ -613,7 +613,7 @@ La 0.8.6 Beta, publicada el 30 de octubre de 2026, trajo la primera parte de Lor
 - Remote Desk (0.8.7): VNC y RDP se probaron contra una máquina de prueba descartable; RDP contra una sesión real de un sistema de escritorio y las carpetas compartidas de RDP no se verificaron en una sesión real. El tráfico VNC no está cifrado (§6.7).
 - Un certificado autofirmado en una conexión debe nombrar el host para el que se usa.
 - Los fondos en movimiento copian cada cuadro camino a la pantalla (§7.4); un camino sin copias está planeado para la 0.8.8. El decodificador por hardware de la Pi 5 maneja solo HEVC, así que los clips H.264, VP9 y AV1 no se reproducen ahí.
-- La ISO live arm64 corrió solo en QEMU emulado, como compilación de desarrollo sin firmar: hardware real, una memoria USB, un hipervisor con aceleración por hardware, una GPU virtual con 3D, el sonido, los navegadores y una compilación firmada no están probados (§5.6).
+- La ISO live arm64 corrió solo en QEMU emulado: la ISO firmada del release llegó al escritorio live, y una compilación de desarrollo sin firmar se instaló en disco: hardware real, una memoria USB, un hipervisor con aceleración por hardware, una GPU virtual con 3D, el sonido, los navegadores y una compilación firmada no están probados (§5.6).
 - La actualización desde la 0.8.6 todavía no se había probado contra el repositorio firmado cuando se escribieron las notas de la versión (§2.4).
 - La memoria de ventanas con dos pantallas no está probada; restaurar la sesión no reabre una carpeta de Archivos (§3.6).
 - Los discos HFS+ y APFS son de solo lectura (§5.1).

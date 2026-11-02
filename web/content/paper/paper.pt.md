@@ -613,7 +613,7 @@ A 0.8.6 Beta, lançada em 30 de outubro de 2026, trouxe a primeira parte do Lord
 - Remote Desk (0.8.7): VNC e RDP foram testados contra uma máquina de teste descartável; RDP contra uma sessão real de um sistema de desktop e as pastas compartilhadas do RDP não foram verificados numa sessão real. O tráfego VNC não é cifrado (§6.7).
 - Um certificado autoassinado numa conexão precisa nomear o host em que é usado.
 - Os fundos em movimento copiam cada quadro a caminho da tela (§7.4); um caminho sem cópias está planejado para a 0.8.8. O decodificador por hardware do Pi 5 só trata HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
-- A ISO live arm64 rodou só em QEMU emulado, como compilação de desenvolvimento sem assinatura: hardware real, um pendrive, um hipervisor com aceleração por hardware, uma GPU virtual com 3D, o som, os navegadores e uma compilação assinada não foram testados (§5.6).
+- A ISO live arm64 rodou só em QEMU emulado: a ISO assinada da release chegou ao desktop live, e uma compilação de desenvolvimento sem assinatura foi instalada em disco: hardware real, um pendrive, um hipervisor com aceleração por hardware, uma GPU virtual com 3D, o som, os navegadores e uma compilação assinada não foram testados (§5.6).
 - A atualização a partir da 0.8.6 ainda não tinha sido testada contra o repositório assinado quando as notas da versão foram escritas (§2.4).
 - A memória de janelas com duas telas não foi testada; a restauração da sessão não reabre uma pasta de Arquivos (§3.6).
 - Discos HFS+ e APFS são somente leitura (§5.1).

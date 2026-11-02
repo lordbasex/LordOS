@@ -770,7 +770,7 @@ There are no measurements on real PCs in the repository yet. The ISO is tested o
 - Remote Desk (0.8.7): VNC and RDP were run against a throwaway test machine; RDP to a real session of a desktop system and RDP's shared folders have not been verified in a real session. VNC traffic is not encrypted (§6.7).
 - A self-signed certificate on a connection must name the host it's used for.
 - Moving wallpapers copy each frame on its way to the screen (§7.4); a zero-copy path is planned for 0.8.8. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
-- The arm64 live ISO has run on emulated QEMU only, as an unsigned development build: real hardware, a USB stick, a hypervisor with hardware acceleration, a 3D virtual GPU, sound, the browsers and a signed build are not tested (§5.6).
+- The arm64 live ISO has run on emulated QEMU only: the signed release ISO reached the live desktop, and an unsigned development build installed to disk: real hardware, a USB stick, a hypervisor with hardware acceleration, a 3D virtual GPU, sound, the browsers and a signed build are not tested (§5.6).
 - The update from 0.8.6 was not yet tested against the signed repository when the release notes were written (§2.4).
 - Window memory across two displays is not tested; session restore doesn't reopen a Files folder (§3.6).
 - HFS+ and APFS disks are read-only (§5.1).
