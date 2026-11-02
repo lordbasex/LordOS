@@ -1,5 +1,5 @@
 // MapView.jsx — world map of the Network tab, as in per-app network monitors: vector land
-// (dibujada por lord-server en otro hilo: lord.monitor.map / mapFrame, server/src/monitor/map.c),
+// (dibujada por axia-server en otro hilo: lord.monitor.map / mapFrame, server/src/monitor/map.c),
 // un arco desde "Este equipo" a cada país con conexiones, un punto por país y etiquetas en
 // píldora. Rueda: zoom hacia el cursor; arrastrar: mover; doble clic: acercar; botones +, − y
 // "ver todo". Clic en un punto o en un arco: elige ese lugar.

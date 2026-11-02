@@ -25,7 +25,7 @@ int  lpk_open(const char *path, Lpk *out, char *err, size_t errlen);
 const LpkFile *lpk_find(const Lpk *p, const char *path);
 void lpk_free(Lpk *p);
 
-/* Installed apps folder: ~/.local/share/lordos/apps (created if missing). */
+/* Installed apps folder: ~/.local/share/axia/apps (created if missing). */
 const char *lpk_root(void);
 /* Valid package id: [a-z][a-z0-9-]{1,39} (it is also its text namespace). */
 int  lpk_valid_id(const char *id);

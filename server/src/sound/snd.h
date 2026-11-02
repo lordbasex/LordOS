@@ -1,5 +1,5 @@
 /* snd.h — LordOS sound: our own PipeWire client over the PulseAudio protocol that
- * pipewire-pulse serves (see snd.c and docs/SOUND.md). Runs inside lord-server, as the
+ * pipewire-pulse serves (see snd.c and docs/SOUND.md). Runs inside axia-server, as the
  * session user. */
 #ifndef LORD_SND_H
 #define LORD_SND_H

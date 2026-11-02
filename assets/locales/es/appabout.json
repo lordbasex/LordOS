@@ -1,9 +1,9 @@
 {
   "isolated": "Corre aislada, en su propio proceso",
   "linux": "App de Linux",
-  "lordos": "App de LordOS",
+  "lordos": "App de Axia DE",
   "package": "App instalada (.lpk)",
-  "system": "App del sistema — parte de LordOS, verificada con él",
+  "system": "App del sistema — parte de Axia DE, verificada con él",
   "title": "Acerca de {app}",
   "version": "Versión {v}"
 }

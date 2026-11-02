@@ -529,11 +529,11 @@ export function toggleHotkeyWindow() {
   wm.focus(id);
 }
 
-// ---- sesiones que sobreviven (cambio de tema o reinicio de lord-server) ----
+// ---- sesiones que sobreviven (cambio de tema o reinicio de axia-server) ----
 //
 // La disposición viva (ventanas → pestañas → paneles, con la clave del guardián de cada
 // sesión) se guarda en terminal.live. Cuando el módulo arranca y ya hay sesiones abiertas
-// —porque se cambió de tema o porque lord-server se reinició y las recuperó de sus
+// —porque se cambió de tema o porque axia-server se reinició y las recuperó de sus
 // guardianes (server/src/term/hold.c)— se vuelven a abrir las mismas ventanas.
 
 let lastLive = '';

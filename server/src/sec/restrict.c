@@ -61,7 +61,7 @@ void restrict_changed(const char *fwid, uint32_t before, uint32_t after) {
     if (!fwid || !added) return;
     if (!strncmp(fwid, "lpk:", 4) && fwid[4]) {
         /* the same path as revoking the permission in Privacy: the app is told, the camera's
-         * lord-media is killed and the microphone stream is closed */
+         * axia-media is killed and the microphone stream is closed */
         if (added & FW_R_NO_CAMERA) brokersrv_revoke(fwid + 4, "camera");
         if (added & FW_R_NO_MIC) brokersrv_revoke(fwid + 4, "microphone");
     } else if (!strcmp(fwid, "lordos") && local_hook) local_hook(added);

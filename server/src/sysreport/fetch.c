@@ -1,5 +1,5 @@
-/* fetch.c — `lordos-fetch` (see fetch.h). The crown is pixel art drawn two pixels per character
- * cell with half blocks (▀ ▄), in the brand colors (docs/LORDOS-BRAND.md); without color it is plain
+/* fetch.c — `axia-fetch` (see fetch.h). The mark is pixel art drawn two pixels per character
+ * cell with half blocks (▀ ▄), in the violet of the app icon (tools/gen-brand.py); without color it is plain
  * ASCII. */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -59,55 +59,52 @@ static int rpm_packages(const char *root) {
     return !timed_out && WIFEXITED(st) && WEXITSTATUS(st) == 0 ? n : -1;
 }
 
-/* ---- the crown ---- */
+/* ---- the mark ---- */
 
-/* 31 × 23 pixels: H gem highlight, Y gem, A gem shade, W white, L lavender shading, V band, B band
- * edge, '.' nothing. */
-static const char *CROWN[] = {
-    "...............H...............",
-    "..............HHH..............",
-    ".............HHYYY.............",
-    "..............AAA..............",
-    "...............A...............",
-    "...H...........W...........H...",
-    "..HHH.........WWL.........HHH..",
-    ".HHYYY.......WWWLL.......HHYYY.",
-    "..AAA........WWWLL........AAA..",
-    "...A........WWWWLLL........A...",
-    "...W.......WWWWWLLLW.......L...",
-    "...WWW.....WWWWWLLLW.....LLL...",
-    "...WWWW...WWWWWWLLLWW...LLLL...",
-    "...WWWWW..WWWWWWLLLWW..LLLLL...",
-    "...WWWWWW.WWWWWWWWWWW.WLLLLL...",
-    "...WWWWWWWWWWWWWWWWWWWWLLLLL...",
-    "...WWWWWWWWWWWWWWWWWWWWLLLLL...",
-    "..BVVVVVVVVVVVVVVVVVVVVVVVVVB..",
-    "..BVVVVVVVVVVVVVVVVVVVVVVVVVB..",
-    "..WWWWWWWWWWWWWWWWWWWWWWLLLLL..",
-    "..WWWWWWWWWWWWWWWWWWWWWWLLLLL..",
-    "...WWWWWWWWWWWWWWWWWWWWWLLLL...",
-    "...............................",
+/* 31 × 22 pixels: the Axia mark, an "A" whose crossbar runs past both legs, in the icon's violet from
+ * light (P) at the apex to deep (B) at the feet; '.' nothing. */
+static const char *MARK[] = {
+    "..............PPP..............",
+    ".............PPPPP.............",
+    ".............PPPPP.............",
+    "............PPPPPPP............",
+    "............PPP.PPP............",
+    "............PPP.PPP............",
+    "...........PPP...PPP...........",
+    "...........VVV...VVV...........",
+    "..........VVV.....VVV..........",
+    "..........VVV.....VVV..........",
+    ".........VVV.......VVV.........",
+    ".........VVV.......VVV.........",
+    "........VVV.........VVV........",
+    "..VVVVVVVVVVVVVVVVVVVVVVVVVVV..",
+    "..VVVVVVVVVVVVVVVVVVVVVVVVVVV..",
+    ".......BBB...........BBB.......",
+    "......BBB.............BBB......",
+    "......BBB.............BBB......",
+    ".....BBBB.............BBBB.....",
+    ".....BBB...............BBB.....",
+    "....BBBB...............BBBB....",
+    "....BBB.................BBB....",
 };
-#define CROWN_H ((int)(sizeof CROWN / sizeof CROWN[0]))
-#define CROWN_W 31
+#define MARK_H ((int)(sizeof MARK / sizeof MARK[0]))
+#define MARK_W 31
 
 static const char *PLAIN[] = {
-    "               <>              ",
-    "    <>        /  \\        <>   ",
-    "    /\\       /    \\       /\\   ",
-    "    | \\     /      \\     / |   ",
-    "    |  \\   /        \\   /  |   ",
-    "    |   \\_/          \\_/   |   ",
-    "    |                      |   ",
-    "    |======================|   ",
-    "    |______________________|   ",
+    "               /\\              ",
+    "              /  \\             ",
+    "             /    \\            ",
+    "            /      \\           ",
+    "           /        \\          ",
+    "    ======/==========\\======   ",
+    "         /            \\        ",
+    "        /              \\       ",
+    "       /                \\      ",
 };
 
 typedef struct { char key; unsigned char r, g, b, idx; } Pal;
 static const Pal PAL[] = {
-    { 'H', 0xff, 0xf1, 0xa8, 229 }, { 'Y', 0xff, 0xd6, 0x0a, 220 }, { 'A', 0xff, 0xb0, 0x00, 214 },
-    { 'W', 0xff, 0xff, 0xff, 231 }, { 'L', 0xbd, 0xb1, 0xf5, 147 }, { 'V', 0x7c, 0x5c, 0xff, 99 },
-    { 'B', 0x5b, 0x3f, 0xe0, 62 },
+    { 'P', 0xb4, 0x6c, 0xff, 135 }, { 'V', 0x7c, 0x5c, 0xff, 99 }, { 'B', 0x4f, 0x46, 0xe5, 62 },
 };
 
 static const Pal *pal(char k) {
@@ -124,12 +121,12 @@ static void bg(HBuf *b, const Pal *p, FetchColor c) {
     else hb_printf(b, "\033[48;5;%dm", p->idx);
 }
 
-/* One text row of the crown: pixel rows 2y and 2y+1. */
-static void crown_row(HBuf *b, int y, FetchColor c) {
-    if (c == FETCH_PLAIN) { hb_printf(b, "%-*s", CROWN_W, y < (int)(sizeof PLAIN / sizeof PLAIN[0]) ? PLAIN[y] : ""); return; }
-    for (int x = 0; x < CROWN_W; x++) {
-        const Pal *t = 2 * y < CROWN_H ? pal(CROWN[2 * y][x]) : NULL;
-        const Pal *u = 2 * y + 1 < CROWN_H ? pal(CROWN[2 * y + 1][x]) : NULL;
+/* One text row of the mark: pixel rows 2y and 2y+1. */
+static void mark_row(HBuf *b, int y, FetchColor c) {
+    if (c == FETCH_PLAIN) { hb_printf(b, "%-*s", MARK_W, y < (int)(sizeof PLAIN / sizeof PLAIN[0]) ? PLAIN[y] : ""); return; }
+    for (int x = 0; x < MARK_W; x++) {
+        const Pal *t = 2 * y < MARK_H ? pal(MARK[2 * y][x]) : NULL;
+        const Pal *u = 2 * y + 1 < MARK_H ? pal(MARK[2 * y + 1][x]) : NULL;
         if (!t && !u) { hb_printf(b, " "); continue; }
         if (t && u && t == u) { fg(b, t, c); hb_printf(b, "█"); }
         else if (t && u) { fg(b, t, c); bg(b, u, c); hb_printf(b, "▀"); }
@@ -236,7 +233,7 @@ char *fetch_render(const SysReport *r, const FetchLive *l, FetchColor c) {
     int n = 0;
     char v[256], a[96], b2[96];
 
-    snprintf(v, sizeof v, "LordOS %s%s%s%s", r->sw.lordos, r->sw.os[0] ? " (" : "", r->sw.os, r->sw.os[0] ? ")" : "");
+    snprintf(v, sizeof v, "Axia DE %s%s%s%s", r->sw.lordos, r->sw.os[0] ? " (" : "", r->sw.os, r->sw.os[0] ? ")" : "");
     n = add(ls, n, "OS", v);
     const SrMachine *m = &r->machine;
     snprintf(v, sizeof v, "%s%s%s", m->vendor, m->vendor[0] && m->product[0] ? " " : "", m->product);
@@ -296,14 +293,14 @@ char *fetch_render(const SysReport *r, const FetchLive *l, FetchColor c) {
     /* the title: user@host (or the product) and a rule under it */
     char title[160];
     if (l->user[0] && l->host[0]) snprintf(title, sizeof title, "%s@%s", l->user, l->host);
-    else snprintf(title, sizeof title, "LordOS");
-    /* title, rule, the lines, and with color a blank line and the palette; at least the crown's height */
+    else snprintf(title, sizeof title, "Axia DE");
+    /* title, rule, the lines, and with color a blank line and the palette; at least the mark's height */
     int rows = n + (c == FETCH_PLAIN ? 2 : 4);
-    if (rows < (CROWN_H + 1) / 2) rows = (CROWN_H + 1) / 2;
+    if (rows < (MARK_H + 1) / 2) rows = (MARK_H + 1) / 2;
     if (rows < (int)(sizeof PLAIN / sizeof PLAIN[0])) rows = (int)(sizeof PLAIN / sizeof PLAIN[0]);
     for (int y = 0; y < rows; y++) {
         hb_printf(&b, " ");
-        crown_row(&b, y, c);
+        mark_row(&b, y, c);
         hb_printf(&b, "   ");
         if (y == 0) {
             if (c != FETCH_PLAIN) { hb_printf(&b, "\033[1m"); fg(&b, violet, c); }
@@ -318,7 +315,7 @@ char *fetch_render(const SysReport *r, const FetchLive *l, FetchColor c) {
             if (c != FETCH_PLAIN) hb_printf(&b, "\033[0m");
             hb_printf(&b, "%*s%s", 10 - (int)strlen(x->label), "", x->value);
         } else if (y - 2 == n + 1 && c != FETCH_PLAIN) {
-            static const char keys[] = "HYAWLVB";
+            static const char keys[] = "PVB";
             for (const char *k = keys; *k; k++) { bg(&b, pal(*k), c); hb_printf(&b, "   "); }
             hb_printf(&b, "\033[0m");
         }

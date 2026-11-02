@@ -1,4 +1,4 @@
-// archive.js — archives through the confined helper (libarchive inside lord-doc). Extracting
+// archive.js — archives through the confined helper (libarchive inside axia-doc). Extracting
 // never leaves the destination folder: no "..", no absolute paths, no links pointing outside
 // (see docs/DOCUMENTS.md, "Extracting without leaving the folder").
 //

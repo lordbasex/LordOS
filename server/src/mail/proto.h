@@ -1,16 +1,16 @@
-/* proto.h — channel between lord-server and lord-maild (see docs/MAIL.md).
+/* proto.h — channel between axia-server and axia-maild (see docs/MAIL.md).
  *
- * The same framing as lord-doc (doc/wire.h): a SOCK_SEQPACKET socketpair on fd 3, each message a
+ * The same framing as axia-doc (doc/wire.h): a SOCK_SEQPACKET socketpair on fd 3, each message a
  * DocHdr + JSON (+ up to DOC_MAX_FDS-1 descriptors via SCM_RIGHTS; large JSON goes in a sealed
  * memfd). Requests carry an id; replies use the same id; events use id 0.
  *
- * lord-maild has no way to open a socket (seccomp). To reach a server it sends MR_CONNECT
- * {"host","port"}; lord-server answers MQ_SOCK with a connected TCP socket, but only if that
+ * axia-maild has no way to open a socket (seccomp). To reach a server it sends MR_CONNECT
+ * {"host","port"}; axia-server answers MQ_SOCK with a connected TCP socket, but only if that
  * endpoint is one of the configured accounts (or a remote-image host the user just allowed). */
 #ifndef LORD_MAIL_PROTO_H
 #define LORD_MAIL_PROTO_H
 
-/* lord-server → lord-maild */
+/* axia-server → axia-maild */
 enum {
     MQ_INIT = 1,        /* {"config":{…},"zone":"Europe/Madrid","lang":"es"} + fd of the cache folder */
     MQ_REQ,             /* {"op":…} (+ fds of files to attach / photos) */
@@ -18,7 +18,7 @@ enum {
     MQ_CONFIG,          /* the accounts file changed: {"config":{…}} */
 };
 
-/* lord-maild → lord-server */
+/* axia-maild → axia-server */
 enum {
     MR_DONE = 1,        /* request finished: JSON result */
     MR_ERR,             /* request failed: {"error":"code","detail":"…"} */

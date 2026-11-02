@@ -1,6 +1,6 @@
 // Scanner: "driverless" network scanners (eSCL / AirScan) with our own client, without SANE:
 // preview, a hand-drawn area, resolution, color or grayscale, and save as PDF, PNG or JPEG. What
-// the scanner sends is decoded and converted in the sandboxed lord-doc helper.
+// the scanner sends is decoded and converted in the sandboxed axia-doc helper.
 import {
   View, Text, Button, Segmented, Hairline, EmptyState, ScrollView, useTheme, useAppWindow, wm, fs, print, DocImage, releaseImage, decodeImage, convertImage,
   formatDate, formatTime, typeScale, t as tr,

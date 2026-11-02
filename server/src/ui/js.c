@@ -414,13 +414,13 @@ static void session_context(void) {
     js_monitor_register(ctx, lord, js_sys_assets());   /* lord.monitor (app Monitor) */
     js_sec_register(ctx, lord);        /* lord.perms, lord.sign and lord.code (privacy, signing, verified code) */
     js_media_register(ctx, lord);      /* lord.media (video, photos, screenshots, camera, recorder) */
-    js_doc_register(ctx, lord);        /* lord.doc: PDF, archives and fonts through the lord-doc helper */
+    js_doc_register(ctx, lord);        /* lord.doc: PDF, archives and fonts through the axia-doc helper */
     js_print_register(ctx, lord);      /* lord.print: CUPS over IPP and eSCL scanners */
-    js_vault_register(ctx, lord);      /* lord.vault: Passwords and the keyring through the lord-vault helper */
-    js_mail_register(ctx, lord);       /* lord.mail: Mail, Calendar, Contacts, Reminders via lord-maild (docs/MAIL.md) */
+    js_vault_register(ctx, lord);      /* lord.vault: Passwords and the keyring through the axia-vault helper */
+    js_mail_register(ctx, lord);       /* lord.mail: Mail, Calendar, Contacts, Reminders via axia-maild (docs/MAIL.md) */
     js_wm_register(ctx, lord);         /* lord.wm: moving and resizing windows in C (grab.c) */
     js_input_register(ctx, lord);      /* lord.input: touchpads and touchscreens (tp/) */
-    js_fw_register(ctx, lord);         /* lord.fw: per-app network permissions (lord-netperm, docs/FIREWALL.md) */
+    js_fw_register(ctx, lord);         /* lord.fw: per-app network permissions (axia-netperm, docs/FIREWALL.md) */
     js_disk_register(ctx, lord);       /* lord.disks: disks and partitions (Disks app) */
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
     js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
@@ -453,9 +453,9 @@ int js_init(const char *bundle_path) {
 }
 
 /* ---- the recovery screen ----
- * When the theme (or the login screen, or an isolated app's code) was refused, lord-server shows
+ * When the theme (or the login screen, or an isolated app's code) was refused, axia-server shows
  * this instead of a blank screen. It is compiled into the binary, so it is as trusted as
- * lord-server itself. Texts: the "shell" catalog (code.recovery.*) when it can be read, English
+ * axia-server itself. Texts: the "shell" catalog (code.recovery.*) when it can be read, English
  * otherwise. */
 static const char recovery_js[] =
     "(function(){\n"
@@ -537,8 +537,8 @@ int js_init_recovery(int greeter) {
     return run_recovery(greeter ? "greeter" : "session", 0);
 }
 
-/* "App mode" (lord-server --app <id>): the same JS engine, but the `lord` object only has the
- * drawing primitives (local) plus the broker (fs/clipboard/perms through lord-server, which checks
+/* "App mode" (axia-server --app <id>): the same JS engine, but the `lord` object only has the
+ * drawing primitives (local) plus the broker (fs/clipboard/perms through axia-server, which checks
  * the permissions). Loads the "app host" (React + SDK + the app), see app/appclient.c. */
 static void app_context(const char *app_id) {
     rt = JS_NewRuntime();
@@ -554,7 +554,7 @@ static void app_context(const char *app_id) {
     JS_SetPropertyStr(ctx, lord, "screen", screen);
     JS_SetPropertyStr(ctx, lord, "version", JS_NewString(ctx, LORD_VERSION));
     js_broker_register(ctx, lord, app_id);         /* fs/clipboard/perms through the broker + appId */
-    js_vault_register_app(ctx, lord);              /* Passwords only: its own channel to lord-vault */
+    js_vault_register_app(ctx, lord);              /* Passwords only: its own channel to axia-vault */
     js_sys_register_app(ctx, lord);                /* lord.text (language, direction) and lord.image */
     js_wasm_register(ctx, g);                      /* WebAssembly for the app's loadWasm */
     JS_SetPropertyStr(ctx, g, "lord", lord);
@@ -565,7 +565,7 @@ int js_init_app(const char *host_bundle, const char *app_id) {
     char dir[1024];
     snprintf(dir, sizeof dir, "%s", host_bundle);
     snprintf(ui.theme_dir, sizeof ui.theme_dir, "%s", dirname(dir));
-    /* the app host as bytecode lord-server compiled for this session (app/apphost_bc.c) */
+    /* the app host as bytecode axia-server compiled for this session (app/apphost_bc.c) */
     const char *bcs = getenv(APPHOST_BC_ENV);
     int bcfd = bcs ? atoi(bcs) : -1, bcok = 0, how = -1;
     unsetenv(APPHOST_BC_ENV);
@@ -604,7 +604,7 @@ int js_app_recovery(void) {
 }
 
 void js_shutdown(void) {
-    media_shutdown();                   /* the lord-media helpers belong to this context */
+    media_shutdown();                   /* the axia-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
     if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
     hot_rt = NULL;
@@ -869,7 +869,7 @@ void js_broker_event(const char *kind, const char *json) {
     drain_jobs();
 }
 
-/* Process of an isolated app: events lord-server sends through the broker (theme, language…) →
+/* Process of an isolated app: events axia-server sends through the broker (theme, language…) →
  * __lordBrokerEvent(type, data). See runtime/app-host.js. */
 void js_broker_app_event(const char *kind, const char *json, size_t len) {
     if (!ctx) return;

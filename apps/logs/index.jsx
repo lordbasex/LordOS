@@ -1,8 +1,8 @@
 // Logs — a log viewer (see docs/SYSTEM.md, «Logs»).
 //
 // Sources (sidebar):
-//   - LordOS: the session logs (~/.cache/lordos/<name>.log: session.log…);
-//   - My logs: the user's journal (user-<uid>.journal), read by lord-server as the user with our
+//   - LordOS: the session logs (~/.cache/axia/<name>.log: session.log…);
+//   - My logs: the user's journal (user-<uid>.journal), read by axia-server as the user with our
 //     own reader (server/src/logs/journal.c);
 //   - System and Kernel: the system journal. If the user is in systemd-journal or adm it is read
 //     directly; otherwise an administrator asks for it via the helper's closed logs-system action.
@@ -241,7 +241,7 @@ export default function Registros() {
     return () => clearTimeout(id);
   }, [src.kind, src.file, level, range, search, proc]);
 
-  // live: inotify in lord-server notifies; only new entries are requested (at most ~1 per second)
+  // live: inotify in axia-server notifies; only new entries are requested (at most ~1 per second)
   useEffect(() => {
     if (!live) return undefined;
     let timer = null, busy = false;
@@ -354,7 +354,7 @@ export default function Registros() {
           <Hairline edge="bottom" />
         </View>
         <View style={{ flex: 1, minHeight: 0 }}>
-          {state.error ? <EmptyState mascot="confused" title={tr('logs.errorTitle')} hint={state.error} />
+          {state.error ? <EmptyState title={tr('logs.errorTitle')} hint={state.error} />
             : !items.length ? <EmptyState title={null} hint={state.loading ? tr('logs.loading') : tr('logs.empty')} />
             : <VirtualList items={items} selected={sel} onSelect={(i) => { setSel(i); setStick(false); }} stick={stick && sel < 0} onStick={setStick} renderRow={renderRow} />}
         </View>

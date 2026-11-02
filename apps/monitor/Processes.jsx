@@ -3,7 +3,7 @@
 // statistics, open files and ports), from the toolbar, a right-click menu, a double click and the
 // keyboard (⌘/Ctrl+I, Delete).
 //
-// The user's own processes are signalled by lord-server itself (lord.monitor.signal); another
+// The user's own processes are signalled by axia-server itself (lord.monitor.signal); another
 // user's or root's go through the root helper's proc-signal / proc-info (administrators only).
 // Both check the process's start time, so a PID reused meanwhile is never hit, and both refuse
 // the protected ones (PID 1, kernel threads, the session, LordOS's services and helpers,

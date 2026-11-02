@@ -1,7 +1,7 @@
 // media.js — video, music, photos, screenshots, camera and recorder (lord.media, see docs/MEDIA.md).
 //
-// Decoding and encoding is done by lord-media, an isolated helper (no network or file access)
-// that lord-server launches on demand; here we only request things by id and receive events.
+// Decoding and encoding is done by axia-media, an isolated helper (no network or file access)
+// that axia-server launches on demand; here we only request things by id and receive events.
 //
 //   const id = media.play('player', path, { loop: false });   // a player
 //   <MediaView media={id} style={{ flex: 1 }} />              // where it's shown (C draws it)
@@ -9,7 +9,7 @@
 //   media.control(id, 'seek', 30000)
 //
 // Errors (the `error` of a job result and of a player's state) are code lines such as
-// "media.notAnImage": show them with errorText() (sdk/errors.js). 'crash' means lord-media died.
+// "media.notAnImage": show them with errorText() (sdk/errors.js). 'crash' means axia-media died.
 //
 // Camera, microphone and screen ask for permission (requestPermission, the system prompt) and the
 // server checks it again. While in use, the menu bar indicators light up.
@@ -65,7 +65,7 @@ export const media = {
   info: (id) => call('info', id),
   // photos: id of a decoded image ("ready" event with { width, height, orientation, animated })
   image(app, path) { const id = call('image', app, path); if (id) track(id); return id; },
-  // thumbnail in ~/.cache/lordos/thumbs (path) or null while it's being made (thumbRev arrives)
+  // thumbnail in ~/.cache/axia/thumbs (path) or null while it's being made (thumbRev arrives)
   thumb: (path, size = 256) => { try { return call('thumb', path, size); } catch (e) { return null; } },
   probe: (path) => job(() => call('probe', path)).then((r) => (r.ok ? r.result : null)),
   waveform: (path, bars = 200) => job(() => call('waveform', path, bars)).then((r) => (r.ok ? r.result : null)),

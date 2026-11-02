@@ -6,7 +6,7 @@ keywords: copiar, pegar, historial, portapapeles, imágenes
 ---
 # Portapapeles
 
-LordOS guarda lo que copiás en cualquier app (también en las apps Linux): textos, enlaces, colores,
+Axia DE guarda lo que copiás en cualquier app (también en las apps Linux): textos, enlaces, colores,
 código, rutas e imágenes.
 
 - **❖V:** lo último que copiaste, con búsqueda. Enter, un clic o las teclas 1 a 9 lo pegan donde
@@ -19,7 +19,7 @@ código, rutas e imágenes.
 ## Privacidad
 
 - Lo que una app marca como secreto (por ejemplo, un gestor de contraseñas) no se guarda.
-- Los campos de contraseña de LordOS tampoco.
+- Los campos de contraseña de Axia DE tampoco.
 - En [Ajustes → Portapapeles](settings:clipboard) elegís si se guarda el historial, por cuánto
   tiempo y qué apps quedan excluidas, y lo podés borrar todo.
 

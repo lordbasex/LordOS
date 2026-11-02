@@ -1,4 +1,4 @@
-/* js_fan.h — lord.fan, the session side of lord-fand (see js_fan.c, docs/FANS.md). */
+/* js_fan.h — lord.fan, the session side of axia-fand (see js_fan.c, docs/FANS.md). */
 #ifndef LORD_JS_FAN_H
 #define LORD_JS_FAN_H
 

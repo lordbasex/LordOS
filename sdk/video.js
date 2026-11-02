@@ -63,7 +63,7 @@ export function startVideo() {
   const poll = () => {
     const hw = lord.media.hwDecode();
     if (hw) { videoHardware.set(hw); apply(); return; }
-    if (++tries < 40) setTimeout(poll, 250);       // lord-media answers in well under a second
+    if (++tries < 40) setTimeout(poll, 250);       // axia-media answers in well under a second
   };
   poll();
   settings.subscribe(apply);

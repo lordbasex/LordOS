@@ -1,6 +1,6 @@
-/* proto.c — sending and receiving messages between lord-server and lord-media (see proto.h). Both
+/* proto.c — sending and receiving messages between axia-server and axia-media (see proto.h). Both
  * binaries compile it. It validates lengths and descriptors: a broken or compromised helper can't
- * make lord-server read outside a buffer. */
+ * make axia-server read outside a buffer. */
 #include "proto.h"
 
 #include <errno.h>

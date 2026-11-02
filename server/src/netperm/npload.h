@@ -1,4 +1,4 @@
-/* npload.h — what lord-netperm loads into the kernel: its maps and which kind of program each
+/* npload.h — what axia-netperm loads into the kernel: its maps and which kind of program each
  * section of np.bpf.c is. Shared by netperm.c and tests/npverify_test.c (which loads every
  * program into the running kernel, so the verifier checks exactly what the service loads). */
 #ifndef LORD_NP_LOAD_H

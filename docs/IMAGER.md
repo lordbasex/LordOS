@@ -72,12 +72,12 @@ same `.xz` files, the same password and Wi-Fi vectors).
 
 ### In LordOS
 
-`lord-server` runs as the user and never executes anything. Everything that needs root is one of
+`axia-server` runs as the user and never executes anything. Everything that needs root is one of
 four closed admin actions in `server/src/imager/imager_admin.c` (table `IMAGER_ADMIN_ACTIONS`):
 
 | Action | Argument | What it does |
 |---|---|---|
-| `imager-fetch` | `meta`, or `file\n<tag>\n<name>\n<size>` | `/usr/bin/curl` **as the user** (setresuid, no new privileges, no curlrc, https only also after redirects) fetches `https://api.github.com/repos/lordbasex/LordOS/releases?per_page=10` or `https://github.com/lordbasex/LordOS/releases/download/<tag>/<name>` into `~/.cache/lordos/imager` (resumable `.part`; the tag and name are validated; only images and the two signature files). Root never parses what arrives. |
+| `imager-fetch` | `meta`, or `file\n<tag>\n<name>\n<size>` | `/usr/bin/curl` **as the user** (setresuid, no new privileges, no curlrc, https only also after redirects) fetches `https://api.github.com/repos/lordbasex/LordOS/releases?per_page=10` or `https://github.com/lordbasex/LordOS/releases/download/<tag>/<name>` into `~/.cache/axia/imager` (resumable `.part`; the tag and name are validated; only images and the two signature files). Root never parses what arrives. |
 | `imager-fetch-cancel` | none | stops this user's download |
 | `imager-cache-clear` | none | deletes the imager's cache, as the user, one level of release folders |
 | `imager-write` | `<disk>\n<size>\n<model>\n<serial>\nofficial\|custom\n<image>[\n<SHA256SUMS>\n<SHA256SUMS.sig>]` | writes the image to a whole disk (below) |
@@ -228,12 +228,12 @@ strict parser above (`fr_parse`, pure), and only if it is valid applies it, as r
 | Time zone, language, keyboard | `/etc/localtime` → zoneinfo, `/etc/timezone`, `/etc/locale.conf` (Debian 13's `/etc/default/locale` points there), `/etc/default/keyboard` |
 | Wi-Fi country | `cfg80211.ieee80211_regdom=` in `cmdline.txt` (one line kept) |
 | Wi-Fi | `/etc/lordos/net/wifi/<ssid hex>.json` and `.key` (0600, `psk=<hex>`), the format Settings → Network uses; lord-netd now accepts a derived key there (WPA2; a WPA3-only network needs the password itself) |
-| User | `useradd` and `usermod -p <hash>` (fixed paths, the values as arguments, never a shell), groups `sudo audio video input render` (and `pipewire plugdev lpadmin bluetooth netdev` when they exist), linger, the home folders in the chosen language, `~/.config/lordos/settings.json` (language, keyboard, theme, mode, accent, wallpaper, `updates.autoCheck`) and `~/.config/locale.conf`; the setup account is then removed by `firstboot` |
+| User | `useradd` and `usermod -p <hash>` (fixed paths, the values as arguments, never a shell), groups `sudo audio video input render` (and `pipewire plugdev lpadmin bluetooth netdev` when they exist), linger, the home folders in the chosen language, `~/.config/axia/settings.json` (language, keyboard, theme, mode, accent, wallpaper, `updates.autoCheck`) and `~/.config/locale.conf`; the setup account is then removed by `firstboot` |
 | Automatic login | `AUTOLOGIN=<user>` (or empty) in `/etc/lordos/session.conf` |
 | SSH | `systemctl enable` + `start --no-block ssh.service`; with keys only, `~/.ssh/authorized_keys` (0600 in a 0700 folder) and `/etc/ssh/sshd_config.d/05-lordos-keys-only.conf` (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`); root never logs in (10-lordos.conf) |
 | Remote desktop | `/etc/lordos/remote/config` with `enabled=1`, `port=5673`, `allow=all`, `net=lan` (local network only) — the same file Settings → Sharing writes, with the 0.8.3 defaults (TLS, the lockout after 3 failed sign-ins) |
 | Bluetooth off | a soft block of every Bluetooth radio through `/dev/rfkill` (`RFKILL_OP_CHANGE_ALL`), kept across boots by systemd-rfkill; Settings → Bluetooth turns it back on |
-| Cooling | `/etc/lordos/fan.json` with the profile (and `PROFILE` to `lord-fand` if it is already running); performance: `/etc/tmpfiles.d/lordos-cpu-governor.conf` sets the `performance` governor at boot; a block of our own in `config.txt` between `# >>> lordos-firstrun` and `# <<< lordos-firstrun`: `arm_freq=2600` for the mild overclock (fan only), `arm_freq=2000` for the conservative profile without cooling |
+| Cooling | `/etc/lordos/fan.json` with the profile (and `PROFILE` to `axia-fand` if it is already running); performance: `/etc/tmpfiles.d/lordos-cpu-governor.conf` sets the `performance` governor at boot; a block of our own in `config.txt` between `# >>> lordos-firstrun` and `# <<< lordos-firstrun`: `arm_freq=2600` for the mild overclock (fan only), `arm_freq=2000` for the conservative profile without cooling |
 
 The file is then **shredded** (overwritten with random bytes, then zeros, `fsync`, deleted) whatever
 the outcome; `firstboot` deletes it too if anything is left. On an SD card the flash controller may
@@ -248,7 +248,7 @@ created. `--root DIR --boot DIR` apply into a mounted image for tests (`useradd`
 
 | Cooler | Profiles | What they set |
 |---|---|---|
-| Case with a fan, active cooler | **Balanced** (default), Performance, Quiet; optional mild overclock | lord-fand's curve (docs/FANS.md): Balanced 55 °C → 30 %, Performance 45 °C → 40 % plus the `performance` CPU governor, Quiet 60 °C → 30 %; overclock 2.6 GHz instead of 2.4 GHz with no extra voltage |
+| Case with a fan, active cooler | **Balanced** (default), Performance, Quiet; optional mild overclock | axia-fand's curve (docs/FANS.md): Balanced 55 °C → 30 %, Performance 45 °C → 40 % plus the `performance` CPU governor, Quiet 60 °C → 30 %; overclock 2.6 GHz instead of 2.4 GHz with no extra voltage |
 | Passive case | Balanced (default), Conservative | no fan to drive; Conservative caps the clock at 2.0 GHz |
 | Nothing | **Conservative** (default), Balanced | 2.0 GHz so a bare board doesn't reach the 85 °C throttle within minutes |
 

@@ -1,4 +1,4 @@
-/* mailnet_test.c — lord-maild's wire readers against hostile servers (docs/MAIL.md): HTTP chunk
+/* mailnet_test.c — axia-maild's wire readers against hostile servers (docs/MAIL.md): HTTP chunk
  * sizes and Content-Length (overflow, garbage, negative), header limits, IMAP literal sizes near
  * SIZE_MAX, and lines that never end. Everything runs over a local socketpair: no network and a
  * global alarm, so `make test` can never hang on it. */

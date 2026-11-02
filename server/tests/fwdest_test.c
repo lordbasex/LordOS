@@ -5,7 +5,7 @@
  *
  * It also runs tests/fw_domain_cases.txt (0.8.2): one destination's verdict through fw_decide, as the
  * Monitor's per-domain switch shows it with sdk/fwrule.js decide(), once from the store and once after
- * a round trip through the firewall.json text (fw_to_json → fw_from_json), the file lord-netperm reads.
+ * a round trip through the firewall.json text (fw_to_json → fw_from_json), the file axia-netperm reads.
  *
  *   build/fwdest-test [cases file]      (default: tests/fw_dest_cases.txt, run from server/) */
 #include "../src/fw/rules.h"

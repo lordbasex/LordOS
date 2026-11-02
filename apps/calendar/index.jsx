@@ -1,4 +1,4 @@
-// Calendar — day, week and month views of the calendars kept by lord-maild (local, or synced with
+// Calendar — day, week and month views of the calendars kept by axia-maild (local, or synced with
 // CalDAV): see docs/MAIL.md. Data comes from the SDK (calendars, calendarEvents); every call is a
 // promise and usePim() changes whenever something changes, so views re-query on it.
 import {
@@ -188,7 +188,7 @@ export default function CalendarApp() {
           </ToolbarGroup>
         </View>
         {unavailable ? (
-          <EmptyState mascot="confused" title={t('calendar.unavailable')} hint={t('calendar.unavailableHint')} />
+          <EmptyState title={t('calendar.unavailable')} hint={t('calendar.unavailableHint')} />
         ) : view === 'month' ? (
           <MonthGrid cursor={cursor} days={days} cals={cals} now={now} onOpen={(ev) => setSheet({ ev })}
             onSlot={(d) => newEvent(d, 9 * 60)} onDay={(d) => { setCursor(sod(d).getTime()); setView('day'); }} />

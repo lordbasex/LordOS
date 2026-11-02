@@ -1,4 +1,4 @@
-// events.js — mouse and keyboard events sent by lord-server, with DOM-style bubbling.
+// events.js — mouse and keyboard events sent by axia-server, with DOM-style bubbling.
 // Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
 // onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe.
 // keepFocus on a View: a press inside it is not a click elsewhere: the global 'pointerdown' listeners

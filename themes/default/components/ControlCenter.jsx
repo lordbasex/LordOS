@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react';
 
 // Four wallpapers fit in the tile: the current one and a few from the collection (all of them are
 // in Settings → Wallpaper, which «Change Wallpaper…» opens).
-const QUICK = ['lumo-celestial', 'crystal-crown', 'royal-flow', 'event-horizon', 'aurora'];
+const QUICK = ['infinite-galaxy', 'violet-horizon', 'eternal-dawn', 'event-horizon', 'aurora'];
 function quickWallpapers(list, cur) {
   const current = findWallpaper(list, cur);
   const rest = QUICK.map((id) => list.find((w) => w.id === id)).filter((w) => w && w !== current);

@@ -1,6 +1,6 @@
-/* doc.h — lord-server side of the lord-doc document helper (see proto.h).
+/* doc.h — axia-server side of the axia-doc document helper (see proto.h).
  *
- * A «session» is a lord-doc process: an open PDF, an extraction, a compression or the
+ * A «session» is a axia-doc process: an open PDF, an extraction, a compression or the
  * utilities helper (fonts, PDF for printing, images). Everything is asynchronous: a dedicated
  * thread talks to the helpers and leaves the results in a queue that JS reads with doc_poll()
  * (lord.doc.poll). The compositor never waits for a helper; if one hangs, it is killed when
@@ -13,7 +13,7 @@
 
 typedef struct { int fd; const char *role; } DocInitFd;      /* role: "file" | "ro" | "rw" | "out" */
 
-/* Fixed path of the helper: <folder of this binary>/lord-doc. 0 if it exists. */
+/* Fixed path of the helper: <folder of this binary>/axia-doc. 0 if it exists. */
 int  doc_available(void);
 /* New session with these startup fds (doc_session keeps them, also on failure).
  * mode: "pdf" | "arc" | "util". Returns the id (> 0) or -1. */

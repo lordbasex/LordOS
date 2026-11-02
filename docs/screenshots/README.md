@@ -2,7 +2,7 @@
 
 A curated set of LordOS screenshots for the website and the repository: English interface,
 default wallpaper and theme, sample data only (no personal data). Full-screen captures at
-1440 × 900 or 1280 × 800, taken from a headless `lord-server` (the remote-desktop frame stream).
+1440 × 900 or 1280 × 800, taken from a headless `axia-server` (the remote-desktop frame stream).
 
 Every other screenshot in `docs/` is listed, with category, theme and captions in English, Spanish
 and Portuguese, in [`gallery.json`](gallery.json). A full-screen Passwords shot is not in this set yet: its window is protected from captures, so it comes out black in the headless frame stream; see `docs/polish/passwords-after-light.png` for the current look.

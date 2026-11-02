@@ -1,5 +1,5 @@
 // Generator.jsx — the password and passphrase generator (configurable). It generates in
-// lord-vault (getrandom; passphrases from the EFF list of 7776 words) and shows the strength.
+// axia-vault (getrandom; passphrases from the EFF list of 7776 words) and shows the strength.
 // Layout: the result in a monospaced box with its strength under it, Another / Copy (and Use),
 // a neutral Password / Passphrase switch and the options as an inset group (docs/DESIGN.md).
 import { View, Text, useTheme, useStore, Button, Toggle, Segmented, Slider, Stepper, TextInput, t } from '@lordos/sdk';

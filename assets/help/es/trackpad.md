@@ -6,7 +6,7 @@ keywords: touchpad, trackpad, gestos, táctil, desplazamiento, pellizcar
 ---
 # Touchpad y pantalla táctil
 
-LordOS maneja los touchpads y las pantallas táctiles con su propio controlador.
+Axia DE maneja los touchpads y las pantallas táctiles con su propio controlador.
 
 ## Gestos
 

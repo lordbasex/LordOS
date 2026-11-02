@@ -1,5 +1,5 @@
 /* dbus.h — own minimal D-Bus client (no libdbus or sd-bus), just enough to serve the
- * Secret Service (secretsvc.c) from lord-vault. See docs/PASSWORDS.md, "Secret Service".
+ * Secret Service (secretsvc.c) from axia-vault. See docs/PASSWORDS.md, "Secret Service".
  *
  *   - Messages (D-Bus specification 0.41): fixed header + a(yv) fields + body, per-type
  *     alignment, little endian when writing and both orders when reading. Types: y b n q i u x t d s
@@ -8,8 +8,8 @@
  *     depth, NUL-terminated strings with no embedded NUL, booleans 0/1, object paths,
  *     zero alignment and padding, 128 MiB cap). After that the typed reader (DRd) only reads
  *     what was already validated and still checks the bounds.
- *   - Connection: SASL EXTERNAL over an ALREADY connected socket (lord-vault cannot open sockets:
- *     lord-server hands it over), Hello, RequestName; non-blocking send with an output queue.
+ *   - Connection: SASL EXTERNAL over an ALREADY connected socket (axia-vault cannot open sockets:
+ *     axia-server hands it over), Hello, RequestName; non-blocking send with an output queue.
  *
  * The connection buffers are malloc'd (not in the secrets arena, which is wiped entirely on
  * lock) and are wiped with explicit_bzero before being released or reused. */
@@ -115,7 +115,7 @@ typedef struct {
 } DConn;
 
 /* Connects (without authenticating) to the session bus: DBUS_SESSION_BUS_ADDRESS (unix:path= or
- * unix:abstract=) or $XDG_RUNTIME_DIR/bus. For lord-server, outside the sandbox. fd or -1. */
+ * unix:abstract=) or $XDG_RUNTIME_DIR/bus. For axia-server, outside the sandbox. fd or -1. */
 int  dbus_connect_session(void);
 /* System bus: DBUS_SYSTEM_BUS_ADDRESS (unix:path=) or /run/dbus/system_bus_socket. fd or -1. */
 int  dbus_connect_system(void);

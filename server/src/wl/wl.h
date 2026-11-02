@@ -1,4 +1,4 @@
-/* wl.h — lord-server's Wayland compositor: GTK and Qt apps as LordOS windows (see wl.c). */
+/* wl.h — axia-server's Wayland compositor: GTK and Qt apps as LordOS windows (see wl.c). */
 #ifndef LORD_WL_H
 #define LORD_WL_H
 
@@ -25,7 +25,7 @@ int  wl_frame_unseen(unsigned time_ms);
  * (0 left, 1 middle, 2 right). Returns 1 if the pointer is over a Wayland app and 2 if
  * it is over one of its popup menus (drawn on top of everything: the click is not the theme's). */
 int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel);
-/* While lord-server moves or resizes a window (ui/grab.c): no app receives the pointer
+/* While axia-server moves or resizes a window (ui/grab.c): no app receives the pointer
  * (they are sent leave) and only the button count is tracked. */
 void wl_pointer_grab(int nbuttons, const int *down);
 /* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
@@ -99,7 +99,7 @@ int         wl_clip_is_image(void);
 const unsigned char *wl_clip_png(size_t *len);   /* the copied PNG, or NULL */
 const char *wl_clip_image_origin(void);
 int         wl_clip_image_sensitive(void);
-int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/lordos/clip-N.png */
+int         wl_clip_use_image(const char *path);   /* only $XDG_RUNTIME_DIR/axia/clip-N.png */
 
 /* Events for JS: map, unmap, title, appid, geometry, move, resize, maximize, unmaximize,
  * minimize, fullscreen, unfullscreen. data is JSON. */

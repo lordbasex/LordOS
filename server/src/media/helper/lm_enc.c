@@ -1,4 +1,4 @@
-/* lm_enc.c — lord-media's encoder for recording the screen and the camera: H.264 (VA-API if available;
+/* lm_enc.c — axia-media's encoder for recording the screen and the camera: H.264 (VA-API if available;
  * otherwise, libx264; last resort MPEG-4) and AAC from the microphone, in MP4. Times in ms since the
  * start (variable frame rate: it only encodes when something changed). */
 #include "lm.h"

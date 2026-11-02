@@ -1,7 +1,7 @@
-/* mpulse.c — PipeWire streams for media, in lord-server (PulseAudio protocol, the
+/* mpulse.c — PipeWire streams for media, in axia-server (PulseAudio protocol, the
  * same tagstruct as server/src/sound/pulse.c). One connection per stream, so that each one
  * shows up with its app in Settings → Sound: playback (Player, Photos) with its latency for the
- * video clock, or recording (microphone, after the permission). All asynchronous: lord-server never
+ * video clock, or recording (microphone, after the permission). All asynchronous: axia-server never
  * waits for PipeWire (see aring.h and docs/MEDIA.md). */
 #include "mpulse.h"
 #include "../sound/pulse.h"
@@ -159,7 +159,7 @@ static int send_name(LmPulse *p) {
     char pid[16];
     snprintf(pid, sizeof pid, "%d", (int)getpid());
     const char *kv[] = { "application.name", app_name, "application.id", app_id, "application.process.id", pid,
-                         "application.process.binary", "lord-media", "application.icon_name", "multimedia-player" };
+                         "application.process.binary", "axia-media", "application.icon_name", "multimedia-player" };
     ts_proplist(&t, kv, 5);
     return sendcmd(p, &t, tag, W_NAME);
 }

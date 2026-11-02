@@ -364,7 +364,7 @@ export default function Editor() {
       case 'gotoLine': setLineQuery(''); setOverlay('gotoLine'); break;
       case 'gotoFile': setOverlay('gotoFile'); break;
       case 'language': setOverlay('lang'); break;
-      // print with the system dialog (M9): the text is laid out as a PDF in lord-doc
+      // print with the system dialog (M9): the text is laid out as a PDF in axia-doc
       case 'print': print.open({ title: tab.path ? baseName(tab.path) : tr('editor.untitled'), text: doc.text(), mono: true }); break;
       case 'toggleProject': setRoot((r) => (r === null ? '' : null)); break;
       case 'nextTab': { const i = tabs.findIndex((x) => x.id === tab.id); setActiveId(tabs[(i + 1) % tabs.length].id); break; }
@@ -399,7 +399,7 @@ export default function Editor() {
     wm.setMenus(wid, [
       { label: tr('editor.menu.file'), items: [it('editor.cmd.new', 'new', '❖N'), it('editor.cmd.open', 'open', '❖O'), it('editor.cmd.openFolder', 'openFolder', '❖⇧O'), '-',
         it('editor.cmd.save', 'save', '❖S'), it('editor.cmd.saveAs', 'saveAs', '❖⇧S'), '-',
-        // print with the system dialog (M9): the text is laid out as a PDF in lord-doc
+        // print with the system dialog (M9): the text is laid out as a PDF in axia-doc
         it('editor.cmd.print', 'print', '❖P'), '-',
         it('editor.cmd.close', 'close', '❖W')] },
       { label: tr('editor.menu.edit'), items: [it('editor.cmd.undo', 'undo', '❖Z'), it('editor.cmd.redo', 'redo', '❖⇧Z'), '-', it('editor.cmd.cut', 'cut', '❖X'),

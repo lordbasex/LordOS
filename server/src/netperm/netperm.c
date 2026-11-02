@@ -1,4 +1,4 @@
-/* netperm.c — lord-netperm: the root service that enforces per-app network permissions in the
+/* netperm.c — axia-netperm: the root service that enforces per-app network permissions in the
  * kernel (docs/FIREWALL.md, step 2). Closed and minimal:
  *
  *   - no arguments, executes nothing, no network of its own (it creates no AF_INET/AF_INET6
@@ -7,12 +7,12 @@
  *     lordos.service, which contains the subtrees of all sessions: the network ones and, with the
  *     same per-app policy, the device program ("no camera", "no USB") and the Bluetooth socket
  *     program ("no Bluetooth"; it needs the kernel's function list, /sys/kernel/btf/vmlinux);
- *   - reads the rules of each user with a session from ~/.config/lordos/firewall.json (fixed,
+ *   - reads the rules of each user with a session from ~/.config/axia/firewall.json (fixed,
  *     validated path) and compiles them into maps (npcompile.c);
  *   - learns names only from the system resolver (npdns.c);
- *   - tells each lord-server about its apps' new connections over /run/lordos/netperm.sock
+ *   - tells each axia-server about its apps' new connections over /run/lordos/netperm.sock
  *     (npproto.h). The only thing it accepts there is "reload my rules";
- *   - (0.8.5) reads each user's subscribed blocklists (~/.config/lordos/fwlists.txt, the same
+ *   - (0.8.5) reads each user's subscribed blocklists (~/.config/axia/fwlists.txt, the same
  *     fixed-path reader) into np_blk4/np_blk6: their networks, and the addresses the resolver gave
  *     for their domains; and counts the essential system services' bytes (np_sysc);
  *   - cuts the connections a rule now denies: the packet filter drops their packets in the
@@ -165,7 +165,7 @@ static void logf_(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void logf_(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    fputs("lord-netperm: ", stderr);
+    fputs("axia-netperm: ", stderr);
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
     va_end(ap);
@@ -179,13 +179,13 @@ static long long mono(void) {
 
 /* ---- reading a user's rules ----------------------------------------------------------------- */
 
-/* ~/.config/lordos/firewall.json without following links: every folder and the file must belong
+/* ~/.config/axia/firewall.json without following links: every folder and the file must belong
  * to the user, the file must be regular and at most FW_FILE_MAX. The home folder comes from /etc/passwd. */
 static char *read_user_file(unsigned uid, const char *file, size_t max, size_t *len, char *why, size_t wn) {
     struct passwd *pw = getpwuid(uid);
     if (!pw || pw->pw_dir[0] != '/') { snprintf(why, wn, "user without a home folder"); return NULL; }
     int fd = open(pw->pw_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    const char *const parts[] = { ".config", "lordos", file };
+    const char *const parts[] = { ".config", "axia", file };
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || st.st_uid != uid) { snprintf(why, wn, "odd home folder"); if (fd >= 0) close(fd); return NULL; }
     for (int i = 0; i < 3; i++) {
@@ -233,7 +233,7 @@ static void load_rules(Session *s) {
     logf_("uid %u: %zu rules, mode %d", s->uid, fw_rule_count(n), (int)fw_mode(n));
 }
 
-/* (0.8.5) ~/.config/lordos/fwlists.txt, the user's subscribed blocklists compiled by lord-server
+/* (0.8.5) ~/.config/axia/fwlists.txt, the user's subscribed blocklists compiled by axia-server
  * (fw/fwlists.h), through the same reader. A file that doesn't validate keeps the previous set. */
 static void load_lists(Session *s) {
     size_t len = 0;
@@ -1053,7 +1053,7 @@ static void on_event(void *u, const void *data, uint32_t len) {
     on_net_event(&ev, 0);
 }
 
-/* A connection notice (new, denied or cut) towards the user's lord-server and the journal. */
+/* A connection notice (new, denied or cut) towards the user's axia-server and the journal. */
 static void on_net_event(const NpEvent *evp, int cut) {
     NpEvent ev = *evp;
     Session *s;
@@ -1543,8 +1543,8 @@ static void watch_dns(void) {
 
 int main(int argc, char **argv) {
     (void)argv;
-    if (argc != 1) { fprintf(stderr, "lord-netperm takes no arguments (see docs/FIREWALL.md)\n"); return 2; }
-    if (geteuid() != 0) { fprintf(stderr, "lord-netperm: must run as root (lord-netperm.service)\n"); return 1; }
+    if (argc != 1) { fprintf(stderr, "axia-netperm takes no arguments (see docs/FIREWALL.md)\n"); return 2; }
+    if (geteuid() != 0) { fprintf(stderr, "axia-netperm: must run as root (axia-netperm.service)\n"); return 1; }
     setvbuf(stderr, NULL, _IOLBF, 0);
     signal(SIGPIPE, SIG_IGN);
     struct sigaction sa = { .sa_handler = on_term };

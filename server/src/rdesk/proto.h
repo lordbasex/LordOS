@@ -1,5 +1,5 @@
-/* proto.h — lord-server ↔ lord-rdesk, the helper behind the RDP and VNC apps (docs/FILES.md, "Remote desktop"). A
- * SOCK_SEQPACKET pair on fd 3. The first packet is the job as JSON; then fixed messages. The picture is a memfd lord-server
+/* proto.h — axia-server ↔ axia-rdesk, the helper behind the RDP and VNC apps (docs/FILES.md, "Remote desktop"). A
+ * SOCK_SEQPACKET pair on fd 3. The first packet is the job as JSON; then fixed messages. The picture is a memfd axia-server
  * makes and shares: the helper draws BGRA into it and the engine shows it as a media node. */
 #ifndef LORD_RDESK_PROTO_H
 #define LORD_RDESK_PROTO_H
@@ -29,7 +29,7 @@ typedef struct { int w, h, drives; const char *drive[8][2]; } RdView;
 
 #define RD_POLL_MAX 256                 /* messages taken per poll: a flood from the helper doesn't hold the UI thread */
 
-/* The shared picture, its size sealed: the helper can't shrink it under lord-server's mapping. */
+/* The shared picture, its size sealed: the helper can't shrink it under axia-server's mapping. */
 static inline int rd_picture_memfd(size_t len) {
     int fd = (int)syscall(SYS_memfd_create, "lordos-rdesk", 3u /* MFD_CLOEXEC | MFD_ALLOW_SEALING */);
     if (fd < 0) return -1;
@@ -37,7 +37,7 @@ static inline int rd_picture_memfd(size_t len) {
     return fd;
 }
 
-/* Passes the picture to the helper; a full socket never blocks lord-server. 0 sent. */
+/* Passes the picture to the helper; a full socket never blocks axia-server. 0 sent. */
 static inline int rd_send_picture(int sock, int fd) {
     RdMsg r = { RD_SHM, 0, 0, 0, "" };
     struct iovec io = { &r, sizeof r };

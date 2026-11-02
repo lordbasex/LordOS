@@ -1,6 +1,6 @@
 /* bpf2c.c — build tool (runs on the build machine, never as root): reads the .o that
  * `clang -target bpf` produces from np.bpf.c and writes a C header with each program's
- * instructions and its relocations to maps by name (build/gen/np_bpf.h). That way lord-netperm
+ * instructions and its relocations to maps by name (build/gen/np_bpf.h). That way axia-netperm
  * carries the programs inside and neither reads nor interprets ELF at run time.
  *
  *   build/bpf2c build/np.bpf.o build/gen/np_bpf.h

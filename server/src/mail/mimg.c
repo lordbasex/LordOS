@@ -1,5 +1,5 @@
-/* mimg.c — images for Mail and Contacts, decoded inside the sandboxed lord-maild (never in
- * lord-server): PNG, JPEG, GIF (first frame) and BMP with stb_image, scaled down to fit and
+/* mimg.c — images for Mail and Contacts, decoded inside the sandboxed axia-maild (never in
+ * axia-server): PNG, JPEG, GIF (first frame) and BMP with stb_image, scaled down to fit and
  * returned as premultiplied ARGB32 like every image the LordOS renderer takes. */
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG

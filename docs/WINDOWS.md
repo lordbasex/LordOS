@@ -9,7 +9,7 @@ and the cursor shows the arrow for each direction.
 | ![edges](windows-resize-edges.png) | ![resize](windows-resize.png) |
 | The 8 invisible edges of a window (Chromium with the theme's frame): ↖ ↕ ↗ ↔ ↔ ↙ ↕ ↘ | Resizing from the corner: Chromium redraws at the new size while dragging |
 | ![move](windows-move.png) | ![gtk](windows-gtk-move.png) |
-| Moving a window: move cursor, the Dock stays on top | GTK Demo (own frame, CSD) moved from its bar: lord-server follows `xdg_toplevel.move` in C |
+| Moving a window: move cursor, the Dock stays on top | GTK Demo (own frame, CSD) moved from its bar: axia-server follows `xdg_toplevel.move` in C |
 | ![cursors](windows-resize-cursors.png) | ![app](windows-app-cursor.png) |
 | LordOS cursors (`server/src/cursor.c`) at 2x over light and dark backgrounds; the red dot is the hotspot | The I-beam in Chromium's address bar: it asks for it via `cursor-shape-v1` and LordOS draws it |
 
@@ -40,7 +40,7 @@ plane are still per event.
 
 ### C does the dragging (`ui/grab.c`, `lord.wm`)
 
-The theme starts the drag and lord-server follows it on its own:
+The theme starts the drag and axia-server follows it on its own:
 
 ```js
 wm.beginMove(id)              // in the title bar's onMouseDown
@@ -219,7 +219,7 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 
   ![A dragged window's lower-left corner over another window, Raspberry Pi 5 monitor](drag-corner-pi5-over-window.png)
   ![A dragged window's lower-right corner over the wallpaper, Raspberry Pi 5 monitor](drag-corner-pi5-over-wallpaper.png)
-- **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
+- **`LORD_PAINT_VERIFY=N`** in axia-server's environment repaints the whole tree every N-th frame of a
   display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
   the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where
   the terminals are, so on the next frame a terminal's change repaints the whole layer.
@@ -274,15 +274,15 @@ reached 95–103 frames per second: virtio-gpu completes the flip before the ref
 
 ## Measurements (VM 118, 1280×800 at 75 Hz, 4 vCPU)
 
-Continuous 6 s drag in circles with a virtual tablet (uinput, 125 events/s). lord-server writes one
-line per drag to `~/.cache/lordos/session.log`:
+Continuous 6 s drag in circles with a virtual tablet (uinput, 125 events/s). axia-server writes one
+line per drag to `~/.cache/axia/session.log`:
 
 ```
 drag: 464 frames in 6011 ms = 77.2 FPS (464 moves); per frame: work 12.80 ms (max 36.83;
 JS 0.20, layout 0.56, paint 11.43, present 0.61), max gap 36.9 ms; layer: 1023 painted, 467 copied (CPU)
 ```
 
-"work" is what lord-server spends per frame: the pointer and timer JS, layout, painting
+"work" is what axia-server spends per frame: the pointer and timer JS, layout, painting
 ("paint") and presentation ("present"). Since 0.8.6 the line ends with what the copy
 of what is below did during the drag: `below: B built whole, P in part, S frames switched to it (not:
 … ancestor, … blur, … transform, … unreached, … cost)`, the last part counting the frames where the old
@@ -343,7 +343,7 @@ was checked against this path:
   `ui/js_prelude.h`). `__lordTick` keeps the earliest deadline and returns at once when it hasn't
   come; when it has, one pass fires the due timers by deadline, then by id, as before. Clearing the
   earliest timer marks that deadline stale and it is computed again before use, so the wait returned
-  to the main loop is the same number as before. lord-server makes the atoms of the three globals it
+  to the main loop is the same number as before. axia-server makes the atoms of the three globals it
   calls on every pass once per runtime. `build/timer-order-test` runs 400 random timer scripts on this
   prelude and on the one before it and requires the same trace (callbacks, order, arguments, every
   returned wait, logs). A tick with 200 timers pending and none due went from 158.75 µs to 0.30 µs
@@ -374,7 +374,7 @@ dialog dragged over it for 240 frames, and a Dock with a backdrop blur.
 | Drag, two displays (1280×800 + 1920×1200 at 150 %) | 11.3 ms | 2.5 ms |
 
 On VM 120 (live ISO, CPU path, 1280 × 800, the Terminal dragged in circles for 6 s with a uinput
-tablet, lord-server's `drag:` line), switching only `lord-server`: before 7.88–7.99 ms of work per
+tablet, axia-server's `drag:` line), switching only `axia-server`: before 7.88–7.99 ms of work per
 frame (paint 7.30–7.41, layout 0.02, 104.7–105.8 FPS), after 7.98–8.37 ms (paint 7.41–7.76, layout
 0.01–0.02, 101.5–105.4 FPS). The difference is within the run-to-run spread; most of that frame is
 still the Dock's blur.
@@ -393,7 +393,7 @@ window side in `sdk/windows.js`.
   is going on, the SDK reads `lord.wm.pointer()` (`ui/js_wm.c`: the pointer and the drag's edges,
   no arguments, read only) every 90 ms and sets `snapPreview` when the zone changes; the theme draws
   it under the moving window. Crossing into a zone costs one rebuild of what is below the window.
-- **A scripted move (0.8.6, LordBench):** `wm.scriptMove(id, { rx, ry, periodMs })` asks lord-server to move
+- **A scripted move (0.8.6, LordBench):** `wm.scriptMove(id, { rx, ry, periodMs })` asks axia-server to move
   the window along a figure of eight through this same path (`lord.wm.script`, `grab_script_begin` in
   `ui/grab.c`: the window painted once into a layer, one step per frame from the main loop, no button held
   and no JS per frame). The positions come from LordBench's synthetic pointer (`bench/lbinput.c`, a 125 Hz
@@ -445,8 +445,8 @@ Window and Help menus (its in-window menu strip, since it has no menu bar).
   is in each window's Help menu.
 - **Force Quit…** (the crown menu, a system window `apps/forcequit`) lists the open apps and ends the
   chosen one without asking it (`forceQuit`): a Linux or isolated app's own process gets SIGKILL from
-  lord-server through `lord.wayland.kill(surface)` (`js_sys.c`), only that client of the same user and
-  never lord-server itself; an X11 window is only asked to close (every X11 app shares Xwayland); a
+  axia-server through `lord.wayland.kill(surface)` (`js_sys.c`), only that client of the same user and
+  never axia-server itself; an X11 window is only asked to close (every X11 app shares Xwayland); a
   built-in app that runs in the session closes without its close guard.
 
 ## Pending

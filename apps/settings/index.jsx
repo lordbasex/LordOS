@@ -328,7 +328,7 @@ function MotionWallpapers({ login }) {
   );
 }
 
-// Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
+// Grouped by category (Horizons, Cosmos, then the theme's own); grids use the thumbnails.
 function Wallpapers() {
   const t = useTheme();
   const { t: tr } = useLocale();

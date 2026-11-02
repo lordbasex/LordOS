@@ -1,4 +1,4 @@
-/* fanhw.h — lord-fand's hardware side: finds the CPU temperature and the fans it may drive, and
+/* fanhw.h — axia-fand's hardware side: finds the CPU temperature and the fans it may drive, and
  * writes their duty (docs/FANS.md). Everything is found under a sysfs root (normally "", so the
  * real /sys; tests/fan_test.c builds a fake tree). Paths never come from a client: a client only
  * picks a profile, and the daemon drives every fan it found.
@@ -65,7 +65,7 @@ int  fanhw_scan(FanHw *h, const char *root);
 /* CPU temperature in milli-°C, or -1000000 if unreadable. */
 int  fanhw_temp(const FanHw *h);
 /* Takes manual control of every fan (hwmon: pwmN_enable=1; board: raise the trips). Writes what it
- * changed to state_path first (if not NULL) so `lord-fand --restore` can undo it after a crash. */
+ * changed to state_path first (if not NULL) so `axia-fand --restore` can undo it after a crash. */
 int  fanhw_take(FanHw *h, const char *state_path);
 /* Duty 0..100 to fan i (already through fan_output_pct). Rewrites only when the value read back
  * differs, so a kernel step in between is corrected on the next tick. */

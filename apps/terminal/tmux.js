@@ -249,5 +249,5 @@ export function tmuxFocus(sid) {
   if (c) send(c, `select-pane -t %${m.tmuxPane}`);
 }
 
-// Sesiones recuperadas tras reiniciar lord-server que seguían en modo control.
+// Sesiones recuperadas tras reiniciar axia-server que seguían en modo control.
 setTimeout(() => { for (const sid of term.list()) if (term.info(sid)?.tmux) start(sid, true); }, 0);

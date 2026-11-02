@@ -1,13 +1,13 @@
 ---
-title: Instalar o LordOS
+title: Instalar o Axia DE
 app: installer
 section: apps
 order: 40
 keywords: instalar, disco, live, usb, instalador
 ---
-# Instalar o LordOS
+# Instalar o Axia DE
 
-No sistema ao vivo (o pendrive ou o CD do LordOS), o assistente **Instalar o LordOS** copia o
+No sistema ao vivo (o pendrive ou o CD do Axia DE), o assistente **Instalar o Axia DE** copia o
 sistema para o disco.
 
 1. Idioma, região e fuso horário.

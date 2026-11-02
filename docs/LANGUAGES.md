@@ -19,7 +19,7 @@ LordOS handles language across the whole system, not just in the interface. It s
 
 Everything is managed from **Settings → Language & Region** and **Settings → Keyboard**.
 
-## Screenshots (VM, real lord-server)
+## Screenshots (VM, real axia-server)
 
 | | |
 |---|---|
@@ -107,7 +107,7 @@ assets/locales/pt/meta.json   { "id": "pt", "name": "Português", "english": "Po
 ```
 
 The ones shipped with LordOS are in `assets/locales/`; the user's in
-`~/.local/share/lordos/locales/` (they don't need root and win if both exist).
+`~/.local/share/axia/locales/` (they don't need root and win if both exist).
 
 To create one:
 
@@ -131,7 +131,7 @@ the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its
 
 ## Privileged helper (`lord-admin`)
 
-Whatever needs root is done by a small process that `lord-server` creates before dropping
+Whatever needs root is done by a small process that `axia-server` creates before dropping
 privileges (`server/src/admin.c`). It has no screen, input or other descriptors. It only
 understands a closed list of actions, each validated on its own side:
 
@@ -145,7 +145,7 @@ understands a closed list of actions, each validated on its own side:
 - It only serves the request if the session user is in the `sudo`, `admin` or `wheel` group.
 - Programs run with a fixed absolute path and a clean environment; a command is never built from user text.
 - The package list is compiled into the binary, not kept in an editable file.
-- It dies with `lord-server` (`PR_SET_PDEATHSIG`).
+- It dies with `axia-server` (`PR_SET_PDEATHSIG`).
 - From JS: `admin.run('locale-gen', 'pt_BR.UTF-8', onLog)` returns a promise. Progress
   (apt's lines, for example) arrives via `onLog` and via the `admin.busy` store.
 
@@ -312,7 +312,7 @@ sources in **Settings → Keyboard → Input Methods**; the bar button (한, あ
 | Simplified Chinese (pinyin) | letters → candidates by frequency: the whole phrase, **initial-letter abbreviations** (`zg` → 这个/中国, `bjdx` → 北京大学, also `zhg`), phrases that start with what was typed (`zhongg` → 中国, 中国人) and those covering the beginning (the rest stays in composition); 1–9 or Space pick; − = turn the page; Enter leaves the letters | `rime-data-pinyin-simp` (65,000 characters and phrases) |
 
 The Debian language pack for Japanese or Chinese also installs its dictionary (and the CJK
-fonts). A custom dictionary can be put in `~/.local/share/lordos/ime/`.
+fonts). A custom dictionary can be put in `~/.local/share/axia/ime/`.
 
 Composition only happens when a text field or a terminal has focus: otherwise keys pass through
 as-is and app shortcuts keep working. With Ctrl/Alt/❖ whatever is pending is committed and the
@@ -352,7 +352,7 @@ terminal uses the script's Noto font first, so a word doesn't mix fonts.
 | Japanese phrases (`tests/ime-ja.txt`) | 16 / 18 (私は日本語を勉強しています, 東京に行きます, 学校へ行きました…) |
 | VM: Arabic interface with both themes, file names in 7 scripts, the three methods in the Terminal and in a text field | see screenshots |
 
-Memory: with the CJK fonts and both dictionaries loaded, lord-server goes from ~43 to 55 MB of
+Memory: with the CJK fonts and both dictionaries loaded, axia-server goes from ~43 to 55 MB of
 RSS (36 MB anonymous; 19 MB are the mapped fonts and dictionaries, which the kernel shares and
 can drop).
 

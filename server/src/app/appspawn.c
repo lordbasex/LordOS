@@ -1,5 +1,5 @@
-/* appspawn.c — lord-server launches an .lpk app as its own isolated process
- * (`lord-server --app <id>`), the third narrow exception to "the server does not run commands"
+/* appspawn.c — axia-server launches an .lpk app as its own isolated process
+ * (`axia-server --app <id>`), the third narrow exception to "the server does not run commands"
  * (see AGENTS.md). The only argument is a VALIDATED id of an installed package, never caller
  * arguments. The broker socket (socketpair) is created here and handed to the child; the server
  * end is registered in brokersrv.c together with the app process's real pid. */
@@ -39,7 +39,7 @@ int app_package_dir(const char *id, const char *assets, char *out, size_t n) {
     return -1;
 }
 
-/* System apps that get their own channel to lord-vault (vc_attach_app): only Passwords. */
+/* System apps that get their own channel to axia-vault (vc_attach_app): only Passwords. */
 static int wants_vault(const char *id, int system) { return system == 1 && !strcmp(id, "passwords"); }
 
 /* 0 if the process was started (and its broker registered). The id must be an installed package. */
@@ -49,7 +49,7 @@ int app_spawn(const char *id) {
     int sys = app_package_dir(id, js_sys_assets(), dir, sizeof dir);
     if (sys < 0) return -1;
     /* one process per app: if it is already running, it opens another window instead */
-    if (!brokersrv_new_window(id)) { fprintf(stderr, "lord-server: app '%s' already running: new window\n", id); return 0; }
+    if (!brokersrv_new_window(id)) { fprintf(stderr, "axia-server: app '%s' already running: new window\n", id); return 0; }
 
     char self[PATH_MAX];
     ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
@@ -64,7 +64,7 @@ int app_spawn(const char *id) {
      * Wayland client is this app: wl.c routes its ❖ shortcuts to it) */
     int pp[2];
     if (pipe2(pp, O_CLOEXEC)) { close(sv[0]); close(sv[1]); return -1; }
-    /* Passwords talks to lord-vault on its own channel: decrypted data never passes through here */
+    /* Passwords talks to axia-vault on its own channel: decrypted data never passes through here */
     int vfd = wants_vault(id, sys) ? vc_attach_app() : -1;
     int bcfd = apphost_bc_dup_ro();
 
@@ -75,7 +75,7 @@ int app_spawn(const char *id) {
         if (g != 0) { if (g > 0 && write(pp[1], &g, sizeof g) != (ssize_t)sizeof g) _exit(1); _exit(0); }
         signal(SIGTERM, SIG_DFL);
         signal(SIGHUP, SIG_DFL);
-        sigset_t none;                       /* lord-server blocks SIGINT/SIGTERM (signalfd): not the app */
+        sigset_t none;                       /* axia-server blocks SIGINT/SIGTERM (signalfd): not the app */
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         char fdstr[16];
@@ -95,7 +95,7 @@ int app_spawn(const char *id) {
         } else unsetenv(APPHOST_BC_ENV);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); if (null > 2) close(null); }
-        /* lord-server passes the id, already validated; there are no caller arguments */
+        /* axia-server passes the id, already validated; there are no caller arguments */
         char *const argv[] = { self, (char *)"--app", (char *)id, NULL };
         unsetenv("DISPLAY");                    /* no X11 for isolated apps (their seccomp has no unix socket() either) */
         execve("/proc/self/exe", argv, environ);   /* not `self`: after a package upgrade it is "<path> (deleted)" */
@@ -112,7 +112,7 @@ int app_spawn(const char *id) {
     close(pp[0]);
     if (brokersrv_add(sv[0], id, (int)app)) { close(sv[0]); return -1; }
     if (vfd >= 0) brokersrv_set_vault(sv[0]);   /* this app may also ask for the FIDO2 device */
-    if (sys == 1) brokersrv_set_system(sv[0]);  /* a system package: its keyring owner, lord-maild (brokermail.c) */
-    fprintf(stderr, "lord-server: app '%s' started as an isolated process (pid %d)\n", id, (int)app);
+    if (sys == 1) brokersrv_set_system(sv[0]);  /* a system package: its keyring owner, axia-maild (brokermail.c) */
+    fprintf(stderr, "axia-server: app '%s' started as an isolated process (pid %d)\n", id, (int)app);
     return 0;
 }

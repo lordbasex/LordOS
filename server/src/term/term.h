@@ -223,7 +223,7 @@ int   vt_in_tmux(const Term *t);
 int   vt_copy_mode(Term *t, int on);
 int   vt_copy_key(Term *t, const char *key, int ctrl, char **yank);
 
-/* hold.c: holders that keep the shells alive if lord-server restarts */
+/* hold.c: holders that keep the shells alive if axia-server restarts */
 int   hold_main(int argc, char **argv);
 int   hold_spawn(int master, pid_t pid, char *key, size_t keylen);
 void  hold_restore(void (*fn)(int fd, int ctrl, pid_t pid, const char *key));
@@ -264,7 +264,7 @@ typedef struct {
     char log_path[512];
     char key[48];               /* holder name (hold.c); "" if it has none */
     int ctrl;                   /* control connection to the holder, -1 = none */
-    int restored;               /* recovered from a previous lord-server */
+    int restored;               /* recovered from a previous axia-server */
     /* tmux -CC */
     int tmux;                   /* this session is the "gateway" of a tmux in control mode */
     char *tlines;               /* protocol lines pending for JS */

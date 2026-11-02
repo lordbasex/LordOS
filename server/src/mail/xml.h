@@ -1,4 +1,4 @@
-/* xml.h — in-house XML reader for WebDAV (CalDAV and CardDAV) in lord-maild (see docs/MAIL.md).
+/* xml.h — in-house XML reader for WebDAV (CalDAV and CardDAV) in axia-maild (see docs/MAIL.md).
  *
  * Understands namespaces (xmlns and xmlns:p), so elements are looked up by (namespace, name)
  * regardless of the prefix the server chose ("d:", "D:", none). It is strict and bounded:

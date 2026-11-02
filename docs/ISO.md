@@ -39,7 +39,7 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 |---|---|
 | LordOS (live) | normal, in English (the default language) |
 | Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
-| LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
+| LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: axia-server doesn't use the GPU path and composites on the CPU |
 | LordOS (Español) / LordOS (Português) | `lordos.lang=es` / `lordos.lang=pt`: the interface in Spanish or Portuguese the first time |
 | LordOS (copy to RAM) | `toram`: copies the system to memory (~1 GB free is needed) and the USB stick can be removed |
 
@@ -141,7 +141,7 @@ xHCI keyboard and tablet, the ISO on virtio-scsi, a 16 GB qcow2 on virtio-blk.
 | What | Result |
 |---|---|
 | ISO boot through GRUB | menu with the theme ([screenshot](boot/arm64-grub-menu.png)) on GOP; the menu's timeout boots the kernel; live desktop about 3 minutes after power on, with the installer open ([screenshot](boot/arm64-live-desktop.png)) |
-| Live session | `lordos`, `lord-netperm` and `lord-fand` active, no failed unit; network by LordOS's own DHCP on `enp0s1` |
+| Live session | `lordos`, `axia-netperm` and `axia-fand` active, no failed unit; network by LordOS's own DHCP on `enp0s1` |
 | Composition | CPU path, on its own: `gpu: the card (virtio_gpu) has no 3D acceleration: CPU composition`; the KMS driver is `virtio_gpu` (features `-virgl`) |
 | Safe mode (`lordos.gpu=0`) | the menu's "safe mode" entry: `LORD_GPU=0` in the session (`gpu: off (LORD_GPU=0), CPU composition`), desktop and installer |
 | Disk installer, through the wizard | installed onto the qcow2 in about 17 minutes ([screenshot](boot/arm64-installed.png)): GPT with `vda1` EFI and `vda2` of type "Linux root (ARM-64)", no BIOS partition; the Summary step shows that layout |
@@ -157,7 +157,7 @@ The disk installer and the installed system ran on the first build; the final on
   amd64: **a machine with only a firmware framebuffer has no KMS device**, so no desktop (lord-sessiond says so on the
   text console). A virtual machine needs a virtio or similar KMS display; a headless one has nothing to show.
 - Landlock, Yama, BPF LSM (in `CONFIG_LSM`) and BTF are in the kernel, with 4K pages, so the sandbox and the firewall have what
-  they need; on the virtual machine `lord-netperm` is active.
+  they need; on the virtual machine `axia-netperm` is active.
 - **The disk's boot entry.** The installer writes the removable path with `--no-nvram`, so a firmware finds it by itself. On
   edk2 with variables kept from the live boot and the disk at another PCI slot (the ISO's controller removed), the firmware
   did not add the disk: PXE, HTTP, then its shell. With fresh variables it booted. If that happens, run
@@ -364,9 +364,9 @@ What `install-run` validates on the root side, without trusting the interface:
 - **LordOS** as its own package, `lordos_<version>_amd64.deb`, built by `tools/iso/mkdeb.sh`. The
   version and the release channel come from `package.json` (`"version"` and `"lordos": {"channel": "beta"}`;
   an empty channel is a stable release). `make -C server` bakes both, plus the build date and git
-  commit, into `lord-server`, and About and Settings → General show them. The package contains:
+  commit, into `axia-server`, and About and Settings → General show them. The package contains:
   - `/usr/lib/lordos/bin/lord-sessiond` (root: sessions, login screen, remote desktop off, port
-    5673) and `/usr/lib/lordos/bin/lord-server` (each session);
+    5673) and `/usr/lib/lordos/bin/axia-server` (each session);
   - the prebuilt themes, in `/usr/lib/lordos/themes`;
   - `assets/`: fonts, texts, icons and the shell integration;
   - `lordos.service`.
@@ -395,7 +395,7 @@ What `install-run` validates on the root side, without trusting the interface:
   and rime-data-pinyin-simp.
 - **Linux apps:** Chromium and Firefox ESR (preinstalled browsers that draw their own bar with
   LordOS's window buttons, `WAYLAND.md`), plus foot and FeatherPad as samples.
-- **X11 apps (0.8.3):** `xwayland`, started by lord-server only when an X11 app connects
+- **X11 apps (0.8.3):** `xwayland`, started by axia-server only when an X11 app connects
   ([WAYLAND.md](WAYLAND.md), "X11 apps (Xwayland)").
 
 ## Building it
@@ -411,7 +411,7 @@ COPYFILE_DISABLE=1 tar czf - --no-xattrs --exclude build --exclude node_modules 
   package.json README.md server third_party assets themes tools | \
   ssh lord@172.17.0.52 'rm -rf ~/LordOS-iso && mkdir ~/LordOS-iso && cd ~/LordOS-iso && tar xzf -'
 # on VM 116
-make -C server -j4                            # lord-server (GPU=1) and lord-sessiond (needs libssl-dev, libsrtp2-dev, libusrsctp-dev)
+make -C server -j4                            # axia-server (GPU=1) and lord-sessiond (needs libssl-dev, libsrtp2-dev, libusrsctp-dev)
 sudo tools/iso/build.sh /var/tmp/lordos-iso   # → /var/tmp/lordos-iso/out/
 ```
 
@@ -436,7 +436,7 @@ previous one is kept with its date: `lordos-live-0.7.0-amd64-20261016-1529.iso` 
 7. `grub-mkrescue`: a single ISO with El Torito for BIOS and an EFI image (`efi.img`) for UEFI, with
    the hybrid MBR for USB. On arm64, the EFI image only.
 
-lord-server is compiled with `make -C server GPU=1` (it needs `libgbm-dev libegl-dev libgles-dev`) so
+axia-server is compiled with `make -C server GPU=1` (it needs `libgbm-dev libegl-dev libgles-dev`) so
 the ISO ships GPU compositing (Mesa; see `GPU.md`).
 
 Measured on VM 116 (4 Xeon Silver 4108 cores, 4 GB) for 0.7.0: **~8 minutes** (14.5 minutes for 0.8.0, see
@@ -461,12 +461,12 @@ sudo apt-get install -y --no-install-recommends debootstrap squashfs-tools xorri
 
 | Package | What for |
 |---|---|
-| `libssl-dev` | compiling `lord-sessiond` (remote desktop TLS), `lord-maild` (Mail) and, since 0.8.5, `lord-fetch` (the blocklists) and `lord-tls` (the package engine's HTTPS); without it, `make` builds only lord-server and `mkdeb.sh` refuses |
-| `libpoppler-glib-dev`, `libarchive-dev` | compiling `lord-doc` (PDF and archives); without them `make` skips it and the package ships without a PDF viewer |
-| `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | compiling `lord-media` (video, photos, camera, recorder); without them `make` skips it |
-| `libva-dev` | optional: GPU decoding (VA-API) in `lord-media` |
+| `libssl-dev` | compiling `lord-sessiond` (remote desktop TLS), `axia-maild` (Mail) and, since 0.8.5, `axia-dl` (the blocklists) and `lord-tls` (the package engine's HTTPS); without it, `make` builds only axia-server and `mkdeb.sh` refuses |
+| `libpoppler-glib-dev`, `libarchive-dev` | compiling `axia-doc` (PDF and archives); without them `make` skips it and the package ships without a PDF viewer |
+| `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | compiling `axia-media` (video, photos, camera, recorder); without them `make` skips it |
+| `libva-dev` | optional: GPU decoding (VA-API) in `axia-media` |
 | `libsrtp2-dev`, `libusrsctp-dev` | the remote desktop (WebRTC: SRTP and the data channels) in `lord-sessiond`; required: without them `make` stops with an error for `lord-sessiond` (or build with `SESSIOND=0`), and the package always depends on `libsrtp2-1` and `libusrsctp2` |
-| `clang` | compiling `lord-netperm`'s BPF programs (per-app network permissions); without it the build still works, but no rules are applied |
+| `clang` | compiling `axia-netperm`'s BPF programs (per-app network permissions); without it the build still works, but no rules are applied |
 | `debootstrap` | the Debian base system |
 | `squashfs-tools` | `mksquashfs` |
 | `xorriso`, `grub-pc-bin`, `grub-efi-amd64-bin`, `grub-common`, `mtools`, `dosfstools` | `grub-mkrescue`: the hybrid BIOS + UEFI ISO. On an arm64 host, `grub-efi-arm64-bin` instead of the two grub binaries (`build-arm64.sh` installs them in its overlay) |
@@ -534,7 +534,7 @@ was installed in that repeat.
 | Test | Result |
 |---|---|
 | Development build of the same code on VM 116 | `make test`: 23 passed, 0 failed, 22 skipped; `clean-test`: 1,097 checks, 0 failed |
-| Release `lord-server --check-code` | 10 files verified |
+| Release `axia-server --check-code` | 10 files verified |
 | amd64 ISO in a new VM (Proxmox, q35, no network), 2.5 minutes | live desktop with the installer open; not installed from |
 | arm64 ISO on emulated QEMU (`virt`, edk2, virtio-gpu, no acceleration), 11 minutes | live desktop with the installer open; not installed from |
 | Raspberry Pi image | not booted: the board ran the same code in a development build |
@@ -583,7 +583,7 @@ An update of 0.8.4 (no new ISO: the 0.8.4 ISO stays the current one). `lordos_0.
 on VM 116 (build `20261025.9796cda3`) and `lordos_0.8.4.1_arm64.deb` with the Raspberry Pi 5 image on
 the Pi itself, natively, in `build-img.sh`'s arm64 chroot (build `20261025.5adba3b7`; the two builds
 differ only in `tools/rpi/build-img.sh`), both `RELEASE=1` from a tree whose `code-manifest.json` was
-signed on the maintainer's machine; `lord-server --check-code`: verified, release build.
+signed on the maintainer's machine; `axia-server --check-code`: verified, release build.
 `make -C server test`: 23 passed, 0 failed, 8 skipped on VM 116 and 21 passed, 0 failed, 11 skipped in
 the Pi's arm64 chroot (`settings-hw-test` 160/160 on both, with the new `rpi-eeprom-update` parser
 cases); the seven node suites pass on the maintainer's machine; 0 compiler warnings. Both `.deb`:
@@ -596,11 +596,11 @@ The image: `lordos-0.8.4.1-rpi5-arm64.img.xz`, 784 982 908 bytes, sha256
 
 | Check | Result |
 |---|---|
-| Image, read-only (loop device on the Pi): `config.txt` has `display_auto_detect`/`camera_auto_detect` (lines 15–16) **before** `dtoverlay=vc4-kms-v3d` (line 21); `lordos` 0.8.4.1 verified, release build; Chromium 156 and Firefox ESR 153 (Debian's) with `custom_chrome_frame` true, the GTK theme and `inTitlebar` 1; `systemd-timesyncd`, `cups`, `avahi-daemon`, `exfatprogs`, `ntfs-3g`, `power-profiles-daemon`, `gsettings-desktop-schemas`, `rpi-eeprom` 28.34-1 installed; `lord-doc`, `lord-media` and `lord-netperm` with its BPF programs in the package; `dpkg --audit` clean | pass |
-| Store → Updates on VM 120 (0.8.4 installed from its ISO, UEFI, user `rtester`, `lordos.sources` on `apt-staging`): "LordOS 0.8.4.1 is available" with the notes; the plan is `lordos` only (11 MB); Update → no migration → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.4.1 · Beta", build `20261025.9796cda3`, **Verified**; `lordos`, `lord-netperm`, `lord-fand` active, 0 failed units; Settings has no Board firmware on a PC (search "firmware": no results) | pass |
+| Image, read-only (loop device on the Pi): `config.txt` has `display_auto_detect`/`camera_auto_detect` (lines 15–16) **before** `dtoverlay=vc4-kms-v3d` (line 21); `lordos` 0.8.4.1 verified, release build; Chromium 156 and Firefox ESR 153 (Debian's) with `custom_chrome_frame` true, the GTK theme and `inTitlebar` 1; `systemd-timesyncd`, `cups`, `avahi-daemon`, `exfatprogs`, `ntfs-3g`, `power-profiles-daemon`, `gsettings-desktop-schemas`, `rpi-eeprom` 28.34-1 installed; `axia-doc`, `axia-media` and `axia-netperm` with its BPF programs in the package; `dpkg --audit` clean | pass |
+| Store → Updates on VM 120 (0.8.4 installed from its ISO, UEFI, user `rtester`, `lordos.sources` on `apt-staging`): "LordOS 0.8.4.1 is available" with the notes; the plan is `lordos` only (11 MB); Update → no migration → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.4.1 · Beta", build `20261025.9796cda3`, **Verified**; `lordos`, `axia-netperm`, `axia-fand` active, 0 failed units; Settings has no Board firmware on a PC (search "firmware": no results) | pass |
 | `apt update && apt-get upgrade` (VM 120 back at the fresh 0.8.4): 27 s, `lordos` and a Debian update, nothing kept back, no migration, `settings.json` byte-identical, `/run/reboot-required.pkgs` = `lordos`; `apt install --reinstall lordos` runs no migration; after the restart 0 failed units | pass |
 | Staging repository: the 11 Raspberry Pi packages verified against Raspberry Pi's signed index and the pinned SHA-256s; only the arm64 index lists them; `apt-repo.sh verify staging` passes. On the Pi, `apt-get install -s rpi-eeprom` with only Debian and LordOS sources (Raspberry Pi's archive left out, empty dpkg status) resolves everything from `LordOS:stable` and Debian | pass |
-| Raspberry Pi 5 (test SD, 0.8.4 image with the `config.txt` fix by hand): `apt-get install lordos` from staging: 0.8.4.1 in 18 s, no migration, `sshd -t` clean, `lord-server --check-code` verified | pass |
+| Raspberry Pi 5 (test SD, 0.8.4 image with the `config.txt` fix by hand): `apt-get install lordos` from staging: 0.8.4.1 in 18 s, no migration, `sshd -t` clean, `axia-server --check-code` verified | pass |
 | Settings → Board firmware on the Pi (a test account over the LordOS remote desktop): "Update available", installed Tuesday, May 26, 2026, latest Friday, September 25, 2026, release Default; **Update** → "Update ready: restart to finish" with the note and **Restart…** (the session's Restart sheet); the board staged `pieeprom.upd`, `pieeprom.sig` and `recovery.bin` and wrote `/run/rpi-eeprom-update-pending` (no `flashrom`, no `rpieepromab`) | pass |
 | After the restart: `vcgencmd bootloader_version` 2026/09/25 (`1accd665…`, was 2026/05/26 `086b83e3…`), the staged files gone; the page says "Up to date", installed = latest = September 25, 2026 | pass |
 | Browsers on the Pi (installed on the test SD the same way as the image, defaults from `browser-defaults.sh`): Chromium 156 on Wayland with one bar and LordOS's traffic lights; Firefox ESR 153 with its own single bar; Settings → Displays → Video: "Automatic", this board can't decode VP9 or AV1 in hardware, so sites are asked for H.264 | pass |
@@ -608,11 +608,11 @@ The image: `lordos-0.8.4.1-rpi5-arm64.img.xz`, 784 982 908 bytes, sha256
 Found in this test:
 
 - **The first arm64 package was incomplete.** Built in `build-img.sh`'s arm64 chroot (0.8.4's was built
-  natively on the development SD), it had no `lord-doc`, no `lord-media` and no BPF programs in
-  `lord-netperm`: the chroot lacked Poppler, libarchive, FFmpeg and clang, and `make` leaves those
+  natively on the development SD), it had no `axia-doc`, no `axia-media` and no BPF programs in
+  `axia-netperm`: the chroot lacked Poppler, libarchive, FFmpeg and clang, and `make` leaves those
   parts out silently. It was published to staging only, then replaced there (the CDN path
   invalidated). `build-img.sh` now installs the ISO's build packages in the chroot, copies
-  `packaging/`, and refuses a package without `lord-doc`, `lord-media` or the BPF programs.
+  `packaging/`, and refuses a package without `axia-doc`, `axia-media` or the BPF programs.
 - **The Pi image had no network time client** (`systemd-timesyncd`): the board starts months behind
   and refuses every signed index ("not valid yet"); the test SD needed its clock set by hand. Added.
 - **Restart from a session that is not on the monitor** (here the remote desktop) shows the Restart
@@ -630,7 +630,7 @@ Found in this test:
 b022dc3, only adds the website's Imager guide on top), 1 052 588 032 bytes, sha256
 `73bf0124149ecd4e46efc751c1d082d2eb3e7d4c2406a19451f4dedfc144dc72`, built on VM 116 with `GPU=1
 RELEASE=1` from a tree whose `code-manifest.json` was signed on the maintainer's machine
-(`REQUIRE_SIGNED_CODE=1`); `lord-server --check-code`: verified, release build. `make -C server test`:
+(`REQUIRE_SIGNED_CODE=1`); `axia-server --check-code`: verified, release build. `make -C server test`:
 23 passed, 0 failed, 8 skipped on VM 116 (the seven node suites ran on the maintainer's machine, all
 pass) and 24 passed, 0 failed, 7 skipped on the Raspberry Pi 5; 0 compiler warnings. Both `.deb`:
 lintian 0 errors (17 warnings, the known ones); both SBOMs validated with `pyspdxtools`. New
@@ -643,13 +643,13 @@ October 25 with the final build (it adds the Pi HDMI wait, 4d17d2d, and strips `
 
 | Check | Result |
 |---|---|
-| Store → Updates on VM 120 (0.8.3 installed from its ISO, UEFI, `lordos.sources` pointed at `apt-staging`): "LordOS 0.8.4 is available" with the notes; the plan is `lordos` plus `libsrtp2-1` and `libusrsctp2`; Update → migration 005 only → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.4 · Beta", build `20261025.ca52be13`, **Verified**; `lordos`, `lord-netperm`, `lord-fand` active, 0 failed units | pass |
+| Store → Updates on VM 120 (0.8.3 installed from its ISO, UEFI, `lordos.sources` pointed at `apt-staging`): "LordOS 0.8.4 is available" with the notes; the plan is `lordos` plus `libsrtp2-1` and `libusrsctp2`; Update → migration 005 only → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.4 · Beta", build `20261025.ca52be13`, **Verified**; `lordos`, `axia-netperm`, `axia-fand` active, 0 failed units | pass |
 | `apt update && apt upgrade` (0.8.3 → 0.8.4, VM 120 back at the clean 0.8.3): 41 s, migration 005, the two libraries installed, `settings.json` byte-identical, restart, 0 failed units; `apt install --reinstall lordos` runs no migration again. `apt-get upgrade` keeps `lordos` back (new dependencies; noted in the release notes) | pass |
 | Migration 005 on the upgraded system: `/etc/chromium/master_preferences` `custom_chrome_frame` false → true, `/etc/firefox-esr/lordos.js` `inTitlebar` 0 → 1. Settings → Appearance → "Browsers: tabs in the title bar" lists "1 Chromium profile still uses the LordOS frame" (a profile opened on 0.8.3); **Change them** → Chromium opens with a single bar and LordOS's traffic lights | pass |
 | Smoke checks: XTerm opens (Xwayland `:0`, `app-lordos-debian-xterm.scope`); the native LordOS Imager opens (Device step); the overlay scroll bar shows while scrolling and is gone once the pointer leaves; smartmontools installed and smartd forced past its virtualization check: it stays off | pass |
 | Remote desktop on the upgraded VM 120 (Settings → Sharing on, "Local network"), from the maintainer's machine in headless Chrome: H.264 video over UDP, 1280×800, the data channel up, audio packets flowing; with UDP and every TCP connection to 5673 beyond the first dropped (`iptables` on the VM, for the test only) the page shows "Couldn't connect to the remote desktop" with why and what to do, and Try again | pass |
 | VM 117, OVMF: the final ISO boots to the live desktop, About "Version 0.8.4 · Beta", build `20261025.ca52be13`, **Verified**; the install itself was tested with the first build's ISO (`20261019.13bdd697`, the same installer): install on the disk (en_US, Buenos Aires, 2 GB swap) in under 2 minutes; installed: login screen, `lordos` 0.8.4, `xwayland` and `libsrtp2-1` installed, Chromium's new-profile default `custom_chrome_frame: true`, `lordos-firstrun` present, 0 failed units, boot 6.8 s, 4.6 GB used | pass |
-| Raspberry Pi 5 (lordos 0.8.3, kernel `6.18.57-lordos.3-rpi-2712`): `apt-get install lordos` from staging: 0.8.4 in 13 s, migration 005, `sshd -t` clean, `lord-server --check-code` verified; `lordos`, `lord-netperm`, `lord-fand` restarted (no reboot), `display: /dev/dri/card1`; then the source switched back to the live repository: `lordos 0.8.4` installed and candidate | pass |
+| Raspberry Pi 5 (lordos 0.8.3, kernel `6.18.57-lordos.3-rpi-2712`): `apt-get install lordos` from staging: 0.8.4 in 13 s, migration 005, `sshd -t` clean, `axia-server --check-code` verified; `lordos`, `axia-netperm`, `axia-fand` restarted (no reboot), `display: /dev/dri/card1`; then the source switched back to the live repository: `lordos 0.8.4` installed and candidate | pass |
 | Pi firewall cut on kernel `-3` with 0.8.4 (`server/tests/netperm_cut.sh` as root with a hand-made session cgroup, removed afterwards): TCP download cut 0.34 s after the rule, idle session 0.02 s, HTTP/3 0.07 s, a domain rule cuts only that destination, "no internet" keeps the LAN; 15/15 | pass |
 | Raspberry Pi 5 image (build `20261019.13bdd697`): decompressed and attached as a loop device on the Pi; a first-run file written by the Imager's own writer (`apps/imager/core/firstrun.js`: Spanish, Classic, user with autologin, hidden Wi-Fi, SSH keys only, remote desktop, active cooler with the performance profile and overclock) applied by the image's own arm64 `lordos-firstrun` with `--root/--boot`: 26/26 checks (every file, owners and modes, no Wi-Fi password, the file shredded, a broken file applies nothing) | pass |
 | GitHub: the release downloaded back, the key fingerprint `c7155b8e…53ea108e`, "Signature Verified Successfully" and every SHA-256 OK; the downloaded `.dmg`, marked as downloaded, accepted by the system's app check ("Notarized Developer ID") and its staple validated | pass |
@@ -673,7 +673,7 @@ Found in this test:
 9eff265, only adds two CHANGELOG notes on top), 1 051 269 120 bytes, sha256
 `2416c730da65afe37ed6be615fd67448edf100452d443786a9113b90a05c7f5d`, built on VM 116 with `GPU=1
 RELEASE=1` from a tree whose `code-manifest.json` was signed on the maintainer's machine
-(`REQUIRE_SIGNED_CODE=1`); `lord-server --check-code`: verified, release build. `make -C server test`:
+(`REQUIRE_SIGNED_CODE=1`); `axia-server --check-code`: verified, release build. `make -C server test`:
 23 passed, 0 failed, 7 skipped on VM 116 (the six node suites ran on the maintainer's machine, all
 pass) and 24 passed, 0 failed, 6 skipped on the Raspberry Pi 5; 0 compiler warnings. Both `.deb`:
 lintian 0 errors (17 warnings, the known ones); both SBOMs validated with `pyspdxtools`. New in the
@@ -682,14 +682,14 @@ the published 0.8.2 ISO first (user `rtester`), so the upgrade ran on a clean sy
 
 | Check | Result |
 |---|---|
-| Store → Updates on VM 120 (0.8.2 installed from its ISO, UEFI, `lordos.sources` pointed at `apt-staging`): "LordOS 0.8.3 is available" with the notes; the plan is `lordos` only; Update → migration 004 only (a running smartd, started for the test, was stopped) → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.3 · Beta", build `20261019.36cf07b4`, **Verified**; `lordos`, `lord-netperm`, `lord-fand` active, 0 failed units | pass |
+| Store → Updates on VM 120 (0.8.2 installed from its ISO, UEFI, `lordos.sources` pointed at `apt-staging`): "LordOS 0.8.3 is available" with the notes; the plan is `lordos` only; Update → migration 004 only (a running smartd, started for the test, was stopped) → "Restart required" → Restart (the sheet with the open apps) → login screen → About "Version 0.8.3 · Beta", build `20261019.36cf07b4`, **Verified**; `lordos`, `axia-netperm`, `axia-fand` active, 0 failed units | pass |
 | `apt update && apt upgrade` (0.8.2 → 0.8.3, VM 120 back at the clean 0.8.2): 31 s, migration 004, `xwayland` installed as a new recommendation, `settings.json` byte-identical, restart, 0 failed units, X display reserved; `apt install --reinstall lordos` runs no migration again. `apt-get upgrade` keeps `lordos` back (new recommended package; noted in the release notes) | pass |
 | Smoke checks on the upgraded system: XTerm opens (Xwayland `:0`, `app-lordos-debian-xterm.scope`); the Passwords padlock and the Backups clock centered in the Dock; Settings → Appearance → Classic and back, live; overlay scroll bar visible while scrolling and gone 3 s later; smartmontools installed and smartd forced past its virtualization check: it stays off (`ConditionPathExists=/etc/lordos/smartd-enabled`) | pass |
 | Firewall: Chromium playing a video, its row switched off in Monitor → Network: its established sockets went from 10 to 0 within 0.5 s of the click, received bytes stopped; Monitor counts the denials; switching it back on works | pass |
 | Remote desktop on the upgraded VM 120 (Settings → Sharing on, "Local network"): login from the LAN (303 + `__Host-` cookie); 3 wrong passwords (1.25 s each) block the address, the 4th connection is cut before TLS; the block notification and the "Temporarily blocked" row in Settings; **Unblock** → login works again; Monitor → Network shows the "Remote desktop" row with the 3 denials | pass |
 | VM 117, OVMF: live desktop, About 0.8.3 Verified; install on the disk (en_US, Buenos Aires, 2 GB swap) in under 5 minutes; installed: login screen, `lordos` 0.8.3 and `xwayland` installed, `DISPLAY=:0`, 0 failed units, boot 7.4 s, 4.6 GB used | pass |
-| Raspberry Pi 5 (lordos 0.8.0, no repository yet): the 0.8.0 one-time step (key and `lordos.sources`), then `apt-get install lordos` from staging: 0.8.3 in 15 s, migrations 001–004, `xwayland` installed, `sshd -t` clean with root keys kept (migration 002), `lord-server --check-code` verified, `lordos` restarted to the login screen without a reboot; then the source switched to the live repository: `lordos 0.8.3` is the candidate | pass |
-| Raspberry Pi 5 image, read-only: the signed manifest (same SHA-256 as the maintainer's), build `20261019.36cf07b4` in `lord-server`, migrations 001–004, `/usr/bin/Xwayland`, the smartd drop-in, the LordOS kernel `6.18.57-lordos-rpi-2712` | pass |
+| Raspberry Pi 5 (lordos 0.8.0, no repository yet): the 0.8.0 one-time step (key and `lordos.sources`), then `apt-get install lordos` from staging: 0.8.3 in 15 s, migrations 001–004, `xwayland` installed, `sshd -t` clean with root keys kept (migration 002), `axia-server --check-code` verified, `lordos` restarted to the login screen without a reboot; then the source switched to the live repository: `lordos 0.8.3` is the candidate | pass |
+| Raspberry Pi 5 image, read-only: the signed manifest (same SHA-256 as the maintainer's), build `20261019.36cf07b4` in `axia-server`, migrations 001–004, `/usr/bin/Xwayland`, the smartd drop-in, the LordOS kernel `6.18.57-lordos-rpi-2712` | pass |
 
 Found in this test:
 
@@ -705,7 +705,7 @@ Found in this test:
 `lordos-live-0.8.2-amd64.iso` from the `v0.8.2-beta` tag (dcb8293, build `20261019.dcb8293e`),
 1 047 648 256 bytes, sha256 `00d52aa1408805a869c383484f3e1ef675e6ffd42da299d63db916e76e1f4e73`, built on
 VM 116 with `GPU=1 RELEASE=1` from a tree whose `code-manifest.json` was signed on the maintainer's
-machine (`REQUIRE_SIGNED_CODE=1`); `lord-server --check-code`: verified, release build; `make -C server
+machine (`REQUIRE_SIGNED_CODE=1`); `axia-server --check-code`: verified, release build; `make -C server
 test`: 23 passed, 0 failed, 5 skipped (the four node suites ran on the maintainer's machine), 0 compiler
 warnings. Both `.deb`: lintian 0 errors; both SBOMs validated with `pyspdxtools`. This is the first
 version delivered to installed systems as an update, so the upgrade path was tested first.
@@ -719,7 +719,7 @@ version delivered to installed systems as an update, so the upgrade path was tes
 | VM 117, OVMF: boot menu, live desktop, About 0.8.2 Verified; install on the disk (en_US, Buenos Aires, 2 GB swap) in about 95 s; installed: login screen with Crystal Crown, new user on **Celestial**, boot 7.5 s, 0 failed units | pass |
 | VM 123, SeaBIOS, standard VGA: menu at 1024×768, live desktop (VM restored afterwards) | pass |
 | Keys and system prompts: a Wayland test client (`tools/diag/keylag-client`, `server/tests/keyfocus/shellkeys.sh`) got 6 key presses typed into the search with the first 0.8.2 build and **0** with the fix; it gets them again when the search closes | pass |
-| Disks offers smartmontools; Monitor → Disks says "No sensor" for the virtual disk; Settings → Displays → Video "Automatic" (virtual GPU: H.264); Mail, Calendar, Contacts and Reminders as `lord-server --app <id>` (seccomp, own scope); Monitor → Network history (1 h) and per-destination switches with Chromium; typing in Chromium; a copy of `/usr/lib/lordos` with one changed byte → `--check-code` FAILED | pass |
+| Disks offers smartmontools; Monitor → Disks says "No sensor" for the virtual disk; Settings → Displays → Video "Automatic" (virtual GPU: H.264); Mail, Calendar, Contacts and Reminders as `axia-server --app <id>` (seccomp, own scope); Monitor → Network history (1 h) and per-destination switches with Chromium; typing in Chromium; a copy of `/usr/lib/lordos` with one changed byte → `--check-code` FAILED | pass |
 | Raspberry Pi 5 image, read-only on the board: 33 checks pass (kernel with BPF LSM, signed manifest, build, migrations 001–003, wallpapers, drivetemp, video extension); `apt-get update` against `https://lordos.org/apt` in temporary lists: `lordos 0.8.2 arm64`, SHA-256 of the released `.deb` | pass |
 
 Found in this test: Store → Discover showed no suggestions on the QEMU VM (`qemu-guest-agent` needs the
@@ -735,7 +735,7 @@ with `pyspdxtools`.
 
 | Check | Result |
 |---|---|
-| VM 117, OVMF: menu, splash, desktop; About "Version 0.8.1 · Beta", build `20261019.7cba92d2`; `lordos`, `lord-netperm` (11 BPF programs), `lord-fand` active, 0 failed units | pass |
+| VM 117, OVMF: menu, splash, desktop; About "Version 0.8.1 · Beta", build `20261019.7cba92d2`; `lordos`, `axia-netperm` (11 BPF programs), `axia-fand` active, 0 failed units | pass |
 | Crown menu → Restart…: the sheet with its countdown and the open apps, Cancel | pass |
 | Settings → Sharing → Remote login (SSH): installs `openssh-server`, port 22 open, host key fingerprint matches; off closes the port | pass |
 | Monitor → Processes (Get Info, the Quit/Force Quit sheet, cancelled), Network (Chromium's traffic counted, the map), the Dock's quick actions | pass |
@@ -766,16 +766,16 @@ network, the greeter restart and the full install were repeated with the tagged 
 |---|---|
 | Boot menu with the LordOS theme ("LordOS 0.8.0 (live)"), splash with its bar, hand-off to the desktop without a black or text frame (recorded at 5 fps on VM 117) | pass |
 | About "Version 0.8.0 · Beta", build `20261018.46c972ac`; Settings → General 0.8.0 | pass |
-| `lordos`, `lord-netperm` (9 BPF programs, devices and Bluetooth: yes), `lord-fand` active; 0 failed units; `ptrace_scope = 1`; pipewire-pulse module loading off; remote desktop off | pass |
+| `lordos`, `axia-netperm` (9 BPF programs, devices and Bluetooth: yes), `axia-fand` active; 0 failed units; `ptrace_scope = 1`; pipewire-pulse module loading off; remote desktop off | pass |
 | Network (DHCP from `lord-netd`, ping) and audio (tone through the HDA sink, 0 errors in `pw-top`) | pass |
-| Chromium and Firefox ESR open pages with the LordOS frame; Passwords opens as `lord-server --app passwords` (own scope, seccomp, NoNewPrivs) | pass |
-| Firewall: Foot launched from the app launcher, "No internet (LAN only)" set in Settings → Privacy while it runs: a connection to the internet gets EPERM (logged by `lord-netperm`), the LAN still works; Monitor's per-app switch blocks it too | pass |
+| Chromium and Firefox ESR open pages with the LordOS frame; Passwords opens as `axia-server --app passwords` (own scope, seccomp, NoNewPrivs) | pass |
+| Firewall: Foot launched from the app launcher, "No internet (LAN only)" set in Settings → Privacy while it runs: a connection to the internet gets EPERM (logged by `axia-netperm`), the LAN still works; Monitor's per-app switch blocks it too | pass |
 | Domain rules: Settings → Privacy → Network rules by app → Add rule opens the "Block a destination" sheet | pass |
-| SIGPIPE: Foot killed with `kill -9` while flooding output; `lord-server` (same pid) and the session survive; shells keep the default SIGPIPE | pass |
+| SIGPIPE: Foot killed with `kill -9` while flooding output; `axia-server` (same pid) and the session survive; shells keep the default SIGPIPE | pass |
 | `systemctl restart lordos` twice: exactly one login screen process (the old one is stopped) | pass (fixed in this release) |
 | Live boot: 5.4 s kernel + 16.1 s userspace; 666 MB used after login; `ldconfig.service` no longer runs on every live boot | pass |
 | Install on VM 120 (OVMF, 24 GB): en / en_US / Buenos Aires / US / 2 GB swap, 81 s; "Restart" in one click | pass |
-| Installed: splash, login screen, sign in, `lordos`/`lord-netperm`/`lord-fand` active, 0 failed units, boot 4.3 + 3.0 s, 493 MB used, UEFI, network | pass |
+| Installed: splash, login screen, sign in, `lordos`/`axia-netperm`/`axia-fand` active, 0 failed units, boot 4.3 + 3.0 s, 493 MB used, UEFI, network | pass |
 | `install.sh --remote-desktop` on the installed VM 120: port 5673 listening, login page and a login from another machine | pass |
 
 Seen and left for later: the installed system's GRUB prints "Booting `LordOS GNU/Linux`" and
@@ -797,13 +797,13 @@ the whole installation were repeated with the final ISO.
 |---|---|
 | Boot menu: English default, safe mode, Español, Português, copy to RAM | pass ([grub](iso-final/grub.png), [es](iso-final/live-es-desktop.png)) |
 | Live user → desktop (autologin), keyboard follows the entry's language (US / LA) | pass (after fix 1) |
-| `lordos`, `lord-netperm`, `lord-fand` active; `lord-fand` enabled | pass ([terminal](iso-final/live-services.png)) |
-| `lord-fand` on a VM: "0 fan(s) … profile auto", Cooling says "No controllable fans" calmly | pass |
+| `lordos`, `axia-netperm`, `axia-fand` active; `axia-fand` enabled | pass ([terminal](iso-final/live-services.png)) |
+| `axia-fand` on a VM: "0 fan(s) … profile auto", Cooling says "No controllable fans" calmly | pass |
 | Firewall step 2: 7 BPF programs loaded and attached to `lordos.service` and `user@1000.service` | pass |
 | Remote desktop off: no `/etc/lordos/remote/config`, port 5673 closed, toggle off in Sharing | pass |
 | Chromium 155 and Firefox ESR 153 preinstalled, open pages, LordOS frame | pass |
 | GTK 3 app (Mousepad, installed with apt in the live session) with the LordOS titlebar and dark theme | pass (after fix 2) |
-| Passwords: separate `lord-server --app passwords` in its own scope, seccomp, NoNewPrivs; create, lock | pass |
+| Passwords: separate `axia-server --app passwords` in its own scope, seccomp, NoNewPrivs; create, lock | pass |
 | Mail, Monitor (Cooling and Network tabs), Settings (General, Cooling, Sharing), Files, Store (73 097 packages), Terminal, About "0.7.0 · Beta" | pass |
 | Audio: 30 s tone through PipeWire (HDA), 0 errors in `pw-top`, data loop real time (FIFO 88) | pass |
 | Network: DHCP from `lord-netd`, ping to the internet | pass |
@@ -823,7 +823,7 @@ Idle (after a minute without input):
 1. **English live session with the Latin American keyboard.** The SDK's default layout is `latam`,
    and `lordos-live-prep` only wrote the language. It now also writes `keyboards` for the live user
    from the boot entry: English → `us`, Español → `latam`, Português → `br`.
-2. **GTK 3 apps drew light Adwaita.** lord-server writes `gtk-theme` to the GSettings keyfile, but
+2. **GTK 3 apps drew light Adwaita.** axia-server writes `gtk-theme` to the GSettings keyfile, but
    without `gsettings-desktop-schemas` GTK 3 can't read it. The ISO installs it and the package
    recommends it.
 3. **Package copyright** said the license was undefined; it now carries the MIT text and lists

@@ -6,7 +6,7 @@ keywords: remote, remote access, browser, screen sharing, lan
 ---
 # Remote desktop
 
-From another computer on your network you can use LordOS in a web browser, without installing
+From another computer on your network you can use Axia DE in a web browser, without installing
 anything.
 
 1. Turn it on in [Settings → Sharing](settings:sharing) → “Allow access from the network”. It

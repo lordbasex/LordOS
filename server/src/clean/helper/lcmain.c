@@ -1,6 +1,6 @@
-/* lcmain.c — lord-clean, Cleaner's scanner (docs/CLEANER-ARCHITECTURE.md).
+/* lcmain.c — axia-clean, Cleaner's scanner (docs/CLEANER-ARCHITECTURE.md).
  *
- * lord-server (clean.c) starts it from its own folder, with no arguments and a minimal environment,
+ * axia-server (clean.c) starts it from its own folder, with no arguments and a minimal environment,
  * and passes each root as an opened folder over SCM_RIGHTS. It lists them in ro_dir_fds and calls
  * sandbox_apply_helper before reading anything: no network, no exec, nothing written, nothing read
  * but those folders. Without Landlock it refuses to scan, as the design's "no write access to
@@ -9,7 +9,7 @@
  * The walk: getdents on an fd, statx with no following of links for each entry, folders entered with
  * openat2 (RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV). A link is never followed, a
  * mount never crossed, a name that can't be shown never reported. fsops_protected and the user's
- * exclusions are rules of the walk, and lord-server applies them again to every record. It changes
+ * exclusions are rules of the walk, and axia-server applies them again to every record. It changes
  * nothing: it only reports.
  *
  * A project root is the home folder, walked once for all kinds: folders starting with a dot and the places tools
@@ -109,7 +109,7 @@ static void flush_batch(int group) {
     jb_raw(&b, "],\"nodes\":[");
     if (nnodes) jb_raw(&b, nodes.p);
     jb_raw(&b, "]}");
-    if (b.oom || doc_send(SOCK, CR_BATCH, 0, b.p, b.n, NULL, 0)) _exit(1);      /* lord-server is gone */
+    if (b.oom || doc_send(SOCK, CR_BATCH, 0, b.p, b.n, NULL, 0)) _exit(1);      /* axia-server is gone */
     jb_free(&b);
     jb_free(&items);
     jb_free(&nodes);
@@ -157,7 +157,7 @@ static void emit(int root, const char *rel, const struct statx *sx) {
     nitems++;
 }
 
-/* an image's record: the common fields and what lord-server checks a group against */
+/* an image's record: the common fields and what axia-server checks a group against */
 static void emit_image(const File *f) {
     emit(f->root, f->rel, &f->sx);
     items.n--;                              /* over the closing brace */

@@ -1,10 +1,10 @@
-/* js_brokercam.c — `lord.media` inside an isolated .lpk app: the camera, through lord-server
+/* js_brokercam.c — `lord.media` inside an isolated .lpk app: the camera, through axia-server
  * (sec/brokercam.c, docs/PRIVACY.md «Camera»).
  *
- * The app never opens /dev/video* nor runs lord-media. lord-server does, after consent, and gives
- * the app a READ-ONLY fd of lord-media's frame ring: mapped PROT_READ here and drawn by the same
+ * The app never opens /dev/video* nor runs axia-media. axia-server does, after consent, and gives
+ * the app a READ-ONLY fd of axia-media's frame ring: mapped PROT_READ here and drawn by the same
  * <MediaView> code as in the session (media/mview.c), from a local media source with no helper.
- * Each frame arrives as a broker event; the app acknowledges the slot it now shows (lord-server
+ * Each frame arrives as a broker event; the app acknowledges the slot it now shows (axia-server
  * validates every ACK). Photos and videos go to a file the user picks in the system's save dialog;
  * the app only learns the file name. */
 #include "js_broker.h"
@@ -38,7 +38,7 @@ static int cmd(const char *fmt, int sid, const char *rest, int *st_out) {
     return st == BST_OK;
 }
 
-/* (re)map the ring lord-server gives us: read-only */
+/* (re)map the ring axia-server gives us: read-only */
 static void fetch_ring(ACam *a) {
     char p[32], info[128];
     int n = snprintf(p, sizeof p, "ring %d", a->sid);
@@ -97,7 +97,7 @@ void js_brokercam_event(const char *data, size_t len) {
         char p[48];
         int n = snprintf(p, sizeof p, "ack %d %u", sid, id);
         js_broker_send(BOP_CAMERA, p, (uint32_t)n);
-        /* lord-media scales to the box where it is shown (as MM_SIZE does in the session) */
+        /* axia-media scales to the box where it is shown (as MM_SIZE does in the session) */
         int bw = s->box_w, bh = s->box_h;
         if (bw > 0 && bh > 0 && (bw != a->sent_w || bh != a->sent_h) && !s->view.zoom && !s->view.fit) {
             int rw = (s->view.rot % 180) ? bh : bw, rh = (s->view.rot % 180) ? bw : bh;
@@ -148,7 +148,7 @@ static JSValue f_cameras(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return v;
 }
 
-/* camera(app, '/dev/videoN', { width, height }) → id (lord-server checks the permission) */
+/* camera(app, '/dev/videoN', { width, height }) → id (axia-server checks the permission) */
 static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *dev = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;

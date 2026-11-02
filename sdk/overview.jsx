@@ -3,7 +3,7 @@
 // to a desktop in the strip (or to the add button) to move it, add and remove desktops there. With
 // Ctrl+Down it shows only the windows of the app in front, with no strip.
 //
-// The windows are the real ones drawn smaller: WindowShell gives each one a transform (lord-server paints
+// The windows are the real ones drawn smaller: WindowShell gives each one a transform (axia-server paints
 // it from a cached raster, so no app redraws) and what you see is live. Other desktops in the strip are
 // miniatures of their windows' frames with the app icon, over the wallpaper: their windows aren't drawn.
 //

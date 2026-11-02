@@ -12,7 +12,7 @@ Which apps are in the Dock, and in which order, is up to you: see "Customizing t
 
 In the Lord Classic theme, the same section chooses the taskbar position: bottom, top, left or right.
 Everything is applied live, without restarting, and is saved in
-`~/.config/lordos/settings.json`.
+`~/.config/axia/settings.json`.
 
 | | |
 |---|---|
@@ -47,7 +47,7 @@ The SDK records recent apps in `dockRecentApps` every time an app opens a window
 
 Every app can go in the Dock: LordOS apps, installed `.lpk` packages and Linux apps from their
 `.desktop` files (Firefox, Chromium, GTK and Qt apps). The arrangement is saved per user in
-`~/.config/lordos/settings.json` → `dockPinned`.
+`~/.config/axia/settings.json` → `dockPinned`.
 
 | | |
 |---|---|

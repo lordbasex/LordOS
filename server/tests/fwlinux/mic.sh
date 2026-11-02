@@ -76,7 +76,7 @@ sleep 1.5
 f=$OUTD/out.raw; timeout 3 pw-record --rate 48000 --channels 1 --format s16 "$f" >/dev/null 2>&1
 n=$(stat -c %s "$f" 2>/dev/null || echo 0)
 [ "$n" -gt 20000 ] && ok "another program records ($n bytes)" || bad "another program got $n bytes"
-echo "6. straight from the sound card (ALSA hw device, not PipeWire): refused by lord-netperm"
+echo "6. straight from the sound card (ALSA hw device, not PipeWire): refused by axia-netperm"
 CAP=$(ls /dev/snd/pcmC*D*c 2>/dev/null | head -1)
 if [ -n "$CAP" ] && [ -S /run/lordos/netperm.sock ]; then
     got=$(in_scope "$SC" python3 -c 'import os,sys,errno

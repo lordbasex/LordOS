@@ -154,7 +154,7 @@ Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg
   install. Only administrators (the `sudo` group) can update.
 - **Debian updates** are listed below with "Update all" (`pkg-upgrade`, which also takes lordos if
   it is pending).
-- **"Restart required"** appears when an installed update needs it: the running `lord-server` is
+- **"Restart required"** appears when an installed update needs it: the running `axia-server` is
   not the installed `lordos` version, or `/run/reboot-required` exists (the Debian convention: the
   lordos `postinst` writes it on an upgrade, and its kernel hook
   `/etc/kernel/postinst.d/zz-lordos-reboot-required` on every new kernel). "Restart Now…" opens the
@@ -205,7 +205,7 @@ one alone is in [RELEASING.md](RELEASING.md), "A newer hardware snapshot between
 
 What is checked: `apt-repo.sh` adds a `lordos-hwdata` only if its snapshot verifies with
 `tools/release/lordos-release.pub.pem`, and refuses a `lordos` that depends on it while the pool has none; the
-package engine checks `InRelease` and the file's SHA-256; `lord-server` verifies the snapshot's signature with the
+package engine checks `InRelease` and the file's SHA-256; `axia-server` verifies the snapshot's signature with the
 key compiled into it before parsing anything (`sysreport/hwsnap.c`). Without the package (removed by hand with
 `dpkg --force-depends`, or a development install) the panel says there is no community data (`state: "missing"`;
 `build/hwsnap-test` checks a missing folder) and everything else works.
@@ -245,7 +245,7 @@ Today's migrations:
 
 | Migration | What it does |
 |---|---|
-| `001-0.8.1-network-permissions` | Enables `lord-netperm.service` (per-app network permissions) where `lordos.service` is enabled. The ISO, the Pi image and `install.sh` already did; a system set up with `apt` alone had it off. Runs once: disabling it later sticks. |
+| `001-0.8.1-network-permissions` | Enables `axia-netperm.service` (per-app network permissions) where `lordos.service` is enabled. The ISO, the Pi image and `install.sh` already did; a system set up with `apt` alone had it off. Runs once: disabling it later sticks. |
 | `002-0.8.1-root-ssh-keys` | 0.8.1 adds `PermitRootLogin no` (`/etc/ssh/sshd_config.d/10-lordos.conf`). On an **upgrade** from 0.8.0 with SSH installed and keys in `/root/.ssh/authorized_keys` (a VPS run as root), it writes `09-lordos-root-keys.conf` with `PermitRootLogin prohibit-password`, so root keeps logging in with keys (never passwords) instead of being locked out at the next restart. New installs never get it; delete the file to apply LordOS's default. |
 | `003-0.8.2-drivetemp` | 0.8.2 ships `/usr/lib/modules-load.d/lordos-drivetemp.conf` (SATA disk temperatures in Monitor → Disks, read at boot). On a running system it loads `drivetemp` once, so the temperatures show without a restart. Does nothing without systemd (an image being built) or where the kernel has no `drivetemp`. |
 | `004-0.8.3-smartd-off` | 0.8.3 ships a drop-in that keeps Debian's smartd (`smartmontools.service`) off unless `/etc/lordos/smartd-enabled` exists ([SYSTEM.md](SYSTEM.md), "smartd"). A condition is only checked at start, so a smartd already running from an earlier smartmontools install is stopped once. Does nothing without systemd, without smartmontools or where an administrator opted in. |
@@ -254,13 +254,13 @@ Today's migrations:
 
 **Settings migrations** (each user), in `sdk/settings.js`: `MIGRATIONS` is a list of
 `[schema, (settings) => newSettings]` applied in order when the session loads
-`~/.config/lordos/settings.json`; the file records the last one in `schema`. 0.8.1 starts recording
+`~/.config/axia/settings.json`; the file records the last one in `schema`. 0.8.1 starts recording
 it (schema 1, nothing changes). A setting renamed or reshaped in a release gets an entry here, so a
 user who skips versions still converges.
 
 Things that only need new files (a new unit, a new default config) ship in the package as usual; a
 new unit that must be enabled on upgraded systems needs a migration, since `postinst` only enables
-`lord-fand`.
+`axia-fand`.
 
 ## Raspberry Pi firmware packages
 
@@ -483,7 +483,7 @@ for now.
   13's `apt` (`sqv`); one changed byte is rejected (`pkg.pgp.badSignature`).
 - **apt, VM 120 (0.8.0 installed from the ISO, user logged in):** the 0.8.0 one-time step, then
   `apt install lordos`: 0.8.0 → 0.8.1~staging in 29 s with the session open; migration 001
-  applied; `lordos`, `lord-netperm`, `lord-fand` active; `settings.json` byte for byte the same;
+  applied; `lordos`, `axia-netperm`, `axia-fand` active; `settings.json` byte for byte the same;
   `/run/reboot-required.pkgs` = `lordos`; after the restart the login screen came back with the new
   version. That run found the `PermitRootLogin no` lock-out (the VM is administered as root with a
   key), which migration 002 now prevents.

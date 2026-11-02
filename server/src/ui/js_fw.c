@@ -1,10 +1,10 @@
 /* js_fw.c — lord.fw: per-app network permissions for the Monitor and Settings → Privacy
  * (docs/FIREWALL.md, steps 2 to 4).
  *
- * lord-server owns the user's rules (~/.config/lordos/firewall.json, the store in
+ * axia-server owns the user's rules (~/.config/axia/firewall.json, the store in
  * fw/rules.c): it reads them at startup, changes them with these calls and saves them. Then it notifies
- * lord-netperm (the root service that applies them in the kernel) with a single message without data,
- * "read again" (netperm/npproto.h); lord-netperm reads the file itself. Back come the
+ * axia-netperm (the root service that applies them in the kernel) with a single message without data,
+ * "read again" (netperm/npproto.h); axia-netperm reads the file itself. Back come the
  * state, new connections and counters. No call takes paths: the file's path is
  * fixed by the server, and firewall.json is on lord.fs's deny list (fsops.c).
  *
@@ -15,14 +15,14 @@
  *   setTrusted(app, on) / setRestricted(app, [restriction]) / setMode('silent'|'ask'|'off'|'deny')
  *   rules(app)                   [{ id, dir, dst, port, proto, action, when, lastMatch }]
  *                                when: Unix seconds of the decision; lastMatch: Unix seconds of the
- *                                last connection lord-netperm reported as decided by that rule
+ *                                last connection axia-netperm reported as decided by that rule
  *                                (seen by this session since it started; 0 = not seen)
  *   ruleApps()                   [app]: the apps that have at least one rule
  *   addRule({ app, dir, dst, port, proto, action }) → id    removeRule(id)
  *   updateRule(id, { dir, dst, port, proto, action }) → id  same app; the old rule comes back if
  *                                the new one can't be added
  *   poll()                       { counts: { app: [allowed, denied, rx, tx, rxRate, txRate, flows, blocked] },
- *                                  events: [...] } (the bytes when lord-netperm's accounting is loaded,
+ *                                  events: [...] } (the bytes when axia-netperm's accounting is loaded,
  *                                  see npproto.h)
  *   blocks(app, restriction)     true if the app is restricted in it (sdk/notify.js asks before showing
  *                                a built-in app's notification)
@@ -98,7 +98,7 @@ static long long match_last(uint32_t id) {
     return 0;
 }
 
-/* lord-netperm numbers the rules on its own: on every reload it reads firewall.json into a new
+/* axia-netperm numbers the rules on its own: on every reload it reads firewall.json into a new
  * store, so its ids are 1, 2, 3… in the file's order, not this store's ids. To know which of our
  * rules a notice is about, the saved text is read the same way here (fw_to_json, then fw_from_json
  * into a scratch store) and each of those rules is matched to ours by what identifies a rule (app,
@@ -154,7 +154,7 @@ out:
     if (sh) fw_store_free(sh);
 }
 
-/* The notice is lord-netperm's own compact JSON ("by":"rule","rule":N): read just those two keys. */
+/* The notice is axia-netperm's own compact JSON ("by":"rule","rule":N): read just those two keys. */
 static void match_event(const unsigned char *p, size_t n) {
     static const char by[] = "\"by\":\"rule\",\"rule\":";
     if (n < sizeof by || n > 2048) return;
@@ -212,7 +212,7 @@ static void keep(char **slot, const unsigned char *p, size_t n) {
 
 static int lists_on;
 
-/* Reads whatever has arrived, without waiting; a blocklist job that ended makes lord-netperm read
+/* Reads whatever has arrived, without waiting; a blocklist job that ended makes axia-netperm read
  * the new compiled lists. */
 static void pump(void) {
     ensure();
@@ -756,13 +756,13 @@ void js_fw_register(JSContext *c, JSValue lord) {
         const char *h = getenv("HOME");
         char real[PATH_MAX];
         if (!h || !realpath(h, real)) snprintf(real, sizeof real, "/nonexistent");
-        snprintf(path, sizeof path, "%s/.config/lordos/firewall.json", real);
+        snprintf(path, sizeof path, "%s/.config/axia/firewall.json", real);
         char err[200] = "";
         int r = store ? fw_load(store, path, err, sizeof err) : -1;
         if (r < 0) fprintf(stderr, "lord.fw: %s invalid (%s): starting without rules\n", path, err);
         np_map_rebuild();
         restrict_set_store(store);                  /* the broker and js_media.c check it (sec/restrict.h) */
-        ensure();                                   /* lord-netperm reads this session's rules */
+        ensure();                                   /* axia-netperm reads this session's rules */
     }
     if (!store) return;
     JSValue fw = JS_NewObject(c);

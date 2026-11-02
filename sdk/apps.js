@@ -83,7 +83,7 @@ export function launchApp(id) {
     if (code) notify({ app: 'settings', title: errorText(code) });
     return ok;
   }
-  // An installed .lpk app runs as its own isolated process (lord-server --app <id>), if the
+  // An installed .lpk app runs as its own isolated process (axia-server --app <id>), if the
   // server supports it; it reaches the desktop as a Wayland window with app_id = its id. Otherwise it
   // falls back to in-process mode (compatibility). See docs/PRIVACY.md.
   const app = registryApp(id);
@@ -150,7 +150,7 @@ export function windowAppName(w) {
 export function windowIcon(w, getApp) {
   const appId = w?.args?.appId;
   if (String(w?.id).startsWith('linux#')) {
-    // an isolated .lpk app (lord-server --app) arrives as a Wayland window with app_id = its id
+    // an isolated .lpk app (axia-server --app) arrives as a Wayland window with app_id = its id
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;
     const a = linuxAppFor(appId);

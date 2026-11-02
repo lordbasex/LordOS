@@ -58,7 +58,7 @@ this works even though the script itself comes through a pipe.
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
      login (Settings → Users changes it). An existing file is kept;
-   - enables `lord-netperm` (per-app network permissions) and `lord-fand` (fans);
+   - enables `axia-netperm` (per-app network permissions) and `axia-fand` (fans);
    - **display manager:** if GDM, SDDM, LightDM or another display manager is set as
      `display-manager.service`, it asks whether to disable it. If you say yes, it is disabled (not
      removed), `lordos.service` is enabled and `getty@tty1` is masked: at the next boot LordOS shows
@@ -149,7 +149,7 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- --remote-desktop --remote-po
 ```
 
 **What works headless.** LordOS's sessions don't need a screen (`SESSIONS.md`): each session is a
-`lord-server --headless`, and the login screen runs headless too. Without a display manager the
+`axia-server --headless`, and the login screen runs headless too. Without a display manager the
 installer enables `lordos.service` (as on any machine without one), so `lord-sessiond` starts at
 boot and serves the login screen and the sessions over the remote desktop. Apps, Linux apps, the
 firewall and the rest of the desktop work as on a PC; without a GPU everything is drawn on the CPU.
@@ -206,8 +206,8 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- --uninstall
 
 It asks first, then:
 
-- disables `lordos.service` and `lord-netperm` (the package's `prerm` gives the fans back to the
-  kernel and disables `lord-fand`);
+- disables `lordos.service` and `axia-netperm` (the package's `prerm` gives the fans back to the
+  kernel and disables `axia-fand`);
 - unmasks `getty@tty1`;
 - enables the previous display manager again. Without a record (LordOS installed by hand), it
   offers the first display manager it finds installed (`gdm3`, `sddm`, `lightdm`, …);
@@ -217,7 +217,7 @@ It asks first, then:
   it created them;
 - removes the remote desktop configuration (`/etc/lordos/remote/config`), if there is one.
 
-Your home folder and `~/.config/lordos` are kept. The dependencies apt pulled in stay installed;
+Your home folder and `~/.config/axia` are kept. The dependencies apt pulled in stay installed;
 `sudo apt autoremove` removes them. Reboot to get your previous login screen back.
 
 ### Switching back without uninstalling
@@ -283,7 +283,7 @@ Done on 2026-10-18 on the development Mac with Docker (`debian:trixie`, amd64) a
 | Latest release through the GitHub API (repository private) | clear error suggesting `--version`/`--deb` |
 | Debian 12 `os-release` / a trixie-based derivative | refused / warning and continues |
 | A `.deb` for the other architecture, an unknown option, no terminal without `--yes` | refused with a clear message |
-| systemd as PID 1 in a privileged container, with a fake `lightdm.service` as `display-manager.service` | lightdm disabled, `lordos`/`lord-netperm`/`lord-fand` enabled, `getty@tty1` masked, linger on; `--uninstall` re-enabled lightdm (alias restored), unmasked getty, turned linger off, removed groups and the greeter user |
+| systemd as PID 1 in a privileged container, with a fake `lightdm.service` as `display-manager.service` | lightdm disabled, `lordos`/`axia-netperm`/`axia-fand` enabled, `getty@tty1` masked, linger on; `--uninstall` re-enabled lightdm (alias restored), unmasked getty, turned linger off, removed groups and the greeter user |
 | The same with answers typed on a pseudo-terminal while the script comes from a pipe | "no" to the display manager leaves it enabled and `lordos.service` disabled; "no" to "Continue?" changes nothing |
 | No display manager | `lordos` enabled, `getty@tty1` masked, the final message offers `systemctl start lordos` |
 | `--uninstall --purge` with the state file deleted | still finds and re-enables lightdm, unmasks getty, keeps the greeter user (not created by the installer) |
@@ -305,7 +305,7 @@ install, ifupdown):
    sound (Settings → Sound, `pw-cli info 0`), network unchanged (`nmcli device` still shows
    NetworkManager managing the interface; no second DHCP client: `ps aux | grep -i dhcp`), Settings →
    Sharing shows remote desktop off, `ss -ltn | grep 5673` is empty, Ctrl+Alt+F2 gives a text login.
-3. `systemctl status lordos lord-netperm lord-fand` are active; `journalctl -b -u lordos` has no errors.
+3. `systemctl status lordos axia-netperm axia-fand` are active; `journalctl -b -u lordos` has no errors.
 4. On the server install: run the installer from tty1 over the console, then `sudo systemctl start
    lordos` without rebooting; then reboot and check ifupdown still owns `eth0`.
 5. `curl … | sh -s -- --uninstall`, reboot: GDM comes back with GNOME; on the server, the text login

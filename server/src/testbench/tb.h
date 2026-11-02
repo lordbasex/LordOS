@@ -1,4 +1,4 @@
-/* tb.h — what lordos-testbench's parts share: the connection, the window and the input serials
+/* tb.h — what axia-testbench's parts share: the connection, the window and the input serials
  * (testbench.c), and the protocol checklist (checks.c). */
 #ifndef LORD_TESTBENCH_TB_H
 #define LORD_TESTBENCH_TB_H

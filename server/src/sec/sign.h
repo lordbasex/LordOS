@@ -69,7 +69,7 @@ int  catalog_parse(const char *json, size_t len, const char *sig, size_t siglen,
 void catalog_free(Catalog *c);
 
 /* The current catalog: the valid one with the highest serial between /usr/share/lordos/catalog.json and
- * ~/.local/share/lordos/catalog/catalog.json. Reread if the file changed. NULL if none. */
+ * ~/.local/share/axia/catalog/catalog.json. Reread if the file changed. NULL if none. */
 const Catalog *catalog_current(void);
 const char *catalog_author(const char *keyhex);
 /* Revoked? key, id, version and SHA-256 of contenido.json (any of them may be ""). */

@@ -1,8 +1,8 @@
 // Voice Recorder: voice memos (our own design, in the style of desktop recorders).
 //
-// Records the microphone through PipeWire: the stream belongs to lord-server (after the
-// permission) and lord-media writes the WAV. Recordings live in ~/Music/Recordings, with a
-// waveform, play, rename, trim and export to Opus, MP3 or WAV (lord-media, with FFmpeg).
+// Records the microphone through PipeWire: the stream belongs to axia-server (after the
+// permission) and axia-media writes the WAV. Recordings live in ~/Music/Recordings, with a
+// waveform, play, rename, trim and export to Opus, MP3 or WAV (axia-media, with FFmpeg).
 import {
   View, Text, Image, ScrollView, Button, TextInput, Segmented, Hairline, EmptyState, useTheme, useKeyboard, typeScale,
   t as tr, media, usePlayer, userDirs, fs, mediaFormatTime, formatDate, formatTime, addListener, useSound, microphones, defaultSource,

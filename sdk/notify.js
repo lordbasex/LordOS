@@ -65,7 +65,7 @@ function remember(app) {
 }
 
 // Firewall restriction "no notifications" (Settings → Privacy → Apps' network, docs/FIREWALL.md):
-// checked in lord-server's rule store before anything is shown, above the per-app setting. A
+// checked in axia-server's rule store before anything is shown, above the per-app setting. A
 // built-in app is "lordos", an isolated one (.lpk, Passwords) "lpk:<id>". Settings' own system
 // warnings (battery) are exempt; Linux apps ('linux:…') are checked where their D-Bus call arrives.
 function fwNotifyBlocked(app) {

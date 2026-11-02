@@ -33,7 +33,7 @@ export const REFERENCES = [
   },
   {
     // Raspberry Pi 5 Model B Rev 1.1, 16 GB, a 32 GB SD card, the LordOS kernel 6.18.57-lordos.3, the fan on
-    // its header (lord-fand), GPU V3D 7.1; LordOS 0.8.5 with LordBench 1 from the 0.8.6 tree run from a
+    // its header (axia-fand), GPU V3D 7.1; LordOS 0.8.5 with LordBench 1 from the 0.8.6 tree run from a
     // terminal, 2026-10-27, Full with 180 s sustained (55.6 °C at most, no speed lost)
     id: 'pi5', lordbench: 1, mode: 'full',
     results: {

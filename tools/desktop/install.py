@@ -8,9 +8,9 @@ import shutil
 
 REPO = Path(__file__).resolve().parents[2]
 DESKTOP_BINARIES = (
-    'lord-server', 'lord-vault', 'lord-maild', 'lord-doc', 'lord-media',
-    'lord-clean', 'lord-lan', 'lord-rdesk', 'lord-bench', 'lord-fetch',
-    'lordos-sysreport', 'lordos-fetch', 'lordos-testbench',
+    'axia-server', 'axia-vault', 'axia-maild', 'axia-doc', 'axia-media',
+    'axia-clean', 'axia-lan', 'axia-rdesk', 'axia-bench', 'axia-dl',
+    'axia-sysreport', 'axia-fetch', 'axia-testbench',
 )
 
 
@@ -20,10 +20,10 @@ def install(prefix, libexecdir, destdir):
         raise ValueError('prefix and libexecdir must be absolute paths')
     if any(c.isspace() or c in "'\"\\" for c in str(prefix) + str(libexecdir)):
         raise ValueError('installation paths must not contain whitespace or shell quotes')
-    root = libexecdir / 'lord-de'
+    root = libexecdir / 'axia'
     stage = Path(destdir) if destdir else Path('/')
     target = stage / root.relative_to('/')
-    required = ['server/build/lord-server', 'server/build/lord-vault',
+    required = ['server/build/axia-server', 'server/build/axia-vault',
                 'themes/default/theme.bundle.js', 'themes/classic/theme.bundle.js',
                 'assets/app-host.bundle.js', 'code-manifest.json']
     for rel in required:
@@ -49,7 +49,7 @@ def install(prefix, libexecdir, destdir):
         src = REPO / 'server/build' / name
         if src.is_file():
             copy(src, target / 'bin' / name, 0o755)
-    for name in ['fonts', 'locales', 'shell', 'icons', 'mascot', 'brand', 'monitor', 'help', 'wallpapers', 'gtk', 'store', 'cleaner', 'hwreport', 'fw', 'browser']:
+    for name in ['fonts', 'locales', 'shell', 'icons', 'brand', 'monitor', 'help', 'wallpapers', 'gtk', 'store', 'cleaner', 'hwreport', 'fw', 'browser']:
         shutil.copytree(REPO / 'assets' / name, target / 'assets' / name, dirs_exist_ok=True)
     copy(REPO / 'assets/app-host.bundle.js', target / 'assets/app-host.bundle.js')
     shutil.copytree(REPO / 'assets/sysapps', target / 'assets/sysapps', dirs_exist_ok=True)
@@ -64,20 +64,27 @@ def install(prefix, libexecdir, destdir):
     if (REPO / 'code-manifest.sig').exists():
         copy(REPO / 'code-manifest.sig', target / 'code-manifest.sig')
     bindir = prefix / 'bin'
-    launcher = stage / bindir.relative_to('/') / 'lord-de-session'
+    launcher = stage / bindir.relative_to('/') / 'axia-session'
     launcher.parent.mkdir(parents=True, exist_ok=True)
-    launcher.write_text((REPO / 'tools/desktop/lord-de-session.in').read_text().replace('@ROOT@', str(root)))
+    launcher.write_text((REPO / 'tools/desktop/axia-session.in').read_text().replace('@ROOT@', str(root)))
     launcher.chmod(0o755)
-    session = stage / prefix.relative_to('/') / 'share/wayland-sessions/lord-de.desktop'
+    # the terminal commands; they find their helpers through their real path in the libexec folder
+    for name in ['axia-fetch', 'axia-sysreport']:
+        link = launcher.parent / name
+        if (target / 'bin' / name).is_file():
+            if link.is_symlink() or link.exists():
+                link.unlink()
+            link.symlink_to(root / 'bin' / name)
+    session = stage / prefix.relative_to('/') / 'share/wayland-sessions/axia.desktop'
     session.parent.mkdir(parents=True, exist_ok=True)
-    session.write_text((REPO / 'packaging/desktop/lord-de.desktop.in').read_text().replace('@BINDIR@', str(bindir)))
+    session.write_text((REPO / 'packaging/desktop/axia.desktop.in').read_text().replace('@BINDIR@', str(bindir)))
     for file in ['LICENSE', 'THIRD_PARTY.md', 'README.md']:
-        copy(REPO / file, stage / prefix.relative_to('/') / 'share/doc/lord-de' / file)
-    copy(REPO / 'docs/STANDALONE.md', stage / prefix.relative_to('/') / 'share/doc/lord-de/docs/STANDALONE.md')
-    copy(REPO / 'server/src/bench/fonts/OFL.txt', stage / prefix.relative_to('/') / 'share/licenses/lord-de/OFL-Noto.txt')
+        copy(REPO / file, stage / prefix.relative_to('/') / 'share/doc/axia-de' / file)
+    copy(REPO / 'docs/STANDALONE.md', stage / prefix.relative_to('/') / 'share/doc/axia-de/docs/STANDALONE.md')
+    copy(REPO / 'server/src/bench/fonts/OFL.txt', stage / prefix.relative_to('/') / 'share/licenses/axia-de/OFL-Noto.txt')
     for file in ['LICENSE', 'LICENSE-SecLists']:
         for src in (REPO / 'third_party').rglob(file):
-            copy(src, stage / prefix.relative_to('/') / 'share/licenses/lord-de/third_party' / src.relative_to(REPO / 'third_party'))
+            copy(src, stage / prefix.relative_to('/') / 'share/licenses/axia-de/third_party' / src.relative_to(REPO / 'third_party'))
     print(f'Installed desktop in {target}')
 
 

@@ -21,11 +21,11 @@ browsers read it from local files.
 ## How it fits together
 
 ```
- boot ──▶ lord-server (session)                       lord-media (sandboxed helper)
+ boot ──▶ axia-server (session)                       axia-media (sandboxed helper)
           media/hwdec.c ── render nodes (open fds) ──▶ lm_hwprobe.c: VA-API profiles with the
             · virtual GPU? (DRM driver name)           decode (VLD) entrypoint → JSON
             · V4L2 m2m decoders (/dev/videoN)
-            · cache ~/.cache/lordos/video-hw.json (per boot_id)
+            · cache ~/.cache/axia/video-hw.json (per boot_id)
                 │  lord.media.hwDecode()
                 ▼
           sdk/video.js (at login and when the setting changes)
@@ -44,7 +44,7 @@ browsers read it from local files.
 ## 1. Detecting hardware decoding (`server/src/media/hwdec.c`)
 
 Asked once per boot (the first `lord.media.hwDecode()` call starts it; `sdk/video.js` makes that
-call at login) and cached in `~/.cache/lordos/video-hw.json` with `/proc/sys/kernel/random/boot_id`,
+call at login) and cached in `~/.cache/axia/video-hw.json` with `/proc/sys/kernel/random/boot_id`,
 because a live USB boots on a different computer each time.
 
 1. **Virtual GPU:** each `/dev/dri/renderD*` is opened and its DRM driver asked with
@@ -53,7 +53,7 @@ because a live USB boots on a different computer each time.
    virtual machine with a real GPU passed through (`i915`, `amdgpu`, …) is probed like any other
    computer. The machine's own name (DMI vendor and product, the CPU `hypervisor` flag) is only
    reported (`"vm"`), not used for the decision.
-2. **VA-API:** the real render nodes (up to four) go as open descriptors to `lord-media` (job
+2. **VA-API:** the real render nodes (up to four) go as open descriptors to `axia-media` (job
    `MK_HWPROBE`, `server/src/media/helper/lm_hwprobe.c`), the only binary that links libva. It
    locks itself in its usual sandbox first (`sandbox_apply_helper`, with the DRM ioctls), then
    lists the profiles and keeps those with the `VAEntrypointVLD` (decode) entrypoint: VP9 profile
@@ -214,6 +214,6 @@ make -C server test          # settings-hw-test (video-optimize), hwdec-test
 node tools/i18n-check.mjs
 ```
 
-On a VM: log in, then `cat ~/.cache/lordos/video-hw.json` and the two files above. On a YouTube
+On a VM: log in, then `cat ~/.cache/axia/video-hw.json` and the two files above. On a YouTube
 page in Chromium, `MediaSource.isTypeSupported('video/webm; codecs="vp9"')` answers false when VP9
 is held back.

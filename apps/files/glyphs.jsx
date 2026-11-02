@@ -69,7 +69,7 @@ export function EntryIcon({ e, size, dark, thumb = true }) {
       </View>
     );
   }
-  // media (M9): video thumbnails, covers and formats stb cannot read (WebP, HEIC, AVIF), through lord-media
+  // media (M9): video thumbnails, covers and formats stb cannot read (WebP, HEIC, AVIF), through axia-media
   if (thumb && size >= 32 && (kind === 'video' || kind === 'audio' || (kind === 'image' && !isImage(e) && !/\.svg$/i.test(e.name)))) {
     return <MediaThumb e={e} size={size} kind={kind} dark={dark} />;
   }

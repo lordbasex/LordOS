@@ -1,5 +1,5 @@
-/* fand.c — lord-fand: the root service that drives the fans by temperature (docs/FANS.md).
- * Closed and minimal, like lord-netperm:
+/* fand.c — axia-fand: the root service that drives the fans by temperature (docs/FANS.md).
+ * Closed and minimal, like axia-netperm:
  *
  *   - executes nothing and opens no network sockets (the unit forbids every family but AF_UNIX);
  *   - reads the CPU temperature every FAND_TICK_MS and writes each fan's duty (fan/fanhw.c);
@@ -11,10 +11,10 @@
  *                                  administrators only (SO_PEERCRED: root, or a member of
  *                                  sudo, admin or wheel): "OK" or "ERR <code>"
  *     Clients never name paths or devices: the daemon drives every fan it found.
- *   - on SIGTERM/SIGINT, and in `lord-fand --restore` (the unit's ExecStopPost, which also runs
+ *   - on SIGTERM/SIGINT, and in `axia-fand --restore` (the unit's ExecStopPost, which also runs
  *     after a crash), the fans go back to the kernel or the firmware.
  *
- * Other modes, for diagnosis: `lord-fand --detect` prints what it found and exits.
+ * Other modes, for diagnosis: `axia-fand --detect` prints what it found and exits.
  * For tests only (never in the unit): --root DIR (sysfs root), --config FILE, --run DIR. */
 #include "fan/fancurve.h"
 #include "fan/fanhw.h"
@@ -84,7 +84,7 @@ static void load_config(void) {
     close(fd);
     char err[96] = "";
     if (r < 0 || fan_config_parse(buf, (size_t)r, &S.cfg, err, sizeof err))
-        fprintf(stderr, "lord-fand: %s ignored (%s), using defaults\n", S.config, r < 0 ? "not a root-owned file" : err);
+        fprintf(stderr, "axia-fand: %s ignored (%s), using defaults\n", S.config, r < 0 ? "not a root-owned file" : err);
 }
 
 static int save_config(void) {
@@ -218,7 +218,7 @@ static void handle(Client *c) {
         S.cfg.force_until = r.force == FF_TIMED ? wall_s() + (long long)r.minutes * 60 : 0;
     }
     if (save_config()) { S.cfg = old; reply(c->fd, "ERR fan.saveFailed\n", 19); return; }
-    fprintf(stderr, "lord-fand: %s\n", c->buf);
+    fprintf(stderr, "axia-fand: %s\n", c->buf);
     apply_profile();
     tick();
     reply(c->fd, "OK\n", 3);
@@ -263,7 +263,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--root") && i + 1 < argc) S.root = argv[++i];
         else if (!strcmp(argv[i], "--config") && i + 1 < argc) S.config = argv[++i];
         else if (!strcmp(argv[i], "--run") && i + 1 < argc) S.run = argv[++i];
-        else { fprintf(stderr, "usage: lord-fand [--detect | --restore]\n"); return 2; }
+        else { fprintf(stderr, "usage: axia-fand [--detect | --restore]\n"); return 2; }
     }
     if (strlen(S.run) > 100 || strlen(S.config) > 200) return 2;
     snprintf(S.sock, sizeof S.sock, "%s/fand.sock", S.run);
@@ -273,7 +273,7 @@ int main(int argc, char **argv) {
     if (mode_restore) {
         if (access(S.state, F_OK)) return 0;          /* nothing taken */
         int r = fanhw_restore_file(S.root, S.state);
-        fprintf(stderr, "lord-fand: fans given back to the kernel/firmware%s\n", r ? " (partially)" : "");
+        fprintf(stderr, "axia-fand: fans given back to the kernel/firmware%s\n", r ? " (partially)" : "");
         return 0;
     }
     /* a previous run that died without cleaning up: undo it before reading the "original" values */
@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
 
     load_config();
     apply_profile();
-    fprintf(stderr, "lord-fand: %d fan(s), %d firmware fan(s), temperature from %s, profile %s\n",
+    fprintf(stderr, "axia-fand: %d fan(s), %d firmware fan(s), temperature from %s, profile %s\n",
             S.hw.n, S.hw.nro, S.hw.temp_src[0] ? S.hw.temp_src : "nothing", fan_profile_name(S.cfg.profile));
 
     struct sigaction sa = { .sa_handler = on_signal };
@@ -292,7 +292,7 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     int lfd = listen_sock();
-    if (lfd < 0) fprintf(stderr, "lord-fand: %s: %s (fans still controlled, no settings)\n", S.sock, strerror(errno));
+    if (lfd < 0) fprintf(stderr, "axia-fand: %s: %s (fans still controlled, no settings)\n", S.sock, strerror(errno));
     for (int i = 0; i < FAND_CLIENTS; i++) S.cl[i].fd = -1;
 
     long long next = now_ms();
@@ -337,6 +337,6 @@ int main(int argc, char **argv) {
     }
     if (S.controlling) { fanhw_release(&S.hw); unlink(S.state); }
     if (lfd >= 0) { close(lfd); unlink(S.sock); }
-    fprintf(stderr, "lord-fand: stopped, fans given back to the kernel/firmware\n");
+    fprintf(stderr, "axia-fand: stopped, fans given back to the kernel/firmware\n");
     return 0;
 }

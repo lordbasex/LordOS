@@ -1,94 +1,29 @@
 [
  {
-  "id": "crystal-crown",
-  "category": "signature",
-  "thumb": "thumbs/signature/lordos-crystal-crown.jpg",
-  "variants": [
-   {
-    "w": 1672,
-    "h": 941,
-    "file": "signature/lordos-crystal-crown.jpg"
-   }
-  ],
-  "file": "signature/lordos-crystal-crown.jpg"
- },
- {
   "id": "eternal-dawn",
-  "category": "signature",
-  "thumb": "thumbs/signature/lordos-eternal-dawn.jpg",
+  "category": "horizons",
+  "thumb": "thumbs/horizons/lordos-eternal-dawn.jpg",
   "variants": [
    {
     "w": 1672,
     "h": 941,
-    "file": "signature/lordos-eternal-dawn.jpg"
+    "file": "horizons/lordos-eternal-dawn.jpg"
    }
   ],
-  "file": "signature/lordos-eternal-dawn.jpg"
- },
- {
-  "id": "royal-flow",
-  "category": "signature",
-  "thumb": "thumbs/signature/lordos-royal-flow.jpg",
-  "variants": [
-   {
-    "w": 1672,
-    "h": 941,
-    "file": "signature/lordos-royal-flow.jpg"
-   }
-  ],
-  "file": "signature/lordos-royal-flow.jpg"
- },
- {
-  "id": "royal-waves",
-  "category": "signature",
-  "thumb": "thumbs/signature/lordos-royal-waves.jpg",
-  "variants": [
-   {
-    "w": 1672,
-    "h": 941,
-    "file": "signature/lordos-royal-waves.jpg"
-   }
-  ],
-  "file": "signature/lordos-royal-waves.jpg"
+  "file": "horizons/lordos-eternal-dawn.jpg"
  },
  {
   "id": "violet-horizon",
-  "category": "signature",
-  "thumb": "thumbs/signature/lordos-violet-horizon.jpg",
+  "category": "horizons",
+  "thumb": "thumbs/horizons/lordos-violet-horizon.jpg",
   "variants": [
    {
     "w": 1672,
     "h": 941,
-    "file": "signature/lordos-violet-horizon.jpg"
+    "file": "horizons/lordos-violet-horizon.jpg"
    }
   ],
-  "file": "signature/lordos-violet-horizon.jpg"
- },
- {
-  "id": "lumo-aurora",
-  "category": "lumo",
-  "thumb": "thumbs/lumo/lordos-lumo-aurora.jpg",
-  "variants": [
-   {
-    "w": 1672,
-    "h": 941,
-    "file": "lumo/lordos-lumo-aurora.jpg"
-   }
-  ],
-  "file": "lumo/lordos-lumo-aurora.jpg"
- },
- {
-  "id": "lumo-celestial",
-  "category": "lumo",
-  "thumb": "thumbs/lumo/lordos-lumo-celestial.jpg",
-  "variants": [
-   {
-    "w": 1672,
-    "h": 941,
-    "file": "lumo/lordos-lumo-celestial.jpg"
-   }
-  ],
-  "file": "lumo/lordos-lumo-celestial.jpg"
+  "file": "horizons/lordos-violet-horizon.jpg"
  },
  {
   "id": "event-horizon",

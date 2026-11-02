@@ -1,5 +1,5 @@
 /* ical.h — iCalendar (RFC 5545) and the shared content-line syntax of vCard (RFC 6350) for
- * lord-maild: calendars, reminders (VTODO) and invitations (iTIP, RFC 5546).
+ * axia-maild: calendars, reminders (VTODO) and invitations (iTIP, RFC 5546).
  *
  * The parser is bounded (line count, nesting, property count) and never reads outside the input.
  * Times are kept as Unix seconds (UTC). An all-day value keeps its civil date (YYYYMMDD) so it

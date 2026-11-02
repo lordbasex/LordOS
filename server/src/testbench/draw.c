@@ -1,4 +1,4 @@
-/* draw.c — lordos-testbench's pixel drawing: boxes, circles, outlines and a 5×7 bitmap font (no font
+/* draw.c — axia-testbench's pixel drawing: boxes, circles, outlines and a 5×7 bitmap font (no font
  * files, so what it shows doesn't depend on anything the compositor renders). */
 #include "draw.h"
 

@@ -1,6 +1,6 @@
 /* backup.h — the session's backups (see backup.c, engine.h and docs/SYSTEM.md).
  *
- * A lord-server thread, running as the user at the lowest priority (nice 19, "idle" I/O), takes
+ * A axia-server thread, running as the user at the lowest priority (nice 19, "idle" I/O), takes
  * the scheduled snapshots and does restores. It notifies JS through an eventfd watched by the main
  * loop (backup_fd → backup_dispatch → __lordBackup(status)). */
 #ifndef LORD_BACKUP_H

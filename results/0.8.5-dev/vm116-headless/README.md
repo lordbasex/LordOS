@@ -13,8 +13,8 @@ callbacks come at about 1 Hz: the frame times here measure that, not drawing spe
 Reproduce:
 
 ```sh
-lordos-sysreport report --json > sysreport.json
-lordos-testbench --gl --auto 10 > testbench.json      # inside a LordOS session
+axia-sysreport report --json > sysreport.json
+axia-testbench --gl --auto 10 > testbench.json      # inside a LordOS session
 free -m                                                  # whole system
 sudo sh -c 'for f in /proc/[0-9]*/smaps_rollup; do ...'  # PSS per process: see tools/results/collect.sh
 systemd-analyze

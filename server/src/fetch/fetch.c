@@ -1,5 +1,5 @@
-/* fetch.c — lord-fetch: downloads the subscribed blocklists over HTTPS for lord-server, sandboxed
- * (see fetchproto.h). With lord-sessiond and lord-maild, the only binaries that link OpenSSL. */
+/* fetch.c — axia-dl: downloads the subscribed blocklists over HTTPS for axia-server, sandboxed
+ * (see fetchproto.h). With lord-sessiond and axia-maild, the only binaries that link OpenSSL. */
 #include "fetchproto.h"
 #include "../doc/wire.h"
 #include "../fw/fwlists.h"
@@ -69,7 +69,7 @@ static void get(uint32_t id, const char *json, size_t len, int fd) {
     }
     HttpResp r;
     memset(&r, 0, sizeof r);
-    int rc = http_request(c, "GET", host, path, "Accept-Encoding: identity\r\nUser-Agent: LordOS-blocklists/1\r\n", NULL, 0,
+    int rc = http_request(c, "GET", host, path, "Accept-Encoding: identity\r\nUser-Agent: Axia-blocklists/1\r\n", NULL, 0,
                           FWL_RAW_MAX, 180000, &r);
     conn_close(c);
     json_free(&d);
@@ -103,7 +103,7 @@ static void get(uint32_t id, const char *json, size_t len, int fd) {
     }
     size_t bytes = r.blen;
     http_resp_free(&r);
-    int mfd = doc_memfd("lord-fetch-list", out, olen);
+    int mfd = doc_memfd("axia-dl-list", out, olen);
     free(out);
     if (mfd < 0) { fail(id, "oom", ""); return; }
     JBuf b;
@@ -122,10 +122,10 @@ int main(void) {
     setrlimit(RLIMIT_CORE, &nocore);
     signal(SIGPIPE, SIG_IGN);
     struct stat st;
-    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "lord-fetch: started by lord-server only\n"); return 2; }
-    if (net_init()) { fprintf(stderr, "lord-fetch: TLS init failed\n"); return 3; }
+    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "axia-dl: started by axia-server only\n"); return 2; }
+    if (net_init()) { fprintf(stderr, "axia-dl: TLS init failed\n"); return 3; }
     SandboxHelperCfg cfg = {
-        .name = "lordos-fetch",          /* cgroup scope lordos-fetch.scope (lord-sessiond creates it) */
+        .name = "lordos-fetch",        /* cgroup scope lordos-fetch.scope */
         .ro_paths = NULL,
         .extra_syscalls = (int[]){ -1 },
         .allow_ioctl_classes = 0,

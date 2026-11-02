@@ -155,7 +155,7 @@ static int helper_spawn(int *out, pid_t *pid) {
     bin[n] = 0;
     char *slash = strrchr(bin, '/');
     if (!slash) return -1;
-    strcpy(slash + 1, "lord-lan");
+    strcpy(slash + 1, "axia-lan");
     struct stat st;
     if (stat(bin, &st) || !S_ISREG(st.st_mode) || (st.st_uid != 0 && st.st_uid != geteuid()) || (st.st_mode & 022)) return -1;   /* root's or ours, not writable by others */
     int sv[2];
@@ -171,7 +171,7 @@ static int helper_spawn(int *out, pid_t *pid) {
     posix_spawnattr_setsigmask(&at, &none);
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
-    char *argv[] = { "lord-lan", NULL };
+    char *argv[] = { "axia-lan", NULL };
     char *envp[] = { "LANG=C.UTF-8", getenv("LORDOS_SESSIOND") ? "LORDOS_SESSIOND=1" : NULL, NULL };
     int e = posix_spawn(pid, bin, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);

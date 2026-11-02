@@ -1,5 +1,5 @@
 // calendar.js — Calendar and Reminders (docs/MAIL.md): calendars, events and to-dos kept by
-// lord-maild (local, or synced with CalDAV), and the scheduler that rings their alarms with the
+// axia-maild (local, or synced with CalDAV), and the scheduler that rings their alarms with the
 // apps closed, like the Clock alarms (sdk/alarms.js).
 //
 //   calendars.list() → [{ id, name, color, acct, acctName, kind: 'local'|'dav', todos, events, hidden, count }]
@@ -58,7 +58,7 @@ export const reminders = {
 
 // ---- alarms with the apps closed ----
 //
-// Upcoming alarms come from lord-maild ('alarms' for the next 36 hours). One setTimeout to the
+// Upcoming alarms come from axia-maild ('alarms' for the next 36 hours). One setTimeout to the
 // next one (cut in ≤ 1 minute pieces when close, like the Clock, because the monotonic clock
 // stops during suspend). An alarm missed by less than 10 minutes still rings; what was shown is
 // remembered in settings.pimAlarms.fired so it never rings twice.
@@ -123,7 +123,7 @@ async function refresh() {
     const r = await mailRequest('alarms', { from: now - LATE, to: now + AHEAD });
     list = r.alarms || [];
     lastFetch = Date.now();
-  } catch (e) { /* lord-maild not there yet: try later */ }
+  } catch (e) { /* axia-maild not there yet: try later */ }
   refreshing = false;
   arm();
 }
@@ -140,7 +140,7 @@ export function startReminders() {
 // small helper for apps: the current date at midnight
 export const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 export { dismissNotification };
-// a tiny hook for apps that show a value loaded from lord-maild (rev = usePim())
+// a tiny hook for apps that show a value loaded from axia-maild (rev = usePim())
 export function usePimQuery(fn, deps = []) {
   const rev = usePim();
   const [v, setV] = useState(null);

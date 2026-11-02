@@ -1,4 +1,4 @@
-/* js_fan.c — lord.fan: Settings → Cooling and Monitor talk to lord-fand (docs/FANS.md).
+/* js_fan.c — lord.fan: Settings → Cooling and Monitor talk to axia-fand (docs/FANS.md).
  *
  *   lord.fan.status()            the daemon's status object, or null if it is not running
  *   lord.fan.setProfile(name)    auto|quiet|balanced|performance|always|custom   → '' or an error code
@@ -6,7 +6,7 @@
  *   lord.fan.force(v)            'on' | 'off' | minutes (1..1440)
  *   lord.fan.caseConfig()        'argon-one-v5' | 'none' | null (not a LordOS Raspberry Pi image)
  *
- * Everything is validated here and again in lord-fand (which also checks that the user is an
+ * Everything is validated here and again in axia-fand (which also checks that the user is an
  * administrator). The requests are one short line over /run/lordos/fand.sock; the daemon answers
  * at once, and a call never waits more than FAN_WAIT_MS. LORD_FAND_SOCK and LORD_FAN_CASE_FILE
  * point elsewhere for tests and screenshots (they only change what this user's session reads). */

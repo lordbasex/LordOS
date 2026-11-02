@@ -8,14 +8,14 @@ can be checked.
 results/<version>/<machine>/
     README.md        the conditions (hardware or VM, monitor or headless, idle time, apps open, power)
                      and the exact commands
-    sysreport.json   lordos-sysreport report --json: the hardware and what LordOS made of it, with no
+    sysreport.json   axia-sysreport report --json: the hardware and what LordOS made of it, with no
                      serial numbers, addresses or user and host names (tests/sysreport_test.c checks it)
-    testbench.json   lordos-testbench --gl --auto N: the Wayland checklist, frame times (average, p50,
+    testbench.json   axia-testbench --gl --auto N: the Wayland checklist, frame times (average, p50,
                      p99, frames that missed the refresh budget), presentation, the 3D renderer, latency
     memory.txt       the whole system (`free -m`) and PSS per process (/proc/<pid>/smaps_rollup)
     boot.txt         systemd-analyze, and the time from the kernel's start to the desktop's first frame
                      (lord-sessiond's log line; the boot splash shows its own timer from a little later)
-    lordbench.json   from 0.8.6, LordBench: lordos-sysreport bench --full --json (docs/BENCHMARK.md)
+    lordbench.json   from 0.8.6, LordBench: axia-sysreport bench --full --json (docs/BENCHMARK.md)
 ```
 
 `tools/results/collect.sh <machine> [--no-memory] [--no-lordbench] [--bench-seconds N] [--version V]` writes

@@ -5,7 +5,7 @@
 # it needs a free DRM card (stop lordos.service first), sudo (the seat side is root, as
 # lord-sessiond is) and, for the dmabuf client, /dev/udmabuf.
 #
-#   sh tests/gpu_cycle.sh <lord-server> <cycles> [card] [gpu]     (gpu: 1 = LORD_GPU=1, 0 = CPU)
+#   sh tests/gpu_cycle.sh <axia-server> <cycles> [card] [gpu]     (gpu: 1 = LORD_GPU=1, 0 = CPU)
 #
 # Prints per-cycle fd count and RSS of the session and leaves the DRM snapshots in $OUT
 # (default /tmp/gpu-cycle). Run from server/ after `make build/dmabuf-client build/seat-cycle`.
@@ -26,7 +26,7 @@ env -i PATH=/usr/bin:/bin HOME="$OUT/home" XDG_RUNTIME_DIR="$RT" LORD_GPU="$GPU"
     --fonts "$LIB/assets/fonts" --shell "$LIB/assets/shell" 2>"$OUT/stderr.log" &
 SESS=$!
 trap 'kill $SESS 2>/dev/null; sudo pkill -f "$OUT/rt" 2>/dev/null || true' EXIT
-for _ in $(seq 50); do [ -S "$RT/lordos/remote.sock" ] && break; sleep 0.2; done
+for _ in $(seq 50); do [ -S "$RT/axia/remote.sock" ] && break; sleep 0.2; done
 sleep 3
 WL=$(cd "$RT" && ls wayland-* | grep -v lock | head -1)
 
@@ -47,8 +47,8 @@ sleep 8
 
 echo "before: fds=$(ls /proc/$SESS/fd | wc -l) rss_kb=$(awk '/VmRSS/{print $2}' /proc/$SESS/status)"
 # after each cycle (the session off the monitor): open fds and RSS of the session
-sudo build/seat-cycle "$RT/lordos/remote.sock" "$CARD" "$CYCLES" 3000 1500 "$OUT/c" \
+sudo build/seat-cycle "$RT/axia/remote.sock" "$CARD" "$CYCLES" 3000 1500 "$OUT/c" \
     "echo cycle \$CYCLE: fds=\$(ls /proc/$SESS/fd | wc -l) rss_kb=\$(awk '/VmRSS/{print \$2}' /proc/$SESS/status)"
 echo "end (on the monitor): fds=$(ls /proc/$SESS/fd | wc -l) rss_kb=$(awk '/VmRSS/{print $2}' /proc/$SESS/status)"
-grep -E "^(gpu|monitor|wayland):" "$OUT/home/.cache/lordos/session.log" | sort | uniq -c | sort -rn | head -20
+grep -E "^(gpu|monitor|wayland):" "$OUT/home/.cache/axia/session.log" | sort | uniq -c | sort -rn | head -20
 echo "snapshots: $OUT/c-NN.bmp (each time it was shown) and $OUT/c-final.bmp"

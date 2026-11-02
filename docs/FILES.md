@@ -6,7 +6,7 @@ of a classic desktop file manager: tabs, four views, Trash, Quick Preview, Get I
 drop, color tags and search. Disk operations belong to the server (`server/src/fsops.c`,
 `lord.fs` in `js_sys.c`); the app only requests them.
 
-## Screenshots (VM 116, real lord-server)
+## Screenshots (VM 116, real axia-server)
 
 | | |
 |---|---|
@@ -83,7 +83,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   available) or the file's info card. The arrows go to the next one and Space or Esc close it.
   See `DOCUMENTS.md`.
 - **Archives** (M9): double-click opens them like a folder; «Extract here» and «Compress» in the
-  context menu, through the sandboxed helper `lord-doc`, never leaving the destination folder
+  context menu, through the sandboxed helper `axia-doc`, never leaving the destination folder
   (`DOCUMENTS.md`).
 - **Get Info** (❖I): size (for folders it is computed with a 0.9 s cap), location, link,
   creation, modification and access dates, permissions and owner, tags and «Open with».
@@ -95,7 +95,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 - **Applications:** those from `useLauncherApps()` (LordOS, packages and Linux); double-click
   opens them.
 - **Tags:** red, orange, yellow, green, blue, purple and gray, stored in
-  `~/.local/share/lordos/tags.json` (path → colors).
+  `~/.local/share/axia/tags.json` (path → colors).
 - **Path bar** at the bottom, clickable on each segment, and **status bar** («N items, X
   available», «N of M selected» or a copy's progress).
 - **App menus** in the theme's bar: File, Edit, View and Go (in Lord Classic, since 0.8.5, in a strip
@@ -106,15 +106,15 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
 
 **Files → Settings** (❖,), kept in `settings.json` under `files` (`apps/files/prefs.js`). General: what a new window shows, and a double click opening a folder in a new tab. Tags: a name for each color and which show in the sidebar. Sidebar: each item. Advanced: show extensions (the name shown only; renaming still works on the real one), warn before changing an extension or emptying the Trash, remove items over 30 days old from the Trash when Files opens (there is no background job), folders first, and where a search looks. What the reference has and LordOS doesn't (desktop icons, cloud sync) isn't offered.
 
-**List columns** are data in `apps/files/columns.js`, tested without a screen. Extra columns read `lord.fs.stat`, once per file until something changes. Date Changed is the inode's. Comments live in `~/.local/share/lordos/comments.json`, like tags. There is no Version column, and no "date added", because Linux keeps neither.
+**List columns** are data in `apps/files/columns.js`, tested without a screen. Extra columns read `lord.fs.stat`, once per file until something changes. Date Changed is the inode's. Comments live in `~/.local/share/axia/comments.json`, like tags. There is no Version column, and no "date added", because Linux keeps neither.
 
 ## Connect to Server (0.8.7)
 
 `apps/files/connect.js` reads an address strictly: shell metacharacters, a leading `-` and `..` are refused, and each part goes on as data. smb and nfs go to the sign-in sheet and `share-mount`, which takes private IPv4 addresses only, so a name works only if Network already saw it.
 
-**sftp, ssh, ftp, ftps and WebDAV are folders in Files.** `lan/rconnect.c` starts `rclone mount` as the session user, in scope `app-lordos-lordos-rclone.scope` (firewall app `desktop:lordos-rclone`), on `~/.local/share/lordos/remote/<kind> on <host>`, and the folder is a volume in the sidebar with its eject button (`fusermount3 -u`). The configuration, with the password obscured by `rclone obscure -` over a pipe, is a memfd read through `/proc/self/fd/3`: there is no file to protect, nothing is on a command line or in the environment, and it ends with the process. It stays open in rclone for as long as the folder is mounted: emptying it once mounted hung the mount on the first reconnection (tried on VM 116 against the test server, with a control that kept it), so the obscured password stays readable by the session user's own processes while mounted. Sftp's `shell_type` and hash commands are set to none: nothing runs on the server, and rclone has nothing to save to that config. `ssh-keyscan`, `openssl` and `rclone obscure` run through `rconnect_run`: in the same scope, with `sandbox_exec_child` (Landlock: the system's folders read-only, nothing written, no TCP unless they need the server), killed at 15 s, so a stalled server can't hold the job or the password. On a kernel with no Landlock only the scope and the deadline hold (Pi 4 on the archive kernel). `rconnect_config` refuses control characters in any value, so nothing can start another key (`lan_test`). rclone, fuse3, openssh-client and openssl are dependencies of `lordos`; rclone has no sandbox beyond its scope.
+**sftp, ssh, ftp, ftps and WebDAV are folders in Files.** `lan/rconnect.c` starts `rclone mount` as the session user, in scope `app-lordos-lordos-rclone.scope` (firewall app `desktop:lordos-rclone`), on `~/.local/share/axia/remote/<kind> on <host>`, and the folder is a volume in the sidebar with its eject button (`fusermount3 -u`). The configuration, with the password obscured by `rclone obscure -` over a pipe, is a memfd read through `/proc/self/fd/3`: there is no file to protect, nothing is on a command line or in the environment, and it ends with the process. It stays open in rclone for as long as the folder is mounted: emptying it once mounted hung the mount on the first reconnection (tried on VM 116 against the test server, with a control that kept it), so the obscured password stays readable by the session user's own processes while mounted. Sftp's `shell_type` and hash commands are set to none: nothing runs on the server, and rclone has nothing to save to that config. `ssh-keyscan`, `openssl` and `rclone obscure` run through `rconnect_run`: in the same scope, with `sandbox_exec_child` (Landlock: the system's folders read-only, nothing written, no TCP unless they need the server), killed at 15 s, so a stalled server can't hold the job or the password. On a kernel with no Landlock only the scope and the deadline hold (Pi 4 on the archive kernel). `rconnect_config` refuses control characters in any value, so nothing can start another key (`lan_test`). rclone, fuse3, openssh-client and openssl are dependencies of `lordos`; rclone has no sandbox beyond its scope.
 
-**Who the server is.** SFTP: `ssh-keyscan` reads the key first; a key seen for the first time shows its fingerprint and is kept in `~/.config/lordos/remote_known_hosts` (0600) only if the person accepts, a different one is refused outright, and rclone checks that file on the real connection (`known_hosts_file`, always set). ftps and https WebDAV: TLS is verified with `openssl s_client`, hostname included, and `no_check_certificate` is never set. A certificate the system doesn't trust shows its fingerprint; accepted, that certificate alone is kept per host and port under `~/.config/lordos/remote_certs` (0600) and given to rclone as `SSL_CERT_FILE`, with `SSL_CERT_DIR` pointing nowhere, so that certificate alone is trusted for that connection. An accepted certificate is checked before the system's verdict: a different one is refused even if a public authority signed it. Every SSH key that goes in the file is shown first, and an answer counts only for the fingerprint on screen. The certificate must still name the host (a subject alternative name for it): rclone's TLS has no way to accept a name mismatch except switching all checks off, which is never done, so such a server says so and doesn't connect. Plain ftp and http WebDAV say on the sheet that the password travels readable. ssh:// also offers Terminal with the line typed and **not run**: Terminal checks it against a fixed pattern, so an app that opens Terminal this way can't run anything.
+**Who the server is.** SFTP: `ssh-keyscan` reads the key first; a key seen for the first time shows its fingerprint and is kept in `~/.config/axia/remote_known_hosts` (0600) only if the person accepts, a different one is refused outright, and rclone checks that file on the real connection (`known_hosts_file`, always set). ftps and https WebDAV: TLS is verified with `openssl s_client`, hostname included, and `no_check_certificate` is never set. A certificate the system doesn't trust shows its fingerprint; accepted, that certificate alone is kept per host and port under `~/.config/axia/remote_certs` (0600) and given to rclone as `SSL_CERT_FILE`, with `SSL_CERT_DIR` pointing nowhere, so that certificate alone is trusted for that connection. An accepted certificate is checked before the system's verdict: a different one is refused even if a public authority signed it. Every SSH key that goes in the file is shown first, and an answer counts only for the fingerprint on screen. The certificate must still name the host (a subject alternative name for it): rclone's TLS has no way to accept a name mismatch except switching all checks off, which is never done, so such a server says so and doesn't connect. Plain ftp and http WebDAV say on the sheet that the password travels readable. ssh:// also offers Terminal with the line typed and **not run**: Terminal checks it against a fixed pattern, so an app that opens Terminal this way can't run anything.
 
 A connected server can be pinned: the secondary click on its row in Locations offers Pin to Locations. It stays there, dim, while it isn't connected, and a click connects again. The address is kept in Files' settings and never the password, which comes from the keyring if it was remembered and is asked for if not.
 
@@ -124,7 +124,7 @@ Tested against a real Windows 11 Pro server with a local account: the sign-in, t
 
 ## Remote desktop (0.8.7)
 
-Remote Desk (`apps/remote-desk`, `sdk/remotedesk.jsx`), one app for RDP and VNC with a switch between them, draws the remote screen with LordOS's own engine, as a media node. There is no client window, X11, Xwayland or toolkit. `lord.rdesk` (`ui/js_rdesk.c`) starts `lord-rdesk` (`rdesk/`) in `app-lordos-lordos-rdesk.scope`; it resolves and connects, then applies the helper sandbox (no new sockets, no exec, read-only `/etc/ssl` and `/usr/lib` for RDP), and paints BGRA into a memfd lord-server shares. The picture's size is sealed (`F_SEAL_SHRINK`, `F_SEAL_GROW`), lord-server takes at most 256 messages per poll and never blocks on the helper, and the scope has lord-server's memory limits (256 MB high, 512 MB max). VNC is our own RFB 3.8 client (`rdesk/rfb.c`: None and VNC auth, refusing a server that offers only None when a password was given, password wiped after the handshake, Raw, CopyRect, Hextile, resize; `tests/rdesk_test.c` with a fuzz run). VNC auth's DES is required by the protocol and is weak: the traffic is not encrypted. RDP allows only TLS and NLA (`FreeRDP_RdpSecurity` off, proved by `tests/rdesk_rdp_test.c`: no credentials go to a server that picks RDP's own security). A certificate that differs from the accepted one gets its own warning with both fingerprints (`sdk/remotecert.js`). RDP is libfreerdp's core with its software GDI, and its client library only for shared folders, handed the connected socket; `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` are dependencies of `lordos`. An unknown or changed certificate shows its fingerprint and the person decides; a trusted one is kept in settings with the address. Passwords reach the helper in one message and go to the keyring only if asked.
+Remote Desk (`apps/remote-desk`, `sdk/remotedesk.jsx`), one app for RDP and VNC with a switch between them, draws the remote screen with LordOS's own engine, as a media node. There is no client window, X11, Xwayland or toolkit. `lord.rdesk` (`ui/js_rdesk.c`) starts `axia-rdesk` (`rdesk/`) in `app-lordos-lordos-rdesk.scope`; it resolves and connects, then applies the helper sandbox (no new sockets, no exec, read-only `/etc/ssl` and `/usr/lib` for RDP), and paints BGRA into a memfd axia-server shares. The picture's size is sealed (`F_SEAL_SHRINK`, `F_SEAL_GROW`), axia-server takes at most 256 messages per poll and never blocks on the helper, and the scope has axia-server's memory limits (256 MB high, 512 MB max). VNC is our own RFB 3.8 client (`rdesk/rfb.c`: None and VNC auth, refusing a server that offers only None when a password was given, password wiped after the handshake, Raw, CopyRect, Hextile, resize; `tests/rdesk_test.c` with a fuzz run). VNC auth's DES is required by the protocol and is weak: the traffic is not encrypted. RDP allows only TLS and NLA (`FreeRDP_RdpSecurity` off, proved by `tests/rdesk_rdp_test.c`: no credentials go to a server that picks RDP's own security). A certificate that differs from the accepted one gets its own warning with both fingerprints (`sdk/remotecert.js`). RDP is libfreerdp's core with its software GDI, and its client library only for shared folders, handed the connected socket; `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` are dependencies of `lordos`. An unknown or changed certificate shows its fingerprint and the person decides; a trusted one is kept in settings with the address. Passwords reach the helper in one message and go to the keyring only if asked.
 
 ## Views and the sidebar (0.8.7)
 
@@ -156,7 +156,7 @@ before that, outside a session (see "What was tested"). **SMB with a password:**
    tunnels), up, with a private IPv4 address (`lan_private`: 10/8, 172.16/12, 192.168/16, 169.254/16). IPv6 is not
    searched. With no such interface nothing is sent.
 2. **mDNS/DNS-SD:** three legacy-unicast questions per link for the service types in `lan/lanservices.h`. Datagrams
-   stay in lord-server's socket and are handed to the helper; an unconnected UDP socket in the helper could reach
+   stay in axia-server's socket and are handed to the helper; an unconnected UDP socket in the helper could reach
    any address.
 3. **TCP probe of ports 445 and 2049:** first the neighbours the kernel knows and what mDNS named, then the rest of
    the subnet, at most its /24 (`lan_sweep_range`), at most 512 addresses in a pass, at most 30 new connections a
@@ -170,11 +170,11 @@ before that, outside a session (see "What was tested"). **SMB with a password:**
 The page opening keeps what a pass under 5 minutes old found; *Search again* needs 30 seconds between passes
 (`LAN_REST_S`, `LAN_KEEP_S`). Leaving the page cancels the pass and ends the helper.
 
-**`lord-lan`** (`lan/lanhelper.c`, `lan/lanparse.c`, protocol in `lan/lanproto.h`) reads everything that comes back.
-Same rules as `lord-fetch`: fixed path next to lord-server (owned by root or the user, not writable by others), no
+**`axia-lan`** (`lan/lanhelper.c`, `lan/lanparse.c`, protocol in `lan/lanproto.h`) reads everything that comes back.
+Same rules as `axia-dl`: fixed path next to axia-server (owned by root or the user, not writable by others), no
 arguments, `LANG` and `LORDOS_SESSIOND` only, the channel on fd 3, `sandbox_apply_helper` before anything is read (no socket, connect,
-bind or exec, no files, 64 MB). It links libc only. It gets datagrams and sockets lord-server already connected and
-never chooses where to connect: the one port it names, mountd's, is connected by lord-server on that same host.
+bind or exec, no files, 64 MB). It links libc only. It gets datagrams and sockets axia-server already connected and
+never chooses where to connect: the one port it names, mountd's, is connected by axia-server on that same host.
 Its answers are parsed again with `sec/json.c` and every text goes through `lan_clean_text`. `lord.lan`
 (`ui/js_lan.c`) has `start`, `stop` and `poll`: JS names no address, port or socket, and it doesn't exist for
 isolated apps.
@@ -187,7 +187,7 @@ anonymous sessions (most desktop systems by default) shows as "lists its folders
 
 **Signing in shows the folders.** *Connect* asks who connects, not a share's name: the name of a folder is something
 the server knows and the person may not. `lord.lan.listShares` (`lan_list_start` in `lan/lan.c`) runs on a thread and a
-`lord-lan` of its own, only to an address on a local subnet (`on_link`), through the same `lan` connector and port 445,
+`axia-lan` of its own, only to an address on a local subnet (`on_link`), through the same `lan` connector and port 445,
 and hands the helper the connected socket and one request, `LQ_SMB_AUTH`, with the name and password. The helper
 (`lan/smbauth.c`) answers the NTLMv2 challenge, signs what follows as SMB 2.0.2 and 2.1 do, with HMAC-SHA256, reads
 `NetrShareEnum` over `srvsvc` as the anonymous path does, and wipes the password; it is in that request and nowhere
@@ -234,7 +234,7 @@ app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app
 | A pass with the real helper in its sandbox | VM 116 and VM 125 on the real LAN | about 19 s for 506 connections on one /24; two of the maintainer's desktop computers (name, `_smb._tcp`, SSH, SFTP; SMB 3.0.2, signing required, anonymous session refused), `lordos-pi` at 172.17.0.24 (name by reverse mDNS, SSH), VM 116, VM 125, and three machines with SSH and no name |
 | Share list, export list | test server on VM 125 | Samba's `Public` and `Private`, its export; reached over a veth to a network namespace, not over the LAN |
 | `share-mount` / `share-unmount` | VM 125 (kernel 6.12) against that server | guest, password, wrong password (`share.denied`), NFS 4.2, writing as the user, refusals (public address, `..`, a folder that isn't a share) |
-| The page and the sheet in a real `lord-server` | VM 125, a private headless session (as root with `--user`, so with the admin helper), built with `LAN_ANY_LINK` so the veth counted | the list, Connect as guest, with a typed password, NFS, ⏏, the keyring's "not remembered" note, a dead server |
+| The page and the sheet in a real `axia-server` | VM 125, a private headless session (as root with `--user`, so with the admin helper), built with `LAN_ANY_LINK` so the veth counted | the list, Connect as guest, with a typed password, NFS, ⏏, the keyring's "not remembered" note, a dead server |
 | Parsers | `build/lan-test` under ASan/UBSan | every format against crafted, truncated and 40,000 damaged answers |
 
 **Not tested:** a real SMB or NFS server on the LAN (the only ones there refuse anonymous sessions, and the
@@ -294,7 +294,7 @@ isn't built, so treat signing in to a real SMB server as untested.
   «Open with» and the helpers keep the home folder and the user's mounts.
 - Writing, copying to, moving and sending to the Trash reject the protected folders
   (`fsops_protected`: `~/.local/share/applications`, `~/.config/autostart`,
-  `~/.local/share/lordos/apps`, `~/.config/lordos/settings.json`, the permission and firewall
+  `~/.local/share/axia/apps`, `~/.config/axia/settings.json`, the permission and firewall
   decisions `permisos.json` and `firewall.json`, the blocklists (0.8.5), `backup.json`, the Mail
   accounts and cache, and the Passwords vaults). Copying *from* them is allowed.
 - There is no general `remove`.

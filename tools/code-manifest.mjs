@@ -1,5 +1,5 @@
 // Writes code-manifest.json: the size and SHA-256 of every file LordOS runs as its own code (see
-// docs/SIGNING.md, "Verified system code"). lord-server checks each file against it before loading
+// docs/SIGNING.md, "Verified system code"). axia-server checks each file against it before loading
 // it (server/src/sec/codesig.c); tools/release/sign-code.sh signs it with the LordOS release key.
 //
 //   node tools/code-manifest.mjs [--root <dir>] [--check]
@@ -32,7 +32,7 @@ export function codeFiles(dir) {
   for (const t of list('themes')) add(`themes/${t}/theme.bundle.js`);
   add('assets/app-host.bundle.js');
   for (const a of list('assets/sysapps')) add(`assets/sysapps/${a}/app.js`);
-  // byte order, as lord-server compares paths with strcmp
+  // byte order, as axia-server compares paths with strcmp
   return out.sort((a, b) => (Buffer.compare(Buffer.from(a), Buffer.from(b))));
 }
 

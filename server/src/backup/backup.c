@@ -1,6 +1,6 @@
 /* backup.c — the backup scheduler and worker thread (see backup.h).
  *
- *   ~/.config/lordos/backup.json   the configuration: destination, schedule, exclusions, battery.
+ *   ~/.config/axia/backup.json   the configuration: destination, schedule, exclusions, battery.
  *                                  Only backup_configure writes it (lord.fs cannot: it decides
  *                                  where the data goes; it is in fsops_protected).
  *
@@ -43,8 +43,8 @@
 #define RETRY_NODEST 300                /* s before checking again whether the disk is back */
 #define BATTERY_RECHECK 60
 
-static const char *const default_excl[] = { ".cache", ".local/share/Trash", ".local/share/lordos/apps",
-                                            ".local/share/lordos/trash", ".thumbnails", NULL };
+static const char *const default_excl[] = { ".cache", ".local/share/Trash", ".local/share/axia/apps",
+                                            ".local/share/axia/trash", ".thumbnails", NULL };
 
 typedef enum { S_IDLE, S_RUNNING, S_PAUSED, S_NODEST, S_RESTORING, S_DELETING, S_LOCKED, S_UNLOCKING } State;
 static const char *const state_names[] = { "idle", "running", "paused", "nodest", "restoring", "deleting", "locked", "unlocking" };
@@ -516,7 +516,7 @@ int backup_start(const char *h, const char *u) {
     for (char *p = hn; *p && k < sizeof host - 1; p++)
         host[k++] = ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-') ? *p : '_';
     host[k] = 0;
-    if (pathf(cfg_path, sizeof cfg_path, "%s/.config/lordos/backup.json", home)) return -1;
+    if (pathf(cfg_path, sizeof cfg_path, "%s/.config/axia/backup.json", home)) return -1;
     pthread_condattr_t ca;
     pthread_condattr_init(&ca);
     pthread_cond_init(&cv, &ca);        /* CLOCK_REALTIME: backups follow wall-clock time */

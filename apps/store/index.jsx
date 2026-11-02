@@ -364,7 +364,7 @@ export default function Store() {
           {!standaloneDesktop && item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {CATS.filter((c) => counts[c]).map((c) => item(`cat:${c}`, tr(`store.cat.${c}`), counts[c], GLYPH[c]))}
-          <SectionTitle>LordOS</SectionTitle>
+          <SectionTitle>Axia DE</SectionTitle>
           {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
           <View style={{ height: 12 }} />
         </ScrollView>

@@ -1,5 +1,5 @@
 /* netrec.c — feeds the traffic history (see netrec.h). Costs one read of /proc/net/dev and a look at
- * the latest lord-netperm counters every 5 s, plus one append of a few dozen bytes per minute. */
+ * the latest axia-netperm counters every 5 s, plus one append of a few dozen bytes per minute. */
 #include "netrec.h"
 #include "monpriv.h"
 #include "../ui/js_fw.h"
@@ -37,8 +37,8 @@ long long netrec_now(void) { return (long long)time(NULL); }
 static void path_of(char *out, size_t n) {
     const char *x = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
     out[0] = 0;
-    if (x && x[0] == '/' && !strstr(x, "/../")) snprintf(out, n, "%s/lordos/net-history.bin", x);
-    else if (home && home[0] == '/') snprintf(out, n, "%s/.local/state/lordos/net-history.bin", home);
+    if (x && x[0] == '/' && !strstr(x, "/../")) snprintf(out, n, "%s/axia/net-history.bin", x);
+    else if (home && home[0] == '/') snprintf(out, n, "%s/.local/state/axia/net-history.bin", home);
 }
 
 void netrec_init(int ok) {
@@ -65,7 +65,7 @@ double netrec_timeout(void) {
     return d < 0 ? 0 : d;
 }
 
-/* {"app":[allowed,denied,rx,tx,...,[[...]]],...} from lord-netperm (npproto.h). Only the key and the
+/* {"app":[allowed,denied,rx,tx,...,[[...]]],...} from axia-netperm (npproto.h). Only the key and the
  * 3rd and 4th numbers are taken; anything unexpected ends the reading (what was read stays). */
 static void read_counts(const char *j) {
     ncur = 0;

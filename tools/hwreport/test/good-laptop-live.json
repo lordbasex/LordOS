@@ -186,8 +186,8 @@
       "services": {
         "lord-sessiond": true,
         "lord-netd": true,
-        "lord-netperm": true,
-        "lord-fand": false
+        "axia-netperm": true,
+        "axia-fand": false
       }
     },
     "session": {

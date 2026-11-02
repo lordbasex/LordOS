@@ -10,7 +10,7 @@
 #   - no screen-cast portal is installed that could hand a PipeWire screen stream to an app
 #     (xdg-desktop-portal with a ScreenCast backend);
 #   - no PipeWire node is a screen source;
-#   - a restricted app can't read the framebuffer device (/dev/fb*, lord-netperm's cgroup/dev).
+#   - a restricted app can't read the framebuffer device (/dev/fb*, axia-netperm's cgroup/dev).
 #
 #   bash server/tests/fwlinux/screen.sh     (after make -C server build/wl-globals)
 . "$(dirname "$0")/lib.sh"

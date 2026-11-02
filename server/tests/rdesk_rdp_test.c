@@ -1,4 +1,4 @@
-/* rdesk_rdp_test.c — lord-rdesk with a server that offers only RDP's own security: no certificate, so no connection, and the
+/* rdesk_rdp_test.c — axia-rdesk with a server that offers only RDP's own security: no certificate, so no connection, and the
  * password is never sent. A stub answers the X.224 request; anything after that would be the session. */
 #include "../src/rdesk/proto.h"
 

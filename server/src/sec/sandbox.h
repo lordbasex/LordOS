@@ -2,14 +2,14 @@
  *
  * Our own code: no bubblewrap, flatpak or firejail. Uses kernel 6.12 features directly:
  *   - Landlock (ABI up to 6): read-only access to the package folder, the runtime and the fonts;
- *     read and write of ~/.local/share/lordos/appdata/<id>; nothing else from $HOME. TCP
+ *     read and write of ~/.local/share/axia/appdata/<id>; nothing else from $HOME. TCP
  *     rules and abstract unix socket scoping.
  *   - seccomp-bpf: a syscall allowlist; no ptrace, mount, kexec, bpf, perf, keyctl or
  *     module loading. Without the `network` permission, it also blocks network sockets.
  *   - no_new_privs and all capabilities dropped.
  *   - its own cgroup v2 (cgroup.c) with bounded memory and CPU.
  * If something is missing in the kernel, it warns in the log and goes on without that part (it doesn't keep the app from
- * starting). Applied in the app process (lord-server --app <id>), after dropping
+ * starting). Applied in the app process (axia-server --app <id>), after dropping
  * privileges and before loading the app's code. */
 #ifndef LORD_SEC_SANDBOX_H
 #define LORD_SEC_SANDBOX_H
@@ -18,8 +18,8 @@
 
 typedef struct {
     const char *id;             /* package id (already validated) */
-    const char *pkg_dir;        /* ~/.local/share/lordos/apps/<id>  (read-only) */
-    const char *data_dir;       /* ~/.local/share/lordos/appdata/<id> (read and write) */
+    const char *pkg_dir;        /* ~/.local/share/axia/apps/<id>  (read-only) */
+    const char *data_dir;       /* ~/.local/share/axia/appdata/<id> (read and write) */
     const char *runtime_dir;    /* XDG_RUNTIME_DIR (for the Wayland socket; just what's needed) */
     const char *const *ro_extra;/* extra read-only folders (fonts, assets); NULL-terminated */
     const char *const *dev_files;/* exact device files opened for read and write; NULL-terminated */
@@ -34,7 +34,7 @@ int sandbox_apply(const SandboxConfig *cfg);
 /* cgroup scope name of a .lpk app: "app-lordos-lpk-<id>.scope". */
 void sandbox_scope_name(const char *id, char *out, size_t n);
 
-/* ---- variant for decoding helpers (lord-media, lord-doc) ----
+/* ---- variant for decoding helpers (axia-media, axia-doc) ----
  * A helper that decodes untrusted data (video, PDF, archives)
  * needs neither network nor filesystem access: it gets fds already open and writes to
  * another fd. This variant applies: no network, no files except the read-only folders
@@ -44,16 +44,16 @@ void sandbox_scope_name(const char *id, char *out, size_t n);
 /* ioctl classes a helper may need for hardware decoding. Filtered by the
  * type byte of the ioctl number (_IOC_TYPE): only those types; never a generic ioctl nor
  * TIOCSTI. The helper can NOT open /dev (Landlock): it gets the device fds already
- * opened by lord-server. */
+ * opened by axia-server. */
 enum { SANDBOX_IOCTL_DRM = 1, SANDBOX_IOCTL_V4L2 = 2, SANDBOX_IOCTL_DMABUF = 4, SANDBOX_IOCTL_MEDIA = 8 };
 
 typedef struct {
-    const char *name;               /* cgroup scope name (e.g. "lord-media") */
+    const char *name;               /* cgroup scope name (e.g. "axia-media") */
     const char *const *ro_paths;    /* read-only folders (fonts, /usr/lib…); NULL-terminated */
     const int *extra_syscalls;      /* extra allowed syscalls; -1-terminated */
     int  allow_ioctl_classes;       /* OR of SANDBOX_IOCTL_* (hardware decoding) */
     long mem_max_mb;                /* memory cap (0 = no cap) */
-    /* folders already opened by lord-server (directory fds), -1-terminated; NULL = none.
+    /* folders already opened by axia-server (directory fds), -1-terminated; NULL = none.
      * ro: read; rw: read + write/create files, folders and symlinks and delete
      * files (no truncation). That way the helper needs no path at all. */
     const int *ro_dir_fds;
@@ -79,7 +79,7 @@ void sandbox_exec_child(int network);
 /* ---- "no access to your files" for Linux apps (the launcher, apps.c) ----
  * Landlock only: no seccomp, no capability changes, no network or scoping rules, so a normal
  * GTK/Qt app or browser keeps working; device ioctls are not handled (the device restrictions are
- * lord-netperm's). What the app may touch:
+ * axia-netperm's). What the app may touch:
  *   read and execute: the system (/usr, /etc, /opt, /var/lib, /var/cache, /sys, a few service
  *   folders of /run), plus ro[];
  *   read and write: /tmp, /var/tmp, /dev, /proc, the runtime dir, plus rw[] (its own config, cache and

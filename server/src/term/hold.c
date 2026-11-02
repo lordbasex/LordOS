@@ -1,4 +1,4 @@
-/* hold.c — sessions that survive a lord-server restart (a session server).
+/* hold.c — sessions that survive a axia-server restart (a session server).
  *
  * For each session a holder is launched: the same binary re-executed with --term-holder,
  * with no privileges and none of the server's memory. It only keeps the PTY master open (so
@@ -29,7 +29,7 @@
 static char dir[256];
 
 /* /run/user/<uid>/lordos-term (tmpfs, wiped when the machine reboots) or, if it does not
- * exist, ~/.cache/lordos/term. Always 0700. */
+ * exist, ~/.cache/axia/term. Always 0700. */
 const char *hold_dir(void) {
     if (dir[0]) return dir;
     char run[64];
@@ -42,9 +42,9 @@ const char *hold_dir(void) {
         char p[256];
         snprintf(p, sizeof p, "%s/.cache", home);
         mkdir(p, 0700);
-        snprintf(p, sizeof p, "%s/.cache/lordos", home);
+        snprintf(p, sizeof p, "%s/.cache/axia", home);
         mkdir(p, 0700);
-        snprintf(dir, sizeof dir, "%s/.cache/lordos/term", home);
+        snprintf(dir, sizeof dir, "%s/.cache/axia/term", home);
     }
     mkdir(dir, 0700);
     if (stat(dir, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid() || (st.st_mode & 077)) { dir[0] = 0; return NULL; }

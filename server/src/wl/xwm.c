@@ -1,7 +1,7 @@
 /* xwm.c — LordOS's X window manager for Xwayland (see xwm.h).
  *
  * It speaks the X11 protocol itself (x11wire.c), on the connection Xwayland opened for it with
- * `-wm`, fully asynchronously: it never waits for a reply, so lord-server can't stall on
+ * `-wm`, fully asynchronously: it never waits for a reply, so axia-server can't stall on
  * Xwayland while Xwayland waits on the compositor. Replies are matched by sequence number to a
  * FIFO of callbacks.
  *

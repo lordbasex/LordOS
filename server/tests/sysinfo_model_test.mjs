@@ -139,7 +139,7 @@ eq('not a list', parseMemoryLines(undefined), []);
 // ---- checks (part 1) ----
 const st = (rows) => Object.fromEntries(rows.map((r) => [r.id, r.state]));
 const good = {
-  report: { software: { landlockAbi: 6, bpfLsm: true, kernelConfig: { CONFIG_CGROUP_BPF: 'y' }, services: { 'lord-netperm': true } },
+  report: { software: { landlockAbi: 6, bpfLsm: true, kernelConfig: { CONFIG_CGROUP_BPF: 'y' }, services: { 'axia-netperm': true } },
     session: { composition: 'gpu', renderer: 'AMD Radeon RX 580' } },
   facts: { uid: 1000, euid: 1000, cgroup: '/system.slice/lordos.service/lordos-session-1000/server', leafRoot: true, parentRoot: true, appScopes: 3, remoteListening: false },
   code: { state: 'verified', files: 9, refused: [] }, remote: { enabled: false }, stats: { rssKB: 71680 },
@@ -147,7 +147,7 @@ const good = {
 eq('a healthy system', st(evaluate(good)), { serverUser: 'pass', landlock: 'pass', netperm: 'pass', code: 'pass', remoteClosed: 'pass', cgroups: 'pass', gpu: 'pass', memory: 'info' });
 eq('levels', evaluate(good).map((r) => r.level), ['configured', 'configured', 'configured', 'effective', 'effective', 'configured', 'configured', 'measured']);
 const broken = {
-  report: { software: { landlockAbi: 3, bpfLsm: false, kernelConfig: {}, services: { 'lord-netperm': false } }, session: { composition: 'gpu-off', gpuInit: 'no-3d' } },
+  report: { software: { landlockAbi: 3, bpfLsm: false, kernelConfig: {}, services: { 'axia-netperm': false } }, session: { composition: 'gpu-off', gpuInit: 'no-3d' } },
   facts: { uid: 0, euid: 0, cgroup: '/system.slice/lordos.service/lordos-session-0/server', leafRoot: false, parentRoot: true, appScopes: 0, remoteListening: true },
   code: { state: 'verified', files: 9, refused: [{ path: 'x' }] }, remote: { enabled: false },
 };
@@ -183,14 +183,14 @@ eq('helper never ran', evaluateProbe({ ...okProbe, probe: { ...okProbe.probe, tr
 eq('garbage does not throw', evaluateProbe({ probe: { tries: [null, 3, { id: 5 }] } }).map((r) => r.state), ['unknown', 'fail', 'fail', 'unknown']);
 
 // ---- the Test Bench's report ----
-const bench = { tool: 'lordos-testbench', at: 1, fps: 59.9, presentation: true, presented: 600, discarded: 0, refreshHz: 60,
+const bench = { tool: 'axia-testbench', at: 1, fps: 59.9, presentation: true, presented: 600, discarded: 0, refreshHz: 60,
   latency: { n: 4, avgMs: 21.25 }, gl: { renderer: 'AMD Radeon RX 580', kind: 'HARDWARE GPU', drawMs: 0.4 },
   checks: [{ id: 'a', state: 'pass' }, { id: 'b', state: 'pass' }, { id: 'c', state: 'info' }] };
 eq('a good bench', st(evaluateBench(bench)), { wayland: 'pass', renderer3d: 'pass', presented: 'info', latency: 'info' });
 eq('a failing check is named', evaluateBench({ ...bench, checks: [...bench.checks, { id: 'clipboard round trip', state: 'fail' }] })[0].vars.list, 'clipboard round trip');
 eq('software renderer warns, headless presents nothing', st(evaluateBench({ ...bench, presented: 0, discarded: 9, gl: { renderer: 'llvmpipe', kind: 'SOFTWARE (CPU)' }, latency: {} })),
   { wayland: 'pass', renderer3d: 'warn', presented: 'warn' });
-eq('not a bench report', [evaluateBench(null), evaluateBench({ tool: 'x' }), evaluateBench({ tool: 'lordos-testbench' })], [null, null, null]);
+eq('not a bench report', [evaluateBench(null), evaluateBench({ tool: 'x' }), evaluateBench({ tool: 'axia-testbench' })], [null, null, null]);
 
 // ---- a Raspberry Pi's revision code ----
 eq('a Pi 5, 16 GB, from Sony UK', piBoard('e04171'), { product: 'Raspberry Pi 5 Model B', chip: 'BCM2712', maker: 'Sony UK', memoryGB: 16, version: '1.1' });

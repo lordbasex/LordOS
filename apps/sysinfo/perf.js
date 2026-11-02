@@ -21,7 +21,7 @@ export const DESKTOP_CATEGORIES = [
   { id: 'compositor', ids: ['comp.fps', 'comp.p50', 'comp.p99', 'comp.missed', 'comp.in50', 'comp.in99'] },
   { id: 'desktop', ids: ['desk.fps', 'desk.p50', 'desk.p99', 'desk.missed', 'desk.in50', 'desk.in99', 'desk.work'] },
 ];
-// the helper-sandbox self-test lord-bench makes after locking itself in (server/src/bench/lbproto.h, LB_SBX_*):
+// the helper-sandbox self-test axia-bench makes after locking itself in (server/src/bench/lbproto.h, LB_SBX_*):
 // every one of these must be refused
 export const SANDBOX_TRIES = ['helperSocket', 'helperInet', 'helperExec', 'helperFork', 'helperNewFile', 'helperRead'];
 // the tries only Landlock refuses, and its bit in the sandbox mask (server/src/sec/sandbox.h, SB_LANDLOCK_FS)

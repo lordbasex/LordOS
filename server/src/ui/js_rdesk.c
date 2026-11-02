@@ -1,4 +1,4 @@
-/* js_rdesk.c — lord.rdesk: the RDP and VNC apps (docs/FILES.md, "Remote desktop"). lord-server starts lord-rdesk in a
+/* js_rdesk.c — lord.rdesk: the RDP and VNC apps (docs/FILES.md, "Remote desktop"). axia-server starts axia-rdesk in a
  * scope of its own, gives it the job once and shares the picture, which the engine shows as a media node.
  *
  *   open(proto, host, port, user, domain, password) → id, or 0
@@ -42,7 +42,7 @@ static int helper_path(char *bin, size_t n) {
     bin[l] = 0;
     char *s = strrchr(bin, '/');
     if (!s) return -1;
-    strcpy(s + 1, "lord-rdesk");
+    strcpy(s + 1, "axia-rdesk");
     struct stat st;
     return stat(bin, &st) || !S_ISREG(st.st_mode) || (st.st_uid != 0 && st.st_uid != geteuid()) || (st.st_mode & 022) ? -1 : 0;
 }
@@ -107,7 +107,7 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 /* the same limits for both protocols: libfreerdp is what needs them */
                 CgroupLimits lim = { .mem_high_mb = 256, .mem_max_mb = 512, .cpu_percent = 0 };
                 if (cgroup_enter("app-lordos-lordos-rdesk.scope", &lim) && getenv("LORDOS_SESSIOND")) _exit(126);
-                char *args[] = { "lord-rdesk", NULL };
+                char *args[] = { "axia-rdesk", NULL };
                 execve(bin, args, environ);
                 _exit(127);
             }

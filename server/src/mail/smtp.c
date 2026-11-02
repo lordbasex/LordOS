@@ -1,7 +1,7 @@
-/* smtp.c — composing (MIME) and sending (SMTP submission) for lord-maild (see maild.h).
+/* smtp.c — composing (MIME) and sending (SMTP submission) for axia-maild (see maild.h).
  *
  * Messages are built here, never by JS: headers are encoded (RFC 2047/2231), bodies go out as
- * quoted-printable, attachments as base64 read from the fds lord-server opened for the files the
+ * quoted-printable, attachments as base64 read from the fds axia-server opened for the files the
  * user picked. Submission is on 465 (implicit TLS) or 587 (STARTTLS, required), with AUTH PLAIN
  * or LOGIN. One sender thread serves every account, plus the "send later" outbox. */
 #include "maild.h"
@@ -119,7 +119,7 @@ char *compose_message(Account *a, const JVal *m, int *fds, int nfds, size_t *ole
     /* threading headers: ids only (no line breaks smuggled in) */
     if (irt && *irt && !strpbrk(irt, "\r\n")) jb_printf(&b, "In-Reply-To: %.*s\r\n", 998, irt);
     if (refs && *refs && !strpbrk(refs, "\r\n")) jb_printf(&b, "References: %.*s\r\n", 3000, refs);
-    jb_raw(&b, "MIME-Version: 1.0\r\nX-Mailer: LordOS Mail\r\n");
+    jb_raw(&b, "MIME-Version: 1.0\r\nX-Mailer: Axia Mail\r\n");
     const char *text = json_str(m, "text"), *html = json_str(m, "html");
     const char *ics = json_str(m, "calendar"), *icsm = json_str(m, "calendarMethod");
     const JVal *atts = json_get(m, "attachments");

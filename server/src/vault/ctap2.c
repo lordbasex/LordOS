@@ -1,6 +1,6 @@
 /* ctap2.c — our own FIDO2 client: CTAPHID over hidraw + CTAP2 with hmac-secret (see ctap2.h).
  *
- * Only read/write/poll on the fd that arrives already open (runs sandboxed in lord-vault). An
+ * Only read/write/poll on the fd that arrives already open (runs sandboxed in axia-vault). An
  * HID report is 64 bytes; when writing it is prefixed by report number 0 (65 bytes),
  * as hidraw requires for devices without report ids. */
 #include "ctap2.h"

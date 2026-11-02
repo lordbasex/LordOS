@@ -1,4 +1,4 @@
-// Contacts — address books kept by lord-maild (local, or synced with CardDAV): see docs/MAIL.md.
+// Contacts — address books kept by axia-maild (local, or synced with CardDAV): see docs/MAIL.md.
 // Three columns: books and groups, the contact list (search, letter sections, virtualized) and
 // the card, with an edit mode. Groups are contacts with kind 'group' and a list of member uids.
 import {
@@ -155,7 +155,7 @@ export default function ContactsApp() {
       </View>
       <View style={{ flex: 1 }}>
         {unavailable ? (
-          <EmptyState mascot="confused" title={t('contacts.unavailable')} hint={t('contacts.unavailableHint')} />
+          <EmptyState title={t('contacts.unavailable')} hint={t('contacts.unavailableHint')} />
         ) : draft ? (
           <Editor key={draft._new ? 'new' : keyOf(draft)} contact={draft} groups={groups} onCancel={() => setDraft(null)} onSave={saveDraft}
             onDelete={draft._new ? null : () => setSheet({ confirm: draft })} />

@@ -39,7 +39,7 @@ export const disks = {
   },
 };
 
-// The formats that come with the Store's Disk Formats item (docs/FILES.md); lord-server asks the same in disk-mount.
+// The formats that come with the Store's Disk Formats item (docs/FILES.md); axia-server asks the same in disk-mount.
 export const COMMERCIAL_FORMATS = ['vfat', 'exfat', 'ntfs', 'hfsplus', 'apfs'];
 const FORMATS_MARK = '/usr/lib/lordos/disk-formats.enabled';
 export const diskFormatsOn = () => { try { stat(FORMATS_MARK); return true; } catch (e) { return false; } };

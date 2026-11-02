@@ -62,7 +62,7 @@ const launcherKey = (id) => {
   return p.kind === 'desktop' ? `desktop:${p.key}` : p.key;
 };
 
-// ---- pinned (in ~/.config/lordos/settings.json → dockPinned) ----
+// ---- pinned (in ~/.config/axia/settings.json → dockPinned) ----
 
 let themeDefaults = [FIRST, LAUNCHER];
 const dockOpened = new Map();         // running unpinned and pinned groups, in the order they opened

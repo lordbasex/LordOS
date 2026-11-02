@@ -1,7 +1,7 @@
 /* dmabuf_client.c — app Wayland de prueba que muestra búferes dmabuf (zwp_linux_dmabuf_v1).
  *
  * Los dmabuf salen de /dev/udmabuf (memoria común con forma de dmabuf, lineal XRGB8888): así se
- * prueba el camino de los búferes de GPU de lord-server sin una GPU real (importación EGL,
+ * prueba el camino de los búferes de GPU de axia-server sin una GPU real (importación EGL,
  * scanout directo a pantalla completa y, en el camino por CPU, el mapeo lineal).
  *
  *   dmabuf-client [--fullscreen] [--frames N] [--size AxB]

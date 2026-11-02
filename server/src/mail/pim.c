@@ -1,4 +1,4 @@
-/* pim.c — calendars, reminders and address books of lord-maild, local and synced with CalDAV /
+/* pim.c — calendars, reminders and address books of axia-maild, local and synced with CalDAV /
  * CardDAV (see maild.h, dav.h and docs/MAIL.md).
  *
  * A collection is a calendar (events and/or to-dos) or an address book. Local ones live only

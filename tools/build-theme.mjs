@@ -1,5 +1,5 @@
 // Bundles a React theme (with the SDK and every app in apps/) into a single .js that
-// lord-server loads with QuickJS.
+// axia-server loads with QuickJS.
 // Usage: node tools/build-theme.mjs [theme ...]   (no arguments: every theme)
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
@@ -68,7 +68,7 @@ async function buildTheme(name) {
 }
 
 const names = process.argv.slice(2);
-// The «app host»: React + runtime + SDK (broker) + the app loader, for lord-server --app
+// The «app host»: React + runtime + SDK (broker) + the app loader, for axia-server --app
 // (see server/src/app/appclient.c). A single bundle in assets/app-host.bundle.js.
 async function buildAppHost() {
   const t0 = Date.now();
@@ -83,9 +83,9 @@ async function buildAppHost() {
   console.log(`app-host: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
 }
 
-// Built-in apps with "process": "isolated" (Passwords): their app.js for `lord-server --app <id>`,
+// Built-in apps with "process": "isolated" (Passwords): their app.js for `axia-server --app <id>`,
 // built like an .lpk (React and the SDK come from the app host), into assets/sysapps/<id>/.
-// lord-server prefers this read-only system package over any user package with the same id.
+// axia-server prefers this read-only system package over any user package with the same id.
 async function buildSysApps() {
   const dir = path.join(root, 'apps');
   const sharedPlugin = {

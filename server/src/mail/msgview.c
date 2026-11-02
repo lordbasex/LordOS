@@ -431,7 +431,7 @@ int https_get(const char *url, char **body, size_t *blen, size_t max, char *err,
         if (http_split_url(cur, &tls, host, sizeof host, &port, path, sizeof path)) { snprintf(err, ecap, "url"); return -1; }
         if (port != 80 && port != 443) { snprintf(err, ecap, "port"); return -1; }
         char why[32];
-        int fd = net_connect(host, port, why, sizeof why);      /* lord-server: granted host, public address only */
+        int fd = net_connect(host, port, why, sizeof why);      /* axia-server: granted host, public address only */
         if (fd < 0) { snprintf(err, ecap, "%s", why); return -1; }
         Conn *c = conn_new(fd, host, 10000);
         if (!c) { snprintf(err, ecap, "memory"); return -1; }

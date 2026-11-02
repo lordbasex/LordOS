@@ -1,5 +1,5 @@
 // draw.js — dibujo en píxeles RGBA (prop `pixels` de <Image>) para los gráficos y el ícono del
-// Monitor (el mapa lo dibuja lord-server: server/src/monitor/map.c). Todo con Uint32Array (un
+// Monitor (el mapa lo dibuja axia-server: server/src/monitor/map.c). Todo con Uint32Array (un
 // píxel por escritura) y solo cuando cambian los datos.
 
 const cache = new Map();

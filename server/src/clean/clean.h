@@ -1,5 +1,5 @@
-/* clean.h — Cleaner's lord-server side (docs/CLEANER-ARCHITECTURE.md): one job at a time on a thread of
- * its own (a scan by the lord-clean helper, a plan or its execution), polled by lord.clean. The
+/* clean.h — Cleaner's axia-server side (docs/CLEANER-ARCHITECTURE.md): one job at a time on a thread of
+ * its own (a scan by the axia-clean helper, a plan or its execution), polled by lord.clean. The
  * compositor never waits for it.
  *
  * JS gets candidate ids and display paths; authority stays here. A plan is built from ids of a scan,
@@ -65,7 +65,7 @@ char *clean_saved(void);                    /* the kept map: { at, volume } or n
 void  clean_forget_saved(void);
 
 #ifdef CLEAN_TEST
-/* tests only: not in lord-server */
+/* tests only: not in axia-server */
 extern long clean_test_max_files;
 extern int  clean_test_plan_ttl;
 extern int  clean_test_stop_helper;

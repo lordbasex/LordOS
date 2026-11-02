@@ -231,7 +231,7 @@ function OldKernels({ setDialog }) {
   );
 }
 
-// ---- Large files: found by a tree scan, filtered in lord-server ----
+// ---- Large files: found by a tree scan, filtered in axia-server ----
 
 export function LargeHero() {
   return <Hero art="large" title={tr('cleaner.hero.large.title')} line={tr('cleaner.hero.large.line')} features={[['large', tr('cleaner.hero.large.f1')], ['activity', tr('cleaner.hero.large.f2')], ['cleanup', tr('cleaner.hero.large.f3')]]} />;

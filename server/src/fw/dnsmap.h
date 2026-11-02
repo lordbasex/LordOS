@@ -66,7 +66,7 @@ int dnsmap_learn(DnsMap *m, const char *app, const uint8_t *pkt, size_t len, lon
 int dnsmap_lookup(DnsMap *m, const char *app, int fam, const uint8_t *addr, long long now, char (*out)[FW_NAME_MAX], int max);
 
 /* Walks an app's addresses with their current names (without changing the LRU); cb returns
- * != 0 to stop. Returns how many addresses it walked. lord-netperm uses it to compile the
+ * != 0 to stop. Returns how many addresses it walked. axia-netperm uses it to compile the
  * domain rules into BPF maps (docs/FIREWALL.md, step 2). */
 int dnsmap_each(DnsMap *m, const char *app, long long now,
                 int (*cb)(void *u, int fam, const uint8_t *addr, const char (*names)[FW_NAME_MAX], int n), void *u);

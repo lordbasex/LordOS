@@ -161,7 +161,7 @@
             "services": {
               "type": "object", "additionalProperties": false, "properties": {
                 "lord-sessiond": { "type": "boolean" }, "lord-netd": { "type": "boolean" },
-                "lord-netperm": { "type": "boolean" }, "lord-fand": { "type": "boolean" } }
+                "axia-netperm": { "type": "boolean" }, "axia-fand": { "type": "boolean" } }
             }
           }
         },

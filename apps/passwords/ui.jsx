@@ -7,7 +7,7 @@ import { builtinById } from './templates.js';
 import { appMode } from './api.js';
 import { Glyph, Tile, iconKind, tint } from './glyphs.jsx';
 
-// A picked file is a path (shell: lord-server opens it, validated like lord.fs) or { fd, name }
+// A picked file is a path (shell: axia-server opens it, validated like lord.fs) or { fd, name }
 // (app process: the system dialog opened it). fileReq builds the request options for either.
 export function fileReq(...items) {
   const files = [], fds = [];
@@ -179,7 +179,7 @@ export function StrengthBar({ score, bits }) {
   );
 }
 
-// ---- QR code (hex rows from lord-vault → pixels) ----
+// ---- QR code (hex rows from axia-vault → pixels) ----
 
 export function QrImage({ qr, scale = 5 }) {
   if (!qr || !qr.size) return null;

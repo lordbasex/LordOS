@@ -1,14 +1,14 @@
 /* brokercam.c — the camera for isolated .lpk apps, server side (see broker.h BOP_CAMERA and
  * docs/PRIVACY.md, "Camera").
  *
- * After consent, lord-server opens /dev/videoN and hands it ONLY to lord-media (MK_CAMERA), which
+ * After consent, axia-server opens /dev/videoN and hands it ONLY to axia-media (MK_CAMERA), which
  * decodes into its frame ring (MM_RING: a sealed memfd with MP_RING_SLOTS BGRA slots). The app
  * never sees the device: it gets a READ-ONLY reopen of the ring (/proc/self/fd/N, O_RDONLY, so it
  * can only map it PROT_READ) and, per frame, an event with the frame id. The app acknowledges what
  * it shows; every ACK is validated here (current generation, a slot we really forwarded and that
- * is still pending, rate limited) before it reaches lord-media, so a misbehaving app can only
+ * is still pending, rate limited) before it reaches axia-media, so a misbehaving app can only
  * starve itself. Photos and videos are written to a file the user picks in the system's save
- * dialog (powerbox): lord-server opens it and gives the fd to lord-media, never to the app.
+ * dialog (powerbox): axia-server opens it and gives the fd to axia-media, never to the app.
  * Revoking the permission kills the helper and closes the stream at once. */
 #include "broker_int.h"
 #include "perms.h"
@@ -35,7 +35,7 @@
 #define ACK_BURST 30.0
 
 typedef struct {
-    int used, conn, sid;        /* broker connection, media source in lord-server */
+    int used, conn, sid;        /* broker connection, media source in axia-server */
     int gen, w, h, slots, ringfd;
     uint64_t sent[MP_RING_SLOTS], seq;      /* frames forwarded to the app and not acked yet */
     double tokens, tok_at;
@@ -99,7 +99,7 @@ static void self_ack(Cam *c, MediaSrc *s, uint32_t id) {
     for (int i = 0; i < MP_RING_SLOTS; i++) if (c->sent[i] && c->sent[i] <= q) c->sent[i] = 0;
 }
 
-/* Messages of this camera's lord-media: they go to the app, not to the session's JS. */
+/* Messages of this camera's axia-media: they go to the app, not to the session's JS. */
 static int on_helper_msg(void *src, const MediaMsg *m, const char *payload, int *fds) {
     MediaSrc *s = src;
     Cam *c = s->bk;
@@ -137,7 +137,7 @@ static int on_helper_msg(void *src, const MediaMsg *m, const char *payload, int 
         return 1;
     }
     case MM_INFO:
-        /* lord-media's JSON: parsed again here, and only well-formed JSON goes on to the app */
+        /* axia-media's JSON: parsed again here, and only well-formed JSON goes on to the app */
         if (payload && m->len && m->len < 1024 && payload[0] == '{') {
             JDoc d;
             if (!json_parse(payload, strlen(payload), &d, NULL, 0)) { json_free(&d); cam_event(c, "event %d info %s", c->sid, payload); }
@@ -227,7 +227,7 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
         char params[96];
         snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\n", w, h, render >= 0, media_hwaccel());
         int fds[2] = { dfd, render };
-        /* the device fd goes to lord-media only */
+        /* the device fd goes to axia-media only */
         s->sock = media_spawn(MK_CAMERA, params, fds, 2, &s->pid);
         close(dfd);
         if (render >= 0) close(render);
@@ -244,7 +244,7 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
         brokersrv_device(app, "camera", 1);
         char r[16];
         int n = snprintf(r, sizeof r, "%d", c->sid);
-        fprintf(stderr, "broker[%s]: camera %s opened (lord-media %d)\n", app, dev, (int)s->pid);
+        fprintf(stderr, "broker[%s]: camera %s opened (axia-media %d)\n", app, dev, (int)s->pid);
         brokersrv_reply(fd, reqid, BST_OK, r, (uint32_t)n, -1);
         return;
     }
@@ -298,7 +298,7 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
         }
         if (!s || s->sock < 0 || !allowed || c->pick_req) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
         clean_name(rest, cmd[0] == 'p' ? "foto.jpg" : "video.mp4", c->out_name, sizeof c->out_name);
-        /* the save dialog is the system's; the chosen file is opened here and goes to lord-media */
+        /* the save dialog is the system's; the chosen file is opened here and goes to axia-media */
         c->pick_req = 0x80000000u | (next_pick++ & 0x3fffffffu);   /* never the keyring's 0xC0000000 tag */
         c->pick_kind = cmd[0] == 'p' ? 1 : 2;
         c->pick_mirror = mirror != 0;
@@ -373,7 +373,7 @@ void brokercam_revoke(const char *app) {
         const char *a = c->used ? brokersrv_conn_app(c->conn) : NULL;
         if (!a || strcmp(a, app)) continue;
         cam_event(c, "closed %d revoked", c->sid);
-        fprintf(stderr, "broker[%s]: camera permission revoked: lord-media %d killed\n", app, (int)(media_src_get(c->sid) ? media_src_get(c->sid)->pid : 0));
+        fprintf(stderr, "broker[%s]: camera permission revoked: axia-media %d killed\n", app, (int)(media_src_get(c->sid) ? media_src_get(c->sid)->pid : 0));
         cam_free(c, 1);
     }
 }
@@ -398,7 +398,7 @@ void brokercam_tick(void) {
         Cam *c = &cams[i];
         if (!c->used) continue;
         MediaSrc *s = media_src_get(c->sid);
-        if (!s || s->sock < 0) {                     /* lord-media ended or crashed */
+        if (!s || s->sock < 0) {                     /* axia-media ended or crashed */
             cam_event(c, "closed %d ended", c->sid);
             cam_free(c, 0);
         }

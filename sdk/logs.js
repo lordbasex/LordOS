@@ -1,7 +1,7 @@
 // logs.js — logs for the Logs app (lord.logs, server/src/ui/js_logs.c; docs/SYSTEM.md).
 //
 //   await logs.query({ scope: 'user'|'system', since, until, prio, kernel, match, grep, limit })
-//        → [{ t (µs), s, p, pid, uid, k, id, u, b, m }]  (read by a lord-server thread, as the
+//        → [{ t (µs), s, p, pid, uid, k, id, u, b, m }]  (read by a axia-server thread, as the
 //          user: their journal, and the system one only if their group allows it)
 //   await logs.system(query)      the same for the system journal, through the helper's
 //                                 logs-system action (administrators only)

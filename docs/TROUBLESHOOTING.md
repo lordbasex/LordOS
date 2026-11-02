@@ -8,7 +8,7 @@ or the recovery screen, means a file in `/usr/lib/lordos` no longer matches: a d
 hand, or tampering. To see which files:
 
 ```sh
-sudo /usr/lib/lordos/bin/lord-server --check-code
+sudo /usr/lib/lordos/bin/axia-server --check-code
 ```
 
 To repair it, reinstall the package (your files and settings are not touched):
@@ -52,7 +52,7 @@ timestamp:
 
 | Stage | What happened |
 |---|---|
-| `rx` | `lord-server` read the key |
+| `rx` | `axia-server` read the key |
 | `flush` | the key was written to the app's socket (`wl_keyboard.key`) |
 | `commit` | the app sent its next frame (its answer: the glyph) |
 | `shown` | the page flip with that frame finished |
@@ -63,7 +63,7 @@ guest's kernel and then delivered in clumps.
 
 How to read it:
 
-- **`rx` high:** `lord-server`'s main loop is busy. Report it with the output.
+- **`rx` high:** `axia-server`'s main loop is busy. Report it with the output.
 - **`commit − flush` high:** the app itself is slow.
 - **`shown − commit` high:** frames reach the screen late, a compositor problem. Report it, and use
   `lordos.gpu=0` until it is fixed.
@@ -89,7 +89,7 @@ The trace measures time. It is not a key log:
 - **Who can turn it on:** only `lord-sessiond` (root) passes `LORD_INPUT_DEBUG=1` to user
   sessions, and only when the kernel line has `lordos.inputdebug=1` or the service sets
   `LORD_INPUT_DEBUG=1`. There is no run-time switch, and the login screen never gets it.
-- **Where it goes:** its own file, `$XDG_RUNTIME_DIR/lordos-keylag.log`, created with mode 0600 in
+- **Where it goes:** its own file, `$XDG_RUNTIME_DIR/axia-keylag.log`, created with mode 0600 in
   the session's tmpfs and gone at logout. It is never written to the session log.
 - **How long it runs:** it stops by itself 120 s after the first traced key, or after 4000 lines.
   Log out and back in for a new one.

@@ -1,4 +1,4 @@
-# Desktop independente
+# Axia DE: desktop independente
 
 ## Objetivo e limites
 
@@ -7,7 +7,7 @@ A branch `feature/standalone-fedora-de` separa a unidade instalável do desktop 
 ```mermaid
 flowchart TD
   Apps[Aplicativos e temas React] --> SDK[SDK e runtime]
-  SDK --> Server[lord-server: compositor e motor gráfico]
+  SDK --> Server[axia-server: compositor e motor gráfico]
   Server --> Seat[libseat]
   Seat --> Host[logind ou seatd da distribuição]
   Server --> Services[PipeWire/PulseAudio, BlueZ, CUPS, D-Bus]
@@ -47,7 +47,23 @@ SHA-256 e o leitor xz ainda ficam em `server/src/pkg/crypto.c` e `xz.c`, porque 
 
 Removido do repositório: o motor de pacotes APT/dpkg (`server/src/pkg/`, exceto as primitivas `crypto.c` e `xz.c`), `lord-tls`, `apt/`, `packaging/{apt,debian,kernel,migrations,systemd,udev}`, o chaveiro do repositório LordOS, `tools/{iso,rpi,immutable,install,boot}`, a publicação do repositório APT e o SBOM do `.deb`. Também saíram as partes que só existiam na distribuição LordOS: `lord-netd` e os drivers de rede próprios (DHCP, Wi‑Fi, WireGuard, OpenVPN, IPsec), `lord-sessiond` (login, sessão e área de trabalho remota pelo navegador), o despachante `admin.c`, o instalador, o Imager e o tema `greeter`.
 
-A loja usa diretamente `apps/store/host.jsx`, que encaminha pacotes do sistema ao gerenciador do host. A detecção de mídia live usa `rd.live.image` (dracut), em vez do caminho do `live-boot` do Debian, e `lordos-fetch` conta pacotes com `rpm -qa`.
+A loja usa diretamente `apps/store/host.jsx`, que encaminha pacotes do sistema ao gerenciador do host. A detecção de mídia live usa `rd.live.image` (dracut), em vez do caminho do `live-boot` do Debian, e `axia-fetch` conta pacotes com `rpm -qa`.
+
+## Nome e identidade: Axia DE
+
+O fork se chama **Axia DE**. A política de marca do LordOS pede que um fork tenha nome e logo próprios e deixe de usar o nome LordOS, a coroa e o mascote Lumo; o código continua sob a licença MIT, com os créditos do LordOS no Sobre, no README e no LICENSE.
+
+| O quê | Antes | Agora |
+|---|---|---|
+| Sessão e iniciador | `lord-de.desktop`, `lord-de-session` | `axia.desktop`, `axia-session`; `XDG_CURRENT_DESKTOP=Axia` |
+| Programas | `/usr/libexec/lord-de/bin/lord-*`, `lordos-*` | `/usr/libexec/axia/bin/axia-*` (o auxiliar de listas de bloqueio é `axia-dl`; `axia-fetch` é o resumo no terminal) |
+| Pacote | `lord-de` | `axia-de` (substitui `lord-de` e ajusta a sessão escolhida no GDM e no AccountsService) |
+| Pastas do usuário | `~/.config/lordos`, `~/.cache/lordos`, `~/.local/share/lordos`, `~/.local/state/lordos` | as mesmas com `axia`; o primeiro início move as antigas |
+| Logo | coroa | logo provisório gerado por `tools/gen-brand.py` |
+| Mascote | Lumo | removido |
+| Papéis de parede | raposa Lumo (padrão), coroa | removidos; padrão "Galáxia infinita" |
+
+Ficam com os nomes antigos, de propósito: a API interna (`lord.*`, `@lordos/sdk`), os identificadores internos (`lordos` no firewall e na área de transferência, escopos de cgroup `lordos-*`), os caminhos de sistema dos serviços de root não compilados (`/etc/lordos`, `/run/lordos`) e a pasta `LordOS-Backups`, cujo nome também entra na verificação da chave dos backups criptografados. Trocar esses nomes não muda nada para o usuário e quebraria dados existentes.
 
 ## Verificação
 
@@ -68,7 +84,7 @@ A CI `.github/workflows/desktop-fedora.yml` reproduz o build e os testes em Fedo
 5. Comportamento sob SELinux em enforcing, portais e ativação de aplicativos D-Bus.
 6. Aplicativos isolados em sessão de usuário: delegação de cgroups e permissões que antes dependiam dos serviços LordOS.
 
-A separação remove a necessidade dos serviços específicos do LordOS, mas não substitui automaticamente todas as suas funções. O firewall por aplicativo de `lord-netperm`, o controle de ventoinhas e a administração privilegiada não fazem parte desta instalação.
+A separação remove a necessidade dos serviços específicos do LordOS, mas não substitui automaticamente todas as suas funções. O firewall por aplicativo de `axia-netperm`, o controle de ventoinhas e a administração privilegiada não fazem parte desta instalação.
 
 ## Evolução
 
@@ -76,7 +92,7 @@ A separação remove a necessidade dos serviços específicos do LordOS, mas nã
 - Substituir as páginas administrativas restantes por adaptadores de serviços do host.
 - Publicar um RPM com build reproduzível do frontend conforme as regras de empacotamento do destino, dependências opcionais e assinatura própria do fork.
 - Substituir a delegação de cgroups pedida ao `lord-sessiond` (`src/sec/cgroup.c`) pelo gerenciador systemd do usuário.
-- Decidir o destino de `lord-netperm` e `lord-fand` como unidades systemd do Fedora, ou removê-los.
+- Decidir o destino de `axia-netperm` e `axia-fand` como unidades systemd do Fedora, ou removê-los.
 - Expandir a matriz de testes para outras distribuições e arquiteturas.
 
 ## Referências de implementação

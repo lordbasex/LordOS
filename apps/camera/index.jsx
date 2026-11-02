@@ -1,5 +1,5 @@
 // Camera: webcam preview (V4L2), photos and videos (our own design, in the style of desktop camera
-// apps). lord-server opens the device after the camera permission; lord-media (sandboxed) reads
+// apps). axia-server opens the device after the camera permission; axia-media (sandboxed) reads
 // and encodes it. Photos and videos go to ~/Pictures/Camera.
 //
 // The window is always dark, like a viewfinder: the controls below the preview don't follow the

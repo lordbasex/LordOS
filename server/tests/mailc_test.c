@@ -1,4 +1,4 @@
-/* mailc_test.c — lord-server's network policy for lord-maild (docs/MAIL.md): which endpoints the
+/* mailc_test.c — axia-server's network policy for axia-maild (docs/MAIL.md): which endpoints the
  * connector accepts for configured accounts, and the public-address check that keeps remote
  * images (hosts chosen by whoever sent the mail) away from loopback, LAN and link-local. */
 #include "mail/mailc.h"

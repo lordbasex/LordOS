@@ -1,6 +1,6 @@
-/* lcimage.c — decoding for similar images, in lord-clean only: lord-server never decodes a file it
+/* lcimage.c — decoding for similar images, in axia-clean only: axia-server never decodes a file it
  * didn't make. PNG, JPEG, GIF (first frame) and BMP with the stb_image the project already carries,
- * set up as lord-maild's mimg.c, inside the same sandbox as the walk: no network, no exec, nothing
+ * set up as axia-maild's mimg.c, inside the same sandbox as the walk: no network, no exec, nothing
  * written. A hostile file reaches no further than the scanner already could.
  *
  * The hash: the image as 9 × 8 averaged grey cells, one bit per neighbouring pair, 1 where the left is

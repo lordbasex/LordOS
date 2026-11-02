@@ -6,7 +6,7 @@
 //
 //   BASE                      the keys every theme shares
 //   useShortcuts({ grabs, table, onSuperTap, appsPaste })  a theme's own: its table, which fixed list
-//                             of keys lord-server keeps from apps ('flow' or 'classic',
+//                             of keys axia-server keeps from apps ('flow' or 'classic',
 //                             server/src/wl/keygrab.c), what ❖ pressed alone does and whether ❖V
 //                             belongs to the apps
 //   addShortcuts(entries)     a module's own (Screenshots, the Terminal's drop-down window);

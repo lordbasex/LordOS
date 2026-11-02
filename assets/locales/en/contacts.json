@@ -66,6 +66,6 @@
   "type.other": "other",
   "type.work": "work",
   "unavailable": "Contacts are not available",
-  "unavailableHint": "The mail and calendar service (lord-maild) is not running or not installed.",
+  "unavailableHint": "The mail and calendar service (axia-maild) is not running or not installed.",
   "untitledGroup": "Untitled group"
 }

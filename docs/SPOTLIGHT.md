@@ -51,7 +51,7 @@ Sections are ordered by their best result; the calculator always goes on top.
 - The description and the keywords only count if the text really appears, and they weigh less.
 - Files are compared without the extension.
 - What is opened often moves up, and usage loses weight after 30 days. It is stored in
-  `~/.local/share/lordos/spotlight.json` (the last 300 entries).
+  `~/.local/share/axia/spotlight.json` (the last 300 entries).
 
 **Preview (on the right):**
 - the app's icon;
@@ -66,7 +66,7 @@ Sections are ordered by their best result; the calculator always goes on top.
 | | |
 |---|---|
 | ![full](clipboard-full-panel.png) | ![quick](clipboard-quick-panel.png) |
-| ❖⇧V: filters with counters, color swatch, code in monospace, image preview and actions | ❖V: the latest items, after restarting lord-server (the pinned link is on top) |
+| ❖⇧V: filters with counters, color swatch, code in monospace, image preview and actions | ❖V: the latest items, after restarting axia-server (the pinned link is on top) |
 | ![paste](clipboard-paste.png) | ![settings](clipboard-settings.png) |
 | Chosen with ❖V and the 8 key: «360» was pasted into the Settings search box, which had focus | Settings → Clipboard |
 
@@ -98,7 +98,7 @@ and the time.
 ### Where it is stored
 
 - **Files:**
-  - `~/.local/share/lordos/clipboard/history.json`, with the entries;
+  - `~/.local/share/axia/clipboard/history.json`, with the entries;
   - `img-*.png` next to it, with the images.
 - **How images are stored:** the compositor leaves the latest image in
   `$XDG_RUNTIME_DIR/lordos/clip-N.png`, which is lost on reboot. That's why
@@ -142,7 +142,7 @@ Sensitive content never enters the history, but it can still be pasted:
   as `img-*.png`.
 - **Secret:** `tests/clip_secret.c` offers text + `x-kde-passwordManagerHint`, like KeePassXC.
   The text could be pasted with `wl-paste` and didn't end up in `history.json`.
-- **Restart:** after restarting lord-server, the history was still there, with the pinned items
+- **Restart:** after restarting axia-server, the history was still there, with the pinned items
   on top.
 - **Full panel:** filters, pin and delete work.
 - **Paste:** ❖V and the 8 key pasted into a LordOS text field.

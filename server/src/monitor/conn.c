@@ -7,9 +7,9 @@
  * on every sample. For other users' sockets only how many there are is counted.
  *
  * (0.8.5) Each socket's cgroup comes too (INET_DIAG_CGROUP_ID): a socket made in one of the session's
- * scopes is that app's, whoever holds it now (lord-server holds the ones Mail's connector made, a
+ * scopes is that app's, whoever holds it now (axia-server holds the ones Mail's connector made, a
  * program in the Terminal is the Terminal's), so the list says "scope": the app's firewall id, the
- * same lord-netperm counts it under ("cgApp").
+ * same axia-netperm counts it under ("cgApp").
  *
  * The country comes from the local database (mmdb.c). No address leaves the machine. */
 #include "monpriv.h"

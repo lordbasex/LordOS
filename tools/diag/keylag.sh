@@ -10,15 +10,15 @@
 # 2. If the session was started with the key latency trace (boot menu: add lordos.inputdebug=1 to
 #    the kernel line, LordOS 0.8.1 or later), it asks you to type in the slow app for a few
 #    seconds and prints, per stage, p50/p95/max in ms after the kernel's evdev timestamp:
-#    lord-server read it (rx), the app got it (flush), the app answered (commit) and the frame with
+#    axia-server read it (rx), the app got it (flush), the app answered (commit) and the frame with
 #    it was on screen (shown). The trace has timings only: no key, character or modifier.
 # 3. It says which stage is slow and what to try.
 set -u
 export LC_ALL=C          # decimal points in awk and printf
 SECS=${1:-30}
 RT=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-TRACE=$RT/lordos-keylag.log
-LOGDIR=$HOME/.cache/lordos
+TRACE=$RT/axia-keylag.log
+LOGDIR=$HOME/.cache/axia
 SLOG=$LOGDIR/session.log
 ALOG=$LOGDIR/apps.log
 
@@ -89,7 +89,7 @@ say ""
 say "$n key presses (ms after the kernel event)    p50     p95     max"
 for f in rx flush commit shown; do
     case $f in
-        rx) label="lord-server read the key        (rx)";;
+        rx) label="axia-server read the key        (rx)";;
         flush) label="the app received it         (flush)";;
         commit) label="the app drew its answer    (commit)";;
         shown) label="that frame was on screen    (shown)";;
@@ -104,7 +104,7 @@ say ""
 say "key presses arriving less than 15 ms after the previous one: $clump %"
 say ""
 if [ "$rx" -gt 30 ]; then
-    say "-> lord-server is slow to read keys (busy main loop). Note what is open and report it with this output."
+    say "-> axia-server is slow to read keys (busy main loop). Note what is open and report it with this output."
 elif [ "$((co - fl))" -gt 50 ]; then
     say "-> The app itself is slow to answer (commit - flush). Try it with fewer tabs or without the video."
 elif [ "$((sh - co))" -gt 50 ]; then

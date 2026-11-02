@@ -8,7 +8,7 @@
  * the 64-byte signature over the exact bytes of the manifest). <root> is the folder that holds
  * assets/ and themes/ (/usr/lib/lordos when installed).
  *
- * lord-server checks the signature once per process, with the public key compiled in, and the hash
+ * axia-server checks the signature once per process, with the public key compiled in, and the hash
  * of every file before it runs it: codesig_load() reads the file from one descriptor (opened under
  * <root>, never following a link out of it), hashes exactly the bytes it read and returns those same
  * bytes, so what is checked is what runs (no TOCTOU).

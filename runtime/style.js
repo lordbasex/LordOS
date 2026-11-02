@@ -1,4 +1,4 @@
-// style.js — converts CSS/React-style styles into lord-server's native properties.
+// style.js — converts CSS/React-style styles into axia-server's native properties.
 // Colors → ARGB number, shorthands (margin, padding, border, boxShadow, background…) → simple properties.
 
 const NAMED = {

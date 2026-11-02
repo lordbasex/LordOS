@@ -1,8 +1,8 @@
-/* net.h — buffered connections with TLS for lord-maild (OpenSSL: lord-maild and lord-sessiond are
+/* net.h — buffered connections with TLS for axia-maild (OpenSSL: axia-maild and lord-sessiond are
  * the only binaries that link it, see docs/ARCHITECTURE.md).
  *
- * lord-maild never opens sockets itself (its seccomp profile forbids socket/connect): it asks
- * lord-server for a connection to host:port, lord-server checks that the endpoint belongs to a
+ * axia-maild never opens sockets itself (its seccomp profile forbids socket/connect): it asks
+ * axia-server for a connection to host:port, axia-server checks that the endpoint belongs to a
  * configured account and hands over an already connected TCP socket (SCM_RIGHTS). This file runs
  * TLS on top of that socket.
  *

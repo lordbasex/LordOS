@@ -39,7 +39,7 @@ int net_init(void) {
     static const char *const bundles[] = { "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", NULL };
     int ok = 0;
     for (int i = 0; bundles[i] && !ok; i++) ok = SSL_CTX_load_verify_locations(ctx, bundles[i], NULL) == 1;
-    if (!ok) { fprintf(stderr, "lord-maild: no CA bundle found; every TLS connection will fail verification\n"); }
+    if (!ok) { fprintf(stderr, "axia-maild: no CA bundle found; every TLS connection will fail verification\n"); }
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
     return 0;
 }

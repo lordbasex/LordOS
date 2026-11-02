@@ -1,12 +1,12 @@
 ---
-title: Bienvenido a LordOS
+title: Bienvenido a Axia DE
 section: start
 order: 1
 keywords: inicio, empezar, introducción, novedades
 ---
-# Bienvenido a LordOS
+# Bienvenido a Axia DE
 
-LordOS es una distribución GNU/Linux libre basada en Debian, con su propio entorno de escritorio,
+Axia DE es una distribución GNU/Linux libre basada en Debian, con su propio entorno de escritorio,
 servidor gráfico y compositor Wayland hechos desde cero en C, y una interfaz en React que corre
 sobre su propio motor. Las apps de Linux (GTK, Qt, navegadores) funcionan junto a las propias. Está
 pensado para andar bien en equipos modestos.
@@ -30,4 +30,4 @@ todos los atajos de las apps la usan.
 - [Apps Linux (GNOME y KDE)](help:linux-apps)
 - [Privacidad y permisos](help:privacy)
 
-Podés volver a ver el recorrido de bienvenida desde el menú **Ayuda → Bienvenido a LordOS**.
+Podés volver a ver el recorrido de bienvenida desde el menú **Ayuda → Bienvenido a Axia DE**.

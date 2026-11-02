@@ -1,5 +1,5 @@
 /* lan_test.c — Files → Network without a network: the address policy, the arguments of the share-*
- * actions, and every parser of lord-lan against crafted and damaged answers. Built with ASan and UBSan. */
+ * actions, and every parser of axia-lan against crafted and damaged answers. Built with ASan and UBSan. */
 #include "../src/lan/lanaddr.h"
 #include "../src/lan/lanparse.h"
 #include "../src/lan/smbauth.h"

@@ -106,11 +106,11 @@ static void discover(JBuf *out) {
     free(svc);
 }
 
-/* ~/.cache/lordos/scan: where scans stay until they're saved */
+/* ~/.cache/axia/scan: where scans stay until they're saved */
 static int scan_dir(char *out, size_t n) {
     const char *home = getenv("HOME");
     if (!home || home[0] != '/') return -1;
-    const char *parts[] = { ".cache", ".cache/lordos", ".cache/lordos/scan" };
+    const char *parts[] = { ".cache", ".cache/axia", ".cache/axia/scan" };
     for (int i = 0; i < 3; i++) {
         snprintf(out, n, "%s/%s", home, parts[i]);
         if (mkdir(out, 0700) && errno != EEXIST) return -1;

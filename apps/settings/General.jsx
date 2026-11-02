@@ -1,7 +1,7 @@
 // Settings → General (machine and software details) and Updates (Debian and LordOS).
 import {
   View, Text, Button, useTheme, useLocale, useSystemInfo, useServerStats, lordosVersion, screen, formatBytes, formatDuration, formatNumber,
-  admin, wm, LordOSLogo, LordOSWordmark, spacing, typeScale, standaloneDesktop,
+  admin, wm, AxiaLogo, AxiaWordmark, spacing, typeScale, standaloneDesktop,
 } from '@lordos/sdk';
 import { useState, version as reactVersion } from 'react';
 import { Stack, Section, ValueRow, Note, Message, Actions } from './ui.jsx';
@@ -25,8 +25,8 @@ export function General() {
   return (
     <Stack>
       <View style={{ alignItems: 'center', gap: spacing.xs, paddingTop: spacing.xs }}>
-        <LordOSLogo size={72} />
-        <View style={{ marginTop: spacing.s }}><LordOSWordmark size={typeScale.largeTitle} crown={false} /></View>
+        <AxiaLogo size={72} />
+        <View style={{ marginTop: spacing.s }}><AxiaWordmark size={typeScale.largeTitle} mark={false} /></View>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{ver.channel ? tr('about.versionChannel', { v: ver.version, channel: ver.channel }) : tr('about.version', { v: ver.version })}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{`${info.hostname} · ${info.os}`}</Text>
       </View>
@@ -39,11 +39,11 @@ export function General() {
         [tr('about.uptime'), formatDuration(info.uptime)],
       ]} />
       <Card title={tr('settings.general.software')} rows={[
-        ['LordOS', ver.channel ? `${ver.version} ${ver.channel}` : ver.version],
+        ['Axia DE', ver.channel ? `${ver.version} ${ver.channel}` : ver.version],
         ver.build ? [tr('about.buildLabel'), ver.build] : null,
         [tr('about.os'), info.os],
         [tr('about.kernel'), `${info.kernel} (${info.arch})`],
-        [tr('about.server'), 'lord-server (C · DRM/KMS · evdev · Wayland)'],
+        [tr('about.server'), 'axia-server (C · DRM/KMS · evdev · Wayland)'],
         [tr('about.engine'), `QuickJS + React ${reactVersion}`],
         [tr('about.ram'), `${formatNumber(st.rssKB / 1024, 1)} MB (JS ${formatNumber(st.jsKB / 1024, 1)} MB)`],
       ]} />

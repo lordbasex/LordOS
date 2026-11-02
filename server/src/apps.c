@@ -10,9 +10,9 @@
  *     specification and run with execv;
  *   - terminal apps (Terminal=true) are neither listed nor launched;
  *   - JS cannot create .desktop files: lord.fs is read-only and LordOS app packages are installed
- *     in another folder (~/.local/share/lordos/apps), so a command cannot be
+ *     in another folder (~/.local/share/axia/apps), so a command cannot be
  *     invented from the UI.
- * App output goes to ~/.cache/lordos/apps.log (trimmed when it exceeds 1 MB).
+ * App output goes to ~/.cache/axia/apps.log (trimmed when it exceeds 1 MB).
  *
  * An app the owner restricted with "no access to your files" (Settings → Privacy, firewall id
  * desktop:<id>, sec/restrict.h) starts under Landlock (sandbox_apply_files): only its own config,
@@ -359,8 +359,8 @@ int apps_list(const char *lang, const DesktopApp **out) {
             int flen = snprintf(file, sizeof file, "%s/%s", dirs[d], de->d_name);
             if (flen < 0 || flen >= PATH_MAX || parse_desktop(file, lang, e)) continue;
             if (!e->is_app || e->hidden || e->nodisplay || e->terminal || !e->has_name || !e->exec[0]) continue;
-            if (e->only[0] && !list_has(e->only, "LordOS")) continue;
-            if (e->not_[0] && list_has(e->not_, "LordOS")) continue;
+            if (e->only[0] && !list_has(e->only, "Axia")) continue;
+            if (e->not_[0] && list_has(e->not_, "Axia")) continue;
             char prog[PATH_MAX];
             if (e->tryexec[0] && find_program(e->tryexec, d == 0, prog, sizeof prog)) continue;
             DesktopApp *a = &list[n++];
@@ -462,9 +462,9 @@ static void open_log(void) {
     if (!home) return;
     snprintf(path, sizeof path, "%s/.cache", home);
     mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos", home);
+    snprintf(path, sizeof path, "%s/.cache/axia", home);
     mkdir(path, 0700);
-    snprintf(path, sizeof path, "%s/.cache/lordos/apps.log", home);
+    snprintf(path, sizeof path, "%s/.cache/axia/apps.log", home);
     struct stat st;
     int flags = O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW;
     if (!lstat(path, &st) && st.st_size > 1024 * 1024) flags |= O_TRUNC;
@@ -504,7 +504,7 @@ static void plan_add(FilesPlan *p, int rw, const char *fmt, const char *a, const
  * the only name used: Exec, StartupWMClass and Name are free text of the .desktop file. */
 static int own_dir_ok(const char *id) {
     /* folders another program reads to run something, or that hold someone else's keys or data */
-    static const char *const deny[] = { "lordos", "ssh", "gnupg", "autostart", "applications", "systemd", "environment.d",
+    static const char *const deny[] = { "axia", "lordos", "ssh", "gnupg", "autostart", "applications", "systemd", "environment.d",
                                         "keyrings", "dconf", "git", "trash", "mime", "fontconfig", "pulse", "pipewire",
                                         "wireplumber", "user-dirs.dirs", "mimeapps.list", "gtk-3.0", "gtk-4.0", "fish",
                                         "bash", "zsh", "nvim", "vim", "emacs", "nano", "mc", "flatpak", "containers",
@@ -518,7 +518,7 @@ static int own_dir_ok(const char *id) {
     size_t n = strlen(id);
     if (!n || n > 100 || id[0] == '.' || id[0] == '-') return 0;
     for (const char *q = id; *q; q++) if (!isalnum((unsigned char)*q) && !strchr("._-+", *q)) return 0;
-    if (!strncasecmp(id, "lordos", 6)) return 0;
+    if (!strncasecmp(id, "axia", 4) || !strncasecmp(id, "lordos", 6)) return 0;
     for (int i = 0; deny[i]; i++) if (!strcasecmp(id, deny[i])) return 0;
     return 1;
 }
@@ -531,7 +531,7 @@ static int own_dir_ok(const char *id) {
 static const char *const sensitive[] = { "/.ssh", "/.gnupg", "/.config/systemd", "/.local/share/systemd",
                                          "/.local/share/dbus-1", "/.config/environment.d", "/.config/user-tmpfiles.d",
                                          "/.local/bin", "/bin", "/.config/autostart", "/.local/share/applications",
-                                         "/.config/lordos", "/.local/share/lordos", NULL };
+                                         "/.config/axia", "/.local/share/axia", NULL };
 
 static int path_under(const char *path, const char *dir) {
     size_t n = strlen(dir);
@@ -903,7 +903,7 @@ static int launch(const char *id, const char *file, const char *action) {
 
     pid_t pid = fork();
     if (pid == 0) {
-        /* orphaned grandchild: it does not remain a child of lord-server */
+        /* orphaned grandchild: it does not remain a child of axia-server */
         setsid();
         if (fork() != 0) _exit(0);
         sigset_t none;
@@ -918,7 +918,7 @@ static int launch(const char *id, const char *file, const char *action) {
         if (!cwd[0] || chdir(cwd)) { if (home && chdir(home)) {} }
         /* its own app-lordos-<id>.scope cgroup: the firewall, the Monitor, the PipeWire guard and
          * the notification server know the app only by it. In a LordOS session a launch that can't
-         * be placed there never runs (it would run as lord-server itself, with none of its rules). */
+         * be placed there never runs (it would run as axia-server itself, with none of its rules). */
         if (app_scope_reserved(id) || (app_scope_enter(id) && getenv("LORDOS_SESSIOND"))) {
             static const char msg[] = "apps: could not place the app in its own scope: not launched\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}

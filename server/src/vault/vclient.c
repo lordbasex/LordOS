@@ -1,4 +1,4 @@
-/* vclient.c — lord-server talks to lord-vault (see vclient.h). */
+/* vclient.c — axia-server talks to axia-vault (see vclient.h). */
 #include "vclient.h"
 #include "vwire.h"
 #include "fidodev.h"
@@ -34,10 +34,10 @@ static int inflight;
 static Ev *qhead, *qtail;
 static char helper[PATH_MAX];
 static int helper_ok = -1;
-static char *pending_pass;              /* session password that arrived before lord-vault was running */
+static char *pending_pass;              /* session password that arrived before axia-vault was running */
 
 /* Private requests (the broker's keyring op, src/sec/brokerkr.c): their replies go to their own
- * queue, read by lord-server's C code (vc_take_private), never to the JS queue (vc_poll). */
+ * queue, read by axia-server's C code (vc_take_private), never to the JS queue (vc_poll). */
 #define VC_PRIV_MAX 64
 static uint32_t priv_ids[VC_PRIV_MAX];
 static int npriv;
@@ -60,7 +60,7 @@ int vc_available(void) {
             char *sl = strrchr(self, '/');
             if (sl) {
                 *sl = 0;
-                snprintf(helper, sizeof helper, "%.*s/lord-vault", (int)(sizeof helper - 16), self);
+                snprintf(helper, sizeof helper, "%.*s/axia-vault", (int)(sizeof helper - 16), self);
                 struct stat st;
                 /* owned by the user or root, and nobody else can replace it */
                 if (stat(helper, &st) == 0 && S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR) && !(st.st_mode & S_IWOTH) &&
@@ -113,7 +113,7 @@ static void *read_loop(void *arg) {
     return NULL;
 }
 
-/* the session bus socket (unauthenticated: lord-vault does that) */
+/* the session bus socket (unauthenticated: axia-vault does that) */
 static int connect_bus(void) {
     const char *a = getenv("DBUS_SESSION_BUS_ADDRESS");
     struct sockaddr_un sa = { .sun_family = AF_UNIX };
@@ -164,7 +164,7 @@ int vc_start(void) {
     const char *home = getenv("HOME");
     if (!home) return -1;
     char dir[PATH_MAX];
-    const char *parts[] = { ".local", ".local/share", ".local/share/lordos", ".local/share/lordos/vault" };
+    const char *parts[] = { ".local", ".local/share", ".local/share/axia", ".local/share/axia/vault" };
     for (int i = 0; i < 4; i++) { snprintf(dir, sizeof dir, "%s/%s", home, parts[i]); mkdir(dir, 0700); }
     int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     if (dfd < 0) return -1;
@@ -191,7 +191,7 @@ int vc_start(void) {
     envp[ne++] = "LANG=C.UTF-8";
     if (getenv("LORD_VAULT_DEBUG")) envp[ne++] = "LORD_VAULT_DEBUG=1";
     envp[ne] = NULL;
-    char *argv[] = { "lord-vault", NULL };
+    char *argv[] = { "axia-vault", NULL };
     pid_t p;
     int r = posix_spawn(&p, helper, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
@@ -209,7 +209,7 @@ int vc_start(void) {
     sock = sv[0];
     pthread_mutex_unlock(&mu);
     if (pthread_create(&reader, NULL, read_loop, (void *)(intptr_t)sv[0]) == 0) { pthread_detach(reader); reader_on = 1; }
-    fprintf(stderr, "lord-server: lord-vault started (pid %d)\n", (int)p);
+    fprintf(stderr, "axia-server: axia-vault started (pid %d)\n", (int)p);
     if (pending_pass) {
         vc_session_password(pending_pass);
         explicit_bzero(pending_pass, strlen(pending_pass));
@@ -342,7 +342,7 @@ static void json_escape(char *out, size_t n, const char *s) {
 void vc_session_password(const char *pass) {
     if (!pass || !pass[0]) return;
     if (vc_start()) {
-        /* it could not be launched yet (lord-server is just starting): saved for when it is running */
+        /* it could not be launched yet (axia-server is just starting): saved for when it is running */
         if (!pending_pass && vc_available() && !is_greeter()) pending_pass = strdup(pass);
         return;
     }

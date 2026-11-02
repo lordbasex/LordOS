@@ -1,8 +1,8 @@
 // LordBench's desktop scene (0.8.6, docs/BENCHMARK.md "Desktop impact"): while a desktop run is in its
 // comp.* or desk.* step, Performance opens a second System Information window with this scene and asks
-// lord-server to move it along a figure of eight (wm.scriptMove: the drag's own path in C, one step per
+// axia-server to move it along a figure of eight (wm.scriptMove: the drag's own path in C, one step per
 // frame, no JS per frame), while one element inside it turns through lord.setStyle (no React render per
-// frame). lord-server records its own frame times meanwhile (bench/lbframes.c); nothing here measures.
+// frame). axia-server records its own frame times meanwhile (bench/lbframes.c); nothing here measures.
 import { View, Text, useTheme, useLocale, spacing, typeScale, wm, workArea } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 

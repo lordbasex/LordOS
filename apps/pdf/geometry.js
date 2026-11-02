@@ -1,4 +1,4 @@
-// geometry.js — from page points (what lord-doc returns, origin at the top left) to
+// geometry.js — from page points (what axia-doc returns, origin at the top left) to
 // view pixels with zoom and rotation, and back. Same transformation the helper uses
 // when drawing (h_pdf.c, op_render).
 

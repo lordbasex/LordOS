@@ -49,7 +49,7 @@ typedef struct {
     char *extra;
 } Job;
 
-/* ---- the helper's fixed path, next to lord-server, as for lord-doc and lord-media ---- */
+/* ---- the helper's fixed path, next to axia-server, as for axia-doc and axia-media ---- */
 
 static int helper_path(char *out, size_t n) {
     char self[PATH_MAX];
@@ -59,14 +59,14 @@ static int helper_path(char *out, size_t n) {
     char *slash = strrchr(self, '/');
     if (!slash) return -1;
     *slash = 0;
-    if ((size_t)snprintf(out, n, "%s/lord-bench", self) >= n) return -1;
+    if ((size_t)snprintf(out, n, "%s/axia-bench", self) >= n) return -1;
     struct stat st;
     if (stat(out, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     if ((st.st_uid != 0 && st.st_uid != getuid()) || (st.st_mode & (S_IWGRP | S_IWOTH))) return -1;
     return 0;
 }
 
-/* ---- what lord-server opens for it ---- */
+/* ---- what axia-server opens for it ---- */
 
 static int open_render_node(void) {
     for (int i = 128; i < 136; i++) {
@@ -137,7 +137,7 @@ static void cond_json(HBuf *b, const LbCond *c) {
     hb_printf(b, "}");
 }
 
-/* the frame phases lord-server recorded itself (bench/lbframes.h): [p50, p99] in ms, and counts */
+/* the frame phases axia-server recorded itself (bench/lbframes.h): [p50, p99] in ms, and counts */
 static void phases_json(HBuf *b, const LbPhaseStats *p) {
     const struct { const char *k; LbPct v; } t[] = {
         { "wakeMs", p->wake }, { "beforeRenderMs", p->pre }, { "renderMs", p->build }, { "paintMs", p->paint },
@@ -193,7 +193,7 @@ static char *build_result(const Job *j, int st, const char *why, const Res *r, c
     hb_printf(&b, ",\"sandbox\":%d", r->sandbox);
     int any_sbx = 0;
     for (int i = 0; i < LB_SBX_COUNT; i++) any_sbx |= r->sbx_have[i];
-    if (any_sbx) {                      /* what lord-bench tried after locking itself in: each one must be denied */
+    if (any_sbx) {                      /* what axia-bench tried after locking itself in: each one must be denied */
         hb_printf(&b, ",\"sandboxTries\":[");
         for (int i = 0, k = 0; i < LB_SBX_COUNT; i++) if (r->sbx_have[i])
             hb_printf(&b, "%s{\"id\":\"%s\",\"denied\":%s,\"errno\":%d}", k++ ? "," : "", lb_sbx_name(i), r->sbx_refused[i] ? "true" : "false", r->sbx_errno[i]);
@@ -240,13 +240,13 @@ static char *build_result(const Job *j, int st, const char *why, const Res *r, c
     return hb_take(&b);
 }
 
-/* ~/.local/state/lordos/lordbench.json, the previous one kept as lordbench-prev.json */
+/* ~/.local/state/axia/lordbench.json, the previous one kept as lordbench-prev.json */
 static const char *saving;
 static void write_saving(FILE *f) { fputs(saving, f); fputc('\n', f); }
 static int state_dir(char *out, size_t n) {
     const char *st = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
-    if (st && st[0] == '/') snprintf(out, n, "%s/lordos", st);
-    else if (home && home[0] == '/') snprintf(out, n, "%s/.local/state/lordos", home);
+    if (st && st[0] == '/') snprintf(out, n, "%s/axia", st);
+    else if (home && home[0] == '/') snprintf(out, n, "%s/.local/state/axia", home);
     else return -1;
     return 0;
 }
@@ -287,7 +287,7 @@ static double cpu_busy(unsigned long long b0, unsigned long long t0, unsigned lo
     return t1 > t0 ? 100.0 * (double)(b1 - b0) / (double)(t1 - t0) : 0;
 }
 
-/* launches lord-bench with the job and the fds; its socket, or -1 */
+/* launches axia-bench with the job and the fds; its socket, or -1 */
 static int spawn_helper(const char *path, const LbGo *go, const int *fds, int nfd, pid_t *pid) {
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return -1;
@@ -304,7 +304,7 @@ static int spawn_helper(const char *path, const LbGo *go, const int *fds, int nf
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
     char sessiond[32] = "LORDOS_SESSIOND=1";
     char *envp[] = { "LANG=C.UTF-8", getenv("LORDOS_SESSIOND") ? sessiond : NULL, NULL };
-    char *argv[] = { "lord-bench", NULL };
+    char *argv[] = { "axia-bench", NULL };
     int e = posix_spawn(pid, path, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&at);
@@ -532,7 +532,7 @@ static void *run(void *arg) {
         goto stop;
     }
 
-    /* the helper, with what lord-server opened for it */
+    /* the helper, with what axia-server opened for it */
     gpu = open_render_node();
     if (j->full) {
         disk = open_scratch(scratch_dir, sizeof scratch_dir, &storage_mb);
@@ -606,7 +606,7 @@ static void *run(void *arg) {
     pthread_mutex_unlock(&mu);
     pid = -1;
 
-    /* video, in lord-media: the sustained test is over, so throttling stops a run again */
+    /* video, in axia-media: the sustained test is over, so throttling stops a run again */
     g.sustained = 0;
     VidCtx vc = { r, &g, 0 };
     int vr = lbv_run(j->full, on_video, video_tick, &vc);

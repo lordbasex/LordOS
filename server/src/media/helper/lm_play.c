@@ -1,16 +1,16 @@
-/* lm_play.c — lord-media's player (MK_PLAY).
+/* lm_play.c — axia-media's player (MK_PLAY).
  *
  * FFmpeg only demuxes and decodes; the rest is our own:
  *   - a decoding thread with per-track queues (packets) and bounded output queues
  *     (video frames, PCM), like ffplay but smaller;
- *   - the main thread serves lord-server, gives the audio to PipeWire as it asks for it
+ *   - the main thread serves axia-server, gives the audio to PipeWire as it asks for it
  *     and presents each frame when it's due according to the audio clock (what PipeWire has already
  *     played, with its latency: GET_PLAYBACK_LATENCY). Without audio, the clock is the system's.
  *   - a frame that arrives late is dropped (and counted), so as not to delay the audio;
  *   - each frame is scaled only once to the size at which it's shown and written into one of
- *     three shared-memory slots with lord-server (sealed memfd). lord-server copies it
+ *     three shared-memory slots with axia-server (sealed memfd). axia-server copies it
  *     once when compositing: there are no more copies.
- *   - VA-API (if lord-server passed the render node and there's a driver): the GPU decodes and the
+ *   - VA-API (if axia-server passed the render node and there's a driver): the GPU decodes and the
  *     frame (NV12) is downloaded to scale it. */
 #include "lm.h"
 #include "../aring.h"
@@ -227,7 +227,7 @@ static void pq_push_front(PktQ *q, AVPacket *p) {
  * software, from the keyframe before what is on screen. Under P.mu, on the decoding thread, which owns
  * P.vdec; frames still queued keep their own reference to the hardware's. */
 #ifdef LM_HWFALL_TEST
-static int hwf_tested;              /* build/lord-media-hwfall: the failure was faked once */
+static int hwf_tested;              /* build/axia-media-hwfall: the failure was faked once */
 #endif
 static void hw_to_software(void) {
     if (P.hw_only) { LM_LOG("hardware decoder failed: stopping, this video is hardware only"); _exit(0); }
@@ -265,7 +265,7 @@ static int decode_video(void) {
         int r = avcodec_receive_frame(P.vdec, f);
         double dt = lm_now_ms() - t0;
         pthread_mutex_lock(&P.mu);
-#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 1  /* build/lord-media-hwfall: a decoder that fails after 30 frames */
+#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 1  /* build/axia-media-hwfall: a decoder that fails after 30 frames */
         if (r >= 0 && P.decoded >= 30 && P.decoded < 1000 && !hwf_tested) {
             P.hw_active = 1;
             av_frame_unref(f);
@@ -476,7 +476,7 @@ typedef struct {
 } Clock;
 
 static Clock C;
-static ARingHdr *AR;                /* lord-server's audio ring (or NULL: no audio) */
+static ARingHdr *AR;                /* axia-server's audio ring (or NULL: no audio) */
 #define FRAME_BYTES 4                /* s16 stereo */
 
 static int64_t clock_ms(void) {
@@ -516,7 +516,7 @@ static void feed_audio(void) {
     }
     pthread_cond_broadcast(&P.cv);
     pthread_mutex_unlock(&P.mu);
-    if (wrote) mp_sendv(LM_SOCK, MM_AUDIO, 0, 0, 0, 0, 0);       /* lord-server passes it to PipeWire */
+    if (wrote) mp_sendv(LM_SOCK, MM_AUDIO, 0, 0, 0, 0, 0);       /* axia-server passes it to PipeWire */
 }
 
 static void set_playing(int on) {
@@ -539,7 +539,7 @@ static void seek_to(int64_t ms) {
     pthread_cond_broadcast(&P.cv);
     pthread_mutex_unlock(&P.mu);
     if (C.audio) {
-        /* lord-server discards what was left in the ring and in PipeWire (FLUSH) */
+        /* axia-server discards what was left in the ring and in PipeWire (FLUSH) */
         atomic_store(&AR->discard_to, atomic_load(&AR->wpos));
         atomic_fetch_add(&AR->serial, 1);
         C.anchor_byte = -1;
@@ -575,7 +575,7 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     /* VA-API before seccomp (it loads the driver from /usr/lib) */
     char accel[24];
     P.hw = lm_hw_device(lm_hw_accel(params, accel, sizeof accel), render);
-    /* lord-server creates the audio ring (sealed); it's validated before using it */
+    /* axia-server creates the audio ring (sealed); it's validated before using it */
     if (pulse >= 0 && want_audio) {
         struct stat st;
         void *m = MAP_FAILED;
@@ -682,9 +682,9 @@ void lm_player(const char *params, int fd, int pulse, int render) {
         }
         if (C.audio) {
             feed_audio();
-            /* lord-server stopped consuming (PipeWire went away): continue with the system clock */
+            /* axia-server stopped consuming (PipeWire went away): continue with the system clock */
             /* normally the ring is almost full (decoding runs ~1 s ahead): what
-             * indicates the cut is that lord-server's read position doesn't move */
+             * indicates the cut is that axia-server's read position doesn't move */
             static double full_since;
             static uint64_t last_r;
             uint64_t r = atomic_load(&AR->rpos);

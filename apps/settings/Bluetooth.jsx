@@ -1,5 +1,5 @@
 // Settings → Bluetooth: on/off, my devices (connect, disconnect, forget) and nearby devices
-// (pair). BlueZ over the system bus, from lord-server (server/src/hw/bt.c); PIN and passkey
+// (pair). BlueZ over the system bus, from axia-server (server/src/hw/bt.c); PIN and passkey
 // requests are drawn by the system (sdk/hardware.jsx, BluetoothPrompt). Headphones and speakers
 // show up in Sound through PipeWire. See docs/SETTINGS.md, "Bluetooth".
 import { View, Text, useTheme, useLocale, Toggle, Button, admin, useBluetooth, onBluetoothResult } from '@lordos/sdk';

@@ -70,8 +70,8 @@ a Flatpak" system, or converting existing installations in place.
 
 - `/usr` is an ordinary ext4 directory tree owned by dpkg. Root (or `sudo`) can change any file.
 - 0.8.2 phase 1 (`server/src/sec/codesig.c`) checks only LordOS's JavaScript bundles, from inside
-  `lord-server`; its threat model says plainly that it does not protect against root, who can
-  replace `lord-server` itself (and its compiled-in key).
+  `axia-server`; its threat model says plainly that it does not protect against root, who can
+  replace `axia-server` itself (and its compiled-in key).
 - Updates are in-place `dpkg` upgrades from the signed APT repository (0.8.1). A broken update is
   fixed by another update; there is no "previous version". A power cut during `dpkg` can leave a
   half-configured system (dpkg recovers most of it, not all).
@@ -123,9 +123,9 @@ What each layer stops (✓ stops, ~ partly, ✗ no). "Classic" is today's LordOS
   would turn that into a reboot into the other slot. Root can also write a new UKI to the ESP; only
   Secure Boot stops that from booting.
 
-**How it composes with phase 1 (signed code).** With a verified `/usr`, `lord-server`, its
+**How it composes with phase 1 (signed code).** With a verified `/usr`, `axia-server`, its
 compiled-in release key, the bundles and `code-manifest.json` are all inside the verified image, so
-phase 1's stated gap ("root can replace lord-server") closes for anything that must survive a
+phase 1's stated gap ("root can replace axia-server") closes for anything that must survive a
 reboot, as long as the UKI is trusted (Secure Boot on PCs). Phase 1 stays: it costs ~7–34 ms, it
 protects the classic edition and development trees, and it gives the clear "this component was
 modified" screen instead of an I/O error.

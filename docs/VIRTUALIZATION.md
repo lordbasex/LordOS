@@ -25,7 +25,7 @@ The bar is section 15: the most complete desktop virtualization app, and visuall
    and getting its drivers is one flow.
 3. **LordOS's own desktop.** The VM's picture is a node in our compositor, with no QEMU window, no X11, no toolkit. Moving, resizing,
    full screen, Picture in Picture, desktops and the theme all work as for any app.
-4. **Same security model as the rest of LordOS.** `lord-server` never runs as root. Each VM is one sandboxed process tree. Privileged
+4. **Same security model as the rest of LordOS.** `axia-server` never runs as root. Each VM is one sandboxed process tree. Privileged
    steps are closed admin actions. A guest gets nothing of the host unless the person gives it.
 5. **Both architectures, same features where the hardware allows.** Where it doesn't, the app says so instead of offering a switch
    that fails.
@@ -135,7 +135,7 @@ Decisions:
 ## 3. Architecture
 
 ```
-lord-server (the person's user, never root)
+axia-server (the person's user, never root)
   └─ Machines app (React, sdk/vm.js → lord.vm.*)
        │  closed RPC
        ▼
@@ -147,7 +147,7 @@ lord-server (the person's user, never root)
     ├─ passt or tap helper network
     └─ usbredir            attached device, on demand
        ▲
-  qemu ──p2p D-Bus──▶ lord-vmdisplay ──fixed binary messages, dmabuf by descriptor──▶ lord-server's compositor (MediaView)
+  qemu ──p2p D-Bus──▶ lord-vmdisplay ──fixed binary messages, dmabuf by descriptor──▶ axia-server's compositor (MediaView)
 
 Admin helper (closed actions, root)
   vm-enable, vm-bridge-on/off, vm-usb-allow
@@ -161,7 +161,7 @@ Admin helper (closed actions, root)
 - **`lord-vm`**, new, C, the supervisor: starts the tree, holds the QMP connection, applies settings, takes snapshots, reports state.
   It writes no display code.
 - **`sdk/vm.js` and `lord.vm`**: the app's only way in, as `lord.rdesk` is for Remote Desk.
-- The approach is the one `lord-rdesk` proved: a helper in its own cgroup scope with memory limits and a Landlock and seccomp sandbox, talking
+- The approach is the one `axia-rdesk` proved: a helper in its own cgroup scope with memory limits and a Landlock and seccomp sandbox, talking
   over a socketpair, drawing into something the engine shows.
 
 ### 3.2 Display: no QEMU window
@@ -175,13 +175,13 @@ redirection travels over Chardev with the stream name `org.qemu.usbredir` (**Rep
 
 So one socket carries picture, input, clipboard, sound and USB. No bus daemon is involved: QEMU accepts the peer through QMP `add_client`.
 
-**The compositor never speaks D-Bus to QEMU.** A compromised QEMU must not get a parser inside the process that draws the whole desktop, so the top security risk gets a process of its own. `lord-vmdisplay` is small, one per VM, sandboxed with no files and no network. It speaks that D-Bus protocol to QEMU and passes `lord-server` only fixed binary messages over a socketpair, as `lord-rdesk` does.
+**The compositor never speaks D-Bus to QEMU.** A compromised QEMU must not get a parser inside the process that draws the whole desktop, so the top security risk gets a process of its own. `lord-vmdisplay` is small, one per VM, sandboxed with no files and no network. It speaks that D-Bus protocol to QEMU and passes `axia-server` only fixed binary messages over a socketpair, as `axia-rdesk` does.
 
 It checks before forwarding: the size against limits, the dmabuf's real length (`lseek`) against stride and height, fourcc and modifier against what this GPU imported before, the update rate, the cursor's size, and the clipboard's size and types. Input and clipboard travel back the same way.
 
 What this doesn't remove: importing a dmabuf still reaches the host's GPU driver in the compositor, so an import failure must show a black picture and never take the session down, and **the compositor never waits on a guest's fence without a timeout**. A guest that hangs its GPU work costs its own window, not the desktop.
  The media node path (`MediaView`) already shows dmabufs and shared-memory
-pictures from `lord-media` and `lord-rdesk`.
+pictures from `axia-media` and `axia-rdesk`.
 
 - With GPU: a dmabuf goes straight to the compositor with no copy. **Target:** one frame of added latency at most.
 - Without GPU acceleration (2D guests, TCG, virtio-win guests): the shared-memory path, copied on update, with damage rectangles.
@@ -197,7 +197,7 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
 - **Landlock:** read-only `/usr/lib`, firmware and ISOs chosen for this VM; read-write only that VM's folder. On kernels without
   Landlock (see 2.3) the app shows "Weaker isolation on this kernel".
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours. Our allowlist needs care: QEMU uses many
-  ioctls on `/dev/kvm`, and `lord-server`'s helper filter can't be reused unchanged.
+  ioctls on `/dev/kvm`, and `axia-server`'s helper filter can't be reused unchanged.
 - `/dev/kvm`, `/dev/vhost-net`, render node and tap are opened by `lord-vm` and passed as descriptors, so QEMU can't open devices. For KVM, `-add-fd` plus `-accel kvm,device=/dev/fdset/NN`, which Debian 13's QEMU manual documents (**Reported**, to run in Phase 0).
 - No network sockets of its own: networking is an fd.
 - Files are opened by the supervisor and passed by descriptor wherever QEMU allows (`/dev/fdset`).
@@ -561,7 +561,7 @@ If the D-Bus clipboard turns out unworkable on a guest, the clipboard moves to t
 
 ### 6.9 Sound, camera, microphone
 
-Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; camera through USB redirect or `uvc` emulation. Off by default.
+Sound via `audio-dbus`, into PipeWire by `axia-server`. Microphone and camera: asked once per VM with the existing Permissions flow; camera through USB redirect or `uvc` emulation. Off by default.
 
 ### 6.10 Graphics
 
@@ -632,7 +632,7 @@ The first icon on the bar shows its state: gray (not installed), amber (machine 
 - **A list of what works now, and what doesn't and why:** Shell, Logs, File copy, Clipboard, Resolution, Folders, Apps. Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
 - **Not connected:** the next step, which depends on the state. If the guest is still booting, says wait. If the agent isn't installed: an **Install Agent** button attaches a small verified disc, shows the one command to run, and removes the disc once connected.
 
-**Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates an older agent itself only with the person's consent, from the signed disc.
+**Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `axia-server`, parses it, inside the sandbox. A newer host updates an older agent itself only with the person's consent, from the signed disc.
 
 **Direction of trust.** The host runs things in the guest, never the reverse. A guest can't open a channel, start a host program, or read a host path. Only the person's own user can reach a VM's socket. A profile can turn the agent's shell off while leaving file copy on, and **Testing** starts with everything off.
 
@@ -781,7 +781,7 @@ All text in en, es and pt from the first commit, a `machines.json` per language.
 
 - **Unit:** settings → QEMU arguments in a table test, for each architecture; `machine.json` schema and migration.
 - **Sandbox:** a test that a hostile `lord-vm` child can't open `~/.ssh`, another VM's folder, or `/dev/kvm` again.
-- **Fuzz:** `lordos-guest` parser and D-Bus listener in `lord-server`.
+- **Fuzz:** `lordos-guest` parser and D-Bus listener in `axia-server`.
 - **Boot matrix** in CI where KVM exists: Debian, Ubuntu, Fedora, LordOS on amd64; same on arm64 (Pi).
 - **Real hardware matrix before each claim:** Pi 5 16 KiB kernel; Pi 5 4 KiB kernel; Pi 4; Intel; AMD; a nested amd64 VM (TCG path and refused KVM).
 - **Install test** of each pinned virtio-win version before the catalog moves.
@@ -803,7 +803,7 @@ Machines (React + LordOS SDK)
     → QEMU + KVM
       → Debian 13 guest, amd64 and arm64
         → D-Bus display with validated buffers
-          → lord-server MediaView, a window in the compositor
+          → axia-server MediaView, a window in the compositor
 ```
 
 | Phase | Ships | Done when |

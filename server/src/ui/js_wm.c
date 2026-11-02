@@ -2,7 +2,7 @@
  *
  *   lord.wm.grab(node, edges, { inset, minW, minH, maxW, maxH, minTop }) → bool
  *       edges 0 = move; 1 top, 2 bottom, 4 left, 8 right (like xdg_toplevel.resize).
- *       Only with a button held down; lord-server tracks it until it is released.
+ *       Only with a button held down; axia-server tracks it until it is released.
  *   lord.wm.cancel()                 also stops a scripted move
  *   lord.wm.script(node, { rx, ry, periodMs, inset, minTop, areas }) → bool
  *       LordBench's desktop scene (docs/BENCHMARK.md): the node moves along a figure of eight, rx × ry px,

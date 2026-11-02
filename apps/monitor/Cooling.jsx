@@ -1,7 +1,7 @@
 // Monitor → Cooling (docs/FANS.md): the cooling hardware drawn live (the fan turns with the real
 // duty, the heatsink warms with the temperature), the active profile and step on its curve, a
 // temperature/fan history and a quick "full speed" button. The profile and the curve are changed in
-// Settings → Cooling; both use lord.fan (lord-fand).
+// Settings → Cooling; both use lord.fan (axia-fand).
 import {
   View, Text, Button, useTheme, useLocale, useFan, useStore, fanHistory, fanCase, fanControl, coolingVariant, CoolingArt,
   FanCurveChart, formatTemp, formatNumber, typeScale, wm, FAN_HISTORY,

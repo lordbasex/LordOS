@@ -1,11 +1,11 @@
-/* doc_test.c — test client for lord-doc (the document helper), without lord-server.
+/* doc_test.c — test client for axia-doc (the document helper), without axia-server.
  *
- *   doc-test <lord-doc> selftest                    what the confinement blocks (JSON with errno)
- *   doc-test <lord-doc> list <archive>
- *   doc-test <lord-doc> extract <archive> <folder>    (the folder must exist)
- *   doc-test <lord-doc> zip <out.zip> <paths…>
- *   doc-test <lord-doc> pdf <file.pdf> [width]      opens, renders page 1 and measures
- *   doc-test <lord-doc> font <file.ttf>
+ *   doc-test <axia-doc> selftest                    what the confinement blocks (JSON with errno)
+ *   doc-test <axia-doc> list <archive>
+ *   doc-test <axia-doc> extract <archive> <folder>    (the folder must exist)
+ *   doc-test <axia-doc> zip <out.zip> <paths…>
+ *   doc-test <axia-doc> pdf <file.pdf> [width]      opens, renders page 1 and measures
+ *   doc-test <axia-doc> font <file.ttf>
  *
  * tests/doc_evil.sh uses it with malicious archives built by tests/make_evil_archives.py. */
 #include "doc/proto.h"
@@ -37,7 +37,7 @@ static void start(const char *helper, const char *mode, const int *fds, const ch
     child = fork();
     if (!child) {
         dup2(sv[1], 3);
-        char *argv[] = { "lord-doc", NULL };
+        char *argv[] = { "axia-doc", NULL };
         execv(helper, argv);
         _exit(127);
     }
@@ -75,7 +75,7 @@ static int call(uint32_t op, const char *json, const int *fds, int nfds, int qui
 }
 
 int main(int argc, char **argv) {
-    if (argc < 3) { fprintf(stderr, "usage: doc-test <lord-doc> selftest|list|extract|zip|pdf|font …\n"); return 2; }
+    if (argc < 3) { fprintf(stderr, "usage: doc-test <axia-doc> selftest|list|extract|zip|pdf|font …\n"); return 2; }
     const char *helper = argv[1], *cmd = argv[2];
     int st = 0;
     if (!strcmp(cmd, "selftest")) {

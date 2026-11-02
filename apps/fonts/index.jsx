@@ -1,6 +1,6 @@
 // Fonts — font viewer and manager: installed fonts by family, a sample with text and
 // sizes of your choice, a character table by block and information; install a .ttf/.otf for the
-// user (~/.local/share/fonts) and remove it. Fonts are opened in the confined lord-doc
+// user (~/.local/share/fonts) and remove it. Fonts are opened in the confined axia-doc
 // helper (FreeType), so a broken or malicious font does not affect the desktop.
 import {
   View, Text, TextInput, Slider, Button, Segmented, useTheme, useAppWindow, useKeyboard, wm, fs, clipboard, DocImage, releaseImage,

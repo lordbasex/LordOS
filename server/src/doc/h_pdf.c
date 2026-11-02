@@ -145,7 +145,7 @@ static void op_render(uint32_t id, const JVal *a) {
     if (W < 1) W = 1;
     if (H < 1) H = 1;
     size_t len = (size_t)W * H * 4;
-    int fd = doc_memfd_new("lord-doc-page", len);
+    int fd = doc_memfd_new("axia-doc-page", len);
     if (fd < 0) { reply_err(id, "memory", ""); return; }
     uint32_t *px = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (px == MAP_FAILED) { close(fd); reply_err(id, "memory", ""); return; }
@@ -536,7 +536,7 @@ static void op_undo(uint32_t id, const JVal *a) {
 }
 
 static void op_save(uint32_t id, const DocMsg *m, const JVal *a) {
-    int fd = m->nfds ? m->fds[0] : slot_fd(a, "slot");      /* new file opened by lord-server */
+    int fd = m->nfds ? m->fds[0] : slot_fd(a, "slot");      /* new file opened by axia-server */
     if (!doc || fd < 0) { reply_err(id, "bad-request", "slot"); return; }
     GError *err = NULL;
     int d = dup(fd);
@@ -551,7 +551,7 @@ static void op_save(uint32_t id, const DocMsg *m, const JVal *a) {
 
 static void op_blob(uint32_t id) {
     if (!doc) { reply_err(id, "bad-request", ""); return; }
-    int fd = doc_memfd_new("lord-doc-pdf", 0);
+    int fd = doc_memfd_new("axia-doc-pdf", 0);
     GError *err = NULL;
     int d = fd >= 0 ? dup(fd) : -1;
     gboolean ok = d >= 0 && poppler_document_save_to_fd(doc, d, TRUE, &err);

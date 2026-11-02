@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+if [ "$(id -u)" = 0 ]; then
+    echo 'Start Axia DE as your normal session user, without sudo.' >&2
+    exit 1
+fi
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=axia
+export XDG_CURRENT_DESKTOP=Axia
+export DESKTOP_SESSION=axia
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    echo 'A login session with XDG_RUNTIME_DIR is required (logind or seatd).' >&2
+    exit 1
+fi
+cd '@ROOT@/bin'
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    exec dbus-run-session -- ./axia-server "$@"
+fi
+exec ./axia-server "$@"

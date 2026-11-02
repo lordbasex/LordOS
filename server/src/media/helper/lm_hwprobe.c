@@ -1,6 +1,6 @@
 /* lm_hwprobe.c — which video codecs the GPU decodes through VA-API (MK_HWPROBE; docs/VIDEO.md).
  *
- * lord-server passes the render nodes it opened (up to four, virtual GPUs left out); the sandbox
+ * axia-server passes the render nodes it opened (up to four, virtual GPUs left out); the sandbox
  * (with the DRM ioctls) is already on. The answer is one MM_RESULT with JSON: a codec counts if one
  * of the nodes' drivers lists one of its profiles with the VLD (decode) entrypoint. No driver, no
  * profiles: everything false. */

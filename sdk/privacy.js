@@ -37,8 +37,8 @@ let seq = 1;
 const inApp = () => typeof lord !== 'undefined' && lord.broker && typeof lord.broker.request === 'function';
 
 // Requests a permission: if there is already a decision, it respects it; if not, it queues a system prompt.
-// Inside an isolated app (lord-server --app), it goes through the broker: the prompt is drawn by
-// lord-server, not the app.
+// Inside an isolated app (axia-server --app), it goes through the broker: the prompt is drawn by
+// axia-server, not the app.
 export function requestPermission(app, perm) {
   if (inApp()) { try { return Promise.resolve(!!lord.broker.request(perm)); } catch (e) { return Promise.resolve(false); } }
   const st = perms.get(app, perm);
@@ -64,7 +64,7 @@ if (typeof globalThis !== 'undefined') {
       } else if (kind === 'pick') {
         if (typeof globalThis.__lordBrokerPick === 'function') globalThis.__lordBrokerPick(data.reqid, data.app, data.save, data.suggest);
       } else if (kind === 'mailopen' || kind === 'launch') {
-        // an isolated system app asked the session to open an attachment or another app; lord-server
+        // an isolated system app asked the session to open an attachment or another app; axia-server
         // checked it (sec/brokermail.c), sdk/sysopen.js does it
         if (typeof globalThis.__lordSysOpen === 'function') globalThis.__lordSysOpen(kind, data);
       } else if (kind === 'device') {
@@ -78,7 +78,7 @@ if (typeof globalThis !== 'undefined') {
 function answer(item, allow) {
   queue.set((q) => q.filter((x) => x.id !== item.id));
   if (item.broker != null) {
-    // prompt from an isolated app: lord-server saves the decision and answers the app
+    // prompt from an isolated app: axia-server saves the decision and answers the app
     try { lord.broker.resolve(item.broker, allow); } catch (e) { /* server without broker */ }
   } else {
     perms.set(item.app, item.perm, allow ? 'allow' : 'deny');
@@ -121,7 +121,7 @@ const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p 
 const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone' }]
 
 export function markDeviceUse(app, kind, on) {
-  // Inside an isolated app, it is reported through the broker (lord-server shows the indicator).
+  // Inside an isolated app, it is reported through the broker (axia-server shows the indicator).
   if (typeof lord !== 'undefined' && lord.broker && typeof lord.broker.device === 'function') {
     try { lord.broker.device(kind, !!on); } catch (e) { /* */ }
     return;
@@ -205,7 +205,7 @@ export function onPermissionRevoked(fn) {
   try { return typeof globalThis.__lordOnRevoke === 'function' ? globalThis.__lordOnRevoke(fn) : () => {}; } catch (e) { return () => {}; }
 }
 
-// Microphone for an isolated app: lord-server owns the PipeWire stream and passes the app
+// Microphone for an isolated app: axia-server owns the PipeWire stream and passes the app
 // a READ-ONLY ring (see docs/PRIVACY.md). micLevel() gives the level (RMS 0..1).
 export function micStart() { try { return !!(lord.broker && lord.broker.micStart && lord.broker.micStart()); } catch (e) { return false; } }
 export function micStop() { try { lord.broker && lord.broker.micStop && lord.broker.micStop(); } catch (e) { /* */ } }

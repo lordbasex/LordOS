@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ---- what paint.c reaches outside the UI engine: lord-bench has no terminals, Wayland windows, media or
+/* ---- what paint.c reaches outside the UI engine: axia-bench has no terminals, Wayland windows, media or
  * GPU path (the same stubs as tests/engine_test.c) ---- */
 void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)x; (void)y; (void)w; (void)h; (void)op; }
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
@@ -225,7 +225,7 @@ static void build_scene(void) {
     }
 }
 
-/* ---- paint threads: the same row bands as lord-server's pool (par.c), without its priority ---- */
+/* ---- paint threads: the same row bands as axia-server's pool (par.c), without its priority ---- */
 
 typedef void (*BandFn)(void *ctx, int a, int b);
 static struct {

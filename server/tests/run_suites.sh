@@ -3,7 +3,7 @@
 # them (the other suites run inside their build rule). Called from server/ by the Makefile:
 #
 #   make -C server test         sh tests/run_suites.sh        self-contained suites, a few seconds
-#   make -C server test-full    sh tests/run_suites.sh full   also the helpers (lord-media, lord-doc),
+#   make -C server test-full    sh tests/run_suites.sh full   also the helpers (axia-media, axia-doc),
 #                                                             the sandbox and the external comparisons
 #
 # Exits with 1 if any suite fails. A suite whose tool or data isn't installed is reported as
@@ -205,7 +205,7 @@ EOF
 full() {
     echo "== slow and environment-dependent suites (tests/run_suites.sh full)"
     # media helper: a generated WAV (one second of a 440 Hz tone), probe, waveform and its confinement
-    if [ -x build/lord-media ] && have python3; then
+    if [ -x build/axia-media ] && have python3; then
         python3 -I - "$T/tone.wav" <<'EOF'
 import math, struct, sys, wave
 w = wave.open(sys.argv[1], 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000)
@@ -214,10 +214,10 @@ EOF
         run "media-test probe" build/media-test probe "$T/tone.wav"
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
-    else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    else skip "media-test" "build/axia-media (FFmpeg -dev packages) and python3"; fi
     # document helper: malicious archives and the confinement
-    if [ -x build/lord-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (lord-doc)" sh tests/doc_evil.sh
-    else skip "doc_evil.sh" "build/lord-doc (Poppler and libarchive -dev packages) and python3"; fi
+    if [ -x build/axia-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (axia-doc)" sh tests/doc_evil.sh
+    else skip "doc_evil.sh" "build/axia-doc (Poppler and libarchive -dev packages) and python3"; fi
     # sandbox: Landlock and seccomp of the running kernel
     if [ -r /sys/kernel/security/lsm ] && grep -q landlock /sys/kernel/security/lsm; then
         run "sandbox-test (app)" build/sandbox-test

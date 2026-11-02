@@ -7,7 +7,7 @@ keywords: loja, instalar, apps, pacotes, debian, atualizar, remover
 ---
 # Loja
 
-Para instalar, atualizar e remover apps: os do LordOS (`.lpk`) e os do Debian.
+Para instalar, atualizar e remover apps: os do Axia DE (`.lpk`) e os do Debian.
 
 - **Descobrir:** os apps de desktop do Debian por categoria, com ícone e descrição no seu idioma.
 - **Buscar:** primeiro aparecem os apps e depois os outros pacotes.

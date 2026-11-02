@@ -4,7 +4,7 @@
 // Searches apps, files in the home folder, Settings sections, notes, the clipboard
 // history and the Store; it also calculates (2*(3+4), 15% of 2400, sqrt(2)) and converts units
 // (10 km to mi, 72 f to c, 1,5 gb to mb). ↑↓ choose, Enter opens, ❖Enter shows in Files, Esc closes.
-// What is opened often rises in the results (~/.local/share/lordos/spotlight.json).
+// What is opened often rises in the results (~/.local/share/axia/spotlight.json).
 import { createElement as h, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Image, addListener, screen, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -28,7 +28,7 @@ export const spotlight = {
 
 // ---- recent use (for ranking) ----
 
-const USE_FILE = '.local/share/lordos/spotlight.json';
+const USE_FILE = '.local/share/axia/spotlight.json';
 let usage = null;
 function loadUsage() {
   if (usage) return usage;
@@ -45,7 +45,7 @@ function noteUse(key) {
   u[key] = { n: (u[key]?.n || 0) + 1, at: Date.now() };
   const keys = Object.keys(u);
   if (keys.length > 300) for (const k of keys.sort((a, b) => u[a].at - u[b].at).slice(0, keys.length - 300)) delete u[k];
-  try { ensureDir('.local/share/lordos'); fs.write(USE_FILE, JSON.stringify(u)); } catch (e) { /* no disk: memory only */ }
+  try { ensureDir('.local/share/axia'); fs.write(USE_FILE, JSON.stringify(u)); } catch (e) { /* no disk: memory only */ }
 }
 function usageBoost(key) {
   const u = loadUsage()[key];

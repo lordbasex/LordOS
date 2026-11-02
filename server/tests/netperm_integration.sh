@@ -1,12 +1,12 @@
 #!/bin/bash
-# netperm_integration.sh — test of lord-netperm with the real kernel (docs/FIREWALL.md, step 2).
+# netperm_integration.sh — test of axia-netperm with the real kernel (docs/FIREWALL.md, step 2).
 # Run it in the test VM as the session user (with passwordless sudo), with lord-sessiond
-# (Delegate=yes) and lord-netperm running:
+# (Delegate=yes) and axia-netperm running:
 #
 #   bash server/tests/netperm_integration.sh [gateway]
 #
-# Builds an app scope by hand (as the lord-server launcher does), writes rules to
-# ~/.config/lordos/firewall.json, asks lord-netperm to reload them over its socket and tests:
+# Builds an app scope by hand (as the axia-server launcher does), writes rules to
+# ~/.config/axia/firewall.json, asks axia-netperm to reload them over its socket and tests:
 # deny and allow, a domain rule that leaves a single site, "LAN only", "no incoming
 # connections" and "no network". It only uses the gateway, the machine itself and example.com/debian.org.
 # At the end it leaves firewall.json as it was.
@@ -15,13 +15,13 @@ GW=${1:-172.17.0.1}
 U=$(id -u)
 SESS=/sys/fs/cgroup/system.slice/lordos.service/lordos-session-$U
 SC=$SESS/app-lordos-nptest.scope
-FW=~/.config/lordos/firewall.json
+FW=~/.config/axia/firewall.json
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "  ok:   $*"; }
 bad() { fail=$((fail+1)); echo "  BAD:  $*"; }
 [ -d "$SESS" ] || { echo "no LordOS session for uid $U ($SESS)"; exit 2; }
-[ -S /run/lordos/netperm.sock ] || { echo "lord-netperm is not running"; exit 2; }
-mkdir -p ~/.config/lordos
+[ -S /run/lordos/netperm.sock ] || { echo "axia-netperm is not running"; exit 2; }
+mkdir -p ~/.config/axia
 BACKUP=$(mktemp); HAD=0
 [ -f "$FW" ] && { cp "$FW" "$BACKUP"; HAD=1; }
 trap 'if [ $HAD = 1 ]; then cp "$BACKUP" "$FW"; else rm -f "$FW"; fi; reload; rm -f "$BACKUP"' EXIT

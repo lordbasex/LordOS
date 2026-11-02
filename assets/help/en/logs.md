@@ -7,14 +7,14 @@ keywords: logs, journal, errors, debug, console, diagnostics
 ---
 # Logs
 
-System and LordOS logs. Use it to see what happened when something fails.
+System and Axia DE logs. Use it to see what happened when something fails.
 
 ## Sources
 
 - **My logs:** your systemd journal (your apps and services), read with your permissions.
 - **System** and **Kernel:** the system journal. Administrators (sudo group) see it through the
   administration helper, as does anyone in the journal reader group.
-- **LordOS:** your session logs (`~/.cache/lordos`, like `session.log`).
+- **Axia DE:** your session logs (`~/.cache/axia`, like `session.log`).
 
 ## Filter
 

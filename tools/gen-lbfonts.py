@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gen-lbfonts.py - the fonts of LordBench's shaping workload (server/src/bench/lbui.c, docs/BENCHMARK.md).
 
-lord-bench opens no files, so the fonts it shapes with are built into it (build/gen/lb_fonts.h, made by the
+axia-bench opens no files, so the fonts it shapes with are built into it (build/gen/lb_fonts.h, made by the
 Makefile from server/src/bench/fonts). The Latin one is LordOS's own Inter (assets/fonts); the others are
 Debian 13's Noto fonts subset to exactly the characters of the paragraphs in server/src/bench/lbtext.h,
 keeping every OpenType layout feature and lookup those characters can reach, so the shaper gives the same

@@ -1,4 +1,4 @@
-/* card.h — the test card of lordos-testbench (see card.c). */
+/* card.h — the test card of axia-testbench (see card.c). */
 #ifndef LORD_TESTBENCH_CARD_H
 #define LORD_TESTBENCH_CARD_H
 

@@ -31,7 +31,7 @@ list drawn inside a form row sat under the rows that came after it, whatever its
 
 Each layer is a root node of the screen's size with a fixed `zIndex`, above the theme's tree;
 content enters it through a React portal (`runtime/index.js`: `layerContainer`, `createPortal`).
-A layer node is `pointerEvents: 'box-none'`: lord-server never hits the layer itself, only what is
+A layer node is `pointerEvents: 'box-none'`: axia-server never hits the layer itself, only what is
 in it, so an empty part of a layer lets the click through to whatever is below.
 
 | Layer | zIndex | What goes there |
@@ -93,7 +93,7 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
 
 The menu bar, the Dock, menus and the Control Center blur what is behind them
 (`backdropFilter`). The blur reads the screen around the surface, a margin of twice its radius
-(`canvas_backdrop_blur`). lord-server only repaints the area that changed, and outside it the
+(`canvas_backdrop_blur`). axia-server only repaints the area that changed, and outside it the
 screen still holds the last frame, with the surface's own tint already on it: before 0.8.1, closing
 a menu or the Control Center left a lighter band in the menu bar where the repainted area met it.
 Now `paint_damage` (`paint.c`, `blur_walk`) grows the damaged area to the whole surface whenever a
@@ -114,7 +114,7 @@ last frame's *final* pixels, so whatever is painted above the blurred surface an
 margin (a sibling's shadow, a menu, the window's own border over a translucent Terminal) was
 blurred into the surface's edges, while a full repaint blurs only what lies below it; the
 difference stayed until the next full repaint. `test_damage_fuzz` in `build/engine-test` found it
-(random trees through lord-server's whole damage pipeline, every painted frame compared with a full
+(random trees through axia-server's whole damage pipeline, every painted frame compared with a full
 repaint). The cost: a repaint that touches the Dock or the menu bar also repaints the band of twice
 the blur radius around it (about 41 px for a 20 px blur; the screen edges cut it). On VM 116 with
 Monitor's moving map, with and without a blurred Terminal over it, layout and paint per frame stayed

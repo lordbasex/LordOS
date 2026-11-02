@@ -6,7 +6,7 @@ keywords: remoto, acesso remoto, navegador, compartilhar tela, lan
 ---
 # Desktop remoto
 
-De outro computador da sua rede você pode usar o LordOS com um navegador, sem instalar nada.
+De outro computador da sua rede você pode usar o Axia DE com um navegador, sem instalar nada.
 
 1. Ligue em [Ajustes → Compartilhar](settings:sharing) → “Permitir o acesso pela rede”. Vem
    **desligado**.

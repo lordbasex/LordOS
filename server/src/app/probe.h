@@ -9,7 +9,7 @@
  * must fail under it. Returns the pipe to read its result (and its pid in *child), or -1. */
 int probe_helper_start(const char *data, int *child);
 /* After the app's sandbox: tries what must fail, collects the helper child, sends everything to
- * lord-server (BOP_PROBE) and returns 0 if it was taken. */
+ * axia-server (BOP_PROBE) and returns 0 if it was taken. */
 int probe_main(const char *home, const char *data, int sandbox_mask, int helper_fd, int helper_pid);
 
 #endif

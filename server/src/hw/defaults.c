@@ -38,7 +38,7 @@ static int write_atomic(const char *path, const char *text) {
 }
 
 /* For tests only: a folder that stands for "/" when the system files are read (the fake XDG trees of
- * tests/defaults_test.c). Empty in lord-server: nothing else sets it. */
+ * tests/defaults_test.c). Empty in axia-server: nothing else sets it. */
 static char sysroot[256];
 void defaults_set_root(const char *root) { snprintf(sysroot, sizeof sysroot, "%s", root && root[0] == '/' ? root : ""); }
 const char *defaults_root(void) { return sysroot; }
@@ -158,6 +158,6 @@ int defaults_set_terminal(const char *id) {
     snprintf(path, sizeof path, "%s/.config", h);
     mkdir(path, 0700);
     snprintf(path, sizeof path, "%s/.config/xdg-terminals.list", h);
-    snprintf(text, sizeof text, "# Written by LordOS (Settings → Default Apps)\n%s\n", id);
+    snprintf(text, sizeof text, "# Written by Axia DE (Settings → Default Apps)\n%s\n", id);
     return write_atomic(path, text);
 }

@@ -17,7 +17,7 @@
   "default.denyShort": "blocks everything else",
   "default.allowHint": "What no rule covers follows the firewall mode.",
   "default.denyHint": "Only what an Allow rule covers can connect.",
-  "notEnforceable": "This app has no scope of its own (it was not opened from LordOS), so its rules are kept but not enforced.",
+  "notEnforceable": "This app has no scope of its own (it was not opened from Axia DE), so its rules are kept but not enforced.",
   "empty": "No rules for this app.",
   "add": "Add rule…",
   "edit": "Edit",

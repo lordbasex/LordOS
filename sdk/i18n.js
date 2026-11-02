@@ -8,7 +8,7 @@
 //
 // Strings live in JSON catalogs that the server reads at runtime:
 //   assets/locales/<language>/<namespace>.json            (bundled with LordOS)
-//   ~/.local/share/lordos/locales/<language>/<namespace>.json   (the user's language packs)
+//   ~/.local/share/axia/locales/<language>/<namespace>.json   (the user's language packs)
 // The namespace is the first part of the key ('terminal', 'files', 'shell'…). A new
 // language is a folder with those files and a meta.json; no code changes are needed.
 // If a key is missing English is used and, if it isn't there either, the key itself.
@@ -110,7 +110,7 @@ locale.subscribe(() => applyNative(locale.get()));
 
 // Direction of the interface ('rtl' in Arabic, Hebrew, Persian…) and of a standalone text (that of its
 // first strong character: an Arabic file name inside an English interface).
-// An isolated app (runtime/app-host.js) also gets the direction from lord-server with the language
+// An isolated app (runtime/app-host.js) also gets the direction from axia-server with the language
 // (`dir`), so it mirrors like the desktop even if it cannot read that language's meta.json.
 function dirOf(l) { return l.dir === 'rtl' || l.dir === 'ltr' ? l.dir : meta(l.lang).direction === 'rtl' ? 'rtl' : 'ltr'; }
 export const direction = () => dirOf(locale.get());

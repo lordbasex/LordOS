@@ -6,7 +6,7 @@
 //   snapDisplay(rects, i, x, y, threshold)      while dragging: the "magnetic" position of rects[i] at (x, y)
 //   resolveDrop(rects, i, x, y, threshold)      on drop: a position that touches another display edge to edge
 //                                               and overlaps none (the nearest one to the snapped position)
-//   placementOk(rects, i, x, y)                 the rule lord-server checks too (out_fits in outputs.c)
+//   placementOk(rects, i, x, y)                 the rule axia-server checks too (out_fits in outputs.c)
 //
 // Every rect is { x, y, w, h } in the desktop's logical px (integers). `threshold` is in the same
 // units: Settings converts its 12 preview px with the preview's scale.
@@ -95,7 +95,7 @@ function alongEdge(v, len, op, olen, threshold) {
 
 // On drop: the snapped position if it is a valid one; otherwise the nearest position that touches a
 // display edge to edge without overlapping any (beside it, aligned when close, or slid along its edge
-// past a display in the way). lord-server keeps such a position exactly (display_arrange, out_fits).
+// past a display in the way). axia-server keeps such a position exactly (display_arrange, out_fits).
 export function resolveDrop(rects, i, x, y, threshold) {
   if (rects.length < 2) return { x: Math.round(x), y: Math.round(y) };
   const s = snapDisplay(rects, i, x, y, threshold);

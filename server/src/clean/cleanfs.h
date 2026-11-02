@@ -1,4 +1,4 @@
-/* cleanfs.h — what lord-server and lord-clean share to reach and judge a file (cleanfs.c). */
+/* cleanfs.h — what axia-server and axia-clean share to reach and judge a file (cleanfs.c). */
 #ifndef LORD_CLEAN_FS_H
 #define LORD_CLEAN_FS_H
 

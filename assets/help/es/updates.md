@@ -6,7 +6,7 @@ keywords: actualizar, actualizaciones, paquetes, debian, seguridad
 ---
 # Actualizaciones
 
-LordOS está hecho sobre Debian y se actualiza con su propio motor de paquetes, que verifica las
+Axia DE está hecho sobre Debian y se actualiza con su propio motor de paquetes, que verifica las
 firmas de Debian antes de usar cualquier cosa.
 
 - [Ajustes → Actualizaciones](settings:updates) busca actualizaciones y muestra cuántas hay.

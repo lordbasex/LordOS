@@ -1,4 +1,4 @@
-/* vault_int.h — what the parts of lord-vault share (vault.c: process, channels and requests;
+/* vault_int.h — what the parts of axia-vault share (vault.c: process, channels and requests;
  * keyring.c: the system keyring and Secret Service). */
 #ifndef LORD_VAULT_INT_H
 #define LORD_VAULT_INT_H

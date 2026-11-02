@@ -4,7 +4,7 @@
 //   configured  the mechanism is present (a kernel feature, a service running, an owner);
 //   effective   something was tried and gave the right answer;
 //   measured    a number, shown as it is (no pass or fail in this version).
-// Part 1 (0.8.5) has only what lord-server can see itself; the probe app that tries what must fail
+// Part 1 (0.8.5) has only what axia-server can see itself; the probe app that tries what must fail
 // (sandbox, firewall) is part 2. The thresholds are constants here: this file is bundled into the
 // theme, which is signed with the release key (code-manifest.json), so they are signed too.
 //
@@ -25,7 +25,7 @@ export function evaluate(ctx) {
   const r = c.report || {}, f = c.facts || {}, sw = r.software || {}, s = r.session || {};
   const out = [];
 
-  // lord-server runs as the user, never as root (§2.2)
+  // axia-server runs as the user, never as root (§2.2)
   if (f.uid == null || f.uid < 0) out.push(row('serverUser', '§2.2', 'configured', 'unknown'));
   else out.push(row('serverUser', '§2.2', 'configured', f.uid > 0 && f.euid > 0 ? 'pass' : 'fail', f.uid > 0 && f.euid > 0 ? 'serverUserOk' : 'serverUserRoot', { uid: f.uid }));
 
@@ -36,11 +36,11 @@ export function evaluate(ctx) {
   else if (ll > 0) out.push(row('landlock', '§6.4', 'configured', 'warn', 'landlockOld', { abi: ll, min: LIMITS.landlockAbi }));
   else out.push(row('landlock', '§6.4', 'configured', 'fail', 'landlockNone'));
 
-  // the per-app firewall (§6.6): lord-netperm running, and the kernel pieces its programs need
+  // the per-app firewall (§6.6): axia-netperm running, and the kernel pieces its programs need
   const kc = sw.kernelConfig || {};
   const services = sw.services || {};
-  if (services['lord-netperm'] == null) out.push(row('netperm', '§6.6', 'configured', 'unknown'));
-  else if (!services['lord-netperm']) out.push(row('netperm', '§6.6', 'configured', 'fail', 'netpermOff'));
+  if (services['axia-netperm'] == null) out.push(row('netperm', '§6.6', 'configured', 'unknown'));
+  else if (!services['axia-netperm']) out.push(row('netperm', '§6.6', 'configured', 'fail', 'netpermOff'));
   else if (kc.CONFIG_CGROUP_BPF === 'n' || !sw.bpfLsm) out.push(row('netperm', '§6.6', 'configured', 'warn', !sw.bpfLsm ? 'netpermNoLsm' : 'netpermNoCgroupBpf'));
   else out.push(row('netperm', '§6.6', 'configured', 'pass', 'netpermOk'));
 
@@ -59,7 +59,7 @@ export function evaluate(ctx) {
   else out.push(row('remoteClosed', '§11.4', 'effective', listening ? 'fail' : 'pass', listening ? 'remoteOffListening' : 'remoteOffClosed', { port: LIMITS.remotePort }));
 
   // the session's cgroup tree belongs to root (§11.4): an app can't leave its scope
-  // (only LordOS's own tree counts: a lord-server started from a terminal sits in that terminal's cgroup)
+  // (only LordOS's own tree counts: a axia-server started from a terminal sits in that terminal's cgroup)
   if (f.leafRoot == null || f.parentRoot == null) out.push(row('cgroups', '§11.4', 'configured', 'unknown'));
   else if (!/\/lordos-session-\d+\/server$/.test(f.cgroup || '')) out.push(row('cgroups', '§11.4', 'configured', 'info', 'cgroupsNotSession'));
   else out.push(row('cgroups', '§11.4', 'configured', f.leafRoot && f.parentRoot ? 'pass' : 'fail',
@@ -123,10 +123,10 @@ export const PENDING = ['netpermEffective'];
 // Before the probe has run.
 export const PROBE_CHECKS = ['appSandbox', 'helperSandbox', 'broker', 'appScope'];
 
-// ---- the Test Bench's last report (lordos-testbench, ~/.local/state/lordos/testbench.json) ----
+// ---- the Test Bench's last report (axia-testbench, ~/.local/state/axia/testbench.json) ----
 // The Wayland checklist (§3.4), the 3D renderer, whether frames are presented and input-to-screen latency.
 export function evaluateBench(b) {
-  if (!b || b.tool !== 'lordos-testbench' || !Array.isArray(b.checks)) return null;
+  if (!b || b.tool !== 'axia-testbench' || !Array.isArray(b.checks)) return null;
   const out = [];
   const fails = b.checks.filter((c) => c && c.state === 'fail');
   const passes = b.checks.filter((c) => c && c.state === 'pass').length;

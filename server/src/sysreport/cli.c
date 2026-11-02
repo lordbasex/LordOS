@@ -1,16 +1,16 @@
-/* cli.c — `lordos-sysreport` and `lordos-fetch`, System Information's commands (see
- * docs/BENCHMARK.md). Ordinary user commands: lord-server never runs them. The report is the same as
+/* cli.c — `axia-sysreport` and `axia-fetch`, System Information's commands (see
+ * docs/BENCHMARK.md). Ordinary user commands: axia-server never runs them. The report is the same as
  * the app's, so one can be made on a machine without a session (a headless Pi, a VM over SSH, CI).
  *
- *   lordos-sysreport report [--json | --markdown]
- *   lordos-sysreport bench [--quick | --full] [--json]
- *   lordos-fetch [--share] [--color=auto|always|never]      (also: lordos-sysreport fetch …)
+ *   axia-sysreport report [--json | --markdown]
+ *   axia-sysreport bench [--quick | --full] [--json]
+ *   axia-fetch [--share] [--color=auto|always|never]      (also: axia-sysreport fetch …)
  *
- * lordos-fetch is a link to this binary. --root <dir> reads a fake tree instead of this machine
+ * axia-fetch is a link to this binary. --root <dir> reads a fake tree instead of this machine
  * (tests and fixtures only).
  *
- * bench runs LordBench through lord-server's own code (bench/lbrun.c): the same sandboxed lord-bench
- * and lord-media, which must be next to this binary (it is installed in the LordOS folder; /usr/bin has
+ * bench runs LordBench through axia-server's own code (bench/lbrun.c): the same sandboxed axia-bench
+ * and axia-media, which must be next to this binary (it is installed in the LordOS folder; /usr/bin has
  * links), the same guards and the same result file as System Information → Performance. Without a session
  * the helper gets no cgroup scope and the desktop test can't run. */
 #include "sysreport.h"
@@ -30,16 +30,16 @@
 
 static int usage(int fetch) {
     if (fetch)
-        fprintf(stderr, "usage: lordos-fetch [--share] [--color=auto|always|never]\n"
-                        "  Shows the crown and a summary of this computer. --share leaves out the user and\n"
+        fprintf(stderr, "usage: axia-fetch [--share] [--color=auto|always|never]\n"
+                        "  Shows the Axia mark and a summary of this computer. --share leaves out the user and\n"
                         "  host names, for a screenshot you will post.\n");
     else
-        fprintf(stderr, "usage: lordos-sysreport report [--json | --markdown]\n"
-                        "       lordos-sysreport bench [--quick | --full] [--json]\n"
-                        "       lordos-sysreport fetch [--share] [--color=auto|always|never]\n"
+        fprintf(stderr, "usage: axia-sysreport report [--json | --markdown]\n"
+                        "       axia-sysreport bench [--quick | --full] [--json]\n"
+                        "       axia-sysreport fetch [--share] [--color=auto|always|never]\n"
                         "  report prints this computer's hardware and what the system made of it (no serial\n"
                         "  numbers, addresses, host or user names). Markdown by default.\n"
-                        "  bench measures it with LordBench, as System Information → Performance does: --quick\n"
+                        "  bench measures it with AxiaBench, as System Information → Performance does: --quick\n"
                         "  (default, about half a minute) or --full (adds storage and 3 minutes of sustained load,\n"
                         "  4 to 6 minutes). The result is also saved for the app. Nothing is sent anywhere.\n");
     return 2;
@@ -62,7 +62,7 @@ static int bench_print(const char *json) {
     if (json_parse(json, strlen(json), &d, err, sizeof err)) { puts(json); return 0; }
     const JVal *r = json_get(d.root, "result");
     const char *status = json_str(r, "status"), *stop = json_str(r, "stopReason");
-    printf("LordBench %d, %s test: %s in %.0f s (LordOS %s, %s, %.0f threads)\n", (int)json_num(r, "lordbench", 0),
+    printf("AxiaBench %d, %s test: %s in %.0f s (Axia DE %s, %s, %.0f threads)\n", (int)json_num(r, "lordbench", 0),
            json_str(r, "mode") ? json_str(r, "mode") : "?", status ? status : "?", json_num(r, "seconds", 0),
            json_str(r, "lordos") ? json_str(r, "lordos") : "?", json_str(r, "arch") ? json_str(r, "arch") : "?", json_num(r, "threads", 0));
     if (stop && stop[0]) printf("stopped: %s\n", stop);
@@ -79,7 +79,7 @@ static int bench_print(const char *json) {
         printf("  %-18s %s\n", m->key, m->type == J_STR ? m->str : "");
     }
     if (only_full) printf("(%d more with --full)\n", only_full);
-    /* the helper-sandbox self-test lord-bench made after locking itself in: every one of the LB_SBX_COUNT tries
+    /* the helper-sandbox self-test axia-bench made after locking itself in: every one of the LB_SBX_COUNT tries
      * must be there and refused, as the Stability verdict checks (apps/sysinfo/perf.js) */
     const JVal *sb = json_get(r, "sandboxTries");
     int leaks = 0;
@@ -116,7 +116,7 @@ static int bench(int full, int json) {
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
     if (lbrun_start(full ? "full" : "quick", full ? CLI_SUSTAINED_S : 0, "{\"cli\":true}")) {
-        fprintf(stderr, "lordos-sysreport: LordBench did not start: another run is going on, or the lord-bench next to this program is missing or writable by others\n");
+        fprintf(stderr, "axia-sysreport: AxiaBench did not start: another run is going on, or the axia-bench next to this program is missing or writable by others\n");
         return 1;
     }
     char last[96] = "";
@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
     const char *root = "", *mode = "markdown", *color = "auto";
     const char *base = strrchr(argv[0], '/');
     base = base ? base + 1 : argv[0];
-    int fetch = !strcmp(base, "lordos-fetch"), report = 0, share = 0, bnch = 0, full = 0, json = 0;
+    int fetch = !strcmp(base, "axia-fetch"), report = 0, share = 0, bnch = 0, full = 0, json = 0;
     for (int i = 1; i < argc; i++) {
         if (!fetch && !report && !bnch && !strcmp(argv[i], "report")) report = 1;
         else if (!fetch && !report && !bnch && !strcmp(argv[i], "fetch")) fetch = 1;

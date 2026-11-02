@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Run Lord DE with Fedora's user bus and an independent polkit agent."""
+"""Run Axia DE with Fedora's user bus and an independent polkit agent."""
 import os
 from pathlib import Path
 import signal
@@ -13,7 +13,7 @@ def sockets(runtime):
 
 
 def x_display(pid):
-    # Lord DE reserves an Xwayland socket before starting Xwayland on demand.
+    # Axia DE reserves an Xwayland socket before starting Xwayland on demand.
     # Match its lock to this compositor, rather than guessing a display number.
     for lock in Path('/tmp').glob('.X*-lock'):
         try:
@@ -31,15 +31,15 @@ def x_display(pid):
 
 def main():
     if os.geteuid() == 0:
-        raise SystemExit('Start Lord DE as a regular user.')
+        raise SystemExit('Start Axia DE as a regular user.')
     if not os.environ.get('DBUS_SESSION_BUS_ADDRESS'):
         os.execvp('dbus-run-session', ['dbus-run-session', '--', __file__])
     runtime = Path(os.environ['XDG_RUNTIME_DIR'])
     before = sockets(runtime)
-    env = dict(os.environ, XDG_CURRENT_DESKTOP='LordOS', XDG_SESSION_DESKTOP='lord-de',
+    env = dict(os.environ, XDG_CURRENT_DESKTOP='Axia', XDG_SESSION_DESKTOP='axia',
                XDG_SESSION_TYPE='wayland', GDK_BACKEND='wayland', MOZ_ENABLE_WAYLAND='1',
                DISPLAY='')
-    server = subprocess.Popen(['/usr/bin/lord-de-session'], env=env)
+    server = subprocess.Popen(['/usr/bin/axia-session'], env=env)
     helpers = []
 
     def stop(signum, frame):

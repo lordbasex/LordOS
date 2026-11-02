@@ -23,7 +23,7 @@ mkdir -p ~/.config/fwprobe ~/.cache/fwprobe ~/.cache/fontconfig
 echo shm > /dev/shm/fwlinux-shm-$U                  # the session's shared memory: not visible to the app
 PROBE=~/.config/fwprobe/probe.py           # its own config dir: visible to the restricted app
 cp "$D/files_probe.py" "$PROBE"
-SPID=$(pgrep -u "$U" -o -x lord-server || echo 1)   # a session process: its /proc/<pid>/root must not be reachable
+SPID=$(pgrep -u "$U" -o -x axia-server || echo 1)   # a session process: its /proc/<pid>/root must not be reachable
 TSOCK=/tmp/fwlinux-tmp-$U.sock                       # a socket in the real /tmp (like a terminal multiplexer's)
 rm -f "$TSOCK"
 python3 -c "import socket,sys,time; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(); time.sleep(60)" "$TSOCK" &

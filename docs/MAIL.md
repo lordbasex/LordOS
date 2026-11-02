@@ -4,12 +4,12 @@ LordOS ships four native apps for personal information: **Mail** (a three-pane c
 spirit of classic desktop mail clients), **Calendar**, **Contacts** and **Reminders**. They are
 ordinary LordOS apps (React on our engine, `apps/mail`, `apps/calendar`, `apps/contacts`,
 `apps/reminders`). All the network protocols and every parser of data that comes from outside
-run in one sandboxed helper process, **`lord-maild`**.
+run in one sandboxed helper process, **`axia-maild`**.
 
 | Piece | Status |
 |---|---|
-| `lord-maild`: IMAP (IDLE, CONDSTORE, MOVE, UIDPLUS, SPECIAL-USE), SMTP submission (465 / 587 STARTTLS), CalDAV and CardDAV | **done**, tested against Dovecot 2.4, Postfix and Radicale 3.5 (VM 123) |
-| Sandbox: shared helper sandbox (`sandbox_apply_helper`), **no sockets at all**: connections come from `lord-server`, only to configured servers | **done** |
+| `axia-maild`: IMAP (IDLE, CONDSTORE, MOVE, UIDPLUS, SPECIAL-USE), SMTP submission (465 / 587 STARTTLS), CalDAV and CardDAV | **done**, tested against Dovecot 2.4, Postfix and Radicale 3.5 (VM 123) |
+| Sandbox: shared helper sandbox (`sandbox_apply_helper`), **no sockets at all**: connections come from `axia-server`, only to configured servers | **done** |
 | TLS with OpenSSL, verification against the system CA store and the host name; bad certificates shown, never accepted silently | **done** (local CA in the VM; a mismatched certificate shows the warning) |
 | Local cache (Maildir-like) and offline index; 10,000-message folder opens from the cache | **done** (list of 10,000: ~20 ms per window, see Measurements) |
 | Conversations (References / In-Reply-To / subject), unified inbox, flags, 6 color categories | **done** |
@@ -29,41 +29,41 @@ run in one sandboxed helper process, **`lord-maild`**.
 ## Processes and trust
 
 ```
- lord-server --app mail | calendar | contacts | reminders      (0.8.2: each its own sandboxed process,
+ axia-server --app mail | calendar | contacts | reminders      (0.8.2: each its own sandboxed process,
    apps/<id> (React), sdk/mail.js, calendar.js, contacts.js     no network, no access to the cache)
                  │ lord.mail.request / poll (ui/js_brokermail.c) over the broker: BOP_MAIL
                  ▼
- lord-server ── server/src/sec/brokermail.c (per-app allow list, fds from the system dialog only)
+ axia-server ── server/src/sec/brokermail.c (per-app allow list, fds from the system dialog only)
              ── server/src/ui/js_mail.c (the session's lord.mail: notifications, alarms, need-auth)
-             └─ server/src/mail/mailc.c: starts lord-maild, its channel thread, the CONNECTOR
-                 │ socketpair (fd 3, same framing as lord-doc: header + JSON + SCM_RIGHTS)
- lord-maild  ── sandboxed: TLS, IMAP, SMTP, HTTP/WebDAV, MIME, HTML, iCalendar, vCard, images
+             └─ server/src/mail/mailc.c: starts axia-maild, its channel thread, the CONNECTOR
+                 │ socketpair (fd 3, same framing as axia-doc: header + JSON + SCM_RIGHTS)
+ axia-maild  ── sandboxed: TLS, IMAP, SMTP, HTTP/WebDAV, MIME, HTML, iCalendar, vCard, images
 ```
 
 - **The windows run in their own process (0.8.2).** Mail, Calendar, Contacts and Reminders are
-  system packages that run as `lord-server --app <id>` with Landlock, seccomp, no network and their
-  own cgroup scope; they reach lord-maild only through `lord-server` (`BOP_MAIL`), each with its own
+  system packages that run as `axia-server --app <id>` with Landlock, seccomp, no network and their
+  own cgroup scope; they reach axia-maild only through `axia-server` (`BOP_MAIL`), each with its own
   allow list, its own replies and images, and files only as fds picked in the system dialog. The
   session keeps new-mail notifications, alarms and passwords on demand. See
   [PRIVACY.md, "System apps in their own process"](PRIVACY.md#system-apps-in-their-own-process-082).
-- **lord-maild** is started by `lord-server` with a fixed path (`<lord-server dir>/lord-maild`,
+- **axia-maild** is started by `axia-server` with a fixed path (`<axia-server dir>/axia-maild`,
   owned by root or the user, not writable by others), no arguments, a minimal environment and the
   channel on fd 3. Before reading anything from the network it loads the CA bundle and the time
   zone, receives the cache folder as an open fd, and locks itself in with
   `sandbox_apply_helper()` (`server/src/sec/sandbox.c`): Landlock (read-only `/usr`, the
   zoneinfo; write access only below the cache folder), seccomp without `socket`, `connect`,
   `bind`, `execve` or `fork` (threads only, TSYNC), no capabilities, cgroup scope
-  `lordos-maild.scope`. It dies with `lord-server` (`PR_SET_PDEATHSIG`) and is not dumpable.
-- **No socket of its own.** `lord-maild` cannot create sockets. To reach a server it sends
-  `MR_CONNECT {host, port}`; `lord-server` (`mailc.c`) checks the endpoint against the accounts
+  `lordos-maild.scope`. It dies with `axia-server` (`PR_SET_PDEATHSIG`) and is not dumpable.
+- **No socket of its own.** `axia-maild` cannot create sockets. To reach a server it sends
+  `MR_CONNECT {host, port}`; `axia-server` (`mailc.c`) checks the endpoint against the accounts
   file and, if allowed, resolves it, connects (10 s timeout) on a thread of its own and passes the
   connected socket back (`MQ_SOCK`). (0.8.5) The socket itself is made and connected by Mail's connector
-  (`lord-server --net-connector mail`, in `lordos-net-mail.scope`), so Mail and the calendar sync
+  (`axia-server --net-connector mail`, in `lordos-net-mail.scope`), so Mail and the calendar sync
   are their own app for the firewall and Monitor → Network ("Mail and calendars", `lordos:mail`;
   `FIREWALL.md`, "LordOS components in their own scopes"); the endpoint check above is unchanged. The allowed endpoints are exactly: each account's IMAP and
   SMTP `host:port`, each DAV URL's `host:port`, and — for CalDAV/CardDAV discovery redirects inside
   the same provider (for example `pNN-caldav.icloud.com`) — other hosts of the same domain on port 443.
-  So a malicious message that takes over `lord-maild` still cannot talk to anything else.
+  So a malicious message that takes over `axia-maild` still cannot talk to anything else.
 - **Remote images** are the only other endpoints, and only after the user presses *Load Images*
   (or trusts the sender): `lord.mail.allowImages(urls)` grants those `http(s)` hosts on ports 80/443
   for ten minutes, and the connector then refuses every resolved address that is not public
@@ -71,29 +71,29 @@ run in one sandboxed helper process, **`lord-maild`**.
   ranges behind v4-mapped, NAT64 and 6to4 addresses), checked on the address it actually connects
   to (no DNS rebinding). Redirects (at most 3) go through the same check; each image is capped at
   5 MB and 20 s. Tested by `build/mailc-test`.
-- **OpenSSL** is linked only by `lord-maild`, `lord-sessiond` and, since 0.8.5, `lord-fetch` (the blocklist
+- **OpenSSL** is linked only by `axia-maild`, `lord-sessiond` and, since 0.8.5, `axia-dl` (the blocklist
   downloader) and `lord-tls` (the package engine's HTTPS); see `ARCHITECTURE.md`.
-  `lord-server` never links it.
+  `axia-server` never links it.
 - **The compositor never waits**: requests are asynchronous (`lord.mail.poll()`), and inside
-  `lord-maild` network work runs on account threads, never on the thread that reads the channel.
-- **Images are decoded in the sandbox** (stb_image in `lord-maild`, PNG/JPEG/GIF/BMP) and come
-  back as sealed memfds of ARGB pixels, like `lord-doc`'s; `lord-server` only copies pixels.
+  `axia-maild` network work runs on account threads, never on the thread that reads the channel.
+- **Images are decoded in the sandbox** (stb_image in `axia-maild`, PNG/JPEG/GIF/BMP) and come
+  back as sealed memfds of ARGB pixels, like `axia-doc`'s; `axia-server` only copies pixels.
 
 ### Passwords and the keyring
 
 Passwords never touch a file. When you add an account, Mail stores the password in the system
 keyring (Passwords, `keyring.set('mail', { service: 'mail:<id>', account: user })`, see
-`docs/PASSWORDS.md`) and hands it to `lord-maild`, which keeps it in memory only. When
-`lord-maild` starts and needs it, it asks (`need-auth` event) and the SDK reads it from the
+`docs/PASSWORDS.md`) and hands it to `axia-maild`, which keeps it in memory only. When
+`axia-maild` starts and needs it, it asks (`need-auth` event) and the SDK reads it from the
 keyring. If the keyring is locked or there is none (a session without a login password, such as
 the test VM's autologin), the account works for the session and Mail shows ⚠ next to it to type
 the password again.
 
-The accounts file `~/.config/lordos/mail/accounts.json` holds servers, user names, signatures and
+The accounts file `~/.config/axia/mail/accounts.json` holds servers, user names, signatures and
 **trusted certificate fingerprints**, never passwords (`saveConfig` refuses a `password` field).
-Because it decides which servers `lord-maild` may reach, `lord.fs` cannot write it
+Because it decides which servers `axia-maild` may reach, `lord.fs` cannot write it
 (`fsops_protected`): only `lord.mail.saveConfig` can, after validating it. The cache
-`~/.local/share/lordos/mail` is protected the same way.
+`~/.local/share/axia/mail` is protected the same way.
 
 ### Certificates
 
@@ -155,7 +155,7 @@ count, and the reading pane shows the whole conversation from every folder excep
 ### Local cache and offline search
 
 ```
-~/.local/share/lordos/mail/
+~/.local/share/axia/mail/
   <account>/folders              folder list
   <account>/f/<hash>/state       UIDVALIDITY UIDNEXT HIGHESTMODSEQ
   <account>/f/<hash>/index       one line per message (headers for the list, flags, preview)
@@ -164,7 +164,7 @@ count, and the reading pane shows the whole conversation from every folder excep
   att/…  img/…  outbox/…  pim/…  attachments opened, remote images loaded, "send later", calendars/contacts
 ```
 
-Everything is in memory while `lord-maild` runs. The **search index** is an inverted index of
+Everything is in memory while `axia-maild` runs. The **search index** is an inverted index of
 folded words (lower case, no accents): subject, people, preview and, for downloaded messages, the
 body; every word of the query matches by prefix ("presu" finds "presupuesto"), and results come
 sorted by date. It is rebuilt from the cache in milliseconds at start and never needs the network.
@@ -205,8 +205,8 @@ simple `text/html` that Mail builds itself from the parsed markdown (nothing typ
 through as HTML). The editor is the Notes editor (monospaced). Signatures (markdown) per account
 are added below the cursor. Replies quote the original; Forward brings its attachments.
 
-- **Attachments**: the file sheet lists the home folder; `lord-server` opens the files (same
-  rules as `lord.fs`) and passes the fds; `lord-maild` reads them (25 MB each, 35 MB per message).
+- **Attachments**: the file sheet lists the home folder; `axia-server` opens the files (same
+  rules as `lord.fs`) and passes the fds; `axia-maild` reads them (25 MB each, 35 MB per message).
 - **Drafts** are saved to the server's Drafts folder (❖S, and every 30 s while there are changes;
   the previous version is replaced), and the draft is removed when the message is sent.
 - **Send later**: in 1 hour, tomorrow at 8:00, Monday at 8:00. The message is composed at once and
@@ -245,19 +245,19 @@ applications registered in their consoles, so this is **prepared but disabled**:
 - `sdk/mail.js` → `OAUTH_PROVIDERS.google` / `.microsoft`: endpoints and scopes are filled in;
   `enabled: false`, `clientId: ''`. The setup sheet shows *Sign in with Gmail* greyed out with
   "Needs your client ID".
-- `lord-maild` accepts `"auth": "oauth2"` in an account and answers `oauth-disabled`.
+- `axia-maild` accepts `"auth": "oauth2"` in an account and answers `oauth-disabled`.
 
 To enable it: register an OAuth client (Google Cloud Console → APIs & Services → Credentials,
 type "Desktop app", scopes `https://mail.google.com/` and the calendar/contacts ones; or Azure →
 App registrations, "Mobile and desktop applications", redirect `http://localhost`, delegated
 permissions `IMAP.AccessAsUser.All`, `SMTP.Send`, `offline_access`), put the client ID in
 `OAUTH_PROVIDERS`, and implement the remaining pieces: the authorization-code flow with PKCE
-(a loopback redirect served by `lord-server`), storing the refresh token in the keyring, and
+(a loopback redirect served by `axia-server`), storing the refresh token in the keyring, and
 `AUTHENTICATE XOAUTH2` in `imap.c`/`smtp.c` (the place is marked `oauth-disabled`).
 
 ## Calendar, Reminders and Contacts
 
-Kept by `lord-maild` too (`server/src/mail/pim.c`), so they work with every app closed and are
+Kept by `axia-maild` too (`server/src/mail/pim.c`), so they work with every app closed and are
 synced by the same sandboxed process. Local collections exist from the first run (a calendar, a
 reminders list, an address book); CalDAV/CardDAV accounts add the server's collections.
 
@@ -290,7 +290,7 @@ reminders list, an address book); CalDAV/CardDAV accounts add the server's colle
 ### Alarms with the apps closed
 
 Like the Clock's alarms (`sdk/alarms.js`), they live in the SDK, not in an app window:
-`startShell` calls `startReminders()`, which asks `lord-maild` for the alarms of the next 36 hours
+`startShell` calls `startReminders()`, which asks `axia-maild` for the alarms of the next 36 hours
 (event `VALARM`s, and to-dos at their due time — 9:00 for all-day ones), sets one timer to the next
 one (in pieces of at most a minute when it is close, because the monotonic clock stops during
 suspend), rings a sticky notification (Snooze 10 min, *Mark as done* for to-dos, Open), and
@@ -302,7 +302,7 @@ rings. It re-reads the list whenever calendar data changes.
 `lord.mail` (`server/src/ui/js_mail.c`): `available()`, `start()`, `request(json, [paths])` → id,
 `poll()`, `pending()`, `config()`, `saveConfig(json)`, `allowImages(urls)`, `bind(node, image)`,
 `release(image)`, `cacheDir()`. Every request is a JSON object with an `op`; files are picked by the
-user and opened by `lord-server`.
+user and opened by `axia-server`.
 
 SDK (`@lordos/sdk`):
 
@@ -316,7 +316,7 @@ SDK (`@lordos/sdk`):
 - `sdk/filepicker.jsx`: `<FilePicker>` (choose files from the home folder in apps that run in the
   theme's context).
 
-Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folders`, `counts`,
+Operations of `axia-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folders`, `counts`,
 `list`, `thread`, `search`, `open`, `attachment`, `image`, `invite`, `invite-respond`, `flag`,
 `move`, `delete`, `create-folder`, `send` (also `{test:true}` to check SMTP), `draft`, `sync`,
 `autocomplete`, `alarms`, and `cal-*`, `ev-*`, `todo-*`, `book-*`, `contact-*`.
@@ -340,8 +340,8 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
   every literal size around the buffer-growth boundaries, endless lines — over a socketpair.
 - `build/mailc-test` (69 checks): the connector's endpoint policy and the public-address check.
 - `make -C server mail-asan`: the same suites under AddressSanitizer and UBSan.
-- `build/maild-cli '{"op":"status"}' --wait 5` (not part of `test`) drives `lord-maild` from a
-  terminal like `lord-server` does; with another `HOME` it uses another cache.
+- `build/maild-cli '{"op":"status"}' --wait 5` (not part of `test`) drives `axia-maild` from a
+  terminal like `axia-server` does; with another `HOME` it uses another cache.
 
 ## Measurements (VM 123, 4 vCPU, local Dovecot)
 
@@ -351,8 +351,8 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
 | Opening that folder from the cache (`list`, 60 rows) | ~20 ms (the CLI polls every 20 ms: the real number is lower) |
 | Any window of it (offset 5,000) | ~20 ms |
 | Search over all accounts (`factura valentina`, prefix match) | ~20 ms |
-| `lord-maild` start with the 10,000-message cache (index + search index) | ~0.1 s |
-| `lord-maild` memory with that cache | ~25 MB RSS |
+| `axia-maild` start with the 10,000-message cache (index + search index) | ~0.1 s |
+| `axia-maild` memory with that cache | ~25 MB RSS |
 | Scrolling the 10,000-row list | only visible rows exist; rows load in windows of ~40 |
 
 ## Testing on the VM

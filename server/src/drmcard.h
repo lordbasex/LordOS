@@ -1,4 +1,4 @@
-/* drmcard.h — which /dev/dri/cardN is the display (lord-server and lord-sessiond).
+/* drmcard.h — which /dev/dri/cardN is the display (axia-server and lord-sessiond).
  *
  * On a PC it is usually card0, but not always: with simpledrm at boot, amdgpu/i915 show up
  * as card1. On ARM boards (Raspberry Pi 4/5 and many others) the display and the 3D GPU are

@@ -761,7 +761,7 @@ static OutSlot *slot_of(struct wl_resource *r) {
 
 static void send_output(struct wl_resource *r, const WlOutput *o) {
     int ver = wl_resource_get_version(r);
-    wl_output_send_geometry(r, o->x, o->y, o->mm_w, o->mm_h, WL_OUTPUT_SUBPIXEL_UNKNOWN, "LordOS", o->desc[0] ? o->desc : "lord-server",
+    wl_output_send_geometry(r, o->x, o->y, o->mm_w, o->mm_h, WL_OUTPUT_SUBPIXEL_UNKNOWN, "LordOS", o->desc[0] ? o->desc : "axia-server",
                             WL_OUTPUT_TRANSFORM_NORMAL);
     wl_output_send_mode(r, WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED, o->pw, o->ph, o->refresh > 0 ? o->refresh : 60000);
     if (ver >= 2) wl_output_send_scale(r, int_scale(o->scale));
@@ -1152,7 +1152,7 @@ static void src_gone(struct wl_resource *r) {
     free(s);
 }
 
-/* The image is also saved as a file in $XDG_RUNTIME_DIR/lordos (user-only),
+/* The image is also saved as a file in $XDG_RUNTIME_DIR/axia (user-only),
  * for the history preview; the last 10 are kept. */
 static void store_png(const unsigned char *png, size_t n) {
     unsigned char *copy = malloc(n);
@@ -1167,7 +1167,7 @@ static void store_png(const unsigned char *png, size_t n) {
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return;
     char dir[128], old[160];
-    snprintf(dir, sizeof dir, "%s/lordos", rt);
+    snprintf(dir, sizeof dir, "%s/axia", rt);
     mkdir(dir, 0700);
     if (clip_img_gen > 10) { snprintf(old, sizeof old, "%s/clip-%u.png", dir, clip_img_gen - 10); unlink(old); }
     snprintf(clip_png_path, sizeof clip_png_path, "%s/clip-%u.png", dir, clip_img_gen);
@@ -1340,16 +1340,16 @@ const unsigned char *wl_clip_png(size_t *len) {
 const char *wl_clip_image_origin(void) { return clip_img_origin; }
 int wl_clip_image_sensitive(void) { return clip_img_sensitive; }
 
-/* Only two places: the compositor's previews ($XDG_RUNTIME_DIR/lordos/clip-N.png) and the
- * saved history (~/.local/share/lordos/clipboard/img-*.png). */
+/* Only two places: the compositor's previews ($XDG_RUNTIME_DIR/axia/clip-N.png) and the
+ * saved history (~/.local/share/axia/clipboard/img-*.png). */
 static int clip_path_ok(const char *path) {
     const char *rt = getenv("XDG_RUNTIME_DIR"), *home = getenv("HOME");
     char dir[PATH_MAX];
     size_t n = strlen(path);
     if (n < 6 || strcmp(path + n - 4, ".png") || strstr(path, "..")) return 0;
     for (int k = 0; k < 2; k++) {
-        if (k == 0 && rt) snprintf(dir, sizeof dir, "%s/lordos/clip-", rt);
-        else if (k == 1 && home) snprintf(dir, sizeof dir, "%s/.local/share/lordos/clipboard/img-", home);
+        if (k == 0 && rt) snprintf(dir, sizeof dir, "%s/axia/clip-", rt);
+        else if (k == 1 && home) snprintf(dir, sizeof dir, "%s/.local/share/axia/clipboard/img-", home);
         else continue;
         size_t dl = strlen(dir);
         if (!strncmp(path, dir, dl) && n > dl + 4 && !strchr(path + dl, '/')) return 1;
@@ -2593,8 +2593,8 @@ static void send_key_to_focus(int code, int value) {
     mods_sent[0] = d; mods_sent[1] = l; mods_sent[2] = lk; mods_sent[3] = g;
 }
 
-/* The client with the keyboard is an isolated LordOS app (`lord-server --app`): its pid is the one
- * lord-server registered when it spawned it (brokersrv). A Linux app never matches. */
+/* The client with the keyboard is an isolated LordOS app (`axia-server --app`): its pid is the one
+ * axia-server registered when it spawned it (brokersrv). A Linux app never matches. */
 static int focus_is_lord_app(void) {
     pid_t pid = 0;
     uid_t uid;
@@ -3310,7 +3310,7 @@ void wl_close_all(int ms) {
 }
 
 /* Force Quit (the crown menu): SIGKILL to the process that owns this Wayland window, for an app that
- * stopped answering. Only a client of this session's user, never lord-server itself, never pid 1, and
+ * stopped answering. Only a client of this session's user, never axia-server itself, never pid 1, and
  * never an X11 window (its client is Xwayland, which every X11 app shares: those are asked to close).
  * 0, or an error code for the interface. */
 const char *wl_kill(int id) {

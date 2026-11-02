@@ -39,12 +39,12 @@ static void t_review(void) {
     hello(16, 16); Rfb r = make();
     CHECK(rfb_handshake(&r, pw) == 1 && !r.w && !pw[0] && !memchr(pw, 's', 6));
     CHECK(ol == 12);                    /* it never picked a type */
-    /* the picture's size can't change under lord-server's mapping */
+    /* the picture's size can't change under axia-server's mapping */
     int fd = rd_picture_memfd(4096);
     CHECK(fd >= 0 && ftruncate(fd, 0) && errno == EPERM && ftruncate(fd, 8192) && errno == EPERM);
     void *m = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     CHECK(m != MAP_FAILED); ((char *)m)[4095] = 1; munmap(m, 4096);
-    /* a full socket doesn't block lord-server */
+    /* a full socket doesn't block axia-server */
     int sv[2];
     CHECK(!socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv));
     int sent = 0;

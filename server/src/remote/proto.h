@@ -1,7 +1,7 @@
-/* proto.h — local protocol between lord-server (the session), lord-sessiond (which lends it the
+/* proto.h — local protocol between axia-server (the session), lord-sessiond (which lends it the
  * monitor) and the remote desktop network bridge.
  *
- * Session unix socket: $XDG_RUNTIME_DIR/lordos/remote.sock (lord-server creates it already as the
+ * Session unix socket: $XDG_RUNTIME_DIR/axia/remote.sock (axia-server creates it already as the
  * user, 0600; root can also get in). Each message: u32 length (of what follows, little endian),
  * u8 type and the data. See docs/REMOTE.md and docs/SESSIONS.md. */
 #ifndef LORD_REMOTE_PROTO_H
@@ -49,7 +49,7 @@ enum {
     RP_INPUT_ADD = 23,  /* + fds: keyboards, mice or touchpads plugged in later (only to the monitor's
                          * session; the session closes unplugged ones when it gets ENODEV). Root only */
     RP_KEYRING = 24,    /* text: the password just verified on the login screen; the session opens
-                         * its keyring with it (lord-vault, docs/PASSWORDS.md) and wipes it. Root only */
+                         * its keyring with it (axia-vault, docs/PASSWORDS.md) and wipes it. Root only */
     RP_NOTICE = 25,     /* JSON, from lord-sessiond (root, seat) only: a notice for the user on the monitor,
                          * {"t":"blocked","ip":"…","min":N,"n":N} (a source blocked after failed remote logins) */
     RP_SCROLL = 30,     /* u8 phase (1 begins, 2 continues, 3 ends), i32 dx, dy in 1/256 pixel: browser trackpad */

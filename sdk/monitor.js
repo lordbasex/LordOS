@@ -5,16 +5,16 @@
 //   const conns = useStore(monitorConnections);  // { t, others, list: [{ id, proto, remote, cc, app… }] }
 //   monitor.info()                               // { cpuModel, cores, geo, home: { lat, lon, cc } }
 //
-// lord-server samples in its own thread only while some useMonitor is mounted (and
+// axia-server samples in its own thread only while some useMonitor is mounted (and
 // polls it): with the app closed it costs nothing. The process and connection lists are built
 // only if some useMonitor asks for them, once per second.
 //
 // One process (Processes tab, docs/MONITOR.md "Process actions"):
 //   monitor.watchProcess(p, { asAdmin })   Get Info: monitorDetail follows p once per second; returns stop()
-//   await monitor.stopProcess(p, 'TERM' | 'KILL')   the user's own: lord-server signals it; another
+//   await monitor.stopProcess(p, 'TERM' | 'KILL')   the user's own: axia-server signals it; another
 //                                                  user's or root's: the root helper (administrators)
 //
-// Traffic history (0.8.2, docs/MONITOR.md "Traffic history"): lord-server records the machine's and
+// Traffic history (0.8.2, docs/MONITOR.md "Traffic history"): axia-server records the machine's and
 // each of the user's apps' bytes per minute (7 days) and per hour (30 days) in a file of the user's,
 // while Settings → Privacy → Monitor → "Keep a traffic history" is on (settings.monitor.history).
 //   monitor.history({ from, step, n, app })  → { res, oldest, now, rx: [n], tx: [n], top: [[app, rx, tx]] } | null
@@ -141,8 +141,8 @@ export function useMonitor({ procs = false, conns = false, geo = true, everyMs =
 }
 
 // ---- per-app firewall (lord.fw, docs/FIREWALL.md) ----
-// lord-netperm (root) applies the rules in the kernel and counts each app's new connections;
-// lord-server passes them to JS. firewallState: { status, counts: { app: [allowed, denied, rx, tx,
+// axia-netperm (root) applies the rules in the kernel and counts each app's new connections;
+// axia-server passes them to JS. firewallState: { status, counts: { app: [allowed, denied, rx, tx,
 // rxRate, txRate, [[addr, rx, tx, rxRate, txRate, blocked], ...], blocked] } (the bytes when
 // status.bytes; blocked: bytes of open connections dropped because a rule now denies them),
 // events: [the last 200 new connections], rev }. rev goes up when a rule changes.
@@ -251,14 +251,14 @@ async function stopProcess(p, kind, { own } = {}) {
   await admin.run('proc-signal', `${p.pid} ${p.st} ${kind}`, null, { quiet: true });
 }
 
-// The history records in lord-server, with the window closed too; the switch is the user's setting
-// (lord-server ignores it on the login screen and in isolated apps).
+// The history records in axia-server, with the window closed too; the switch is the user's setting
+// (axia-server ignores it on the login screen and in isolated apps).
 let historyOn = null;
 function syncHistory() {
   const on = settings.get()?.monitor?.history !== false;
   if (on === historyOn || !available() || typeof lord.monitor.historyEnable !== 'function') return;
   historyOn = on;
-  try { lord.monitor.historyEnable(on); } catch (e) { /* an older lord-server */ }
+  try { lord.monitor.historyEnable(on); } catch (e) { /* an older axia-server */ }
 }
 if (typeof lord !== 'undefined') { syncHistory(); settings.subscribe(syncHistory); }
 

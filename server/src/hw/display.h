@@ -1,4 +1,4 @@
-/* display.h — Settings → Displays on the lord-server side (docs/SETTINGS.md, "Displays", and
+/* display.h — Settings → Displays on the axia-server side (docs/SETTINGS.md, "Displays", and
  * docs/DISPLAYS.md for several displays and HiDPI).
  *
  *   - lists the card's outputs with their EDID name, modes, scale and place in the arrangement;
@@ -6,7 +6,7 @@
  *     (100–200 % in 25 % steps), position in the global logical space, extend or mirror, and the
  *     main display (menu bar and Dock). main.c applies it between frames (display_take_resync);
  *   - live changes are kept per display (EDID identity) and saved on "Keep" in
- *     ~/.config/lordos/displays.json;
+ *     ~/.config/axia/displays.json;
  *   - Night Light: a color temperature on every CRTC's gamma LUT, or a software LUT applied while
  *     copying frames when a card has no gamma (virtio-gpu, some ARM boards);
  *   - idle: screen off (DPMS on every display) after N seconds without input, plus "lock" and

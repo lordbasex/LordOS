@@ -48,7 +48,7 @@ typedef enum {
 } FwDstKind;
 
 /* Restrictions of an app in the "Restricted apps" list. The network ones are applied by fw_decide
- * (and, in the kernel, by lord-netperm). The others are checked with fw_blocks, through
+ * (and, in the kernel, by axia-netperm). The others are checked with fw_blocks, through
  * sec/restrict.h, where the resource is handed out (docs/FIREWALL.md, "Non-network
  * restrictions"): the broker for isolated apps, js_media.c and sdk/notify.js for built-in apps. */
 enum {
@@ -179,7 +179,7 @@ uint32_t    fw_flag_from_name(const char *name);            /* 0 if it doesn't e
 char *fw_to_json(const FwStore *s, size_t *len);
 /* Replaces the contents of s with those of the JSON. If anything fails validation, s stays the same and err says what. */
 int   fw_from_json(FwStore *s, const char *text, size_t len, char *err, size_t errlen);
-/* Per-user file (~/.config/lordos/firewall.json): atomic write with mode 0600. */
+/* Per-user file (~/.config/axia/firewall.json): atomic write with mode 0600. */
 int   fw_save(const FwStore *s, const char *path);
 int   fw_load(FwStore *s, const char *path, char *err, size_t errlen);
 

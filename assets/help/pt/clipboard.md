@@ -6,7 +6,7 @@ keywords: copiar, colar, histórico, área de transferência, imagens
 ---
 # Área de transferência
 
-O LordOS guarda o que você copia em qualquer app (também nos apps Linux): textos, links, cores,
+O Axia DE guarda o que você copia em qualquer app (também nos apps Linux): textos, links, cores,
 código, caminhos e imagens.
 
 - **❖V:** o que você copiou por último, com busca. Enter, um clique ou as teclas 1 a 9 colam onde
@@ -19,7 +19,7 @@ código, caminhos e imagens.
 ## Privacidade
 
 - O que um app marca como secreto (por exemplo, um gerenciador de senhas) não é guardado.
-- Os campos de senha do LordOS também não.
+- Os campos de senha do Axia DE também não.
 - Em [Ajustes → Área de transferência](settings:clipboard) você escolhe se o histórico é guardado,
   por quanto tempo e quais apps ficam de fora, e pode apagar tudo.
 

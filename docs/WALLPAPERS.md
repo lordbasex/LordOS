@@ -52,7 +52,7 @@ Videos are downloaded on demand by closed admin actions (`server/src/hw/wallpape
 
 JS names an entry, never a URL or a path. The base must be the project's GitHub owner on `raw.githubusercontent.com`, the
 bytes go through `fetch_batch` (a child as `nobody`, in the Store's scope, so the firewall sees `lordos:store`), and a file
-whose size or hash isn't the catalog's is deleted. `lord-media` keeps its sandbox and receives an open file, and
+whose size or hash isn't the catalog's is deleted. `axia-media` keeps its sandbox and receives an open file, and
 `media_open_input` accepts those two system folders besides the user's own files. `server/tests/wallpaper_find_test.c` covers the lookup.
 
 An added video stays in the user's files. It needs at most 10 s and a format this machine decodes in hardware.
@@ -70,7 +70,7 @@ driver's attack surface; it already ran Mesa in software.
 
 Hardware HEVC needs Raspberry Pi's FFmpeg, pinned in `/etc/apt/preferences.d/raspberrypi` (migration 006 adds the pin on
 upgrades, and the next `apt` update brings the packages). That FFmpeg opens the decoder by path, so for this one job,
-`MK_PLAY` with `hwaccel=v4l2request`, `lord-media` may open two exact device files found from sysfs before the sandbox,
+`MK_PLAY` with `hwaccel=v4l2request`, `axia-media` may open two exact device files found from sysfs before the sandbox,
 reads `/sys/class`, `/sys/bus` and `/run/udev`, and gets the V4L2 and media controller ioctl classes.
 
 ## Measurements
@@ -78,9 +78,9 @@ reads `/sys/class`, `/sys/bus` and `/run/udev`, and gets the V4L2 and media cont
 | Machine | Case | Result |
 |---|---|---|
 | Pi 5, login, trial build | 1080p60 H.264, software decode, CPU composition | about 156 % of one core |
-| Pi 5, login, 0.8.7 | 1080p60 HEVC, hardware decode, GPU composition | `lord-media` 41 %, `lord-server` 147 % of one core, 30 s, SoC 52 °C with its case |
+| Pi 5, login, 0.8.7 | 1080p60 HEVC, hardware decode, GPU composition | `axia-media` 41 %, `axia-server` 147 % of one core, 30 s, SoC 52 °C with its case |
 
-Decoding is in hardware; each frame is then read back and converted to BGRA in `lord-media`, and `lord-server` paints it. That copy is why the total stays high. Showing the decoder's buffer directly on the GPU is the next step, in 0.8.8.
+Decoding is in hardware; each frame is then read back and converted to BGRA in `axia-media`, and `axia-server` paints it. That copy is why the total stays high. Showing the decoder's buffer directly on the GPU is the next step, in 0.8.8.
 
 Settings → Wallpaper has a switch at the top, Desktop or Login screen, and the same tiles choose for that target: a video (`wallpaper-login "<id> <variant>"`) or a still wallpaper (`wallpaper-login "still <id>"`, kept in `/var/lib/lordos/wallpapers/login-still`, shown with no video at all).
 
@@ -88,7 +88,7 @@ Settings offers 1×, 0.75×, 0.5× and 0.25×. A slower speed decodes fewer fram
 
 Choosing a still wallpaper turns the moving one off, since it would stay in front. A new player can start while the last one still holds the decoder, so a stop nobody asked for is retried four times, half a second apart; the tile shows a spinner until the video plays.
 
-A moving wallpaper plays with `hwOnly`: if the hardware decoder doesn't start, or fails, `lord-media` stops rather than decoding in software, and the still image stays.
+A moving wallpaper plays with `hwOnly`: if the hardware decoder doesn't start, or fails, `axia-media` stops rather than decoding in software, and the still image stays.
 
 ## The collection
 

@@ -1,11 +1,11 @@
 #!/bin/bash
-# bluetooth.sh — "no Bluetooth" for Linux apps: socket(AF_BLUETOOTH) refused by lord-netperm's
+# bluetooth.sh — "no Bluetooth" for Linux apps: socket(AF_BLUETOOTH) refused by axia-netperm's
 # per-cgroup LSM program (docs/FIREWALL.md, "Linux apps"). Applies immediately to new sockets.
 # BlueZ over D-Bus is a separate path (see the documentation).
 #
 #   bash server/tests/fwlinux/bluetooth.sh
 . "$(dirname "$0")/lib.sh"
-[ -S /run/lordos/netperm.sock ] || { echo "lord-netperm is not running"; exit 2; }
+[ -S /run/lordos/netperm.sock ] || { echo "axia-netperm is not running"; exit 2; }
 APP=desktop:fwbt
 SC=$(scope fwbt)
 SOCK='

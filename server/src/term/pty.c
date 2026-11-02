@@ -1,6 +1,6 @@
 /* pty.c — creates the pseudo-terminal and launches the user's shell.
  *
- * It is the only way lord-server has to run processes, and it only launches the user's own
+ * It is the only way axia-server has to run processes, and it only launches the user's own
  * login shell (the one in /etc/passwd), just like any terminal emulator.
  * The child inherits no capabilities, blocked signals or descriptors from the server. */
 #include "term.h"

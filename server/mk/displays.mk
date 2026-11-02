@@ -1,6 +1,6 @@
 # Several displays and HiDPI (docs/DISPLAYS.md): the layout math of the global logical space
-# (src/outputs.c) is linked into lord-server and tested on its own.
-build/lord-server: build/obj/outputs.o
+# (src/outputs.c) is linked into axia-server and tested on its own.
+build/axia-server: build/obj/outputs.o
 build/obj/outputs.o: src/outputs.h
 test: build/outputs-test
 build/outputs-test: tests/outputs_test.c src/outputs.c src/outputs.h src/canvas.h

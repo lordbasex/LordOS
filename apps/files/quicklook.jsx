@@ -1,7 +1,7 @@
 // quicklook.jsx — Quick Preview contents (Space): an image, the first page of a PDF, text or code,
 // a font sample, what is inside an archive and, if the media agent offers it (media.poster), a
 // video frame or an audio cover. What comes from outside (PDFs, fonts, archives) is opened by the
-// confined helper lord-doc.
+// confined helper axia-doc.
 import * as sdk from '@lordos/sdk';
 import { View, Text, Image, useTheme, formatBytes, DocImage, releaseImage, pdfThumb, fontSample, archive, warmDocs, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -25,7 +25,7 @@ function useTiming(e, ready) {
   }
 }
 
-// asynchronous request that returns an image from lord-doc (released on change). It is sent while
+// asynchronous request that returns an image from axia-doc (released on change). It is sent while
 // drawing, not in an effect: so the helper works while the panel is painted.
 function useDocImage(key, make) {
   const [, force] = useState(0);

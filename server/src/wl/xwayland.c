@@ -1,6 +1,6 @@
 /* xwayland.c — Xwayland on demand: X11 apps start it by connecting (see xwayland.h).
  *
- * lord-server reserves an X display for the session (the lock file /tmp/.X<n>-lock and the socket
+ * axia-server reserves an X display for the session (the lock file /tmp/.X<n>-lock and the socket
  * /tmp/.X11-unix/X<n>, mode 0600: only this user's programs can connect; no abstract socket, no
  * TCP) and sets DISPLAY=:<n>. Nothing runs until an X11 app connects. Then, and only then, it
  * starts /usr/bin/Xwayland with a fixed argument list:
@@ -8,12 +8,12 @@
  *   Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST
  *
  * fd 3 is the listening socket (Xwayland accepts that first connection and the next ones), fd 4 is
- * its Wayland connection (WAYLAND_SOCKET, a socketpair: lord-server knows which client is Xwayland)
+ * its Wayland connection (WAYLAND_SOCKET, a socketpair: axia-server knows which client is Xwayland)
  * and fd 5 is the window manager's connection (xwm.c). XTEST (synthetic input) is off: an X11 app
  * can't type into another one. Xwayland runs in its own scope (lordos-xwayland.scope) and its own
  * network namespace (no network at all), with no_new_privs, a minimal environment and its log in
- * ~/.cache/lordos/xwayland.log. 10 s after the last X11 app closes, the window manager stops it
- * (xwl_idle); the socket stays in lord-server, so the next X11 app starts it again. */
+ * ~/.cache/axia/xwayland.log. 10 s after the last X11 app closes, the window manager stops it
+ * (xwl_idle); the socket stays in axia-server, so the next X11 app starts it again. */
 #include "xwayland.h"
 #include "xwm.h"
 #include "x11wire.h"
@@ -193,7 +193,7 @@ static int open_log(void) {
     const char *home = getenv("HOME");
     if (!home) return -1;
     char p[512];
-    snprintf(p, sizeof p, "%s/.cache/lordos/xwayland.log", home);
+    snprintf(p, sizeof p, "%s/.cache/axia/xwayland.log", home);
     struct stat st;
     int trunc = !stat(p, &st) && st.st_size > (1 << 20);
     return open(p, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_CLOEXEC | (trunc ? O_TRUNC : 0), 0600);
@@ -240,7 +240,7 @@ static void spawn(void) {
         dup2(logfd >= 0 ? logfd : null, 2);
         if (dup2(a, 3) != 3 || dup2(b, 4) != 4 || dup2(c, 5) != 5) _exit(126);
         syscall(SYS_close_range, 6, ~0u, 0);
-        /* its own scope: never lord-server's (the firewall and the Monitor know it apart) */
+        /* its own scope: never axia-server's (the firewall and the Monitor know it apart) */
         CgroupLimits lim = { 0, 0, 0 };
         if (cgroup_enter("lordos-xwayland.scope", &lim) && managed) {
             static const char m[] = "xwayland: could not enter lordos-xwayland.scope: not started\n";
@@ -251,7 +251,7 @@ static void spawn(void) {
          * only this user (Xwayland never needs root or the network) */
         uid_t uid = getuid();
         gid_t gid = getgid();
-        /* lord-server dropped root, so it isn't dumpable and /proc/self is root's: the maps below
+        /* axia-server dropped root, so it isn't dumpable and /proc/self is root's: the maps below
          * couldn't be written (Xwayland would run as the overflow uid and fail to start xkbcomp) */
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
         if (!unshare(CLONE_NEWUSER | CLONE_NEWNET)) {

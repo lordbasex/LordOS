@@ -84,15 +84,15 @@ int main(void) {
 
     /* a parent of a protected path can't be trashed, renamed, moved or restored over: that would take
      * the protected path with it, or bring a crafted one in */
-    static const char *const dirs[] = { ".config", ".config/lordos", ".config/plain", ".local", ".local/share", ".local/share/lordos",
-                                         ".local/share/lordos/vault", "box", NULL };
+    static const char *const dirs[] = { ".config", ".config/axia", ".config/plain", ".local", ".local/share", ".local/share/axia",
+                                         ".local/share/axia/vault", "box", NULL };
     for (int i = 0; dirs[i]; i++) { path(a, dirs[i]); mkdir(a, 0700); }
-    put(".config/lordos/settings.json", "{}");
-    put(".config/lordos/other.json", "{}");
-    put(".local/share/lordos/vault/v", "x");
+    put(".config/axia/settings.json", "{}");
+    put(".config/axia/other.json", "{}");
+    put(".local/share/axia/vault/v", "x");
     put(".config/plain/a.txt", "a");
     put("box/settings.json", "{\"evil\":1}");
-    static const char *const parents[] = { ".config/lordos", ".config", ".local/share/lordos", ".local/share", ".local", NULL };
+    static const char *const parents[] = { ".config/axia", ".config", ".local/share/axia", ".local/share", ".local", NULL };
     for (int i = 0; parents[i]; i++) {
         path(a, parents[i]);
         CHECK(fsops_protected_below(a));
@@ -102,9 +102,9 @@ int main(void) {
         CHECK(fsjob_start(a, b, 1, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
         CHECK(exists(parents[i]) && !exists("moved-away"));
     }
-    CHECK(exists(".config/lordos/settings.json"));
+    CHECK(exists(".config/axia/settings.json"));
     /* nor can a folder take such a name */
-    path(a, ".config/lordos");
+    path(a, ".config/axia");
     path(b, ".config/lordos-old");
     char c2[512];
     path(c2, "box");
@@ -120,9 +120,9 @@ int main(void) {
     CHECK(!fsops_rename(a, b, err, sizeof err));
     CHECK(exists(".config/plain2/a.txt"));
     CHECK(!fstrash_put(b, err, sizeof err));
-    path(a, ".config/lordos/other.json");
+    path(a, ".config/axia/other.json");
     CHECK(!fsops_protected_below(a));
-    path(b, ".config/lordos/renamed.json");
+    path(b, ".config/axia/renamed.json");
     CHECK(!fsops_rename(a, b, err, sizeof err));
     path(a, "box");
     path(b, "box2");
@@ -155,10 +155,10 @@ int main(void) {
         path(info, ".local/share/Trash/info/plain3.trashinfo");
         FILE *f = fopen(info, "w");
         if (f) {
-            fprintf(f, "[Trash Info]\nPath=%s/.config/lordos\nDeletionDate=2026-01-01T00:00:00\n", H);
+            fprintf(f, "[Trash Info]\nPath=%s/.config/axia\nDeletionDate=2026-01-01T00:00:00\n", H);
             fclose(f);
         }
-        path(a, ".config/lordos");
+        path(a, ".config/axia");
         path(b, ".config/lordos-kept");
         CHECK(!rename(a, b));
         CHECK(fstrash_restore(t, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));

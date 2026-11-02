@@ -7,7 +7,7 @@
 //   cleaner.restore(planId, id)          back from the Trash; history() / clearHistory(); emptyTrash()
 //   cleaner.cancel(forget)               stops the job; forget also drops the results
 //   cleaner.results(scanId | 'plan', offset, limit, filter) a page of { id, rule, path, size, allocated, … }
-//   cleaner.plan(scanId, ids)            a plan, built and checked in lord-server: its id
+//   cleaner.plan(scanId, ids)            a plan, built and checked in axia-server: its id
 //   cleaner.execute(planId)              runs it once
 //   cleaner.status()                     { available, free, total }
 //

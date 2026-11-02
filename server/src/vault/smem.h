@@ -1,4 +1,4 @@
-/* smem.h — memory for lord-vault secrets (see docs/PASSWORDS.md, "Memory").
+/* smem.h — memory for axia-vault secrets (see docs/PASSWORDS.md, "Memory").
  *
  * Everything decrypted (the vault, fields, requests and replies that carry secrets) lives
  * in blocks of this arena and not in the libc heap:

@@ -1,4 +1,4 @@
-/* lan_list.c — lord-lan's sign-in against one test server, a tool, not part of make test:
+/* lan_list.c — axia-lan's sign-in against one test server, a tool, not part of make test:
  *   LAN_PW=... build/lan-list 127.0.0.1 4445 user [domain]
  * The password comes from the environment so it never is on a command line. */
 #include "../src/doc/wire.h"
@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     if (argc < 4) return 2;
     int sv[2];
     socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sv);
-    if (!fork()) { dup2(sv[1], 3); execl("build/lord-lan", "lord-lan", (char *)NULL); _exit(9); }
+    if (!fork()) { dup2(sv[1], 3); execl("build/axia-lan", "axia-lan", (char *)NULL); _exit(9); }
     close(sv[1]);
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons((uint16_t)atoi(argv[2])) };

@@ -7,7 +7,7 @@ keywords: ajustes, configuração, preferências, sistema
 ---
 # Ajustes
 
-Tudo o que se configura no LordOS está nos Ajustes. O campo no alto busca entre as seções.
+Tudo o que se configura no Axia DE está nos Ajustes. O campo no alto busca entre as seções.
 
 | Seção | O que tem |
 |---|---|

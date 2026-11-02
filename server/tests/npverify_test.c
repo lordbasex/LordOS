@@ -1,10 +1,10 @@
-/* npverify_test.c — lord-netperm's BPF programs against the real kernel verifier, and the BTF
+/* npverify_test.c — axia-netperm's BPF programs against the real kernel verifier, and the BTF
  * reader (src/netperm/bpfsys.c) it uses to find the LSM hook.
  *
  *   build/npverify-test            (in `make test`; as root it also loads every program)
  *
  * Without root: only the BTF reader, on blobs built here (good, truncated, unknown kind). As root
- * (sudo, in the test VM): creates the same maps as lord-netperm (npload.h), loads every program
+ * (sudo, in the test VM): creates the same maps as axia-netperm (npload.h), loads every program
  * of build/gen/np_bpf.h with the kind and attach point the service uses, and fails with the
  * verifier's log if the kernel refuses one; then finds bpf_lsm_socket_create in the running
  * kernel's BTF. Nothing is attached: no cgroup, process or device is touched. */

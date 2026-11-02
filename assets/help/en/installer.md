@@ -1,13 +1,13 @@
 ---
-title: Install LordOS
+title: Install Axia DE
 app: installer
 section: apps
 order: 40
 keywords: install, disk, live, usb, installer
 ---
-# Install LordOS
+# Install Axia DE
 
-In the live system (the LordOS USB stick or CD), the **Install LordOS** assistant copies the system
+In the live system (the Axia DE USB stick or CD), the **Install Axia DE** assistant copies the system
 to the disk.
 
 1. Language, region and time zone.

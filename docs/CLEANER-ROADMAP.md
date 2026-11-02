@@ -14,7 +14,7 @@ Last updated 2026-11-01. Released in 0.8.7-beta.
 
 | Feature | State | Notes |
 |---|---|---|
-| `lord-clean` scanner | Built | Rules, tree and duplicates modes |
+| `axia-clean` scanner | Built | Rules, tree and duplicates modes |
 | Compiled rule table | Built | 61 rules; `CLEANER.md` lists them. The 18 added on 2026-10-31 are in the rows below |
 | `lord.clean` | Built | The history holds no paths, by design. The kept storage map does hold folder names: see its row |
 | Plan in C with expiry | Built | Ten minutes, runs once |
@@ -31,7 +31,7 @@ Last updated 2026-11-01. Released in 0.8.7-beta.
 | Scan dashboard and review board | Built | Cleanup, Storage and Duplicates in turn; the board's cards show real parts |
 | Motion budget | Built | Frame times on VM 116 and a Raspberry Pi 5 in `CLEANER-TESTS.md`: 5 to 7 % of a core idle, 12 to 18 % scanning. Aurora's pauses of up to a second while scanning are not explained yet |
 | Bubble view | Built | Glass spheres with an icon per kind of folder. Selecting a folder reviews its large files; no folder action |
-| Similar images | Built | Decoded only in `lord-clean`; JPEG, PNG, GIF and BMP; 20,000 images at most; to the Trash, one image of each group always stays |
+| Similar images | Built | Decoded only in `axia-clean`; JPEG, PNG, GIF and BMP; 20,000 images at most; to the Trash, one image of each group always stays |
 | Apps | Built | Installed apps by size, removed by the package engine or `.lpk` removal, with a row in Activity; leftovers of removed LordOS apps. A real removal of an installed Linux app and its Activity row ran on VM 125 on 2026-10-31 |
 | System files | Built | Three closed admin actions plus `clean-status`. Not run on the VM; all four ran as root in a throwaway emulated arm64 system on 2026-10-30 |
 | Status word: updates | Built | The panel reads the `lordos` package's state when it opens. The word itself was seen only with that state stubbed: `lordos` isn't a package on the VM |
@@ -42,7 +42,7 @@ Last updated 2026-11-01. Released in 0.8.7-beta.
 | Tool and installer rules | Built | Playwright, Puppeteer, Go module downloads, JetBrains, Dart pub, Maven repository, Flatpak app caches, old installers, big videos. Covered in `clean-test` |
 | Bands and summary on the map | Built | Covered in `clean-test` |
 | What each rule finds, during a scan | Partly | Code exists; no case in `clean-test` yet |
-| Kept storage map | Built | `~/.cache/lordos/cleaner-map.txt`, 0600, on by default, with a switch in Settings. Covered in `clean-test` |
+| Kept storage map | Built | `~/.cache/axia/cleaner-map.txt`, 0600, on by default, with a switch in Settings. Covered in `clean-test` |
 | Minimum time per scan step | Partly | 2.6 s a step of a full scan, 1.8 s a section's scan. Code exists; no case in `clean-test` yet |
 
 ## Phases 2 and 3: what has no row above

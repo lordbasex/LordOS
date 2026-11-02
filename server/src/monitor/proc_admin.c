@@ -1,6 +1,6 @@
 /* proc_admin.c — process actions of the root helper, for the Monitor's Processes tab when the
  * process belongs to another user or to root (the user's own processes are signalled by
- * lord-server itself, without root). Administrators only.
+ * axia-server itself, without root). Administrators only.
  *
  *   proc-signal <pid> <start> TERM|KILL   stop one process; <start> is its start time (field 22
  *                                         of /proc/<pid>/stat), so a reused PID is never hit
@@ -53,7 +53,7 @@ void proc_act_signal(const AdminReq *r, const char *arg, size_t len) {
         admin_err("admin.invalidArgument", NULL);
         return;
     }
-    /* the helper's parent is the session's lord-server */
+    /* the helper's parent is the session's axia-server */
     const char *e = proc_signal(pid, start, !strcmp(w, "KILL") ? SIGKILL : SIGTERM, (int)getppid());
     if (e) admin_err(e, NULL);
     else admin_say("OK", "%d", pid);   /* i18n-ok */

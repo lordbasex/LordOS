@@ -15,7 +15,7 @@ def run(*args, **kwargs):
 
 
 def main():
-    symbols = run('nm', str(REPO / 'server/build/lord-server'))
+    symbols = run('nm', str(REPO / 'server/build/axia-server'))
     for symbol in ['pkg_act_install', 'pkg_act_update', 'install_act_run', 'net_act_restore',
                    'act_langpack', 'js_pkg_register', 'js_imager_register', 'pin_load',
                    'pkg_act_source_add', 'hw_act_wallpaper_get', 'share_act_mount',
@@ -32,26 +32,26 @@ def main():
         bundle = (REPO / f'themes/{name}/theme.bundle.js').read_text()
         assert 'pkg-install-file' not in bundle, 'Debian store bundled into desktop'
         assert 'install-run' not in bundle, 'OS installer bundled into desktop'
-    with tempfile.TemporaryDirectory(prefix='lord-de-stage-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='axia-stage-') as tmp:
         install('/usr', '/usr/libexec', tmp)
-        staged = Path(tmp) / 'usr/libexec/lord-de'
+        staged = Path(tmp) / 'usr/libexec/axia'
         assert set(p.name for p in (staged / 'bin').iterdir()) == {
             name for name in DESKTOP_BINARIES if (REPO / 'server/build' / name).is_file()}
-        for name in ['lord-clean', 'lord-lan', 'lord-bench', 'lordos-sysreport', 'lordos-testbench']:
+        for name in ['axia-clean', 'axia-lan', 'axia-bench', 'axia-sysreport', 'axia-testbench']:
             assert (staged / 'bin' / name).is_file(), f'missing desktop helper: {name}'
         assert (staged / 'assets/cleaner').is_dir()
-        assert (Path(tmp) / 'usr/share/licenses/lord-de/OFL-Noto.txt').is_file()
+        assert (Path(tmp) / 'usr/share/licenses/axia-de/OFL-Noto.txt').is_file()
         assert not (Path(tmp) / 'etc').exists()
         assert not (Path(tmp) / 'usr/lib/systemd').exists()
-        assert (Path(tmp) / 'usr/share/wayland-sessions/lord-de.desktop').is_file()
-        assert 'FAILED' not in run(str(staged / 'bin/lord-server'), '--check-code', str(staged))
+        assert (Path(tmp) / 'usr/share/wayland-sessions/axia.desktop').is_file()
+        assert 'FAILED' not in run(str(staged / 'bin/axia-server'), '--check-code', str(staged))
         Path(tmp).chmod(0o755)
         # An ordinary user can initialize the complete desktop without root or a seat
         # in headless mode. This does not validate DRM/KMS or physical input.
-        with tempfile.TemporaryDirectory(prefix='lord-de-home-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='axia-home-') as tmp:
             home = Path(tmp)
             (home / 'runtime').mkdir(mode=0o700)
-            config = home / '.config/lordos'
+            config = home / '.config/axia'
             config.mkdir(parents=True)
             env = dict(os.environ, HOME=tmp, USER='nobody', XDG_RUNTIME_DIR=str(home / 'runtime'))
             for key in ['SUDO_USER', 'DBUS_SESSION_BUS_ADDRESS', 'WAYLAND_DISPLAY', 'DISPLAY']:
@@ -76,16 +76,16 @@ def main():
                 if os.geteuid() == 0:
                     os.chown(prefs, 65534, 65534)
                 try:
-                    run(str(staged / 'bin/lord-server'), '--headless', '800x600', '--timeout', '5',
+                    run(str(staged / 'bin/axia-server'), '--headless', '800x600', '--timeout', '5',
                         '--theme', f'../themes/{theme}/theme.bundle.js',
                         cwd=staged / 'bin', env=env, timeout=25, **opts)
                 except subprocess.CalledProcessError as error:
-                    log = home / '.cache/lordos/session.log'
+                    log = home / '.cache/axia/session.log'
                     print(error.stderr)
                     if log.exists():
                         print(log.read_text())
                     raise
-                log = (home / '.cache/lordos/session.log').read_text()
+                log = (home / '.cache/axia/session.log').read_text()
                 assert f'js: theme ../themes/{theme}/theme.bundle.js loaded' in log, log
                 for error in ['ReferenceError:', 'TypeError:', 'SyntaxError:', 'code refused']:
                     assert error not in log, log

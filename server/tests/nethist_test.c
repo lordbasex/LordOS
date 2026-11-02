@@ -238,14 +238,14 @@ static void test_apps_and_clear(void) {
 int main(void) {
     snprintf(dir, sizeof dir, "/tmp/nethist-test-XXXXXX");
     if (!mkdtemp(dir)) { perror("mkdtemp"); return 1; }
-    snprintf(path, sizeof path, "%s/state/lordos/net-history.bin", dir);
+    snprintf(path, sizeof path, "%s/state/axia/net-history.bin", dir);
     test_roundtrip();
     test_rotation();
     test_corruption();
     test_apps_and_clear();
     unlink(path);
     char p[400];
-    snprintf(p, sizeof p, "%s/state/lordos", dir); rmdir(p);
+    snprintf(p, sizeof p, "%s/state/axia", dir); rmdir(p);
     snprintf(p, sizeof p, "%s/state", dir); rmdir(p);
     rmdir(dir);
     printf("nethist-test: %d checks, %d failures\n", checks, fails);

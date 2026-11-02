@@ -199,7 +199,7 @@ const patch = (id, p) => windows.set((ws) => ws.map((w) => (w.id === id ? { ...w
 // ---- dragging in C (lord.wm, docs/WINDOWS.md) ----
 // The theme marks each window's node with ref={wm.frameRef(id, inset)}; inset = how much the
 // node extends past the frame on each side (the invisible borders for resizing). Moving or resizing is tracked
-// by lord-server with no JS per frame; on release __lordWm('end') arrives and the new geometry is saved.
+// by axia-server with no JS per frame; on release __lordWm('end') arrives and the new geometry is saved.
 const frameNodes = new Map();         // window id → { node, inset }
 const frameRefs = new Map();
 let grab = null;
@@ -320,7 +320,7 @@ export const wm = {
   // Returns the window id.
   open(appId, opts = {}) {
     if (!registry.has(appId)) {
-      // inside an isolated system app (lord-server --app): another system app is opened by the
+      // inside an isolated system app (axia-server --app): another system app is opened by the
       // session, through the broker (Mail → Calendar, Contacts → a new message; sec/brokermail.c)
       if (typeof lord !== 'undefined' && typeof lord.appId === 'string' && lord.broker && typeof lord.broker.openApp === 'function') {
         lord.broker.openApp(String(appId), JSON.stringify(opts.args || {}), !!opts.new);
@@ -437,7 +437,7 @@ export const wm = {
     return () => { if (guards.get(id) === fn) guards.delete(id); };
   },
   setMenus: (id, menus) => {
-    // In an isolated app (lord-server --app) the menus go to the system menu bar through the
+    // In an isolated app (axia-server --app) the menus go to the system menu bar through the
     // broker: they are serialized (no onClick, with an id per item) and clicks come back as an event.
     if (typeof lord !== 'undefined' && typeof lord.appId === 'string') { sendAppMenus(menus); return; }   // only in the app process
     appMenus.set((m) => ({ ...m, [id]: menus }));
@@ -468,7 +468,7 @@ export const wm = {
   frameRef,
   beginMove: (id) => beginGrab(id, 0),
   beginResize: (id, edges) => beginGrab(id, edges & 15),
-  // LordBench's desktop scene (apps/sysinfo/scene.jsx): lord-server moves the window along a figure of
+  // LordBench's desktop scene (apps/sysinfo/scene.jsx): axia-server moves the window along a figure of
   // eight (rx × ry px, one turn every periodMs) through the drag's own path, one step per frame, until
   // stopScript() or pointer input. The store keeps the old place: the scene's window is closed after.
   scriptMove(id, { rx, ry, periodMs }) {

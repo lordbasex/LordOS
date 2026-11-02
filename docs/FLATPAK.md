@@ -25,7 +25,7 @@ Nothing here has been run on a VM. No compatibility with any Flathub app is clai
 - **Flatpak stays optional.** The Debian `flatpak` package is installed only when the user turns
   Flathub on in the Store, through the existing package engine (`pkg-install`, without Recommends),
   like Chrome or Spotify. LordOS never links libflatpak, libostree or bubblewrap. Its own isolation
-  stays its own code: the root-owned app scope, `lord-netperm`'s kernel programs and the launcher's
+  stays its own code: the root-owned app scope, `axia-netperm`'s kernel programs and the launcher's
   view. Flatpak's sandbox (bubblewrap) is an extra layer inside it, never the only one.
 - **Identity:** a Flatpak app is started only by LordOS's launcher, in a root-owned
   `app-lordos-fp-<id>.scope`, which the firewall, the Monitor, the PipeWire guard and the
@@ -43,7 +43,7 @@ Nothing here has been run on a VM. No compatibility with any Flathub app is clai
   0.8.6; a LordOS portal is a later phase with its own review.
 - **Installing:** per user (`flatpak --user`), no root and no new admin action. The Flathub remote
   comes from a `.flatpakrepo` file LordOS ships (its GPG key pinned), the catalog is Flathub's
-  signed appstream data that `flatpak` itself verifies, and every `flatpak` command lord-server runs
+  signed appstream data that `flatpak` itself verifies, and every `flatpak` command axia-server runs
   is one of a closed list, run in its own firewall component `lordos:flathub`.
 - **Seven approvals are needed** (see "Exceptions to approve"): the Flatpak launch path, the
   `flatpak:<id>` identity and scope name, the closed list of `flatpak` management commands with
@@ -78,7 +78,7 @@ The `flatpak` package also installs (file list from packages.debian.org):
 
 LordOS's package engine installs Recommends only when asked (`pkg-install … --recommends`,
 [PACKAGES.md](PACKAGES.md)), so turning Flathub on would not pull `xdg-desktop-portal` in. That
-matters: lord-server already owns `org.freedesktop.portal.Desktop` on the session bus for the
+matters: axia-server already owns `org.freedesktop.portal.Desktop` on the session bus for the
 Settings portal (`server/src/ui/portal.c`), and `tests/fwlinux/screen.sh` depends on no screen-cast
 portal being installed.
 
@@ -95,7 +95,7 @@ portal being installed.
 - **Checked (LordOS).** The user manager has PID 1 do that move, which only checks the uid
   ([FIREWALL.md](FIREWALL.md), "Escape via `systemd-run --user`"). So a `flatpak run` started inside
   `app-lordos-<id>.scope` would leave it for `user@<uid>.service/app.slice/…`. There
-  `lord-netperm` finds no app scope and applies the per-user union: restriction-only, so not a
+  `axia-netperm` finds no app scope and applies the per-user union: restriction-only, so not a
   hole, but the app loses its own rules, its counters in the Monitor and its device restrictions,
   and its traffic isn't attributed.
 - **Checked (flatpak-portal.c).** `flatpak-portal` (D-Bus activated, under `user@`) runs
@@ -103,7 +103,7 @@ portal being installed.
   same way, whatever LordOS does with the parent.
 - **Checked (flatpak-run.c).** bubblewrap is started with `--unshare-user --disable-userns` (when
   unprivileged) and `--unshare-pid`. A process's cgroup doesn't change across namespaces, so
-  `lord-netperm`'s programs (`bpf_get_current_ancestor_cgroup_id`) and `sec/appid.c` find a
+  `axia-netperm`'s programs (`bpf_get_current_ancestor_cgroup_id`) and `sec/appid.c` find a
   Flatpak app by its scope exactly as they find a Linux app, as long as it stays in it.
 
 ### Options
@@ -129,11 +129,11 @@ Linux apps); bubblewrap then nests its own user namespace inside LordOS's (allow
 from outside, unless the launcher binds a per-app folder into the view (open question 4).
 
 **C. Let Flatpak move the app, then have root move it back.** A new request to `lord-sessiond`'s
-placement service ("reclaim this pid into that scope"), checked against the pid lord-server
+placement service ("reclaim this pid into that scope"), checked against the pid axia-server
 started. *Rejected:* `AGENTS.md` says not to add requests to that service or place arbitrary
 pids, and the app runs under `user@` until it is moved back.
 
-**Recommendation: B.** The firewall id is `flatpak:<id>`; `fw_app_canon`, `lord-netperm`'s scope
+**Recommendation: B.** The firewall id is `flatpak:<id>`; `fw_app_canon`, `axia-netperm`'s scope
 scan (`netperm.c`), `sec/appid.c`, the PipeWire guard (`sec/pwguard.c`), the Monitor
 (`ui/js_monitor.c`) and `sec/restrict.c` learn the `app-lordos-fp-` prefix the way they learned
 `app-lordos-lpk-`. The launcher's `valid_id` already refuses desktop ids starting with `lpk-`; it
@@ -259,8 +259,8 @@ Whatever the app declares, the launcher always adds:
 | `--nosocket=session-bus` | the unfiltered bus reaches the systemd user manager (`systemd-run --user`) and the session helper |
 | `--no-talk-name=org.freedesktop.Flatpak` | `flatpak-spawn --host`: any command, unsandboxed, outside the scope |
 | `--no-talk-name=org.freedesktop.systemd1` | units and transient scopes outside the scope |
-| no `--own-name` of a name lord-server serves (`org.freedesktop.Notifications`, `org.freedesktop.portal.Desktop`) | impersonating LordOS's services |
-| `--nofilesystem` (hide) for `~/.config/lordos`, `~/.local/share/lordos`, `~/.cache/lordos`, `~/.local/share/applications`, `~/.config/autostart`, `~/.config/systemd`, `~/.config/environment.d`, `~/.local/bin` | the folders `fsops_protected()` and the launcher's grant rules keep from every app: rules, permissions, launchers, autostart, units |
+| no `--own-name` of a name axia-server serves (`org.freedesktop.Notifications`, `org.freedesktop.portal.Desktop`) | impersonating LordOS's services |
+| `--nofilesystem` (hide) for `~/.config/axia`, `~/.local/share/axia`, `~/.cache/axia`, `~/.local/share/applications`, `~/.config/autostart`, `~/.config/systemd`, `~/.config/environment.d`, `~/.local/bin` | the folders `fsops_protected()` and the launcher's grant rules keep from every app: rules, permissions, launchers, autostart, units |
 | `--filesystem=<file>:ro` for `~/.bashrc`, `~/.profile`, `~/.bash_profile`, `~/.zshrc` (those that exist) | shell startup files run outside any sandbox at the next login |
 
 `org.freedesktop.portal.Flatpak` (sub-sandboxes) can't be refused reliably by an option, so in
@@ -279,7 +279,7 @@ adds it as well, as defence in depth (the kernel path is the boundary, not bubbl
 
 | Restriction | Enforced by (unchanged LordOS code) | Also added to `flatpak run` |
 |---|---|---|
-| network rules, no-internet, no-LAN, no-network | `lord-netperm` cgroup programs on the scope | `--unshare=network` for no-network |
+| network rules, no-internet, no-LAN, no-network | `axia-netperm` cgroup programs on the scope | `--unshare=network` for no-network |
 | no camera | `cgroup/dev` (V4L2) + PipeWire guard | — |
 | no USB | `cgroup/dev` | `--nodevice=usb` |
 | no Bluetooth | `cgroup/lsm_socket_create` | `--disallow=bluetooth` |
@@ -308,23 +308,23 @@ way. To measure on the VM (test 9).
 
 ### Portals
 
-LordOS runs no `xdg-desktop-portal`; lord-server serves `org.freedesktop.portal.Settings` itself.
+LordOS runs no `xdg-desktop-portal`; axia-server serves `org.freedesktop.portal.Settings` itself.
 
 **A. Install `xdg-desktop-portal` and write a LordOS backend** (`org.freedesktop.impl.portal.*`:
 FileChooser, Screenshot, ScreenCast, Camera…). The frontend identifies Flatpak apps (from
 `/.flatpak-info` of the caller), keeps the permission store and runs the document portal.
 *Trade-offs:* a large GLib daemon under `user@` (outside any LordOS scope) that decides app
-identity and brokers files; it wants the `org.freedesktop.portal.Desktop` name lord-server holds
+identity and brokers files; it wants the `org.freedesktop.portal.Desktop` name axia-server holds
 (the Settings portal would move to a backend); its ScreenCast and Camera frontends hand out
 PipeWire streams, which would break the "no Linux app can copy the screen" claim the moment a
 backend exists.
 
-**B. Serve the needed frontend interfaces in lord-server, on the name it already owns.**
+**B. Serve the needed frontend interfaces in axia-server, on the name it already owns.**
 FileChooser (LordOS's own dialog, `fs.openFile`-style), OpenURI, Notification, Inhibit, next to
 Settings. The caller is identified as notifyd does it today: the bus's
 `GetConnectionUnixProcessID`, then that pid's cgroup (the proxy's scope), never a file the app can
 write. ScreenCast, Screenshot and Camera are not offered. *Trade-offs:* a new D-Bus surface in
-lord-server with untrusted callers; FileChooser for a sandboxed app needs a way to expose the
+axia-server with untrusted callers; FileChooser for a sandboxed app needs a way to expose the
 chosen file after start, which is the document portal's FUSE file system (Debian's
 `xdg-document-portal` is part of the `xdg-desktop-portal` package) or a LordOS equivalent.
 
@@ -380,7 +380,7 @@ FileChooser).
 
 ### Options
 
-**A. lord-server runs `flatpak --user` for a closed list of commands, in its own firewall
+**A. axia-server runs `flatpak --user` for a closed list of commands, in its own firewall
 component.** Flatpak does the network, TLS, OSTree and signature checks itself (libostree +
 GPGME). LordOS controls which commands run, their arguments, their scope and what it reads back.
 *Trade-offs:* a third-party program doing network and parsing as the user, not inside
@@ -413,7 +413,7 @@ minimal environment, stdin `/dev/null`, output to a log or parsed strictly):
 A ref is validated in C: `app/<id>/<native arch>/<branch>`, the id as in Problem 2, the branch
 `[A-Za-z0-9._-]{1,64}`. Runtimes are never named by the UI; Flatpak resolves them.
 
-Each command is started like a connector: lord-server forks, the child enters a root-owned
+Each command is started like a connector: axia-server forks, the child enters a root-owned
 `lordos-net-flathub.scope` (the firewall component `lordos:flathub`, added to
 `fw_component_scope`'s fixed list) and execs `/usr/bin/flatpak`. In the Monitor its traffic is
 "Flathub", with its own rules, and blocking it says that no Flatpak update arrives meanwhile (as
@@ -434,11 +434,11 @@ neither verified nor free software. Offering `verified_floss` as a setting is op
 
 After `update --appstream flathub`, the signature-checked appstream data sits in
 `~/.local/share/flatpak/appstream/flathub/<arch>/active/` (`appstream.xml`, icons in
-`icons/64x64` and `icons/128x128`; exact file names **Unverified**). lord-server doesn't parse it
+`icons/64x64` and `icons/128x128`; exact file names **Unverified**). axia-server doesn't parse it
 (a 10+ MB XML file from the network): a sandboxed helper does, with `sandbox_apply_helper`, the
 file given as an fd, returning a compact index in a sealed memfd (id, name and summary in the
 user's language, categories, licence, `flathub::verification::verified`, content rating, icon
-file name, sizes), which lord-server validates again before the Store reads it. Which helper
+file name, sizes), which axia-server validates again before the Store reads it. Which helper
 (a new mode of an existing one, or a small new binary) is open question 5; the rule is the same as
 for every decoder. The website's API is never used.
 
@@ -461,11 +461,11 @@ libseccomp for isolation", and `.lpk` isolation must stay LordOS's own code. The
 allowing Flatpak as an **app source**:
 
 1. LordOS doesn't link it: no libflatpak, libostree or bubblewrap code in any LordOS binary.
-   lord-server only executes `/usr/bin/flatpak` with fixed argv (E1, E3).
+   axia-server only executes `/usr/bin/flatpak` with fixed argv (E1, E3).
 2. It isn't installed by default; it arrives as a Debian package the user chooses in the Store,
    like the Commercial apps, and the page says what it adds (about the size: **Unverified**,
    measured in test 1; Flathub runtimes add hundreds of MB each).
-3. LordOS's boundaries for a Flatpak app are LordOS's: the root-owned scope, `lord-netperm`'s
+3. LordOS's boundaries for a Flatpak app are LordOS's: the root-owned scope, `axia-netperm`'s
    programs, the PipeWire guard, notifyd and the launcher's view. If bubblewrap failed open, the app
    would still be held by every LordOS restriction the owner set, exactly like an unsandboxed Linux
    app. Flatpak's sandbox adds to that; LordOS's guarantees don't depend on it.
@@ -512,9 +512,9 @@ network exceptions:
   override files and exports) is added to `fsops_protected()`, since the system reads it to launch
   and install.
 - **E7. A sandboxed parser for Flathub's appstream data** (`sandbox_apply_helper`, file as an fd,
-  sealed memfd back, validated again in lord-server), whichever binary hosts it.
+  sealed memfd back, validated again in axia-server), whichever binary hosts it.
 
-Not requested now: **E8**, lord-server serving more `org.freedesktop.portal.*` interfaces (portal
+Not requested now: **E8**, axia-server serving more `org.freedesktop.portal.*` interfaces (portal
 option B), which gets its own review in a later phase.
 
 ## Device restrictions, the session bus and `no-files` (Design, summary)
@@ -581,7 +581,7 @@ claimed; packages installed for it go into `VM-SETUP.md`.
 5. Firewall: "no internet" on `flatpak:<id>` blocks the app's connections (`denied out tcp …`),
    per-domain rules apply, the Monitor shows its bytes; an escape attempt from inside the app
    (`systemd-run --user`, `flatpak-spawn --host`, `gdbus call` to `org.freedesktop.systemd1`) fails.
-6. Never-granted: an app declaring `home` can't read `~/.config/lordos/firewall.json`, can't write
+6. Never-granted: an app declaring `home` can't read `~/.config/axia/firewall.json`, can't write
    `~/.local/share/applications` or `~/.config/autostart`, and sees `~/.bashrc` read-only; an app
    declaring `host` likewise. A user override file granting `session-bus` has no effect.
 7. no-files: the app sees only `~/.var/app/<id>`; `/media/$USER` and other homes aren't visible;
@@ -614,7 +614,7 @@ claimed; packages installed for it go into `VM-SETUP.md`.
    honour the declaration and show it in the Store?
 4. **Per-app runtime state.** Bind a persistent per-app `$XDG_RUNTIME_DIR/.flatpak/<id>` into the
    view (shared `/tmp` between an app's instances, `flatpak ps`), or keep it private per launch?
-5. **Which binary parses appstream** (E7): a mode of `lord-doc` (which already decodes untrusted
+5. **Which binary parses appstream** (E7): a mode of `axia-doc` (which already decodes untrusted
    files), or a small new helper?
 6. **Key roll-over.** Accept Flathub's key updates delivered in its signed summary (`xa.gpg-keys`,
    Flatpak's default behaviour), or pin strictly to the key LordOS ships and update it only in

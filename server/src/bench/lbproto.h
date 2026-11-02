@@ -1,10 +1,10 @@
-/* lbproto.h — the channel between lord-server (lbrun.c) and lord-bench (lbmain.c), LordBench's
+/* lbproto.h — the channel between axia-server (lbrun.c) and axia-bench (lbmain.c), LordBench's
  * sandboxed helper (docs/BENCHMARK.md, "0.8.6 — LordBench").
  *
- * A SOCK_SEQPACKET pair on fd 3. lord-server sends one LbGo (with up to two fds: the GPU's render node
- * and a storage scratch file, both opened by lord-server); lord-bench answers only with fixed-size
- * LbMsg records: no text, no paths. lord-server checks every field (lb_msg_valid) and builds the JSON
- * itself. To stop a run, lord-server kills the helper. */
+ * A SOCK_SEQPACKET pair on fd 3. axia-server sends one LbGo (with up to two fds: the GPU's render node
+ * and a storage scratch file, both opened by axia-server); axia-bench answers only with fixed-size
+ * LbMsg records: no text, no paths. axia-server checks every field (lb_msg_valid) and builds the JSON
+ * itself. To stop a run, axia-server kills the helper. */
 #ifndef LORD_BENCH_LBPROTO_H
 #define LORD_BENCH_LBPROTO_H
 
@@ -40,7 +40,7 @@ enum {
     LB_CPU_JS1,                         /* QuickJS running a fixed script, one core, runs/s */
     LB_CPU_JSN,                         /* the same on all cores, runs/s */
     LB_CPU_UI1,                         /* the UI engine's layout and paint of a fixed 1920×1080 scene, one core, frames/s (lbui.h) */
-    LB_CPU_UIN,                         /* the same with the paint's row bands on up to 8 threads (as lord-server's paint threads), frames/s */
+    LB_CPU_UIN,                         /* the same with the paint's row bands on up to 8 threads (as axia-server's paint threads), frames/s */
     LB_CPU_SHAPE1,                      /* shaping fixed paragraphs in five scripts (lbtext.h), one core, runs/s */
     LB_CPU_SHAPEN,                      /* the same on all cores, runs/s */
     LB_MEM_COPY,                        /* memory bandwidth, copy, GB/s */
@@ -55,7 +55,7 @@ enum {
     LB_DISK_RAND,                       /* storage, random 4 KiB reads, IOPS */
     LB_SUS_START,                       /* sustained: all-core matrix multiply, first 10 s, GFLOP/s */
     LB_SUS_END,                         /* sustained: last 10 s, GFLOP/s */
-    /* measured by lord-media (bench/lbvideo.c, media/helper/lm_vbench.c), never by lord-bench */
+    /* measured by axia-media (bench/lbvideo.c, media/helper/lm_vbench.c), never by axia-bench */
     LB_VID_H264_1080,                   /* software decoding of a generated clip, frames/s */
     LB_VID_HEVC_1080,
     LB_VID_VP9_1080,
@@ -64,7 +64,7 @@ enum {
     LB_VID_HEVC_2160,
     LB_VENC_H264,                       /* the remote desktop's encoders with its own settings, 1920×1080, frames/s */
     LB_VENC_VP8,
-    /* measured by lord-server itself (bench/lbframes.c), desktop mode only */
+    /* measured by axia-server itself (bench/lbframes.c), desktop mode only */
     LB_COMP_FPS,                        /* the compositor, a scripted scene, nothing else running: frames shown per second */
     LB_COMP_P50,                        /* ms to build a frame, median */
     LB_COMP_P99,                        /* ms to build a frame, 99th percentile */
@@ -80,7 +80,7 @@ enum {
     LB_DESK_WORK,                       /* what the load got done meanwhile, GFLOP/s */
     LB_COUNT
 };
-#define LB_HELPER_LAST LB_SUS_END       /* lord-bench may only report ids up to this one */
+#define LB_HELPER_LAST LB_SUS_END       /* axia-bench may only report ids up to this one */
 #define LB_VID_FIRST   LB_VID_H264_1080
 #define LB_VID_LAST    LB_VENC_VP8
 #define LB_DESK_FIRST  LB_COMP_FPS
@@ -98,7 +98,7 @@ enum {
 };
 
 /* The helper-sandbox self-test (sec.helper-sandbox; the same tries as the Sandbox Probe's helper child,
- * app/probe.c), made by lord-bench right after sandbox_apply_helper and before any work. Every one must
+ * app/probe.c), made by axia-bench right after sandbox_apply_helper and before any work. Every one must
  * fail, and none could change anything if it didn't: a socket or a file that opened is closed at once
  * (the file is unnamed, O_TMPFILE), exec is called with an invalid environment pointer (an exec the
  * sandbox allows fails with EFAULT before anything is replaced), and a fork that worked would only
@@ -125,7 +125,7 @@ const char *lb_name(int id);            /* "cpu.sha256.1", …; NULL out of rang
 const char *lb_sbx_name(int id);        /* "helperSocket", …; NULL out of range */
 const char *lb_unit(int id);            /* "MB/s", "GFLOP/s", "runs/s", "GB/s", "ns", "fps", "Mpx/s", "IOPS", "ms", "%" */
 int         lb_lower_better(int id);    /* 1 for latency, frame times and missed frames */
-/* 1 if a record from lord-bench is acceptable: magic, kind, an id lord-bench measures (or a sandbox try),
+/* 1 if a record from axia-bench is acceptable: magic, kind, an id axia-bench measures (or a sandbox try),
  * finite values in range */
 int         lb_msg_valid(const LbMsg *m);
 

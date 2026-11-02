@@ -1,4 +1,4 @@
-// Reminders — to-do lists kept by lord-maild (local, or synced with CalDAV as VTODO): see
+// Reminders — to-do lists kept by axia-maild (local, or synced with CalDAV as VTODO): see
 // docs/MAIL.md. Smart lists (Today, Scheduled, All, Flagged, Completed) are filters over
 // reminders.items(); their alarms ring with the app closed (sdk/calendar.js, startReminders).
 import {
@@ -106,7 +106,7 @@ export default function RemindersApp() {
           <ToolbarButton icon="+" iconSize={20} title={t('reminders.newReminder')} disabled={unavailable || sel === 'completed'} onClick={() => newRow.current?.()} />
         </Toolbar>
         {unavailable ? (
-          <EmptyState mascot="confused" title={t('reminders.unavailable')} hint={t('reminders.unavailableHint')} />
+          <EmptyState title={t('reminders.unavailable')} hint={t('reminders.unavailableHint')} />
         ) : (
           <ListView key={sel} sel={sel} title={title} color={color} items={items} lists={lists} now={now} showDone={showDone || sel === 'completed'}
             newRowRef={newRow} loading={!itemsQ.data} />

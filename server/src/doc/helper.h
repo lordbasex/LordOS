@@ -1,6 +1,6 @@
-/* helper.h — what the parts of the lord-doc helper share (helper.c, h_pdf.c, h_arc.c,
+/* helper.h — what the parts of the axia-doc helper share (helper.c, h_pdf.c, h_arc.c,
  * h_font.c, h_make.c). It runs already locked down: it doesn't open files by path, it only uses the fds
- * lord-server passed to it. */
+ * axia-server passed to it. */
 #ifndef LORD_DOC_HELPER_H
 #define LORD_DOC_HELPER_H
 

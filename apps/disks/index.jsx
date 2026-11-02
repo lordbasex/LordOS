@@ -3,7 +3,7 @@
 // (SMART) and the actions: mount, unmount, eject, format, rename, erase and create a bootable USB
 // from an image.
 //
-// lord-server reads the list without root (lord.disks, refreshed by itself on mount and udev
+// axia-server reads the list without root (lord.disks, refreshed by itself on mount and udev
 // events). Anything that changes something goes through the helper with the closed disk-*
 // actions, which validate again on the root side: never the system disk, and internal disks only
 // for an administrator.
@@ -283,7 +283,7 @@ export default function Disks() {
   // pick something on open (the first removable, if any) and keep a valid selection if it disappears
   const disk = list.find((d) => d.name === sel.disk) || list.find((d) => d.removable) || list[0];
   const part = disk && sel.part ? disk.partitions.find((p) => p.name === sel.part) || null : null;
-  if (!disks.available()) return <EmptyState mascot="confused" title={tr('disks.unavailable')} />;
+  if (!disks.available()) return <EmptyState title={tr('disks.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       <Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={setSel} />

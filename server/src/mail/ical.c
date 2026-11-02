@@ -999,7 +999,7 @@ static void person_line(JBuf *b, const char *prop, const char *email, const char
 char *ical_build(const IcBuild *x, size_t *olen) {
     JBuf b;
     jb_init(&b);
-    jb_raw(&b, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//LordOS//Calendar 1.0//EN\r\nCALSCALE:GREGORIAN\r\n");
+    jb_raw(&b, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Axia DE//Calendar 1.0//EN\r\nCALSCALE:GREGORIAN\r\n");
     if (x->method && *x->method) jb_printf(&b, "METHOD:%s\r\n", x->method);
     const char *tz = x->tzid && *x->tzid && tz_zone_valid(x->tzid) ? x->tzid : NULL;
     if (tz && !x->allday && (!x->is_todo || x->start)) { if (vtimezone(&b, tz)) tz = NULL; }

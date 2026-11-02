@@ -7,7 +7,7 @@
 //   backup.restore(id, rel, { replace, suffix })   ('' = everything; result in status.restore)
 //   backup.unlock(pass, create) / backup.lock()     encrypted backups (result in status.unlock)
 //
-// A lord-server thread at the lowest priority does the copying; the status is pushed
+// A axia-server thread at the lowest priority does the copying; the status is pushed
 // (__lordBackup), never polled. When a run fails (or succeeds, if the user asked for it) the
 // user is notified with notify(), even with the app closed.
 import { createStore, useStore } from './store.js';

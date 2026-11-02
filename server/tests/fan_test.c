@@ -1,4 +1,4 @@
-/* fan_test.c — lord-fand without hardware (docs/FANS.md):
+/* fan_test.c — axia-fand without hardware (docs/FANS.md):
  *   - curve evaluation and hysteresis, presets, output clamping;
  *   - fan.json parser: valid files, round trip, and many broken ones (fuzz-ish);
  *   - socket request parser;

@@ -1,4 +1,4 @@
-/* vwire.c — lord-vault protocol messages (see vwire.h). */
+/* vwire.c — axia-vault protocol messages (see vwire.h). */
 #include "vwire.h"
 
 #include <errno.h>

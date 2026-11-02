@@ -2,7 +2,7 @@
  *
  * It is a separate vault, login.lvault, a "login" keyring: it unlocks by itself at
  * login with the session password (lord-sessiond verifies it and hands it to the session
- * only once; lord-server forwards it here and wipes it), and stays open until logout.
+ * only once; axia-server forwards it here and wipes it), and stays open until logout.
  * Locking the screen does not lock it (the Passwords vault does lock).
  *
  * It stores two kinds of items (vault entries with an "x" that says whose they are):
@@ -107,7 +107,7 @@ int keyring_handle(Chan *c, uint32_t id, const char *op, const Vj *j) {
     vj_getsbuf(j, 0, "owner", owner, sizeof owner);
     vj_getsbuf(j, 0, "service", service, sizeof service);
     vj_getsbuf(j, 0, "account", account, sizeof account);
-    /* the Passwords app manages the whole keyring; everything else goes through lord-server, which sets the owner */
+    /* the Passwords app manages the whole keyring; everything else goes through axia-server, which sets the owner */
     int admin = c->role == ROLE_APP || (c->role == ROLE_SYSTEM && vj_getb(j, 0, "admin", 0));
     if (!admin && !valid_owner(owner)) { reply_err(c, id, "bad-owner"); return 1; }
     if (!strcmp(op, "kr-set")) {
@@ -166,7 +166,7 @@ int keyring_handle(Chan *c, uint32_t id, const char *op, const Vj *j) {
         return 1;
     }
     if (!strcmp(op, "kr-share")) {
-        /* only lord-server (after asking the user) or the Passwords app */
+        /* only axia-server (after asking the user) or the Passwords app */
         if (c->role != ROLE_APP && !vj_getb(j, 0, "admin", 0)) { reply_err(c, id, "denied"); return 1; }
         char eid[40] = "", app[72] = "";
         vj_getsbuf(j, 0, "id", eid, sizeof eid);
@@ -215,7 +215,7 @@ void keyring_session_password(const char *pass) {
         VKdf kdf;
         vf_calibrate(400, &kdf, NULL);               /* login must not wait long */
         if (vault_create(v, VS_SESSION, &f, &kdf, "", "{\"autolock\":0}", NULL) == VF_OK) {
-            fprintf(stderr, "lord-vault: session keyring created\n");
+            fprintf(stderr, "axia-vault: session keyring created\n");
             keyring_lock_changed();
         }
         return;
@@ -474,7 +474,7 @@ static int be_remove(void *ud, const char *id) {
 
 static void be_caller(void *ud, const char *sender, uint32_t pid) {
     (void)ud;
-    if (getenv("LORD_VAULT_DEBUG")) fprintf(stderr, "lord-vault: Secret Service: request from %s (pid %u)\n", sender, pid);
+    if (getenv("LORD_VAULT_DEBUG")) fprintf(stderr, "axia-vault: Secret Service: request from %s (pid %u)\n", sender, pid);
 }
 
 static const SsBackend backend = {
@@ -486,9 +486,9 @@ static const SsBackend backend = {
 void keyring_start_bus(int busfd) {
     int r = ss_start(busfd, &backend, NULL);
     ss_active = r == 0;
-    if (r == 1) fprintf(stderr, "lord-vault: org.freedesktop.secrets already has an owner (gnome-keyring?): not serving it\n");
-    else if (r < 0) fprintf(stderr, "lord-vault: could not talk to the session bus\n");
-    else if (getenv("LORD_VAULT_DEBUG")) fprintf(stderr, "lord-vault: Secret Service on the bus (%s)\n", ss_unique_name());
+    if (r == 1) fprintf(stderr, "axia-vault: org.freedesktop.secrets already has an owner (gnome-keyring?): not serving it\n");
+    else if (r < 0) fprintf(stderr, "axia-vault: could not talk to the session bus\n");
+    else if (getenv("LORD_VAULT_DEBUG")) fprintf(stderr, "axia-vault: Secret Service on the bus (%s)\n", ss_unique_name());
     if (r) close(busfd);
 }
 

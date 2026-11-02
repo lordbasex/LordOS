@@ -7623,14 +7623,14 @@
     }
   },
   {
-    "file": "docs/lordos-fetch.png",
+    "file": "docs/axia-fetch.png",
     "category": "apps",
     "theme": "light",
     "variant": "normal",
     "caption": {
-      "en": "lordos-fetch in the Terminal: the crown and a summary of the computer",
-      "es": "lordos-fetch en la Terminal: la corona y un resumen del equipo",
-      "pt": "lordos-fetch no Terminal: a coroa e um resumo do computador"
+      "en": "axia-fetch in the Terminal: the crown and a summary of the computer",
+      "es": "axia-fetch en la Terminal: la corona y un resumen del equipo",
+      "pt": "axia-fetch no Terminal: a coroa e um resumo do computador"
     }
   },
   {

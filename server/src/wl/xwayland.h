@@ -1,6 +1,6 @@
 /* xwayland.h — X11 apps through Xwayland, started only when one connects (xwayland.c).
  *
- * The fourth exception to "lord-server doesn't run programs" (AGENTS.md): it only ever starts
+ * The fourth exception to "axia-server doesn't run programs" (AGENTS.md): it only ever starts
  * /usr/bin/Xwayland (root-owned, not writable by others), with an argument list fixed in C, when
  * the first X11 client connects to this session's X socket; never from JS and with no argument
  * from anyone. See docs/WAYLAND.md, "X11 apps (Xwayland)". */

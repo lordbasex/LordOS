@@ -1,6 +1,6 @@
 # GPU in LordOS: composition, dmabuf and games
 
-lord-server has two paths for building the screen:
+axia-server has two paths for building the screen:
 
 - **CPU** (the usual one): the UI and the app windows are copied into the canvas and a dumb
   buffer is sent with a page flip. It needs nothing besides the kernel.
@@ -27,7 +27,7 @@ and its buffers and the apps' dmabufs become framebuffers with `DRM_IOCTL_MODE_A
 1. `LORD_GPU=0`: always CPU.
 2. The kernel is asked which driver the card has (`DRM_IOCTL_VERSION`). If it's one without 3D
    (simpledrm, bochs, cirrus, qxl, ast, mgag200, vkms, udl, virtio-gpu without virgl…), the CPU
-   is used **without loading Mesa**: lord-server stays at ~32 MB.
+   is used **without loading Mesa**: axia-server stays at ~32 MB.
 3. Otherwise, GBM + EGL are set up. If `GL_RENDERER` is a software one (llvmpipe, softpipe), it
    falls back to the CPU, because compositing with llvmpipe costs more than our own path (see
    measurements). `LORD_GPU=1` forces the GPU anyway, for testing.
@@ -45,10 +45,10 @@ Chromium showed up to a second late. Measurements and the key latency trace are 
 
 **VMware virtual machines** (VMware SVGA, the `vmwgfx` kernel driver). `vmwgfx` is not in the
 list of plain drivers, so Mesa is loaded: with the machine's 3D acceleration on, Mesa's `svga`
-driver (`vmwgfx_dri.so`, in `libgl1-mesa-dri`, which the ISO ships) is the renderer and lord-server
+driver (`vmwgfx_dri.so`, in `libgl1-mesa-dri`, which the ISO ships) is the renderer and axia-server
 composites on the GPU (`GL_RENDERER` starts with `SVGA3D`); with 3D off, Mesa falls back to
-llvmpipe and lord-server to the CPU path. Which one ran is in the session log: in a LordOS
-Terminal, `grep gpu: ~/.cache/lordos/session.log` (for example `gpu: GPU composition (SVGA3D; …)`
+llvmpipe and axia-server to the CPU path. Which one ran is in the session log: in a LordOS
+Terminal, `grep gpu: ~/.cache/axia/session.log` (for example `gpu: GPU composition (SVGA3D; …)`
 or `gpu: the renderer is software (llvmpipe …): CPU composition`). Not verified: the Proxmox test
 machines' "VMware compatible" display is QEMU's 2D-only `vmware-svga`, which `vmwgfx` refuses
 (since 0.8.1 it isn't even loaded there; see `ISO.md`, "Firmware and displays"), so only the
@@ -597,7 +597,7 @@ That really exercises the GBM/EGL/GLES/KMS code, but **not** the AMD or Nvidia d
 | Automatic selection in the VM | "virtio_gpu without 3D" → CPU without loading Mesa: 32 MB of RSS |
 | `LORD_GPU=0` | everything as before |
 
-lord-server CPU with `glmark2-es2-wayland` in a window for 10 s:
+axia-server CPU with `glmark2-es2-wayland` in a window for 10 s:
 
 | Path | CPU | RSS |
 |---|---|---|
@@ -616,7 +616,7 @@ compositing is the GPU's work, and the CPU only uploads what changed in the UI.
 
 To test it on the AMD PC (live ISO):
 1. Boot.
-2. In the LordOS Terminal, `grep gpu: ~/.cache/lordos/session.log` (or System Information →
+2. In the LordOS Terminal, `grep gpu: ~/.cache/axia/session.log` (or System Information →
    Hardware → Graphics, 0.8.5): it must say
    `GPU composition (AMD Radeon …)` and `cursor by hardware (cursor plane)`.
 3. `vkcube`, `glmark2-es2-wayland`, a game (SuperTuxKart, 0 A.D.).

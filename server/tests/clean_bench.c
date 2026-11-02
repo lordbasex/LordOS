@@ -1,6 +1,6 @@
 /* clean_bench.c — times Cleaner's scans on a throwaway folder given as the home folder (never a real one): wall
- * time, the helper's peak memory, lord-server's memory, and the cost of the calls the compositor's thread makes.
- *   build/clean-bench <folder>           needs build/lord-clean next to it
+ * time, the helper's peak memory, axia-server's memory, and the cost of the calls the compositor's thread makes.
+ *   build/clean-bench <folder>           needs build/axia-clean next to it
  *   build/clean-bench <folder> images N  writes N pairs of JPEG pictures in <folder>/Pictures and times similar images only */
 #include "clean/clean.h"
 #include "clean/rules.h"
@@ -71,7 +71,7 @@ static void run(const char *name, int kind, const CleanOpts *o) {
         int running = strstr(j, "\"state\":\"running\"") != NULL;
         if (!running) {
             char *c = strstr(j, "\"seen\":"), *d = strstr(j, "\"candidates\":"), *e = strstr(j, "\"groups\":"), *l = strstr(j, "\"complete\":");
-            printf("%-6s %8.0f ms  seen %ld  candidates %ld  groups %ld  complete %.5s  helper peak %ld MB  lord-server RSS %ld MB  worst poll %.2f ms\n", name, now() - t0,
+            printf("%-6s %8.0f ms  seen %ld  candidates %ld  groups %ld  complete %.5s  helper peak %ld MB  axia-server RSS %ld MB  worst poll %.2f ms\n", name, now() - t0,
                    c ? atol(c + 7) : 0, d ? atol(d + 13) : 0, e ? atol(e + 9) : 0, l ? l + 11 : "?", peak / 1024, vm("/proc/self/status", "VmRSS:") / 1024, worst);
             free(j);
             break;

@@ -41,6 +41,6 @@
   "smart.scheduled": "Scheduled",
   "smart.today": "Today",
   "unavailable": "Reminders are not available",
-  "unavailableHint": "The mail and calendar service (lord-maild) is not running or not installed.",
+  "unavailableHint": "The mail and calendar service (axia-maild) is not running or not installed.",
   "untitled": "New Reminder"
 }

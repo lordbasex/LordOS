@@ -1,17 +1,17 @@
-/* js_vault.c — lord.vault: Passwords and the keyring through the confined helper lord-vault (see
+/* js_vault.c — lord.vault: Passwords and the keyring through the confined helper axia-vault (see
  * src/vault/vclient.c and docs/PASSWORDS.md).
  *
  *   lord.vault.available()                     → bool
  *   lord.vault.request(json, { files })        → id; files: [{ path, mode: 'r' | 'w' }]
  *       'r' = an existing file in the home folder or on one of the user's disks (realpath + roots);
- *       'w' = a NEW file (O_EXCL) in a valid lord.fs destination. lord-server opens them and
- *       passes only the fds to lord-vault, which cannot open paths.
+ *       'w' = a NEW file (O_EXCL) in a valid lord.fs destination. axia-server opens them and
+ *       passes only the fds to axia-vault, which cannot open paths.
  *   lord.vault.poll()                          → JSON text [{ id, kind: 'rep'|'evt', data }] or null
  *   lord.vault.pending()                       → requests without a reply
  *   lord.vault.lock(why)                       → lock the vault (screen lock, user switch)
  *   lord.vault.fidoDevices()                   → [{ path, name, vid, pid }] (without opening them)
  *   lord.vault.fidoAttach(app)                 → { ok, name } — only with the app's usb permission:
- *       lord-server opens /dev/hidrawN and passes the fd to lord-vault; the app never sees it.
+ *       axia-server opens /dev/hidrawN and passes the fd to axia-vault; the app never sees it.
  *   lord.vault.promptDone(prompt, ok)          → answer to Secret Service's unlock prompt
  * Everything is validated here; none of this runs programs or opens caller paths without validating them. */
 #include "js_vault.h"
@@ -183,9 +183,9 @@ void js_vault_register(JSContext *c, JSValue lord) {
 }
 
 /* ================= app mode =================
- * The Passwords app runs as its own sandboxed process (lord-server --app passwords). lord-server
- * gave it a channel of its own to lord-vault (vc_attach_app, env LORD_VAULT_FD): requests and
- * replies, including revealed secrets, travel between the two sandboxed processes only; lord-server
+ * The Passwords app runs as its own sandboxed process (axia-server --app passwords). axia-server
+ * gave it a channel of its own to axia-vault (vc_attach_app, env LORD_VAULT_FD): requests and
+ * replies, including revealed secrets, travel between the two sandboxed processes only; axia-server
  * never sees them. Same lord.vault API as in the shell, except that files are fds the user picked
  * in the system dialog (powerbox): request(json, { fds: [fd…] }). */
 
@@ -243,7 +243,7 @@ static JSValue fa_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         VMsg m;
         int r = vw_feed(app_fd, &app_rx, &m, &vw_malloc);
         if (r == 0) break;
-        if (r < 0) {                                     /* lord-vault went away */
+        if (r < 0) {                                     /* axia-vault went away */
             close(app_fd);
             app_fd = -1;
             static const char crash[] = "{\"id\":0,\"kind\":\"evt\",\"data\":{\"ev\":\"crash\"}}";
@@ -312,8 +312,8 @@ static const JSCFunctionListEntry vault_app_funcs[] = {
 };
 
 /* ---- lord.keyring of an isolated .lpk app (any app without its own vault channel) ----
- *   lord.keyring.request(op, service, account, label, secret) → JSON text of lord-vault's reply
- *       op: 'get' | 'set' | 'delete' | 'list'. It goes through the broker (BOP_KEYRING); lord-server
+ *   lord.keyring.request(op, service, account, label, secret) → JSON text of axia-vault's reply
+ *       op: 'get' | 'set' | 'delete' | 'list'. It goes through the broker (BOP_KEYRING); axia-server
  *       sets the owner from the verified app id, so the app only reaches its own items (or those
  *       the user agreed to share with it). Errors are thrown as codes (keyring.*, vault.unavailable).
  * The reply buffer may hold a secret: it is wiped once it is a JS string. */

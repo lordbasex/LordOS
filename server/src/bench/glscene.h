@@ -1,5 +1,5 @@
 /* glscene.h — a fixed 3D scene (a rotating cube, a colour per face) drawn with OpenGL ES 2 in whatever
- * context is current: lordos-testbench's window (wayland-egl) or LordBench's offscreen context. Needs
+ * context is current: axia-testbench's window (wayland-egl) or LordBench's offscreen context. Needs
  * GLESv2 only; the caller owns EGL. */
 #ifndef LORD_BENCH_GLSCENE_H
 #define LORD_BENCH_GLSCENE_H

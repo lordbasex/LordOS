@@ -30,7 +30,7 @@ static const struct libseat_seat_listener listener = { enable, disable };
 int seat_start(void) {
     libseat_set_log_level(LIBSEAT_LOG_LEVEL_ERROR);
     seat = libseat_open_seat(&listener, NULL);
-    if (!seat) { perror("lord-de: opening seat (logind or seatd required)"); return -1; }
+    if (!seat) { perror("axia: opening seat (logind or seatd required)"); return -1; }
     /* Enable may already be queued by open_seat. Dispatch it before opening DRM. */
     for (int i = 0; !active && i < 5; i++)
         if (libseat_dispatch(seat, 1000) < 0) break;

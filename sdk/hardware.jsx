@@ -6,12 +6,12 @@
 //   night         Night Light scheduler: sunset to sunrise (from the time zone's coordinates, never
 //                 from the network) or custom hours, with a 30-minute fade, plus "on until tomorrow"
 //   battery       store with lord.power.state(); low-battery notice; battery in the menu bar
-//   idle          screen off / lock / sleep after N minutes (deadlines live in lord-server)
+//   idle          screen off / lock / sleep after N minutes (deadlines live in axia-server)
 //   bluetooth     store with lord.bt.state(); pairing requests (<BluetoothPrompt />)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
-// Everything arrives as __lordHw(kind, data) from lord-server (ui/js_hw.c): no polling.
+// Everything arrives as __lordHw(kind, data) from axia-server (ui/js_hw.c): no polling.
 import { createElement as h, useEffect, useState } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -347,7 +347,7 @@ function linuxNotify(n) {
   if (id) fromLinux.set(n.id, id);
 }
 
-// ---- events from lord-server ----
+// ---- events from axia-server ----
 
 globalThis.__lordHw = (kind, data) => {
   switch (kind) {

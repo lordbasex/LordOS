@@ -79,7 +79,7 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
   edge kept (clamped so the edges share a pixel), aligned to the start, end or center when within
   the threshold, or slid just past a display that is in the way. Any relative position is allowed:
   side by side, stacked, or offset diagonally as long as edges touch.
-- **lord-server keeps it exactly.** `lord.display.arrange(conn, x, y, true)` (`display_arrange`)
+- **axia-server keeps it exactly.** `lord.display.arrange(conn, x, y, true)` (`display_arrange`)
   checks the position with `out_fits` (the same rule as `placementOk` in the SDK); a fitting
   position is kept as is (`out_snap` with no alignment), anything else is still snapped next to a
   display with the old 24 px alignment. `out_fix`, run on every plan, leaves a valid arrangement
@@ -180,7 +180,7 @@ Like macOS's "Arrange Displays", with more than one display (extend mode):
 | `wp_viewporter` | 1 | now also on the CPU path: crop and scale with a bilinear blit (`canvas_blit_scaled`) |
 
 A client's buffer is drawn into its logical box at the display's resolution: 1:1 when it rendered
-at exactly that size (fractional-scale clients), scaled otherwise. lord-server logs how each app
+at exactly that size (fractional-scale clients), scaled otherwise. axia-server logs how each app
 renders, once per change:
 
 ```
@@ -202,8 +202,8 @@ Settings → Displays → "Screenshots and sharing": **main display** (default) 
 
 ## Measurements (VM 118, CPU path, 4 vCPU)
 
-Window drag (the About window, 6 s circles at 125 events/s with a uinput tablet; lord-server's
-`drag:` line). "Work" is lord-server's time per rendered frame (JS of the pointer + layout +
+Window drag (the About window, 6 s circles at 125 events/s with a uinput tablet; axia-server's
+`drag:` line). "Work" is axia-server's time per rendered frame (JS of the pointer + layout +
 paint + present).
 
 | Setup | Work per frame | Paint | Present | Frames/s |
@@ -249,7 +249,7 @@ head: `screendump file.ppm vga 1` in `qm monitor 118`.
   CRTCs than connectors are untested.
 - **Mirror with one CRTC driving two connectors** (hardware cloning) is not used: each mirrored
   display has its own CRTC and frame.
-- **Screenshot and recording files** were not produced on VM 118 (its build has no `lord-media`);
+- **Screenshot and recording files** were not produced on VM 118 (its build has no `axia-media`);
   the capture paths ran (the permission prompt appeared on the main display). The remote desktop
   with two displays was not tested with a browser.
 - **Legacy Wayland clients at 125/150/175 %** get `scale = 2` and are downscaled (bilinear): not

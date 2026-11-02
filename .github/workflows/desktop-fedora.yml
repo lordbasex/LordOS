@@ -16,4 +16,4 @@ jobs:
       - run: npm ci
       - run: make -j2 check GPU=${{ matrix.gpu }} CFLAGS='-O2 -g -D_FORTIFY_SOURCE=3 -fstack-protector-strong'
       - name: Stage installation
-        run: make install PREFIX=/usr DESTDIR="$RUNNER_TEMP/lord-de"
+        run: make install PREFIX=/usr DESTDIR="$RUNNER_TEMP/axia-de"

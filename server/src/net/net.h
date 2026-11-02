@@ -1,7 +1,7 @@
 /* net.h — LordOS's own networking and VPN (see docs/NETWORK.md).
  *
  * Two sides:
- *  - lord-server (no root): reads the state with rtnetlink (interfaces, addresses, routes,
+ *  - axia-server (no root): reads the state with rtnetlink (interfaces, addresses, routes,
  *    counters) and listens for changes; lord.net (ui/js_net.c) exposes it to JS.
  *  - the privileged helper (admin.c, root): the "net-*" actions in the table below:
  *    configuring interfaces, our own DHCP client, Wi-Fi (wpa_supplicant), WireGuard (our own
@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include "../admin.h"
 
-/* ---- lord-server side ---- */
+/* ---- axia-server side ---- */
 
 int  net_open(void);                    /* rtnetlink notification socket; 0 ok */
 int  net_fd(void);                      /* for poll; -1 if not there */

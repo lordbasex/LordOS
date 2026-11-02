@@ -1,12 +1,12 @@
-/* mailc.h — lord-server's side of lord-maild (see proto.h and docs/MAIL.md).
+/* mailc.h — axia-server's side of axia-maild (see proto.h and docs/MAIL.md).
  *
- * One lord-maild per session, started on first use with a fixed path (next to this binary), no
+ * One axia-maild per session, started on first use with a fixed path (next to this binary), no
  * arguments and a minimal environment. A thread of ours talks to it, so the compositor never
  * waits: results and events queue up and JS reads them with mail_poll() (lord.mail.poll).
  *
- * This side also owns the network policy: lord-maild cannot open sockets, and asks us for a
+ * This side also owns the network policy: axia-maild cannot open sockets, and asks us for a
  * connection to host:port. We connect only to the servers of the configured accounts (read from
- * ~/.config/lordos/mail/accounts.json, which only lord.mail.saveConfig can write) and, for ten
+ * ~/.config/axia/mail/accounts.json, which only lord.mail.saveConfig can write) and, for ten
  * minutes, to the image hosts of a message whose remote images the user chose to load. */
 #ifndef LORD_MAIL_MAILC_H
 #define LORD_MAIL_MAILC_H
@@ -20,23 +20,23 @@ int   mail_start(void);                     /* 0 if running (starts it if needed
 int   mail_request(const char *json, size_t len, int *fds, int nfds);
 char *mail_poll(void);                      /* JSON array of events (malloc) or NULL */
 int   mail_pending(void);
-/* Re-reads the accounts file, rebuilds the allowed endpoints and tells lord-maild. */
+/* Re-reads the accounts file, rebuilds the allowed endpoints and tells axia-maild. */
 void  mail_reload_config(void);
 /* Validates (JSON object, ≤ MAIL_CONFIG_MAX, no "password"/"secret" in an account) and writes the
  * accounts file (0600, atomic), then reloads it. 0, 1 if refused, 2 if it could not be written. */
 int   mail_save_config(const char *json, size_t len);
 /* Remote images of one message: allow these http(s) hosts for a while. */
 void  mail_allow_hosts(const char *const *urls, int n, int seconds);
-const char *mail_config_path(void);         /* ~/.config/lordos/mail/accounts.json */
-const char *mail_cache_path(void);          /* ~/.local/share/lordos/mail */
+const char *mail_config_path(void);         /* ~/.config/axia/mail/accounts.json */
+const char *mail_cache_path(void);          /* ~/.local/share/axia/mail */
 
-/* Decoded images (ARGB32 premultiplied) returned by lord-maild. */
+/* Decoded images (ARGB32 premultiplied) returned by axia-maild. */
 const uint32_t *mail_image_lock(int handle, int *w, int *h);
 void  mail_image_unlock(void);
 void  mail_image_release(int handle);
 
 /* ---- isolated system apps (Mail, Calendar, Contacts, Reminders in their own process) ----
- * Each app process that uses lord-maild through the broker (sec/brokermail.c) is an "owner":
+ * Each app process that uses axia-maild through the broker (sec/brokermail.c) is an "owner":
  * replies to its requests and its decoded images belong to it alone, and broadcast events reach it
  * according to its mask: MAIL_EV_ALL (Mail) or MAIL_EV_PIM (only pim-changed/ready; no senders or
  * subjects for Calendar, Contacts and Reminders). Owner 0 is the session's JavaScript. */

@@ -11,7 +11,7 @@ import tarfile
 
 root = Path.cwd()
 version = json.loads((root / 'package.json').read_text())['version']
-name = f'lord-de-{version}'
+name = f'axia-de-{version}'
 out = root / 'dist' / f'{name}.tar.gz'
 out.parent.mkdir(exist_ok=True)
 exclude = {'.git', 'node_modules', 'build', 'dist', '__pycache__', 'target'}

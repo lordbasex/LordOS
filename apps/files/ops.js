@@ -70,8 +70,8 @@ export function paste(destDir) {
   if (c.mode === 'cut') fileClipboard.set(null);
 }
 
-// ---- tags (~/.local/share/lordos/tags.json: path → [colors]) ----
-const TAGS_FILE = '.local/share/lordos/tags.json';
+// ---- tags (~/.local/share/axia/tags.json: path → [colors]) ----
+const TAGS_FILE = '.local/share/axia/tags.json';
 export const tagStore = createStore((() => {
   try { return JSON.parse(fs.read(TAGS_FILE)); } catch (e) { return {}; }
 })());
@@ -85,10 +85,10 @@ export function toggleTag(paths, color) {
     if (cur.size) all[p] = [...cur]; else delete all[p];
   }
   tagStore.set(all);
-  try { fs.mkdir('.local/share/lordos'); fs.write(TAGS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
+  try { fs.mkdir('.local/share/axia'); fs.write(TAGS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
 }
-// Comments, kept like tags (~/.local/share/lordos/comments.json: path → text).
-const COMMENTS_FILE = '.local/share/lordos/comments.json';
+// Comments, kept like tags (~/.local/share/axia/comments.json: path → text).
+const COMMENTS_FILE = '.local/share/axia/comments.json';
 export const commentStore = createStore((() => {
   try { return JSON.parse(fs.read(COMMENTS_FILE)); } catch (e) { return {}; }
 })());
@@ -97,7 +97,7 @@ export function setComment(path, text) {
   const all = { ...commentStore.get() };
   if (text.trim()) all[path] = text.slice(0, 500); else delete all[path];
   commentStore.set(all);
-  try { fs.mkdir('.local/share/lordos'); fs.write(COMMENTS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
+  try { fs.mkdir('.local/share/axia'); fs.write(COMMENTS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
 }
 // Moving or renaming keeps the tags.
 export function moveTags(from, to) {

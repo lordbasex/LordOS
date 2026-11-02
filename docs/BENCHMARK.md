@@ -1,6 +1,6 @@
 # System Information, LordBench and hardware reports (proposal)
 
-**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `lordos-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `lord-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `lordos-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports were released in 0.8.7-beta (2026-11-01; see "Built so far" under 0.8.7: the report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the Compatibility panel); a `checks` subcommand of `lordos-sysreport` is not built.** It plans three releases and a later stage:
+**Status: design proposal. Built and released in 0.8.5-beta (2026-10-27; see "Work plan for 0.8.5" below): the collector, `axia-sysreport report|fetch`, the System Information app (Overview, Hardware, Compatibility, Checks, Report), the Sandbox Probe and the shared measurement library `server/src/bench`. LordBench's first part was released in 0.8.6-beta (2026-10-30): the `axia-bench` helper, its CPU, memory, GPU, storage and sustained workloads, the interface (layout, paint, shaping) and video workloads, the desktop-impact mode (the compositor's frames, their phases and pointer-to-screen latency under load), the boot test, the guards, `axia-sysreport bench` and System Information's Performance tab are built, with two of the three reference machines (VM 116 and the Raspberry Pi 5 16 GB; see "Built so far" under 0.8.6); the modest x86 PC reference is not, and moved to 0.8.7 with hardware video decoding (2026-10-29). Community reports were released in 0.8.7-beta (2026-11-01; see "Built so far" under 0.8.7: the report format, Share on GitHub, the issue form and its workflow, the catalogue and its signed snapshot in the Compatibility panel); a `checks` subcommand of `axia-sysreport` is not built.** It plans three releases and a later stage:
 
 | Release | What |
 |---|---|
@@ -24,24 +24,24 @@ clients so no logic is duplicated:
 server/src/sysreport/        collector + checks (library, read-only, no root)
 server/src/bench/            LordBench workloads (library)
         │
-        ├── lord-server: lord.sysinfo (js_hw.c) → apps/sysinfo        (the app)
-        ├── lordos-sysreport  report | fetch | bench [--quick|--full] [--json]  (CLI, runs as the user)
+        ├── axia-server: lord.sysinfo (js_hw.c) → apps/sysinfo        (the app)
+        ├── axia-sysreport  report | fetch | bench [--quick|--full] [--json]  (CLI, runs as the user)
         └── tests (fake sysfs trees, fixtures) and, later, Lumo's tools
 ```
 
-- **`lordos-sysreport`** is an ordinary user command in `/usr/bin` that the user or a test script
-  runs; `lord-server` never runs it. It writes the same JSON as the app, so reports can be made on
+- **`axia-sysreport`** is an ordinary user command in `/usr/bin` that the user or a test script
+  runs; `axia-server` never runs it. It writes the same JSON as the app, so reports can be made on
   a machine without a session (a headless Pi, a VM over SSH, CI).
-- **Shared with the Test Bench.** `lordos-testbench` (0.8.5, `src/testbench`, a Wayland client that checks
+- **Shared with the Test Bench.** `axia-testbench` (0.8.5, `src/testbench`, a Wayland client that checks
   the display server from the outside) and LordBench keep their own names and jobs, but the measurement
   pieces live once, in `server/src/bench/`, and both link them: `bench.c` (the clock; frame times with
   average, p50, p99 and frames that missed the refresh budget; presentation accounting with vblanks skipped
   and zero-copy frames; input-to-screen latency; the GL renderer's kind; JSON strings; the report written
-  atomically to `~/.local/state/lordos/<name>.json`) and `glscene.c` (the fixed 3D scene, drawn with GLES2
+  atomically to `~/.local/state/axia/<name>.json`) and `glscene.c` (the fixed 3D scene, drawn with GLES2
   in whatever context is current: the bench's wayland-egl window, LordBench's offscreen context). Tested by
   `build/bench-test`. LordBench's workloads go next to them.
-- **`lord-bench`** is the helper the app starts for workloads, launched like `lord-doc` and
-  `lord-media`: fixed path (`<lord-server dir>/lord-bench`), no arguments, minimal environment,
+- **`axia-bench`** is the helper the app starts for workloads, launched like `axia-doc` and
+  `axia-media`: fixed path (`<axia-server dir>/axia-bench`), no arguments, minimal environment,
   channel on fd 3, `sandbox_apply_helper()` before any work; it gets only the render node and a
   temporary file as fds. It links libc, Mesa's GBM/EGL/GLES (already used by the GPU path) and the
   vendored QuickJS (one of its workloads), nothing new. The CLI links the same library directly.
@@ -88,7 +88,7 @@ window is protected while they show (`wm.setProtected`), so screenshots, recordi
 (with their HID++ battery) and a laptop's built-in keyboard and touchpad (`lord.sysinfo.peripherals()`,
 `sysreport/periph.c`), plus BlueZ's paired or connected devices (`lord.bt`, with Battery1 where BlueZ has it, which for
 an LE device usually means only while it is connected). This list is not in the report: a device names itself and
-that name can carry a person's, so `SysReport` has no place for these strings, `lordos-sysreport` and `lordos-fetch`
+that name can carry a person's, so `SysReport` has no place for these strings, `axia-sysreport` and `axia-fetch`
 don't link `periph.c`, and `apps/sysinfo/model.js` builds each row field by field, so no address or D-Bus path can come
 along. USB `serial`, an input device's `uniq` and `phys` and a power supply's `serial_number` are never read.
 
@@ -107,7 +107,7 @@ long name with the bus path dropped; a Raspberry Pi's HDMI outputs by port; anyt
 | Kernel driver loaded | the device's `driver` link (`amdgpu`, `i915`, `xe`, `nouveau`, `nvidia-drm`, `v3d`/`vc4`, `virtio_gpu`…) |
 | DRM/KMS available | a card node with connectors, modesetting working (`kms.c`) |
 | Render node | `/dev/dri/renderD*` openable by the session |
-| EGL context active | `lord-server` created one; the GL renderer string; hardware or software (llvmpipe) |
+| EGL context active | `axia-server` created one; the GL renderer string; hardware or software (llvmpipe) |
 | Composition | the GPU path is on, or the exact reason it's off (the same one the log gives) |
 | Direct scanout | seen during a fullscreen video or app, with the count since the session started |
 | Video decode | VA-API profiles per codec (`MK_HWPROBE`); on the Pi 5 the HEVC V4L2 decoder |
@@ -129,11 +129,11 @@ the test:
 
 | Id | Paper | Configured | Effective |
 |---|---|---|---|
-| `sec.server-user` | §2.2 | `lord-server`'s uid ≠ 0 | — |
+| `sec.server-user` | §2.2 | `axia-server`'s uid ≠ 0 | — |
 | `sec.app-sandbox` | §6.4 | `Seccomp: 2`, `NoNewPrivs: 1` on an isolated app | a probe app (a system package started like any isolated app) tries to read a file outside its grant, open a socket, `ptrace`, create a user namespace and reach another app's scope; every attempt must be refused |
-| `sec.helper-sandbox` | §6.7 | — | a child of the probe app that takes `sandbox_apply_helper()` checks that a unix socket, `exec`, `fork` and the app's data folder fail (0.8.5); `lord-bench` repeats it after its own lock-in on every LordBench run, with an internet socket, a new file and a system file too, shown in Performance's Stability verdict (0.8.6) |
+| `sec.helper-sandbox` | §6.7 | — | a child of the probe app that takes `sandbox_apply_helper()` checks that a unix socket, `exec`, `fork` and the app's data folder fail (0.8.5); `axia-bench` repeats it after its own lock-in on every LordBench run, with an internet socket, a new file and a system file too, shown in Performance's Stability verdict (0.8.6) |
 | `sec.landlock` | §6.4 | Landlock ABI ≥ 6 | covered by the probe app |
-| `sec.netperm` | §6.6 | `lord-netperm` running, programs attached, devices and Bluetooth programs loaded | the probe app, denied the network by a temporary rule, fails to connect to a local listener |
+| `sec.netperm` | §6.6 | `axia-netperm` running, programs attached, devices and Bluetooth programs loaded | the probe app, denied the network by a temporary rule, fails to connect to a local listener |
 | `sec.code` | §6.9 | manifest present | every loaded bundle verified in this session |
 | `sec.remote-closed` | §11.4 | remote desktop setting | nothing listens on 5673 when it's off |
 | `sec.cgroups` | §11.4 | root-owned session tree, one scope per app | — |
@@ -181,8 +181,8 @@ A versioned JSON (`schema: 1`) and a Markdown summary, saved to `~/Documents`:
 | CPU, one core and all cores | SHA-256 (`pkg/crypto.c`), deflate (built as xz decoding, below), a matrix multiply; LordOS's own work: layout and paint of a fixed scene, shaping a fixed paragraph in several scripts, QuickJS running a fixed script |
 | Memory | bandwidth (copy, triad) and latency (pointer chase) |
 | GPU | offscreen GLES on the render node: fill rate, texture upload, composing N screen-size layers, timed with fences |
-| Compositor | `lord-server`'s own frame counters during a scripted window drag, CPU path and GPU path |
-| Video | short test clips we generate (H.264, HEVC, VP9, AV1; 1080p and 4K) decoded in `lord-media`, hardware and software (only software decoding is built, below); the remote desktop's encoders |
+| Compositor | `axia-server`'s own frame counters during a scripted window drag, CPU path and GPU path |
+| Video | short test clips we generate (H.264, HEVC, VP9, AV1; 1080p and 4K) decoded in `axia-media`, hardware and software (only software decoding is built, below); the remote desktop's encoders |
 | Storage | sequential and random I/O on a size-limited temporary file (Full only, with a warning on SD cards) |
 | Boot | the seconds from the kernel's start to the first frame on the monitor, recorded by `lord-sessiond` on every boot with the version and build (`/var/lib/lordos/boot-times.jsonl`, built in 0.8.5; [RESULTS.md](RESULTS.md), "Boot time"): LordBench reads that history, shows each version's median and spread over its boots (the first boot after an update apart: it builds caches), and with the user's consent can reboot N times in a row to measure it |
 | Sustained | several minutes of all-core load (Full only) |
@@ -230,10 +230,10 @@ in an isolated headless session through System Information → Performance, and 
 maintainer's own session on a 1920×1080 60 Hz monitor (HDMI-A-1 and HDMI-A-2 both tried), with a 0.8.6
 development package.
 
-- **`lord-bench`** (`server/src/bench/lbmain.c`, `mk/lordbench.mk`): launched by lord-server
+- **`axia-bench`** (`server/src/bench/lbmain.c`, `mk/lordbench.mk`): launched by axia-server
   (`bench/lbrun.c`) from its own folder only (owned by root or the user, not writable by others), no
   arguments, `LANG` only (and `LORDOS_SESSIOND` in a lord-sessiond session), the channel on fd 3. It
-  receives one fixed-size request (`LbGo`, `bench/lbproto.h`) with at most two fds lord-server opened: the
+  receives one fixed-size request (`LbGo`, `bench/lbproto.h`) with at most two fds axia-server opened: the
   GPU's render node (`/dev/dri/renderD128…`) and, for Full, an unnamed scratch file (`O_TMPFILE` in
   `~/.cache`, at most 1 GB and a quarter of the free space). Then it locks itself in with
   `sandbox_apply_helper` before any work (scope `lordos-bench.scope`, 2 GB memory cap, read-only
@@ -241,7 +241,7 @@ development package.
   Mesa (without the last two, Mesa's loader on the Pi 5 could not identify the V3D device and every GPU
   measurement was skipped; the GPU itself is still reached only through the render node fd), DRM and dma-buf ioctls only when
   it got the render node, no sockets, no exec, threads only). It answers only with fixed-size records
-  (`LbMsg`: a measurement id, a value and its spread); lord-server checks each one (`lb_msg_valid`: the
+  (`LbMsg`: a measurement id, a value and its spread); axia-server checks each one (`lb_msg_valid`: the
   magic, a known kind and id, finite values in range) and writes the JSON itself. Stopping is a SIGKILL.
 - **Workloads** (`bench/lbwork.c`, `bench/lbui.c`, `bench/lbgpu.c`), each repeated three times and reported as the
   median with its spread (max − min), on one core and on all of them:
@@ -250,7 +250,7 @@ development package.
     decoder (`pkg/xz.c`; the text is generated at build time by `bench/lbcorpus.c` and compressed with
     `xz -9`), instead of the deflate in the design above; QuickJS running a fixed script (strings, JSON,
     sorting, objects, a regular expression), one runtime per thread.
-  - LordOS's own interface work (`bench/lbui.c`), with the engine's real code linked into `lord-bench`
+  - LordOS's own interface work (`bench/lbui.c`), with the engine's real code linked into `axia-bench`
     (`ui/node.c`, `style.c`, `layout.c`, `paint.c`, `text.c`, `canvas.c`, the shaper `otf.c`, `shape*.c`,
     `bidi.c`; the Wayland, terminal, media and GPU hooks of `paint.c` are stubs, as in `tests/engine_test.c`):
     - **Layout and paint** (`cpu.ui.1`, `cpu.ui.n`, frames per second): a fixed 1920×1080 scene built in C,
@@ -261,7 +261,7 @@ development package.
       lays the tree out, computes the damage and paints the whole screen; the glyph, text and shadow caches stay
       warm, as on a running desktop (one frame before the clock starts fills them). `cpu.ui.1` is everything on
       one core; `cpu.ui.n` the same frames with the paint's row-local loops split in bands over up to 8 threads
-      (`canvas_parallel`, the same pieces as lord-server's paint threads, `par.c`, without their real-time
+      (`canvas_parallel`, the same pieces as axia-server's paint threads, `par.c`, without their real-time
       priority), so it measures what the compositor's own threads gain, not N independent copies: the engine
       keeps one tree per process.
     - **Shaping** (`cpu.shape.1`, `cpu.shape.n`, runs per second, summed over the threads): one run shapes five
@@ -284,7 +284,7 @@ development package.
       12 % faster than the full fonts (fewer lookups, smaller coverage tables; VM 116, 587–631 against 514–560
       runs/s on one core), so the workload is comparable only with itself. Line breaking is not part of the run: the engine's Thai word breaker reads libthai's dictionary
       from a file. A trace of a run shows these workloads open nothing; the helper's sandbox, seccomp list and fds
-      are unchanged. `lord-bench` grows from 1.48 to 2.42 MB of code (about 0.63 MB of fonts) and 0.46 MB of
+      are unchanged. `axia-bench` grows from 1.48 to 2.42 MB of code (about 0.63 MB of fonts) and 0.46 MB of
       static data.
     - **They measure LordOS's engine together with the machine.** An optimisation of `paint.c`, `layout.c` or the
       shaper changes these four numbers on the same hardware. So a reference value of one of them carries the
@@ -301,9 +301,9 @@ development package.
     cache for that file, random 4 KiB reads for 3 s; the file is emptied at the end and, being unnamed,
     disappears with the fd.
   - Sustained (Full only, 3 minutes from the app): the matrix product on every core, a sample every
-    10 s with the temperature lord-server read at that moment.
-- **Video** (after the helper's measurements, Quick and Full): a `lord-media` job (`MK_VBENCH`,
-  `media/helper/lm_vbench.c`, launched from lord-server's folder by `bench/lbvideo.c`, no fds at all). It makes its
+    10 s with the temperature axia-server read at that moment.
+- **Video** (after the helper's measurements, Quick and Full): a `axia-media` job (`MK_VBENCH`,
+  `media/helper/lm_vbench.c`, launched from axia-server's folder by `bench/lbvideo.c`, no fds at all). It makes its
   own test clips in memory from a synthetic picture (gradients, moving blocks and a little noise, the same every
   time) with this system's FFmpeg: H.264 (libx264 `veryfast`, 8 Mbit/s), HEVC (libx265 `ultrafast`), VP9 (libvpx
   realtime) and AV1 (SVT-AV1 preset 12, else libaom or rav1e) at 1080p, and H.264 and HEVC at 4K. Each clip is
@@ -311,7 +311,7 @@ development package.
   second, three times, as frames per second. Then the remote desktop's own encoders with their settings
   (`lm_stream_sw_encoder`: libx264 `ultrafast`/`zerolatency`, libvpx VP8 realtime) encode 1920×1080 frames as fast
   as they can. Quick measures H.264 at 1080p and the H.264 encoder; an encoder or decoder this FFmpeg lacks is
-  "skipped: no codec". lord-media answers only `MM_BENCH` records (a measurement, a kind, a rate in thousandths),
+  "skipped: no codec". axia-media answers only `MM_BENCH` records (a measurement, a kind, a rate in thousandths),
   checked by `lbv_record_valid` before they become results. Hardware decoding is not measured: neither test
   machine has it (no VA-API on VM 116; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's FFmpeg
   lacks; hardware decoding moved to 0.8.7).
@@ -319,10 +319,10 @@ development package.
   System Information opens a second window with a scene (cards, shadows and a square turned through
   `lord.setStyle` with the engine's `rotate` key; until 0.8.6's frame-cost work it sent a `transform` key the engine
   doesn't have and stood still, so desktop results from before that change measured a lighter scene and aren't
-  comparable) and lord-server moves that window along a figure of eight through the drag's own path
+  comparable) and axia-server moves that window along a figure of eight through the drag's own path
   (`lord.wm.script`, `grab_script_begin` in `ui/grab.c`: painted once into a layer, one step per frame, no JS per
-  frame). lord-server records every frame it builds and every frame the main display shows (`bench/lbframes.c`,
-  from `render()` and the page flips; one atomic read per frame when off): 10 s alone, then 10 s while `lord-bench`
+  frame). axia-server records every frame it builds and every frame the main display shows (`bench/lbframes.c`,
+  from `render()` and the page flips; one atomic read per frame when off): 10 s alone, then 10 s while `axia-bench`
   loads every core at the lowest priority (`LB_MODE_LOAD`: nice 19, idle I/O class) after 2 s of warm-up. Each
   phase gives the frames shown per second, the time to build a frame (median and 99th percentile) and the share of
   intervals between shown frames longer than 1.5 refresh periods; the load phase also gives the work the load
@@ -330,13 +330,13 @@ development package.
   late frames (problems above 25 %). Without a monitor the compositor draws only while someone watches (the
   remote desktop), so a headless session gives "skipped: too few frames" unless a viewer is connected.
 - **Pointer to screen** (in both phases of the desktop test): the scene's window is moved by a **synthetic pointer**
-  (`bench/lbinput.c`), a thread of lord-server that plays a 125 Hz mouse: each event is stamped with the monotonic
+  (`bench/lbinput.c`), a thread of axia-server that plays a 125 Hz mouse: each event is stamped with the monotonic
   clock when it is made, goes into a ring and is announced on an eventfd the main loop polls like an input device;
   the main loop takes the newest position once per frame, as it does with a real mouse's motion, and moves the
   window through the drag's path. Each event's latency ends at the presentation of the first frame that shows it or
   a later position (`lbf_input`, `lbf_built`, `lbf_presented` in `bench/lbframes.c`); the results are the median and
   the 99th percentile (`comp.in50/in99`, `desk.in50/in99`), and the verdict warns when the 99th percentile passes
-  three refresh periods. It measures lord-server's part (waking up, the frame, the flip), not the mouse, USB or the
+  three refresh periods. It measures axia-server's part (waking up, the frame, the flip), not the mouse, USB or the
   kernel's; the positions only move LordBench's own window. Without the thread the scene moves by the clock and the
   latency is "failed". On VM 116 without a monitor: 14.6 ms median and 25.2 ms p99 alone, 15.1 and 30.9 ms under
   load; on the Pi 5 (no monitor): about 15.7 and 27 ms alone, 22 and 52 ms under load ("The desktop under load").
@@ -348,7 +348,7 @@ development package.
   "Boot time"). The test always ends: the count only goes down, a state older than 30 minutes is discarded, and
   lord-sessiond reads the file again right before restarting. The Boot time group shows the latest test's median
   and range per version.
-- **Guards and conditions** (`bench/lbcond.c`, read by lord-server, never by the helper): the hottest
+- **Guards and conditions** (`bench/lbcond.c`, read by axia-server, never by the helper): the hottest
   thermal zone (or the CPU's coretemp/k10temp/zenpower hwmon sensor) and the lowest passive and
   critical trip points; the x86 thermal throttle counters; the Raspberry Pi firmware's `get_throttled`
   flags and its `rpi_volt` under-voltage alarm; cpufreq, governor and ACPI platform profile; batteries
@@ -375,7 +375,7 @@ development package.
   - The frequency-capped, throttled and soft-limit bits are not exposed at all on this kernel; reading them
     would need the mailbox (`/dev/vcio`, `vcgencmd`), which LordBench never opens or runs.
 
-  So lord-server reads, world-readable and without exec or root: `rpi_volt`'s `in0_lcrit_alarm` (exactly `0`
+  So axia-server reads, world-readable and without exec or root: `rpi_volt`'s `in0_lcrit_alarm` (exactly `0`
   or `1`, anything else is unknown); `get_throttled` where a kernel has it (directly under a
   `/sys/devices/platform` node or its `<node>:firmware` child; 1-8 hex digits with an optional `0x` and a
   newline, nothing else, `rpifw_parse_throttled`; masked to the eight known bits: 0 under-voltage now, 1 ARM
@@ -408,7 +408,7 @@ development package.
   run by hand as root, said `0x0` throughout). Not verified yet: that the alarm reads `1` during an actual
   under-voltage, and how fast the Pi 5 reaches 80 °C without a cooler in the peak tests.
 
-  The reader is shared (`hw/rpifw.c`, `rpifw_read`: lord-server, `lordos-sysreport` and the tests link it), and
+  The reader is shared (`hw/rpifw.c`, `rpifw_read`: axia-server, `axia-sysreport` and the tests link it), and
   System Information's Raspberry Pi section uses it too (2026-10-29; before, it looked only for `get_throttled`, so on
   the Pi 5 with the LordOS kernel its Power and Throttling rows were always empty). It shows what the kernel shows
   and leaves out the rest: with only `rpi_volt` (the LordOS kernel), a Power row for the last few seconds ("No
@@ -420,12 +420,12 @@ development package.
   set, malformed and missing; older Pi 4 and Pi 5 kernels with `get_throttled`; both; neither; a machine that isn't
   a Pi); on the Pi 5 the shared reader gave LordBench the values above, while System Information's rows themselves
   were not looked at there.
-- **Helper-sandbox self-test** (`sec.helper-sandbox`, repeated inside `lord-bench`, `sandbox_tries` in
-  `bench/lbmain.c`): right after `sandbox_apply_helper` and before any work, in every mode, `lord-bench` tries six
+- **Helper-sandbox self-test** (`sec.helper-sandbox`, repeated inside `axia-bench`, `sandbox_tries` in
+  `bench/lbmain.c`): right after `sandbox_apply_helper` and before any work, in every mode, `axia-bench` tries six
   things that must fail: the Sandbox Probe's helper tries (`app/probe.c`) with its own versions of the data-folder
   one, plus an internet socket and a system file. A unix socket (`helperSocket`), an internet socket
   (`helperInet`), `execve` of `/usr/bin/true` (`helperExec`), `fork` (`helperFork`), a new unnamed file in `/tmp`
-  (`helperNewFile`, `O_TMPFILE`: lord-bench has no writable folder) and reading `/etc/passwd` (`helperRead`). None
+  (`helperNewFile`, `O_TMPFILE`: axia-bench has no writable folder) and reading `/etc/passwd` (`helperRead`). None
   could change anything if it worked: exec is called with an invalid environment pointer, so an exec the sandbox
   let through fails with `EFAULT` before anything is replaced (and counts as not refused); a socket or the unnamed
   file is closed at once; a forked child only exits. Each try is one fixed record (`LB_MSG_SANDBOX`: the try, refused
@@ -434,11 +434,11 @@ development package.
   state (results from before have none); the tries are named to the user in their language ("run a program", …).
   On a kernel without Landlock (no `SB_LANDLOCK_FS` in the sandbox mask) the two file tries are expected to work:
   that is the kernel's limit, already recorded in the mask, so they make the verdict warn ("Without Landlock in
-  this kernel the benchmark helper could still: …"), not fail. `lordos-sysreport bench` checks the same six by
+  this kernel the benchmark helper could still: …"), not fail. `axia-sysreport bench` checks the same six by
   name: "helper sandbox: N of 6 tries refused", a `NOT REFUSED: <id>` line for each one that worked or is
   missing (and "allowed without Landlock" for the file tries on such a kernel). On VM 116 all six were refused:
   `EPERM` from seccomp for the sockets, exec and fork, `EACCES` from Landlock for the two files.
-- **The result** (`~/.local/state/lordos/lordbench.json`, the previous one kept as
+- **The result** (`~/.local/state/axia/lordbench.json`, the previous one kept as
   `lordbench-prev.json`; a refused run keeps the last result): LordBench's version, the mode, status and
   stop reason, LordOS and kernel versions, live or installed, threads, the quiet wait, conditions before
   and after, the disk kind, the GPU kind (hardware, virtual or software), the sandbox mask and the
@@ -494,25 +494,25 @@ throttling does not fire on the Pi; the `rpi_volt` under-voltage alarm is read);
 temperature are the evidence that it did not throttle. (Since then the alarm is watched during the whole run and
 the firmware's documented 80 °C limit counts as throttling on a Pi: "The Raspberry Pi firmware's throttling" above.)
 
-Raspberry Pi 5 16 GB, the interface workloads, two Quick runs from a terminal (`lordos-sysreport bench --quick
+Raspberry Pi 5 16 GB, the interface workloads, two Quick runs from a terminal (`axia-sysreport bench --quick
 --json`, the arm64 build of the `perf-frame` branch, 2026-10-29; 39 s each, 36.4 → 40.8 °C, the `ondemand` governor,
 4 threads): layout and paint 39.31–39.37 fps on one core and 45.38–45.41 fps with the paint threads; shaping
 630.0–632.3 runs/s on one core and 2,521.7–2,526.7 runs/s on four (4.0×). The Pi's paint threads gain about 15 %
 (VM 116: 8 %). These are not in `references.js`: a reference comes from a Full run (next paragraph).
 
 Raspberry Pi 5 16 GB, the interface workloads for its reference, two Full runs from a terminal over SSH, without the
-monitor (`lordos-sysreport bench --full --json`, the arm64 build of main at 601b5d5 run from a folder in the home
-with `lord-bench` and `lord-media` next to it, not the installed 0.8.5 package's; the LordOS kernel
+monitor (`axia-sysreport bench --full --json`, the arm64 build of main at 601b5d5 run from a folder in the home
+with `axia-bench` and `axia-media` next to it, not the installed 0.8.5 package's; the LordOS kernel
 6.18.57-lordos.3, the `ondemand` governor, 4 threads, the fan on its header; 2026-10-30; the load average 0.00 and
 35.3 °C before, the quiet check 0.4–0.5 % busy; the under-voltage alarm read 0 throughout, no throttling). The
-first run took 178 s and had no sustained part: `lordos-sysreport bench --full` passed no sustained time, although
+first run took 178 s and had no sustained part: `axia-sysreport bench --full` passed no sustained time, although
 its help says 3 minutes, so it was fixed to the app's 180 s (`CLI_SUSTAINED_S` in `sysreport/cli.c`) and run
 again: 358 s, 37.0 → 49.6 °C, 59.0 °C at most. The second run is the reference: layout and paint 39.22 fps on one
 core (spread 0.06) and 45.23 fps with the paint threads (spread 0.53); shaping 628.3 runs/s on one core and 2,514.0
 on four (4.0×). The first run gave 39.37, 45.28, 628.8 and 2,513.4: within 0.4 % of it, and within 0.6 % of the two
 Quick runs above. The sandbox self-test refused all six tries in both. Its other measurements were within 3.2 % of
 the 2026-10-27 run except the matrix product on four cores, 6.72 instead of 5.99 GFLOP/s (+12 %, both runs), the
-sustained load with it, 6.55 → 6.56 instead of 5.86 → 5.88 GFLOP/s (+12 %; the same `lord-bench` workload code;
+sustained load with it, 6.55 → 6.56 instead of 5.86 → 5.88 GFLOP/s (+12 %; the same `axia-bench` workload code;
 the cause was not looked for), the random 4K reads, 2,429–2,437 instead of 2,692 (−10 %), the GPU upload, 3,687–3,738
 instead of 3,897 MB/s (−4 to −5 %), and xz, 64.0 and 244.0 instead of 67.0 and 254.0 MB/s (−4 %); the reference keeps the 2026-10-27 values for those, and adds only the four interface
 workloads, with `"lordos": "0.8.5-beta"`, the version the run reported.
@@ -566,7 +566,7 @@ from; it was measured there together with the real-time priority (below).
 
 **Tried and dropped.** A 0.5 ms time slice for the compositor's threads (EEVDF's custom slice, `sched_setattr`):
 it looked like a gain at first, but the tool that set it from outside also gave it to the load; set only on the
-compositor's threads, as lord-server would, it made no difference (8–10 % late with weight 1000, 28–33 % with 100).
+compositor's threads, as axia-server would, it made no difference (8–10 % late with weight 1000, 28–33 % with 100).
 And turning the paint threads off when the frame waits for them under load: their own measurement showed they still
 saved time, so it never acted.
 
@@ -576,8 +576,8 @@ scheduler tick (4 ms on the LordOS Pi kernel, `CONFIG_HZ=250`). Now the composit
 threads run at `SCHED_RR` priority 2 (the lowest real-time levels: ahead of every normal thread, behind the kernel's
 own), as KWin does for its compositor and Mutter for the thread that sends frames to the screen:
 
-- lord-sessiond starts the session's lord-server with `RLIMIT_RTPRIO` 2 and `RLIMIT_RTTIME` 5 s (soft; `remote/sess.c`).
-- lord-server takes it in `par_init` (`par.c`) right after dropping root, before it starts any process or other
+- lord-sessiond starts the session's axia-server with `RLIMIT_RTPRIO` 2 and `RLIMIT_RTTIME` 5 s (soft; `remote/sess.c`).
+- axia-server takes it in `par_init` (`par.c`) right after dropping root, before it starts any process or other
   thread: the main thread takes `SCHED_RR`, the paint threads inherit it, then the main thread adds
   `SCHED_RESET_ON_FORK`, so every thread and process it starts later (apps, helpers, Mesa's threads, LordBench's
   load) gets the normal policy. Then it lowers `RLIMIT_RTPRIO` to 0, soft and hard: nothing it starts can ask for
@@ -589,8 +589,8 @@ own), as KWin does for its compositor and Mutter for the thread that sends frame
 - Without lord-sessiond, or on a kernel that refuses it (`CONFIG_RT_GROUP_SCHED`), nothing changes.
 
 Checked on VM 116 with the new lord-sessiond: the main thread is `SCHED_RR|SCHED_RESET_ON_FORK`, the 7 paint threads
-`SCHED_RR`, the other 22 threads and every child (`lord-admin`, `lord-vault`, `lord-maild`, `lord-doc`, the
-terminal's shell, `lord-bench`) `SCHED_OTHER` with a real-time limit of 0. Measured on VM 116 (8 vCPU, no monitor,
+`SCHED_RR`, the other 22 threads and every child (`lord-admin`, `axia-vault`, `axia-maild`, `axia-doc`, the
+terminal's shell, `axia-bench`) `SCHED_OTHER` with a real-time limit of 0. Measured on VM 116 (8 vCPU, no monitor,
 CPU composition) under load, the session at weight 1000 laid out as lord-sessiond does, with the same limits; two
 runs each:
 
@@ -725,10 +725,10 @@ whose layer is about 4.5 Mpx.
 Without the frame pipeline a frame is started only after the last flip completed (one frame in flight), so any
 frame whose whole chain (the work before `render()`, the build, the GPU's own part, the flip) takes more than one
 period is shown a vblank late, and the rate locks at half the refresh. The build time alone (`desk.p50`/`p99`) can't
-tell which part was too long. So lord-server also records, for every frame the main display shows, while LordBench
+tell which part was too long. So axia-server also records, for every frame the main display shows, while LordBench
 records or while a scripted move runs (`bench/lbframes.c`: `lbf_phase_built` when the frame is submitted, at the
 end of `render()` or, for a frame the pipeline prepared, right after its submission; `lbf_phase_shown` at that
-frame's flip; all of it measured by lord-server itself, never by a helper):
+frame's flip; all of it measured by axia-server itself, never by a helper):
 
 | Phase (JSON key, `[p50, p99]` ms) | From → to |
 |---|---|
@@ -774,7 +774,7 @@ not show these yet; results keep comparing as before (no new result ids, LordBen
 
 **Checked** on VM 116: `lordbench-test` feeds known frames (one on time, one queued after its vblank, one whose GPU
 finished after it, one not shown, a prepared one) and checks each class, percentile, count and the text. A desktop
-run of the branch's lord-server in an isolated headless session (a test theme moving one window with
+run of the branch's axia-server in an isolated headless session (a test theme moving one window with
 `lord.wm.script` over 40 cards, CPU composition, one viewer on its `remote.sock`) wrote both objects: alone 601
 frames, all on time, render 0.84/1.78 ms, paint 0.55/1.21 ms; under load 720–721 frames, 715–721 on time (three
 runs). Those are a check that it works, not a measurement (a small scene, no GPU). The GPU fields were not
@@ -807,9 +807,9 @@ session, the variables set in the session's environment; the results above):
 1. LordBench → Desktop impact, twice with the build's defaults then (GPU drag where its self-test passes, the
    pipeline while frames are heavy), three times with `LORD_PIPELINE=0`, and twice with `LORD_PIPELINE=0
    LORD_GPU_DRAG=0` (the defaults now).
-2. From `~/.cache/lordos/session.log`: the `gpu: GPU drag on|off` line, the `lord-server: frame pipeline …` line, the
+2. From `~/.cache/axia/session.log`: the `gpu: GPU drag on|off` line, the `axia-server: frame pipeline …` line, the
    `lordbench: desktop … phases` lines and the `drag (scripted):` line, and from
-   `~/.local/state/lordos/lordbench-desktop.json` `frames.phases`.
+   `~/.local/state/axia/lordbench-desktop.json` `frames.phases`.
 3. Read under load: if most frames are `cpuLate`, the build is too long (`paintMs`, `uploadMs`, `beforeRenderMs`
    say which part, and `paintThreads` whether the pool helped); if `gpuLate`, the GPU's own work (`gpuMs`) is; if
    `onTime` is high and the rate still 30, the classification is wrong and the flip times must be looked at.
@@ -817,7 +817,7 @@ session, the variables set in the session's environment; the results above):
    with the pipeline, `prepared` and `heldMs` say how many frames were painted ahead and how long they waited.
 4. `LORD_GPU_VERIFY=1` once with GPU drag over a Desktop impact run: `gpu-verify: … differ=0` on every line.
 5. A real screenshot of a dragged window on the monitor (its rounded corners, `docs/WINDOWS.md`): clean.
-6. `vcgencmd` every 2 s during one run (clocks, temperature, `get_throttled`), and `lordos-sysreport bench --quick
+6. `vcgencmd` every 2 s during one run (clocks, temperature, `get_throttled`), and `axia-sysreport bench --quick
    --json` twice (the interface workloads above).
 
 Boot: the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (lord-sessiond's record;
@@ -833,10 +833,10 @@ screenshot predates the video and desktop parts):
 
 ![System Information → Performance](sysinfo-performance.png)
 
-**`lordos-sysreport bench [--quick | --full] [--json]`** (`sysreport/cli.c`): LordBench from a terminal, over SSH or
-in CI, through lord-server's own code (`bench/lbrun.c`, the same guards, helpers and result file as the app, which
-then shows it). It is installed as `/usr/lib/lordos/bin/lordos-sysreport` with `/usr/bin/lordos-sysreport` and
-`lordos-fetch` as links, because `lbrun` only starts the `lord-bench` and `lord-media` next to its own binary
+**`axia-sysreport bench [--quick | --full] [--json]`** (`sysreport/cli.c`): LordBench from a terminal, over SSH or
+in CI, through axia-server's own code (`bench/lbrun.c`, the same guards, helpers and result file as the app, which
+then shows it). It is installed as `/usr/lib/lordos/bin/axia-sysreport` with `/usr/bin/axia-sysreport` and
+`axia-fetch` as links, because `lbrun` only starts the `axia-bench` and `axia-media` next to its own binary
 (`/proc/self/exe`; a group- or world-writable helper is refused, so a build tree made with umask 002 needs `chmod
 g-w`). Without a session the helpers get no cgroup scope, and the desktop test needs a session. One line per
 measurement (or the JSON with `--json`); exit 0 when the run finished, 1 when it didn't, and 3 when it finished
@@ -855,7 +855,7 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
 ## 0.8.7 — Community hardware reports
 
 - **Moved from 0.8.6** (decided by the maintainer on 2026-10-29): LordBench's modest x86 PC reference and
-  hardware video decoding in `lord-media` and the video workloads ("Built so far", the end of the 0.8.6 section).
+  hardware video decoding in `axia-media` and the video workloads ("Built so far", the end of the 0.8.6 section).
 - **Share on GitHub** saves the report as a small HTML page and opens it with the default browser
   (the existing `lord.apps.launchWith('', path)` rule). That page opens GitHub's new-issue form with
   the `hardware-report` template, title and summary filled in; the user attaches the JSON and
@@ -898,7 +898,7 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
   classes, the speed (1–100,000) and the flag; the share preview, the issue summary (`boot: usb, 5000 Mbps`), the
   workflow's comment and a `boot:<class>` label show it; a copy to memory on an installed system, or a link speed on
   anything but USB, is flagged as implausible. System Information shows it in Software (*Started from*) and
-  `lordos-sysreport report` in the Overview (*Started*). VM 116 (ext4 on a SCSI disk) reports `internal`.
+  `axia-sysreport report` in the Overview (*Started*). VM 116 (ext4 on a SCSI disk) reports `internal`.
 - **Share on GitHub** (Report → *Share on GitHub…*, `apps/sysinfo/share.js`): a preview of the summary and of the
   exact JSON first, then on every click (nothing remembered) the app writes `lordos-hwreport-<date>.json` and
   `.html` to Documents (never over an existing file) and opens the page with `lord.apps.launchWith('', path)`. The
@@ -962,7 +962,7 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
   loop, btrfs, stacked mounts, a DVD, NFS, iSCSI, NBD, a live system fetched over the network, virtio, a loop
   device, a link that climbs out of `/sys`, a USB speed that isn't a number), each also checked for device names,
   serials, the mount point and the command line in the JSON and the Markdown.
-- **Checked on VM 116** in an isolated headless session, with `lord-server` built for a throwaway test key
+- **Checked on VM 116** in an isolated headless session, with `axia-server` built for a throwaway test key
   (`CODE_PUBKEY`) and the snapshot signed by `sign-hwsnapshot.sh` with that key: the Compatibility panel shows the
   reference machine's data for the virtio GPU, the network and the sound card; the same snapshot with one count
   changed is refused ("the signature didn't verify") and nothing is shown. Share on GitHub wrote both files; the
@@ -1001,15 +1001,15 @@ composed per frame, what slows V3D under an all-core load, optionally a 1000 Hz 
 
 Until 2026-10-29 the signed snapshot shipped inside the `lordos` package, so the Compatibility panel only learned
 about new reports when LordOS itself was released. The goal is a newer snapshot between releases **without giving
-`lord-server` or any helper a new network power** (AGENTS.md: no generic network, the Store's download child and
-`lord-tls` only fetch packages, `lord-fetch` only fetches blocklists). The options:
+`axia-server` or any helper a new network power** (AGENTS.md: no generic network, the Store's download child and
+`lord-tls` only fetch packages, `axia-dl` only fetches blocklists). The options:
 
 | | How | New network code | Verdict |
 |---|---|---|---|
 | A | Keep it in `lordos` (today) | none | Updates only with a release |
 | B | **A separate small package, `lordos-hwdata`**, in the signed APT repository | none: the existing package engine | **Chosen** (approved by the maintainer, 2026-10-29) and implemented |
-| C | `lord-server` downloads `snapshot.json` from lordos.org through the Store's download child and `lord-tls` | a new kind of download in the package engine (a URL that is not a package, a new admin action or engine call) | Not recommended: a new network job to review for one file |
-| D | `lord-fetch` downloads it next to the blocklists | a second job for `lord-fetch`, which AGENTS.md forbids | Rejected |
+| C | `axia-server` downloads `snapshot.json` from lordos.org through the Store's download child and `lord-tls` | a new kind of download in the package engine (a URL that is not a package, a new admin action or engine call) | Not recommended: a new network job to review for one file |
+| D | `axia-dl` downloads it next to the blocklists | a second job for `axia-dl`, which AGENTS.md forbids | Rejected |
 | E | The user downloads it from lordos.org/hardware and opens it in System Information | none (a file the user picks, verified with the same key) | Possible later as a complement for machines that never update; clumsy as the main path |
 
 **B, in detail.** `lordos-hwdata` is an `Architecture: all` package holding only `snapshot.json` and
@@ -1145,7 +1145,7 @@ the launcher. The app takes only that one value and starts no measurement. No ro
   kernel's first line on the serial port; the test `grub.cfg` swapped `quiet loglevel=3` for a serial console, and the
   ISO has no system on it, so that run stops in the initramfs).
 - **The whole session:** the 0.8.6 live ISO, booted with that command line (QEMU's `-kernel`) and this branch's
-  `lord-server`, bundles and an unsigned code manifest laid over it from an extra initramfs, reached the desktop with
+  `axia-server`, bundles and an unsigned code manifest laid over it from an extra initramfs, reached the desktop with
   System Information on Performance and no installer window.
 - **In an isolated headless session** (a private mount namespace with a fake `/proc/cmdline` and `/run/live`): the same
   with the flag; without it, and with `lordos.check=10`, the installer opens as always. With the flag and no live
@@ -1159,12 +1159,12 @@ the launcher. The app takes only that one value and starts no measurement. No ro
   0.8.5; the checks are evaluated in `apps/sysinfo/checks.js`); in 0.8.6
   `bench.start(mode, sustainedSeconds)`, `bench.poll()`, `bench.cancel()`, `bench.saved(which)`,
   `bench.boots()`, `bench.bootTest()`.
-- `lordos-sysreport`, a user command (not started by `lord-server`).
+- `axia-sysreport`, a user command (not started by `axia-server`).
 - One read-only admin action, `hw-memory-modules` (anyone, no arguments): SMBIOS memory device
   entries parsed strictly in C, returning slot, size, type, speed and manufacturer only.
 - The probe app for the effective checks: a signed system package started through the existing
   `lord.apps.launchPackage(id)`; no new launcher path.
-- `lord-bench` (0.8.6), as above.
+- `axia-bench` (0.8.6), as above.
 - `lord.sysinfo.community()` in `server/src/ui/js_hw.c` (0.8.7): the catalogue's snapshot, only after
   `sysreport/hwsnap.c` verified its signature with the release key; no arguments and no path from JS.
 - Data packages `pci.ids` and `usb.ids` (Debian, architecture `all`), documented in `VM-SETUP.md`.
@@ -1172,12 +1172,12 @@ the launcher. The app takes only that one value and starts no measurement. No ro
 ## Work plan for 0.8.5
 
 **Built (2026-10-26):** `server/src/sysreport/` (the collector, `ids.c` for `pci.ids`/`usb.ids`, the JSON
-and Markdown output), `lordos-sysreport report [--json | --markdown]` in `/usr/bin` (package `lordos`,
+and Markdown output), `axia-sysreport report [--json | --markdown]` in `/usr/bin` (package `lordos`,
 which recommends `pci.ids` and `usb.ids`), and `tests/sysreport_test.c`: five fake machines (AMD desktop,
 Intel laptop, Nvidia desktop, Raspberry Pi 5, VM) full of serials, UUIDs, MAC addresses, a host name, a
 user name, monitor serials and a MAC inside an interface name, none of which may reach a report
 (`build/sysreport-test fixture <dir> <kind>` writes one for `--root`). Checked on VM 116 against the real
-machine. `lordos-fetch` (the same binary under that name; `lordos-sysreport fetch`) shows the crown in
+machine. `axia-fetch` (the same binary under that name; `axia-sysreport fetch`) shows the crown in
 the brand colors beside a short summary (system, computer, kernel, uptime, packages, shell, display, CPU,
 GPU, memory, disk, isolation); the user and host names appear only on screen and `--share` leaves them out
 for a screenshot to post; `--color=auto|always|never`, `NO_COLOR` respected, true color when `COLORTERM`
@@ -1196,7 +1196,7 @@ Checked on VM 116 in an isolated headless session (own home, runtime folder and 
 ![Compatibility](sysinfo-compatibility.png)
 
 **Report tab (2026-10-26):** the exact text that would be saved, as Markdown (`lord.sysinfo.markdown()`:
-`lordos-sysreport`'s text plus a "This session" section) or JSON (the report as `lord.sysinfo.report()`
+`axia-sysreport`'s text plus a "This session" section) or JSON (the report as `lord.sysinfo.report()`
 gives it); **Copy** and **Save to Documents** (`lordos-report-<date>.md|json`, `-2`, `-3`… never over an
 existing file), with **Show in Files**. Nothing is sent anywhere: publishing is Share on GitHub (0.8.7), and the user does it.
 
@@ -1211,16 +1211,16 @@ so it shows disabled):
 
 ![Hardware → Memory](sysinfo-memory.png)
 
-**Checks, part 1 (2026-10-26):** what `lord-server` can see itself, evaluated in `apps/sysinfo/checks.js`
+**Checks, part 1 (2026-10-26):** what `axia-server` can see itself, evaluated in `apps/sysinfo/checks.js`
 (the thresholds are constants there, so they are signed with the theme bundle instead of a separate
-`checks.json`), from `lord.sysinfo.facts()` (`sysreport/facts.c`: lord-server's uid/euid from
+`checks.json`), from `lord.sysinfo.facts()` (`sysreport/facts.c`: axia-server's uid/euid from
 `/proc/self/status`, its cgroup and who owns it, the app scopes beside it, and whether anything
 listens on port 5673 in `/proc/net/tcp{,6}`): display server without root (§2.2), Landlock ABI ≥ 6
-(§6.4), `lord-netperm` running with cgroup BPF and the BPF LSM (§6.6), verified system code
+(§6.4), `axia-netperm` running with cgroup BPF and the BPF LSM (§6.6), verified system code
 (effective: every bundle loaded this session matched; §6.9), remote desktop closed when off
 (effective: nothing listens on its port; §11.4), the session's cgroup tree owned by root (only inside
-`…/lordos-session-<uid>/server`; §11.4), composition on the GPU (§7.3) and lord-server's memory now
-(measured, no pass or fail; §7.1). On VM 116 it found two real things: `lord-netperm` isn't installed
+`…/lordos-session-<uid>/server`; §11.4), composition on the GPU (§7.3) and axia-server's memory now
+(measured, no pass or fail; §7.1). On VM 116 it found two real things: `axia-netperm` isn't installed
 there (the unit doesn't exist), and the first run refused a stale `app-host.bundle.js` in the test
 tree. Part 2 is below.
 
@@ -1233,14 +1233,14 @@ like any isolated app: no new argument, path or exec. In app mode (`app/appclien
 package only, `app/probe.c` runs instead of the app's code:
 
 1. **Before the app's sandbox**, while the process is single-threaded and has loaded nothing, it forks a
-   child that takes the decoding helpers' profile (`sandbox_apply_helper`, as `lord-doc` and `lord-media`)
+   child that takes the decoding helpers' profile (`sandbox_apply_helper`, as `axia-doc` and `axia-media`)
    and tries a unix socket, exec, fork and the app's data folder.
 2. It applies **the same sandbox as any isolated app** (same read-only folders, no network) and tries
    what must fail: the home folder, `/etc/passwd`, the root cgroup's `cgroup.procs`, an internet and a
    unix socket, `ptrace`, a user namespace, `mount`, `exec`. Its own data folder must work (the control:
    a probe that can't write there reports nothing it can be trusted for).
 3. It asks its broker for what must be refused: a path outside its folder, the clipboard without
-   permission, the FIDO2 device, `lord-maild`.
+   permission, the FIDO2 device, `axia-maild`.
 4. It sends the result as `BOP_PROBE` and exits, without a window. `brokersrv.c` takes `BOP_PROBE` only
    from that system package, validates the JSON (≤ 8 KB) and adds what only it can read: the process's
    `NoNewPrivs`, `Seccomp` and `CapEff` and its cgroup with `memory.max`. `lord.sysinfo.probe()` returns
@@ -1260,9 +1260,9 @@ temporary rule), video decode and encode and Vulkan (shown as *Not checked*).
 
 1. `server/src/sysreport/`: collector, GPU layers, `pci.ids`/EDID readers, fake-sysfs fixtures
    (AMD desktop, Intel laptop, Nvidia desktop, Raspberry Pi 5, VM), the anonymization test,
-   `hw-memory-modules`, `lordos-sysreport report`.
+   `hw-memory-modules`, `axia-sysreport report`.
 2. The app: Overview, Hardware, Compatibility; About's button; en, es, pt; right to left.
-3. Checks, configured and effective, the probe app, thresholds signed in `apps/sysinfo/checks.js` (built); `lordos-sysreport checks` (not built yet).
+3. Checks, configured and effective, the probe app, thresholds signed in `apps/sysinfo/checks.js` (built); `axia-sysreport checks` (not built yet).
 4. Reports with preview; docs; screenshots on VMs; the first real reports: the Raspberry Pi 5 with a
    monitor and the maintainer's PC (Core i9-10900, Radeon RX 580), the first real AMD data in the
    project.

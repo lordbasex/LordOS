@@ -1,4 +1,4 @@
-/* gl3d.h — lordos-testbench's 3D view (see gl3d.c). */
+/* gl3d.h — axia-testbench's 3D view (see gl3d.c). */
 #ifndef LORD_TESTBENCH_GL3D_H
 #define LORD_TESTBENCH_GL3D_H
 

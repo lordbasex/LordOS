@@ -132,7 +132,7 @@ static int arg_lang(JSContext *c, int argc, JSValueConst *argv, char *out, size_
 
 static const char *base(const char *p) { const char *b = strrchr(p, '/'); return b ? b + 1 : p; }
 
-/* App of a process: lord-server itself is LordOS; otherwise, the one from the .desktop whose program
+/* App of a process: axia-server itself is LordOS; otherwise, the one from the .desktop whose program
  * matches the executable, argv[0] or the process name (comm, truncated to 15). */
 static const DesktopApp *match(const DesktopApp *apps, int n, const char *exe, const char *cmd, const char *name) {
     const char *eb = exe[0] ? base(exe) : "";

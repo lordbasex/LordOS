@@ -1,6 +1,6 @@
-// HtmlView — draws the safe tree that lord-maild's sanitizer made from a message's HTML
+// HtmlView — draws the safe tree that axia-maild's sanitizer made from a message's HTML
 // (server/src/mail/html.h) with our own views: blocks, layout tables, text runs, images and
-// links. Nothing here ever interprets HTML or runs anything; images are decoded in lord-maild
+// links. Nothing here ever interprets HTML or runs anything; images are decoded in axia-maild
 // and remote ones are requested only after the user chose to load them.
 import { View, Text, Image, useTheme, mailRequest } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';

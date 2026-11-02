@@ -1,7 +1,7 @@
 /* lm_cam.c — the camera (MK_CAMERA): our own V4L2 (no libv4l), MJPEG with libavcodec, the
  * preview through the same slots as the player (lm_out.c), JPEG photo and H.264 + AAC video.
- * lord-server opens the /dev/videoN (after checking the camera permission) and it arrives as an
- * fd: lord-media can't open another device. */
+ * axia-server opens the /dev/videoN (after checking the camera permission) and it arrives as an
+ * fd: axia-media can't open another device. */
 #include "lm.h"
 
 #include <errno.h>

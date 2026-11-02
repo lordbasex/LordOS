@@ -1,5 +1,5 @@
 // wayland.js — ventanas de apps Linux (GTK, Qt, foot…) que se conectan al compositor Wayland
-// de lord-server (server/src/wl). Para el tema son ventanas como las de las apps LordOS: entran
+// de axia-server (server/src/wl). Para el tema son ventanas como las de las apps LordOS: entran
 // en el gestor con la app interna 'linux' y su id es 'linux#<superficie>'.
 //
 // Those that ask for server-side decoration (Qt, foot) get the theme's frame; those that draw their
@@ -110,7 +110,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       break;
     }
     // desde donde se apretó el botón (la app pide mover recién después de un umbral)
-    // lo sigue lord-server en C (wm.beginMove/beginResize, docs/WINDOWS.md); si no se puede (el tema no
+    // lo sigue axia-server en C (wm.beginMove/beginResize, docs/WINDOWS.md); si no se puede (el tema no
     // marcó el nodo de la ventana), con los eventos del puntero como antes
     // A hidden desktop's window never gets to bring itself forward: these requests come from the app.
     case 'move': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginMove(id)) drag = { id, edges: null, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;

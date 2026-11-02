@@ -10,9 +10,9 @@ What protects the user's files, and what doesn't. Design in `CLEANER-ARCHITECTUR
 - Each object is checked again right before acting.
 - There is no shell, `system()` or `popen()` anywhere in Cleaner.
 
-## The scanner, `lord-clean`
+## The scanner, `axia-clean`
 
-Fixed path next to `lord-server`, no arguments, `LANG` only, channel on fd 3. lord-server opens each root and passes it over
+Fixed path next to `axia-server`, no arguments, `LANG` only, channel on fd 3. axia-server opens each root and passes it over
 `SCM_RIGHTS`; the helper lists them in `ro_dir_fds` and calls `sandbox_apply_helper` (scope `lordos-cleaner`) before reading. It
 refuses to run without Landlock. It has no network, no exec and no write access.
 
@@ -22,12 +22,12 @@ depth, path length, folders and results. Reaching one marks the scan incomplete.
 
 **What a compromised scanner can do:** read the roots it was given. Every rules scan now gives it the home folder for the project walk, so that is the whole home folder, not just the rules' folders. For a tree of `/` or a duplicates scan, it is what the session user
 may read in them, and `fsops_protected` paths are only skipped by rule, as Landlock can't exclude a subtree. It can't send anything anywhere but
-to lord-server, which validates every record with `sec/json.c`: types, ranges, the path's shape, device, rule, owner and
-`fsops_protected`. A malformed record discards the whole scan. A lying helper can make lord-server hold a false candidate, but acting on it
+to axia-server, which validates every record with `sec/json.c`: types, ranges, the path's shape, device, rule, owner and
+`fsops_protected`. A malformed record discards the whole scan. A lying helper can make axia-server hold a false candidate, but acting on it
 needs the real object to match.
 
-**Decoding:** similar images are the one place Cleaner reads the *contents* of files as anything but bytes to hash, and it happens only in `lord-clean`, never in
-`lord-server`. It uses the vendored `stb_image`, limited to PNG, JPEG, GIF and BMP, with the same sandbox as the walk and no new syscall or folder. A hostile image is a
+**Decoding:** similar images are the one place Cleaner reads the *contents* of files as anything but bytes to hash, and it happens only in `axia-clean`, never in
+`axia-server`. It uses the vendored `stb_image`, limited to PNG, JPEG, GIF and BMP, with the same sandbox as the walk and no new syscall or folder. A hostile image is a
 reason to expect a crash, which fails the scan: a decoder bug reaches what the list above says and no more. Files over 64 MiB and pictures over 40 megapixels are not
 decoded, and a similar-images scan runs with 480 MiB of address space, so a small file that asks for more (a 311 KB 16-bit PNG asked for 588 MB) is left out instead of bringing the scope's limit of 512 MB down on the whole scan. A group whose members aren't within reach of the first image is a protocol error.
 
@@ -35,7 +35,7 @@ decoded, and a similar-images scan runs with 480 MiB of address space, so a smal
 
 ## Plans
 
-Built in C from ids of a scan, kept in lord-server, valid ten minutes, run once. Category plans refuse rules marked `explicit_only`.
+Built in C from ids of a scan, kept in axia-server, valid ten minutes, run once. Category plans refuse rules marked `explicit_only`.
 
 ## Acting on an item
 
@@ -59,12 +59,12 @@ for byte with the one that goes.
 **Browsers:** only named cache folders. A live process behind the profile's lock (`lock` for Firefox, `SingletonLock` for Chromium) blocks the
 rule at scan and at action; a link that can't be read blocks it too; a stale pid doesn't.
 
-**Project outputs:** `clean_rule_check` holds every project rule to `review`, the Trash, `explicit_only` and no other location, so the real delete can't reach them. lord-server takes a folder record only from such a rule and checks its name, age, owner and path as for any record. At the plan and right before acting, `clean_project_kind` reads the evidence again from the folder opened beneath the home folder, and an output whose evidence is gone or changed kind ends as *changed*. The confirmation names each folder. A candidate's idle time is what the helper reported, read again by lord-server against the rule's age but not worked out again from the disk, so a lying helper could make a recent `node_modules` look idle: the evidence would still have to be real, the user would still have to choose it by name, and it can be restored from the Trash.
+**Project outputs:** `clean_rule_check` holds every project rule to `review`, the Trash, `explicit_only` and no other location, so the real delete can't reach them. axia-server takes a folder record only from such a rule and checks its name, age, owner and path as for any record. At the plan and right before acting, `clean_project_kind` reads the evidence again from the folder opened beneath the home folder, and an output whose evidence is gone or changed kind ends as *changed*. The confirmation names each folder. A candidate's idle time is what the helper reported, read again by axia-server against the rule's age but not worked out again from the disk, so a lying helper could make a recent `node_modules` look idle: the evidence would still have to be real, the user would still have to choose it by name, and it can be restored from the Trash.
 
 **Similar images:** to the Trash only, never a real delete. A plan refuses to take every image of a group, and the image that stays is checked right before acting.
 
 **What removed apps left:** the folder must belong to no installed package and no system app. That is checked at the scan and again right before acting, so an app installed in
-between keeps its folder. If lord-server doesn't know where the system's apps are, or that folder isn't there, nothing is offered. It goes whole to the Trash, one by one, named in the confirmation, never
+between keeps its folder. If axia-server doesn't know where the system's apps are, or that folder isn't there, nothing is offered. It goes whole to the Trash, one by one, named in the confirmation, never
 in a cleanup by category.
 
 **The download and desktop folders' names** come from a file the user owns, and they can only move rules that keep their narrow patterns, an age and the Trash. A value is taken only if it would pass
@@ -79,7 +79,7 @@ general, so the confirmation says so for every model.
 
 ## The kept storage map
 
-A tree scan of the home folder or `/` writes `~/.cache/lordos/cleaner-map.txt`: folder names and sizes. This is a change from the earlier design, which kept no paths at all. The history is still counts and sizes with no path, but folder names now stay on disk between sessions. It is on by default, and off with the switch in Settings or removed with Clear in Activity; turning it off removes the file.
+A tree scan of the home folder or `/` writes `~/.cache/axia/cleaner-map.txt`: folder names and sizes. This is a change from the earlier design, which kept no paths at all. The history is still counts and sizes with no path, but folder names now stay on disk between sessions. It is on by default, and off with the switch in Settings or removed with Clear in Activity; turning it off removes the file.
 
 It is mode 0600, written through a new name with `O_EXCL | O_NOFOLLOW`, and read only if it is a regular file the user owns. It never leaves the machine. It isn't on `lord.fs`'s deny list, so any program running as the user can read it, as it can walk those folders itself. Isolated apps can't: they have only their data folder.
 

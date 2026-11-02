@@ -1,4 +1,4 @@
-/* media_int.h — internal parts of lord-server's media (media.c, mview.c, capture.c,
+/* media_int.h — internal parts of axia-server's media (media.c, mview.c, capture.c,
  * annot.c and ui/js_media.c). */
 #ifndef LORD_MEDIA_INT_H
 #define LORD_MEDIA_INT_H
@@ -57,7 +57,7 @@ typedef struct {
     int playing;
     /* recordings: temporary file → final one when it ends well */
     char tmp[4096], dst[4096];
-    /* screen recording: input slots (lord-server writes) */
+    /* screen recording: input slots (axia-server writes) */
     int in_fd, in_slots, in_w, in_h, in_busy[4];
     uint8_t *in_map;
     size_t in_len;
@@ -66,8 +66,8 @@ typedef struct {
     long rec_frames, rec_dropped;
     int64_t stats[6];
     int job;                    /* image: job that decodes it */
-    MAudio *audio;              /* player: the PipeWire stream (lord-server's) */
-    MAudio *mic;                /* recordings: the microphone (lord-server's, with permission) */
+    MAudio *audio;              /* player: the PipeWire stream (axia-server's) */
+    MAudio *mic;                /* recordings: the microphone (axia-server's, with permission) */
     /* camera of an isolated app (sec/brokercam.c): its helper's messages go to the app over the
      * broker instead of the session; bk_msg returns 1 when it consumed the message */
     void *bk;
@@ -99,11 +99,11 @@ int  media_take_pixels(int job, uint8_t **out, int *w, int *h);
 int  media_open_input(const char *path, char *real, size_t n);
 int  media_open_output(const char *path, char *tmp, size_t tn, char *dst, size_t dn);
 int  media_finish_output(const char *tmp, const char *dst, int ok);
-/* Thumbnail: the path in ~/.cache/lordos/thumbs if it's already there; otherwise it requests it and returns NULL. */
+/* Thumbnail: the path in ~/.cache/axia/thumbs if it's already there; otherwise it requests it and returns NULL. */
 const char *media_thumb(const char *path, int size, char *out, size_t n);
 int  media_cameras(char *json, size_t n);
 
-/* maudio.c: the media's PipeWire streams (lord-media doesn't have the socket) */
+/* maudio.c: the media's PipeWire streams (axia-media doesn't have the socket) */
 MAudio *maudio_open(int rec, const char *app, const char *title, const char *role_or_source, int *ring_fd);
 void maudio_close(MAudio *a);
 void maudio_service(MAudio *a);

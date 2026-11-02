@@ -1,15 +1,15 @@
 /* brokerkr.c — the session keyring for isolated .lpk apps (BOP_KEYRING, see broker.h and
  * docs/PASSWORDS.md, "Keyring for .lpk apps").
  *
- * The app sends "op\0service\0account\0label\0secret"; lord-server builds the lord-vault request
- * itself, with owner = "app.<id>", where <id> is the app id lord-server verified when it spawned
+ * The app sends "op\0service\0account\0label\0secret"; axia-server builds the axia-vault request
+ * itself, with owner = "app.<id>", where <id> is the app id axia-server verified when it spawned
  * the process (brokersrv_add). The app never chooses the owner, and the "app." prefix keeps
  * isolated apps apart from the owners the desktop's own apps use ("mail", "settings"…).
  *
- * The request goes to lord-vault on lord-server's system channel as a private request
- * (vc_request_private): the reply never reaches the desktop's JS. lord-vault only lets an owner
- * see its own items; when an app asks for an item that belongs to another app (lord-vault answers
- * "not-shared"), lord-server shows the system consent prompt (privacy.js, "keyring") and, only if
+ * The request goes to axia-vault on axia-server's system channel as a private request
+ * (vc_request_private): the reply never reaches the desktop's JS. axia-vault only lets an owner
+ * see its own items; when an app asks for an item that belongs to another app (axia-vault answers
+ * "not-shared"), axia-server shows the system consent prompt (privacy.js, "keyring") and, only if
  * the user allows it, records the share (kr-share) and asks again. Nothing here blocks: replies
  * and the user's answer arrive later (brokerkr_tick, brokerkr_resolve). Buffers that may hold
  * a secret are wiped before they are freed. */
@@ -31,7 +31,7 @@ enum { ST_FREE, ST_REQ, ST_PROMPT, ST_SHARE, ST_RETRY };
 typedef struct {
     int st, conn, fd, dead;
     uint32_t reqid;                  /* the app's request */
-    int vid;                         /* lord-vault request id */
+    int vid;                         /* axia-vault request id */
     uint32_t prompt;
     char op;                         /* 'g' get, 's' set, 'd' delete, 'l' list */
     char owner[64], item[40];
@@ -58,7 +58,7 @@ static void remember_denied(const char *owner, const char *item) {
     snprintf(denied[i].item, sizeof denied[i].item, "%s", item);
 }
 
-/* lord-vault's error code → the code line the app gets (assets/locales/<lang>/errors.json) */
+/* axia-vault's error code → the code line the app gets (assets/locales/<lang>/errors.json) */
 static const char *map_code(const char *v) {
     if (!v) return "keyring.failed";
     if (!strcmp(v, "locked")) return "keyring.locked";
@@ -111,7 +111,7 @@ static int send_vault(KrReq *r, const char *op, const char *label, const char *s
     return rc;
 }
 
-/* The kr-share lord-server sends after the user allowed it (the only "admin" request built here). */
+/* The kr-share axia-server sends after the user allowed it (the only "admin" request built here). */
 static int send_share(KrReq *r) {
     char *qi = quote(r->item), *qo = quote(r->owner);
     int rc = -1;
@@ -166,7 +166,7 @@ void brokerkr_handle(int conn, int fd, uint32_t reqid, const char *app, char *pa
     if (sent) { reply_code(r, BST_ERROR, "vault.unavailable"); finish(r); }
 }
 
-/* lord-vault answered request r: `rep` is its JSON ({"ok":true,…} | {"error":…}) */
+/* axia-vault answered request r: `rep` is its JSON ({"ok":true,…} | {"error":…}) */
 static void on_reply(KrReq *r, char *rep, size_t len) {
     if (r->dead) { finish(r); return; }
     if (!strncmp(rep, "{\"ok\":true", 10)) {
@@ -175,7 +175,7 @@ static void on_reply(KrReq *r, char *rep, size_t len) {
             if (send_vault(r, "kr-get", NULL, NULL, NULL)) { reply_code(r, BST_ERROR, "vault.unavailable"); finish(r); }
             return;
         }
-        brokersrv_reply(r->fd, r->reqid, BST_OK, rep, (uint32_t)len, -1);   /* item(s) as lord-vault sent them */
+        brokersrv_reply(r->fd, r->reqid, BST_OK, rep, (uint32_t)len, -1);   /* item(s) as axia-vault sent them */
         finish(r);
         return;
     }

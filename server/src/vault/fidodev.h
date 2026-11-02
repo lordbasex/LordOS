@@ -1,10 +1,10 @@
-/* fidodev.h — find and open FIDO2 keys (lord-server side, outside the sandbox).
+/* fidodev.h — find and open FIDO2 keys (axia-server side, outside the sandbox).
  *
  * Walks /sys/class/hidraw/hidraw*: a device is FIDO if its HID report descriptor
  * (device/report_descriptor) declares an application collection with Usage Page 0xF1D0 (FIDO
  * Alliance) and Usage 0x01 (CTAPHID). The name and vid:pid come from device/uevent (HID_NAME,
- * HID_ID). lord-server opens the chosen one (after the user's permission) and passes the fd to
- * lord-vault; neither the app nor lord-vault opens /dev. */
+ * HID_ID). axia-server opens the chosen one (after the user's permission) and passes the fd to
+ * axia-vault; neither the app nor axia-vault opens /dev. */
 #ifndef LORD_VAULT_FIDODEV_H
 #define LORD_VAULT_FIDODEV_H
 

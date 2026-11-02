@@ -1,4 +1,4 @@
-/* state.c — network state without root, for lord-server: interfaces, addresses, routes,
+/* state.c — network state without root, for axia-server: interfaces, addresses, routes,
  * counters (rtnetlink dumps), DNS, who manages each interface, and change notifications. */
 #include "net.h"
 #include "netpriv.h"

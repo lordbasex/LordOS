@@ -9,8 +9,8 @@
  * meanwhile" paths (prompt answered or file picked after the restriction) and the built-in apps'
  * hook (firewall id "lordos", used by js_media.c).
  *
- * Only the edges are stand-ins: the terminal's clipboard, PipeWire (maudio_*), lord-vault's FIDO
- * attach, the keyring, the keyboard and lord-media's spawn. open() is wrapped so /dev/video9 is
+ * Only the edges are stand-ins: the terminal's clipboard, PipeWire (maudio_*), axia-vault's FIDO
+ * attach, the keyring, the keyboard and axia-media's spawn. open() is wrapped so /dev/video9 is
  * /dev/null. Temporary HOME. `make build/broker-restrict-test && build/broker-restrict-test`. */
 #include "sec/broker_int.h"
 #include "sec/perms.h"
@@ -33,7 +33,7 @@
 static int fails, total;
 static void check(int ok, const char *what) { total++; printf("%s: %s\n", ok ? "ok  " : "FAIL", what); if (!ok) fails++; }
 
-/* ---- stand-ins for the rest of lord-server ---- */
+/* ---- stand-ins for the rest of axia-server ---- */
 const char *term_clipboard(void) { return "clipboard text"; }
 void term_set_clipboard(const char *s, size_t n) { (void)s; (void)n; }
 void term_clipboard_mark(const char *app, int secret) { (void)app; (void)secret; }

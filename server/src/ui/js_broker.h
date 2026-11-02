@@ -1,6 +1,6 @@
 /* js_broker.h — lado app del broker (ver appclient.c, sec/broker.h). Provee el objeto `lord` del
  * proceso de la app: las primitivas de dibujo (locales) más fs/clipboard/perms, que van por el
- * broker a lord-server, que verifica los permisos. */
+ * broker a axia-server, que verifica los permisos. */
 #ifndef LORD_JS_BROKER_H
 #define LORD_JS_BROKER_H
 
@@ -23,7 +23,7 @@ void app_windows_register(JSContext *c, JSValue lord);
 int  js_broker_rpc(int op, const void *payload, uint32_t len, int *status, char **out, uint32_t *outlen);
 int  js_broker_rpc_fd(int op, const void *payload, uint32_t len, char *info, size_t n);
 int  js_broker_send(int op, const void *payload, uint32_t len);
-/* the same RPC passing fds (SCM_RIGHTS, at most 16) with the request: files for lord-maild */
+/* the same RPC passing fds (SCM_RIGHTS, at most 16) with the request: files for axia-maild */
 int  js_broker_rpc_fds(int op, const void *payload, uint32_t len, const int *fds, int nfds, int *status, char **out, uint32_t *outlen);
 /* lord.mail of the isolated system Mail, Calendar, Contacts and Reminders (js_brokermail.c) */
 void js_brokermail_register(JSContext *c, JSValue lord, const char *app_id);
@@ -32,7 +32,7 @@ void js_brokermail_chunk(const char *data, size_t len);
 void js_brokercam_register(JSContext *c, JSValue lord);
 void js_brokercam_event(const char *data, size_t len);
 
-/* Passwords (app mode): ask lord-server to hand the FIDO2 key to lord-vault (see js_broker.c). */
+/* Passwords (app mode): ask axia-server to hand the FIDO2 key to axia-vault (see js_broker.c). */
 int js_broker_vault_fido(char *name, size_t n, char *err, size_t en);
 
 #endif

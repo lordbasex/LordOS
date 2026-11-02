@@ -42,24 +42,17 @@ def disc(cy, rx, ry, h, fill):
             f'<ellipse cx="{220-rx*.28}" cy="{cy-ry*.3}" rx="{rx*.5}" ry="{ry*.4}" fill="url(#gloss)"/>')
 
 
-CROWN = ('<g filter="url(#lift)">'
-         # the far side of the crown: its inside shows, so it reads as a ring and not as a cut-out
-         '<ellipse cx="220" cy="236" rx="132" ry="30" fill="#6b3410"/><path d="M104 232L132 150l44 44 44-78 44 78 44-44 28 82z" fill="#8a4a16"/>'
-         '<path d="M92 240L60 96l90 74 70-136 70 136 90-74-32 144Q220 300 92 240z" fill="url(#crown)"/>'
-         # each point lit on one side and shaded on the other
-         '<path d="M220 34l-70 136 70 96z" fill="#fff" opacity=".3"/><path d="M220 34l70 136-70 96z" fill="#8a4210" opacity=".3"/>'
-         '<path d="M60 96l90 74-26 84-32-14z" fill="#fff" opacity=".16"/><path d="M380 96l-90 74 26 84 32-14z" fill="#8a4210" opacity=".34"/>'
-         # the band follows the curve of the ring
-         '<path d="M90 236Q220 298 350 236L344 266Q220 328 96 266z" fill="url(#band)"/>'
-         '<path d="M94 241Q220 301 346 241" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="4" stroke-linecap="round"/>'
-         '<path d="M97 264Q220 326 343 264" fill="none" stroke="#7a3f10" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>'
-         '<circle cx="60" cy="92" r="15" fill="url(#gold)"/><circle cx="220" cy="30" r="17" fill="url(#gold)"/><circle cx="380" cy="92" r="15" fill="url(#gold)"/>'
-         '<circle cx="55" cy="87" r="5" fill="#fff" opacity=".85"/><circle cx="214" cy="24" r="6" fill="#fff" opacity=".85"/><circle cx="375" cy="87" r="5" fill="#fff" opacity=".85"/>'
-         '<path d="M220 158l26 22-10 34h-32l-10-34z" fill="url(#gem)"/><path d="M220 158l26 22h-52z" fill="#fff" opacity=".4"/><path d="M204 214l16-34 16 34z" fill="#3b0f78" opacity=".35"/>'
-         '<circle cx="136" cy="262" r="11" fill="url(#gemc)"/><circle cx="304" cy="262" r="11" fill="url(#gemc)"/><circle cx="220" cy="284" r="13" fill="url(#gem)"/>'
-         '<circle cx="132" cy="258" r="3.5" fill="#fff"/><circle cx="300" cy="258" r="3.5" fill="#fff"/><circle cx="215" cy="279" r="4" fill="#fff"/></g>')
+# a faceted crystal in gold on the plinth: the top table lit, the pavilion's facets shaded in turn
+GEM = ('<g filter="url(#lift)"><g transform="translate(0 26)">'
+       '<path d="M120 150L170 92H270L320 150L220 290z" fill="url(#crown)"/>'
+       '<path d="M170 92H270L250 150H190z" fill="#fff" opacity=".42"/>'
+       '<path d="M120 150L170 92L190 150z" fill="#fff" opacity=".22"/><path d="M320 150L270 92L250 150z" fill="#8a4210" opacity=".3"/>'
+       '<path d="M120 150H190L220 290z" fill="#fff" opacity=".14"/><path d="M190 150H250L220 290z" fill="#fff" opacity=".05"/>'
+       '<path d="M250 150H320L220 290z" fill="#8a4210" opacity=".36"/>'
+       '<path d="M120 150H320" stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round"/>'
+       '<circle cx="196" cy="108" r="7" fill="#fff" opacity=".9"/></g></g>')
 ART = {
- 'scan': disc(344, 112, 24, 30, 'plinth') + disc(316, 84, 17, 16, 'plinth') + '<ellipse cx="220" cy="312" rx="96" ry="13" fill="#060920" opacity=".55" filter="url(#contact)"/>' + CROWN,
+ 'scan': disc(344, 112, 24, 30, 'plinth') + disc(316, 84, 17, 16, 'plinth') + '<ellipse cx="220" cy="312" rx="96" ry="13" fill="#060920" opacity=".55" filter="url(#contact)"/>' + GEM,
  'cleanup': '<g transform="rotate(24 220 210)" filter="url(#lift)">'
    '<rect x="208" y="28" width="24" height="232" rx="12" fill="url(#steel)"/><rect x="212" y="34" width="6" height="210" rx="3" fill="#fff" opacity=".6"/>'
    '<rect x="174" y="236" width="92" height="42" rx="12" fill="url(#band)"/><rect x="182" y="240" width="76" height="12" rx="6" fill="url(#gloss)"/>'
@@ -162,7 +155,7 @@ def orbits(accent, line, name):
 
 for colour, name in (('#ffffff', 'status-light'), ('#141a4d', 'status-dark')):
     p = SRC / f'{name}.svg'
-    p.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"><path d="M4 19h16M5 16 3.5 7l5 4 3.5-7 3.5 7 5-4L19 16z" fill="{colour}" stroke="{colour}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>\n')
+    p.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"><path d="M10 3.5 11.9 9.1 17.5 11 11.9 12.9 10 18.5 8.1 12.9 2.5 11 8.1 9.1z" fill="{colour}" stroke="{colour}" stroke-width="1.2" stroke-linejoin="round"/><path d="M18 14.5 18.8 16.7 21 17.5 18.8 18.3 18 20.5 17.2 18.3 15 17.5 17.2 16.7z" fill="{colour}"/></svg>\n')
     subprocess.check_call(['rsvg-convert', '-w', '36', '-h', '36', str(p), '-o', str(OUT / f'{name}.png')])
 
 sky('#060920', '#0d1138', '#1b1152', '#2c2a84', 'sky-dark')

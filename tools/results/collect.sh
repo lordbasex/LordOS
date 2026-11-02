@@ -5,13 +5,13 @@
 #   tools/results/collect.sh <machine> [--no-memory] [--no-lordbench] [--bench-seconds N] [--version V]
 #
 # <machine> is a short name, [a-z0-9-] (e.g. vm116-headless, pi5-8gb-hdmi). It writes:
-#   sysreport.json   lordos-sysreport report --json (no serial numbers, addresses or names)
-#   testbench.json   lordos-testbench --gl --auto N (the Wayland checklist, frame times, 3D renderer)
+#   sysreport.json   axia-sysreport report --json (no serial numbers, addresses or names)
+#   testbench.json   axia-testbench --gl --auto N (the Wayland checklist, frame times, 3D renderer)
 #   memory.txt       whole system (`free -m`) and per process (PSS from /proc/<pid>/smaps_rollup); with
 #                    sudo, root's processes too
 #   boot.txt         systemd-analyze, and the time to the desktop's first frame from the kernel's start
 #   boot-times.jsonl every recorded boot on this machine: seconds to the first frame, version, kernel
-#   lordbench.json   lordos-sysreport bench --full --json (LordBench, about 5 minutes; --no-lordbench skips it)
+#   lordbench.json   axia-sysreport bench --full --json (LordBench, about 5 minutes; --no-lordbench skips it)
 #   README.md        when, what version, the conditions to fill in, and these exact commands
 # The version is the installed one (software.lordos in the report); --version names it for a development
 # build, e.g. 0.8.5-dev.
@@ -32,20 +32,20 @@ while [ $# -gt 0 ]; do
     shift
 done
 case "$SECS" in ''|*[!0-9]*) echo "--bench-seconds takes a number" >&2; exit 2 ;; esac
-command -v lordos-sysreport >/dev/null || { echo "lordos-sysreport not installed" >&2; exit 1; }
-[ -n "$V" ] || V=$(lordos-sysreport report --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["software"]["lordos"])' 2>/dev/null || echo unknown)
+command -v axia-sysreport >/dev/null || { echo "axia-sysreport not installed" >&2; exit 1; }
+[ -n "$V" ] || V=$(axia-sysreport report --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["software"]["lordos"])' 2>/dev/null || echo unknown)
 case "$V" in *[!A-Za-z0-9.+~-]*|'') V=unknown ;; esac
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 [ -d "$ROOT/tools/results" ] || ROOT=$PWD      # copied on its own (not in the repository): write here
 D="$ROOT/results/$V/$M"
 mkdir -p "$D"
 
-lordos-sysreport report --json > "$D/sysreport.json"
+axia-sysreport report --json > "$D/sysreport.json"
 
-if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v lordos-testbench >/dev/null; then
-    timeout $((SECS + 30)) lordos-testbench --gl --auto "$SECS" > "$D/testbench.json" || echo "the Test Bench ended with an error" >&2
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v axia-testbench >/dev/null; then
+    timeout $((SECS + 30)) axia-testbench --gl --auto "$SECS" > "$D/testbench.json" || echo "the Test Bench ended with an error" >&2
 else
-    echo "no Wayland session (WAYLAND_DISPLAY) or lordos-testbench missing: testbench.json skipped" >&2
+    echo "no Wayland session (WAYLAND_DISPLAY) or axia-testbench missing: testbench.json skipped" >&2
 fi
 
 if [ "$MEM" = 1 ]; then
@@ -80,7 +80,7 @@ J() { if sudo -n true 2>/dev/null; then sudo -n journalctl "$@"; else journalctl
 
 # last: its load would disturb the memory and frame times above
 if [ "$LB" = 1 ]; then
-    lordos-sysreport bench --full --json > "$D/lordbench.json" || { rm -f "$D/lordbench.json"; echo "LordBench ended with an error: lordbench.json skipped" >&2; }
+    axia-sysreport bench --full --json > "$D/lordbench.json" || { rm -f "$D/lordbench.json"; echo "LordBench ended with an error: lordbench.json skipped" >&2; }
 fi
 
 cat > "$D/README.md" <<MD
@@ -95,12 +95,12 @@ the system was idle before measuring; which apps were open; power source and pro
 Reproduce:
 
 \`\`\`sh
-lordos-sysreport report --json > sysreport.json
-lordos-testbench --gl --auto $SECS > testbench.json      # inside a LordOS session
+axia-sysreport report --json > sysreport.json
+axia-testbench --gl --auto $SECS > testbench.json      # inside a LordOS session
 free -m                                                  # whole system
 sudo sh -c 'for f in /proc/[0-9]*/smaps_rollup; do ...'  # PSS per process: see tools/results/collect.sh
 systemd-analyze
-lordos-sysreport bench --full --json > lordbench.json
+axia-sysreport bench --full --json > lordbench.json
 \`\`\`
 MD
 echo "written to $D"

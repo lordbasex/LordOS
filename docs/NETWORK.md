@@ -4,7 +4,7 @@ LordOS's networking is its own and runs directly on top of the kernel. It doesn'
 
 | Side | What it does | Files |
 |---|---|---|
-| lord-server (without root) | Reads the state with rtnetlink (interfaces, addresses, routes, counters) and listens for changes. DNS comes from `/run/systemd/resolve/resolv.conf` or `/etc/resolv.conf`. It exposes it to JS as `lord.net`. | `state.c`, `ui/js_net.c` |
+| axia-server (without root) | Reads the state with rtnetlink (interfaces, addresses, routes, counters) and listens for changes. DNS comes from `/run/systemd/resolve/resolv.conf` or `/etc/resolv.conf`. It exposes it to JS as `lord.net`. | `state.c`, `ui/js_net.c` |
 | `lord-netd` (root, the system network) | Serves the `net-*` actions of `admin.c`'s closed list and owns the resident processes (DHCP, wpa_supplicant, VPN). `lord-sessiond` starts and supervises it at boot (see "The network belongs to the system"). Without `lord-sessiond`, the session's helper serves them, as before. | `actions.c`, `dhcp.c`, `wifi.c`, `wg.c`, `ovpn.c`, `ipsec.c` + `vici.c`, `vpnproc.c` (PPTP, OpenConnect, Fortinet), `vpn.c` (the common parts), `sys.c` |
 | shared | Our own netlink, minimal cryptography (X25519, SHA-1/PBKDF2, base64), utilities | `nl.c`, `crypto.c`, `netpriv.h` |
 
@@ -28,8 +28,8 @@ lordos.service
         ├── if:<if>                     DHCP client (our own code)
         ├── wpa:<if>                    wpa_supplicant
         └── vpn:<name>                  openvpn, charon, pppd…
-lord-server --user lord ── lord-admin ──┐  /run/lordos/netd.sock (0600, root only)
-lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded as they are
+axia-server --user lord ── lord-admin ──┐  /run/lordos/netd.sock (0600, root only)
+axia-server --user ana  ── lord-admin ──┘  net-* actions are forwarded as they are
 ```
 
 - **What it is.** `lord-netd` is `admin.c` built with `LORD_NETD` (`server/src/net/netd.c` only has
@@ -73,7 +73,7 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
   inotify on `/run/lordos` (the socket is created under another name and renamed once it listens)
   and reconnects. An action in progress answers `ERR netd.restarted` ("The system network service
   restarted; try again").
-- **Without `lord-sessiond`** (a standalone `lord-server`, in development) there is no
+- **Without `lord-sessiond`** (a standalone `axia-server`, in development) there is no
   `/run/lordos/netd.enabled`, and the session's helper runs the network itself, as before (with
   `net-owner`). With that mark, a session never brings the network up on its own.
 - **Resident processes no longer inherit the helper's descriptors** (`admin_daemon_fork` and
@@ -115,7 +115,7 @@ enabled. `lordos.service` now has `DelegateSubgroup=supervisor`.
 | Feature | How | Status |
 |---|---|---|
 | Interfaces, addresses, routes, counters, DNS | rtnetlink without root | ✅ |
-| Change notifications | rtnetlink groups in lord-server's `poll` → `__lordNet` | ✅ |
+| Change notifications | rtnetlink groups in axia-server's `poll` → `__lordNet` | ✅ |
 | DHCPv4 | Our own client (RFC 2131). Uses AF_PACKET, renews at T1 by unicast and asks again at T2. DHCPRELEASE when stopping. | ✅ against dnsmasq: lease, renewal and release |
 | Static IP | address/prefix, gateway and DNS | ✅ |
 | DNS | With systemd-resolved: `resolvectl` per interface. Without resolved: `/etc/resolv.conf`. | ✅ resolved |

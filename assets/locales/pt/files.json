@@ -30,7 +30,7 @@
   "group.kind.doc": "Documento",
   "group.kind.folder": "Pasta",
   "group.kind.image": "Imagem",
-  "group.kind.lpk": "App do LordOS",
+  "group.kind.lpk": "App do Axia DE",
   "group.kind.other": "Documento",
   "group.kind.pdf": "Documento PDF",
   "group.kind.text": "Texto",
@@ -73,7 +73,7 @@
   "kind.doc": "Documento",
   "kind.folder": "Pasta",
   "kind.image": "Imagem",
-  "kind.lpk": "App do LordOS",
+  "kind.lpk": "App do Axia DE",
   "kind.other": "Documento",
   "kind.pdf": "Documento PDF",
   "kind.text": "Texto",
@@ -249,7 +249,7 @@
   "connect.help.rdp": "Área de trabalho remota, no app RDP",
   "connect.err.empty": "Digite um endereço.",
   "connect.err.invalid": "Esse endereço não é válido.",
-  "connect.err.scheme": "O LordOS não conhece {scheme}://.",
+  "connect.err.scheme": "O Axia DE não conhece {scheme}://.",
   "connect.err.port": "As pastas compartilhadas usam sua porta padrão.",
   "connect.err.name": "“{name}” não está na página Rede. Abra-a para procurar ou use o endereço.",
   "connect.err.noClient": "Nenhum app instalado abre endereços {scheme}://.",
@@ -295,5 +295,5 @@
   "fav.gone": "{name} não está mais lá",
   "pin.add": "Fixar em Locais",
   "pin.remove": "Remover de Locais",
-  "net.offLink": "Este servidor está fora da sua rede local, então o LordOS não lista as pastas dele. Digite o nome da pasta."
+  "net.offLink": "Este servidor está fora da sua rede local, então o Axia DE não lista as pastas dele. Digite o nome da pasta."
 }

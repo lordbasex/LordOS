@@ -43,10 +43,10 @@ int main(void) {
     CHECK(STREQ(proc_protect_reason(1, 0, "systemd", "/usr/lib/systemd/systemd", NULL, 999), "init"));
     CHECK(STREQ(proc_protect_reason(2, 0x00200000, "kthreadd", "", NULL, 999), "kernel"));
     CHECK(STREQ(proc_protect_reason(77, 0x00200000, "kworker/0:1", "", NULL, 999), "kernel"));
-    CHECK(STREQ(proc_protect_reason(999, 0, "lord-server", "/usr/lib/lordos/bin/lord-server", NULL, 999), "session"));
-    CHECK(STREQ(proc_protect_reason(500, 0, "lord-server", "/usr/lib/lordos/bin/lord-server", "--term-holder", 999), "system"));
-    CHECK(proc_protect_reason(501, 0, "lord-server", "/usr/lib/lordos/bin/lord-server", "--app", 999) == NULL);
-    const char *sys[] = { "lord-sessiond", "lord-netperm", "lord-netd", "lord-fand", "lord-vault", "lord-maild", "lord-doc", "lord-media",
+    CHECK(STREQ(proc_protect_reason(999, 0, "axia-server", "/usr/lib/lordos/bin/axia-server", NULL, 999), "session"));
+    CHECK(STREQ(proc_protect_reason(500, 0, "axia-server", "/usr/lib/lordos/bin/axia-server", "--term-holder", 999), "system"));
+    CHECK(proc_protect_reason(501, 0, "axia-server", "/usr/lib/lordos/bin/axia-server", "--app", 999) == NULL);
+    const char *sys[] = { "lord-sessiond", "axia-netperm", "lord-netd", "axia-fand", "axia-vault", "axia-maild", "axia-doc", "axia-media",
                           "lord-admin", "pipewire", "pipewire-pulse", "wireplumber" };
     for (size_t i = 0; i < sizeof sys / sizeof sys[0]; i++) CHECK(STREQ(proc_protect_reason(600, 0, sys[i], "", NULL, 999), "system"));
     CHECK(STREQ(proc_protect_reason(601, 0, "x", "/usr/bin/pipewire (deleted)", NULL, 999), "system"));

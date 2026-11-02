@@ -234,7 +234,7 @@ const char *hw_rpi_case_text(const char *id) {
         return "# lordos-case.txt: written by LordOS (Settings, Cooling). Do not edit by hand.\n"
                "# Argon ONE V5 case: its board puts the two front USB 2.0 ports and the audio chip\n"
                "# (USB) on the USB-C controller, which has to work as a host. Its fan is on the fan\n"
-               "# header and is driven by lord-fand: nothing to set for it.\n"
+               "# header and is driven by axia-fand: nothing to set for it.\n"
                "[pi5]\n"
                "dtoverlay=dwc2,dr_mode=host\n"
                "[all]\n";

@@ -1,5 +1,5 @@
 /* lan_scan.c — one real pass of Files → Network on the network this machine is on, printed as JSON,
- * with the real lord-lan next to this binary. Run it outside a LordOS session. */
+ * with the real axia-lan next to this binary. Run it outside a LordOS session. */
 #include "../src/lan/lan.h"
 
 #include <stdio.h>

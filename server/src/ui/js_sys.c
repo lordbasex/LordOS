@@ -8,9 +8,9 @@
  * 32 MB), creates folders, renames, copies and moves (in a thread, fsops.c), and sends to the freedesktop
  * Trash; real deletion is only possible inside the Trash. Writing is atomic (temporary + rename),
  * doesn't follow symbolic links in the final file and can NOT touch ~/.local/share/applications,
- * ~/.config/autostart, ~/.local/share/lordos/apps or ~/.config/lordos/settings.json: from JS it is
+ * ~/.config/autostart, ~/.local/share/axia/apps or ~/.config/axia/settings.json: from JS it is
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
- * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
+ * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/axia/settings.json;
  * lord.themes only accepts simple names. */
 #include "../hw/hw_admin.h"
 #include "js_sys.h"
@@ -370,7 +370,7 @@ static JSValue f_sys_cpu(JSContext *c, JSValueConst this_val, int argc, JSValueC
 /* ---- lord.settings ---- */
 
 static void settings_path(char *out, size_t size, const char *suffix) {
-    snprintf(out, size, "%s/.config/lordos/settings.json%s", home, suffix);
+    snprintf(out, size, "%s/.config/axia/settings.json%s", home, suffix);
 }
 
 static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -394,7 +394,7 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     char dir[PATH_MAX + 64], tmp[PATH_MAX + 64], path[PATH_MAX + 64];
     snprintf(dir, sizeof dir, "%s/.config", home);
     mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.config/lordos", home);
+    snprintf(dir, sizeof dir, "%s/.config/axia", home);
     mkdir(dir, 0700);
     settings_path(tmp, sizeof tmp, ".tmp");
     settings_path(path, sizeof path, "");
@@ -650,10 +650,10 @@ static int valid_id_dot(const char *s) {
     return 1;
 }
 
-/* Catalog folders: assets/locales (bundled) and ~/.local/share/lordos/locales
+/* Catalog folders: assets/locales (bundled) and ~/.local/share/axia/locales
  * (the user's language packs; they win if both exist). */
 static void locale_root(int user, char *out, size_t n) {
-    if (user) snprintf(out, n, "%s/.local/share/lordos/locales", home);
+    if (user) snprintf(out, n, "%s/.local/share/axia/locales", home);
     else snprintf(out, n, "%s/locales", assets);
 }
 
@@ -714,7 +714,7 @@ static JSValue f_locale_languages(JSContext *c, JSValueConst this_val, int argc,
 }
 
 /* lord.locale.installPack(language, { namespace: JSONtext }) → copies a LordOS language pack
- * to ~/.local/share/lordos/locales/<language>/ (doesn't need root). */
+ * to ~/.local/share/axia/locales/<language>/ (doesn't need root). */
 static JSValue f_locale_install(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *lang = JS_ToCString(c, argv[0]);
@@ -724,8 +724,8 @@ static JSValue f_locale_install(JSContext *c, JSValueConst this_val, int argc, J
         char p[PATH_MAX + 64];
         snprintf(p, sizeof p, "%s/.local", home); mkdir(p, 0700);
         snprintf(p, sizeof p, "%s/.local/share", home); mkdir(p, 0700);
-        snprintf(p, sizeof p, "%s/.local/share/lordos", home); mkdir(p, 0700);
-        snprintf(p, sizeof p, "%s/.local/share/lordos/locales", home); mkdir(p, 0700);
+        snprintf(p, sizeof p, "%s/.local/share/axia", home); mkdir(p, 0700);
+        snprintf(p, sizeof p, "%s/.local/share/axia/locales", home); mkdir(p, 0700);
         snprintf(dir, sizeof dir, "%s/%s", p, lang);
         mkdir(dir, 0700);
         JSPropertyEnum *props;
@@ -1456,7 +1456,7 @@ static JSValue f_wl_close(JSContext *c, JSValueConst this_val, int argc, JSValue
 }
 
 /* lord.wayland.kill(id) → '' or an error code: Force Quit of a Linux app's window (wl_kill: its own
- * process only, same user, never X11 or lord-server). */
+ * process only, same user, never X11 or axia-server). */
 static JSValue f_wl_kill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     int32_t id = 0;
@@ -2052,7 +2052,7 @@ static JSValue f_session_switch(JSContext *c, JSValueConst this_val, int argc, J
 }
 
 /* lord.session.power('reboot'|'poweroff'): asks lord-sessiond (root), which decides (docs/SESSIONS.md,
- * "Restart and Shut Down from a session"). Only those two words, sent as a fixed message; lord-server
+ * "Restart and Shut Down from a session"). Only those two words, sent as a fixed message; axia-server
  * runs nothing. false if no lord-sessiond drives this session's monitor. */
 static JSValue f_session_power(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;

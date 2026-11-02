@@ -1,4 +1,4 @@
-// cache.js — pages already rendered by lord-doc, with a memory cap. While the version
+// cache.js — pages already rendered by axia-doc, with a memory cap. While the version
 // at the new zoom arrives, whatever exists for that page is shown (smaller or larger, scaled):
 // so drawing is progressive and there is never a gap.
 import { releaseImage } from '@lordos/sdk';

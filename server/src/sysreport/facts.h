@@ -1,5 +1,5 @@
 /* facts.h — what System Information's Checks tab reads about the running session (docs/BENCHMARK.md,
- * "Checks: configured versus effective"), without root: lord-server's own ids from /proc/self/status,
+ * "Checks: configured versus effective"), without root: axia-server's own ids from /proc/self/status,
  * its cgroup and who owns it, the app scopes beside it, and whether anything listens on a TCP port
  * (/proc/net/tcp and tcp6, which list every socket of the network namespace). `root` prefixes every
  * path ("" for this machine), as in sysreport.h. */

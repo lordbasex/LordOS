@@ -50,7 +50,7 @@ static char home[PATH_MAX], media1[PATH_MAX], media2[PATH_MAX], remote_root[PATH
 
 void fsops_init(const char *h, const char *user) {
     pathf(home, sizeof home, "%s", h);
-    pathf(remote_root, sizeof remote_root, "%s/.local/share/lordos/remote", home);
+    pathf(remote_root, sizeof remote_root, "%s/.local/share/axia/remote", home);
     pathf(media1, sizeof media1, "/media/%s", user && *user ? user : "-");
     pathf(media2, sizeof media2, "/run/media/%s", user && *user ? user : "-");
 }
@@ -76,16 +76,16 @@ int fsops_readable(const char *real) {
 }
 
 static const char *const protect[] = { "/.local/share/applications", "/.config/autostart",
-                                           "/.local/share/lordos/apps", "/.config/lordos/settings.json",
-                                           "/.config/lordos/permisos.json",
-                                           "/.config/lordos/firewall.json", /* network permissions: an app does not write its own rules */
-                                           "/.config/lordos/fwlists.json",  /* (0.8.5) subscribed blocklists: only lord.fw */
-                                           "/.config/lordos/fwlists.txt",   /* their compiled entries, read by lord-netperm */
-                                           "/.cache/lordos/fwlists",        /* their downloads: only lord-server writes them */
-                                           "/.config/lordos/backup.json",   /* Backups: decides where the data goes */
-                                           "/.config/lordos/mail",          /* Mail accounts and trusted certificates: only lord.mail.saveConfig (docs/MAIL.md) */
-                                           "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
-                                           "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
+                                           "/.local/share/axia/apps", "/.config/axia/settings.json",
+                                           "/.config/axia/permisos.json",
+                                           "/.config/axia/firewall.json", /* network permissions: an app does not write its own rules */
+                                           "/.config/axia/fwlists.json",  /* (0.8.5) subscribed blocklists: only lord.fw */
+                                           "/.config/axia/fwlists.txt",   /* their compiled entries, read by axia-netperm */
+                                           "/.cache/axia/fwlists",        /* their downloads: only axia-server writes them */
+                                           "/.config/axia/backup.json",   /* Backups: decides where the data goes */
+                                           "/.config/axia/mail",          /* Mail accounts and trusted certificates: only lord.mail.saveConfig (docs/MAIL.md) */
+                                           "/.local/share/axia/mail",     /* Mail cache: only axia-maild writes it */
+                                           "/.local/share/axia/vault",    /* Passwords vaults: only axia-vault writes them (docs/PASSWORDS.md) */
                                            NULL };
 
 int fsops_protected(const char *real) {

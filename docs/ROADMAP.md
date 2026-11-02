@@ -13,7 +13,7 @@ screenshots (QEMU `screendump`) and documented.
 
 ## M2 — UI engine with React ✅ (2026-10-15)
 
-- [x] QuickJS 2025-04-26 vendored in `third_party/quickjs`, embedded in `lord-server`.
+- [x] QuickJS 2025-04-26 vendored in `third_party/quickjs`, embedded in `axia-server`.
 - [x] Native node tree (`View`, `Text`, `Image`) + styles (a CSS subset, see `themes/README.md`).
 - [x] Our own flexbox layout (`server/src/ui/layout.c`).
 - [x] Text with `stb_truetype` and the Inter font (OFL); PNG/JPEG images with `stb_image`.
@@ -39,10 +39,10 @@ input (keyboard → characters per layout), copying only the damaged region to t
 
 ## M3 — SDK, apps as packages and swappable themes ✅ (2026-10-15)
 
-- [x] Security: `lord-server` drops root after opening the display/input; it runs as the user with
+- [x] Security: `axia-server` drops root after opening the display/input; it runs as the user with
       only `CAP_SYS_TTY_CONFIG` (verified in `/proc/<pid>/status`).
 - [x] Native APIs: `lord.fs` (read-only, confined to `$HOME`), `lord.system` (/proc),
-      `lord.settings` (`~/.config/lordos/settings.json`), `lord.themes`, `lord.quit`.
+      `lord.settings` (`~/.config/axia/settings.json`), `lord.themes`, `lord.quit`.
 - [x] Input: right click, wheel, double click; keyboard with `latam` and `us` layouts,
       accents with dead keys, keypad.
 - [x] `@lordos/sdk` (`sdk/`): window manager, persistent settings, token contract
@@ -168,7 +168,7 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
 - [x] Our own networking (netlink, DHCP, Wi-Fi with wpa_supplicant) and VPN (WireGuard over our own netlink,
       OpenVPN) in Settings → Network (`NETWORK.md`).
 - [x] React 19.3.1 (`react-reconciler` 0.34): adapted renderer (`runtime/index.js`), tested with
-      both themes, live theme switching, installed apps (.lpk) and Linux apps. lord-server: 34 MB RSS.
+      both themes, live theme switching, installed apps (.lpk) and Linux apps. axia-server: 34 MB RSS.
 - [x] Files (`FILES.md`): tabs, four views, freedesktop
       Trash, Quick Preview, Get Info, background copy/move (`fsops.c`),
       drag and drop, tags, search, mounted disks and «Open With» (`launchWith`).
@@ -197,21 +197,21 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
     original» / «Share my version». Tests `build/sign-test` (55/55, RFC 8032 + NIST) and
     `build/pkgstate-test` (11/11).
   - [x] `tools/lpk.mjs`: `keygen`, signing when packaging, `sign`, `verify` and `catalog`.
-  - [x] Each `.lpk` as an isolated process (`lord-server --app <id>`): a Wayland client with the
+  - [x] Each `.lpk` as an isolated process (`axia-server --app <id>`): a Wayland client with the
     theme's frame, in the Dock and the remote desktop; a broker that checks every `lord.*`; system
     prompts requested by the app. The malicious app (`tests/lpk-evil`) fails at everything at
     run time; the legitimate one (`tests/lpk-legit`) works after consent.
   - [x] Per-session delegated cgroup (`Delegate=yes`, `lord-sessiond` in the `supervisor` leaf):
     `app-lordos-lpk-<id>.scope` and `app-lordos-<id>.scope` (Linux apps) under
     `lordos-session-<uid>`; tested with fast user switching and remote desktop.
-  - [x] `sandbox_apply_helper` hardened for lord-media and lord-doc (no sockets or exec, threads
+  - [x] `sandbox_apply_helper` hardened for axia-media and axia-doc (no sockets or exec, threads
     only, TSYNC, folders by fd, ioctl by class, our own kcmp): `sandbox-test helper` 17/17.
-  - [x] Graphical powerbox (a dialog drawn by `lord-server` that hands over only the fd), the
+  - [x] Graphical powerbox (a dialog drawn by `axia-server` that hands over only the fd), the
     camera as a read-only frame ring and the microphone stream for the app, live
     tokens/language/RTL and menus for the isolated app (`PRIVACY.md`).
 - [x] **Per-app firewall**, steps 1 to 4 (`FIREWALL.md`), tested on VM 122:
   - [x] rule store, precedence, `dnsmap` and JSON (`server/src/fw`, step 1);
-  - [x] `lord-netperm`, the root service that enforces the rules with cgroup BPF (connect, sendmsg,
+  - [x] `axia-netperm`, the root service that enforces the rules with cgroup BPF (connect, sendmsg,
     bind, sock_create) in the sessions' subtree, with our own loader (no libbpf), rules
     compiled to LPM/hash maps (`build/npcompile-test`: 480,000 connections against `fw_decide`,
     0 differences) and names only from the system resolver (systemd-resolved monitor);
@@ -226,13 +226,13 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
     also devices, files and notifications, `FIREWALL.md`, "Linux apps");
   - [x] root-owned scopes: `lord-sessiond` places every app process and a Linux app can't move
     itself to another cgroup (VM 122). Then still open, closed since: `systemd-run --user --scope`
-    (PID 1 moves it into `user@<uid>.service`; `lord-netperm` now holds it to the per-user union and
+    (PID 1 moves it into `user@<uid>.service`; `axia-netperm` now holds it to the per-user union and
     device-restricted apps get their own view, `FIREWALL.md`, «Escape via `systemd-run --user`»).
   - [ ] "ask" mode (designed). (Per-destination switches: done in 0.8.2, `MONITOR.md`.)
 - [x] **Monitor** app, phase 1 (`MONITOR.md`), tested on VM 123:
   - [x] Overview, CPU, Memory, Network, Disks and Processes tabs with the look of TangoOS's
     Monitor;
-  - [x] metrics read by `lord-server` in its own thread, at 4 Hz and only while the app is open
+  - [x] metrics read by `axia-server` in its own thread, at 4 Hz and only while the app is open
     (closed, it costs nothing);
   - [x] per-app connections with sock_diag, from process to app through the `.desktop` files;
   - [x] our own vector map with zoom and arcs, in the style of a per-app network monitor;
@@ -254,7 +254,7 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
   - [x] Optional per-architecture NEON in `canvas.c` (blit and masks), bit-identical to C
     (`build/canvas-test`); `STBI_NEON`.
   - [x] Separate display and GPU (vc4 + v3d):
-    - the card with connectors (`drmcard.h`), in lord-server and lord-sessiond;
+    - the card with connectors (`drmcard.h`), in axia-server and lord-sessiond;
     - `IN_FORMATS` of the primary plane and direct scanout only with accepted modifiers;
     - the EGL render node in the dmabuf feedback.
   - [x] `tools/rpi/build-img.sh`: `lordos-<version>-rpi5-arm64.img.xz` for Raspberry Pi Imager:
@@ -270,17 +270,17 @@ our own installer, and network, VPN, sound and clipboard with our own interface.
   - [x] Run `build-img.sh` and test on the 16 GB Pi 5 (test list in `RASPBERRY.md`; the image is
     a release file since 0.8.0; results in `RASPBERRY.md` and the release tests in `ISO.md`).
   - [x] (0.8.7, `WALLPAPERS.md`) Hardware video on the Pi 5 (HEVC via V4L2 stateless; H.264 in software) in
-    `lord-media`.
+    `axia-media`.
   - [ ] A «create user» step on the login screen, instead of setup mode.
 
 ## M9 — Documents and printing ✅ (2026-10-17)
 
 Details in `DOCUMENTS.md` and `PRINTING.md`. Tested on VM 116 with screenshots (`archives-*`, `pdf-*`, `print-*`, `fonts-*` and related `.png` files).
 
-- [x] **`lord-doc`, the sandboxed helper:**
+- [x] **`axia-doc`, the sandboxed helper:**
   - it is the only binary with Poppler (glib interface) and libarchive;
   - it is launched on demand with a fixed path and no arguments, and works only with the fds
-    lord-server passes it;
+    axia-server passes it;
   - it locks itself in with `sandbox_apply_helper`: no network or sockets, Landlock with writes only
     under the destination, seccomp, cgroup and a memory cap;
   - pages come back in sealed memfds;
@@ -316,7 +316,7 @@ Details in `DOCUMENTS.md` and `PRINTING.md`. Tested on VM 116 with screenshots (
   - PDF thumbnails in icon view;
   - encrypted archives;
   - PDF signatures;
-  - scanners and `ipps` over TLS from lord-server;
+  - scanners and `ipps` over TLS from axia-server;
   - complex-script shaping in printed text;
   - ZWJ emoji in the text engine;
   - testing with real printers and scanners.
@@ -325,15 +325,15 @@ Details in `DOCUMENTS.md` and `PRINTING.md`. Tested on VM 116 with screenshots (
 
 Details in `MEDIA.md`. Tested on VM 119 with screenshots (`photos-*`, `music-*`, `video-*`, `recorder-*`, `screenshots-*` and related `.png` files).
 
-- [x] **`lord-media`, the sandboxed helper:**
+- [x] **`axia-media`, the sandboxed helper:**
   - it is the only binary with FFmpeg (libavcodec, libavformat, libswscale, libswresample) and libva;
   - it is launched on demand with a fixed path and no arguments, and works only with the fds
-    lord-server passes it (files, camera, render node);
+    axia-server passes it (files, camera, render node);
   - `sandbox_apply_helper`: no sockets, exec or network, ioctl by class (DRM, V4L2) only when
     needed, TSYNC; `media-test sandbox` verifies it;
   - frames come back through three sealed shared-memory slots; if it crashes, only the
     window finds out (tested with a real segfault).
-- [x] **Audio over shared memory:** the PipeWire stream belongs to lord-server; the PCM goes through a
+- [x] **Audio over shared memory:** the PipeWire stream belongs to axia-server; the PCM goes through a
   ring and the video clock through a seqlock on the same page (no round trips). Mean A/V offset
   0.5–1.9 ms. The microphone, the other way around.
 - [x] **Player:**
@@ -341,7 +341,7 @@ Details in `MEDIA.md`. Tested on VM 119 with screenshots (`photos-*`, `music-*`,
   - fullscreen and picture in picture (`wm.setFullscreen`/`wm.setPip` in the SDK);
   - music library by artist and album with cover art, queue, shuffle and repeat;
   - media keys and the Control Center tile.
-- [x] **Photos:** photo library from the pictures folder (`~/Pictures` in English) with thumbnails in `~/.cache/lordos/thumbs`, viewer with zoom,
+- [x] **Photos:** photo library from the pictures folder (`~/Pictures` in English) with thumbnails in `~/.cache/axia/thumbs`, viewer with zoom,
   panning, rotation, fullscreen, slideshow, animated GIF, HEIC/AVIF/WebP/BMP, basic
   editing saved as a copy, and printing.
 - [x] **Screenshots:**
@@ -358,7 +358,7 @@ Details in `MEDIA.md`. Tested on VM 119 with screenshots (`photos-*`, `music-*`,
   MP3 or WAV.
 - [x] **Files:** «Open With» Photos and Player, video thumbnails, cover art and WebP/HEIC/AVIF;
   `media.poster` for Quick Preview.
-- [x] **Performance:** painting straight from the video when only an opaque frame changed: lord-server with
+- [x] **Performance:** painting straight from the video when only an opaque frame changed: axia-server with
   a 1080p video went from 42 % to 13 % of a core windowed and from 92 % to 15 % fullscreen.
 - [ ] **Pending:**
   - measure VA-API on the AMD PC (the VM has no driver);
@@ -388,7 +388,7 @@ with screenshots (`backup-*`, `disks-*`, `logs-*`, `clock-*`, `help-*` `.png` fi
   never touch the system disk.
 - [x] **Backups** (`apps/backup`): scheduled hard-link snapshots of the home, hourly/daily/weekly
   retention, browse by date and restore, exclusions, optional encryption with Monocypher; a
-  lord-server thread at nice 19 and idle I/O, paused on battery (`build/backup-test`).
+  axia-server thread at nice 19 and idle I/O, paused on battery (`build/backup-test`).
 - [x] **Logs** (`apps/logs`): our own systemd journal reader, the user's own journal and LordOS
   logs, system logs for admins through a closed action, filters, search, live follow and export
   (`build/journal-test`).
@@ -411,7 +411,7 @@ with screenshots (`backup-*`, `disks-*`, `logs-*`, `clock-*`, `help-*` `.png` fi
 Details in `PASSWORDS.md`. Tested on VM 116 with a real `lord-sessiond` session
 (`passwords-*.png`).
 
-- [x] **`lord-vault`**, sandboxed helper (no network, no sockets, no exec, fd-only files); the only
+- [x] **`axia-vault`**, sandboxed helper (no network, no sockets, no exec, fd-only files); the only
   binary with Monocypher; decrypted data in an mlock/MADV_DONTDUMP arena, wiped on lock.
 - [x] **Own `.lvault` format:** XChaCha20-Poly1305, vault key wrapped per unlock method (Argon2id
   tuned per machine, BLAKE2b), attachments sealed separately, atomic save with `.bak`; every flipped
@@ -430,11 +430,11 @@ Details in `PASSWORDS.md`. Tested on VM 116 with a real `lord-sessiond` session
   `<AutofillButton>`.
 - [x] **Secret Service** with our own D-Bus code (plain + DH sessions): `secret-tool` and Chromium
   work without gnome-keyring.
-- [x] **The Passwords UI runs as its own sandboxed process** (`lord-server --app passwords`, a
-  system package built into `assets/sysapps/`): its own channel to `lord-vault`
+- [x] **The Passwords UI runs as its own sandboxed process** (`axia-server --app passwords`, a
+  system package built into `assets/sysapps/`): its own channel to `axia-vault`
   (`vc_attach_app`), files through the powerbox, FIDO2 and secret clipboard through the broker
   (`BOP_VAULT_FIDO`, `BOP_CLIP_SECRET`), protected Wayland window. Revealed values never enter
-  `lord-server`'s JavaScript heap. In-process fallback kept (see `PASSWORDS.md`).
+  `axia-server`'s JavaScript heap. In-process fallback kept (see `PASSWORDS.md`).
 - [x] Keyring for isolated `.lpk` apps: a broker op (`BOP_KEYRING`, `sec/brokerkr.c`) that sets
   the owner from the verified app id (`PASSWORDS.md`, "Keyring for isolated .lpk apps").
 - [ ] Test with real FIDO2 keys (only the uhid software authenticator was available).
@@ -471,7 +471,7 @@ Details in `SETTINGS.md`. Tested on VM 118 (`settings-*.png`), Bluetooth with a 
 Details in `MAIL.md`. Tested on VM 123 against local Dovecot, Postfix and Radicale with a test CA
 (`mail-*.png`, `calendar-*.png`, `contacts*.png`, `reminders*.png`).
 
-- [x] **`lord-maild`**, sandboxed helper with no sockets of its own: `lord-server` connects only to
+- [x] **`axia-maild`**, sandboxed helper with no sockets of its own: `axia-server` connects only to
   the configured servers (or public image hosts after *Load Images*) and passes the fd. OpenSSL,
   certificates verified against the system CA store, explicit per-account trust otherwise.
 - [x] **IMAP** (IDLE, CONDSTORE, MOVE, UIDPLUS, SPECIAL-USE, modified UTF-7), **SMTP** 465/587,
@@ -489,7 +489,7 @@ Details in `MAIL.md`. Tested on VM 123 against local Dovecot, Postfix and Radica
   dates, priorities, flags, smart lists, VTODO over CalDAV), **Contacts** (local and CardDAV,
   groups, photo; Mail autocompletes from it). Alarms ring with the apps closed.
 - [x] **Isolated apps (0.8.2):** Mail, Calendar, Contacts and Reminders run as their own sandboxed
-  processes (`lord-server --app <id>`), with `BOP_MAIL` and per-app allow lists in the broker
+  processes (`axia-server --app <id>`), with `BOP_MAIL` and per-app allow lists in the broker
   (`sec/brokermail.c`, `MAIL.md`).
 - [x] **Tests:** `mail-test` 30,953 checks (IMAP, MIME, charsets, HTML sanitizer, iCal, vCard, XML,
   mutation fuzzing), `mailnet-test` 138, `mailc-test` 69; ASan/UBSan target.
@@ -506,7 +506,7 @@ Details in `MAIL.md`. Tested on VM 123 against local Dovecot, Postfix and Radica
 - [x] **Chromium and Firefox** preinstalled (Linux apps, not native; verified in the final ISO, see
   `docs/ISO.md`, "Final ISO test").
 - [x] **Camera in isolated apps** (`.lpk`) and **several windows per isolated app** (VM 122,
-  `PRIVACY.md`): read-only frame ring from `lord-media` with validated ACKs, photo/video through
+  `PRIVACY.md`): read-only frame ring from `axia-media` with validated ACKs, photo/video through
   the powerbox, instant revoke; one Wayland toplevel per window, grouped in the Dock, «New
   window» from the app and the Dock.
 - [x] **Visual polish, app by app** (before the ISO; done 2026-10-18, see `docs/polish/`): review every native app
@@ -516,7 +516,7 @@ Details in `MAIL.md`. Tested on VM 123 against local Dovecot, Postfix and Radica
   uniform margins and spacing, alignment, typographic hierarchy, sidebars,
   toolbars and sheets as in the design guide, controls with the same size and height, nothing overlapping or
   clipped; in light, dark, RTL and in small windows; with before and after screenshots.
-- [x] **Final ISO** with everything (check that `lord-doc` and `lord-media` are inside) and a **Raspberry
+- [x] **Final ISO** with everything (check that `axia-doc` and `axia-media` are inside) and a **Raspberry
   Pi 5 image** (`tools/rpi/build-img.sh`), tested on the real Pi: released as 0.8.0 (`ISO.md`,
   `RASPBERRY.md`).
 
@@ -532,7 +532,7 @@ no migration (`UPDATES.md`). What it delivered, each item described in its own d
 - [x] The Store: a new look, the Artificial Intelligence catalog and the Commercial page (vendor
   repositories added with `pkg-source-add`), a signed featured banner, downloads over HTTPS
   (`lord-tls`) and apt's priorities (`PACKAGES.md`, `UPDATES.md`, "Mirrored apps (catalog)").
-- [x] System Information with its Sandbox Probe, `lordos-sysreport`, `lordos-fetch`, the Test Bench,
+- [x] System Information with its Sandbox Probe, `axia-sysreport`, `axia-fetch`, the Test Bench,
   the boot time on the splash and on record, and versioned results (`BENCHMARK.md`, `PRIVACY.md`,
   `RESULTS.md`).
 - [x] Files: This Computer and every disk (item below; `FILES.md`, `SYSTEM.md`).
@@ -557,17 +557,17 @@ Raspberry Pi 5 image `lordos-0.8.6-rpi5-arm64.img.xz`). Updated in place from 0.
 LordBench and a desktop that stays smooth under load. Each item is described in its own document.
 
 **LordBench** (`BENCHMARK.md`; the item under "Before 1.0" has the details):
-- [x] The sandboxed `lord-bench` helper: CPU, memory, GPU, storage and sustained workloads; the thermal, throttle
+- [x] The sandboxed `axia-bench` helper: CPU, memory, GPU, storage and sustained workloads; the thermal, throttle
   and battery guards; versioned results and System Information → Performance.
 - [x] Video workloads (software decoding, the remote desktop's encoders), the desktop-impact mode, the
-  pointer-to-screen latency, the N-boot test, `lordos-sysreport bench` and the Pi 5 reference.
+  pointer-to-screen latency, the N-boot test, `axia-sysreport bench` and the Pi 5 reference.
 - [x] LordOS's own interface work as workloads (`cpu.ui`, `cpu.shape`, fonts built into the helper) and the
-  helper-sandbox self-test inside `lord-bench` (2026-10-28).
+  helper-sandbox self-test inside `axia-bench` (2026-10-28).
 - [x] The interface workloads measured on the Pi 5 for its reference. *Two Quick runs from a terminal (2026-10-29):*
   layout and paint 39.3–39.4 fps on one core, 45.4 fps with the paint threads; shaping 630–632 runs/s on one core,
   2,522–2,527 on four. *Full run (2026-10-30, over SSH without the monitor, `ondemand`, 180 s sustained, 37.0 → 49.6
   °C):* 39.22 / 45.23 fps and 628.3 / 2,514.0 runs/s, now in `apps/sysinfo/references.js` (a second Full run without
-  the sustained part: within 0.4 %). That run found `lordos-sysreport bench --full` passed no sustained time; it now
+  the sustained part: within 0.4 %). That run found `axia-sysreport bench --full` passed no sustained time; it now
   runs the app's 180 s (`BENCHMARK.md`).
 - The x86 PC reference and hardware video decoding moved to 0.8.7 (decided by the maintainer on 2026-10-29;
   "Release 0.8.7-beta" below).
@@ -641,8 +641,8 @@ left for after 0.8.6, and the new native app:
   Phase 1 and the rows of Phase 2 shipped in 0.8.7; each feature's state is in `CLEANER-ROADMAP.md`.
 - [ ] The x86 PC reference for LordBench (a modest PC still to be chosen; moved from 0.8.6 on 2026-10-29).
 - [ ] Hardware video decoding (VA-API on PCs; the Pi 5's HEVC decoder needs FFmpeg's `v4l2request`, which Debian's
-  FFmpeg lacks), in `lord-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In 0.8.7: the Pi 5's
-  HEVC decoder in `lord-media` through Raspberry Pi's FFmpeg (`WALLPAPERS.md`), and the player leaves a failing hardware
+  FFmpeg lacks), in `axia-media` and LordBench's video workloads (moved from 0.8.6 on 2026-10-29). In 0.8.7: the Pi 5's
+  HEVC decoder in `axia-media` through Raspberry Pi's FFmpeg (`WALLPAPERS.md`), and the player leaves a failing hardware
   decoder (`MEDIA.md`), not run on real hardware. Left: LordBench's video workloads, whose job's sandbox waits for the
   maintainer.
 - [x] Step 12: GPU drag for the whole drag, also where the Dock or the menu bar overlap the window (moved from 0.8.6
@@ -670,7 +670,7 @@ Only what is already decided:
   best per-app firewalls, no copied look or names.
   - **Native apps as their own rows:** every built-in component that uses the network gets a row
     with its name and icon, backed by its own process and cgroup so rules are enforced by the
-    kernel: Mail (`lord-maild`, also the Calendar, Contacts and Reminders sync), Store and
+    kernel: Mail (`axia-maild`, also the Calendar, Contacts and Reminders sync), Store and
     updates (the package engine), Remote desktop, Printers, VPN, and the Terminal (its programs in
     their own scope, shown as "Terminal" with the program's name). Apps that never touch the
     network (Calculator) don't appear. Essential system traffic (DNS, time, DHCP) is shown but
@@ -744,13 +744,13 @@ Only what is already decided:
   video decode and encode), the services, a Compatibility panel, and the paper's claims checked on
   this machine, each marked *configured* or *effective* (a probe app tries what must fail). JSON
   and Markdown reports with preview, built from an allow-list of fields. The logic lives in
-  `server/src/sysreport/`, shared by the app, the `lordos-sysreport` command and tests.
+  `server/src/sysreport/`, shared by the app, the `axia-sysreport` command and tests.
   - [x] collector, `pci.ids`/`usb.ids`/EDID readers, fake-sysfs fixtures, anonymization test,
-    `lordos-sysreport report` (2026-10-26);
+    `axia-sysreport report` (2026-10-26);
   - [x] the GPU's live layers (EGL, composition, scanout) through `lord.sysinfo` (2026-10-26);
   - [x] the read-only `hw-memory-modules` admin action (2026-10-26);
   - [x] Overview, Hardware and Compatibility tabs (en, es, pt; 2026-10-26; right to left not yet checked on screen);
-  - [x] Checks part 1: what lord-server sees itself, configured and effective (2026-10-26);
+  - [x] Checks part 1: what axia-server sees itself, configured and effective (2026-10-26);
   - [x] Checks part 2: the Sandbox Probe tries what must fail (app sandbox, helper sandbox, broker, scope; 2026-10-26);
   - [ ] a connection refused by the per-app firewall (an app with network access and a temporary rule);
   - [x] reports: the Report tab with the exact text, Copy and Save to Documents (2026-10-26);
@@ -775,7 +775,7 @@ Only what is already decided:
   one new closed admin action, `share-mount` (host, share and user validated; the password on
   standard input, never in argv; fixed options `nosuid,nodev` and the user's uid; only under
   `/media/<user>/`), the password in the keyring, the mount's traffic as its own firewall app.
-  *Built (0.8.7, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `lord-lan`, listing
+  *Built (0.8.7, `FILES.md`, "Network"):* Files → Network, the sandboxed helper `axia-lan`, listing
   shares and exports, `share-mount` and `share-unmount`, the keyring, the `lan` connector for the search inside a
   session (`FIREWALL.md`, "Files → Network and the connectors"), Connect to Server and listing shares with a password.
   *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
@@ -790,7 +790,7 @@ Only what is already decided:
   Flatpak, and its rules keep isolation as LordOS's own code (no bubblewrap/flatpak for `.lpk`). What
   has to be solved so Flatpak apps follow LordOS's security model:
   - **Identity and the firewall:** `flatpak run` moves the app into its own transient
-    `app-flatpak-<id>-*.scope` under `user@`, where `lord-netperm` treats it as an escape and applies
+    `app-flatpak-<id>-*.scope` under `user@`, where `axia-netperm` treats it as an escape and applies
     the per-user union, not that app's rules. Flatpak apps must start through LordOS's launcher in
     LordOS's app scope (or a root-owned `lordos-flatpak-<id>` scope) so Monitor, the firewall and the
     device restrictions see them as themselves; device-restricted apps have no session bus, which
@@ -804,7 +804,7 @@ Only what is already decided:
     requests to LordOS's own prompts.
   - **Installing:** per user (`--user`, no root), so no new admin action; the Flathub remote pinned by
     its key, and its signed appstream data (not the website's API) as the Store's catalog, through a
-    network path that needs approval like `lord-fetch`.
+    network path that needs approval like `axia-dl`.
 
 - [ ] **Steam in the Store's Commercial section (needs multiarch)** — Debian 13's `steam-installer`
   (contrib) depends on `steam-libs-i386`: 72 i386 packages with `--no-install-recommends`, after
@@ -815,21 +815,21 @@ Only what is already decided:
   resolver (same arch by default; `foreign`, `allowed` with `:any`, explicit `:i386`), co-installable
   `Multi-Arch: same` packages and dpkg called with `name:arch`.
 
-- [x] **LordBench (first part released in 0.8.6-beta, 2026-10-30; the open items moved to 0.8.7)** — `BENCHMARK.md`. Workloads in the sandboxed `lord-bench` helper
+- [x] **LordBench (first part released in 0.8.6-beta, 2026-10-30; the open items moved to 0.8.7)** — `BENCHMARK.md`. Workloads in the sandboxed `axia-bench` helper
   (CPU and LordOS's own work, memory, GPU, compositor, video, storage, sustained load); peak
   performance and desktop impact measured apart; frame times against the refresh rate actually in
   use; stops on the hardware's trip points and throttling; every result records its conditions;
   three verdicts (performance against several reference machines, compatibility, stability), no
   single score; results versioned.
-  *Built (2026-10-27):* the `lord-bench` helper, CPU, memory, GPU, storage and sustained workloads,
+  *Built (2026-10-27):* the `axia-bench` helper, CPU, memory, GPU, storage and sustained workloads,
   the thermal, throttle and battery guards, the boot history and System Information → Performance are built
   (`BENCHMARK.md`, "Built so far"), and so are the video workloads (software decoding, the remote desktop's
   encoders), the desktop-impact mode (the compositor's frame times alone and under a low-priority load), the N-boot
-  test, the pointer-to-screen latency, `lordos-sysreport bench` and the Pi 5 reference. *(2026-10-28)* Also built:
+  test, the pointer-to-screen latency, `axia-sysreport bench` and the Pi 5 reference. *(2026-10-28)* Also built:
   LordOS's own interface work as workloads (layout and paint of a fixed 1920×1080 scene with the engine's real
   code, one core and with the paint threads, and shaping fixed paragraphs in five scripts, with the fonts built
   into the helper; VM 116: 37.0 and 39.9 fps, 619 and 3,595 runs/s), and the helper-sandbox self-test inside
-  `lord-bench` (six tries that must fail, checked by the Stability verdict and `lordos-sysreport bench`). The Pi 5's
+  `axia-bench` (six tries that must fail, checked by the Stability verdict and `axia-sysreport bench`). The Pi 5's
   reference has the interface workloads since a Full run on 2026-10-30 (39.22 / 45.23 fps, 628.3 / 2,514.0 runs/s).
   What it found on the Pi 5 under load (the desktop fell to 24 fps under load;
   the compositor's CPU weight and its real-time priority fix it on VM 116; on the Pi 5 with its monitor they take it
@@ -889,7 +889,7 @@ Only what is already decided:
     can't connect").
   - [x] **Rendering once:** the GPU keeps composing while someone watches (the composed frame is read
     back once; only protected windows on screen, or screen recording, still need the CPU path); the
-    same frame feeds the encoder (`lord-media` MK_STREAM: VA-API when the card encodes H.264, libx264
+    same frame feeds the encoder (`axia-media` MK_STREAM: VA-API when the card encodes H.264, libx264
     otherwise; frames only when something changed, and fewer when the encoder is behind).
   - [x] **Per session:** one encoder per session and codec, shared by every viewer (only the
     encryption is per connection); two users means two sessions, two encoders, each as its user.
@@ -964,10 +964,10 @@ Only what is already decided:
     windows that move together), window thumbnails over the taskbar buttons, and a typography
     scale token (apps still set their own font sizes).
 - [ ] **Mail: sign in with Google and Microsoft (OAuth2)**, so nobody needs an app password. The
-  pieces are prepared and disabled today (`sdk/mail.js` `OAUTH_PROVIDERS`, `lord-maild` answers
+  pieces are prepared and disabled today (`sdk/mail.js` `OAUTH_PROVIDERS`, `axia-maild` answers
   `oauth-disabled`; see `MAIL.md`, "OAuth"):
   - the authorization-code flow with PKCE in the system browser and a loopback redirect served by
-    `lord-server`; the refresh token stored in the system keyring (Passwords), never in the account
+    `axia-server`; the refresh token stored in the system keyring (Passwords), never in the account
     file; `AUTHENTICATE XOAUTH2` in `imap.c` and `smtp.c`; token refresh and revoke on account removal;
   - Google calendars and contacts (CalDAV/CardDAV) with the same sign-in;
   - **needs iPERFEX to register LordOS with each provider** (only the project owners can do this):
@@ -978,7 +978,7 @@ Only what is already decided:
     scope is restricted: until Google verifies the app, only up to 100 listed test users can sign in;
   - Microsoft first: it is retiring password sign-in for IMAP, so OAuth will become the only way in.
 
-- [x] **Browsers with their own bar (0.8.4)** — lord-server honors the decoration mode an app asks
+- [x] **Browsers with their own bar (0.8.4)** — axia-server honors the decoration mode an app asks
   for (xdg-decoration and KDE's server-decoration), also while the window is open; Chromium and
   Firefox draw their own bar by default, with LordOS's window buttons (traffic lights from LordOS's
   GTK theme in Chromium), and the window menu, resize edges and snap layouts keep working. See
@@ -1024,7 +1024,7 @@ Only what is already decided:
     compromised or over-eager assistant; data leaving the machine), transports (local socket
     only by default; remote access only through an explicit, authenticated opt-in), which MCP
     features to support (tools first; resources read-only; no sampling), and how it fits the
-    privilege split (`lord-server` never runs as root and never runs arbitrary commands).
+    privilege split (`axia-server` never runs as root and never runs arbitrary commands).
   - **Off by default.** A switch in Settings → Privacy, and every assistant appears as its own
     client with a name and an identity, like an app.
   - **Ask, then grant, like camera and microphone:** each assistant requests the capabilities it
@@ -1052,8 +1052,8 @@ Only what is already decided:
   MCP item above. Input: the maintainer's design notes and the results of a prototype on another system (Qwen3 1.7B and
   4B with llama.cpp; on the test PC the CPU beat the RX 580 offload by 2.5×, so nothing is assumed
   per vendor). Adapted to LordOS's rules:
-  - **Inference in a sandboxed helper** (`lord-ai`, like `lord-media`): the only binary that links
-    llama.cpp; no network, the model file as an fd, a private channel to `lord-server` (no TCP port,
+  - **Inference in a sandboxed helper** (`lord-ai`, like `axia-media`): the only binary that links
+    llama.cpp; no network, the model file as an fd, a private channel to `axia-server` (no TCP port,
     no HTTP API another app could reach). The Python prototype is reference only and doesn't ship.
   - **Models only with consent:** a signed catalogue on lordos.org (hash and licence per model),
     downloaded through the package engine's checks, loaded on demand and unloaded when idle.

@@ -12,7 +12,7 @@ Cópias automáticas da sua pasta pessoal.
 ## Começar
 
 1. Em **Ajustes** do app escolha o **destino**: um disco externo (de preferência ext4) ou uma
-   pasta. As cópias são guardadas em `LordOS-Copias`.
+   pasta. As cópias são guardadas em `Axia DE-Copias`.
 2. Escolha a **frequência**: a cada hora, a cada dia, a cada semana ou manual.
 3. **Copiar agora** faz a primeira.
 

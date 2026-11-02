@@ -1,13 +1,13 @@
-// api.js — estado de la app Contraseñas y los pedidos a lord-vault (por @lordos/sdk vaultRequest).
-// Lo descifrado vive en lord-vault; acá llega solo lo que se muestra: la lista liviana (sin
+// api.js — estado de la app Contraseñas y los pedidos a axia-vault (por @lordos/sdk vaultRequest).
+// Lo descifrado vive en axia-vault; acá llega solo lo que se muestra: la lista liviana (sin
 // secretos), la entrada abierta (los ocultos sin valor) y un valor cuando el usuario lo pide
 // (mostrar, copiar, editar). Ver docs/PASSWORDS.md.
 import { createStore, vaultRequest, onVaultEvent, clipboard, t } from '@lordos/sdk';
 
 export const APP_ID = 'passwords';
 
-// true when this UI runs as its own sandboxed process (lord-server --app passwords) with a direct
-// channel to lord-vault; false in the shell (in-process fallback). See docs/PASSWORDS.md.
+// true when this UI runs as its own sandboxed process (axia-server --app passwords) with a direct
+// channel to axia-vault; false in the shell (in-process fallback). See docs/PASSWORDS.md.
 export const appMode = typeof lord !== 'undefined' && !!(lord.vault && lord.vault.appMode);
 
 export const app = createStore({
@@ -46,7 +46,7 @@ export async function reloadLogin() {
   } catch (e) { app.set((s) => ({ ...s, login: { entries: [], unlocked: false } })); }
 }
 
-// reemplaza/agrega un ítem de la lista con lo que devolvió lord-vault
+// reemplaza/agrega un ítem de la lista con lo que devolvió axia-vault
 export function upsertItem(item) {
   if (!item) return;
   app.set((s) => {
@@ -71,7 +71,7 @@ let clearTimer = null;
 export function copySecret(value, label) {
   const secs = Number(app.get().meta?.clip ?? 30) || 30;
   if (appMode) {
-    // app process: lord-server marks it sensitive and clears it after `secs` if unchanged
+    // app process: axia-server marks it sensitive and clears it after `secs` if unchanged
     lord.clipboard.set(value, { secure: true, clearAfter: secs });
     toast(t('passwords.copied', { what: label, secs }));
     return;
@@ -111,7 +111,7 @@ export async function setTags(tags) {
   app.set((s) => ({ ...s, tags }));
 }
 
-// Eventos de lord-vault: bloqueo (automático, pantalla), cambios desde otro lado, toque de la llave
+// Eventos de axia-vault: bloqueo (automático, pantalla), cambios desde otro lado, toque de la llave
 let wired = false;
 export function wireEvents() {
   if (wired) return;
@@ -124,7 +124,7 @@ export function wireEvents() {
   });
 }
 
-// Mensaje legible para un código de error de lord-vault
+// Mensaje legible para un código de error de axia-vault
 export function errorText(code) {
   const known = ['bad-key', 'locked', 'not-found', 'corrupt', 'truncated', 'not-a-vault', 'unsupported-version', 'no-device', 'keyfile-read',
     'keyfile-short', 'keyfile-write', 'unknown-format', 'bad-password', 'encrypted-export', 'unsupported-cipher', 'unsupported-kdf',

@@ -1,12 +1,12 @@
 /* nethist.h — the Monitor's traffic history (0.8.2, docs/MONITOR.md "Traffic history").
  *
  * Bytes received and sent per minute, for the machine (every interface but lo, as the Monitor's
- * totals) and for each of the user's apps (lord-netperm's per-app counters), kept 7 days per minute
+ * totals) and for each of the user's apps (axia-netperm's per-app counters), kept 7 days per minute
  * and 30 days per hour in one compact file of the user's:
  *
- *   $XDG_STATE_HOME/lordos/net-history.bin   (default ~/.local/state/lordos/net-history.bin, 0600)
+ *   $XDG_STATE_HOME/axia/net-history.bin   (default ~/.local/state/axia/net-history.bin, 0600)
  *
- * The apps are the user's own, so the file is the user's (lord-server writes it as the user; no
+ * The apps are the user's own, so the file is the user's (axia-server writes it as the user; no
  * root process writes into a home folder). It holds app ids and byte counts only: never an address,
  * a domain or a country.
  *

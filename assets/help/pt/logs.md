@@ -7,7 +7,7 @@ keywords: registros, logs, journal, erros, depurar, console, diagnóstico
 ---
 # Registros
 
-Os registros do sistema e do LordOS. Serve para ver o que aconteceu quando
+Os registros do sistema e do Axia DE. Serve para ver o que aconteceu quando
 algo falha.
 
 ## Fontes
@@ -15,7 +15,7 @@ algo falha.
 - **Meus registros:** o seu journal do systemd (seus apps e serviços), lido com as suas permissões.
 - **Sistema** e **Kernel:** o journal do sistema. Os administradores (grupo sudo) o veem pelo
   assistente de administração, assim como quem estiver no grupo de leitura do journal.
-- **LordOS:** os registros da sua sessão (`~/.cache/lordos`, como `session.log`).
+- **Axia DE:** os registros da sua sessão (`~/.cache/axia`, como `session.log`).
 
 ## Filtrar
 

@@ -3,13 +3,13 @@
 //
 // The item is optional and off by default (settings.monitor.menuItem; Settings → Privacy → Monitor
 // or the Monitor's view menu). While it is shown, once per second: the machine's byte counters
-// (lord.monitor.netTotals(), one small file read) and lord-netperm's notices (firewall.refresh()).
+// (lord.monitor.netTotals(), one small file read) and axia-netperm's notices (firewall.refresh()).
 // Hidden, it costs nothing. Its panel shows the sent/received graph of the last five minutes, the
 // apps moving bytes now, what was denied in the last ten minutes, the firewall mode, the
 // blocklists and a link to the Monitor.
 //
-// startNetStatus() (startShell) also asks lord-server, once an hour, to download the enabled
-// blocklists that are a day old (lord.fw.updateLists; lord-server does nothing when they are fresh).
+// startNetStatus() (startShell) also asks axia-server, once an hour, to download the enabled
+// blocklists that are a day old (lord.fw.updateLists; axia-server does nothing when they are fresh).
 import { memo, useEffect, useRef, useState } from 'react';
 import { View, Text, addListener } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -53,7 +53,7 @@ function tick() {
     }
   }
   if (s) prev = s;
-  if (panelOpen) firewall.refresh();      // lord-netperm's notices only while the panel shows them
+  if (panelOpen) firewall.refresh();      // axia-netperm's notices only while the panel shows them
 }
 
 function sync() {
@@ -229,7 +229,7 @@ let started = false;
 function updateLists() {
   if (!firewall.available()) return;
   firewall.updateLists(false);
-  // lord-server swaps the new set in and tells lord-netperm when the job ends; reading the state
+  // axia-server swaps the new set in and tells axia-netperm when the job ends; reading the state
   // is what lets it notice, so keep reading while it works
   let n = 0;
   const poll = () => {

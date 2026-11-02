@@ -2,7 +2,7 @@
 // a missing file or a machine without the hardware just shows it. Decisions are in motionmodel.js.
 //
 // One video per file, whatever the number of displays showing it. Files live in /var/lib/lordos/wallpapers, fetched by
-// the closed action wallpaper-get from the catalog in the package (lord-server only keeps a file with the catalog's hash).
+// the closed action wallpaper-get from the catalog in the package (axia-server only keeps a file with the catalog's hash).
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { Image, MediaView, addListener } from '@lordos/runtime';
 import catalog from '../assets/wallpapers/motion.json';
@@ -22,7 +22,7 @@ export const motionThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
 export const motionPoster = (it) => `asset:wallpapers/motion/${it.id}.poster.jpg`;
 export const motionDownloads = createStore({});     // id → percent while downloading
 
-// What this machine can play: empty until lord-media answers, and empty for good without the hardware.
+// What this machine can play: empty until axia-media answers, and empty for good without the hardware.
 export function currentCodecs() {
   try { return motionCodecs(lord.media.hwDecode(), lord.media.composition()); } catch (e) { return []; }
 }
@@ -133,7 +133,7 @@ function acquire(file, rate, key, display, onLost) {
   if (!p) {
     let id = 0;
     motionBusy.set(true);
-    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS' }); } catch (e) { motionBusy.set(false); return null; }
+    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'Axia DE' }); } catch (e) { motionBusy.set(false); return null; }
     if (!id) { motionBusy.set(false); return null; }
     p = { id, tag, views: new Map(), paused: false, playing: createStore(false) };
     media.on(id, (type, d) => {

@@ -46,7 +46,7 @@ static double ns_now(void) {
     return t.tv_sec * 1e9 + t.tv_nsec;
 }
 
-/* the lord-server loop: timers run between events */
+/* the axia-server loop: timers run between events */
 static void ticks_until(double t) {
     for (;;) {
         double w = tp_timeout(last_tick);

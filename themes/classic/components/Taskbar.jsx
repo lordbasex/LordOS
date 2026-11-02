@@ -11,7 +11,7 @@
 import {
   View, Text, Layer, useSettings, useWindows, useClock, wm, windowTitle, formatTime, formatDate, t as tr,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
-  useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
+  useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, AxiaLogo,
   mainDisplay, screen, toggleShowDesktop,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -180,7 +180,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
     <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2, direction: 'ltr' }}>
       <BarButton t={t} vert={vert} active={start} refFn={startRef} onClick={() => { hideTip(); onStart(); }}
         onEnter={() => showTip(tr('shell.classic.start'), startRef.current)} onLeave={hideTip}>
-        <LordOSLogo size={26} />
+        <AxiaLogo size={26} />
       </BarButton>
       <BarButton t={t} vert={vert} refFn={searchRef} onClick={() => { hideTip(); onSearch(); }}
         onEnter={() => showTip(tr('shell.classic.search'), searchRef.current)} onLeave={hideTip}>

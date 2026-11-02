@@ -27,7 +27,7 @@ static int nrows;
 static char file_path[PATH_MAX];
 static int loaded;
 
-const char *perm_file_suffix(void) { return "/.config/lordos/permisos.json"; }
+const char *perm_file_suffix(void) { return "/.config/axia/permisos.json"; }
 
 static Row *find(const char *app, int create) {
     for (int i = 0; i < nrows; i++) if (rows[i].used && !strcmp(rows[i].app, app)) return &rows[i];

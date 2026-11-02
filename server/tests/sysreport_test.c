@@ -9,13 +9,13 @@
  * person's name inside one) are on screen only: the trees hold them all, and no report may carry them.
  *
  *   build/sysreport-test                       the tests (make test)
- * lordos-fetch's summary is checked on the same trees: with --share it carries none of those values
+ * axia-fetch's summary is checked on the same trees: with --share it carries none of those values
  * either, and without color it has no escape codes.
  *
  *   build/sysreport-test smbios                the memory module lines of this machine, as the
  *                                              hw-memory-modules action gives them (root)
  *   build/sysreport-test fixture <dir> <kind>  writes a fake tree (amd, intel, nvidia, rpi5, vm), for
- *                                              `lordos-sysreport report --root <dir>` */
+ *                                              `axia-sysreport report --root <dir>` */
 #include "sysreport/sysreport.h"
 #include "sysreport/periph.h"
 #include "sysreport/ids.h"
@@ -458,7 +458,7 @@ static void test_kind(const char *kind) {
     }
     CHECK(ll && bl && zr, "%s: kernel config", kind);
     if (strcmp(kind, "rpi5")) CHECK(r->naudio == 1 && !strcmp(r->audio[0], "HD-Audio Generic"), "%s: audio %s", kind, r->audio[0]);
-    CHECK(contains(md, "# System report") && contains(md, "| LordOS | 0.8.5-beta |"), "%s: markdown head", kind);
+    CHECK(contains(md, "# System report") && contains(md, "| Axia DE | 0.8.5-beta |"), "%s: markdown head", kind);
 
     if (!strcmp(kind, "amd")) {
         CHECK(!strcmp(r->machine.vendor, "Micro-Star International Co., Ltd.") && !r->machine.version[0], "amd: dmi (placeholder dropped)");
@@ -552,12 +552,12 @@ static void test_fetch(const char *kind) {
     FetchColor modes[3] = { FETCH_PLAIN, FETCH_256, FETCH_TRUECOLOR };
     for (int m = 0; m < 3; m++) {
         char *out = fetch_render(r, &l, modes[m]);
-        CHECK(out && contains(out, "LordOS 0.8.5-beta (Debian GNU/Linux 13 (trixie))") && contains(out, "CPU"), "%s/%d: fetch lines", kind, m);
+        CHECK(out && contains(out, "Axia DE 0.8.5-beta (Debian GNU/Linux 13 (trixie))") && contains(out, "CPU"), "%s/%d: fetch lines", kind, m);
         for (size_t i = 0; i < sizeof SECRETS / sizeof SECRETS[0]; i++)
             CHECK(!contains(out, SECRETS[i]), "%s/%d: fetch --share carries \"%s\"", kind, m, SECRETS[i]);
         CHECK(m != FETCH_PLAIN || !strchr(out, '\033'), "%s: plain fetch has escape codes", kind);
-        CHECK(m != FETCH_TRUECOLOR || contains(out, "\033[38;2;255;214;10m"), "%s: true color gem", kind);
-        CHECK(m != FETCH_256 || contains(out, "\033[38;5;220m"), "%s: 256-color gem", kind);
+        CHECK(m != FETCH_TRUECOLOR || contains(out, "\033[38;2;180;108;255m"), "%s: true color mark", kind);
+        CHECK(m != FETCH_256 || contains(out, "\033[38;5;135m"), "%s: 256-color mark", kind);
         free(out);
     }
     fetch_live(&l, root, 0);

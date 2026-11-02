@@ -191,7 +191,7 @@ char *sysreport_json(const SysReport *r) {
     hb_printf(&b, "}");
     jkey(&b, &g, "services"); hb_printf(&b, "{"); int h = 1;
     jb(&b, &h, "lord-sessiond", s->sessiond); jb(&b, &h, "lord-netd", s->netd);
-    jb(&b, &h, "lord-netperm", s->netperm); jb(&b, &h, "lord-fand", s->fand);
+    jb(&b, &h, "axia-netperm", s->netperm); jb(&b, &h, "axia-fand", s->fand);
     hb_printf(&b, "}}");
 
     hb_printf(&b, "}\n");
@@ -223,7 +223,7 @@ char *sysreport_markdown(const SysReport *r) {
     char t[256], u[64];
     const SrMachine *m = &r->machine;
     hb_printf(&b, "# System report\n\n");
-    hb_printf(&b, "Made on %s by LordOS's System Information (schema %d). It lists the hardware and what the system made of it; it holds no serial numbers, addresses, host or user names.\n\n", r->date, r->schema);
+    hb_printf(&b, "Made on %s by Axia DE's System Information (schema %d). It lists the hardware and what the system made of it; it holds no serial numbers, addresses, host or user names.\n\n", r->date, r->schema);
 
     hb_printf(&b, "## Overview\n\n| | |\n|---|---|\n");
     two(t, sizeof t, m->vendor, m->product);
@@ -238,7 +238,7 @@ char *sysreport_markdown(const SysReport *r) {
     hb_printf(&b, "| Secure Boot |"); cell(&b, m->secure_boot < 0 ? "" : m->secure_boot ? "on" : "off"); hb_printf(&b, "\n");
     hb_printf(&b, "| System |"); cell(&b, r->sw.os); hb_printf(&b, "\n");
     hb_printf(&b, "| Kernel |"); cell(&b, r->sw.kernel); hb_printf(&b, "\n");
-    hb_printf(&b, "| LordOS |"); cell(&b, r->sw.lordos); hb_printf(&b, "\n");
+    hb_printf(&b, "| Axia DE |"); cell(&b, r->sw.lordos); hb_printf(&b, "\n");
     if (r->sw.live || r->sw.boot_medium[0]) {
         static const char *const media[][2] = {
             { "internal", "an internal disk" }, { "usb", "a USB drive" }, { "sd", "an SD card" },
@@ -370,7 +370,7 @@ char *sysreport_markdown(const SysReport *r) {
     }
 
     const SrSoftware *s = &r->sw;
-    hb_printf(&b, "## Kernel features LordOS uses\n\n| | |\n|---|---|\n");
+    hb_printf(&b, "## Kernel features Axia DE uses\n\n| | |\n|---|---|\n");
     hb_printf(&b, "| Security modules |"); cell(&b, s->lsm); hb_printf(&b, "\n");
     if (s->landlock_abi >= 0) { snprintf(t, sizeof t, "%d", s->landlock_abi); hb_printf(&b, "| Landlock ABI |"); cell(&b, s->landlock_abi ? t : "unavailable"); hb_printf(&b, "\n"); }
     hb_printf(&b, "| cgroup v2 |"); cell(&b, s->cgroup2 ? "yes" : "no"); hb_printf(&b, "\n");

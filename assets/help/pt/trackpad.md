@@ -6,7 +6,7 @@ keywords: touchpad, trackpad, gestos, toque, rolagem, pinça
 ---
 # Touchpad e tela sensível ao toque
 
-O LordOS controla touchpads e telas sensíveis ao toque com o seu próprio driver.
+O Axia DE controla touchpads e telas sensíveis ao toque com o seu próprio driver.
 
 ## Gestos
 

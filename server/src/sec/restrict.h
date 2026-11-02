@@ -4,13 +4,13 @@
  * Settings → Privacy → "Apps' network" lets the owner restrict an app: "no camera", "no
  * microphone"… (FW_R_* in fw/rules.h, stored in firewall.json by lord.fw). A restriction is
  * stronger than any permission: a restricted app is denied without a prompt, even if the user
- * allowed the permission before. The network ones are applied in the kernel by lord-netperm; the
+ * allowed the permission before. The network ones are applied in the kernel by axia-netperm; the
  * others are checked here, by the code that hands out the resource:
  *
  *   isolated apps (.lpk and Passwords), firewall id "lpk:<id>": the broker (brokersrv.c,
  *     brokercam.c) for camera, microphone, screen, USB (the FIDO2 key of Passwords), the file
  *     picker (powerbox) and reading the clipboard;
- *   built-in apps inside lord-server, firewall id "lordos": js_media.c (camera, microphone,
+ *   built-in apps inside axia-server, firewall id "lordos": js_media.c (camera, microphone,
  *     screen capture and recording).
  *
  * Linux apps (desktop:<id>) are not sandboxed: they reach devices directly, so only the network

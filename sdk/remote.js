@@ -1,6 +1,6 @@
 // remote.js — remote desktop: who is watching this session from the network, and the on-screen notice.
 //
-// lord-server notifies (__lordRemote) every time someone connects or disconnects through the
+// axia-server notifies (__lordRemote) every time someone connects or disconnects through the
 // remote desktop (lord-sessiond, docs/REMOTE.md). <RemoteBadge /> is mounted by startShell: a
 // fixed notice at the top right while there are connections, in every theme.
 //

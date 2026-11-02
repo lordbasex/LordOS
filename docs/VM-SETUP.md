@@ -88,7 +88,7 @@ sudo apt-get install -y --no-install-recommends build-essential
 ```
 
 It brings gcc 14.2, make, libc6-dev and linux-libc-dev (headers `drm/drm_mode.h`, `linux/input.h`).
-Nothing else is needed: `lord-server` only links `libc` and `libm` (verified with `ldd`).
+Nothing else is needed: `axia-server` only links `libc` and `libm` (verified with `ldd`).
 There is no `rsync` on the VM; the code is copied with `tar` over SSH:
 
 ```sh
@@ -100,7 +100,7 @@ COPYFILE_DISABLE=1 tar czf - --exclude build server | \
 
 ```sh
 # on the VM
-sudo ./build/lord-server --timeout 60 [--debug]
+sudo ./build/axia-server --timeout 60 [--debug]
 ```
 
 From the Proxmox host:
@@ -130,7 +130,7 @@ On the development machine: `npm install && npm run build` (generates `themes/de
 COPYFILE_DISABLE=1 tar czf - --no-xattrs --exclude build --exclude node_modules --exclude legacy \
   server third_party assets themes | ssh lord@172.17.0.51 'cd ~/LordOS && tar xzf - && make -C server -j4'
 # on the VM, from ~/LordOS/server:
-sudo ./build/lord-server [--profile]      # --profile: per-primitive timings and % repainted
+sudo ./build/axia-server [--profile]      # --profile: per-primitive timings and % repainted
 ```
 
 No new package was installed for M2: QuickJS, stb and Inter are inside the repo.
@@ -144,9 +144,9 @@ mkdir -p ~/Escritorio ~/Documentos ~/Descargas ~/Imágenes ~/Música ~/Videos
 ```
 
 Deployment: same as step 6. There is no need to copy `apps/`, `sdk/` or `runtime/` to the VM
-because they are inside each theme's bundle; do copy the whole `themes/`. `sudo ./build/lord-server` starts as
+because they are inside each theme's bundle; do copy the whole `themes/`. `sudo ./build/axia-server` starts as
 root and switches to `lord` (visible in the log: `running as lord (uid 1000)`). User settings:
-`~/.config/lordos/settings.json`.
+`~/.config/axia/settings.json`.
 
 QMP testing: `tools/lord-qmp-input.py` now accepts `rdown`/`rup` (right click) and
 `wheelup`/`wheeldown`. Keyboard: `echo "sendkey f4" | qm monitor 115` (HMP `sendkey`
@@ -156,7 +156,7 @@ No new package was installed for M3.
 
 ## Step 8 — M4: native terminal
 
-No package was installed: the terminal is part of `lord-server` and uses the `bash` Debian
+No package was installed: the terminal is part of `axia-server` and uses the `bash` Debian
 already ships. The whole `assets/` (JetBrains Mono fonts and
 `assets/shell/lord-bash.sh`) has to be copied in addition to `server/` and `themes/`.
 
@@ -204,8 +204,8 @@ A minimal `~/.zshrc` was created for zsh (without one, zsh opens its first-run w
 Restarting the server **without losing the terminals** (the shells stay in their holders):
 
 ```sh
-sudo pkill -x lord-server        # SIGTERM: saves screens and leaves the shells alive
-cd ~/LordOS/server && sudo setsid -f sh -c "./build/lord-server > /tmp/lord.log 2>&1 < /dev/null"
+sudo pkill -x axia-server        # SIGTERM: saves screens and leaves the shells alive
+cd ~/LordOS/server && sudo setsid -f sh -c "./build/axia-server > /tmp/lord.log 2>&1 < /dev/null"
 ls /run/user/1000/lordos-term/   # one .sock (and .state) per live session
 ```
 
@@ -221,7 +221,7 @@ sudo apt-get install -y --no-install-recommends libxkbcommon-dev xkb-data libx11
 
 | Package | Version | What for |
 |---|---|---|
-| `libxkbcommon-dev` (brings `libxkbcommon0`) | 1.7.0 | keyboard: lord-server links `-lxkbcommon` |
+| `libxkbcommon-dev` (brings `libxkbcommon0`) | 1.7.0 | keyboard: axia-server links `-lxkbcommon` |
 | `xkb-data` | 2.42 | every keyboard layout |
 | `libx11-data` | 1.8.12 | data only: compose tables (dead keys) in `/usr/share/X11/locale` |
 
@@ -231,7 +231,7 @@ the tests: the `pt_BR.UTF-8` and `es_AR.UTF-8` regions (`locale-gen`), `/etc/def
 and `mythes-pt-br`. The time zone was tested by changing it to America/Sao_Paulo and set back to
 America/Argentina/Buenos_Aires.
 
-The helper (a `lord-server` child that stays root) only exists if the server was started with
+The helper (a `axia-server` child that stays root) only exists if the server was started with
 sudo; the user `lord` is in the `sudo` group, which is what it requires to serve requests.
 
 ## Step 11 — M5b: complex scripts and input methods
@@ -270,7 +270,7 @@ sudo apt-get install -y --no-install-recommends libwayland-dev wayland-protocols
 
 | Package | Version | What for |
 |---|---|---|
-| `libwayland-dev` (brings `libwayland-server0`) | 1.23.1 | lord-server links `-lwayland-server` |
+| `libwayland-dev` (brings `libwayland-server0`) | 1.23.1 | axia-server links `-lwayland-server` |
 | `wayland-protocols` | 1.44 | xdg-shell and xdg-decoration XML |
 | `libwayland-bin` | 1.23.1 | `wayland-scanner`: generates the protocol code at build time |
 
@@ -296,7 +296,7 @@ systemctl --user enable --now pipewire pipewire-pulse wireplumber
 
 | Package | What for |
 |---|---|
-| `pipewire`, `pipewire-pulse`, `wireplumber` | sound server; lord-server talks to it over the PulseAudio protocol |
+| `pipewire`, `pipewire-pulse`, `wireplumber` | sound server; axia-server talks to it over the PulseAudio protocol |
 | `pipewire-alsa` | apps that use ALSA directly go through PipeWire |
 | `pulseaudio-utils`, `sound-theme-freedesktop` | testing only (`pactl`, `paplay` and `.oga` sounds) |
 
@@ -413,17 +413,17 @@ See `SESSIONS.md` and `REMOTE.md`. On VM 118 (172.17.0.53):
 ```sh
 sudo apt-get install -y --no-install-recommends libssl-dev      # to build lord-sessiond
 sudo apt-get install -y --no-install-recommends libgbm-dev libegl-dev libgles-dev libgl1-mesa-dri   # GPU path
-make -C server -j4                                              # lord-server and lord-sessiond
+make -C server -j4                                              # axia-server and lord-sessiond
 # test install, root-owned (lord-sessiond only starts sessions with root-owned binaries):
 sudo install -d /usr/local/lib/lordos/bin
-sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/lord-server /usr/local/lib/lordos/bin/
+sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/axia-server /usr/local/lib/lordos/bin/
 sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/local/lib/lordos
 ```
 
 - `lordos.service` (`/etc/systemd/system`): `ExecStart=/usr/local/lib/lordos/bin/lord-sessiond`,
   `ExecReload=/bin/kill -HUP $MAINPID`, `KillMode=process`, `Conflicts=getty@tty1.service`.
   Enabled.
-- The first version's `lordos-remote.service` and the hand-launched `lord-server` were removed.
+- The first version's `lordos-remote.service` and the hand-launched `axia-server` were removed.
 - `/etc/default/keyboard` with `XKBLAYOUT="us"`: it is the login screen's layout.
   Without that file it uses `latam`, LordOS's.
 - **Test users:**
@@ -431,7 +431,7 @@ sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/
   - the passwords of `lord` and `bob` are test-only, for logging in through the monitor and the web.
 - `lordos-greeter` is created by `lord-sessiond`.
 - The card is `virtio_gpu` without 3D: by default the monitor's session composites on the CPU, just like
-  the old lord-server. To test the GPU path with llvmpipe,
+  the old axia-server. To test the GPU path with llvmpipe,
   `/etc/systemd/system/lordos.service.d/gpu.conf` with `Environment=LORD_GPU=1` is used.
 - `/etc/lordos/remote/config`: `enabled=1` after the Settings → Sharing test,
   `port=5673`.
@@ -465,12 +465,12 @@ qm start 122
 - **Kernel**: `6.12.111+deb13-amd64` with Landlock ABI 6 (`/usr/include/linux/landlock.h`), seccomp
   and cgroup v2 (`cpu memory pids` delegated in `user@1000.service`). Nothing had to be installed
   for isolation: it is all kernel and libc.
-- `libssl-dev` only to build `lord-sessiond` (as on 118); `lord-server` doesn't link it.
+- `libssl-dev` only to build `lord-sessiond` (as on 118); `axia-server` doesn't link it.
 - **`lord-sessiond` with delegated cgroups** (as on 118, plus `Delegate=yes`):
 
   ```sh
   sudo install -d /usr/local/lib/lordos/bin
-  sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/lord-server /usr/local/lib/lordos/bin/
+  sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/axia-server /usr/local/lib/lordos/bin/
   sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/local/lib/lordos
   echo "AUTOLOGIN=lord" | sudo tee /etc/lordos/session.conf
   ```
@@ -483,7 +483,7 @@ qm start 122
   login screen's latam layout); `/etc/lordos/remote/config` with `enabled=1`,
   `port=5673`. Browser logins were tested with the `ws_test.py` client (TLS +
   WebSocket with Python's standard library).
-- **Without `lord-sessiond`** (a standalone `lord-server` with sudo, as in development) there is no delegated
+- **Without `lord-sessiond`** (a standalone `axia-server` with sudo, as in development) there is no delegated
   subtree: apps run without a cgroup, with a warning (expected fallback).
 - **Test apps installed:** `tests/lpk-evil` (unsigned) and `tests/lpk-legit` (signed with the
   development key), plus Fractal; FeatherPad and foot were already there (from 115).
@@ -522,7 +522,7 @@ sudo apt-get install -y --no-install-recommends libgbm-dev libegl-dev libgles-de
 sudo apt-get install -y --no-install-recommends bc             # only for the measurements (~/cpu.sh)
 make -C server -j4 && make -C server test
 sudo install -d /usr/local/lib/lordos/bin /etc/lordos
-sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/lord-server /usr/local/lib/lordos/bin/
+sudo install -m 755 -o root -g root server/build/lord-sessiond server/build/axia-server /usr/local/lib/lordos/bin/
 sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/local/lib/lordos
 ```
 
@@ -540,7 +540,7 @@ sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/
   - Firefox ESR (already on 115) opening `www.bbc.co.uk`;
   - load with `dd` and shell loops.
 - **Measurement scripts:**
-  - `~/cpu.sh SEC`: CPU % of `lord-server`;
+  - `~/cpu.sh SEC`: CPU % of `axia-server`;
   - `~/thr.sh SEC`: the same, per thread.
 - **No network touched:** no port was opened and `eth0`'s network wasn't changed (only the IP via
   cloud-init when cloning).
@@ -554,7 +554,7 @@ See `TRACKPAD.md`. On VM 123 (172.17.0.55):
 - `chromium` (155, from Debian) was already on the VM and was used to test pinch over Wayland;
 - `/dev/uinput` comes with Debian's kernel;
 - `linux-perf` was installed (`apt-get install --no-install-recommends linux-perf`), only to measure
-  where `lord-server` spends CPU while moving the map (`perf record --call-graph dwarf`);
+  where `axia-server` spends CPU while moving the map (`perf record --call-graph dwarf`);
 - `tpsim play --mouse ...` simulates a high-resolution wheel mouse; hot plugging and unplugging
   is tested with `tpsim play` (it creates the device, plays back and removes it);
 - Fractal 1.1.0 (`examples/apps/fractal`, unsigned) was installed from Files → Store, to
@@ -588,7 +588,7 @@ sudo install -m 755 tests/touchpad-sim/tpsim /usr/local/bin/tpsim
 On **VM 116** (172.17.0.52), in a separate folder, `~/LordOS-m9`: `~/LordOS-iso` and its build
 environment were not touched.
 
-**To build `lord-doc`** (the documents helper, `DOCUMENTS.md`):
+**To build `axia-doc`** (the documents helper, `DOCUMENTS.md`):
 
 ```sh
 sudo apt-get install -y --no-install-recommends libpoppler-glib-dev libarchive-dev pkg-config
@@ -596,10 +596,10 @@ sudo apt-get install -y --no-install-recommends libpoppler-glib-dev libarchive-d
 
 | Package | Version | What for |
 |---|---|---|
-| `libpoppler-glib-dev` (brings `libpoppler-glib8t64`, `libcairo2-dev`, `libglib2.0-dev`, FreeType and fontconfig) | 25.03.0 | `lord-doc`: PDF |
-| `libarchive-dev` (brings `libarchive13t64`) | 3.7.4 | `lord-doc`: archives |
+| `libpoppler-glib-dev` (brings `libpoppler-glib8t64`, `libcairo2-dev`, `libglib2.0-dev`, FreeType and fontconfig) | 25.03.0 | `axia-doc`: PDF |
+| `libarchive-dev` (brings `libarchive13t64`) | 3.7.4 | `axia-doc`: archives |
 
-Without those `-dev` packages, `make -C server` builds everything else and skips `build/lord-doc` (`DOCHELPER=0`).
+Without those `-dev` packages, `make -C server` builds everything else and skips `build/axia-doc` (`DOCHELPER=0`).
 
 **For printing** (`PRINTING.md`):
 
@@ -632,15 +632,15 @@ sudo systemd-run --unit=lord-test-escl-mdns --uid=lord avahi-publish -s "Escáne
 **The session on VM 116**, as in step 15:
 
 - `lordos.service` (lord-sessiond) was installed with `Delegate=yes`;
-- the binaries go in `/usr/local/lib/lordos/bin`: `lord-sessiond`, `lord-server` and
-  **`lord-doc`**, which has to sit next to `lord-server`;
+- the binaries go in `/usr/local/lib/lordos/bin`: `lord-sessiond`, `axia-server` and
+  **`axia-doc`**, which has to sit next to `axia-server`;
 - `/etc/default/keyboard` with `XKBLAYOUT="us"`;
 - `lord`'s password is test-only, for logging in through the login screen.
 
 With `KillMode=process`, restarting requires stopping the sessions too:
 
 ```sh
-sudo systemctl stop lordos; sudo pkill -x lord-server; sudo pkill -x lord-sessiond
+sudo systemctl stop lordos; sudo pkill -x axia-server; sudo pkill -x lord-sessiond
 sudo systemctl reset-failed lordos; sudo systemctl start lordos
 ```
 
@@ -653,13 +653,13 @@ are left in its cgroup.
 - `~/Documentos/Formulario.pdf`: the form from `/usr/share/cups/data`;
 - `~/Descargas`: the archives from `tests/make_evil_archives.py`;
 - `Lobster-Regular.ttf`: an OFL font from google/fonts, for installing.
-- Measurements: the file `~/.cache/lordos/doc-trace` turns on lord-doc's timing log.
+- Measurements: the file `~/.cache/axia/doc-trace` turns on axia-doc's timing log.
 
 ## Step 19 — M9: media (VM 119 `lordos-spot`)
 
 See `MEDIA.md`. VM 119 (172.17.0.54), a clone of the development VM, was set aside for media.
 
-**Build** (`lord-media`; without these `-dev` packages, `make` builds everything else without it):
+**Build** (`axia-media`; without these `-dev` packages, `make` builds everything else without it):
 
 ```sh
 sudo apt-get install -y --no-install-recommends libavcodec-dev libavformat-dev libavutil-dev \
@@ -670,7 +670,7 @@ At run time: `libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 
 libva-drm2`. For VA-API with AMD or Intel, also `mesa-va-drivers` (it doesn't help on the VM: 2D virtio-gpu
 has no driver, and `vainfo` fails).
 
-**Installed like the `.deb`:** `lord-sessiond`, `lord-server` and `lord-media` (root-owned) in
+**Installed like the `.deb`:** `lord-sessiond`, `axia-server` and `axia-media` (root-owned) in
 `/usr/lib/lordos/bin`, with the themes and `assets` in `/usr/lib/lordos`.
 - `lordos.service` is the one from `tools/iso/rootfs`, without `ExecStartPre`, plus
   `lordos.service.d/delegate.conf` with `Delegate=yes`.
@@ -734,7 +734,7 @@ See `WINDOWS.md` and `SOUND.md` (Real time). On VM 118 (172.17.0.53):
   `/etc/systemd/system/lordos.service.d/gpu-ventanas.conf` with `Environment=LORD_GPU=1`. It was added
   only for measuring and removed.
 
-## Step 20 — M8: per-app firewall, `lord-netperm` (VM 122 `lordos-sandbox`)
+## Step 20 — M8: per-app firewall, `axia-netperm` (VM 122 `lordos-sandbox`)
 
 See `FIREWALL.md`, step 2. On VM 122 (172.17.0.56), which already had `lord-sessiond` with
 `Delegate=yes`:
@@ -747,9 +747,9 @@ See `FIREWALL.md`, step 2. On VM 122 (172.17.0.56), which already had `lord-sess
 
   ```sh
   make -C server -j4 && make -C server test
-  sudo install -m 755 -o root -g root server/build/lord-netperm server/build/lord-server /usr/local/lib/lordos/bin/
-  sudo install -m 644 lord-netperm.service /etc/systemd/system/      # the unit from FIREWALL.md (ExecStart in /usr/local/lib/lordos/bin)
-  sudo systemctl daemon-reload && sudo systemctl enable --now lord-netperm
+  sudo install -m 755 -o root -g root server/build/axia-netperm server/build/axia-server /usr/local/lib/lordos/bin/
+  sudo install -m 644 axia-netperm.service /etc/systemd/system/      # the unit from FIREWALL.md (ExecStart in /usr/local/lib/lordos/bin)
+  sudo systemctl daemon-reload && sudo systemctl enable --now axia-netperm
   ```
 
   The unit is the same one that goes into the ISO (the text was handed to the main session). It has
@@ -759,7 +759,7 @@ See `FIREWALL.md`, step 2. On VM 122 (172.17.0.56), which already had `lord-sess
 - **Restarting `lordos.service`:** with `KillMode=process`, a `systemctl restart` leaves session
   processes behind and systemd can't start the service again ("Device or resource busy"). What was done:
   `systemctl kill -s KILL --kill-whom=all lordos`, `reset-failed` and `start`. To have it log in
-  by itself again, `/run/lordos/autologin-done` was deleted. `lord-netperm` reattaches by itself
+  by itself again, `/run/lordos/autologin-done` was deleted. `axia-netperm` reattaches by itself
   to the new cgroup.
 - **Tests only:**
   - `~/.local/share/applications/nptest.desktop` ("Prueba de red"): `foot -e ~/bin/nptest-loop.sh`,
@@ -769,7 +769,7 @@ See `FIREWALL.md`, step 2. On VM 122 (172.17.0.56), which already had `lord-sess
     downloaded from the internet.
 - **No network touched:** neither eth0 nor nftables rules. The hooks are cgroup hooks and only
   reach the apps in LordOS sessions.
-- **`systemd-run --user` escape (M8 follow-up, no new packages).** `lord-netperm` now also attaches
+- **`systemd-run --user` escape (M8 follow-up, no new packages).** `axia-netperm` now also attaches
   to each session user's `user@<uid>.service` and applies the per-user restriction union there (see
   `FIREWALL.md`, «Escape via `systemd-run --user`»). Tested as the restricted app `desktop:aisla`
   ("no internet"): `systemd-run --user --scope curl`, `systemd-run --user curl` (service) and
@@ -797,10 +797,10 @@ See `PASSWORDS.md`. Everything was built in a new folder, `~/LordOS-pw` (the wor
 `~/LordOS-pw-ctap`, `~/LordOS-pw-dbus`, `~/LordOS-pw-kdbx` and `~/LordOS-pw-qr`); `~/LordOS-iso`
 and `~/LordOS-m9` were not touched.
 
-- **Deploy:** `make -C server` in `~/LordOS-pw`, then `lord-server`, `lord-sessiond`,
-  `lord-vault` (new) and `lord-doc` installed into `/usr/local/lib/lordos/bin` (root, 755), and
+- **Deploy:** `make -C server` in `~/LordOS-pw`, then `axia-server`, `lord-sessiond`,
+  `axia-vault` (new) and `axia-doc` installed into `/usr/local/lib/lordos/bin` (root, 755), and
   `themes/` and `assets/` copied to `/usr/local/lib/lordos/`. Restarting the service needs the
-  sessions killed first (`KillMode=process`): `systemctl stop lordos`, `pkill -x lord-server`,
+  sessions killed first (`KillMode=process`): `systemctl stop lordos`, `pkill -x axia-server`,
   `reset-failed`, `start`.
 - **Test user** `pwtest` (`useradd -m -s /bin/bash -c "Prueba Contraseñas" pwtest`, test-only
   password) so the login password path (`RP_KEYRING` → `login.lvault`) could be tested without
@@ -813,7 +813,7 @@ and `~/LordOS-m9` were not touched.
   | `chromium` | 155.0.8059.79-1~deb13u1 | saving and autofilling a login through the Secret Service |
   | `keepassxc-minimal` | 2.7.10+dfsg1-1 | creating the KDBX test files (`server/tests/import/`) |
   | `python3-venv` | 3.13.5-1 | a venv in `~/LordOS-pw-kdbx/venv` with pykeepass 4.2.0 for KDBX 4 variants |
-  | `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | Debian 13 | building `lord-media`, so LordOS screenshots work for the protected-window capture |
+  | `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`, `libswresample-dev` | Debian 13 | building `axia-media`, so LordOS screenshots work for the protected-window capture |
 
 - **FIDO2:** `/etc/udev/rules.d/71-lordos-fido.rules` (the rule in `PASSWORDS.md`); the software
   authenticator `server/build/softfido` (from `tests/fido-soft/softfido.c`) runs as root on
@@ -845,8 +845,8 @@ RAM and disappears on reboot.
   `device_del`). It's installed from the session's Terminal (`sudo tar xf /dev/sdX -C /tmp` and
   `instalar-pulido-120.sh`, which copies `bin`, `themes` and `assets` to `/usr/lib/lordos` and
   restarts `lordos.service`).
-- **Libraries:** the 0.7.0 ISO doesn't have the runtime libraries of the current `lord-doc` and
-  `lord-media` (Poppler, libarchive, FFmpeg and their dependencies), so the PDF Viewer, Fonts and the
+- **Libraries:** the 0.7.0 ISO doesn't have the runtime libraries of the current `axia-doc` and
+  `axia-media` (Poppler, libarchive, FFmpeg and their dependencies), so the PDF Viewer, Fonts and the
   Photos thumbnails failed (`libpoppler-glib.so.8: cannot open shared object file`). The libraries
   that were missing were copied from a Debian 13 container (`cp -n` into
   `/usr/lib/x86_64-linux-gnu`, then `ldconfig`). They aren't installed with `apt`.
@@ -854,7 +854,7 @@ RAM and disappears on reboot.
 - **Sample content** in `/home/lordos`: generated photos in `Imágenes` (with `Viajes` and `Familia`
   subfolders), `Documentos/Guia-LordOS.pdf` (5 pages with an outline), five notes in `Notas`, a
   small project in `Proyectos/lordos-demo`, and the Arabic test pack in
-  `~/.local/share/lordos/locales/ar`.
+  `~/.local/share/axia/locales/ar`.
 - **Screenshots:** a scratch-only harness (never in the repo) bundled into the test theme. F9/F8
   step through 30 scenarios (6 apps × dark, light, RTL, minimum size, large), F7 opens a Terminal
   and F6 shows a glyph test. Captured with `screendump` from the Proxmox monitor.
@@ -878,7 +878,7 @@ RAM and disappears on reboot.
   icon view in English and Arabic, the demo in LTR and RTL, the Dock's minimize effect slowed down to 6 s,
   and the Player); sample files with long English, Arabic, Hebrew, Thai and emoji names in
   `Documentos/Largos`. The drag was measured with a small static C uinput tablet (the live ISO has no
-  `python3`) run with `sudo` from the Terminal, switching only `lord-server` between the two builds.
+  `python3`) run with `sudo` from the Terminal, switching only `axia-server` between the two builds.
   Nothing is installed with `apt`. Once a React error in the scratch demo app (no `Icon` export) left the
   session black; `system_reset` from the Proxmox monitor brought the live ISO back and the build was
   deployed again.
@@ -893,20 +893,20 @@ isolated app»). On VM 122 (172.17.0.56):
     doesn't ship v4l2loopback; DKMS built and signed it);
   - `ffmpeg` 7.1.5 and `v4l-utils` 1.30.1, to feed and inspect the virtual camera;
   - `libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev`, to
-    build `lord-media` (as in step 19).
+    build `axia-media` (as in step 19).
 - **Virtual camera:** `/etc/modules-load.d/v4l2loopback.conf` (`v4l2loopback`) and
   `/etc/modprobe.d/v4l2loopback.conf` (`video_nr=10 card_label="Camara virtual (v4l2loopback)"
   exclusive_caps=1`) → `/dev/video10` (group `video`). The service
   `/etc/systemd/system/lordos-test-camfeed.service` (enabled) runs `ffmpeg -re -f lavfi -i
   testsrc2=size=1280x720:rate=30 -pix_fmt yuyv422 -f v4l2 /dev/video10`.
 - **`lordos.service`:** added `DelegateSubgroup=supervisor` (as in the ISO's unit).
-  `/usr/local/lib/lordos/bin` now also has `lord-media`.
+  `/usr/local/lib/lordos/bin` now also has `axia-media`.
 - **Test apps and files (test only):**
   - `~/.local/share/applications/aisla.desktop` («Prueba de aislamiento»): `foot -e
     ~/bin/escape-aisla-122.sh`, which tries to leave its scope and checks the network before and
-    after; `~/.config/lordos/firewall.json` restricts `desktop:aisla` (no internet, no incoming);
+    after; `~/.config/axia/firewall.json` restricts `desktop:aisla` (no internet, no incoming);
   - `tests/lpk-legit` 1.1.0 (camera, «New window») unpacked into
-    `~/.local/share/lordos/apps/grabadora`;
+    `~/.local/share/axia/apps/grabadora`;
   - `~/foto.jpg` and `~/video.mp4`, saved through the powerbox during the test.
 - **Scripts:** `~/deploy-aisla-122.sh [full]` (installs the build; `full` stops/kills
   `lordos.service`, clears `/run/lordos/autologin-done` and starts it) and
@@ -940,7 +940,7 @@ See `SETTINGS.md`. On VM 118 (172.17.0.53), which already had `lord-sessiond` wi
   without it WirePlumber never enables Bluetooth audio). The ISO needs the same file in
   `/etc/wireplumber/wireplumber.conf.d/`.
 - **Files written by the tests:** `/etc/systemd/logind.conf.d/lordos.conf` (power button back to
-  `poweroff`, lid `suspend`: logind's defaults), `~/.config/lordos/displays.json` (1280×800),
+  `poweroff`, lid `suspend`: logind's defaults), `~/.config/axia/displays.json` (1280×800),
   `~/.config/mimeapps.list` (Firefox ESR as browser, Mousepad as text editor),
   `~/Escritorio/nota-ajustes.txt`. NTP was turned off and on again; the clock was set by hand once.
 - **Screenshots** with `qm monitor 118` (`screendump`, converted to PNG on the development machine) and the mouse
@@ -953,7 +953,7 @@ system"). VM 119 still runs LordOS installed like the `.deb` (step 19). It was n
 the ISO.
 
 **Deploy:** the tree is copied to `~/LordOS-sis` (only changed files, so `make` never keeps stale
-objects), built with `make -C server -j4`, and `lord-server`, `lord-sessiond`, `lord-media` and the
+objects), built with `make -C server -j4`, and `axia-server`, `lord-sessiond`, `axia-media` and the
 new `lord-netd` are installed root-owned in `/usr/lib/lordos/bin`, with the themes and `assets`.
 
 **Proxmox change (approved by main):** `qm set 119 --sata1 local-lvm:8`, an 8 GB SATA disk (`sdb`,
@@ -1008,13 +1008,13 @@ device and the temporary locale files were removed.
 Local test servers only, all on 127.0.0.1 inside the VM; no real accounts. Details in `MAIL.md`.
 
 1. **Packages:** `dovecot-imapd dovecot-lmtpd postfix radicale apache2-utils python3-bcrypt openssl
-   ca-certificates` (and `gdb` for debugging). To build `lord-maild`: `libssl-dev`.
+   ca-certificates` (and `gdb` for debugging). To build `axia-maild`: `libssl-dev`.
 2. **Names:** `127.0.0.1 mail.lordos.test dav.lordos.test lordos.test` in `/etc/hosts`.
 3. **Test CA:** in `/etc/lordos-test-mail/`, a CA (`ca.crt`) and a server certificate for those
    three names (SAN, `extendedKeyUsage=serverAuth`), plus a self-signed `bad.crt` to try the
    certificate warning. The CA goes to `/usr/local/share/ca-certificates/lordos-test-mail-ca.crt`
    and `update-ca-certificates`. (It has no `keyUsage`: Python ≥ 3.13 clients need
-   `ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT`; OpenSSL in `lord-maild` accepts it.)
+   `ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT`; OpenSSL in `axia-maild` accepts it.)
 4. **Dovecot 2.4** (`/etc/dovecot/local.conf`): `listen = 127.0.0.1`, `protocols = imap lmtp`,
    virtual users from `/etc/dovecot/users` (passwd-file, SHA512-CRYPT, uid/gid 5000 `vmail`,
    `mail_home = /var/vmail/%{user | username}`, Maildir), `ssl = required`,
@@ -1071,7 +1071,7 @@ screen. Results and screenshots: `docs/qa/` (`all-apps.png`, `settings-pages.png
   the headers to rebuild `v4l2loopback` for the virtual camera (`/dev/video10`).
 - **The package instead of `/usr/local`:** `tools/iso/mkdeb.sh /tmp/lordos-qa-122.deb` and
   `apt-get install /tmp/lordos-qa-122.deb` (this validates `Depends`). The VM's own units in
-  `/etc/systemd/system` (`lordos.service`, `lord-netperm.service`, pointing at `/usr/local/lib/lordos`)
+  `/etc/systemd/system` (`lordos.service`, `axia-netperm.service`, pointing at `/usr/local/lib/lordos`)
   were moved aside to `*.qa-122.bak` so the package's units in `/usr/lib/systemd/system` are used;
   both enabled. `/usr/local/lib/lordos` is left in place, unused.
 - **Login screen instead of autologin:** `/etc/lordos/session.conf` is `AUTOLOGIN=` (the previous
@@ -1098,9 +1098,9 @@ See `FIREWALL.md`, "Linux apps". Tree in `~/LordOS-fwlinux`, built there (`make 
   `libnotify-bin` (`notify-send`, `notify.sh`), `libglib2.0-bin` (`gdbus`, the
   `StartTransientUnit` escape test), `ristretto` (an image viewer for the "what breaks" check),
   `alsa-utils` (`arecord`, `mic.sh`).
-- **Installed:** `server/build/lord-netperm` in `/usr/lib/lordos/bin/` and
-  `tools/iso/rootfs/etc/systemd/system/lord-netperm.service` in `/etc/systemd/system/`, enabled
-  (this VM didn't have the service). The session's `lord-server` was not replaced: the launcher,
+- **Installed:** `server/build/axia-netperm` in `/usr/lib/lordos/bin/` and
+  `tools/iso/rootfs/etc/systemd/system/axia-netperm.service` in `/etc/systemd/system/`, enabled
+  (this VM didn't have the service). The session's `axia-server` was not replaced: the launcher,
   notification and PipeWire code were tested with their test tools (`build/launch-cli`,
   `build/notifyd-cli`, `build/pwguard-cli`), which run the same source files.
 - **Devices:** the VM's `v4l2loopback` camera (`/dev/video10`), its USB buses, `/dev/hidraw0`,
@@ -1112,7 +1112,7 @@ See `FIREWALL.md`, "Linux apps". Tree in `~/LordOS-fwlinux`, built there (`make 
 ## Step 27 — Remote login (SSH) in Settings → Sharing (VM 122 `lordos-sandbox`, October 18)
 
 See `REMOTE.md`, "Remote login (SSH)". Tree in `~/LordOS-ssh` (sent with `tar`), only
-`make -C server build/lord-server`; that `lord-server`, the three theme bundles, `app-host` and
+`make -C server build/axia-server`; that `axia-server`, the three theme bundles, `app-host` and
 `assets/locales` were installed over `/usr/lib/lordos` after saving the previous ones.
 
 - **Packages:** `openssh-server` and `openssh-sftp-server` were purged with `apt-get` (test setup:
@@ -1123,7 +1123,7 @@ See `REMOTE.md`, "Remote login (SSH)". Tree in `~/LordOS-ssh` (sent with `tar`),
   `sshd_config` with `PasswordAuthentication no`) was restored from a backup, both LordOS drop-ins
   were removed and `ssh.service` was enabled again, so other agents' SSH access and known host
   keys are unchanged. `lord` was taken out of `sudo` for the standard-user test and put back. The
-  saved `lord-server`, themes and assets were restored and `~/LordOS-ssh` deleted.
+  saved `axia-server`, themes and assets were restored and `~/LordOS-ssh` deleted.
 - **Side effects:** the VM was rebooted twice (the reboot tests), which ended `bob`'s background
   session; `lord` ends at the login screen. Nothing in the network configuration was touched.
 
@@ -1168,12 +1168,12 @@ Tree in `~/LordOS-wp`, built there (`make -C server -j4`, `make -C server test`:
 3 skipped). Nothing was installed with apt.
 
 - **Deployment, temporary:** `/usr/local/lib/lordos` was copied to `lordos.wp123-bak`, the new
-  `lord-server`, `lord-sessiond`, `lord-vault`, `lord-maild`, the themes and `assets/` were installed
+  `axia-server`, `lord-sessiond`, `axia-vault`, `axia-maild`, the themes and `assets/` were installed
   over it, and the collection went to `/usr/share/backgrounds/lordos` with the
   `assets/wallpapers` link, as the package does. Afterwards the backup was copied back, the files
   that only the new build had were removed (`diff -rq` against the backup: identical), and
   `/usr/share/backgrounds/lordos` was deleted.
-- **New user:** `~/.config/lordos/settings.json` was replaced by `{"language": "en"}` for the
+- **New user:** `~/.config/axia/settings.json` was replaced by `{"language": "en"}` for the
   screenshots (Celestial by default, then Crystal Crown and light mode chosen in Settings) and
   restored from its backup (`wallpaper: "sunset"` again).
 - **Login screen:** the session from before the deploy was ended and `/run/lordos/autologin-done`
@@ -1184,7 +1184,7 @@ Tree in `~/LordOS-wp`, built there (`make -C server -j4`, `make -C server test`:
 
 See `MONITOR.md` ("Disk temperature and health") and `SYSTEM.md` ("SMART with smartmontools").
 
-- **Deploy:** the `v082-disks` tree built in `~/LordOS-dt082`; only `lord-server`, the themes and
+- **Deploy:** the `v082-disks` tree built in `~/LordOS-dt082`; only `axia-server`, the themes and
   `assets/locales` were installed in `/usr/lib/lordos`, after a backup
   (`/var/tmp/disktemp082-backup/lordos-before.tgz`), and put back from it afterwards.
 - **Test user:** `disktest` ("Disk Test", in the `sudo` group, a test-only password), created so the
@@ -1206,18 +1206,18 @@ rectangles"). On VM 119 (172.17.0.54), built in its own folders (`~/LordOS-monre
 the end.
 
 - **Installed:** `linux-perf` (`apt-get install --no-install-recommends linux-perf`), to find where
-  `lord-server` spends CPU while the map animates (`perf record -g -t <main thread>`). It stays
+  `axia-server` spends CPU while the map animates (`perf record -g -t <main thread>`). It stays
   installed.
-- **Deployed for the test, then restored:** `/usr/lib/lordos` (the session's `lord-server`, the
-  theme bundles, `assets`, and for the per-app history `lord-netperm` from the same tree, since the
+- **Deployed for the test, then restored:** `/usr/lib/lordos` (the session's `axia-server`, the
+  theme bundles, `assets`, and for the per-app history `axia-netperm` from the same tree, since the
   installed one predates the 0.8.1 traffic accounting) was saved in `/var/backups/lordos-monred-bak`
   and put back at the end (file list and contents compared with `diff -r`; the backup was then
-  deleted). `lord-netperm.service` was restarted with the original binary.
+  deleted). `axia-netperm.service` was restarted with the original binary.
 - **Session:** `/etc/lordos/session.conf` with `AUTOLOGIN=lord` (it didn't exist; removed at the
   end) and `/run/lordos/autologin-done` removed before each `systemctl restart lordos`, to start a
   fresh session with each build. The language (English), Appearance mode and Reduce motion were
   changed for the screenshots and measurements, and `settings.json` and `firewall.json` were
-  restored from a copy; the history file the test wrote (`~/.local/state/lordos`) was deleted. The
+  restored from a copy; the history file the test wrote (`~/.local/state/axia`) was deleted. The
   VM ends at the login screen.
 - **Traffic:** `curl --limit-rate 40k` loops to Debian mirrors in ten countries from the SSH
   session (stopped at the end), and Firefox ESR (already on the VM) opening a few sites and one
@@ -1228,8 +1228,8 @@ the end.
 ## Step 33 — Mail, Calendar, Contacts and Reminders in their own process (VM 118 `lordos-notes`, October 19)
 
 See `PRIVACY.md` ("System apps in their own process"). On VM 118 (172.17.0.53), tree in
-`~/LordOS-inmut2`, built there and installed into `/usr/local/lib/lordos` (`lord-server`,
-`lord-sessiond`, and `lord-maild` and `lord-vault`, which this VM's install didn't have, plus themes
+`~/LordOS-inmut2`, built there and installed into `/usr/local/lib/lordos` (`axia-server`,
+`lord-sessiond`, and `axia-maild` and `axia-vault`, which this VM's install didn't have, plus themes
 and assets) by `~/inst-inmut2-118.sh`; the previous tree was saved in
 `~/inmut2-backup-20261019/lordos` and put back at the end (files that only the new build added were
 removed, so `diff -r` against the backup is empty). Sessions were the autologin session of `lord`
@@ -1245,9 +1245,9 @@ removed, so `diff -r` against the backup is empty). Sessions were the autologin 
   and the `dovecot`/`dovenull` users are gone.
 - **Input:** a uinput tablet (`~/uinput-inmut2-118.py`, as a transient unit, now with right click)
   driven through `/run/uinput-inmut2`; screenshots with `screendump` from the Proxmox host.
-- **Undone at the end:** `~/.config/lordos/settings.json` (English UI and `debugTiming` for the
+- **Undone at the end:** `~/.config/axia/settings.json` (English UI and `debugTiming` for the
   tests) restored from the backup, the Mail restriction in `firewall.json` removed, and the test
-  data deleted (`~/.config/lordos/mail`, `~/.local/share/lordos/mail`, the four apps'
+  data deleted (`~/.config/axia/mail`, `~/.local/share/axia/mail`, the four apps'
   `appdata` folders, two files in `~/Documents`). Nothing in the network configuration was touched.
 
 ## Step 34 — 0.8.3: X11 apps with Xwayland (VM 118 `lordos-notes`, October 19)
@@ -1276,25 +1276,25 @@ See `WAYLAND.md` ("X11 apps (Xwayland)") and `PRIVACY.md` ("X11 apps"). Installe
 
 See `DESIGN.md` ("Lord Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
 `~/LordOS-classic`, built there (`make -C server`, `make -C server test`) and installed into
-`/usr/lib/lordos` (`lord-server`, `lord-media`, `lord-vault`, `lord-maild`, the theme bundles, the
+`/usr/lib/lordos` (`axia-server`, `axia-media`, `axia-vault`, `axia-maild`, the theme bundles, the
 app host, the system apps, `assets/{fonts,locales,shell,icons,mascot,monitor,help}` and the wallpaper
 JPEGs under `assets/wallpapers`, which this older install didn't have) by `~/deploy-classic-119.sh`.
 The installed tree was saved first in `/var/backups/lordos-classic-bak` and put back at the end.
 
 - **Nothing installed with apt.** No Proxmox or network setting was touched (`eth0` keeps 172.17.0.54).
 - **Session:** `/etc/lordos/session.conf` with `AUTOLOGIN=lord` (it didn't exist; removed at the
-  end). A fresh session needs the old one's `lord-server` ended first, then `/run/lordos/autologin-done`
+  end). A fresh session needs the old one's `axia-server` ended first, then `/run/lordos/autologin-done`
   removed and `systemctl restart lordos` (restarting the service alone keeps the open session).
 - **Screenshots and measurements:** a scratch-only harness (never in the repo) was built in front of
   both themes' bundles: it read `~/.cache/lordos-shot.json` and opened one app at a centered frame,
   switched theme, mode or language. Screenshots with `screendump` from the Proxmox host, the pointer
   with `lord-qmp-input.py 119 1280 800`, keys with `qm monitor 119` `sendkey`, holding
   `flock /tmp/sistema-119-screen.lock`. Window drags for the frame times with a QMP script in the
-  host's `/tmp` (deleted afterwards); lord-server's own `drag:` lines in `~/.cache/lordos/session.log`.
+  host's `/tmp` (deleted afterwards); axia-server's own `drag:` lines in `~/.cache/axia/session.log`.
 - **Test notifications** with `notify-send` (they live in the session's memory only).
 - **Undone at the end:** `/usr/lib/lordos` put back from the backup (the files the deploy added
   removed, the rest copied back; `diff -r` against the backup empty, then the backup deleted),
-  `~/.config/lordos/settings.json` restored from its copy, `~/.cache/lordos-shot*.json`,
+  `~/.config/axia/settings.json` restored from its copy, `~/.cache/lordos-shot*.json`,
   `~/shot-harness`, `~/deploy-classic-119.sh` and `~/LordOS-classic` deleted. The VM ends at the
   login screen.
 
@@ -1386,7 +1386,7 @@ and installed over `/usr/lib/lordos` by `~/deploy-brs-119.sh` (it saved `/usr/li
   end.
 - **Session:** `/etc/lordos/session.conf` with `AUTOLOGIN=lord` (it didn't exist; removed at the
   end), English and light in `settings.json` (restored at the end). A new session for the login-time
-  tidy-up: the session's `lord-server` ended, `/run/lordos/autologin-done` removed, `systemctl
+  tidy-up: the session's `axia-server` ended, `/run/lordos/autologin-done` removed, `systemctl
   restart lordos`.
 - **Browsers,** started from SSH in the session (`WAYLAND_DISPLAY=wayland-0`, the session bus,
   `GSETTINGS_BACKEND=keyfile`) by `~/brs-run.sh`, quit with `SIGTERM` (Chromium) or Ctrl+Q and
@@ -1471,10 +1471,10 @@ See `RASPBERRY.md` ("The LordOS kernel", "Switching kernels on a board") and `FI
     `lordos-prev/` once. Before the change: `/var/tmp/lordos-pik/config.txt.before` and
     `tryboot.txt.before`. First boot of `-3` through `tryboot`, then a normal boot, a `tryboot` into
     `-2` (69 modules loaded, everything active) and back.
-  - `lord-netperm` was still the 0.8.2 binary (not restarted by the 0.8.3 upgrade): restarted.
+  - `axia-netperm` was still the 0.8.2 binary (not restarted by the 0.8.3 upgrade): restarted.
   - Tests in `/var/tmp/lordos-pik` (tree copy in `src/`, logs): `netperm_cut.sh` as root with a
-    hand-made `lordos-session-0` cgroup (gone at the reboot; `/root/.config/lordos` removed), before
-    (12/15, the stall) and after (15/15); `verify-board`; `lord-fand` `FORCE 1`/`FORCE off`;
+    hand-made `lordos-session-0` cgroup (gone at the reboot; `/root/.config/axia` removed), before
+    (12/15, the stall) and after (15/15); `verify-board`; `axia-fand` `FORCE 1`/`FORCE off`;
     `make -C server test`.
   - Not changed: the network configuration, the `lordbasex` account, the partitions, `cmdline.txt`
     (this board's lacks `cgroup_enable=memory`, so `verify-board` reports the memory controller as
@@ -1497,7 +1497,7 @@ See `IMAGER.md`. Tree in `~/LordOS-imager`, built there (`make -C server`, `make
   `TRAN usb`, `RM 1`. Every write was preceded by `~/ImagerTest/vguard.sh sdc`, which prints the
   device and stops unless it is that gadget with the backing file's size. No other disk was written.
 - **Images:** the signed 0.8.1 release folder copied from the development machine, and 0.8.3
-  downloaded from GitHub by `imager-fetch` into `~/.cache/lordos/imager`.
+  downloaded from GitHub by `imager-fetch` into `~/.cache/axia/imager`.
 - **Session:** `/etc/lordos/session.conf` with `AUTOLOGIN=lord` (it didn't exist) and lord's
   `settings.json` set to English, both put back at the end; the locked `pwtest` session from an earlier
   test was ended by the service restarts.
@@ -1513,7 +1513,7 @@ See `IMAGER.md`. Tree in `~/LordOS-imager`, built there (`make -C server`, `make
   lord's `settings.json` restored, `lordos.service` restarted to the login screen; the gadget
   unloaded (`rmmod g_mass_storage dummy_hcd`), the bind mount and the scratch mount removed, and the
   scratch disk detached and deleted from the VM (`qm set 116 --delete scsi1`, then the unused volume
-  removed); `~/ImagerTest`, `~/.cache/lordos/imager`, `~/.config/LordOS Imager` and the test key and
+  removed); `~/ImagerTest`, `~/.cache/axia/imager`, `~/.config/LordOS Imager` and the test key and
   image files deleted. `~/LordOS-imager` (the tree) is kept, like the other agents' trees. No network
   or Proxmox setting other than the scratch disk was touched.
 
@@ -1587,9 +1587,9 @@ See `ISO.md`, "Release test (0.8.4 Beta, October 19–25)".
   published 0.8.2 one, same SHA-256) to make room. Built the arm64 package and the image in
   `/var/tmp/lordos-src-084` and `/var/tmp/lordos-rpi-v084c`. The installed LordOS went from 0.8.3 to
   0.8.4 with apt (from staging, then the source put back on the live repository), migration 005;
-  `lordos`, `lord-netperm` and `lord-fand` restarted, no reboot. The firewall cut test ran as root
+  `lordos`, `axia-netperm` and `axia-fand` restarted, no reboot. The firewall cut test ran as root
   with a hand-made `lordos-session-0` cgroup (removed afterwards, with the empty
-  `/root/.config/lordos` it created); the first-run check used a loop device on a decompressed copy
+  `/root/.config/axia` it created); the first-run check used a loop device on a decompressed copy
   of the image in `/var/tmp/r084-fr` (removed). Network, the `lordbasex` account and the SD
   partitions untouched; the board was not reflashed.
 
@@ -1622,17 +1622,17 @@ See `MONITOR.md` ("Network, second generation", "The menu bar network item", "Bl
 `FIREWALL.md` ("LordOS components in their own scopes", "The essential system services",
 "Blocklists"). On VM 118 (172.17.0.53), tree in `~/LordOS-netmon` (copied over SSH with `tar`: the
 VM has no rsync), built there (`make -C server`, `make -C server test`, `sudo build/npverify-test`)
-and installed over `/usr/local/lib/lordos` (`lord-server`, `lord-netperm`, the new `lord-fetch`,
+and installed over `/usr/local/lib/lordos` (`axia-server`, `axia-netperm`, the new `axia-dl`,
 themes and assets) by `~/deploy-netmon-118.sh`, which first saved `/usr/local/lib/lordos` in
-`/var/backups/lordos-netmon-bak` and `~/.config/lordos` in `~/.config-lordos-backup-netmon`.
+`/var/backups/lordos-netmon-bak` and `~/.config/axia` in `~/.config-lordos-backup-netmon`.
 `lord-sessiond` was not replaced (lord-netd isn't installed on this VM, so the network service row
 was not tested here). Nothing was installed with apt.
 
-- **Unit drop-in:** `/etc/systemd/system/lord-netperm.service.d/netmon084.conf` with
+- **Unit drop-in:** `/etc/systemd/system/axia-netperm.service.d/netmon084.conf` with
   `RestrictAddressFamilies=AF_UNIX AF_PACKET AF_NETLINK` (this VM's unit predates 0.8.3's sock_diag);
   removed at the end.
 - **Session:** the autologin session of `lord` (`/run/lordos/autologin-done` removed, the session's
-  lord-server ended, `lordos` restarted), English, dark and then light for the screenshots, the menu
+  axia-server ended, `lordos` restarted), English, dark and then light for the screenshots, the menu
   bar item on (all in `settings.json`, restored at the end).
 - **Test traffic:** `curl` started from SSH inside `lordos-net-terminal.scope` (as a Terminal program)
   and, for the A/B measurements, inside `app-lordos-npbench.scope`: HTTPS requests to public sites
@@ -1641,39 +1641,39 @@ was not tested here). Nothing was installed with apt.
   `nc -z` to a listed domain checked that the owner's allow rule wins. The Store's "Check for
   updates" for the Store's own row.
 - **Blocklists:** four catalog lists and one custom list downloaded over HTTPS from their sources;
-  copies in `~/.cache/lordos/fwlists`, removed at the end with `fwlists.json` and `fwlists.txt`.
+  copies in `~/.cache/axia/fwlists`, removed at the end with `fwlists.json` and `fwlists.txt`.
 - **Measurements:** `iperf3` (already on this VM since step 28) through a veth pair `npb0`/`npb1`
   into a private namespace `npb` (10.213.7.0/30), deleted after each run; eth0 and the network
-  configuration were not touched. For the A/B runs the 0.8.3 `lord-netperm` and main's build
+  configuration were not touched. For the A/B runs the 0.8.3 `axia-netperm` and main's build
   (built in `~/LordOS-netmon-base`) were swapped in for a few minutes and the new build put back.
 - **Input and screenshots:** `lord-qmp-input.py 118 2987 1067` and `lord-type.py 118` from the
   Proxmox host, `screendump` converted to PNG on the development machine.
 - **Undone at the end:** `/usr/local/lib/lordos` restored from the backup (`diff -r` empty), the
-  drop-in removed and `lord-netperm` restarted with the old binary, `~/.config/lordos` restored
+  drop-in removed and `axia-netperm` restarted with the old binary, `~/.config/axia` restored
   (`diff -r` against the backup empty), the blocklist files and the test scopes removed, the trees,
   scripts and backups deleted, `lordos` restarted to the login screen. The traffic history
-  (`~/.local/state/lordos/net-history.bin`) keeps the test minutes (app ids and byte counts only).
+  (`~/.local/state/axia/net-history.bin`) keeps the test minutes (app ids and byte counts only).
   No Proxmox setting was touched.
 
 ## Step 47 — 0.8.5: System Information's collector (VM 116 `lordos-gpu`, October 26)
 
 See `BENCHMARK.md` ("0.8.5 — System Information"). Built in `~/LordOS-085fs` (`make -C server
-build/lordos-sysreport build/sysreport-test`) and run from there as `lord`; nothing was installed
+build/axia-sysreport build/sysreport-test`) and run from there as `lord`; nothing was installed
 over `/usr/local/lib/lordos`.
 
 - **Installed:** `usb.ids` (Debian, architecture `all`: the USB vendor and product names, read by
-  `lordos-sysreport`; `pci.ids` was already installed). The package recommends both.
-- **The app:** `lord-server` from that tree in an isolated headless session (`--headless 1280x800`,
+  `axia-sysreport`; `pci.ids` was already installed). The package recommends both.
+- **The app:** `axia-server` from that tree in an isolated headless session (`--headless 1280x800`,
   its own `HOME`, `XDG_RUNTIME_DIR` and `dbus-run-session`, removed afterwards), driven and captured
   over its own `remote.sock` (keys, clicks and the still frame's lossless tiles); the user's session
   was not touched.
 - **Installed build (with the user's go-ahead):** `/usr/local/lib/lordos` replaced by the 0.8.5 test build
   (backup of the previous one in `/usr/local/lib/lordos.1026.bak`), `lordos.service` restarted;
-  `lordos-sysreport`, `lordos-fetch` and `lordos-testbench` in `/usr/local/bin`, and
-  `/usr/share/applications/lordos-testbench.desktop`.
-- **lord-netperm (with the user's go-ahead to change the VM):** VM 116 had no per-app firewall service (System
-  Information → Checks reported it). Installed `/usr/local/lib/lordos/bin/lord-netperm` and
-  `/etc/systemd/system/lord-netperm.service` (the ISO's unit with that path), enabled and started; the network
+  `axia-sysreport`, `axia-fetch` and `axia-testbench` in `/usr/local/bin`, and
+  `/usr/share/applications/axia-testbench.desktop`.
+- **axia-netperm (with the user's go-ahead to change the VM):** VM 116 had no per-app firewall service (System
+  Information → Checks reported it). Installed `/usr/local/lib/lordos/bin/axia-netperm` and
+  `/etc/systemd/system/axia-netperm.service` (the ISO's unit with that path), enabled and started; the network
   kept working.
 
 ## Step — 0.8.5 release: Raspberry Pi kernel and image on VM 116 (2026-10-27)

@@ -10,7 +10,7 @@ keywords: buscar, búsqueda, calculadora, convertir, unidades
 
 ## Qué encuentra
 
-- **Apps** (de LordOS, de la Tienda y Linux).
+- **Apps** (de Axia DE, de la Tienda y Linux).
 - **Archivos y carpetas** de tu carpeta personal.
 - **Secciones de Ajustes:** «red», «teclado», «fondo»…
 - **Notas** de la app Notas, por título o por texto.

@@ -3,7 +3,7 @@
  * title bar buttons and the GTK 3 theme, and follow LordOS's changes live (SettingChanged).
  * Uses Passwords' own D-Bus client (vault/dbus.c). See docs/WAYLAND.md, "GTK and GNOME apps".
  *
- * GTK 3 outside Flatpak doesn't read the portal: it reads GSettings. lord-server gives the apps
+ * GTK 3 outside Flatpak doesn't read the portal: it reads GSettings. axia-server gives the apps
  * GSETTINGS_BACKEND=keyfile and writes those same keys to ~/.config/glib-2.0/settings/keyfile, which
  * GLib watches: GTK 3 also changes live (without dconf or running gsettings). */
 #include "portal.h"

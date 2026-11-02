@@ -1,6 +1,6 @@
-/* vjson.h — JSON inside lord-vault without going through the libc heap: a reader that marks
+/* vjson.h — JSON inside axia-vault without going through the libc heap: a reader that marks
  * tokens over the text (without copying it) and a writer that grows in the secrets arena (smem.h).
- * Used by the protocol with lord-server/the app, the vault payload and the importers.
+ * Used by the protocol with axia-server/the app, the vault payload and the importers.
  *
  * Reader: vj_parse builds an array of tokens in order; each one knows where its subtree ends
  * (next), so walking an object is: for (k = o + 1; k < t[o].next; k = t[k + 1].next) { key k,

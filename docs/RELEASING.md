@@ -57,7 +57,7 @@ The releases page is the project's public changelog: every release is documented
      (`assets/hwreport/snapshot.json.sig`, same key and format), which ships in its own package, `lordos-hwdata`
      (below); `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb-hwdata.sh` refuses an unsigned one or one whose signature
      doesn't verify with `lordos-release.pub.pem`.
-   - Send the tree, with both files, to the build VMs (never the key). Build lord-server as a release:
+   - Send the tree, with both files, to the build VMs (never the key). Build axia-server as a release:
      `make -C server RELEASE=1` (it only runs code signed with the release key, with no development
      mode).
    - Build the ISO on the build VM (`sudo REQUIRE_SIGNED_CODE=1 tools/iso/build.sh`, [ISO.md](ISO.md)),
@@ -72,7 +72,7 @@ The releases page is the project's public changelog: every release is documented
      (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb-hwdata.sh <folder>`; the ISO and image builds make it too and install
      it with `lordos`, which depends on it). The package is reproducible: built again from the same snapshot and
      signature on another VM it has the same bytes. `mkdeb.sh` puts `code-manifest.json` and
-     `code-manifest.sig` in `/usr/lib/lordos/` and runs `lord-server --check-code` on the staged tree:
+     `code-manifest.sig` in `/usr/lib/lordos/` and runs `axia-server --check-code` on the staged tree:
      the package is not built if a bundle changed after signing or the signature is missing. A bundle
      rebuilt after signing means signing again. An update with a fourth number may ship without a
      new ISO (0.8.4.1 did: the 0.8.4 ISO stayed the current one, see [ISO.md](ISO.md)).
@@ -204,7 +204,7 @@ container):
    its release folder (step 3 of the release), unchanged if no report arrived since.
 
 Nothing new runs on the systems: the package engine checks `InRelease` and the file's SHA-256 as for any update,
-and `lord-server` checks the snapshot's own signature before System Information sees it. A snapshot can only go
+and `axia-server` checks the snapshot's own signature before System Information sees it. A snapshot can only go
 forward: going back to an older one is a downgrade, which the engine never does on its own. **The format rule:**
 while any supported `lordos` reads snapshot format 1, `lordos-hwdata` carries format 1 (`mkdeb-hwdata.sh`
 refuses any other); a format 2 needs `Breaks: lordos (<< <first version that reads it>)` in that script first.

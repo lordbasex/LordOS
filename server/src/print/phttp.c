@@ -142,7 +142,7 @@ int phttp_request(int fd, const char *method, const char *host, const char *path
     double deadline = now_ms() + timeout_ms;
     char head[2048];
     size_t total = blen + (docfd >= 0 ? doclen : 0);
-    int hl = snprintf(head, sizeof head, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: LordOS/0.7\r\nConnection: close\r\n%s%s%s",
+    int hl = snprintf(head, sizeof head, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Axia/0.8\r\nConnection: close\r\n%s%s%s",
                       method, path, host, ctype ? "Content-Type: " : "", ctype ? ctype : "", ctype ? "\r\n" : "");
     if (hl < 0 || (size_t)hl >= sizeof head) return -1;
     if (body || docfd >= 0 || !strcmp(method, "POST") || !strcmp(method, "PUT"))

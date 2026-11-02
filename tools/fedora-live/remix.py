@@ -10,7 +10,7 @@ import shutil
 import subprocess
 
 HERE = Path(__file__).resolve().parent
-LABEL = 'Lord-DE-Live-44'
+LABEL = 'Axia-DE-Live-44'
 
 
 def run(*args, **kwargs):
@@ -34,49 +34,49 @@ def write(root, name, data, mode=0o644):
 
 def customize(root):
     # Keep GDM and the GNOME components needed by its greeter; hide the desktop
-    # sessions so both live and new users enter Lord DE.
+    # sessions so both live and new users enter Axia DE.
     for folder in ['usr/share/wayland-sessions', 'usr/share/xsessions']:
         for path in (root / folder).glob('gnome*.desktop'):
             text = re.sub(r'^Hidden=.*\n?', '', path.read_text(), flags=re.M)
             write(root, str(path.relative_to(root)), text.rstrip() + '\nHidden=true\n')
-    session = root / 'usr/share/wayland-sessions/lord-de.desktop'
-    text = session.read_text().replace('Exec=/usr/bin/lord-de-session',
-                                       'Exec=/usr/libexec/lord-de/fedora-session')
+    session = root / 'usr/share/wayland-sessions/axia.desktop'
+    text = session.read_text().replace('Exec=/usr/bin/axia-session',
+                                       'Exec=/usr/libexec/axia/fedora-session')
     text = re.sub(r'^DesktopNames=.*\n?', '', text, flags=re.M)
-    write(root, str(session.relative_to(root)), text + 'DesktopNames=LordOS;\n')
-    write(root, '/usr/libexec/lord-de/fedora-session', (HERE / 'session.py').read_text(), 0o755)
-    write(root, '/usr/libexec/lord-de/installer-browser',
+    write(root, str(session.relative_to(root)), text + 'DesktopNames=Axia;\n')
+    write(root, '/usr/libexec/axia/fedora-session', (HERE / 'session.py').read_text(), 0o755)
+    write(root, '/usr/libexec/axia/installer-browser',
           (HERE / 'installer-browser.py').read_text(), 0o755)
-    normal_gdm = '[daemon]\nDefaultSession=lord-de.desktop\nInitialSetupEnable=False\n'
+    normal_gdm = '[daemon]\nDefaultSession=axia.desktop\nInitialSetupEnable=False\n'
     write(root, '/etc/gdm/custom.conf', normal_gdm)
-    write(root, '/etc/sysconfig/livesys', 'livesys_session="lord-de"\n')
-    write(root, '/usr/libexec/livesys/sessions.d/livesys-lord-de',
-          (HERE / 'livesys-lord-de').read_text(), 0o755)
-    write(root, '/etc/skel/.dmrc', '[Desktop]\nSession=lord-de\n')
+    write(root, '/etc/sysconfig/livesys', 'livesys_session="axia"\n')
+    write(root, '/usr/libexec/livesys/sessions.d/livesys-axia',
+          (HERE / 'livesys-axia').read_text(), 0o755)
+    write(root, '/etc/skel/.dmrc', '[Desktop]\nSession=axia\n')
     write(root, '/etc/skel/.config/gnome-initial-setup-done', '')
     # Modern GDM uses AccountsService's session rather than DefaultSession in
     # custom.conf. Seed the templates for users created later by Anaconda.
     for kind in ['standard', 'administrator']:
         path = root / f'usr/share/accountsservice/user-templates/{kind}'
         write(root, str(path.relative_to(root)),
-              path.read_text().replace('Session=\n', 'Session=lord-de\nSessionType=wayland\n'))
+              path.read_text().replace('Session=\n', 'Session=axia\nSessionType=wayland\n'))
 
     # Workstation hides account creation in favor of GNOME Initial Setup. The
     # independent desktop needs Anaconda to create the real administrator.
-    write(root, '/etc/anaconda/conf.d/90-lord-de.conf',
+    write(root, '/etc/anaconda/conf.d/90-axia.conf',
           '[User Interface]\nhidden_webui_pages =\nhidden_spokes =\n'
-          'webui_web_engine = /usr/libexec/lord-de/installer-browser\n')
+          'webui_web_engine = /usr/libexec/axia/installer-browser\n')
     installer = root / 'usr/share/applications/liveinst.desktop'
     write(root, str(installer.relative_to(root)), installer.read_text().replace('NoDisplay=true', 'NoDisplay=false'))
-    write(root, '/usr/share/anaconda/post-scripts/99-lord-de.ks',
+    write(root, '/usr/share/anaconda/post-scripts/99-axia.ks',
           '%post --erroronfail\n'
           'cat > /etc/gdm/custom.conf <<\'EOF\'\n' + normal_gdm + 'EOF\n'
-          'rm -f /usr/share/polkit-1/rules.d/20-livesys-lord-de.rules\n'
+          'rm -f /usr/share/polkit-1/rules.d/20-livesys-axia.rules\n'
           'systemctl set-default graphical.target\n'
           '%end\n')
-    write(root, '/usr/share/doc/lord-de/ISO-README.txt',
-          'Fedora 44 + Lord DE 0.8.7 (experimental, unofficial remix).\n'
-          'GDM is retained for login; Lord DE is the default desktop.\n'
+    write(root, '/usr/share/doc/axia-de/ISO-README.txt',
+          'Fedora 44 + Axia DE 0.8.7 (experimental, unofficial remix).\n'
+          'GDM is retained for login; Axia DE is the default desktop.\n'
           'Use Install to Hard Drive in the app launcher, or run liveinst.\n'
           'The installer creates the account for the installed system.\n'
           'For Wi-Fi, run nm-connection-editor or nmtui in Terminal.\n')
@@ -144,7 +144,7 @@ def main():
         if path.is_file() and not path.is_symlink():
             path.unlink()
     grub = (original / 'grub.cfg').read_text().replace('Fedora-WS-Live-44', LABEL)
-    grub = grub.replace('Fedora-Workstation-Live', 'Fedora-Lord-DE-Live').replace('set default="1"', 'set default="0"')
+    grub = grub.replace('Fedora-Workstation-Live', 'Fedora-Axia-DE-Live').replace('set default="1"', 'set default="0"')
     (work / 'grub.cfg').write_text(grub)
     # Generate target SELinux labels directly; host SELinux labels on the
     # rootless extraction must never be copied into the live filesystem.
@@ -165,7 +165,7 @@ def main():
     metadata = {'base': args.iso.name, 'base_sha256': digest(args.iso),
                 'rpm': args.rpm.name, 'rpm_sha256': digest(args.rpm),
                 'iso': args.output.name, 'iso_sha256': sha, 'volume_id': LABEL,
-                'login_manager': 'GDM', 'default_session': 'lord-de',
+                'login_manager': 'GDM', 'default_session': 'axia',
                 'restored_file_capabilities': caps}
     args.output.with_suffix('.iso.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(f'Created {args.output}', flush=True)

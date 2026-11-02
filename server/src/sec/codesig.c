@@ -252,7 +252,7 @@ CodeState codesig_init_root(const char *root, const uint8_t pub[32], int release
     double t0 = now_ms();
     cs.release = release;
     if (!root || !realpath(root, cs.root) || (cs.rootfd = open(cs.root, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) < 0) {
-        snprintf(cs.reason, sizeof cs.reason, "no LordOS folder");
+        snprintf(cs.reason, sizeof cs.reason, "no Axia DE folder");
         cs.root[0] = 0;
         cs.state = release ? CODE_INVALID : CODE_DEVELOPMENT;
         goto done;
@@ -323,7 +323,7 @@ const char *codesig_state_name(CodeState s) {
 }
 
 static void refuse(const char *rel, const char *why) {
-    fprintf(stderr, "code: REFUSED %s: %s — this LordOS component was modified and was not loaded\n", rel, why);
+    fprintf(stderr, "code: REFUSED %s: %s — this Axia DE component was modified and was not loaded\n", rel, why);
     pthread_mutex_lock(&cs_mu);
     int known = 0;
     for (int i = 0; i < cs.nrefused; i++) if (!strcmp(cs.refused[i].path, rel)) known = 1;
@@ -356,7 +356,7 @@ char *codesig_load(const char *path, size_t max, size_t *len, char *why, size_t 
     }
     if (!rel || !valid_rel(rel)) {
         /* outside LordOS's folder: only a development build without a signed manifest runs it */
-        if (cs.state != CODE_DEVELOPMENT) { snprintf(why, whylen, "not part of LordOS's system code"); refuse(path, why); return NULL; }
+        if (cs.state != CODE_DEVELOPMENT) { snprintf(why, whylen, "not part of Axia DE's system code"); refuse(path, why); return NULL; }
         int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY);
         if (fd >= 0) { buf = read_fd(fd, max, &n); close(fd); }
         if (!buf) { snprintf(why, whylen, "cannot read it"); return NULL; }

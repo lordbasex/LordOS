@@ -1,6 +1,6 @@
 /* lbwork.h — LordBench's CPU, memory and storage workloads (docs/BENCHMARK.md, "Workloads"). Pure
  * computation on memory the caller gives or allocates, plus one fd for storage: no paths, no network.
- * Used by lord-bench (lbmain.c) and tested in tests/lordbench_test.c. Each returns a rate (higher is
+ * Used by axia-bench (lbmain.c) and tested in tests/lordbench_test.c. Each returns a rate (higher is
  * better) or, for latency, nanoseconds; a value < 0 means it could not run (out of memory, an I/O error). */
 #ifndef LORD_BENCH_LBWORK_H
 #define LORD_BENCH_LBWORK_H
@@ -25,7 +25,7 @@ double lb_mem_copy(int threads, size_t mb, double secs);
 double lb_mem_triad(int threads, size_t mb, double secs);
 double lb_mem_latency(size_t mb, long hops);    /* ns per dependent load, one thread */
 
-/* storage on fd (a scratch file lord-server opened, read and write), mb MB at most:
+/* storage on fd (a scratch file axia-server opened, read and write), mb MB at most:
  * sequential write and read in MB/s, then random 4 KiB reads for secs, in IOPS */
 int lb_disk(int fd, size_t mb, double secs, double *seq_w, double *seq_r, double *rand_iops);
 

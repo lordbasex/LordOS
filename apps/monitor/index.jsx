@@ -1,11 +1,11 @@
 // Monitor: CPU, memory, network, disk and process usage of this computer, and the network
 // connections of each app on a map (see docs/MONITOR.md). It follows TangoOS's Monitor: tabs,
 // dark cards with a big number and a live chart, a row of small stats and a footer with the
-// sampling rate. lord-server (lord.monitor) reads the metrics only while this window is open,
+// sampling rate. axia-server (lord.monitor) reads the metrics only while this window is open,
 // four times per second.
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
-  useMonitor, monitor, monitorSamples, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp,
+  useMonitor, monitor, monitorSamples, formatBytes, formatNumber, AxiaLogo, iconFromFile, getApp,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -344,7 +344,7 @@ function ComponentGlyph({ comp, size }) {
 }
 
 export function AppGlyph({ item, size = 16 }) {
-  if (item.app === 'lordos') return <LordOSLogo size={size} />;
+  if (item.app === 'lordos') return <AxiaLogo size={size} />;
   const comp = sdk.netModel?.COMPONENTS?.[item.app];
   if (comp) return <ComponentGlyph comp={comp} size={size} />;
   if (item.app === 'remote-desktop') return <RemoteGlyph size={size} />;
@@ -411,7 +411,7 @@ export default function Monitor() {
   const setTab = (v) => { lastTab = v; setTabState(v); };
   useEffect(() => { if (args?.tab) setTab(args.tab); }, [args?.tab, args?.nonce]);
   const showConns = tab === 'network' && prefs.connections !== false;
-  // which lists lord-server builds (without redrawing this window on every sample)
+  // which lists axia-server builds (without redrawing this window on every sample)
   useMonitor({ procs: tab === 'processes', conns: showConns, geo: showConns && prefs.geo !== false, everyMs: 0 });
   const ready = useStore(monitorSamples, (l) => l.length > 0);
   // Voltage only exists where the machine reports something (not in a virtual machine, for one)
