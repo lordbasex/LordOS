@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
     case MK_HWPROBE: lm_hwprobe(fds, MP_MAX_FDS); break;
     case MK_STREAM: lm_stream(payload, st_ring, st_render); break;
     case MK_VBENCH: lm_vbench(payload); break;
+    case MK_LIVE: lm_live(payload, fds[0], fds[1]); break;
     default: LM_LOG("unknown kind %lld", (long long)m.v[0]); return 1;
     }
     return 0;

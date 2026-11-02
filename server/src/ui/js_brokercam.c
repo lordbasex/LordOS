@@ -156,7 +156,11 @@ static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     ACam *a = NULL;
     for (int i = 0; i < MAX_ACAMS && !a; i++) if (!acams[i].used) a = &acams[i];
     char p[96];
-    int n = dev && a ? snprintf(p, sizeof p, "open %.40s %d %d", dev, opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160)) : -1;
+    const char *codec = NULL;
+    if (JS_IsObject(o)) { JSValue v = JS_GetPropertyStr(c, o, "codec"); if (JS_IsString(v)) codec = JS_ToCString(c, v); JS_FreeValue(c, v); }
+    int n = dev && a ? snprintf(p, sizeof p, "open %.40s %d %d %d %.6s %d", dev, opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160),
+                                opt_int(c, o, "link", 0, 0, 99999), codec && !strcmp(codec, "vp8") ? "vp8" : "h264", opt_int(c, o, "kbps", 600, 100, 8000)) : -1;
+    if (codec) JS_FreeCString(c, codec);
     if (dev) JS_FreeCString(c, dev);
     if (n <= 0) return js_throw_code(c, "camera.invalid", NULL);
     int st = BST_ERROR;
@@ -175,6 +179,35 @@ static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (!s) { cmd("close %d%s", sid, NULL, NULL); return js_throw_code(c, "media.tooMany", NULL); }
     *a = (ACam){ .used = 1, .sid = sid, .local = s->id };
     return JS_NewInt32(c, s->id);
+}
+
+/* live(app, tag) → id: what the app's companion hands over under `tag` shows in a <MediaView> (media/live.h) */
+static JSValue f_live(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t tag = 0;
+    if (argc > 1) JS_ToInt32(c, &tag, argv[1]);
+    ACam *a = NULL;
+    for (int i = 0; i < MAX_ACAMS && !a; i++) if (!acams[i].used) a = &acams[i];
+    if (!a || tag < 1) return js_throw_code(c, "camera.invalid", NULL);
+    char p[32];
+    int n = snprintf(p, sizeof p, "live %d", tag), st = BST_ERROR;
+    char *out = NULL;
+    uint32_t len = 0;
+    if (js_broker_rpc(BOP_CAMERA, p, (uint32_t)n, &st, &out, &len) || st != BST_OK || !out) { free(out); return js_throw_code(c, "media.noHelper", NULL); }
+    int sid = atoi(out);
+    free(out);
+    MediaSrc *s = media_src_new(SK_CAMERA, "app");
+    if (!s) { cmd("close %d%s", sid, NULL, NULL); return js_throw_code(c, "media.tooMany", NULL); }
+    *a = (ACam){ .used = 1, .sid = sid, .local = s->id };
+    return JS_NewInt32(c, s->id);
+}
+
+/* liveMic(id, on) → true: lord-server checks the permission, opens the microphone and lights its indicator */
+static JSValue f_live_mic(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    ACam *a = argc >= 2 ? by_local(arg_id(c, argv[0])) : NULL;
+    if (!a) return JS_FALSE;
+    return JS_NewBool(c, cmd("mic %d %s", a->sid, JS_ToBool(c, argv[1]) ? "1" : "0", NULL));
 }
 
 static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -255,6 +288,7 @@ static JSValue f_none(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("cameras", 0, f_cameras), JS_CFUNC_DEF("camera", 3, f_camera), JS_CFUNC_DEF("close", 1, f_close),
+    JS_CFUNC_DEF("live", 2, f_live), JS_CFUNC_DEF("liveMic", 2, f_live_mic),
     JS_CFUNC_DEF("view", 2, f_view), JS_CFUNC_DEF("info", 1, f_info), JS_CFUNC_DEF("photo", 3, f_photo),
     JS_CFUNC_DEF("cameraRecord", 3, f_camera_record), JS_CFUNC_DEF("stop", 1, f_stop),
     JS_CFUNC_DEF("protectedCount", 0, f_zero), JS_CFUNC_DEF("hwaccel", 0, f_none),

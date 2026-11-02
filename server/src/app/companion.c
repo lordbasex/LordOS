@@ -2,7 +2,7 @@
  *
  * lord-server forked this and exec'd itself, so it starts as a new process with one thread and two inherited
  * descriptors: 3, a SOCK_SEQPACKET socket to the app, and 4, if the manifest declares screen-share, a connection to the
- * sharing API already tied to this app. It opens a third, 5, on the home folder, to list it. Nothing else comes in: no path, no argument but the id and whether the
+ * sharing API already tied to this app; and 6, where lord-server hands it the live media links (media/live.h). It opens another, 5, on the home folder, to list it. Nothing else comes in: no path, no argument but the id and whether the
  * network is allowed. Everything here runs before a byte of the package does:
  *   the id is a packaged app's, and this process isn't root;
  *   the whole signed package checks, its key is a Verified author's and nothing revoked it, the binary is read through one
@@ -65,6 +65,7 @@ int companion_main(int argc, char **argv) {
     int network = argv[3][0] == '1', type = 0;
     socklen_t tl = sizeof type;
     if (getsockopt(3, SOL_SOCKET, SO_TYPE, &type, &tl) || type != SOCK_SEQPACKET) return 2;   /* not from lord-server */
+    if (getsockopt(6, SOL_SOCKET, SO_TYPE, &type, &tl) || type != SOCK_SEQPACKET) return 2;
     if (getuid() == 0 || geteuid() == 0) return refuse(id, "companion.root");
 
     /* fd 5 first, before anything can take the number: the only way the engine can list the home (sandbox.c, home_rules) */

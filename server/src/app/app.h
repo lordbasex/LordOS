@@ -22,7 +22,7 @@ int app_package_dir(const char *id, const char *assets, char *out, size_t n);
 /* Starts the companion of packaged app <id>: forks `lord-server --companion <id> <net>`, which checks the signed
  * package and only then runs the binary in its sandbox (companion.c). Never waits. share_fd: the share connection (fd 4 there) or
  * -1; taken over. *app_fd: the app's end of the channel (fd 3 there). The pid, for the caller to kill and reap, or -1. */
-int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd);
+int app_companion_spawn(const char *id, int network, int share_fd, int *app_fd, int *link_fd);
 
 /* `lord-server --companion <id> <0|1>`, with fds 3 and 4 from app_companion_spawn. Returns only if it didn't start. */
 int companion_main(int argc, char **argv);
