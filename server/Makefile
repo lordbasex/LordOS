@@ -406,6 +406,12 @@ test: build/engine-test
 build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# wlroots proof of concept (poc/axia-wlr.c, docs/WLROOTS.md): the UI engine on wlroots 0.20, with
+# wlroots doing the backend, protocols and input. Built on request only, never installed.
+WLR_PKGS := wlroots-0.20 wayland-server xkbcommon pixman-1 libdrm
+build/axia-wlr: poc/axia-wlr.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) -DWLR_USE_UNSTABLE $(shell pkg-config --cflags $(WLR_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ \
+	    poc/axia-wlr.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(shell pkg-config --libs $(WLR_PKGS)) -lm -lpthread
 # the frame pipeline's decisions (src/fpipe.c, docs/GPU.md "The frame pipeline"): LORD_PIPELINE, the auto
 # mode, what a display does next, when input waits, and a display on a vblank grid with and without it
 test: build/fpipe-test

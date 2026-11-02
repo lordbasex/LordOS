@@ -88,6 +88,7 @@ A separação remove a necessidade dos serviços específicos do LordOS, mas nã
 
 ## Evolução
 
+- Trocar o compositor próprio pelo wlroots, mantendo o motor de UI; prova de conceito e plano em [WLROOTS.md](WLROOTS.md).
 - Integrar NetworkManager por D-Bus e autorização via polkit, sem assumir controle da rede do host.
 - Substituir as páginas administrativas restantes por adaptadores de serviços do host.
 - Publicar um RPM com build reproduzível do frontend conforme as regras de empacotamento do destino, dependências opcionais e assinatura própria do fork.
