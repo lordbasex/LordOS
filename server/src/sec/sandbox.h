@@ -88,6 +88,7 @@ void sandbox_exec_child(int network);
 typedef struct {
     const char *home;
     int downloads_fd;       /* ~/Downloads, O_PATH, opened with no link followed */
+    int data_fd;            /* its own folder under appdata, opened with no link followed */
     int app_fd;             /* the package's folder */
     int bin_fd;             /* the binary: the descriptor that was hashed */
     int network;            /* AF_INET, AF_INET6, AF_NETLINK's route family: the manifest's `network`, allowed */

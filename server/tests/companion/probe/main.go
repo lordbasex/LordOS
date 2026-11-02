@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 	"unsafe"
@@ -31,16 +32,16 @@ func check(name string, ok bool, detail any) {
 func denied(name string, err error) { check(name, err != nil, err) }
 func works(name string, err error)  { check(name, err == nil, err) }
 
-// Nothing inherited past 4; the Go runtime's own epoll and eventfd have no file type.
+// Nothing inherited past 5; the Go runtime's own epoll and eventfd have no file type.
 func inherited() {
 	open := 0
-	for fd := 5; fd < 256; fd++ {
+	for fd := 6; fd < 256; fd++ {
 		var st syscall.Stat_t
 		if syscall.Fstat(fd, &st) == nil && st.Mode&syscall.S_IFMT != 0 {
 			open++
 		}
 	}
-	check("no inherited descriptor past 4", open == 0, open)
+	check("no inherited descriptor past 5", open == 0, open)
 }
 
 func files(home string) {
@@ -48,7 +49,28 @@ func files(home string) {
 	_, err := os.ReadFile(filepath.Join(home, "probe-home.txt"))
 	works("read a file in the home folder", err)
 	_, err = os.ReadDir(home)
-	works("list the home folder", err)
+	denied("list the home folder by name", err)
+	lst := os.NewFile(5, home)
+	names, err := lst.Readdirnames(-1)
+	works("list the home folder through fd 5", err)
+	seen := false
+	for _, n := range names {
+		seen = seen || n == "Downloads"
+	}
+	check("fd 5 shows the home", seen, len(names))
+	_, err = os.ReadFile(filepath.Join(home, ".probe-dot"))
+	denied("read a dot-file in the home folder", err)
+	_, err = os.ReadFile(filepath.Join(home, ".probe-hidden/secret"))
+	denied("read a file in a dot-folder", err)
+	_, err = os.ReadDir(filepath.Join(home, ".probe-hidden"))
+	denied("list a dot-folder", err)
+	_, err = os.ReadFile(filepath.Join(home, "link-to-hidden"))
+	denied("read a dot-file through a visible link", err)
+	_, err = syscall.Openat(5, ".probe-hidden/secret", syscall.O_RDONLY, 0)
+	denied("read a dot-folder's file through fd 5", err)
+	_, err = os.ReadDir(filepath.Join(home, "Documents"))
+	works("list a visible folder", err)
+	runtime.KeepAlive(lst)
 	for _, p := range []string{"/etc/passwd", "/etc/shadow", "/proc/self/status", "/proc/1/environ", "/sys/kernel/mm", "/tmp", "/usr/bin", "/usr/lib", "/dev/null", "/dev/urandom", "/var/lib/lordos", "/run/lordos"} {
 		_, err = os.ReadFile(p)
 		if e, ok := err.(*os.PathError); ok && e.Err == syscall.EISDIR {
@@ -70,7 +92,10 @@ func files(home string) {
 	denied("change a file in the home folder", os.WriteFile(filepath.Join(home, "probe-home.txt"), []byte("x"), 0o644))
 	denied("truncate a file in the home folder", os.Truncate(filepath.Join(home, "probe-home.txt"), 0))
 	denied("delete a file in the home folder", os.Remove(filepath.Join(home, "probe-home.txt")))
-	denied("write appdata", os.WriteFile(filepath.Join(home, ".local/share/lordos/appdata/pkgtest/x"), []byte("x"), 0o644))
+	works("write its own app-data folder", os.WriteFile(filepath.Join(home, ".local/share/lordos/appdata/pkgtest/x"), []byte("x"), 0o600))
+	works("rename in its own app-data folder", os.Rename(filepath.Join(home, ".local/share/lordos/appdata/pkgtest/x"), filepath.Join(home, ".local/share/lordos/appdata/pkgtest/y")))
+	denied("write another app's data", os.WriteFile(filepath.Join(home, ".local/share/lordos/appdata/other/x"), []byte("x"), 0o644))
+	denied("write in .config", os.WriteFile(filepath.Join(home, ".config/x"), []byte("x"), 0o644))
 	denied("write /tmp", os.WriteFile("/tmp/companion-x", []byte("x"), 0o644))
 	denied("symlink in Downloads", os.Symlink("/etc/passwd", filepath.Join(dl, "l")))
 	denied("hard link from home into Downloads", os.Link(filepath.Join(home, "probe-home.txt"), filepath.Join(dl, "hl")))
@@ -177,6 +202,9 @@ func share() {
 	c.Write([]byte{1, 0, 0, 0, 51})
 	t, b, err := readMsg(c)
 	check("fd 4 answers SHARE_QUERY", err == nil && t == 60 && len(b) == 10, t)
+	if len(b) == 10 {
+		fmt.Fprintf(&report, "share: query granted %d\n", b[1])
+	}
 	start := []byte{9, 0, 0, 0, 50, 1 | 4, 1, 30, 0, 0xd0, 7, 0, 0}
 	c.Write(start)
 	for {

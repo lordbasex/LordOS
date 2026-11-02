@@ -25,6 +25,8 @@ catalog() { mkdir -p $H/.local/share/lordos/catalog; cp $F/cat-$1/catalog.json $
 freshhome() {
   rm -rf $H; mkdir -p $H/.config/lordos $H/Downloads
   echo secret > $H/probe-home.txt
+  echo secret > $H/.probe-dot; mkdir -p $H/.probe-hidden $H/Documents $H/.local/share/lordos/appdata/other; echo secret > $H/.probe-hidden/secret
+  ln -s .probe-hidden/secret $H/link-to-hidden
   cat > $H/.config/lordos/permisos.json <<X
 { "version": 1, "apps": { "pkgtest": { "network": { "state": "allow", "when": 1 }, "status-item": { "state": "allow", "when": 1 } } } }
 X
@@ -71,6 +73,7 @@ grep '^FAIL' $T/report.txt
 pc=$(grep -c '^ok' $T/report.txt); fc=$(grep -c '^FAIL' $T/report.txt); pass=$((pass+pc)); fail=$((fail+fc))
 has "the report is complete" '^end' $T/report.txt
 has "fd 4: frames with a grant" '^share: frames' $T/report.txt
+has "SHARE_QUERY shows the grants before the first start" '^share: query granted 15' $T/report.txt
 has "the app heard it started" '"started"' $DATA/msg0.json
 wait_for $DATA/msg1.json 20; has "fd 3 both ways" 'pong' $DATA/msg1.json
 has "the status item was accepted" '"ok":true' $DATA/status.json

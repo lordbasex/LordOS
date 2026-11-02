@@ -10,6 +10,7 @@
 #include "sandbox.h"
 #include "cgroup.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -660,6 +661,30 @@ static int ll_any(int rs, int fd, uint64_t allow) {
 }
 #endif
 
+#ifdef HAVE_LANDLOCK
+#define COMPANION_HOME_RULES 4096    /* past this the rest of the home stays out: less access, never more */
+
+/* D10: the home's visible entries, one rule each, read when the companion starts. A rule on the home itself would reach every
+ * hidden folder under it, since a rule covers its whole hierarchy. So the home has no rule at all: no file of it opens unless a
+ * visible entry leads there, an entry made later waits for the next start, links are skipped (Landlock judges where they end), and
+ * the home is listed only through the descriptor inherited on fd 5. */
+static int home_rules(int rs, const char *home, uint64_t rd) {
+    DIR *d = opendir(home);
+    if (!d) return -1;
+    int n = 0, bad = 0;
+    for (struct dirent *e; !bad && n < COMPANION_HOME_RULES && (e = readdir(d)); ) {
+        if (e->d_name[0] == '.') continue;
+        int fd = openat(dirfd(d), e->d_name, O_PATH | O_NOFOLLOW | O_CLOEXEC);
+        if (fd < 0) continue;
+        struct stat st;
+        if (!fstat(fd, &st) && (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode))) { bad = ll_any(rs, fd, rd); n++; }
+        close(fd);
+    }
+    closedir(d);
+    return bad;
+}
+#endif
+
 static int companion_landlock(const SandboxCompanionCfg *cfg) {
 #ifdef HAVE_LANDLOCK
     int abi = ll_abi();
@@ -679,10 +704,8 @@ static int companion_landlock(const SandboxCompanionCfg *cfg) {
 #endif
     int rs = ll_create(&attr, sizeof attr);
     if (rs < 0) return -1;
-    int home = open(cfg->home, O_PATH | O_DIRECTORY | O_CLOEXEC);
-    int bad = home < 0 || ll_any(rs, home, rd) || ll_any(rs, cfg->downloads_fd, wr) || ll_any(rs, cfg->app_fd, rd) ||
-              ll_any(rs, cfg->bin_fd, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE);
-    if (home >= 0) close(home);
+    int bad = home_rules(rs, cfg->home, rd) || ll_any(rs, cfg->downloads_fd, wr) || ll_any(rs, cfg->data_fd, wr) ||
+              ll_any(rs, cfg->app_fd, rd) || ll_any(rs, cfg->bin_fd, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE);
     /* what a name lookup and TLS read; a system without one of them just doesn't have it */
     static const char *const net_ro[] = { "/etc/ssl", "/etc/resolv.conf", "/run/systemd/resolve", NULL };
     for (int i = 0; cfg->network && net_ro[i] && !bad; i++) {
@@ -705,7 +728,7 @@ static int companion_landlock(const SandboxCompanionCfg *cfg) {
 static const int allow_companion[] = {
     NR(SYS_read), NR(SYS_write), NR(SYS_readv), NR(SYS_writev), NR(SYS_pread64), NR(SYS_pwrite64),
     NR(SYS_close), NR(SYS_lseek), NR(SYS_fstat), NR(SYS_newfstatat), NR(SYS_statx), NR(SYS_fstatfs), NR(SYS_statfs),
-    NR(SYS_openat), NR(SYS_getdents64), NR(SYS_readlinkat), NR(SYS_faccessat), NR(SYS_faccessat2), NR(SYS_fcntl),
+    NR(SYS_openat), NR(SYS_getdents64), NR(SYS_readlinkat), NR(SYS_faccessat), NR(SYS_faccessat2), NR(SYS_fcntl), NR(SYS_flock),
     NR(SYS_dup), NR(SYS_dup3), NR(SYS_pipe2), NR(SYS_ppoll), NR(SYS_pselect6),
     NR(SYS_epoll_create1), NR(SYS_epoll_ctl), NR(SYS_epoll_pwait), NR(SYS_eventfd2),
     NR(SYS_mmap), NR(SYS_munmap), NR(SYS_mremap), NR(SYS_mprotect), NR(SYS_madvise), NR(SYS_brk),
@@ -801,7 +824,7 @@ static int companion_filter(struct sock_filter *f, int cap, const SandboxCompani
 }
 
 int sandbox_exec_companion(const SandboxCompanionCfg *cfg) {
-    if (!SB_AUDIT_ARCH || !cfg->home || cfg->home[0] != '/' || !cfg->home[1] || cfg->downloads_fd < 0 || cfg->app_fd < 0 || cfg->bin_fd < 0) return -1;
+    if (!SB_AUDIT_ARCH || !cfg->home || cfg->home[0] != '/' || !cfg->home[1] || cfg->downloads_fd < 0 || cfg->data_fd < 0 || cfg->app_fd < 0 || cfg->bin_fd < 0) return -1;
     if (apply_nopriv() || drop_caps()) return -1;
     if (companion_landlock(cfg)) return -1;
     static struct sock_filter filt[512];
