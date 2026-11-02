@@ -161,7 +161,7 @@ export function resetShortcuts() {
 }
 function setGrabs(name) { if (typeof lord.wayland !== 'undefined') lord.wayland.grabKeys(name); }
 
-// A theme's shortcuts. The table is read once: `run` should be stable or go through a ref.
+// A theme's shortcuts. The table is read when the grabs change: `run` should be stable or go through a ref.
 export function useShortcuts({ grabs = '', table = [], onSuperTap: tap = null, appsPaste: paste = false }) {
   const tapRef = useRef(tap);
   tapRef.current = tap;
@@ -173,8 +173,8 @@ export function useShortcuts({ grabs = '', table = [], onSuperTap: tap = null, a
     changed();
     return () => { themeTable = []; onSuperTap = null; changed(); };
   }, []);
-  // a setting can change the table of keys while the theme runs (Lord Flow's ⌃ arrows)
-  useEffect(() => { setGrabs(grabs); changed(); }, [grabs]);
+  // a setting can change the table of keys while the theme runs (Lord Flow's ⌃ arrows, the switcher's keys)
+  useEffect(() => { themeTable = table; setGrabs(grabs); changed(); }, [grabs]);
 }
 
 // Runs a module's entry by its id (Lord Classic's ❖⇧S is Screenshots' area capture).
