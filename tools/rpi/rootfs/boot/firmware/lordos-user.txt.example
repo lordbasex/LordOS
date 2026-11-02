@@ -12,7 +12,7 @@ fullname=Ana Pérez
 password_hash=$y$j9T$REEMPLAZAR$REEMPLAZAR
 #password=
 hostname=ana-pi
-# es, en or pt
+# es, en, pt or fr
 lang=en
 timezone=America/Argentina/Buenos_Aires
 keyboard=latam

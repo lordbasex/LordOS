@@ -54,7 +54,7 @@ function lookup(lang, key) {
   const c = catalogs[lang]?.[ns];
   return c ? c[rest] : undefined;
 }
-const plural = (lang, n) => (lang === 'pt' ? (n === 0 || n === 1 ? 'one' : 'other') : n === 1 ? 'one' : 'other');
+const plural = (lang, n) => (lang === 'pt' || lang === 'fr' ? (n === 0 || n === 1 ? 'one' : 'other') : n === 1 ? 'one' : 'other');
 export function t(key, vars = {}) {
   const lang = locale.get().lang;
   let v = lookup(lang, key);
@@ -65,9 +65,9 @@ export function t(key, vars = {}) {
 }
 export function tOptional(key, vars) { const r = t(key, vars); return r === key ? '' : r; }
 export function useLocale() { const l = useStore(locale); return { t, lang: l.lang }; }
-export const setLanguage = (lang) => { locale.set({ lang: ['en', 'es', 'pt'].includes(lang) ? lang : 'en' }); document.documentElement.lang = locale.get().lang; };
+export const setLanguage = (lang) => { locale.set({ lang: ['en', 'es', 'pt', 'fr'].includes(lang) ? lang : 'en' }); document.documentElement.lang = locale.get().lang; };
 export const direction = () => 'ltr';
-const intlLang = () => ({ en: 'en-US', es: 'es-AR', pt: 'pt-BR' }[locale.get().lang] || 'en-US');
+const intlLang = () => ({ en: 'en-US', es: 'es-AR', pt: 'pt-BR', fr: 'fr-FR' }[locale.get().lang] || 'en-US');
 export function formatNumber(n, digits = null) {
   return new Intl.NumberFormat(intlLang(), digits == null ? {} : { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
 }

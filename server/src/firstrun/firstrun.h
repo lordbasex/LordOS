@@ -25,7 +25,7 @@ typedef struct {
     int version;
     /* each field: has_x says the key was present */
     int has_hostname;        char hostname[64];
-    int has_lang;            char lang[8];             /* en | es | pt */
+    int has_lang;            char lang[8];             /* en | es | pt | fr */
     int has_timezone;        char timezone[64];        /* Area/City, checked against zoneinfo on apply */
     int has_keyboard;        char keyboard[16];        /* xkb layout [a-z]{2,10}, checked on apply */
     int has_variant;         char variant[40];

@@ -214,9 +214,9 @@ function Greeter() {
         const kbs = layouts.map((l, i) => ({ layout: l, variant: variants[i] || '' }));
         if (JSON.stringify(settings.get().keyboards) !== JSON.stringify(kbs)) keyboard.set(kbs);
         // language: the one chosen here before or the system's (if there is no catalog, English)
-        if (!['es', 'en', 'pt'].includes(settings.get().language)) {
+        if (!['es', 'en', 'pt', 'fr'].includes(settings.get().language)) {
           const sys = String(m.lang || '').slice(0, 2);
-          setLanguage(['es', 'en', 'pt'].includes(sys) ? sys : 'en');
+          setLanguage(['es', 'en', 'pt', 'fr'].includes(sys) ? sys : 'en');
         }
         // the selected user: the one from the locked screen, another (switch user), the last one
         // shown on the monitor, one with an open session or the first. Only when the screen is shown
@@ -272,7 +272,7 @@ function Greeter() {
   const avatarSize = Math.round(Math.max(76, Math.min(110, H * 0.12)));
   const kbs = keyboard.configured();
   const kbIdx = Math.min(s.keyboardIndex || 0, kbs.length - 1);
-  const langs = languages().filter((l) => ['es', 'en', 'pt'].includes(l.id));
+  const langs = languages().filter((l) => ['es', 'en', 'pt', 'fr'].includes(l.id));
   const locked = info.mode === 'lock' && user && user.name === info.user;
   // the column rises so the password stays above the on-screen keyboard
   const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);

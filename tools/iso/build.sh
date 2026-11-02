@@ -126,6 +126,7 @@ es_AR.UTF-8 UTF-8
 es_MX.UTF-8 UTF-8
 en_US.UTF-8 UTF-8
 pt_BR.UTF-8 UTF-8
+fr_FR.UTF-8 UTF-8
 EOF
 in_ch locale-gen > /dev/null
 echo 'LANG=en_US.UTF-8' > "$CH/etc/default/locale"     # English by default (lordos-live-prep switches it)
@@ -230,6 +231,10 @@ menuentry "LordOS $VERSION (Español)" {
 }
 menuentry "LordOS $VERSION (Português)" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=pt
+    initrd /live/initrd.img
+}
+menuentry "LordOS $VERSION (Français)" {
+    linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=fr
     initrd /live/initrd.img
 }
 menuentry "LordOS $VERSION (copy to RAM: the USB drive can be removed)" {

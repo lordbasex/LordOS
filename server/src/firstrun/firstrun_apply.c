@@ -240,6 +240,7 @@ static void apply_hostname(const FirstRun *fr) {
 static const char *locale_of(const char *lang) {
     if (!strcmp(lang, "es")) return "es_ES.UTF-8";
     if (!strcmp(lang, "pt")) return "pt_BR.UTF-8";
+    if (!strcmp(lang, "fr")) return "fr_FR.UTF-8";
     return "en_US.UTF-8";
 }
 

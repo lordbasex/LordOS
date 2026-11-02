@@ -10,20 +10,22 @@
 #include <unistd.h>
 
 /* The same list as tools/iso/rootfs/usr/lib/lordos/lordos-live-prep (there with _ for spaces). */
-static const char *const names[3][HOMEDIRS_COUNT] = {
+static const char *const names[4][HOMEDIRS_COUNT] = {
     { "Escritorio", "Documentos", "Descargas", "Música", "Imágenes", "Videos" },   /* i18n-ok */
     { "Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos" },
     { "Área de trabalho", "Documentos", "Downloads", "Música", "Imagens", "Vídeos" },   /* i18n-ok */
+    { "Bureau", "Documents", "Téléchargements", "Musique", "Images", "Vidéos" },   /* i18n-ok */
 };
 static const char *const xdg_keys[HOMEDIRS_COUNT] = { "DESKTOP", "DOCUMENTS", "DOWNLOAD", "MUSIC", "PICTURES", "VIDEOS" };
 
 const char *homedirs_ui_lang(const char *locale) {
     if (locale && !strncmp(locale, "es", 2)) return "es";
     if (locale && !strncmp(locale, "pt", 2)) return "pt";
+    if (locale && !strncmp(locale, "fr", 2)) return "fr";
     return "en";                        /* English is the default language */
 }
 
-static int lang_index(const char *ui) { return !strcmp(ui, "es") ? 0 : !strcmp(ui, "pt") ? 2 : 1; }
+static int lang_index(const char *ui) { return !strcmp(ui, "es") ? 0 : !strcmp(ui, "pt") ? 2 : !strcmp(ui, "fr") ? 3 : 1; }
 
 const char *homedirs_name(const char *ui_lang, int i) {
     if (i < 0 || i >= HOMEDIRS_COUNT) return NULL;
@@ -70,7 +72,7 @@ int homedirs_create(const char *home, uid_t uid, gid_t gid, const char *locale) 
         if (write_new(cfd, "user-dirs.dirs", text, uid, gid)) bad = -1;
         /* the language they were named in (xdg-user-dirs-update compares it when the language changes) */
         char loc[64];
-        snprintf(loc, sizeof loc, "%s", li == 1 ? "en_US" : li == 2 ? "pt_BR" : "es_ES");
+        snprintf(loc, sizeof loc, "%s", li == 1 ? "en_US" : li == 2 ? "pt_BR" : li == 3 ? "fr_FR" : "es_ES");
         if (locale && !strncmp(locale, ui, 2)) { snprintf(loc, sizeof loc, "%s", locale); loc[strcspn(loc, ".@")] = 0; }
         snprintf(text, sizeof text, "%s\n", loc);
         if (write_new(cfd, "user-dirs.locale", text, uid, gid)) bad = -1;

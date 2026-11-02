@@ -11,7 +11,7 @@ Generates (with the Python standard library only, no network):
   assets/monitor/geoip-country.mmdb.xz   IP → country (DB-IP Lite Country, CC BY 4.0), in a minimal
                                       MaxMind DB format (only {"country": {"iso_code"}}), compressed with xz
   apps/monitor/countries.js           [longitude, latitude] of each country's label (LABEL_X/LABEL_Y)
-  assets/locales/{es,en,pt}/countries.json   country names (Natural Earth's NAME_ES/EN/PT)
+  assets/locales/{es,en,pt,fr}/countries.json   country names (Natural Earth's NAME_ES/EN/PT/FR)
 
 Downloads (by hand, once):
   https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson
@@ -250,7 +250,7 @@ def build_mmdb(csv_path, out):
 # ---- countries -----------------------------------------------------------------------------
 
 def countries(geojson):
-    pos, names = {}, {'es': {}, 'en': {}, 'pt': {}}
+    pos, names = {}, {'es': {}, 'en': {}, 'pt': {}, 'fr': {}}
     for feat in geojson['features']:
         p = feat['properties']
         cc = iso_of(p)
@@ -260,7 +260,7 @@ def countries(geojson):
         if lon is None or lat is None:
             continue
         pos[cc] = [round(lon, 2), round(lat, 2)]
-        for lang, key in (('es', 'NAME_ES'), ('en', 'NAME_EN'), ('pt', 'NAME_PT')):
+        for lang, key in (('es', 'NAME_ES'), ('en', 'NAME_EN'), ('pt', 'NAME_PT'), ('fr', 'NAME_FR')):
             names[lang][cc] = p.get(key) or p.get('NAME_EN') or p.get('NAME') or cc
     return pos, names
 

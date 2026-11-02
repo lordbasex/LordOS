@@ -1,0 +1,73 @@
+{
+  "archiveName": "Archive",
+  "archiveSummary": {
+    "one": "{count} fichier, {size}",
+    "other": "{count} fichiers, {size}"
+  },
+  "compressOne": "Compresser « {name} »",
+  "compressMany": {
+    "one": "Compresser {count} élément",
+    "other": "Compresser {count} éléments"
+  },
+  "compressing": "Compression de « {name} »…",
+  "compressProgress": "Compression de « {name} » : {files} fichiers",
+  "compressed": {
+    "one": "« {name} » prêt ({count} fichier)",
+    "other": "« {name} » prêt ({count} fichiers)"
+  },
+  "compressError": "Impossible de compresser « {name} » ({error})",
+  "extractHere": "Extraire ici",
+  "extractSelected": {
+    "one": "Extraire {count} élément",
+    "other": "Extraire {count} éléments"
+  },
+  "extracting": "Extraction de « {name} »…",
+  "extractProgress": "Extraction de « {name} » : {files} fichiers ({pct} %)",
+  "extracted": {
+    "one": "Extrait dans « {name} » ({count} fichier)",
+    "other": "Extrait dans « {name} » ({count} fichiers)"
+  },
+  "extractedSkipped": {
+    "one": "Extrait dans « {name} » ({count} fichier) ; {skipped} ignorés par sécurité",
+    "other": "Extrait dans « {name} » ({count} fichiers) ; {skipped} ignorés par sécurité"
+  },
+  "extractError": "Impossible d’extraire « {name} » ({error})",
+  "opening": "Ouverture de « {name} »…",
+  "loading": "Chargement…",
+  "locked": "protégé par mot de passe",
+  "pages": {
+    "one": "{count} page",
+    "other": "{count} pages"
+  },
+  "more": {
+    "one": "et {count} de plus",
+    "other": "et {count} de plus"
+  },
+  "err.invalid": "ce n’est pas une archive, ou elle est endommagée",
+  "err.disk-full": "le disque est plein",
+  "err.too-big": "trop volumineux",
+  "err.too-many": "trop de fichiers",
+  "err.corrupt": "fichier endommagé",
+  "err.write": "écriture impossible",
+  "err.unavailable": "le service de documents n’est pas disponible",
+  "err.cancelled": "annulé",
+  "err.crash": "le service de documents s’est arrêté de façon inattendue",
+  "err.timeout": "délai dépassé",
+  "err.protocol": "le service de documents a envoyé une réponse non valide",
+  "err.spawn": "impossible de démarrer le service de documents",
+  "err.closed": "le document a été fermé",
+  "err.bad-request": "requête non valide",
+  "err.bad-field": "champ de formulaire non valide",
+  "err.bad-page": "page non valide",
+  "err.busy": "le service de documents est occupé",
+  "err.memory": "mémoire insuffisante",
+  "err.no-fonts": "aucune police disponible",
+  "err.not-open": "le document n’est pas ouvert",
+  "err.nothing": "rien à enregistrer",
+  "err.read-only": "le document est en lecture seule",
+  "err.save": "enregistrement impossible",
+  "err.unknown-op": "opération inconnue",
+  "err.image": "image non valide",
+  "err.blob": "données non valides",
+  "err.password": "le document est protégé par un mot de passe"
+}

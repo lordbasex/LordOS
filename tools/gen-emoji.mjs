@@ -4,11 +4,11 @@
 //
 // The folder must contain (downloaded once, not kept in the repository):
 //   emoji-test.txt                       https://unicode.org/Public/emoji/15.1/emoji-test.txt
-//   ann-{en,es,pt}.json, der-{en,es,pt}.json   cldr-json 45: cldr-annotations-full and
+//   ann-{en,es,pt,fr}.json, der-{en,es,pt,fr}.json   cldr-json 45: cldr-annotations-full and
 //                                        cldr-annotations-derived-full (annotations.json)
 // Writes:
 //   sdk/emojidata.js                     emojis by category (no texts) and which ones accept a skin tone
-//   assets/locales/{en,es,pt}/emojikw.json   name and keywords of each emoji per language
+//   assets/locales/{en,es,pt,fr}/emojikw.json   name and keywords of each emoji per language
 // Data license: Unicode License v3 (Unicode and CLDR), see docs/DOCUMENTS.md.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,7 +64,7 @@ js += '];\n';
 js += `export const TONED = new Set(${JSON.stringify([...toned].join(' '))}.split(' '));\n`;
 fs.writeFileSync(path.join(root, 'sdk/emojidata.js'), js);
 
-for (const lang of ['en', 'es', 'pt']) {
+for (const lang of ['en', 'es', 'pt', 'fr']) {
   const ann = { ...JSON.parse(fs.readFileSync(path.join(src, `der-${lang}.json`), 'utf8')).annotationsDerived.annotations,
     ...JSON.parse(fs.readFileSync(path.join(src, `ann-${lang}.json`), 'utf8')).annotations.annotations };
   const enAnn = lang === 'en' ? ann : { ...JSON.parse(fs.readFileSync(path.join(src, 'der-en.json'), 'utf8')).annotationsDerived.annotations,

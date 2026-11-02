@@ -1,0 +1,10 @@
+{
+  "openTitle": "« {app} » souhaite ouvrir un fichier",
+  "saveTitle": "« {app} » souhaite enregistrer un fichier",
+  "open": "Ouvrir",
+  "save": "Enregistrer",
+  "cancel": "Annuler",
+  "up": "Dossier parent",
+  "name": "Nom",
+  "folder": "Dossier"
+}

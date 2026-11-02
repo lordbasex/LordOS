@@ -27,6 +27,7 @@ const ALLOW = [
   [/(^|\/)shell\.json$/, 'Show All Windows', 'app windows, not the OS'],
   [/^assets\/help\/[a-z]+\/windows\.md$/, /^(title: Windows|# Windows)$/m, 'the Help article about app windows'],
   [/^assets\/help\//, '[Windows](help:windows)', 'link to the Help article about app windows'],
+  [/^assets\/locales\/fr\/(countries|emojikw)\.json$/, 'Macédoine', 'the country in French: the check reads "Mac" before an é as a whole word'],
 ];
 
 function files() {

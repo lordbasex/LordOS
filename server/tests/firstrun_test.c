@@ -212,7 +212,7 @@ static void broken(void) {
         "", "\n", "# only a comment\n", "hostname=pi\nversion=1\n", "version=2\n", "version=1\nversion=1\n",
         "version=1\nhostname=pi\nhostname=pi2\n", "version=1\nfoo=bar\n", "version=1\nhostname\n",
         "version=1\nhostname= pi\n", "version=1\nhostname=pi \n", "version=1\nhostname=\n", "version=1\nhostname=PI\n",
-        "version=1\n hostname=pi\n", "version=1\nhostname=p\ti\n", "version=1\nlang=fr\n", "version=1\nlang=EN\n",
+        "version=1\n hostname=pi\n", "version=1\nhostname=p\ti\n", "version=1\nlang=de\n", "version=1\nlang=EN\n",
         "version=1\ntimezone=../../etc/shadow\n", "version=1\nkeyboard=../x\n", "version=1\nkeyboard=US\n",
         "version=1\nkeyboard_variant=intl\n", "version=1\nwifi_country=ar\n", "version=1\nwifi_country=ARG\n",
         "version=1\nuser=root\npassword_hash=$6$saltstring$svn8UoSVapNtMuq1ukKS4tPQd8iKwSMHWjl/O817G3uBnIFNjnQJuesI68u4OTLiBFdcbYEdFCoEOfaS35inz1\n",

@@ -1,0 +1,73 @@
+{
+  "months": [
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre"
+  ],
+  "monthsShort": [
+    "janv.",
+    "févr.",
+    "mars",
+    "avr.",
+    "mai",
+    "juin",
+    "juil.",
+    "août",
+    "sept.",
+    "oct.",
+    "nov.",
+    "déc."
+  ],
+  "weekdays": [
+    "dimanche",
+    "lundi",
+    "mardi",
+    "mercredi",
+    "jeudi",
+    "vendredi",
+    "samedi"
+  ],
+  "weekdaysShort": [
+    "dim.",
+    "lun.",
+    "mar.",
+    "mer.",
+    "jeu.",
+    "ven.",
+    "sam."
+  ],
+  "date": {
+    "short": "{wd} {day} {mon}",
+    "long": "{weekday} {day} {month} {yyyy}",
+    "dayMonth": "{weekday} {day} {month}",
+    "numeric": "{dd}/{mm}/{yyyy}"
+  },
+  "decimal": ",",
+  "group": " ",
+  "hour12": false,
+  "regions": {
+    "fr_CH": {
+      "decimal": ".",
+      "date": {
+        "numeric": "{dd}.{mm}.{yyyy}"
+      }
+    },
+    "fr_CA": {
+      "date": {
+        "numeric": "{yyyy}-{mm}-{dd}"
+      }
+    },
+    "fr_BE": {
+      "group": "."
+    }
+  }
+}

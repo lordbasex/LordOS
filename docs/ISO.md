@@ -40,7 +40,7 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 | LordOS (live) | normal, in English (the default language) |
 | Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
 | LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
-| LordOS (Español) / LordOS (Português) | `lordos.lang=es` / `lordos.lang=pt`: the interface in Spanish or Portuguese the first time |
+| LordOS (Español) / LordOS (Português) / LordOS (Français) | `lordos.lang=es` / `lordos.lang=pt` / `lordos.lang=fr`: the interface in that language the first time |
 | LordOS (copy to RAM) | `toram`: copies the system to memory (~1 GB free is needed) and the USB stick can be removed |
 
 The GRUB menu itself is in English (GRUB's default). Every entry except safe mode boots with the
@@ -183,7 +183,7 @@ text in between.
   fonts): the navy background, a small crown, the entries in the brand colours with the selected one
   on a rounded violet band,. The ISO copies it to
   `/boot/grub/themes/lordos/`; the package installs it in `/usr/share/grub/themes/lordos/` (on arm64
-  too since 0.8.7) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português,
+  too since 0.8.7) and the disk installer sets `GRUB_THEME` to it. The entries (English, Español, Português, Français,
   safe mode, copy to RAM) are the same as before; *Check this computer* joined them in 0.8.7, and the menu's height
   went from 290 to 344 for its six lines. GRUB's theme has no scrollbar and takes the padding and the selection
   band's edges from that height (`get_num_shown_items`), so 290 shows five lines. `tests/livestart_test.mjs` works
@@ -425,7 +425,7 @@ previous one is kept with its date: `lordos-live-0.7.0-amd64-20261016-1529.iso` 
 2. `debootstrap --variant=minbase` of trixie, with main, contrib, non-free and non-free-firmware.
 3. `apt-get install --no-install-recommends` of the list above and the LordOS package.
 4. Configuration:
-   - locales `es_ES`, `es_AR`, `es_MX`, `en_US` and `pt_BR`;
+   - locales `es_ES`, `es_AR`, `es_MX`, `en_US`, `pt_BR` and `fr_FR`;
    - the `lordos` user, with linger;
    - `lordos.service` enabled and `getty@tty1` masked;
    - `/etc/resolv.conf` as a regular file, for LordOS's DHCP;
@@ -806,7 +806,7 @@ Idle (after a minute without input):
 
 1. **English live session with the Latin American keyboard.** The SDK's default layout is `latam`,
    and `lordos-live-prep` only wrote the language. It now also writes `keyboards` for the live user
-   from the boot entry: English → `us`, Español → `latam`, Português → `br`.
+   from the boot entry: English → `us`, Español → `latam`, Português → `br`, Français → `fr`.
 2. **GTK 3 apps drew light Adwaita.** lord-server writes `gtk-theme` to the GSettings keyfile, but
    without `gsettings-desktop-schemas` GTK 3 can't read it. The ISO installs it and the package
    recommends it.
@@ -861,7 +861,7 @@ It boots from the CD first.
 - Optional persistence on the USB stick (live-boot's `persistence`). (The installer to disk is done:
   "Installing to disk" above.)
 - **Keyboard:** `lordos-live-prep` sets the live user's layout from the boot entry's language
-  (English: US, Español: Latin American, Português: Brazilian) and it's changed in Settings →
+  (English: US, Español: Latin American, Português: Brazilian, Français: French) and it's changed in Settings →
   Keyboard. A selector on first boot is missing.
 - **Real GPU (AMD/Nvidia):** to be tested with the ISO on real hardware. The GPU path is built
   (`GPU.md`); the ISO ships Mesa and the firmware, and the "safe mode" entry passes `LORD_GPU=0`.
