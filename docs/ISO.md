@@ -525,6 +525,20 @@ text was fixed (sha256 `daba6313…c8ec65`). That ISO has the same binaries; onl
 With the final ISO, UEFI boot, the network, ❖L/Enter and the installer summary were repeated. Nothing
 was installed in that repeat.
 
+## Release test (0.8.7 Beta, November 1)
+
+`lordos-live-0.8.7-amd64.iso` (1,081,851,904 bytes, sha256 `0b2fec20c44e0ff69fa835d6a3095a37cebe1ca3516e40b795a3fa4105679042`), `lordos-live-0.8.7-arm64.iso`
+(1,053,931,520 bytes, sha256 `4255b2f6e39036cdb1a916243741bdeb012d7832e89da96690ff2706893eae40`) and `lordos-0.8.7-rpi5-arm64.img.xz` (811,451,772 bytes, sha256
+`5c98a83e4c58e48921a724ba93dd4d08fac2863c8858ff7783b4249ace7e9555`) are the 0.8.7-beta release files, built on VM 116 with `GPU=1 RELEASE=1` from a signed tree.
+
+| Test | Result |
+|---|---|
+| Development build of the same code on VM 116 | `make test`: 23 passed, 0 failed, 22 skipped; `clean-test`: 1,097 checks, 0 failed |
+| Release `lord-server --check-code` | 10 files verified |
+| amd64 ISO in a new VM (Proxmox, q35, no network), 2.5 minutes | live desktop with the installer open; not installed from |
+| arm64 ISO on emulated QEMU (`virt`, edk2, virtio-gpu, no acceleration), 11 minutes | live desktop with the installer open; not installed from |
+| Raspberry Pi image | not booted: the board ran the same code in a development build |
+
 ## Release test (0.8.6 Beta, October 30)
 
 `lordos-live-0.8.6-amd64.iso` (1,054,357,504 bytes, sha256
