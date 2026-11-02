@@ -9,6 +9,7 @@
 #include "../errcode.h"
 #include "../pkg/crypto.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -43,6 +44,10 @@ int sig_official(const char *keyhex) {
 #ifdef LORD_SIGN_TEST
     if (test_official[0] && !strcmp(test_official, keyhex)) return 1;
 #endif
+#ifdef LORD_PKGAPP_TEST
+    /* only build/lord-server-pkgtest, a test binary for tests/companion_e2e.sh, never installed */
+    if (getenv("LORD_TEST_OFFICIAL") && !strcmp(getenv("LORD_TEST_OFFICIAL"), keyhex)) return 1;
+#endif
     return 0;
 }
 
@@ -72,24 +77,40 @@ int sig_make_detached(const uint8_t seed[32], const void *data, size_t len, char
     return n > 0 && (size_t)n < outlen ? 0 : -1;
 }
 
+/* The fields both checks need: contenido.json is about this app and version, with a list of files. */
+static const JVal *contents_files(const JVal *root, const char *id, const char *version, char *err, size_t errlen) {
+    const char *cid = json_str(root, "id"), *cver = json_str(root, "version");
+    const JVal *files = json_get(root, "files");
+    if (json_num(root, "format", 0) != 1) { seterr(err, errlen, "sig.contents.unknownFormat"); return NULL; }
+    if (!cid || strcmp(cid, id) || !cver || strcmp(cver, version)) { seterr(err, errlen, "sig.contents.otherApp"); return NULL; }
+    if (!files || files->type != J_ARR) { seterr(err, errlen, "sig.contents.noFiles"); return NULL; }
+    return files;
+}
+
+/* One entry of the list: well formed, and not named twice. */
+static int contents_entry(const JVal *files, const JVal *f, const char **path, const char **sha, double *size, char *err, size_t errlen) {
+    *path = json_str(f, "path");
+    *sha = json_str(f, "sha256");
+    *size = json_num(f, "size", -1);
+    if (!*path || !lpk_valid_path(*path) || !strcmp(*path, SIG_CONTENTS) || !strcmp(*path, SIG_SIGNATURE) || !is_hex(*sha, 64) || *size < 0) {
+        seterr(err, errlen, "sig.contents.badEntry");
+        return -1;
+    }
+    for (const JVal *g = files->kid; g != f; g = g->next)
+        if (!strcmp(json_str(g, "path"), *path)) { seterr(err, errlen, "sig.contents.duplicate"); return -1; }
+    return 0;
+}
+
 /* contenido.json against the package's files: each file (except contenido.json and firma.json)
  * appears once, with the same size and SHA-256, and none is extra or missing. */
 static int check_contents(const Lpk *pk, const JVal *root, const char *id, const char *version, char *err, size_t errlen) {
-    const char *cid = json_str(root, "id"), *cver = json_str(root, "version");
-    const JVal *files = json_get(root, "files");
-    if (json_num(root, "format", 0) != 1) { seterr(err, errlen, "sig.contents.unknownFormat"); return -1; }
-    if (!cid || strcmp(cid, id) || !cver || strcmp(cver, version)) { seterr(err, errlen, "sig.contents.otherApp"); return -1; }
-    if (!files || files->type != J_ARR) { seterr(err, errlen, "sig.contents.noFiles"); return -1; }
+    const JVal *files = contents_files(root, id, version, err, errlen);
+    if (!files) return -1;
     int listed = 0;
     for (const JVal *f = files->kid; f; f = f->next) {
-        const char *path = json_str(f, "path"), *sha = json_str(f, "sha256");
-        double size = json_num(f, "size", -1);
-        if (!path || !lpk_valid_path(path) || !strcmp(path, SIG_CONTENTS) || !strcmp(path, SIG_SIGNATURE) || !is_hex(sha, 64) || size < 0) {
-            seterr(err, errlen, "sig.contents.badEntry");
-            return -1;
-        }
-        for (const JVal *g = files->kid; g != f; g = g->next)
-            if (!strcmp(json_str(g, "path"), path)) { seterr(err, errlen, "sig.contents.duplicate"); return -1; }
+        const char *path, *sha;
+        double size;
+        if (contents_entry(files, f, &path, &sha, &size, err, errlen)) return -1;
         const LpkFile *lf = lpk_find(pk, path);
         if (!lf) { if (err && errlen) lerr_set(err, errlen, "sig.fileMissing", "path", path, NULL); return -1; }
         uint8_t h[32];
@@ -106,6 +127,47 @@ static int check_contents(const Lpk *pk, const JVal *root, const char *id, const
     return 0;
 }
 
+/* Signature, signer and revocation, once the file list was checked by `check`. */
+typedef int (*ContentsCheck)(const JVal *root, void *ctx, char *err, size_t errlen);
+
+static int verify_signed(const void *cd, size_t cn, const void *sd, size_t sn, const char *id, const char *version,
+                         ContentsCheck check, void *ctx, LpkSigInfo *out, char *err, size_t errlen) {
+    uint8_t h[32];
+    sha256(cd, cn, h);
+    hex_encode(h, 32, out->contents_sha);
+    JDoc d;
+    char why[96];
+    if (json_parse((const char *)cd, cn, &d, why, sizeof why)) {
+        if (err && errlen) lerr_set(err, errlen, "sig.contents.invalid", NULL);
+        return -1;
+    }
+    int r = check(d.root, ctx, err, errlen);
+    const JVal *signer = json_get(d.root, "signer");
+    const char *sname = json_str(signer, "name"), *skey = json_str(signer, "key");
+    if (!r && sd) {
+        r = sig_verify_detached((const char *)sd, sn, cd, cn, out->key, err, errlen);
+        if (!r && (!skey || strcmp(skey, out->key))) { seterr(err, errlen, "sig.contents.otherKey"); r = -1; }
+    }
+    if (!r) {
+        if (!sd) out->trust = LPK_UNSIGNED;
+        else if (sig_official(out->key)) { out->trust = LPK_OFFICIAL; snprintf(out->signer, sizeof out->signer, "LordOS"); }
+        else {
+            const char *a = catalog_author(out->key);
+            out->trust = a ? LPK_VERIFIED : LPK_SIGNED;
+            snprintf(out->signer, sizeof out->signer, "%s", a ? a : sname && sname[0] ? sname : out->key);
+        }
+        if (catalog_revoked(out->key, id, version, out->contents_sha, out->revoked_why, sizeof out->revoked_why)) out->revoked = 1;
+    }
+    json_free(&d);
+    return r;
+}
+
+typedef struct { const Lpk *pk; const char *id, *version; } PkCtx;
+static int pk_check(const JVal *root, void *ctx, char *err, size_t errlen) {
+    const PkCtx *c = ctx;
+    return check_contents(c->pk, root, c->id, c->version, err, errlen);
+}
+
 int sig_verify_package(const Lpk *pk, const char *id, const char *version, LpkSigInfo *out, char *err, size_t errlen) {
     memset(out, 0, sizeof *out);
     const LpkFile *c = lpk_find(pk, SIG_CONTENTS), *s = lpk_find(pk, SIG_SIGNATURE);
@@ -117,33 +179,128 @@ int sig_verify_package(const Lpk *pk, const char *id, const char *version, LpkSi
         if (catalog_revoked("", id, version, "", out->revoked_why, sizeof out->revoked_why)) out->revoked = 1;
         return 0;
     }
-    uint8_t h[32];
-    sha256(c->data, c->size, h);
-    hex_encode(h, 32, out->contents_sha);
-    JDoc d;
-    char why[96];
-    if (json_parse((const char *)c->data, c->size, &d, why, sizeof why)) {
-        if (err && errlen) lerr_set(err, errlen, "sig.contents.invalid", NULL);
+    PkCtx ctx = { pk, id, version };
+    return verify_signed(c->data, c->size, s ? s->data : NULL, s ? s->size : 0, id, version, pk_check, &ctx, out, err, errlen);
+}
+
+/* ---- a package unpacked on disk (the third app root, sec/pkgapp.c) ---- */
+
+#define TREE_META_MAX (4u * 1024 * 1024)
+#define TREE_MAX_FILES 4096
+
+/* Root's and writable by nobody else, and never a set-id file. */
+static int tree_owned(const struct stat *st) {
+#ifdef LORD_SIGN_TEST
+    if (st->st_uid == getuid()) return !(st->st_mode & (S_IWGRP | S_IWOTH | S_ISUID | S_ISGID));     /* tests/pkgapp_test.c, no root */
+#endif
+    return st->st_uid == 0 && !(st->st_mode & (S_IWGRP | S_IWOTH | S_ISUID | S_ISGID));
+}
+
+/* Every entry under the folder is a regular file or a folder of the right owner; n counts the files. */
+static int tree_count(int dirfd, int depth, int *n) {
+    if (depth > 16) return -1;
+    int fd = openat(dirfd, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    DIR *d = fd >= 0 ? fdopendir(fd) : NULL;
+    if (!d) { if (fd >= 0) close(fd); return -1; }
+    int r = 0;
+    struct dirent *e;
+    while (!r && (e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        struct stat st;
+        if (fstatat(dirfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW) || !tree_owned(&st)) { r = -1; break; }
+        if (S_ISDIR(st.st_mode)) {
+            int sub = openat(dirfd, e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            r = sub >= 0 ? tree_count(sub, depth + 1, n) : -1;
+            if (sub >= 0) close(sub);
+        } else if (!S_ISREG(st.st_mode) || ++*n > TREE_MAX_FILES) r = -1;
+    }
+    closedir(d);
+    return r;
+}
+
+/* Whole file, one descriptor: what is hashed is what comes back. */
+static int tree_file(int dirfd, const char *path, const char *sha, double size, int *keep, char *err, size_t errlen) {
+    int fd = openat(dirfd, path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || !tree_owned(&st)) {
+        if (fd >= 0) close(fd);
+        if (err && errlen) lerr_set(err, errlen, "sig.fileMissing", "path", path, NULL);
         return -1;
     }
-    int r = check_contents(pk, d.root, id, version, err, errlen);
-    const JVal *signer = json_get(d.root, "signer");
-    const char *sname = json_str(signer, "name"), *skey = json_str(signer, "key");
-    if (!r && s) {
-        r = sig_verify_detached((const char *)s->data, s->size, c->data, c->size, out->key, err, errlen);
-        if (!r && (!skey || strcmp(skey, out->key))) { seterr(err, errlen, "sig.contents.otherKey"); r = -1; }
+    Sha256 ctx;
+    sha256_init(&ctx);
+    static unsigned char buf[1 << 20];
+    unsigned long long total = 0;
+    int bad = 0;
+    for (;;) {
+        ssize_t r = read(fd, buf, sizeof buf);
+        if (r < 0 && errno == EINTR) continue;
+        if (r < 0) bad = 1;
+        if (r <= 0) break;
+        sha256_update(&ctx, buf, (size_t)r);
+        total += (unsigned long long)r;
     }
-    if (!r) {
-        if (!s) out->trust = LPK_UNSIGNED;
-        else if (sig_official(out->key)) { out->trust = LPK_OFFICIAL; snprintf(out->signer, sizeof out->signer, "LordOS"); }
-        else {
-            const char *a = catalog_author(out->key);
-            out->trust = a ? LPK_VERIFIED : LPK_SIGNED;
-            snprintf(out->signer, sizeof out->signer, "%s", a ? a : sname && sname[0] ? sname : out->key);
-        }
-        if (catalog_revoked(out->key, id, version, out->contents_sha, out->revoked_why, sizeof out->revoked_why)) out->revoked = 1;
+    uint8_t h[32];
+    char hx[65];
+    sha256_final(&ctx, h);
+    hex_encode(h, 32, hx);
+    if (bad || (double)total != size || (double)st.st_size != size || strcmp(hx, sha)) {
+        close(fd);
+        if (err && errlen) lerr_set(err, errlen, "sig.fileModified", "path", path, NULL);
+        return -1;
     }
-    json_free(&d);
+    if (keep) *keep = fd; else close(fd);
+    return 0;
+}
+
+typedef struct { int dirfd; const char *id, *version, *keep; int *keep_fd; } TreeCtx;
+
+static int tree_check(const JVal *root, void *vctx, char *err, size_t errlen) {
+    const TreeCtx *c = vctx;
+    const JVal *files = contents_files(root, c->id, c->version, err, errlen);
+    if (!files) return -1;
+    int real = 0, listed = 0;
+    /* the walk first: it refuses links, so the opens below can't be led out of the folder */
+    if (tree_count(c->dirfd, 0, &real)) { seterr(err, errlen, "sig.extraFiles"); return -1; }
+    for (const JVal *f = files->kid; f; f = f->next) {
+        const char *path, *sha;
+        double size;
+        if (contents_entry(files, f, &path, &sha, &size, err, errlen)) return -1;
+        int want = c->keep && !strcmp(path, c->keep);
+        if (tree_file(c->dirfd, path, sha, size, want ? c->keep_fd : NULL, err, errlen)) return -1;
+        listed++;
+    }
+    if (real != listed + 2) { seterr(err, errlen, "sig.extraFiles"); return -1; }        /* + contenido.json and firma.json */
+    return 0;
+}
+
+int sig_verify_tree(int dirfd, const char *id, const char *version, const char *keep, int *keep_fd, LpkSigInfo *out, char *err, size_t errlen) {
+    memset(out, 0, sizeof *out);
+    if (keep_fd) *keep_fd = -1;
+    char *c = NULL, *s = NULL;
+    size_t cn = 0, sn = 0;
+    int r = -1;
+    for (int i = 0; i < 2; i++) {
+        int fd = openat(dirfd, i ? SIG_SIGNATURE : SIG_CONTENTS, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        struct stat st;
+        char *b = NULL;
+        if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && tree_owned(&st) && (size_t)st.st_size <= TREE_META_MAX &&
+            (b = malloc((size_t)st.st_size + 1)) && read(fd, b, (size_t)st.st_size) == st.st_size) {
+            b[st.st_size] = 0;
+            if (i) { s = b; sn = (size_t)st.st_size; } else { c = b; cn = (size_t)st.st_size; }
+        } else free(b);
+        if (fd >= 0) close(fd);
+    }
+    out->has_contents = c != NULL;
+    out->has_signature = s != NULL;
+    if (!c || !s) seterr(err, errlen, "sig.contents.missing");       /* a tree is never unsigned */
+    else {
+        TreeCtx ctx = { dirfd, id, version, keep, keep_fd };
+        r = verify_signed(c, cn, s, sn, id, version, tree_check, &ctx, out, err, errlen);
+    }
+    if (r && keep_fd && *keep_fd >= 0) { close(*keep_fd); *keep_fd = -1; }
+    free(c);
+    free(s);
     return r;
 }
 

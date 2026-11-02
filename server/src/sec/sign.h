@@ -38,6 +38,11 @@ typedef struct {
  * badly signed or is missing files (err says why). */
 int sig_verify_package(const Lpk *pk, const char *id, const char *version, LpkSigInfo *out, char *err, size_t errlen);
 
+/* The same check on an unpacked folder, reading each file through one descriptor: nothing but root-owned
+ * regular files and folders no one else can write, every file listed and none extra. keep (a listed path, or NULL):
+ * *keep_fd gets the descriptor that was hashed, so what runs is what was checked. A tree must be signed. */
+int sig_verify_tree(int dirfd, const char *id, const char *version, const char *keep, int *keep_fd, LpkSigInfo *out, char *err, size_t errlen);
+
 /* Verifies a firma.json (alg, key, sig) over data. 0 on success; key (65) gets the key. */
 int sig_verify_detached(const char *sig_json, size_t siglen, const void *data, size_t len, char key[65], char *err, size_t errlen);
 
