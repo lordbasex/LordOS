@@ -19,6 +19,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- Screen sharing: a fullscreen Linux window no longer covers the sharing indicator, and a visitor can't click or type in the windows of the app that let them in.
 - Live media for packaged apps: a companion hands what it receives to a sandboxed decoder, and the app shows it in a `<MediaView>`, with sound. The camera and microphone of a call come back through the same link, behind the same permissions and indicators.
 - Store: a Remote access section, shown once the catalog has an app in it.
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
