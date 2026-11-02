@@ -62,6 +62,7 @@
 #include "../term/term.h"
 #include "../ui/ui.h"
 #include "../sec/broker.h"
+#include "wlregion.h"
 
 enum { R_NONE, R_TOPLEVEL, R_POPUP, R_SUB, R_CURSOR };
 
@@ -135,6 +136,9 @@ struct Surf {
     XWin *xw;
     int xpop, xx, xy, xmin;
     char app_alt[128];              /* X11: the WM_CLASS instance (the class is app_id) */
+    /* wl_surface.set_input_region: without one the whole surface takes input */
+    WlRgn input, p_input;
+    int has_input, p_input_set, p_has_input;
 };
 
 /* Shape of a surface's hole in the UI: if it changes, the UI must be repainted. */
@@ -539,8 +543,17 @@ static void srf_frame(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     wl_list_insert(s->p_frames.prev, wl_resource_get_link(cb));
 }
 
-static void srf_region(struct wl_client *c, struct wl_resource *r, struct wl_resource *region) {
+static void srf_opaque(struct wl_client *c, struct wl_resource *r, struct wl_resource *region) {
     (void)c; (void)r; (void)region;
+}
+
+static void srf_input(struct wl_client *c, struct wl_resource *r, struct wl_resource *region) {
+    Surf *s = wl_resource_get_user_data(r);
+    static const WlRgn none;
+    const WlRgn *from = region ? wl_resource_get_user_data(region) : &none;
+    if (wlrgn_copy(&s->p_input, from)) { wl_client_post_no_memory(c); return; }
+    s->p_input_set = 1;
+    s->p_has_input = region != NULL;
 }
 
 static void srf_commit(struct wl_client *c, struct wl_resource *r) {
@@ -555,6 +568,13 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     }
     s->bscale = s->p_bscale;
     apply_viewport(s);
+    if (s->p_input_set) {
+        WlRgn t = s->input;                 /* the pending one is overwritten by the next request */
+        s->input = s->p_input;
+        s->p_input = t;
+        s->has_input = s->p_has_input;
+        s->p_input_set = 0;
+    }
     wl_list_insert_list(s->frames.prev, &s->p_frames);
     wl_list_init(&s->p_frames);
     wl_list_insert_list(s->feedback.prev, &s->p_feedback);
@@ -585,7 +605,7 @@ static void srf_offset(struct wl_client *c, struct wl_resource *r, int32_t x, in
 
 static const struct wl_surface_interface surface_impl = {
     .destroy = srf_destroy, .attach = srf_attach, .damage = srf_damage, .frame = srf_frame,
-    .set_opaque_region = srf_region, .set_input_region = srf_region, .commit = srf_commit,
+    .set_opaque_region = srf_opaque, .set_input_region = srf_input, .commit = srf_commit,
     .set_buffer_transform = srf_transform, .set_buffer_scale = srf_scale, .damage_buffer = srf_damage,
     .offset = srf_offset,
 };
@@ -635,6 +655,8 @@ static void surface_gone(struct wl_resource *r) {
     constraint_update();                /* s may have been the window with the keyboard */
     if (s->dmabuf) queue_release(s->dmabuf);
     gpu_tex_free(s->tex);
+    wlrgn_free(&s->input);
+    wlrgn_free(&s->p_input);
     free(s->px);
     free(s);
 }
@@ -642,10 +664,17 @@ static void surface_gone(struct wl_resource *r) {
 /* ---- wl_compositor / wl_region ---- */
 
 static void rgn_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-static void rgn_op(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
-    (void)c; (void)r; (void)x; (void)y; (void)w; (void)h;
+static void rgn_op(struct wl_client *c, struct wl_resource *r, int sub, int x, int y, int w, int h) {
+    if (wlrgn_push(wl_resource_get_user_data(r), sub, x, y, w, h)) wl_client_post_no_memory(c);
 }
-static const struct wl_region_interface region_impl = { .destroy = rgn_destroy, .add = rgn_op, .subtract = rgn_op };
+static void rgn_add(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) { rgn_op(c, r, 0, x, y, w, h); }
+static void rgn_sub(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) { rgn_op(c, r, 1, x, y, w, h); }
+static const struct wl_region_interface region_impl = { .destroy = rgn_destroy, .add = rgn_add, .subtract = rgn_sub };
+static void rgn_gone(struct wl_resource *r) {
+    WlRgn *g = wl_resource_get_user_data(r);
+    wlrgn_free(g);
+    free(g);
+}
 
 static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     int slot = -1;
@@ -670,9 +699,10 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
 }
 
 static void comp_create_region(struct wl_client *c, struct wl_resource *r, uint32_t id) {
-    struct wl_resource *res = wl_resource_create(c, &wl_region_interface, wl_resource_get_version(r), id);
-    if (!res) { wl_client_post_no_memory(c); return; }
-    wl_resource_set_implementation(res, &region_impl, NULL, NULL);
+    WlRgn *g = calloc(1, sizeof *g);
+    struct wl_resource *res = g ? wl_resource_create(c, &wl_region_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(g); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(res, &region_impl, g, rgn_gone);
 }
 
 static const struct wl_compositor_interface compositor_impl = {
@@ -2455,7 +2485,10 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
         Surf *hit = surface_at(k, lx - k->sx, ly - k->sy, ox, oy);
         if (hit) return hit;
     }
-    if (s->content && lx >= 0 && ly >= 0 && lx < s->lw && ly < s->lh) { *ox = lx; *oy = ly; return s; }
+    if (s->content && lx >= 0 && ly >= 0 && lx < s->lw && ly < s->lh && (!s->has_input || wlrgn_has(&s->input, lx, ly))) {
+        *ox = lx; *oy = ly;
+        return s;
+    }
     return NULL;
 }
 

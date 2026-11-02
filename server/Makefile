@@ -278,6 +278,11 @@ build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/keygrab_test.c src/wl/keygrab.c
 	./$@
+test: build/wlregion-test
+build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc -o $@ tests/wlregion_test.c
+	./$@
 
 test: build/xwm-test
 build/xwm-test: tests/xwm_test.c src/wl/x11wire.c src/wl/x11wire.h

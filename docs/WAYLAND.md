@@ -25,7 +25,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 
 | Protocol | Version | What it does |
 |---|---|---|
-| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit and released right away |
+| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit and released right away; `set_input_region` is applied on commit and the pointer hit test obeys it (`wlregion.h`). A surface with an empty region takes no input and the pointer goes to what is below: Firefox's content is such a subsurface, and GTK only knows the toplevel below it. `set_opaque_region` is ignored |
 | `wl_shm` | (libwayland) | ARGB8888/XRGB8888 shared memory |
 | `wl_subcompositor` | 1 | subsurfaces (composited on top of their parent) |
 | `wl_output` | 4 | one per display: logical position, physical mode, scale rounded up, name and description (`DISPLAYS.md`) |
