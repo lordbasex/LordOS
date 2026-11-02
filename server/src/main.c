@@ -57,6 +57,7 @@
 #include "ui/portal.h"
 #include "ui/js_logs.h"
 #include "hw/hw.h"
+#include "hw/pkagent.h"
 #include "hw/modes.h"
 #include "ui/js_hw.h"
 #include "outputs.h"
@@ -557,12 +558,14 @@ static int remote_typed;
 static void keyboards_check(Server *s) {
     static int last = -1;
     int now = input_has_keyboard(&s->input) || remote_typed;
+    pkagent_set_local(s->input.count > 0);                 /* whether a PS/2 keyboard is real is unknown until it types */
     js_input_set_keyboard(now);
     if (now != last) { last = now; js_keyboards_event(now); }
 }
 
 static void remote_key(int code, int value) {
     Server *s = remote_server;
+    if (pkagent_blocks_injected(value)) return;           /* an authentication prompt takes only this computer's keys */
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
     if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
@@ -1085,6 +1088,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
             s->buttons[s->nbuttons++] = (ButtonEvent){ ev->value == 1, button };
         else if (ev->code < BTN_MISC) {
+            if (pkagent_key(ev->code, ev->value)) break;   /* before JavaScript, input methods and apps */
             if (keylag_enabled) keylag_rx(ev->value, &ev->time);
             js_key(ev->code, ev->value);
             if (keylag_enabled) keylag_handled();
@@ -2599,7 +2603,7 @@ int main(int argc, char **argv) {
         n += nabr;
         int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes lord-media y sus streams de PipeWire */
         n += nmed;
-        int hwbase = n, nhw = hw_pollfds(pfd + n, 4);            /* uevents and the system bus (src/hw) */
+        int hwbase = n, nhw = hw_pollfds(pfd + n, 7);            /* uevents and the system bus (src/hw) */
         n += nhw;
         if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
         loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */

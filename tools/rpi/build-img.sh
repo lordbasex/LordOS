@@ -69,7 +69,7 @@ esac
 PKGS_BASE="initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
  iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps e2fsprogs fdisk dosfstools util-linux
  systemd-timesyncd"
-PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit
+PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit polkitd pkexec
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
  cups avahi-daemon power-profiles-daemon shared-mime-info gsettings-desktop-schemas"

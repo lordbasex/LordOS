@@ -6,6 +6,7 @@
 #include "../sec/pwguard.h"
 #include "ppd.h"
 #include "sysbus.h"
+#include "pkagent.h"
 #include "uevent.h"
 
 #include <stdio.h>
@@ -39,6 +40,7 @@ void hw_start(const DisplayHost *h, int with_bus) {
     if (with_bus && sysbus_start() == 0) {
         bt_start(hw_emit);
         ppd_start(hw_emit);
+        pkagent_start(hw_emit);
         sysbus_on_signal(td_signal);
         sysbus_add_match("type='signal',sender='org.freedesktop.timedate1',interface='org.freedesktop.DBus.Properties',path='/org/freedesktop/timedate1'");
     }
@@ -50,6 +52,7 @@ int hw_pollfds(struct pollfd *p, int max) {
     if (n < max && notifyd_fd() >= 0) p[n++] = (struct pollfd){ notifyd_fd(), (short)(POLLIN | (notifyd_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && sysbus_fd() >= 0) p[n++] = (struct pollfd){ sysbus_fd(), (short)(POLLIN | (sysbus_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && pwguard_fd() >= 0) p[n++] = (struct pollfd){ pwguard_fd(), (short)(POLLIN | (pwguard_wants_write() ? POLLOUT : 0)), 0 };
+    n += pkagent_pollfds(p + n, max - n);
     return n;
 }
 
@@ -65,12 +68,14 @@ void hw_dispatch(const struct pollfd *p, int n) {
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();
         else if (p[i].fd == pwguard_fd()) pwguard_dispatch();
     }
+    pkagent_dispatch(p, n);
 }
 
 void hw_events(void) {
     bt_flush_events();
     notifyd_tick();
     pwguard_tick();
+    pkagent_tick();
     if (sysbus_up() && sysbus_wants_write()) dbus_flush(sysbus_conn());
 }
 

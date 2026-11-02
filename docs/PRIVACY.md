@@ -260,6 +260,61 @@ rule's fixed root, from a plan the user confirmed, with a confirmation that says
 `lord.fs` gained nothing, and the scans stay on this machine. Its history keeps counts and sizes, never a path. Three closed
 admin actions clean the operating system's own files, for administrators (`clean-journal`, `clean-apt-cache`, `clean-var-tmp`).
 
+## Authentication for Linux apps (0.8.8)
+
+A Linux app that needs root usually runs `pkexec`, whatever desktop it is on, and an update of a launcher
+installed from a `.deb` is the common case. pkexec needs polkit and an **authentication agent**: the
+program that asks for the password. Without one it stops with error 127. Since 0.8.8 `lordos` depends on
+`polkitd` and `pkexec`, both are on the images, and `lord-server` is the session's agent. It adds no
+admin action and nothing of it runs as root: the admin helper's closed list is not involved, `lord-server`
+stays the session user, and the only privileged program is polkit's own setuid helper.
+
+| Step | What happens |
+|---|---|
+| The app runs `pkexec` | `/usr/bin/pkexec` is `lord-pkexec`, no privilege and no secret (the real one, diverted, is `/usr/bin/pkexec.distrib`) |
+| | It asks `lord-server`, on `$XDG_RUNTIME_DIR/lordos-pkagent.sock` (mode 0600, `SO_PEERCRED`), to answer for its parent, then becomes the real pkexec with the same pid, arguments and environment |
+| | `lord-server` accepts only the caller itself or the caller's parent, of the same user, and calls polkit's `RegisterAuthenticationAgent` for that process and start time |
+| polkit calls `BeginAuthentication` | Only from the bus name that owns `org.freedesktop.PolicyKit1`. The session draws the prompt in the `system` layer |
+| The password is typed | See below |
+| Enter | `lord-server` starts `/usr/lib/polkit-1/polkit-agent-helper-1`, writes the cookie and, when PAM asks, the password, once, to its stdin. The helper checks it and tells polkitd by itself |
+
+**Why per process.** polkit finds a session's agent by asking logind which session a process belongs to, and
+that answer comes from the cgroup: LordOS's apps live under `lordos.service`
+([Root-owned app scopes](#root-owned-app-scopes)), so for them `sd_pid_get_session` and `sd_pid_get_owner_uid` both fail.
+A logind session of the user doesn't help while the apps stay there, and moving the tree under
+`user.slice` would move the firewall's BPF attachment, the Monitor and every scope. The process-scoped registration is polkit's
+own (`pkttyagent --process` uses it). It has one effect worth knowing: such a process is not "active" for
+polkit, so `allow_active` actions still ask, as they did. Nothing changes for what didn't use an agent.
+
+**What the prompt says.** The app's name comes from the root-owned scope of the process that asked
+(`appid_of_pid`), which an app can't claim; a process outside any app scope shows its command name, which it chose itself. The message,
+with the command and the target user, and the action id come from polkitd. All of it passes through `pk_clean`, which removes
+control, bidi and invisible characters, so a command line can't reorder itself.
+
+**The password.**
+
+- Keys from this computer's input devices (the evdev fds `lord-sessiond` lends only while the session is on the monitor) reach
+  `pkagent_key` in `main.c` before JavaScript, any input method or a Wayland client. While a prompt is open
+  nothing else receives them, and a key held down before it opened still gets its release.
+- They are stored in one page that is `mlock`ed, `MADV_DONTDUMP` and `MADV_DONTFORK`, wiped right after the single write to the
+  helper, on a wrong password and on cancel. Nothing is logged. PAM's messages are not shown.
+- JavaScript receives a character count to draw dots, and `lord.polkit` has one function, `cancel`. It has no way
+  to read the field or to submit it: only a physical Enter does.
+- Keys from the remote desktop, screen sharing and the on-screen keyboard are dropped while a prompt is open. A session that doesn't hold
+  this computer's input devices (one not on the monitor) says so and can only be cancelled.
+- A one-time code or any second PAM question is treated as a failure: there is no second question in this prompt.
+- Three wrong passwords end the request; Esc or Cancel at any time.
+
+**What it doesn't cover.** Programs that ask polkit directly over D-Bus, without pkexec (a disk mount through
+udisks2, for example), still find no agent: only pkexec passes through `lord-pkexec`. An app with the
+"no access to your files" or a device restriction runs in a user namespace, where setuid programs have no effect, so
+pkexec fails there as it always did. A remote viewer sees the prompt and the number of dots. `pkexec` in a terminal is
+left alone: it finds the terminal and uses its own text prompt. As on any desktop, an app running as you
+can draw a window that looks like a prompt: this one is above every window, and the password belongs in it only when you
+asked for what it names.
+
+Size: `polkitd`, `pkexec` and their polkit and duktape libraries come to about 1.1 MB installed on Debian 13 (1122 KB by the packages' `Installed-Size`); the images already had `polkitd` through `rtkit`, so there they add `pkexec` and its agent library, 132 KB.
+
 ## Decoding helpers: `sandbox_apply_helper`
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data
@@ -453,6 +508,7 @@ through `globalThis.__lordos.monitorDevices`.
 | `server/tests/sandbox_test.c` | sandbox tests (app, network, helper) |
 | `server/src/sec/brokermail.c`, `server/src/ui/js_brokermail.c` | lord-maild for the isolated Mail, Calendar, Contacts and Reminders (`BOP_MAIL`, `BOP_SYS_OPEN`) |
 | `server/src/app/apphost_bc.c` | the app host compiled to bytecode once per session |
+| `server/src/hw/pkagent.c`, `pkfield.c`, `lord_pkexec.c` | the polkit authentication agent, its field and the pkexec front |
 | `sdk/sysopen.js` | the session opens attachments and apps for the isolated system apps |
 | `server/tests/brokermail_test.c` | `build/brokermail-test` |
 
