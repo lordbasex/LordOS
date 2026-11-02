@@ -13,6 +13,7 @@ const DEFAULTS = {
   motion: {},            // moving wallpaper per display: { '*': id, <display id>: id } (sdk/motion.jsx)
   motionFiles: {},       // id → the variant on disk
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
+  wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
   wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
   keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
   keyboards: null,       // [{ layout, variant }] from xkb-data

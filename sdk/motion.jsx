@@ -12,6 +12,7 @@ import { createStore, useStore } from './store.js';
 import { admin } from './admin.js';
 import { windows } from './windows.js';
 import { battery } from './hardware.jsx';
+import { userWallpaperName } from './wallpapers.js';
 import { displayCovered, motionCodecs, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
 
 const STORE = '/var/lib/lordos/wallpapers';
@@ -62,6 +63,11 @@ export async function removeMotion(it) {
   settings.set({ motionFiles: files, motion });
 }
 
+// A picture of the user's own: the action leaves a copy in their home and answers its id. The login screen can't read a
+// home, so choosing one for it stores a copy of its own as root.
+export const addWallpaperImage = (path) => admin.run('wallpaper-image', path, null, { quiet: true }).then((name) => `image:${name}`);
+export const removeWallpaperImage = (id) => admin.run('wallpaper-image', `remove ${userWallpaperName(id)}`, null, { quiet: true });
+export const setLoginImage = (id) => admin.run('wallpaper-login-image', userWallpaperName(id), null, { quiet: true });
 export const setLoginStill = (id) => admin.run('wallpaper-login', `still ${id}`, null, { quiet: true });
 export const setLoginMotion = (it) => admin.run('wallpaper-login', it ? `${it.id} ${settings.get().motionFiles?.[it.id]}` : 'default', null, { quiet: true });
 

@@ -122,11 +122,15 @@ int hw_kbdlight_name_valid(const char *n);
 void hw_act_wallpaper_get(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len);
+void hw_act_wallpaper_image(const AdminReq *r, const char *arg, size_t len);
+void hw_act_wallpaper_login_image(const AdminReq *r, const char *arg, size_t len);
 
 #define HW_ADMIN_ACTIONS \
     { "wallpaper-get", hw_act_wallpaper_get, A_ANYONE }, \
     { "wallpaper-remove", hw_act_wallpaper_remove, 0 }, \
     { "wallpaper-login", hw_act_wallpaper_login, 0 }, \
+    { "wallpaper-image", hw_act_wallpaper_image, A_FORK | A_ANYONE }, \
+    { "wallpaper-login-image", hw_act_wallpaper_login_image, A_FORK }, \
     { "display-brightness", hw_act_brightness, A_ANYONE }, \
     { "keyboard-light", hw_act_keyboard_light, A_ANYONE }, \
     { "power-profile", hw_act_power_profile, A_ANYONE }, \
