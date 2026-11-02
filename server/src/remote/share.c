@@ -382,7 +382,7 @@ static void handle(Conn *c, const SwMsg *m) {
     switch (m->type) {
     case SHARE_START: on_start(c, m); break;
     case SHARE_QUERY:
-        if (sw_bucket_take(&c->b_other, t, OTHER_RATE, OTHER_RATE)) send_state(c);
+        if (sw_bucket_take(&c->b_other, t, OTHER_RATE, OTHER_RATE)) { store_read(); send_state(c); }   /* grants read before any start */
         break;
     case SHARE_STOP: end_share(c, SW_ENDED_BY_APP, 0); break;
     case SHARE_LOCK:
