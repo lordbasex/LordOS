@@ -303,9 +303,10 @@ control, bidi and invisible characters, so a command line can't reorder itself.
 - Keys from the remote desktop, screen sharing and the on-screen keyboard are dropped while a prompt is open. A session that doesn't hold
   this computer's input devices (one not on the monitor) says so and can only be cancelled.
 - A one-time code or any second PAM question is treated as a failure: there is no second question in this prompt.
+- An account with no password (the live system, the OVA's setup session) answers with Enter. An Enter on an empty field costs no try.
 - Three wrong passwords end the request; Esc or Cancel at any time.
 
-**What it doesn't cover.** Programs that ask polkit directly over D-Bus, without pkexec (a disk mount through
+**What it doesn't cover.** A process of the session that keeps group `input` can read `/dev/input` itself, so this prompt keeps keys away from Wayland clients and JavaScript, not from such a process. Programs that ask polkit directly over D-Bus, without pkexec (a disk mount through
 udisks2, for example), still find no agent: only pkexec passes through `lord-pkexec`. An app with the
 "no access to your files" or a device restriction runs in a user namespace, where setuid programs have no effect, so
 pkexec fails there as it always did. A remote viewer sees the prompt and the number of dots. `pkexec` in a terminal is

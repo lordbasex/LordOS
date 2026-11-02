@@ -115,6 +115,7 @@ chown 1000:1000 "$H/.config/lordos/settings.json"
 # what makes each machine its own: created on its first boot
 : > "$T/etc/machine-id"
 rm -f "$T/var/lib/dbus/machine-id" "$T/var/lib/systemd/random-seed" "$T/etc/ssh/ssh_host_"*
+rm -f "$T/etc/ssl/private/ssl-cert-snakeoil.key" "$T/etc/ssl/certs/ssl-cert-snakeoil.pem"
 
 # the same boot settings as the installer
 cat > "$T/etc/default/grub" <<'EOF'

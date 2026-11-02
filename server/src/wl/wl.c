@@ -2561,7 +2561,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
             if (!t || t->role != R_POPUP) dismiss_popups();
         }
     pointer_enter(target, lx, ly);
-    if (!target) return 0;
+    if (!target) return fs_surf && fs_surf->content ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
     unsigned t = now_ms();
     struct wl_resource *p;
     FOR_CLIENT(&pointers, target->client, p) {

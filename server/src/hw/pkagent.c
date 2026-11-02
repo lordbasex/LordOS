@@ -9,7 +9,9 @@
  * it, waits for the answer and execs the real pkexec, with the same pid and arguments.
  *
  * The password. Keys of this computer's keyboards reach pkagent_key before anything else, so they
- * never enter JavaScript, an input method or a Wayland client. They stay in a locked page (pkfield.c)
+ * never enter JavaScript, an input method or a Wayland client's keyboard. A process in group input
+ * can still read /dev/input itself, as with any password typed in this session (docs/PRIVACY.md).
+ * They stay in a locked page (pkfield.c)
  * and are written once to polkit-agent-helper-1's stdin, then wiped. Nothing else can type here or
  * press Enter: injected keys are dropped and JavaScript has no way to submit. Nothing from the field is
  * ever logged. polkit's helper checks the password and tells polkitd by itself. */
@@ -172,6 +174,8 @@ static void pop(void) {
     show();
 }
 
+static int blank;
+
 static void finish(int ok) {
     helper_stop();
     if (ok) dbus_reply(sysbus_conn(), &q[0].call, NULL, NULL);
@@ -182,14 +186,15 @@ static void finish(int ok) {
 static void failed(void) {
     helper_stop();
     pkf_wipe(&field);
-    if (++q[0].tries >= MAX_TRIES) { finish(0); return; }
+    if (!blank && ++q[0].tries >= MAX_TRIES) { finish(0); return; }  /* a stray Enter costs no try */
     st = ST_ASK;
     wrong = 1;
     show();
 }
 
 static void submit(void) {
-    if (!nq || st != ST_ASK || !field.len) return;
+    if (!nq || st != ST_ASK) return;
+    blank = !field.len;                     /* an account with no password, as on the live system */
     st = ST_CHECK;
     wrong = 0;
     if (helper_start(&q[0])) { failed(); return; }
