@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Copying from a native Wayland app with a long clipboard type name reached no other app: the name was cut at 63 characters and the app dropped its data.
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
