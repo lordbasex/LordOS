@@ -1027,12 +1027,21 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
     }
     switch (ev->type) {
     case EV_REL:
-        if (ev->code == REL_X) { s->cx += ev->value; s->rdx += ev->value; s->moved = 1; }
-        if (ev->code == REL_Y) { s->cy += ev->value; s->rdy += ev->value; s->moved = 1; }
+        if (ev->code == REL_X || ev->code == REL_Y) {
+            /* Settings → Mouse & Trackpad: 0.4 to 2 times what the mouse sends, the fractions kept */
+            static double part[2];
+            double k = tp_config()->mouse_speed, f = k <= 0.5 ? 0.4 + 1.2 * k : 1 + 2 * (k - 0.5);
+            int y = ev->code == REL_Y;
+            double v = ev->value * f + part[y];
+            int n = (int)v;
+            part[y] = v - n;
+            if (y) { s->cy += n; s->rdy += n; } else { s->cx += n; s->rdx += n; }
+            s->moved = 1;
+        }
         /* ruedas: la de alta resolución y la horizontal van como scroll fino (tp/tp_route.c, value120);
          * los pasos enteros de siempre, solo si el mouse no tiene la de alta resolución */
-        if (ev->code == REL_WHEEL && !d->wheel_hires) s->wheel += ev->value;
-        if (ev->code == REL_WHEEL_HI_RES) tp_route_wheel120(ev->value, 0);
+        if (ev->code == REL_WHEEL && !d->wheel_hires) s->wheel += tp_config()->mouse_natural ? -ev->value : ev->value;
+        if (ev->code == REL_WHEEL_HI_RES) tp_route_wheel120(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
         if (ev->code == REL_HWHEEL_HI_RES) tp_route_wheel120(0, ev->value);
         if (ev->code == REL_HWHEEL && !d->hwheel_hires) tp_route_wheel120(0, ev->value * 120);
         break;

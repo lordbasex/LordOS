@@ -1,4 +1,9 @@
 {
+  "mouse.title": "Mouse",
+  "mouse.speed": "Speed",
+  "mouse.natural": "Natural scrolling",
+  "mouse.naturalHint": "The content moves against the wheel's direction.",
+  "noDevice": "No trackpad found on this computer. These settings apply when you connect one.",
   "device": "{name} · {w} × {h} mm",
   "clickpad": "click by pressing the touchpad",
   "tab.point": "Point & Click",

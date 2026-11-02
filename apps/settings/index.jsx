@@ -604,13 +604,6 @@ function Keyboard() {
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
-      {themes.current() === 'default' && (
-        <Section title={tr('settings.kb.desktopArrows.title')} footer={tr('settings.kb.desktopArrows.hint')}>
-          <SettingRow label={tr('settings.kb.desktopArrows.label')}>
-            <Toggle small on={s.desktopArrows !== false} onChange={(v) => set({ desktopArrows: v })} />
-          </SettingRow>
-        </Section>
-      )}
       <SwitcherSettings tr={tr} />
       <ShortcutsList />
     </Stack>
@@ -700,10 +693,10 @@ const GROUPS = [
   [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
-// Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor); Board firmware
+// Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'trackpad' || hasPad) && (id !== 'firmware' || pi5);
+const sectionShown = (id, hasPad, pi5 = isPi5()) => id !== 'firmware' || pi5;
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.

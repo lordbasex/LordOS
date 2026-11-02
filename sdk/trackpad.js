@@ -14,6 +14,8 @@ import { visibleOn } from './desktopmodel.js';
 
 export const TRACKPAD_DEFAULTS = {
   speed: 0.5,               // pointer speed (0..1)
+  mouseSpeed: 0.5,          // a mouse's speed (0..1)
+  mouseNatural: false,      // a mouse's wheel the other way
   tap: true,                // tap to click
   tapDrag: true,            // tap and drag
   natural: true,            // natural scrolling

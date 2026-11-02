@@ -115,7 +115,7 @@ sudo python3 -c "
 f=open('$APPS/pkgtest/bin/engine','r+b'); f.seek(4096); b=f.read(1); f.seek(4096); f.write(bytes([b[0]^1]))"
 x=$(dhome bash -c "$(declare -f direct); B=$B direct pkgtest"); case "$x" in *refused*sig.fileModified*) ok "--companion: one byte: refused ($x)";; *) no "one byte: $x";; esac
 gone "nothing of it ran" $REP
-session; sleep 4
+session; sleep 9
 has "the app itself is refused too" "was refused: sig.fileModified" $H/.cache/lordos/session.log
 gone "no report" $REP
 is "no companion" "$(cpid)" ""

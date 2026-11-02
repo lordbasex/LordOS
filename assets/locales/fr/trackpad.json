@@ -1,4 +1,9 @@
 {
+  "mouse.title": "Souris",
+  "mouse.speed": "Vitesse",
+  "mouse.natural": "Défilement naturel",
+  "mouse.naturalHint": "Le contenu se déplace dans le sens inverse de la molette.",
+  "noDevice": "Aucun trackpad trouvé sur cet ordinateur. Ces réglages s'appliquent lorsque vous en connectez un.",
   "device": "{name} · {w} × {h} mm",
   "clickpad": "cliquer en appuyant sur le pavé tactile",
   "tab.point": "Pointer et cliquer",

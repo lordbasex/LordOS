@@ -21,6 +21,8 @@ enum { TP_CLICK_TWO_FINGERS = 0, TP_CLICK_BOTTOM_RIGHT = 1, TP_CLICK_BOTTOM_LEFT
 
 typedef struct {
     double speed;           /* 0..1, pointer speed (0.5 = normal) */
+    double mouse_speed;     /* 0..1, a mouse's speed (0.5 = as it comes) */
+    int mouse_natural;      /* a mouse's wheel the other way */
     int tap;                /* tap to click (1/2/3 fingers = left/right/middle) */
     int tap_drag;           /* tap and drag (tap, and put the finger back down right away) */
     int natural;            /* natural scrolling (the content follows the fingers) */

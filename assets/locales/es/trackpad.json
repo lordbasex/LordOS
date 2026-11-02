@@ -1,4 +1,9 @@
 {
+  "mouse.title": "Mouse",
+  "mouse.speed": "Velocidad",
+  "mouse.natural": "Desplazamiento natural",
+  "mouse.naturalHint": "El contenido se mueve en sentido contrario a la rueda.",
+  "noDevice": "No se encontró un trackpad en esta computadora. Estos ajustes se aplican cuando conectes uno.",
   "device": "{name} · {w} × {h} mm",
   "clickpad": "se hace clic apretando el touchpad",
   "tab.point": "Señalar y hacer clic",

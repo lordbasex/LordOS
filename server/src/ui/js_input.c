@@ -37,7 +37,7 @@ static JSValue f_devices(JSContext *c, JSValueConst this, int argc, JSValueConst
 }
 
 static const struct { const char *name; size_t off; } flags[] = {
-    { "tap", offsetof(TpConfig, tap) },           { "tapDrag", offsetof(TpConfig, tap_drag) },
+    { "mouseNatural", offsetof(TpConfig, mouse_natural) }, { "tap", offsetof(TpConfig, tap) },           { "tapDrag", offsetof(TpConfig, tap_drag) },
     { "natural", offsetof(TpConfig, natural) },   { "threeDrag", offsetof(TpConfig, three_drag) },
     { "dwt", offsetof(TpConfig, dwt) },           { "scroll", offsetof(TpConfig, scroll) },
     { "kinetic", offsetof(TpConfig, kinetic) },   { "pinch", offsetof(TpConfig, pinch) },
@@ -63,6 +63,9 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     JSValue v = JS_GetPropertyStr(c, argv[0], "speed");
     double d;
     if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0 && d <= 1) k.speed = d;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[0], "mouseSpeed");
+    if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0 && d <= 1) k.mouse_speed = d;
     JS_FreeValue(c, v);
     for (size_t i = 0; i < sizeof flags / sizeof flags[0]; i++) {
         v = JS_GetPropertyStr(c, argv[0], flags[i].name);

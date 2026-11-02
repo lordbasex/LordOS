@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
 - The pointer no longer jumps back to the middle of the screen on Intel laptops with a motion sensor: it was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).
 
 ### Added
@@ -19,6 +20,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue.
 - French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
+- Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
 - App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
 
 ### Added

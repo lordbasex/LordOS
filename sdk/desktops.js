@@ -50,6 +50,12 @@ export function addDesktopAndShow() {
   return id;
 }
 export const canAddDesktop = () => desktopList.get().length < MAX_DESKTOPS;
+// Settings → Desktop & Dock: how many there are. A removed desktop's windows go to the one beside it, as in the Overview.
+export function setDesktopCount(n) {
+  const want = cleanCount(n);
+  while (desktopList.get().length < want) if (createDesktop() == null) break;
+  while (desktopList.get().length > want) { const l = desktopList.get(); if (!closeDesktop(l[l.length - 1])) break; }
+}
 export function removeDesktopById(id) { return closeDesktop(id); }
 export const closeActiveDesktop = () => closeDesktop(activeDesktop.get());
 

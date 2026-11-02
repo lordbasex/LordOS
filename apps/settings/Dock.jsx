@@ -5,6 +5,7 @@
 import { View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dock, themes, spacing, typeScale } from '@lordos/sdk';
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
+import { DesktopsSection } from './Desktops.jsx';
 
 // A small picture of the screen with the Dock (or the taskbar) on the chosen side.
 function Preview({ side, t }) {
@@ -103,6 +104,7 @@ export function DockSettings() {
   }
   return (
     <Stack>
+      <DesktopsSection tr={tr} />
       <Section title={tr('settings.dock.position')} footer={tr('settings.dock.sidesHint')}>
         <SidePicker value={p.dockPosition} sides={['left', 'bottom', 'right']} onChange={(v) => set({ dockPosition: v })} />
       </Section>

@@ -91,7 +91,7 @@ struct TpDevice {
     double ts_t0;
 };
 
-static TpConfig cfg = { .speed = 0.5, .tap = 1, .tap_drag = 1, .natural = 1, .secondary = TP_CLICK_TWO_FINGERS,
+static TpConfig cfg = { .speed = 0.5, .mouse_speed = 0.5, .tap = 1, .tap_drag = 1, .natural = 1, .secondary = TP_CLICK_TWO_FINGERS,
                         .three_drag = 0, .dwt = 1, .scroll = 1, .kinetic = 1, .pinch = 1, .swipe3 = 1, .swipe4 = 0 };
 static const TpSink *sink;
 static void *sink_ud;

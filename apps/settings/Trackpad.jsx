@@ -74,6 +74,17 @@ export function TrackpadSettings() {
   const toggle = (key) => <Toggle small on={!!c[key]} onChange={(v) => setTrackpad({ [key]: v })} />;
   return (
     <Stack>
+      <Section title={tr('trackpad.mouse.title')}>
+        <SettingRow label={tr('trackpad.mouse.speed')} stack={false}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.slow')}</Text>
+            <Slider value={c.mouseSpeed} onChange={(v) => setTrackpad({ mouseSpeed: Math.round(v * 100) / 100 })} width={120} />
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.fast')}</Text>
+          </View>
+        </SettingRow>
+        <SettingRow label={tr('trackpad.mouse.natural')} hint={tr('trackpad.mouse.naturalHint')}>{toggle('mouseNatural')}</SettingRow>
+      </Section>
+      {devices.length === 0 && <Note>{tr('trackpad.noDevice')}</Note>}
       <View style={{ alignItems: 'center' }}>
         <Segmented appearance="neutral" value={tab} onChange={setTab} options={[['point', tr('trackpad.tab.point')], ['scroll', tr('trackpad.tab.scroll')], ['more', tr('trackpad.tab.more')]]} />
       </View>
