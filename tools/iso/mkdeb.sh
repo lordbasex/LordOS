@@ -12,6 +12,7 @@
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
 #                                         which starts the lord-bench and lord-media next to it
 #   /usr/bin/lordos-fetch                 the crown and a summary of the computer (a link to the same binary)
+#   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
@@ -81,6 +82,7 @@ install -m 755 server/build/lordos-sysreport "$L/bin/lordos-sysreport"
 "$STRIP" --strip-unneeded "$L/bin/lordos-sysreport" 2>/dev/null || true
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
+install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"

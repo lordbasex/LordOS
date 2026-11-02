@@ -1,0 +1,75 @@
+#!/bin/sh
+# lordos-issue — what a bug report needs, ready to paste into a GitHub issue (CONTRIBUTING.md). It only reads. It runs as the
+# user, also on the live system; `sudo lordos-issue` adds the kernel log when the user can't read it. Addresses, the user's
+# and the computer's names, serial numbers and home paths are replaced. Nothing is sent anywhere.
+# Usage: lordos-issue [--print]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
+LC_ALL=C; export LC_ALL
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+out="${HOME:-/tmp}/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
+[ -w "${HOME:-/nonexistent}" ] || out="/tmp/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
+MAX=60000
+host=$(hostname 2>/dev/null)
+user=${SUDO_USER:-$(id -un)}
+
+clean() {
+    sed -E \
+        -e 's/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/<mac>/g' \
+        -e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/<ip>/g' -e 's/\b[0-9a-f]*:[0-9a-f]*:[0-9a-f:]*:[0-9a-f]*\/[0-9]+\b/<ip>/g' \
+        -e 's/\b([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b/<ip>/g' \
+        -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/<email>/g' \
+        -e 's#/home/[^/ :"]+#/home/<user>#g' \
+        -e 's/([Ss]erial|SerialNumber|UUID|uuid)([ =:]+)[^ ,;]+/\1\2<hidden>/g' \
+        -e 's/(ssid|SSID)([ =:]+)[^ ,;]+/\1\2<hidden>/g' |
+    { if [ -n "$host" ] && [ "$host" != localhost ]; then sed "s/$host/<host>/g"; else cat; fi; } |
+    { if [ -n "$user" ] && [ "$user" != root ]; then sed "s/\b$user\b/<user>/g"; else cat; fi; }
+}
+section() { printf '\n### %s\n\n```text\n' "$1"; }
+end() { printf '```\n'; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+{
+    printf '<!-- made by lordos-issue; names and addresses were replaced. Read it before you post it. -->\n'
+    section "System"
+    if have lordos-fetch; then lordos-fetch --share --color=never 2>&1; fi
+    dpkg-query -W lordos 2>/dev/null
+    uname -srm
+    if [ -d /run/live/medium ]; then echo "live system: yes"; else echo "live system: no"; fi
+    if [ -d /sys/firmware/efi ]; then echo "firmware: UEFI"; elif [ -r /proc/device-tree/model ]; then echo "firmware: board"; else echo "firmware: BIOS"; fi
+    echo "session: ${XDG_SESSION_TYPE:-unknown}"
+    end
+
+    section "Graphics and network devices"
+    if have lspci; then lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D|Display|Network|Ethernet' | grep -v -E '^--|Subsystem'; else echo "lspci isn't installed"; fi
+    end
+
+    section "Displays"
+    for f in /sys/class/drm/card*-*/status; do [ -r "$f" ] && printf '%s: %s\n' "$(basename "$(dirname "$f")")" "$(cat "$f")"; done
+    end
+
+    section "Input devices"
+    grep -E '^(N:|H:)' /proc/bus/input/devices 2>/dev/null | sed -e 's/^N: Name=/ /' -e 's/^H: Handlers=/    /'
+    end
+
+    section "Wi-Fi, firmware"
+    if have rfkill; then rfkill list 2>/dev/null | grep -E 'Wireless|Bluetooth|blocked' | grep -v 'Soft blocked: no\|Hard blocked: no'; fi
+    ls /sys/class/net 2>/dev/null | tr '\n' ' '; echo
+    end
+
+    section "This session's log (last 60 lines)"
+    if [ -r "$HOME/.cache/lordos/session.log" ]; then tail -n 60 "$HOME/.cache/lordos/session.log"; else echo "none"; fi
+    end
+
+    section "System errors in this boot (last 80)"
+    if have journalctl; then journalctl -b -p warning --no-pager -o short-monotonic 2>/dev/null | tail -n 80; else echo "no journal"; fi
+    end
+
+    section "Kernel errors in this boot (last 40)"
+    dmesg --level=err,warn 2>/dev/null | tail -n 40 || true
+    if ! dmesg -n 0 >/dev/null 2>&1 && [ "$(id -u)" != 0 ]; then echo "(run: sudo lordos-issue, for the complete kernel log)"; fi
+    end
+} 2>&1 | clean | head -c "$MAX" > "$out"
+chmod 600 "$out" 2>/dev/null
+
+[ "$1" = --print ] && cat "$out"
+printf '\nSaved to %s\n' "$out" >&2
+printf 'Read it first, then paste it in the Logs box of a new issue: https://github.com/lordbasex/LordOS/issues/new?template=bug_report.yml\n' >&2

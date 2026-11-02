@@ -4,17 +4,48 @@ Thank you for helping. The full guide is at
 **[lordos.org/legal/contributing](https://lordos.org/legal/contributing/)**; this is the short
 version.
 
-## Before the repository is public
+## Reporting a bug
 
-The repository is private during the early betas. Watch it on GitHub and follow
-[lordos.org](https://lordos.org) to know when it opens. Until then, send feedback through the
-[contact form](https://www.iperfex.com/contacto/?lang=en).
+**Security problems are not reported in issues**: see [SECURITY.md](SECURITY.md). For anything else, open an
+[issue](https://github.com/lordbasex/LordOS/issues/new/choose) and include what is below. It makes the difference between a
+problem we can fix and one we can only guess at.
 
-## Bugs and ideas
+### 1. Collect the report
 
-See [lordos.org/legal/issues](https://lordos.org/legal/issues/). Use the issue forms; never post
-passwords or personal data. **Security problems are not reported in issues**: see
-[SECURITY.md](SECURITY.md).
+Open Terminal and run:
+
+```sh
+lordos-issue
+```
+
+It only reads, sends nothing, and saves `~/lordos-issue-<date>.txt` with your LordOS version, hardware, displays, input
+devices, the session's log and the errors of this boot. Addresses, your user and computer names and home paths are replaced.
+**Read the file before posting it**, since issues are public. Run `sudo lordos-issue` to add the complete kernel log. Paste it in the
+**Logs** box of the form.
+
+If the problem stops you from using the desktop, press **Ctrl+Alt+F2** to get a text console, sign in and run it there. On the live
+system it works the same way. If `lordos-issue` isn't there (before 0.8.7.1), send the output of these:
+
+```sh
+lordos-fetch --share --color=never
+grep -E '^N:' /proc/bus/input/devices
+journalctl -b -p warning --no-pager | tail -n 80
+tail -n 60 ~/.cache/lordos/session.log
+```
+
+### 2. Say what happened
+
+- The LordOS version and how you installed it (ISO, Raspberry Pi image, or on Debian).
+- The computer's model.
+- The exact steps, what you expected, and what happened instead. A photo of the screen helps when nothing else can be collected.
+
+### 3. Share how your hardware runs
+
+If everything works, a hardware report helps too: **System Information → Report → Share on GitHub**.
+
+## Ideas
+
+Use the feature form, and say what problem it solves. Check [the open issues](https://github.com/lordbasex/LordOS/issues) first.
 
 ## Pull requests
 
@@ -41,7 +72,7 @@ Pull requests with unsigned commits can't be merged.
 ## Rules
 
 - **English only** in code, comments, commit messages and documentation. Interface text goes in
-  `assets/locales/{en,es,pt}/`, never hard-coded.
+  `assets/locales/{en,es,pt,fr}/`, never hard-coded.
 - **Tests must pass:** `make -C server test` (and `make -C server test-full` when you touch the
   helpers or the sandbox), plus `node tools/i18n-check.mjs`, which also runs
   `tools/brand-check.mjs` and `tools/err-check.mjs`.

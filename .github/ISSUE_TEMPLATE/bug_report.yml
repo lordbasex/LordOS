@@ -59,7 +59,7 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: The relevant lines from the Logs app. Remove anything personal before pasting.
+      description: Run `lordos-issue` in Terminal and paste the file it saves. Read it first, issues are public. If it isn't there, see CONTRIBUTING.md.
       render: text
   - type: checkboxes
     id: confirm
