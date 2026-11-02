@@ -836,9 +836,8 @@ export default function Files() {
             <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
             <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
           </ToolbarGroup>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tight ? '' : title}</Text>
-          </View>
+          {/* the folder's name is in the window's title bar, every theme draws it there */}
+          <View style={{ flex: 1, minWidth: 0 }} />
           {narrow ? (
             <View ref={viewBtn}><ToolbarButton icon={VIEW_GLYPH[tab.view]} title={tr('files.menu.view')} onClick={() => menuUnder(viewBtn, viewMenuItems())} /></View>
           ) : (
