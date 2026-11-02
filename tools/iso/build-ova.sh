@@ -181,13 +181,21 @@ rm -f "$W/esp.img" "$W/root.img"
 rm -rf "$W/esp" "$T"
 
 # 6. the VMDK: streamOptimized, what OVF names and every hypervisor reads. qemu-img picks a random CID:
-# same length, in place
+# same length, in place. It also pads the file past the last grain; VMware's reader stops at the
+# end-of-stream marker, so its digest of the file doesn't match the manifest ("SHA digest of file
+# does not match manifest") and the import fails. The file ends at the marker, one zero sector.
 echo "== VMDK"
 VMDK="$W/$NAME-disk1.vmdk"
 qemu-img convert -f raw -O vmdk -o subformat=streamOptimized,adapter_type=lsilogic "$RAW" "$VMDK"
 CID_AT=$(head -c 4096 "$VMDK" | LC_ALL=C grep -abo -m1 '^CID=[0-9a-f]\{8\}' | cut -d: -f1)
 [ -n "$CID_AT" ] || { echo "build-ova.sh: no CID in the VMDK" >&2; exit 1; }
 printf 'CID=%s' "$VMDK_CID" | dd of="$VMDK" bs=1 seek="$CID_AT" conv=notrunc status=none
+TAIL_B=131072
+VMDK_B=$(stat -c %s "$VMDK")
+LAST=$(tail -c "$TAIL_B" "$VMDK" | od -An -v -tu1 -w1 | grep -n -v '^ *0$' | tail -1 | cut -d: -f1)
+[ -n "$LAST" ] || { echo "build-ova.sh: nothing at the end of the VMDK" >&2; exit 1; }
+END=$(( VMDK_B - TAIL_B + LAST ))
+truncate -s "$(( (END + 511) / 512 * 512 + 512 ))" "$VMDK"
 rm -f "$RAW"
 
 # 7. the descriptor. The sections are standard and all that another hypervisor reads; vbox:Machine is
@@ -224,7 +232,7 @@ cat > "$OVF" <<EOF
     </ProductSection>
     <OperatingSystemSection ovf:id="96" vmw:osType="debian12_64Guest">
       <Info>The kind of installed guest operating system</Info>
-      <Description>Debian_64</Description>
+      <Description>Debian GNU/Linux 13 (64-bit)</Description>
       <vbox:OSType ovf:required="false">Debian_64</vbox:OSType>
     </OperatingSystemSection>
     <VirtualHardwareSection>
@@ -307,7 +315,7 @@ cat > "$OVF" <<EOF
             <NAT/>
           </Adapter>
         </Network>
-        <AudioAdapter controller="HDA" useDefault="true" enabled="true"/>
+        <AudioAdapter controller="HDA" useDefault="true" driver="Default" enabled="true"/>
         <RTC localOrUTC="UTC"/>
         <Clipboard/>
         <StorageControllers>
