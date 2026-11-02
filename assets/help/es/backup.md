@@ -12,7 +12,7 @@ Copias automáticas de tu carpeta personal.
 ## Empezar
 
 1. En **Ajustes** de la app elegí el **destino**: un disco externo (mejor en ext4) o una carpeta.
-   Las copias se guardan en `LordOS-Copias`.
+   Las copias se guardan en `Axia DE-Copias`.
 2. Elegí la **frecuencia**: cada hora, cada día, cada semana o a mano.
 3. **Copiar ahora** hace la primera.
 

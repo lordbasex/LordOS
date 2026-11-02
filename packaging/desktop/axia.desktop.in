@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Axia DE
+Comment=Wayland desktop based on LordOS
+Exec=@BINDIR@/axia-session
+TryExec=@BINDIR@/axia-session
+Type=Application

@@ -1,141 +1,276 @@
-<p align="center">
-  <a href="https://lordos.org">
-    <img src="docs/brand/png/logo-horizontal-light-800.png#gh-light-mode-only" alt="LordOS" width="360">
-    <img src="docs/brand/png/logo-horizontal-dark-800.png#gh-dark-mode-only" alt="LordOS" width="360">
-  </a>
-</p>
+# Axia DE
 
-<h3 align="center">The free, fast and secure Linux desktop.</h3>
+[English](#english) | [Português](#portugues) | [Español](#espanol)
 
-<p align="center">
-  <a href="https://lordos.org"><b>lordos.org</b></a> ·
-  <a href="https://lordos.org/#download">Download</a> ·
-  <a href="https://lordos.org/features/own-desktop/">Features</a> ·
-  <a href="https://lordos.org/gallery/">Gallery</a> ·
-  <a href="https://lordos.org/paper/">Paper</a> ·
-  <a href="https://lordos.org/faq/">FAQ</a> ·
-  <a href="docs/README.md">Docs</a>
-</p>
+<a id="english"></a>
 
-LordOS is a free GNU/Linux distribution based on Debian, with its own desktop environment:
-a display server and Wayland compositor written in C, its own interface engine, and native apps
-made to feel calm, clear and private. It runs on 64-bit PCs and on the Raspberry Pi 5, and the
-Linux apps you already use (Chromium, Firefox, GTK and Qt apps) run alongside the native ones.
+## English
 
-<p align="center">
-  <img src="docs/screenshots/desktop-overview-light.png#gh-light-mode-only" alt="The LordOS desktop" width="860">
-  <img src="docs/screenshots/desktop-overview-dark.png#gh-dark-mode-only" alt="The LordOS desktop in dark mode" width="860">
-</p>
+Axia DE is a fork of [LordOS](https://github.com/lordbasex/LordOS) focused on extracting and developing its desktop environment as a project independent of the distribution. Fedora is this fork’s first integration target.
 
-## Everything you need. Nothing you don't.
+The C Wayland compositor, graphics engine, React runtime, themes, and native applications remain the desktop components. The host distribution provides the kernel, login, networking, audio, and system package management.
 
-| | |
-|---|---|
-| **[A desktop of its own](https://lordos.org/features/own-desktop/)** | Its own display server and Wayland compositor in C and its own interface engine, on a solid Debian base. Smooth on any 64-bit PC (amd64), and light enough for the Raspberry Pi 5 (arm64). |
-| **[Private by design](https://lordos.org/features/private-by-design/)** | Installable LordOS apps run isolated and ask before using your camera, microphone, files or network. You decide. |
-| **[A firewall you can see](https://lordos.org/features/visible-firewall/)** | Watch every connection on a live world map, then allow or block it per app, by domain, address or network, and restrict camera, microphone, files and more. Subscribe to public blocklists of ads, trackers and malware, or deny everything a rule doesn't allow. |
-| **[Passwords built in](https://lordos.org/features/passwords/)** | A vault for passwords, 2FA codes and cards that unlocks with a password or a USB key. |
-| **[Mail, Calendar, Contacts](https://lordos.org/features/mail-calendar/)** | Native apps for your accounts, with remote images blocked until you say so. |
-| **[Your Linux apps too](https://lordos.org/features/linux-apps/)** | Chromium, Firefox and GTK apps fit right in, with the same window frame and dark mode. |
-| **AI apps in the Store** | A curated catalog: Claude Code, Claude Desktop, Visual Studio Code, Cursor, Codex CLI, goose, opencode, and llama.cpp and whisper.cpp to run models on your own computer, each from a pinned, verified source. The Store downloads over HTTPS. |
-| **System Information** | Every piece of hardware and what LordOS makes of it, a report you can read before you copy it, and checks that try LordOS's security claims on your own computer. A Performance tab runs LordBench: quick and full tests shown against reference machines, never as one score. Community hardware reports: share yours on GitHub with your own account (LordOS sends nothing), and the Compatibility panel shows what others confirmed. |
-| **Cleaner** | See what uses the disk and remove what can safely go. A scan only reads, and nothing changes until you review and confirm a plan. |
-| **Remote Desk** | One app for RDP and VNC, drawn by LordOS itself, with no client window or toolkit. Files connects to servers too: SMB, NFS, SFTP, FTP and WebDAV open as folders. |
-| **Moving wallpapers** | Short loops behind the desktop and the login screen, for a compatible GPU with hardware decoding, with no software mode. They pause when nobody sees them. |
-| **Disk Formats** | One Store item opens NTFS, exFAT, FAT, HFS+ and APFS volumes on the desktop, with every driver's license and source shown first. HFS+ and APFS are read-only. |
+**Status: experimental.** Builds and headless startup can be verified in a Fedora container. Physical sessions with logind/seatd still need hardware validation, including TTY switching, GPU support, suspend, and SELinux.
 
-Measured, not promised: on the final ISO test before the first release (a 0.7.0 build, 2026-10-18) the
-whole system idled at **465–487 MB of RAM**, of which `lord-server` (the display server with the whole
-desktop) was **32–36 MB**, and booted in about **16 s** (see [`docs/ISO.md`](docs/ISO.md), "Final ISO
-test"). The released 0.8.5-beta, updated in place on a VMware VM with GPU composition, used **592 MB** for
-the whole system about five minutes after sign-in and showed its first frame **7.4 s** after the kernel
-started ([`results/0.8.5-beta/vmware-fusion`](results/0.8.5-beta/vmware-fusion)). What is isolated today, exactly, is in
-[`docs/PRIVACY.md`](docs/PRIVACY.md).
-
-## Get LordOS
-
-The latest release is **[0.8.7-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.7-beta)**
-(2026-11-01). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
-and on [lordos.org](https://lordos.org/#download).
-
-- **PC (64-bit):** a live and installable ISO, `lordos-live-0.8.7-amd64.iso`. Try it without installing.
-- **Generic arm64 (UEFI):** a live and installable ISO for arm64 machines and virtual machines,
-  `lordos-live-0.8.7-arm64.iso`, new in 0.8.7. Tested on emulated QEMU only.
-- **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.7-rpi5-arm64.img.xz`,
-  with fan control and our own kernel. The Raspberry Pi 5 is the only supported board.
-- **Already running LordOS?** It updates in place from the signed repository on lordos.org.
-- **Already on Debian 13?** Install LordOS on top of your current system with one command:
-
-  ```sh
-  curl -fsSL https://lordos.org/install.sh | sh
-  ```
-
-**Verify your download.** `SHA256SUMS` is signed with the LordOS release key (Ed25519),
-fingerprint `c7155b8e6bbbb180f907381994d06af76d333016cd6f3facf67cadd053ea108e`. See
-[code signing](https://lordos.org/legal/code-signing/) and [`docs/SIGNING.md`](docs/SIGNING.md).
-
-Status: **beta**. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Documentation
-
-- [`docs/README.md`](docs/README.md): the index of every document.
-- [The paper](https://lordos.org/paper/) ([`docs/PAPER.md`](docs/PAPER.md)): vision, architecture,
-  security model, performance and roadmap, with links to the source files.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): components, processes and dependencies.
-
-## Repository map
-
-- `server/`: `lord-server` (display server and Wayland compositor: DRM/KMS and evdev straight
-  from the kernel, without X11, libdrm or libinput) plus `lord-sessiond`, `lord-netd`,
-  `lord-netperm`, `lord-fand` and the sandboxed helpers (`lord-media`, `lord-doc`, `lord-vault`,
-  `lord-maild`, `lord-fetch`, `lord-tls`, `lord-clean`, `lord-lan`, `lord-rdesk`, and LordBench's
-  `lord-bench`).
-- `runtime/`: `@lordos/runtime`, the React renderer for lord-server.
-- `sdk/`: `@lordos/sdk`, the API for themes and apps.
-- `apps/`: the native apps. See [`apps/README.md`](apps/README.md).
-- `themes/`: complete desktops in React, swappable live. See [`themes/README.md`](themes/README.md).
-- `assets/`: fonts, icons, the brand and Lumo, and the UI texts per language.
-- `tools/`: ISO and Raspberry Pi image builders, the Debian installer, release signing, the website.
-- `web/`: the [lordos.org](https://lordos.org) website.
-- `third_party/`: QuickJS, stb, Monocypher and word lists, vendored (see [`THIRD_PARTY.md`](THIRD_PARTY.md)).
-
-## Building from source
-
-On the development machine (needs Node.js):
+### Build on Fedora
 
 ```sh
-npm install && npm run build        # bundles every theme with the SDK and the apps
+sudo dnf install gcc make binutils python3 pkgconf-pkg-config \
+  wayland-devel wayland-protocols-devel libxkbcommon-devel \
+  libxcrypt-devel libseat-devel openssl-devel nodejs npm
+npm ci
+make -j4
+make check
 ```
 
-On Debian 13 (see [`docs/VM-SETUP.md`](docs/VM-SETUP.md) for the full list of packages):
+Node.js and npm are only used to build the themes. The desktop does not require them at runtime. The default build uses CPU composition when the Mesa development libraries are unavailable. GPU composition remains optional:
 
 ```sh
-make -C server -j4 && make -C server test
+sudo dnf install mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel
+make -j4
 ```
 
-Images: [`docs/ISO.md`](docs/ISO.md) (PC) and [`docs/RASPBERRY.md`](docs/RASPBERRY.md) (Raspberry Pi 5).
+Package documentation: [Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/), [libxkbcommon](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon/), [libseat](https://packages.fedoraproject.org/pkgs/seatd/libseat-devel/), [Node.js](https://developer.fedoraproject.org/tech/languages/nodejs/nodejs.html).
 
-## Contributing and security
+### Install and run
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md).
-- Found a vulnerability? Please read [`SECURITY.md`](SECURITY.md) and don't open a public issue.
-- Bugs and ideas: [how to report](https://lordos.org/legal/issues/).
+To inspect the installation without changing your system:
 
-## Support the project
+```sh
+make install PREFIX=/usr DESTDIR="$PWD/build/stage"
+```
 
-LordOS is free and open source. If it makes your computer better, help us keep building it:
-[lordos.org/#support](https://lordos.org/#support).
+For a local installation with an entry in your login manager:
 
-## Made by iPERFEX
+```sh
+sudo make install PREFIX=/usr
+```
 
-LordOS is developed by [iPERFEX](https://www.iperfex.com/?lang=en). Meet Lumo, the guardian of
-LordOS, in the [brand guide](docs/LORDOS-BRAND.md). To work with us on LordOS (sponsorship,
-collaborations, custom apps or support), see [lordos.org/about](https://lordos.org/about/).
+Installation adds `axia-session`, the files under `/usr/libexec/axia`, and the **Axia DE** session. It does not enable services or replace your login manager. Log out and select this session at login, or run `axia-session` from an available local TTY. Run the desktop as your regular user, **without sudo**. DRM and evdev access goes through libseat with logind or seatd.
 
-## License
+To check headless startup from the checkout:
 
-MIT for LordOS's code (see [`LICENSE`](LICENSE)). Each third-party component keeps its own
-license (see [`THIRD_PARTY.md`](THIRD_PARTY.md) and [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md)).
-The LordOS name, logo and Lumo are covered by the [trademark policy](https://lordos.org/legal/trademark/).
+```sh
+cd server
+./build/axia-server --headless 800x600 --timeout 2
+```
 
-Copyright © 2026 [iPERFEX](https://www.iperfex.com/?lang=en). All rights reserved for the website, brand and content; the code is free software under the MIT license.
+This mode does not open a window inside GNOME/KDE. `Ctrl+Alt+Backspace` ends the physical session; `Ctrl+Alt+F1` through `F10` requests a TTY switch from the session provider.
+
+### Local RPM
+
+```sh
+sudo dnf install rpm-build
+sh tools/desktop/dist.sh
+mkdir -p build/rpmbuild/SOURCES
+cp dist/axia-de-*.tar.gz build/rpmbuild/SOURCES/
+rpmbuild -ba --define "_topdir $PWD/build/rpmbuild" packaging/rpm/axia-de.spec
+```
+
+The source archive includes themes built from the lockfile; the RPM build compiles the C code without network access. This is an experimental local package, not yet prepared for submission to the official Fedora repositories. The RPM uses CPU composition to keep its dependencies small.
+
+### Desktop and OS separation
+
+The Debian package manager, the OS installer and Imager, the privileged administration helper, `lord-netd` and `lord-sessiond` have been removed from this fork. `axia-netperm` and `axia-fand` stay in the source but are not built or installed. The store manages `.lpk` applications and offers to open the distribution’s software manager when available. RPM/DNF packages are not treated as Debian packages.
+
+Networking and VPNs, users, SSH, fans, disk formatting, and other administrative operations previously handled by the helper are left to the host system. Pages that still depend on that helper have limited functionality. Audio uses the PulseAudio protocol, including PipeWire; Bluetooth and other existing integrations continue to use D-Bus.
+
+The upstream distribution code (Debian packaging, APT repository, ISO and Raspberry Pi images) is no longer in this repository, and the build has a single profile. The `upstream` remote keeps that history for selective cherry-picks.
+
+See [the extraction architecture and next steps](docs/STANDALONE.md) (in Portuguese). The [original documentation](docs/README.md) describes upstream LordOS; its ISO, installation, and administration commands do not automatically apply to this fork.
+
+### Repository layout
+
+- `server/`: compositor, graphics engine, application helpers, and the `src/platform/` layer.
+- `runtime/`, `sdk/`, `themes/`, `apps/`: interface and native applications.
+- `tools/desktop/`: installation, verification, and source archive preparation for packaging.
+- `packaging/desktop/`, `packaging/rpm/`: session integration and Fedora package.
+- `tools/fedora-live/`: experimental Fedora 44 live ISO with Axia DE as the default session; see [FEDORA-LIVE.md](docs/FEDORA-LIVE.md) (in Portuguese).
+
+### Origin and licenses
+
+The code derives from LordOS, developed by iPERFEX. Original credits and copyright notices are preserved. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md) for the code and its components. This fork is not an official LordOS release, and the LordOS name, crown logo and Lumo mascot are not used in it, as the LordOS trademark policy asks of forks.
+
+[English](#english) | [Português](#portugues) | [Español](#espanol)
+
+<a id="portugues"></a>
+
+## Português
+
+O Axia DE é um fork do [LordOS](https://github.com/lordbasex/LordOS) dedicado a extrair e desenvolver seu ambiente de desktop como um projeto independente da distribuição. Fedora é a primeira plataforma de integração deste fork.
+
+O compositor Wayland em C, o motor gráfico, o runtime React, os temas e os aplicativos nativos continuam sendo os componentes do desktop. A distribuição fornece o kernel, o login, a rede, o áudio e o gerenciamento dos pacotes do sistema.
+
+**Estado: experimental.** A compilação e a inicialização sem monitor são verificáveis em contêiner Fedora. A sessão física com logind/seatd ainda precisa ser validada em hardware, incluindo troca de TTY, GPU, suspensão e SELinux.
+
+### Compilar no Fedora
+
+```sh
+sudo dnf install gcc make binutils python3 pkgconf-pkg-config \
+  wayland-devel wayland-protocols-devel libxkbcommon-devel \
+  libxcrypt-devel libseat-devel openssl-devel nodejs npm
+npm ci
+make -j4
+make check
+```
+
+Node.js e npm são usados apenas para compilar os temas. A execução do desktop não depende deles. O caminho padrão usa a composição por CPU quando as bibliotecas Mesa de desenvolvimento estão ausentes. A composição por GPU continua opcional:
+
+```sh
+sudo dnf install mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel
+make -j4
+```
+
+Documentação dos pacotes: [Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/), [libxkbcommon](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon/), [libseat](https://packages.fedoraproject.org/pkgs/seatd/libseat-devel/), [Node.js](https://developer.fedoraproject.org/tech/languages/nodejs/nodejs.html).
+
+### Instalar e executar
+
+Para inspecionar a instalação sem alterar o sistema:
+
+```sh
+make install PREFIX=/usr DESTDIR="$PWD/build/stage"
+```
+
+Para uma instalação local com entrada no gerenciador de login:
+
+```sh
+sudo make install PREFIX=/usr
+```
+
+A instalação adiciona `axia-session`, os arquivos em `/usr/libexec/axia` e a sessão **Axia DE**. Não habilita serviços nem substitui o gerenciador de login. Encerre a sessão atual e selecione essa entrada no login, ou execute `axia-session` em uma TTY local livre. Execute o desktop como seu usuário normal, **sem sudo**. O acesso a DRM e evdev passa por libseat com logind ou seatd.
+
+Para verificar a inicialização sem monitor, dentro do checkout:
+
+```sh
+cd server
+./build/axia-server --headless 800x600 --timeout 2
+```
+
+Esse modo não abre uma janela dentro do GNOME/KDE. `Ctrl+Alt+Backspace` encerra a sessão física; `Ctrl+Alt+F1` a `F10` solicita a troca de TTY ao provedor de sessão.
+
+### RPM local
+
+```sh
+sudo dnf install rpm-build
+sh tools/desktop/dist.sh
+mkdir -p build/rpmbuild/SOURCES
+cp dist/axia-de-*.tar.gz build/rpmbuild/SOURCES/
+rpmbuild -ba --define "_topdir $PWD/build/rpmbuild" packaging/rpm/axia-de.spec
+```
+
+O arquivo fonte inclui os temas compilados a partir do lockfile; o build do RPM compila o C sem acessar a rede. É um pacote local experimental, ainda sem preparação para submissão aos repositórios oficiais do Fedora. O RPM usa a composição por CPU para manter suas dependências pequenas.
+
+### Separação entre desktop e SO
+
+O gerenciador de pacotes Debian, o instalador do SO e o Imager, o helper administrativo privilegiado, `lord-netd` e `lord-sessiond` foram removidos deste fork. `axia-netperm` e `axia-fand` continuam no código-fonte, mas não são compilados nem instalados. A loja administra aplicativos `.lpk` e oferece abrir o gerenciador de software da distribuição quando disponível. Pacotes RPM/DNF não são tratados como pacotes Debian.
+
+Rede e VPN, usuários, SSH, ventoinhas, formatação de discos e outras operações administrativas do antigo helper ficam com o sistema hospedeiro. As páginas que ainda dependem dele têm funcionalidades limitadas. Áudio usa o protocolo PulseAudio, incluindo PipeWire; Bluetooth e outras integrações existentes continuam usando D-Bus.
+
+O código de distribuição do upstream (empacotamento Debian, repositório APT, imagens ISO e Raspberry Pi) não está mais neste repositório, e o build tem um único perfil. O remoto `upstream` guarda esse histórico para `cherry-pick` seletivo.
+
+Veja [a arquitetura da extração e os próximos passos](docs/STANDALONE.md). A [documentação original](docs/README.md) descreve o LordOS upstream; seus comandos de ISO, instalação e administração não se aplicam automaticamente a este fork.
+
+### Estrutura
+
+- `server/`: compositor, motor gráfico, helpers de aplicativos e camada `src/platform/`.
+- `runtime/`, `sdk/`, `themes/`, `apps/`: interface e aplicativos nativos.
+- `tools/desktop/`: instalação, verificação e arquivo fonte para empacotamento.
+- `packaging/desktop/`, `packaging/rpm/`: integração da sessão e pacote Fedora.
+- `tools/fedora-live/`: ISO live experimental do Fedora 44 com Axia DE como sessão padrão; veja [FEDORA-LIVE.md](docs/FEDORA-LIVE.md).
+
+### Origem e licenças
+
+O código deriva do LordOS, desenvolvido pela iPERFEX. Créditos e avisos de copyright originais são preservados. Consulte [LICENSE](LICENSE) e [THIRD_PARTY.md](THIRD_PARTY.md) para o código e seus componentes. Este fork não é uma versão oficial do LordOS e não usa o nome LordOS, o logo da coroa nem o mascote Lumo, como a política de marca do LordOS pede aos forks.
+
+[English](#english) | [Português](#portugues) | [Español](#espanol)
+
+<a id="espanol"></a>
+
+## Español
+
+Axia DE es un fork de [LordOS](https://github.com/lordbasex/LordOS) dedicado a extraer y desarrollar su entorno de escritorio como un proyecto independiente de la distribución. Fedora es la primera plataforma de integración de este fork.
+
+El compositor Wayland en C, el motor gráfico, el runtime de React, los temas y las aplicaciones nativas siguen siendo los componentes del escritorio. La distribución proporciona el kernel, el inicio de sesión, la red, el audio y la gestión de los paquetes del sistema.
+
+**Estado: experimental.** La compilación y el inicio sin monitor se pueden verificar en un contenedor Fedora. La sesión física con logind/seatd todavía necesita validación en hardware, incluidos el cambio de TTY, la GPU, la suspensión y SELinux.
+
+### Compilar en Fedora
+
+```sh
+sudo dnf install gcc make binutils python3 pkgconf-pkg-config \
+  wayland-devel wayland-protocols-devel libxkbcommon-devel \
+  libxcrypt-devel libseat-devel openssl-devel nodejs npm
+npm ci
+make -j4
+make check
+```
+
+Node.js y npm solo se utilizan para compilar los temas. El escritorio no depende de ellos durante su ejecución. La compilación predeterminada utiliza composición por CPU cuando las bibliotecas de desarrollo de Mesa no están disponibles. La composición por GPU sigue siendo opcional:
+
+```sh
+sudo dnf install mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel
+make -j4
+```
+
+Documentación de los paquetes: [Wayland](https://packages.fedoraproject.org/pkgs/wayland/wayland-devel/), [libxkbcommon](https://packages.fedoraproject.org/pkgs/libxkbcommon/libxkbcommon/), [libseat](https://packages.fedoraproject.org/pkgs/seatd/libseat-devel/), [Node.js](https://developer.fedoraproject.org/tech/languages/nodejs/nodejs.html).
+
+### Instalar y ejecutar
+
+Para inspeccionar la instalación sin modificar el sistema:
+
+```sh
+make install PREFIX=/usr DESTDIR="$PWD/build/stage"
+```
+
+Para una instalación local con una entrada en el gestor de inicio de sesión:
+
+```sh
+sudo make install PREFIX=/usr
+```
+
+La instalación añade `axia-session`, los archivos en `/usr/libexec/axia` y la sesión **Axia DE**. No habilita servicios ni sustituye el gestor de inicio de sesión. Cierra la sesión actual y selecciona esta entrada al iniciar sesión, o ejecuta `axia-session` desde una TTY local disponible. Ejecuta el escritorio con tu usuario habitual, **sin sudo**. El acceso a DRM y evdev se realiza mediante libseat con logind o seatd.
+
+Para comprobar el inicio sin monitor desde el checkout:
+
+```sh
+cd server
+./build/axia-server --headless 800x600 --timeout 2
+```
+
+Este modo no abre una ventana dentro de GNOME/KDE. `Ctrl+Alt+Backspace` termina la sesión física; `Ctrl+Alt+F1` a `F10` solicita el cambio de TTY al proveedor de sesión.
+
+### RPM local
+
+```sh
+sudo dnf install rpm-build
+sh tools/desktop/dist.sh
+mkdir -p build/rpmbuild/SOURCES
+cp dist/axia-de-*.tar.gz build/rpmbuild/SOURCES/
+rpmbuild -ba --define "_topdir $PWD/build/rpmbuild" packaging/rpm/axia-de.spec
+```
+
+El archivo fuente incluye los temas compilados a partir del lockfile; la compilación del RPM compila el código C sin acceder a la red. Es un paquete local experimental, todavía sin preparar para su inclusión en los repositorios oficiales de Fedora. El RPM utiliza composición por CPU para mantener pocas dependencias.
+
+### Separación entre escritorio y SO
+
+El gestor de paquetes Debian, el instalador del SO y el Imager, el helper de administración privilegiado, `lord-netd` y `lord-sessiond` se eliminaron de este fork. `axia-netperm` y `axia-fand` siguen en el código fuente, pero no se compilan ni se instalan. La tienda gestiona aplicaciones `.lpk` y ofrece abrir el gestor de software de la distribución cuando está disponible. Los paquetes RPM/DNF no se tratan como paquetes Debian.
+
+La red y las VPN, los usuarios, SSH, los ventiladores, el formateo de discos y otras operaciones administrativas del antiguo helper quedan a cargo del sistema anfitrión. Las páginas que todavía dependen de él tienen funcionalidades limitadas. El audio utiliza el protocolo PulseAudio, incluido PipeWire; Bluetooth y otras integraciones existentes siguen utilizando D-Bus.
+
+El código de distribución upstream (empaquetado Debian, repositorio APT, imágenes ISO y Raspberry Pi) ya no está en este repositorio, y el build tiene un único perfil. El remoto `upstream` conserva ese historial para `cherry-pick` selectivo.
+
+Consulta [la arquitectura de la extracción y los próximos pasos](docs/STANDALONE.md) (en portugués). La [documentación original](docs/README.md) describe LordOS upstream; sus comandos de ISO, instalación y administración no se aplican automáticamente a este fork.
+
+### Estructura del repositorio
+
+- `server/`: compositor, motor gráfico, helpers de aplicaciones y capa `src/platform/`.
+- `runtime/`, `sdk/`, `themes/`, `apps/`: interfaz y aplicaciones nativas.
+- `tools/desktop/`: instalación, verificación y preparación del archivo fuente para empaquetado.
+- `packaging/desktop/`, `packaging/rpm/`: integración de la sesión y paquete Fedora.
+- `tools/fedora-live/`: ISO live experimental de Fedora 44 con Axia DE como sesión predeterminada; consulta [FEDORA-LIVE.md](docs/FEDORA-LIVE.md) (en portugués).
+
+### Origen y licencias
+
+El código deriva de LordOS, desarrollado por iPERFEX. Se conservan los créditos y avisos de copyright originales. Consulta [LICENSE](LICENSE) y [THIRD_PARTY.md](THIRD_PARTY.md) para el código y sus componentes. Este fork no es una versión oficial de LordOS y no usa el nombre LordOS, el logo de la corona ni la mascota Lumo, como pide a los forks la política de marca de LordOS.
+
+[English](#english) | [Português](#portugues) | [Español](#espanol)

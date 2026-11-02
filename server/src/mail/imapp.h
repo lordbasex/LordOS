@@ -1,4 +1,4 @@
-/* imapp.h — IMAP4rev1 response parser (RFC 3501) for lord-maild, pure and bounds-checked.
+/* imapp.h — IMAP4rev1 response parser (RFC 3501) for axia-maild, pure and bounds-checked.
  *
  * The connection layer (imap.c) assembles one complete response: the line plus any literals,
  * kept inline exactly as on the wire ("{N}\r\n" followed by N bytes). imap_parse() turns it into

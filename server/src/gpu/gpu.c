@@ -1,4 +1,4 @@
-/* gpu.c — lord-server's GPU composition: Mesa's GBM + EGL + GLES2 (approved by the
+/* gpu.c — axia-server's GPU composition: Mesa's GBM + EGL + GLES2 (approved by the
  * user on 2026-10-16; see docs/GPU.md).
  *
  * Modesetting is still our own (kms.c, ioctls without libdrm): GBM is created on the same

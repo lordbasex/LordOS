@@ -310,7 +310,7 @@ static void typed_line(JBuf *b, const char *prop, const JVal *item, const char *
 char *vcard_build(const JVal *c, const unsigned char *photo, size_t plen, const char *ptype, size_t *olen) {
     JBuf b, l;
     jb_init(&b);
-    jb_raw(&b, "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//LordOS//Contacts 1.0//EN\r\n");
+    jb_raw(&b, "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Axia DE//Contacts 1.0//EN\r\n");
 #define LINE(...) do { jb_init(&l); __VA_ARGS__; if (!l.oom) ic_line(&b, l.p); jb_free(&l); } while (0)
     LINE(jb_raw(&l, "UID:"); field(&l, js(c, "uid")));
     const JVal *n = json_get(c, "n");

@@ -1,5 +1,5 @@
 /* fancurve.h — fan profiles, curve evaluation with hysteresis, the configuration file and the
- * socket requests of lord-fand (docs/FANS.md). Pure code: no I/O, so it is tested by
+ * socket requests of axia-fand (docs/FANS.md). Pure code: no I/O, so it is tested by
  * tests/fan_test.c.
  *
  * A curve is a list of steps "from T °C, P %", sorted by temperature. Below the first step the fan

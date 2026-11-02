@@ -12,7 +12,7 @@ Automatic backups of your home folder.
 ## Getting started
 
 1. In the app's **Settings** choose the **destination**: an external disk (ideally ext4) or a
-   folder. Backups are stored in `LordOS-Copias`.
+   folder. Backups are stored in `Axia DE-Copias`.
 2. Choose the **frequency**: hourly, daily, weekly or manual.
 3. **Back up now** makes the first one.
 

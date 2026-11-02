@@ -1,6 +1,6 @@
-/* lan.h — Files → Network, lord-server's side (docs/FILES.md, "Network"). Off until the page is
+/* lan.h — Files → Network, axia-server's side (docs/FILES.md, "Network"). Off until the page is
  * opened: one bounded pass over the local network on a thread of its own, the answers read by the
- * sandboxed lord-lan helper. lord-server decides every address; JS names none.
+ * sandboxed axia-lan helper. axia-server decides every address; JS names none.
  *
  * What a pass touches: interfaces with a real device and a private IPv4 address; mDNS on those
  * links; ports 445 and 2049 of the known neighbours and of the interface's subnet (at most its /24),

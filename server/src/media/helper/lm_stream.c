@@ -1,11 +1,11 @@
 /* lm_stream.c — the remote desktop's live encoder (MK_STREAM, docs/REMOTE.md, "Video (WebRTC)").
  *
- * One per session and codec: lord-server copies each changed frame of the session (protected windows
+ * One per session and codec: axia-server copies each changed frame of the session (protected windows
  * already black) into a free slot of a sealed memfd (MM_INRING / MM_INFRAME), as for the screen
  * recording; here it becomes H.264 (VA-API when the card encodes it, else libx264) or VP8 (libvpx),
  * tuned for latency: no B-frames, one frame in, one frame out, a keyframe only when asked
  * (MM_KEYFRAME: a new viewer or a lost packet) and the bit rate the slowest viewer can take
- * (MM_RATE). The session's sound arrives in an audio ring that lord-server fills from PipeWire and
+ * (MM_RATE). The session's sound arrives in an audio ring that axia-server fills from PipeWire and
  * goes out as Opus (20 ms). Every encoded frame goes back as MM_PACKET chunks; the bridges of the
  * session's viewers only add the per-connection encryption. */
 #include "lm.h"
@@ -48,7 +48,7 @@ typedef struct {
 static Vid V;
 static Aud A;
 
-/* Blocking send of one MM_PACKET message (the helper may wait; lord-server never does). */
+/* Blocking send of one MM_PACKET message (the helper may wait; axia-server never does). */
 static int send_wait(const int64_t v[6], uint32_t id, const uint8_t *p, size_t n) {
     for (int tries = 0; tries < 50; tries++) {
         if (!mp_send(LM_SOCK, MM_PACKET, id, v, p, n, NULL, 0)) return 0;

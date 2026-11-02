@@ -23,7 +23,7 @@
   "imager.verifiedImage": "The image matches its signed SHA-256",
   "imager.written": "Written and verified",
   "install.chownWarning": "Warning: could not change the owner of a file",
-  "install.done": "LordOS was installed on {dev}",
+  "install.done": "Axia DE was installed on {dev}",
   "install.homedirsWarning": "Warning: could not create the user's folders",
   "install.installingTo": "Installing on {dev}",
   "install.rebooting": "Restarting",
@@ -33,14 +33,14 @@
     "one": "{count} package installed for “{lang}”",
     "other": "{count} packages installed for “{lang}”"
   },
-  "lang.noDebianPackages": "No Debian packages for “{lang}”: only the region and the LordOS texts",
+  "lang.noDebianPackages": "No Debian packages for “{lang}”: only the region and the Axia DE texts",
   "lang.package": "Package: {name}",
   "locale.generated": "Region {name} installed",
   "locale.systemSet": "System region: {name}",
-  "net.alreadyLordos": "{name} was already managed by LordOS",
+  "net.alreadyLordos": "{name} was already managed by Axia DE",
   "net.configured": "{name}: {method}",
   "net.down": "{name} turned off",
-  "net.managed": "{name} is now managed by LordOS",
+  "net.managed": "{name} is now managed by Axia DE",
   "net.otherSession": "The network is managed by another session",
   "net.restoreSystem": "The network is managed by the system",
   "net.restored": {
@@ -136,8 +136,8 @@
   "vpn.imported": "VPN imported",
   "vpn.saved": "Saved",
   "wg.ignoredLines": {
-    "one": "{count} line ignored (PostUp, PreDown, Table…): LordOS does not run commands",
-    "other": "{count} lines ignored (PostUp, PreDown, Table…): LordOS does not run commands"
+    "one": "{count} line ignored (PostUp, PreDown, Table…): Axia DE does not run commands",
+    "other": "{count} lines ignored (PostUp, PreDown, Table…): Axia DE does not run commands"
   },
   "wifi.connecting": "Connecting to {ssid}…",
   "wifi.disconnected": "Disconnected",

@@ -1,7 +1,7 @@
 /* lbgpu.c — LordBench's GPU workloads (docs/BENCHMARK.md, "Workloads", GPU): OpenGL ES 2 offscreen on
- * the render node lord-server opened and passed in (GBM + EGL, a surfaceless context and a framebuffer
+ * the render node axia-server opened and passed in (GBM + EGL, a surfaceless context and a framebuffer
  * object of 1920×1080), nothing on screen. Every frame ends with glFinish, so the times are the GPU's.
- * Runs inside lord-bench after its sandbox: Mesa's driver loads from /usr/lib (read-only) and talks to
+ * Runs inside axia-bench after its sandbox: Mesa's driver loads from /usr/lib (read-only) and talks to
  * the device only through that fd (DRM ioctls). */
 #include "lbgpu.h"
 #include "bench.h"

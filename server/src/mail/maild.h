@@ -1,14 +1,14 @@
-/* maild.h — internals of lord-maild, the sandboxed Mail/Calendar/Contacts helper (docs/MAIL.md).
+/* maild.h — internals of axia-maild, the sandboxed Mail/Calendar/Contacts helper (docs/MAIL.md).
  *
  * Threads:
- *   - main: reads the channel with lord-server, answers local requests (lists, search, opening a
+ *   - main: reads the channel with axia-server, answers local requests (lists, search, opening a
  *     cached message, calendars and contacts) and queues network work;
  *   - one worker per mail account: IMAP sync, IDLE on the inbox, flag changes, moves, appends;
  *   - one sender: SMTP (and the "send later" outbox);
  *   - one worker per CalDAV/CardDAV account.
  * One coarse lock (G) protects the in-memory cache; network I/O never holds it.
  *
- * Files: everything lives under the cache folder lord-server opened for us (cache_fd):
+ * Files: everything lives under the cache folder axia-server opened for us (cache_fd):
  *   <acct>/folders            folder list
  *   <acct>/f/<dir>/state      uidvalidity uidnext highestmodseq
  *   <acct>/f/<dir>/index      one line per message (headers, flags, preview)
@@ -36,7 +36,7 @@ void reply_done(uint32_t id, JBuf *b);              /* frees b */
 void reply_err(uint32_t id, const char *code, const char *detail);
 void send_event(JBuf *b);                           /* frees b */
 void reply_image(uint32_t id, const uint32_t *argb, int w, int h);
-/* Asks lord-server for a TCP connection; returns a connected fd or -1 (why: denied/dns/connect). */
+/* Asks axia-server for a TCP connection; returns a connected fd or -1 (why: denied/dns/connect). */
 int  net_connect(const char *host, int port, char *why, size_t wcap);
 /* Connects and starts TLS (implicit or STARTTLS is the caller's job when starttls=1).
  * On a certificate problem emits a "cert" event for that account. */

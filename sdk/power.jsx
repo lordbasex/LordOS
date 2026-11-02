@@ -5,7 +5,7 @@
 // layer inside its ThemeProvider (so the sheet takes the theme's colors; default and classic do):
 // what will happen, a 60 s countdown that does it if nobody cancels, the apps still open and the
 // other users logged in. Confirming asks lord-sessiond
-// (root) through lord.session.power('reboot'|'poweroff'); lord-server runs nothing. The policy is
+// (root) through lord.session.power('reboot'|'poweroff'); axia-server runs nothing. The policy is
 // decided there: alone, any user; with other users' sessions open, only an administrator. The sheet
 // shows the same rule beforehand, and a refusal from lord-sessiond comes back as
 // {t:'power', ok:false, why:'admin'}.

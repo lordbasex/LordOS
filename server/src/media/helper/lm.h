@@ -1,12 +1,12 @@
-/* lm.h — lord-media: the LordOS media helper (see docs/MEDIA.md).
+/* lm.h — axia-media: the LordOS media helper (see docs/MEDIA.md).
  *
  * It's the only LordOS program that links FFmpeg (libavcodec, libavformat, libswscale,
  * libswresample) and libva, and only to decode and encode: the player, the
- * synchronization and the UI are our own. lord-server launches it on demand, with a fixed path and no
+ * synchronization and the UI are our own. axia-server launches it on demand, with a fixed path and no
  * arguments; it runs as the user, in the helpers' shared sandbox
  * (sec/sandbox.c, sandbox_apply_helper): no network, no opening files (only the descriptors that
- * lord-server passes it, including PipeWire, the render node and the camera) and with seccomp. If it crashes, the
- * desktop goes on: lord-server only sees that the socket closed. */
+ * axia-server passes it, including PipeWire, the render node and the camera) and with seccomp. If it crashes, the
+ * desktop goes on: axia-server only sees that the socket closed. */
 #ifndef LORD_MEDIA_LM_H
 #define LORD_MEDIA_LM_H
 
@@ -21,10 +21,10 @@
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
 
-#define LM_SOCK 3                       /* the socket with lord-server */
+#define LM_SOCK 3                       /* the socket with axia-server */
 
 extern int lm_debug;
-#define LM_LOG(...) do { fprintf(stderr, "lord-media[%d]: ", (int)getpid()); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
+#define LM_LOG(...) do { fprintf(stderr, "axia-media[%d]: ", (int)getpid()); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
 #define LM_DBG(...) do { if (lm_debug) LM_LOG(__VA_ARGS__); } while (0)
 
 double lm_now_ms(void);                 /* monotonic clock */
@@ -41,7 +41,7 @@ int  lm_close_output(AVFormatContext *oc, int write_trailer);
 int  lm_memfd(size_t n, void **map, const char *name);
 int  lm_write_all(int fd, const void *p, size_t n);
 
-/* VA-API: FFmpeg device over the render node lord-server passed (or NULL). */
+/* VA-API: FFmpeg device over the render node axia-server passed (or NULL). */
 AVBufferRef *lm_vaapi_device(int render_fd);
 int lm_hwaccel_is(const char *params, const char *name);
 /* /dev/videoN and /dev/mediaN of the Pi 5's HEVC decoder (rpi-hevc-dec) from sysfs; 0 if found. */
@@ -57,7 +57,7 @@ void lm_buf_printf(LmBuf *b, const char *fmt, ...) __attribute__((format(printf,
 void lm_buf_str(LmBuf *b, const char *s);      /* JSON string with escapes */
 void lm_buf_free(LmBuf *b);
 
-/* Replies to lord-server. A failed result's payload and every error are code lines (../../errcode.h),
+/* Replies to axia-server. A failed result's payload and every error are code lines (../../errcode.h),
  * never prose: the UI translates them (errors.media.*). Details go to the log (LM_LOG). */
 void lm_result(uint32_t id, int status, const char *payload, int fd);
 void lm_error(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -71,7 +71,7 @@ AVFrame *lm_to_bgra(const AVFrame *src, int w, int h, int premultiply);
 int  lm_encode_image(const AVFrame *bgra, const char *format, int quality, int out_fd);
 void lm_probe_json(AVFormatContext *fmt, LmBuf *b);
 
-/* ---- frame output to lord-server (lm_out.c) ---- */
+/* ---- frame output to axia-server (lm_out.c) ---- */
 void lm_out_init(int native);           /* native: original size (without scaling to the box) */
 int  lm_out_present(AVFrame *f, int64_t pts);   /* 0 presented, 1 dropped (no slot), -1 error */
 void lm_out_ack(uint32_t id);
@@ -89,7 +89,7 @@ int    lm_enc_audio(LmEnc *e, const int16_t *pcm, int samples);
 int64_t lm_enc_close(LmEnc *e);         /* writes the trailer; returns the duration in ms (or <0) */
 const char *lm_enc_name(const LmEnc *e);
 
-/* ---- microphone: ring that lord-server fills (lm_io.c) ---- */
+/* ---- microphone: ring that axia-server fills (lm_io.c) ---- */
 struct ARingHdr;
 /* Maps and validates the ring (mono, 48 kHz). NULL if it's unusable. */
 void *lm_mic_ring(int fd, size_t *len);

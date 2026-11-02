@@ -70,7 +70,7 @@ static void rt_demote(int sig) {
         if (t) sched_setscheduler(t, SCHED_OTHER, &p);
     }
     if (atomic_exchange(&rt_on, 0)) {
-        static const char m[] = "lord-server: back to the normal priority (a thread ran too long on real time, or it could not be set)\n";
+        static const char m[] = "axia-server: back to the normal priority (a thread ran too long on real time, or it could not be set)\n";
         if (write(2, m, sizeof m - 1) < 0) {}
     }
 }
@@ -90,7 +90,7 @@ void par_init(int threads) {
         if (!rt_set(0)) {
             atomic_store(&rt_tids[0], (int)syscall(SYS_gettid));
             atomic_store(&rt_on, 1);
-        } else fprintf(stderr, "lord-server: no real-time priority (%s)\n", strerror(errno));
+        } else fprintf(stderr, "axia-server: no real-time priority (%s)\n", strerror(errno));
     }
     if (threads <= 0) {
         cpu_set_t set;
@@ -109,7 +109,7 @@ void par_init(int threads) {
     }
     if (atomic_load(&rt_on)) {
         if (rt_set(SCHED_RESET_ON_FORK)) rt_demote(0);   /* never leave a thread that forks at real time */
-        else fprintf(stderr, "lord-server: compositor at real-time priority %d (SCHED_RR, %d threads)\n", PAR_RT_PRIO, nthreads);
+        else fprintf(stderr, "axia-server: compositor at real-time priority %d (SCHED_RR, %d threads)\n", PAR_RT_PRIO, nthreads);
     }
     /* the limit goes to 0 for good, hard limit included: apps, helpers and shells this server starts
      * can never ask for real time */

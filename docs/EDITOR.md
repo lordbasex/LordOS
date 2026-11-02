@@ -122,7 +122,7 @@ For the editor, these were added to the system:
     permissions;
   - up to 32 MB;
   - they can't touch `~/.local/share/applications`, `~/.config/autostart`,
-    `~/.local/share/lordos/apps` or `~/.config/lordos/settings.json` (nor the other protected
+    `~/.local/share/axia/apps` or `~/.config/axia/settings.json` (nor the other protected
     files and folders added since, `FILES.md`), not even through a symlink (tested): JS can't create a `.desktop` file, which is the only thing `lord.apps.launch` runs.
 
 ## Performance (measured)
@@ -136,7 +136,7 @@ For the editor, these were added to the system:
 - **Outside the UI (Node, same code):** tokenizing the 10,001 lines takes 76 ms; a keystroke in
   the document, 0.004 ms.
 - **Tests of `buffer.js` and `syntax.js`:** 28/28 in Node and in QuickJS (the same engine as
-  lord-server; `/tmp/qjsrun` on the VM): multiple cursors, grouped undo, position mapping, CRLF,
+  axia-server; `/tmp/qjsrun` on the VM): multiple cursors, grouped undo, position mapping, CRLF,
   «modified» after undo, and the language states.
 
 ## Pending

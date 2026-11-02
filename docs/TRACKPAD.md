@@ -68,7 +68,7 @@ but badly.
   (`BTN_TOOL_TRIPLETAP` with 2 slots), counting goes by `BTN_TOOL_*`.
 
 `lord-sessiond` lends them just like mice (see `SESSIONS.md`). The session log
-(`~/.cache/lordos/session.log`) says what it found:
+(`~/.cache/axia/session.log`) says what it found:
 
 ```
 tp: LordOS SynPS/2 Synaptics TouchPad (simulado): touchpad (clickpad), 105×87 mm, 5 contacts
@@ -178,7 +178,7 @@ on):
 ## Settings → Trackpad
 
 It's in the Language & Keyboard group, and only appears if there is a touchpad. It's saved in
-`settings.trackpad` (`~/.config/lordos/settings.json`) and applied live:
+`settings.trackpad` (`~/.config/axia/settings.json`) and applied live:
 `sdk/trackpad.js` calls `lord.input.configure`.
 
 Each row has a small drawing of the gesture that animates on mouse hover.
@@ -364,7 +364,7 @@ tp: scroll: 19 frames, average latency 2.94 ms, max 30.17 ms (read → JS/Waylan
 
 The maximum is a frame that was being drawn on the CPU at that exact moment.
 
-**`lord-server` CPU** (`~/cpu.sh`, % of one core, with the Monitor open):
+**`axia-server` CPU** (`~/cpu.sh`, % of one core, with the Monitor open):
 
 | What | CPU |
 |---|---|

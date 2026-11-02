@@ -22,7 +22,7 @@ build/vcrypto-test: tests/vcrypto_test.c $(VAULT_BASE) src/vault/vcrypto.h src/v
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/vcrypto_test.c $(VAULT_BASE) -lpthread
 	./$@ || { rm -f $@; exit 1; }
 test: build/vcrypto-test
-# Lists embedded in lord-vault (EFF words, common passwords): ../third_party/wordlists
+# Lists embedded in axia-vault (EFF words, common passwords): ../third_party/wordlists
 build/obj/vault/lists.o: ../third_party/wordlists/eff_large_wordlist.txt ../third_party/wordlists/10k-most-common.txt
 	@mkdir -p build/gen/vault build/obj/vault
 	cp ../third_party/wordlists/eff_large_wordlist.txt build/gen/vault/words.txt
@@ -37,28 +37,28 @@ build/vault-test: tests/vault_test.c $(VAULT_CORE) build/obj/vault/monocypher.o 
 	$(CC) $(CPPFLAGS) $(VAULT_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/vault_test.c $(VAULT_CORE) build/obj/vault/monocypher.o build/obj/vault/lists.o -lpthread -lm
 	./$@ || { rm -f $@; exit 1; }
 test: build/vault-test
-# lord-vault: the confined Passwords and keyring helper (src/vault/vault.c)
+# axia-vault: the confined Passwords and keyring helper (src/vault/vault.c)
 LV_SRC := $(VAULT_CORE) src/vault/vault.c src/vault/keyring.c src/vault/vimport.c src/vault/csvp.c src/vault/kdbx.c src/vault/xmlmini.c \
           src/vault/qr.c src/vault/ctap2.c src/vault/p256.c src/vault/cbor.c src/vault/secretsvc.c src/vault/dbus.c \
           src/sec/sandbox.c src/sec/cgroup.c
-build/lord-vault: $(LV_SRC) build/obj/vault/monocypher.o build/obj/vault/vstb.o build/obj/vault/lists.o $(VAULT_HDR)
+build/axia-vault: $(LV_SRC) build/obj/vault/monocypher.o build/obj/vault/vstb.o build/obj/vault/lists.o $(VAULT_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(VAULT_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LV_SRC) build/obj/vault/monocypher.o build/obj/vault/vstb.o build/obj/vault/lists.o -lpthread -lm
 # (only when all its parts are there, so the tree always builds)
 LV_READY := $(and $(wildcard src/vault/secretsvc.c),$(wildcard src/vault/dbus.c),$(wildcard src/vault/vimport.c),$(wildcard src/vault/kdbx.c),$(wildcard src/vault/csvp.c),$(wildcard src/vault/xmlmini.c))
 ifneq ($(LV_READY),)
-all: build/lord-vault
+all: build/axia-vault
 endif
-# lord-server side: launching lord-vault, its channel and lord.vault (src/vault/vclient.c, src/ui/js_vault.c).
-# They are added to build/lord-server as prerequisites ($^ includes them in the link).
+# axia-server side: launching axia-vault, its channel and lord.vault (src/vault/vclient.c, src/ui/js_vault.c).
+# They are added to build/axia-server as prerequisites ($^ includes them in the link).
 VC_OBJ := build/obj/vault/vclient.o build/obj/vault/vwire.o build/obj/vault/fidodev.o build/obj/ui/js_vault.o
-build/lord-server: $(VC_OBJ)
+build/axia-server: $(VC_OBJ)
 $(VC_OBJ): $(wildcard src/vault/vclient.h src/vault/vwire.h src/vault/fidodev.h src/ui/js_vault.h)
-# lord-vault end to end with lord-server's client (needs build/lord-vault; does not run by itself)
-build/vault-e2e: tests/vault_e2e.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/vault/vjson.c src/vault/smem.c $(VAULT_HDR) build/lord-vault
+# axia-vault end to end with axia-server's client (needs build/axia-vault; does not run by itself)
+build/vault-e2e: tests/vault_e2e.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/vault/vjson.c src/vault/smem.c $(VAULT_HDR) build/axia-vault
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/vault_e2e.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/vault/vjson.c src/vault/smem.c -lpthread
-# the keyring op of isolated .lpk apps (src/sec/brokerkr.c) against lord-vault (needs build/lord-vault)
-build/brokerkr-e2e: tests/brokerkr_e2e.c src/sec/brokerkr.c src/sec/json.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/sec/broker_int.h src/sec/broker.h $(VAULT_HDR) build/lord-vault
+# the keyring op of isolated .lpk apps (src/sec/brokerkr.c) against axia-vault (needs build/axia-vault)
+build/brokerkr-e2e: tests/brokerkr_e2e.c src/sec/brokerkr.c src/sec/json.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/sec/broker_int.h src/sec/broker.h $(VAULT_HDR) build/axia-vault
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/brokerkr_e2e.c src/sec/brokerkr.c src/sec/json.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c -lpthread
 # demo vault for the screenshots (not a test)
 build/vault-demo: tests/vault_demo.c src/vault/vclient.c src/vault/vwire.c src/vault/fidodev.c src/vault/vjson.c src/vault/smem.c $(VAULT_HDR)

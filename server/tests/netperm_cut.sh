@@ -1,12 +1,12 @@
 #!/bin/bash
 # netperm_cut.sh — open connections are cut when a rule changes to deny (docs/FIREWALL.md,
 # "Existing connections are cut"). Run it in the test VM as the session user (passwordless sudo),
-# with lord-sessiond and lord-netperm running:
+# with lord-sessiond and axia-netperm running:
 #
 #   bash server/tests/netperm_cut.sh [lan-host]
 #
-# Like netperm_integration.sh it builds an app scope by hand, writes ~/.config/lordos/firewall.json
-# (restored at the end) and asks lord-netperm to reload. Inside the scope it starts long downloads
+# Like netperm_integration.sh it builds an app scope by hand, writes ~/.config/axia/firewall.json
+# (restored at the end) and asks axia-netperm to reload. Inside the scope it starts long downloads
 # (TCP, and QUIC with curl --http3-only when the network allows UDP 443) and an idle TCP session to
 # the SSH port of lan-host, then changes the rules and measures how fast the traffic stops and what
 # the app sees. Then the rule goes back to allow and a new connection must work at once.
@@ -20,15 +20,15 @@ OTHER_URL=${OTHER_URL:-$ISO_DIR$(curl -s --max-time 8 "$ISO_DIR" | grep -o 'debi
 U=$(id -u)
 SESS=/sys/fs/cgroup/system.slice/lordos.service/lordos-session-$U
 SC=$SESS/app-lordos-npcut.scope
-FW=~/.config/lordos/firewall.json
+FW=~/.config/axia/firewall.json
 APP=desktop:npcut
 T=$(mktemp -d)
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "  ok:   $*"; }
 bad() { fail=$((fail+1)); echo "  BAD:  $*"; }
 [ -d "$SESS" ] || { echo "no LordOS session for uid $U ($SESS)"; exit 2; }
-[ -S /run/lordos/netperm.sock ] || { echo "lord-netperm is not running"; exit 2; }
-mkdir -p ~/.config/lordos
+[ -S /run/lordos/netperm.sock ] || { echo "axia-netperm is not running"; exit 2; }
+mkdir -p ~/.config/axia
 HAD=0
 [ -f "$FW" ] && { cp "$FW" "$T/fw.backup"; HAD=1; }
 # ends everything still running in the scope (cgroup.kill) and the background jobs

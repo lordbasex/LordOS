@@ -1,14 +1,14 @@
-/* vault.c — lord-vault: the passwords and keyring helper (see docs/PASSWORDS.md).
+/* vault.c — axia-vault: the passwords and keyring helper (see docs/PASSWORDS.md).
  *
- * lord-server (vclient.c) launches it from a fixed path (next to its own binary), without
+ * axia-server (vclient.c) launches it from a fixed path (next to its own binary), without
  * arguments, with the control channel on fd 3. Before reading a single vault:
- *   - no core dumps or ptrace (PR_SET_DUMPABLE 0, RLIMIT_CORE 0), it dies with lord-server;
+ *   - no core dumps or ptrace (PR_SET_DUMPABLE 0, RLIMIT_CORE 0), it dies with axia-server;
  *   - it receives the vaults folder (an fd) over the control channel and, if there is one, the
  *     socket already connected to the session's D-Bus bus; and confines itself with
  *     sandbox_apply_helper: no network, no new sockets, no exec, no files except that folder
  *     (and the fds passed to it later).
  * Decrypted data lives only in the secrets arena (smem.h: mlock, MADV_DONTDUMP, wiped on
- * lock). It serves several channels: the control one (lord-server) and those of the Passwords app.
+ * lock). It serves several channels: the control one (axia-server) and those of the Passwords app.
  * Slow work that waits for a person (touching the FIDO2 key) runs in a separate thread; Argon2id
  * (≈0.5–1 s) runs in the loop. */
 #include "vault_int.h"
@@ -229,7 +229,7 @@ int vault_unlock_with(Vault *v, int type, const VFactors *f, char *err, size_t e
             vj_free(&j);
         }
     }
-    if (debug) fprintf(stderr, "lord-vault: %s abierta (ranura %d, %s, %.0f ms de KDF, %d entradas)\n",
+    if (debug) fprintf(stderr, "axia-vault: %s abierta (ranura %d, %s, %.0f ms de KDF, %d entradas)\n",
                        v->file, slot, slot_type_name(h.slots[slot].type), kdf_ms, m.n);
     event_v("unlocked", (int)(v - vaults));
     if (v == &vaults[V_LOGIN]) keyring_lock_changed();
@@ -1495,7 +1495,7 @@ static void handle_request(Chan *c, VMsg *m) {
     uint32_t id = m->id;
     int vi = vault_of(&j);
     Vault *v = &vaults[vi];
-    if (debug > 1) fprintf(stderr, "lord-vault: op %s (%s)\n", op, vi == V_MAIN ? "main" : "login");
+    if (debug > 1) fprintf(stderr, "axia-vault: op %s (%s)\n", op, vi == V_MAIN ? "main" : "login");
     if (!strcmp(op, "status")) { vault_probe(&vaults[V_MAIN]); if (!vaults[V_LOGIN].unlocked) vault_probe(&vaults[V_LOGIN]); VjB b; vb_init(&b); status_json(&b); reply(c, id, &b); }
     else if (!strcmp(op, "create")) op_create(c, id, &j, m);
     else if (!strcmp(op, "unlock")) op_unlock(c, id, &j, m);
@@ -1617,7 +1617,7 @@ static void handle_request(Chan *c, VMsg *m) {
     vj_free(&j);
 }
 
-/* ================= control (lord-server only) ================= */
+/* ================= control (axia-server only) ================= */
 
 static void handle_ctl(Chan *c, VMsg *m) {
     Vj j;
@@ -1672,7 +1672,7 @@ static void lockdown(void) {
     static const char *ro[] = { NULL };
     SandboxHelperCfg cfg = { .name = "lordos-vault", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024, .rw_dir_fds = rw, .ro_dir_fds = NULL };
     int mask = sandbox_apply_helper(&cfg);
-    if (debug) fprintf(stderr, "lord-vault[%d]: caja=%#x\n", getpid(), (unsigned)mask);
+    if (debug) fprintf(stderr, "axia-vault[%d]: caja=%#x\n", getpid(), (unsigned)mask);
 }
 
 int main(void) {
@@ -1686,7 +1686,7 @@ int main(void) {
     /* 1) init: the vaults folder (and maybe the bus) */
     VMsg m;
     if (vw_recv(CTL_FD, &m, &smalloc)) return 1;
-    if (m.kind != VW_CTL || m.nfds < 1) { fprintf(stderr, "lord-vault: the folder is missing\n"); return 1; }
+    if (m.kind != VW_CTL || m.nfds < 1) { fprintf(stderr, "axia-vault: the folder is missing\n"); return 1; }
     vault_dirfd = m.fds[0];
     m.fds[0] = -1;
     int busfd = -1;
@@ -1717,7 +1717,7 @@ int main(void) {
         /* auto-lock */
         Vault *mv = &vaults[V_MAIN];
         if (mv->unlocked && mv->autolock_s > 0 && !fj.busy && now_ms() - mv->last_use > mv->autolock_s * 1000.0) {
-            if (debug) fprintf(stderr, "lord-vault: automatic lock\n");
+            if (debug) fprintf(stderr, "axia-vault: automatic lock\n");
             vault_lock(mv);
         }
         if (r <= 0) continue;

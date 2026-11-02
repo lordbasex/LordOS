@@ -41,7 +41,7 @@ function load(id) {
   return loaded.get(id);
 }
 
-// With app mode (lord-server --app), an .lpk app is NEVER evaluated in the theme's context: if something
+// With app mode (axia-server --app), an .lpk app is NEVER evaluated in the theme's context: if something
 // opens its window in-process (wm.open, the Dock's «New window»…), the isolated process is launched and
 // this empty window is closed. See docs/PRIVACY.md.
 const isolated = () => typeof lord.apps !== 'undefined' && typeof lord.apps.launchPackage === 'function';
@@ -50,7 +50,7 @@ function Redirect({ id }) {
   const win = sdk.useAppWindow();
   React.useEffect(() => {
     // already running: a plain open focuses its window; «New window» (wm.open(id, { new: true }))
-    // asks the running process for another window (lord-server forwards it over the broker)
+    // asks the running process for another window (axia-server forwards it over the broker)
     const running = windows.get().filter((w) => w.args?.pkg && w.args?.appId === id);
     const wantsNew = win && win.id && String(win.id).includes('#');
     if (running.length && !wantsNew) wm.focus(running[running.length - 1].id);

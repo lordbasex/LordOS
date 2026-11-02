@@ -1,14 +1,14 @@
-/* maild.c — lord-maild: the helper that speaks IMAP, SMTP, CalDAV and CardDAV for Mail,
+/* maild.c — axia-maild: the helper that speaks IMAP, SMTP, CalDAV and CardDAV for Mail,
  * Calendar, Contacts and Reminders (see maild.h, proto.h and docs/MAIL.md).
  *
- * lord-server starts it with a fixed path, no arguments, a minimal environment and the channel on
+ * axia-server starts it with a fixed path, no arguments, a minimal environment and the channel on
  * fd 3. Before reading anything from the network it:
- *   - dies with lord-server (PR_SET_PDEATHSIG) and never dumps core;
+ *   - dies with axia-server (PR_SET_PDEATHSIG) and never dumps core;
  *   - loads the system CA bundle and the local time zone;
  *   - receives the cache folder as an open fd (MQ_INIT) and locks itself in with the shared
  *     helper sandbox (sandbox_apply_helper): Landlock with read-only /usr and the zoneinfo, write
  *     access only below the cache folder; seccomp without socket/connect/bind/exec/fork; no
- *     capabilities. It cannot open a single socket: every connection comes from lord-server,
+ *     capabilities. It cannot open a single socket: every connection comes from axia-server,
  *     which only connects to the servers of the configured accounts. */
 #include "maild.h"
 #include "proto.h"
@@ -48,7 +48,7 @@ void dbg(const char *fmt, ...) {
     if (!debug) return;
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "lord-maild: ");
+    fprintf(stderr, "axia-maild: ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
@@ -87,7 +87,7 @@ void send_event(JBuf *b) {
 
 void reply_image(uint32_t id, const uint32_t *argb, int w, int h) {
     size_t bytes = (size_t)w * (size_t)h * 4;
-    int fd = doc_memfd("lord-maild-img", argb, bytes);
+    int fd = doc_memfd("axia-maild-img", argb, bytes);
     if (fd < 0) { reply_err(id, "image", "memfd"); return; }
     char j[64];
     snprintf(j, sizeof j, "{\"w\":%d,\"h\":%d}", w, h);
@@ -95,7 +95,7 @@ void reply_image(uint32_t id, const uint32_t *argb, int w, int h) {
     close(fd);
 }
 
-/* ---- connections through lord-server ---- */
+/* ---- connections through axia-server ---- */
 
 typedef struct { uint32_t cid; int done, fd; char why[24]; } Pend;
 static Pend pend[64];
@@ -466,7 +466,7 @@ static uint32_t *uids_of(const JVal *args, int *n) {
 }
 
 /* Requests that may wait on the network run on their own thread: the main thread is the one
- * that receives lord-server's answers (connections included), so it must never block. */
+ * that receives axia-server's answers (connections included), so it must never block. */
 typedef struct { uint32_t id; char *json; size_t len; } Bg;
 static void *bg_image(void *arg) {
     Bg *b = arg;
@@ -641,11 +641,11 @@ int main(void) {
     signal(SIGPIPE, SIG_IGN);
     debug = getenv("LORD_MAIL_DEBUG") != NULL;
     struct stat st;
-    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "lord-maild: started by lord-server only\n"); return 2; }
-    if (net_init()) { fprintf(stderr, "lord-maild: TLS init failed\n"); return 3; }
+    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "axia-maild: started by axia-server only\n"); return 2; }
+    if (net_init()) { fprintf(stderr, "axia-maild: TLS init failed\n"); return 3; }
     tzset();
     DocMsg m;
-    if (doc_recv(SOCK, &m) || m.h.op != MQ_INIT || m.nfds != 1) { fprintf(stderr, "lord-maild: bad start\n"); return 4; }
+    if (doc_recv(SOCK, &m) || m.h.op != MQ_INIT || m.nfds != 1) { fprintf(stderr, "axia-maild: bad start\n"); return 4; }
     cache_fd = m.fds[0];
     m.fds[0] = -1;
     JDoc init;

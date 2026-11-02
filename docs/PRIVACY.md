@@ -9,10 +9,10 @@ first time and the user decides. See also [SIGNING.md](SIGNING.md) (signed packa
 
 | Piece | Status |
 |---|---|
-| Every `.lpk` app runs as **its own process** (`lord-server --app <id>`), a Wayland client of the compositor | **done**, tested on VM 122 |
-| **Broker**: a single socket between the app and `lord-server`, which checks the permission of every call | **done** (fs, clipboard, permissions, indicators) |
+| Every `.lpk` app runs as **its own process** (`axia-server --app <id>`), a Wayland client of the compositor | **done**, tested on VM 122 |
+| **Broker**: a single socket between the app and `axia-server`, which checks the permission of every call | **done** (fs, clipboard, permissions, indicators) |
 | Our own sandbox (`server/src/sec/sandbox.c`): Landlock + seccomp (TSYNC) + cgroup + no capabilities | **done** (`build/sandbox-test`: 13/13 app, 13/13 with network) |
-| Hardened variant for decoding helpers (`sandbox_apply_helper`, lord-media and lord-doc) | **done** (`build/sandbox-test helper`: 17/17) |
+| Hardened variant for decoding helpers (`sandbox_apply_helper`, axia-media and axia-doc) | **done** (`build/sandbox-test helper`: 17/17) |
 | Sandbox (`build/sandbox-test`) | **13/13→14/14 app**, 14/14 with network, 17/17 helper |
 | Per-app permissions with system-drawn prompts, stored where the app can't write (`server/src/sec/perms.c`) | **done** |
 | Prompts drawn by the system (including those an isolated app requests through the broker), Settings → Privacy, green/orange dots | **done** |
@@ -21,10 +21,10 @@ first time and the user decides. See also [SIGNING.md](SIGNING.md) (signed packa
 | Package signing and trust levels | **done**, see [SIGNING.md](SIGNING.md) |
 | Theme tokens, language and direction (RTL) **live** inside the app process | **done** (light/dark, accent, language; tested with Arabic) |
 | Live revocation: when a permission is denied, the app releases the camera/microphone at once | **done** |
-| Powerbox: open/save dialog **drawn by lord-server** that hands over only the fd of the chosen file | **done** (`fs.openFile`/`fs.saveFile`) |
+| Powerbox: open/save dialog **drawn by axia-server** that hands over only the fd of the chosen file | **done** (`fs.openFile`/`fs.saveFile`) |
 | App menus in the system menu bar | **done** (through the broker) |
-| **Microphone** as data (audio) through a read-only ring, after consent | **done** (lord-server opens the PipeWire stream; the app reads the level with its own cursor; revoking closes it) |
-| Camera as decoded frames through a ring (via lord-media), after consent | **done**, tested on VM 122 with v4l2loopback (see [Camera for isolated apps](#camera-for-isolated-apps)) |
+| **Microphone** as data (audio) through a read-only ring, after consent | **done** (axia-server opens the PipeWire stream; the app reads the level with its own cursor; revoking closes it) |
+| Camera as decoded frames through a ring (via axia-media), after consent | **done**, tested on VM 122 with v4l2loopback (see [Camera for isolated apps](#camera-for-isolated-apps)) |
 | Several windows per isolated app | **done**, tested on VM 122 (see [Several windows per isolated app](#several-windows-per-isolated-app)) |
 | **Mail, Calendar, Contacts and Reminders** run as their own sandboxed process (0.8.2) | **done**, tested on VM 118 (see [System apps in their own process](#system-apps-in-their-own-process-082)) |
 | Store and Photos in their own process | **not yet**: they stay in the session's process, see [what stays in-process and why](#what-stays-in-process-and-why) |
@@ -35,11 +35,11 @@ Not every program on LordOS is sandboxed. This is exactly what applies to each k
 
 | Kind | Process | Landlock + seccomp | cgroup scope | Broker and permissions | Firewall |
 |---|---|---|---|---|---|
-| `.lpk` apps, Passwords, Mail, Calendar, Contacts, Reminders | own process (`lord-server --app <id>`) | yes | own (`app-lordos-lpk-<id>.scope`) | yes: every call is checked in `lord-server` | per app (`lpk:<id>`): network rules and every non-network restriction (broker) |
-| Other built-in apps | inside `lord-server` | no | `lord-server`'s | no broker: camera, microphone and screen are checked in C (`js_media.c`), notifications in `sdk/notify.js` | as "LordOS" (`lordos`): network rules; camera, microphone, screen and notifications restrictions |
-| Linux apps from the launcher | own process | no by default; with "no access to your files", or restricted from the microphone, camera, USB or Bluetooth, their own user, mount, PID and IPC namespaces plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`lord-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
-| Terminal programs | children of the Terminal's shell | no | `lordos-net-terminal.scope` (0.8.5; best effort, `lord-server`'s if it can't be placed) | no | as "Terminal" (`lordos:terminal`, 0.8.5): network rules, each program listed by name |
-| LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads | a connector (`lord-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `lord-fetch` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
+| `.lpk` apps, Passwords, Mail, Calendar, Contacts, Reminders | own process (`axia-server --app <id>`) | yes | own (`app-lordos-lpk-<id>.scope`) | yes: every call is checked in `axia-server` | per app (`lpk:<id>`): network rules and every non-network restriction (broker) |
+| Other built-in apps | inside `axia-server` | no | `axia-server`'s | no broker: camera, microphone and screen are checked in C (`js_media.c`), notifications in `sdk/notify.js` | as "LordOS" (`lordos`): network rules; camera, microphone, screen and notifications restrictions |
+| Linux apps from the launcher | own process | no by default; with "no access to your files", or restricted from the microphone, camera, USB or Bluetooth, their own user, mount, PID and IPC namespaces plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`axia-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
+| Terminal programs | children of the Terminal's shell | no | `lordos-net-terminal.scope` (0.8.5; best effort, `axia-server`'s if it can't be placed) | no | as "Terminal" (`lordos:terminal`, 0.8.5): network rules, each program listed by name |
+| LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads | a connector (`axia-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `axia-dl` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
 
 Built-in apps reach files through `lord.fs`: since 0.8.5 its reading calls (`list`, `read`, `stat`,
 `du`, `free`, `search`) reach the whole tree as the session user (`fsops_readable`; the system's own
@@ -59,11 +59,11 @@ one doesn't cover are in [FIREWALL.md](FIREWALL.md#non-network-restrictions) and
 
 ## The per-app process
 
-When a `.lpk` app is opened (app launcher, Dock, Store), `lord-server` launches it as its own
-process: **the same binary in "app mode"**, `lord-server --app <id>` (`server/src/app/`).
+When a `.lpk` app is opened (app launcher, Dock, Store), `axia-server` launches it as its own
+process: **the same binary in "app mode"**, `axia-server --app <id>` (`server/src/app/`).
 
 ```
-lord-server (session, compositor)                    lord-server --app evil (isolated)
+axia-server (session, compositor)                    axia-server --app evil (isolated)
 ├── Wayland compositor (wl.c)   ◀── Wayland client ── window (wl_shm, xdg_toplevel)
 ├── broker (sec/brokersrv.c)    ◀── socket (SEQPACKET) ── lord.fs / clipboard / permissions…
 └── system prompts (sdk/privacy.js)                     QuickJS + React + SDK + app.js
@@ -97,26 +97,26 @@ lord-server (session, compositor)                    lord-server --app evil (iso
 | ![light mode, violet accent, live](privacy-app-light.png) | ![the same app in Arabic (RTL), live](privacy-app-arabic.png) |
 | The theme switched to light and to the user's accent: the isolated app follows at once | Switching the session to Arabic mirrors the app and retranslates it, without restarting it |
 | ![powerbox: dialog drawn by the system](privacy-file-picker.png) | ![app menus in the system bar](privacy-app-menu.png) |
-| Opening a file: lord-server draws the dialog; the app gets only the fd | The isolated app's menus in the system menu bar |
+| Opening a file: axia-server draws the dialog; the app gets only the fd | The isolated app's menus in the system menu bar |
 | ![revoking closes the microphone](privacy-revoke.png) | ![app stopped: the compositor doesn't change](privacy-app-stopped.png) |
 | Denying the microphone turns it off at once (recording stopped, the dot went away) | With the app hung (SIGSTOP) the desktop responds just the same |
 
 ### The broker (`sec/broker.h`, `sec/brokersrv.c`, `ui/js_broker.c`)
 
 `SOCK_SEQPACKET` messages: header (`reqid`, `op`, `status`, `len`) + data. Every request is
-checked in `lord-server`:
+checked in `axia-server`:
 
-| Request | What `lord-server` does |
+| Request | What `axia-server` does |
 |---|---|
-| `fs.home/read/write/list` | only inside `~/.local/share/lordos/appdata/<id>`; everything else is **denied** |
+| `fs.home/read/write/list` | only inside `~/.local/share/axia/appdata/<id>`; everything else is **denied** |
 | `clipboard.get` | only with the `clipboard` permission granted; `clipboard.set` always |
 | `broker.request(perm)` | allowed/denied according to what is stored; if "ask", it queues a **system prompt** and replies when the user decides (the app waits) |
 | `broker.device(kind, on)` | turns the camera/microphone indicator on/off, only if that permission is granted |
-| `broker.pick(save, name)` | **powerbox**: lord-server draws the open/save dialog and passes the app **only the fd** of the chosen file (SCM_RIGHTS); the app doesn't see the folder |
+| `broker.pick(save, name)` | **powerbox**: axia-server draws the open/save dialog and passes the app **only the fd** of the chosen file (SCM_RIGHTS); the app doesn't see the folder |
 | `broker.menus(json)` | publishes the app's menus for the system menu bar; clicks come back as an event |
-| `keyring.request(op, …)` | the session keyring (`BOP_KEYRING`, `sec/brokerkr.c`): lord-server sets the owner to `app.<id>` from the verified app id; another app's item only after a **system prompt** (docs/PASSWORDS.md, "Keyring for isolated .lpk apps") |
+| `keyring.request(op, …)` | the session keyring (`BOP_KEYRING`, `sec/brokerkr.c`): axia-server sets the owner to `app.<id>` from the verified app id; another app's item only after a **system prompt** (docs/PASSWORDS.md, "Keyring for isolated .lpk apps") |
 
-In addition, lord-server sends the app, unrequested, the **live state** (`BOP_EVENT`): the theme
+In addition, axia-server sends the app, unrequested, the **live state** (`BOP_EVENT`): the theme
 tokens (light/dark, accent, background), the language and direction (RTL), the keyboard layout,
 the **revocation** of a permission (so it releases the device) and the menu item the user chose.
 The server never waits for an app: it reads and writes the socket without blocking
@@ -127,7 +127,7 @@ turned off.
 ### Live theme, language and RTL
 
 The theme publishes its tokens with `lord.broker.publish('theme', …)` and the language with
-`publish('locale', …)` (`sdk/theme.js`, `sdk/privacy.js`); lord-server forwards them to every
+`publish('locale', …)` (`sdk/theme.js`, `sdk/privacy.js`); axia-server forwards them to every
 isolated app and keeps them for the ones that start later (`lord.broker.state()` at startup). The
 "app host" (`runtime/app-host.js`) applies the tokens and, when the language changes, remounts the
 app (like the theme). Tested: switching to light mode and the accent show up at once in the app,
@@ -136,7 +136,7 @@ and switching the session to Arabic mirrors it (RTL) and retranslates it.
 ### Powerbox
 
 The app can't open the home folder (`sandbox-test`: opening `~/Documentos` directly fails). To
-open or save, it calls `fs.openFile()` / `fs.saveFile(name, data)`; lord-server draws the dialog
+open or save, it calls `fs.openFile()` / `fs.saveFile(name, data)`; axia-server draws the dialog
 (`sdk/powerbox.jsx`, in the shell), opens the chosen file with the user's permissions and passes
 the app **only that fd** over SCM_RIGHTS. The app reads/writes the fd (`broker.fdRead/fdWrite`) and
 never sees the rest of the disk.
@@ -144,23 +144,23 @@ never sees the rest of the disk.
 ### Menus and revocation
 
 - **Menus:** `wm.setMenus(id, menus)` in an isolated app serializes the menus (with an id per item)
-  and sends them through the broker; lord-server puts them on that app's window and the theme shows
-  them in its menu bar. When an item is chosen, lord-server notifies the app, which runs its
+  and sends them through the broker; axia-server puts them on that app's window and the theme shows
+  them in its menu bar. When an item is chosen, axia-server notifies the app, which runs its
   `onClick`.
 - **Live revocation:** when a permission is set to "Ask" or "Deny" in Settings → Privacy,
-  lord-server notifies the app (which releases the camera/microphone with `onPermissionRevoked`)
+  axia-server notifies the app (which releases the camera/microphone with `onPermissionRevoked`)
   and turns the indicator off on the spot, without closing the app. For the microphone, it also
   closes the PipeWire stream (`maudio_close`) in the server: the `source-output` disappears at
   once.
 
 ### Microphone (read-only broadcast ring)
 
-The microphone is opened by **lord-server**, not the app: with the permission at ALLOW, the broker
+The microphone is opened by **axia-server**, not the app: with the permission at ALLOW, the broker
 calls `maudio_open(1, …)` (`server/src/media/maudio.c`), which creates a PipeWire capture stream
 and a ring in a sealed `memfd`. The broker passes the app a **read-only duplicate** of the fd
 (`/proc/self/fd/N` opened `O_RDONLY`, over SCM_RIGHTS): the app can only map it `PROT_READ`.
 
-It is a **broadcast** ring: lord-server writes (`wpos`) and, since the only consumer (the app)
+It is a **broadcast** ring: axia-server writes (`wpos`) and, since the only consumer (the app)
 reads with its own cursor and **never touches `rpos`**, the server frees the space itself
 (`maudio_mic_drain`, advances `rpos` up to `wpos`) so the ring doesn't jam. The app follows `wpos`,
 detects overruns (`wpos - cursor > size`) and reads only the most recent data. The app never opens
@@ -169,7 +169,7 @@ PipeWire nor sees the device fd. `lord.broker.micLevel()` returns the RMS (0..1)
 ![live microphone level in the isolated app](privacy-microphone-level.png)
 
 Tested on VM 122: with real audio coming in through the capture, the recorder's level bar moves;
-on pressing "Stop" or on **Denying** the permission in Settings, lord-server's `source-output`
+on pressing "Stop" or on **Denying** the permission in Settings, axia-server's `source-output`
 disappears and the bar and the orange dot go off.
 
 ![denying the microphone closes the capture](privacy-microphone-revoked.png)
@@ -180,7 +180,7 @@ Our own code, without bubblewrap, flatpak or firejail. It uses kernel 6.12 featu
 
 - **Landlock** (ABI up to 6): read-only access to the package folder, the "app host", the fonts
   (LordOS and `/usr/share/fonts`) and the libraries; read and write only to
-  `~/.local/share/lordos/appdata/<id>`; nothing else from `$HOME`. TCP rules and scoping of
+  `~/.local/share/axia/appdata/<id>`; nothing else from `$HOME`. TCP rules and scoping of
   abstract unix sockets and signals (`LANDLOCK_SCOPE_*`).
 - **seccomp-bpf**: an **allow list** of syscalls, applied to every thread (`TSYNC`). The dangerous
   ones are left out by definition: `ptrace`, `mount`, `kexec`, `bpf`, `perf_event_open`,
@@ -188,11 +188,11 @@ Our own code, without bubblewrap, flatpak or firejail. It uses kernel 6.12 featu
 - **Sockets**: Wayland and the broker are already connected before the sandbox, so the app **can't
   open new unix sockets** nor `socketpair` (Landlock ≤ 6 doesn't filter `connect` to named unix
   sockets: this way it can't reach the session bus, `cups.sock` or `wayland-0`).
-- **The network**: `lord-server` runs without root, so it **can't** create a network namespace
+- **The network**: `axia-server` runs without root, so it **can't** create a network namespace
   (`unshare(CLONE_NEWNET)` needs `CAP_SYS_ADMIN`). Decision: the app stays in the machine's netns,
   and **without the `network` permission** seccomp rejects `socket(AF_INET/AF_INET6)` and Landlock
   (ABI ≥ 4) denies it TCP `bind`/`connect`. With the permission (declared **and** granted, decided
-  at launch), they are allowed. On top of that, `lord-netperm`'s cgroup BPF programs enforce the
+  at launch), they are allowed. On top of that, `axia-netperm`'s cgroup BPF programs enforce the
   app's firewall rules in the kernel (defense in depth, see `FIREWALL.md`), and traffic is
   attributed by the scope's name.
 - **`no_new_privs`**, all capabilities dropped (empty `capset` + `PR_CAPBSET_DROP`).
@@ -208,14 +208,14 @@ The app declares **zero** permissions and tries everything when it opens. Sessio
 with `lord-sessiond`):
 
 ```
-lord-server: app 'evil' lanzada como proceso aislado
+axia-server: app 'evil' lanzada como proceso aislado
 sandbox[evil]: cgroup=1 landlock-fs=1 landlock-net=1 seccomp=1 nopriv=1 nocaps=1 net=no
 ```
 
 | Attempt | Result |
 |---|---|
 | read `~/.ssh/id_rsa` | blocked (the broker only serves the app's folder; Landlock hides it anyway) |
-| read `~/.config/lordos/settings.json` | blocked |
+| read `~/.config/axia/settings.json` | blocked |
 | write outside its folder | blocked |
 | silently read the clipboard | blocked (no `clipboard` permission) |
 | open `/etc/shadow` | blocked |
@@ -224,7 +224,7 @@ sandbox[evil]: cgroup=1 landlock-fs=1 landlock-net=1 seccomp=1 nopriv=1 nocaps=1
 | the microphone without consent | without new unix sockets it can't reach PipeWire; through the broker, only with the `microphone` permission |
 
 By contrast, the same app opened **in process** (the M7 mode) read `settings.json` and wrote
-`~/.config/lordos/robado.txt`. That's why a package is now never evaluated in the theme's context
+`~/.config/axia/robado.txt`. That's why a package is now never evaluated in the theme's context
 when app mode exists.
 
 ### The Sandbox Probe, on the user's own computer (0.8.5)
@@ -235,7 +235,7 @@ when app mode exists.
 takes the same sandbox and tries what must fail (the home folder, system files, the root cgroup, sockets,
 `ptrace`, a user namespace, `mount`, `exec`), forks a child before the sandbox that takes the decoding
 helpers' profile and tries what must fail there, and asks the broker for what it must refuse. The result
-goes to lord-server as `BOP_PROBE` (only from that system package), which adds the process's
+goes to axia-server as `BOP_PROBE` (only from that system package), which adds the process's
 `NoNewPrivs`, `Seccomp`, `CapEff` and cgroup. It never gets a permission or a network grant; see
 `BENCHMARK.md`, "Checks, part 2".
 
@@ -253,7 +253,7 @@ sandbox-test helper: 17/17   see "Helpers" below
 ## Cleaner's delete
 
 Cleaner is the only place in LordOS that deletes a file outside the Trash (approved by the maintainer on 2026-10-30;
-`CLEANER-SECURITY.md`). It runs in `lord-server` as the session user, only for a file a scan found under a `regenerable`
+`CLEANER-SECURITY.md`). It runs in `axia-server` as the session user, only for a file a scan found under a `regenerable`
 rule's fixed root, from a plan the user confirmed, with a confirmation that says it can't be undone. JS can't name a path,
 `lord.fs` gained nothing, and the scans stay on this machine. Its history keeps counts and sizes, never a path. Three closed
 admin actions clean the operating system's own files, for administrators (`clean-journal`, `clean-apt-cache`, `clean-var-tmp`).
@@ -261,15 +261,15 @@ admin actions clean the operating system's own files, for administrators (`clean
 ## Decoding helpers: `sandbox_apply_helper`
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data
-(`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
-`lord-maild`, `lord-vault`, since 0.8.7 the network reader `lord-lan`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
-engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `lord-bench`, and since 0.8.7 Cleaner's
-scanner `lord-clean` and Remote Desk's `lord-rdesk`) use
+(`axia-media`: video, photos, camera; `axia-doc`: Poppler and libarchive; and the other helpers:
+`axia-maild`, `axia-vault`, since 0.8.7 the network reader `axia-lan`, since 0.8.5 the blocklist downloader `axia-dl` and the package
+engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `axia-bench`, and since 0.8.7 Cleaner's
+scanner `axia-clean` and Remote Desk's `axia-rdesk`) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
 
 ```c
 SandboxHelperCfg cfg = {
-    .name = "lord-doc",                     /* cgroup scope */
+    .name = "axia-doc",                     /* cgroup scope */
     .ro_paths = (const char *[]){ "/usr/share/fonts", NULL },
     .ro_dir_fds = NULL,                     /* already-open folders, read-only (-1 at the end) */
     .rw_dir_fds = (int[]){ workfd, -1 },    /* already-open folders, read and write */
@@ -281,7 +281,7 @@ sandbox_apply_helper(&cfg);                 /* SANDBOX_HELPER_DIR_FDS says the f
 ```
 
 - **No network and no new sockets**: `socket`, `socketpair`, `connect`, `bind`, `listen` and
-  `accept` fail with EPERM; the channel to `lord-server` arrives inherited (`sendmsg`/`recvmsg`
+  `accept` fail with EPERM; the channel to `axia-server` arrives inherited (`sendmsg`/`recvmsg`
   still work).
 - **No `execve`/`execveat`**. **Threads only**: `clone` only with `CLONE_THREAD`; `clone3` → ENOSYS
   (glibc falls back to `clone`, which can be filtered by flags).
@@ -294,7 +294,7 @@ sandbox_apply_helper(&cfg);                 /* SANDBOX_HELPER_DIR_FDS says the f
 - **ioctl by class** (`allow_ioctl_classes`): only types `'d'` (DRM/VA-API), `'V'` (V4L2, Pi 5)
   and `'b'` (DMA-BUF sync), filtering the `_IOC_TYPE` byte of the ioctl number; never a generic
   ioctl nor `TIOCSTI`. The helper can't open `/dev`: it receives the fds of the devices
-  `lord-server` opens.
+  `axia-server` opens.
 - **`kcmp`**: only if requested in `extra_syscalls`, and only to compare fds **of its own process**
   (`pid1 == pid2 == getpid()`, the pid is known when the filter is built). Mesa needs it
   (`os_same_file_description` dedups DRM fds); with another process it gives EPERM.
@@ -312,7 +312,7 @@ itself works and with the parent gives EPERM; `ptrace` fails.
 
 ## Per-app cgroup and delegation (`server/src/sec/cgroup.c`)
 
-`lord-server` runs without root; to create the apps' scopes it needs a **delegated cgroup
+`axia-server` runs without root; to create the apps' scopes it needs a **delegated cgroup
 subtree**. `lord-sessiond` prepares it (see [SESSIONS.md](SESSIONS.md)):
 
 1. `lordos.service` has `Delegate=yes`.
@@ -320,7 +320,7 @@ subtree**. `lord-sessiond` prepares it (see [SESSIONS.md](SESSIONS.md)):
    service root is left without processes and can enable `cpu memory pids` for its children
    (cgroup v2's "no internal processes" rule).
 3. For each session, `cgroup_delegate_session(uid, gid)` creates `lordos-session-<uid>/server` and
-   puts the user's `lord-server` there. **Update:** the subtree is no longer chowned to the user;
+   puts the user's `axia-server` there. **Update:** the subtree is no longer chowned to the user;
    it stays root's.
 4. **Update:** the app scopes (`app-lordos-lpk-<id>.scope`, `app-lordos-<id>.scope`,
    `app-lordos-media.scope`…) are created by `lord-sessiond` on request and are root-owned, so an
@@ -332,23 +332,23 @@ Measured on VM 122 (two users, `lord` on the monitor and `bob` from the browser)
 Unit lordos.service (/system.slice/lordos.service):
 ├─supervisor
 │ ├─16249 lord-sessiond
-│ └─16570 lord-server --headless 1280x800 --greeter …
+│ └─16570 axia-server --headless 1280x800 --greeter …
 ├─lordos-session-1000
 │ ├─app-lordos-lpk-evil.scope
-│ │ └─16366 lord-server --app evil
+│ │ └─16366 axia-server --app evil
 │ ├─server
-│ │ ├─16254 lord-server --headless 1280x800 --user lord …
-│ │ └─16256 lord-server --headless 1280x800 --user lord …
+│ │ ├─16254 axia-server --headless 1280x800 --user lord …
+│ │ └─16256 axia-server --headless 1280x800 --user lord …
 │ └─app-lordos-featherpad.scope
 │   └─16401 featherpad
 └─lordos-session-1001
   └─server
-    ├─16520 lord-server --headless 1280x800 --user bob …
-    └─16524 lord-server --headless 1280x800 --user bob …
+    ├─16520 axia-server --headless 1280x800 --user bob …
+    └─16524 axia-server --headless 1280x800 --user bob …
 ```
 
 `app-lordos-lpk-evil.scope`: `memory.high` 201326592, `memory.max` 536870912, `cpu.max`
-`100000 100000`. Without delegation (for example a standalone `lord-server` run with sudo, during
+`100000 100000`. Without delegation (for example a standalone `axia-server` run with sudo, during
 development) the apps run without a scope, with a warning.
 
 ## Permissions (per-app prompts)
@@ -357,7 +357,7 @@ development) the apps run without a scope, with a warning.
   "**"App" wants to use the microphone — Allow / Don't Allow**". For an isolated app, the request
   arrives through the broker and the session draws the prompt (`sdk/privacy.js`, `__lordBroker` →
   `PermissionPrompt` → `lord.broker.resolve`).
-- **Where they are stored:** per user, in `~/.config/lordos/permisos.json`, a file the app **can't
+- **Where they are stored:** per user, in `~/.config/axia/permisos.json`, a file the app **can't
   write**: it is on the `lord.fs` deny list (`js_sys.c` `resolve_target` and `fsops.c`
   `fsops_protected`), like `settings.json`, and outside what Landlock lets the app process see.
   The state is handled by `server/src/sec/perms.c`; the lookup is O(1).
@@ -365,7 +365,7 @@ development) the apps run without a scope, with a warning.
   can't obtain a permission it didn't declare (for example, `network` is only granted if it is
   declared **and** allowed).
 - **Revoking** in Settings → Privacy applies at once to the camera and the microphone: the app is
-  told (`revoke`), `lord-server` kills the camera's `lord-media` and closes the microphone stream,
+  told (`revoke`), `axia-server` kills the camera's `axia-media` and closes the microphone stream,
   and a camera video that records sound stops (see [Menus and revocation](#menus-and-revocation)).
   Other permissions apply to the next request. The network permission is applied when the app
   starts (its scope's rules), so a change reaches a running app the next time it is opened.
@@ -431,7 +431,7 @@ through `globalThis.__lordos.monitorDevices`.
 
 | Path | What it is |
 |---|---|
-| `server/src/app/appclient.c` | `lord-server --app <id>`: Wayland client, sandbox, engine |
+| `server/src/app/appclient.c` | `axia-server --app <id>`: Wayland client, sandbox, engine |
 | `server/src/app/appspawn.c` | launch the isolated app with its broker (validated id) |
 | `server/src/sec/brokersrv.c`, `broker.h` | broker, server side |
 | `server/src/ui/js_broker.c` | broker, app side (`lord.fs/clipboard/broker` of the app process) |
@@ -449,7 +449,7 @@ through `globalThis.__lordos.monitorDevices`.
 | `apps/settings/Privacy.jsx` | Settings → Privacy |
 | `tests/lpk-evil`, `tests/lpk-legit` | test apps (malicious and legitimate) |
 | `server/tests/sandbox_test.c` | sandbox tests (app, network, helper) |
-| `server/src/sec/brokermail.c`, `server/src/ui/js_brokermail.c` | lord-maild for the isolated Mail, Calendar, Contacts and Reminders (`BOP_MAIL`, `BOP_SYS_OPEN`) |
+| `server/src/sec/brokermail.c`, `server/src/ui/js_brokermail.c` | axia-maild for the isolated Mail, Calendar, Contacts and Reminders (`BOP_MAIL`, `BOP_SYS_OPEN`) |
 | `server/src/app/apphost_bc.c` | the app host compiled to bytecode once per session |
 | `sdk/sysopen.js` | the session opens attachments and apps for the isolated system apps |
 | `server/tests/brokermail_test.c` | `build/brokermail-test` |
@@ -475,23 +475,23 @@ counts `wl_keyboard.key` presses) while keys are typed; with the search open it 
 Mail parses mail from anyone; Calendar, Contacts and Reminders show invitations, `.ics` and
 `.vcf` files and synced data. Since 0.8.2 their windows are no longer drawn by the session's
 JavaScript: like Passwords, each one is a system package (`"process": "isolated"` in its manifest,
-built into `assets/sysapps/<id>/`) that runs as `lord-server --app <id>`, with the same sandbox as an
+built into `assets/sysapps/<id>/`) that runs as `axia-server --app <id>`, with the same sandbox as an
 `.lpk` app. If a message ever exploited a bug in Mail's interface code, it would be locked in that
 process: it could not read your files, your SSH keys, Passwords' data or the other apps' data, open
 a socket, or hang the desktop. Parsing itself (IMAP, MIME, HTML, iCalendar, vCard, images) was
-already done in `lord-maild` ([MAIL.md](MAIL.md)) and still is.
+already done in `axia-maild` ([MAIL.md](MAIL.md)) and still is.
 
 | | Mail | Calendar | Contacts | Reminders |
 |---|---|---|---|---|
-| Process, scope | `lord-server --app mail`, `app-lordos-lpk-mail.scope` | `… --app calendar`, `app-lordos-lpk-calendar.scope` | `… --app contacts`, `app-lordos-lpk-contacts.scope` | `… --app reminders`, `app-lordos-lpk-reminders.scope` |
-| Files it can open itself | its data folder `~/.local/share/lordos/appdata/mail` and read-only system data (its package, the app host, fonts, language packs) | the same, for `calendar` | the same, for `contacts` | the same, for `reminders` |
+| Process, scope | `axia-server --app mail`, `app-lordos-lpk-mail.scope` | `… --app calendar`, `app-lordos-lpk-calendar.scope` | `… --app contacts`, `app-lordos-lpk-contacts.scope` | `… --app reminders`, `app-lordos-lpk-reminders.scope` |
+| Files it can open itself | its data folder `~/.local/share/axia/appdata/mail` and read-only system data (its package, the app host, fonts, language packs) | the same, for `calendar` | the same, for `contacts` | the same, for `reminders` |
 | Your files | only what you pick in the system's open/save dialog (attachments to send, saving an attachment) | — (no file use) | only the `.vcf` to import and a contact's photo, picked in the system dialog | — |
-| Network | **none** (no sockets: Landlock + seccomp, `net=no`). lord-maild's connections are made by `lord-server` exactly as before, only to the configured servers | none | none | none |
-| lord-maild requests (`BOP_MAIL`) | all of them | `cal-*`, `ev-*`, `todo-*`, `alarms`, `status` | `book-*`, `contact-*`, `autocomplete`, `status` | `cal-*`, `todo-*`, `alarms`, `status` |
-| lord-maild events | all (new mail, status, certificates, PIM changes) | only "PIM data changed" | only "PIM data changed" | only "PIM data changed" |
-| Accounts file, remote images | through `lord-server` (`mail_save_config`, same validation; no passwords) | no | no | no |
+| Network | **none** (no sockets: Landlock + seccomp, `net=no`). axia-maild's connections are made by `axia-server` exactly as before, only to the configured servers | none | none | none |
+| axia-maild requests (`BOP_MAIL`) | all of them | `cal-*`, `ev-*`, `todo-*`, `alarms`, `status` | `book-*`, `contact-*`, `autocomplete`, `status` | `cal-*`, `todo-*`, `alarms`, `status` |
+| axia-maild events | all (new mail, status, certificates, PIM changes) | only "PIM data changed" | only "PIM data changed" | only "PIM data changed" |
+| Accounts file, remote images | through `axia-server` (`mail_save_config`, same validation; no passwords) | no | no | no |
 | Keyring (`BOP_KEYRING`) | its own items, owner `mail` (the owner Mail always had: the session's need-auth handler reads the same items); another app's only after the system prompt | own items (unused) | own items (unused) | own items (unused) |
-| Mail's cache (`~/.local/share/lordos/mail`) | not readable; one cached attachment as a read-only fd (to save it), or the session opens it with your apps | no | no | no |
+| Mail's cache (`~/.local/share/axia/mail`) | not readable; one cached attachment as a read-only fd (to save it), or the session opens it with your apps | no | no | no |
 | Opening another app | Calendar (an invitation), through the session (`BOP_SYS_OPEN`) | Mail, Contacts, Reminders likewise | Mail (a new message to a contact) | likewise |
 
 What did not change: new-mail notifications, calendar and reminder alarms, passwords on demand
@@ -512,11 +512,11 @@ theme, language and RTL, and Monitor and the firewall all work as for any isolat
 
 ### How it works
 
-- **lord-maild through lord-server** (`sec/brokermail.c`, app side `ui/js_brokermail.c`). The app
+- **axia-maild through axia-server** (`sec/brokermail.c`, app side `ui/js_brokermail.c`). The app
   process has the same `lord.mail` API as the session (so `sdk/mail.js`, `calendar.js` and
   `contacts.js` are unchanged), but every call is a `BOP_MAIL` broker request, only for a system
   package (`brokersrv_conn_system`, set by `app_spawn` for `assets/sysapps`) named `mail`,
-  `calendar`, `contacts` or `reminders`. `lord-server` checks the request JSON as `js_mail.c` does,
+  `calendar`, `contacts` or `reminders`. `axia-server` checks the request JSON as `js_mail.c` does,
   then the per-app allow list above, then the files: only fds the app already holds (from the
   system dialog), only readable regular files of at most 64 MB, only for `send`, `draft`,
   `contact-save`, `contact-import` and `ev-import`. Other fds that arrive with any broker request
@@ -524,10 +524,10 @@ theme, language and RTL, and Monitor and the firewall all work as for any isolat
 - **Replies and events are per app.** `mailc.c` keeps one owner queue per app process: a reply goes
   only to the process that asked (an app cannot read another app's results or images), broadcast
   events go to the session and to each app by its mask. They reach the app as `mail` events in
-  chunks of 60 KB; `lord-server` never blocks on a full socket (it resumes on `POLLOUT`).
+  chunks of 60 KB; `axia-server` never blocks on a full socket (it resumes on `POLLOUT`).
 - **Images** (remote images, inline images, contact photos) stay owned by the app that asked:
   `lord.mail.bind` receives a sealed memfd with the pixels.
-- **Attachments.** *Open* → `lord-server` resolves the cached file (`att/…` inside the cache, no
+- **Attachments.** *Open* → `axia-server` resolves the cached file (`att/…` inside the cache, no
   `..`, no links out) and the session opens it with your apps (`sdk/sysopen.js`, the same rules as
   Files). *Save* → a read-only fd of that one file, then the system's save dialog.
 - **Args for an isolated app.** `wm.open('mail', { args })` in the session (a notification's
@@ -542,13 +542,13 @@ theme, language and RTL, and Monitor and the firewall all work as for any isolat
 
 ### Proof from inside the Mail process (VM 118)
 
-`gdb -p <pid of lord-server --app mail>` calling `open()` and `socket()` inside the running,
+`gdb -p <pid of axia-server --app mail>` calling `open()` and `socket()` inside the running,
 sandboxed Mail process (root attaches with `ptrace`; the calls run as the app):
 
 ```
 open ~/.ssh/authorized_keys = -1                  errno = 13 (EACCES)
-open ~/.config/lordos/mail/accounts.json = -1     errno = 13
-open ~/.local/share/lordos/mail (cache) = -1      errno = 13
+open ~/.config/axia/mail/accounts.json = -1     errno = 13
+open ~/.local/share/axia/mail (cache) = -1      errno = 13
 open appdata/passwords (another app) = -1         errno = 13
 open ~/Documents/inmut2-budget.txt = -1           errno = 13
 open appdata/mail (its own) = 6                   allowed
@@ -556,7 +556,7 @@ socket(AF_INET, SOCK_STREAM) = -1                 errno = 13
 ```
 
 `kill -9` of the Mail process, six times in a row while it was open: each time only its windows
-went away; the desktop, lord-maild (and its sync), the notifications and the other apps kept
+went away; the desktop, axia-maild (and its sync), the notifications and the other apps kept
 running, and Mail opened again normally. `build/brokermail-test` (47 checks) runs the real
 `brokermail.c`: who may ask, each app's allow list, malformed requests, sockets/folders/write-only
 fds refused, the memfd path, the Mail-only verbs, attachment paths (`..`, outside `att/`, a symlink
@@ -573,7 +573,7 @@ package keeps its plain owner while a user `.lpk` with the same id does not reac
 | Memory | the session grows ~5 MB when Mail opens | Mail 26 MB RSS / 18 MB PSS; Calendar 22 / 15 MB; Contacts 20 / 13.5 MB; Reminders ~21 MB RSS |
 
 - **The app host as bytecode** (`app/apphost_bc.c`): three seconds after the session starts, a
-  thread of `lord-server` with its own QuickJS runtime reads `assets/app-host.bundle.js` once
+  thread of `axia-server` with its own QuickJS runtime reads `assets/app-host.bundle.js` once
   through the verified-code check (`codesig_load`, see [SIGNING.md](SIGNING.md), "Verified system
   code"; the check's state is set up on the main thread before, and only its counters change
   under a lock) and compiles exactly those verified bytes into a sealed memfd (1.7 MB), so the
@@ -584,7 +584,7 @@ package keeps its plain owner while a user `.lpk` with the same id does not reac
   This took Mail from ~225 ms to ~145 ms.
 - Painting the window early (before the JavaScript) was tried and dropped: on this VM the session's
   frame drawing then competed with the app's start-up and the content arrived ~55 ms later.
-- With `"debugTiming": true` in `~/.config/lordos/settings.json` (no UI), opening an app logs
+- With `"debugTiming": true` in `~/.config/axia/settings.json` (no UI), opening an app logs
   `timing:` lines to the session log; each isolated app always logs its first frame.
 
 ### What stays in-process and why
@@ -599,12 +599,12 @@ package keeps its plain owner while a user `.lpk` with the same id does not reac
   saves edits as copies next to the originals) and prints. The system dialog hands over one file,
   not a folder, and isolated apps cannot print yet, so isolating it needs a folder grant and
   printing over the broker first. The untrusted part, decoding images, already happens in the
-  sandboxed `lord-media` helper (`media.image`, `media.edit`), not in the window's process.
+  sandboxed `axia-media` helper (`media.image`, `media.edit`), not in the window's process.
 - **Not covered for the isolated four:** printing (none of them prints today) and drag and drop
   (none of them accepts drops today). Links in mail are shown and copied (LordOS has no web engine),
   as before.
 - **Limits.** A firewall *network* rule for `lpk:mail` does not stop mail syncing: the connections
-  are opened by `lord-server` for `lord-maild` (firewall id `lordos`), as in 0.8.1; the Mail window
+  are opened by `axia-server` for `axia-maild` (firewall id `lordos`), as in 0.8.1; the Mail window
   process itself has no network at all. Certificate warnings that happened while Mail was closed are
   shown again on the next connection attempt (the account shows its error meanwhile).
 
@@ -645,7 +645,7 @@ a Wayland app.**
   LordOS's.
 - **Synthetic input.** Xwayland starts with XTEST disabled, so an X app can't type or click into
   another X app (e.g. a terminal) with synthetic events.
-- **Xwayland itself** runs in `lordos-xwayland.scope` (not lord-server's), without network (its own
+- **Xwayland itself** runs in `lordos-xwayland.scope` (not axia-server's), without network (its own
   empty network namespace) and with `no_new_privs`; it is started only by a connection to the
   session's X socket (mode 0600, no abstract socket, no TCP) and stopped 10 s after the last X app.
 
@@ -678,11 +678,11 @@ accounting behind. `.lpk` apps never could (Landlock hides `/sys`).
 Now the subtree stays **root-owned** and the scopes are created by root:
 
 - `cgroup_delegate_session()` (`server/src/sec/cgroup.c`) creates `lordos-session-<uid>/server`
-  and moves the session's `lord-server` there, but no longer chowns anything to the user
+  and moves the session's `axia-server` there, but no longer chowns anything to the user
   (`cgroup_harden_session`). Since 0.8.6 it also gives `server` `cpu.weight` 1000
   against 100 for every scope, so a busy app can't take half of the compositor's CPU (nice values
   don't count between cgroups; `BENCHMARK.md`, "The desktop under load"). lord-sessiond also starts the
-  session's lord-server with `RLIMIT_RTPRIO` 2 (and `RLIMIT_RTTIME` 5 s): lord-server puts its main and paint threads
+  session's axia-server with `RLIMIT_RTPRIO` 2 (and `RLIMIT_RTTIME` 5 s): axia-server puts its main and paint threads
   at `SCHED_RR` 2 (`SCHED_RESET_ON_FORK` on the thread that starts things) and lowers the limit to 0, soft and hard,
   before it starts any process, so no app, helper or shell can ask for real time (`par.c`; the root admin helper,
   forked earlier, lowers its own to 0 too). At startup, `cgroup_service_init()` hardens the subtrees left by an
@@ -695,9 +695,9 @@ Now the subtree stays **root-owned** and the scopes are created by root:
   asks that socket to place **the calling process itself**, right before `execve` (or before the
   sandbox). Without `lord-sessiond` (development) it falls back to the old self-migration.
 - `cgroup_place_serve()` (root) only places a peer that:
-  - is in its own session's `server` leaf (`/proc/<pid>/cgroup`): `lord-server` or a child it
+  - is in its own session's `server` leaf (`/proc/<pid>/cgroup`): `axia-server` or a child it
     forked right before exec. A process already in an app scope can never ask;
-  - runs a binary from `lord-server`'s directory (root-owned, not writable by others;
+  - runs a binary from `axia-server`'s directory (root-owned, not writable by others;
     `insecure_dev` relaxes it on development VMs). A binary replaced while running
     (`(deleted)`) is still accepted;
   - asks for a valid name: `app-lordos-<id>.scope` or `lordos-<helper>.scope`, never
@@ -726,7 +726,7 @@ $ mkdir <own scope>/sub                         Permission denied
 
 ![The scope escape attempts fail](isolation-scope.png)
 
-Also tested: the `.lpk` app, `lord-media` (`app-lordos-media.scope`) and Linux apps are placed
+Also tested: the `.lpk` app, `axia-media` (`app-lordos-media.scope`) and Linux apps are placed
 by `lord-sessiond`; `systemctl restart lordos` twice with the session alive (the new
 `lord-sessiond` hardens the old subtree, starts a new placement service, and an app launched
 afterwards still lands in its scope); `DelegateSubgroup=supervisor` in the unit.
@@ -735,7 +735,7 @@ afterwards still lands in its scope); `DelegateSubgroup=supervisor` in the unit.
 user's systemd manager for a new scope or service. The manager has PID 1 do the move
 (`AttachProcessesToUnit`), which runs as root and only checks that the process and the target unit
 belong to the same UID; it does not look at the source cgroup. The process then runs in
-`user@<uid>.service/app.slice/…`, outside `lordos.service`. This is closed by `lord-netperm`:
+`user@<uid>.service/app.slice/…`, outside `lordos.service`. This is closed by `axia-netperm`:
 it attaches its cgroup programs to each LordOS session user's `user@<uid>.service` too, and holds a
 process that escapes there to the strictest **union** of that user's running restricted apps'
 restrictions (restriction-only, so never less restrictive than the app's own policy). Tested on
@@ -753,40 +753,40 @@ Consent, the green dot and revocation already existed. The frames now reach the 
 app ever touching the device:
 
 ```
-/dev/video10 ──open (after consent)──▶ lord-server ──fd──▶ lord-media (MK_CAMERA, sandbox_apply_helper)
+/dev/video10 ──open (after consent)──▶ axia-server ──fd──▶ axia-media (MK_CAMERA, sandbox_apply_helper)
                                                               │ decodes into MM_RING (3 BGRA slots,
                                                               │ sealed memfd), MM_FRAME per frame
-lord-server (sec/brokercam.c) ◀──────────────────────────────┘
+axia-server (sec/brokercam.c) ◀──────────────────────────────┘
    │ read-only reopen of the ring (/proc/self/fd/N, O_RDONLY) + "frame <sid> <id>" events
    ▼
-lord-server --app (ui/js_brokercam.c) — maps it PROT_READ, draws it with <MediaView> (media/mview.c),
-   answers "ack <sid> <id>"; lord-server validates it and only then sends MM_ACK to lord-media
+axia-server --app (ui/js_brokercam.c) — maps it PROT_READ, draws it with <MediaView> (media/mview.c),
+   answers "ack <sid> <id>"; axia-server validates it and only then sends MM_ACK to axia-media
 ```
 
 - **Broker op `BOP_CAMERA`** (`sec/broker.h`): `list`, `open dev w h`, `ring sid` (→ the read-only
   fd), `ack sid id` and `size sid w h` (no reply), `photo sid mirror name`,
   `record sid mirror mic name`, `recstop sid`, `close sid`. Each one checks the `camera`
-  permission again in `lord-server`.
-- **The device:** `lord-server` validates `/dev/videoN`, opens it and passes it only to
-  `lord-media`. The app process never sees it (Landlock hides `/dev` anyway).
-- **The ring:** `lord-server` checks the memfd from `lord-media` (sealed against shrinking, big
+  permission again in `axia-server`.
+- **The device:** `axia-server` validates `/dev/videoN`, opens it and passes it only to
+  `axia-media`. The app process never sees it (Landlock hides `/dev` anyway).
+- **The ring:** `axia-server` checks the memfd from `axia-media` (sealed against shrinking, big
   enough) and keeps it. The app gets a new **read-only** open file description, so it can only map
   it `PROT_READ` (verified: the mapping is `r--s` in `/proc/<pid>/maps`) and can't write a frame
   that another reader would see.
-- **ACK validation** (`brokercam.c`): an ACK is forwarded to `lord-media` only if its generation
-  is the current ring's, its slot exists and holds a frame `lord-server` forwarded and nobody
+- **ACK validation** (`brokercam.c`): an ACK is forwarded to `axia-media` only if its generation
+  is the current ring's, its slot exists and holds a frame `axia-server` forwarded and nobody
   acknowledged yet, and the app has tokens left (120 ACKs/s, burst 30). Anything else is dropped
-  and counted. `lord-media` frees slots only on a valid ACK, so an app that never acknowledges, or
-  acknowledges garbage, only stops its own preview. If the app's socket is full, `lord-server`
+  and counted. `axia-media` frees slots only on a valid ACK, so an app that never acknowledges, or
+  acknowledges garbage, only stops its own preview. If the app's socket is full, `axia-server`
   acknowledges the frame itself so the ring never jams. After a resize the app may acknowledge a
   frame of the previous generation once: that's logged as `invalid camera ACK ignored (1)`.
-- **Photo and video:** the app asks `photo`/`record` with a suggested name. `lord-server` opens
+- **Photo and video:** the app asks `photo`/`record` with a suggested name. `axia-server` opens
   the **system's save dialog** (the powerbox, reqids with the high bit set), opens the chosen
-  file itself (`O_NOFOLLOW`, regular file only) and gives that fd to `lord-media` (`MM_PHOTO`,
+  file itself (`O_NOFOLLOW`, regular file only) and gives that fd to `axia-media` (`MM_PHOTO`,
   `MM_RECORD`). The app only gets the file's name back (event `photo`/`video`). Recording with
-  sound also needs the `microphone` permission; the PipeWire stream is `lord-server`'s.
+  sound also needs the `microphone` permission; the PipeWire stream is `axia-server`'s.
 - **Revoke:** Settings → Privacy → Camera → Deny calls `brokersrv_revoke`, which sends `revoke`
-  to the app, kills its `lord-media` (`SIGKILL`) and closes the source: the stream stops at once
+  to the app, kills its `axia-media` (`SIGKILL`) and closes the source: the stream stops at once
   and the green dot goes off. The app gets `closed` (`revoked: true`) and blanks its view.
 - **Same SDK:** an isolated app uses `media.cameras()`, `media.camera()`, `<MediaView>`,
   `media.photo()` and `media.cameraRecord()` as in the session; in the app process `lord.media`
@@ -794,9 +794,9 @@ lord-server --app (ui/js_brokercam.c) — maps it PROT_READ, draws it with <Medi
 
 Tested on VM 122 with `v4l2loopback` (`/dev/video10`) fed by `ffmpeg` (`testsrc2` 1280×720 YUYV,
 service `lordos-test-camfeed`) and `tests/lpk-legit`: live preview, `foto.jpg` (1280×720 JPEG)
-and `video.mp4` (H.264, 4.5 s) saved through the powerbox, and revocation (the `lord-media`
+and `video.mp4` (H.264, 4.5 s) saved through the powerbox, and revocation (the `axia-media`
 process is gone within 0.5 s). While previewing, the app process uses ~1–2 % CPU and
-`lord-media` ~9 %.
+`axia-media` ~9 %.
 
 | | |
 |---|---|
@@ -834,7 +834,7 @@ menu listing every window, closing a window, focus and input in each one.
 
 Also fixed while testing: the app's event loop now drains broker events that arrived during a
 synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_ParseJSON` (a
-`revoke` could be dropped), and an isolated app no longer inherits `lord-server`'s blocked
+`revoke` could be dropped), and an isolated app no longer inherits `axia-server`'s blocked
 `SIGTERM`/`SIGINT`.
 
 ### Quitting, shortcuts and the keyboard layout
@@ -858,7 +858,7 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
 
 ![an isolated app's menu open in the system menu bar](appmode-menu.png)
 
-Tested in headless sessions on VM 116 (`lord-server --headless` as `lord`, real pointer and keys
+Tested in headless sessions on VM 116 (`axia-server --headless` as `lord`, real pointer and keys
 through the remote desktop socket): the app's menu opens from the menu bar and its
 items run in the app (File → New entry), ❖N/❖A/❖C/❖W reach the app while ❖V opens the clipboard
 history, and ❖Q and Dock → Quit end the process.
@@ -867,7 +867,7 @@ history, and ❖Q and Dock → Quit end the process.
 
 The page sends nothing until it is opened, and stops when it closes. A pass stays on the local network: private
 IPv4 addresses on this computer's own links, never the internet, at most 30 connections a second. What it learns
-(names, addresses, shares) stays in lord-server's memory and is written nowhere. What other machines see: mDNS
+(names, addresses, shares) stays in axia-server's memory and is written nowhere. What other machines see: mDNS
 questions, TCP connections to ports 445, 2049 and 22, and on an SMB server one anonymous session attempt, which a
 server may log as a failed logon; an intrusion detector on the LAN may notice the sweep. Passwords go to the
 kernel and, only if asked, to the keyring. See `FILES.md`, "Network".

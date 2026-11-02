@@ -1,5 +1,5 @@
-/* lm_io.c — lord-media I/O without paths: FFmpeg reads and writes through the descriptors that
- * lord-server passed (our own AVIOContext), sealed memfds for the frames, VA-API over the received render
+/* lm_io.c — axia-media I/O without paths: FFmpeg reads and writes through the descriptors that
+ * axia-server passed (our own AVIOContext), sealed memfds for the frames, VA-API over the received render
  * node and a minimal JSON for the replies. */
 #include "lm.h"
 
@@ -221,7 +221,7 @@ AVBufferRef *lm_hw_device(const char *accel, int fd) {
     if (!accel || !*accel || !strcmp(accel, "none") || fd < 0) return NULL;
     if (!strcmp(accel, "vaapi")) return lm_vaapi_device(fd);
     if (!strcmp(accel, "v4l2request")) {
-        /* The stateless decoder lives in Raspberry Pi's FFmpeg only: a DRM device over the render node lord-server
+        /* The stateless decoder lives in Raspberry Pi's FFmpeg only: a DRM device over the render node axia-server
          * sent, and the hwaccel opens the two device files the sandbox lets through (lm_main.c). */
         AVBufferRef *ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_DRM);
         if (!ref) return NULL;

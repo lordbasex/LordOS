@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
     /* modify an installed file */
     char f[512];
-    snprintf(f, sizeof f, "%s/.local/share/lordos/apps/%s/app.js", home, id);
+    snprintf(f, sizeof f, "%s/.local/share/axia/apps/%s/app.js", home, id);
     int fd = open(f, O_WRONLY | O_APPEND);
     if (fd >= 0) { if (write(fd, "\n/*tocado*/\n", 12)) {} close(fd); }
     OK(!pkg_status(id, &st) && st.modified && st.nchanged >= 1, "after editing app.js: \"Modified by you\" (%d changes)", st.nchanged);
@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     OK(sawAppjs, "the detected change is app.js (modified)");
 
     /* add a new file */
-    snprintf(f, sizeof f, "%s/.local/share/lordos/apps/%s/extra.txt", home, id);
+    snprintf(f, sizeof f, "%s/.local/share/axia/apps/%s/extra.txt", home, id);
     fd = open(f, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) { if (write(fd, "x", 1)) {} close(fd); }
     pkg_status(id, &st);

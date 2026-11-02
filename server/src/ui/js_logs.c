@@ -2,7 +2,7 @@
  *
  * Everything is read-only and runs as the session user: the journal files that the kernel and
  * journald's ACLs let them read (their user-<uid>.journal; the system one only if they are in
- * systemd-journal or adm) and their LordOS logs (~/.cache/lordos/<name>.log). The system journal
+ * systemd-journal or adm) and their LordOS logs (~/.cache/axia/<name>.log). The system journal
  * for an administrator goes through the helper's logs-system action (logs/logs_admin.c).
  *
  *   sources()                  { user: n files, system: bool (readable directly), uid }
@@ -10,9 +10,9 @@
  *                              a thread of its own does the reading; when done,
  *                              __lordLogs('result', id) arrives; fetch the result with take(id)
  *   take(id)                   [{ t, s, p, pid, uid, k, id, u, b, m }] (t in µs) or null
- *   files()                    [{ name, size, mtime }] of ~/.cache/lordos/<name>.log
+ *   files()                    [{ name, size, mtime }] of ~/.cache/axia/<name>.log
  *   tail(name, bytes)          the end of one of those files (max. 1 MB), from a line start
- *   follow(on)                 inotify on the journal folders and ~/.cache/lordos:
+ *   follow(on)                 inotify on the journal folders and ~/.cache/axia:
  *                              __lordLogs('journal') or __lordLogs('file', name) on change
  *
  * The thread and inotify go through a single epoll fd that the main loop watches (logs_fd()), so
@@ -138,7 +138,7 @@ static int follow(void) {
         jdirs[1] = inotify_add_watch(ino, p, IN_MODIFY | IN_CREATE | IN_MOVED_TO);
     }
     if (home()) {
-        snprintf(p, sizeof p, "%s/.cache/lordos", home());
+        snprintf(p, sizeof p, "%s/.cache/axia", home());
         cachedir = inotify_add_watch(ino, p, IN_MODIFY | IN_CREATE | IN_MOVED_TO);
     }
     struct epoll_event ev = { .events = EPOLLIN, .data.fd = ino };
@@ -291,7 +291,7 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     JSValue arr = JS_NewArray(c);
     if (!home()) return arr;
     char dir[512];
-    snprintf(dir, sizeof dir, "%s/.cache/lordos", home());
+    snprintf(dir, sizeof dir, "%s/.cache/axia", home());
     DIR *d = opendir(dir);
     if (!d) return arr;
     struct dirent *de;
@@ -319,7 +319,7 @@ static JSValue f_tail(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (!name) return JS_EXCEPTION;
     int ok = log_name_ok(name);
     char p[1024];
-    snprintf(p, sizeof p, "%s/.cache/lordos/%s", home(), name);
+    snprintf(p, sizeof p, "%s/.cache/axia/%s", home(), name);
     JS_FreeCString(c, name);
     if (!ok) return js_throw_code(c, "logs.badName", NULL);
     double want = 262144;

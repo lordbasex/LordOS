@@ -1,7 +1,7 @@
 /* perms.h — per-app permissions with system-drawn prompts (see perms.c and docs/PRIVACY.md).
  *
  * Each permission of each app has a state: ask (the first time), allowed or denied.
- * Decisions are stored per user in ~/.config/lordos/permisos.json, a file that
+ * Decisions are stored per user in ~/.config/axia/permisos.json, a file that
  * apps can NOT write (it's on lord.fs's deny list, like settings.json). The
  * broker (and, while apps run in the same context, the system SDK) looks it up here:
  * the lookup is O(1) over an in-memory table. */
@@ -45,6 +45,6 @@ int perm_list(PermEntry *out, int max);
 
 /* Loads permisos.json (once). The path is added to lord.fs's deny list. */
 void perm_init(const char *home);
-const char *perm_file_suffix(void);         /* "/.config/lordos/permisos.json" for the deny list */
+const char *perm_file_suffix(void);         /* "/.config/axia/permisos.json" for the deny list */
 
 #endif

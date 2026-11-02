@@ -92,7 +92,7 @@ int http_request(Conn *c, const char *method, const char *host, const char *path
                  size_t max_body, int deadline_ms, HttpResp *out) {
     memset(out, 0, sizeof *out);
     double end = now_ms() + (deadline_ms > 0 ? deadline_ms : 60000);
-    if (conn_printf(c, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: LordOS-Mail/1.0\r\nAccept-Encoding: identity\r\n%sContent-Length: %zu\r\n\r\n",
+    if (conn_printf(c, "%s %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: Axia-Mail/1.0\r\nAccept-Encoding: identity\r\n%sContent-Length: %zu\r\n\r\n",
                     method, path, host, extra ? extra : "", body ? blen : 0)) return -1;
     if (body && blen && conn_write(c, body, blen)) return -1;
     size_t ll;

@@ -1,10 +1,10 @@
 /* lm_rec.c — screen recording (MK_SCREENREC) and the voice recorder (MK_AUDIOREC).
  *
- * Screen: lord-server composites each frame as always and, while recording, copies the
+ * Screen: axia-server composites each frame as always and, while recording, copies the
  * result (with protected windows in black) into a free slot of a memfd it shares
- * with lord-media (MM_INRING / MM_INFRAME). Here it's encoded to H.264 and MM_SLOTFREE is announced. If
- * there's no free slot, lord-server drops that frame: it never waits.
- * Microphone: lord-server owns the PipeWire capture stream (after the permission) and
+ * with axia-media (MM_INRING / MM_INFRAME). Here it's encoded to H.264 and MM_SLOTFREE is announced. If
+ * there's no free slot, axia-server drops that frame: it never waits.
+ * Microphone: axia-server owns the PipeWire capture stream (after the permission) and
  * writes it into a shared-memory ring (aring.h); here it's only read. s16 mono at 48 kHz. */
 #include "lm.h"
 

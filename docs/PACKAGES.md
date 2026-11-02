@@ -70,7 +70,7 @@ The code is in `server/src/pkg/`:
     installing) is done on that copy, so the user can't change it midway.
 - **Essential packages.** Packages with `Essential: yes` or `Protected: yes` are never removed.
 - **Names.** They follow Debian's syntax (`[a-z0-9][a-z0-9+.-]+`). Arguments are validated in the
-  helper, even though lord-server has already validated them.
+  helper, even though axia-server has already validated them.
 
 ## Files
 
@@ -248,7 +248,7 @@ Cards are ordered: installable, then explained (not available), then installed.
 
 ### Detection
 
-`lord.hwinfo.scan()` (`server/src/hw/hwscan.c`, exposed in `ui/js_hw.c`) runs in `lord-server`,
+`lord.hwinfo.scan()` (`server/src/hw/hwscan.c`, exposed in `ui/js_hw.c`) runs in `axia-server`,
 **without root**, and only reads world-readable kernel files: `/sys/class/dmi/id` (vendor, product,
 board, chassis; never the serial numbers, which are root-only), `/proc/device-tree/model` and
 `compatible`, `/sys/bus/pci/devices/*` (vendor, device, class, bound driver),
@@ -264,7 +264,7 @@ only `LOG fw <file> <driver>` lines whose file name passes `hwscan_fw_name_valid
 no `..`, no leading `/`) and is still missing, never other log text.
 
 `LORD_HWSCAN_ROOT=/path` (development and screenshots only; an absolute path without `..`) makes
-`lord-server` read a fake tree instead, with the kernel log in `<root>/kmsg`; the Store then labels the
+`axia-server` read a fake tree instead, with the kernel log in `<root>/kmsg`; the Store then labels the
 section "Test data". `build/hwscan-test fixture <dir> demo` writes such a tree (also `vmware`,
 `virtualbox`, `nvidia`, `printer`, `scanner`, `rpi5`, `qemu`, `firmware`); `build/hwscan-test dump`
 prints the facts of the machine it runs on.
@@ -299,7 +299,7 @@ LordOS desktop on it), a USB printer and scanner of each vendor in the table, Wi
 adapters without firmware (that the miss is logged as expected and the device works after the
 install), and VMware and VirtualBox guests.
 
-## `lord.pkg` (lord-server, without root)
+## `lord.pkg` (axia-server, without root)
 
 The queries read the index with mmap and `/var/lib/dpkg/status`, and reload by themselves when
 these change. `lang` (`'es'`, `'pt'` or omitted) picks the AppStream name and description.
@@ -390,7 +390,7 @@ build/pkg-test                         # unit tests: versions, deb822, SHA, RSA,
                                        # index and resolver over a toy repository
 build/pkg-test pgp /usr/share/keyrings/debian-archive-keyring.gpg InRelease
 build/pkg-test plan /var/lib/lordos/pkg /var/lib/dpkg/status gimp     # the plan, without installing
-sudo build/pkg-test run pkg-update     # the real actions, without lord-server
+sudo build/pkg-test run pkg-update     # the real actions, without axia-server
 sudo build/pkg-test run pkg-install "cowsay sl"
 ```
 
@@ -481,7 +481,7 @@ sudo build/pkg-test run pkg-install "cowsay sl"
 
 The engine downloads `https://` sources over TLS and `http://` ones as before. The download child (nobody,
 in `lordos-net-store.scope`) resolves and connects the TCP socket itself; for `https://` it starts
-`lord-tls` (`server/src/tls/tlsproxy.c`, next to `lord-server`, root's) with the socket on fd 3 and a
+`lord-tls` (`server/src/tls/tlsproxy.c`, next to `axia-server`, root's) with the socket on fd 3 and a
 socketpair on fd 4. lord-tls loads the system's CA bundle, takes the helpers' sandbox (no sockets, no exec,
 no files), does a TLS 1.2+ handshake with SNI, checks the chain and the host name, answers `1` (or `0`,
 which the engine reports as `pkg.http.tlsFailed`) and then relays plain HTTP, so the HTTP code is the

@@ -1,6 +1,6 @@
 /* netconn_test.c — the components' network connectors (src/sec/netconn.c, 0.8.5):
  * request validation on both sides, the sockets the connector makes, the real connector process
- * (this binary re-executed with --net-connector, as lord-server is) and its fail-closed start. */
+ * (this binary re-executed with --net-connector, as axia-server is) and its fail-closed start. */
 #include "sec/netconn.h"
 
 #include <arpa/inet.h>

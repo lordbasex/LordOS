@@ -24,7 +24,7 @@ button next to the language, which is always there, so someone with no physical 
 
 ### Is a keyboard attached?
 
-`lord.input.hasKeyboard()` answers from the devices `lord-server` has really opened (`input.c`,
+`lord.input.hasKeyboard()` answers from the devices `axia-server` has really opened (`input.c`,
 `server/src/osk.c`, the fds `lord-sessiond` lends it), and a change arrives as `__lordKeyboards(present)`
 with no polling. Neither plugging a keyboard in nor unplugging it opens or closes the panel.
 
@@ -42,7 +42,7 @@ tells them apart. Use Always, or the menu bar button, on such a machine.
 | Where the field is | How it is known |
 |---|---|
 | LordOS: `TextInput`, and custom fields that use `ime.attach` (Notes, Terminal, Text Editor) | `sdk/textfocus.js` |
-| Isolated apps (`lord-server --app`: Mail, Passwords…) | the `BOP_TEXT_FOCUS` broker hint, obeyed only for the window in front |
+| Isolated apps (`axia-server --app`: Mail, Passwords…) | the `BOP_TEXT_FOCUS` broker hint, obeyed only for the window in front |
 | Linux apps that use `zwp_text_input_v3` (GTK, Qt) | `server/src/wl/wl_textinput.c` → `textinput` event |
 | Linux apps that don't (X11 apps; Chromium by default) | not known: **the menu bar button opens it** and the keys work the same |
 

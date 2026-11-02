@@ -1,5 +1,5 @@
 /* xz.c — decompressors for Debian's indexes: our own xz (LZMA2) and gzip (stb_image's
- * inflate, which is already in lord-server for PNGs). All in memory: repository files are
+ * inflate, which is already in axia-server for PNGs). All in memory: repository files are
  * a few tens of MB.
  *
  * xz: container with one or more streams, blocks with a single LZMA2 filter (what Debian's

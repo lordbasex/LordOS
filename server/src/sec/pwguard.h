@@ -3,7 +3,7 @@
  *
  * Linux apps talk to PipeWire directly (natively, or through pipewire-pulse), so the kernel's
  * device rules don't cover the microphone (PipeWire opens the sound card, not the app) nor a
- * camera that PipeWire serves. lord-server keeps one connection of its own to the session's
+ * camera that PipeWire serves. axia-server keeps one connection of its own to the session's
  * PipeWire, on the manager socket ($XDG_RUNTIME_DIR/pipewire-0-manager), with our own
  * implementation of the native protocol (no libpipewire). For every PipeWire client it works out
  * the app (the PID's cgroup → the launcher's scope → desktop:<id>) and, if that app is

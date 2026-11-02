@@ -1,8 +1,8 @@
-/* helper.c — lord-doc: lord-server's document helper (see proto.h and docs/DOCUMENTS.md).
+/* helper.c — axia-doc: axia-server's document helper (see proto.h and docs/DOCUMENTS.md).
  *
- * lord-server (doc.c) launches it from a fixed path (next to its own binary), with no arguments and
+ * axia-server (doc.c) launches it from a fixed path (next to its own binary), with no arguments and
  * with the channel on fd 3. It runs as the user, and before reading a single byte of a document:
- *   - it dies if lord-server dies (PR_SET_PDEATHSIG) and leaves no core;
+ *   - it dies if axia-server dies (PR_SET_PDEATHSIG) and leaves no core;
  *   - memory limit (RLIMIT_AS) and its own cgroup (lordos-doc.scope) if possible;
  *   - it receives the fds it will use (DQ_INIT_FD) and locks itself down (DQ_INIT_GO) with the common module
  *     sandbox_apply_helper (server/src/sec/sandbox.c):
@@ -82,7 +82,7 @@ void reply_image_fd(uint32_t id, int fd, int w, int h, const char *extra) {
 }
 
 void reply_image(uint32_t id, const uint32_t *px, int w, int h, const char *extra) {
-    int fd = doc_memfd_new("lord-doc-img", (size_t)w * h * 4);
+    int fd = doc_memfd_new("axia-doc-img", (size_t)w * h * 4);
     if (fd < 0) { reply_err(id, "memory", ""); return; }
     size_t len = (size_t)w * h * 4, off = 0;
     const char *p = (const char *)px;
@@ -153,7 +153,7 @@ static void lockdown(void) {
     SandboxHelperCfg cfg = { .name = "lordos-doc", .ro_paths = ro, .extra_syscalls = sys, .mem_max_mb = 1024,
                              .ro_dir_fds = rofd, .rw_dir_fds = rwfd };
     int mask = sandbox_apply_helper(&cfg);
-    if (getenv("LORD_DOC_DEBUG")) fprintf(stderr, "lord-doc[%d]: modo=%s caja=%#x fds=%d\n", getpid(), mode, (unsigned)mask, hnslots);
+    if (getenv("LORD_DOC_DEBUG")) fprintf(stderr, "axia-doc[%d]: modo=%s caja=%#x fds=%d\n", getpid(), mode, (unsigned)mask, hnslots);
 }
 
 /* ---- startup and loop ---- */
@@ -176,9 +176,9 @@ static void selftest(uint32_t id) {
     fd = open("/etc/shadow", O_RDONLY);
     jb_printf(&b, ",\"shadow\":%d", fd >= 0 ? 0 : errno);
     if (fd >= 0) close(fd);
-    fd = open("/tmp/lord-doc-selftest", O_WRONLY | O_CREAT, 0600);
+    fd = open("/tmp/axia-doc-selftest", O_WRONLY | O_CREAT, 0600);
     jb_printf(&b, ",\"write_tmp\":%d", fd >= 0 ? 0 : errno);
-    if (fd >= 0) { close(fd); unlink("/tmp/lord-doc-selftest"); }
+    if (fd >= 0) { close(fd); unlink("/tmp/axia-doc-selftest"); }
     int s4 = socket(AF_INET, SOCK_STREAM, 0);
     jb_printf(&b, ",\"inet\":%d", s4 >= 0 ? 0 : errno);
     if (s4 >= 0) close(s4);
@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
     struct rlimit as = { (rlim_t)1536 << 20, (rlim_t)1536 << 20 };
     setrlimit(RLIMIT_AS, &as);
     struct stat st;
-    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "lord-doc: lo lanza lord-server\n"); return 2; }
+    if (fstat(SOCK, &st) || !S_ISSOCK(st.st_mode)) { fprintf(stderr, "axia-doc: lo lanza axia-server\n"); return 2; }
     syscall(SYS_close_range, SOCK + 1, ~0U, 0);
     signal(SIGPIPE, SIG_IGN);
     /* archive names in UTF-8 (libarchive converts according to the locale) */

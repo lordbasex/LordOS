@@ -1,4 +1,4 @@
-/* bench_test.c — the measurement pieces shared by lordos-testbench and LordBench (src/bench/bench.c). */
+/* bench_test.c — the measurement pieces shared by axia-testbench and LordBench (src/bench/bench.c). */
 #define _XOPEN_SOURCE 700
 #define _DARWIN_C_SOURCE
 #include "../src/bench/bench.h"
@@ -81,19 +81,19 @@ int main(void) {
     CHECK(!strcmp(buf, "\"a\\\"b\\\\c\\u000a\\u0001\""), "json %s", buf);
     free(buf);
 
-    /* the state file: written whole under $XDG_STATE_HOME/lordos, bad names refused */
+    /* the state file: written whole under $XDG_STATE_HOME/axia, bad names refused */
     char dir[] = "/tmp/bench-test-XXXXXX";
     CHECK(mkdtemp(dir) != NULL, "mkdtemp");
     setenv("XDG_STATE_HOME", dir, 1);
     CHECK(bench_save("testbench", w_hello) == 0, "save");
     char path[128], got[32] = "";
-    snprintf(path, sizeof path, "%s/lordos/testbench.json", dir);
+    snprintf(path, sizeof path, "%s/axia/testbench.json", dir);
     FILE *r = fopen(path, "r");
     CHECK(r && fgets(got, sizeof got, r) && !strcmp(got, "{\"x\":1}\n"), "saved content");
     if (r) fclose(r);
     CHECK(bench_save("../x", w_hello) < 0 && bench_save("A", w_hello) < 0 && bench_save("", w_hello) < 0, "bad names");
     unlink(path);
-    snprintf(path, sizeof path, "%s/lordos", dir);
+    snprintf(path, sizeof path, "%s/axia", dir);
     rmdir(path);
     rmdir(dir);
 

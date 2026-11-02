@@ -1,9 +1,9 @@
 /* brokerkr_e2e.c — the keyring op of isolated .lpk apps (src/sec/brokerkr.c, BOP_KEYRING) end to
- * end with a real lord-vault: the payload an app sends, the owner lord-server sets ("app.<id>"),
+ * end with a real axia-vault: the payload an app sends, the owner axia-server sets ("app.<id>"),
  * isolation between two app ids, the consent prompt (deny and allow), a shell owner that a .lpk
  * with the same id cannot reach, a missing item, bad requests and a locked keyring.
  * brokersrv_reply and brokersrv_prompt_event are stand-ins here: replies go to a socketpair (the
- * "app"), prompts are recorded. Temporary HOME, no D-Bus. Needs build/lord-vault next to it:
+ * "app"), prompts are recorded. Temporary HOME, no D-Bus. Needs build/axia-vault next to it:
  * `make build/brokerkr-e2e && build/brokerkr-e2e`. */
 #include "sec/broker_int.h"
 #include "vault/vclient.h"
@@ -110,7 +110,7 @@ int main(void) {
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return 1;
     app_end = sv[0];
     srv_end = sv[1];
-    check(vc_available(), "lord-vault next to the binary");
+    check(vc_available(), "axia-vault next to the binary");
 
     /* no session keyring yet */
     CALL("alpha", "set", "sync.example.org", "ana", "s");
@@ -156,7 +156,7 @@ int main(void) {
     CALL("gamma", "list", "", "", "");
     check(is_ok() && !strstr(got, "sync.example.org"), "gamma still sees nothing");
 
-    /* the owner is set by lord-server: a .lpk named "mail" does not reach the desktop's "mail" items */
+    /* the owner is set by axia-server: a .lpk named "mail" does not reach the desktop's "mail" items */
     sys_req("{\"op\":\"kr-set\",\"owner\":\"mail\",\"service\":\"imap.example.com\",\"account\":\"ana\",\"secret\":\"desk-secret\"}");
     k = CALL("mail", "get", "imap.example.com", "ana", "");
     check(k == 'p' && strstr(prompt, "\"owner\":\"mail\""), ".lpk \"mail\" (owner app.mail) does not own the desktop's \"mail\" item");

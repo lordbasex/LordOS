@@ -1,4 +1,4 @@
-/* vcard.h — vCard 2.1, 3.0 and 4.0 (RFC 6350) for Contacts in lord-maild.
+/* vcard.h — vCard 2.1, 3.0 and 4.0 (RFC 6350) for Contacts in axia-maild.
  *
  * Reading goes through the shared content-line parser (ical.h). The JSON a contact becomes:
  *   {"uid","fn","n":{"family","given","middle","prefix","suffix"},"nick","org","dept","title",

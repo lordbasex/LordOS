@@ -1,5 +1,5 @@
 /* lordbench_test.c — LordBench without the helper process (docs/BENCHMARK.md, "0.8.6 — LordBench"): the
- * records lord-server accepts from lord-bench and from lord-media's video measurement (and the helper-sandbox
+ * records axia-server accepts from axia-bench and from axia-media's video measurement (and the helper-sandbox
  * self-test's), the compositor's frame statistics, short runs of every CPU, memory and storage workload (the
  * UI engine's scene and the shaper's paragraphs with every glyph in the built-in fonts), the
  * conditions read from fake sysfs trees (temperatures and trip points, throttle counters, the Pi's
@@ -70,15 +70,15 @@ int main(void) {
         for (int k = 0; k < i; k++) CHECK(strcmp(lb_name(i), lb_name(k)), "unique %s", lb_name(i));
     }
     CHECK(!lb_name(LB_COUNT) && !lb_name(-1), "names out of range");
-    /* lord-bench may not report what lord-media or lord-server measure */
+    /* axia-bench may not report what axia-media or axia-server measure */
     m = msg(LB_MSG_RESULT, LB_VID_H264_1080, 60, 1);
-    CHECK(!lb_msg_valid(&m), "a video result from lord-bench");
+    CHECK(!lb_msg_valid(&m), "a video result from axia-bench");
     m = msg(LB_MSG_RESULT, LB_COMP_P99, 3, 0);
-    CHECK(!lb_msg_valid(&m), "a frame time from lord-bench");
+    CHECK(!lb_msg_valid(&m), "a frame time from axia-bench");
     m = msg(LB_MSG_STEP, LB_DESK_FPS, 0, 0);
-    CHECK(!lb_msg_valid(&m), "a desktop step from lord-bench");
+    CHECK(!lb_msg_valid(&m), "a desktop step from axia-bench");
     m = msg(LB_MSG_SKIP, LB_SUS_END, 0, LB_SKIP_NOCODEC);
-    CHECK(!lb_msg_valid(&m), "a video skip reason from lord-bench");
+    CHECK(!lb_msg_valid(&m), "a video skip reason from axia-bench");
     CHECK(lb_lower_better(LB_COMP_P99) && lb_lower_better(LB_DESK_MISSED) && !lb_lower_better(LB_DESK_FPS) && !lb_lower_better(LB_VID_AV1_1080), "which are lower-better");
     CHECK(!strcmp(lb_name(LB_VENC_VP8), "video.enc.vp8") && !strcmp(lb_unit(LB_COMP_MISSED), "%"), "video and frame names");
     CHECK(!strcmp(lb_name(LB_CPU_UIN), "cpu.ui.n") && !strcmp(lb_unit(LB_CPU_UI1), "fps") && !strcmp(lb_name(LB_CPU_SHAPE1), "cpu.shape.1"), "UI names");
@@ -100,7 +100,7 @@ int main(void) {
     for (int i = 0; i < LB_SBX_COUNT; i++) CHECK(lb_sbx_name(i) && !strncmp(lb_sbx_name(i), "helper", 6), "try names %d", i);
     CHECK(!lb_sbx_name(LB_SBX_COUNT) && !lb_sbx_name(-1) && !strcmp(lb_sbx_name(LB_SBX_FORK), "helperFork"), "try names out of range");
 
-    /* ---- lord-media's video records ---- */
+    /* ---- axia-media's video records ---- */
     CHECK(lbv_record_valid(VB_HEVC_2160, VBR_RESULT, 24500, 300, 0), "a video result");
     CHECK(lbv_record_valid(VB_AV1_1080, VBR_SKIP, 0, 0, VBS_NOCODEC), "a video skip");
     CHECK(lbv_record_valid(VB_ENC_VP8, VBR_STEP, 0, 0, 0), "a video step");

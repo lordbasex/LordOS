@@ -17,7 +17,7 @@
   "default.denyShort": "bloquea todo lo demás",
   "default.allowHint": "Lo que ninguna regla cubre sigue el modo del firewall.",
   "default.denyHint": "Solo puede conectarse lo que cubra una regla Permitir.",
-  "notEnforceable": "Esta app no tiene un ámbito propio (no se abrió desde LordOS), así que sus reglas se guardan pero no se aplican.",
+  "notEnforceable": "Esta app no tiene un ámbito propio (no se abrió desde Axia DE), así que sus reglas se guardan pero no se aplican.",
   "empty": "Esta app no tiene reglas.",
   "add": "Agregar regla…",
   "edit": "Editar",

@@ -659,7 +659,7 @@ int term_replay(Session *s, int index) {
     return s->replay;
 }
 
-/* Session log in ~/.local/share/lordos/terminal (raw output). */
+/* Session log in ~/.local/share/axia/terminal (raw output). */
 const char *term_log(Session *s, int on) {
     if (!on) { if (s->log) fclose(s->log); s->log = NULL; return NULL; }
     if (s->log) return s->log_path;
@@ -668,8 +668,8 @@ const char *term_log(Session *s, int on) {
     char dir[400];
     snprintf(dir, sizeof dir, "%s/.local", home); mkdir(dir, 0755);
     snprintf(dir, sizeof dir, "%s/.local/share", home); mkdir(dir, 0755);
-    snprintf(dir, sizeof dir, "%s/.local/share/lordos", home); mkdir(dir, 0755);
-    snprintf(dir, sizeof dir, "%s/.local/share/lordos/terminal", home); mkdir(dir, 0700);
+    snprintf(dir, sizeof dir, "%s/.local/share/axia", home); mkdir(dir, 0755);
+    snprintf(dir, sizeof dir, "%s/.local/share/axia/terminal", home); mkdir(dir, 0700);
     time_t now = time(NULL);
     struct tm tm;
     localtime_r(&now, &tm);

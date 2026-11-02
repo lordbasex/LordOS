@@ -1,16 +1,16 @@
-/* aring.h — audio between lord-server and lord-media over shared memory (see docs/MEDIA.md).
+/* aring.h — audio between axia-server and axia-media over shared memory (see docs/MEDIA.md).
  *
- * lord-media doesn't talk to PipeWire: the PipeWire socket (PulseAudio protocol) is a
+ * axia-media doesn't talk to PipeWire: the PipeWire socket (PulseAudio protocol) is a
  * very broad capability (loading modules, recording other streams, changing the output), and a
  * compromised decoder must not have it. So:
- *   - playback: lord-media writes PCM (s16, 48 kHz, stereo) into this ring; lord-server owns
+ *   - playback: axia-media writes PCM (s16, 48 kHz, stereo) into this ring; axia-server owns
  *     the PipeWire stream and copies from the ring when PipeWire asks (REQUEST), without waiting.
- *   - the clock: lord-server writes in the same page which byte of the ring is being heard now
- *     (read_index − output latency) and at what instant, with a seqlock. lord-media reads it
+ *   - the clock: axia-server writes in the same page which byte of the ring is being heard now
+ *     (read_index − output latency) and at what instant, with a seqlock. axia-media reads it
  *     without locks or round trips to sync the video.
- *   - recording (microphone): the other way around; lord-server owns the capture stream (after the
- *     permission) and writes; lord-media reads.
- * lord-server creates the memfd, sealed (it can't be shrunk or grown). Only one writer and one
+ *   - recording (microphone): the other way around; axia-server owns the capture stream (after the
+ *     permission) and writes; axia-media reads.
+ * axia-server creates the memfd, sealed (it can't be shrunk or grown). Only one writer and one
  * reader per ring; positions are byte counters that never wrap to zero. */
 #ifndef LORD_MEDIA_ARING_H
 #define LORD_MEDIA_ARING_H
@@ -28,11 +28,11 @@ typedef struct {
     uint32_t magic, rate, channels, size;       /* size: data bytes (power of 2) */
     _Atomic uint64_t wpos;                      /* bytes written (writer) */
     _Atomic uint64_t rpos;                      /* bytes read (reader) */
-    /* playback: lord-media asks to discard what's before discard_to (seek) by bumping serial */
+    /* playback: axia-media asks to discard what's before discard_to (seek) by bumping serial */
     _Atomic uint64_t discard_to;
     _Atomic uint32_t serial;
     _Atomic uint32_t overruns;                  /* recording: bytes lost because the ring was full (x1024) */
-    /* clock (written by lord-server, seqlock: odd = writing) */
+    /* clock (written by axia-server, seqlock: odd = writing) */
     _Atomic uint32_t clk_seq;
     _Atomic int32_t  clk_valid, clk_playing;
     _Atomic int64_t  clk_pos;                   /* ring byte heard at clk_mono_us */
@@ -77,8 +77,8 @@ static inline size_t ar_peek(ARingHdr *h, void *p, size_t n) {
 static inline void ar_consume(ARingHdr *h, size_t n) { atomic_fetch_add_explicit(&h->rpos, n, memory_order_release); }
 static inline size_t ar_read(ARingHdr *h, void *p, size_t n) { n = ar_peek(h, p, n); ar_consume(h, n); return n; }
 
-/* Variants for lord-server: the other side (lord-media, or an app) can write the header,
- * so lord-server does NOT trust the other side's size or positions: it uses its own size and its
+/* Variants for axia-server: the other side (axia-media, or an app) can write the header,
+ * so axia-server does NOT trust the other side's size or positions: it uses its own size and its
  * own cursor, and bounds everything. The worst the other side can do is lose or repeat audio. */
 static inline size_t ar_write_t(ARingHdr *h, uint32_t size, uint64_t *wpos, const void *p, size_t n) {
     uint64_t r = atomic_load_explicit(&h->rpos, memory_order_acquire), w = *wpos;
@@ -106,7 +106,7 @@ static inline size_t ar_read_t(ARingHdr *h, uint32_t size, uint64_t *rpos, void 
     return n;
 }
 
-/* Clock: written by lord-server and read by lord-media. */
+/* Clock: written by axia-server and read by axia-media. */
 static inline void ar_clock_write(ARingHdr *h, int valid, int playing, int64_t pos, int64_t mono_us, int64_t lat_us) {
     uint32_t s = atomic_load_explicit(&h->clk_seq, memory_order_relaxed);
     atomic_store_explicit(&h->clk_seq, s + 1, memory_order_relaxed);

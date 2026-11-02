@@ -248,8 +248,8 @@ int pkg_user_key(uint8_t seed[32], char pubhex[65], char name[128]) {
     const char *home = getenv("HOME");
     if (!home) return -1;
     char dir[PATH_MAX], path[PATH_MAX + 16];
-    snprintf(dir, sizeof dir, "%s/.local/share/lordos/keys", home);
-    lpk_root();                                     /* creates ~/.local/share/lordos */
+    snprintf(dir, sizeof dir, "%s/.local/share/axia/keys", home);
+    lpk_root();                                     /* creates ~/.local/share/axia */
     if (mkdir(dir, 0700) && errno != EEXIST) return -1;
     snprintf(path, sizeof path, "%s/user.json", dir);
     size_t len = 0;

@@ -1,4 +1,5 @@
 // @lordos/sdk — everything a LordOS theme or app needs.
+export { standaloneDesktop } from './platform.js';
 import { createElement, cloneElement, Fragment } from 'react';
 import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
@@ -21,7 +22,7 @@ export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe,
 export { ime, useIme } from './ime.js';
 export { wayland } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, APP_CATEGORIES, appCategory } from './apps.js';
-import { windowIcon as windowIconOf } from './apps.js';
+import { windowIcon as windowIconOf, linuxAppFor as linuxAppOf, launchApp as launchAppOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
 import { startOsk } from './osk.js';
 import { startWindowMemory } from './windowmemory.js';
@@ -55,8 +56,7 @@ import { startNetStatus } from './netstatus.jsx';
 import { startCleanerStatus } from './cleanerstatus.jsx';
 export { errorText, statusText, codeError, parseCode } from './errors.js';
 export { logs } from './logs.js';
-export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
-export { Lumo, lumoSource } from './mascot.js';
+export { AxiaLogo, AxiaGlyph, AxiaWordmark } from './logo.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
@@ -95,7 +95,6 @@ import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
 import { maybeStartTour } from './help.js';
-import { liveStartWindow } from './livestart.js';
 import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
 export { systemInfo, systemReport, lordosVersion, useSystemInfo, useServerStats, useCpuUsage, formatBytes, formatDuration } from './system.js';
@@ -128,7 +127,7 @@ export { lordosUpdate, restartNeeded, updatePrefs, setUpdatePrefs, UPDATE_DEFAUL
 export { suggestions, refreshSuggestions, reevaluate as reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen, unseenSuggestions } from './suggestions.js';
 export { vaultAvailable, vaultRequest, onVaultEvent, keyring, autofill, autofillReveal, KeyringPrompt, AutofillButton } from './vault.js';   // Passwords and keyring (docs/PASSWORDS.md)
 import { KeyringPrompt } from './vault.js';
-// Mail, Calendar, Contacts and Reminders through the sandboxed helper lord-maild (docs/MAIL.md)
+// Mail, Calendar, Contacts and Reminders through the sandboxed helper axia-maild (docs/MAIL.md)
 export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mailStatus, autoconfig, OAUTH_PROVIDERS, trackMailStatus, isolatedPim, pickFileFd, closeFileFd } from './mail.js';
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
@@ -148,7 +147,7 @@ import { DisplayConfirm, BluetoothPrompt, startHardware } from './hardware.jsx';
 export { identifyDisplays, identifying as identifyingDisplays, IDENTIFY_MS } from './displaysui.jsx';
 import { DisplayIdentify } from './displaysui.jsx';
 export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlacementOk, SNAP_PREVIEW_PX } from './displaylayout.js';
-// Fans and cooling (lord-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
+// Fans and cooling (axia-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
 export { useFan, fanStatus, fanHistory, fanCase, fanControl, refreshFan, coolingVariant, heatColor, CoolingArt, FanCurveChart, formatTemp, FAN_HISTORY } from './cooling.jsx';
 export { DEFAULT_CATEGORIES, defaultFor, defaultInfo, setDefaultFor, resetDefaultFor, candidatesFor, defaultOpenerId, nativeOf } from './defaults.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
@@ -212,12 +211,8 @@ export function startShell(element) {
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();
   render(createElement(LocaleRoot, null, element));
-  // live ISO: the installation assistant opens by itself, in front, or System Information for the
-  // boot entry "Check this computer" (livestart.js)
-  if (isLiveSystemOf()) {
-    const opening = liveStartWindow(lord.system.info(), getAppOf);
-    if (opening) setTimeout(() => wmOf.open(...opening), 300);
-  }
+  // live media: the installation helper opens by itself (tools/fedora-live/axia-install.py)
+  if (isLiveSystemOf()) setTimeout(() => { const a = linuxAppOf('org.axia.Install'); if (a) launchAppOf(a.id); }, 1500);
   startAlarms();                        // Clock alarms and timer, with the app closed
   startMail();                          // new-mail notifications and passwords on demand (docs/MAIL.md)
   startReminders();                     // calendar and reminder alarms, with the apps closed

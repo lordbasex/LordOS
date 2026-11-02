@@ -34,8 +34,8 @@ const throws = async (what, f, re) => {
 const valid = (r) => validate(schema, r).length === 0;
 
 const laptop = readJson('tools/hwreport/test/good-laptop-live.json');
-const vm = readJson('web/content/hardware/reports/reference-vm116.json');
-const pi = readJson('web/content/hardware/reports/reference-pi5-16gb.json');
+const vm = readJson('tools/hwreport/reports/reference-vm116.json');
+const pi = readJson('tools/hwreport/reports/reference-pi5-16gb.json');
 
 // ---- the schema ----
 ok('the laptop report is valid', valid(laptop));
@@ -113,10 +113,11 @@ ok('no boot row when unknown', !summaryRows(variant((r) => { r.system.software.b
 ok('the summary carries the boot class', summaryText(laptop).includes('boot: usb, 5000 Mbps'));
 ok('the title says live', issueTitle(laptop).endsWith(', live)') && issueTitle(laptop).length <= TITLE_MAX);
 ok('a long machine name keeps the title short', issueTitle({ ...laptop, system: { ...laptop.system, machine: { vendor: 'V'.repeat(80), product: 'P'.repeat(80) } } }).length <= TITLE_MAX);
-const url = new URL(issueUrl(laptop));
-eq('the link goes to the template', [url.origin + url.pathname, url.searchParams.get('template'), url.searchParams.get('lordos')], ['https://github.com/lordbasex/LordOS/issues/new', 'hardware-report.yml', '0.8.7-beta']);
+ok('no repository, no issue link', issueUrl(laptop) === null);
+const url = new URL(issueUrl(laptop, 'https://github.com/example/axia'));
+eq('the link goes to the template', [url.origin + url.pathname, url.searchParams.get('template'), url.searchParams.get('lordos')], ['https://github.com/example/axia/issues/new', 'hardware-report.yml', '0.8.7-beta']);
 eq('only the title, version and summary travel in the link', [...url.searchParams.keys()], ['template', 'title', 'lordos', 'summary']);
-ok('the summary is short', url.searchParams.get('summary').length <= 600 && issueUrl(laptop).length < 2000);
+ok('the summary is short', url.searchParams.get('summary').length <= 600 && issueUrl(laptop, 'https://github.com/example/axia').length < 2000);
 ok('the summary has no report-only detail', !/i915.*46a8|totalKB|kernelConfig|results/.test(summaryText(laptop)));
 const taken = new Set(['lordos-hwreport-2026-10-28.json', 'lordos-hwreport-2026-10-28-2.html']);
 eq('file names skip taken ones', shareFileNames('2026-10-28', (f) => taken.has(f)), { json: 'lordos-hwreport-2026-10-28-3.json', html: 'lordos-hwreport-2026-10-28-3.html' });

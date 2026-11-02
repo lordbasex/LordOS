@@ -30,7 +30,7 @@
   "group.kind.doc": "Documento",
   "group.kind.folder": "Carpeta",
   "group.kind.image": "Imagen",
-  "group.kind.lpk": "App de LordOS",
+  "group.kind.lpk": "App de Axia DE",
   "group.kind.other": "Documento",
   "group.kind.pdf": "Documento PDF",
   "group.kind.text": "Texto",
@@ -73,7 +73,7 @@
   "kind.doc": "Documento",
   "kind.folder": "Carpeta",
   "kind.image": "Imagen",
-  "kind.lpk": "App de LordOS",
+  "kind.lpk": "App de Axia DE",
   "kind.other": "Documento",
   "kind.pdf": "Documento PDF",
   "kind.text": "Texto",
@@ -249,7 +249,7 @@
   "connect.help.rdp": "Escritorio remoto, en la app RDP",
   "connect.err.empty": "Escribí una dirección.",
   "connect.err.invalid": "Esa dirección no es válida.",
-  "connect.err.scheme": "LordOS no conoce {scheme}://.",
+  "connect.err.scheme": "Axia DE no conoce {scheme}://.",
   "connect.err.port": "Las carpetas compartidas usan su puerto estándar.",
   "connect.err.name": "“{name}” no está en la página Red. Abrila para buscar, o usá la dirección.",
   "connect.err.noClient": "Ninguna app instalada abre direcciones {scheme}://.",
@@ -295,5 +295,5 @@
   "fav.gone": "{name} ya no está",
   "pin.add": "Fijar en Ubicaciones",
   "pin.remove": "Quitar de Ubicaciones",
-  "net.offLink": "Este servidor está fuera de tu red local, así que LordOS no lista sus carpetas. Escribí el nombre de la carpeta."
+  "net.offLink": "Este servidor está fuera de tu red local, así que Axia DE no lista sus carpetas. Escribí el nombre de la carpeta."
 }

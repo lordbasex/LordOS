@@ -18,10 +18,7 @@ assets/locales/*.tgz
 logs/
 /code-manifest.json
 /code-manifest.sig
+*.rpm
+/dist/
 /assets/hwreport/snapshot.json.sig
-# the desktop imager's builds (desktop/imager, docs/IMAGER.md)
-desktop/imager/target/
-desktop/imager/dist/
-desktop/imager/node_modules/
-desktop/imager/src-tauri/gen/
 HANDOFF.md

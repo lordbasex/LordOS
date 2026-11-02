@@ -534,7 +534,7 @@ export default function Files() {
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
       '-',
-      // compress and extract (M9, lord-doc)
+      // compress and extract (M9, axia-doc)
       ...(wDir && list.length === 1 && isArchiveFile(e) ? [{ label: tr('docs.extractHere'), onClick: () => extractHere(e, arcReport, tr) }] : []),
       ...(wDir ? [{ label: list.length === 1 ? tr('docs.compressOne', { name: e.name }) : tr('docs.compressMany', { count: list.length }), onClick: () => compress(paths, wDir, arcReport, tr) }] : []),
       '-',
@@ -725,14 +725,14 @@ export default function Files() {
   // columns only in folders; elsewhere, the list
   const view = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
   const entriesOf = (dir) => { try { return lord.fs.list(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
-  const freeSpace = useMemo(() => { try { return curDir && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
+  const freeSpace = useMemo(() => { try { return curDir && !curDir.includes('/.local/share/axia/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
   const quickEntry = quick ? (first || flat[0]) : null;
   const infoEntry = info ? (first || (curDir ? { name: fs.basename(curDir), path: curDir, dir: true, size: 0 } : null)) : null;
   const job = jobs[0];
   const crumbs = (() => {
     if (loc.type !== 'dir') return [{ label: title, loc }];
     const home = fs.home();
-    const remote = `${home}/.local/share/lordos/remote/`;
+    const remote = `${home}/.local/share/axia/remote/`;
     const base = loc.path.startsWith(remote) ? loc.path.split('/').slice(0, remote.split('/').length).join('/')
       : loc.path === home || loc.path.startsWith(`${home}/`) ? home
       : loc.path.startsWith('/run/media/') ? loc.path.split('/').slice(0, 5).join('/') : loc.path.startsWith('/media/') ? loc.path.split('/').slice(0, 4).join('/') : '/';

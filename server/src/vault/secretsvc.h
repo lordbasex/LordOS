@@ -3,7 +3,7 @@
  * "Secret Service".
  *
  * This is how Chromium, Firefox, libsecret/secret-tool and other Linux apps store their passwords in
- * the LordOS keyring without gnome-keyring or kwallet. Runs in lord-vault: lord-server connects the
+ * the LordOS keyring without gnome-keyring or kwallet. Runs in axia-vault: axia-server connects the
  * session bus socket and hands it over already open (the helper cannot open sockets).
  *
  * Objects:

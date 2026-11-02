@@ -1,9 +1,9 @@
 // mail.js — Mail, and the shared channel for Calendar, Contacts and Reminders: everything goes
-// through lord.mail to the sandboxed helper lord-maild (docs/MAIL.md). All calls are
+// through lord.mail to the sandboxed helper axia-maild (docs/MAIL.md). All calls are
 // asynchronous: requests return promises; a timer reads results and events (lord.mail.poll),
 // so the desktop never waits for the network.
 //
-//   mailAvailable()                          is lord-maild installed?
+//   mailAvailable()                          is axia-maild installed?
 //   mailRequest(op, args, { files })         → promise with the reply, or an Error with .code; files are paths, or
 //                                            { fd } in an isolated app (lord.mail.appMode)
 //   onMailEvent(fn)                          events: new, changed, folders, status, need-auth, auth-failed,
@@ -214,10 +214,10 @@ function openMessage(acct, folder, uid) {
   if (getApp('mail')) wm.open('mail', { args: { acct, folder, uid, nonce: Date.now() } });
 }
 
-// In the isolated Mail app (lord-server --app mail, lord.mail.appMode) startMail never runs: the
+// In the isolated Mail app (axia-server --app mail, lord.mail.appMode) startMail never runs: the
 // session keeps notifications, the unread count and passwords on demand. The app keeps its own copy
-// of the account status from the events lord-server forwards to it (sec/brokermail.c), seeded with
-// lord-maild's current status.
+// of the account status from the events axia-server forwards to it (sec/brokermail.c), seeded with
+// axia-maild's current status.
 let tracking = false;
 export function trackMailStatus() {
   if (tracking || !has() || !lord.mail.appMode) return;
@@ -276,13 +276,13 @@ export function startMail() {
     } else if (ev.ev === 'send-failed') {
       notify({ app: 'mail', title: t('mail.notify.sendFailed'), body: `${ev.subject || ''}\n${ev.error || ''}`, sticky: true });
     } else if (ev.ev === 'crash') {
-      // lord-maild went away (crash or update): start it again; lord-server waits 3 s between tries
+      // axia-maild went away (crash or update): start it again; axia-server waits 3 s between tries
       setTimeout(() => { try { lord.mail.start(); } catch (e) { /* not available */ } }, 3500);
     } else if (ev.ev === 'ready') {
       refreshCounts();
     }
   });
-  // lord-maild also keeps calendars and reminders: start it if there is anything to keep
+  // axia-maild also keeps calendars and reminders: start it if there is anything to keep
   lord.mail.start();
   if (cfg.accounts.length) refreshCounts();
 }

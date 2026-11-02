@@ -1,4 +1,4 @@
-// pdf.js — PDF through the confined helper (Poppler inside lord-doc; see docs/DOCUMENTS.md).
+// pdf.js — PDF through the confined helper (Poppler inside axia-doc; see docs/DOCUMENTS.md).
 //
 //   const doc = await pdf.open(path | { blob }, { quick })
 //   doc.info           { pages, sizes: [[w, h]…] (points), title, author, outline, forms }

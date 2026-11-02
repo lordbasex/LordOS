@@ -1,6 +1,6 @@
-/* js_doc.c — lord.doc: PDF, archives, fonts and images through the confined lord-doc helper
+/* js_doc.c — lord.doc: PDF, archives, fonts and images through the confined axia-doc helper
  * (server/src/doc, see docs/DOCUMENTS.md). Here we only validate paths and arguments and open
- * the files; neither Poppler nor libarchive is loaded into lord-server. Everything is asynchronous: each
+ * the files; neither Poppler nor libarchive is loaded into axia-server. Everything is asynchronous: each
  * function returns ids and the results arrive with lord.doc.poll().
  *
  *   available()                              is the helper there?

@@ -1,7 +1,7 @@
-// cooling.jsx — the session side of lord-fand (docs/FANS.md), shared by Settings → Cooling and
+// cooling.jsx — the session side of axia-fand (docs/FANS.md), shared by Settings → Cooling and
 // Monitor → Cooling:
 //
-//   useFan()            status of lord-fand ({ temp, fans, profile, curve, step, … } or null), polled
+//   useFan()            status of axia-fand ({ temp, fans, profile, curve, step, … } or null), polled
 //                       every 2 s only while something on screen uses it, plus a short history
 //   fanHistory          store with the last FAN_HISTORY samples { t, temp, pct, rpm }
 //   coolingVariant(s)   'argon' | 'cooler' | 'pc' | 'none': which illustration fits the hardware
@@ -85,7 +85,7 @@ export function heatColor(temp, alpha = 1) {
 
 // Rotation that follows the duty: up to 1.2 turns per second at 100 %, eased; stops (no timer) at
 // 0 %, while the window is minimized and with Reduce motion. The rotors are turned with
-// lord.setStyle on their nodes (no React render per frame): lord-server repaints a cached raster.
+// lord.setStyle on their nodes (no React render per frame): axia-server repaints a cached raster.
 function useSpin(pct) {
   const { id } = useAppWindow() || {};
   const hidden = useWindowHidden(id);

@@ -19,17 +19,17 @@ lordos.service (root)
     ├── lord-netd (netsup.c)          the system network, from boot (NETWORK.md); restarted if it exits
     ├── web connections (conn.c)      one child per browser; becomes the user (REMOTE.md)
     └── workers                       short-lived children: verify password, create the session
-lord-server --greeter --user lordos-greeter   login screen (theme themes/greeter)
-lord-server --user lord               one session per user, alive in the background
-lord-server --user bob
+axia-server --greeter --user lordos-greeter   login screen (theme themes/greeter)
+axia-server --user lord               one session per user, alive in the background
+axia-server --user bob
 ```
 
 ### One session per user
 
-Each session is a `lord-server --headless WxH --user <u>`. It starts as root and drops privileges
+Each session is a `axia-server --headless WxH --user <u>`. It starts as root and drops privileges
 right away, as before. It has two states:
 
-- **On the monitor.** It draws straight to the card, like a regular lord-server:
+- **On the monitor.** It draws straight to the card, like a regular axia-server:
   - GPU composition (Mesa: EGL, GBM, GLES2) if there's a card with 3D;
   - linux-dmabuf for apps and games, and direct fullscreen scanout;
   - cursor via the card's plane;
@@ -56,7 +56,7 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
 - **`/run/user/<uid>`:** if it doesn't exist, `user@<uid>.service` is started, which also starts
   its PipeWire. Since 0.8.5 `lord-sessiond` starts `user@<uid>` and waits for the user's session bus
   socket (up to 5 s) before starting the session: with automatic login the session used to start a
-  few milliseconds before the bus existed, so `lord-vault` (the Secret Service) and the notification
+  few milliseconds before the bus existed, so `axia-vault` (the Secret Service) and the notification
   server never got on it (`PASSWORDS.md`).
 - **GPU:**
   - by default, each session uses it while it's on the monitor;
@@ -125,7 +125,7 @@ connections, workers): `sd_mon_child()` closes them before dropping root.
 
 `sd_mon_open` (`remote/monitor.c`) waits up to 30 s for a card with KMS, a connector and a CRTC
 (`drmcard.h`). A card that opens but has none of that, such as a render-only GPU, counts as no card:
-lord-server could not start on it. lord-sessiond logs `no usable display driver`, creates
+axia-server could not start on it. lord-sessiond logs `no usable display driver`, creates
 `/run/lordos/no-display`, writes what happened on tty1 (`tell_no_display`) and keeps running with no
 monitor, so remote desktop still works if it is on. `lordos.service` stays active for that reason: read
 the journal, not the unit's state. Once the driver is fixed, `systemctl restart lordos.service` picks the
@@ -166,7 +166,7 @@ nothing and the boot is the same as before (the first frame is then black, as al
 
 ### The login screen (greeter)
 
-It's a `lord-server --headless --greeter` running as `lordos-greeter`, unprivileged and without
+It's a `axia-server --headless --greeter` running as `lordos-greeter`, unprivileged and without
 an admin helper. Its runtime is in `/run/lordos/greeter` and its home in
 `/var/lib/lordos-greeter`. It loads the special theme `themes/greeter` (React, the same engine):
 
@@ -232,7 +232,7 @@ discarded and `left` only goes down, so the test always ends; it is refused in t
 ### Lock, switch user and log out
 
 **The login screen runs only when it is shown (0.8.5).** It used to stay running behind the session
-after sign-in, a whole `lord-server` (about 53 MB of its own memory, 78 MB of PSS, measured in a VMware
+after sign-in, a whole `axia-server` (about 53 MB of its own memory, 78 MB of PSS, measured in a VMware
 VM). Now `lord-sessiond` stops it 10 s after a session takes the monitor (`GREETER_LINGER_S`), and
 `sd_greeter_get` starts it again for a lock, a user switch or a log out; its socket is up in 8–22 ms
 and it reaches the monitor about 20 ms after it's asked for. On a lock or a switch the monitor is taken
@@ -254,7 +254,7 @@ after the screen went dark`.
   previous session stays alive in the background and you return to it by logging in again.
 
   ![Switch user](login-switch-user.png)
-- **Log out:** ends that user's `lord-server` and the monitor goes back to the login screen.
+- **Log out:** ends that user's `axia-server` and the monitor goes back to the login screen.
 - **Restarting `lord-sessiond`:**
   - sessions stay alive (`KillMode=process`), and on return you get back in through the login
     screen;
@@ -296,7 +296,7 @@ card lent to a session has not been tested on real hardware yet.
   session open.
 - **The request:** `session.restart()` / `session.shutdown()` → `lord.session.power('reboot'|'poweroff')`
   (`js_sys.c`), which only knows those two words and sends a fixed `RP_SESSION`
-  `{"a":"power","p":"reboot"|"poweroff"}`. lord-server runs nothing.
+  `{"a":"power","p":"reboot"|"poweroff"}`. axia-server runs nothing.
 - **The decision is lord-sessiond's** (`session_power` in `sessiond.c`), and only for the session
   that is on the monitor (its connection is the only one it reads requests from):
   - the user is alone (no other user has a session): any user may restart or shut down;
@@ -324,7 +324,7 @@ Settings → Session → **Reopen windows when you log in**: Always (the default
 
 | How the session ended | Always | Ask first | Off |
 |---|---|---|---|
-| Log out, Restart, Shut Down, `systemctl`, a signal to `lord-server` | reopens | asks | nothing |
+| Log out, Restart, Shut Down, `systemctl`, a signal to `axia-server` | reopens | asks | nothing |
 | Power cut, crash, `SIGKILL` | asks ("did not shut down properly") | asks | nothing |
 | Everything was closed | clean desktop | clean desktop | clean desktop |
 
@@ -373,20 +373,20 @@ opened with (only `args` are saved), a Terminal's shells after a reboot (a new o
 ## cgroups: one subtree per session
 
 Each app in a session goes into its own cgroup v2 (a «scope») so monitoring can attribute traffic
-and hardware and so limits can be applied (see [PRIVACY.md](PRIVACY.md)). `lord-server` runs
+and hardware and so limits can be applied (see [PRIVACY.md](PRIVACY.md)). `axia-server` runs
 without root, so `lord-sessiond` **delegates** a subtree to it:
 
 - `lordos.service` has `Delegate=yes`. At startup, `lord-sessiond` moves itself to the
   `supervisor` leaf (`cgroup_service_init`, `server/src/sec/cgroup.c`), so the service root has
   no processes and can enable `cpu memory pids` for its children.
 - When a user's session is created (`spawn` in `sess.c`), the child —still root, before
-  `lord-server`'s `execve`— calls `cgroup_delegate_session(uid, gid)`: it creates
+  `axia-server`'s `execve`— calls `cgroup_delegate_session(uid, gid)`: it creates
   `lordos-session-<uid>/server`, moves itself there and hands the subtree to the user (`chown`).
-- `lord-server` creates its apps' scopes as siblings of `server`, without root:
+- `axia-server` creates its apps' scopes as siblings of `server`, without root:
   `app-lordos-lpk-<id>.scope` (isolated `.lpk` apps) and `app-lordos-<id>.scope` (Linux apps).
 - **Update (root-owned scopes):** the subtree is no longer chowned to the user. The scopes are
   created by `lord-sessiond` (a root child on `/run/lordos/cgroup.sock`, `remote/cgsup.c`) when
-  `lord-server`, or a child it forked right before exec, asks to be placed; all of them, and
+  `axia-server`, or a child it forked right before exec, asks to be placed; all of them, and
   every `cgroup.procs`, are root's. After a restart the new `lord-sessiond` hardens the subtrees
   of the sessions that survived. See `PRIVACY.md`, «Root-owned app scopes».
 - The login screen and the web connections stay in `supervisor`.
@@ -395,7 +395,7 @@ without root, so `lord-sessiond` **delegates** a subtree to it:
 lordos.service
 ├─supervisor                 lord-sessiond, login screen, web connections
 ├─lordos-session-1000        (lord's)
-│ ├─server                   its lord-server and its helper
+│ ├─server                   its axia-server and its helper
 │ ├─app-lordos-lpk-evil.scope
 │ └─app-lordos-featherpad.scope
 └─lordos-session-1001        (bob's)
@@ -407,7 +407,7 @@ Tested in VM 122: `lord` on the monitor, `bob` logging in through the browser (n
 user switching from `lord` to `bob` and back, with `lord`'s apps (FeatherPad and an isolated app)
 alive. With `KillMode=process`, a service restart leaves the sessions in their subtrees.
 
-Without `Delegate=yes` (or `lord-server` run standalone with sudo, as in development) everything
+Without `Delegate=yes` (or `axia-server` run standalone with sudo, as in development) everything
 works as before: apps run without a scope and a warning goes to the log.
 
 ## Autologin
@@ -479,7 +479,7 @@ session. Everything that changes something goes through closed `admin.c` actions
 - **Messages from the sessions:** lord-sessiond's connection (`RP_SEAT`) doesn't receive the
   screen. It only reads short JSON of up to 4 KB and skips everything else without interpreting
   it. Screen rectangles are processed by the web bridge, which already runs as the user.
-- **Binaries:** sessions are only created with a `lord-server` owned by root that nobody else can
+- **Binaries:** sessions are only created with a `axia-server` owned by root that nobody else can
   write. `insecure_dev=1` in `/etc/lordos/remote/config` allows it in a development VM.
 - **Locking really takes the session off the monitor:** it isn't a layer on top of the desktop.
   If the user's session hangs, the login screen keeps working.

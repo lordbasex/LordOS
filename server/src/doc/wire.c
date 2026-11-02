@@ -54,7 +54,7 @@ int doc_send(int sock, uint32_t op, uint32_t id, const char *json, size_t len, c
     int n = 0, jfd = -1;
     DocHdr h = { op, id, 0, 0 };
     if (json && len > DOC_INLINE_MAX) {
-        jfd = doc_memfd("lord-doc-json", json, len);
+        jfd = doc_memfd("axia-doc-json", json, len);
         if (jfd < 0) return -1;
         all[n++] = jfd;
         h.flags |= DOCF_JSON_FD;

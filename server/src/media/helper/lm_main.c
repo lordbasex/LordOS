@@ -1,6 +1,6 @@
-/* lm_main.c — entry point of lord-media (see lm.h and docs/MEDIA.md).
+/* lm_main.c — entry point of axia-media (see lm.h and docs/MEDIA.md).
  *
- * lord-server launches it with no arguments, with the socket on fd 3. The first message (MM_JOB)
+ * axia-server launches it with no arguments, with the socket on fd 3. The first message (MM_JOB)
  * says what type of helper it is and brings the descriptors. Before reading a single byte of the file
  * the sandbox is applied: Landlock (no home folder or network) and, after initializing
  * VA-API if needed, seccomp. */
@@ -25,16 +25,16 @@ static void av_log_cb(void *avcl, int level, const char *fmt, va_list vl) {
     if (++count > 200) return;                  /* a broken file doesn't flood the log */
     char line[512];
     vsnprintf(line, sizeof line, fmt, vl);
-    fprintf(stderr, "lord-media[%d]: ffmpeg: %s", (int)getpid(), line);
+    fprintf(stderr, "axia-media[%d]: ffmpeg: %s", (int)getpid(), line);
 }
 
 int main(int argc, char **argv) {
     (void)argv;
-    if (argc != 1) { fprintf(stderr, "lord-media: launched by lord-server (no arguments)\n"); return 2; }
+    if (argc != 1) { fprintf(stderr, "axia-media: launched by axia-server (no arguments)\n"); return 2; }
     signal(SIGPIPE, SIG_IGN);
-    prctl(PR_SET_PDEATHSIG, SIGKILL);           /* if lord-server goes away, so does this one */
+    prctl(PR_SET_PDEATHSIG, SIGKILL);           /* if axia-server goes away, so does this one */
     if (getppid() == 1) return 1;
-    prctl(PR_SET_NAME, "lord-media");
+    prctl(PR_SET_NAME, "axia-media");
     lm_debug = getenv("LORD_MEDIA_DEBUG") != NULL;
     /* only the socket: any other inherited descriptor is closed */
 #ifdef SYS_close_range
@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     }
     /* mp_send skips missing descriptors: a silent video has no audio ring, and its render node comes in the ring's place */
     if (m.v[0] == MK_PLAY && mp_param_int(payload, "hw", 0) && fds[2] < 0 && fds[1] >= 0) { fds[2] = fds[1]; fds[1] = -1; }
-    /* The shared sandbox (sec/sandbox.c, the same as lord-doc's), before reading a byte
+    /* The shared sandbox (sec/sandbox.c, the same as axia-doc's), before reading a byte
      * of the file and before initializing VA-API: no network, nothing opened outside the system's libraries and
      * data (read-only), no /dev (devices arrive as fds) and with the
      * DRM/V4L2/dma-buf ioctls only if the job needs them. The VA-API driver is loaded

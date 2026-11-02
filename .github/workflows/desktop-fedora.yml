@@ -1,0 +1,19 @@
+name: Standalone desktop (Fedora)
+on:
+  push:
+  pull_request:
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        gpu: [0, 1]
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Build dependencies
+        run: dnf install -y git gcc make binutils python3 xz pkgconf-pkg-config wayland-devel wayland-protocols-devel libxkbcommon-devel libxcrypt-devel libseat-devel openssl-devel nodejs npm freerdp-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGLES-devel
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: make -j2 check GPU=${{ matrix.gpu }} CFLAGS='-O2 -g -D_FORTIFY_SOURCE=3 -fstack-protector-strong'
+      - name: Stage installation
+        run: make install PREFIX=/usr DESTDIR="$RUNNER_TEMP/axia-de"

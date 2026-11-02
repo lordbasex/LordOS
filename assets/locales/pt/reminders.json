@@ -41,6 +41,6 @@
   "smart.scheduled": "Agendados",
   "smart.today": "Hoje",
   "unavailable": "Os lembretes não estão disponíveis",
-  "unavailableHint": "O serviço de e-mail e calendário (lord-maild) não está em execução ou não está instalado.",
+  "unavailableHint": "O serviço de e-mail e calendário (axia-maild) não está em execução ou não está instalado.",
   "untitled": "Novo lembrete"
 }

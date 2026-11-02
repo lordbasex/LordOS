@@ -228,7 +228,7 @@ static int app_exists(const char *id) {
     for (const char *p = id; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return 1;
     char p[PATH_MAX * 2];
     struct stat st;
-    snprintf(p, sizeof p, "%s/.local/share/lordos/apps/%s", fsops_home(), id);
+    snprintf(p, sizeof p, "%s/.local/share/axia/apps/%s", fsops_home(), id);
     if (!lstat(p, &st) || errno != ENOENT) return 1;
     snprintf(p, sizeof p, "%s/sysapps", sysapps);
     if (stat(p, &st) || !S_ISDIR(st.st_mode)) return 1;     /* a theme with no system apps can't tell either */
@@ -236,7 +236,7 @@ static int app_exists(const char *id) {
     return !lstat(p, &st) || errno != ENOENT;
 }
 
-/* ---- the helper's fixed path, next to lord-server (as lord-bench and lord-doc) ---- */
+/* ---- the helper's fixed path, next to axia-server (as axia-bench and axia-doc) ---- */
 
 static int helper_path(char *out, size_t n) {
     char self[PATH_MAX];
@@ -246,7 +246,7 @@ static int helper_path(char *out, size_t n) {
     char *slash = strrchr(self, '/');
     if (!slash) return -1;
     *slash = 0;
-    if ((size_t)snprintf(out, n, "%s/lord-clean", self) >= n) return -1;
+    if ((size_t)snprintf(out, n, "%s/axia-clean", self) >= n) return -1;
     struct stat st;
     if (stat(out, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     if ((st.st_uid != 0 && st.st_uid != getuid()) || (st.st_mode & (S_IWGRP | S_IWOTH))) return -1;
@@ -274,7 +274,7 @@ static int spawn_helper(const char *path, const char *go, size_t len, const int 
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
     char sessiond[32] = "LORDOS_SESSIOND=1";
     char *envp[] = { "LANG=C.UTF-8", getenv("LORDOS_SESSIOND") ? sessiond : NULL, NULL };
-    char *argv[] = { "lord-clean", NULL };
+    char *argv[] = { "axia-clean", NULL };
     int e = posix_spawn(pid, path, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
     posix_spawnattr_destroy(&at);
@@ -822,7 +822,7 @@ static void expand_sources(Scan *s, int home) {
 
 #define SAVED_MAGIC "lordos-cleaner-map 1"
 
-static void saved_path(char *out, size_t n) { snprintf(out, n, "%s/.cache/lordos/cleaner-map.txt", fsops_home()); }
+static void saved_path(char *out, size_t n) { snprintf(out, n, "%s/.cache/axia/cleaner-map.txt", fsops_home()); }
 
 /* Folder names and totals, for the user alone. Nothing can be acted on from it: a saved map has no candidates. */
 static void save_tree(const Scan *s) {
@@ -830,7 +830,7 @@ static void save_tree(const Scan *s) {
     saved_path(p, sizeof p);
     snprintf(dir, sizeof dir, "%s/.cache", fsops_home());
     mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.cache/lordos", fsops_home());
+    snprintf(dir, sizeof dir, "%s/.cache/axia", fsops_home());
     mkdir(dir, 0700);
     snprintf(tmp, sizeof tmp, "%s.%d", p, (int)getpid());
     int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
@@ -1554,8 +1554,8 @@ static int keeper_check(const Scan *s, const Item *it, int fd, const char *name,
     return same ? I_READY : I_CHANGED;
 }
 
-/* What ran, in ~/.local/state/lordos/cleaner-history.json: counts, bytes and rule ids. Never a path. */
-static void history_path(char *out, size_t n) { snprintf(out, n, "%s/.local/state/lordos/cleaner-history.json", fsops_home()); }
+/* What ran, in ~/.local/state/axia/cleaner-history.json: counts, bytes and rule ids. Never a path. */
+static void history_path(char *out, size_t n) { snprintf(out, n, "%s/.local/state/axia/cleaner-history.json", fsops_home()); }
 
 static char *history_read(size_t *len) {
     char p[PATH_MAX + 64];
@@ -1580,7 +1580,7 @@ static void history_add(const char *line) {
     char dir[PATH_MAX + 64];
     snprintf(dir, sizeof dir, "%s/.local/state", fsops_home());
     mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.local/state/lordos", fsops_home());
+    snprintf(dir, sizeof dir, "%s/.local/state/axia", fsops_home());
     mkdir(dir, 0700);
     size_t len = 0;
     char *old = history_read(&len);

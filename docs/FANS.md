@@ -1,7 +1,7 @@
 # Fans and cooling
 
 LordOS drives the fans by temperature from the first boot, before anyone logs in, and keeps doing
-it if a session crashes. A small root service, `lord-fand`, reads the CPU temperature every two
+it if a session crashes. A small root service, `axia-fand`, reads the CPU temperature every two
 seconds and writes each fan's duty from a profile. **Settings → Cooling** picks the profile, edits a
 custom curve and runs the fans at full speed for a while; **Monitor → Cooling** shows the same
 hardware live, with the curve and a temperature/fan history.
@@ -10,7 +10,7 @@ hardware live, with the curve and a temperature/fan history.
 
 | Piece | Code |
 |---|---|
-| Root service | `server/src/fan/fand.c` (`lord-fand`), unit `tools/iso/rootfs/etc/systemd/system/lord-fand.service` |
+| Root service | `server/src/fan/fand.c` (`axia-fand`), unit `tools/iso/rootfs/etc/systemd/system/axia-fand.service` |
 | Curves, presets, `fan.json`, socket requests | `server/src/fan/fancurve.c` (pure, tested) |
 | Temperature and fan discovery, duty writes, giving control back | `server/src/fan/fanhw.c` |
 | Session API `lord.fan` | `server/src/ui/js_fan.c` (registered from `js_hw.c`) |
@@ -22,7 +22,7 @@ hardware live, with the curve and a temperature/fan history.
 
 ## What it drives
 
-`lord-fand` scans sysfs once at start (`fanhw_scan`). A client never names a path or a device: it
+`axia-fand` scans sysfs once at start (`fanhw_scan`). A client never names a path or a device: it
 only picks a profile, and the daemon drives every fan it found.
 
 | Kind | Found as | How it is driven |
@@ -35,7 +35,7 @@ Temperature source, first match: a thermal zone of type `cpu-thermal`, `x86_pkg_
 `cpu_thermal`; then hwmon `k10temp`, `coretemp`, `zenpower` or `cpu_thermal` (`temp1_input`);
 then `thermal_zone0`. Without a readable temperature the fans run at 100 %.
 
-`lord-fand --detect` prints what it found. On the Raspberry Pi 5 used for testing:
+`axia-fand --detect` prints what it found. On the Raspberry Pi 5 used for testing:
 
 ```
 board: Raspberry Pi 5
@@ -95,9 +95,9 @@ cooling device to four active trip points of `cpu-thermal` (50, 60, 67.5 and 75 
    number of steps is fixed too.
 2. **Write `pwm1` directly** and keep the kernel out of the way.
 
-LordOS does (2), with the kernel as a **backstop**: while `lord-fand` drives the fan it moves the
+LordOS does (2), with the kernel as a **backstop**: while `axia-fand` drives the fan it moves the
 four active trips to 78, 80, 82 and 84 °C (the critical 110 °C trip is never touched). Below that
-the kernel's `step_wise` governor leaves `pwm1` alone; if `lord-fand` ever hangs and the board gets
+the kernel's `step_wise` governor leaves `pwm1` alone; if `axia-fand` ever hangs and the board gets
 hot, the kernel still spins the fan up by itself (the firmware throttles at 85 °C). Each tick the
 daemon reads `pwm1` back and rewrites it if it differs, so a kernel step in between (seen for a few
 seconds after a large change, while the governor's state settles) is corrected within 2 s.
@@ -108,7 +108,7 @@ the cooling device's `cur_state` is set to the level the kernel would pick for t
 temperature, so there is no gap. This happens:
 
 - on `SIGTERM`/`SIGINT` (stop, shutdown, package removal);
-- in `lord-fand --restore`, the unit's `ExecStopPost`, which also runs after `SIGKILL` or a crash.
+- in `axia-fand --restore`, the unit's `ExecStopPost`, which also runs after `SIGKILL` or a crash.
   Before taking a fan the daemon writes what it is about to change to `/run/lordos/fand.restore`
   (`trip <index> <m°C>`, `enable <channel> <value> <device path>`); `--restore` rescans, applies only
   values that match a fan the scan found (range-checked) and deletes the file;
@@ -119,7 +119,7 @@ A motherboard channel gets its original `pwmN_enable` (usually 2 or 5, the chip'
 
 ## Configuration and protocol
 
-`/etc/lordos/fan.json` is written only by `lord-fand` (temporary file, `fsync`, `rename`), and read
+`/etc/lordos/fan.json` is written only by `axia-fand` (temporary file, `fsync`, `rename`), and read
 only if it is a root-owned regular file nobody else can write. Strict reader (`sec/json.c`):
 unknown keys, wrong types or an invalid curve make it fall back to the defaults.
 
@@ -147,9 +147,9 @@ is on screen.
 
 ## The service
 
-`lord-fand.service` starts early (`sysinit.target`, before `lordos.service`), `Restart=always`,
+`axia-fand.service` starts early (`sysinit.target`, before `lordos.service`), `Restart=always`,
 and is enabled by the package's `postinst` (also in the ISO and Raspberry Pi image chroots). It is
-hardened like `lord-netperm.service`, and more:
+hardened like `axia-netperm.service`, and more:
 
 - no capabilities at all (`CapabilityBoundingSet=` empty: root owns the sysfs files it writes);
 - `RestrictAddressFamilies=AF_UNIX`, `PrivateNetwork=yes`, `IPAddressDeny=any`;
@@ -184,9 +184,9 @@ config and socket); the unit never passes them.
   previous point); Add step / Remove step / Reset.
 - Monitor shows the curve next to a three-minute temperature/fan history (Monitor's own chart), the
   profile, the step, every fan, and a **Full speed for 30 min** button (same `lord.fan.force`).
-- Controls are enabled when `lord-fand` says the user may change them (`canChange`).
+- Controls are enabled when `axia-fand` says the user may change them (`canChange`).
 
-Measured on VM 116, headless `lord-server` with Monitor → Cooling open and the fan at 55 %, 30 s
+Measured on VM 116, headless `axia-server` with Monitor → Cooling open and the fan at 55 %, 30 s
 with nobody watching: **2.4 % CPU** with the animation, **1.9 %** with Reduce motion (the
 difference, about 0.5 % of one core, is the spinning fan). A first version that re-rendered React
 on every frame cost 8.9 %.
@@ -204,7 +204,7 @@ into a scratch folder and read; **none of them was executed**.
 - **Fan:** a 30 mm PWM blower plugged into the **Raspberry Pi 5 fan header** (manual, assembly
   step 4: "Connect the blower FAN cable … to the exposed Raspberry Pi 5 FAN Port"; features table:
   "actively controlled by the Raspberry Pi OS"). So it is the `pwmfan` board fan above, driven by
-  `lord-fand` like the Active Cooler. Measured on the user's case: 0 RPM stopped, about 2 700 RPM at
+  `axia-fand` like the Active Cooler. Measured on the user's case: 0 RPM stopped, about 2 700 RPM at
   30 %, 4 500–4 700 at 55 %, 6 700–7 400 at 100 %.
 - **No microcontroller, no HAT EEPROM.** On the user's Raspberry Pi 5 in this case there is no
   `/proc/device-tree/hat`, and with I2C bus 1 enabled at runtime (`dtparam i2c_arm=on`, removed
@@ -233,7 +233,7 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
 
 | The vendor script | LordOS |
 |---|---|
-| Fan daemon (Python, I2C or GPIO) | `lord-fand` (C, root, hardened); the V5's fan is on the fan header |
+| Fan daemon (Python, I2C or GPIO) | `axia-fand` (C, root, hardened); the V5's fan is on the fan header |
 | Fan curve config `/etc/argononed.conf` | Settings → Cooling, `/etc/lordos/fan.json` |
 | `dtoverlay=dwc2,dr_mode=host` (front USB, audio) | `rpi-case argon-one-v5` → `lordos-case.txt` |
 | `dtparam=nvme`, `pciex1_gen=3` | already in the LordOS image's `config.txt` |
@@ -261,13 +261,13 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
   51 °C). The same binary under the unit's full hardening (`systemd-run` with the unit's
   properties): trips raised, `CURVE` applied and saved, and after killing only the main process
   `ExecStopPost` restored everything.
-- On VM 116: `make -C server test` passes; headless `lord-server` with a fake-sysfs `lord-fand`
+- On VM 116: `make -C server test` passes; headless `axia-server` with a fake-sysfs `axia-fand`
   for every variant, dark and light; the custom profile selected and a point dragged with the
   pointer (the daemon logged `CURVE 55:30,60:55,72:85`).
 
 ## Not done or untested
 
-- The fan curve under the packaged `lord-fand.service` on the real Raspberry Pi: the packaged unit
+- The fan curve under the packaged `axia-fand.service` on the real Raspberry Pi: the packaged unit
   runs there (the 0.8.4 update restarted it, `ISO.md`, "Release test (0.8.4 Beta)"), but the
   measurements above were taken with the unit's properties through `systemd-run`.
 - Real PC motherboards (`nct67xx`, `it87`) and laptops: fake sysfs only.

@@ -11,7 +11,7 @@ export const accents = {
   grafito: '#8e8e93',
 };
 
-// The LordOS collection (Signature, Lumo, Cosmos; sdk/wallpapers.js) and this theme's own
+// The desktop collection (Horizons, Cosmos; sdk/wallpapers.js) and this theme's own
 // gradients (tools/gen-wallpaper.py). name: English fallback; the shown name is the translation of
 // nameKey (assets/locales/*/shell.json). Thumbnails: assets/thumbs/ (320×180).
 const gradients = [

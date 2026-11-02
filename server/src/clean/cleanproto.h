@@ -1,10 +1,10 @@
-/* cleanproto.h — the channel between lord-server (clean.c) and lord-clean, Cleaner's sandboxed scanner
+/* cleanproto.h — the channel between axia-server (clean.c) and axia-clean, Cleaner's sandboxed scanner
  * (docs/CLEANER-ARCHITECTURE.md).
  *
- * The transport is lord-doc's (doc/wire.h): a SOCK_SEQPACKET pair on fd 3, messages of a header and JSON,
- * a batch too large for one message travelling in a sealed memfd. lord-server sends one CQ_GO with the
- * opened roots as fds, in the order of "roots"; lord-clean answers with CR_BATCH records and ends with
- * CR_DONE or CR_ERR. Everything lord-clean says is validated by lord-server (clean.c); to stop a scan it
+ * The transport is axia-doc's (doc/wire.h): a SOCK_SEQPACKET pair on fd 3, messages of a header and JSON,
+ * a batch too large for one message travelling in a sealed memfd. axia-server sends one CQ_GO with the
+ * opened roots as fds, in the order of "roots"; axia-clean answers with CR_BATCH records and ends with
+ * CR_DONE or CR_ERR. Everything axia-clean says is validated by axia-server (clean.c); to stop a scan it
  * kills the helper.
  *
  *   CQ_FDS    {}                                 + up to CLEAN_FDS_MSG root fds, in the order of "roots"
@@ -40,7 +40,7 @@
 #define CLEAN_MAX_GROUP  1024       /* files shown in one group of duplicates */
 #define CLEAN_MAX_EXCLUDE 32
 
-/* similar images: what is decoded, in lord-clean only (helper/lcimage.c) */
+/* similar images: what is decoded, in axia-clean only (helper/lcimage.c) */
 #define CLEAN_MAX_IMAGES   20000    /* images read in one scan: past this the scan is incomplete */
 #define CLEAN_IMAGE_MIN    8192     /* bytes: smaller files are icons, not photos */
 #define CLEAN_IMAGE_MAX    (64u << 20)    /* bytes of a file read into memory */

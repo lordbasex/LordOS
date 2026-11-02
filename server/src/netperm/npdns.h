@@ -1,4 +1,4 @@
-/* npdns.h — where lord-netperm learns the names of addresses from (for domain rules). Only
+/* npdns.h — where axia-netperm learns the names of addresses from (for domain rules). Only
  * from responses produced by the system resolver (docs/FIREWALL.md, step 2,
  * "Where the names come from"):
  *

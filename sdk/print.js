@@ -4,7 +4,7 @@
 // For apps:
 //   print.open({ title, path })            print a PDF (opens the system dialog)
 //   print.open({ title, doc })             a PDF already opened with pdf.open (with its annotations)
-//   print.open({ title, text, mono })      text (Editor, Notes): a PDF is built in lord-doc
+//   print.open({ title, text, mono })      text (Editor, Notes): a PDF is built in axia-doc
 //   print.open({ title, image })           an image (Photos, the scanner)
 //     → promise: { job, printer } | { saved: path } | null (cancelled)
 //

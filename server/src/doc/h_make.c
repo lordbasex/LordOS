@@ -164,11 +164,11 @@ static void op_text(uint32_t id, const JVal *a) {
     paper_size(a, &pw, &ph);
     fonts_load(mono);
     if (!nfonts[mono]) { reply_err(id, "no-fonts", ""); return; }
-    int fd = doc_memfd_new("lord-doc-pdf", 0);
+    int fd = doc_memfd_new("axia-doc-pdf", 0);
     if (fd < 0) { reply_err(id, "memory", ""); return; }
     cairo_surface_t *s = cairo_pdf_surface_create_for_stream(write_fd, &fd, pw, ph);
     if (title && title[0]) cairo_pdf_surface_set_metadata(s, CAIRO_PDF_METADATA_TITLE, title);
-    cairo_pdf_surface_set_metadata(s, CAIRO_PDF_METADATA_CREATOR, "LordOS");
+    cairo_pdf_surface_set_metadata(s, CAIRO_PDF_METADATA_CREATOR, "Axia DE");
     cairo_t *cr = cairo_create(s);
     const double margin = 56, line = size * 1.38, top = margin + (title && title[0] ? 18 : 0);
     double maxw = pw - 2 * margin;
@@ -280,7 +280,7 @@ static void op_image_pdf(const DocMsg *m, const JVal *a) {
     paper_size(a, &pw, &ph);
     int iw = cairo_image_surface_get_width(img), ih = cairo_image_surface_get_height(img);
     if (iw > ih && pw < ph) { double t = pw; pw = ph; ph = t; }      /* landscape */
-    int fd = doc_memfd_new("lord-doc-pdf", 0);
+    int fd = doc_memfd_new("axia-doc-pdf", 0);
     cairo_surface_t *s = cairo_pdf_surface_create_for_stream(write_fd, &fd, pw, ph);
     cairo_t *cr = cairo_create(s);
     double margin = json_bool(a, "fill", 0) ? 0 : 18;

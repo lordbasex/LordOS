@@ -1,4 +1,4 @@
-/* gl3d.c — lordos-testbench's 3D view: the shared scene (src/bench/glscene.c, also LordBench's) drawn
+/* gl3d.c — axia-testbench's 3D view: the shared scene (src/bench/glscene.c, also LordBench's) drawn
  * with EGL and OpenGL ES 2 on a subsurface, through Mesa's Wayland platform, the way a game or a GPU app draws. It shows which renderer did the
  * work (a GPU's driver, or a software one such as llvmpipe), how long the GPU takes per frame, and it
  * sends its buffers through the compositor's dmabuf path (Mesa uses linux-dmabuf with a GPU, wl_shm with

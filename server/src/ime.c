@@ -13,7 +13,7 @@
  *           composition. 1–9 choose, Space takes the first, - and = page.
  *
  * Dictionaries are only loaded when the method is activated and are also looked up in
- * ~/.local/share/lordos/ime/. */
+ * ~/.local/share/axia/ime/. */
 #include "ime.h"
 
 #include <ctype.h>
@@ -93,12 +93,12 @@ static int map_file(const char *path, const uint8_t **data, size_t *size) {
     return 0;
 }
 
-/* User dictionary (~/.local/share/lordos/ime/<name>) or the system one. */
+/* User dictionary (~/.local/share/axia/ime/<name>) or the system one. */
 static int find_dict(const char *const *names, int n, char *out, size_t size) {
     const char *home = getenv("HOME");
     for (int i = 0; i < n; i++) {
         if (home && names[i][0] != '/') {
-            snprintf(out, size, "%s/.local/share/lordos/ime/%s", home, names[i]);
+            snprintf(out, size, "%s/.local/share/axia/ime/%s", home, names[i]);
             if (!access(out, R_OK)) return 0;
         }
         if (names[i][0] == '/') {

@@ -1,7 +1,7 @@
 # LordOS Terminal
 
 LordOS's native terminal, inspired by popular terminal emulators. It isn't a Linux app running inside LordOS:
-the emulation, the PTY and the drawing are LordOS's own C code inside `lord-server`,
+the emulation, the PTY and the drawing are LordOS's own C code inside `axia-server`,
 and the UI (tabs, panes, profiles, menus) is a React app like the others.
 
 ```
@@ -14,7 +14,7 @@ server/src/term/
   vt.c          xterm-256color emulator: VT500 parser, grid + history, reflow, selection,
                 search, marks, graphemes, OSC 7/8/52/133/1337, images (OSC 1337 and Sixel)
   pty.c         posix_openpt + fork/exec of the user's shell, without privileges
-  hold.c        holders: keep the shells alive if lord-server restarts
+  hold.c        holders: keep the shells alive if axia-server restarts
   term_paint.c  grid drawing: fonts, ligatures, emoji, boxes, cursor, selection, images
 server/src/ui/otf.c     our own OpenType: GSUB substitutions (ligatures, emoji) and CBDT glyphs
 server/src/ui/fonts.c   catalog of installed fonts (TTF/OTF/TTC)
@@ -30,7 +30,7 @@ through JavaScript would be slow on modest machines; here the text goes from the
 grid and from the grid to the screen without touching QuickJS. Only the *damage* (the rows
 that changed) is repainted.
 
-## Screenshots (VM, real lord-server)
+## Screenshots (VM, real axia-server)
 
 | | |
 |---|---|
@@ -49,7 +49,7 @@ that changed) is repainted.
 | ![import](terminal-import-color-scheme.png) | ![keys](terminal-key-bindings.png) |
 | Importing a binary preferences plist | Per-profile and global keys, editable shortcuts |
 | ![recovered](terminal-session-restored.png) | ![tmux](terminal-tmux.png) |
-| After restarting lord-server: same tabs and panes, the counter kept running | `tmux -CC`: tmux windows as tabs, with 3 native panes |
+| After restarting axia-server: same tabs and panes, the counter kept running | `tmux -CC`: tmux windows as tabs, with 3 native panes |
 | ![fish](terminal-fish-shell.png) | ![host](terminal-host-profile.png) |
 | fish integration (red/blue marks, directory) | Automatic profile switch (rule `~/prod/*` → Production profile, badge PROD) |
 
@@ -129,7 +129,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Per-line timestamps | ✅ | ❖⇧E |
 | Ctrl/❖+click on paths and links | 🟡 | paths under `$HOME` open Files; URLs are copied (there is no browser) |
 | Instant Replay | ✅ | ❖⌥B, up to 1200 frames / 6 MB per session |
-| Log the session to a file, save the contents | ✅ | `~/.local/share/lordos/terminal/`, the documents folder (`XDG_DOCUMENTS_DIR`, in the user's language) |
+| Log the session to a file, save the contents | ✅ | `~/.local/share/axia/terminal/`, the documents folder (`XDG_DOCUMENTS_DIR`, in the user's language) |
 | Broadcast input to all panes | ✅ | ❖⌥I |
 | Alert when the command finishes | ✅ | ❖⌥A |
 
@@ -223,7 +223,7 @@ VM with real `.itermcolors` files (Dracula, Catppuccin) and with a binary prefer
 
 Each session has a **holder** (`lord-term-holder`, the same binary re-executed with
 `--term-holder`): an unprivileged ~2 MB process that only keeps the PTY master open and listens
-on a private unix socket (`/run/user/<uid>/lordos-term/`, 0700). If lord-server ends because of
+on a private unix socket (`/run/user/<uid>/lordos-term/`, 0700). If axia-server ends because of
 a signal (restart, update) the shell keeps running; on startup, the server connects to each
 holder (only from the same user, `SO_PEERCRED`) and receives the PTY via `SCM_RIGHTS`. Before
 exiting it saves the screen and history (up to 5000 lines, with colors) in a `.state` file next
@@ -246,7 +246,7 @@ pane (with its history, colors and cursor). In that window:
 | Esc in the gateway or closing the window | `detach-client` (the tmux session stays alive) |
 
 Each pane's output (`%output`) goes from the C parser straight to its virtual session; what is
-typed goes back as `send-keys -H`. If lord-server restarts with tmux attached, the gateway goes
+typed goes back as `send-keys -H`. If axia-server restarts with tmux attached, the gateway goes
 back into control mode and the tmux windows reopen by themselves. Tested with tmux 3.5a in the
 VM: attach, typing in a pane, `split-window -v`, `kill-pane`, `new-window`, `refresh-client`,
 live output, recovery after a restart and `detach-client`. Equalize and maximize pane are

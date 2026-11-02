@@ -1,7 +1,7 @@
 # Sound in LordOS
 
 The sound server is **PipeWire**, the same one GTK, Qt and Firefox apps use. LordOS doesn't ship
-another server or use libpipewire or libpulse: lord-server talks to PipeWire with its own C
+another server or use libpipewire or libpulse: axia-server talks to PipeWire with its own C
 client (`server/src/sound/`). With that client, the UI shows and changes:
 
 - outputs and inputs;
@@ -135,7 +135,7 @@ input. The results were compared with `pactl` and `wpctl status`:
 | `systemctl --user restart pipewire pipewire-pulse wireplumber` | "desconectado… reintentando" ("disconnected… retrying"), `connected: false`, and after 2 s it reconnects by itself |
 | `lord.sound` from JS (QuickJS with the binding, without the screen) | changes volume and mute, turns on the meter and plays sounds; rejects invalid type, index or name |
 
-lord-server builds with the client inside (`main.c` polls `snd_fd()`). The sound UI in Control
+axia-server builds with the client inside (`main.c` polls `snd_fd()`). The sound UI in Control
 Center and Settings is built separately, on top of this API.
 
 ## Session: where PipeWire lives
@@ -144,10 +144,10 @@ PipeWire runs as a systemd user service (`pipewire`, `pipewire-pulse` and `wirep
 socket activation). Those services live in the user's `systemd --user`, which exists while the
 user has a session or "linger".
 
-- **Today in the VM:** lord-server is started with `sudo` from SSH and then drops privileges to
+- **Today in the VM:** axia-server is started with `sudo` from SSH and then drops privileges to
   `lord`. So that PipeWire is there even without an open SSH session,
   `loginctl enable-linger lord` was enabled: `systemd --user` starts with the machine and leaves
-  the sockets in `/run/user/1000`. lord-server finds the socket there even though `sudo` cleared
+  the sockets in `/run/user/1000`. axia-server finds the socket there even though `sudo` cleared
   `XDG_RUNTIME_DIR`. The Wayland compositor already fills in that variable with
   `/run/user/<uid>`.
 - **With our own session (M8):** login goes through PAM with `pam_systemd`. That creates the
@@ -174,7 +174,7 @@ PulseAudio's source was downloaded with `apt-get source --download-only pulseaud
 
 Chromium's audio (YouTube) stuttered on the live ISO.
 
-**Cause.** PipeWire ran at normal priority (`SCHED_OTHER`, nice 0), the same as lord-server, which
+**Cause.** PipeWire ran at normal priority (`SCHED_OTHER`, nice 0), the same as axia-server, which
 composites on the CPU, and as the browser. It asks for real time in two ways, and neither worked
 in LordOS:
 
@@ -213,7 +213,7 @@ and for the stream:
 For the "without real time" case, PipeWire's VM adjustment was removed with two test files in
 `~/.config/pipewire/*.conf.d/` (deleted afterwards).
 
-lord-server doesn't need real time and doesn't hold PipeWire back:
+axia-server doesn't need real time and doesn't hold PipeWire back:
 - its PulseAudio client is non-blocking (`O_NONBLOCK`; if the socket is full, it buffers and
   moves on);
 - it uses 2 % CPU with or without audio playing.
@@ -243,8 +243,8 @@ took ERR from climbing to 0 → 0 over 30 s of YouTube (sink WAIT 287 µs, BUSY 
 hardware `cpu.vm.name` is not set, the rule doesn't match and latency stays as before. No unit or
 generator is needed: the match is WirePlumber's own.
 
-Startup: helpers that do background work right after login now yield. `lord-maild` (its first
-full sync starts at login) runs at nice 19 with the idle I/O class; the `lord-media` thumbnail and
+Startup: helpers that do background work right after login now yield. `axia-maild` (its first
+full sync starts at login) runs at nice 19 with the idle I/O class; the `axia-media` thumbnail and
 probe worker runs at nice 10 with the lowest best-effort I/O level. The backup thread already ran
 at nice 19, idle I/O, 5 minutes after login and never on battery. PipeWire itself runs with
 real-time priority (see above), so contention inside the guest can't starve it; what the extra

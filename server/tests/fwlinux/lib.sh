@@ -1,18 +1,18 @@
 # lib.sh — shared by the per-restriction end-to-end tests of Linux apps (docs/FIREWALL.md, "Linux
 # apps"). Run them in the test VM as the session user, with passwordless sudo, a LordOS session
-# (lord-sessiond) and lord-netperm running. Each script builds an app scope by hand, the way the
+# (lord-sessiond) and axia-netperm running. Each script builds an app scope by hand, the way the
 # launcher's root-owned scopes look (system.slice/lordos.service/lordos-session-<uid>/
-# app-lordos-<id>.scope), writes ~/.config/lordos/firewall.json and puts it back at the end.
+# app-lordos-<id>.scope), writes ~/.config/axia/firewall.json and puts it back at the end.
 set -u
 U=$(id -u)
 G=$(id -g)
 SESS=/sys/fs/cgroup/system.slice/lordos.service/lordos-session-$U
-FW=~/.config/lordos/firewall.json
+FW=~/.config/axia/firewall.json
 pass=0; fail=0
 ok()  { pass=$((pass+1)); echo "  ok:   $*"; }
 bad() { fail=$((fail+1)); echo "  BAD:  $*"; }
 [ -d "$SESS" ] || { echo "no LordOS session for uid $U ($SESS)"; exit 2; }
-mkdir -p ~/.config/lordos
+mkdir -p ~/.config/axia
 FW_BACKUP=$(mktemp); FW_HAD=0
 [ -f "$FW" ] && { cp "$FW" "$FW_BACKUP"; FW_HAD=1; }
 SCOPES=""
@@ -25,7 +25,7 @@ scope() {
     echo "$sc"
 }
 
-# netperm_reload: asks lord-netperm to reread firewall.json (the only message it takes)
+# netperm_reload: asks axia-netperm to reread firewall.json (the only message it takes)
 netperm_reload() {
     [ -S /run/lordos/netperm.sock ] || return 0
     python3 - <<'PY'

@@ -1,4 +1,4 @@
-/* display.c — Settings → Displays, lord-server side (see display.h, docs/DISPLAYS.md). */
+/* display.c — Settings → Displays, axia-server side (see display.h, docs/DISPLAYS.md). */
 #include "display.h"
 #include "edid.h"
 #include "jbuf.h"
@@ -32,7 +32,7 @@ typedef struct {
 
 static struct {
     const DisplayHost *host;
-    char path[PATH_MAX];                /* ~/.config/lordos/displays.json */
+    char path[PATH_MAX];                /* ~/.config/axia/displays.json */
     Conf saved, live, undo;             /* the file, what is shown now, before the last change */
     int capture_all;
     int dirty, retry, save_pending;
@@ -192,12 +192,12 @@ void display_init(const DisplayHost *h) {
         char dir[PATH_MAX];
         snprintf(dir, sizeof dir, "%s/.config", home);
         mkdir(dir, 0700);
-        snprintf(dir, sizeof dir, "%s/.config/lordos", home);
+        snprintf(dir, sizeof dir, "%s/.config/axia", home);
         mkdir(dir, 0700);
-        snprintf(D.path, sizeof D.path, "%s/.config/lordos/displays.json", home);
+        snprintf(D.path, sizeof D.path, "%s/.config/axia/displays.json", home);
         load();
     }
-    /* lord-server started on its own card as root (development): the picker ran before $HOME was
+    /* axia-server started on its own card as root (development): the picker ran before $HOME was
      * the user's, so the saved configuration is applied now (and the other displays are opened) */
     D.dirty = 1;
 }

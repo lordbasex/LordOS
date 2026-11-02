@@ -24,7 +24,7 @@ static int media_path(char *out, size_t n) {
     char *slash = strrchr(self, '/');
     if (!slash) return -1;
     *slash = 0;
-    if ((size_t)snprintf(out, n, "%s/lord-media", self) >= n) return -1;
+    if ((size_t)snprintf(out, n, "%s/axia-media", self) >= n) return -1;
     struct stat st;
     if (stat(out, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     if ((st.st_uid != 0 && st.st_uid != getuid()) || (st.st_mode & (S_IWGRP | S_IWOTH))) return -1;
@@ -58,7 +58,7 @@ int lbv_run(int full, LbvOn on, int (*tick)(void *ctx), void *ctx) {
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
     char *envp[] = { "LANG=C.UTF-8", "SVT_LOG=1", NULL };      /* SVT-AV1 prints its settings otherwise */
-    char *argv[] = { "lord-media", NULL };
+    char *argv[] = { "axia-media", NULL };
     pid_t pid;
     int e = posix_spawn(&pid, path, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);

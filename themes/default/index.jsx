@@ -47,7 +47,7 @@ configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
 const DOCK_DEFAULT = [...DOCK_ORDER, ...apps.filter((a) => a.dock && !DOCK_ORDER.includes(a.id)).map((a) => a.id)];
 
 // Minimize effect: a window that was just minimized stays drawn for MIN_MS, shrinking towards the
-// Dock (transform: scale, painted from a cached raster by lord-server; layout doesn't change).
+// Dock (transform: scale, painted from a cached raster by axia-server; layout doesn't change).
 const MIN_MS = 260;
 function useMinimizing(windows) {
   const prev = useRef(new Map());

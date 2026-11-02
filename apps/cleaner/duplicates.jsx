@@ -1,11 +1,11 @@
 // Duplicates: exact copies in the folders the user chose. Nothing is selected by itself; the selection menu picks
-// copies by group. lord-server keeps
+// copies by group. axia-server keeps
 // at least one independent copy of every group and compares bytes right before acting.
 import { View, cleaner, t as tr, formatBytes, formatNumber, formatDate, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useMemo } from 'react';
 import { Label, Glass, GlassButton, Pill, Check, Hero, PagedList, CountUp, SelectBar, ORB_SPACE } from './ui.jsx';
 
-// which copies to pick; lord-server keeps one of each group whatever is picked
+// which copies to pick; axia-server keeps one of each group whatever is picked
 export const picks = (groups, smart) => {
   const by = (keep) => groups.flatMap((g) => { const k = keep(g); return g.filter((m) => m !== k).map((m) => m.id); });
   const newest = (g) => g.reduce((a, m) => (m.mtime > a.mtime ? m : a)), oldest = (g) => g.reduce((a, m) => (m.mtime < a.mtime ? m : a));

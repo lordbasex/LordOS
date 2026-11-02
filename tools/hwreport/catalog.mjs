@@ -3,7 +3,7 @@
 //   (a) the model of lordos.org/hardware (web/build.mjs renders it, en/es/pt, with renderSections below), and
 //   (b) the compact snapshot System Information's Compatibility panel reads (assets/hwreport/snapshot.json,
 //       shipped in the lordos package and signed on the maintainer's machine with tools/release/sign-hwsnapshot.sh;
-//       lord-server verifies it in C, server/src/sysreport/hwsnap.c, before JS sees it).
+//       axia-server verifies it in C, server/src/sysreport/hwsnap.c, before JS sees it).
 //
 //   node tools/hwreport/catalog.mjs [--reports <dir>] [--snapshot <out.json>] [--check]
 //
@@ -25,7 +25,7 @@ import { reportKind, machineLabel, gpuVendor, mainGpu } from '../../apps/sysinfo
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const SCHEMA_FILE = path.join(REPO, 'apps/sysinfo/hwreport.schema.json');
-export const REPORTS_DIR = path.join(REPO, 'web/content/hardware/reports');
+export const REPORTS_DIR = path.join(REPO, 'tools/hwreport/reports');
 export const SNAPSHOT_FILE = path.join(REPO, 'assets/hwreport/snapshot.json');
 export const loadSchema = () => JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
 

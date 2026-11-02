@@ -1,4 +1,4 @@
-/* rdeskhelper.c — lord-rdesk: one remote desktop connection. It runs in a scope of its own (firewall app
+/* rdeskhelper.c — axia-rdesk: one remote desktop connection. It runs in a scope of its own (firewall app
  * desktop:lordos-rdesk), connects, drops into the helper sandbox, and only ever draws into the shared picture. The
  * engine shows that picture; there is no window, toolkit or display connection here. */
 #include "proto.h"
@@ -32,7 +32,7 @@ void rd_send(uint32_t type, int a, int b, int c, const char *text) {
     send(CH, &m, sizeof m, MSG_NOSIGNAL);
 }
 
-/* the picture for this size: asks lord-server and waits for the memfd */
+/* the picture for this size: asks axia-server and waits for the memfd */
 uint32_t *rd_picture(int w, int h) {
     static uint32_t *map;
     static size_t len;
@@ -124,7 +124,7 @@ int main(void) {
     int rdp = !strcmp(proto, "rdp");
     int sock = dial(host, port ? port : rdp ? 3389 : 5900);
     if (sock < 0) { rd_send(RD_STATE, RS_UNREACHABLE, 0, 0, NULL); return 1; }
-    /* it stays in the scope lord-server placed it in, with that scope's memory limits. connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
+    /* it stays in the scope axia-server placed it in, with that scope's memory limits. connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
     RdView view = { .w = (int)json_num(d.root, "w", 0), .h = (int)json_num(d.root, "h", 0) };
     int rofds[9], rwfds[9], nro = 0, nrw = 0;
     int drives = rdp ? (int)json_num(d.root, "drives", 0) : 0;

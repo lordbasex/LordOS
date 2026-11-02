@@ -1,9 +1,9 @@
 // app-host.js — the «host» that runs inside the process of an isolated .lpk app
-// (lord-server --app <id>, see server/src/app/appclient.c). It brings React, the runtime and the SDK
-// (with the broker's `lord` object, whose fs/clipboard/perms are checked by lord-server), loads the
+// (axia-server --app <id>, see server/src/app/appclient.c). It brings React, the runtime and the SDK
+// (with the broker's `lord` object, whose fs/clipboard/perms are checked by axia-server), loads the
 // package's app.js and draws it. The app uses `@lordos/sdk` as always.
 //
-// Theme, language and direction (RTL) come from lord-server: the state at startup
+// Theme, language and direction (RTL) come from axia-server: the state at startup
 // (lord.broker.state()) and then live (__lordBrokerEvent), so the app looks like the rest of the
 // desktop and changes with it (light/dark mode, accent, wallpaper, language).
 //
@@ -47,7 +47,7 @@ applyState(lord.broker.state());          // current session state, before the f
 
 // ---- the app's windows ----
 const APP = lord.appId;
-const AW = lord.appWindows;              // undefined with an older lord-server: one window
+const AW = lord.appWindows;              // undefined with an older axia-server: one window
 const keys = new Map([[APP, 0]]);        // window id → surface key in C (0 = main window)
 const idOfKey = (key) => { for (const [id, k] of keys) if (k === key) return id; return null; };
 

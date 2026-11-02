@@ -1,7 +1,7 @@
-/* fwsub_test.c — blocklist subscriptions, lord-server's side (src/fw/fwsub.c) and the lord-fetch
+/* fwsub_test.c — blocklist subscriptions, axia-server's side (src/fw/fwsub.c) and the axia-dl
  * helper's request checks (0.8.5, docs/FIREWALL.md "Blocklists"). No network: the downloads are
- * seeded in the cache folder; lord-fetch is only asked things it must refuse.
- *   build/fwsub-test [path to build/lord-fetch] */
+ * seeded in the cache folder; axia-dl is only asked things it must refuse.
+ *   build/fwsub-test [path to build/axia-dl] */
 #include "fw/fwsub.h"
 #include "fw/fwlists.h"
 #include "doc/wire.h"
@@ -74,10 +74,10 @@ static void test_subscriptions(const char *root) {
            "{\"id\":\"ips\",\"url\":\"http://plain.example/ips\",\"format\":\"ips\"},"
            "{\"id\":\"nets\",\"url\":\"https://lists.example.org/nets.txt\",\"format\":\"ips\"}]}");
     CHECK(!fws_init(root, assets, "/nonexistent"));
-    /* seeded downloads (what lord-fetch would have written) */
-    snprintf(p, sizeof p, "%s/.cache/lordos/fwlists/ads.txt", root);
+    /* seeded downloads (what axia-dl would have written) */
+    snprintf(p, sizeof p, "%s/.cache/axia/fwlists/ads.txt", root);
     put(p, "d tracker.example\ns ads.example\n");
-    snprintf(p, sizeof p, "%s/.cache/lordos/fwlists/nets.txt", root);
+    snprintf(p, sizeof p, "%s/.cache/axia/fwlists/nets.txt", root);
     put(p, "n 203.0.113.0/24\n");
     char *j = fws_json();
     CHECK(j && strstr(j, "\"id\":\"ads\"") && strstr(j, "\"id\":\"nets\"") && !strstr(j, "bad id") && !strstr(j, "plain.example"));
@@ -93,8 +93,8 @@ static void test_subscriptions(const char *root) {
     CHECK(!fws_match(NULL, 0, 4, a));                               /* nets is off */
     CHECK(!fws_set("nets", 1) && wait_job());
     CHECK(fws_match(NULL, 0, 4, a) && !strcmp(fws_match(NULL, 0, 4, a), "nets"));
-    /* the compiled file lord-netperm reads */
-    snprintf(p, sizeof p, "%s/.config/lordos/fwlists.txt", root);
+    /* the compiled file axia-netperm reads */
+    snprintf(p, sizeof p, "%s/.config/axia/fwlists.txt", root);
     char *t = slurp(p);
     char err[64];
     FwLists *l = t ? fwl_load_text(t, strlen(t), err, sizeof err) : NULL;
@@ -108,8 +108,8 @@ static void test_subscriptions(const char *root) {
     CHECK(fws_add_custom("https://x.example/l", "csv", id, e, sizeof e) == -1 && !strcmp(e, "fw.list.badFormat"));
     CHECK(fws_add_custom("https://lists.example.org/ads.txt", "domains", id, e, sizeof e) == -1 && !strcmp(e, "fw.list.exists"));
     CHECK(!fws_add_custom("https://own.example/mine.txt", "hosts", id, e, sizeof e) && !strcmp(id, "custom-1"));
-    wait_job();                         /* it tries to download it (no lord-fetch here: an error, no copy) */
-    snprintf(p, sizeof p, "%s/.config/lordos/fwlists.json", root);
+    wait_job();                         /* it tries to download it (no axia-dl here: an error, no copy) */
+    snprintf(p, sizeof p, "%s/.config/axia/fwlists.json", root);
     t = slurp(p);
     CHECK(t && strstr(t, "\"enabled\":[\"ads\",\"nets\",\"custom-1\"]") && strstr(t, "own.example"));
     j = fws_json();
@@ -124,15 +124,15 @@ static void test_subscriptions(const char *root) {
     CHECK(!fws_match(n1, 1, 0, NULL));
 }
 
-/* lord-fetch refuses what it must, without any network (it never opens a socket itself) */
+/* axia-dl refuses what it must, without any network (it never opens a socket itself) */
 static void test_helper(const char *bin) {
-    if (access(bin, X_OK)) { printf("fwsub-test: lord-fetch skipped: needs %s\n", bin); return; }
+    if (access(bin, X_OK)) { printf("fwsub-test: axia-dl skipped: needs %s\n", bin); return; }
     int sv[2];
     CHECK(!socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv));
     pid_t p = fork();
     if (p == 0) {
         dup2(sv[1], 3);
-        char *argv[] = { "lord-fetch", NULL }, *envp[] = { NULL };
+        char *argv[] = { "axia-dl", NULL }, *envp[] = { NULL };
         execve(bin, argv, envp);
         _exit(127);
     }
@@ -169,7 +169,7 @@ static void test_helper(const char *bin) {
     waitpid(p, &st, 0);
     CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0);
     close(sv[0]);
-    printf("fwsub-test: lord-fetch refuses bad requests and a peer without TLS: ok\n");
+    printf("fwsub-test: axia-dl refuses bad requests and a peer without TLS: ok\n");
 }
 
 int main(int argc, char **argv) {
@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
     unsetenv("LORDOS_SESSIOND");
     test_urls();
     test_subscriptions(root);
-    test_helper(argc > 1 ? argv[1] : "build/lord-fetch");
+    test_helper(argc > 1 ? argv[1] : "build/axia-dl");
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
     (void)!system(cmd);

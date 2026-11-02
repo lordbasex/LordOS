@@ -1,4 +1,4 @@
-/* drmcard.h — which /dev/dri/cardN is the display (lord-server and lord-sessiond).
+/* drmcard.h — which /dev/dri/cardN is the display (axia-server and lord-sessiond).
  *
  * On a PC it is usually card0, but not always: with simpledrm at boot, amdgpu/i915 show up
  * as card1. On ARM boards (Raspberry Pi 4/5 and many others) the display and the 3D GPU are
@@ -21,6 +21,9 @@
 #include <unistd.h>
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
+#ifdef LORD_LIBSEAT
+#include "platform/seat.h"
+#endif
 
 /* 2 = has a connected connector, 1 = has connectors (none connected), 0 = not KMS. */
 static inline int drm_card_score(int fd) {
@@ -56,10 +59,19 @@ static inline int drm_pick_card(char *out, size_t size) {
     for (int i = 0; i < 16 && best < 2; i++) {
         char p[32];
         snprintf(p, sizeof p, "/dev/dri/card%d", i);
+        if (access(p, F_OK)) continue;
+#ifdef LORD_LIBSEAT
+        int fd = seat_device_open(p, O_RDWR | O_CLOEXEC);
+#else
         int fd = open(p, O_RDWR | O_CLOEXEC);
+#endif
         if (fd < 0) continue;
         int s = drm_card_score(fd);
+#ifdef LORD_LIBSEAT
+        seat_device_close(fd);
+#else
         close(fd);
+#endif
         if (s > best) { best = s; best_i = i; }
     }
     snprintf(out, size, "/dev/dri/card%d", best_i < 0 ? 0 : best_i);

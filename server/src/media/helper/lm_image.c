@@ -1,4 +1,4 @@
-/* lm_image.c — images in lord-media: decode a frame (photo, cover art or a frame of a
+/* lm_image.c — images in axia-media: decode a frame (photo, cover art or a frame of a
  * video), convert it to BGRA, encode PNG/JPEG and describe a file in JSON (probe). */
 #include "lm.h"
 

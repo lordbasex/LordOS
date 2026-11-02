@@ -41,6 +41,6 @@
   "smart.scheduled": "Programados",
   "smart.today": "Hoy",
   "unavailable": "Los recordatorios no están disponibles",
-  "unavailableHint": "El servicio de correo y calendario (lord-maild) no está en marcha o no está instalado.",
+  "unavailableHint": "El servicio de correo y calendario (axia-maild) no está en marcha o no está instalado.",
   "untitled": "Nuevo recordatorio"
 }

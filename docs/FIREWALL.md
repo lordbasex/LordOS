@@ -6,7 +6,7 @@ access" permission on Android and other systems. It is built in steps:
 | Step | What | Status |
 |---|---|---|
 | 1 | Rule store, the decision maker and the names learned from DNS (`server/src/fw`), with tests | **done** |
-| 2 | Enforce it in the kernel with cgroup hooks: the root service `lord-netperm` (`server/src/netperm`) | **done** (VM 122) |
+| 2 | Enforce it in the kernel with cgroup hooks: the root service `axia-netperm` (`server/src/netperm`) | **done** (VM 122) |
 | 3 | Monitor: the "Rule" column and the counters | **done**: per-app switch, counters and "Allow / Block this domain" per destination |
 | 4 | Settings: "Trusted apps" and "Restricted apps" | **done**: lists and mode (silent / off; deny since 0.8.5) |
 | 4b | Settings: network rules by app (domains, addresses, networks) | **done** (VM 122), see [Rules by app](#rules-by-app-settings-and-monitor) |
@@ -65,7 +65,7 @@ Destination details:
 
 `fw_app_canon` accepts:
 
-- `lordos` (lord-server and its built-in apps);
+- `lordos` (axia-server and its built-in apps);
 - `desktop:<id>` (Linux apps with a `.desktop`). Two ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`) and `desktop:lordos-rdesk` (the RDP and VNC apps). The launcher refuses a `.desktop` with either id (`app_scope_reserved`), so none can inherit their rules;
 - `lpk:<id>` (`.lpk` apps);
 - the absolute path of the executable (what the Monitor uses when it can't find a `.desktop`).
@@ -85,21 +85,21 @@ A valid id:
 - **Trusted apps:** nothing is recorded and nothing is asked for them. Explicit rules still
   apply: a `deny` the owner set for a trusted app is enforced.
 - **Restricted apps:** each one has a set of restrictions. The four network ones are decided by
-  `fw_decide` and enforced in the kernel by `lord-netperm` for every app with its own scope. The
+  `fw_decide` and enforced in the kernel by `axia-netperm` for every app with its own scope. The
   others are enforced where the resource is handed out (see
   [Non-network restrictions](#non-network-restrictions)).
 
   | Restriction | In the JSON | .lpk apps and Passwords (`lpk:<id>`) | Built-in apps (`lordos`) | Linux apps (`desktop:<id>`) |
   |---|---|---|---|---|
-  | no internet | `no-internet` | `lord-netperm` | `lord-netperm` | `lord-netperm` |
+  | no internet | `no-internet` | `axia-netperm` | `axia-netperm` | `axia-netperm` |
   | no LAN | `no-lan` | same (also `127.0.0.1` and `::1`) | same | same |
   | no network | `no-network` | same | same | same |
   | no incoming connections | `no-incoming` | same | same | same |
-  | no camera | `no-camera` | broker (`brokercam.c`) | `js_media.c` | `lord-netperm` (`cgroup/dev`) and the PipeWire guard |
-  | no microphone | `no-mic` | broker (`BOP_MIC`, camera videos) | `js_media.c` | the PipeWire guard and `lord-netperm` (ALSA capture nodes) |
-  | no screen capture | `no-screen` | broker (the `screen` permission; isolated apps have no capture API) | `js_media.c` | by design (no capture protocol), and `lord-netperm` (`/dev/fb*`) |
-  | no USB | `no-usb` | broker (`BOP_VAULT_FIDO`, the `usb` permission) | not offered (the desktop itself) | `lord-netperm` (`cgroup/dev`) |
-  | no Bluetooth | `no-bluetooth` | broker (the `bluetooth` permission; no Bluetooth API in app mode) | not offered (the desktop itself) | `lord-netperm` (`socket(AF_BLUETOOTH)`); BlueZ over D-Bus is not covered |
+  | no camera | `no-camera` | broker (`brokercam.c`) | `js_media.c` | `axia-netperm` (`cgroup/dev`) and the PipeWire guard |
+  | no microphone | `no-mic` | broker (`BOP_MIC`, camera videos) | `js_media.c` | the PipeWire guard and `axia-netperm` (ALSA capture nodes) |
+  | no screen capture | `no-screen` | broker (the `screen` permission; isolated apps have no capture API) | `js_media.c` | by design (no capture protocol), and `axia-netperm` (`/dev/fb*`) |
+  | no USB | `no-usb` | broker (`BOP_VAULT_FIDO`, the `usb` permission) | not offered (the desktop itself) | `axia-netperm` (`cgroup/dev`) |
+  | no Bluetooth | `no-bluetooth` | broker (the `bluetooth` permission; no Bluetooth API in app mode) | not offered (the desktop itself) | `axia-netperm` (`socket(AF_BLUETOOTH)`); BlueZ over D-Bus is not covered |
   | no access to your files | `no-files` | broker (file picker, camera saves, the `files` permission) | not offered (the desktop itself) | the launcher (own namespaces + Landlock), at the next launch |
   | no reading the clipboard | `no-clipboard` | broker (`BOP_CLIP_GET`, the `clipboard` permission) | not offered (the desktop itself) | not offered yet |
   | no notifications | `no-notifications` | `sdk/notify.js` and the `notifications` permission | `sdk/notify.js` | `hw/notifyd.c` (by the caller's cgroup) |
@@ -132,7 +132,7 @@ reloading anything. What each kind of app goes through:
     `BOP_VAULT_FIDO` (the USB security key of Passwords) are refused;
   - `BOP_DEVICE` does not light the indicator for a restricted device;
   - a prompt the user allows, or a file the user picks, after the app was restricted is refused too.
-- **Built-in apps inside `lord-server` (firewall id `lordos`).** They share one JS context with
+- **Built-in apps inside `axia-server` (firewall id `lordos`).** They share one JS context with
   the desktop shell, so the checks are at the native boundary that knows what is asked for:
   `js_media.c` `permitted()` refuses camera, microphone and screen capture and recording with
   `fw.restricted.*`, before the permission. `sdk/notify.js` drops notifications from built-in and
@@ -142,14 +142,14 @@ reloading anything. What each kind of app goes through:
   one line. Restrict individual apps instead.
 - **Linux apps (`desktop:<id>`).** They are not sandboxed by default and reach devices, sockets
   and the sound server directly, so each restriction is enforced at a point the app can't go
-  around: the kernel (`lord-netperm`), the launcher (`no-files`), our notification server and our
-  connection to PipeWire. See [Linux apps](#linux-apps). Terminal programs run in `lord-server`'s
+  around: the kernel (`axia-netperm`), the launcher (`no-files`), our notification server and our
+  connection to PipeWire. See [Linux apps](#linux-apps). Terminal programs run in `axia-server`'s
   cgroup and count as `lordos` (network rules only); a program started some other way, outside
   the launcher, is in no app scope and gets no per-app restriction.
 
 **Live revocation.** Adding a restriction to a running app (`restrict_changed()`, called by
 `setRestricted`) takes the device away at once, the same way revoking the permission does: for an
-isolated app `brokersrv_revoke()` sends `revoke`, kills the camera's `lord-media`, closes the
+isolated app `brokersrv_revoke()` sends `revoke`, kills the camera's `axia-media`, closes the
 microphone stream and stops a camera video that records sound; for the built-in apps a hook in
 `js_media.c` kills the camera helper (the window gets `closed` with `revoked`) and finishes
 microphone and screen recordings properly. New notifications and file picks are refused from that
@@ -168,14 +168,14 @@ the app gives itself.
 
 | Restriction | Where | How | Applies | Tested by |
 |---|---|---|---|---|
-| network (4) | `lord-netperm` | cgroup `sock_addr`/`sock_create` programs (above) | at once: new connections, binds and sockets | `tests/netperm_integration.sh` |
-| no camera | `lord-netperm`, `cgroup/dev` | `open()` of a V4L2 node (major 81) → `EPERM` | at once (next `open`; an fd already open stays usable) | `tests/fwlinux/devices.sh` (v4l2loopback, `v4l2-ctl`) |
+| network (4) | `axia-netperm` | cgroup `sock_addr`/`sock_create` programs (above) | at once: new connections, binds and sockets | `tests/netperm_integration.sh` |
+| no camera | `axia-netperm`, `cgroup/dev` | `open()` of a V4L2 node (major 81) → `EPERM` | at once (next `open`; an fd already open stays usable) | `tests/fwlinux/devices.sh` (v4l2loopback, `v4l2-ctl`) |
 | | PipeWire guard (`sec/pwguard.c`) | `Video/Source` nodes hidden from the app, its `Stream/Input/Video` streams destroyed | within 1 s | unit test only (no PipeWire camera node on the test VM) |
-| no USB | `lord-netperm`, `cgroup/dev` | `/dev/bus/usb/*` (189), `/dev/hidraw*` (dynamic, from `/proc/devices`), `/dev/ttyACM*` (166), `/dev/ttyUSB*` (188) | at once (next `open`) | `devices.sh` |
-| no Bluetooth | `lord-netperm`, `cgroup/lsm_socket_create` | `socket(AF_BLUETOOTH, …)` → `EPERM` | at once (new sockets) | `tests/fwlinux/bluetooth.sh` |
-| no screen capture | by design, and `lord-netperm` | the compositor offers no capture protocol, Xwayland (0.8.3) sees only X windows and a restricted app gets no X display, no screen-cast portal is installed; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh` |
+| no USB | `axia-netperm`, `cgroup/dev` | `/dev/bus/usb/*` (189), `/dev/hidraw*` (dynamic, from `/proc/devices`), `/dev/ttyACM*` (166), `/dev/ttyUSB*` (188) | at once (next `open`) | `devices.sh` |
+| no Bluetooth | `axia-netperm`, `cgroup/lsm_socket_create` | `socket(AF_BLUETOOTH, …)` → `EPERM` | at once (new sockets) | `tests/fwlinux/bluetooth.sh` |
+| no screen capture | by design, and `axia-netperm` | the compositor offers no capture protocol, Xwayland (0.8.3) sees only X windows and a restricted app gets no X display, no screen-cast portal is installed; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh` |
 | no microphone | PipeWire guard | capture nodes (`Audio/Source*`, `Audio/Duplex`) and their ports hidden, the app's `Stream/Input/Audio` streams destroyed, including a recording already running | within 1 s | `tests/fwlinux/mic.sh` (`pw-record`, `parecord`, `arecord`) |
-| | `lord-netperm`, `cgroup/dev` | ALSA capture PCM nodes (`/dev/snd/pcmC*D*c`, from `/sys/class/sound`): recording from the card without PipeWire | at once (next `open`) | `mic.sh` |
+| | `axia-netperm`, `cgroup/dev` | ALSA capture PCM nodes (`/dev/snd/pcmC*D*c`, from `/sys/class/sound`): recording from the card without PipeWire | at once (next `open`) | `mic.sh` |
 | no access to your files | the launcher (`apps.c`, `sec/sandbox.c`) | its own user, mount and PID namespace and Landlock (below) | at the next launch | `tests/fwlinux/files.sh` (a probe app, malicious `.desktop` files, `gtk4-print-editor`) |
 | no notifications | `hw/notifyd.c` | the caller's PID from the bus → its cgroup → its app: dropped, answered with a valid id | the next notification | `tests/fwlinux/notify.sh`, `notifyd-test` |
 | no reading the clipboard | — | not offered for Linux apps yet: the Wayland data device is not mediated per app | — | — |
@@ -184,7 +184,7 @@ Settings → Privacy shows "(at next launch)" next to "No access to your files" 
 says that everything else applies at once, and has one help line per restriction.
 
 **Devices (`cgroup/dev`).** In cgroup v2 the device controller *is* a `BPF_PROG_TYPE_CGROUP_DEVICE`
-program; with none attached, everything is allowed. `lord-netperm` attaches one (with a
+program; with none attached, everything is allowed. `axia-netperm` attaches one (with a
 `bpf_link`, multi-attach) to `lordos.service` and to each session's `user@<uid>.service`. It looks
 the app up exactly like the network programs (its scope's ancestor id, or the `user@` union), runs
 on `open()` and `mknod()` of a device node, and returns 0 only for the device classes the app is
@@ -197,8 +197,8 @@ nodes to the user's own PipeWire and WirePlumber, and the microphone would be go
 server: the user controls that manager (units, drop-ins, environment, PipeWire's own config), so
 no such check is unforgeable. Instead a restricted app can't get there: see "Its own view"
 below. Everything else returns 1. Programs systemd attaches higher up (`DeviceAllow=`) still
-apply: the kernel allows only what all of them allow. A denial is logged by `lord-netperm` once per
-5 s, not counted with the connections. `lord-server`'s own scope (`lordos`) never gets device
+apply: the kernel allows only what all of them allow. A denial is logged by `axia-netperm` once per
+5 s, not counted with the connections. `axia-server`'s own scope (`lordos`) never gets device
 restrictions in the kernel: it opens the camera, the FIDO key and the sound for the apps after
 their own permission and restriction checks.
 
@@ -210,7 +210,7 @@ reach the app through the input, sound and camera paths, not as raw USB.
 **Bluetooth sockets (`cgroup/lsm_socket_create`).** The inet `sock_create` hook never sees
 `AF_BLUETOOTH`, so this is a per-cgroup LSM program (`BPF_LSM_CGROUP`, kernel 6.0 or later, with
 the `bpf` LSM active, as in Debian 13) on the `socket_create` hook. Its attach point is the BTF id
-of `bpf_lsm_socket_create`, which `lord-netperm` reads from `/sys/kernel/btf/vmlinux` with its own
+of `bpf_lsm_socket_create`, which `axia-netperm` reads from `/sys/kernel/btf/vmlinux` with its own
 small reader (`bpfs_btf_func_id`). The kernel only loads LSM programs that declare a
 GPL-compatible license: this one declares "Dual MIT/GPL" (our code is MIT, which may also be
 distributed under the GPL); the others keep "LordOS". If the kernel refuses the device or the
@@ -219,8 +219,8 @@ Bluetooth program, the network ones still work and the status says `"devices":fa
 
 On the Raspberry Pi 5 this needs the LordOS kernel from 0.8.1 on (`6.18.57-2+lordos`, built with
 `CONFIG_BPF_LSM` and BTF; see `RASPBERRY.md`, "The LordOS kernel"). 0.8.0's Pi kernel had neither,
-so there `lord-netperm` reported `"bluetooth":false` and "No Bluetooth" wasn't enforced. Tested on
-a Pi 5 (2026-10-18): `lord-netperm: 9 BPF programs loaded (devices: yes, Bluetooth sockets: yes)`,
+so there `axia-netperm` reported `"bluetooth":false` and "No Bluetooth" wasn't enforced. Tested on
+a Pi 5 (2026-10-18): `axia-netperm: 9 BPF programs loaded (devices: yes, Bluetooth sockets: yes)`,
 `npverify-test` 37/37, and the steps of `tests/fwlinux/bluetooth.sh` (as root, for the board's
 user): `socket(AF_BLUETOOTH)` in the restricted app's scope → `EPERM`, inet and unix sockets there
 still work, the same call outside the scope works, and lifting the restriction gives it back.
@@ -243,7 +243,7 @@ socket" check predates Xwayland: with the session's X socket in place since 0.8.
 and needs updating.) If a screen-cast portal backend is
 ever installed, this no longer holds and `screen.sh` fails.
 
-**The PipeWire guard (`sec/pwguard.c`).** `lord-server` keeps one connection of its own to the
+**The PipeWire guard (`sec/pwguard.c`).** `axia-server` keeps one connection of its own to the
 session's PipeWire, on the manager socket, with our own implementation of the native protocol
 (no libpipewire). It binds every client, reads who it is and, for a restricted app, sends
 `update_permissions`: permission 0 on every capture node and its ports and on every other client
@@ -302,7 +302,7 @@ the apps could change. Who a client is:
   `firewall.json` itself. Such a change takes effect outside the restriction later (the next
   login, a reload). Only `no-files` keeps an app from them.
 - A Linux app restricted without `no-files` runs as the user, so it could take over another of the
-  user's processes (lord-server, PipeWire, another app) with `ptrace` and act through it. LordOS
+  user's processes (axia-server, PipeWire, another app) with `ptrace` and act through it. LordOS
   sets `kernel.yama.ptrace_scope = 1` (`/usr/lib/sysctl.d/50-lordos-ptrace.conf`): only a
   process's own descendants can be traced.
 - A pulse socket of its own for each restricted app (`pipewire-pulse` listening on a per-app
@@ -466,7 +466,7 @@ In the test, with 50,000 rules from 500 apps, a decision with one name and one I
 
 ### File
 
-There is one per user: `~/.config/lordos/firewall.json`. It is compact JSON read by the strict
+There is one per user: `~/.config/axia/firewall.json`. It is compact JSON read by the strict
 reader in `server/src/sec/json.c`. For example:
 
 ```json
@@ -564,7 +564,7 @@ Otherwise, an app with its own DNS server could claim that `permitido.com` is an
 During development they were also run with `-fsanitize=address,undefined`, with clang on the development machine and
 with gcc 14 on Linux.
 
-## Step 2: `lord-netperm`, the rules in the kernel
+## Step 2: `axia-netperm`, the rules in the kernel
 
 ```
 server/src/netperm/np_shared.h   map types and the decision (np_decide), identical in BPF and C
@@ -573,9 +573,9 @@ server/src/netperm/bpf2c.c       build tool: clang's .o → build/gen/np_bpf.h
 server/src/netperm/bpfsys.{c,h}  direct bpf() syscall: maps, load, bpf_link, ring
 server/src/netperm/npcompile.{c,h}  rules → map entries (pure C, with a test)
 server/src/netperm/npdns.{c,h}   names from the system resolver
-server/src/netperm/npproto.h     the socket between lord-server and lord-netperm
+server/src/netperm/npproto.h     the socket between axia-server and axia-netperm
 server/src/netperm/netperm.c     the service
-server/src/ui/js_fw.c            lord.fw (lord-server)
+server/src/ui/js_fw.c            lord.fw (axia-server)
 tests/npcompile_test.c           build/npcompile-test (in make test)
 tests/netperm_integration.sh     test against the kernel (on the VM)
 tests/netperm_bench.c, netperm_measure.sh   measurements
@@ -583,7 +583,7 @@ tests/netperm_bench.c, netperm_measure.sh   measurements
 
 ### The service
 
-`lord-netperm` is a separate root process, with its own systemd unit (`lord-netperm.service`,
+`axia-netperm` is a separate root process, with its own systemd unit (`axia-netperm.service`,
 `Restart=always`, before `lordos.service`). It isn't part of `lord-netd` or `lord-sessiond`.
 
 - **No arguments, no execution.** It doesn't launch programs. With arguments, it doesn't start.
@@ -651,13 +651,13 @@ the source cgroup, so the process lands in `user@<uid>.service/app.slice/…` �
 internet from there.
 
 **Chosen fix (option a): attach to `user@<uid>.service` + a per-user restriction union.** For each
-LordOS session user, `lord-netperm` attaches the same cgroup programs a second time to that user's
+LordOS session user, `axia-netperm` attaches the same cgroup programs a second time to that user's
 `user@<uid>.service`. There the process is not in any app scope, so `find_app` (`np.bpf.c`) falls
 back to `np_union`, keyed by the `user@<uid>` cgroup id (the ancestor at `cfg->user_level`). Its
 value is the **strictest union** of the restrictions (the `NP_R_*` bits ORed) of all of that user's
 currently-running restricted apps, with `trusted=1` so anything the union does not forbid is
 allowed silently. If the user has no restricted app running, there is no entry and `user@` is fully
-open (the user manager and its own services are untouched). `lord-netperm` rebuilds the union
+open (the user manager and its own services are untouched). `axia-netperm` rebuilds the union
 whenever a scope or a rule changes (`sync_union`), and removes it when the user's session or user
 manager goes away.
 
@@ -720,7 +720,7 @@ connection took its bytes with it: a browser playing a video showed a few KB. No
 `cgroup_skb` programs (ingress and egress) count every packet of the session's apps:
 
 - the app is the socket's cgroup at the scope level (`bpf_skb_ancestor_cgroup_id`), the same id
-  as the other programs; they only **add** to an `np_counts` entry that `lord-netperm` creates when
+  as the other programs; they only **add** to an `np_counts` entry that `axia-netperm` creates when
   the scope appears, so nothing outside an app (login screen, the system) is counted or stored;
 - the bytes are the IP length of each skb (one GRO/GSO segment, so a fast TCP flow is a few
   thousand calls per second, not one per wire packet); the remote address comes from the IP header
@@ -730,7 +730,7 @@ connection took its bytes with it: a browser playing a video showed a few KB. No
   are optional: a kernel that refuses them leaves the firewall working and the Monitor falls back
   to `tcp_info` (`STATUS` says `"bytes": false`).
 
-Every second `lord-netperm` reads `np_counts` (one lookup per app) and, only if bytes moved, the
+Every second `axia-netperm` reads `np_counts` (one lookup per app) and, only if bytes moved, the
 whole `np_flows` table in one `BPF_MAP_LOOKUP_BATCH` call, works out the rates and sends `COUNTS`
 (below). With nothing moving it reads no table and sends nothing.
 
@@ -758,7 +758,7 @@ milliseconds, in two layers:
      sock_diag dump) is decided as `in` on that port, like `bind`. So denying an app's outgoing
      internet doesn't cut the clients of a server it runs, and "no incoming connections" now also
      cuts the connections already accepted.
-2. **Destroy the socket.** So the app sees the connection end instead of a stall, `lord-netperm`
+2. **Destroy the socket.** So the app sees the connection end instead of a stall, `axia-netperm`
    destroys it over sock_diag netlink (`SOCK_DESTROY`, `npdiag.c`): the kernel aborts it (TCP sends
    a reset, the app gets `ECONNABORTED`). Two triggers:
    - **right after every reload:** a dump of the machine's TCP sockets and connected UDP sockets
@@ -766,7 +766,7 @@ milliseconds, in two layers:
      same decision denies is destroyed. This also cuts idle connections (a push channel, an SSH
      session) that send nothing;
    - **when the filter drops a packet of a socket** it reports it once (an `NpEvent` with `cut`,
-     the 4-tuple and the socket cookie, deduplicated in `np_seen` by cookie) and `lord-netperm`
+     the 4-tuple and the socket cookie, deduplicated in `np_seen` by cookie) and `axia-netperm`
      destroys exactly that socket (the cookie must match). That covers a domain whose address the
      resolver gave after the connection opened, and sockets outside the dump's reach.
 
@@ -777,7 +777,7 @@ milliseconds, in two layers:
    packet after the reload passes, and new connections work at once.
 
 **What the Monitor shows:** every cut socket counts as one more *denied* connection (the kernel
-counts it on the first drop; a sweep's destroyed sockets are added by `lord-netperm`) and appears
+counts it on the first drop; a sweep's destroyed sockets are added by `axia-netperm`) and appears
 in the connection log as denied; the bytes dropped are sent as *blocked* (`COUNTS`, index 7, and
 per address at index 5) and the app's detail shows "Blocked traffic". The counters go out every
 second, so the row shows the block within a second.
@@ -827,7 +827,7 @@ again afterwards):
   a video over QUIC is a few thousand packets per second. TCP throughput is unchanged within
   run-to-run noise.
 - The CPU columns are the client's system CPU (% of one core over 15 s, `iperf3 -J`), two runs each.
-- `lord-netperm` itself only works on a reload (one sock_diag dump) and on a cut socket.
+- `axia-netperm` itself only works on a reload (one sock_diag dump) and on a cut socket.
 
 ### From rules to maps (`npcompile.c`)
 
@@ -913,13 +913,13 @@ connect to the IPs of `permitido.com` even if another one requested them.
 
 `/run/lordos/netperm.sock` is 0666: anyone can connect.
 
-- `lord-netperm` knows who each client is through `SO_PEERCRED`. There are up to 4 connections
+- `axia-netperm` knows who each client is through `SO_PEERCRED`. There are up to 4 connections
   per user and each one sees only its user's apps.
 - The protocol is in `npproto.h`: `u32` length, `u8` type and the data.
-- **From lord-server to lord-netperm** there is a single message, with no data: `RELOAD`. Anything
+- **From axia-server to axia-netperm** there is a single message, with no data: `RELOAD`. Anything
   else drops the connection.
-- **The rules don't travel over the socket.** `lord-netperm` reads the user's
-  `~/.config/lordos/firewall.json` itself, with `CAP_DAC_READ_SEARCH`:
+- **The rules don't travel over the socket.** `axia-netperm` reads the user's
+  `~/.config/axia/firewall.json` itself, with `CAP_DAC_READ_SEARCH`:
   - folder by folder with `openat`, `O_NOFOLLOW` and `O_NONBLOCK`;
   - each folder and the file must belong to the user;
   - the file must be a regular file of up to 4 MB;
@@ -927,7 +927,7 @@ connect to the IPs of `permitido.com` even if another one requested them.
     stay.
 
   It reads it when the session appears and on every `RELOAD`.
-- **From lord-netperm to lord-server:**
+- **From axia-netperm to axia-server:**
   - `STATUS`: `{bpf, devices, bluetooth, bytes, dns, error}` (`bytes`: the accounting programs are loaded);
   - `EVENT`: `{app, v, dir, proto, addr, port, by, rule, flag, record}`, a new connection;
   - `COUNTS`: `{app: [allowed, denied, rx, tx, rxRate, txRate, [[addr, rx, tx, rxRate, txRate], ...]]}`,
@@ -938,9 +938,9 @@ connect to the IPs of `permitido.com` even if another one requested them.
 
   If nobody reads, notices are dropped. Counters are sent again when they change.
 
-### `lord.fw` (lord-server, `js_fw.c`)
+### `lord.fw` (axia-server, `js_fw.c`)
 
-lord-server owns the user's rules: it loads them at startup, changes them and saves them with
+axia-server owns the user's rules: it loads them at startup, changes them and saves them with
 `fw_save`. Then it sends `RELOAD`. The socket never blocks. It is read in `lord.fw.poll()`, which
 the SDK calls once per second while the Monitor's Network tab is open.
 
@@ -994,9 +994,9 @@ NFQUEUE) is per-connection work outside the kernel. It will work as a "retry" pr
 
 1. An app's first connection to a destination with no rule is **denied right away** (EPERM). The
    `ask` verdict goes in `np_apps`, and the notice goes out through the ring with `record`.
-2. lord-netperm passes it to lord-server, and the SDK shows a system prompt (`PermissionPrompt`):
+2. axia-netperm passes it to axia-server, and the SDK shows a system prompt (`PermissionPrompt`):
    ""App" wants to connect to ejemplo.com:443 — Allow once / Always / Deny".
-3. The answer becomes a rule (once, until quit, or forever) and lord-netperm compiles it at once.
+3. The answer becomes a rule (once, until quit, or forever) and axia-netperm compiles it at once.
 4. The app retries: browsers and most clients do it on their own, and the prompt offers "Retry"
    for the rest. The second connection gets through.
 
@@ -1006,7 +1006,7 @@ the prompt: `np_seen` already groups them for 5 s.
 ### Tested on VM 122
 
 `tests/netperm_integration.sh` sets up an app scope like the launcher does and writes rules:
-**18 out of 18**, with `lord-netperm` as a hardened systemd service.
+**18 out of 18**, with `axia-netperm` as a hardened systemd service.
 
 | Case | Result |
 |---|---|
@@ -1039,7 +1039,7 @@ and `/dev/tcp`:
 | `systemd-run --user curl https://example.com` (transient service) | blocked — same, even though the user manager forks it |
 | `setsid curl https://example.com` | blocked — `setsid` does not change the cgroup, stays in the app scope |
 
-`lord-netperm` logs each `user@` denial as `uid 1000 user@: denied … (union of
+`axia-netperm` logs each `user@` denial as `uid 1000 user@: denied … (union of
 restricted apps no-internet)`. A normal process outside `user@`/`lordos.service` app scopes (e.g. an
 SSH session scope) still reaches the internet while the restricted app runs, so normal apps are
 unaffected. Cross-user: a restricted app for `bob` (uid 1001) blocks `bob`'s `systemd-run --user`
@@ -1055,7 +1055,7 @@ over TCP on 127.0.0.1.
 
 | | TCP connect (median) | UDP connect (median) | throughput |
 |---|---|---|---|
-| lord-netperm off | 13.9 / 13.7 / 16.7 µs | 2.1 / 2.0 / 2.5 µs | 842 MB/s |
+| axia-netperm off | 13.9 / 13.7 / 16.7 µs | 2.1 / 2.0 / 2.5 µs | 842 MB/s |
 | on, no rules (silent) | 13.7 / 17.4 / 17.4 µs | 2.4 / 2.5 / 3.0 µs | 818 MB/s |
 | on, 402 rules for the app | 13.7 / 13.8 / 17.7 µs | 3.1 / 2.6 / 2.5 µs | 829 MB/s |
 
@@ -1063,8 +1063,8 @@ over TCP on 127.0.0.1.
   **0.5 µs**. In TCP it stays within loopback noise.
 - **Throughput doesn't change:** the differences are within run-to-run noise. (These loopback
   numbers predate the accounting programs of 0.8.1, which return at once on loopback.)
-- **The compositor:** lord-server's main thread, with the Monitor open on Network (which calls
-  `lord.fw.poll` once per second), used 3.20 % of a core with lord-netperm on, 3.20 % off and
+- **The compositor:** axia-server's main thread, with the Monitor open on Network (which calls
+  `lord.fw.poll` once per second), used 3.20 % of a core with axia-netperm on, 3.20 % off and
   3.13 % on again. 30 s each. Nothing of the firewall runs in the frame: `poll` reads a socket that
   doesn't block. Per-frame times weren't measured separately.
 
@@ -1085,7 +1085,7 @@ Before, the same QUIC download showed "—" (0 B): UDP had no `tcp_info`.
 client inside an app scope; system CPU as % of one core over 15 s, two runs with the accounting
 programs:
 
-| | 0.8.0 `lord-netperm` | 0.8.1 (accounting) |
+| | 0.8.0 `axia-netperm` | 0.8.1 (accounting) |
 |---|---|---|
 | TCP, ~24 Gbit/s (GSO/GRO: few, large skbs) | 162.0 / 161.6 % | 164.5 / 163.1 %, 162.4 / 162.3 % |
 | UDP 1 Gbit/s, 1200 B datagrams (104,000 packets/s), sending | 91.5 % | 94.7 %, 100.2 % |
@@ -1095,31 +1095,31 @@ programs:
 - UDP at 104,000 packets per second: about 5 % of one core more, roughly 0.5 µs per packet (two
   map lookups, two atomic adds, one header read). A QUIC video at a few MB/s is a few thousand
   packets per second: well under 0.1 %.
-- `lord-netperm` itself: 0.00–0.01 s of CPU per 15 s run (one counter read per app per second,
+- `axia-netperm` itself: 0.00–0.01 s of CPU per 15 s run (one counter read per app per second,
   plus one batch read of `np_flows` only while bytes move).
 - Script: `bench-monred-118.sh` in the scratchpad (veth `npb0`/`npb1`, namespace `npb`, both
   removed afterwards); `iperf3` was installed on VM 118 for this (`VM-SETUP.md`).
 
 ### LordOS components in their own scopes (0.8.5)
 
-Built-in parts that use the network used to run inside lord-server, so their traffic was
+Built-in parts that use the network used to run inside axia-server, so their traffic was
 "LordOS" and a rule could only take all of them at once. Since 0.8.5 each one has its own process in
-its own scope, `lordos-net-<name>.scope`, which lord-netperm reads as the firewall app
+its own scope, `lordos-net-<name>.scope`, which axia-netperm reads as the firewall app
 `lordos:<name>` (`fw_component_scope`, a fixed list: `mail`, `store`, `print`, `terminal`,
 `lists`). The kernel attributes a socket to the cgroup of the process that *created* it, so:
 
-- **Connectors** (`server/src/sec/netconn.c`): for Mail (lord-maild's servers: Mail, Calendar,
+- **Connectors** (`server/src/sec/netconn.c`): for Mail (axia-maild's servers: Mail, Calendar,
   Contacts, Reminders), printers and scanners (IPP and eSCL over TCP, the mDNS socket) and the
-  blocklist downloads, lord-server starts `lord-server --net-connector <name>`: the **same binary**
+  blocklist downloads, axia-server starts `axia-server --net-connector <name>`: the **same binary**
   re-executed (like the terminal holders), fixed argv, `LANG` and `LORDOS_SESSIOND` only, the channel
   on fd 3 and every other descriptor closed. It asks lord-sessiond to place it in its scope, waits a
-  quarter of a second so lord-netperm sees the new scope, and then only answers fixed-size requests:
+  quarter of a second so axia-netperm sees the new scope, and then only answers fixed-size requests:
   family (IPv4/IPv6), type (stream/datagram), and an address and port to `connect()` to
-  (non-blocking; lord-server waits for the result). It returns the socket over SCM_RIGHTS and
-  lord-server checks it is the kind it asked for. It takes no names or paths, runs nothing, has
-  `no_new_privs`, is not dumpable and has 64 file descriptors; it only does what lord-server could
+  (non-blocking; axia-server waits for the result). It returns the socket over SCM_RIGHTS and
+  axia-server checks it is the kind it asked for. It takes no names or paths, runs nothing, has
+  `no_new_privs`, is not dumpable and has 64 file descriptors; it only does what axia-server could
   do itself, as the same user. **Fail closed:** in a LordOS session a connector that can't enter its
-  scope exits and the request fails (the traffic would otherwise be lord-server's and decided by
+  scope exits and the request fails (the traffic would otherwise be axia-server's and decided by
   its rules). Outside a session (development, the tests) the socket is made in place, as before.
 - **Store and updates:** the package engine's download child (the root admin helper's fork that
   drops to `nobody`) moves itself into `lordos-net-store.scope` before dropping root
@@ -1149,11 +1149,11 @@ neither).
 Files → Network (`FILES.md`, "Network") uses the network for one thing: one bounded pass over the LAN while its page
 is open. By the rule above its sockets come from a connector of its own, approved by the maintainer on 2026-10-31.
 Borrowing `print` was rejected: file-share probes would show as "Printers and scanners" in the Monitor and follow that
-row's rules. Making the sockets in lord-server was rejected too: the traffic would be LordOS's own.
+row's rules. Making the sockets in axia-server was rejected too: the traffic would be LordOS's own.
 
 **What was added:** a component `lan` (firewall app `lordos:lan`, scope `lordos-net-lan.scope`): the same connector,
 same fixed-size requests, no new request type, used by `lan.c` only for one unconnected UDP socket per link
-(`sendto` 224.0.0.251:5353, kept by lord-server) and TCP to ports 445, 2049, 111, 22 and mountd's on addresses
+(`sendto` 224.0.0.251:5353, kept by axia-server) and TCP to ports 445, 2049, 111, 22 and mountd's on addresses
 `on_link` accepts. Connectors can't tell ports apart; `lan.c` is what bounds them. The change is `NC_LAN`, the name in
 `NAMES`, `FW_COMPONENTS` and `netconn_test`, a row in `sdk/netmodel.js` with its text in three languages, and
 `lan_socket` calling `netconn_socket`.
@@ -1172,7 +1172,7 @@ raw socket for discovery, which the cgroup programs don't see: only its unicast 
 ### Measurements, 0.8.5 (VM 118)
 
 `iperf3` through a veth pair into a private namespace (eth0 untouched), the client in an app scope,
-system CPU in % of one core over 15 s, 0.8.3's lord-netperm and this one interleaved twice:
+system CPU in % of one core over 15 s, 0.8.3's axia-netperm and this one interleaved twice:
 
 | | 0.8.3 | 0.8.5 |
 |---|---|---|
@@ -1211,7 +1211,7 @@ gave the same numbers as this one, so the difference is not the port parsing its
 - **Cutting under `user@`:** the packet filter is attached only to `lordos.service`, so a process
   that escaped to `user@<uid>.service` keeps the connections it already had when a restriction is
   added; its new ones are refused by the union as before.
-- **Cuts after a restart of `lord-netperm`:** the ports an app bound before the restart come back
+- **Cuts after a restart of `axia-netperm`:** the ports an app bound before the restart come back
   from the listening TCP sockets only; a UDP server bound before it is decided as outgoing until it
   binds again.
 - **Per-port rules with direction `in`** are applied at `bind`, with an unknown address.
@@ -1241,14 +1241,14 @@ gave the same numbers as this one, so the difference is not the port parsing its
 A curated catalog of public lists by topic (advertising, trackers, malware and attacks), domain-
 and address-based, that the owner turns on in Settings → Privacy → Blocklists, plus custom lists by
 https address. Lists are downloaded daily over HTTPS by an unprivileged, sandboxed helper, parsed
-strictly, checked again by lord-server, compiled into one file and enforced by lord-netperm in the
+strictly, checked again by axia-server, compiled into one file and enforced by axia-netperm in the
 existing per-app maps. They never override a rule the owner wrote for a destination.
 
 ```
 assets/fw/blocklists.json        the catalog: id, topic, url, format, licence, source, date checked
 server/src/fw/fwlists.{c,h}      raw parsers, the set (hashes), the compiled file's reader
-server/src/fw/fwsub.{c,h}        lord-server: subscriptions, the download job, compiling
-server/src/fetch/fetch.c         lord-fetch, the downloader (OpenSSL), fetchproto.h its protocol
+server/src/fw/fwsub.{c,h}        axia-server: subscriptions, the download job, compiling
+server/src/fetch/fetch.c         axia-dl, the downloader (OpenSSL), fetchproto.h its protocol
 server/src/ui/js_fw.c            lord.fw.lists / setList / addList / removeList / updateLists / listMatch
 apps/monitor/Blocklists.jsx      Settings → Privacy → Blocklists
 tests/fwlists_test.c, fwsub_test.c
@@ -1272,20 +1272,20 @@ Left out: a malware URL feed whose terms are fair use without a stated licence; 
 address list (CC0) that was empty when checked; The Block List Project's malware list (2.6 million
 entries, over the size limit); lists under non-commercial licences.
 
-### Downloading: lord-fetch
+### Downloading: axia-dl
 
-- **Who connects:** lord-server resolves the list's host and connects through the blocklists'
+- **Who connects:** axia-server resolves the list's host and connects through the blocklists'
   connector, so the socket is `lordos:lists`'s (its own row and rules). Only `https://` addresses
   (`fws_split_url`: a host name with a dot, an optional port, a printable path; no user info, no
   addresses in brackets).
-- **lord-fetch** (`server/src/fetch/fetch.c`): posix_spawned by the job thread from lord-server's
+- **axia-dl** (`server/src/fetch/fetch.c`): posix_spawned by the job thread from axia-server's
   folder (root's or the user's, not writable by others), no arguments, `LANG` only, the channel
-  (lord-doc's framing) on fd 3. It loads the CA bundle and then calls `sandbox_apply_helper` (scope
-  `lordos-fetch.scope`, 256 MB; no socket, connect, bind or exec; no files). For each list it gets the
+  (axia-doc's framing) on fd 3. It loads the CA bundle and then calls `sandbox_apply_helper` (scope
+  `axia-fetch.scope`, 256 MB; no socket, connect, bind or exec; no files). For each list it gets the
   connected socket and `{host, path, format, sub}`; it speaks TLS 1.2 or later with the certificate
   checked against the system CA store and the host name (mail/net.c, never relaxed), sends one
   HTTP/1.1 GET with `Accept-Encoding: identity`, and reads at most 16 MB with deadlines
-  (mail/http.c). A redirect comes back to lord-server, which follows at most three, https only.
+  (mail/http.c). A redirect comes back to axia-server, which follows at most three, https only.
 - **Strict parsing, in the helper** (`fwl_parse_raw`): a NUL byte, a line over 1024 bytes or a body
   over 16 MB reject the list; comments (`#`, `!`, `;`, `//`, inline ` #`) are dropped; a hosts file
   only maps names to `0.0.0.0`, `127.0.0.1`, `::` or `::1`; a domain list has one name per line
@@ -1295,22 +1295,22 @@ entries, over the size limit); lists under non-commercial licences.
   and networks broader than /8 or /16. More than 10 % unparsable lines (over 20) reject the list as
   the wrong format. At most 300,000 names or 100,000 networks per list (the rest is cut and said).
   What comes back is normalized lines (`d name`, `s name`, `n cidr`), each once, in a sealed memfd.
-- **lord-server checks it again** (every line with the same validator) before keeping a copy in
-  `~/.cache/lordos/fwlists/<id>.txt` with its state (`<id>.json`: when, how many, the last error).
-- **Daily:** `sdk/netstatus.jsx` asks once an hour (`lord.fw.updateLists`); lord-server downloads
+- **axia-server checks it again** (every line with the same validator) before keeping a copy in
+  `~/.cache/axia/fwlists/<id>.txt` with its state (`<id>.json`: when, how many, the last error).
+- **Daily:** `sdk/netstatus.jsx` asks once an hour (`lord.fw.updateLists`); axia-server downloads
   only the enabled lists whose copy is more than 20 hours old, and a list that failed is tried again
   after an hour. Turning a list on downloads it at once if there's no copy.
 
 ### Compiling and enforcing
 
-- **One file:** the job thread writes every enabled list's lines into `~/.config/lordos/fwlists.txt`
+- **One file:** the job thread writes every enabled list's lines into `~/.config/axia/fwlists.txt`
   (header `lordos-fwlists 1`, at most 32 MB) and keeps a set of hashes for the Monitor's "on the list
-  …" (`lord.fw.listMatch`); when the job ends lord-server sends the usual RELOAD. The three files
+  …" (`lord.fw.listMatch`); when the job ends axia-server sends the usual RELOAD. The three files
   are on `lord.fs`'s deny list.
-- **lord-netperm** reads `fwlists.txt` with the same fixed-path, no-links, user-owned, size-limited
+- **axia-netperm** reads `fwlists.txt` with the same fixed-path, no-links, user-owned, size-limited
   reader as `firewall.json`, and any invalid line keeps the previous set. Names are kept as 64-bit
   hashes (keyed per process) in sorted arrays, about 10 bytes a name: 380,000 names and 19,000
-  networks take 13.8 MB of lord-netperm's memory.
+  networks take 13.8 MB of axia-netperm's memory.
 - **In the kernel:** each user with lists gets a set in `np_blk4`/`np_blk6` (LPM tries keyed by
   set and address), and each of their apps carries it (`NpApp.blk`). The set holds the lists'
   networks and, from the system resolver's answers, the addresses of listed names; an address is
@@ -1329,7 +1329,7 @@ own encrypted DNS is only checked by address.
 **Tested:** `fwlists-test` (hosts, domains and address formats, every rejection rule, the set and its
 lookups, CNAME-style shared addresses, the file reader, 20,000 mutated lists; also under ASan and
 UBSan) and `fwsub-test` (URL parsing, the catalog and config, compiling seeded copies, custom lists,
-and lord-fetch refusing bad requests and a peer without TLS, without network). On VM 118: two lists
+and axia-dl refusing bad requests and a peer without TLS, without network). On VM 118: two lists
 downloaded over HTTPS (8,527 names and 19,405 networks), then all four; `curl` from the Terminal to
 a listed domain and to a listed address failed with `denied out tcp … (list)`; switching that
 domain's row on in the Monitor wrote `{"app":"lordos:terminal","dst":"nationalityship.com","action":"allow"}`
@@ -1378,18 +1378,18 @@ rules in exactly that order (`sortByPrecedence` in `sdk/fwrule.js`, a copy of `c
   user can replace with a domain.
 
 Short connections (a `curl`) close before the next sample, so besides the open sockets each app
-lists the destinations `lord-netperm` reported recently ("recent connection" / "recently denied").
+lists the destinations `axia-netperm` reported recently ("recent connection" / "recently denied").
 Since 0.8.2 each destination in an app's open row also has its own allow/block switch: it shows what
 the app's rules decide for that name or address (the same order as `fw_decide`, mirrored in
 `sdk/fwrule.js` `decide()` and checked against it with `server/tests/fw_domain_cases.txt`) and a
 click writes, flips or removes the exact-name rule (`MONITOR.md`, "Per-destination switches").
 The detail pane also links to "Rules for this app" (Settings → Privacy, with that app open).
 
-**Last match.** `lord-netperm`'s `EVENT` notices carry the rule that decided (`"by":"rule"`,
-`"rule": N`). lord-server keeps, per rule, the time it last saw one (memory only, like the counters;
+**Last match.** `axia-netperm`'s `EVENT` notices carry the rule that decided (`"by":"rule"`,
+`"rule": N`). axia-server keeps, per rule, the time it last saw one (memory only, like the counters;
 `lastMatch` in `rules()`), and Settings reads it every 5 s while shown. Two details:
 
-- `lord-netperm` numbers rules on its own: on every reload it reads `firewall.json` into a new
+- `axia-netperm` numbers rules on its own: on every reload it reads `firewall.json` into a new
   store, so its ids are 1, 2, 3… in file order. After every save `js_fw.c` reads the saved text the
   same way and maps those ids to its own rules by app, direction, destination, ports and protocol.
 - Notices are deduplicated per destination for 5 s, and only those this session received count:
@@ -1423,7 +1423,7 @@ Settings says this in a footer under the rules, in the user's language.
 - `server/tests/fwrule_input_test.mjs` (run by `run_suites.sh` when `node` is installed, otherwise
   "skipped: needs node") runs the same file through the sheet's parser, plus ports, protocols, the
   default rule and the precedence order: 99 checks. Both parsers read one file, so they can't drift.
-- End to end on VM 122 (`lord-netperm` from the package, the new `lord-server` and bundle): a
+- End to end on VM 122 (`axia-netperm` from the package, the new `axia-server` and bundle): a
   `.desktop` "Curl test" (`foot -e` a loop of `curl https://example.com` and
   `https://www.debian.org`, every 4 s) started from the launcher runs in
   `app-lordos-curltest.scope`. From the Monitor, "Block this address" → typed `*.example.com` →
@@ -1435,7 +1435,7 @@ Settings says this in a footer under the rules, in the user's language.
   | rule added (14:55:02) | `curl: (7) Failed to connect … Could not connect to server` from 14:55:07 | 200 |
   | rule deleted in Settings (14:58:18) | 200 at 14:58:18 | 200 |
 
-  `lord-netperm` logged each denial for `desktop:curltest` (`tcp 172.66.147.243:443 (rule)`, the
+  `axia-netperm` logged each denial for `desktop:curltest` (`tcp 172.66.147.243:443 (rule)`, the
   other address, and UDP 443 for HTTP/3). Edit (`10.0.0.0/8` → `10.1.0.0/16`) replaced the rule in
   `firewall.json` in place.
 

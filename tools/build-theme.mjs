@@ -1,5 +1,5 @@
 // Bundles a React theme (with the SDK and every app in apps/) into a single .js that
-// lord-server loads with QuickJS.
+// axia-server loads with QuickJS.
 // Usage: node tools/build-theme.mjs [theme ...]   (no arguments: every theme)
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import path from 'node:path';
 import { writeManifest } from './code-manifest.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const defines = { 'process.env.NODE_ENV': '"production"', __LORD_STANDALONE__: 'true' };
 
 // Virtual module '@lordos/apps': one entry per apps/<id>/manifest.json.
 const appsPlugin = {
@@ -58,7 +59,7 @@ async function buildTheme(name) {
       '@lordos/sdk': path.join(root, 'sdk', 'index.js'),
     },
     plugins: [appsPlugin],
-    define: { 'process.env.NODE_ENV': '"production"' },
+    define: defines,
     metafile: true,
     logLevel: 'warning',
   });
@@ -67,7 +68,7 @@ async function buildTheme(name) {
 }
 
 const names = process.argv.slice(2);
-// The «app host»: React + runtime + SDK (broker) + the app loader, for lord-server --app
+// The «app host»: React + runtime + SDK (broker) + the app loader, for axia-server --app
 // (see server/src/app/appclient.c). A single bundle in assets/app-host.bundle.js.
 async function buildAppHost() {
   const t0 = Date.now();
@@ -76,15 +77,15 @@ async function buildAppHost() {
     outfile: path.join(root, 'assets', 'app-host.bundle.js'),
     bundle: true, format: 'iife', target: 'es2020', minify: true, jsx: 'automatic',
     alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
-    define: { 'process.env.NODE_ENV': '"production"' }, metafile: true, logLevel: 'warning',
+    define: defines, metafile: true, logLevel: 'warning',
   });
   const bytes = Object.values(result.metafile.outputs)[0].bytes;
   console.log(`app-host: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
 }
 
-// Built-in apps with "process": "isolated" (Passwords): their app.js for `lord-server --app <id>`,
+// Built-in apps with "process": "isolated" (Passwords): their app.js for `axia-server --app <id>`,
 // built like an .lpk (React and the SDK come from the app host), into assets/sysapps/<id>/.
-// lord-server prefers this read-only system package over any user package with the same id.
+// axia-server prefers this read-only system package over any user package with the same id.
 async function buildSysApps() {
   const dir = path.join(root, 'apps');
   const sharedPlugin = {
@@ -107,7 +108,7 @@ async function buildSysApps() {
     const result = await build({
       entryPoints: [path.join(dir, id, 'index.jsx')],
       bundle: true, write: false, format: 'iife', globalName: '__lordosApp', target: 'es2020', minify: true,
-      jsx: 'automatic', plugins: [sharedPlugin], define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'warning',
+      jsx: 'automatic', plugins: [sharedPlugin], define: defines, logLevel: 'warning',
     });
     fs.writeFileSync(path.join(out, 'app.js'), result.outputFiles[0].contents);
     fs.writeFileSync(path.join(out, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

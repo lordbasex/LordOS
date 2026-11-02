@@ -280,7 +280,7 @@ int cups_submit(const char *printer, int docfd, size_t len, const JVal *o, JBuf 
     ipp_init(&q, IPP_OP_PRINT_JOB, reqid++);
     ipp_std(&q, uri, user());
     const char *name = json_str(o, "name");
-    ipp_add_str(&q, IPP_T_NAME, "job-name", name && cups_valid_text(name, 200) && name[0] ? name : "LordOS");
+    ipp_add_str(&q, IPP_T_NAME, "job-name", name && cups_valid_text(name, 200) && name[0] ? name : "Axia DE");
     ipp_add_str(&q, IPP_T_MIMETYPE, "document-format", "application/pdf");
     ipp_group(&q, IPP_G_JOB);
     int copies = (int)json_num(o, "copies", 1);

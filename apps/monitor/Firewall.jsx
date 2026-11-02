@@ -1,6 +1,6 @@
 // Firewall.jsx — Settings → Privacy → "Apps' network" (registered with registerPrivacySection,
 // like the Monitor item). See docs/FIREWALL.md, step 4.
-//   - status of lord-netperm (the service that applies the rules in the kernel) and the mode;
+//   - status of axia-netperm (the service that applies the rules in the kernel) and the mode;
 //   - Trusted apps: allowed without logging (explicit denials still apply);
 //   - Restricted apps: one checkbox per restriction (no internet = "LAN only", no LAN, no network,
 //     no incoming connections, and the non-network ones: camera, microphone…). Every one is
@@ -8,7 +8,7 @@
 //     itself: it does not offer files, USB, clipboard or Bluetooth, which the shell always uses.
 //     For Linux apps each checkbox says when it applies (all at once, files at the next launch)
 //     and the clipboard isn't offered yet; a help line per restriction says what it covers.
-// The rules are saved by lord-server (lord.fw); this screen writes no files. Drawn like the
+// The rules are saved by axia-server (lord.fw); this screen writes no files. Drawn like the
 // Settings sections: 13/600 headers, inset GroupBoxes with hairlines, footers.
 import { View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, spacing, typeScale, errorText, netModel } from '@lordos/sdk';
 import { useState } from 'react';

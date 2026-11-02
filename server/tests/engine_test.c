@@ -825,8 +825,8 @@ static void test_hidden_blur_damage(void) {
     paint_multi_damage = 0;
 }
 
-/* ---- lord-server's whole CPU damage pipeline (main.c), modelled ----
- * The tests above paint each frame's rectangles straight into one canvas. lord-server does more:
+/* ---- axia-server's whole CPU damage pipeline (main.c), modelled ----
+ * The tests above paint each frame's rectangles straight into one canvas. axia-server does more:
  * paint_ui adds each frame's rectangles to the display's pending list (o->pl, o->pend) and a display
  * whose page flip is still pending keeps gathering them; paint_out paints the gathered list into
  * the scene; present_cpu copies into the KMS back buffer what that buffer is missing (what the

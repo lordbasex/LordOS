@@ -50,7 +50,7 @@ would pass as a rule's root counts; anything else, or no such file, means `~/Dow
 
 ## Code projects
 
-A folder's name proves nothing, so a rules scan walks the home folder, in the sandboxed `lord-clean`, for build outputs that prove themselves by what is next to them or inside them.
+A folder's name proves nothing, so a rules scan walks the home folder, in the sandboxed `axia-clean`, for build outputs that prove themselves by what is next to them or inside them.
 
 | Kind | Folders | Evidence |
 |---|---|---|
@@ -65,13 +65,13 @@ A folder's name proves nothing, so a rules scan walks the home folder, in the sa
 
 Node's 60 days are judged over the whole project: the newest change in any file or folder of it, leaving build outputs, `.git`, `dist`, `coverage` and `__pycache__` out. A project with nothing else in it proves nothing and is not offered.
 
-Each folder is one candidate, moved whole. They are chosen one by one, never by category, and go to the Trash and not to the real delete, because that approval covers fixed roots only. The confirmation names them and says the project needs its install or build step again. `lord-server` checks the evidence again at the plan and right before acting.
+Each folder is one candidate, moved whole. They are chosen one by one, never by category, and go to the Trash and not to the real delete, because that approval covers fixed roots only. The confirmation names them and says the project needs its install or build step again. `axia-server` checks the evidence again at the plan and right before acting.
 
 The walk doesn't enter folders starting with a dot, an unproved `node_modules`, or `go`, `snap`, `Android` and `flutter` directly in the home folder, where tools unpack other people's sources. It stops at a proved output and at 5,000,000 entries, then marks the scan incomplete.
 
 ## Similar images
 
-Found by a separate scan of the folders the user chose, from the Duplicates section. `lord-clean` decodes JPEG, PNG, GIF (first
+Found by a separate scan of the folders the user chose, from the Duplicates section. `axia-clean` decodes JPEG, PNG, GIF (first
 frame) and BMP, reduces each picture to 9 × 8 grey cells and keeps one bit per neighbouring pair: a 64-bit difference hash.
 Two images are similar within 6 of those bits and 2 % in proportions, and each image joins the largest one it resembles, so a
 chain of slight changes doesn't become one group. Files under 8 KiB, pictures under 32 pixels a side, files over 64 MiB and
@@ -87,7 +87,7 @@ The map view colours a band rising from the bottom of each tile: what rebuilds b
 
 The line above the views gives the free space, both amounts, and what wasn't scanned: the disk's used space minus what this scan walked, so other folders, other users' files and what the system reserves. Space that goes to the Trash isn't free until the Trash is emptied, so it is never added to the free space.
 
-**Kept between sessions.** A tree scan of the home folder or `/` writes `~/.cache/lordos/cleaner-map.txt`, mode 0600: folder names and sizes, for the session user. It is on by default. Turning off the switch in Settings removes the file, and Clear in Activity removes it with the history. Opening Storage with no scan yet shows it with its date. It holds no candidates, so nothing can be acted on from it: Large files, the summary by type, the bands, the line above the views (its date takes that place) and Review are not there until a new scan. Files in Show still opens the folder.
+**Kept between sessions.** A tree scan of the home folder or `/` writes `~/.cache/axia/cleaner-map.txt`, mode 0600: folder names and sizes, for the session user. It is on by default. Turning off the switch in Settings removes the file, and Clear in Activity removes it with the history. Opening Storage with no scan yet shows it with its date. It holds no candidates, so nothing can be acted on from it: Large files, the summary by type, the bands, the line above the views (its date takes that place) and Review are not there until a new scan. Files in Show still opens the folder.
 
 The file is replaced at each scan. A scan of another disk doesn't save a map, and removes the one there was.
 
@@ -97,7 +97,7 @@ Only apps the package index knows as desktop applications appear, plus LordOS `.
 itself are left out, and a plan that would take `lordos` is refused. So is a removal the engine won't do alone because other packages need that app: Cleaner shows a message and doesn't offer to take them too. Without administrator rights, Linux apps are listed with no
 Remove button.
 
-A removed `.lpk` app keeps its data folder (`~/.local/share/lordos/appdata/<id>`). That folder is a leftover only while no installed
+A removed `.lpk` app keeps its data folder (`~/.local/share/axia/appdata/<id>`). That folder is a leftover only while no installed
 app and no system app has that id, checked at the scan and again right before acting. Removing it is a choice by name, to the
 Trash, since it may hold what the user made there.
 
@@ -114,7 +114,7 @@ shown only if it stays within kernel packages and leaves the running one alone, 
 ## The item by the clock
 
 On by default, because it costs nothing when idle: a still image with no timer. Everything in its panel is read only while the
-panel is open, every two seconds: disk, memory, processor load, temperature if `lord-fand` reports it, network rates and
+panel is open, every two seconds: disk, memory, processor load, temperature if `axia-fand` reports it, network rates and
 connected disks. It makes no monitoring claim, has no memory "free up" and no speed test. Its one recommendation is the last
 scan's real size. Turn it off in Cleaner → Settings.
 

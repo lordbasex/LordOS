@@ -1,4 +1,4 @@
-/* mime.h — mail messages (RFC 5322, MIME 2045-2049, 2047, 2231) for lord-maild.
+/* mime.h — mail messages (RFC 5322, MIME 2045-2049, 2047, 2231) for axia-maild.
  *
  * Everything works on the raw in-memory message and checks every index against the length:
  * a broken or malicious message yields empty parts, never a read outside the buffer. What is

@@ -49,7 +49,7 @@ volta ao app anterior.
 Em um app Linux, ❖C, V, X, A, Z, F, T, W, N, L, R, P e S chegam como Ctrl (como Ctrl+Shift em um
 emulador de terminal, onde Ctrl+C é a interrupção), só para esse app. Por isso ❖V cola e ❖L é o Ctrl+L
 dele: com um app Linux à frente a tela bloqueia com ❖⌃Q e a área de transferência abre com ❖⇧V. Em um
-app do LordOS dentro da sessão ❖V também cola; ❖⇧V é a área de transferência.
+app do Axia DE dentro da sessão ❖V também cola; ❖⇧V é a área de transferência.
 
 ## Lord Classic
 

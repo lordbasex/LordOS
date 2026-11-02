@@ -4,7 +4,7 @@
 
 #include <stddef.h>
 
-/* JSON with the answer, or NULL while lord-media is still probing (the first call starts it):
+/* JSON with the answer, or NULL while axia-media is still probing (the first call starts it):
  * {"boot","vm","gpu","virtualGpu","vaapi","vendor","v4l2","vp9","av1","h264","hevc","reason"} */
 const char *hwdec_result(void);
 int  hwdec_pollfd(void);                /* -1 when nothing is pending (main loop, via media_pollfds) */

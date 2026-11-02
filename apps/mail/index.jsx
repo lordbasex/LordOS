@@ -1,6 +1,6 @@
 // Mail — a native mail app in the spirit of a classic three-pane client: accounts and folders,
 // the message list with previews (conversations grouped), and the reading pane. Everything comes
-// from the sandboxed helper lord-maild (docs/MAIL.md): IMAP with IDLE, SMTP, a local cache with
+// from the sandboxed helper axia-maild (docs/MAIL.md): IMAP with IDLE, SMTP, a local cache with
 // an offline search index, and HTML turned into our own views without running anything.
 import {
   View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, TextInput, ScrollView, t, wm, fs, monthName, formatDate, formatTime,
@@ -153,7 +153,7 @@ function Row({ it, selected, onClick, onRightClick, cfg }) {
   );
 }
 
-// A virtual list: only the visible rows exist; rows load in windows from lord-maild as you scroll.
+// A virtual list: only the visible rows exist; rows load in windows from axia-maild as you scroll.
 function MessageList({ src, rev, selected, onSelect, onMenu, cfg }) {
   const th = useTheme();
   const box = useRef(null);
@@ -302,7 +302,7 @@ function Attachments({ msg }) {
   const fetch = async (a) => `${lord.mail.cacheDir()}/${await rel(a)}`;
   const open = async (a) => {
     setBusy(a.idx);
-    // in its own process Mail cannot open files: lord-server checks the cached attachment and the
+    // in its own process Mail cannot open files: axia-server checks the cached attachment and the
     // session opens it with the user's apps
     try { if (isolatedPim()) lord.mail.openAttachment(await rel(a), a.name); else openPath(await fetch(a), a.name); } catch (e) { /* shown in the row */ }
     setBusy(null);

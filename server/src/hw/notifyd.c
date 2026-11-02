@@ -69,8 +69,8 @@ static void reply_caps(const DMsg *m) {
 static void reply_info(const DMsg *m) {
     DBuf b;
     dw_init(&b);
-    dw_str(&b, "LordOS");
-    dw_str(&b, "LordOS");
+    dw_str(&b, "Axia DE");
+    dw_str(&b, "Axia DE");
     dw_str(&b, "0.7");
     dw_str(&b, "1.2");
     dbus_reply(&conn, m, "ssss", &b);

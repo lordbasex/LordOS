@@ -1,13 +1,13 @@
 /* mstream.c — the remote desktop's video on the session side (docs/REMOTE.md, "Video (WebRTC)").
  *
  * The session renders once; the frame the remote desktop sees (protected windows in black, from
- * media_composed or the GPU's read-back) feeds one live encoder per codec in use: lord-media in
+ * media_composed or the GPU's read-back) feeds one live encoder per codec in use: axia-media in
  * MK_STREAM mode, through a sealed memfd of 3 slots, as for the screen recording. Every viewer of this
  * session gets the same encoded frames (remote/mirror.c sends them to each bridge); only the
  * encryption is per connection. Two users means two sessions, two lord-servers and two encoders.
  * If the encoder is behind (no free slot) the frame waits: the newest one goes when a slot frees up,
  * so a slow machine sends fewer frames, never old ones. Sound: the session's default output,
- * recorded by lord-server itself (maudio.c, PipeWire) into a ring the encoder reads. */
+ * recorded by axia-server itself (maudio.c, PipeWire) into a ring the encoder reads. */
 #include "../par.h"
 #include "../canvas.h"
 #include "mstream.h"
@@ -111,7 +111,7 @@ static int start(Enc *e, int codec) {
     MediaSrc *s = media_src_new(SK_STREAM, "remote");
     if (!s) return -1;
     int ring = -1, render = codec == 1 ? media_render_fd() : -1;
-    if (e->audio) s->mic = maudio_open(1, "LordOS", "Remote desktop", "@DEFAULT_MONITOR@", &ring);
+    if (e->audio) s->mic = maudio_open(1, "Axia DE", "Remote desktop", "@DEFAULT_MONITOR@", &ring);
     char params[200];
     snprintf(params, sizeof params, "codec=%s\nwidth=%d\nheight=%d\nfps=%d\nkbps=%u\nhw=%d\nhwaccel=%s\naudio=%d\nrender=%d\n",
              codec == 1 ? "h264" : "vp8", fw, fh, e->fps, e->kbps, render >= 0, media_hwaccel(), ring >= 0, render >= 0);
@@ -120,7 +120,7 @@ static int start(Enc *e, int codec) {
     if (render >= 0) close(render);
     if (s->sock < 0) { media_src_close(s); e->retry_at = now_ms() + 10000; return -1; }
     s->bk_msg = on_msg;
-    /* input slots: lord-server writes, lord-media only reads */
+    /* input slots: axia-server writes, axia-media only reads */
     int slots = 3;
     size_t n = (size_t)fw * fh * 4 * slots;
     int fd = memfd_create("lordos-remote", MFD_CLOEXEC | MFD_ALLOW_SEALING);

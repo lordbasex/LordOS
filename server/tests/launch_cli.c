@@ -3,9 +3,9 @@
  *
  *   build/launch-cli <desktop id> [file]
  *
- * Reads ~/.config/lordos/firewall.json into the same store lord.fw uses (sec/restrict.h) and
+ * Reads ~/.config/axia/firewall.json into the same store lord.fw uses (sec/restrict.h) and
  * calls apps_launch / apps_launch_with: the real launcher code, Landlock plan included. Outside
- * a session the app stays in the caller's cgroup (the cgroup service only places lord-server's
+ * a session the app stays in the caller's cgroup (the cgroup service only places axia-server's
  * own binaries). A test tool: never installed. */
 #include "apps.h"
 #include "fsops.h"
@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     if (argc < 2 || argc > 3) { fprintf(stderr, "usage: launch-cli <desktop id> [file]\n"); return 2; }
     const char *home = getenv("HOME");
     char path[4096], err[200] = "";
-    snprintf(path, sizeof path, "%s/.config/lordos/firewall.json", home ? home : "/nonexistent");
+    snprintf(path, sizeof path, "%s/.config/axia/firewall.json", home ? home : "/nonexistent");
     FwStore *s = fw_store_new();
     if (!s || fw_load(s, path, err, sizeof err) < 0) fprintf(stderr, "launch-cli: %s: %s (no restrictions)\n", path, err);
     restrict_set_store(s);

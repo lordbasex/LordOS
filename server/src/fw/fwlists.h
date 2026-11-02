@@ -3,7 +3,7 @@
  * Three pieces, all pure C with no network and no files of their own:
  *
  *   1. The raw parsers (fwl_parse_raw): what a list's server sent (a hosts file, one domain per
- *      line, or one address / network per line) → normalized lines. They run in lord-fetch, the
+ *      line, or one address / network per line) → normalized lines. They run in axia-dl, the
  *      sandboxed helper, on untrusted bytes. Strict: a NUL byte, a line longer than FWL_LINE_MAX,
  *      or too many lines that don't parse reject the whole list; LAN networks, networks broader
  *      than /8 (IPv4) or /16 (IPv6), names without a dot and the usual hosts-file names
@@ -14,8 +14,8 @@
  *      64-bit hashes (seeded per process) in sorted arrays: about 10 bytes a name. Name lookups walk
  *      the labels right to left; address lookups try each prefix length present (binary search).
  *
- *   3. The compiled file, ~/.config/lordos/fwlists.txt: written by lord-server (js_fw.c, after
- *      validating every line again) and read by lord-netperm (root) through the same fixed-path,
+ *   3. The compiled file, ~/.config/axia/fwlists.txt: written by axia-server (js_fw.c, after
+ *      validating every line again) and read by axia-netperm (root) through the same fixed-path,
  *      no-links reader as firewall.json, with fwl_load_text:
  *
  *        lordos-fwlists 1
@@ -67,7 +67,7 @@ void     fwl_free(FwLists *l);
  * repeated entry goes at the next lookup or fwl_finish, the first tag stays), -1 invalid line,
  * -2 the set is full. */
 int      fwl_add_line(FwLists *l, const char *line, size_t len, uint16_t tag);
-/* Only checks a line, as fwl_add_line would (lord-server compiles the file without keeping it). */
+/* Only checks a line, as fwl_add_line would (axia-server compiles the file without keeping it). */
 int      fwl_check_line(const char *line, size_t len);
 /* Sorts and drops repeated entries; returns how many went. Lookups and counts do it on their own. */
 size_t   fwl_finish(FwLists *l);

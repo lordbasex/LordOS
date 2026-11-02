@@ -1,10 +1,10 @@
 // Packages and signs LordOS apps (.lpk = tar.gz; see docs/NATIVE-APPS.md and docs/SIGNING.md).
 //
 //   node tools/lpk.mjs <folder> [output.lpk] [--key key.json | --unsigned]
-//       packages the app; signs it with --key, with $LPK_KEY or with ~/.config/lordos/lpk-key.json
+//       packages the app; signs it with --key, with $LPK_KEY or with ~/.config/axia/lpk-key.json
 //       (if it exists). Without a key the result is «Unsigned» (still with contenido.json, to detect damage).
 //   node tools/lpk.mjs keygen [--name "Name"] [--out file]
-//       creates an Ed25519 key pair (default ~/.config/lordos/lpk-key.json, mode 600).
+//       creates an Ed25519 key pair (default ~/.config/axia/lpk-key.json, mode 600).
 //   node tools/lpk.mjs sign <package.lpk> --key key.json [output.lpk]
 //       re-signs a package (with a new contenido.json).
 //   node tools/lpk.mjs verify <package.lpk>
@@ -24,7 +24,7 @@ const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf(name); if (i < 0) return undefined; const v = argv[i + 1]; argv.splice(i, 2); return v; };
 const bool = (name) => { const i = argv.indexOf(name); if (i < 0) return false; argv.splice(i, 1); return true; };
 const die = (msg) => { console.error(`lpk: ${msg}`); process.exit(1); };
-const DEFAULT_KEY = path.join(os.homedir(), '.config', 'lordos', 'lpk-key.json');
+const DEFAULT_KEY = path.join(os.homedir(), '.config', 'axia', 'lpk-key.json');
 
 // ---- Ed25519 keys (32-byte seed in hex, like pkgstate.c) ----
 const PKCS8 = Buffer.from('302e020100300506032b657004220420', 'hex');

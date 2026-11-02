@@ -1,8 +1,8 @@
-/* np.bpf.c — lord-netperm's cgroup BPF programs (see docs/FIREWALL.md, step 2).
+/* np.bpf.c — axia-netperm's cgroup BPF programs (see docs/FIREWALL.md, step 2).
  *
  * Restricted C for `clang -target bpf -O2` (Makefile, BPF=1). It doesn't use libbpf or its
  * headers: helpers are declared by number and the maps are symbols of the "maps" section that
- * build/bpf2c turns into relocations; lord-netperm creates the maps and fills in their fds.
+ * build/bpf2c turns into relocations; axia-netperm creates the maps and fills in their fds.
  *
  * Programs (attached to the sessions' cgroup subtree, lordos.service):
  *   cgroup/connect4, connect6   TCP and connected UDP (also the UDP getaddrinfo uses for sorting)
@@ -21,7 +21,7 @@
  *                               essential system services (np_sysc); and the cut of connections
  *                               opened before a rule changed: a packet whose connection the app's
  *                               current rules deny is dropped (counted as "blocked") and its socket
- *                               is reported once, so lord-netperm destroys it (SOCK_DESTROY).
+ *                               is reported once, so axia-netperm destroys it (SOCK_DESTROY).
  *
  * The same programs are also attached to the user@<uid>.service of each LordOS session, to
  * close the `systemd-run --user` escape (the process ends up there, outside lordos.service). A
@@ -32,7 +32,7 @@
  * Each one: looks up the app by the process's scope (ancestor at level cfg.level) or, failing
  * that, by the user@ union (level cfg.user_level), decides with
  * np_decide (np_shared.h, the same thing tests/npcompile_test.c tests) and returns 1 (allow) or
- * 0 (the kernel returns EPERM to the app). It counts the connection and notifies lord-netperm over
+ * 0 (the kernel returns EPERM to the app). It counts the connection and notifies axia-netperm over
  * the ring buffer only if it's new (np_seen, 5 s). Nothing per packet: only per connection, bind or
  * sendto. A UDP connect() counts only the first time within 5 s, like a sendto: getaddrinfo does one
  * per address to sort them (RFC 6724) and they aren't real connections.
@@ -62,7 +62,7 @@ static unsigned long long (*bpf_get_socket_cookie)(void *ctx) = (void *)46;
 static struct bpf_sock *(*bpf_sk_fullsock)(struct bpf_sock *sk) = (void *)95;
 static unsigned long long (*bpf_skb_cgroup_id)(void *skb) = (void *)79;
 
-/* the maps: only their names (lord-netperm defines them, netperm.c) */
+/* the maps: only their names (axia-netperm defines them, netperm.c) */
 char np_cfg[4] SEC("maps");
 char np_apps[4] SEC("maps");
 char np_union[4] SEC("maps");
@@ -375,7 +375,7 @@ SEC("cgroup/dev") int np_dev(struct bpf_cgroup_dev_ctx *ctx) {
     if (snd) {
         /* Recording straight from the card. In the app's own scope this fails closed: an ALSA node
          * the last scan didn't classify (a USB microphone plugged in since) counts as capture.
-         * Outside it only the known capture nodes count (lord-netperm keeps no-mic out of the
+         * Outside it only the known capture nodes count (axia-netperm keeps no-mic out of the
          * user@ union today, so this is for a union that ever carries it). */
         np_u32 minor = ctx->minor;
         np_u32 *kind = bpf_map_lookup_elem(&np_snd, &minor);
@@ -412,7 +412,7 @@ SEC("cgroup/lsm_socket_create") int np_bt_socket(unsigned long long *ctx) {
 #define TCP_FLAG_RST 0x04
 
 /* A dropped packet of a socket the app's rules now deny: reported once per socket (np_seen keyed
- * by its cookie), so lord-netperm destroys it (TCP gets a reset instead of a stall, a connected UDP
+ * by its cookie), so axia-netperm destroys it (TCP gets a reset instead of a stall, a connected UDP
  * socket an error) and the Monitor counts one more denied connection. If the socket is still
  * there 5 s later (a kernel without SOCK_DESTROY), it's asked again, without counting. */
 NP_INLINE void report_cut(struct __sk_buff *skb, np_u64 cgid, const NpFlowKey *k, const np_u8 *la, int lport, int rport,
@@ -451,7 +451,7 @@ NP_INLINE void report_cut(struct __sk_buff *skb, np_u64 cgid, const NpFlowKey *k
 }
 
 /* (0.8.5) The essential system services (name resolution, time, the network service), which are
- * not apps: lord-netperm attaches these programs to their own cgroups too and keys np_sysc by the
+ * not apps: axia-netperm attaches these programs to their own cgroups too and keys np_sysc by the
  * socket's cgroup. They are only counted, never filtered: their traffic can't be blocked. */
 NP_INLINE int count_system(struct __sk_buff *skb, int in) {
     np_u64 id = bpf_skb_cgroup_id(skb);
@@ -464,7 +464,7 @@ NP_INLINE int count_system(struct __sk_buff *skb, int in) {
     return 1;
 }
 
-/* Only for apps lord-netperm knows (it creates their np_counts entry when the scope appears), so
+/* Only for apps axia-netperm knows (it creates their np_counts entry when the scope appears), so
  * nothing else (the login screen, the system) is counted, stored or filtered. Loopback isn't
  * counted or filtered. The skb starts at the IP header in both directions. Returns 1 (let it
  * through) or 0 (drop). An allowed packet adds its bytes to its app (the socket's cgroup, the

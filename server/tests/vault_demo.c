@@ -2,7 +2,7 @@
  * entries from every template, a tree of user categories, tags, 2FA, attachments and
  * weak, reused and old passwords for the report. All invented.
  *
- *   build/vault-demo <password> [image.jpg]      (HOME = the user's; launches its own lord-vault)
+ *   build/vault-demo <password> [image.jpg]      (HOME = the user's; launches its own axia-vault)
  * It does not overwrite an existing vault. */
 #include "vault/vclient.h"
 #include "vault/vjson.h"
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: vault-demo <password> [image]\n"); return 2; }
     setenv("XDG_RUNTIME_DIR", "/nonexistent", 1);
     unsetenv("DBUS_SESSION_BUS_ADDRESS");
-    if (vc_start()) { fprintf(stderr, "could not launch lord-vault\n"); return 1; }
+    if (vc_start()) { fprintf(stderr, "could not launch axia-vault\n"); return 1; }
     char buf[4096];
     snprintf(buf, sizeof buf, "{\"op\":\"create\",\"method\":\"password\",\"password\":\"%s\"}", argv[1]);
     const char *r = req(buf, NULL, 0);

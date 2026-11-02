@@ -3,7 +3,7 @@
  *
  *   build/sandbox-test          app profile, without network permission
  *   build/sandbox-test net      app profile, with network permission
- *   build/sandbox-test helper   helper profile (lord-media, lord-doc): no new sockets, no
+ *   build/sandbox-test helper   helper profile (axia-media, axia-doc): no new sockets, no
  *                               connect/bind, no exec, threads only, clone3 → ENOSYS, TSYNC,
  *                               folders by fd (rw_dir_fds) and kcmp only against itself */
 #include "sec/sandbox.h"
@@ -37,11 +37,11 @@ static const char *home;
 
 static int app_mode(int network) {
     char pkg[512], data[512], ssh[512], settings[512], parent[512];
-    snprintf(pkg, sizeof pkg, "%s/.local/share/lordos/apps/evil", home);
-    snprintf(parent, sizeof parent, "%s/.local/share/lordos/appdata", home);
-    snprintf(data, sizeof data, "%s/.local/share/lordos/appdata/evil", home);
+    snprintf(pkg, sizeof pkg, "%s/.local/share/axia/apps/evil", home);
+    snprintf(parent, sizeof parent, "%s/.local/share/axia/appdata", home);
+    snprintf(data, sizeof data, "%s/.local/share/axia/appdata/evil", home);
     snprintf(ssh, sizeof ssh, "%s/.ssh", home);
-    snprintf(settings, sizeof settings, "%s/.config/lordos/settings.json", home);
+    snprintf(settings, sizeof settings, "%s/.config/axia/settings.json", home);
     mkdir(parent, 0755);
     mkdir(data, 0755);
     int pre = socket(AF_UNIX, SOCK_STREAM, 0);          /* like the Wayland one: opened BEFORE */
@@ -100,7 +100,7 @@ static void *early_fn(void *a) {
 }
 
 static int helper_mode(void) {
-    /* work folder passed as an fd (as lord-server does with lord-doc) */
+    /* work folder passed as an fd (as axia-server does with axia-doc) */
     char work[512], outside[512];
     snprintf(work, sizeof work, "%s/.cache/lordos-helper-test", home);
     snprintf(outside, sizeof outside, "%s/.cache", home);

@@ -1,4 +1,4 @@
-// @lordos/runtime — React renderer for lord-server (same model as React Native):
+// @lordos/runtime — React renderer for axia-server (same model as React Native):
 // the <View>, <Text> and <Image> components are native nodes drawn by the server in C.
 import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
@@ -13,7 +13,7 @@ export const Text = 'text';
 export const Image = 'image';
 // <Terminal session={id} />: grid of a lord.term session drawn in C.
 export const Terminal = 'terminal';
-// <Surface surface={id} />: window of a Linux (Wayland) app composited by lord-server.
+// <Surface surface={id} />: window of a Linux (Wayland) app composited by axia-server.
 export const Surface = 'surface';
 // <MediaView media={id} />: video, photo, capture or camera from lord.media (docs/MEDIA.md); drawn by C.
 export const MediaView = 'media';
@@ -52,7 +52,7 @@ export function displayFor(r) {
   return best || displayAt(r.x + r.w / 2, r.y + r.h / 2);
 }
 // The screen can change size (session viewed from another monitor or from the browser):
-// lord-server updates lord.screen and calls __lordScreen.
+// axia-server updates lord.screen and calls __lordScreen.
 const screenListeners = new Set();
 let rootNode = 0;
 export function onScreenChange(fn) { screenListeners.add(fn); return () => screenListeners.delete(fn); }
@@ -239,7 +239,7 @@ export function onShellKeyboard(fn) { keyboardWatchers.add(fn); return () => key
 
 // ---- layers: one stacking order for the whole screen (sdk/layers.js, docs/LAYERS.md) ----
 // Each layer is a root node of the screen's size, above the React tree (zIndex > 0) and
-// pointerEvents 'box-none' (lord-server never hits the layer itself, only what is in it), so paint
+// pointerEvents 'box-none' (axia-server never hits the layer itself, only what is in it), so paint
 // order and hit testing follow the same order. Content goes in with createPortal.
 const layerNodes = new Map();                 // zIndex → container
 export function layerContainer(z) {

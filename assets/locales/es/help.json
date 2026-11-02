@@ -4,7 +4,7 @@
   "notFound": "No se encontró ese artículo.",
   "openApp": "Abrir {app}",
   "unavailable": "La ayuda no está disponible.",
-  "tour.open": "Bienvenido a LordOS",
+  "tour.open": "Bienvenido a Axia DE",
   "tour.skip": "Omitir",
   "tour.back": "Atrás",
   "tour.next": "Siguiente",
@@ -14,7 +14,7 @@
   "section.apps": "Apps",
   "section.system": "Sistema",
   "section.settings": "Ajustes",
-  "tour.0.title": "Bienvenido a LordOS",
+  "tour.0.title": "Bienvenido a Axia DE",
   "tour.0.body": "Un escritorio propio, rápido y liviano. En un minuto te mostramos lo básico; podés omitir este recorrido y volver a verlo desde el menú Ayuda.",
   "tour.1.title": "El escritorio",
   "tour.1.body": "Arriba está la barra de menú, con los menús de la app que tenés al frente, el Centro de control y la hora. Abajo, el Dock con tus apps; F4 abre Aplicaciones, con todas.",
@@ -23,7 +23,7 @@
   "tour.3.title": "Ajustes a tu medida",
   "tour.3.body": "En Ajustes elegís el modo oscuro, el color, el fondo, la red, los usuarios y mucho más. Estos botones abren algunas secciones.",
   "tour.4.title": "Apps del sistema",
-  "tour.4.body": "Archivos, Terminal, Tienda, Monitor, Reloj, Discos, Copias de seguridad y Registros vienen instalados. Las apps Linux (GTK y Qt) también se abren como ventanas de LordOS.",
+  "tour.4.body": "Archivos, Terminal, Tienda, Monitor, Reloj, Discos, Copias de seguridad y Registros vienen instalados. Las apps Linux (GTK y Qt) también se abren como ventanas de Axia DE.",
   "tour.5.title": "Siempre a mano",
   "tour.5.body": "Si tenés dudas, abrí Ayuda desde el menú Ayuda de la barra o buscá con ❖Espacio. ¡Que lo disfrutes!"
 }

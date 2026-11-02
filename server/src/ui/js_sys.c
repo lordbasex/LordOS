@@ -8,9 +8,9 @@
  * 32 MB), creates folders, renames, copies and moves (in a thread, fsops.c), and sends to the freedesktop
  * Trash; real deletion is only possible inside the Trash. Writing is atomic (temporary + rename),
  * doesn't follow symbolic links in the final file and can NOT touch ~/.local/share/applications,
- * ~/.config/autostart, ~/.local/share/lordos/apps or ~/.config/lordos/settings.json: from JS it is
+ * ~/.config/autostart, ~/.local/share/axia/apps or ~/.config/axia/settings.json: from JS it is
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
- * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
+ * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/axia/settings.json;
  * lord.themes only accepts simple names. */
 #include "../hw/hw_admin.h"
 #include "js_sys.h"
@@ -337,18 +337,11 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     char *compat = read_small("/proc/device-tree/compatible", 512, &clen);
     JS_SetPropertyStr(c, o, "board", JS_NewString(c, compat && hw_is_bcm2712(compat, clen) ? "pi5" : ""));
     free(compat);
-    /* live system (ISO): the installer shows up there */
-    int live = access("/run/live/medium/live/filesystem.squashfs", F_OK) == 0;
+    /* live media: dracut's dmsquash-live, which Fedora's live images boot with */
+    char *cmd = read_small("/proc/cmdline", 4096, NULL);
+    int live = cmd && sysreport_cmdline_has(cmd, "rd.live.image");
+    free(cmd);
     JS_SetPropertyStr(c, o, "live", JS_NewBool(c, live));
-    /* the live ISO's "Check this computer" boot entry (lordos.check=1): only a yes or no leaves here,
-     * and only on a live system. sdk/livestart.js opens System Information for it. */
-    int check = 0;
-    if (live) {
-        char *cmd = read_small("/proc/cmdline", 4096, NULL);
-        check = cmd && sysreport_cmdline_has(cmd, "lordos.check=1");
-        free(cmd);
-    }
-    JS_SetPropertyStr(c, o, "liveCheck", JS_NewBool(c, check));
     struct statvfs vs;                      /* system disk (/) */
     if (!statvfs("/", &vs)) {
         JS_SetPropertyStr(c, o, "diskTotal", JS_NewFloat64(c, (double)vs.f_blocks * vs.f_frsize));
@@ -377,7 +370,7 @@ static JSValue f_sys_cpu(JSContext *c, JSValueConst this_val, int argc, JSValueC
 /* ---- lord.settings ---- */
 
 static void settings_path(char *out, size_t size, const char *suffix) {
-    snprintf(out, size, "%s/.config/lordos/settings.json%s", home, suffix);
+    snprintf(out, size, "%s/.config/axia/settings.json%s", home, suffix);
 }
 
 static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -401,7 +394,7 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     char dir[PATH_MAX + 64], tmp[PATH_MAX + 64], path[PATH_MAX + 64];
     snprintf(dir, sizeof dir, "%s/.config", home);
     mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.config/lordos", home);
+    snprintf(dir, sizeof dir, "%s/.config/axia", home);
     mkdir(dir, 0700);
     settings_path(tmp, sizeof tmp, ".tmp");
     settings_path(path, sizeof path, "");
@@ -564,8 +557,8 @@ static void read_vars(JSContext *c, JSValue o, const char *path) {
 static void apply_locale_conf(void) {
     char path[PATH_MAX + 32];
     locale_conf(path, sizeof path);
-    const char *files[2] = { "/etc/default/locale", path };
-    for (int k = 0; k < 2; k++) {
+    const char *files[3] = { "/etc/default/locale", "/etc/locale.conf", path };
+    for (int k = 0; k < 3; k++) {
         char *txt = read_small(files[k], 8192, NULL);
         for (char *line = txt ? strtok(txt, "\n") : NULL; line; line = strtok(NULL, "\n")) {
             char *eq = strchr(line, '=');
@@ -587,6 +580,7 @@ static JSValue f_locale_get(JSContext *c, JSValueConst this_val, int argc, JSVal
     locale_conf(path, sizeof path);
     read_vars(c, u, path);
     read_vars(c, sys, "/etc/default/locale");
+    read_vars(c, sys, "/etc/locale.conf");
     JS_SetPropertyStr(c, o, "user", u);
     JS_SetPropertyStr(c, o, "system", sys);
     return o;
@@ -626,11 +620,18 @@ static JSValue f_locale_available(JSContext *c, JSValueConst this_val, int argc,
     (void)this_val; (void)argc; (void)argv;
     JSValue arr = JS_NewArray(c);
     FILE *f = fopen("/usr/share/i18n/SUPPORTED", "r");
+    /* Fedora ships the locale archive without Debian's SUPPORTED catalog.
+     * Enumerate installed locales with a fixed, unprivileged command there. */
+    int installed_only = f == NULL;
+    if (installed_only) f = popen("/usr/bin/locale -a", "re");
     char line[256];
     uint32_t i = 0;
     while (f && fgets(line, sizeof line, f)) {
         char loc[128], cs[64];
-        if (sscanf(line, "%127s %63s", loc, cs) != 2 || strcmp(cs, "UTF-8")) continue;
+        if (installed_only) {
+            if (sscanf(line, "%127s", loc) != 1) continue;
+            if (!strcasestr(loc, "utf8") && !strcasestr(loc, "utf-8")) continue;
+        } else if (sscanf(line, "%127s %63s", loc, cs) != 2 || strcmp(cs, "UTF-8")) continue;
         locale_t l = newlocale(LC_ALL_MASK, loc, (locale_t)0);
         if (l) freelocale(l);
         JSValue o = JS_NewObject(c);
@@ -638,7 +639,7 @@ static JSValue f_locale_available(JSContext *c, JSValueConst this_val, int argc,
         JS_SetPropertyStr(c, o, "generated", JS_NewBool(c, l != 0));
         JS_SetPropertyUint32(c, arr, i++, o);
     }
-    if (f) fclose(f);
+    if (f) { if (installed_only) pclose(f); else fclose(f); }
     return arr;
 }
 
@@ -649,10 +650,10 @@ static int valid_id_dot(const char *s) {
     return 1;
 }
 
-/* Catalog folders: assets/locales (bundled) and ~/.local/share/lordos/locales
+/* Catalog folders: assets/locales (bundled) and ~/.local/share/axia/locales
  * (the user's language packs; they win if both exist). */
 static void locale_root(int user, char *out, size_t n) {
-    if (user) snprintf(out, n, "%s/.local/share/lordos/locales", home);
+    if (user) snprintf(out, n, "%s/.local/share/axia/locales", home);
     else snprintf(out, n, "%s/locales", assets);
 }
 
@@ -713,7 +714,7 @@ static JSValue f_locale_languages(JSContext *c, JSValueConst this_val, int argc,
 }
 
 /* lord.locale.installPack(language, { namespace: JSONtext }) → copies a LordOS language pack
- * to ~/.local/share/lordos/locales/<language>/ (doesn't need root). */
+ * to ~/.local/share/axia/locales/<language>/ (doesn't need root). */
 static JSValue f_locale_install(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *lang = JS_ToCString(c, argv[0]);
@@ -723,8 +724,8 @@ static JSValue f_locale_install(JSContext *c, JSValueConst this_val, int argc, J
         char p[PATH_MAX + 64];
         snprintf(p, sizeof p, "%s/.local", home); mkdir(p, 0700);
         snprintf(p, sizeof p, "%s/.local/share", home); mkdir(p, 0700);
-        snprintf(p, sizeof p, "%s/.local/share/lordos", home); mkdir(p, 0700);
-        snprintf(p, sizeof p, "%s/.local/share/lordos/locales", home); mkdir(p, 0700);
+        snprintf(p, sizeof p, "%s/.local/share/axia", home); mkdir(p, 0700);
+        snprintf(p, sizeof p, "%s/.local/share/axia/locales", home); mkdir(p, 0700);
         snprintf(dir, sizeof dir, "%s/%s", p, lang);
         mkdir(dir, 0700);
         JSPropertyEnum *props;
@@ -1455,7 +1456,7 @@ static JSValue f_wl_close(JSContext *c, JSValueConst this_val, int argc, JSValue
 }
 
 /* lord.wayland.kill(id) → '' or an error code: Force Quit of a Linux app's window (wl_kill: its own
- * process only, same user, never X11 or lord-server). */
+ * process only, same user, never X11 or axia-server). */
 static JSValue f_wl_kill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     int32_t id = 0;
@@ -2051,7 +2052,7 @@ static JSValue f_session_switch(JSContext *c, JSValueConst this_val, int argc, J
 }
 
 /* lord.session.power('reboot'|'poweroff'): asks lord-sessiond (root), which decides (docs/SESSIONS.md,
- * "Restart and Shut Down from a session"). Only those two words, sent as a fixed message; lord-server
+ * "Restart and Shut Down from a session"). Only those two words, sent as a fixed message; axia-server
  * runs nothing. false if no lord-sessiond drives this session's monitor. */
 static JSValue f_session_power(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;

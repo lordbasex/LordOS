@@ -1,5 +1,0 @@
-{
-  "name": "Pantalla de ingreso",
-  "description": "La pantalla de login de LordOS (la usa lord-sessiond; no se elige como tema).",
-  "hidden": true
-}

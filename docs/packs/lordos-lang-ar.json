@@ -133,7 +133,7 @@
    "admin.running": "{action}: {arg}…",
    "admin.system-locale": "منطقة النظام",
    "admin.timezone": "المنطقة الزمنية",
-   "admin.unavailable": "المساعد الإداري لا يعمل: يجب تشغيل lord-server باستخدام sudo وأن يكون المستخدم في مجموعة sudo.",
+   "admin.unavailable": "المساعد الإداري لا يعمل: يجب تشغيل axia-server باستخدام sudo وأن يكون المستخدم في مجموعة sudo.",
    "change": "تغيير…",
    "dark": "داكن",
    "effects": "تأثيرات الشفافية",

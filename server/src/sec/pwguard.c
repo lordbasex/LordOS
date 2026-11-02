@@ -5,7 +5,7 @@
  * We only use: core.hello, client.update_properties, core.get_registry, core.pong,
  * registry.bind (clients only), registry.destroy (a restricted app's capture streams) and
  * client.update_permissions; and we read core.ping/error/remove_id, registry.global /
- * global_remove and client.info. Everything is non-blocking: lord-server never waits for it. */
+ * global_remove and client.info. Everything is non-blocking: axia-server never waits for it. */
 #include "pwguard.h"
 #include "appid.h"
 #include "restrict.h"
@@ -513,7 +513,7 @@ static void resolve(PgClient *c) {
     else if (r > 0) {                                /* not in any app's scope */
         c->app[0] = 0;
         /* escaped to the user's service manager while restricted apps run: treated as restricted
-         * (like lord-netperm's per-user union) */
+         * (like axia-netperm's per-user union) */
         if (guard_armed && in_user_manager(pid)) c->unverified = 1;
     }
 }

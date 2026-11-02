@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds malicious archives for tests/doc_evil.sh (lord-doc safe extraction).
+"""Builds malicious archives for tests/doc_evil.sh (axia-doc safe extraction).
 
 Usage: python3 -I make_evil_archives.py <folder>
 Each one tries to write outside the destination folder in a different way. The targets

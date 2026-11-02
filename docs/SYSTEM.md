@@ -42,7 +42,7 @@ The LordOS disk utility, like GNOME Disks.
 | `apps/disks/` | The app: `index.jsx`, `health.jsx` (SMART), `dialogs.jsx` (format, rename, erase, bootable USB), `icons.jsx` |
 
 **Notifications without polling.** While the app is open (`useDisks`), `lord.disks.watch(true)`
-opens an epoll with two things. That single fd goes into the `lord-server` main loop (`main.c`),
+opens an epoll with two things. That single fd goes into the `axia-server` main loop (`main.c`),
 and JS gets `__lordDisks('change')`, coalesced into one every 150 ms. Closing the app closes
 everything.
 
@@ -342,7 +342,7 @@ modules. Since 0.8.7 `disk-mount` refuses FAT, exFAT, NTFS, HFS+ and APFS withou
 ## Backups (`apps/backup`)
 
 Scheduled backups of the home folder to an external disk or a folder. The
-engine is our own code (no rsync) and runs **as the user**, inside `lord-server`: backing up the
+engine is our own code (no rsync) and runs **as the user**, inside `axia-server`: backing up the
 home folder needs no root, so no new action was added to `admin.c`.
 
 | | |
@@ -379,8 +379,8 @@ home folder needs no root, so no new action was added to `admin.c`.
 - **Symbolic links** are stored as links (their text) and never followed. The walk uses `lstat`
   and opens with `O_NOFOLLOW`; it does not cross into other filesystems (a disk mounted inside the
   home folder) and skips fifos, sockets and devices.
-- **Exclusions:** always `.cache`, `.local/share/Trash`, `.local/share/lordos/apps`,
-  `.local/share/lordos/trash` and `.thumbnails`; the `LordOS-Backups` folder itself when the
+- **Exclusions:** always `.cache`, `.local/share/Trash`, `.local/share/axia/apps`,
+  `.local/share/axia/trash` and `.thumbnails`; the `LordOS-Backups` folder itself when the
   destination is inside the home folder (by device and inode); and the folders the user adds
   (validated relative paths: no `..`, leading `/` or control characters).
 
@@ -409,7 +409,7 @@ In the **Backups** tab: snapshots by day, the tree of each one (with real sizes)
   identical, nothing happens.
 - **The same rules as `lord.fs`:** it only writes in the home folder and the user's disks
   (`fsops_allowed`, on the resolved folder), never in protected places (`fsops_protected`:
-  `~/.local/share/applications`, `~/.config/autostart`, `~/.local/share/lordos/apps`,
+  `~/.local/share/applications`, `~/.config/autostart`, `~/.local/share/axia/apps`,
   `settings.json`, `permisos.json`, `backup.json`, and also `firewall.json`, the blocklists, the
   Mail accounts and cache and the Passwords vaults, the whole list in `server/src/fsops.c`). A `.desktop` file planted in a backup is not
   restored, not even through a link in the home folder that points to a protected folder.
@@ -421,7 +421,7 @@ In the **Backups** tab: snapshots by day, the tree of each one (with real sizes)
 
 ### Scheduling, priority and battery (`server/src/backup/backup.c`)
 
-- **A `lord-server` thread**, not a separate process, so no new way to run programs is added. The
+- **A `axia-server` thread**, not a separate process, so no new way to run programs is added. The
   thread sets **nice 19** (`setpriority` on its own tid) and **idle I/O** (`ioprio_set`, class 3)
   and blocks all signals. What it copies is dropped from the page cache
   (`posix_fadvise(DONTNEED)`), so it does not evict what the desktop uses.
@@ -437,7 +437,7 @@ In the **Backups** tab: snapshots by day, the tree of each one (with real sizes)
 - **Notifications** (`sdk/notify.js`), even with the app closed: when a backup fails; when a "Back
   Up Now" run succeeds; when a restore finishes; and once per session when backups are encrypted
   and locked.
-- **Configuration:** `~/.config/lordos/backup.json` (`dest`, `interval`:
+- **Configuration:** `~/.config/axia/backup.json` (`dest`, `interval`:
   `hourly|daily|weekly|manual`, `pauseOnBattery`, `encrypt`, `exclude`). Only
   `lord.backup.configure` writes it, and it validates the destination (real path, inside the
   `lord.fs` roots, writable). It is on the `fsops_protected` list: it decides where the data goes,
@@ -531,7 +531,7 @@ LordOS's log viewer.
     `adm`) it is read like the user's own; otherwise an administrator gets it through the closed
     action `logs-system`; anyone else is told it needs an administrator;
   - **Kernel:** the kernel's messages (`_TRANSPORT=kernel`) from the readable journal;
-  - **LordOS:** the session's own logs, `~/.cache/lordos/<name>.log` (`session.log`,
+  - **LordOS:** the session's own logs, `~/.cache/axia/<name>.log` (`session.log`,
     `greeter.log`…).
 - **Filters:** level (all, info and above, warnings and above, errors), time range (15 min, 1 hour,
   24 h, everything), process or unit (`[A-Za-z0-9@._:-]`, the same check as the C side), and free-text
@@ -548,7 +548,7 @@ LordOS's log viewer.
 
 No libsystemd and no `journalctl`. The files are read with `pread` and a small block cache, never
 `mmap`: journald can shrink or rewrite a file and `mmap` would turn that into `SIGBUS` inside
-lord-server.
+axia-server.
 
 - **Format:** header `LPKSHHRH`, the entry-array chain, ENTRY and DATA objects, in both the regular
   and the **compact** layout (Debian 13's systemd 257 writes compact files). Fields used: `MESSAGE`,
@@ -564,7 +564,7 @@ lord-server.
 
 ### Permissions
 
-- **The user's own logs** are read by lord-server **as the user**: the kernel and journald's ACLs
+- **The user's own logs** are read by axia-server **as the user**: the kernel and journald's ACLs
   decide. `user-<uid>.journal` is readable by its owner; the system journal only by
   `systemd-journal`/`adm`.
 - **System logs for administrators** go through `logs-system` (`server/src/logs/logs_admin.c`,
@@ -574,12 +574,12 @@ lord-server.
     characters), `limit` 1–5000;
   - the paths don't come from the user: `/var/log/journal/<machine-id>/system*.journal*`;
   - it runs no program; it streams one JSON `LOG` line per entry and `OK <n>`.
-- `lord.logs.tail(name)` only reads `~/.cache/lordos/<name>.log` with a validated name.
+- `lord.logs.tail(name)` only reads `~/.cache/axia/<name>.log` with a validated name.
 
 ### Live follow without polling
 
-`lord.logs.follow(true)` adds inotify watches on the journal directories and `~/.cache/lordos`.
-Queries run in a lord-server thread; the thread and inotify share one epoll fd in the main loop
+`lord.logs.follow(true)` adds inotify watches on the journal directories and `~/.cache/axia`.
+Queries run in a axia-server thread; the thread and inotify share one epoll fd in the main loop
 (`logs_fd()`), so the compositor never waits for a read. When something changes, JS gets
 `__lordLogs('journal')` or `__lordLogs('file', name)` and asks only for the entries after the
 newest one it has (at most about once a second). With the app closed there is no watch and no
@@ -666,15 +666,15 @@ the `Date` of the whole theme (the bar, the other apps). Instead:
 
 Alarms, the timer and the stopwatch live in the SDK, not in the window: `startShell` calls
 `startAlarms()` once per session. So they ring with Clock closed and also with the session in the
-background (fast user switching, or viewed only from the browser): the `lord-server` session keeps
+background (fast user switching, or viewed only from the browser): the `axia-server` session keeps
 running, and so does its JS.
 
 - **Storage:** `settings.clock = { alarms: [{ id, h, m, days, label, on, snooze, fired }],
-  cities: [...] }` in `~/.config/lordos/settings.json`. `fired` is the instant it last rang, so it
+  cities: [...] }` in `~/.config/axia/settings.json`. `fired` is the instant it last rang, so it
   does not ring again when the session restarts.
 - **No polling:** a single `setTimeout` until the next thing due (alarm, snooze or end of the
   timer). It is re-armed when the alarms change (settings subscription).
-- **Clock changes and suspend:** `lord-server` timers use `CLOCK_MONOTONIC`, which does not advance
+- **Clock changes and suspend:** `axia-server` timers use `CLOCK_MONOTONIC`, which does not advance
   while suspended. So the wait is cut into slices —1 minute if something is due within the hour,
   10 minutes otherwise— and each wake-up recomputes with the real time. Anything that should have
   rung less than 10 minutes ago still rings; older ones are dropped (yesterday's alarm does not ring

@@ -1,6 +1,6 @@
 // History.jsx — the Network tab's traffic history (0.8.2, docs/MONITOR.md "Traffic history"): the
 // same mirrored chart as the live minute, over 1 hour, 24 hours, 7 or 30 days, read from the file
-// lord-server keeps (monitor.history). Step back and forward one window at a time; "Now" comes back
+// axia-server keeps (monitor.history). Step back and forward one window at a time; "Now" comes back
 // to the present. The file holds bytes per minute (7 days) and per hour (30 days), for the machine
 // and for each app; never an address or a name.
 import { View, Text, Segmented, useTheme, useLocale, monitor, formatDate, formatTime } from '@lordos/sdk';

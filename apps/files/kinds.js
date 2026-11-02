@@ -58,7 +58,7 @@ export function appOpens(mimeTypes, mime) {
 }
 
 export const isTextual = (e) => ['text', 'code'].includes(kindOf(e));
-export const isImage = (e) => kindOf(e) === 'image' && !/\.(svg|heic|avif|tiff?|webp)$/i.test(e.name);   // the ones stb_image draws (the rest: lord-media thumbnail)
+export const isImage = (e) => kindOf(e) === 'image' && !/\.(svg|heic|avif|tiff?|webp)$/i.test(e.name);   // the ones stb_image draws (the rest: axia-media thumbnail)
 
 // Band color of each kind in the document icon.
 export const KIND_COLOR = {

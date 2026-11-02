@@ -225,7 +225,7 @@ void canvas_clear(Canvas *c, uint32_t rgb) {
     }
 }
 
-/* ---- parallel rows (lord-server sets canvas_parallel; tests and helpers stay serial) ----
+/* ---- parallel rows (axia-server sets canvas_parallel; tests and helpers stay serial) ----
  * The row-local primitives (every pixel depends only on its own row: fills, strokes, gradients,
  * blits, shadow masks) run as the same call on each thread with the clip cut to a band of rows,
  * so the pixels are the same as on one thread. */

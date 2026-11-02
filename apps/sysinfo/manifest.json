@@ -2,7 +2,7 @@
   "id": "sysinfo",
   "version": "0.8.6",
   "name": "System Information",
-  "description": "Every piece of hardware detected and what LordOS makes of it",
+  "description": "Every piece of hardware detected and what Axia DE makes of it",
   "size": [
     960,
     640

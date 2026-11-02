@@ -1,4 +1,4 @@
-/* imap.c — IMAP4rev1 client and the per-account worker of lord-maild (see maild.h).
+/* imap.c — IMAP4rev1 client and the per-account worker of axia-maild (see maild.h).
  *
  * Per account: connect (implicit TLS on 993, or STARTTLS on 143), authenticate (AUTHENTICATE
  * PLAIN or LOGIN with an app password; XOAUTH2 is prepared but disabled until the user registers

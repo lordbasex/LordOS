@@ -1,7 +1,7 @@
 // fs.js — files in the home folder and on the user's mounted disks (/media/$USER,
 // /run/media/$USER); the server rejects paths outside them. Writing is atomic and cannot touch
-// ~/.local/share/applications, ~/.config/autostart, ~/.local/share/lordos/apps or
-// ~/.config/lordos/settings.json (see server/src/ui/js_sys.c and server/src/fsops.c).
+// ~/.local/share/applications, ~/.config/autostart, ~/.local/share/axia/apps or
+// ~/.config/axia/settings.json (see server/src/ui/js_sys.c and server/src/fsops.c).
 import { useEffect, useState } from 'react';
 
 export const home = () => lord.fs.home();

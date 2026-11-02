@@ -49,7 +49,7 @@ quick press goes back to the previous app.
 In a Linux app, ❖C, V, X, A, Z, F, T, W, N, L, R, P and S arrive as Ctrl (as Ctrl+Shift in a terminal
 emulator, where Ctrl+C is the interrupt), to that app only. So ❖V pastes and ❖L is its own Ctrl+L
 there: with a Linux app in front the screen locks with ❖⌃Q, and the clipboard opens with ❖⇧V. In a
-LordOS app inside the session ❖V pastes too; ❖⇧V is the clipboard.
+Axia DE app inside the session ❖V pastes too; ❖⇧V is the clipboard.
 
 ## Lord Classic
 

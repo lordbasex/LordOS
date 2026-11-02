@@ -7,7 +7,7 @@
 
 #define ADMIN_ARG_MAX 65536             /* argument of an action (may have several lines) */
 
-/* ---- server side (lord-server, without root) ---- */
+/* ---- server side (axia-server, without root) ---- */
 
 /* Called as root, before dropping privileges. user = the session user. */
 int  admin_start(const char *user);

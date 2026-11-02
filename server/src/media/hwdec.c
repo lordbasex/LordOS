@@ -2,12 +2,12 @@
  *
  * The answer drives "Optimize video for this computer" (Settings → Displays): with Automatic,
  * the browsers are asked for H.264 instead of the codecs the hardware can't decode. Asked once per
- * boot and cached in ~/.cache/lordos/video-hw.json (keyed by /proc/sys/kernel/random/boot_id), since
+ * boot and cached in ~/.cache/axia/video-hw.json (keyed by /proc/sys/kernel/random/boot_id), since
  * a live USB boots on a different computer every time.
  *
  *   1. Virtual GPU (virtio-gpu, VMware SVGA, QXL, Bochs, Hyper-V, VirtualBox): no, without asking.
  *      A virtual machine with a real GPU passed through is probed like any other computer.
- *   2. VA-API: lord-media (the only binary that links libva) receives the render nodes already open
+ *   2. VA-API: axia-media (the only binary that links libva) receives the render nodes already open
  *      and lists the profiles with a decode entrypoint (lm_hwprobe.c, MK_HWPROBE).
  *   3. V4L2 memory-to-memory decoders (ARM boards): VP9/AV1/H.264/HEVC as stateless (VP9F, AV1F,
  *      S264, S265) or stateful (VP90, AV01, H264, HEVC) formats on the OUTPUT queue. The Raspberry
@@ -159,13 +159,13 @@ static void build_json(void) {
              H.boot, vm, gpu, b(H.virt), b(H.vaapi), vendor, b(H.v4l2), b(vp9), b(av1), b(h264), b(hevc), why);
 }
 
-static void cache_path(char *out, size_t n) { snprintf(out, n, "%s/.cache/lordos/video-hw.json", media_home()); }
+static void cache_path(char *out, size_t n) { snprintf(out, n, "%s/.cache/axia/video-hw.json", media_home()); }
 
 static void save_cache(void) {
     char dir[4096], path[4200], tmp[4300];
     snprintf(dir, sizeof dir, "%s/.cache", media_home());
     mkdir(dir, 0700);
-    snprintf(dir, sizeof dir, "%s/.cache/lordos", media_home());
+    snprintf(dir, sizeof dir, "%s/.cache/axia", media_home());
     mkdir(dir, 0700);
     cache_path(path, sizeof path);
     snprintf(tmp, sizeof tmp, "%s.%d.part", path, (int)getpid());
@@ -218,7 +218,7 @@ static void start(void) {
     read_line("/sys/class/dmi/id/product_name", product, sizeof product);
     hwdec_vm_name(vendor, product, cpu_hypervisor_flag(), H.vm, sizeof H.vm);
 
-    /* the render nodes that belong to a real GPU go to lord-media */
+    /* the render nodes that belong to a real GPU go to axia-media */
     int fds[MP_MAX_FDS], nfds = 0, any = 0;
     int allow = strcmp(media_hwaccel(), "none") != 0;
     for (int i = 128; i < 136 && nfds < MP_MAX_FDS; i++) {
@@ -241,7 +241,7 @@ static void start(void) {
     H.deadline = mono_ms() + PROBE_TIMEOUT_MS;
 }
 
-/* "vp9":true inside lord-media's JSON (fixed keys, written by lm_hwprobe.c). */
+/* "vp9":true inside axia-media's JSON (fixed keys, written by lm_hwprobe.c). */
 static int jbool(const char *json, const char *key) {
     char k[32];
     snprintf(k, sizeof k, "\"%s\":true", key);

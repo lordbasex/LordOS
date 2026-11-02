@@ -1,5 +1,5 @@
 /* lm_job.c — the MK_WORKER helper: handles short queued jobs, one per MM_JOB message
- * (MW_*), with the descriptors lord-server passes. It exits on its own if a while passes without work.
+ * (MW_*), with the descriptors axia-server passes. It exits on its own if a while passes without work.
  * Each reply is an MM_RESULT with the job id. */
 #include "lm.h"
 
@@ -69,7 +69,7 @@ static void job_thumb(uint32_t id, int in, int out, int size, int as_pixels) {
     if (as_pixels) {
         void *map;
         size_t n = (size_t)tw * th * 4;
-        int mfd = lm_memfd(n, &map, "lord-media-poster");
+        int mfd = lm_memfd(n, &map, "axia-media-poster");
         if (mfd < 0) { av_frame_free(&o); lm_result(id, -1, "sys.outOfMemory", -1); return; }
         for (int y = 0; y < th; y++) memcpy((uint8_t *)map + (size_t)y * tw * 4, o->data[0] + (size_t)y * o->linesize[0], (size_t)tw * 4);
         munmap(map, n);
@@ -111,7 +111,7 @@ static void job_image(uint32_t id, int in) {
     if (!o) { lm_result(id, -1, "media.convertFailed", -1); return; }
     void *map;
     size_t n = (size_t)w * h * 4;
-    int mfd = lm_memfd(n, &map, "lord-media-image");
+    int mfd = lm_memfd(n, &map, "axia-media-image");
     if (mfd < 0) { av_frame_free(&o); lm_result(id, -1, "sys.outOfMemory", -1); return; }
     int alpha = 0;
     for (int y = 0; y < h; y++) {
@@ -202,7 +202,7 @@ static void job_edit(uint32_t id, int in, int out, const char *p) {
     av_frame_free(&c);
 }
 
-/* Pixels from lord-server (screenshots) → PNG/JPEG. */
+/* Pixels from axia-server (screenshots) → PNG/JPEG. */
 static void job_encode(uint32_t id, int mfd, int out, int w, int h, const char *p) {
     struct stat st;
     if (w <= 0 || h <= 0 || w > MP_MAX_DIM || h > MP_MAX_DIM || fstat(mfd, &st) || st.st_size < (off_t)w * h * 4) {
@@ -426,7 +426,7 @@ static void job_selftest(uint32_t id) {
     fd = open("/home", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     lm_buf_printf(&b, ",\"open_home\":\"%s\"", fd < 0 ? strerror(errno) : "ABIERTO");
     if (fd >= 0) close(fd);
-    fd = open("/tmp/lord-media-test", O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+    fd = open("/tmp/axia-media-test", O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
     lm_buf_printf(&b, ",\"create_tmp\":\"%s\"", fd < 0 ? strerror(errno) : "CREADO");
     if (fd >= 0) close(fd);
     fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);

@@ -1,6 +1,6 @@
 /* totp.h — one-time codes (2FA): HOTP (RFC 4226) and TOTP (RFC 6238) with SHA-1, SHA-256 and
  * SHA-512, base32 (RFC 4648) and otpauth:// URIs (the Google Authenticator format carried by
- * the QR codes of websites). The secret never leaves lord-vault: the UI receives only the code. */
+ * the QR codes of websites). The secret never leaves axia-vault: the UI receives only the code. */
 #ifndef LORD_VAULT_TOTP_H
 #define LORD_VAULT_TOTP_H
 

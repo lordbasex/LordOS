@@ -731,7 +731,7 @@ static JSValue f_clip_save_image(JSContext *c, JSValueConst this_val, int argc, 
 }
 
 /* lord.clipboard.useImage(path): copies an image from the history again (only the
- * previews the compositor saved in $XDG_RUNTIME_DIR/lordos). */
+ * previews the compositor saved in $XDG_RUNTIME_DIR/axia). */
 static JSValue f_clip_use_image(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *p = JS_ToCString(c, argv[0]);
@@ -750,7 +750,7 @@ static JSValue f_clip_image_data(JSContext *c, JSValueConst this_val, int argc, 
 }
 
 /* lord.clipboard.deleteSaved(name): deletes an image from the saved history. Only names
- * img-<letters, numbers, hyphens>.png inside ~/.local/share/lordos/clipboard (there is no general
+ * img-<letters, numbers, hyphens>.png inside ~/.local/share/axia/clipboard (there is no general
  * file deletion). */
 static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
@@ -761,7 +761,7 @@ static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc
     for (size_t i = 4; ok && i < len - 4; i++) ok = (n[i] >= 'a' && n[i] <= 'z') || (n[i] >= '0' && n[i] <= '9') || n[i] == '-';
     char path[PATH_MAX];
     const char *home = getenv("HOME");
-    if (ok && home) snprintf(path, sizeof path, "%s/.local/share/lordos/clipboard/%s", home, n);
+    if (ok && home) snprintf(path, sizeof path, "%s/.local/share/axia/clipboard/%s", home, n);
     JS_FreeCString(c, n);
     return JS_NewBool(c, ok && home && unlink(path) == 0);
 }

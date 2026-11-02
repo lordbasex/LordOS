@@ -49,7 +49,7 @@ const char *cgroup_self(void) {
     return path;
 }
 
-/* Directory where the app scope is created. In the delegated session, lord-server runs in the leaf
+/* Directory where the app scope is created. In the delegated session, axia-server runs in the leaf
  * ".../lordos-session-<uid>/server": scopes go as siblings, in the parent directory (which
  * has the controllers enabled). If the parent isn't writable, its own cgroup is tried
  * (works if it has no controllers). If neither, there's no delegated subtree. */
@@ -90,7 +90,7 @@ static int write_at(int dirfd, const char *leaf, const char *val) {
 }
 
 /* Is this a scope name lord-sessiond agrees to create? "app-lordos-<id>.scope" (Linux and .lpk
- * apps, lord-media) or "lordos-<helper>.scope" (lord-doc, lord-vault), never "lordos-session-…". */
+ * apps, axia-media) or "lordos-<helper>.scope" (axia-doc, axia-vault), never "lordos-session-…". */
 int cgroup_scope_name_ok(const char *name) {
     size_t n = name ? strlen(name) : 0;
     if (n < 8 || n > 90 || strcmp(name + n - 6, ".scope")) return 0;
@@ -328,8 +328,8 @@ static int proc_cgroup(pid_t pid, char *out, size_t n) {
     return r;
 }
 
-/* The executable of the peer must be a LordOS binary from bindir (lord-server, lord-media,
- * lord-doc…). A binary replaced while it runs shows up as "<path> (deleted)": still accepted. */
+/* The executable of the peer must be a LordOS binary from bindir (axia-server, axia-media,
+ * axia-doc…). A binary replaced while it runs shows up as "<path> (deleted)": still accepted. */
 static int exe_trusted(pid_t pid, const char *bindir, int insecure) {
     char p[64], exe[PATH_MAX];
     snprintf(p, sizeof p, "/proc/%d/exe", (int)pid);
@@ -364,7 +364,7 @@ int cgroup_place_serve(int cfd, const char *bindir, int insecure) {
     int cpu = 0;
     if (sscanf(req, "enter %95s %ld %ld %d", name, &mh, &mm, &cpu) != 4 || !cgroup_scope_name_ok(name)) { reply(cfd, "err request"); return -1; }
     if (cr.uid < 1000 || cr.uid >= 60000) { reply(cfd, "err uid"); return -1; }
-    /* The peer must still be in its session's «server» leaf: lord-server itself, or a child it
+    /* The peer must still be in its session's «server» leaf: axia-server itself, or a child it
      * forked right before exec. A process already in an app scope (an app) can never ask. */
     char svc[PATH_MAX], want[PATH_MAX], have[PATH_MAX];
     if (service_root(svc, sizeof svc)) { reply(cfd, "err service"); return -1; }

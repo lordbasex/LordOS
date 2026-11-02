@@ -1,10 +1,10 @@
 // About LordOS: real system data (/proc) and display server stats.
 import { version as reactVersion } from 'react';
 import { useMemo } from 'react';
-import { View, Text, Button, wm, LordOSLogo, LordOSWordmark, Lumo, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr } from '@lordos/sdk';
+import { View, Text, Button, wm, AxiaLogo, AxiaWordmark, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr } from '@lordos/sdk';
 
 export function Icon({ size }) {
-  return <LordOSLogo size={size} />;
+  return <AxiaLogo size={size} />;
 }
 
 // One line of the spec list, as in a classic "About" window: the label in a trailing-aligned column
@@ -33,7 +33,7 @@ function Badge({ color, label }) {
   );
 }
 
-// The state of LordOS's own code, as lord-server checked it (docs/SIGNING.md, "Verified system code").
+// The state of LordOS's own code, as axia-server checked it (docs/SIGNING.md, "Verified system code").
 const CODE = {
   verified: { color: '#30d158', key: 'about.codeVerified' },
   development: { color: '#ff9f0a', key: 'about.codeDevelopment' },
@@ -54,7 +54,7 @@ export default function About() {
   return (
     <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
       <Icon size={64} />
-      <View style={{ marginTop: 12 }}><LordOSWordmark size={typeScale.largeTitle} crown={false} /></View>
+      <View style={{ marginTop: 12 }}><AxiaWordmark size={typeScale.largeTitle} mark={false} /></View>
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginTop: 2 }}>{ver.channel ? tr('about.versionChannel', { v: ver.version, channel: ver.channel }) : tr('about.version', { v: ver.version })}</Text>
       {ver.build ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, marginTop: 1 }}>{tr('about.build', { b: ver.build })}</Text> : null}
       <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
@@ -75,7 +75,7 @@ export default function About() {
           <InfoRow k={tr('about.bootTime')} v={tr(info.bootShown === 'session' ? 'about.bootToDesktop' : 'about.bootToLogin', { s: formatNumber(info.bootSeconds, 3) })} />
         ) : null}
         <View style={{ height: 1, backgroundColor: t.separator, marginVertical: 8, marginHorizontal: 24 }} />
-        <InfoRow k={tr('about.server')} v="lord-server (C · DRM/KMS · evdev)" />
+        <InfoRow k={tr('about.server')} v="axia-server (C · DRM/KMS · evdev)" />
         <InfoRow k={tr('about.engine')} v={`QuickJS + React ${reactVersion}`} />
         <InfoRow k={tr('about.codeLabel')} v={tr(cs.key)} />
         <InfoRow k={tr('about.display')} v={`${screen.width} × ${screen.height}`} />
@@ -87,7 +87,7 @@ export default function About() {
       </View>
       <View style={{ flex: 1, minHeight: 12 }} />
       <View style={{ alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24 }}>
-        <Lumo pose="avatar" size={24} />
+        <AxiaLogo size={24} />
         <Text style={{ flex: 1, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('about.credits')}</Text>
       </View>
     </View>

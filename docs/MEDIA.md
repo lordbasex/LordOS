@@ -1,6 +1,6 @@
 # Media: Photos, Player, Screenshots, Camera and Recorder (M9)
 
-Five preinstalled native LordOS apps, plus a sandboxed helper, `lord-media`. It is the only LordOS
+Five preinstalled native LordOS apps, plus a sandboxed helper, `axia-media`. It is the only LordOS
 program that links FFmpeg, and only to decode and encode. The player, audio/video sync, the
 interface and compositing are our own.
 
@@ -15,12 +15,12 @@ interface and compositing are our own.
 The names are generic and the icons are our own, drawn with nodes like those of the other apps.
 We took the way the apps of popular desktop systems work, never their logos or their design.
 
-## Screenshots (VM 119, real lord-server, Proxmox `screendump`)
+## Screenshots (VM 119, real axia-server, Proxmox `screendump`)
 
 | | |
 |---|---|
 | ![photo library](photos-library.png) | ![avif](photos-avif.png) |
-| Photo library: thumbnails made by lord-media (PNG, JPEG, WebP, BMP, HEIC, AVIF and GIF) | Viewer with an AVIF |
+| Photo library: thumbnails made by axia-media (PNG, JPEG, WebP, BMP, HEIC, AVIF and GIF) | Viewer with an AVIF |
 | ![zoom](photos-zoom.png) | ![edit](photos-edit.png) |
 | Rotated 90° and at 150 % | Editing: crop, brightness and contrast live; "Save as copy" |
 | ![albums](music-albums.png) | ![playing](music-now-playing.png) |
@@ -57,7 +57,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
  apps (React)  Photos · Player · Screenshots · Camera · Recorder
       │         <MediaView media={id}/> · sdk/media.js (media, usePlayer, nowPlaying)
       ▼
- lord-server   ui/js_media.c (lord.media, validation and permissions)
+ axia-server   ui/js_media.c (lord.media, validation and permissions)
       │        media/media.c   helpers, jobs, thumbnails, paths
       │        media/mview.c   draws the media node (direct copy, zoom, rotation, mipmaps)
       │        media/capture.c screenshots, recording, remote desktop, protected windows
@@ -65,30 +65,30 @@ We took the way the apps of popular desktop systems work, never their logos or t
       │        media/annot.c   annotations
       │   SEQPACKET socket + fds (media/proto.h)   shared memory (frames, audio)
       ▼
- lord-media    media/helper/*  (FFmpeg + libva; sandbox; no network or files)
+ axia-media    media/helper/*  (FFmpeg + libva; sandbox; no network or files)
 ```
 
-### The `lord-media` helper
+### The `axia-media` helper
 
-- **How it's launched:** lord-server launches it on demand (`media_spawn`), with a fixed path:
-  `<lord-server folder>/lord-media`, which must be owned by root or the user and not writable by
+- **How it's launched:** axia-server launches it on demand (`media_spawn`), with a fixed path:
+  `<axia-server folder>/axia-media`, which must be owned by root or the user and not writable by
   others. It takes no arguments, the environment is minimal and the socket goes on fd 3. There is
   one per player, camera or recording, and two *workers* for short jobs (thumbnails and probes in
   the background; images, edits and exports in the foreground). Workers exit on their own after
   20 s without work. A one-shot `MK_HWPROBE` helper lists, once per boot, which codecs VA-API
   decodes on the render nodes it gets (`lm_hwprobe.c`, for "Video in the browser": see
   [VIDEO.md](VIDEO.md)). A one-shot `MK_VBENCH` helper (0.8.6, LordBench) gets no fds at all: it makes
-  its test clips in memory and answers only fixed `MM_BENCH` records (`lm_vbench.c`, lord-server's side in
+  its test clips in memory and answers only fixed `MM_BENCH` records (`lm_vbench.c`, axia-server's side in
   `bench/lbvideo.c`; see [BENCHMARK.md](BENCHMARK.md)).
-- **It never receives a path.** lord-server validates each path with the same rules as `lord.fs`
+- **It never receives a path.** axia-server validates each path with the same rules as `lord.fs`
   (home folder and the user's mounts), opens the file and passes it the fd.
   - Outputs are created as temporary files next to the destination. When they finish well they're
     renamed with `RENAME_NOREPLACE`, so a file is never overwritten.
   - The camera (`/dev/videoN`) and the render node (`/dev/dri/renderD*`, for VA-API) are opened by
-    lord-server too.
+    axia-server too.
   - Audio doesn't arrive as a socket (see "Audio").
 - **Sandbox:** the one the helpers share, `sandbox_apply_helper` from `sec/sandbox.c` (the same as
-  lord-doc). It's applied before reading a byte of the file and before initializing VA-API:
+  axia-doc). It's applied before reading a byte of the file and before initializing VA-API:
   - Landlock: read-only `/usr/lib`, `/usr/share`, `/etc/ld.so.cache` and `/sys/devices`; nothing
     from the home folder, `/tmp`, `/dev` or `/run`;
   - seccomp with TSYNC: no `socket`/`connect`/`bind`, no `exec`, `clone` only for threads, and
@@ -99,9 +99,9 @@ We took the way the apps of popular desktop systems work, never their logos or t
   `build/media-test sandbox` tests it from outside: opening `/etc/passwd` or `/home`, creating in
   `/tmp`, an AF_INET or AF_UNIX `socket`, `fork` and `exec`: all fail.
 - **If it crashes, the desktop carries on.**
-  - lord-server never waits for the helper: non-blocking socket, small messages.
+  - axia-server never waits for the helper: non-blocking socket, small messages.
   - The shared memory the helper sends must come sealed against shrinking (`F_SEAL_SHRINK`, it is
-    checked): a compromised helper can't bring lord-server down with `SIGBUS`.
+    checked): a compromised helper can't bring axia-server down with `SIGBUS`.
   - When the socket closes, the window gets `closed` (`crashed: true`) and shows a notice. The
     process is waited for or killed.
   - Tested with a real bug (a queue overflow at the end of the file, now fixed): the segfault ended
@@ -116,7 +116,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
     that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
     hand over none; a frame clears its own count, so one damaged packet changes nothing) make the player open a software
     decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames
-    (`build/lord-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
+    (`build/axia-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
     load from other jobs): a 640 × 360 H.264 clip with no audio, five runs of each, 119 frames received in 4 s and a largest gap
     of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, 6 s, two runs with the decoder failure, one with each other case), the switch
     is a seek: the audio left in the ring is dropped, the largest gap was 229–272 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended 0.2–0.6 s
@@ -124,9 +124,9 @@ We took the way the apps of popular desktop systems work, never their logos or t
 
 ### Video frames: a single copy
 
-1. lord-media decodes and scales each frame (swscale, with the video's BT.709/601 color matrix)
-   **to the exact size it's shown at**. lord-server tells it the node's box with `MM_SIZE`.
-2. It writes it into one of three slots of a sealed memfd and announces `MM_FRAME`. lord-server
+1. axia-media decodes and scales each frame (swscale, with the video's BT.709/601 color matrix)
+   **to the exact size it's shown at**. axia-server tells it the node's box with `MM_SIZE`.
+2. It writes it into one of three slots of a sealed memfd and announces `MM_FRAME`. axia-server
    replies `MM_ACK` when it starts showing it, and from then on the previous ones are free. If no
    slot is free, the frame is dropped instead of waiting.
 3. The `media` node copies the slot straight onto the canvas (`canvas_blit`): that's the
@@ -136,7 +136,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
 4. **Painting from the video:** if everything that changed in the frame is inside an opaque video
    (`media_cover_node`), `paint.c` doesn't paint what lies below it in paint order (background,
    windows behind, the Dock's blur); it walks those nodes only for their clips. The layers on top
-   (controls, subtitles) are painted as usual. It brought lord-server's cost with a 1080p video
+   (controls, subtitles) are painted as usual. It brought axia-server's cost with a 1080p video
    down from 42 % to 11–13 % of a core in a window, and from 92 % to 14 % in full screen (see
    "Measurements"). It isn't used on the GPU path, which builds its window list there.
 
@@ -145,32 +145,32 @@ changed is uploaded. **Pending:** true zero-copy, exporting the VA-API surface a
 and importing it through EGL as an external texture. It wasn't written because there's nowhere to
 test it: neither the VM nor the host has a GPU with VA-API.
 
-### Audio: PipeWire belongs to lord-server, not the helper
+### Audio: PipeWire belongs to axia-server, not the helper
 
 The PipeWire socket (PulseAudio protocol) allows loading modules, recording other streams and
 changing the output, so a compromised decoder must not have it. Audio goes through shared memory
 (`media/aring.h`):
 
 - **Playback:**
-  - lord-media writes PCM (s16, 48 kHz, stereo) into a 1.4 s ring that lord-server creates (sealed
+  - axia-media writes PCM (s16, 48 kHz, stereo) into a 1.4 s ring that axia-server creates (sealed
     memfd).
-  - lord-server owns the PipeWire stream (`maudio.c`, with the asynchronous client `mpulse.c`) and
+  - axia-server owns the PipeWire stream (`maudio.c`, with the asynchronous client `mpulse.c`) and
     copies from the ring when PipeWire asks (`REQUEST`).
   - The stream shows up as "Player" in Settings → Sound, and the volume is set there.
 - **The clock:**
-  - After each `GET_PLAYBACK_LATENCY`, every 40 ms while playing, lord-server writes into the
+  - After each `GET_PLAYBACK_LATENCY`, every 40 ms while playing, axia-server writes into the
     ring's page which byte is being heard (`read_index − output latency`) and at which
     `CLOCK_MONOTONIC` instant, with a seqlock.
-  - lord-media reads it without locks or round trips and presents each frame when
+  - axia-media reads it without locks or round trips and presents each frame when
     `pts ≤ clock + 4 ms`; if it's late, it drops it.
-  - Without audio, the clock is the system clock. If lord-server stops reading the ring for more
+  - Without audio, the clock is the system clock. If axia-server stops reading the ring for more
     than 2 s (PipeWire went down), the video carries on with the system clock.
-- **Recording** (microphone, after the permission): the other way around. lord-server owns the
-  recording stream and writes into the ring; lord-media reads it for the Recorder's WAV or the AAC
+- **Recording** (microphone, after the permission): the other way around. axia-server owns the
+  recording stream and writes into the ring; axia-media reads it for the Recorder's WAV or the AAC
   of screen and camera recordings.
-- **Seek:** lord-media bumps `serial` and `discard_to`; lord-server drops what came before and
+- **Seek:** axia-media bumps `serial` and `discard_to`; axia-server drops what came before and
   does a `FLUSH` of the stream.
-- **Distrust:** lord-server never trusts the shared header (the other side can write it). It uses
+- **Distrust:** axia-server never trusts the shared header (the other side can write it). It uses
   its own size and its own cursor and bounds everything (`ar_write_t`, `ar_read_t`,
   `ar_avail_t`): the worst that can happen is lost or repeated audio.
 
@@ -236,7 +236,7 @@ passes the media keys and Print Screen to LordOS even when a Wayland app has foc
 | `control(id, 'play'\|'pause'\|'seek'\|'volume'\|'audioTrack'\|'subTrack'\|'loop', value)` | |
 | `view(id, { fit, zoom, cx, cy, rotate, mirror, background, brightness, contrast })` | How it's drawn in `<MediaView>` |
 | `image(app, path)` → id | Decoded photo (`ready` event) |
-| `thumb(path, side)` | Path in `~/.cache/lordos/thumbs` or `null` while it's being made (`thumb` event) |
+| `thumb(path, side)` | Path in `~/.cache/axia/thumbs` or `null` while it's being made (`thumb` event) |
 | `probe(path)`, `waveform(path, bars)`, `poster(path, side)` + `take(id)` | Jobs (`job` event); `poster` leaves RGBA pixels |
 | `edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, format, quality })` | Edited copy |
 | `transcode(app, path, output, { format: 'opus'\|'mp3'\|'wav', from, to })` | Export audio with trimming |
@@ -268,7 +268,7 @@ Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `st
 ## Files and Files (the app)
 
 - **Thumbnails:**
-  - they go in `~/.cache/lordos/thumbs/<sha256 of path, date, size and side>.png`;
+  - they go in `~/.cache/axia/thumbs/<sha256 of path, date, size and side>.png`;
   - the background worker makes them;
   - the ones that fail aren't requested again during the session;
   - Files uses them for videos, audio covers and the images stb doesn't read (WebP, HEIC, AVIF).
@@ -280,7 +280,7 @@ Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `st
   - recordings in `~/Music/Recordings`;
   - with xdg-user-dirs the user's folders are respected, and the subfolder's name follows the
     language (`Capturas`, `Cámara`, `Grabaciones` in Spanish).
-- **Music library:** saved in `~/.cache/lordos/music.json`, by path, size and date. Only the tags
+- **Music library:** saved in `~/.cache/axia/music.json`, by path, size and date. Only the tags
   of what changed are read again.
 
 ## Measurements (VM 119)
@@ -288,7 +288,7 @@ Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `st
 Big Buck Bunny 1080p H.264 at 30 frames/s with MP3 audio. VM with 4 vCPU (Xeon Silver 4108 at
 1.8 GHz) and virtio-gpu without 3D, so it composites on the CPU and **there is no VA-API**.
 
-| Test | lord-server | lord-media | Frames |
+| Test | axia-server | axia-media | Frames |
 |---|---|---|---|
 | `media-test` (no compositor, 960×540) | — | 37–43 % | 30.0/s, 0 dropped in 60 s |
 | In the session, windowed (~958×539), before painting from the video | 41.5 % | 38–42 % | |
@@ -303,8 +303,8 @@ it, not counting vblank):
 
 | | Mean | Maximum |
 |---|---|---|
-| Before (lord-media with the PipeWire socket, latency on the same stream) | 0.97–1.01 ms | 25–28 ms |
-| Now (lord-server ring + seqlock clock), `media-test` | 1.7–1.9 ms | 4–10 ms |
+| Before (axia-media with the PipeWire socket, latency on the same stream) | 0.97–1.01 ms | 25–28 ms |
+| Now (axia-server ring + seqlock clock), `media-test` | 1.7–1.9 ms | 4–10 ms |
 | Now, in the session (60 s) | 0.55 ms | 31 ms (at startup) |
 
 The test clip is a `testsrc2` with a 100 ms beep every second (`sync.mp4`). In both versions
@@ -316,21 +316,21 @@ something changes), 0 dropped frames.
 
 **To measure VA-API on the AMD PC** (live ISO):
 1. `vainfo`: it must say radeonsi and list `H264`.
-2. Play a 1080p video and look in `~/.cache/lordos/session.log` for the playback summary line
+2. Play a 1080p video and look in `~/.cache/axia/session.log` for the playback summary line
    (`media: playback (…): …, VA-API, …`).
 3. With `python3 server/tests/media_cpu.py 30` (or `top`), compare against
    `LORD_MEDIA_HWACCEL=none`.
 
 ## Tests
 
-- `make -C server build/lord-media build/media-test` (needs FFmpeg's `-dev` packages; if they're
-  missing, `make` builds everything else without `lord-media`).
-- `build/media-test probe|thumb|image|wave|export|edit|play|sandbox` launches `lord-media` the same
-  way lord-server does, with no arguments and with fds:
+- `make -C server build/axia-media build/media-test` (needs FFmpeg's `-dev` packages; if they're
+  missing, `make` builds everything else without `axia-media`).
+- `build/media-test probe|thumb|image|wave|export|edit|play|sandbox` launches `axia-media` the same
+  way axia-server does, with no arguments and with fds:
   - `play` measures frames, drops, A/V offset and CPU, with audio through `maudio.c` as in the
     session;
   - `sandbox` checks the sandbox.
-- **On VM 119**, with lord-server installed as in the `.deb` (`/usr/lib/lordos`,
+- **On VM 119**, with axia-server installed as in the `.deb` (`/usr/lib/lordos`,
   `lordos.service`), the screenshots above were taken:
   - all the apps;
   - permissions;

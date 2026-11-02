@@ -8,7 +8,7 @@ import { mdToHtml, mdToText } from './md.js';
 import { formatSize } from './util.js';
 
 // An attachment is a path (Mail in the session) or { fd, name, size } (Mail in its own process: a
-// file from the system dialog, or a cached attachment lord-server opened for it).
+// file from the system dialog, or a cached attachment axia-server opened for it).
 const attName = (p) => (typeof p === 'object' ? p.name : fs.basename(p));
 const attKey = (p) => (typeof p === 'object' ? `fd:${p.fd}` : p);
 function attSize(p) {

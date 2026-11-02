@@ -42,7 +42,7 @@ function useWidth(ref, fallback) {
 // place in the desktop, proportional to its logical size, drawn as a small screen with its number
 // (with several displays), name and resolution. Dragging is magnetic (sdk/displaylayout.js): edges
 // stick edge to edge and tops/bottoms, lefts/rights and centers align within 12 preview px; on drop
-// the display always touches another and never overlaps one, and lord-server keeps that position.
+// the display always touches another and never overlaps one, and axia-server keeps that position.
 // A click selects a display and shows its number on the real screen (identifyDisplays). The white bar
 // marks the main display (menu bar, Dock).
 function Arrangement({ outs, sel, onSelect, mirror, nums, t }) {

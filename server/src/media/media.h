@@ -1,6 +1,6 @@
-/* media.h — media in lord-server (see media.c and docs/MEDIA.md).
+/* media.h — media in axia-server (see media.c and docs/MEDIA.md).
  *
- * lord-server NEVER links FFmpeg: it launches its helper lord-media (fixed path, no arguments) and
+ * axia-server NEVER links FFmpeg: it launches its helper axia-media (fixed path, no arguments) and
  * passes it the files already open. What lives here:
  *   - the helpers (player, camera, recordings and two «workers» for short jobs);
  *   - the image «sources» that a `media` node (<MediaView>) draws: video frames over

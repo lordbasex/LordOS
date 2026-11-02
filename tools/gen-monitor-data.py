@@ -6,7 +6,7 @@ Usage:
 
 Generates (with the Python standard library only, no network):
   assets/monitor/land.bin             country outlines (Natural Earth 1:50m, public domain),
-                                      simplified and in hundredths of a degree; lord-server
+                                      simplified and in hundredths of a degree; axia-server
                                       fills them as vectors at any zoom (server/src/monitor/map.c)
   assets/monitor/geoip-country.mmdb.xz   IP → country (DB-IP Lite Country, CC BY 4.0), in a minimal
                                       MaxMind DB format (only {"country": {"iso_code"}}), compressed with xz
@@ -241,7 +241,7 @@ def build_mmdb(csv_path, out):
     meta += mm_str('build_epoch') + mm_uint(int(time.time()), 9)
     meta += mm_str('languages') + bytes([0x00, 0x04])   # empty array
     db = bytes(tree) + b'\x00' * 16 + data + b'\xab\xcd\xefMaxMind.com' + meta
-    # compressed with xz (LZMA2 only, CRC64): lord-server decompresses it with its own xz
+    # compressed with xz (LZMA2 only, CRC64): axia-server decompresses it with its own xz
     with open(out, 'wb') as f:
         f.write(lzma.compress(db, format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64, preset=9 | lzma.PRESET_EXTREME))
     return node_count, len(merged)

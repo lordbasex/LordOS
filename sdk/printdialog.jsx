@@ -1,6 +1,6 @@
 // printdialog.jsx — the system print dialog (print.open in print.js). It is mounted by
 // startShell, so any app uses it without drawing anything of its own. The preview is the same
-// confined PDF reader (lord-doc): what you see is what is sent to CUPS.
+// confined PDF reader (axia-doc): what you see is what is sent to CUPS.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, addListener, mainBox } from '@lordos/runtime';
 import { useStore } from './store.js';

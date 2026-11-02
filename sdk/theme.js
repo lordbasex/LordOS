@@ -53,7 +53,7 @@ function publishTokens(value) {
 }
 
 // Linux apps (GTK, GNOME, Qt) read the mode, accent and title-bar button order through
-// org.freedesktop.portal.Settings, served by lord-server (ui/portal.c). gtkButtons is the
+// org.freedesktop.portal.Settings, served by axia-server (ui/portal.c). gtkButtons is the
 // GTK order: traffic lights on the left, or buttons on the right in a taskbar-style theme.
 const GNOME_ACCENTS = { azul: 'blue', violeta: 'purple', rosa: 'pink', naranja: 'orange', verde: 'green', grafito: 'slate',
   rojo: 'red', amarillo: 'yellow', turquesa: 'teal', celeste: 'blue' };

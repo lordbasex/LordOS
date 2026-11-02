@@ -15,5 +15,5 @@ In [Settings → Language & Region](settings:language):
   [Clock](help:clock).
 - **Language packages:** dictionaries, manuals and fonts for that script.
 
-LordOS also renders Arabic, Hebrew and other complex scripts properly: with a right-to-left
+Axia DE also renders Arabic, Hebrew and other complex scripts properly: with a right-to-left
 language, the whole interface is mirrored.

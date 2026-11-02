@@ -17,9 +17,9 @@ editor, generator, first run); the shots below are from the first version.
 | ![Create the vault](passwords-create.png) | ![Unlock with the master password](passwords-unlock.png) |
 | Creating the vault: choose how it unlocks (password, FIDO2 key, key file, password + key file) | Locked vault: one tab per unlock method present in the file |
 | ![Internet item with TOTP](passwords-internet.png) | ![2FA codes](passwords-2fa.png) |
-| An *Internet* item: website, user, hidden password (reveal/copy), live 2FA code with countdown, notes, reminder "change every 90 days" | All 2FA codes with their countdown; the TOTP secret never leaves `lord-vault` |
+| An *Internet* item: website, user, hidden password (reveal/copy), live 2FA code with countdown, notes, reminder "change every 90 days" | All 2FA codes with their countdown; the TOTP secret never leaves `axia-vault` |
 | ![Wi-Fi QR](passwords-wifi-qr.png) | ![Identity document with photo](passwords-identity.png) |
-| Wi-Fi: the QR code to join from a phone (`WIFI:T:WPA;S:…;P:…;;`) is generated inside `lord-vault` | *Identity and documents*: encrypted photo attachment previewed (decoded and downscaled inside `lord-vault`) |
+| Wi-Fi: the QR code to join from a phone (`WIFI:T:WPA;S:…;P:…;;`) is generated inside `axia-vault` | *Identity and documents*: encrypted photo attachment previewed (decoded and downscaled inside `axia-vault`) |
 | ![Finance](passwords-finance.png) | ![Card](passwords-card.png) |
 | *Finance*: password and coordinates card revealed on request; the "change every 90 days" reminder is overdue | *Cards*: the list shows only the last 4 digits; number, CVV and PIN stay hidden |
 | ![Servers/SSH](passwords-ssh-key.png) | ![Crypto](passwords-crypto-wallet.png) |
@@ -33,7 +33,7 @@ editor, generator, first run); the shots below are from the first version.
 | ![Unlock with a USB key file](passwords-unlock-usb-key.png) | ![Unlock with a FIDO2 key](passwords-unlock-security-key.png) |
 | Unlocking with a key file on a USB stick (`/media/pwtest/PENDRIVE`) | Unlocking with a FIDO2 security key (here the software authenticator, see "Testing") |
 | ![Vault settings](passwords-settings.png) | ![USB permission prompt](passwords-security-key-permission.png) |
-| Unlock methods: password, recovery key, FIDO2 key and key file side by side; each wraps the same vault key | Using the security key goes through the system permission prompt (the per-app `usb` permission); only `lord-server` opens `/dev/hidrawN` |
+| Unlock methods: password, recovery key, FIDO2 key and key file side by side; each wraps the same vault key | Using the security key goes through the system permission prompt (the per-app `usb` permission); only `axia-server` opens `/dev/hidrawN` |
 | ![Chromium offers to save](passwords-browser-save.png) | ![Chromium Safe Storage in the session keyring](passwords-browser-keyring.png) |
 | Chromium (Wayland, `--password-store=gnome-libsecret`) saving a password | …its "Chromium Safe Storage" key lands in our Secret Service, visible in *Session keyring* |
 | ![Chromium autofills after a restart](passwords-browser-autofill.png) | ![Protected window in a capture](passwords-protected-capture.png) |
@@ -47,18 +47,18 @@ editor, generator, first run); the shots below are from the first version.
 
 ```
  Passwords app process                       Settings → Network, Mail, … (sdk keyring)
- (lord-server --app passwords, sandboxed;            │ lord.vault.request(json, files)
+ (axia-server --app passwords, sandboxed;            │ lord.vault.request(json, files)
   apps/passwords, src/ui/js_vault.c app mode)        │
         │ own channel (vc_attach_app)                ▼
-        │ LORD_VAULT_FD                     lord-server  (src/vault/vclient.c, src/ui/js_vault.c)
-   - spawns lord-vault (fixed path, no args, minimal env), one per session
+        │ LORD_VAULT_FD                     axia-server  (src/vault/vclient.c, src/ui/js_vault.c)
+   - spawns axia-vault (fixed path, no args, minimal env), one per session
    - opens files the user picked (validated like lord.fs) and passes only fds
    - opens /dev/hidrawN for FIDO2 after the `usb` permission, passes the fd
    - connects the session D-Bus socket and passes it (Secret Service)
    - screen lock / user switch → "lock-all"; login → session password (RP_KEYRING)
         │ SOCK_SEQPACKET, JSON messages, SCM_RIGHTS (src/vault/vwire.c)
         ▼
- lord-vault  (src/vault/vault.c, keyring.c, …) — sandbox_apply_helper:
+ axia-vault  (src/vault/vault.c, keyring.c, …) — sandbox_apply_helper:
    no network, no new sockets, no exec, threads only, Landlock: only the vault folder (fd)
    - XChaCha20-Poly1305 + Argon2id (Monocypher), the .lvault format
    - decrypted vaults in the secret arena (mlock, MADV_DONTDUMP, wiped on lock)
@@ -69,34 +69,34 @@ editor, generator, first run); the shots below are from the first version.
 
 **Why this split.** Everything that touches plaintext vault data, parses untrusted files (KDBX,
 CSV, JSON, images with QR codes) or talks to the security key runs in one small helper that cannot
-open the network, sockets or paths, the same model as `lord-doc` and `lord-media`
-(`docs/PRIVACY.md`, "Decoding helpers"). `lord-server` (the compositor) only relays: it never holds
+open the network, sockets or paths, the same model as `axia-doc` and `axia-media`
+(`docs/PRIVACY.md`, "Decoding helpers"). `axia-server` (the compositor) only relays: it never holds
 the vault key and never parses the vault. The UI gets just what it shows:
 
 - the list view gets titles, user names, URLs, tags and flags, **never** a secret;
 - an open item comes with hidden fields as `{"has": true}`; a value travels only when the user
   clicks reveal, copy or edits it;
-- TOTP secrets never leave `lord-vault`: the UI receives the 6–8 digit code and the seconds left;
-- the Wi-Fi QR is built from the item inside `lord-vault`; the UI receives a bitmap.
+- TOTP secrets never leave `axia-vault`: the UI receives the 6–8 digit code and the seconds left;
+- the Wi-Fi QR is built from the item inside `axia-vault`; the UI receives a bitmap.
 
 ### The UI runs in its own sandboxed process (app mode)
 
 The Passwords window is not drawn by the session's JavaScript context: it is its own process,
-`lord-server --app passwords` (a Wayland client of the compositor with Landlock + seccomp and no
+`axia-server --app passwords` (a Wayland client of the compositor with Landlock + seccomp and no
 network, like an installed `.lpk`). Revealed values, edited fields and the decrypted list live only
-in that process and in `lord-vault`; `lord-server`'s QuickJS heap never sees them.
+in that process and in `axia-vault`; `axia-server`'s QuickJS heap never sees them.
 
 | Piece | How |
 |---|---|
 | System package | `tools/build-theme.mjs` builds every built-in app whose manifest says `"process": "isolated"` into `assets/sysapps/<id>/` (`app.js`, `manifest.json`, `locales/`). `app_package_dir()` (`src/app/appspawn.c`) prefers that folder (root- or user-owned, not world-writable) over a user `.lpk` with the same id, so a package cannot shadow it. |
 | Vault channel | `app_spawn()` calls `vc_attach_app()` **only** for the system `passwords` package and hands the socket to the child as `LORD_VAULT_FD`. In the app, `js_vault_register_app()` exposes the same `lord.vault` API over that socket (non-blocking `vw_feed` polling, `lord.vault.appMode = true`). The relayed JSON is wiped after use. |
-| Files | The system's own open/save dialog (powerbox, drawn by `lord-server`) picks the file; the app gets only the fd and passes it on to `lord-vault` (`request(json, { fds })`). Key files, attachments, import, export, the breach list and QR images all go this way. |
-| FIDO2 | `BOP_VAULT_FIDO`: after the user allows `usb`, `lord-server` opens the hidraw device and gives it straight to `lord-vault` (`vc_fido_attach`); the app never holds the device. Only the app spawned with a vault channel may ask. |
-| Clipboard | `BOP_CLIP_SECRET`: the copy is marked sensitive (out of the history, password-manager hint for Wayland clients) and `lord-server` clears it after the chosen seconds if it still holds the same text (compared by SHA-256; the text is not kept). |
+| Files | The system's own open/save dialog (powerbox, drawn by `axia-server`) picks the file; the app gets only the fd and passes it on to `axia-vault` (`request(json, { fds })`). Key files, attachments, import, export, the breach list and QR images all go this way. |
+| FIDO2 | `BOP_VAULT_FIDO`: after the user allows `usb`, `axia-server` opens the hidraw device and gives it straight to `axia-vault` (`vc_fido_attach`); the app never holds the device. Only the app spawned with a vault channel may ask. |
+| Clipboard | `BOP_CLIP_SECRET`: the copy is marked sensitive (out of the history, password-manager hint for Wayland clients) and `axia-server` clears it after the chosen seconds if it still holds the same text (compared by SHA-256; the text is not kept). |
 | Protection | The manifest says `"protected": true`; `sdk/wayland.js` marks the app's Wayland window protected as soon as it maps, so it is black in screenshots, recordings and the remote desktop (`passwords-app-screenshot.png`). |
 | Window | Opening Passwords (Dock, app launcher, Search, `wm.open('passwords')`) starts the process or focuses its window; the manifest's `size`/`minSize` now size the app window. |
 
-**Fallback.** If `lord-server` has no app mode or the system package is missing (a dev tree
+**Fallback.** If `axia-server` has no app mode or the system package is missing (a dev tree
 without `npm run build`), the same UI runs in the shell's context as before (path-based files, the
 in-app file picker, the shell clipboard timer). The vault itself is unchanged either way.
 
@@ -114,9 +114,9 @@ covered the whole form.
 ## The vault format (`.lvault`, version 1)
 
 One file, portable: copy it, back it up, carry it on a USB stick. The default vault is
-`~/.local/share/lordos/vault/contrasenas.lvault`; the session keyring is `login.lvault` next to
+`~/.local/share/axia/vault/contrasenas.lvault`; the session keyring is `login.lvault` next to
 it. Both folders are on the `lord.fs` deny list (`fsops_protected`): JavaScript cannot overwrite
-or delete them; only `lord-vault` writes there.
+or delete them; only `axia-vault` writes there.
 
 ```
 header   magic "LORDVLT\x1a" | u16 version=1 | u16 minor | u32 header_len | vault_id[16]
@@ -158,7 +158,7 @@ trailer  "LVLTEND\0" | u64 total_len
   file to a temporary name and `renameat` it over `name.bak` (so `.bak` is always the previous
   version, replaced atomically); `renameat` the new file over `name`; `fsync` the folder. At every
   moment there is a complete vault on disk. This works inside Landlock because everything happens
-  within the one folder `lord-vault` received as an fd.
+  within the one folder `axia-vault` received as an fd.
 - **Argon2id cost** is stored per slot and tuned per machine (`vf_calibrate`): it measures one
   pass at 64 MiB, then picks memory (19–256 MiB, at most 1/8 of RAM) and passes for ~0.7 s.
   "Settings → Preferences → Measure" shows what this machine would use; changing the password
@@ -182,9 +182,9 @@ trailer  "LVLTEND\0" | u64 total_len
 Several methods can coexist; at least one besides the recovery key must remain.
 
 **Device access.** `lord.vault.fidoAttach(app)` only works when the app holds the `usb` permission
-(system prompt, stored in `permisos.json`, checked in C). `lord-server` finds FIDO devices by the
+(system prompt, stored in `permisos.json`, checked in C). `axia-server` finds FIDO devices by the
 HID report descriptor (usage page 0xF1D0, `src/vault/fidodev.c`), opens `/dev/hidrawN` and passes
-the fd to `lord-vault`. Neither the app nor its JavaScript ever sees the device.
+the fd to `axia-vault`. Neither the app nor its JavaScript ever sees the device.
 FIDO hidraw nodes need a udev rule because LordOS sessions are not logind seat sessions
 (`TAG+="uaccess"` does not apply):
 
@@ -224,8 +224,8 @@ Locking frees the model block by block; every arena block is wiped on free.
   sensitive LordOS clipboard, the KDE/GNOME convention clipboard managers honour
   (`src/wl/wl.c`). The bytes handed to Wayland clients are wiped after sending.
 - The clipboard is cleared after 30 s (configurable: 15/30/60/120 s) if it still holds the same
-  value: by `lord-server` in app mode (`BOP_CLIP_SECRET`), by the app in the in-process fallback.
-  Replacing the clipboard also wipes the previous text in `lord-server` (`term_set_clipboard`).
+  value: by `axia-server` in app mode (`BOP_CLIP_SECRET`), by the app in the in-process fallback.
+  Replacing the clipboard also wipes the previous text in `axia-server` (`term_set_clipboard`).
 
 ## The session keyring (`login.lvault`)
 
@@ -235,10 +235,10 @@ A separate vault, like the *login* keyring of other desktop systems:
    `/etc/shadow`, unchanged).
 2. Right after, the login worker sends it once over the session socket as `RP_KEYRING` (accepted
    only from a root peer, `src/remote/mirror.c`) and wipes its copy.
-3. `lord-server` forwards it to `lord-vault` (`session-password` on the control channel) and wipes
-   its buffers; `lord-vault` opens `login.lvault` (a `session` slot, Argon2id tuned to ~0.4 s) or
+3. `axia-server` forwards it to `axia-vault` (`session-password` on the control channel) and wipes
+   its buffers; `axia-vault` opens `login.lvault` (a `session` slot, Argon2id tuned to ~0.4 s) or
    creates it on first login.
-4. If the account password was changed outside LordOS, the slot no longer opens: `lord-vault` emits
+4. If the account password was changed outside LordOS, the slot no longer opens: `axia-vault` emits
    `keyring-mismatch` (the UI can ask for the old password; re-wrapping is a `password-change` on
    `v:"login"`).
 
@@ -270,7 +270,7 @@ await keyring.list('mail');                         // without secrets
 - **Trust boundary:** built-in apps (other than the isolated system packages: Passwords, and since
   0.8.2 Mail, Calendar, Contacts and Reminders) run in the shell's JavaScript context, so for them the owner
   string is passed by trusted system code, not enforced by a process boundary. For isolated `.lpk`
-  apps the owner is set by `lord-server` from the broker (see below). The Passwords app process
+  apps the owner is set by `axia-server` from the broker (see below). The Passwords app process
   manages the keyring over its own vault channel, which only the system `passwords` package
   receives.
 - **Settings → Network** now stores Wi-Fi passwords (`wifi:<ssid>`) and VPN credentials
@@ -280,7 +280,7 @@ await keyring.list('mail');                         // without secrets
 
 ### Keyring for isolated .lpk apps
 
-An isolated app (`lord-server --app <id>`) has no `lord.vault`; the same SDK calls go through the
+An isolated app (`axia-server --app <id>`) has no `lord.vault`; the same SDK calls go through the
 broker instead, and the `app` argument is ignored:
 
 ```js
@@ -296,20 +296,20 @@ How it works (`sec/brokerkr.c`, `ui/js_vault.c`):
 - The app calls `lord.keyring.request(op, service, account, label, secret)`, a broker request
   (`BOP_KEYRING`, payload `op\0service\0account\0label\0secret`; op is `get`, `set`, `delete`
   or `list`). Service, account and label are at most 255 bytes, the secret at most 64 KiB.
-- `lord-server` builds the `kr-*` request itself with **owner = `app.<id>`**, where `<id>` is the
+- `axia-server` builds the `kr-*` request itself with **owner = `app.<id>`**, where `<id>` is the
   app id it verified when it spawned the process. The app never sends an owner, and the `app.`
   prefix keeps a package called `mail` away from the desktop's own `mail` items.
-- The request goes to `lord-vault` on lord-server's control-side channel as a *private request*
-  (`vc_request_private`): its reply goes to a queue that only lord-server's C code reads, never
-  to the desktop's JavaScript. lord-server does not use `vc_attach_app` for these apps, because an
+- The request goes to `axia-vault` on axia-server's control-side channel as a *private request*
+  (`vc_request_private`): its reply goes to a queue that only axia-server's C code reads, never
+  to the desktop's JavaScript. axia-server does not use `vc_attach_app` for these apps, because an
   attached channel is the Passwords app's and may manage every item. Nothing waits: the reply
   wakes the main loop (an eventfd) and is sent back to the app; buffers that held a secret are
   wiped.
-- An app sees only its own items. If it asks (`get`) for an item another app saved, lord-vault
-  answers `not-shared` and lord-server shows the **system consent prompt** («"Notes" wants to use a
+- An app sees only its own items. If it asks (`get`) for an item another app saved, axia-vault
+  answers `not-shared` and axia-server shows the **system consent prompt** («"Notes" wants to use a
   password that "Sync" saved in the keyring», `privacy.ask.keyring`). If the user allows it,
-  lord-server records the share for that one item (`kr-share`) and asks again; if not, the app
-  gets `keyring.notShared`, and lord-server does not ask again for that app and item until the
+  axia-server records the share for that one item (`kr-share`) and asks again; if not, the app
+  gets `keyring.notShared`, and axia-server does not ask again for that app and item until the
   session ends (an app cannot keep the prompt on screen by asking in a loop). A shared item can be read, never changed or deleted, by the other
   app; for `set`, `delete` and `list` another app's items simply do not exist.
 - Errors are code lines (docs/LANGUAGES.md): `keyring.locked`, `keyring.noKeyring`,
@@ -317,7 +317,7 @@ How it works (`sec/brokerkr.c`, `ui/js_vault.c`):
   `keyring.busy`, `keyring.failed`, `vault.unavailable`. The SDK keeps the short codes of the
   shell (`e.code` = `locked`, `not-found`…, `e.errorCode` = the full code), so the same app code
   works in both places.
-- Test: `make -C server build/brokerkr-e2e && server/build/brokerkr-e2e` (needs `build/lord-vault`;
+- Test: `make -C server build/brokerkr-e2e && server/build/brokerkr-e2e` (needs `build/axia-vault`;
   isolation between two app ids, the prompt denied (and not asked again) and allowed, a desktop owner a package cannot
   reach, a missing item, bad requests, a locked keyring and an app that closed mid-request).
 
@@ -325,7 +325,7 @@ How it works (`sec/brokerkr.c`, `ui/js_vault.c`):
 
 `<AutofillButton app service|url|ssid onFill />` is a small 🔑 button next to a login field. It
 lists what the app saved in the keyring for that service plus matching Passwords items (by host,
-or by SSID for Wi-Fi) while the vault is unlocked; the secret leaves `lord-vault` only when the
+or by SSID for Wi-Fi) while the vault is unlocked; the secret leaves `axia-vault` only when the
 user picks one. Used in Settings → Network (Wi-Fi password, VPN credentials).
 
 ### Secret Service (`org.freedesktop.secrets`)
@@ -333,9 +333,9 @@ user picks one. Used in Settings → Network (Wi-Fi password, VPN credentials).
 Our own minimal D-Bus code (`src/vault/dbus.c`, `secretsvc.c`). Before writing it we checked: no
 LordOS binary links libdbus or libsystemd (sd-bus), so adding either would have been a new
 dependency; the protocol subset needed (SASL EXTERNAL, Hello, RequestName, method calls and
-returns, signals, properties) is small. `lord-server` connects the session bus socket
+returns, signals, properties) is small. `axia-server` connects the session bus socket
 (`DBUS_SESSION_BUS_ADDRESS` or `$XDG_RUNTIME_DIR/bus`) and passes it already connected; the
-sandboxed `lord-vault` authenticates and serves on it.
+sandboxed `axia-vault` authenticates and serves on it.
 
 - Objects: `/org/freedesktop/secrets` (Service), `/org/freedesktop/secrets/collection/login`
   (alias `default`), items below it, sessions and prompts.
@@ -345,7 +345,7 @@ sandboxed `lord-vault` authenticates and serves on it.
   base64.
 - If another service already owns the name (gnome-keyring, kwallet), LordOS does not take it.
   Two things keep it LordOS's (0.8.5): `lord-sessiond` starts a session only once the user's session
-  bus exists (with automatic login it used to start a few milliseconds earlier, and `lord-vault` then
+  bus exists (with automatic login it used to start a few milliseconds earlier, and `axia-vault` then
   never got on the bus), and the lordos package ships
   `/usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf`, which starts gnome-keyring (when
   an app pulls it in) with only its PKCS#11 component. Its D-Bus activation file runs only when
@@ -363,7 +363,7 @@ sandboxed `lord-vault` authenticates and serves on it.
 
 ## Import and export (`src/vault/vimport.c`, `kdbx.c`, `csvp.c`, `xmlmini.c`)
 
-All parsers run inside `lord-vault` on bytes read from an fd, allocate from the arena and were
+All parsers run inside `axia-vault` on bytes read from an fd, allocate from the arena and were
 fuzzed (truncation at every offset and random byte flips under ASan/UBSan).
 
 | Format | How |
@@ -396,11 +396,11 @@ many tags (with colours), favourite, archived, trash, history, attachments and a
 
 - **Weak:** strength below "fair" or in the bundled list of the 10,000 most common passwords
   (SecLists, MIT), also catching case, trailing digits/symbols and leetspeak variants.
-- **Reused:** grouped by a keyed BLAKE2b of the password (computed in `lord-vault`).
+- **Reused:** grouped by a keyed BLAKE2b of the password (computed in `axia-vault`).
 - **Old:** past their reminder, or unchanged for a year.
 - **Breached, offline only:** the common-password list, and optionally a local Have I Been Pwned
   "pwned-passwords-sha1-ordered-by-hash" file chosen by the user (binary search with `pread`).
-  Nothing is ever looked up online; `lord-vault` has no network at all.
+  Nothing is ever looked up online; `axia-vault` has no network at all.
 - **Generator:** passwords (length 8–64, classes, no look-alikes) and passphrases from the EFF large
   word list (7,776 words, CC BY 3.0 US), with separator, capitals and a digit. Random bytes from
   `getrandom` with rejection sampling.
@@ -409,7 +409,7 @@ many tags (with colours), favourite, archived, trash, history, attachments and a
 
 - RFC 6238 TOTP and RFC 4226 HOTP with SHA-1/256/512, 6–10 digits, any period; `otpauth://` URIs
   and bare base32 secrets.
-- Adding 2FA from a QR image: `qr-scan` decodes the PNG/JPEG inside `lord-vault` with our own QR
+- Adding 2FA from a QR image: `qr-scan` decodes the PNG/JPEG inside `axia-vault` with our own QR
   decoder (`src/vault/qr.c`: finder patterns, affine sampling with the alignment pattern, format
   and version info, Reed-Solomon correction).
 
@@ -421,7 +421,7 @@ many tags (with colours), favourite, archived, trash, history, attachments and a
 | Unlock with the master password | 435–660 ms (target 0.5–1 s) |
 | Session keyring at login | ~0.4 s, created on first login |
 | Search 10,001 items (model) | 0.44–1.60 ms |
-| Search 10,004 items (inside lord-vault, measured there) | worst 1.53 ms (< 10 ms) |
+| Search 10,004 items (inside axia-vault, measured there) | worst 1.53 ms (< 10 ms) |
 | List of 10,004 items to the UI | 1.7 MB in 43 ms round trip |
 | Open a vault with 10,004 items (recovery key, no Argon2) | 169 ms |
 | Import a 10,000-row Chrome CSV | 223 ms total (parse 14 ms) |
@@ -430,7 +430,7 @@ many tags (with colours), favourite, archived, trash, history, attachments and a
 | FIDO2 hmac-secret with the software key | ~307 ms (three simulated 100 ms touches) |
 | Wi-Fi QR encode / decode a 1000×1000 screenshot | 0.53 ms / 11.4 ms |
 | Secret Service DH modexp (1024 bit) | 5.3 ms |
-| lord-vault memory with the demo vault open | 28 KB in use, 256 KB mlocked, all regions locked |
+| axia-vault memory with the demo vault open | 28 KB in use, 256 KB mlocked, all regions locked |
 
 ## Testing
 
@@ -448,7 +448,7 @@ many tags (with colours), favourite, archived, trash, history, attachments and a
 
 Not part of `make test` because they need the real helper or root:
 
-- `build/vault-e2e` (51/51): drives the real sandboxed `lord-vault` through `vclient.c` (create,
+- `build/vault-e2e` (51/51): drives the real sandboxed `axia-vault` through `vclient.c` (create,
   unlock, wrong password, items, search, report, TOTP, QR, attachments, key file on a "USB",
   recovery key, password + key file, import/export, keyring ownership and sharing, screen lock
   closing Passwords but not the keyring, `NoNewPrivs`/`Seccomp` set, and the app channel from
@@ -474,7 +474,7 @@ whose only verification is built in (fingerprint) are not implemented/tested.
 |---|---|
 | `third_party/monocypher/` | Monocypher 4.0.2 (CC0/BSD-2), official tests and vectors |
 | `third_party/wordlists/` | EFF large word list (CC BY 3.0 US), 10k common passwords (SecLists, MIT) |
-| `server/src/vault/vault.c`, `vault_int.h` | `lord-vault`: process, sandbox, channels, requests |
+| `server/src/vault/vault.c`, `vault_int.h` | `axia-vault`: process, sandbox, channels, requests |
 | `server/src/vault/keyring.c` | session keyring, `kr-*` requests, Secret Service backend |
 | `server/src/vault/vfile.c` | the `.lvault` format, slots, KDF, atomic save |
 | `server/src/vault/vmodel.c` | decrypted content: items, search, list, history |
@@ -485,7 +485,7 @@ whose only verification is built in (fingerprint) are not implemented/tested.
 | `server/src/vault/ctap2.c`, `cbor.c`, `p256.c`, `fidodev.c` | FIDO2 client, CBOR, P-256, device discovery |
 | `server/src/vault/dbus.c`, `secretsvc.c` | own D-Bus and the Secret Service |
 | `server/src/vault/vimport.c`, `kdbx.c`, `csvp.c`, `xmlmini.c` | importers |
-| `server/src/vault/vclient.c`, `server/src/ui/js_vault.c` | lord-server side, `lord.vault` (shell and app mode) |
+| `server/src/vault/vclient.c`, `server/src/ui/js_vault.c` | axia-server side, `lord.vault` (shell and app mode) |
 | `server/src/app/appspawn.c`, `appclient.c` | system package lookup, the vault channel for the app, window size from the manifest |
 | `server/src/sec/brokersrv.c`, `server/src/ui/js_broker.c` | `BOP_VAULT_FIDO`, `BOP_CLIP_SECRET` |
 | `assets/sysapps/passwords/` | the built app process bundle (generated by `npm run build`) |

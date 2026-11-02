@@ -1,4 +1,4 @@
-/* mail_test.c — parsers of lord-maild (docs/MAIL.md): IMAP responses, MIME (multipart,
+/* mail_test.c — parsers of axia-maild (docs/MAIL.md): IMAP responses, MIME (multipart,
  * encodings, charsets), the HTML sanitizer against hostile input, iCalendar and vCard, and the
  * WebDAV XML reader. Every parser is also fed thousands of randomly mutated inputs (a small
  * deterministic fuzzer); run under -fsanitize=address,undefined in `make mail-asan`. */

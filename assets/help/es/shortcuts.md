@@ -49,7 +49,7 @@ Una pulsación rápida vuelve a la app anterior.
 En una app Linux, ❖C, V, X, A, Z, F, T, W, N, L, R, P y S llegan como Ctrl (como Ctrl+Mayús en un
 emulador de terminal, donde Ctrl+C es la interrupción), solo a esa app. Por eso ❖V pega y ❖L es su
 propio Ctrl+L: con una app Linux al frente la pantalla se bloquea con ❖⌃Q y el portapapeles se abre con
-❖⇧V. En una app de LordOS dentro de la sesión ❖V también pega; ❖⇧V es el portapapeles.
+❖⇧V. En una app de Axia DE dentro de la sesión ❖V también pega; ❖⇧V es el portapapeles.
 
 ## Lord Classic
 

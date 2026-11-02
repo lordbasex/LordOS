@@ -6,7 +6,7 @@
  *   icon.png        optional
  *   locales/<language>.json, *.wasm, images…   optional
  *
- * It is installed without root, in ~/.local/share/lordos/apps/<id>/ (user-only). The rules:
+ * It is installed without root, in ~/.local/share/axia/apps/<id>/ (user-only). The rules:
  * only regular files and folders (no links or devices), relative paths with letters,
  * digits, '.', '-' and '_' (no "..", no components starting with '.'), at most
  * LPK_MAX_FILES files and LPK_MAX_TOTAL bytes. It is decompressed in memory with stb_image's
@@ -164,7 +164,7 @@ const char *lpk_root(void) {
     const char *home = getenv("HOME");
     if (!home) return NULL;
     char tmp[PATH_MAX];
-    static const char *const parts[] = { "/.local", "/.local/share", "/.local/share/lordos", "/.local/share/lordos/apps" };
+    static const char *const parts[] = { "/.local", "/.local/share", "/.local/share/axia", "/.local/share/axia/apps" };
     for (size_t i = 0; i < sizeof parts / sizeof *parts; i++) {
         snprintf(tmp, sizeof tmp, "%s%s", home, parts[i]);
         if (mkdir(tmp, 0755) && errno != EEXIST) return NULL;

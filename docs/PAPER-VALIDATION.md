@@ -26,9 +26,9 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 1.2 | JavaScript has no API to run programs, with three narrow exceptions | Design (`AGENTS.md`); the exceptions grew since: Xwayland (0.8.3), the network connectors and the blocklist downloader (0.8.5) | **Outdated → corrected in 0.8.5** (§1.2 now lists them, the Store's download child included) |
 | 1.2 | GPU composition optional, the CPU path always works | Test (`canvas-test`, CPU path in every test); Check `gpu` says which path and why | Holds |
 | 1.2 | The compositor never waits on helpers or apps | Design (non-blocking sockets) | Design |
-| 2.2 | `lord-server` runs as the user | Check `serverUser` (configured) | Holds |
+| 2.2 | `axia-server` runs as the user | Check `serverUser` (configured) | Holds |
 | 2.4 | `lord-netd` only takes `net-*` actions from uid 0 peers | Design; `net-test` covers the actions | Partly tested |
-| 2.4 | `lord-fand` writes only fans its scan found and restores them on stop or crash | Test (`fan-test`, fake sysfs); Measured on the Pi 5 (§7.4) | Holds |
+| 2.4 | `axia-fand` writes only fans its scan found and restores them on stop or crash | Test (`fan-test`, fake sysfs); Measured on the Pi 5 (§7.4) | Holds |
 | 2.4 | (0.8.6) With no default chosen, a file opens with the system's default or the first installed app that declares its type, shown as "Automatic" | Test (`defaults-test`, fake XDG tree); checked once in an isolated session on VM 116 (2026-10-29) | Holds |
 | 2.4 | Display changes revert after 15 s without confirmation | Manual | Not automated |
 | 3.6 | Passwords are checked by the root process, not the login screen | Design; `remote-sec-test` covers the parsers | Design |
@@ -74,7 +74,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | § | Claim | How | State |
 |---|---|---|---|
 | 6.4 | Landlock ABI up to 6 for `.lpk` apps | Check `landlock` (configured) + Sandbox Probe `appSandbox` (effective) | Holds |
-| 6.4 | Seccomp denies ptrace, mount, exec…; no new privileges; no capabilities | Sandbox Probe (effective: each tried; NoNewPrivs, Seccomp 2, CapEff 0 read by lord-server); Test (`sandbox-test`) | Holds |
+| 6.4 | Seccomp denies ptrace, mount, exec…; no new privileges; no capabilities | Sandbox Probe (effective: each tried; NoNewPrivs, Seccomp 2, CapEff 0 read by axia-server); Test (`sandbox-test`) | Holds |
 | 6.4 | Per-app cgroup: memory.high 192 MB, memory.max 512 MB, one core | Sandbox Probe `appScope` (memory.max) | Holds in a session; memory.high and CPU not shown yet |
 | 6.4 | No network permission: no internet sockets, no TCP | Sandbox Probe (`netInet` refused) | Holds |
 | 6.4 | `sandbox-test` 14/14 and 14/14 with network | Test (`test-full`) | Holds |
@@ -103,9 +103,9 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 |---|---|---|---|
 | 7.1 | Live ISO idle 465 MB, installed idle 487 MB, CPU 99 % idle | Measured once (VM 117, 120) | Measured → LordBench |
 | 7.1 | Boot 16.3 s with UEFI | Measured once | Measured → LordBench |
-| 7.1 | `lord-server` without 3D ~32 MB RSS; session ~50 MB, login 41 MB | Measured once; Check `memory` shows the current number (VM 116 today: ~100 MB in a headless session with apps open) | **Re-measure** at idle |
+| 7.1 | `axia-server` without 3D ~32 MB RSS; session ~50 MB, login 41 MB | Measured once; Check `memory` shows the current number (VM 116 today: ~100 MB in a headless session with apps open) | **Re-measure** at idle |
 | 7.2 | Window drag 1280×800 CPU path 6.7–6.9 ms, ~120 fps | Measured once (VM 118) | Measured → LordBench |
-| 7.2 | Video: lord-server 42 % → 13 %, fullscreen 92 % → 15 % of a core | Measured once | Measured |
+| 7.2 | Video: axia-server 42 % → 13 %, fullscreen 92 % → 15 % of a core | Measured once | Measured |
 | 7.1 | — | New in the 0.8.5-beta edition: the released package measured on a VMware VM updated from 0.8.4.1, whole system 592 MB used and the first frame 7.4 s after the kernel started (`results/0.8.5-beta/vmware-fusion`, `RESULTS.md`) | Measured, versioned results (§7.1) |
 | 7.2 | — | New in 0.8.5: remote desktop CPU reference (`REMOTE.md`, "Measurements (0.8.5, CPU reference)") | Added in the 0.8.5 edition (§7.2) |
 | 7.2 | — | New in 0.8.6: dragged windows' rounded corners no longer turn black (the drag layer's corner restore mixes both pixels alpha included); a drag frame repaints only what changed, pixel-identical except an approved 1-level change at rounded corners below the window; GPU drag composes the window with the CPU's exact arithmetic after a self-test (`WINDOWS.md`, `GPU.md`) | Test (`engine-test`: `test_drag_corners` against a full repaint on both paths, `test_drag_exact`'s 2,417 golden frame hashes per path, the `gpu-drag` path; `canvas-test`: GPU drag's arithmetic over all 8,421,376 valid combinations, x86_64 only) | Holds on VM 116; on the Pi 5 (V3D, 2026-10-29) GPU drag's self-test passes (11,373,321 pixels, 341 ms), `LORD_GPU_VERIFY=1` compared 138 frames with 0 differences, and screenshots of the monitor show clean corners while dragging; GPU drag is off by default (no measurable gain) |
@@ -149,15 +149,15 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.1 | RDP refuses RDP's own security before any credential | Test (`rdesk_rdp_test.c`, stub server; the old setting sent 395 bytes); xrdp over TLS on the test VM | Holds |
 | 5.1 | SMB sign-in carries a target name and MIC and needs the server's signature | Test (`lan-test`); `lan-list` against Samba on the test VM, right and wrong password | Holds on Samba and on the one real share above |
 | 5.1 | Programs that read a server's bytes run read-only with a 15 s limit | Test (`rconnect-run-test`, also `ssh-keyscan`, `openssl`, `rclone obscure` for real) | Holds with Landlock; without it only scope and deadline |
-| 3.3, 7.4 | Moving wallpapers need GPU composition and hardware decoding; on the Pi 5 at login, 1080p60 HEVC: `lord-media` 41 %, `lord-server` 147 % of one core | Test (`motion_model_test.mjs`, `wallpaper_find_test.c`); Measured on the Pi 5, 30 s, SoC 52 °C (`WALLPAPERS.md`) | Measured once; no run on a desktop session is recorded |
+| 3.3, 7.4 | Moving wallpapers need GPU composition and hardware decoding; on the Pi 5 at login, 1080p60 HEVC: `axia-media` 41 %, `axia-server` 147 % of one core | Test (`motion_model_test.mjs`, `wallpaper_find_test.c`); Measured on the Pi 5, 30 s, SoC 52 °C (`WALLPAPERS.md`) | Measured once; no run on a desktop session is recorded |
 | 3.6 | The login screen composes on the GPU (`lordos-greeter` in `render` and `video`) | Measured on the Pi 5 with the row above | Measured once |
 | 5.1 | Remote Desk: VNC and RDP with pointer and keyboard | A throwaway test machine | Measured once; RDP to a real session of a desktop system and RDP's shared folders **Untested** |
 | 5.1 | Disk Formats: NTFS, exFAT and FAT32 read and write, HFS+ and APFS read-only | VM 125 from the sidebar with the drivers present (`FILES.md`) | Measured once |
 | 5.6 | arm64 live ISO: live desktop, wizard install, boot of the result | An unsigned development build on emulated QEMU (`ISO.md`) | Measured once; real hardware, a USB stick, a hardware-accelerated hypervisor, a 3D virtual GPU, sound, the browsers and a signed build **Untested** |
-| 6.2, 6.7 | `lord-media` opens two exact decoder device files, only for `v4l2request` playback | Design (`lm_main.c`) | Design |
+| 6.2, 6.7 | `axia-media` opens two exact decoder device files, only for `v4l2request` playback | Design (`lm_main.c`) | Design |
 | 6.3 | `wallpaper-get` deletes a file whose size or SHA-256 isn't the catalog's | Design (`wallpaper_admin.c`); `wallpaper_find_test.c` covers the lookup | Partly tested |
 | 6.6 | A `.desktop` file can't take `desktop:lordos-rclone` or `desktop:lordos-rdesk` | Design (`app_scope_reserved`) | Design |
-| 6.7 | `lord-rdesk` takes the helpers' sandbox after connecting; a VNC server that skips a given password is refused | Test (`rdesk_test.c`, with a fuzz run) | Holds |
+| 6.7 | `axia-rdesk` takes the helpers' sandbox after connecting; a VNC server that skips a given password is refused | Test (`rdesk_test.c`, with a fuzz run) | Holds |
 | 6.7 | SFTP keys, and certificates for ftps and https WebDAV, kept only after being shown; an accepted certificate outranks the system's list | Test (`lan-test`, `rconnect-run-test`); VM 116 against the test server | Partly tested |
 | 6.9 | The tested-hardware snapshot is verified in C before it is shown | Test (`hwsnap-test`, a tampered snapshot refused) | Holds; the update path against the real signed repository **Untested** |
 | 7.2 | Cleaner: a tree of 102,653 entries in 446 ms, duplicates in 5.1 s, a real delete of 20,000 files in 1.0 s | Measured on VM 116 (122,000 files, warm cache; `CLEANER-TESTS.md`) | Measured once |
@@ -167,7 +167,7 @@ memory from a process's RSS (§7.1) and points to versioned results (§11.5, `do
 | 5.6 | `install.sh` names an administrator on a Debian with a root password | A clean amd64 Debian 13 virtual machine | Measured once; logging in on the login screen not part of that run |
 | 6.3 | `admin-rescue` decides again as root and refuses when an administrator exists | Test (`admin-rescue-test`); an installed amd64 virtual machine | Holds; real hardware and arm64 **Untested** |
 | 6.3 | `hw-serial-numbers`, `rpi-pmic`: read-only, values validated in C | Test (`settings-hw-test`) | Holds |
-| 6.7 | `lord-clean` and `lord-lan` take the helpers' sandbox | Test (`clean-test`, `lan-test`) | Holds; `clean-test` has no case yet for what a scan shows per rule or for the minimum time per step |
+| 6.7 | `axia-clean` and `axia-lan` take the helpers' sandbox | Test (`clean-test`, `lan-test`) | Holds; `clean-test` has no case yet for what a scan shows per rule or for the minimum time per step |
 | 6.11 | The on-screen keyboard's panel and System Information with serials showing are protected | Design (`protected` node) | Partly tested |
 
 ## What the paper must change for 0.8.5
@@ -181,9 +181,9 @@ State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26)
 2. §3.4: Xwayland is supported on demand (0.8.3). **Done.**
 3. §3.6: remote login lockout (3 failures; 15 min → 1 h → 24 h; fixed 1.25 s answers); WebRTC video with
    H.264/VP8 and Opus sound instead of PNG/JPEG and no audio. **Done.**
-4. §7: re-measure `lord-server`'s memory at idle and the theme's size; add the 0.8.5 remote desktop and CPU
+4. §7: re-measure `axia-server`'s memory at idle and the theme's size; add the 0.8.5 remote desktop and CPU
    path measurements (`REMOTE.md`, `GPU.md`). **Partly:** the theme's size and the 0.8.5 CPU path are in;
-   §7.1 now separates whole-system memory from a process's RSS, but `lord-server`'s idle RSS is still the
+   §7.1 now separates whole-system memory from a process's RSS, but `axia-server`'s idle RSS is still the
    0.8.0 number (not re-measured).
 5. §6: mention that anyone can now check the sandbox on their own computer (System Information → Checks).
    **Done** (§6.4).
@@ -193,15 +193,15 @@ State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26)
 | Gap | Covers | Plan |
 |---|---|---|
 | A denied connection, tried on the user's machine | §6.6 effective | An app with network access and a temporary rule (Checks) |
-| Repeatable performance numbers | §7 | LordBench (0.8.6: CPU, memory, GPU offscreen, storage, sustained load, software video decoding and encoders, the desktop's frame times and pointer-to-screen latency alone and under load (and the compositor's CPU weight and real-time priority they led to), the boot time per version, the N-boot test, `lordos-sysreport bench`, the interface layout/paint and shaping workloads and the helper-sandbox self-test are built, with VM 116 and the Pi 5 as references, `BENCHMARK.md` "Built so far"; idle memory and CPU, hardware video decoding and app start are not; hardware video decoding and the x86 PC reference moved to 0.8.7 on 2026-10-29) |
+| Repeatable performance numbers | §7 | LordBench (0.8.6: CPU, memory, GPU offscreen, storage, sustained load, software video decoding and encoders, the desktop's frame times and pointer-to-screen latency alone and under load (and the compositor's CPU weight and real-time priority they led to), the boot time per version, the N-boot test, `axia-sysreport bench`, the interface layout/paint and shaping workloads and the helper-sandbox self-test are built, with VM 116 and the Pi 5 as references, `BENCHMARK.md` "Built so far"; idle memory and CPU, hardware video decoding and app start are not; hardware video decoding and the x86 PC reference moved to 0.8.7 on 2026-10-29) |
 | Rendering, 3D and video on every GPU | §3.2, §7.2–7.3 | The visual test bench below |
 | Every key, the mouse, touchpads, gamepads, and the Wayland protocols | §3.3–§3.4 | The visual test bench below |
 | Real hardware | §10.2 | Reports from System Information (0.8.7) |
 
-## The visual test bench (`lordos-testbench`)
+## The visual test bench (`axia-testbench`)
 
-**Phase 1 built (2026-10-26):** `server/src/testbench/` (`make -C server build/lordos-testbench`), packaged as
-`/usr/bin/lordos-testbench` with `packaging/desktop/lordos-testbench.desktop` (Test Bench in the launcher).
+**Phase 1 built (2026-10-26):** `server/src/testbench/` (`make -C server build/axia-testbench`), packaged as
+`/usr/bin/axia-testbench` with `packaging/desktop/axia-testbench.desktop` (Test Bench in the launcher).
 The test card is ported from go-link-console's `pkg/testpattern` (same author). It shows the card with a
 live clock and a marker that moves one step per frame, frames a second and frame times, `wp_presentation`
 feedback (shown, discarded, refresh, skipped vblanks, zero-copy), the pointer (exact crosshair, eight
@@ -255,7 +255,7 @@ keyboard test can't light them; the bench should list them as taken by the syste
 ![3D on VM 116 (software renderer)](testbench-3d.png)
 
 **Phase 4 (2026-10-26): the report in System Information.** The bench writes its last report to
-`~/.local/state/lordos/testbench.json` (atomically, after its checklist and on exit); System Information →
+`~/.local/state/axia/testbench.json` (atomically, after its checklist and on exit); System Information →
 Checks shows it (Wayland protocols, the 3D renderer, whether frames reach the screen, input-to-screen
 latency; `evaluateBench` in `apps/sysinfo/checks.js`, tested) with **Open Test Bench**, which launches it like any
 Linux app.
@@ -279,10 +279,10 @@ LordOS writes its own compositor, so it needs its own tool to show, on any compu
 and what it receives are right. The idea is a test-pattern window like a TV test card (and like the test
 pattern of go-link-console), with live measurements around it:
 
-- **What it is:** a native Wayland client in C (`tools/testbench/`, installed as `/usr/bin/lordos-testbench`
+- **What it is:** a native Wayland client in C (`tools/testbench/`, installed as `/usr/bin/axia-testbench`
   with a `.desktop` file). It speaks the protocol directly with `libwayland-client`, the way any app does,
   so it tests the compositor from the outside. It is launched like any Linux app (`lord.apps.launch`), so
-  no new exception in `lord-server`, and it also runs on other compositors for comparison.
+  no new exception in `axia-server`, and it also runs on other compositors for comparison.
 - **The pattern (rendering):** colour bars, grey steps, a resolution grating (1-pixel lines that show
   scaling or blurring), a geometry grid and circle (wrong aspect or scaling shows at once), a live clock
   and a frame counter that changes every frame (a dropped or repeated frame is visible), scale and
@@ -292,7 +292,7 @@ pattern of go-link-console), with live measurements around it:
 - **3D:** a rotating textured scene with EGL/GLES2 on the GPU (`linux-dmabuf`), showing the renderer and
   whether the buffer was scanned out directly or composed; a CPU-only shm mode to compare.
 - **Video:** a generated moving pattern at 24/30/60 fps (no files, no decoders), to see judder and dropped
-  frames; later the same through `lord-media`'s hardware decoder.
+  frames; later the same through `axia-media`'s hardware decoder.
 - **Keyboard:** a full keyboard drawn on screen; each key lights when its key event arrives, with the
   keycode, the keysym from the keymap the compositor sent, modifiers, repeat rate and delay; a list of
   keys never seen, to go through every key of a real keyboard.
@@ -307,6 +307,6 @@ pattern of go-link-console), with live measurements around it:
   `idle-inhibit`, `xdg-activation`, cursor-shape. Its output is a report (JSON and Markdown) that System
   Information can attach, with the GPU and the monitor, so the same run on many computers shows where
   LordOS's Wayland works and where it doesn't.
-- **Automation:** `lordos-testbench --auto` runs the protocol checklist and a timed render without a person,
+- **Automation:** `axia-testbench --auto` runs the protocol checklist and a timed render without a person,
   for CI and for the VMs (the input tests then use the remote desktop's injected keys and pointer, as the
   tests in this repository already do).

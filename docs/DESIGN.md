@@ -301,7 +301,7 @@ Check every pass on the VM with:
   (`left`/`right` and `margin*Left`/`Right` stay physical, as in CSS).
 - **Scale and rotate:** `transform: [{ scale: pressed ? 0.96 : 1 }]` for a press effect,
   `transform: 'rotate(…deg)'` for a spinner; layout doesn't change and clicks follow what is painted.
-  lord-server paints the subtree once into a cached raster and composites it, so animating the scale
+  axia-server paints the subtree once into a cached raster and composites it, so animating the scale
   is cheap (the Dock's minimize effect does it on a whole window: `engine-dock-minimize.png`).
 - **`flex: 0`** is React Native's: the box keeps its `width`/`height` and doesn't grow or shrink (it
   used to mean a zero basis, which collapsed a box with a `width`). `flex: 1` and a `width` on the same

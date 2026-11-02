@@ -1,5 +1,5 @@
 /* gpu.h — GPU composition (Mesa's GBM + EGL + GLES2) and direct scanout (see gpu.c and
- * docs/GPU.md). If there is no usable GPU, gpu_init fails and lord-server keeps going by CPU as always. */
+ * docs/GPU.md). If there is no usable GPU, gpu_init fails and axia-server keeps going by CPU as always. */
 #ifndef LORD_GPU_H
 #define LORD_GPU_H
 
@@ -31,7 +31,7 @@ const char *gpu_renderer(void);         /* "llvmpipe (LLVM …)", "AMD Radeon �
  * (LORD_GPU=0), "no-3d", "no-gbm", "no-egl", "no-config", "no-context", "software" (llvmpipe and
  * the like), "shaders", or "" (never tried). The rest is the live context's, "" or 0 without one
  * (the renderer also names the software one that was turned down);
- * scanouts counts the frames shown directly since lord-server started. */
+ * scanouts counts the frames shown directly since axia-server started. */
 typedef struct {
     const char *why, *renderer, *render_node;
     int dmabuf;

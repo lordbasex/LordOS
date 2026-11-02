@@ -2,13 +2,13 @@
  * to QuickJS bytecode once per session, so an isolated app does not parse 430 KB of JavaScript
  * every time it starts (~80 ms on a 1.8 GHz core; reading the bytecode takes ~3 ms).
  *
- * lord-server reads the bundle once through the verified-code check (codesig_load: the bytes that
+ * axia-server reads the bundle once through the verified-code check (codesig_load: the bytes that
  * were hashed against the signed manifest are the bytes returned) and compiles exactly those bytes,
  * both on a thread of its own, with its own QuickJS runtime, a few seconds after the session starts,
  * into a sealed memfd. app_spawn() hands the app process a read-only fd of it
  * (LORD_APPHOST_BC_FD). The app process loads and verifies the source itself as before and uses
  * the bytecode only if its header carries the size and SHA-256 of those same bytes; otherwise, or
- * with no fd, it parses the source. The bytecode comes from lord-server (the same binary and
+ * with no fd, it parses the source. The bytecode comes from axia-server (the same binary and
  * QuickJS), never from the app or from a file a user can write. */
 #include "apphost_bc.h"
 #include "../pkg/crypto.h"
@@ -55,7 +55,7 @@ static void *compile_thread(void *arg) {
     char why[160];
     size_t got = 0;
     char *src = codesig_load(bc_path, BC_MAX, &got, why, sizeof why);
-    if (!src) { fprintf(stderr, "lord-server: no app host bytecode: %s\n", why); return NULL; }
+    if (!src) { fprintf(stderr, "axia-server: no app host bytecode: %s\n", why); return NULL; }
     JSRuntime *rt = JS_NewRuntime();
     JSContext *cx = rt ? JS_NewContext(rt) : NULL;
     uint8_t *bc = NULL;
@@ -84,7 +84,7 @@ static void *compile_thread(void *arg) {
     if (rt) JS_FreeRuntime(rt);
     if (mfd >= 0) {
         atomic_store(&bc_fd, mfd);
-        fprintf(stderr, "lord-server: app host compiled to bytecode (%zu KB) for isolated apps\n", bl / 1024);
+        fprintf(stderr, "axia-server: app host compiled to bytecode (%zu KB) for isolated apps\n", bl / 1024);
     }
     return NULL;
 }
@@ -96,13 +96,13 @@ void apphost_bc_start(const char *bundle_path) {
     snprintf(bc_path, sizeof bc_path, "%s", bundle_path);
     /* the verified-code state is set up once, on this thread (main.c); without it, no bytecode:
      * the apps parse the source, as before */
-    if (codesig_state() == CODE_UNCHECKED) { fprintf(stderr, "lord-server: no app host bytecode: code check not set up\n"); return; }
+    if (codesig_state() == CODE_UNCHECKED) { fprintf(stderr, "axia-server: no app host bytecode: code check not set up\n"); return; }
     pthread_t t;
     pthread_attr_t at;
     pthread_attr_init(&at);
     pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
     if (pthread_create(&t, &at, compile_thread, NULL)) {
-        fprintf(stderr, "lord-server: no thread for the app host bytecode\n");
+        fprintf(stderr, "axia-server: no thread for the app host bytecode\n");
     }
     pthread_attr_destroy(&at);
 }

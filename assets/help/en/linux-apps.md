@@ -6,25 +6,25 @@ keywords: wayland, gtk, qt, firefox, linux apps, debian
 ---
 # Linux apps (GNOME and KDE)
 
-LordOS has its own Wayland compositor, so Linux apps —GTK (GNOME), Qt (KDE), Firefox, Electron—
+Axia DE has its own Wayland compositor, so Linux apps —GTK (GNOME), Qt (KDE), Firefox, Electron—
 open as regular desktop windows.
 
 - **Install them:** from the [Store](help:store), which lists Debian apps with their icons and
   descriptions.
 - **Open them:** Apps, the Dock or Search, like any app.
 - **Open a file with one of them:** in [Files](help:files), right-click → “Open with”.
-- **Clipboard:** what you copy in a Linux app pastes in LordOS and the other way round, images too.
-- **Keyboard and touchpad:** they get the keys (❖ combinations still belong to LordOS, except in Lord Flow, where [❖C, ❖V and others arrive as Ctrl](help:shortcuts)) and the
+- **Clipboard:** what you copy in a Linux app pastes in Axia DE and the other way round, images too.
+- **Keyboard and touchpad:** they get the keys (❖ combinations still belong to Axia DE, except in Lord Flow, where [❖C, ❖V and others arrive as Ctrl](help:shortcuts)) and the
   pinch and swipe gestures.
 
 Apps that draw their own frame (for example GNOME apps with libadwaita) show without the theme's
-frame. For safety, LordOS only opens installed apps (their `.desktop` files), never a typed command.
+frame. For safety, Axia DE only opens installed apps (their `.desktop` files), never a typed command.
 
 ## Frame and colors
 
-- **Chromium and Firefox** use the LordOS frame (the theme's traffic lights). To go back to the
+- **Chromium and Firefox** use the Axia DE frame (the theme's traffic lights). To go back to the
   browser's own tab strip: in Chromium, ⋮ menu → Settings → Appearance → turn off "Use system title
   bar and borders"; in Firefox, ☰ menu → More tools → Customize toolbar → uncheck "Title Bar".
-- **GTK and GNOME** follow LordOS's dark or light mode and accent color live, and put the window
+- **GTK and GNOME** follow Axia DE's dark or light mode and accent color live, and put the window
   buttons on the left, like the traffic lights (on the right with the Lord Classic theme). GTK 3 apps use
-  the "LordOS" theme; their accent color is fixed.
+  the "Axia DE" theme; their accent color is fixed.

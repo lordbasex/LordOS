@@ -12,7 +12,9 @@
 // added to the schema.
 
 export const FORMAT = 'lordos-hwreport';
-export const REPO_URL = 'https://github.com/lordbasex/LordOS';
+// Where reports are filed as issues. Axia DE has no public repository yet: without one, the share page
+// offers only the files, with no link to open.
+export const REPO_URL = '';
 export const ISSUE_TEMPLATE = 'hardware-report.yml';
 export const TITLE_MAX = 100;
 export const SUMMARY_MAX = 600;
@@ -212,14 +214,15 @@ export function summaryText(rep) {
 
 // GitHub's issue forms take a field's value from the query string by its id (the template's "summary" and
 // "lordos" fields); the title too.
-export function issueUrl(rep) {
+export function issueUrl(rep, repo = REPO_URL) {
+  if (!repo) return null;
   const q = [
     ['template', ISSUE_TEMPLATE],
     ['title', issueTitle(rep)],
     ['lordos', String((rep && rep.lordos) || '')],
     ['summary', summaryText(rep)],
   ].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
-  return `${REPO_URL}/issues/new?${q}`;
+  return `${repo}/issues/new?${q}`;
 }
 
 // ---- the files ----
@@ -293,7 +296,7 @@ ${tr}
 <ol>
 ${steps}
 </ol>
-<p><a class="go" href="${esc(url)}" rel="noopener noreferrer">${T('open')}</a></p>
+${url ? `<p><a class="go" href="${esc(url)}" rel="noopener noreferrer">${T('open')}</a></p>` : ''}
 <p class="small">${T('fileLabel')} <code>${esc(jsonName)}</code></p>
 <p class="small">${T('footer')}</p>
 </main>

@@ -18,9 +18,9 @@ events and the supported style subset), [DESIGN.md](DESIGN.md) (tokens and the s
 
 A theme is **the whole desktop, written in React**: wallpaper, menu bar or taskbar, Dock, app
 launcher, panels, menus and every window frame. It is not a style sheet and it does not run in a web
-engine. `lord-server` (the display server and Wayland compositor, in C) evaluates the theme's bundle
+engine. `axia-server` (the display server and Wayland compositor, in C) evaluates the theme's bundle
 with QuickJS; a React reconciler (`runtime/index.js`) turns the tree into native nodes
-(`lord.setStyle`, `appendChild`…) that `lord-server` lays out (flexbox) and paints itself, on the
+(`lord.setStyle`, `appendChild`…) that `axia-server` lays out (flexbox) and paints itself, on the
 CPU or the GPU. So you write ordinary function components with hooks, but with `<View>`, `<Text>`,
 `<Image>` instead of DOM elements, and a CSS subset as React Native-style style objects
 (`themes/README.md`, "Supported styles").
@@ -63,9 +63,9 @@ since 0.8.5 lists every installed theme (the only place to choose one; `StylePic
 loads the new bundle (`themes.use` in `sdk/index.js`, `lord.themes.use` in `server/src/ui/js_sys.c`,
 `switch_theme` in `server/src/main.c`): the LordOS app windows that were open (up to 8) reopen in
 the new theme with their frames, and Linux windows stay connected and get the new frame. The
-choice is stored as `theme` in `~/.config/lordos/settings.json`.
+choice is stored as `theme` in `~/.config/axia/settings.json`.
 
-How a session starts: `lord-sessiond` always starts `lord-server` with
+How a session starts: `lord-sessiond` always starts `axia-server` with
 `--theme <LordOS folder>/themes/default/theme.bundle.js` (`server/src/remote/sessiond.c`,
 `sess.c`); the default theme's `startShell()` sees that the user chose another one and switches to
 it at once. If the chosen theme can't be loaded, the session stays on the theme it came from.
@@ -217,7 +217,7 @@ adds invisible resize edges on 4 sides and 4 corners (6 px outside, 3 px inside)
 Inside it:
 
 - a title bar whose `onMouseDown` calls **`wm.beginMove(w.id)`**. Moving and resizing are then done
-  by `lord-server` in C (`server/src/ui/grab.c`): React gets no event per frame, and the moving
+  by `axia-server` in C (`server/src/ui/grab.c`): React gets no event per frame, and the moving
   window is painted from a cached layer ([WINDOWS.md](WINDOWS.md)). `beginMove` returns `false` when
   it can't (a maximized window, no button held); Lord Classic then drags out of the maximized place
   in JS with `wm.move`;
@@ -321,7 +321,7 @@ apps. Mount `<AppSwitcher />` inside the `ThemeProvider` for the app switcher, a
 
 ### The login and lock screen are not your theme
 
-`themes/greeter` is loaded by `lord-sessiond` with `lord-server --greeter`, as the system user
+`themes/greeter` is loaded by `lord-sessiond` with `axia-server --greeter`, as the system user
 `lordos-greeter`, from a fixed path (`server/src/remote/sessiond.c`). It is also the lock screen
 (mode `lock`) and the user switcher. It calls `render()` itself instead of `startShell()`, and it never
 sees passwords being checked: it sends them with `lord.greeter.send()` and the root process answers
@@ -363,7 +363,7 @@ user assigned the app to from the Dock. The window list is global: windows are n
 
 ### Performance rules
 
-Everything runs on `lord-server`'s main thread, which also composites the screen and serves the
+Everything runs on `axia-server`'s main thread, which also composites the screen and serves the
 Linux apps. A slow theme makes the whole desktop slow.
 
 - **No React render per frame.** Moving and resizing windows is already in C. To animate, change one
@@ -399,7 +399,7 @@ Visible text goes through `t('namespace.key')` ([LANGUAGES.md](LANGUAGES.md)); a
 `appName(app)`, dates and times through `formatDate`/`formatTime`. The bundled themes' strings are in
 the `shell` catalog (`assets/locales/{en,es,pt}/shell.json`). A theme of your own can reuse existing
 `shell.*` keys (the example does) or bring its own namespace: `lord.locale.catalog` reads
-`<lang>/<namespace>.json` from `~/.local/share/lordos/locales/` first and then LordOS's
+`<lang>/<namespace>.json` from `~/.local/share/axia/locales/` first and then LordOS's
 `assets/locales/` (`f_locale_catalog` in `js_sys.c`). A missing key shows the key itself. Inside the
 LordOS tree, `node tools/i18n-check.mjs` checks every `t()` key in `themes/` against the English
 catalog and every language against English.
@@ -434,12 +434,12 @@ signed the old one).
 
 LordOS's own JavaScript is checked before it runs ([SIGNING.md](SIGNING.md#verified-system-code-082)).
 Every bundle goes through `codesig_load` (`server/src/sec/codesig.c`, called from `load_code` in
-`server/src/ui/js.c`): once per process `lord-server` reads `code-manifest.json` and
+`server/src/ui/js.c`): once per process `axia-server` reads `code-manifest.json` and
 `code-manifest.sig` from the LordOS folder (`/usr/lib/lordos` installed, the repository root in a
 development tree) and verifies the signature with the release key compiled into it. Then, per
 bundle:
 
-| `lord-server` build | Manifest in the LordOS folder | A `themes/<id>/theme.bundle.js` that is not listed |
+| `axia-server` build | Manifest in the LordOS folder | A `themes/<id>/theme.bundle.js` that is not listed |
 |---|---|---|
 | **Release** (`make -C server RELEASE=1`; the published images and `.deb`) | signed by LordOS | **refused**: `code: REFUSED themes/<id>/theme.bundle.js: not listed in the manifest` |
 | Release | missing, unsigned, or a bad signature | **everything is refused** (state "invalid"): the recovery screen |
@@ -450,20 +450,20 @@ bundle:
 So on an installed release system, copying a theme into `/usr/lib/lordos/themes/<id>/` (which needs
 root anyway) makes it **appear** in Settings → Appearance → Desktop style (the list only looks for a
 readable `theme.bundle.js`), but choosing it does nothing visible except a notice: the switch is
-refused, `lord-server` reloads the theme it was on (`switch_theme`), the session shows the sticky
+refused, `axia-server` reloads the theme it was on (`switch_theme`), the session shows the sticky
 notification "This LordOS component was modified and was not loaded" naming the file
 (`sdk/codesig.js`), and choosing it again in that session does nothing (`ui.theme_failed`). Because `theme` was already
 saved in the settings, the same happens once at every login. **Do not** try to make it load by
 regenerating the installed manifest: on a release build an unsigned or changed manifest invalidates
 all of LordOS's code and leaves only the recovery screen.
 
-A bundle outside the LordOS folder (for example `lord-server --theme /home/me/x/theme.bundle.js`)
+A bundle outside the LordOS folder (for example `axia-server --theme /home/me/x/theme.bundle.js`)
 is run only when the state is "development" (a development build with no manifest or an unsigned
 one), logged as `code: … loaded unchecked (outside …, development build)`; otherwise it is refused
 with "not part of LordOS's system code".
 
 **Third-party themes can't run on release builds today.** That is deliberate for now: a theme is not
-sandboxed. It runs inside `lord-server`, in the same JavaScript context as every native app, with
+sandboxed. It runs inside `axia-server`, in the same JavaScript context as every native app, with
 the whole `lord.*` API of the session (files, the terminal, the network, administrator requests),
 and it sees the desktop's keyboard and pointer input. It also carries its own copy of the SDK,
 including the code that shows the permission prompts and records the answers (`lord.perms.set`,
@@ -480,36 +480,36 @@ than what built-in code gets. None of that exists yet.
 `/usr/local/lib/lordos` ([VM-SETUP.md](VM-SETUP.md), step 22). The list of themes is the folder that
 holds the running theme's folder (`themes_root` in `js_sys.c`); there is no per-user themes folder.
 
-**Trying one in a development session** (a development build of `lord-server`, see the table
+**Trying one in a development session** (a development build of `axia-server`, see the table
 above):
 
 1. Put the theme in `themes/<id>` of your LordOS tree and run `node tools/build-theme.mjs <id>` (or
    `npm run build`).
-2. Copy the tree to the VM and build `lord-server` as in [VM-SETUP.md](VM-SETUP.md), step 6 (`themes/`
+2. Copy the tree to the VM and build `axia-server` as in [VM-SETUP.md](VM-SETUP.md), step 6 (`themes/`
    and `assets/` with `server/`). Copy `code-manifest.json` too, or none at all: a stale manifest
    refuses the new bundle.
 3. Start it and choose the theme in **Settings → Appearance → Desktop style**. Passing
-   `--theme ../themes/<id>/theme.bundle.js` to a standalone `sudo ./build/lord-server` also works,
-   but `startShell` switches to the theme saved in `~/.config/lordos/settings.json` (`"theme"`) if it
+   `--theme ../themes/<id>/theme.bundle.js` to a standalone `sudo ./build/axia-server` also works,
+   but `startShell` switches to the theme saved in `~/.config/axia/settings.json` (`"theme"`) if it
    is another one, so set that too.
 4. After rebuilding, switch to another theme and back (or log out and in) to load the new bundle.
    There is no hot reload.
 
 A theme that throws while its bundle is evaluated makes the switch fall back to the theme you came
-from (`lord-server: the theme failed, going back to …`); the error is in the log. Keep Lord Flow or
+from (`axia-server: the theme failed, going back to …`); the error is in the log. Keep Lord Flow or
 Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 **Debugging.**
 
-- Sessions started by `lord-sessiond` write their log to **`~/.cache/lordos/session.log`** (the login
-  screen to `greeter.log`); a standalone `lord-server` writes to the terminal it was started from.
+- Sessions started by `lord-sessiond` write their log to **`~/.cache/axia/session.log`** (the login
+  screen to `greeter.log`); a standalone `axia-server` writes to the terminal it was started from.
 - `console.log`, `.info`, `.debug` → `js: …` lines; `console.warn` → `js: [warn] …`;
   `console.error` → `js: [error] …` (the prelude in `server/src/ui/js_prelude.h`). Exceptions in timers
   and animation frames are logged as `js: [error] timer: …` / `raf: …`.
 - Useful lines: `js: theme <path> loaded in N ms (K KB)`, `code: …` (the verified-code state and each
-  check or refusal), `lord-server: cambiando a tema <path>` (a switch), `js: unsupported style '<key>'`.
-- `sudo /usr/lib/lordos/bin/lord-server --check-code [<folder>]` checks a whole tree the way a session
-  would; `lord-server --debug` and `--profile` (per-primitive timings) for drawing problems.
+  check or refusal), `axia-server: cambiando a tema <path>` (a switch), `js: unsupported style '<key>'`.
+- `sudo /usr/lib/lordos/bin/axia-server --check-code [<folder>]` checks a whole tree the way a session
+  would; `axia-server --debug` and `--profile` (per-primitive timings) for drawing problems.
 - `lord.getLayout(node.id)` returns `[x, y, w, h]` of a node (both themes use it to place menus).
 
 ## 5. Checklist before sharing a theme

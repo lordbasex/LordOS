@@ -1,19 +1,19 @@
-/* brokermail.c — lord-maild for the isolated system apps (BOP_MAIL, BOP_SYS_OPEN).
+/* brokermail.c — axia-maild for the isolated system apps (BOP_MAIL, BOP_SYS_OPEN).
  *
  * Mail, Calendar, Contacts and Reminders run as their own sandboxed process
- * (`lord-server --app <id>`, the system package in assets/sysapps). Their process has no network
- * and cannot read the mail cache or the accounts file; it reaches lord-maild only through here, and
- * lord-server keeps every rule it applied when these apps ran in-process (js_mail.c):
+ * (`axia-server --app <id>`, the system package in assets/sysapps). Their process has no network
+ * and cannot read the mail cache or the accounts file; it reaches axia-maild only through here, and
+ * axia-server keeps every rule it applied when these apps ran in-process (js_mail.c):
  *
  *   - only a system package (brokersrv_conn_system) named mail, calendar, contacts or reminders;
  *   - each app may send only its own requests: Mail all of them, Calendar `cal-*`/`ev-*`/`todo-*`,
  *     Reminders `cal-*`/`todo-*`, Contacts `book-*`/`contact-*`/`autocomplete` (so a compromised
  *     Calendar cannot read mail);
- *   - files reach lord-maild only as fds the app already holds (from the system file dialog), and
+ *   - files reach axia-maild only as fds the app already holds (from the system file dialog), and
  *     only regular files of at most 64 MB, only for the requests that take files;
  *   - replies, decoded images and events belong to that app's owner queue in mailc.c; Calendar,
  *     Contacts and Reminders get only the PIM events (no senders or subjects);
- *   - the accounts file (which servers lord-maild may reach) and remote-image grants: Mail only,
+ *   - the accounts file (which servers axia-maild may reach) and remote-image grants: Mail only,
  *     with the same validation as lord.mail.saveConfig / allowImages;
  *   - attachments: Mail gets a read-only fd of one cached attachment (to save it through the
  *     system dialog) or asks the session to open it (the session opens it with the user's apps).

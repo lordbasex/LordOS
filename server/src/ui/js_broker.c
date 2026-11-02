@@ -1,7 +1,7 @@
 /* js_broker.c — el objeto `lord` del proceso de una app .lpk aislada (ver js_broker.h).
  *
  * Dibujar es local (las primitivas createNode/setStyle… las registra js.c). Todo lo demás
- * (fs, portapapeles, permisos, dispositivos) va por el broker a lord-server, que verifica el
+ * (fs, portapapeles, permisos, dispositivos) va por el broker a axia-server, que verifica el
  * permiso de cada llamada. Así la API del SDK para quien escribe la app no cambia. */
 #include "js_broker.h"
 #include "../sec/broker.h"
@@ -46,7 +46,7 @@ static char *pkg_read(const char *rel, size_t max, size_t *len);
 static struct { char *buf; size_t len; } queued[32];
 static int nqueued;
 static void queue_event(const char *p, size_t n) {
-    /* lord-maild replies (js_brokermail.c) are taken at once: never dropped while an RPC waits */
+    /* axia-maild replies (js_brokermail.c) are taken at once: never dropped while an RPC waits */
     if (n > 5 && !memcmp(p, "mail", 5)) { js_brokermail_chunk(p + 5, n - 5); return; }
     if (nqueued >= 32) return;
     char *b = malloc(n + 1);
@@ -72,7 +72,7 @@ static int rpc_fds(int op, const void *payload, uint32_t len, const int *fds, in
     struct iovec iov[2] = { { &h, sizeof h }, { (void *)payload, len } };
     struct msghdr m = { .msg_iov = iov, .msg_iovlen = len ? 2 : 1 };
     char cbuf[CMSG_SPACE(16 * sizeof(int))];
-    if (nfds) {                                             /* files for lord-maild (BOP_MAIL) */
+    if (nfds) {                                             /* files for axia-maild (BOP_MAIL) */
         memset(cbuf, 0, sizeof cbuf);
         m.msg_control = cbuf;
         m.msg_controllen = CMSG_SPACE((size_t)nfds * sizeof(int));
@@ -129,7 +129,7 @@ static void dispatch_event(const char *buf, size_t n) {
     const char *kind = buf, *json = nul + 1;
     size_t jl = n - (size_t)(json - buf);
     if (!strcmp(kind, "cam")) { js_brokercam_event(json, jl); return; }     /* camera frames (js_brokercam.c) */
-    if (!strcmp(kind, "mail")) { js_brokermail_chunk(json, jl); return; }  /* lord-maild replies (js_brokermail.c) */
+    if (!strcmp(kind, "mail")) { js_brokermail_chunk(json, jl); return; }  /* axia-maild replies (js_brokermail.c) */
     if (!strcmp(kind, "keyboard")) { apply_keyboard(json, jl); return; }
     if (!strcmp(kind, "state")) {                    /* resincronizar: teclado acá, el resto a JS */
         JDoc d;
@@ -269,7 +269,7 @@ static JSValue f_clip_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     const char *s = JS_ToCStringLen(c, &sl, argv[0]);
     int st;
     /* lord.clipboard.set(text, { secure, clearAfter }): a secret (Passwords) is marked sensitive and
-     * cleared by lord-server after clearAfter seconds if it is still there */
+     * cleared by axia-server after clearAfter seconds if it is still there */
     int secure = 0, clear_after = 0;
     if (argc > 1 && JS_IsObject(argv[1])) {
         JSValue v = JS_GetPropertyStr(c, argv[1], "secure");
@@ -295,7 +295,7 @@ static JSValue f_clip_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     return JS_UNDEFINED;
 }
 
-/* For js_vault.c (Passwords in app mode): lord-server opens the FIDO2 key for lord-vault after the
+/* For js_vault.c (Passwords in app mode): axia-server opens the FIDO2 key for axia-vault after the
  * `usb` permission. 0 and the device name, or -1 with err ("denied", "no-device"…). */
 int js_broker_vault_fido(char *name, size_t n, char *err, size_t en) {
     int st = BST_ERROR; char *out = NULL; uint32_t len = 0;
@@ -361,7 +361,7 @@ int js_broker_send(int op, const void *payload, uint32_t len) {
     return sendmsg(broker_fd, &m, MSG_NOSIGNAL | MSG_DONTWAIT) < 0 ? -1 : 0;
 }
 
-/* lord.broker.pick(save, nombreSugerido) → { fd, name } | null (el diálogo lo dibuja lord-server) */
+/* lord.broker.pick(save, nombreSugerido) → { fd, name } | null (el diálogo lo dibuja axia-server) */
 static JSValue f_broker_pick(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     int save = JS_ToBool(c, argv[0]);
@@ -437,7 +437,7 @@ static JSValue f_broker_request(JSContext *c, JSValueConst t, int argc, JSValueC
     free(out);
     return JS_NewBool(c, allow);
 }
-/* Micrófono: pide el anillo a lord-server (con consentimiento), lo mapea de solo lectura y lee el
+/* Micrófono: pide el anillo a axia-server (con consentimiento), lo mapea de solo lectura y lee el
  * nivel. La app nunca abre PipeWire ni toca el fd del dispositivo. */
 #include <sys/mman.h>
 #include "../media/aring.h"
@@ -488,7 +488,7 @@ static JSValue f_mic_level(JSContext *c, JSValueConst t, int argc, JSValueConst 
 }
 
 /* lord.broker.openApp(app, json, newWindow) → true: a system app opens another one with args
- * (Mail → Calendar, Contacts → a new message). lord-server allows it only between Mail, Calendar,
+ * (Mail → Calendar, Contacts → a new message). axia-server allows it only between Mail, Calendar,
  * Contacts and Reminders, and only small args without paths (sec/brokermail.c). */
 static JSValue f_broker_open_app(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -597,7 +597,7 @@ static JSValue f_locale_catalog(JSContext *c, JSValueConst t, int argc, JSValueC
         } else {                                      /* paquetes de idioma del usuario primero, como en la sesión */
             char path[PATH_MAX + 128];
             const char *home = getenv("HOME");
-            snprintf(path, sizeof path, "%s/.local/share/lordos/locales/%s/%s.json", home ? home : "/nonexistent", lang, ns);
+            snprintf(path, sizeof path, "%s/.local/share/axia/locales/%s/%s.json", home ? home : "/nonexistent", lang, ns);
             txt = read_path(path, 1 << 20, &len);
             if (!txt) {
                 snprintf(path, sizeof path, "%s/locales/%s/%s.json", js_sys_assets(), lang, ns);
@@ -618,7 +618,7 @@ static JSValue f_locale_languages(JSContext *c, JSValueConst t, int argc, JSValu
     for (int user = 0; user < 2; user++) {
     char root[PATH_MAX + 64];
     const char *home = getenv("HOME");
-    if (user) snprintf(root, sizeof root, "%s/.local/share/lordos/locales", home ? home : "/nonexistent");
+    if (user) snprintf(root, sizeof root, "%s/.local/share/axia/locales", home ? home : "/nonexistent");
     else snprintf(root, sizeof root, "%s/locales", js_sys_assets());
     DIR *d = opendir(root);
     struct dirent *e;
@@ -759,6 +759,6 @@ void js_broker_register(JSContext *c, JSValue lord, const char *id) {
     JS_SetPropertyStr(c, lord, "appId", JS_NewString(c, id));
     JS_SetPropertyStr(c, lord, "loadApp", JS_NewCFunction(c, f_load_app, "loadApp", 0));
     app_windows_register(c, lord);           /* several windows per isolated app */
-    js_brokercam_register(c, lord);          /* lord.media: the camera through lord-server (js_brokercam.c) */
+    js_brokercam_register(c, lord);          /* lord.media: the camera through axia-server (js_brokercam.c) */
     js_brokermail_register(c, lord, id);     /* lord.mail: system Mail, Calendar, Contacts, Reminders (js_brokermail.c) */
 }

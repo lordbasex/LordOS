@@ -3,7 +3,7 @@
 // A single one for the whole session: shared by the terminal, text fields and Linux apps
 // (Wayland; the compositor bridges both ways). The history keeps everything that gets
 // copied in any of them —text, links, colors, code, paths and images— with its
-// origin and time. It is stored in ~/.local/share/lordos/clipboard/ (history.json + img-*.png) and
+// origin and time. It is stored in ~/.local/share/axia/clipboard/ (history.json + img-*.png) and
 // survives a reboot; it is turned off or limited in Settings → Clipboard.
 //
 // Never stored: what was copied from a password field (clipboard.set(t, { secure: true })), what
@@ -23,7 +23,7 @@ import { wm } from './windows.js';
 import { TextInput, focusToken, restoreFocus, pasteIntoFocused } from './components.jsx';
 import * as fs from './fs.js';
 
-const DIR = '.local/share/lordos/clipboard';
+const DIR = '.local/share/axia/clipboard';
 const FILE = `${DIR}/history.json`;
 export const DEFAULTS = { save: true, max: 500, maxMB: 200, expireDays: 30, ignoreApps: [], clearOnLogout: false };
 const conf = () => ({ ...DEFAULTS, ...(settings.get().clipboard || {}) });
@@ -53,7 +53,7 @@ const ensureDir = () => {
   for (const part of DIR.split('/')) { cur = cur ? `${cur}/${part}` : part; try { fs.mkdir(cur); } catch (e) { /* already exists */ } }
 };
 const imageName = (p) => String(p).split('/').pop();
-const ownImage = (p) => String(p).includes('/.local/share/lordos/clipboard/img-');
+const ownImage = (p) => String(p).includes('/.local/share/axia/clipboard/img-');
 
 function prune(list) {
   const c = conf();
@@ -219,7 +219,7 @@ function relTime(ms) {
   if (s < 86400) return t('shell.clipboard.hours', { count: Math.floor(s / 3600) });
   return formatDate(new Date(ms), 'short');
 }
-const originLabel = (o) => (!o || o === 'lordos' ? 'LordOS' : o === 'terminal' ? t('shell.clipboard.fromTerminal') : o === 'linux' ? 'Linux' : o.replace(/^.*\./, ''));
+const originLabel = (o) => (!o || o === 'lordos' ? 'Axia DE' : o === 'terminal' ? t('shell.clipboard.fromTerminal') : o === 'linux' ? 'Linux' : o.replace(/^.*\./, ''));
 
 function Swatch({ color, size = 14 }) {
   return h(View, { style: { width: size, height: size, borderRadius: 3, backgroundColor: color, border: '1px solid rgba(128,128,128,0.5)' } });

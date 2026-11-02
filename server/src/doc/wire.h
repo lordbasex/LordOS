@@ -1,5 +1,5 @@
-/* wire.h — lord-doc protocol messages (proto.h): send and receive a DocHdr + JSON + fds.
- * Both sides use it: lord-server (doc.c) and the helper (helper.c). */
+/* wire.h — axia-doc protocol messages (proto.h): send and receive a DocHdr + JSON + fds.
+ * Both sides use it: axia-server (doc.c) and the helper (helper.c). */
 #ifndef LORD_DOC_WIRE_H
 #define LORD_DOC_WIRE_H
 

@@ -1,5 +1,5 @@
 /*
- * lord-server — servidor gráfico de LordOS, escrito desde cero.
+ * axia-server — servidor gráfico de LordOS, escrito desde cero.
  *
  * Toma la placa de video (DRM/KMS) y el input (evdev) directamente del kernel, sin X11,
  * Wayland, libdrm ni libinput. La interfaz la define un tema React que corre en QuickJS
@@ -16,6 +16,7 @@
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
 #include "admin.h"
+#include "platform/seat.h"
 #include "keylag.h"
 #include "bench/lbinput.h"
 #include "net/net.h"
@@ -385,32 +386,56 @@ static double now_ms(void) {
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* Axia DE was LordOS: the first start moves the user's lordos folders (settings, passwords, caches,
+ * history) to their axia names. Only a real folder moves, never over an existing axia one. */
+static void migrate_user_dirs(void) {
+    const char *home = getenv("HOME");
+    if (!home || home[0] != '/') return;
+    static const char *const bases[][2] = {
+        { "XDG_CONFIG_HOME", ".config" }, { "XDG_CACHE_HOME", ".cache" },
+        { "XDG_DATA_HOME", ".local/share" }, { "XDG_STATE_HOME", ".local/state" },
+    };
+    for (size_t i = 0; i < sizeof bases / sizeof bases[0]; i++) {
+        const char *env = getenv(bases[i][0]);
+        char base[1024], from[1100], to[1100];
+        if (env && env[0] == '/') snprintf(base, sizeof base, "%s", env);
+        else snprintf(base, sizeof base, "%s/%s", home, bases[i][1]);
+        snprintf(from, sizeof from, "%s/lordos", base);
+        snprintf(to, sizeof to, "%s/axia", base);
+        struct stat st;
+        if (lstat(from, &st) || !S_ISDIR(st.st_mode)) continue;
+        if (renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE) == 0)
+            fprintf(stderr, "axia-server: moved %s to %s\n", from, to);
+        else if (errno != EEXIST) fprintf(stderr, "axia-server: could not move %s: %s\n", from, strerror(errno));
+    }
+}
+
 /* Drops from root to the user who ran sudo (or --user), keeping only
  * CAP_SYS_TTY_CONFIG so the console can be put back in text mode on exit. */
 static int drop_privileges(const char *user) {
     if (geteuid() != 0) return 0;
     if (!user) user = getenv("SUDO_USER");
     if (!user) {
-        fprintf(stderr, "lord-server: warning, still running as root (use sudo or --user)\n");
+        fprintf(stderr, "axia-server: warning, still running as root (use sudo or --user)\n");
         return 0;
     }
     struct passwd *pw = getpwnam(user);
-    if (!pw || pw->pw_uid == 0) { fprintf(stderr, "lord-server: invalid user '%s'\n", user); return -1; }
+    if (!pw || pw->pw_uid == 0) { fprintf(stderr, "axia-server: invalid user '%s'\n", user); return -1; }
     if (prctl(PR_SET_KEEPCAPS, 1) || initgroups(pw->pw_name, pw->pw_gid) ||
         setgid(pw->pw_gid) || setuid(pw->pw_uid)) {
-        perror("lord-server: dropping privileges");
+        perror("axia-server: dropping privileges");
         return -1;
     }
     struct __user_cap_header_struct hdr = { _LINUX_CAPABILITY_VERSION_3, 0 };
     struct __user_cap_data_struct caps[2];
     memset(caps, 0, sizeof caps);
     caps[0].effective = caps[0].permitted = 1u << CAP_SYS_TTY_CONFIG;
-    if (syscall(SYS_capset, &hdr, caps)) perror("lord-server: capset");
+    if (syscall(SYS_capset, &hdr, caps)) perror("axia-server: capset");
     prctl(PR_SET_KEEPCAPS, 0);
-    if (setuid(0) == 0) { fprintf(stderr, "lord-server: could not drop privileges\n"); return -1; }
+    if (setuid(0) == 0) { fprintf(stderr, "axia-server: could not drop privileges\n"); return -1; }
     setenv("HOME", pw->pw_dir, 1);
     setenv("USER", pw->pw_name, 1);
-    fprintf(stderr, "lord-server: running as %s (uid %d)\n", pw->pw_name, (int)pw->pw_uid);
+    fprintf(stderr, "axia-server: running as %s (uid %d)\n", pw->pw_name, (int)pw->pw_uid);
     return 0;
 }
 
@@ -583,11 +608,11 @@ static void publish_displays(Server *s) {
         memset(w, 0, sizeof *w);
         *w = (WlOutput){ o->v.x, o->v.y, o->v.w, o->v.h, o->v.pw, o->v.ph, s->headless ? 60000 : mode_refresh_mhz(&o->kms.mode),
                          out_scale(o), o->d.mm_w, o->d.mm_h, "", "" };
-        if (s->headless) { snprintf(w->name, sizeof w->name, "LORD-1"); snprintf(w->desc, sizeof w->desc, "LordOS display"); }
+        if (s->headless) { snprintf(w->name, sizeof w->name, "LORD-1"); snprintf(w->desc, sizeof w->desc, "Axia DE display"); }
         else { snprintf(w->name, sizeof w->name, "%s", o->d.connector); snprintf(w->desc, sizeof w->desc, "%s", o->d.name); }
         if (len < (int)sizeof json - 300) {
             char name[140];
-            jquote(name, sizeof name, s->headless ? "LordOS" : o->d.name);
+            jquote(name, sizeof name, s->headless ? "Axia DE" : o->d.name);
             len += snprintf(json + len, sizeof json - (size_t)len, "%s{\"id\":%u,\"name\":%s,\"connector\":\"%s\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,"
                             "\"pw\":%d,\"ph\":%d,\"scale\":%d,\"main\":%s}", n ? "," : "", s->headless ? 0 : o->kms.conn_id, name, w->name,
                             o->v.x, o->v.y, o->v.w, o->v.h, o->v.pw, o->v.ph, out_scale(o), i == s->main_out ? "true" : "false");
@@ -619,7 +644,7 @@ static void set_size(Server *s, int w, int h) {
         s->main_out = 0;
     }
     int changed = w != s->W || h != s->H;
-    if (changed) fprintf(stderr, "lord-server: desktop %dx%d → %dx%d\n", s->W, s->H, w, h);
+    if (changed) fprintf(stderr, "axia-server: desktop %dx%d → %dx%d\n", s->W, s->H, w, h);
     s->W = w;
     s->H = h;
     ui.width = (float)w;
@@ -840,13 +865,13 @@ static void outputs_apply(Server *s) {
 
 /* ---- the monitor, lent by lord-sessiond (docs/SESSIONS.md) ----
  * fds[0] is the card (lord-sessiond already made it master), the rest keyboards and mice. The
- * session draws on the card like a plain lord-server: with GPU if there is one, direct scanout of
+ * session draws on the card like a plain axia-server: with GPU if there is one, direct scanout of
  * fullscreen and hardware cursor. When switching user, lord-sessiond takes the master away and
  * revokes the input (EVIOCREVOKE); before that it sends RP_UNDISPLAY. */
 /* lord-sessiond: a keyboard, mouse or touchpad plugged in while the session is on the monitor */
 static void remote_input_add(const int *fds, int n) {
     Server *s = remote_server;
-    if (s->headless) { for (int i = 0; i < n; i++) close(fds[i]); return; }
+    if (s->headless) { for (int i = 0; i < n; i++) seat_device_close(fds[i]); return; }
     if (input_add_fds(&s->input, fds, n)) wl_input_devices_changed();
     keyboards_check(s);
 }
@@ -858,7 +883,7 @@ static void remote_input_add(const int *fds, int n) {
 static int parked_fd[PARK_MAX], parked_n, parked_flags;
 static unsigned parked_seq;
 static void parked_drop(void) {
-    for (int i = 0; i < parked_n; i++) close(parked_fd[i]);
+    for (int i = 0; i < parked_n; i++) seat_device_close(parked_fd[i]);
     parked_n = 0;
 }
 
@@ -866,10 +891,12 @@ static void parked_drop(void) {
  * the first frame is on the screen (docs/SESSIONS.md, "Boot splash"). */
 static int splash_wait;
 
+static char local_card[PATH_MAX];
+
 static void display_attach(const int *fds, int n, int flags) {
     Server *s = remote_server;
     parked_drop();                      /* a new RP_DISPLAY replaces what was waiting */
-    if (!s->headless || n < 1) { for (int i = 0; i < n; i++) close(fds[i]); return; }
+    if (!s->headless || n < 1) { for (int i = 0; i < n; i++) seat_device_close(fds[i]); return; }
     Out *o0 = &s->out[0];
     out_free(o0);
     memset(o0, 0, sizeof *o0);
@@ -888,7 +915,7 @@ static void display_attach(const int *fds, int n, int flags) {
         } else {
             fprintf(stderr, "monitor: could not use the card\n");
             if (card >= 0) close(card);
-            for (int i = 1; i < n; i++) close(fds[i]);
+            for (int i = 1; i < n; i++) seat_device_close(fds[i]);
         }
         set_size(s, s->W, s->H);            /* back to the frame in memory */
         return;
@@ -956,6 +983,22 @@ static void display_detach(void) {
     fprintf(stderr, "monitor: the session leaves the screen\n");
 }
 
+/* Reuse the compositor's existing display hand-off on logind/seatd switches. */
+static void local_enable(void) {
+    int fds[65], n = 0;
+    int card = seat_device_open(local_card, O_RDWR | O_CLOEXEC);
+    if (card < 0) { perror("axia: reopening DRM"); return; }
+    fds[n++] = card;
+    for (int i = 0; i < 64; i++) {
+        char path[64];
+        snprintf(path, sizeof path, "/dev/input/event%d", i);
+        if (access(path, F_OK)) continue;
+        int fd = seat_device_open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (fd >= 0) fds[n++] = fd;
+    }
+    display_attach(fds, n, 0);
+}
+
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
     if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_activity(now_ms());
@@ -1001,6 +1044,10 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->value == 1 && ev->code < BTN_MISC) tp_key_activity(ev->code, now_ms());   /* ignorar el touchpad al escribir */
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
+        if (ev->value == 1 && s->ctrl && s->alt && ev->code >= KEY_F1 && ev->code <= KEY_F10 && seat_managed()) {
+            seat_switch(ev->code - KEY_F1 + 1);
+            break;
+        }
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) s->quit = 1;
         /* Botones con la numeración del DOM: 0 izquierdo, 1 medio, 2 derecho. */
         int button = ev->code == BTN_LEFT ? 0 : ev->code == BTN_MIDDLE ? 1 : ev->code == BTN_RIGHT ? 2 : -1;
@@ -2023,7 +2070,7 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
             if (!strcmp(alt, theme) || access(alt, R_OK)) continue;
             js_shutdown();
             ui_reset();
-            fprintf(stderr, "lord-server: theme %s was not loaded, trying %s\n", theme, alt);
+            fprintf(stderr, "axia-server: theme %s was not loaded, trying %s\n", theme, alt);
             if (js_init(alt) == 0) { snprintf(used, n, "%s", alt); return 0; }
         }
     }
@@ -2032,7 +2079,7 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     return js_init_recovery(greeter);
 }
 
-/* lord-server --check-code [root]: checks the signed manifest and every file it lists, the way a
+/* axia-server --check-code [root]: checks the signed manifest and every file it lists, the way a
  * session would load them (docs/SIGNING.md, "Verified system code"). Used by tools/iso/mkdeb.sh
  * and for troubleshooting. Exit 0 when everything matches; 1 otherwise; with --require-signed, a
  * development (unsigned) manifest also fails. */
@@ -2044,7 +2091,7 @@ static int check_code(int argc, char **argv) {
         else root = argv[i];
     }
     char exe[PATH_MAX], def[PATH_MAX];
-    if (!root) {                                    /* next to this binary: <root>/bin/lord-server */
+    if (!root) {                                    /* next to this binary: <root>/bin/axia-server */
         ssize_t k = readlink("/proc/self/exe", exe, sizeof exe - 1);
         if (k <= 0) return 1;
         exe[k] = 0;
@@ -2076,16 +2123,16 @@ static int switch_theme(const char *current) {
     char path[sizeof ui.theme_request];
     snprintf(path, sizeof path, "%s", ui.theme_request);
     ui.theme_request[0] = 0;
-    fprintf(stderr, "lord-server: cambiando a tema %s\n", path);
+    fprintf(stderr, "axia-server: cambiando a tema %s\n", path);
     js_shutdown();
     ui_reset();
     term_detach_all();
     if (js_init(path)) {
-        fprintf(stderr, "lord-server: the theme failed, going back to %s\n", current);
+        fprintf(stderr, "axia-server: the theme failed, going back to %s\n", current);
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", path);
         js_shutdown();
         ui_reset();
-        if (js_init(current)) fprintf(stderr, "lord-server: %s did not load again either\n", current);
+        if (js_init(current)) fprintf(stderr, "axia-server: %s did not load again either\n", current);
         wl_remap_all();
         return -1;
     }
@@ -2141,8 +2188,8 @@ int main(int argc, char **argv) {
     /* (0.8.5) a component's network connector (sec/netconn.h): only creates sockets in its scope */
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-code")) return check_code(argc, argv);
-    /* «modo app»: lord-server --app <id> corre una app .lpk como cliente Wayland aislado
-     * (app/appclient.c). El id ya viene validado del propio lord-server (no de JS). */
+    /* «modo app»: axia-server --app <id> corre una app .lpk como cliente Wayland aislado
+     * (app/appclient.c). El id ya viene validado del propio axia-server (no de JS). */
     if (argc >= 3 && !strcmp(argv[1], "--app")) {
         const char *fonts = "../assets/fonts", *host = "../assets/app-host.bundle.js";
         for (int i = 3; i + 1 < argc; i++) {
@@ -2150,6 +2197,10 @@ int main(int argc, char **argv) {
             else if (!strcmp(argv[i], "--host")) host = argv[++i];
         }
         return app_main(argv[2], host, fonts);
+    }
+    if (geteuid() == 0) {
+        fprintf(stderr, "axia: start the desktop as your normal session user, without sudo\n");
+        return 1;
     }
     const char *card = NULL;               /* sin --card: la que tiene pantalla (drmcard.h) */
     const char *theme = "../themes/default/theme.bundle.js";
@@ -2198,10 +2249,12 @@ int main(int argc, char **argv) {
         set_size(&s, w, h);                 /* out[0] = the frame in memory */
     }
     else {
+        if (seat_start()) return 1;
         char picked[64];
         if (!card) { drm_pick_card(picked, sizeof picked); card = picked; }
         kms_set_picker(display_pick);       /* the display saved in Settings (displays.json) */
-        if (kms_open(K0(&s), card)) return 1;
+        snprintf(local_card, sizeof local_card, "%s", card);
+        if (kms_open(K0(&s), card)) { seat_stop(); return 1; }
         /* one display until the plan (after dropping root: displays.json is the user's) opens the others */
         s.W = (int)K0(&s)->width;
         s.H = (int)K0(&s)->height;
@@ -2219,27 +2272,22 @@ int main(int argc, char **argv) {
     if (!s.headless) {
         if (input_open(&s.input)) fprintf(stderr, "input: no devices (permissions?)\n");
         /* The text console stops drawing over us. */
-        vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+        if (!seat_managed()) vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
         if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
     }
 
-    /* Privileged helper (a closed set of actions: region, time zone, language packs). The
-     * login screen has none: what needs root is done by lord-sessiond. */
     const char *session_user = s.greeter ? NULL : user ? user : getenv("SUDO_USER");
-    if (session_user && admin_start(session_user)) fprintf(stderr, "lord-server: no administration helper\n");
-    /* LordOS networking: with lord-sessiond the network belongs to the system (lord-netd brings it
-     * up at boot) and net-restore only confirms; without it (a standalone lord-server) this
-     * session's helper brings it up (see net_act_restore and docs/NETWORK.md) */
-    else if (session_user) admin_send("net-restore", "", 0);
+    if (!session_user && !s.greeter) session_user = getenv("USER");
     int ok = drop_privileges(user) == 0;
+    if (ok) migrate_user_dirs();
     if (ok && s.headless && getenv("HOME")) {
         /* no terminal: the session log goes to the home folder */
         char log[1024];
         snprintf(log, sizeof log, "%s/.cache", getenv("HOME"));
         mkdir(log, 0700);
-        snprintf(log, sizeof log, "%s/.cache/lordos", getenv("HOME"));
+        snprintf(log, sizeof log, "%s/.cache/axia", getenv("HOME"));
         mkdir(log, 0700);
-        snprintf(log, sizeof log, "%s/.cache/lordos/%s", getenv("HOME"), s.greeter ? "greeter.log" : "session.log");
+        snprintf(log, sizeof log, "%s/.cache/axia/%s", getenv("HOME"), s.greeter ? "greeter.log" : "session.log");
         if (!freopen(log, "w", stderr)) { /* carries on without a log */ }
         setvbuf(stderr, NULL, _IOLBF, 0);
     }
@@ -2261,14 +2309,14 @@ int main(int argc, char **argv) {
         struct stat st;
         if (K0(&s)->fd >= 0 && fstat(K0(&s)->fd, &st) == 0) wl_set_drm_device(st.st_rdev);
     }
-    if (ok && wl_start()) fprintf(stderr, "lord-server: no Wayland (Linux apps will not be able to open)\n");
+    if (ok && wl_start()) fprintf(stderr, "axia-server: no Wayland (Linux apps will not be able to open)\n");
     /* X11 apps: an X socket now, Xwayland only when one connects (wl/xwayland.c); not on the login screen */
     else if (ok && !s.greeter && session_user) xwl_init();
     publish_displays(&s);                   /* one wl_output per display */
-    if (ok && net_open()) fprintf(stderr, "lord-server: no network notifications (rtnetlink)\n");
+    if (ok && net_open()) fprintf(stderr, "axia-server: no network notifications (rtnetlink)\n");
     /* Backups: a thread running as the user, nice 19 and idle I/O (backup/backup.c) */
     if (ok && !s.greeter && getenv("HOME") && session_user) backup_start(getenv("HOME"), session_user);
-    if (ok && snd_start()) fprintf(stderr, "lord-server: no PipeWire for now (sound); it retries on its own\n");
+    if (ok && snd_start()) fprintf(stderr, "axia-server: no PipeWire for now (sound); it retries on its own\n");
     if (ok && !s.greeter) portal_start();   /* dark mode, accent and buttons for GTK/GNOME/Qt (ui/portal.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
@@ -2278,7 +2326,7 @@ int main(int argc, char **argv) {
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,
                                            remote_refresh, remote_resize, remote_greeter, display_attach, display_detach,
                                            remote_scroll, remote_pinch, remote_input_add, remote_notice };
-    if (ok && mirror_start(s.W, s.H, &mirror_in)) fprintf(stderr, "lord-server: no remote desktop (socket)\n");
+    if (ok && mirror_start(s.W, s.H, &mirror_in)) fprintf(stderr, "axia-server: no remote desktop (socket)\n");
     char current[sizeof ui.theme_request];
     if (ok) ok = start_theme(theme, s.greeter, current, sizeof current) == 0;
     if (ok && !s.greeter) {                  /* the app host as bytecode for isolated apps (app/apphost_bc.c) */
@@ -2290,6 +2338,7 @@ int main(int argc, char **argv) {
         input_close(&s.input);
         if (!s.headless) kms_close(K0(&s));
         if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
+        seat_stop();
         return 1;
     }
 
@@ -2307,11 +2356,12 @@ int main(int argc, char **argv) {
     sigaction(SIGTERM, &stop_sa, NULL);
     keylag_init(s.greeter);                 /* key latency trace, only with LORD_INPUT_DEBUG=1 (keylag.h) */
     fpipe_init(&fpipe, getenv("LORD_PIPELINE"));
-    fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
+    fprintf(stderr, "axia-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
             fpipe.mode == FPIPE_OFF ? "off" : fpipe.mode == FPIPE_ALWAYS ? "always" : "while frames are heavy");
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
 
     double start = now_ms();
+    seat_callbacks(local_enable, display_detach);
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
             char next[sizeof current];
@@ -2438,6 +2488,10 @@ int main(int argc, char **argv) {
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
         pfd[n++] = (struct pollfd){ sfd, POLLIN, 0 };
         for (int i = 0; i < s.input.count; i++) pfd[n++] = (struct pollfd){ s.input.dev[i].fd, POLLIN, 0 };
+        int seatbase = seat_fd() >= 0 ? n : -1;
+        if (seatbase >= 0) pfd[n++] = (struct pollfd){ seat_fd(), POLLIN, 0 };
+        int inputbase = seat_managed() && input_watch_fd() >= 0 ? n : -1;
+        if (inputbase >= 0) pfd[n++] = (struct pollfd){ input_watch_fd(), POLLIN, 0 };
         int tbase = n, nterm = term_pollfds(pfd + n, TERM_MAX, term_ids);
         n += nterm;
         int abase = admin_fd() >= 0 ? n : -1;
@@ -2464,7 +2518,7 @@ int main(int argc, char **argv) {
         n += nbrk;
         int abr = n, nabr = brokersrv_audio_pollfds(pfd + n, 16);  /* micrófono de las apps aisladas (PipeWire) */
         n += nabr;
-        int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes lord-media y sus streams de PipeWire */
+        int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes axia-media y sus streams de PipeWire */
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 4);            /* uevents and the system bus (src/hw) */
         n += nhw;
@@ -2529,6 +2583,9 @@ int main(int argc, char **argv) {
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
         if (nhw) hw_dispatch(pfd + hwbase, nhw);
+        /* Dispatch after input: a seat switch can replace the entire device list. */
+        if (seatbase >= 0 && pfd[seatbase].revents && seat_dispatch() < 0) break;
+        if (inputbase >= 0 && pfd[inputbase].revents && input_watch_dispatch(&s.input, !s.headless)) wl_input_devices_changed();
         if (parked_n && s.headless && display_hotplug_seq() != parked_seq) {   /* a monitor may have appeared */
             int f[PARK_MAX], fn = parked_n;
             memcpy(f, parked_fd, sizeof(int) * (size_t)fn);
@@ -2552,8 +2609,9 @@ int main(int argc, char **argv) {
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
     if (s.renders)
-        fprintf(stderr, "lord-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
+        fprintf(stderr, "axia-server: %ld frames, %ld UI renders, layout %.2f ms, paint %.2f ms (average)\n",
                 s.frames, s.renders, s.layout_total / s.renders, s.paint_total / s.renders);
+    seat_callbacks(NULL, NULL);
     input_close(&s.input);
     mirror_stop();
     gpu_tex_free(s.cursor_tex);
@@ -2569,5 +2627,6 @@ int main(int argc, char **argv) {
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);
     out_free(&s.cap);
+    seat_stop();
     return 0;
 }

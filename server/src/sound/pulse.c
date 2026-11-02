@@ -59,7 +59,7 @@ void ts_u64(TsOut *t, uint64_t v) {
     if (p) { p[0] = T_USEC; put_be32(p + 1, (uint32_t)(v >> 32)); put_be32(p + 5, (uint32_t)v); }
 }
 
-/* 'T': timeval (seconds and microseconds), requested by GET_PLAYBACK_LATENCY (lord-media). */
+/* 'T': timeval (seconds and microseconds), requested by GET_PLAYBACK_LATENCY (axia-media). */
 void ts_timeval(TsOut *t, uint32_t sec, uint32_t usec) {
     uint8_t *p = grow(t, 9);
     if (p) { p[0] = T_TIMEVAL; put_be32(p + 1, sec); put_be32(p + 5, usec); }

@@ -1,8 +1,8 @@
-/* proto.h — protocol between lord-server and its helper lord-media (see docs/MEDIA.md).
+/* proto.h — protocol between axia-server and its helper axia-media (see docs/MEDIA.md).
  *
  * One SOCK_SEQPACKET socket per helper: each packet is a MediaMsg plus an optional payload
  * ("key=value" text per line or short JSON) and up to MP_MAX_FDS descriptors (SCM_RIGHTS).
- * lord-media never opens paths: every file, device or socket reaches it already open through here.
+ * axia-media never opens paths: every file, device or socket reaches it already open through here.
  * Video frames travel over shared memory (memfd sealed against shrinking), not over
  * the socket. */
 #ifndef LORD_MEDIA_PROTO_H
@@ -52,7 +52,7 @@ enum {
 };
 
 enum {
-    /* lord-server → lord-media */
+    /* axia-server → axia-media */
     MM_JOB = 1,         /* v[0] = MK_* or MW_*; payload = key=value parameters */
     MM_SIZE,            /* v[0], v[1]: size of the box where it's shown (px) */
     MM_PLAY,
@@ -70,7 +70,7 @@ enum {
     MM_KEYFRAME,        /* live encoder: the next frame is a keyframe */
     MM_RATE,            /* live encoder: v[0] = target kbit/s */
 
-    /* lord-media → lord-server */
+    /* axia-media → axia-server */
     MM_INFO = 64,       /* payload = JSON with the file's information */
     MM_RING,            /* fd = frames memfd; v[0] = gen, v[1] = width, v[2] = height, v[3] = slots */
     MM_FRAME,           /* id = gen << 8 | slot; v[0] = pts ms */
@@ -89,7 +89,7 @@ enum {
                            v[3] = why skipped (VBS_*) */
 };
 
-/* MK_VBENCH's measurements, in order; lord-server maps them to its own ids (bench/lbvideo.c) */
+/* MK_VBENCH's measurements, in order; axia-server maps them to its own ids (bench/lbvideo.c) */
 enum { VB_H264_1080, VB_HEVC_1080, VB_VP9_1080, VB_AV1_1080, VB_H264_2160, VB_HEVC_2160, VB_ENC_H264, VB_ENC_VP8, VB_COUNT };
 enum { VBR_STEP = 0, VBR_RESULT, VBR_SKIP };
 enum { VBS_NOCODEC = 1, VBS_FAILED, VBS_MODE };

@@ -10,7 +10,7 @@ keywords: search, find, calculator, convert, units
 
 ## What it finds
 
-- **Apps** (LordOS, Store and Linux).
+- **Apps** (Axia DE, Store and Linux).
 - **Files and folders** in your home folder.
 - **Settings sections:** “network”, “keyboard”, “wallpaper”…
 - **Notes** from the Notes app, by title or text.

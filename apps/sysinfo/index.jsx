@@ -1,12 +1,12 @@
 // System Information (0.8.5, docs/BENCHMARK.md): every piece of hardware detected and what LordOS
 // makes of it. (0.8.7) Report → Share on GitHub (share.js) and community data in Compatibility (community.js). Overview, Hardware (a source list and a detail pane) and Compatibility. The report
-// comes from lord.sysinfo.report() (server/src/sysreport, the same collector as lordos-sysreport and
-// lordos-fetch), read once on open and again with Refresh; model.js works out the GPU layers and the
+// comes from lord.sysinfo.report() (server/src/sysreport, the same collector as axia-sysreport and
+// axia-fetch), read once on open and again with Refresh; model.js works out the GPU layers and the
 // Compatibility panel; Performance (0.8.6, performance.jsx) runs LordBench. The report holds no serial numbers, addresses or names.
 // Two things on the Hardware tab are not part of it and never go into it: the serial numbers (SerialNumbers, on request) and
 // the peripherals' names (Peripherals). Both live in their own component's state; nothing here hands them to `r`.
 import {
-  View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
+  View, Text, ScrollView, Button, useTheme, useLocale, AxiaLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
   fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
 } from '@lordos/sdk';
@@ -105,7 +105,7 @@ function Overview({ r, info }) {
     <ScrollView style={{ flex: 1 }}>
       <View style={{ padding: spacing.xl, gap: spacing.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l }}>
-          <LordOSLogo size={64} />
+          <AxiaLogo size={64} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: t.text, textAlign: 'start' }}>{machineName(r) || tr('sysinfo.thisComputer')}</Text>
             <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>
@@ -128,7 +128,7 @@ function Overview({ r, info }) {
           <Card title={tr('sysinfo.section.storage')} value={formatBytes(disks.reduce((a, d) => a + d.bytes, 0))}
             sub={tr('sysinfo.disks', { count: disks.length })} />
           <Card title={tr('sysinfo.isolation')} value={sw.landlockAbi > 0 ? tr('sysinfo.landlock', { abi: sw.landlockAbi }) : tr('sysinfo.landlockUnknown')}
-            sub={[sw.bpfLsm ? tr('sysinfo.bpfLsm') : '', sw.cgroup2 ? tr('sysinfo.cgroup2') : '', sw.services?.['lord-netperm'] ? tr('sysinfo.appFirewall') : ''].filter(Boolean).join(' · ')} />
+            sub={[sw.bpfLsm ? tr('sysinfo.bpfLsm') : '', sw.cgroup2 ? tr('sysinfo.cgroup2') : '', sw.services?.['axia-netperm'] ? tr('sysinfo.appFirewall') : ''].filter(Boolean).join(' · ')} />
         </View>
       </View>
     </ScrollView>
@@ -527,7 +527,7 @@ function CheckRow({ c }) {
 }
 
 // The Sandbox Probe (apps/sysprobe): started like any isolated app; its result arrives through
-// lord-server (lord.sysinfo.probe()). It takes well under a second; after 10 s it didn't report.
+// axia-server (lord.sysinfo.probe()). It takes well under a second; after 10 s it didn't report.
 function useProbe() {
   const [st, setSt] = useState(() => { let p = null; try { p = lord.sysinfo.probe(); } catch (e) { /* older server */ } return { busy: false, result: p, error: null }; });
   const run = () => {
@@ -547,11 +547,11 @@ function useProbe() {
   return [st, run];
 }
 
-// The Test Bench (a Wayland client of its own, lordos-testbench): its last report, read from the user's state
+// The Test Bench (a Wayland client of its own, axia-testbench): its last report, read from the user's state
 // folder, and a button that opens it from the launcher like any Linux app.
 function useBenchReport(n) {
   return useMemo(() => {
-    try { return JSON.parse(fs.read(`${fs.home()}/.local/state/lordos/testbench.json`)); } catch (e) { return null; }
+    try { return JSON.parse(fs.read(`${fs.home()}/.local/state/axia/testbench.json`)); } catch (e) { return null; }
   }, [n]);
 }
 
@@ -569,7 +569,7 @@ function BenchGroup() {
           <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('sysinfo.bench.intro')}</Text>
         </View>
         <Button label={tr('sysinfo.bench.reload')} onClick={() => setN(n + 1)} />
-        <Button primary label={tr('sysinfo.bench.open')} onClick={() => launchApp('desktop:lordos-testbench')} />
+        <Button primary label={tr('sysinfo.bench.open')} onClick={() => launchApp('desktop:axia-testbench')} />
       </View>
       <GroupBox footer={b && b.at ? tr('sysinfo.probe.when', { time: new Date(b.at).toLocaleString() }) : null}>
         {rows ? rows.map((c) => <CheckRow key={c.id} c={c} />)
@@ -773,7 +773,7 @@ function SystemInformationMain({ startTab }) {
   const [n, setN] = useState(0);
   const r = useMemo(() => systemReport(), [n]);
   const info = useMemo(() => systemInfo(), [n]);
-  if (!r) return <EmptyState mascot="confused" title={tr('sysinfo.unavailable')} />;
+  if (!r) return <EmptyState title={tr('sysinfo.unavailable')} />;
   return (
     <View style={{ flex: 1 }}>
       <Toolbar>

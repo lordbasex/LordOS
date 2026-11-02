@@ -335,7 +335,7 @@ static void send_client_name(void) {
     const char *kv[] = {
         "application.name", "LordOS", "application.id", "org.lordos.Server",
         "application.icon_name", "audio-card", "application.process.id", pid,
-        "application.process.binary", "lord-server",
+        "application.process.binary", "axia-server",
     };
     ts_proplist(&t, kv, 5);
     cmd_send(&t, tag, R_NAME, 0, 0);

@@ -3,11 +3,11 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  suggestions, unseenSuggestions, refreshSuggestions,
+  suggestions, unseenSuggestions, refreshSuggestions, standaloneDesktop,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { AiDetail, AiDiscover, AiPage, catalogApp, catalogApps } from './ai.js';
-import { CATS, debian, useDebian } from './debian.js';
+// System packages belong to the host distribution's software manager (host.jsx).
+import { AiDetail, AiDiscover, AiPage, CATS, catalogApp, catalogApps, debian, useDebian } from './host.jsx';
 import { GLYPH } from './ui.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -131,7 +131,7 @@ function findPackageFiles() {
   for (const dir of ['', 'Descargas', 'Downloads', 'Escritorio', 'Desktop']) {
     let list = [];
     try { list = fs.list(dir || '.'); } catch (e) { continue; }
-    for (const e of list) if (!e.dir && /\.(lpk|deb)$/i.test(e.name)) out.push({ path: `${fs.home()}/${dir ? `${dir}/` : ''}${e.name}`, name: e.name, size: e.size });
+    for (const e of list) if (!e.dir && (standaloneDesktop ? /\.lpk$/i : /\.(lpk|deb)$/i).test(e.name)) out.push({ path: `${fs.home()}/${dir ? `${dir}/` : ''}${e.name}`, name: e.name, size: e.size });
   }
   return out;
 }
@@ -146,6 +146,7 @@ function InstallFile({ path, onDone }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setMsg(null);
+    if (standaloneDesktop && isDeb) { setInfo(null); setMsg({ ok: false, text: tr('store.host.description') }); return; }
     if (isDeb) { setInfo(null); return; }
     try { setInfo(packages.inspect(path)); } catch (e) { setInfo(null); setMsg({ ok: false, text: tr('store.lordos.invalid', { error: e.message }) }); }
   }, [path]);
@@ -154,7 +155,7 @@ function InstallFile({ path, onDone }) {
   const loc = (v) => (v && typeof v === 'object' ? v[lang] || v[lang.split('-')[0]] || v.en || Object.values(v)[0] : v) || '';
   const installed = m && packageList.get().find((p) => p.id === m.id);
   const install = () => {
-    if (isDeb) {
+    if (isDeb && !standaloneDesktop) {
       setBusy(true);
       debian.installFile(path).then(() => { setMsg({ ok: true, text: tr('store.done.installed') }); onDone?.(); },
         (e) => setMsg({ ok: false, text: e.message })).finally(() => setBusy(false));
@@ -187,12 +188,12 @@ function InstallFile({ path, onDone }) {
           </View>
         </View>
       )}
-      {isDeb && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
+      {isDeb && !standaloneDesktop && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
       <Message msg={msg} />
       {!msg?.ok && <debian.Refused />}
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
-        {(m || isDeb) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
+        {(m || (isDeb && !standaloneDesktop)) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
       </View>
     </View>
   );
@@ -356,14 +357,14 @@ export default function Store() {
         <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
           <SectionTitle>{tr('store.section.store')}</SectionTitle>
           {item('discover', tr('store.page.discover'), null, PAGE_GLYPH.discover)}
-          {item('suggested', tr('store.page.suggested'), unseen, PAGE_GLYPH.suggested)}
+          {!standaloneDesktop && item('suggested', tr('store.page.suggested'), unseen, PAGE_GLYPH.suggested)}
           {item('installed', tr('store.page.installed'), launcher.length, PAGE_GLYPH.installed)}
           {item('updates', tr('store.page.updates'), deb.upgrades?.length, PAGE_GLYPH.updates)}
-          <SectionTitle>{tr('store.section.categories')}</SectionTitle>
-          {item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
+          {!standaloneDesktop && <SectionTitle>{tr('store.section.categories')}</SectionTitle>}
+          {!standaloneDesktop && item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {CATS.filter((c) => counts[c]).map((c) => item(`cat:${c}`, tr(`store.cat.${c}`), counts[c], GLYPH[c]))}
-          <SectionTitle>LordOS</SectionTitle>
+          <SectionTitle>Axia DE</SectionTitle>
           {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
           <View style={{ height: 12 }} />
         </ScrollView>

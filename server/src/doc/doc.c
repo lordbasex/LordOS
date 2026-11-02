@@ -1,4 +1,4 @@
-/* doc.c — lord-doc sessions on the lord-server side (see doc.h and proto.h). */
+/* doc.c — axia-doc sessions on the axia-server side (see doc.h and proto.h). */
 #include "doc.h"
 #include "proto.h"
 #include "wire.h"
@@ -85,13 +85,13 @@ static void wake(void) {
     if (wakefd >= 0 && write(wakefd, &one, sizeof one) < 0) { /* a wakeup is already pending */ }
 }
 
-/* Measurements in the log: LORD_DOC_TRACE=1 or the file ~/.cache/lordos/doc-trace */
+/* Measurements in the log: LORD_DOC_TRACE=1 or the file ~/.cache/axia/doc-trace */
 static int trace(void) {
     static int t = -1;
     if (t < 0) {
         char p[1024];
         const char *h = getenv("HOME");
-        snprintf(p, sizeof p, "%s/.cache/lordos/doc-trace", h ? h : "/nonexistent");
+        snprintf(p, sizeof p, "%s/.cache/axia/doc-trace", h ? h : "/nonexistent");
         t = getenv("LORD_DOC_TRACE") || access(p, F_OK) == 0;
     }
     return t;
@@ -110,11 +110,11 @@ int doc_available(void) {
         *slash = 0;
         if (strlen(self) + 10 > sizeof helper) return -1;
         memcpy(helper, self, strlen(self));
-        memcpy(helper + strlen(self), "/lord-doc", 10);
+        memcpy(helper + strlen(self), "/axia-doc", 10);
     }
     struct stat st, me;
     if (stat(helper, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
-    /* owned by the same user as lord-server (or by root) and writable by nobody else */
+    /* owned by the same user as axia-server (or by root) and writable by nobody else */
     if (stat("/proc/self/exe", &me) || (st.st_uid != 0 && st.st_uid != me.st_uid) || (st.st_mode & 022)) return -1;
     return 0;
 }
@@ -190,7 +190,7 @@ static int spawn(Sess *s) {
     if (assets) { snprintf(fenv, sizeof fenv, "LORD_DOC_FONTS=%s", assets); envp[ne++] = fenv; }
     if (getenv("LORD_DOC_DEBUG")) envp[ne++] = "LORD_DOC_DEBUG=1";
     envp[ne] = NULL;
-    char *argv[] = { "lord-doc", NULL };
+    char *argv[] = { "axia-doc", NULL };
     pid_t pid;
     int r = posix_spawn(&pid, helper, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
@@ -361,7 +361,7 @@ static void on_message(Sess *s) {
     json_free(&d);
     doc_msg_free(&m);
     if (trace())
-        fprintf(stderr, "lord-doc: request %u: queue %.1f ms, helper %.1f ms\n", q->op, q->sent - q->queued, now_ms() - q->sent);
+        fprintf(stderr, "axia-doc: request %u: queue %.1f ms, helper %.1f ms\n", q->op, q->sent - q->queued, now_ms() - q->sent);
     req_free(q);
     s->inflight = NULL;
     pending--;

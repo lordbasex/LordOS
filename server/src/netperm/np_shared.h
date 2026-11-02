@@ -1,4 +1,4 @@
-/* np_shared.h — what lord-netperm's BPF programs (np.bpf.c), the compiler of rules into maps
+/* np_shared.h — what axia-netperm's BPF programs (np.bpf.c), the compiler of rules into maps
  * (npcompile.c) and its test (tests/npcompile_test.c) share. See docs/FIREWALL.md, step 2.
  *
  * It compiles the same with `clang -target bpf` (no libc) and with the system compiler: only
@@ -6,7 +6,7 @@
  * very function, so the kernel-less test compares exactly what will run inside against
  * fw_decide (the step 1 reference).
  *
- * Maps (created by lord-netperm; the programs see them by name):
+ * Maps (created by axia-netperm; the programs see them by name):
  *   np_cfg     ARRAY  [0] → NpCfg                   level of the apps' scope, enabled
  *   np_apps    HASH   cgroup id (u64) → NpApp       restrictions, trusted, mode, generic list
  *   np_union   HASH   id of user@<uid> (u64) → NpApp  strict union of the user's restricted apps
@@ -17,7 +17,7 @@
  *   np_flows   LRU    NpFlowKey → NpFlow            bytes received / sent / blocked per (app, remote address)
  *   np_bound   LRU    NpBoundKey → u8               local ports an app bound (bind with port != 0): a packet
  *                                                     on one of them belongs to an incoming connection
- *   np_events  RINGBUF                              NpEvent towards lord-netperm
+ *   np_events  RINGBUF                              NpEvent towards axia-netperm
  *   np_snd     HASH   ALSA minor (u32) → u32           every ALSA node in /sys/class/sound: NP_SND_CAPTURE for the
  *                                                     capture PCMs (/dev/snd/pcmC*D*c), NP_SND_OTHER for the rest
  *   np_blk4    LPM    (list set, IPv4/n) → u8       (0.8.5) a user's subscribed blocklists: their networks and
@@ -182,7 +182,7 @@ typedef struct {
     np_u16 lport, rport;        /* the local and remote ports (port is the one the rule looked at) */
     np_u8  cut;                 /* 0: a connection attempt; 1: first drop of this socket; 2: repeated */
     np_u8  destroy;             /* 1: a TCP connection (not a listener) or a connected UDP socket:
-                                 * lord-netperm destroys it. 0: an unconnected UDP socket or a
+                                 * axia-netperm destroys it. 0: an unconnected UDP socket or a
                                  * listener, which may also serve allowed peers: only the drop */
     np_u8  pad2[2];
     np_u64 cookie;              /* the socket's cookie (bpf_get_socket_cookie), checked by SOCK_DESTROY */

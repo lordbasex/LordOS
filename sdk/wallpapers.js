@@ -7,16 +7,15 @@
 import index from '../assets/wallpapers/index.json';
 
 // The desktop of a new user (sdk/settings.js DEFAULTS) and the fallback for an unknown id.
-export const DEFAULT_WALLPAPER = 'lumo-celestial';
-// The login screen's background (themes/greeter; the remote login page serves the same image
-// through themes/greeter/assets/background.jpg, a link to it).
-export const GREETER_WALLPAPER = 'crystal-crown';
+export const DEFAULT_WALLPAPER = 'infinite-galaxy';
+// The still background Settings offers for the login screen.
+export const GREETER_WALLPAPER = 'violet-horizon';
 
 // Categories in the order Settings shows them; a theme's own wallpapers come after.
-export const WALLPAPER_CATEGORIES = ['signature', 'lumo', 'cosmos', 'gradients'];
+export const WALLPAPER_CATEGORIES = ['horizons', 'cosmos', 'gradients'];
 
-// English fallback for an id: "crystal-crown" → "Crystal Crown", "lumo-celestial" → "Celestial"
-const englishName = (id) => id.replace(/^lumo-/, '').split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+// English fallback for an id: "violet-horizon" → "Violet Horizon"
+const englishName = (id) => id.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 export const lordosWallpapers = index.map((e) => ({
   id: e.id,

@@ -1,16 +1,16 @@
-/* media.c — the lord-media helpers from lord-server (see media.h and docs/MEDIA.md).
+/* media.c — the axia-media helpers from axia-server (see media.h and docs/MEDIA.md).
  *
  * Rules:
- *   - lord-media is launched only from here, with the fixed path <lord-server folder>/lord-media,
+ *   - axia-media is launched only from here, with the fixed path <axia-server folder>/axia-media,
  *     no arguments and a minimal environment. The binary has to be owned by the user or by root and not
  *     writable by others.
- *   - It never receives a path: lord-server validates each path (home folder or the user's
+ *   - It never receives a path: axia-server validates each path (home folder or the user's
  *     mounts, like lord.fs), opens the file and passes it the fd. Outputs are created as
  *     temporaries next to the destination and renamed when they finish well, without overwriting anything.
- *   - The socket is a non-blocking SOCK_SEQPACKET: lord-server never waits for the helper. If the
+ *   - The socket is a non-blocking SOCK_SEQPACKET: axia-server never waits for the helper. If the
  *     helper crashes or hangs, it's killed and only that window finds out ("closed" event).
  *   - The shared memory the helper sends has to come sealed against shrinking
- *     (F_SEAL_SHRINK): otherwise, a compromised helper could bring down lord-server with
+ *     (F_SEAL_SHRINK): otherwise, a compromised helper could bring down axia-server with
  *     SIGBUS by truncating it. */
 #include "media_int.h"
 #include "hwdec.h"
@@ -118,7 +118,7 @@ static int helper_path(char *out, size_t n) {
     char *slash = strrchr(self, '/');
     if (!slash) return -1;
     *slash = 0;
-    if ((size_t)snprintf(out, n, "%.*s/lord-media", (int)(n > 16 ? n - 16 : 0), self) >= n) return -1;
+    if ((size_t)snprintf(out, n, "%.*s/axia-media", (int)(n > 16 ? n - 16 : 0), self) >= n) return -1;
     struct stat st;
     if (stat(out, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     /* owned by the user or by root, and nobody else can change it */
@@ -132,7 +132,7 @@ static int helper_path(char *out, size_t n) {
 int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
     static char path[PATH_MAX];
     static int checked;
-    if (!checked) { checked = helper_path(path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-media is missing (no video, music or camera)\n"); }
+    if (!checked) { checked = helper_path(path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: axia-media is missing (no video, music or camera)\n"); }
     if (checked < 0) return -1;
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return -1;
@@ -145,13 +145,13 @@ int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *p
     if (p == 0) {
         sigset_t all;
         sigemptyset(&all);
-        sigprocmask(SIG_SETMASK, &all, NULL);        /* lord-server blocks SIGTERM/SIGINT (signalfd) */
+        sigprocmask(SIG_SETMASK, &all, NULL);        /* axia-server blocks SIGTERM/SIGINT (signalfd) */
         for (int sig = 1; sig < 32; sig++) if (sig != SIGKILL && sig != SIGSTOP) signal(sig, SIG_DFL);
         if (dup2(sv[1], 3) < 0) _exit(127);
 #ifdef SYS_close_range
         syscall(SYS_close_range, 4U, ~0U, 0);
 #endif
-        char *const argv[] = { "lord-media", NULL };
+        char *const argv[] = { "axia-media", NULL };
         static char lang[64], dbg[32], va[96];
         char *env[5];
         int ne = 0;
@@ -507,7 +507,7 @@ static void src_dispatch(MediaSrc *s) {
             else bury(pid, 500), s->pid = 0;
             if (s->tmp[0]) { media_finish_output(s->tmp, s->dst, 0); s->tmp[0] = 0; }
             if (s->kind == SK_SCREENREC) media_capture_src_closed(s);
-            if (crashed) fprintf(stderr, "media: lord-media (%s) terminated abruptly; the window stays\n", s->app);
+            if (crashed) fprintf(stderr, "media: axia-media (%s) terminated abruptly; the window stays\n", s->app);
             media_event(s->id, "closed", "{\"crashed\":%s}", crashed ? "true" : "false");
             if (s->closing) { s->closing = 0; s->state = MS_DONE; media_src_close(s); }
             return;
@@ -652,7 +652,7 @@ static void worker_kick(int bg) {
     if (wk->sock < 0) {
         wk->sock = media_spawn(MK_WORKER, NULL, NULL, 0, &wk->pid);
         if (wk->sock < 0) {
-            /* no lord-media: all jobs fail */
+            /* no axia-media: all jobs fail */
             while (queue[bg]) { Job *j = queue[bg]; queue[bg] = j->next; queued[bg]--; payload[0] = 0; snprintf(payload, sizeof payload, "media.noHelper"); job_finish(j, -1, -1); job_free(j); }
             queue_tail[bg] = NULL;
             return;
@@ -713,7 +713,7 @@ static void worker_dispatch(int bg) {
             bury(wk->pid, 500);
             wk->pid = 0;
             if (wk->cur) {
-                fprintf(stderr, "media: lord-media crashed during a job (%d); moving on to the next\n", wk->cur->kind);
+                fprintf(stderr, "media: axia-media crashed during a job (%d); moving on to the next\n", wk->cur->kind);
                 snprintf(payload, sizeof payload, "media.helperCrashed");
                 job_finish(wk->cur, -1, -1);
                 job_free(wk->cur);
@@ -733,7 +733,7 @@ static void worker_dispatch(int bg) {
     worker_kick(bg);
 }
 
-/* ---- thumbnails: ~/.cache/lordos/thumbs/<sha256>.png ---- */
+/* ---- thumbnails: ~/.cache/axia/thumbs/<sha256>.png ---- */
 
 #define THUMB_TRACK 4096
 static uint64_t thumb_keys[THUMB_TRACK];        /* requested or failed (not retried) */
@@ -768,7 +768,7 @@ const char *media_thumb(const char *path, int size, char *out, size_t n) {
     uint8_t h[32];
     sha256(key, strlen(key), h);
     char dir[PATH_MAX];
-    snprintf(dir, sizeof dir, "%s/.cache/lordos/thumbs", media_home());
+    snprintf(dir, sizeof dir, "%s/.cache/axia/thumbs", media_home());
     char hex[33];
     for (int i = 0; i < 16; i++) snprintf(hex + i * 2, 3, "%02x", h[i]);
     snprintf(out, n, "%s/%s.png", dir, hex);

@@ -38,7 +38,7 @@ static double mono_ms(void) {
 void keylag_init(int greeter) {
     const char *e = getenv("LORD_INPUT_DEBUG");
     keylag_enabled = !greeter && e && !strcmp(e, "1");
-    if (keylag_enabled) fprintf(stderr, "keylag: key latency trace on (LORD_INPUT_DEBUG=1), in $XDG_RUNTIME_DIR/lordos-keylag.log\n");
+    if (keylag_enabled) fprintf(stderr, "keylag: key latency trace on (LORD_INPUT_DEBUG=1), in $XDG_RUNTIME_DIR/axia-keylag.log\n");
 }
 
 static void stop(const char *why) {
@@ -54,7 +54,7 @@ static int open_out(void) {
     if (out) return 0;
     const char *rt = getenv("XDG_RUNTIME_DIR");
     char path[512];
-    if (!rt || rt[0] != '/' || snprintf(path, sizeof path, "%s/lordos-keylag.log", rt) >= (int)sizeof path) return -1;
+    if (!rt || rt[0] != '/' || snprintf(path, sizeof path, "%s/axia-keylag.log", rt) >= (int)sizeof path) return -1;
     unlink(path);                                   /* a trace left by an earlier session of this user */
     int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0) return -1;

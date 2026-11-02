@@ -6,7 +6,7 @@ keywords: copy, paste, history, clipboard, images
 ---
 # Clipboard
 
-LordOS keeps what you copy in any app (Linux apps too): text, links, colors, code, paths and images.
+Axia DE keeps what you copy in any app (Linux apps too): text, links, colors, code, paths and images.
 
 - **❖V:** the latest items you copied, with search. Enter, a click or the keys 1 to 9 paste it
   where you were.
@@ -18,7 +18,7 @@ LordOS keeps what you copy in any app (Linux apps too): text, links, colors, cod
 ## Privacy
 
 - What an app marks as secret (for example a password manager) is not saved.
-- Neither are LordOS password fields.
+- Neither are Axia DE password fields.
 - In [Settings → Clipboard](settings:clipboard) you choose whether history is kept, for how long
   and which apps are excluded, and you can clear it all.
 

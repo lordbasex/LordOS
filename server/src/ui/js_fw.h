@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 void js_fw_register(JSContext *c, JSValue lord);
-/* the latest per-app counters from lord-netperm (its JSON, or NULL) and a number that changes with them */
+/* the latest per-app counters from axia-netperm (its JSON, or NULL) and a number that changes with them */
 const char *js_fw_counts(uint64_t *seq);
 
 #endif

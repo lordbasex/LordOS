@@ -5,11 +5,11 @@
 //     the same one the Monitor's switch writes);
 //   - its rules: allow or block a domain (exact, or *.example.com with every subdomain), an IP
 //     address or a CIDR network, with an optional port or range and protocol. Each row says when
-//     the rule last decided a connection (lord-netperm's notices, seen by this session);
+//     the rule last decided a connection (axia-netperm's notices, seen by this session);
 //   - add (a sheet that checks what is typed), edit and delete. There is no priority to reorder:
 //     the engine picks the most specific match (rules.c, fw_decide), so the list is shown in that
 //     order and the footer explains it.
-// The rules are saved by lord-server (lord.fw); this screen writes no files.
+// The rules are saved by axia-server (lord.fw); this screen writes no files.
 import {
   View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, fwRule,
   spacing, typeScale, formatDate, formatTime, direction, netModel,

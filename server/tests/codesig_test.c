@@ -308,7 +308,7 @@ static void test_sha256(void) {
     sha256_select(0); sha256(buf, big, a);
     sha256_select(1); sha256(buf, big, b);
     CHECK(same && !memcmp(a, b, 32), "SHA-256: the CPU's instructions match the C code");
-    /* speed of what lord-server uses here (docs/SIGNING.md, "Startup cost") */
+    /* speed of what axia-server uses here (docs/SIGNING.md, "Startup cost") */
     struct timespec t0, t1;
     clock_gettime(CLOCK_MONOTONIC, &t0);
     sha256(buf, big, a);

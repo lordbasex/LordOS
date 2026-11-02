@@ -3,7 +3,7 @@
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
 import {
-  View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  standaloneDesktop, View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
@@ -328,7 +328,7 @@ function MotionWallpapers({ login }) {
   );
 }
 
-// Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
+// Grouped by category (Horizons, Cosmos, then the theme's own); grids use the thumbnails.
 function Wallpapers() {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -349,7 +349,7 @@ function Wallpapers() {
   const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
   return (
     <Stack>
-      <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
+      {!standaloneDesktop && <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />}
       {note ? <Note>{note}</Note> : null}
       <Section>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
@@ -485,7 +485,7 @@ function LanguageRegion() {
         </SettingRow>
         <PackImport onDone={(text) => { reloadCatalogs(); setMsg({ ok: true, text }); }} />
       </Section>
-      {!isAdmin && <Note tone="warn">{tr('settings.admin.unavailable')}</Note>}
+      {!isAdmin && <Note tone="warn">{tr(standaloneDesktop ? 'settings.host.adminUnavailable' : 'settings.admin.unavailable')}</Note>}
       <AdminLog />
       <Message msg={msg} />
     </Stack>
@@ -701,7 +701,7 @@ const SECTIONS = GROUPS.flat();
 // Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor); Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'trackpad' || hasPad) && (id !== 'firmware' || pi5);
+const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'trackpad' || hasPad) && (id !== 'firmware' || pi5) && (!standaloneDesktop || !['sharing', 'users', 'cooling', 'firmware'].includes(id));
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -748,7 +748,10 @@ export default function Settings() {
   const { args } = useAppWindow();
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
-  const setSection = (s) => { lastSection = s; setSectionState(s); };
+  const setSection = (s) => {
+    if (standaloneDesktop && ['sharing', 'users', 'cooling', 'firmware'].includes(s)) s = 'general';
+    lastSection = s; setSectionState(s);
+  };
   // 'themes' (the old Themes page, links from older help) now opens Appearance
   useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];

@@ -34,8 +34,8 @@ download cache to clean. And `lord.pkg.plan` already gives the read-only removal
 apps/cleaner/            the interface (JSX, @lordos/sdk)
 sdk/cleaner.js           the SDK module over lord.clean
 server/src/ui/js_clean.c lord.clean: start, poll, cancel, results, plan, execute, status
-server/src/clean/        the lord-server side: job thread, rule table, plans, execution
-server/src/clean/helper/ lord-clean, the sandboxed scanner
+server/src/clean/        the axia-server side: job thread, rule table, plans, execution
+server/src/clean/helper/ axia-clean, the sandboxed scanner
 assets/locales/*/cleaner.json
 ```
 
@@ -45,10 +45,10 @@ Cleaner is a built-in app, not an isolated one. An isolated app only has its dat
 of broker operations for all of this, while the authority here belongs in C anyway. The JS holds no power beyond
 `lord.clean`, and that module can be brokered later without changing the app.
 
-### `lord-clean`, the scanner
+### `axia-clean`, the scanner
 
-A helper in the pattern of `lord-bench` and `lord-doc`: fixed path next to `lord-server`, no arguments, minimal
-environment, channel on fd 3, its own scope (`lordos-cleaner`). lord-server opens each root as an `O_DIRECTORY` fd and
+A helper in the pattern of `axia-bench` and `axia-doc`: fixed path next to `axia-server`, no arguments, minimal
+environment, channel on fd 3, its own scope (`lordos-cleaner`). axia-server opens each root as an `O_DIRECTORY` fd and
 passes it over `SCM_RIGHTS`. The helper lists them in `ro_dir_fds` and calls `sandbox_apply_helper` before reading.
 
 It has no network, no exec and no write access to anything. A bug in parsing a hostile file name can't reach further
@@ -56,7 +56,7 @@ than reading. It walks with `openat2` (`RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | 
 `statx` for identity and allocated blocks.
 
 Landlock can't exclude a subtree, so the helper can read everything under a root. Skipping `fsops_protected` is a rule of
-the walk, repeated in lord-server for every record it accepts.
+the walk, repeated in axia-server for every record it accepts.
 
 Memory is bounded: a file count limit, a depth limit and paged results. A scan that hits a limit says so, and is marked
 incomplete. Progress is real counters, and a percentage appears only when the total is known.
@@ -64,17 +64,17 @@ incomplete. Progress is real counters, and a percentage appears only when the to
 ### Results
 
 The helper reports records with a kind, a rule id, the path relative to a root, device, inode, link count, size,
-allocated bytes and modification time. lord-server validates each one and keeps them in memory for that scan. JS gets
+allocated bytes and modification time. axia-server validates each one and keeps them in memory for that scan. JS gets
 pages with a `candidate id` and a display path, never anything it can use as authority.
 
-Nothing of a scan outlives it except one thing: the folder names and sizes of the last tree scan of the home folder or `/`, in `~/.cache/lordos/cleaner-map.txt` (Storage map below). That file holds no candidates.
+Nothing of a scan outlives it except one thing: the folder names and sizes of the last tree scan of the home folder or `/`, in `~/.cache/axia/cleaner-map.txt` (Storage map below). That file holds no candidates.
 
 Hard links count once. Sizes come in two columns: logical and allocated. What a cleanup will free is always an estimate:
 reflinks, compression, snapshots and open files change it.
 
 ### Rules
 
-A table compiled into lord-server (`clean/rules.c`), with a test that validates every entry. A rule has an id, version,
+A table compiled into axia-server (`clean/rules.c`), with a test that validates every entry. A rule has an id, version,
 category, root relative to the home folder, a bounded name pattern, optional minimum age, exclusions, risk (`regenerable`,
 `review`, `protected`), allowed action and a text key. There are no commands and no rule files from outside: a rule can
 only pick from the fixed list of actions.
@@ -82,15 +82,15 @@ only pick from the fixed list of actions.
 Only well-known locations are rules. `~/.cache` as a whole is not one, since applications keep sessions and databases
 there. A name like `.tmp` or a folder called `cache` proves nothing by itself.
 
-The one exception to fixed locations is a project output (`project` in `CleanRule`, `clean_project_kind` in `clean/cleanfs.c`). Eight kinds, each with its folder names and what proves it: a file next to the folder, one inside it, or both where a name is too common. `lord-clean` walks the home folder once for all kinds, reports each proved folder whole with its totals, and for a kind with an idle time adds the newest modification time in the project, build outputs apart. `clean_rule_check` refuses a project rule that isn't `review`, to the Trash, `explicit_only` and without any other location. Project outputs are in `CLEANER.md`.
+The one exception to fixed locations is a project output (`project` in `CleanRule`, `clean_project_kind` in `clean/cleanfs.c`). Eight kinds, each with its folder names and what proves it: a file next to the folder, one inside it, or both where a name is too common. `axia-clean` walks the home folder once for all kinds, reports each proved folder whole with its totals, and for a kind with an idle time adds the newest modification time in the project, build outputs apart. `clean_rule_check` refuses a project rule that isn't `review`, to the Trash, `explicit_only` and without any other location. Project outputs are in `CLEANER.md`.
 
-The same evidence is read again in lord-server at the plan and right before acting (`item_check`). A candidate whose evidence is gone ends as *changed*.
+The same evidence is read again in axia-server at the plan and right before acting (`item_check`). A candidate whose evidence is gone ends as *changed*.
 
 ### Plans and actions
 
 1. The user selects candidates. JS sends ids.
 2. `lord.clean.plan(scan, ids)` builds the plan in C: it re-checks every candidate and returns the list, totals and
-   warnings. The plan stays in lord-server, and it expires.
+   warnings. The plan stays in axia-server, and it expires.
 3. `lord.clean.execute(plan)` runs it on a thread. Before each action it reopens the object from its root with
    `openat2`, compares device, inode, size and modification time, and skips it as *changed* if they differ.
 4. Each item ends as done, skipped, changed, denied, failed, cancelled or unsupported.
@@ -124,7 +124,7 @@ Other rules (`review`) use the Trash. Project outputs are `review` for that reas
 Tests that delete run only in throwaway folders, never in a real home folder.
 
 Found during this audit and fixed first: `fsops_protected` matched a protected path and what is under it, so trashing a
-*parent* such as `~/.config/lordos` passed. `lord.fs.rename`, `trash`, a move and a restore now refuse a parent of a
+*parent* such as `~/.config/axia` passed. `lord.fs.rename`, `trash`, a move and a restore now refuse a parent of a
 protected path, as source or destination (`fsops_protected_below`, `fsops-test`).
 
 ## Performance
@@ -141,15 +141,15 @@ the copy being kept confirms it. At least one independent copy always stays, and
 
 ## Similar images
 
-The same walk, kept to image names of at least 8 KiB, then `helper/lcimage.c` inside `lord-clean`: the file is read whole, up to
+The same walk, kept to image names of at least 8 KiB, then `helper/lcimage.c` inside `axia-clean`: the file is read whole, up to
 64 MiB, its size in pixels is read from the header and refused past 40 megapixels before anything is allocated for it, and it is
-decoded to grey with the `stb_image` the project already carries, set up as `lord-maild`'s. Nothing is decoded in `lord-server`. The
+decoded to grey with the `stb_image` the project already carries, set up as `axia-maild`'s. Nothing is decoded in `axia-server`. The
 image's cells give a 64-bit difference hash. The helper sends one group at a time, largest image first, with sizes and hashes;
-lord-server checks that every member really is within reach of the first (`clean_similar`, shared with the helper) and throws away a
+axia-server checks that every member really is within reach of the first (`clean_similar`, shared with the helper) and throws away a
 scan that lies. The plan is the duplicates' plan: one image of each group stays, as another inode. Right before acting, the image
 that stays is checked to be the file the scan saw; there is no byte comparison, as the bytes differ.
 
-Thumbnails on the page are `media.thumb`, made by `lord-media`.
+Thumbnails on the page are `media.thumb`, made by `axia-media`.
 
 ## Storage map
 
@@ -180,7 +180,7 @@ Deliberate differences:
 | 2, system care | Apps and their leftovers, performance page reusing Monitor and Disks, similar images, developer and AI caches, privacy recommendations. Built and pending rows are in `CLEANER-ROADMAP.md` |
 | 3, optional modules | Optional malware scanner, configuration audit, browser, mail and cloud modules, scheduled scans that only notify |
 
-Build order for Phase 1: `lord-clean` and one safe rule end to end, then the rest of the rules, then large files and the
+Build order for Phase 1: `axia-clean` and one safe rule end to end, then the rest of the rules, then large files and the
 storage map, then duplicates.
 
 Names: the interface uses generic words only ("Scan", "Storage map"), as for every LordOS app.

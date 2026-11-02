@@ -8,7 +8,7 @@ int    js_init(const char *bundle_path);
 /* js_init/js_init_app return JS_REFUSED when the code was refused by the verified-code check
  * (sec/codesig.h): the caller falls back to another theme or to js_init_recovery(). */
 #define JS_REFUSED (-2)
-int    js_init_app(const char *host_bundle, const char *app_id);   /* lord-server --app <id> */
+int    js_init_app(const char *host_bundle, const char *app_id);   /* axia-server --app <id> */
 int    js_init_recovery(int greeter);   /* the built-in "component was modified" screen */
 int    js_app_recovery(void);           /* the same in an isolated app's window */
 void   js_shutdown(void);
@@ -40,6 +40,6 @@ void   js_screen_resized(void);
 void   js_set_displays(const char *json);
 void   js_hw_event(const char *kind, const char *json);   /* Settings' hardware (src/hw) → __lordHw */
 void   js_broker_event(const char *kind, const char *json);   /* broker notices → theme */
-void   js_broker_app_event(const char *kind, const char *json, size_t len);   /* lord-server → isolated app */
+void   js_broker_app_event(const char *kind, const char *json, size_t len);   /* axia-server → isolated app */
 
 #endif

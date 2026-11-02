@@ -10,8 +10,8 @@ keywords: barra de menus, dock, launchpad, central de controle, fundo, widgets
 
 No alto da tela:
 
-- **O logotipo do LordOS:** Sobre, Ajustes, Aplicativos, bloquear a tela, trocar de usuário e sair
-- **Reabrir janelas:** os apps abertos ao sair, reiniciar ou desligar voltam ao lugar na próxima entrada. Depois de uma queda de energia, o LordOS pergunta antes. Escolha Sempre, Perguntar antes ou Desativado em Ajustes → Sessão.
+- **O logotipo do Axia DE:** Sobre, Ajustes, Aplicativos, bloquear a tela, trocar de usuário e sair
+- **Reabrir janelas:** os apps abertos ao sair, reiniciar ou desligar voltam ao lugar na próxima entrada. Depois de uma queda de energia, o Axia DE pergunta antes. Escolha Sempre, Perguntar antes ou Desativado em Ajustes → Sessão.
   da sessão.
 - **Os menus do app em primeiro plano** (por exemplo Arquivo, Editar, Visualizar), e os menus
   Janela e Ajuda.
@@ -24,7 +24,7 @@ No alto da tela:
 - O **Dock** mostra os apps fixados e os abertos (um ponto embaixo). Clique com o botão direito
   em um ícone para ver as opções.
 - **Aplicativos** (**F4** ou tocar sozinha a tecla ❖), o lançador de apps, mostra todos os apps por categoria, com
-  busca: os do LordOS, os instalados pela Loja e os apps Linux.
+  busca: os do Axia DE, os instalados pela Loja e os apps Linux.
 
 ## Central de controle
 
@@ -38,7 +38,7 @@ podem ficar coladas na área de trabalho como post-its.
 
 ## Temas
 
-O LordOS traz dois temas: **Lord Flow** (barra de menus e Dock) e **Lord Classic** (barra de
+O Axia DE traz dois temas: **Lord Flow** (barra de menus e Dock) e **Lord Classic** (barra de
 tarefas e menu iniciar). Eles mudam na hora em [Ajustes → Aparência](settings:appearance).
 
 No **Lord Classic**: o botão iniciar (ou Super) abre o menu iniciar, onde digitar pesquisa apps,

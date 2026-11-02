@@ -274,7 +274,7 @@ int main(int argc, char **argv) {
     if (argc == 4 && !strcmp(argv[1], "fixture")) {
         mkdirs(argv[2]);
         tree(argv[2], argv[3]);
-        printf("fixture %s in %s (run lord-server with LORD_HWSCAN_ROOT=%s)\n", argv[3], argv[2], argv[2]);
+        printf("fixture %s in %s (run axia-server with LORD_HWSCAN_ROOT=%s)\n", argv[3], argv[2], argv[2]);
         return 0;
     }
     parse_tests();

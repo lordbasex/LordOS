@@ -2,7 +2,7 @@
  * Only ui/js.c includes it, and tests/timer_order_test.c, which checks the timers against the
  * algorithm of 0.8.6's first build (the same callbacks in the same order, the same waits).
  *
- * The real event loop is lord-server's (main.c): it calls __lordTick(now) and sleeps for what it
+ * The real event loop is axia-server's (main.c): it calls __lordTick(now) and sleeps for what it
  * returns (ms until the next timer, -1 with none). Due timers run by their deadline, then by id
  * (the order they were set), each at most once per tick; one set while the tick runs waits for the
  * next tick, as does one cleared before its turn. minAt is the earliest deadline, so a tick with

@@ -2,7 +2,7 @@
 // thumbnails and outline, search with highlighting, zoom and fit, rotate, select and copy text,
 // go to a page, links, forms, annotations (highlight, note and freehand) saved as a
 // copy, dark mode with the page inverted and printing with the system dialog.
-// Poppler runs in the confined lord-doc helper (see docs/DOCUMENTS.md); this app only asks.
+// Poppler runs in the confined axia-doc helper (see docs/DOCUMENTS.md); this app only asks.
 import {
   View, Text, TextInput, Button, useTheme, useAppWindow, useKeyboard, addListener, wm, fs, clipboard, pdf, print, DocImage, releaseImage,
   formatNumber, direction, t as tr, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, SearchField, EmptyState,
@@ -95,7 +95,7 @@ export default function PdfViewer() {
   const [error, setError] = useState(null);
   const [needPass, setNeedPass] = useState(false);
   const [password, setPassword] = useState('');
-  const [rev, setRev] = useState(0);                  // something arrived from lord-doc: redraw
+  const [rev, setRev] = useState(0);                  // something arrived from axia-doc: redraw
   const [zoom, setZoom] = useState(saved?.zoom || 'width');   // number | 'width' | 'page'
   const [rot, setRot] = useState(0);
   const [mode, setMode] = useState(saved?.mode || 'continuous');   // 'continuous' | 'single'

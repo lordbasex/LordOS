@@ -11,7 +11,7 @@
  *   - a firewall restriction of the built-in apps (firewall id "lordos", sec/restrict.h) beats the
  *     permission: refused with fw.restricted.<perm>, and restricting while a camera, microphone
  *     or screen recording runs stops it at once (media_restricted below);
- *   - the decoder (lord-media) never receives a path: lord-server opens the file and passes the fd. */
+ *   - the decoder (axia-media) never receives a path: axia-server opens the file and passes the fd. */
 #include "js_media.h"
 #include "../media/media_int.h"
 #include "../media/proto.h"
@@ -102,7 +102,7 @@ static int arg_id(JSContext *c, JSValueConst v) {
     return id;
 }
 
-/* Built-in apps run inside lord-server: their firewall id is "lordos" (docs/FIREWALL.md). */
+/* Built-in apps run inside axia-server: their firewall id is "lordos" (docs/FIREWALL.md). */
 #define BUILTIN_FWID "lordos"
 
 static int permitted(JSContext *c, const char *app, Perm p) {
@@ -475,7 +475,7 @@ static JSValue f_copy_image(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (!rt) return js_throw_code(c, "media.noRuntimeDir", NULL);
     static unsigned seq;
     char dir[PATH_MAX], dst[PATH_MAX + 64], tmp[PATH_MAX + 64];
-    snprintf(dir, sizeof dir, "%s/lordos", rt);
+    snprintf(dir, sizeof dir, "%s/axia", rt);
     mkdir(dir, 0700);
     snprintf(dst, sizeof dst, "%s/clip-shot%d-%u.png", dir, (int)getpid(), ++seq);
     snprintf(tmp, sizeof tmp, "%s/.shot%d-%u.part", dir, (int)getpid(), seq);
@@ -722,7 +722,7 @@ static const JSCFunctionListEntry media_funcs[] = {
 };
 
 /* A restriction was just added to the built-in apps: what it covers stops now, like revoking the
- * permission of an isolated app. The camera's lord-media is killed (the window gets "closed" with
+ * permission of an isolated app. The camera's axia-media is killed (the window gets "closed" with
  * revoked); recordings that use the microphone or the screen are finished properly (the file is
  * kept up to the moment of the restriction). Sources of isolated apps (bk) are the broker's. */
 static void media_restricted(uint32_t added) {

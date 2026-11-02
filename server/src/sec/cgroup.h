@@ -4,7 +4,7 @@
  *   app-lordos-lpk-<id>.scope   isolated native .lpk apps (sandbox.c)
  *   app-lordos-<id>.scope       Linux apps (.desktop) launched by apps.c
  *
- * Reusable: called in the freshly forked child, right before execve. lord-server runs
+ * Reusable: called in the freshly forked child, right before execve. axia-server runs
  * without root; it needs its cgroup subtree to be delegated (lord-sessiond prepares it, see
  * docs/SESSIONS.md and docs/PRIVACY.md). If that's not possible (no delegation, missing controller,
  * old kernel), it warns in the log and goes on without a cgroup: the app runs anyway, without limits. */
@@ -35,7 +35,7 @@ static inline int app_scope_reserved(const char *id) { return !strcmp(id, "lordo
  * so the monitor knows which scope it's in. "" if it couldn't be read. */
 const char *cgroup_self(void);
 
-/* Called by lord-sessiond (root) in a session's child, before lord-server's execve: creates the
+/* Called by lord-sessiond (root) in a session's child, before axia-server's execve: creates the
  * session's cgroup subtree with memory/CPU/pids enabled and moves the process into its «server»
  * leaf. The subtree stays root-owned (cgroup_harden_session); app scopes are created later by
  * lord-sessiond on request (cgroup_place_serve). Best effort: without delegation (Delegate=yes in
@@ -51,7 +51,7 @@ int cgroup_delegate_session(unsigned uid, unsigned gid);
 int cgroup_service_init(void);
 
 /* (0.8.5) Called by lord-sessiond in lord-netd's child, before its execve: moves the process into
- * the root-owned lordos.service/<name> leaf (only "netd"), so lord-netperm can count the network
+ * the root-owned lordos.service/<name> leaf (only "netd"), so axia-netperm can count the network
  * service's own traffic (DHCP, the VPN daemons) apart from lord-sessiond's. Best effort: 0 placed. */
 int cgroup_service_leaf(const char *name);
 
@@ -61,7 +61,7 @@ int cgroup_service_leaf(const char *name);
  * from the session's «server» leaf, only itself. 0 placed. */
 int cgroup_enter_root(const char *name);
 
-/* (0.8.5) A quarter of a second for lord-netperm to see a scope that was just created (it watches
+/* (0.8.5) A quarter of a second for axia-netperm to see a scope that was just created (it watches
  * the session folder with inotify) before the process in it opens a connection: otherwise the first
  * connections would meet no policy. Called after placing a process in a new scope that connects at
  * once (the Store's download child, the components' connectors). */

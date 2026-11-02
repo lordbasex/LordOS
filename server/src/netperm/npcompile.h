@@ -1,4 +1,4 @@
-/* npcompile.h — from the rule store (fw/rules.c) to the entries of lord-netperm's BPF maps
+/* npcompile.h — from the rule store (fw/rules.c) to the entries of axia-netperm's BPF maps
  * (np_shared.h). It's pure C, no kernel: tests/npcompile_test.c tests it against
  * fw_decide. See docs/FIREWALL.md, "Step 2", "From rules to maps".
  *
@@ -12,7 +12,7 @@
  *
  * "Just once" rules aren't compiled (there's nobody to delete them in the kernel; without ask
  * mode they don't appear). "Ask" mode is compiled as silent, "deny" (0.8.5) as NP_M_DENY.
- * The blocklist set (NpApp.blk) is lord-netperm's: it sets it after compiling (fw/fwlists.h). */
+ * The blocklist set (NpApp.blk) is axia-netperm's: it sets it after compiling (fw/fwlists.h). */
 #ifndef LORD_NP_COMPILE_H
 #define LORD_NP_COMPILE_H
 

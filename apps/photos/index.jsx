@@ -1,7 +1,7 @@
 // Photos — image viewer and library (our own design, in the style of desktop viewers).
 //
-// The library is the XDG pictures folder, ~/Pictures by default (and its folders), with thumbnails in ~/.cache/lordos/thumbs. The
-// viewer decodes with lord-media (PNG, JPEG, animated GIF, WebP, BMP; HEIC/AVIF if FFmpeg can)
+// The library is the XDG pictures folder, ~/Pictures by default (and its folders), with thumbnails in ~/.cache/axia/thumbs. The
+// viewer decodes with axia-media (PNG, JPEG, animated GIF, WebP, BMP; HEIC/AVIF if FFmpeg can)
 // and C draws it: zoom, panning, rotation, full screen and slideshow. Edits
 // (crop, rotation, brightness and contrast) are saved as a copy: the original is left untouched.
 import {
@@ -88,7 +88,7 @@ function Viewer({ list, index, setIndex, onClose, winId, mode }) {
   const pinchK = useRef(1);           // trackpad pinch: scale already applied
   const idRef = useRef(0);
 
-  // File → Print menu (the dialog belongs to the system, to lord-doc)
+  // File → Print menu (the dialog belongs to the system, to axia-doc)
   useEffect(() => {
     if (!path) return;
     wm.setMenus(winId, [{ label: tr('photos.menu.file'), items: [

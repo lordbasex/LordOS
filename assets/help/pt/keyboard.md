@@ -14,13 +14,13 @@ um clique ali ou **❖⌥Espaço** passa para o próximo.
 
 ## Métodos de entrada
 
-Para escrever em idiomas com muitos caracteres, o LordOS traz métodos de entrada próprios:
+Para escrever em idiomas com muitos caracteres, o Axia DE traz métodos de entrada próprios:
 
 - **Coreano** (한): as letras se juntam em sílabas enquanto você digita.
 - **Japonês** (あ, SKK): digite em romaji; Espaço converte para kanji e Enter confirma.
 - **Chinês** (拼, pinyin): digite o pinyin e escolha o caractere com os números.
 
-Eles são adicionados como um layout, em Ajustes → Teclado. Funcionam em todos os apps do LordOS
+Eles são adicionados como um layout, em Ajustes → Teclado. Funcionam em todos os apps do Axia DE
 e no Terminal.
 
 ## Emojis e símbolos

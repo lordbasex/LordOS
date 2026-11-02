@@ -3,7 +3,7 @@
 // The engine's zIndex only orders siblings, so a menu drawn inside the menu bar can never rise
 // above a Dock drawn after it. Instead every shell surface goes into a named layer: a root node of
 // the screen's size (runtime/index.js `layerContainer`) that the content enters through a React
-// portal. Paint order and hit testing follow the same order (lord-server's hit test walks the
+// portal. Paint order and hit testing follow the same order (axia-server's hit test walks the
 // children in paint order, and a layer is `pointerEvents: 'box-none'`: it never takes a click
 // itself), so a click on a menu over the Dock goes to the menu.
 //

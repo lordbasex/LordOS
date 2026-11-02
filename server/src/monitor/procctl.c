@@ -77,8 +77,8 @@ int proc_stat_read(int pid, ProcStat *s) {
 /* ---- the protected list ---- */
 
 static const char *const system_names[] = {
-    "lord-sessiond", "lord-netperm", "lord-netd", "lord-fand",          /* root services */
-    "lord-vault", "lord-maild", "lord-doc", "lord-media",               /* the session's helpers */
+    "lord-sessiond", "axia-netperm", "lord-netd", "axia-fand",          /* root services */
+    "axia-vault", "axia-maild", "axia-doc", "axia-media",               /* the session's helpers */
     "lord-admin",                                                       /* the root helper (comm) */
     "pipewire", "pipewire-pulse", "wireplumber",                        /* sound and screen sharing */
     "systemd", "(sd-pam)",                                              /* the init and user managers */
@@ -104,9 +104,9 @@ const char *proc_protect_reason(int pid, unsigned flags, const char *comm, const
         if (del) *del = 0;
     }
     if (in_system(comm) || in_system(eb)) return "system";
-    /* lord-server: an isolated app (`lord-server --app <id>`) may be quit; any other instance
+    /* axia-server: an isolated app (`axia-server --app <id>`) may be quit; any other instance
      * (another session, a terminal holder) is part of LordOS */
-    if (!strcmp(eb, "lord-server") || (!eb[0] && comm && !strcmp(comm, "lord-server")))
+    if (!strcmp(eb, "axia-server") || (!eb[0] && comm && !strcmp(comm, "axia-server")))
         return argv1 && !strcmp(argv1, "--app") ? NULL : "system";
     return NULL;
 }
@@ -423,7 +423,7 @@ void proc_detail_json(Buf *b, int pid, unsigned long long start, int full, int s
     const char *why = proc_protect_reason(pid, s.flags, s.comm, exe, a1, session_pid);
     mon_buf_printf(b, ",\"prot\":");
     if (why) mon_buf_str(b, why); else mon_buf_printf(b, "null");
-    mon_buf_printf(b, ",\"isolated\":%s", !strcmp(base_of(exe), "lord-server") && !strcmp(a1, "--app") ? "true" : "false");
+    mon_buf_printf(b, ",\"isolated\":%s", !strcmp(base_of(exe), "axia-server") && !strcmp(a1, "--app") ? "true" : "false");
     mon_buf_printf(b, ",\"kthread\":%s", (s.flags & PF_KTHREAD_FLAG) || pid == 2 ? "true" : "false");
     snprintf(path, sizeof path, "/proc/%d/cwd", pid);
     if (full) { ssize_t k = readlink(path, cwd, sizeof cwd - 1); cwd[k > 0 ? k : 0] = 0; }

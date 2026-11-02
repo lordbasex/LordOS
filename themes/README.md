@@ -2,7 +2,7 @@
 
 A theme is a React app that draws **the whole desktop**: wallpaper, bars, dock or taskbar, menus
 and window frames. Apps (`apps/`) go inside those windows and adapt to the theme's colors on
-their own. `lord-server` runs the theme with QuickJS and paints it with its C engine.
+their own. `axia-server` runs the theme with QuickJS and paints it with its C engine.
 
 | Theme | Style |
 |---|---|
@@ -40,7 +40,7 @@ Note that a theme LordOS did not sign only loads on a development build (see the
    - the app's menus with `useAppMenus(focusedWindow)` (e.g. the Terminal's Shell, Edit, View),
    - the window node with the SDK's `<WindowShell win={w} style={…frame…}>`: it adds the invisible
      borders for resizing (4 sides and 4 corners, with their cursor) and the title bar calls
-     `wm.beginMove(w.id)` in `onMouseDown`. Moving and resizing are done by lord-server in C,
+     `wm.beginMove(w.id)` in `onMouseDown`. Moving and resizing are done by axia-server in C,
      without one event per frame (see `docs/WINDOWS.md`),
    - the dock's "app open" dot by comparing with `w.app` (an app can have several windows).
    - texts with `t('shell.…')` (see `docs/LANGUAGES.md`), app names with `appName(app)` and date

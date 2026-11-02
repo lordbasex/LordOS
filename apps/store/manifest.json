@@ -2,7 +2,7 @@
   "id": "store",
   "version": "0.8.5",
   "name": "Store",
-  "description": "LordOS and Debian apps: search, install, update and remove",
+  "description": "Axia DE apps, and the system's software manager for the rest",
   "size": [
     1080,
     700

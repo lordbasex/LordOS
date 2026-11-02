@@ -1,14 +1,14 @@
-/* app.h — lord-server's "app mode": running an .lpk app as its own isolated process and a
+/* app.h — axia-server's "app mode": running an .lpk app as its own isolated process and a
  * Wayland client of the compositor (see appclient.c, docs/PRIVACY.md). */
 #ifndef LORD_APP_H
 #define LORD_APP_H
 
 #include <stddef.h>
 
-/* `lord-server --app <id>`: runs the installed app <id>. Returns the exit code. */
+/* `axia-server --app <id>`: runs the installed app <id>. Returns the exit code. */
 int app_main(const char *id, const char *theme_bundle, const char *fonts);
 
-/* From lord-server (the compositor): launches app <id> as an isolated process and registers its
+/* From axia-server (the compositor): launches app <id> as an isolated process and registers its
  * broker. 0 if it started. The id must be an installed package (it is validated). */
 int app_spawn(const char *id);
 

@@ -31,7 +31,7 @@ typedef struct {
     void (*notice)(const char *json);
 } MirrorInput;
 
-/* After dropping privileges. Creates $XDG_RUNTIME_DIR/lordos/remote.sock. 0 on success. */
+/* After dropping privileges. Creates $XDG_RUNTIME_DIR/axia/remote.sock. 0 on success. */
 int  mirror_start(int w, int h, const MirrorInput *in);
 void mirror_stop(void);
 int  mirror_pollfds(struct pollfd *p, int max);       /* adds its fds; returns how many */

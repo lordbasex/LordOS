@@ -1,4 +1,4 @@
-/* draw.h — lordos-testbench's pixel drawing (see draw.c). */
+/* draw.h — axia-testbench's pixel drawing (see draw.c). */
 #ifndef LORD_TESTBENCH_DRAW_H
 #define LORD_TESTBENCH_DRAW_H
 

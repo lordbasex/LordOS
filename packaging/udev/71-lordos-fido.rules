@@ -1,7 +1,0 @@
-# LordOS: FIDO2 security keys for the session user (docs/PASSWORDS.md).
-# lord-sessiond sessions are not logind seat sessions, so TAG+="uaccess" alone does not reach them.
-# ID_FIDO_TOKEN comes from systemd's 60-fido-id.rules. Only lord-server opens the device (after the
-# app's `usb` permission) and hands the fd to the sandboxed lord-vault.
-ACTION=="remove", GOTO="lordos_fido_end"
-SUBSYSTEM=="hidraw", ENV{ID_FIDO_TOKEN}=="1", GROUP="plugdev", MODE="0660"
-LABEL="lordos_fido_end"

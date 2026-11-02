@@ -1,8 +1,0 @@
-[Plymouth Theme]
-Name=LordOS
-Description=The LordOS crown on navy with a calm progress bar
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/lordos
-ScriptFile=/usr/share/plymouth/themes/lordos/lordos.script

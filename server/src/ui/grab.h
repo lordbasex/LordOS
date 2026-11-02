@@ -1,6 +1,6 @@
 /* grab.h — moving and resizing windows in C (docs/WINDOWS.md).
  *
- * The theme starts the drag (lord.wm.grab) and lord-server follows it on its own: each frame moves the
+ * The theme starts the drag (lord.wm.grab) and axia-server follows it on its own: each frame moves the
  * window's node with the pointer, without calling JS or repainting its content (when moving,
  * the window is painted once into a layer and then only copied). On release, JS receives the
  * result (__lordWm('end', …)) and updates the window manager. */

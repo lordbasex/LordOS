@@ -1,4 +1,4 @@
-// doc.js — documents base: talks to lord.doc (the confined helper lord-doc, see
+// doc.js — documents base: talks to lord.doc (the confined helper axia-doc, see
 // docs/DOCUMENTS.md). Everything is asynchronous: requests return promises and a timer reads
 // the results (lord.doc.poll) only while something is pending, so the desktop never waits.
 //
@@ -15,7 +15,7 @@ import { settings } from './settings.js';
 import { tOptional } from './i18n.js';
 import { errorText } from './errors.js';
 
-// lord-doc reports short codes ('corrupt', 'password'…): the message is their translation (docs.err.*).
+// axia-doc reports short codes ('corrupt', 'password'…): the message is their translation (docs.err.*).
 const docError = (code, extra = {}) => Object.assign(new Error(code ? tOptional(`docs.err.${code}`) ?? errorText(code) : errorText('sys.unknown')), { code, ...extra });
 
 const has = () => typeof lord !== 'undefined' && typeof lord.doc !== 'undefined';

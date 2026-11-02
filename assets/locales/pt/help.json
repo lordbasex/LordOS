@@ -4,7 +4,7 @@
   "notFound": "Esse artigo não foi encontrado.",
   "openApp": "Abrir {app}",
   "unavailable": "A ajuda não está disponível.",
-  "tour.open": "Bem-vindo ao LordOS",
+  "tour.open": "Bem-vindo ao Axia DE",
   "tour.skip": "Pular",
   "tour.back": "Voltar",
   "tour.next": "Próximo",
@@ -14,7 +14,7 @@
   "section.apps": "Apps",
   "section.system": "Sistema",
   "section.settings": "Ajustes",
-  "tour.0.title": "Bem-vindo ao LordOS",
+  "tour.0.title": "Bem-vindo ao Axia DE",
   "tour.0.body": "Um desktop próprio, rápido e leve. Em um minuto mostramos o básico; você pode pular este tour e vê-lo de novo pelo menu Ajuda.",
   "tour.1.title": "A área de trabalho",
   "tour.1.body": "No alto fica a barra de menus, com os menus do app em primeiro plano, a Central de controle e a hora. Embaixo, o Dock com seus apps; F4 abre Aplicativos, com todos.",
@@ -23,7 +23,7 @@
   "tour.3.title": "Do seu jeito",
   "tour.3.body": "Nos Ajustes você escolhe o modo escuro, a cor, o fundo de tela, a rede, os usuários e muito mais. Estes botões abrem algumas seções.",
   "tour.4.title": "Apps do sistema",
-  "tour.4.body": "Arquivos, Terminal, Loja, Monitor, Relógio, Discos, Backups e Registros vêm instalados. Os apps Linux (GTK e Qt) também abrem como janelas do LordOS.",
+  "tour.4.body": "Arquivos, Terminal, Loja, Monitor, Relógio, Discos, Backups e Registros vêm instalados. Os apps Linux (GTK e Qt) também abrem como janelas do Axia DE.",
   "tour.5.title": "Sempre à mão",
   "tour.5.body": "Se tiver dúvidas, abra a Ajuda pelo menu Ajuda da barra ou busque com ❖Espaço. Aproveite!"
 }

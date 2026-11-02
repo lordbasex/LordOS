@@ -1,8 +1,0 @@
-# LordOS updates: the signed LordOS package repository (docs/UPDATES.md).
-# Store → Updates and apt both read this file. The lordos package adds it when it is missing
-# and removes it with the package; to stop LordOS updates, add the line "Enabled: no".
-Types: deb
-URIs: https://lordos.org/apt
-Suites: stable
-Components: main
-Signed-By: /usr/share/keyrings/lordos-archive-keyring.gpg

@@ -1,5 +1,5 @@
 // Backups — scheduled snapshots of the home folder to an external disk or a folder, like Time
-// Machine (see docs/SYSTEM.md). The engine lives in lord-server (lord.backup): a lowest-priority
+// Machine (see docs/SYSTEM.md). The engine lives in axia-server (lord.backup): a lowest-priority
 // thread that copies only what changed and hard-links the rest. This app picks the destination,
 // schedule and exclusions, shows progress, and lets you browse backups by date and restore a
 // file, a folder or everything.

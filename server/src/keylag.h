@@ -1,6 +1,6 @@
 /* keylag.h — key latency trace (docs/TROUBLESHOOTING.md, "Typing feels slow").
  *
- * Off by default and free when off (one branch per key). It only turns on when lord-server starts
+ * Off by default and free when off (one branch per key). It only turns on when axia-server starts
  * with LORD_INPUT_DEBUG=1, which lord-sessiond passes to user sessions (never the login screen)
  * only when the kernel command line has lordos.inputdebug=1 or its own service sets
  * LORD_INPUT_DEBUG=1: root decides, for one boot. There is no run-time switch.
@@ -10,14 +10,14 @@
  * traced, never keys that go to LordOS itself (the theme, its text fields, the Terminal, the
  * Passwords app, keyring and admin prompts), to an isolated LordOS app, or to a protected window;
  * those are skipped without being counted. The trace goes to its own file,
- * $XDG_RUNTIME_DIR/lordos-keylag.log (0600, tmpfs, gone at logout), never to the session log, and
+ * $XDG_RUNTIME_DIR/axia-keylag.log (0600, tmpfs, gone at logout), never to the session log, and
  * stops by itself 120 s after the first traced key or after 4000 lines.
  *
  * One line per traced key, times in ms after the kernel's evdev timestamp (ev, CLOCK_MONOTONIC ms):
  *
  *   keylag n=12 ev=81234.567 press rx=0.08 sent=0.10 flush=0.31 commit=6.20 shown=16.90
  *
- * rx: lord-server read it; sent: wl_keyboard.key queued for the focused app; flush: written to
+ * rx: axia-server read it; sent: wl_keyboard.key queued for the focused app; flush: written to
  * the app's socket; commit: the app's next commit after that (its reaction: the glyph, or simply
  * its next frame if it is animating); shown: the page flip with that content finished. -1 = the
  * stage did not happen (no flip yet, an app that drew nothing). */

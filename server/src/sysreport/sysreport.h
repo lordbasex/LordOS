@@ -1,6 +1,6 @@
 /* sysreport.h — System Information's collector (0.8.5, see docs/BENCHMARK.md): what hardware this
  * machine has and what the kernel made of it, read without root from world-readable files (sysfs,
- * /proc, the device tree, os-release, the kernel config). Used by `lordos-sysreport` and, later, by
+ * /proc, the device tree, os-release, the kernel config). Used by `axia-sysreport` and, later, by
  * `lord.sysinfo`; nothing is written, executed or sent anywhere.
  *
  * Privacy by construction: the report is built from a fixed list of fields, and the structures below

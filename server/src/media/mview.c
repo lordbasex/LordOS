@@ -1,7 +1,7 @@
 /* mview.c — how a `media` node is drawn (<MediaView media={id} />, see docs/MEDIA.md).
  *
- * The source can be a video frame (shared-memory slot with lord-media), a decoded
- * photo or a capture. Common case (video): lord-media already scaled the frame to the size of
+ * The source can be a video frame (shared-memory slot with axia-media), a decoded
+ * photo or a capture. Common case (video): axia-media already scaled the frame to the size of
  * the box, so it's copied as is (a single copy, the compositing one). With zoom, rotation or mirror
  * (Photos, Camera) an intermediate image of the visible size is built, with bilinear interpolation
  * and halvings (mipmaps) for large photos; it's reused as long as nothing
@@ -182,7 +182,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
             }
         }
         if (s->view.bright || s->view.contrast) {
-            /* same calculation as lord-media's editing (lm_job.c): contrast around mid gray */
+            /* same calculation as axia-media's editing (lm_job.c): contrast around mid gray */
             uint8_t lut[256];
             double k = (100.0 + s->view.contrast) / 100.0, bo = s->view.bright * 1.28;
             k *= k;

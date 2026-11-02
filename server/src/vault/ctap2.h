@@ -5,7 +5,7 @@
  * a 32-byte "salt", returns HMAC-SHA256(CredRandom, salt). That result is the key that
  * wraps the vault key: without the physical key (and its touch) the vault cannot be opened.
  *
- * Runs in lord-vault, sandboxed: it receives the fd of /dev/hidrawN already opened by lord-server
+ * Runs in axia-vault, sandboxed: it receives the fd of /dev/hidrawN already opened by axia-server
  * (after the user's permission) and only does read/write of 64-byte reports, no ioctl.
  * Protocol: CTAPHID (INIT with nonce, own channel, CBOR, KEEPALIVE, CANCEL, ERROR) +
  * authenticatorGetInfo, authenticatorClientPIN (getKeyAgreement and getPinToken, PIN protocol 1:

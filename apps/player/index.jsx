@@ -1,6 +1,6 @@
 // Player: videos and music (in the style of desktop players, with our own design).
 //
-// Decoding belongs to lord-media (sandboxed); here are the library (artist and album from the
+// Decoding belongs to axia-media (sandboxed); here are the library (artist and album from the
 // tags, covers), the queue, shuffle and repeat, the video controls (time bar, volume, .srt and
 // in-stream subtitles, full screen, picture in picture) and what is published for Control Center
 // and the media keys (nowPlaying).

@@ -1,4 +1,4 @@
-/* hw.h — glue for Settings' hardware modules in lord-server's main loop: displays, uevents,
+/* hw.h — glue for Settings' hardware modules in axia-server's main loop: displays, uevents,
  * the system bus (Bluetooth, power profiles, timedated) and batteries. See docs/SETTINGS.md. */
 #ifndef LORD_HW_H
 #define LORD_HW_H

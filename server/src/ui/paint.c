@@ -1570,7 +1570,7 @@ static void blur_walk(Node *n, int *grew) {
 /* Off by default since the 0.8.2 release: once, out of five tries during the 0.8.2 integration
  * test, a window minimized over Monitor's animated map left a grey rectangle until it came back,
  * and the cause was not found (engine-test test_minimize_damage, a full-repaint comparison of that
- * scene, passes). Correctness first: one box, exactly as in 0.8.1, unless lord-server runs with
+ * scene, passes). Correctness first: one box, exactly as in 0.8.1, unless axia-server runs with
  * LORD_DAMAGE=multi (main.c). The clipped-subtree skip (paint_cull) and the copy of only the
  * painted rectangles (present_cpu) follow the same switch.
  * (0.8.6) engine-test test_damage_pipeline (that scene through a copy of main.c's whole

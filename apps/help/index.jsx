@@ -4,7 +4,7 @@
 // app:<id> and help:<article> open Settings, an app or another article.
 import {
   View, Text, useTheme, useAppWindow, useLocale, t as tr, help, Markdown, ScrollView, SidebarItem, SectionTitle, Button,
-  getApp, wm, appName, settings, textDirection, SearchField, EmptyState, Hairline, Lumo, spacing, typeScale,
+  getApp, wm, appName, settings, textDirection, SearchField, EmptyState, Hairline, AxiaLogo, spacing, typeScale,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -43,7 +43,7 @@ function TourArt({ step }) {
   const glyph = ['', '', '⌕', '', '', '?'][step];
   return (
     <View style={{ height: 120, flexDirection: 'row', gap: spacing.l, alignItems: 'center', justifyContent: 'center' }}>
-      {step === 0 ? <Lumo pose="wave" size={120} /> : null}
+      {step === 0 ? <AxiaLogo size={112} /> : null}
       {icons.map((id) => { const a = getApp(id); return a?.Icon ? <a.Icon key={id} size={84} /> : null; })}
       {!icons.length && glyph ? <Text style={{ fontSize: 64, color: t.textDim }}>{glyph}</Text> : null}
     </View>
@@ -96,7 +96,7 @@ function Article({ id, onOpen }) {
   const box = useRef(null);
   const width = useWidth(box, 600);
   const a = id ? help.read(id) : null;
-  if (!a) return <EmptyState mascot="confused" title={tr('help.notFound')} />;
+  if (!a) return <EmptyState title={tr('help.notFound')} />;
   const app = a.app ? getApp(a.app) : null;
   const onLink = (url) => {
     const m = /^help:([a-z0-9-]+)$/.exec(String(url));
@@ -143,7 +143,7 @@ export default function Help() {
   const list = useMemo(() => help.list(), [lang]);
   const results = useMemo(() => (query.trim().length >= 2 ? help.search(query) : null), [query, lang]);
   const finishTour = () => { setTour(false); settings.set({ welcomeShown: true }); setArticle('welcome'); };
-  if (!help.available() || !list.length) return <EmptyState mascot="confused" title={tr('help.unavailable')} />;
+  if (!help.available() || !list.length) return <EmptyState title={tr('help.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ width: 240, backgroundColor: t.sidebarBg }}>

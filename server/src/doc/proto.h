@@ -1,14 +1,14 @@
-/* proto.h — protocol between lord-server and its document helper lord-doc (see docs/DOCUMENTS.md).
+/* proto.h — protocol between axia-server and its document helper axia-doc (see docs/DOCUMENTS.md).
  *
- * lord-doc is a separate process, without network and locked down (Landlock + seccomp), that opens PDFs
- * (Poppler), archives (libarchive) and fonts (FreeType). lord-server never links those
+ * axia-doc is a separate process, without network and locked down (Landlock + seccomp), that opens PDFs
+ * (Poppler), archives (libarchive) and fonts (FreeType). axia-server never links those
  * libraries: a malicious PDF or .zip can only bring down the helper.
  *
  * The channel is a SOCK_SEQPACKET socketpair (fd 3 of the helper). Each message is a DocHdr + JSON
  * (UTF-8) and, with SCM_RIGHTS, up to DOC_MAX_FDS descriptors. If the JSON doesn't fit in a message
  * (more than DOC_INLINE_MAX) it travels in a sealed memfd and the header carries DOCF_JSON_FD.
  *
- * Startup: lord-server first sends DQ_INIT_FD messages (the files the helper may
+ * Startup: axia-server first sends DQ_INIT_FD messages (the files the helper may
  * use: the document, the destination folder of an extraction, the items to compress) and
  * then DQ_INIT_GO. Only then does the helper lock itself down, with Landlock built from those
  * fds, and start serving. What arrives afterwards never adds file permissions.

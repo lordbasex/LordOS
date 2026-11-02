@@ -22,7 +22,7 @@ the components below, each under its own license.
 | Inter (`assets/fonts/Inter-*.ttf`) | UI text | SIL OFL 1.1 (`assets/fonts/Inter-LICENSE.txt`) |
 | Plus Jakarta Sans 2.7.1 (`assets/fonts/PlusJakartaSans-ExtraBold.ttf`, `-Medium.ttf`) | the LordOS wordmark: live text in the UI (fontFamily `brand`) and outlined in `assets/brand/*.svg` | SIL OFL 1.1 (`assets/fonts/PlusJakartaSans-LICENSE.txt`) |
 | JetBrains Mono (`assets/fonts/JetBrainsMono-*.ttf`) | terminal and code text | SIL OFL 1.1 (`assets/fonts/JetBrainsMono-LICENSE.txt`) |
-| Noto Sans Arabic, Devanagari, Thai and CJK SC, subset (`server/src/bench/fonts/`) | built into `lord-bench` for LordBench's shaping workload (subset by `tools/gen-lbfonts.py`) | SIL OFL 1.1 (`server/src/bench/fonts/OFL.txt`) |
+| Noto Sans Arabic, Devanagari, Thai and CJK SC, subset (`server/src/bench/fonts/`) | built into `axia-bench` for LordBench's shaping workload (subset by `tools/gen-lbfonts.py`) | SIL OFL 1.1 (`server/src/bench/fonts/OFL.txt`) |
 
 ### Local changes to bundled components
 
@@ -51,18 +51,18 @@ These are not part of this repository; they are installed from Debian.
 
 | Library | Linked by | License |
 |---|---|---|
-| libwayland-server / libwayland-client, libxkbcommon | lord-server | MIT |
-| Mesa (libgbm, libEGL, libGLESv2) | lord-server (GPU path) | MIT |
-| OpenSSL 3 | lord-sessiond, lord-maild | Apache-2.0 |
+| libwayland-server / libwayland-client, libxkbcommon | axia-server | MIT |
+| Mesa (libgbm, libEGL, libGLESv2) | axia-server (GPU path) | MIT |
+| OpenSSL 3 | lord-sessiond, axia-maild | Apache-2.0 |
 | libcrypt | lord-sessiond | LGPL-2.1+ |
-| Poppler (glib), cairo, freetype, fontconfig | lord-doc | GPL-2.0-or-later / LGPL / FTL |
-| libarchive | lord-doc | BSD-2-Clause |
-| FFmpeg (libavcodec, libavformat, libavutil, libswscale, libswresample), libva | lord-media | LGPL-2.1+; Debian's build is GPL-2.0-or-later |
+| Poppler (glib), cairo, freetype, fontconfig | axia-doc | GPL-2.0-or-later / LGPL / FTL |
+| libarchive | axia-doc | BSD-2-Clause |
+| FFmpeg (libavcodec, libavformat, libavutil, libswscale, libswresample), libva | axia-media | LGPL-2.1+; Debian's build is GPL-2.0-or-later |
 
-Note: `lord-doc` and `lord-media` are separate helper processes. Because they link Poppler and
+Note: `axia-doc` and `axia-media` are separate helper processes. Because they link Poppler and
 Debian's FFmpeg build, those two binaries as distributed are covered by the GPL; the MIT-licensed
-LordOS source they are built from is GPL-compatible. `lord-server` itself does not link them.
-On the Raspberry Pi image, and on a Pi updated to 0.8.7, `lord-media` runs on Raspberry Pi's build of FFmpeg (`+rpt`, the
+LordOS source they are built from is GPL-compatible. `axia-server` itself does not link them.
+On the Raspberry Pi image, and on a Pi updated to 0.8.7, `axia-media` runs on Raspberry Pi's build of FFmpeg (`+rpt`, the
 same package names), pinned from its archive for the Pi 5's hardware HEVC (`docs/WALLPAPERS.md`).
 
 These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libfreerdp-client3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT), **fuse3** (LGPL-2.1, GPL-2.0) and openssh-client (BSD). The Store's Disk Formats item, not preinstalled, brings **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, **apfs-dkms** (GPL-2.0).

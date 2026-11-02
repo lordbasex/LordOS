@@ -7,7 +7,7 @@ keywords: settings, configuration, preferences, system
 ---
 # Settings
 
-Everything you can configure in LordOS is in Settings. The field at the top searches the sections.
+Everything you can configure in Axia DE is in Settings. The field at the top searches the sections.
 
 | Section | What it has |
 |---|---|

@@ -66,6 +66,6 @@
   "type.other": "outro",
   "type.work": "trabalho",
   "unavailable": "Os contatos não estão disponíveis",
-  "unavailableHint": "O serviço de e-mail e calendário (lord-maild) não está em execução ou não está instalado.",
+  "unavailableHint": "O serviço de e-mail e calendário (axia-maild) não está em execução ou não está instalado.",
   "untitledGroup": "Grupo sem nome"
 }

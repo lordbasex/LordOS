@@ -1,4 +1,4 @@
-// contacts.js — Contacts (docs/MAIL.md): address books kept by lord-maild (local, or synced
+// contacts.js — Contacts (docs/MAIL.md): address books kept by axia-maild (local, or synced
 // with CardDAV). Mail autocompletes addresses from here and from the people you write to.
 //
 //   books.list() → [{ id, name, color, acct, acctName, kind: 'local'|'dav', count }]
@@ -8,7 +8,7 @@
 //        bday ('YYYY-MM-DD'), notes, cats: [], photo: bool, kind: 'individual'|'group', members: [uid] }]
 //   contacts.save(book, contact, { photo: 'keep' | 'remove' | path }) → uid
 //   contacts.remove(book, uid) / importFile(path, book)
-//   contacts.photo(book, uid, size) → image handle for <ContactPhoto> (decoded in lord-maild)
+//   contacts.photo(book, uid, size) → image handle for <ContactPhoto> (decoded in axia-maild)
 //   contacts.autocomplete(q) → [{ name, email, src: 'contacts'|'mail' }]
 //   displayName(c) / initials(c)
 //   <ContactPhoto contact size />            the photo or the initials on a colored circle

@@ -2,7 +2,7 @@
  * configured versus effective"). Runs only in app mode for the system package `sysprobe`
  * (assets/sysapps/sysprobe, found by app_package_dir as a system app), after its sandbox is applied
  * exactly as for any isolated app, and before any app code would load. It tries what must fail and
- * sends what happened to lord-server over its own broker (BOP_PROBE), then exits. Nothing here
+ * sends what happened to axia-server over its own broker (BOP_PROBE), then exits. Nothing here
  * widens anything: every try is something the sandbox or the broker must refuse, plus two controls
  * that must work (its own data folder) so a refusal isn't mistaken for a broken probe.
  *
@@ -11,8 +11,8 @@
  *   helper: a child forked before the app's sandbox takes the decoding helpers' profile
  *           (sandbox_apply_helper) and tries a socket, exec, fork and the app's data folder;
  *   broker: a path outside its data folder, the clipboard without permission, the FIDO2 device,
- *           lord-maild.
- * lord-server adds what only it can read: the process's NoNewPrivs, Seccomp and capabilities and its
+ *           axia-maild.
+ * axia-server adds what only it can read: the process's NoNewPrivs, Seccomp and capabilities and its
  * cgroup (brokersrv.c). */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -78,7 +78,7 @@ static void kernel_tries(Out *o, const char *home, const char *data) {
     put(o, "ownData", !ok, ok ? 0 : errno);
 }
 
-/* The decoding helpers' profile (sandbox_apply_helper, as lord-doc and lord-media take it), in a child
+/* The decoding helpers' profile (sandbox_apply_helper, as axia-doc and axia-media take it), in a child
  * forked BEFORE the app's sandbox: the app's seccomp rightly refuses a second filter, and at that point
  * the process is single-threaded and has loaded nothing. The child writes its items, joined with
  * commas, to the pipe; probe_main reads them after the app's own tries. */

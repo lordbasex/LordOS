@@ -24,15 +24,15 @@
  *                                               (hw/hwscan.c: DMI, device tree, PCI/USB IDs, virtio
  *                                               ports, missing firmware when the kernel log is readable)
  *   lord.sysinfo.report()                       System Information (sysreport/: the same report as
- *                                               lordos-sysreport, no serials, addresses or names) plus
+ *                                               axia-sysreport, no serials, addresses or names) plus
  *                                               session: how this session composes the screen and its
  *                                               GPU context (gpu/gpu.h gpu_info, lord_composition)
- *   lord.sysinfo.facts()                        the Checks tab's facts (sysreport/facts.c): lord-server's
+ *   lord.sysinfo.facts()                        the Checks tab's facts (sysreport/facts.c): axia-server's
  *                                               uid/euid, its cgroup and who owns it, app scopes, and
  *                                               whether anything listens on the remote desktop's port
  *   lord.sysinfo.probe()                        the last sandbox probe's result (sec/brokersrv.c, BOP_PROBE:
  *                                               the system package `sysprobe`, app/probe.c), or null
- *   lord.sysinfo.markdown()                     the same report as Markdown, as lordos-sysreport prints it,
+ *   lord.sysinfo.markdown()                     the same report as Markdown, as axia-sysreport prints it,
  *                                               with a "This session" section (System Information's Report tab)
  *   lord.sysinfo.peripherals()                  (0.8.7) keyboards, mice, receivers and other devices on this machine's USB
  *                                               and input buses (sysreport/periph.c), for the Hardware tab only: their
@@ -43,15 +43,15 @@
  *                                               trusts and well formed (sysreport/hwsnap.c); no arguments, no path
  *                                               from JS; state 'ok' | 'missing' | 'unsigned' | 'bad-signature' | 'invalid'
  *   lord.sysinfo.bench.start(mode, sustainedS) / poll() / cancel() / saved(which) / boots()
- *                                               LordBench (bench/lbrun.c, the lord-bench helper): mode
- *                                               'quick' | 'full' (then video in lord-media) | 'desktop'
+ *                                               LordBench (bench/lbrun.c, the axia-bench helper): mode
+ *                                               'quick' | 'full' (then video in axia-media) | 'desktop'
  *                                               (the compositor's frame times, alone and under load);
  *                                               poll() → {state, step, progress, result}; saved(0|1) the
  *                                               last or previous peak result, saved(2|3) the desktop ones;
  *                                               boots() the boot times per LordOS version (lord-sessiond's history);
  *                                               bootTest() the boot time test's state or null (bench/boottest.h;
  *                                               started and stopped with the boot-test admin actions)
- *   lord.fan.status() / setProfile(p) / setCurve(pts) / force(v) / caseConfig()   (js_fan.c, lord-fand)
+ *   lord.fan.status() / setProfile(p) / setCurve(pts) / force(v) / caseConfig()   (js_fan.c, axia-fand)
  *   lord.browserFrame.apply(on, which)          Settings → Appearance → "Browsers: tabs in the title bar":
  *                                               one preference in the user's Chromium/Firefox profiles
  *                                               (hw/brframe.c); which = 'all' | 'chromium' | 'firefox';

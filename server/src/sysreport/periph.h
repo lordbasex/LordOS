@@ -3,7 +3,7 @@
  * wireless receiver come from the input class, with their battery from the HID++ power supplies.
  *
  * This is NOT part of the report. A device names itself, and a name can carry a person's ("Ana's keyboard"), so
- * the structures in sysreport.h have no place for these strings and the lordos-sysreport and lordos-fetch commands
+ * the structures in sysreport.h have no place for these strings and the axia-sysreport and axia-fetch commands
  * don't link this file. Serial numbers (the USB "serial" attribute, a power supply's serial_number) and addresses
  * (an input device's "uniq" and "phys") are never read. Bluetooth devices come from BlueZ, in the app
  * (apps/sysinfo/model.js, from lord.bt). */

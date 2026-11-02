@@ -1,6 +1,10 @@
-# lord-server — libc + kernel headers + libxkbcommon + libwayland-server + vendored QuickJS and stb.
+# axia-server — libc + kernel headers + libxkbcommon + libwayland-server + vendored QuickJS and stb.
 # No libdrm, libinput, X11 or WebKit; the Wayland compositor (src/wl) and the terminal (src/term) are our own.
 CC      ?= cc
+# The desktop runs on a host distribution: devices come from libseat, and networking,
+# packages and login stay with the host.
+CPPFLAGS += -DLORD_LIBSEAT $(shell pkg-config --cflags libseat)
+LDLIBS += $(shell pkg-config --libs libseat)
 CFLAGS  ?= -O2 -g
 WARN    := -Wall -Wextra
 CPPFLAGS += -D_GNU_SOURCE -Isrc -Ibuild/gen -isystem ../third_party/quickjs -isystem ../third_party/stb
@@ -19,7 +23,7 @@ endif
 endif
 
 # Wayland protocols: wayland-scanner generates the code from the wayland-protocols XML files.
-WLPROTO := /usr/share/wayland-protocols
+WLPROTO ?= $(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_XML  := $(WLPROTO)/stable/xdg-shell/xdg-shell.xml $(WLPROTO)/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml
 WL_GEN  := build/gen/xdg-shell-protocol.h build/gen/xdg-decoration-unstable-v1-protocol.h
 WL_OBJ  := build/gen/xdg-shell-protocol.o build/gen/xdg-decoration-unstable-v1-protocol.o
@@ -35,7 +39,7 @@ WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
 # GPU compositing (src/gpu): Mesa (GBM + EGL + GLES2) if its -dev packages are present; otherwise (or with
-# GPU=0) it's built without GPU and lord-server always composites on the CPU. See docs/GPU.md.
+# GPU=0) it's built without GPU and axia-server always composites on the CPU. See docs/GPU.md.
 GPU ?= $(shell pkg-config --exists gbm egl glesv2 2>/dev/null && echo 1 || echo 0)
 ifeq ($(GPU),1)
 CPPFLAGS += -DLORD_GPU $(shell pkg-config --cflags gbm egl glesv2)
@@ -50,21 +54,21 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 
 # .lpk app isolation, permissions and signing (src/sec, see docs/PRIVACY.md and docs/SIGNING.md)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
-MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
-# Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
+MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
+# Media (src/media, docs/MEDIA.md): only the axia-server side. Only axia-media links FFmpeg.
 MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c
-# App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
+# App mode: axia-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_find.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/apps.c src/lpk.c src/fsops.c src/remote/mirror.c src/remote/ipnet.c src/remote/rtcwire.c src/users/admin_rescue.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwayland.c src/osk.c \
        src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c \
        src/term/vt.c src/term/pty.c src/term/term.c src/term/term_paint.c src/term/hold.c \
-       src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c \
-       src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/http.c src/pkg/pkg.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
+       src/net/nl.c src/net/state.c \
+       src/pkg/crypto.c src/pkg/xz.c src/ui/js_sec.c \
        $(SEC_SRC) $(APP_SRC) $(MON_SRC) $(MEDIA_SRC)
-# Documents and printing (M9): lord-doc helper sessions and our own IPP/mDNS/eSCL client
+# Documents and printing (M9): axia-doc helper sessions and our own IPP/mDNS/eSCL client
 # (src/doc, src/print; see docs/DOCUMENTS.md and docs/PRINTING.md). No Poppler or libarchive here.
 DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/print/phttp.c src/print/mdns.c src/print/cups.c \
            src/print/escl.c src/print/print.c src/ui/js_print.c
@@ -73,7 +77,7 @@ SRC += $(DOC_SRC)
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c
 SRC += $(FW_SRC)
 OBJ := $(SRC:src/%.c=build/obj/%.o)
-HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
+HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/remote/*.h src/users/*.h src/sec/*.h src/platform/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
 # Touchpad and touchscreens: our own driver (src/tp, no libinput), gestures and touches for the
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
@@ -89,7 +93,7 @@ SRC += $(WM_SRC)
 CLOCK_SRC := src/ui/tzif.c src/ui/js_help.c
 SRC += $(CLOCK_SRC)
 # Logs (docs/SYSTEM.md): our own systemd journal reader, the logs-system action and lord.logs
-LOGS_SRC := src/logs/journal.c src/logs/logs_admin.c src/ui/js_logs.c
+LOGS_SRC := src/logs/journal.c src/ui/js_logs.c
 SRC += $(LOGS_SRC)
 HDR += $(wildcard src/logs/*.h)
 # Backups (docs/SYSTEM.md): hard-linked snapshots in a low-priority thread
@@ -99,67 +103,46 @@ HDR += $(wildcard src/backup/*.h)
 # optional encryption uses Monocypher (vendored in third_party/monocypher; the object comes from mk/vault.mk)
 build/obj/backup/%.o: CPPFLAGS += -isystem ../third_party/monocypher
 # Disks (docs/SYSTEM.md): disks, partitions and mounts without root, our own SMART and the disk-* actions
-DISK_SRC := src/disk/disk.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/ui/js_disk.c
+DISK_SRC := src/disk/disk.c src/disk/smart.c src/disk/smartctl.c src/ui/js_disk.c
 SRC += $(DISK_SRC)
 HDR += $(wildcard src/disk/*.h)
-# LordOS Imager (docs/IMAGER.md): the imager-* actions (verified image → removable disk, downloads
-# as the user) and lordos-firstrun, the Raspberry Pi first-run file applier (src/firstrun)
-IMAGER_SRC := src/imager/imgverify.c src/imager/imager_admin.c src/ui/js_imager.c
-SRC += $(IMAGER_SRC)
-HDR += $(wildcard src/imager/*.h)
-FIRSTRUN_SRC := src/firstrun/firstrun.c src/firstrun/firstrun_apply.c src/users/homedirs.c
-ALL += build/lordos-firstrun
-build/lordos-firstrun: $(FIRSTRUN_SRC) src/firstrun/firstrun.h src/users/homedirs.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(FIRSTRUN_SRC)
-test: build/firstrun-test build/firstrun-fuzz build/imager-test
-build/firstrun-test: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/firstrun.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
-	./$@ || { rm -f $@; exit 1; }
-build/firstrun-fuzz: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/firstrun.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
-	    -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
-	./$@ 300000 || { rm -f $@; exit 1; }
-build/imager-test: tests/imager_test.c src/imager/imgverify.c src/imager/imgverify.h src/pkg/crypto.c
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
-	    -o $@ tests/imager_test.c src/imager/imgverify.c src/pkg/crypto.c
-	./$@ || { rm -f $@; exit 1; }
+SRC += src/platform/admin.c src/platform/net.c
+SRC += src/platform/seat.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR += $(wildcard src/tp/*.h)
 
-.PHONY: all clean test test-full drag-golden
-# lord-sessiond: sessions, login screen and remote desktop (docs/SESSIONS.md). It's the
-# only one that links OpenSSL (TLS), and with it libsrtp2 and usrsctp (the remote desktop's WebRTC);
-# without libssl-dev, only lord-server is built.
-SESSIOND ?= $(shell pkg-config --exists openssl 2>/dev/null && echo 1 || echo 0)
-ALL += build/lord-server
-ifeq ($(SESSIOND),1)
-ALL += build/lord-sessiond
-endif
-# lord-media: the media helper (docs/MEDIA.md). It's the only one that links FFmpeg (and libva);
-# lord-server never does. If FFmpeg's -dev packages are missing, everything else is built without it.
+.PHONY: all clean test test-full test-platform drag-golden
+test-platform: build/seat-test build/platform-admin-test
+	./build/seat-test
+	./build/platform-admin-test
+build/seat-test: tests/seat_test.c src/platform/seat.c src/platform/seat.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -D_GNU_SOURCE -DLORD_LIBSEAT $(shell pkg-config --cflags libseat) -Isrc -o $@ tests/seat_test.c src/platform/seat.c
+build/platform-admin-test: tests/platform_admin_test.c src/platform/admin.c src/admin.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -D_GNU_SOURCE -Isrc -o $@ tests/platform_admin_test.c src/platform/admin.c
+ALL += build/axia-server
+# axia-media: the media helper (docs/MEDIA.md). It's the only one that links FFmpeg (and libva);
+# axia-server never does. If FFmpeg's -dev packages are missing, everything else is built without it.
 MEDIA ?= $(shell pkg-config --exists libavcodec libavformat libavutil libswscale libswresample 2>/dev/null && echo 1 || echo 0)
 ifeq ($(MEDIA),1)
-ALL += build/lord-media
+ALL += build/axia-media
 endif
-# lord-doc: the document helper (docs/DOCUMENTS.md). It's the only one that links Poppler and
-# libarchive (and cairo, FreeType and fontconfig, which come with Poppler); lord-server never does.
+# axia-doc: the document helper (docs/DOCUMENTS.md). It's the only one that links Poppler and
+# libarchive (and cairo, FreeType and fontconfig, which come with Poppler); axia-server never does.
 DOCHELPER ?= $(shell pkg-config --exists poppler-glib libarchive cairo-pdf cairo-ft freetype2 fontconfig 2>/dev/null && echo 1 || echo 0)
 ifeq ($(DOCHELPER),1)
-ALL += build/lord-doc
+ALL += build/axia-doc
 endif
-# lord-netperm (src/netperm, docs/FIREWALL.md step 2): the root service that applies per-app network
+# axia-netperm (src/netperm, docs/FIREWALL.md step 2): the root service that applies per-app network
 # permissions with cgroup BPF programs. The programs are compiled with clang -target bpf (BPF=1,
 # if clang is available) and go inside the binary (build/bpf2c → build/gen/np_bpf.h). Without clang it still
-# builds and the service warns that it has no BPF. No libbpf or bcc.
+# builds and the service warns that it has no BPF. No libbpf or bcc. Not part of `all`: no unit
+# installs it on a host distribution yet.
 .DEFAULT_GOAL := all
-BPF ?= $(shell command -v clang >/dev/null 2>&1 && echo 1 || echo 0)
+BPF ?= 0
 NP_SRC := src/netperm/netperm.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/npdiag.c \
           src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/sec/json.c
-ALL += build/lord-netperm
 ifeq ($(BPF),1)
 NP_GEN := build/gen/np_bpf.h
 NP_CPP := -DNP_HAVE_BPF
@@ -173,7 +156,7 @@ build/np.bpf.o: src/netperm/np.bpf.c src/netperm/np_shared.h
 build/gen/np_bpf.h: build/np.bpf.o build/bpf2c
 	@mkdir -p build/gen
 	build/bpf2c $< $@
-build/lord-netperm: $(NP_SRC) $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) src/sec/json.h $(NP_GEN)
+build/axia-netperm: $(NP_SRC) $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) src/sec/json.h $(NP_GEN)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(NP_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ $(NP_SRC)
 # tests/npverify_test.c: the BTF reader, and (as root) every program through the kernel verifier
@@ -189,12 +172,11 @@ build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
-# lord-fand (src/fan, docs/FANS.md): the root service that drives the fans by temperature. libc
+# axia-fand (src/fan, docs/FANS.md): the root service that drives the fans by temperature. libc
 # only; it executes nothing and has no network. tests/fan_test.c: curves, fan.json, requests and a
 # fake sysfs (run by tests/run_suites.sh).
 FAN_SRC := src/fan/fancurve.c src/fan/fanhw.c src/sec/json.c
-ALL += build/lord-fand
-build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h
+build/axia-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC)
 test: build/ptrlock-test
@@ -216,10 +198,10 @@ all: $(ALL)
 # Most suites run inside their own build rule (`./$@ || ...`). The ones below are only built here; once
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
-# helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/vt-dump build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test
+# helpers (axia-media, axia-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
+test: build/vt-dump build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/wasm-js-test build/fsops-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test
 	@sh tests/run_suites.sh
-test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc,$(ALL))
+test-full: test build/sandbox-test build/doc-test $(filter build/axia-media build/axia-doc,$(ALL))
 	@sh tests/run_suites.sh full
 SHAPE_SRC := src/ui/otf.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/unicode.c
 build/shape-test: tests/shape_test.c $(SHAPE_SRC) $(HDR)
@@ -231,13 +213,6 @@ build/wasm-js-test: tests/wasm_js_test.c src/ui/js_wasm.c src/ui/js_wasm.h $(WAS
 build/wasm-test: tests/wasm_test.c $(WASM_SRC) src/wasm/wasm.h src/wasm/wasm_int.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wasm_test.c $(WASM_SRC) -lm
-PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/http.c src/pkg/pkg.c src/sec/json.c
-build/pkg-test: tests/pkg_test.c $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o src/admin.h $(wildcard src/pkg/*.h)
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_test.c $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o -lm
-PKG_READ_SRC := src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/crypto.c
-build/pkg-js-test: tests/pkg_js_test.c src/ui/js_pkg.c $(PKG_READ_SRC) $(QJS_OBJ) $(wildcard src/pkg/*.h)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_js_test.c src/ui/js_pkg.c $(PKG_READ_SRC) $(QJS_OBJ) -lm -lpthread
 build/thbrk-test: tests/thbrk_test.c src/ui/thbrk.c src/ui/thbrk.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/thbrk_test.c src/ui/thbrk.c
 # package signing: SHA-256 (NIST), Ed25519 (RFC 8032), JSON, contenido.json and catalog
@@ -308,7 +283,7 @@ build/broker-restrict-test: tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) -Wl,--wrap=open
 	./$@ || { rm -f $@; exit 1; }
-# lord-maild for the isolated system apps (src/sec/brokermail.c): who may ask what, files, Mail-only verbs
+# axia-maild for the isolated system apps (src/sec/brokermail.c): who may ask what, files, Mail-only verbs
 test: build/brokermail-test
 build/brokermail-test: tests/brokermail_test.c src/sec/brokermail.c src/sec/json.c $(wildcard src/sec/*.h src/mail/*.h)
 	@mkdir -p build
@@ -386,7 +361,7 @@ build/dnsmap-test: tests/dnsmap_test.c src/fw/dnsmap.c src/fw/rules.c src/fw/fwm
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/dnsmap_test.c src/fw/dnsmap.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # backup engine: snapshots, hard links, restore, retention, interruptions, exclusions, encryption
-build/lord-server: build/obj/vault/monocypher.o
+build/axia-server: build/obj/vault/monocypher.o
 test: build/backup-test
 build/backup-test: tests/backup_test.c src/backup/engine.c src/backup/crypt.c src/fsops.c src/backup/engine.h src/backup/crypt.h src/fsops.h build/obj/vault/monocypher.o
 	@mkdir -p build
@@ -431,6 +406,12 @@ test: build/engine-test
 build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# wlroots proof of concept (poc/axia-wlr.c, docs/WLROOTS.md): the UI engine on wlroots 0.20, with
+# wlroots doing the backend, protocols and input. Built on request only, never installed.
+WLR_PKGS := wlroots-0.20 wayland-server xkbcommon pixman-1 libdrm
+build/axia-wlr: poc/axia-wlr.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) -DWLR_USE_UNSTABLE $(shell pkg-config --cflags $(WLR_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ \
+	    poc/axia-wlr.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(shell pkg-config --libs $(WLR_PKGS)) -lm -lpthread
 # the frame pipeline's decisions (src/fpipe.c, docs/GPU.md "The frame pipeline"): LORD_PIPELINE, the auto
 # mode, what a display does next, when input waits, and a display on a vblank grid with and without it
 test: build/fpipe-test
@@ -467,10 +448,6 @@ build/sound-test: tests/sound_test.c src/sound/pulse.c src/sound/pulse.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sound_test.c src/sound/pulse.c
 build/sound-cli: tests/sound_cli.c src/sound/snd.c src/sound/pulse.c src/sound/snd.h src/sound/pulse.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/sound_cli.c src/sound/snd.c src/sound/pulse.c -lm
-NET_SRC := src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c
-build/net-test: tests/net_test.c $(NET_SRC) $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o src/net/net.h src/net/netpriv.h src/net/vpn.h src/admin.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/net_test.c $(NET_SRC) $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o -lm
 # Test Wayland app with dmabuf (udmabuf): see docs/GPU.md. Needs libwayland-client.
 CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoration-unstable-v1 stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presentation-time \
                 unstable/relative-pointer/relative-pointer-unstable-v1 unstable/pointer-constraints/pointer-constraints-unstable-v1 \
@@ -521,14 +498,14 @@ MEDIA_PKGS += libva libva-drm
 MEDIA_CPPFLAGS := -DLM_VAAPI
 endif
 LM_SRC := $(wildcard src/media/helper/*.c) src/media/proto.c src/sec/sandbox.c src/sec/cgroup.c
-build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
+build/axia-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
-# lord-media with a decoder that fails after 30 frames (HWFALL=2: frames that can't be read back), to run the way
+# axia-media with a decoder that fails after 30 frames (HWFALL=2: frames that can't be read back), to run the way
 # out of it where there is no hardware (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
 HWFALL ?= 1
-build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
+build/axia-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST=$(HWFALL) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
@@ -564,34 +541,15 @@ $(foreach p,$(WL_MORE),$(eval $(call wl_proto,$(p))))
 build/gen/%.o: build/gen/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
 
-build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
+build/axia-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/conn.o \
-                build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \
-                build/obj/remote/rsec.o build/obj/remote/ipnet.o build/obj/remote/lockout.o build/obj/remote/rtcwire.o build/obj/remote/rtc.o \
-                build/obj/bench/boottest.o
-# The remote desktop shows the screen only over WebRTC (docs/REMOTE.md, "Video (WebRTC)"): our own peer in
-# the bridge, on Debian's libsrtp2 and usrsctp (and OpenSSL's DTLS). lord-sessiond can't be built without
-# them (libsrtp2-dev, libusrsctp-dev).
-ifeq ($(SESSIOND),1)
-ifneq ($(shell pkg-config --exists libsrtp2 usrsctp 2>/dev/null && echo 1),1)
-$(error lord-sessiond needs libsrtp2 and usrsctp for the remote desktop: apt-get install libsrtp2-dev libusrsctp-dev (or SESSIOND=0))
-endif
-SESSIOND_LIBS := $(shell pkg-config --libs libsrtp2 usrsctp)
-build/obj/remote/rtc.o: CPPFLAGS += $(shell pkg-config --cflags libsrtp2 usrsctp)
-endif
-build/obj/remote/pages.o: src/remote/login.html src/remote/client.html
-	@mkdir -p $(dir $@)
-	$(LD) -r -b binary -z noexecstack -o $@ src/remote/login.html src/remote/client.html
 # Root over SSH (advanced, src/remote/ssh_root.c): public key lines and fingerprints.
 test: build/ssh-root-test
 build/ssh-root-test: tests/ssh_root_test.c src/remote/ssh_root.c src/remote/ssh_root.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/ssh_root_test.c src/remote/ssh_root.c src/pkg/crypto.c
 	./$@ || { rm -f $@; exit 1; }
-build/lord-sessiond: $(SESSIOND_OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread
 
 # Version, channel and build of LordOS, shown in About and Settings → General (lord.version and
 # lord.system.info()). Version and channel come from ../package.json ("version" and "lordos": {"channel"}),
@@ -606,7 +564,7 @@ build/gen/lord_version.h: FORCE
 	@printf '#define LORD_VERSION "%s"\n#define LORD_CHANNEL "%s"\n#define LORD_BUILD "%s"\n' \
 	    '$(or $(LORD_VERSION),0.0.0)' '$(LORD_CHANNEL)' '$(shell printf %s '$(LORD_BUILD)' | tr -cd 'A-Za-z0-9.+~-')' > $@.new
 	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
-build/obj/ui/js.o build/obj/ui/js_sys.o build/obj/ui/js_hw.o build/obj/term/pty.o build/obj/remote/sessiond.o: build/gen/lord_version.h
+build/obj/ui/js.o build/obj/ui/js_sys.o build/obj/ui/js_hw.o build/obj/term/pty.o: build/gen/lord_version.h
 # Verified system code (src/sec/codesig.c, docs/SIGNING.md "Verified system code"). RELEASE=1: a
 # release build, which only runs a manifest signed with the LordOS release key (no development mode).
 # CODE_PUBKEY=<64 hex>: a TEST build that trusts a throwaway key instead of the release key (VM tests
@@ -624,12 +582,17 @@ build/obj/sec/codesig.o: build/gen/codesig_build.h
 .PHONY: FORCE
 FORCE:
 
-# the action table is built from each module's list: a new action must reach admin.c
-build/obj/admin.o: $(wildcard src/*/*_admin.h)
 
 build/obj/%.o: src/%.c $(HDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
+
+# Switching GPU builds must rebuild objects even without `make clean`.
+build/gen/profile.h: FORCE
+	@mkdir -p build/gen
+	@printf '/* profile=desktop gpu=%s */\n' '$(GPU)' > $@.new
+	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
+$(OBJ): build/gen/profile.h
 
 # The CPU path's pixel loops (blur, rounded rectangles, blending) vectorize at -O3: the backdrop blur
 # 9.6 → 5.3 ms and rounded rectangles 1.45× faster on x86-64, same pixels (a later -O3 wins over -O2)
@@ -654,7 +617,7 @@ LD_PKGS := poppler-glib libarchive cairo-pdf cairo-ft freetype2 fontconfig
 build/obj/doc/h_stb.o: src/doc/h_stb.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
-build/lord-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
+build/axia-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags $(LD_PKGS)) -o $@ $(LD_SRC) build/obj/doc/h_stb.o $(shell pkg-config --libs $(LD_PKGS)) -lm
 # rules for extracting without leaving the folder (tests/arcpath_test.c)
 build/arcpath-test: tests/arcpath_test.c src/doc/arcpath.c src/doc/arcpath.h
@@ -672,7 +635,7 @@ build/netconn-test: tests/netconn_test.c $(NETCONN_SRC) src/sec/json.c src/sec/n
 build/ipp-test: tests/ipp_test.c src/print/ipp.c src/print/mdns.c src/print/cups.c src/print/phttp.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC) $(wildcard src/print/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/ipp_test.c src/print/ipp.c src/print/mdns.c src/print/cups.c src/print/phttp.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC) -lpthread
-# lord-doc end to end: malicious archives, PDF and the lockdown (needs build/lord-doc)
+# axia-doc end to end: malicious archives, PDF and the lockdown (needs build/axia-doc)
 build/doc-test: tests/doc_test.c src/doc/wire.c src/sec/json.c $(wildcard src/doc/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/doc_test.c src/doc/wire.c src/sec/json.c
@@ -680,18 +643,11 @@ build/doc-test: tests/doc_test.c src/doc/wire.c src/sec/json.c $(wildcard src/do
 # Passwords and the system keyring (docs/PASSWORDS.md): rules in mk/vault*.mk
 include $(sort $(wildcard mk/*.mk))
 
-# lord-netd (docs/NETWORK.md, "The network belongs to the system"): admin.c with LORD_NETD (net-* actions
-# only) plus networking and the package engine (net-vpn-enable). libc only; lord-sessiond runs it.
-all: build/lord-netd
-NETD_OBJ := build/obj/netd/admin.o build/obj/netd/netd.o $(NET_SRC:src/%.c=build/obj/%.o) $(PKG_SRC:src/%.c=build/obj/%.o) build/obj/sec/cgroup.o build/obj/ui/stb.o
-build/obj/netd/admin.o: src/admin.c $(HDR)
-	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) -DLORD_NETD $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
-build/obj/netd/netd.o: src/net/netd.c src/admin.h
-	@mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
-build/lord-netd: $(NETD_OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ -lm -lpthread
+# The modules above add compositor objects outside SRC; rebuild them on GPU
+# changes too, so switching builds cannot retain a GPU object.
+$(HW_OBJ) $(LAN_SRV_OBJ) $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(MAILC_OBJ) $(VC_OBJ) build/obj/outputs.o: build/gen/profile.h
+build/axia-bench: build/gen/profile.h
+
 
 # SMART parsers (ATA and NVMe) of the Disks app: hand-built data, healthy/warning/failing
 test: build/smart-test
@@ -711,12 +667,6 @@ build/disktemp-test: tests/disktemp_test.c src/monitor/disktemp.c src/monitor/di
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/disktemp_test.c src/monitor/disktemp.c
 	./$@ || { rm -f $@; exit 1; }
-# manual test of the disk-* actions (root and real devices; not part of `test`)
-DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/smart.c src/disk/smartctl.c src/disk/disk_admin.c src/disk/smartctl_admin.c src/pkg/crypto.c \
-               src/imager/imgverify.c src/imager/imager_admin.c tests/imager_key.c
-build/disk-cli: $(DISKCLI_SRC) src/disk/disk.h src/imager/imager_admin.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(DISKCLI_SRC)
 # a system with no administrator (src/users/admin_rescue.c): who may become one
 test: build/admin-rescue-test
 build/admin-rescue-test: tests/admin_rescue_test.c src/users/admin_rescue.c src/users/admin_rescue.h

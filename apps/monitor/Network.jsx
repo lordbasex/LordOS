@@ -13,7 +13,7 @@
 // de regla de la lista y los contadores de permitidas/denegadas ya están en su lugar.
 import {
   View, Text, ScrollView, useTheme, useLocale, useStore, monitor, monitorConnections, useMonitor,
-  formatBytes, formatNumber, tOptional, useSystemInfo, wm, direction, firewall, firewallState, useLauncherApps, Lumo, Button, useAppWindow, useSettings,
+  formatBytes, formatNumber, tOptional, useSystemInfo, wm, direction, firewall, firewallState, useLauncherApps, Button, useAppWindow, useSettings,
   netModel, ConfirmDialog,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -39,7 +39,7 @@ const countryName = (cc) => (cc ? tOptional(`countries.${cc}`) || cc : '');
 // firewall's recent notices, "recent" (or "recently denied").
 const placeOf = (tr, h) => (h.cc ? countryName(h.cc) : h.scope ? tr(`monitor.net.scope.${h.scope}`) : tr(h.denied ? 'fwrules.recentDenied' : 'fwrules.recent'));
 
-// Names the system resolver gave for each address, if lord-netperm's notices carry them ("host" or
+// Names the system resolver gave for each address, if axia-netperm's notices carry them ("host" or
 // "hosts"). The names belong to the system, not to one app (docs/FIREWALL.md, "Where the names come
 // from"), so one map serves every app. Without them a row offers a rule for its address instead.
 // (0.8.5) An address the resolver reached through a CNAME chain has several names (deb.debian.org →
@@ -74,7 +74,7 @@ export function openAppRules(key) {
 }
 
 // Country and scope of every address seen in an open connection, so an address that only appears
-// in lord-netperm's byte counters (its socket already closed) still lands on the map.
+// in axia-netperm's byte counters (its socket already closed) still lands on the map.
 const geoSeen = new Map();
 function rememberGeo(c) {
   if (!c.remote || c.dir === 'listen') return;
@@ -88,7 +88,7 @@ export const ipProtoName = (n) => IP_PROTOS[n] || `IP ${n}`;
 const ETHERTYPES = { 0x0003: 'ALL', 0x0800: 'IPv4', 0x0806: 'ARP', 0x86dd: 'IPv6', 0x888e: 'EAPOL', 0x88cc: 'LLDP', 0x8100: 'VLAN', 0x88f7: 'PTP' };
 export const etherName = (n) => ETHERTYPES[n] || `0x${(n || 0).toString(16).padStart(4, '0')}`;
 
-// Groups the connections by app. Without lord-netperm's byte counters (withFirewall), bytes and
+// Groups the connections by app. Without axia-netperm's byte counters (withFirewall), bytes and
 // rates come from the open TCP sockets (tcp_info) and the difference with the previous reading.
 function useGroups(conns) {
   const prev = useRef({ t: 0, bytes: new Map() });
@@ -141,7 +141,7 @@ function useGroups(conns) {
 
 // Agrega a cada app su regla y sus contadores del firewall (lord.fw), y las apps que no tienen
 // conexiones abiertas pero sí intentos (una app denegada no llega a tener sockets).
-// lord-netperm's byte counters for one app ([allowed, denied, rx, tx, rxRate, txRate, flows,
+// axia-netperm's byte counters for one app ([allowed, denied, rx, tx, rxRate, txRate, flows,
 // blocked]): the kernel counts every packet of the app's sockets (TCP and UDP, so QUIC too, and the
 // connections that already closed), which replaces the open-socket estimate. flows: [[addr, rx, tx,
 // rxRate, txRate, blocked], ...], its busiest addresses. blocked: bytes of open connections the
@@ -292,7 +292,7 @@ function AppRow({ g, node, ctx, open, selected, onToggle, onSelect, maxBytes, tr
         </View>
         <Activity hist={hist} selected={selected} />
         <Text style={{ width: 44, fontSize: 10, color: selected ? '#fff' : t.textDim, textAlign: 'end', whiteSpace: 'nowrap' }}>{total ? formatBytes(total) : '—'}</Text>
-        {/* regla: permitir / denegar la red a la app (lord-netperm la aplica en el kernel) */}
+        {/* regla: permitir / denegar la red a la app (axia-netperm la aplica en el kernel) */}
         <RuleSwitch g={g} selected={selected} onConfirm={onConfirm} />
       </View>
       {open && node ? <TreeChildren node={node} ctx={ctx} /> : null}
@@ -306,7 +306,7 @@ function AppRow({ g, node, ctx, open, selected, onToggle, onSelect, maxBytes, tr
   );
 }
 
-// Each app's rates over the last minute, one entry per second (from lord-netperm's counters, or the
+// Each app's rates over the last minute, one entry per second (from axia-netperm's counters, or the
 // open sockets without them): the row's activity indicator and the detail's chart.
 function useRateHistory(apps) {
   const ref = useRef({ at: 0, map: new Map() });
@@ -508,7 +508,6 @@ function Summary({ groups, conns, last, tr, fw, names, range, sysHist, launcher,
         {conns?.others ? <KV k={tr('monitor.net.others')} v={formatNumber(conns.others, 0)} color={t.textDim} /> : null}
         {fwOn && !fwDenied ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <Lumo pose="shield" size={40} />
             <Text style={{ flex: 1, fontSize: 11, color: t.textDim, lineHeight: 1.35 }}>{tr('monitor.net.allGood')}</Text>
           </View>
         ) : null}
@@ -726,7 +725,7 @@ function seen(key, active) {
 }
 
 // One flow per (app, address, port) for sdk/netmodel.js: the kernel's per-port counters when
-// lord-netperm sends them (COUNTS), the open sockets' ports otherwise. Apps with no destination yet
+// axia-netperm sends them (COUNTS), the open sockets' ports otherwise. Apps with no destination yet
 // (only listening, or a component that hasn't connected) keep a flow with no address, so their row stays.
 function flowsOf(apps, names, tr) {
   const out = [];

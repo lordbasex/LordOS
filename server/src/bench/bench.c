@@ -90,13 +90,13 @@ int bench_save(const char *name, void (*write)(FILE *)) {
     if (!name || !*name || strlen(name) > 32 || strspn(name, "abcdefghijklmnopqrstuvwxyz0123456789-") != strlen(name)) return -1;
     const char *st = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
     char dir[512], tmp[600], path[600];
-    if (st && st[0] == '/') snprintf(dir, sizeof dir, "%s/lordos", st);
+    if (st && st[0] == '/') snprintf(dir, sizeof dir, "%s/axia", st);
     else if (home && home[0] == '/') {
         snprintf(dir, sizeof dir, "%s/.local", home);
         mkdir(dir, 0700);
         snprintf(dir, sizeof dir, "%s/.local/state", home);
         mkdir(dir, 0700);
-        snprintf(dir, sizeof dir, "%s/.local/state/lordos", home);
+        snprintf(dir, sizeof dir, "%s/.local/state/axia", home);
     } else return -1;
     mkdir(dir, 0700);
     snprintf(tmp, sizeof tmp, "%s/.%s.json.tmp", dir, name);

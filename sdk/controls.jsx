@@ -7,7 +7,6 @@ import { useTheme, popupBg } from './theme.js';
 import { TextInput, useAppWindow } from './components.jsx';
 import { wm } from './windows.js';
 import { direction } from './i18n.js';
-import { Lumo } from './mascot.js';
 import { Overlay } from './layers.js';
 
 // Design tokens (docs/DESIGN.md): an 8 px grid, desktop-standard type sizes and control heights.
@@ -182,15 +181,11 @@ export function SearchField({ value, onChange, placeholder, onSubmit, onCancel, 
 }
 
 // Empty state: an icon (a glyph or an element), a short title and one hint line, centered.
-// mascot: a Lumo pose ('confused' for errors and unavailable services, 'celebrate' for "all done",
-// 'shield' for security, 'wave' for welcome) drawn instead of the icon. Use it only where the state
-// is an outcome worth a little warmth, not for "nothing selected" panes (docs/DESIGN.md).
-export function EmptyState({ icon, mascot, title, hint, action, style }) {
+export function EmptyState({ icon, title, hint, action, style }) {
   const t = useTheme();
   return (
     <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, padding: spacing.xxl }, style]}>
-      {mascot ? <Lumo pose={mascot} size={112} style={{ marginBottom: spacing.xs }} />
-        : typeof icon === 'string' ? <Text style={{ fontSize: 40, color: t.textDim, marginBottom: spacing.xs }}>{icon}</Text> : icon}
+      {typeof icon === 'string' ? <Text style={{ fontSize: 40, color: t.textDim, marginBottom: spacing.xs }}>{icon}</Text> : icon}
       {title ? <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{title}</Text> : null}
       {hint ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', maxWidth: 360, lineHeight: 1.4 }}>{hint}</Text> : null}
       {action ? <View style={{ marginTop: spacing.s }}>{action}</View> : null}

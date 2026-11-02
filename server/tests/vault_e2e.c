@@ -1,9 +1,9 @@
-/* vault_e2e.c — lord-vault end to end, through the same client lord-server uses
+/* vault_e2e.c — axia-vault end to end, through the same client axia-server uses
  * (src/vault/vclient.c): create, unlock, wrong password, entries, search, report, TOTP,
  * QR, generator, import/export, attachments, slots (key file, recovery), keyring,
  * auto-lock, and that the process memory is protected (VmFlags "dd" = MADV_DONTDUMP,
  * "lo" = mlock; Dumpable 0). Uses a temporary HOME; does not touch the D-Bus bus.
- * Run with `make build/vault-e2e && build/vault-e2e` (needs build/lord-vault next to it). */
+ * Run with `make build/vault-e2e && build/vault-e2e` (needs build/axia-vault next to it). */
 #include "vault/vclient.h"
 #include "vault/vjson.h"
 #include "vault/vwire.h"
@@ -77,8 +77,8 @@ int main(void) {
     setenv("HOME", home, 1);
     setenv("XDG_RUNTIME_DIR", "/nonexistent", 1);
     unsetenv("DBUS_SESSION_BUS_ADDRESS");
-    check(vc_available(), "lord-vault next to the binary");
-    check(vc_start() == 0, "launch lord-vault");
+    check(vc_available(), "axia-vault next to the binary");
+    check(vc_start() == 0, "launch axia-vault");
     const char *r;
     char p[512], rec[64];
 
@@ -160,7 +160,7 @@ int main(void) {
     r = req(p, NULL, 0);
     check(ok(r) && strstr(r, "CLAVE-DE-LICENCIA-1234"), "attachment after save and unlock");
 
-    /* App channel (vc_attach_app): what the sandboxed Passwords process (lord-server --app) uses.
+    /* App channel (vc_attach_app): what the sandboxed Passwords process (axia-server --app) uses.
      * Same API on its own socket; a lock from the control channel reaches it as an event. */
     {
         int afd = vc_attach_app();
@@ -263,7 +263,7 @@ int main(void) {
 
     /* protected process memory */
     {
-        FILE *ps = popen("pgrep -n -x lord-vault", "r");
+        FILE *ps = popen("pgrep -n -x axia-vault", "r");
         int vpid = 0;
         if (ps) { if (fscanf(ps, "%d", &vpid) != 1) vpid = 0; pclose(ps); }
         char path[64], line[256];
@@ -272,8 +272,8 @@ int main(void) {
         int dd = 0, lo = 0;
         while (sm && fgets(line, sizeof line, sm)) if (!strncmp(line, "VmFlags:", 8)) { if (strstr(line, " dd")) dd++; if (strstr(line, " lo")) lo++; }
         if (sm) fclose(sm);
-        printf("lord-vault %d: %d MADV_DONTDUMP regions, %d mlocked (smaps %s)\n", vpid, dd, lo, sm ? "readable" : "unreadable: not dumpable");
-        check(vpid > 0, "lord-vault is running");
+        printf("axia-vault %d: %d MADV_DONTDUMP regions, %d mlocked (smaps %s)\n", vpid, dd, lo, sm ? "readable" : "unreadable: not dumpable");
+        check(vpid > 0, "axia-vault is running");
         check(!sm || (dd > 0 && lo > 0), "memory with DONTDUMP and mlock (or the process isn't dumpable)");
         snprintf(path, sizeof path, "/proc/%d/status", vpid);
         FILE *ss = fopen(path, "r");
@@ -283,7 +283,7 @@ int main(void) {
         check(nnp && secc, "sandboxed: no_new_privs and seccomp");
     }
 
-    /* 10,000 entries through import, and search measured inside lord-vault */
+    /* 10,000 entries through import, and search measured inside axia-vault */
     {
         snprintf(f, sizeof f, "%s/grande.csv", home);
         fp = fopen(f, "w");
@@ -304,8 +304,8 @@ int main(void) {
             Vj j;
             if (!vj_parse(&j, r, strlen(r))) { double ms = vj_getn(&j, 0, "ms", 99); if (ms > worst) worst = ms; vj_free(&j); }
         }
-        printf("search in lord-vault with 10,004 entries: worst %.2f ms\n", worst);
-        check(worst < 10, "search < 10 ms in lord-vault");
+        printf("search in axia-vault with 10,004 entries: worst %.2f ms\n", worst);
+        check(worst < 10, "search < 10 ms in axia-vault");
         t0 = now_ms();
         r = req("{\"op\":\"list\"}", NULL, 0);
         printf("list of 10,004 entries: %zu KB in %.0f ms (round trip)\n", strlen(r) / 1024, now_ms() - t0);

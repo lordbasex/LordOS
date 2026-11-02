@@ -98,7 +98,7 @@ static double ms_between(uint64_t a, uint64_t b) { return a && b && b >= a ? (do
 static void rec_shown(Rec *r, const LbPhase *p, uint64_t flip, uint64_t gpu) {
     if (!rec_on(r)) return;
     r->n++;
-    /* a piped frame: the flip that let it be submitted woke lord-server (swake); its CPU time is its prepare
+    /* a piped frame: the flip that let it be submitted woke axia-server (swake); its CPU time is its prepare
      * and its submission, and between them it was held for that flip */
     uint64_t start = p->piped ? p->swake : p->wake;
     if (p->piped ? p->sfrom_flip : p->from_flip) rec_put(r, PH_WAKE, ms_between(p->prev_flip, start));

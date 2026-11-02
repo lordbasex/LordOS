@@ -1,6 +1,6 @@
 // Settings → Cooling (docs/FANS.md): the detected cooling hardware drawn at the top with the live
 // temperature and fan speed, the fan profile (or "let the system decide"), the curve (draggable in
-// the custom profile), "full speed for a while" and, on a Raspberry Pi 5, the case. lord-fand (root)
+// the custom profile), "full speed for a while" and, on a Raspberry Pi 5, the case. axia-fand (root)
 // does the work; this page only sends validated requests through lord.fan.
 import {
   View, Text, useTheme, useLocale, Segmented, Toggle, Button, admin, useFan, useStore, fanCase, fanControl, refreshFan,
@@ -60,7 +60,7 @@ export function CoolingSettings() {
   const run = (code) => setErr(code ? tr(`errors.${code}`) : '');
 
   if (s === undefined) return <Stack><Note>{tr('cooling.loading')}</Note></Stack>;
-  // lord-fand says whether this user may change the fans (an administrator); the case is an admin action
+  // axia-fand says whether this user may change the fans (an administrator); the case is an admin action
   const isAdmin = !!s?.canChange;
   const controllable = !!s && s.fans.length > 0;
   const custom = s?.custom?.length ? s.custom : PRESET_CURVE;

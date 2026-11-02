@@ -1,8 +1,8 @@
-// powerbox.jsx — the open/save file dialog is drawn by lord-server (not the app), as
+// powerbox.jsx — the open/save file dialog is drawn by axia-server (not the app), as
 // a «powerbox»: the isolated app doesn't see the home folder; it only receives the fd
 // of the file the user picks here. See docs/PRIVACY.md and server/src/sec/brokersrv.c.
 //
-// In the theme (compositor) process: lord-server notifies with __lordBrokerPick(reqid, app, save,
+// In the theme (compositor) process: axia-server notifies with __lordBrokerPick(reqid, app, save,
 // suggest); the dialog is shown and, with the choice, lord.broker.pickResult(reqid,
 // path) is called. In the app process: the SDK offers fs.openFile()/fs.saveFile().
 import { createElement as h } from 'react';

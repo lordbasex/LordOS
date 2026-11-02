@@ -1,8 +1,0 @@
-{
-  "_note": "Creators shown on /about/. A linkedin value still in [[PLACEHOLDER]] form hides that button.",
-  "people": [
-    { "name": "Pablo Miranda", "initials": "PM", "photo": null, "linkedin": "https://www.linkedin.com/in/pablomirandasavina/" },
-    { "name": "Federico Pereira", "initials": "FP", "photo": "web/src/team/federico-pereira.jpg", "linkedin": "https://www.linkedin.com/in/wilson-federico-pereira-medina/" }
-  ],
-  "company": { "linkedin": "https://www.linkedin.com/company/iperfex", "site": "https://www.iperfex.com/?lang={lang}", "contact": "https://www.iperfex.com/contacto/?lang={lang}" }
-}

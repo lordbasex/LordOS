@@ -1,4 +1,4 @@
-// settings.js — user settings, stored in ~/.config/lordos/settings.json.
+// settings.js — user settings, stored in ~/.config/axia/settings.json.
 import { createStore, useStore } from './store.js';
 import { DEFAULT_WALLPAPER } from './wallpapers.js';
 
@@ -13,7 +13,7 @@ const DEFAULTS = {
   motion: {},            // moving wallpaper per display: { '*': id, <display id>: id } (sdk/motion.jsx)
   motionFiles: {},       // id → the variant on disk
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
-  wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
+  wallpaper: DEFAULT_WALLPAPER,  // Infinite Galaxy
   keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,

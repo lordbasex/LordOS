@@ -40,9 +40,9 @@ typedef struct { char host[256]; int port; int suffix; } Allow;
 typedef struct { char host[256]; int port; time_t until; } Grant;
 typedef struct { int handle, w, h, owner; uint32_t *px; uint64_t seq; } Img;
 
-/* Isolated system apps (Mail, Calendar, Contacts, Reminders as `lord-server --app <id>`): each
+/* Isolated system apps (Mail, Calendar, Contacts, Reminders as `axia-server --app <id>`): each
  * app process is an "owner" with its own event queue. Replies to its requests go only there; the
- * events lord-maild broadcasts go to the session (owner 0) and to every owner whose mask allows
+ * events axia-maild broadcasts go to the session (owner 0) and to every owner whose mask allows
  * them. brokermail.c reads these queues and forwards them over the broker. */
 typedef struct { int used, mask; JBuf ev; } Owner;
 typedef struct { int id, owner; } Route;
@@ -75,8 +75,8 @@ static void paths(void) {
     if (cfg_path[0]) return;
     const char *h = getenv("HOME");
     if (!h) h = "/nonexistent";
-    snprintf(cfg_path, sizeof cfg_path, "%s/.config/lordos/mail/accounts.json", h);
-    snprintf(cache_path, sizeof cache_path, "%s/.local/share/lordos/mail", h);
+    snprintf(cfg_path, sizeof cfg_path, "%s/.config/axia/mail/accounts.json", h);
+    snprintf(cache_path, sizeof cache_path, "%s/.local/share/axia/mail", h);
 }
 
 const char *mail_config_path(void) { paths(); return cfg_path; }
@@ -92,11 +92,11 @@ int mail_available(void) {
         if (!slash) return -1;
         *slash = 0;
         if (strlen(self) + 12 > sizeof helper) return -1;
-        snprintf(helper, sizeof helper, "%s/lord-maild", self);
+        snprintf(helper, sizeof helper, "%s/axia-maild", self);
     }
     struct stat st, me;
     if (stat(helper, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
-    /* owned by root or by lord-server's owner, and not writable by anyone else */
+    /* owned by root or by axia-server's owner, and not writable by anyone else */
     if (stat("/proc/self/exe", &me) || (st.st_uid != 0 && st.st_uid != me.st_uid) || (st.st_mode & 022)) return -1;
     return 0;
 }
@@ -559,7 +559,7 @@ static void on_connect(uint32_t cid, const char *json, size_t len) {
     }
     int how = host_ok(host) && port > 0 && port <= 65535 ? allowed_now(host, port) : 0;
     if (!how) {
-        fprintf(stderr, "lord-server: lord-maild asked for %s:%d, which is not a configured server: denied\n", host, port);
+        fprintf(stderr, "axia-server: axia-maild asked for %s:%d, which is not a configured server: denied\n", host, port);
         send_msg(MQ_SOCK, cid, "{\"error\":\"denied\"}", -1);
         return;
     }
@@ -688,7 +688,7 @@ int mail_start(void) {
     envp[ne++] = "LANG=C.UTF-8";
     if (getenv("LORD_MAIL_DEBUG")) envp[ne++] = "LORD_MAIL_DEBUG=1";
     envp[ne] = NULL;
-    char *argv[] = { "lord-maild", NULL };
+    char *argv[] = { "axia-maild", NULL };
     pid_t pid;
     int e = posix_spawn(&pid, helper, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);

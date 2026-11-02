@@ -168,7 +168,7 @@ static JSValue f_broker_resolve(JSContext *c, JSValueConst t, int argc, JSValueC
     return JS_UNDEFINED;
 }
 /* lord.broker.publish(type, json): the theme publishes its tokens ("theme") or the language ("locale") and
- * lord-server forwards them live to the isolated apps. */
+ * axia-server forwards them live to the isolated apps. */
 static JSValue f_broker_publish(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     const char *kind = JS_ToCString(c, argv[0]);

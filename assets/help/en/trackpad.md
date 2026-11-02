@@ -6,7 +6,7 @@ keywords: touchpad, trackpad, gestures, touch, scrolling, pinch
 ---
 # Touchpad and touchscreen
 
-LordOS drives touchpads and touchscreens with its own driver.
+Axia DE drives touchpads and touchscreens with its own driver.
 
 ## Gestures
 

@@ -1,8 +1,8 @@
-/* brokermail_test.c — lord-maild for the isolated system apps (src/sec/brokermail.c, BOP_MAIL and
+/* brokermail_test.c — axia-maild for the isolated system apps (src/sec/brokermail.c, BOP_MAIL and
  * BOP_SYS_OPEN): who may ask, which requests each app may send, which files may travel to
- * lord-maild, the Mail-only verbs (accounts file, remote images, attachments) and opening another
+ * axia-maild, the Mail-only verbs (accounts file, remote images, attachments) and opening another
  * app. The real brokermail.c runs against stand-ins for brokersrv.c and mailc.c that record what
- * would have reached lord-maild or the session. Temporary HOME.
+ * would have reached axia-maild or the session. Temporary HOME.
  * `make build/brokermail-test && build/brokermail-test`. */
 #include "sec/broker_int.h"
 #include "mail/mailc.h"

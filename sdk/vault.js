@@ -1,8 +1,8 @@
 // vault.js — Passwords and the system keyring: talks to lord.vault (the confined helper
-// lord-vault, see docs/PASSWORDS.md). Everything is asynchronous: requests return promises and a
+// axia-vault, see docs/PASSWORDS.md). Everything is asynchronous: requests return promises and a
 // timer reads the replies (lord.vault.poll); the desktop never waits.
 //
-//   vaultAvailable()                                is lord-vault there?
+//   vaultAvailable()                                is axia-vault there?
 //   vaultRequest(op, args, { files })               → promise with the reply ({ ok, … }) or an error with .code
 //   onVaultEvent(fn)                                events: locked, unlocked, changed, touch, ss-prompt, keyring-mismatch, crash
 //   keyring.set(app, { service, account, secret, label }) / get(app, { service, account }) / remove / list
@@ -57,7 +57,7 @@ function startSlow() { if (!slow && has()) slow = setInterval(pump, 600); }
 export function vaultRequest(op, args = {}, { files, fds } = {}) {
   if (!has()) return Promise.reject(Object.assign(new Error('unavailable'), { code: 'unavailable' }));
   let id;
-  // files: paths opened by lord-server (shell); fds: files picked in the system dialog (app process)
+  // files: paths opened by axia-server (shell); fds: files picked in the system dialog (app process)
   try { id = lord.vault.request(JSON.stringify({ op, ...args }), files || fds ? { files, fds } : undefined); }
   // lord.vault.request throws translated errors with a code (server/src/ui/js_err.h)
   catch (e) { return Promise.reject(Object.assign(new Error(e.message), { code: e.code === 'vault.unavailable' ? 'unavailable' : 'file' })); }
@@ -75,8 +75,8 @@ export function onVaultEvent(fn) {
 }
 
 // ---- the session keyring, per app ----
-// In an isolated .lpk app (lord-server --app <id>) there is no lord.vault: lord.keyring goes through
-// the broker, and lord-server sets the owner from the verified app id ("app.<id>"), so the `app`
+// In an isolated .lpk app (axia-server --app <id>) there is no lord.vault: lord.keyring goes through
+// the broker, and axia-server sets the owner from the verified app id ("app.<id>"), so the `app`
 // argument is ignored there. Reading another app's item makes the system ask the user first.
 // Errors carry the same short codes in both cases (locked, no-keyring, not-found, not-shared,
 // unavailable); `errorCode` keeps the full code (keyring.locked…) and `message` is translated.
@@ -103,7 +103,7 @@ export const keyring = {
   remove: (app, { service, account = '' }) => (hasAppKeyring() ? appKeyring('delete', service, account) : vaultRequest('kr-del', { owner: app, service, account })),
   list: async (app) => (hasAppKeyring() ? await appKeyring('list') : await vaultRequest('kr-list', { owner: app })).items || [],
   // the user agreed that `app` may use another app's item (the system asks, not the app); not
-  // available inside an isolated app: there lord-server asks the user by itself on get
+  // available inside an isolated app: there axia-server asks the user by itself on get
   share: (id, app, allow = true) => (hasAppKeyring()
     ? Promise.reject(Object.assign(new Error('denied'), { code: 'denied' }))
     : vaultRequest('kr-share', { admin: true, id, app, allow })),
@@ -125,7 +125,7 @@ export async function autofill(app, { url, service, ssid } = {}) {
   return list.filter((e) => !e.trash && hit(e)).map((e) => ({ id: e.id, title: e.title, username: e.sub || '' }));
 }
 
-// The user picked one: username and password (the password leaves lord-vault only now).
+// The user picked one: username and password (the password leaves axia-vault only now).
 export async function autofillReveal(id) {
   const e = (await vaultRequest('get', { id, reveal: true })).entry;
   const f = (k) => e.f.find((x) => x.k === k)?.v || '';
@@ -181,7 +181,7 @@ export function KeyringPrompt() {
 //
 //   <AutofillButton app="settings" service="wifi:Casa" ssid="Casa" onFill={({ username, password }) => …} />
 // Offers what the app saved in the session keyring (service) and matching Passwords entries.
-// The secret leaves lord-vault only when the user picks one.
+// The secret leaves axia-vault only when the user picks one.
 export function AutofillButton({ app, service, url, ssid, onFill }) {
   const th = useTheme();
   const [open, setOpen] = useState(false);

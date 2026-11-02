@@ -1,23 +1,19 @@
-# LordOS wallpapers
+# Axia DE wallpapers
 
-Created by iPERFEX with an AI image generator; part of the LordOS brand assets.
+Created by iPERFEX with an AI image generator for LordOS. Axia DE keeps only the pieces without
+LordOS brand elements: the crown and Lumo wallpapers were removed.
 
-The collection that LordOS ships in `/usr/share/backgrounds/lordos/` and shows in
+The collection that Axia DE ships and shows in
 **Settings → Wallpaper**, grouped by category. The default theme also keeps its four gradients
 (Aurora, Ocean, Sunset, Graphite; `themes/default/assets/`, made by `tools/gen-wallpaper.py`) as the
 "Gradients" category.
 
 | Category | File | Name (en / es / pt) |
 |---|---|---|
-| Signature | `signature/lordos-crystal-crown.jpg` | Crystal Crown / Corona de cristal / Coroa de cristal (**login screen**) |
-| Signature | `signature/lordos-eternal-dawn.jpg` | Eternal Dawn / Amanecer eterno / Amanhecer eterno |
-| Signature | `signature/lordos-royal-flow.jpg` | Royal Flow / Flujo real / Fluxo real |
-| Signature | `signature/lordos-royal-waves.jpg` | Royal Waves / Ondas reales / Ondas reais |
-| Signature | `signature/lordos-violet-horizon.jpg` | Violet Horizon / Horizonte violeta / Horizonte violeta |
-| Lumo | `lumo/lordos-lumo-aurora.jpg` | Aurora |
-| Lumo | `lumo/lordos-lumo-celestial.jpg` | Celestial (**default desktop** for new users) |
+| Horizons | `horizons/lordos-eternal-dawn.jpg` | Eternal Dawn / Amanecer eterno / Amanhecer eterno |
+| Horizons | `horizons/lordos-violet-horizon.jpg` | Violet Horizon / Horizonte violeta / Horizonte violeta (**login screen**) |
 | Cosmos | `cosmos/lordos-event-horizon.jpg` | Event Horizon / Horizonte de sucesos / Horizonte de eventos |
-| Cosmos | `cosmos/lordos-infinite-galaxy.jpg` | Infinite Galaxy / Galaxia infinita / Galáxia infinita |
+| Cosmos | `cosmos/lordos-infinite-galaxy.jpg` | Infinite Galaxy / Galaxia infinita / Galáxia infinita (**default desktop** for new users) |
 | Cosmos | `cosmos/lordos-solar-odyssey.jpg` | Solar Odyssey / Odisea solar / Odisseia solar |
 | Cosmos | `cosmos/lordos-stellar-voyage.jpg` | Stellar Voyage / Viaje estelar / Viagem estelar |
 
@@ -27,7 +23,7 @@ The names shown in the interface come from `assets/locales/<lang>/shell.json`
 ## Files
 
 - `<category>/lordos-<name>.jpg`: the wallpaper at the original's native size (1672×941 today),
-  JPEG quality 90, 4:4:4 chroma, baseline. About 4 MB for all eleven; the 2 MB PNG originals are
+  JPEG quality 90, 4:4:4 chroma, baseline. About 2 MB for all six; the 2 MB PNG originals are
   not kept in the repository (the JPEGs measure 39–46 dB PSNR against them and look the same).
 - `thumbs/<category>/lordos-<name>.jpg`: 320×180 thumbnails for Settings and the Control Center,
   so the pickers never decode the full images.
@@ -43,7 +39,7 @@ The originals are 1672×941, so they are upscaled (bilinear, "cover" crop) on bi
 put the PNG next to the original with its size in the name and run the generator again:
 
 ```
-<originals>/lumo/lordos-lumo-celestial@3840x2160.png  →  lumo/lordos-lumo-celestial@3840x2160.jpg
+<originals>/cosmos/lordos-infinite-galaxy@3840x2160.png  →  cosmos/lordos-infinite-galaxy@3840x2160.jpg
 ```
 
 The desktop and the login screen then pick, for each screen, the smallest variant that covers it
@@ -52,11 +48,7 @@ screen gets the 4K one. No code changes are needed.
 
 ## License and provenance
 
-The images were created by iPERFEX with an AI image generator and are part of the LordOS brand
-assets, like the logo and Lumo. The files are distributed with LordOS under the same terms as the
-rest of the repository (MIT); the LordOS name, the crown and Lumo that appear in them are also
-covered by the LordOS trademark and brand policy (`web/content/legal/trademark.en.md`). Because
-they are AI-generated, copyright protection for the images themselves may be limited in some
-countries; the trademark policy still applies to the brand elements in them. The "Lumo" pieces are
-an artistic interpretation of the celestial fox, not the official mascot drawing (for that, use
-`assets/brand/mascot/`).
+The images were created by iPERFEX with an AI image generator for LordOS and are distributed under the
+same terms as the rest of the repository (MIT). The ones kept here show none of the LordOS brand
+elements (name, crown or Lumo), which the LordOS trademark policy reserves. Because they are
+AI-generated, copyright protection for the images themselves may be limited in some countries.

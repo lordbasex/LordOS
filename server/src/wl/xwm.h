@@ -1,6 +1,6 @@
 /* xwm.h — LordOS's X window manager for Xwayland (xwm.c) and its glue with the compositor (wl.c).
  *
- * X11 apps are clients of Xwayland; Xwayland is one Wayland client of lord-server and gives every
+ * X11 apps are clients of Xwayland; Xwayland is one Wayland client of axia-server and gives every
  * mapped top-level X window a wl_surface. The window manager is a second X client (on the fd
  * Xwayland gets with -wm) that decides what those windows are: a LordOS window with the theme's
  * frame, a menu or tooltip drawn above everything (override-redirect), their title and app

@@ -1,4 +1,4 @@
-/* fwsub.c — the user's blocklist subscriptions, lord-server's side (see fwsub.h). */
+/* fwsub.c — the user's blocklist subscriptions, axia-server's side (see fwsub.h). */
 #include "fwsub.h"
 #include "fwlists.h"
 #include "../doc/wire.h"
@@ -250,7 +250,7 @@ static int has_copy(const List *l) {
     return !stat(p, &st) && S_ISREG(st.st_mode);
 }
 
-/* ---- the worker: downloading (lord-fetch) and compiling ---- */
+/* ---- the worker: downloading (axia-dl) and compiling ---- */
 
 typedef struct { int fd; pid_t pid; } Helper;
 
@@ -271,7 +271,7 @@ static int helper_start(Helper *h) {
     posix_spawnattr_setsigmask(&at, &none);
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
-    char *argv[] = { "lord-fetch", NULL };
+    char *argv[] = { "axia-dl", NULL };
     char *envp[] = { "LANG=C.UTF-8", getenv("LORDOS_SESSIOND") ? "LORDOS_SESSIOND=1" : NULL, NULL };
     int e = posix_spawn(&h->pid, fetch_bin, &fa, &at, argv, envp);
     posix_spawn_file_actions_destroy(&fa);
@@ -436,7 +436,7 @@ static void *worker(void *arg) {
         helper_stop(&h);
 
         /* compile every enabled list that has a copy: their lines go to fwlists.txt as they are
-         * (each checked again; lord-netperm drops repeated ones), and into the set lord-server keeps
+         * (each checked again; axia-netperm drops repeated ones), and into the set axia-server keeps
          * for the Monitor (hashes only: a few bytes a name) */
         FwLists *s = fwl_new();
         char ids[FWS_MAX_LISTS][32];
@@ -514,27 +514,27 @@ static void kick(int fetch) {
 int fws_init(const char *home, const char *assets, const char *bindir) {
     if (inited) return 0;
     if (!home || !assets || !bindir) return -1;
-    snprintf(cfg_path, sizeof cfg_path, "%s/.config/lordos/fwlists.json", home);
-    snprintf(txt_path, sizeof txt_path, "%s/.config/lordos/fwlists.txt", home);
+    snprintf(cfg_path, sizeof cfg_path, "%s/.config/axia/fwlists.json", home);
+    snprintf(txt_path, sizeof txt_path, "%s/.config/axia/fwlists.txt", home);
     snprintf(catalog_path, sizeof catalog_path, "%s/fw/blocklists.json", assets);
-    snprintf(fetch_bin, sizeof fetch_bin, "%s/lord-fetch", bindir);
+    snprintf(fetch_bin, sizeof fetch_bin, "%s/axia-dl", bindir);
     char p[PATH_MAX];
     snprintf(p, sizeof p, "%s/.cache", home);
     mkdir(p, 0700);
-    snprintf(p, sizeof p, "%s/.cache/lordos", home);
+    snprintf(p, sizeof p, "%s/.cache/axia", home);
     mkdir(p, 0700);
-    snprintf(cache_dir, sizeof cache_dir, "%s/.cache/lordos/fwlists", home);
+    snprintf(cache_dir, sizeof cache_dir, "%s/.cache/axia/fwlists", home);
     mkdir(cache_dir, 0700);
     snprintf(p, sizeof p, "%s/.config", home);
     mkdir(p, 0700);
-    snprintf(p, sizeof p, "%s/.config/lordos", home);
+    snprintf(p, sizeof p, "%s/.config/axia", home);
     mkdir(p, 0700);
     inited = 1;
     load_catalog();
     load_config();
     int any = 0;
     for (int i = 0; i < nl; i++) { load_state(&L[i]); any |= L[i].on; }
-    /* the set for the Monitor's "on a list" (the kernel's copy is lord-netperm's) */
+    /* the set for the Monitor's "on a list" (the kernel's copy is axia-netperm's) */
     if (any) { pthread_mutex_lock(&mu); kick(0); pthread_mutex_unlock(&mu); }
     return 0;
 }

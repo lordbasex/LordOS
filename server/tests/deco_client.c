@@ -1,5 +1,5 @@
 /* deco_client.c — who draws a window's frame (docs/WAYLAND.md, "Frame and colors"): run inside a
- * LordOS session, it checks that lord-server honors the mode an app asks for.
+ * LordOS session, it checks that axia-server honors the mode an app asks for.
  *
  *   xdg-decoration: the first configure prefers SERVER_SIDE; set_mode(CLIENT_SIDE) is answered
  *   CLIENT_SIDE (also after the window is mapped, followed by an xdg_surface.configure);

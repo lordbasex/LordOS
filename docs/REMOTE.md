@@ -238,9 +238,9 @@ primaries, sRGB transfer) so the browser shows the same colors as the tiles: the
 difference between both over the whole screen is 0.1 levels. The bridge makes the PNG straight from
 the session's rectangle (`enc.c`, the only image code left); it keeps no copy of the screen.
 
-**One encoder per session.** The session's `lord-server` renders as always; the frame the remote
+**One encoder per session.** The session's `axia-server` renders as always; the frame the remote
 desktop sees (protected windows in black, from `media_composed`, or the GPU's read-back) goes to a
-live encoder: `lord-media` in `MK_STREAM` mode, through a sealed memfd of 3 slots, like the screen
+live encoder: `axia-media` in `MK_STREAM` mode, through a sealed memfd of 3 slots, like the screen
 recording. It uses H.264 with VA-API when the card encodes it, else libx264 (`ultrafast`,
 `zerolatency`, CRF 22 with a bit-rate cap, and the deblocking filter that `ultrafast` turns off), or VP8 with libvpx (`realtime`) for browsers without
 H.264. Every viewer of the session gets the same encoded frames over the session socket
@@ -251,7 +251,7 @@ The browser's estimate (REMB) is a ceiling only when it falls by more than 15 % 
 it only grows with what the browser receives, so as a fixed ceiling it kept a new connection near
 3 Mbit/s for about three minutes (video in blocks); now a LAN reaches the top in about 10 s. A viewer that falls more than
 3 MB behind skips frames until the next keyframe; a lost frame (PLI, FIR) asks for one, and the
-current screen is encoded again for it. Two users means two sessions, two `lord-server`s and two
+current screen is encoded again for it. Two users means two sessions, two `axia-server`s and two
 encoders, each as its own user.
 
 **The frame rate follows the viewer's screen.** The page measures its screen's refresh rate with
@@ -412,7 +412,7 @@ The WebRTC peer lives in the bridge, which already dropped root (see Process and
 UDP sockets, its TURN connection and its TLS are created after the drop, as the user; the only
 socket it gets from root is the ICE-TCP handoff listener. `lord-sessiond` links libsrtp2 and
 usrsctp (Debian packages; `make` requires them for `lord-sessiond`, and the package depends on
-`libsrtp2-1` and `libusrsctp2`); `lord-server` links neither; FFmpeg stays only in `lord-media`.
+`libsrtp2-1` and `libusrsctp2`); `axia-server` links neither; FFmpeg stays only in `axia-media`.
 
 **Admin action:**
 
@@ -454,7 +454,7 @@ WebRTC-only build:
 
 What stays as it is: ICE-lite answers checks from any allowed address that knows the credentials
 (they only travel inside the authenticated TLS WebSocket), as fast as they come; a relay sees the
-traffic's size and timing; the encoder, `lord-media`, parses only our own frames (in its sandbox, as
+traffic's size and timing; the encoder, `axia-media`, parses only our own frames (in its sandbox, as
 for recording).
 
 ### Measurements (0.8.4, video)
@@ -464,7 +464,7 @@ LAN; a window dragged in circles for 16 s; CPU per process from `/proc`, traffic
 `main` at the time (video with the image path behind it), "after" this WebRTC-only build, measured
 the same hour in the same way.
 
-| Situation | | Frames/s | Network | lord-server | encoder | bridge(s) |
+| Situation | | Frames/s | Network | axia-server | encoder | bridge(s) |
 |---|---|---|---|---|---|---|
 | idle, 1 viewer | before | — | 0.09 Mbit/s | 2 % | 2 % | 1 % |
 | | after | — | 0.06–0.13 Mbit/s | 2–3 % | 2 % | 1 % |
@@ -517,7 +517,7 @@ YouTube in Chromium inside the session, watched over the remote desktop:
 |---|---|---|---|
 | 1080p, 24 fps | real time | under 1 % | 25–26 of 60 fps |
 | 1080p, 24 fps, AV1 (17 s read from the player's statistics, 12:08:18 → 12:08:35) | 386 frames, 23–24 fps | 0 new | 26 with the video alone, 38–54 when the sidebar's animated preview and the statistics graphs also change |
-| 1080p, 60 fps, AV1 (before the pool) | 38–44 fps | about 1 in 3 | lord-server saturated |
+| 1080p, 60 fps, AV1 (before the pool) | 38–44 fps | about 1 in 3 | axia-server saturated |
 
 - **The bar counts screen updates, not the video's frames:** a 24 fps video alone gives about 26; anything
   else that moves adds to it. It reached what changed in every case above.
@@ -544,7 +544,7 @@ YouTube in Chromium inside the session, watched over the remote desktop:
    nothing of the connection: it only waits, and when the bridge reports that the session was
    locked, it ends every cookie of that user.
 
-OpenSSL (TLS) is only in `lord-sessiond`; `lord-server` doesn't link it. The certificate is
+OpenSSL (TLS) is only in `lord-sessiond`; `axia-server` doesn't link it. The certificate is
 self-signed P-256, with CN equal to the machine name and ten years of validity. It's in
 `/etc/lordos/remote/cert.pem` (`key.pem` 0600) and is created the first time remote is turned on.
 
@@ -599,7 +599,7 @@ listed after the table.
 | 18 | High | (Found in review of this branch.) "Local network" counted any interface named `ppp*`, `tun*` or `wg*` as a VPN, so a public address arriving over a PPPoE uplink (`ppp0`) or any tunnel passed the default. | Only LordOS's own VPN interface names (with the dash), only to that interface's address, and only from inside its subnet or its point-to-point peer. | unit tests: `ppp0` with a public peer refused; `wg-home` with an in-subnet peer accepted and a public one refused; `/0` subnets refused. |
 
 **Greeter and lock.** A remote browser can't unlock the monitor: the monitor shows the login
-screen (a separate `lord-server` as `lordos-greeter`), and the session only reaches `lord-sessiond`
+screen (a separate `axia-server` as `lordos-greeter`), and the session only reaches `lord-sessiond`
 through the seat connection, whose requests are lock, switch user and power. Signing in from the
 browser resumes the user's session in the background, never on the monitor. Locking the monitor
 ends the remote viewers and every remote cookie of that user; a browser must sign in again with the
@@ -625,7 +625,7 @@ scan; headers; lock. All results are in the table.
 ## Sound
 
 The session's sound reaches the browser with the video (see [Video (WebRTC)](#video-webrtc)): the
-session's `lord-server` records the monitor of the default output from PipeWire itself (the same
+session's `axia-server` records the monitor of the default output from PipeWire itself (the same
 `maudio.c` stream as the screen recorder's microphone, `@DEFAULT_MONITOR@`, mono 48 kHz) into a
 shared-memory ring, and the live encoder makes Opus of it (20 ms frames, 64 kbit/s, low delay). The
 page starts muted (browsers only play sound after a click): the first click or key in the session
@@ -667,7 +667,7 @@ standard OpenSSH server (`openssh-server`), not something of our own.
   `KillMode=process`); new ones are refused and port 22 closes, also after a reboot.
 - **How to connect:** when it's on, the page shows `ssh <your user>@<address>` for each LAN IPv4
   address and for the machine name, and the **ED25519 host key fingerprint** (`SHA256:…`, computed
-  by `lord-server` from `/etc/ssh/ssh_host_ed25519_key.pub`, the same as
+  by `axia-server` from `/etc/ssh/ssh_host_ed25519_key.pub`, the same as
   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`). Compare it with the one `ssh` shows the
   first time it connects.
 - **Who can log in:** all users with a password (the default), or **only administrators**
@@ -705,13 +705,13 @@ The privileged part is two closed actions of the admin helper (`server/src/remot
 | `ssh-allow`             | `all` or `admins` | writes or removes the fixed `AllowGroups` drop-in, `sshd -t`, `systemctl try-reload-or-restart` |
 
 Nothing the user types reaches a command line or sshd's configuration, and no package is installed
-by these actions: that stays in the package engine. `lord-server` only reads the state
+by these actions: that stays in the package engine. `axia-server` only reads the state
 (`lord.ssh.status()` in `server/src/ui/js_sys.c`: the unit files, `/proc/*/comm` for a root
 `sshd`, the drop-in and the public host key), and doesn't run anything.
 
 ### Firewall
 
-Nothing to open. `lord-netperm`'s per-app rules apply to programs started from a LordOS session
+Nothing to open. `axia-netperm`'s per-app rules apply to programs started from a LordOS session
 (they live in its cgroup tree); `sshd` is a system service in `system.slice/ssh.service`, so the
 rules never block it, and LordOS adds no system-wide packet filter. If you run your own (nftables,
 a router), allow TCP port 22 from the local network only. As with remote desktop, to use it from
@@ -742,8 +742,8 @@ the internet, use a VPN instead of opening the port.
 | `server/src/remote/enc.c`             | PNG for the lossless refresh and cursor images (stb_image_write, vendored in third_party/stb) |
 | `server/src/remote/rtc.c`             | the WebRTC peer in the bridge: ICE-lite over UDP and TCP, ICE restarts, STUN server, DTLS-SRTP, SCTP data channels, RTP, TURN client over UDP/TCP/TLS |
 | `server/src/remote/rtcwire.c`         | strict SDP, candidate, STUN/TURN, RTCP and data channel parsers, ICE-TCP framing and routing; RTP payloaders (tested and fuzzed) |
-| `server/src/media/mstream.c`          | the session's shared live encoder (lord-server side)        |
-| `server/src/media/helper/lm_stream.c` | the live encoder in `lord-media` (H.264/VP8, Opus)          |
+| `server/src/media/mstream.c`          | the session's shared live encoder (axia-server side)        |
+| `server/src/media/helper/lm_stream.c` | the live encoder in `axia-media` (H.264/VP8, Opus)          |
 | `server/src/remote/login.html`, `client.html` | pages (embedded in the binary)                      |
 | `server/src/remote/remote_admin.c`    | `remote-*` actions                                         |
 | `server/src/remote/ssh_admin.c`       | `ssh-*` actions (remote login)                             |

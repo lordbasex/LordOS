@@ -266,7 +266,7 @@ int fanhw_take(FanHw *h, const char *state_path) {
         pathf(tmp, sizeof tmp, "%s.tmp", state_path);
         FILE *f = tmp[0] ? fopen(tmp, "we") : NULL;
         if (f) {
-            fprintf(f, "lord-fand 1\n");
+            fprintf(f, "axia-fand 1\n");
             for (int i = 0; i < h->n; i++) {
                 FanTarget *t = &h->t[i];
                 char p[FANHW_PATH];
@@ -289,7 +289,7 @@ int fanhw_take(FanHw *h, const char *state_path) {
             tpath(t, "_enable", p, sizeof p);
             int v;
             if (t->orig_enable < 0 && !read_int(p, &v)) t->orig_enable = v;
-            if (write_int(p, 1)) { fprintf(stderr, "lord-fand: %s: manual mode refused\n", p); continue; }
+            if (write_int(p, 1)) { fprintf(stderr, "axia-fand: %s: manual mode refused\n", p); continue; }
         }
         t->taken = 1;
         ok++;
@@ -383,7 +383,7 @@ int fanhw_restore_file(const char *root, const char *state_path) {
     int rc = 0;
     if (f) {
         char line[FANHW_PATH + 64];
-        if (!fgets(line, sizeof line, f) || strcmp(line, "lord-fand 1\n")) rc = -1;
+        if (!fgets(line, sizeof line, f) || strcmp(line, "axia-fand 1\n")) rc = -1;
         while (rc == 0 && fgets(line, sizeof line, f)) {
             int a, b, n = 0;
             char dev[FANHW_PATH];

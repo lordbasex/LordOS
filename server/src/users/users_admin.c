@@ -197,18 +197,18 @@ static void prepare_home(const struct passwd *pw) {
     if (homedirs_create(pw->pw_dir, pw->pw_uid, pw->pw_gid, lang)) admin_log("users.homedirsWarning", NULL);
     snprintf(path, sizeof path, "%s/.config", pw->pw_dir);
     if (!mkdir(path, 0755) && chown(path, pw->pw_uid, pw->pw_gid)) { /* carry on */ }
-    snprintf(path, sizeof path, "%s/.config/lordos", pw->pw_dir);
+    snprintf(path, sizeof path, "%s/.config/axia", pw->pw_dir);
     if (!mkdir(path, 0755) && chown(path, pw->pw_uid, pw->pw_gid)) { /* carry on */ }
     char text[96];
     snprintf(path, sizeof path, "%s/.config/locale.conf", pw->pw_dir);
     snprintf(text, sizeof text, "LANG=%s\n", lang);
     if (!write_file(path, text, strlen(text), 0644) && chown(path, pw->pw_uid, pw->pw_gid)) { /* carry on */ }
-    snprintf(path, sizeof path, "%s/.config/lordos/settings.json", pw->pw_dir);
+    snprintf(path, sizeof path, "%s/.config/axia/settings.json", pw->pw_dir);
     /* UI language: the system's if there's a catalog (es, en, pt); otherwise English */
     const char *ui = homedirs_ui_lang(lang);
     snprintf(text, sizeof text, "{\n  \"language\": \"%s\"\n}\n", ui);
     if (!write_file(path, text, strlen(text), 0644) && chown(path, pw->pw_uid, pw->pw_gid)) { /* carry on */ }
-    snprintf(path, sizeof path, "%s/.config/lordos/.dirs", pw->pw_dir);
+    snprintf(path, sizeof path, "%s/.config/axia/.dirs", pw->pw_dir);
     if (!write_file(path, "", 0, 0644) && chown(path, pw->pw_uid, pw->pw_gid)) { /* carry on */ }
 }
 

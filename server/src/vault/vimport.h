@@ -1,6 +1,6 @@
 /* vimport.h — import and export passwords from other managers (see docs/PASSWORDS.md,
- * "Import and export"). Runs inside lord-vault (confined, no network): the file arrives as
- * bytes already read from an fd opened by lord-server. Everything built (strings, attachments) goes in
+ * "Import and export"). Runs inside axia-vault (confined, no network): the file arrives as
+ * bytes already read from an fd opened by axia-server. Everything built (strings, attachments) goes in
  * the secrets arena (smem.h) and imp_free wipes it.
  *
  * Formats:

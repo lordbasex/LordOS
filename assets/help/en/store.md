@@ -7,7 +7,7 @@ keywords: store, install, apps, packages, debian, update, remove
 ---
 # Store
 
-To install, update and remove apps: LordOS apps (`.lpk`) and Debian ones.
+To install, update and remove apps: Axia DE apps (`.lpk`) and Debian ones.
 
 - **Discover:** Debian desktop apps by category, with their icon and description in your language.
 - **Search:** apps come first, then the other packages.

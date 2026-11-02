@@ -3,7 +3,7 @@
  *
  *   XDG_RUNTIME_DIR=/run/user/<uid> build/pwguard-cli <seconds>
  *
- * Rereads ~/.config/lordos/firewall.json every second into the store lord.fw uses
+ * Rereads ~/.config/axia/firewall.json every second into the store lord.fw uses
  * (sec/restrict.h), the way Settings changes it in a session, and runs the guard against the
  * session's PipeWire. A test tool: never installed. */
 #include "sec/pwguard.h"
@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     int secs = argc > 1 ? atoi(argv[1]) : 10;
     const char *home = getenv("HOME");
     char path[4096];
-    snprintf(path, sizeof path, "%s/.config/lordos/firewall.json", home ? home : "/nonexistent");
+    snprintf(path, sizeof path, "%s/.config/axia/firewall.json", home ? home : "/nonexistent");
     FwStore *cur = NULL;
     if (pwguard_start()) { fprintf(stderr, "pwguard-cli: no PipeWire manager socket\n"); return 1; }
     printf("ready\n");

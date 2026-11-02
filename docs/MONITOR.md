@@ -43,7 +43,7 @@ the rest of the tab, and the first generation of the list.
 - **Left:** search (by app, address or country) and one row per app with its icon, number of
   connections, a traffic bar (received in green, sent in orange, relative to the app that moved
   the most), a tiny live activity indicator (its traffic over the last 12 s, one bar per second),
-  the bytes and the **Rule** column: a per-app allow/deny switch that `lord-netperm`
+  the bytes and the **Rule** column: a per-app allow/deny switch that `axia-netperm`
   enforces in the kernel (see "Phase 2"). Each app expands to show its destinations, one row per
   name the system resolver gave (its addresses together) or per address, with the country, the
   ones the firewall reported recently ("recent connection" or "recently denied") and, since 0.8.2,
@@ -148,11 +148,11 @@ backed by its own process and cgroup scope, so its rules are enforced by the ker
 
 | Row | Firewall id | Its traffic |
 |---|---|---|
-| Mail and calendars | `lordos:mail` | lord-maild's servers (Mail, Calendar, Contacts, Reminders sync), made by Mail's connector |
+| Mail and calendars | `lordos:mail` | axia-maild's servers (Mail, Calendar, Contacts, Reminders sync), made by Mail's connector |
 | Store and updates | `lordos:store` | the package engine's downloads (the Store, Settings → General, the daily update check) |
 | Printers and scanners | `lordos:print` | IPP and eSCL to network printers and scanners, and their mDNS discovery |
 | Terminal | `lordos:terminal` | the shell of every terminal and every program it starts; the detail lists the programs by name |
-| Blocklist updates | `lordos:lists` | the daily blocklist downloads (`lord-fetch`) |
+| Blocklist updates | `lordos:lists` | the daily blocklist downloads (`axia-dl`) |
 | VPN | `lordos:vpn` | the counters of LordOS's own VPN interfaces (Settings → Network); not blockable |
 | Name resolution (DNS) | `system:dns` | systemd-resolved; shown, never blockable |
 | Time synchronization | `system:time` | systemd-timesyncd; shown, never blockable |
@@ -164,7 +164,7 @@ Blocking the Store asks first, because no security update arrives while it is bl
 
 ![Blocking the Store and updates asks first](monitor-net2-store-warning.png)
 
-The **"LordOS" row** is now what is left in lord-server itself, close to zero; every socket a
+The **"LordOS" row** is now what is left in axia-server itself, close to zero; every socket a
 component's connector made counts as that component's, also in the open-connections list (the
 socket's cgroup, `INET_DIAG_CGROUP_ID`, mapped to the session's scopes: conn.c `cgApp`).
 
@@ -177,7 +177,7 @@ UDP 443…). Every row has its received and sent bytes, a tiny up/down meter of 
 decides it (another rule, the app's default, a restriction, the deny mode or a blocklist: "Blocked
 by the list Scam sites"). Long lists fold after eight rows ("N more…"). For an address reached
 through a CNAME chain the row shows the shortest name (usually the one the app asked for) and
-searches every name of the chain. The per-port bytes come from lord-netperm (np_flows is per
+searches every name of the chain. The per-port bytes come from axia-netperm (np_flows is per
 address and port since 0.8.5; COUNTS sends each address's eight busiest ports).
 
 **The view menu** (one pop-up button at the top of the column) holds the whole view, kept per user in
@@ -226,7 +226,7 @@ Its panel:
 - the blocklists (lists on, entries) and "Open Monitor…".
 
 While the item is shown it reads `lord.monitor.netTotals()` (one read of `/proc/net/dev`) once
-per second, without the Monitor's sampling thread; lord-netperm's notices are read only while the
+per second, without the Monitor's sampling thread; axia-netperm's notices are read only while the
 panel is open. Hidden, it costs nothing. `sdk/netstatus.jsx`.
 
 ![The panel](menubar-network-panel.png) ![Deny silently cut the open download; DNS still works](menubar-network-deny.png)
@@ -247,7 +247,7 @@ denied.
 ### Measurements (0.8.5, VM 118, 4 vCPU Xeon Silver 4108, kernel 6.12)
 
 Same session, same test traffic (curl in an app scope: a 120 KB/s download and HTTPS requests every
-4 s), main's build (0.8.3 + 0.8.4 so far) against this one, 30 s each, lord-server's CPU in % of
+4 s), main's build (0.8.3 + 0.8.4 so far) against this one, 30 s each, axia-server's CPU in % of
 one core:
 
 | | main | this build |
@@ -257,8 +257,8 @@ one core:
 | desktop idle, menu bar item on | — | 2.95 % |
 | desktop with traffic, item on / its panel open | — | 0.97 % / 3.87 % |
 
-Memory with 4 lists (379,991 names, 19,405 networks): lord-netperm 13.8 MB (2.9 MB without lists),
-lord-server 142 MB with the Monitor open (131 MB on main). The per-packet cost is in `FIREWALL.md`
+Memory with 4 lists (379,991 names, 19,405 networks): axia-netperm 13.8 MB (2.9 MB without lists),
+axia-server 142 MB with the Monitor open (131 MB on main). The per-packet cost is in `FIREWALL.md`
 ("Measurements, 0.8.5").
 
 **Before** (main, no lists: the scam site connects) **and after:**
@@ -298,7 +298,7 @@ Every action is one of the fixed admin actions Settings uses (`remote-block`, `r
 ### Blocking cuts what is open (0.8.3)
 
 Switching an app's rule off (or a destination's switch, or adding a restriction) now also ends the
-connections it already had: the kernel drops their packets and `lord-netperm` closes the sockets
+connections it already had: the kernel drops their packets and `axia-netperm` closes the sockets
 (`FIREWALL.md`, "Existing connections are cut"). Each cut connection adds one to the app's
 *denied* count, and the bytes dropped meanwhile show in its details as **Blocked traffic**
 (`COUNTS` index 7). Within a second of the switch the row shows it.
@@ -310,7 +310,7 @@ An open app row lists the destinations it reached and gives each one an allow/bl
 edits (`FIREWALL.md`, "Rules by app"); there is no new enforcement:
 
 - **What a row is:** one per name the system resolver gave for the app's addresses (from
-  `lord-netperm`'s notices, `hosts`), with its addresses together ("cdn.example.net (4)"), or one
+  `axia-netperm`'s notices, `hosts`), with its addresses together ("cdn.example.net (4)"), or one
   per address when no name is known. The first eight show, then "N more…" (and "Show fewer").
   While the row is open the order is kept: busiest first when it opens, newcomers below, so a
   switch never moves under the pointer.
@@ -324,7 +324,7 @@ edits (`FIREWALL.md`, "Rules by app"); there is no new enforcement:
   any port and protocol, with the other verdict; if that name already has its own rule it is flipped,
   or removed when the app's other rules alone already give the new verdict, so going back and forth
   never piles up rules. It goes through `lord.fw.addRule` / `updateRule` / `removeRule`, which save
-  `firewall.json` and send `RELOAD`; `lord-netperm` applies it to the next connection.
+  `firewall.json` and send `RELOAD`; `axia-netperm` applies it to the next connection.
 - Domains match the names the system resolver returned (`FIREWALL.md`, "What domain rules can't
   see"): a browser using its own encrypted DNS shows addresses, and those rows write address rules.
 - **Tests:** `server/tests/fw_domain_cases.txt`, 37 cases (exact names, wildcards, CNAME chains,
@@ -333,13 +333,13 @@ edits (`FIREWALL.md`, "Rules by app"); there is no new enforcement:
   `firewall.json` text — and through `decide()` by `fwrule_input_test.mjs`, which also checks the
   switch's add / flip / remove choices. On VM 119 a click on a Firefox ESR destination wrote
   `{"app":"desktop:firefox-esr","dst":"scripts.webcontentassessor.com","action":"deny"}` and
-  `lord-netperm` logged the reload.
+  `axia-netperm` logged the reload.
 
 ### Traffic history (0.8.2)
 
-The chart's zoom reads a history lord-server keeps: bytes received and sent **per minute for 7 days
+The chart's zoom reads a history axia-server keeps: bytes received and sent **per minute for 7 days
 and per hour for 30 days**, for the machine (every interface but `lo`, as the live totals) and for
-each of the user's apps (`lord-netperm`'s per-app counters, the ones the live list uses).
+each of the user's apps (`axia-netperm`'s per-app counters, the ones the live list uses).
 
 | Zoom | Window | One bar |
 |---|---|---|
@@ -357,8 +357,8 @@ window's totals.
 **Privacy.**
 
 - **Whose file:** the apps are the user's own, so the history is the user's:
-  `$XDG_STATE_HOME/lordos/net-history.bin` (default `~/.local/state/lordos/net-history.bin`),
-  mode 0600 in a 0700 folder, written by the user's own lord-server. No root process writes into
+  `$XDG_STATE_HOME/lordos/net-history.bin` (default `~/.local/state/axia/net-history.bin`),
+  mode 0600 in a 0700 folder, written by the user's own axia-server. No root process writes into
   a home folder, and the machine's total is recorded only while that user's session runs.
 - **What it holds:** app ids (`desktop:firefox-esr`, `lpk:…`, `lordos`) and byte counts. **Never an
   address, a domain name or a country**, whatever the "connections" switch says: the long-term
@@ -367,11 +367,11 @@ window's totals.
 - **Switch and Clear:** Settings → Privacy → Monitor → **Keep a traffic history** (on by default;
   `settings.monitor.history`) stops recording at once; **Clear History** deletes the file and what
   is in memory. Nothing leaves the machine.
-- The login screen and isolated apps never record (lord-server only allows it in a user session).
+- The login screen and isolated apps never record (axia-server only allows it in a user session).
 
 **How it is written** (`server/src/monitor/netrec.c`, `nethist.c`):
 
-- every 5 s lord-server reads `/proc/net/dev` and the latest per-app counters `lord-netperm`
+- every 5 s axia-server reads `/proc/net/dev` and the latest per-app counters `axia-netperm`
   already sends it (`COUNTS`, read without waiting from the same socket `lord.fw` uses), and adds
   the difference to the minute in progress (in memory: its totals and one entry per app that
   moved bytes);
@@ -421,7 +421,7 @@ The arrow keys move the selection. Both buttons are disabled while nothing is se
 **Stop** opens a sheet: *Are you sure you want to quit "name"?* with **Quit** (SIGTERM: the process
 is asked to close), **Force Quit** (SIGKILL) and **Cancel**.
 
-- **The user's own processes** (same uid) are signalled by `lord-server` itself with a syscall,
+- **The user's own processes** (same uid) are signalled by `axia-server` itself with a syscall,
   not a program: `lord.monitor.signal(pid, start, 'TERM' | 'KILL')` (`js_monitor.c` →
   `proc_signal()` in `monitor/procctl.c`).
 - **Another user's or root's processes**, only for administrators (sudo/admin/wheel): the root
@@ -443,10 +443,10 @@ is asked to close), **Force Quit** (SIGKILL) and **Cancel**.
   |---|---|---|
   | `init` | PID 1 | "This process starts and runs the whole system." |
   | `kernel` | kernel threads (`PF_KTHREAD`) | "This is part of the Linux kernel." |
-  | `session` | the session's own `lord-server` | "This is your LordOS session. To end it, use Log Out…" |
-  | `system` | `lord-sessiond`, `lord-netperm`, `lord-netd`, `lord-fand`, `lord-vault`, `lord-maild`, `lord-doc`, `lord-media`, the root helper (`lord-admin`), any `lord-server` that is not an isolated app (another session, a terminal holder), PipeWire (`pipewire`, `pipewire-pulse`, `wireplumber`) and the systemd managers | "This process is part of LordOS." |
+  | `session` | the session's own `axia-server` | "This is your LordOS session. To end it, use Log Out…" |
+  | `system` | `lord-sessiond`, `axia-netperm`, `lord-netd`, `axia-fand`, `axia-vault`, `axia-maild`, `axia-doc`, `axia-media`, the root helper (`lord-admin`), any `axia-server` that is not an isolated app (another session, a terminal holder), PipeWire (`pipewire`, `pipewire-pulse`, `wireplumber`) and the systemd managers | "This process is part of LordOS." |
 
-  An isolated `.lpk` app (`lord-server --app <id>`) is not protected: a hung app can be quit. The
+  An isolated `.lpk` app (`axia-server --app <id>`) is not protected: a hung app can be quit. The
   names are matched against the process name and, when it can be read, the executable's name. This
   is a guard against mistakes, not a security boundary (the kernel's rules on who may signal whom
   still apply; a terminal can always `kill` the user's own processes).
@@ -629,7 +629,7 @@ server/src/monitor/conn.c    connections via sock_diag + inode → process
 server/src/monitor/mmdb.c    our own MaxMind DB reader (IP → country)
 server/src/monitor/map.c     vector map, on its own thread
 server/src/monitor/nethist.c the traffic history file (append, query, compaction)
-server/src/monitor/netrec.c  feeds it every 5 s from /proc/net/dev and lord-netperm's counters
+server/src/monitor/netrec.c  feeds it every 5 s from /proc/net/dev and axia-netperm's counters
 server/src/monitor/procctl.c the protected list, proc_signal() (pidfd) and the Get Info JSON
 server/src/monitor/proc_admin.c  the root helper's proc-signal / proc-info (administrators)
 assets/monitor/          land.bin (Natural Earth 1:50m), geoip-country.mmdb.xz (DB-IP Lite)
@@ -673,7 +673,7 @@ read; `awake`: I/O in the last minute).
 No function takes paths or commands: the only arguments are booleans, a language code (letters,
 digits, `-` and `_`, up to 15), a PID with its start time (integers), `'TERM'` or `'KILL'`, and the
 history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
-`lord-server` runs nothing for the Monitor.
+`axia-server` runs nothing for the Monitor.
 
 ### Sampling without slowing the screen
 
@@ -700,13 +700,13 @@ also reads ICMP "ping", raw IP and packet sockets from `/proc/net/{icmp,icmp6,ra
 
 **Bytes per app (0.8.1).** `tcp_info` only exists for TCP and only while the socket is open, so up
 to 0.8.0 UDP — and with it QUIC: HTTP/3, a browser playing a video — counted nothing, and a closed
-connection took its bytes with it (a browser streaming music showed 13 KB). With `lord-netperm`
+connection took its bytes with it (a browser streaming music showed 13 KB). With `axia-netperm`
 running, the bytes and rates of each app and of each of its addresses come from the kernel instead:
 its `cgroup_skb` programs count every packet of the app's sockets, TCP and UDP, both directions
 (`FIREWALL.md`, "Traffic accounting"), and its `COUNTS` notice brings, every second, the app's
 totals since its scope appeared, its rates over the last second and its 64 busiest addresses
 (`lord.fw.poll()`, `firewallState.counts`). An address whose socket already closed keeps its bytes
-and its country (remembered from the last open connection to it). Without `lord-netperm` (or with
+and its country (remembered from the last open connection to it). Without `axia-netperm` (or with
 `STATUS` `bytes: false`) the Monitor falls back to `tcp_info`.
 
 The owning process of each of the user's sockets comes from `/proc/<pid>/fd` (`socket:[inode]`) of
@@ -722,7 +722,7 @@ listening one) or `out`. Scope: `internet`, `lan` (private, CGNAT, link-local, U
 0. (0.8.5) a socket made in one of the session's scopes is that scope's app (`cgApp`, from the
    socket's cgroup id; conn.c reads the session's scope ids every 5 s): Mail's connector, the
    Terminal's programs, an app's own sockets;
-1. `lord-server` itself is **LordOS** (native apps and the Store run inside it);
+1. `axia-server` itself is **LordOS** (native apps and the Store run inside it);
 2. otherwise, the `.desktop` whose `Exec` program (`DesktopApp.bin`) matches the executable,
    `argv[0]` or the process name;
 3. otherwise, `StartupWMClass` equal to the process name;
@@ -804,7 +804,7 @@ four switches, saved in `settings.monitor`, and a button:
 
 **Done (firewall, see `FIREWALL.md`):**
 
-- The **Rule** column is a per-app switch (`lord.fw.setAppRule`). `lord-netperm` applies it in the
+- The **Rule** column is a per-app switch (`lord.fw.setAppRule`). `axia-netperm` applies it in the
   kernel and a denied app gets EPERM.
 - The **allowed** and **denied** counters in the summary and for each app come from the kernel.
 - An app with no open connections but with denied attempts still shows up in the list.
@@ -815,7 +815,7 @@ four switches, saved in `settings.monitor`, and a button:
   the system resolver returned; an app with its own encrypted DNS is held only by address rules.
   Screenshots: [light](firewall-domain-rules-monitor-light.png),
   [dark](firewall-domain-rules-monitor-dark.png).
-- **Host names** without asking anyone (0.8.2): `lord-netperm` learns them from the system resolver
+- **Host names** without asking anyone (0.8.2): `axia-netperm` learns them from the system resolver
   and its notices carry them (`hosts`); the destinations are listed by those names.
 - (0.8.2) Each destination's own switch and the traffic history; (0.8.3) blocking cuts the open
   connections; (0.8.5) the tree, the "Deny silently" mode, the blocklists and LordOS's own components
@@ -833,7 +833,7 @@ four switches, saved in `settings.monitor`, and a button:
 
 VM 123 (4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio_gpu` without 3D, CPU compositing, 1280×800).
 
-### lord-server CPU
+### axia-server CPU
 
 Percentage of one core, 30 s average (`~/thr.sh`, per thread, from `/proc/<pid>/task`). During the
 measurement there were 13 downloads in progress and Firefox open on the Network tab.
@@ -864,7 +864,7 @@ measurement there were 13 downloads in progress and Firefox open on the Network 
 
 VM 118: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio_gpu` without 3D, CPU compositing, 1280×800.
 Network tab in front, five downloads running (one over HTTP/3), arcs to 4–6 countries.
-`lord-server` (whole process, % of one core), 3 × 30 s each:
+`axia-server` (whole process, % of one core), 3 × 30 s each:
 
 | Build | Runs | Mean |
 |---|---|---|
@@ -881,7 +881,7 @@ Network tab in front, five downloads running (one over HTTP/3), arcs to 4–6 co
 - An `lord.setStyle` that only moves an absolutely positioned node (the dots, the map image while
   panning) now just places it again instead of remeasuring every ancestor (`js.c`, like a window
   drag); it made no measurable difference here because painting dominates.
-- **`lord-netperm`** stays at 0.0–0.07 % with traffic flowing (one map read per app per second,
+- **`axia-netperm`** stays at 0.0–0.07 % with traffic flowing (one map read per app per second,
   plus one batch read of the address table only while bytes move).
 - **The kernel side** of the accounting is in `FIREWALL.md` ("Measurements").
 
@@ -892,7 +892,7 @@ minimized over the animated map once (out of five tries) left a grey rectangle o
 the window came back. The cause was not found in time: `test_minimize_damage` in
 `build/engine-test` (a window remounted with a shrinking, fading transform towards a blurred Dock
 and then removed, over moving dots, every frame compared with a full repaint) passes, so it is not
-in the scene's painting as the test models it. Until it is found, lord-server repaints one box per
+in the scene's painting as the test models it. Until it is found, axia-server repaints one box per
 frame, exactly as in 0.8.1; `LORD_DAMAGE=multi` in its environment turns on the several-rectangles
 path described here (with the clipped-subtree skip and the per-rectangle present, which follow the
 same switch). The measurements below are with it on. The 9×9 dot images and the map frame's opaque
@@ -945,7 +945,7 @@ last partial frame and the full one; both are the scene changing between the two
 appears when the scene is still for 7 s. The grey rectangle did not appear in either build, so the
 0.8.2 report is still not reproduced, and several rectangles stay off by default.
 
-Cost, the same sessions with one viewer (`lord-server` whole process, % of one core, 5 × 30 s, two
+Cost, the same sessions with one viewer (`axia-server` whole process, % of one core, 5 × 30 s, two
 batches, the build alternated):
 
 | Scene | Mode | Before | After |
@@ -980,7 +980,7 @@ rectangles under 1 % of the screen.
 The blur rule now leaves out a blurred node that an opaque node painted after it covers whole
 (`blur_hidden` in `paint.c`, the opaque-cover skip's test in paint order; CPU path without a dragged
 window). The same scene, Terminal opened first and Monitor → Network over it, ten downloads, one
-remote viewer, `--profile` over the last 150 frames, and `lord-server`'s CPU (whole process, % of
+remote viewer, `--profile` over the last 150 frames, and `axia-server`'s CPU (whole process, % of
 one core, 5 × 30 s, two batches):
 
 | Mode | Repainted per frame | Paint per frame | CPU before | CPU after |
@@ -1018,7 +1018,7 @@ one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor → Netwo
 
 VM 119: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio` GPU without 3D, CPU compositing, 1280×800.
 Network tab in front, ten slow downloads to mirrors in ten countries (arcs to 8–11 countries, about
-20 moving dots). `lord-server` (whole process, % of one core), 5 × 30 s each, the same session
+20 moving dots). `axia-server` (whole process, % of one core), 5 × 30 s each, the same session
 restarted with each build:
 
 | Build | Dots moving | Reduce motion (still) | Animation's cost |

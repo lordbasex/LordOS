@@ -30,7 +30,7 @@ node tools/build-theme.mjs minimal     # → themes/minimal/theme.bundle.js (abo
 ```
 
 The build also rewrites `code-manifest.json` with the new bundle in it (and removes a
-`code-manifest.sig` that no longer matches). That is what lets a development build of lord-server
+`code-manifest.sig` that no longer matches). That is what lets a development build of axia-server
 load it; a release build will not (see the guide, "Verified code: what happens to a theme that
 LordOS did not sign").
 

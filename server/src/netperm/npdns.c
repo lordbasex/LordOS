@@ -258,7 +258,7 @@ void npdns_tick(NpDns *d) {
             d->last_try = now;
             d->vfd = open_varlink();
             d->vlen = 0;
-            if (d->vfd >= 0) fprintf(stderr, "lord-netperm: names from systemd-resolved (varlink monitor)\n");
+            if (d->vfd >= 0) fprintf(stderr, "axia-netperm: names from systemd-resolved (varlink monitor)\n");
         }
         if (d->vfd >= 0 && d->pfd >= 0) { close(d->pfd); d->pfd = -1; }
     } else {
@@ -266,7 +266,7 @@ void npdns_tick(NpDns *d) {
         if (d->pfd < 0 && now - d->last_try >= 5) {
             d->last_try = now;
             d->pfd = open_packet();
-            if (d->pfd >= 0) fprintf(stderr, "lord-netperm: no systemd-resolved; names from the responses of the servers in /etc/resolv.conf\n");
+            if (d->pfd >= 0) fprintf(stderr, "axia-netperm: no systemd-resolved; names from the responses of the servers in /etc/resolv.conf\n");
             d->last_conf = -100;
         }
     }
@@ -279,7 +279,7 @@ static void varlink_read(NpDns *d) {
         if (d->vlen == VL_MAX) { d->vlen = 0; break; }         /* giant message: discarded */
         ssize_t n = recv(d->vfd, d->vbuf + d->vlen, VL_MAX - d->vlen, 0);
         if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR)) {
-            fprintf(stderr, "lord-netperm: the systemd-resolved monitor was cut off\n");
+            fprintf(stderr, "axia-netperm: the systemd-resolved monitor was cut off\n");
             close(d->vfd);
             d->vfd = -1;
             d->vlen = 0;

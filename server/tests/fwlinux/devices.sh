@@ -1,5 +1,5 @@
 #!/bin/bash
-# devices.sh — "no camera" and "no USB" for Linux apps: lord-netperm's cgroup/dev program
+# devices.sh — "no camera" and "no USB" for Linux apps: axia-netperm's cgroup/dev program
 # (docs/FIREWALL.md, "Linux apps"). Needs a video device (v4l2loopback is enough) and
 # v4l2-ctl. Applies immediately: the next open() of an app that is already running.
 #
@@ -8,7 +8,7 @@
 VID=${1:-$(ls /dev/video* 2>/dev/null | head -1)}
 USB=$(find /dev/bus/usb -type c 2>/dev/null | head -1)
 [ -c "$VID" ] || { echo "no video device"; exit 2; }
-[ -S /run/lordos/netperm.sock ] || { echo "lord-netperm is not running"; exit 2; }
+[ -S /run/lordos/netperm.sock ] || { echo "axia-netperm is not running"; exit 2; }
 APP=desktop:fwdev
 SC=$(scope fwdev)
 OPEN='
@@ -51,7 +51,7 @@ expect ok "$(op "$VID")" "open $VID"
 echo "5. escape with systemd-run --user while the restricted app runs"
 restrict $APP no-camera
 in_scope "$SC" sleep 6 &
-sleep 1.5                               # lord-netperm sees the scope and builds the union
+sleep 1.5                               # axia-netperm sees the scope and builds the union
 got=$(systemd-run --user --quiet --wait --pipe python3 -c "$OPEN" "$VID" 2>&1 | tail -1)
 expect EPERM "$got" "systemd-run --user (user@ union)"
 PWCG=/sys/fs/cgroup/user.slice/user-$U.slice/user@$U.service/session.slice/pipewire.service

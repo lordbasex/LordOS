@@ -251,7 +251,7 @@ static int load_one(const char *json_path, Catalog *out, struct stat *st) {
 const Catalog *catalog_current(void) {
     char user[PATH_MAX];
     const char *home = getenv("HOME");
-    snprintf(user, sizeof user, "%s/.local/share/lordos/catalog/catalog.json", home ? home : "/nonexistent");
+    snprintf(user, sizeof user, "%s/.local/share/axia/catalog/catalog.json", home ? home : "/nonexistent");
     const char *paths[2] = { "/usr/share/lordos/catalog.json", user };
     struct stat st[2];
     int changed = 0;

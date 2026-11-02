@@ -1,0 +1,51 @@
+#!/usr/bin/sh
+# Sourced by Fedora livesys, only when rd.live.image is present.
+# User creation, wheel access and final home relabeling stay with livesys.
+mkdir -p /home/liveuser/.config /var/lib/AccountsService/users
+touch /home/liveuser/.config/gnome-initial-setup-done
+cat > /var/lib/AccountsService/users/liveuser <<'EOF'
+[User]
+Session=axia
+SessionType=wayland
+XSession=axia
+SystemAccount=false
+EOF
+chmod 0600 /var/lib/AccountsService/users/liveuser
+# AccountsService may have cached the user as soon as useradd ran. Set the
+# preferences through its API before GDM starts instead of racing file watches.
+uid=$(id -u liveuser)
+busctl call org.freedesktop.Accounts /org/freedesktop/Accounts \
+    org.freedesktop.Accounts FindUserByName s liveuser >/dev/null
+for property in Session XSession; do
+    busctl call org.freedesktop.Accounts /org/freedesktop/Accounts/User"$uid" \
+        org.freedesktop.Accounts.User Set"$property" s axia
+done
+busctl call org.freedesktop.Accounts /org/freedesktop/Accounts/User"$uid" \
+    org.freedesktop.Accounts.User SetSessionType s wayland
+cat > /etc/gdm/custom.conf <<'EOF'
+[daemon]
+DefaultSession=axia.desktop
+InitialSetupEnable=False
+AutomaticLoginEnable=True
+AutomaticLogin=liveuser
+EOF
+
+# This authorization exists only in the live session, for the Fedora installer.
+# It is equivalent to the rule in Fedora's livesys-gnome script.
+mkdir -p /usr/share/polkit-1/rules.d
+cat > /usr/share/polkit-1/rules.d/20-livesys-axia.rules <<'EOF'
+polkit.addRule(function(action, subject) {
+    if (subject.local && subject.user === 'liveuser' &&
+        action.id.indexOf('org.fedoraproject.pkexec.liveinst') === 0)
+        return 'yes';
+    // Install Axia DE's root helper: the media check and Anaconda's logs (tools/fedora-live)
+    if (subject.local && subject.user === 'liveuser' &&
+        action.id === 'org.freedesktop.policykit.exec' &&
+        action.lookup('program') === '/usr/libexec/axia/axia-install-root')
+        return 'yes';
+});
+EOF
+restorecon -F /usr/share/polkit-1/rules.d/20-livesys-axia.rules
+
+# Live-only autologin must not be copied into a disk installation. The normal
+# configuration is restored by the image's Anaconda post-install script.

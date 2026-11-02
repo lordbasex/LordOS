@@ -1,4 +1,4 @@
-/* testbench.c — lordos-testbench: LordOS's visual test bench (docs/PAPER-VALIDATION.md, "the visual test
+/* testbench.c — axia-testbench: LordOS's visual test bench (docs/PAPER-VALIDATION.md, "the visual test
  * bench"). A plain Wayland client, so it tests the compositor from the outside like any app, and runs on
  * any compositor for comparison. What it shows:
  *
@@ -12,10 +12,10 @@
  *     axis source;
  *   - the Wayland globals the compositor advertises, with their versions.
  *
- *   lordos-testbench                    interactive (F5 runs the protocol checklist again, Pause freezes
+ *   axia-testbench                    interactive (F5 runs the protocol checklist again, Pause freezes
  *                                       the picture: one still frame to compare or capture, Ctrl+L
  *                                       locks the pointer for 10 s)
- *   lordos-testbench --auto [seconds]   runs for a while (default 5 s), prints a JSON report and exits
+ *   axia-testbench --auto [seconds]   runs for a while (default 5 s), prints a JSON report and exits
  *   --gl                                 also starts the 3D view (G does it interactively)
  *
  * It reads no files and talks to nothing but the compositor. */
@@ -194,7 +194,7 @@ static void buf_free(Buf *b) {
 static int buf_make(Buf *b, int w, int h) {
     buf_free(b);
     size_t stride = (size_t)w * 4, size = stride * (size_t)h;
-    int fd = memfd_create("lordos-testbench", MFD_CLOEXEC);
+    int fd = memfd_create("axia-testbench", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, (off_t)size)) { if (fd >= 0) close(fd); return -1; }
     void *p = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) { close(fd); return -1; }
@@ -714,7 +714,7 @@ static void report(FILE *o) {
     BenchStats fs;
     bench_frames_stats(&ft, &fs);
     double hz = bench_refresh_hz(&pr) > 0 ? bench_refresh_hz(&pr) : out_refresh_mhz / 1000.0;
-    fprintf(o, "{\"tool\":\"lordos-testbench\",\"v\":1,\"at\":%lld,\"window\":[%d,%d],\"frames\":%lu,\"fps\":%.2f,\"frameMsAvg\":%.3f,\"frameMsMax\":%.3f,"
+    fprintf(o, "{\"tool\":\"axia-testbench\",\"v\":1,\"at\":%lld,\"window\":[%d,%d],\"frames\":%lu,\"fps\":%.2f,\"frameMsAvg\":%.3f,\"frameMsMax\":%.3f,"
                "\"frameMsP50\":%.3f,\"frameMsP99\":%.3f,\"missedBudget\":%d,"
                "\"noFreeBuffer\":%lu,\"presentation\":%s,\"presented\":%lu,\"discarded\":%lu,\"refreshHz\":%.3f,\"vblankSkips\":%lu,\"zeroCopy\":%lu,"
                "\"keyboard\":%s,\"pointer\":%s,\"repeat\":[%d,%d],\"globals\":[",
@@ -741,7 +741,7 @@ static void report(FILE *o) {
     fprintf(o, "]}\n");
 }
 
-/* The last report, for System Information's Checks: ~/.local/state/lordos/testbench.json (bench_save). */
+/* The last report, for System Information's Checks: ~/.local/state/axia/testbench.json (bench_save). */
 static void save_report(void) { bench_save("testbench", report); }
 
 int main(int argc, char **argv) {
@@ -754,18 +754,18 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && atof(argv[i + 1]) > 0) auto_s = atof(argv[++i]);
             if (auto_s > 600) auto_s = 600;
         } else {
-            fprintf(stderr, "usage: lordos-testbench [--gl] [--auto [seconds]]\n");
+            fprintf(stderr, "usage: axia-testbench [--gl] [--auto [seconds]]\n");
             return 2;
         }
     }
     signal(SIGPIPE, SIG_IGN);           /* a clipboard reader that hangs up must not end the bench (toolkits do the same) */
     dpy = wl_display_connect(NULL);
-    if (!dpy) { fprintf(stderr, "lordos-testbench: no Wayland compositor (WAYLAND_DISPLAY)\n"); return 1; }
+    if (!dpy) { fprintf(stderr, "axia-testbench: no Wayland compositor (WAYLAND_DISPLAY)\n"); return 1; }
     xkb = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     registry = wl_display_get_registry(dpy);
     wl_registry_add_listener(registry, &reg_listener, NULL);
     wl_display_roundtrip(dpy);
-    if (!comp || !shm || !wm) { fprintf(stderr, "lordos-testbench: the compositor lacks wl_compositor, wl_shm or xdg_wm_base\n"); return 1; }
+    if (!comp || !shm || !wm) { fprintf(stderr, "axia-testbench: the compositor lacks wl_compositor, wl_shm or xdg_wm_base\n"); return 1; }
     if (presentation) wp_presentation_add_listener(presentation, &pres_listener, NULL);
     surf = wl_compositor_create_surface(comp);
     xsurf = xdg_wm_base_get_xdg_surface(wm, surf);
@@ -773,7 +773,7 @@ int main(int argc, char **argv) {
     top = xdg_surface_get_toplevel(xsurf);
     xdg_toplevel_add_listener(top, &top_listener, NULL);
     xdg_toplevel_set_title(top, "Test Bench");
-    xdg_toplevel_set_app_id(top, "lordos-testbench");
+    xdg_toplevel_set_app_id(top, "axia-testbench");
     xdg_toplevel_set_min_size(top, 640, 480);
     if (decoman) {
         struct zxdg_toplevel_decoration_v1 *deco = zxdg_decoration_manager_v1_get_toplevel_decoration(decoman, top);
@@ -793,7 +793,7 @@ int main(int argc, char **argv) {
         }
         if (auto_s > 0 && ft.frames && now_ms() - start > auto_s * 1000) break;
     }
-    if (wl_display_get_error(dpy) && !checks_done) fprintf(stderr, "lordos-testbench: the connection ended (error %d)\n", wl_display_get_error(dpy));
+    if (wl_display_get_error(dpy) && !checks_done) fprintf(stderr, "axia-testbench: the connection ended (error %d)\n", wl_display_get_error(dpy));
     if (auto_s > 0) report(stdout);
     if (ft.frames) save_report();
     for (int i = 0; i < 2; i++) buf_free(&bufs[i]);

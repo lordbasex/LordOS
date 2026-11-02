@@ -1,7 +1,7 @@
 // Cleaner — explains what uses the disk and helps remove what can safely go (docs/CLEANER.md). The rule is
 // analyse, review, plan, confirm, execute, verify: a scan only reads, and the app holds candidate ids and display
-// paths, never authority. Scanning runs in the sandboxed lord-clean helper; plans and their execution stay in
-// lord-server (lord.clean). Sections appear only for what works.
+// paths, never authority. Scanning runs in the sandboxed axia-clean helper; plans and their execution stay in
+// axia-server (lord.clean). Sections appear only for what works.
 import {
   View, cleaner, wm, windows, useStore, useAppWindow, useSettings, userDirs, t as tr, formatBytes, spacing,
 } from '@lordos/sdk';

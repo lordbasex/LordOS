@@ -1,5 +1,5 @@
 /* smbauth.h — what listing a server's shares after signing in needs (docs/FILES.md, "Network"): NTLMv2
- * and SMB 2 signing, in lord-lan only. Pure functions over bytes, tested with the protocol's own vectors. */
+ * and SMB 2 signing, in axia-lan only. Pure functions over bytes, tested with the protocol's own vectors. */
 #ifndef LORD_LAN_SMBAUTH_H
 #define LORD_LAN_SMBAUTH_H
 

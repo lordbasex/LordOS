@@ -117,9 +117,9 @@ def title_card(text, sub, path):
     for i in range(H):                                            # violet gradient
         c = int(30 + 40 * i / H)
         d.line([(0, i), (W, i)], fill=(c, 18, 70 + int(50 * i / H)))
-    crown = os.path.join(os.path.dirname(__file__), '../../assets/icons/lordos-crown.png')
-    if os.path.exists(crown):
-        ic = Image.open(crown).convert('RGBA').resize((120, 120))
+    mark = os.path.join(os.path.dirname(__file__), '../../assets/icons/axia-mark.png')
+    if os.path.exists(mark):
+        ic = Image.open(mark).convert('RGBA').resize((120, 120))
         img.paste(ic, ((W - 120) // 2, 200), ic)
     f1, f2 = font(54, True), font(26)
     tw = d.textlength(text, font=f1)

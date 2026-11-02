@@ -3,7 +3,7 @@
  *
  *   DBUS_SESSION_BUS_ADDRESS=<a private test bus> build/notifyd-cli <seconds>
  *
- * Loads ~/.config/lordos/firewall.json into the store lord.fw uses (sec/restrict.h), owns the
+ * Loads ~/.config/axia/firewall.json into the store lord.fw uses (sec/restrict.h), owns the
  * name on that bus and prints one line per notification it would show ("notify {...}") or close.
  * A test tool: never installed. */
 #include "hw/notifyd.h"
@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     int secs = argc > 1 ? atoi(argv[1]) : 10;
     const char *home = getenv("HOME");
     char path[4096], err[200] = "";
-    snprintf(path, sizeof path, "%s/.config/lordos/firewall.json", home ? home : "/nonexistent");
+    snprintf(path, sizeof path, "%s/.config/axia/firewall.json", home ? home : "/nonexistent");
     FwStore *s = fw_store_new();
     if (!s || fw_load(s, path, err, sizeof err) < 0) fprintf(stderr, "notifyd-cli: %s: %s (no restrictions)\n", path, err);
     restrict_set_store(s);

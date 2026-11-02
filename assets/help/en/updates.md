@@ -6,7 +6,7 @@ keywords: update, updates, packages, debian, security
 ---
 # Updates
 
-LordOS is built on Debian and updates itself with its own package engine, which verifies Debian's
+Axia DE is built on Debian and updates itself with its own package engine, which verifies Debian's
 signatures before using anything.
 
 - [Settings → Updates](settings:updates) checks for updates and shows how many there are.

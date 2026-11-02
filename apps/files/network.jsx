@@ -45,7 +45,7 @@ function kinds(h) {
 }
 
 // Connecting: who connects, then the folders that server shows them, so nobody has to know a share's name. It's only
-// asked for when the server can't list them. The password goes to lord-lan for the list, to the action for the mount
+// asked for when the server can't list them. The password goes to axia-lan for the list, to the action for the mount
 // and, only if asked, to the keyring.
 export function ConnectSheet({ ask, onClose, onMounted }) {
   const t = useTheme();

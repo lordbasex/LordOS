@@ -1,6 +1,6 @@
-/* mirror.c — the lord-server session as seen from the remote desktop.
+/* mirror.c — the axia-server session as seen from the remote desktop.
  *
- * lord-server (already as the session's user) listens on $XDG_RUNTIME_DIR/lordos/remote.sock;
+ * axia-server (already as the session's user) listens on $XDG_RUNTIME_DIR/axia/remote.sock;
  * it only accepts root (lord-sessiond: the monitor and the network bridge) and the same user (SO_PEERCRED). Through it:
  *   - the screen goes to the session's shared live encoder (media/mstream.c) for every viewer that
  *     subscribed to the video (RP_VIDEO); the encoded frames go back to each one (RP_VFRAME);
@@ -334,7 +334,7 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         }
         break;
     case RP_KEYRING:
-        /* lord-sessiond: the password just verified opens the session's keyring (lord-vault) */
+        /* lord-sessiond: the password just verified opens the session's keyring (axia-vault) */
         if (c->uid == 0 && n > 0 && n <= 1024) {
             char p[1025];
             memcpy(p, d, n);
@@ -444,7 +444,7 @@ int mirror_start(int w, int h, const MirrorInput *in) {
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return -1;
     char dir[200];
-    snprintf(dir, sizeof dir, "%s/lordos", rt);
+    snprintf(dir, sizeof dir, "%s/axia", rt);
     mkdir(dir, 0700);
     struct stat st;
     if (lstat(dir, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) return -1;

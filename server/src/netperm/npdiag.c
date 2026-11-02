@@ -1,4 +1,4 @@
-/* npdiag.c — the sock_diag client of lord-netperm (see npdiag.h). */
+/* npdiag.c — the sock_diag client of axia-netperm (see npdiag.h). */
 #include "netperm/npdiag.h"
 
 #include <errno.h>

@@ -15,5 +15,5 @@ En [Ajustes → Idioma y región](settings:language):
   [Reloj](help:clock).
 - **Paquetes del idioma:** diccionarios, manuales y fuentes de esa escritura.
 
-LordOS también muestra bien el árabe, el hebreo y otras escrituras complejas: con un idioma de
+Axia DE también muestra bien el árabe, el hebreo y otras escrituras complejas: con un idioma de
 derecha a izquierda, toda la interfaz se espeja.

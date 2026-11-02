@@ -46,7 +46,7 @@ Pull requests with unsigned commits can't be merged.
   helpers or the sandbox), plus `node tools/i18n-check.mjs`, which also runs
   `tools/brand-check.mjs` and `tools/err-check.mjs`.
 - **Follow AGENTS.md** for the architecture and code rules of each part.
-- **Brand rules:** use the LordOS name, the crown logo and Lumo as described in
-  [docs/LORDOS-BRAND.md](docs/LORDOS-BRAND.md), and don't use third-party brand or product names in
+- **Brand rules:** Axia DE does not use the LordOS name, crown logo or Lumo (the LordOS trademark
+  policy reserves them; "based on LordOS" is fine), and don't use third-party brand or product names in
   the interface.
 - Be kind: everyone here follows the [code of conduct](CODE_OF_CONDUCT.md).

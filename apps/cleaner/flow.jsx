@@ -1,4 +1,4 @@
-// The way every section acts: a plan built in lord-server, a confirmation short enough to read, the
+// The way every section acts: a plan built in axia-server, a confirmation short enough to read, the
 // execution, and a result that leads with a summary.
 import { View, Text, addListener, cleaner, t as tr, formatBytes, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';

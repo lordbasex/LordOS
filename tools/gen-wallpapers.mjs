@@ -2,7 +2,7 @@
 // Builds the LordOS wallpaper collection (assets/wallpapers/) from the original PNGs.
 //
 // Usage: node tools/gen-wallpapers.mjs <source dir>
-//   <source dir>/<category>/lordos-<name>.png              (category: signature, lumo, cosmos)
+//   <source dir>/<category>/lordos-<name>.png              (category: horizons, cosmos)
 //   <source dir>/<category>/lordos-<name>@<W>x<H>.png      optional higher-resolution variant
 //
 // For each original it writes, with ffmpeg (decode, Lanczos scaling) and cjpeg (libjpeg-turbo):
@@ -14,7 +14,7 @@
 // drop lordos-<name>@3840x2160.png next to the original and run this again.
 //
 // JPEG at quality 90 with 4:4:4 chroma (the art has fine violet and gold detail that 4:2:0 blurs),
-// baseline + optimized Huffman tables. stb_image (lord-server) decodes it; WebP isn't supported.
+// baseline + optimized Huffman tables. stb_image (axia-server) decodes it; WebP isn't supported.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,10 +23,10 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const src = process.argv[2];
 if (!src || !fs.statSync(src, { throwIfNoEntry: false })?.isDirectory()) {
-  console.error('usage: node tools/gen-wallpapers.mjs <source dir with signature/ lumo/ cosmos/>');
+  console.error('usage: node tools/gen-wallpapers.mjs <source dir with horizons/ cosmos/>');
   process.exit(2);
 }
-const CATEGORIES = ['signature', 'lumo', 'cosmos'];
+const CATEGORIES = ['horizons', 'cosmos'];
 const THUMB = [320, 180];
 const out = path.join(root, 'assets', 'wallpapers');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lordos-wp-'));

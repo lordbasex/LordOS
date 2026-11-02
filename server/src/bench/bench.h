@@ -1,4 +1,4 @@
-/* bench.h — measurement pieces shared by lordos-testbench (src/testbench) and LordBench (0.8.6,
+/* bench.h — measurement pieces shared by axia-testbench (src/testbench) and LordBench (0.8.6,
  * docs/BENCHMARK.md): the clock, frame-time statistics against a refresh budget, presentation
  * accounting, input-to-screen latency, the GL renderer's kind and the reports' state file. Pure C with
  * libc and libm only: no Wayland, no GL (the GL scene is glscene.h). */
@@ -47,7 +47,7 @@ const char *bench_gl_kind(const char *renderer);
 
 /* ---- reports ---- */
 void bench_json_str(FILE *o, const char *s);            /* a JSON string, quoted and escaped */
-/* writes $XDG_STATE_HOME/lordos/<name>.json (or ~/.local/state/lordos/<name>.json) whole, renamed into
+/* writes $XDG_STATE_HOME/axia/<name>.json (or ~/.local/state/axia/<name>.json) whole, renamed into
  * place; name is [a-z0-9-]; 0 or -1 */
 int bench_save(const char *name, void (*write)(FILE *));
 

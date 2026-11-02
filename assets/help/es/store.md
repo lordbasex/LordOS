@@ -7,7 +7,7 @@ keywords: tienda, instalar, apps, paquetes, debian, actualizar, quitar
 ---
 # Tienda
 
-Para instalar, actualizar y quitar apps: las de LordOS (`.lpk`) y las de Debian.
+Para instalar, actualizar y quitar apps: las de Axia DE (`.lpk`) y las de Debian.
 
 - **Descubrir:** las apps de escritorio de Debian por categoría, con su ícono y su descripción en
   tu idioma.

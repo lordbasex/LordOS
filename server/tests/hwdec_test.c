@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* hwdec.c's other neighbours in lord-server, not used by these tests */
+/* hwdec.c's other neighbours in axia-server, not used by these tests */
 int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid) { (void)kind; (void)params; (void)fds; (void)nfds; (void)pid; return -1; }
 const char *media_home(void) { return "/nonexistent"; }
 const char *media_hwaccel(void) { return "vaapi"; }

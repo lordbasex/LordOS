@@ -255,7 +255,7 @@ int main(void) {
     mk("sub"); mk("sub/deep"); put("sub/deep/c.txt", "c\n");
     mk(".cache"); put(".cache/junk", "x");
     mk("Excluded"); put("Excluded/x", "x");
-    mk(".config"); mk(".config/lordos"); put(".config/lordos/settings.json", "{\"language\":\"es\"}\n");
+    mk(".config"); mk(".config/axia"); put(".config/axia/settings.json", "{\"language\":\"es\"}\n");
     char p[PATH_MAX], q[PATH_MAX], buf[256];
     snprintf(p, sizeof p, "%s/escape", H); symlink("/etc/passwd", p);
     snprintf(p, sizeof p, "%s/relative", H); symlink("a.txt", p);
@@ -383,12 +383,12 @@ int main(void) {
     snap_path(id3, ".local/share/applications", plant, sizeof plant); mkdir(plant, 0700);
     snap_path(id3, ".local/share/applications/evil.desktop", plant, sizeof plant);
     FILE *f = fopen(plant, "w"); if (f) { fputs("[Desktop Entry]\nExec=rm -rf ~\n", f); fclose(f); }
-    put(".config/lordos/settings.json", "{\"language\":\"pt\"}\n");
+    put(".config/axia/settings.json", "{\"language\":\"pt\"}\n");
     rc = bk_restore(M, id3, "", H, 1, " (restored)", &o);
     CHECK(rc == 0, "restore everything (%s)", o.error);
     snprintf(p, sizeof p, "%s/.local/share/applications/evil.desktop", H);
     CHECK(!exists(p), "does not write .desktop");
-    snprintf(p, sizeof p, "%s/.config/lordos/settings.json", H);
+    snprintf(p, sizeof p, "%s/.config/axia/settings.json", H);
     CHECK(!slurp(p, buf, sizeof buf) && strstr(buf, "pt"), "does not overwrite settings.json");
     CHECK(o.skipped >= 2, "protected paths skipped (%llu)", (unsigned long long)o.skipped);
     /* links: the link is restored, not its target; never descend through a link in the backup */

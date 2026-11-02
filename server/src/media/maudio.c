@@ -1,11 +1,11 @@
-/* maudio.c — media audio in lord-server (see aring.h and docs/MEDIA.md).
+/* maudio.c — media audio in axia-server (see aring.h and docs/MEDIA.md).
  *
- * Playback: lord-media writes PCM into a shared-memory ring that lord-server creates;
+ * Playback: axia-media writes PCM into a shared-memory ring that axia-server creates;
  * here we own the PipeWire stream and, when PipeWire asks for bytes (REQUEST), they're copied from the
  * ring, without waiting for anyone. After each GET_PLAYBACK_LATENCY reply, which byte is being heard
- * and when is written to the ring (seqlock): the video clock in lord-media.
- * Recording: the capture stream belongs to lord-server (after the microphone permission) and it's
- * written into a ring that lord-media reads. That way lord-media never has the PipeWire socket. */
+ * and when is written to the ring (seqlock): the video clock in axia-media.
+ * Recording: the capture stream belongs to axia-server (after the microphone permission) and it's
+ * written into a ring that axia-media reads. That way axia-media never has the PipeWire socket. */
 #include "media_int.h"
 #include "aring.h"
 #include "mpulse.h"
@@ -90,7 +90,7 @@ MAudio *maudio_open(int rec, const char *app, const char *title, const char *rol
     a->ring_fd = -1;
     a->pa.fd = -1;
     a->volume = 1;
-    snprintf(a->app, sizeof a->app, "%s", app && *app ? app : "LordOS");
+    snprintf(a->app, sizeof a->app, "%s", app && *app ? app : "Axia DE");
     snprintf(a->title, sizeof a->title, "%s", title && *title ? title : a->app);
     if (rec) snprintf(a->source, sizeof a->source, "%s", role_or_source ? role_or_source : "");
     else snprintf(a->role, sizeof a->role, "%s", role_or_source && *role_or_source ? role_or_source : "video");

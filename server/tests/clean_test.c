@@ -1,4 +1,4 @@
-/* clean_test.c — Cleaner's lord-server side and the real lord-clean helper (build/lord-clean, next to
+/* clean_test.c — Cleaner's axia-server side and the real axia-clean helper (build/axia-clean, next to
  * this test), in throwaway folders under the system's temporary folder only, never a real home
  * folder: the rule table, the walk (links, `..`, mounts, limits, names, protected paths), what is
  * accepted from the helper, plans, execution against changed files, hard links and cancel. */
@@ -212,10 +212,10 @@ static void test_rules(void) {
     BAD(root, ""); BAD(root, "/etc"); BAD(root, "../x"); BAD(root, ".cache/../x"); BAD(root, ".cache//x"); BAD(root, ".cache/x/");
     BAD(root, ".cache");                            /* the whole cache folder is not a rule */
     BAD(root, ".config"); BAD(root, "Documents"); BAD(root, ".local/share");
-    BAD(root, ".cache/lordos");                     /* holds a protected path */
-    BAD(root, ".config/lordos");
-    BAD(root, ".cache/lordos/fwlists");             /* is one */
-    BAD(root, ".local/share/lordos/vault/sub");     /* is inside one */
+    BAD(root, ".cache/axia");                     /* holds a protected path */
+    BAD(root, ".config/axia");
+    BAD(root, ".cache/axia/fwlists");             /* is one */
+    BAD(root, ".local/share/axia/vault/sub");     /* is inside one */
     BAD(pattern, ""); BAD(pattern, "a*b*"); BAD(pattern, "../x"); BAD(pattern, "a/b"); BAD(pattern, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     BAD(min_age_days, -1); BAD(text_key, "cleaner.rule.other"); BAD(text_key, NULL);
     BAD(risk, (CleanRisk)9); BAD(action, (CleanAction)9);
@@ -306,7 +306,7 @@ static void test_symlinks(void) {
     poll_free(&p);
 }
 
-/* what lord-server takes from the helper: it trusts nothing */
+/* what axia-server takes from the helper: it trusts nothing */
 static void test_records(void) {
     wipe();
     struct stat st;
@@ -383,12 +383,12 @@ static void test_protected(void) {
     /* a table no real build can have: a root that holds a protected path, to prove the walk refuses it */
     static CleanRule wide;
     wide = good();
-    wide.root = ".cache/lordos";
+    wide.root = ".cache/axia";
     wide.pattern = "*";
     wipe();
-    put(".cache/lordos/fwlists/list.png", "blocklist");
-    put(".cache/lordos/fwlists/sub/deep.png", "blocklist");
-    put(".cache/lordos/plain.png", "fine");
+    put(".cache/axia/fwlists/list.png", "blocklist");
+    put(".cache/axia/fwlists/sub/deep.png", "blocklist");
+    put(".cache/axia/plain.png", "fine");
     clean_rules_override(&wide, 1);
     Poll p;
     run_scan(&p);
@@ -397,7 +397,7 @@ static void test_protected(void) {
     CHECK(!has_candidate("list.png") && !has_candidate("deep.png"));
     poll_free(&p);
 
-    /* the same record forced past the helper: lord-server drops it by itself */
+    /* the same record forced past the helper: axia-server drops it by itself */
     struct stat st;
     if (stat(H, &st)) abort();
     char rec[512];
@@ -409,13 +409,13 @@ static void test_protected(void) {
     /* a candidate that became protected: the plan and the execution both refuse it */
     wipe();
     put(T "/a.png", "a");
-    put(".cache/lordos/fwlists/a.png", "must stay");
+    put(".cache/axia/fwlists/a.png", "must stay");
     Poll q;
     int scan = run_scan(&q);
     poll_free(&q);
     static CleanRule moved;
     moved = good();
-    moved.root = ".cache/lordos/fwlists";
+    moved.root = ".cache/axia/fwlists";
     clean_rules_override(&moved, 1);
     plan_all(scan, &q);
     CHECK(count(q.plan, "denied") == 1 && count(q.plan, "ready") == 0);
@@ -426,7 +426,7 @@ static void test_protected(void) {
     CHECK(count(q.plan, "denied") == 1 && count(q.plan, "done") == 0);
     poll_free(&q);
     clean_rules_override(&base, 1);
-    CHECK(exists(".cache/lordos/fwlists/a.png") && exists(T "/a.png"));
+    CHECK(exists(".cache/axia/fwlists/a.png") && exists(T "/a.png"));
 
     /* a rule that stopped offering the action, and one the file is too new for */
     static CleanRule noact, young;
@@ -971,8 +971,8 @@ static void test_rules_on_disk(void) {
     put(".cache/yarn/v6/a", "x");
     put(".cache/go-build/00/a", "x");
     put(".local/share/pnpm/store/v3/a", "x");
-    put(".cache/lordos/thumbs/a.png", "x");
-    put(".cache/lordos/fwlists/list", "must stay");
+    put(".cache/axia/thumbs/a.png", "x");
+    put(".cache/axia/fwlists/list", "must stay");
     put(".npm/other", "must stay");
     put(".cargo/registry/cache/a", "x");
     put(".gradle/caches/a", "x");
@@ -1003,7 +1003,7 @@ static void test_rules_on_disk(void) {
     CHECK(count(p.plan, "done") == 7);
     poll_free(&p);
     CHECK(!exists(".cache/pip/http/a") && exists(".local/share/Trash/files/a") && exists(".cargo/registry/cache/a") && exists("Downloads/old.iso"));
-    CHECK(exists(".npm/other") && exists(".cache/lordos/fwlists/list"));
+    CHECK(exists(".npm/other") && exists(".cache/axia/fwlists/list"));
     clean_cancel(1);
     clean_rules_override(&base, 1);
 }
@@ -1125,7 +1125,7 @@ static void test_tree(void) {
     int fd = open(f, O_WRONLY | O_CREAT, 0600);
     CHECK(fd >= 0 && !ftruncate(fd, 8 << 20));
     close(fd);
-    put(".local/share/lordos/vault/secret.png", "must not be listed");
+    put(".local/share/axia/vault/secret.png", "must not be listed");
     put("Skip/hidden.bin", "x");
     put_size("Skip/huge.bin", 2 << 20, 'e');
     CleanOpts o = { .min_size = 1 << 20, .exclude = { "Skip" }, .nexclude = 1 };
@@ -1207,10 +1207,10 @@ static void test_tree(void) {
     CHECK(j && strstr(j, "\"action\":\"clean\"") && !strstr(j, "Pictures") && !strstr(j, H) && !strstr(j, "big.png"));
     free(j);
     char hist[PATH_MAX * 2];
-    path_of(hist, sizeof hist, ".local/state/lordos/cleaner-history.json");
-    CHECK(exists(".local/state/lordos/cleaner-history.json"));
+    path_of(hist, sizeof hist, ".local/state/axia/cleaner-history.json");
+    CHECK(exists(".local/state/axia/cleaner-history.json"));
     clean_history_clear();
-    CHECK(!exists(".local/state/lordos/cleaner-history.json"));
+    CHECK(!exists(".local/state/axia/cleaner-history.json"));
     /* options: a volume and a folder C doesn't know */
     CHECK(clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .volume = "mount:9" }) == CLEAN_E_BADFOLDER);
     CHECK(clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .volume = "/etc" }) == CLEAN_E_BADFOLDER);
@@ -1220,7 +1220,7 @@ static void test_tree(void) {
     free(j);
 }
 
-/* a scan limited to one source: lord-server reports the root as read-only with no action */
+/* a scan limited to one source: axia-server reports the root as read-only with no action */
 static void test_tree_limits(void) {
     wipe();
     for (int i = 0; i < 300; i++) { char n[64]; snprintf(n, sizeof n, "many/d%d/f.bin", i); put(n, "x"); }
@@ -1530,7 +1530,7 @@ static void test_images(void) {
     CHECK(!strcmp(p.state, "done") && num(p.scan, "groups") == 0 && num(p.scan, "candidates") == 0);
     poll_free(&p);
 
-    /* what lord-server refuses from the helper */
+    /* what axia-server refuses from the helper */
     struct stat st;
     CHECK(!stat(H, &st));
     char dev[64];
@@ -1607,11 +1607,11 @@ static void test_downloads(void) {
     CHECK(!exists("Descargas/film.part") && exists(".local/share/Trash/files/film.part"));
     /* a value that couldn't be a rule's root falls back to the English name, never a wider place */
     static const char *const bad[] = { "XDG_DOWNLOAD_DIR=\"$HOME/../other\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/.cache\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/\"\n",
-                                       "XDG_DOWNLOAD_DIR=\"$HOME/.config/lordos/mail\"\n", "XDG_DOWNLOAD_DIR=\"/etc\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/a\"b\"\n", NULL };
+                                       "XDG_DOWNLOAD_DIR=\"$HOME/.config/axia/mail\"\n", "XDG_DOWNLOAD_DIR=\"/etc\"\n", "XDG_DOWNLOAD_DIR=\"$HOME/a\"b\"\n", NULL };
     put(".cache/x.part", "x");
-    put(".config/lordos/mail/x.part", "x");
+    put(".config/axia/mail/x.part", "x");
     set_old(".cache/x.part");
-    set_old(".config/lordos/mail/x.part");
+    set_old(".config/axia/mail/x.part");
     for (int i = 0; bad[i]; i++) {
         put(".config/user-dirs.dirs", bad[i]);
         run_scan(&p);
@@ -1648,13 +1648,13 @@ static void test_leftovers(void) {
     path_of(sys, sizeof sys, "assets");
     clean_set_sysapps(sys);
     put("assets/sysapps/passwords/manifest.json", "{}");
-    put_size(".local/share/lordos/appdata/gone-app/data.bin", 30000, 'a');
-    put(".local/share/lordos/appdata/gone-app/sub/more", "x");
-    put(".local/share/lordos/appdata/installed-app/data", "keep");
-    put(".local/share/lordos/apps/installed-app/manifest.json", "{}");
-    put(".local/share/lordos/appdata/passwords/state", "keep");
-    put(".local/share/lordos/appdata/Not_An_Id/data", "keep");
-    put(".local/share/lordos/appdata/loose-file", "keep");
+    put_size(".local/share/axia/appdata/gone-app/data.bin", 30000, 'a');
+    put(".local/share/axia/appdata/gone-app/sub/more", "x");
+    put(".local/share/axia/appdata/installed-app/data", "keep");
+    put(".local/share/axia/apps/installed-app/manifest.json", "{}");
+    put(".local/share/axia/appdata/passwords/state", "keep");
+    put(".local/share/axia/appdata/Not_An_Id/data", "keep");
+    put(".local/share/axia/appdata/loose-file", "keep");
     Poll p;
     int scan = run_scan(&p);
     CHECK(!strcmp(p.state, "done"));
@@ -1678,16 +1678,16 @@ static void test_leftovers(void) {
     CHECK(count(p.plan, "ready") == 1 && json_bool(p.plan, "named", 0) == 1 && num(p.plan, "deleteItems") == 0);
     poll_free(&p);
     /* the app comes back between the plan and the action: its folder stays */
-    put(".local/share/lordos/apps/gone-app/manifest.json", "{}");
+    put(".local/share/axia/apps/gone-app/manifest.json", "{}");
     CHECK(clean_execute(plan) == plan);
     wait_job(&p);
     CHECK(count(p.plan, "done") == 0 && count(p.plan, "skipped") == 1);
     poll_free(&p);
-    CHECK(exists(".local/share/lordos/appdata/gone-app/data.bin"));
+    CHECK(exists(".local/share/axia/appdata/gone-app/data.bin"));
     char f[PATH_MAX * 2];
-    path_of(f, sizeof f, ".local/share/lordos/apps/gone-app/manifest.json");
+    path_of(f, sizeof f, ".local/share/axia/apps/gone-app/manifest.json");
     CHECK(!unlink(f));
-    path_of(f, sizeof f, ".local/share/lordos/apps/gone-app");
+    path_of(f, sizeof f, ".local/share/axia/apps/gone-app");
     CHECK(!rmdir(f));
     /* to the Trash, whole, and back */
     scan = run_scan(&p);
@@ -1700,8 +1700,8 @@ static void test_leftovers(void) {
     wait_job(&p);
     CHECK(count(p.plan, "done") == 1);
     poll_free(&p);
-    CHECK(!exists(".local/share/lordos/appdata/gone-app") && exists(".local/share/Trash/files/gone-app/sub/more") && exists(".local/share/lordos/appdata/passwords/state"));
-    CHECK(!clean_restore(plan, want) && exists(".local/share/lordos/appdata/gone-app/data.bin"));
+    CHECK(!exists(".local/share/axia/appdata/gone-app") && exists(".local/share/Trash/files/gone-app/sub/more") && exists(".local/share/axia/appdata/passwords/state"));
+    CHECK(!clean_restore(plan, want) && exists(".local/share/axia/appdata/gone-app/data.bin"));
     /* a theme without the folder of system apps can't tell either, and passwords would look removed */
     char empty[PATH_MAX * 2];
     path_of(empty, sizeof empty, "no-such-assets");
@@ -2083,7 +2083,7 @@ static void test_map(void) {
     CHECK(total > 0 && docs > 0);
     char f[PATH_MAX * 2];
     struct stat st;
-    path_of(f, sizeof f, ".cache/lordos/cleaner-map.txt");
+    path_of(f, sizeof f, ".cache/axia/cleaner-map.txt");
     CHECK(!stat(f, &st) && (st.st_mode & 07777) == 0600);
     time_t before = time(NULL);
     j = clean_saved();
@@ -2111,18 +2111,18 @@ static void test_map(void) {
         "lordos-cleaner-map 1 100 1 home\n/home/x\n0 -1 1 1 1 \n3 0 1 1 1 name\nnot a line\n",
     };
     for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
-        put(".cache/lordos/cleaner-map.txt", bad[i]);
+        put(".cache/axia/cleaner-map.txt", bad[i]);
         clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .saved = 1 });
         wait_job(&p);
         CHECK(!strcmp(p.state, "failed") && p.error && !strcmp(p.error, "nosaved"));
         poll_free(&p);
     }
-    put(".cache/lordos/cleaner-map.txt", "something else\n");
+    put(".cache/axia/cleaner-map.txt", "something else\n");
     j = clean_saved();
     CHECK(j && !strcmp(j, "null"));
     free(j);
     clean_forget_saved();
-    CHECK(!exists(".cache/lordos/cleaner-map.txt"));
+    CHECK(!exists(".cache/axia/cleaner-map.txt"));
     clean_start_kind(CLEAN_KIND_TREE, &(CleanOpts){ .saved = 1 });
     wait_job(&p);
     CHECK(!strcmp(p.state, "failed") && p.error && !strcmp(p.error, "nosaved"));
@@ -2130,10 +2130,10 @@ static void test_map(void) {
     /* the setting is off: nothing stays */
     tree_scan(&(CleanOpts){ .remember = 1 }, &p);
     poll_free(&p);
-    CHECK(exists(".cache/lordos/cleaner-map.txt"));
+    CHECK(exists(".cache/axia/cleaner-map.txt"));
     tree_scan(&(CleanOpts){ 0 }, &p);
     poll_free(&p);
-    CHECK(!exists(".cache/lordos/cleaner-map.txt"));
+    CHECK(!exists(".cache/axia/cleaner-map.txt"));
     clean_cancel(1);
     clean_rules_override(&base, 1);
 }

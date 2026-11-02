@@ -1,4 +1,4 @@
-/* vstb.h — stb_image (vendored) inside lord-vault, with memory in the secrets arena
+/* vstb.h — stb_image (vendored) inside axia-vault, with memory in the secrets arena
  * (smem.h): a decompressed KDBX or the photo of a QR code never goes through the libc heap.
  * The stb symbols stay static (they do not clash with those of ui/stb.c). */
 #ifndef LORD_VAULT_VSTB_H

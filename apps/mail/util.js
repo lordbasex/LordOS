@@ -34,7 +34,7 @@ export function formatSize(n) {
 export const openPath = (path, name) => openFileWithApps(path, name);
 export { revealPath };
 
-// The same rule as lord-maild (mime_safe_filename): a sender-chosen attachment name becomes a
+// The same rule as axia-maild (mime_safe_filename): a sender-chosen attachment name becomes a
 // plain basename: no path parts, no leading dots, no control, bidi-override or FAT-reserved
 // characters, at most 200 bytes. Never empty.
 export function safeName(name) {

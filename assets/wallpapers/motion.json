@@ -3,50 +3,6 @@
  "base": "https://raw.githubusercontent.com/lordbasex/LordOS-wallpapers/main",
  "items": [
   {
-   "id": "crown",
-   "section": "dynamic",
-   "name": "Crystal Crown",
-   "author": "Federico Pereira, LordOS",
-   "license": "MIT",
-   "licenseUrl": "https://opensource.org/license/mit",
-   "source": "https://lordos.org",
-   "variants": [
-    {
-     "name": "1080.hevc",
-     "codec": "hevc",
-     "w": 1920,
-     "h": 1080,
-     "fps": 60.0,
-     "seconds": 6.0,
-     "file": "crown/1080.hevc.mp4",
-     "size": 1529048,
-     "sha256": "78c79ceb6c1869e711c7df25a2f2955a800b2978d155a175d0d47f2ae56c7451"
-    },
-    {
-     "name": "2160.hevc",
-     "codec": "hevc",
-     "w": 3840,
-     "h": 2160,
-     "fps": 60.0,
-     "seconds": 6.0,
-     "file": "crown/2160.hevc.mp4",
-     "size": 3314029,
-     "sha256": "8e2fc72f1be285070c6d82f10bf78bc81f8f398cbc94f8cfe7290c2b53bb132a"
-    },
-    {
-     "name": "1080.h264",
-     "codec": "h264",
-     "w": 1920,
-     "h": 1080,
-     "fps": 60.0,
-     "seconds": 6.0,
-     "file": "crown/1080.h264.mp4",
-     "size": 3125809,
-     "sha256": "48bb24797460ed413e469e46d70846ba01647140f7430f61c86281fef155dc41"
-    }
-   ]
-  },
-  {
    "id": "landscape-canyon",
    "section": "landscape",
    "name": "Canyon clouds",

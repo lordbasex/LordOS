@@ -1,4 +1,4 @@
-/* npdiag.h — lord-netperm's sock_diag client (NETLINK_SOCK_DIAG): lists the machine's TCP and
+/* npdiag.h — axia-netperm's sock_diag client (NETLINK_SOCK_DIAG): lists the machine's TCP and
  * UDP sockets with their cgroup and destroys one (SOCK_DESTROY, the kernel's tcp_abort /
  * udp_abort: the app gets ECONNABORTED and TCP sends a reset). It is how the firewall cuts the
  * connections an app opened before a rule changed (docs/FIREWALL.md, "Existing connections are

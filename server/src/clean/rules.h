@@ -47,7 +47,7 @@ const char *clean_action_name(CleanAction a);
 int clean_root_fits(const char *root, const char *rel, char *star, size_t n);
 
 #ifdef CLEAN_TEST
-void clean_rules_override(const CleanRule *t, int n);   /* tests only: not in lord-server */
+void clean_rules_override(const CleanRule *t, int n);   /* tests only: not in axia-server */
 #endif
 
 #endif

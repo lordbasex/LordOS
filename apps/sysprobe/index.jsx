@@ -1,6 +1,6 @@
 // Sandbox Probe — System Information's test app (docs/BENCHMARK.md, "Checks"). It runs as an isolated
-// process (`lord-server --app sysprobe`), where app mode tries what its sandbox must refuse
-// (server/src/app/probe.c) and reports to lord-server before any of this code would load. This
+// process (`axia-server --app sysprobe`), where app mode tries what its sandbox must refuse
+// (server/src/app/probe.c) and reports to axia-server before any of this code would load. This
 // component only shows if the app couldn't start isolated.
 import { View, Text, useTheme, useLocale, typeScale, spacing } from '@lordos/sdk';
 import { Icon as SysInfoIcon } from '../sysinfo/index.jsx';

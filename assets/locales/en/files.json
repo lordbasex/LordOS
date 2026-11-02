@@ -30,7 +30,7 @@
   "group.kind.doc": "Document",
   "group.kind.folder": "Folder",
   "group.kind.image": "Image",
-  "group.kind.lpk": "LordOS app",
+  "group.kind.lpk": "Axia DE app",
   "group.kind.other": "Document",
   "group.kind.pdf": "PDF document",
   "group.kind.text": "Text",
@@ -73,7 +73,7 @@
   "kind.doc": "Document",
   "kind.folder": "Folder",
   "kind.image": "Image",
-  "kind.lpk": "LordOS app",
+  "kind.lpk": "Axia DE app",
   "kind.other": "Document",
   "kind.pdf": "PDF document",
   "kind.text": "Text",
@@ -249,7 +249,7 @@
   "connect.help.rdp": "Remote desktop, in the RDP app",
   "connect.err.empty": "Type an address.",
   "connect.err.invalid": "That address is not valid.",
-  "connect.err.scheme": "LordOS does not know {scheme}://.",
+  "connect.err.scheme": "Axia DE does not know {scheme}://.",
   "connect.err.port": "Shared folders use their standard port.",
   "connect.err.name": "“{name}” is not on the Network page. Open it to search, or use the address.",
   "connect.err.noClient": "No installed app opens {scheme}:// addresses.",
@@ -295,5 +295,5 @@
   "fav.gone": "{name} isn't there any more",
   "pin.add": "Pin to Locations",
   "pin.remove": "Remove from Locations",
-  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name."
+  "net.offLink": "This server is outside your local network, so Axia DE doesn’t list its folders. Type the folder’s name."
 }

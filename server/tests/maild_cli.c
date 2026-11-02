@@ -1,9 +1,9 @@
-/* maild_cli.c — drives lord-maild the way lord-server does (mailc.c), from a terminal, for
+/* maild_cli.c — drives axia-maild the way axia-server does (mailc.c), from a terminal, for
  * manual tests against local servers (docs/MAIL.md, "Testing"). Not part of `make test`.
  *
  *   build/maild-cli '{"op":"status"}' '{"op":"list","acct":"ana","folder":"INBOX"}' --wait 5
  * Each request waits for its answer; events are printed as they come. The accounts come from
- * ~/.config/lordos/mail/accounts.json; a password can be given with {"op":"auth",…}. */
+ * ~/.config/axia/mail/accounts.json; a password can be given with {"op":"auth",…}. */
 #include "mail/mailc.h"
 
 #include <stdio.h>
@@ -39,7 +39,7 @@ static int wait_for(int id, double seconds) {
 
 int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &t_start);
-    if (mail_start()) { fprintf(stderr, "lord-maild did not start (is it next to this binary?)\n"); return 1; }
+    if (mail_start()) { fprintf(stderr, "axia-maild did not start (is it next to this binary?)\n"); return 1; }
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--wait") && i + 1 < argc) { wait_for(0, atof(argv[++i])); continue; }
         if (!strcmp(argv[i], "--file") && i + 2 < argc) {

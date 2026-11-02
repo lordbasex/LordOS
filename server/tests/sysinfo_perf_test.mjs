@@ -21,7 +21,7 @@ const res = (over = {}) => ({
 });
 const ref = { lordbench: 1, results: { 'cpu.sha256.1': { value: 100 }, 'cpu.matmul.1': { value: 2 }, 'mem.latency': { value: 90 } } };
 
-// every measurement of a peak run (lord-bench's and lord-media's) is in exactly one category
+// every measurement of a peak run (axia-bench's and axia-media's) is in exactly one category
 const ids = CATEGORIES.flatMap((c) => c.ids);
 eq('32 measurements, no repeats', [ids.length, new Set(ids).size], [32, 32]);
 eq('references have every measurement or say it was not measured', REFERENCES.every((r) => ids.every((id) => (r.results[id] && r.results[id].value > 0) !== (r.notMeasured || []).includes(id))), true);

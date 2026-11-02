@@ -1,4 +1,4 @@
-/* netperm_bench.c — how much lord-netperm adds to connect() (docs/FIREWALL.md, "Measurements").
+/* netperm_bench.c — how much axia-netperm adds to connect() (docs/FIREWALL.md, "Measurements").
  *
  *   cc -O2 -o netperm-bench tests/netperm_bench.c
  *   ./netperm-bench [times]            (runs inside an app's scope, see netperm_measure.sh)

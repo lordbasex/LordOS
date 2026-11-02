@@ -1,4 +1,4 @@
-/* appclient.c — «modo app»: `lord-server --app <id>` corre una app .lpk instalada como su propio
+/* appclient.c — «modo app»: `axia-server --app <id>` corre una app .lpk instalada como su propio
  * proceso, aislado (server/src/sec/sandbox.c), y se dibuja como un CLIENTE Wayland del compositor
  * de LordOS. El tema le pone su marco (pide decoración del servidor, como las apps Qt), aparece
  * en el Dock y se ve por el escritorio remoto, igual que cualquier app.
@@ -6,9 +6,9 @@
  * Reusa el motor de interfaz propio (ui/: nodos, layout, pintado, texto) y QuickJS (js.c), igual
  * que el compositor, pero sin KMS ni evdev: dibuja en un búfer de memoria compartida (wl_shm) y
  * recibe la entrada del compositor. Las llamadas lord.* que no son de dibujo van por el broker
- * (ui/js_broker.c), y lord-server verifica los permisos de cada una (server/src/sec).
+ * (ui/js_broker.c), y axia-server verifica los permisos de cada una (server/src/sec).
  *
- * Lo lanza lord-server (tercera excepción acotada a «el servidor no ejecuta comandos», ver
+ * Lo lanza axia-server (tercera excepción acotada a «el servidor no ejecuta comandos», ver
  * AGENTS.md): el único argumento es un id validado de un paquete instalado. */
 #include "app.h"
 #include "../sec/codesig.h"
@@ -323,7 +323,7 @@ static void p_button(void *d, struct wl_pointer *p, uint32_t s, uint32_t t, uint
     if (button >= 0 && nptr < 8) { ptr_down[nptr] = st == WL_POINTER_BUTTON_STATE_PRESSED; ptr_btn[nptr] = button; nptr++; }
     dispatch_pointer();
 }
-/* touchpad (axis_source finger): scroll fino con fases, como en lord-server (docs/TRACKPAD.md) */
+/* touchpad (axis_source finger): scroll fino con fases, como en axia-server (docs/TRACKPAD.md) */
 static int axis_src = -1, fine_on;
 static void p_source(void *d, struct wl_pointer *p, uint32_t src) { (void)d; (void)p; axis_src = (int)src; }
 static void p_stop(void *d, struct wl_pointer *p, uint32_t t, uint32_t a) {
@@ -470,7 +470,7 @@ static int manifest_pair(const char *dir, const char *key, int *w, int *h) {
 
 int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     t_start = now_ms();
-    if (!lpk_valid_id(id)) { fprintf(stderr, "lord-server --app: invalid id\n"); return 2; }
+    if (!lpk_valid_id(id)) { fprintf(stderr, "axia-server --app: invalid id\n"); return 2; }
     /* the process name is the app's id ("mail"), not "exe" (it was started through /proc/self/exe):
      * ps, top and the Monitor's process list show which app it is */
     prctl(PR_SET_NAME, id, 0, 0, 0);
@@ -485,14 +485,14 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         /* verified system code (sec/codesig.c): the manifest is read and checked before the sandbox */
         codesig_init(assets);
         if ((sys = app_package_dir(id, assets, dir, sizeof dir)) < 0) {
-            fprintf(stderr, "lord-server --app: app '%s' is not installed\n", id);
+            fprintf(stderr, "axia-server --app: app '%s' is not installed\n", id);
             return 2;
         }
     }
     /* carpeta de datos de la app (la única que puede escribir) */
     const char *home = getenv("HOME");
     char data[PATH_MAX], parent[PATH_MAX - 48];
-    snprintf(parent, sizeof parent, "%s/.local/share/lordos/appdata", home ? home : "/nonexistent");
+    snprintf(parent, sizeof parent, "%s/.local/share/axia/appdata", home ? home : "/nonexistent");
     mkdir(parent, 0700);
     snprintf(data, sizeof data, "%s/%.40s", parent, id);
     mkdir(data, 0700);
@@ -505,7 +505,7 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         snprintf(hd, sizeof hd, "%s", theme_bundle);
         char *sl = strrchr(hd, '/');
         if (sl) *sl = 0; else snprintf(hd, sizeof hd, ".");
-        snprintf(lg, sizeof lg, "%s/.local/share/lordos/locales", home ? home : "/nonexistent");
+        snprintf(lg, sizeof lg, "%s/.local/share/axia/locales", home ? home : "/nonexistent");
         const char *pro[] = { fonts, hd, "/usr/share/fonts", lg, NULL };
         SandboxConfig psb = { .id = id, .pkg_dir = dir, .data_dir = data, .runtime_dir = getenv("XDG_RUNTIME_DIR"), .ro_extra = pro, .network = 0 };
         int hpid = -1, hfd = probe_helper_start(data, &hpid);   /* single-threaded, nothing loaded yet */
@@ -513,16 +513,16 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
         return probe_main(home ? home : "/nonexistent", data, mask, hfd, hpid);
     }
 
-    if (text_init(fonts)) { fprintf(stderr, "lord-server --app: no fonts\n"); return 1; }
+    if (text_init(fonts)) { fprintf(stderr, "axia-server --app: no fonts\n"); return 1; }
     { char a[PATH_MAX * 2]; snprintf(a, sizeof a, "%.*s/..", (int)(sizeof a - 4), fonts); js_sys_set_assets(a); }
     kb_set("us", "");
 
     dpy = wl_display_connect(NULL);
-    if (!dpy) { fprintf(stderr, "lord-server --app: could not connect to the compositor\n"); return 1; }
+    if (!dpy) { fprintf(stderr, "axia-server --app: could not connect to the compositor\n"); return 1; }
     struct wl_registry *reg = wl_display_get_registry(dpy);
     wl_registry_add_listener(reg, &reg_listener, NULL);
     wl_display_roundtrip(dpy);
-    if (!comp || !shm || !wm) { fprintf(stderr, "lord-server --app: the compositor lacks a required interface\n"); return 1; }
+    if (!comp || !shm || !wm) { fprintf(stderr, "axia-server --app: the compositor lacks a required interface\n"); return 1; }
 
     app_id_str = id;
     int mw = 640, mh = 480, nw = 0, nh = 0;
@@ -541,7 +541,7 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     char *slash = strrchr(hostdir, '/');
     if (slash) *slash = 0; else snprintf(hostdir, sizeof hostdir, ".");
     char langs[PATH_MAX];                    /* paquetes de idioma del usuario (árabe, francés…): solo lectura */
-    snprintf(langs, sizeof langs, "%s/.local/share/lordos/locales", home ? home : "/nonexistent");
+    snprintf(langs, sizeof langs, "%s/.local/share/axia/locales", home ? home : "/nonexistent");
     const char *ro[] = { fonts, hostdir, "/usr/share/fonts", langs, NULL };   /* + fuentes del sistema (emoji, respaldo por escritura) */
     SandboxConfig sb = { .id = id, .pkg_dir = dir, .data_dir = data, .runtime_dir = getenv("XDG_RUNTIME_DIR"), .ro_extra = ro, .network = net };
     /* the local time zone is read now (libc keeps it): /etc/localtime and the zone files are
@@ -550,8 +550,8 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     sandbox_apply(&sb);
 
     int jr = js_init_app(theme_bundle, id);
-    if (jr == JS_REFUSED) fprintf(stderr, "lord-server --app: the app host was modified and was not loaded (recovery screen)\n");
-    else if (jr) { fprintf(stderr, "lord-server --app: could not load the app\n"); return 1; }
+    if (jr == JS_REFUSED) fprintf(stderr, "axia-server --app: the app host was modified and was not loaded (recovery screen)\n");
+    else if (jr) { fprintf(stderr, "axia-server --app: could not load the app\n"); return 1; }
     int recovered = jr == JS_REFUSED;
 
     int wfd = wl_display_get_fd(dpy);

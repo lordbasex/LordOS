@@ -20,7 +20,7 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 | Date & Time | with Language & Region | `apps/settings/DateTime.jsx`, `hw/hw.c` (timedated) |
 | Default Apps | with Keyboard and Trackpad | `apps/settings/DefaultApps.jsx`, `sdk/defaults.js`, `hw/defaults.c`, `hw/mimeapps.c` |
 | Energy (Battery) | with Privacy | `apps/settings/Power.jsx`, `hw/power.c`, `hw/ppd.c` |
-| Cooling | after Energy | `apps/settings/Cooling.jsx`, `sdk/cooling.jsx`, `ui/js_fan.c` → `lord-fand` (`server/src/fan/`); see `FANS.md` |
+| Cooling | after Energy | `apps/settings/Cooling.jsx`, `sdk/cooling.jsx`, `ui/js_fan.c` → `axia-fand` (`server/src/fan/`); see `FANS.md` |
 | Board firmware | after Cooling, only on a Raspberry Pi 5 (BCM2712: Pi 5, Pi 500, CM5) | `apps/settings/Firmware.jsx`, `hw/hw_admin.c` (`rpi-eeprom-status`, `rpi-eeprom-update`) |
 
 Shared pieces: `apps/settings/ui.jsx` (a row with a hint, a pop-up button, the page header) on top of
@@ -50,7 +50,7 @@ the time fields keep `direction: 'ltr'`.
            rpi-eeprom-status (read-only), rpi-eeprom-update, boot-test, boot-test-cancel (LordBench's
            boot time test, docs/BENCHMARK.md)
 
- Cooling: lord.fan (ui/js_fan.c) ── /run/lordos/fand.sock ── lord-fand (root service, src/fan)
+ Cooling: lord.fan (ui/js_fan.c) ── /run/lordos/fand.sock ── axia-fand (root service, src/fan)
 ```
 
 Nothing polls. Hotplugged displays, batteries and chargers arrive as kernel uevents (one
@@ -79,7 +79,7 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
 
   ![Keep these display settings](settings-displays-revert.png)
   ![The same in light mode](settings-displays-revert-light.png)
-- **Saved per display.** "Keep" writes `~/.config/lordos/displays.json`:
+- **Saved per display.** "Keep" writes `~/.config/axia/displays.json`:
 
   ```json
   { "main": "RHT-1234-QEMU_Monitor", "mirror": false, "captureAll": false,
@@ -161,7 +161,7 @@ and signals dispatched to handlers.
   (`StartDiscovery`/`StopDiscovery`), pair (then `Trusted = true` and `Connect`, as other desktop systems do),
   connect, disconnect and forget (`Adapter1.RemoveDevice`). A soft rfkill block is lifted with the
   closed action `bt-unblock`.
-- **Pairing agent.** lord-server exports `org.bluez.Agent1` at `/org/lordos/BluetoothAgent` with
+- **Pairing agent.** axia-server exports `org.bluez.Agent1` at `/org/lordos/BluetoothAgent` with
   the `KeyboardDisplay` capability and becomes the default agent. PIN, passkey, numeric comparison
   and authorization requests are drawn by the system (`BluetoothPrompt`, outside any app) and
   answered with `lord.bt.answer`; PINs are 1–16 alphanumerics and passkeys 0–999999, validated in C.
@@ -212,7 +212,7 @@ with real hardware** (no controller in the VMs).
   daemon, writes the cpufreq governor (`performance`, `schedutil`/`ondemand`, `powersave`) and the
   energy/performance preference of every policy.
 - **Display off, lock, sleep.** Seconds of inactivity (keyboard, mouse, touchpad, remote input),
-  different on battery and on power. lord-server keeps the deadlines (`display_timeout` in the
+  different on battery and on power. axia-server keeps the deadlines (`display_timeout` in the
   poll timeout): screen off is the connector's DPMS (`kms_dpms`; nothing is drawn while it is off),
   "require password" locks the session through `lord-sessiond` N seconds after the screen goes off,
   and sleep runs the closed action `power-suspend` (`systemctl suspend`). The VM is never put to
@@ -229,13 +229,13 @@ with real hardware** (no controller in the VMs).
 
 ![Cooling](fans-settings.png)
 
-Fans by temperature, from the first boot, by the root service `lord-fand` (all the details in
+Fans by temperature, from the first boot, by the root service `axia-fand` (all the details in
 `FANS.md`). The page draws the detected hardware (the fan turns with the real duty and the fins warm
 with the temperature), the profile (System, Quiet, Balanced, Performance, Always on, Custom), the
 curve with its hysteresis bands and the live point (the custom curve's points are dragged on it),
 **Heavy work** (full speed for 30 min, 1 h, 2 h or until turned off) and, on a Raspberry Pi 5, the
 **Case** (`rpi-case`). Without controllable fans it says so ("No controllable fans", or "Fans
-managed by the firmware" with their RPM). Only administrators change anything: `lord-fand` checks
+managed by the firmware" with their RPM). Only administrators change anything: `axia-fand` checks
 the peer and reports `canChange`. Monitor has the same view read-only, with a history and a
 "Full speed for 30 min" button.
 

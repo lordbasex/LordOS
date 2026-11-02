@@ -4,7 +4,7 @@
  *   - state: adapters and devices from ObjectManager.GetManagedObjects, kept up to date by the
  *     InterfacesAdded / InterfacesRemoved / PropertiesChanged signals (no polling);
  *   - actions: power, discovery, pair (then trust and connect), connect, disconnect, forget;
- *   - pairing agent: lord-server exports org.bluez.Agent1 at /org/lordos/BluetoothAgent
+ *   - pairing agent: axia-server exports org.bluez.Agent1 at /org/lordos/BluetoothAgent
  *     ("KeyboardDisplay") and registers it as the default agent. PIN and passkey requests are
  *     shown by the system (sdk/bluetooth.js) and answered with bt_answer(). Calls to the agent
  *     are only accepted from org.bluez's unique bus name.

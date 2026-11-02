@@ -1,10 +1,10 @@
-/* lm_out.c — frame output from lord-media to lord-server (player and camera).
+/* lm_out.c — frame output from axia-media to axia-server (player and camera).
  *
  * Three slots in a sealed memfd (MM_RING). Each frame is scaled only once to the size at
- * which it's shown (the box lord-server announces with MM_SIZE, fitted without distortion) and
- * written into a free slot; MM_FRAME says which one. lord-server answers MM_ACK when it starts
+ * which it's shown (the box axia-server announces with MM_SIZE, fitted without distortion) and
+ * written into a free slot; MM_FRAME says which one. axia-server answers MM_ACK when it starts
  * showing it: from that moment the ones sent before are free. If there's no free slot
- * (lord-server behind), the frame is dropped instead of waiting. */
+ * (axia-server behind), the frame is dropped instead of waiting. */
 #include "lm.h"
 
 #include <math.h>
@@ -19,7 +19,7 @@ typedef struct {
     int gen, w, h, fd;
     uint8_t *map;
     size_t slot_bytes;
-    int server_cur;                 /* slot lord-server is showing (ACK) */
+    int server_cur;                 /* slot axia-server is showing (ACK) */
     int64_t pending[MP_RING_SLOTS]; /* send order of the ones sent without ACK (0 = free) */
     int64_t seq;
     struct SwsContext *sws;
@@ -62,7 +62,7 @@ static int ring_make(int w, int h) {
     O.fd = -1;
     O.slot_bytes = (size_t)w * h * 4;
     void *m;
-    O.fd = lm_memfd(O.slot_bytes * MP_RING_SLOTS, &m, "lord-media-frames");
+    O.fd = lm_memfd(O.slot_bytes * MP_RING_SLOTS, &m, "axia-media-frames");
     if (O.fd < 0) return -1;
     O.map = m;
     O.w = w;

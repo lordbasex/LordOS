@@ -1,5 +1,5 @@
 // remotedesk.jsx — the RDP and VNC apps: saved computers, a form, and the remote screen drawn by the engine as a media
-// node. There is no client window: lord-rdesk paints a shared picture and takes the input from here. Addresses are in
+// node. There is no client window: axia-rdesk paints a shared picture and takes the input from here. Addresses are in
 // settings; passwords only in the keyring. See docs/FILES.md, "Remote desktop".
 import { createElement as h, useEffect, useRef, useState } from 'react';
 import { View, Text, MediaView, addListener } from '@lordos/runtime';

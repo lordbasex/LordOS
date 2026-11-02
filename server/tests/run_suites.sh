@@ -3,7 +3,7 @@
 # them (the other suites run inside their build rule). Called from server/ by the Makefile:
 #
 #   make -C server test         sh tests/run_suites.sh        self-contained suites, a few seconds
-#   make -C server test-full    sh tests/run_suites.sh full   also the helpers (lord-media, lord-doc),
+#   make -C server test-full    sh tests/run_suites.sh full   also the helpers (axia-media, axia-doc),
 #                                                             the sandbox and the external comparisons
 #
 # Exits with 1 if any suite fails. A suite whose tool or data isn't installed is reported as
@@ -136,9 +136,6 @@ EOF
     else
         skip "wasm-test, wasm-js-test" "clang, lld (wasm-ld) and wabt (wat2wasm) to build tests/wasm"
     fi
-    run "net-test crypto" build/net-test crypto
-    run "net-test errors" build/net-test errors
-    run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
@@ -177,9 +174,6 @@ EOF
     # the Store's "Suggested for your computer" rules (assets/store/suggestions.json)
     if have node; then run "suggest-engine-test (sdk/suggestengine.js)" node tests/suggest_engine_test.mjs
     else skip "suggest-engine-test" "node"; fi
-    # the LordOS Imager's shared logic (apps/imager/core) and its first-run files checked by the C parser
-    if have node; then run "imager-core-test (apps/imager/core)" node tests/imager_core_test.mjs
-    else skip "imager-core-test" "node"; fi
     # the overlay scroll bar's model (sdk/scrollbar.js): geometry, thumb hit-test and drag, fade timing
     if have node; then run "scrollbar-model-test (sdk/scrollbar.js)" node tests/scrollbar_model_test.mjs
     else skip "scrollbar-model-test" "node"; fi
@@ -199,12 +193,6 @@ EOF
     # checks (tools/hwreport/lib.mjs), the catalogue and its snapshot, the Compatibility panel's community data
     if have node; then run "hwreport-test (tools/hwreport, apps/sysinfo/share.js)" node tests/hwreport_test.mjs
     else skip "hwreport-test" "node"; fi
-    # (0.8.7) Store → Updates' names for LordOS's data packages (apps/store/syspkg.js): lordos-hwdata as a dated list
-    if have node; then run "store-syspkg-test (apps/store/syspkg.js)" node tests/store_syspkg_test.mjs
-    else skip "store-syspkg-test" "node"; fi
-    # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
-    if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
-    else skip "livestart-test" "node"; fi
     # (0.8.5) Settings → Displays' arrangement (sdk/displaylayout.js): numbers, magnetic snap, valid drops
     if have node; then run "display-layout-test (sdk/displaylayout.js)" node tests/display_layout_test.mjs
     else skip "display-layout-test" "node"; fi
@@ -217,7 +205,7 @@ EOF
 full() {
     echo "== slow and environment-dependent suites (tests/run_suites.sh full)"
     # media helper: a generated WAV (one second of a 440 Hz tone), probe, waveform and its confinement
-    if [ -x build/lord-media ] && have python3; then
+    if [ -x build/axia-media ] && have python3; then
         python3 -I - "$T/tone.wav" <<'EOF'
 import math, struct, sys, wave
 w = wave.open(sys.argv[1], 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000)
@@ -226,10 +214,10 @@ EOF
         run "media-test probe" build/media-test probe "$T/tone.wav"
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
-    else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    else skip "media-test" "build/axia-media (FFmpeg -dev packages) and python3"; fi
     # document helper: malicious archives and the confinement
-    if [ -x build/lord-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (lord-doc)" sh tests/doc_evil.sh
-    else skip "doc_evil.sh" "build/lord-doc (Poppler and libarchive -dev packages) and python3"; fi
+    if [ -x build/axia-doc ] && [ -x build/doc-test ] && have python3; then run "doc_evil.sh (axia-doc)" sh tests/doc_evil.sh
+    else skip "doc_evil.sh" "build/axia-doc (Poppler and libarchive -dev packages) and python3"; fi
     # sandbox: Landlock and seccomp of the running kernel
     if [ -r /sys/kernel/security/lsm ] && grep -q landlock /sys/kernel/security/lsm; then
         run "sandbox-test (app)" build/sandbox-test

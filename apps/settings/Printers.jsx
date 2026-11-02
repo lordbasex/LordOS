@@ -1,5 +1,5 @@
 // Settings → Printers & Scanners. CUPS manages the queue and the drivers; this screen
-// speaks IPP to it over its local socket with lord-server's own client (lord.print). Adding,
+// speaks IPP to it over its local socket with axia-server's own client (lord.print). Adding,
 // removing and choosing the default are authorized by the CUPS policy (lpadmin group, which
 // administrators have). Driverless printing (IPP Everywhere) printers and eSCL scanners on the network
 // are found through mDNS. See docs/PRINTING.md.

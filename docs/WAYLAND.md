@@ -1,6 +1,6 @@
 # Linux apps in LordOS (Wayland)
 
-lord-server is also a **Wayland compositor**: GTK, Qt and any other app that speaks Wayland open
+axia-server is also a **Wayland compositor**: GTK, Qt and any other app that speaks Wayland open
 as LordOS windows, inside the theme, next to the native apps. There's no X server of its own, Weston,
 wlroots or Mutter: only `libwayland-server` (it serializes the protocol; it's been in the dependency policy
 since M1) and the code `wayland-scanner` generates from the `wayland-protocols` XML files. The
@@ -8,7 +8,7 @@ compositor lives in `server/src/wl/wl.c`.
 Apps that only speak X11 open through Xwayland, started on demand, with our own X window manager
 (see "X11 apps (Xwayland)" below).
 
-## Screenshots (VM, real lord-server)
+## Screenshots (VM, real axia-server)
 
 | | |
 |---|---|
@@ -106,7 +106,7 @@ shell. The user approved it for M7. Limits:
   Anything else (an unlisted group, a bad name, no `Exec`) is refused. Tested by
   `build/apps-actions-test` (in `make test`).
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
-  descriptors. Its output goes to `~/.cache/lordos/apps.log`, which is trimmed when it passes 1 MB.
+  descriptors. Its output goes to `~/.cache/axia/apps.log`, which is trimmed when it passes 1 MB.
 - A `.desktop` can't be created from JS:
   - `lord.fs.write` rejects `~/.local/share/applications` and `~/.config/autostart`, also
     through a symlink (see `EDITOR.md`);
@@ -119,7 +119,7 @@ shell. The user approved it for M7. Limits:
   the id rules above are unchanged. The two folders' modification times are compared in nanoseconds,
   so an app installed in the same second the list was last read also shows up.
 - **Force Quit (0.8.5):** `lord.wayland.kill(surface)` sends SIGKILL only to the Wayland client that
-  owns that surface, a process of the same user, never `lord-server`; X11 windows are only asked to
+  owns that surface, a process of the same user, never `axia-server`; X11 windows are only asked to
   close (`WINDOWS.md`, "The Window menu, the app menu and Force Quit").
 
 Icons: the `hicolor` PNG (64, 48, 128… px) or the one in `/usr/share/pixmaps` is used. Apps that
@@ -149,7 +149,7 @@ There's a single one for the whole session:
 code, paths and images, with the source (the app_id of the Linux app that copied). It's stored in
 the home folder and survives reboots. Image previews are first stored in
 `$XDG_RUNTIME_DIR/lordos` (the last 10 are kept) and the history copies them to
-`~/.local/share/lordos/clipboard`. Whatever an app marks as secret
+`~/.local/share/axia/clipboard`. Whatever an app marks as secret
 (`x-kde-passwordManagerHint`, like KeePassXC) can be pasted, but isn't stored. Details in
 `SPOTLIGHT.md`.
 
@@ -168,10 +168,10 @@ the home folder and survives reboots. Image previews are first stored in
 5. After each frame is presented, the apps' `frame` callbacks are answered (so they don't draw
    faster than the screen).
 
-Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53 MB of RSS
+Memory: with foot, FeatherPad and GTK Demo open, axia-server goes from ~51 to 53 MB of RSS
 (each window keeps a copy of its buffer).
 
-**Moving and resizing** (`xdg_toplevel.move`/`resize`) is tracked by lord-server in C, with no JS
+**Moving and resizing** (`xdg_toplevel.move`/`resize`) is tracked by axia-server in C, with no JS
 per frame, just like LordOS windows; while it lasts, the app doesn't receive the pointer. All
 Linux windows, including those with their own frame, have the theme's invisible borders for
 resizing (see `WINDOWS.md`).
@@ -200,11 +200,11 @@ An app chooses; LordOS **prefers** its own frame and honors the app's answer.
 - **`org_kde_kwin_server_decoration`** (GTK 3, so Firefox and Mousepad): default «server»;
   `request_mode(client)` is answered «client».
 - **Live.** When an open window changes mode (Chromium's «Use system title bar and borders»,
-  Firefox's «Title Bar»), lord-server sends JS a `deco` event (`{ csd }`) and `sdk/wayland.js` sets
+  Firefox's «Title Bar»), axia-server sends JS a `deco` event (`{ csd }`) and `sdk/wayland.js` sets
   `args.csd` on the **same** window (`wm.setArgs`): place, size (the outer frame stays where it was;
   the content grows or shrinks by the theme's bar and the app gets a `configure`), maximized state,
   focus and Dock entry don't change.
-- **Before 0.8.4** lord-server answered `SERVER_SIDE` whatever the app asked. Chromium with its own
+- **Before 0.8.4** axia-server answered `SERVER_SIDE` whatever the app asked. Chromium with its own
   bar then drew its tab strip and buttons and LordOS put its frame on top: two bars.
 - Tested with `build/deco-client` (`server/tests/deco_client.c`, run inside a session): every mode
   request in both protocols, before and after mapping, with the `xdg_surface.configure` that must
@@ -248,7 +248,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   bar, with the window buttons in LordOS's order and side (it reads the same `button-layout`), drawn
   in Firefox's own style: Firefox draws those buttons itself, not with the GTK theme, so they aren't
   traffic lights. Back to the LordOS frame: Customize Toolbar → «Title Bar». Firefox draws with GTK
-  3, which doesn't speak xdg-decoration: lord-server also advertises
+  3, which doesn't speak xdg-decoration: axia-server also advertises
   **`org_kde_kwin_server_decoration_manager`** (KDE's), with «server» as the default mode, so GTK 3
   windows without their own bar (Firefox with «Title Bar», Mousepad) ask LordOS for the frame. The
   protocol tables are hand-written in `wl.c`, without plasma-wayland-protocols' XML.
@@ -263,7 +263,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   theme, so the button stays 16 px and the circle is a 13 px radial gradient inside it; measured on
   the VM: 12–13 px circles, 21 px from center to center, like LordOS's own frame.
 - **GTK 4 / libadwaita (GNOME).** They read the mode, the accent and the button order from
-  **`org.freedesktop.portal.Settings`**. lord-server itself serves it (`server/src/ui/portal.c`)
+  **`org.freedesktop.portal.Settings`**. axia-server itself serves it (`server/src/ui/portal.c`)
   on the session bus, without xdg-desktop-portal, with Passwords' own D-Bus client
   (`server/src/vault/dbus.c`). Keys:
   - `org.freedesktop.appearance`: `color-scheme`, `accent-color`, `contrast`;
@@ -273,7 +273,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   When they change, `SettingChanged` is sent. If another program already owns the name
   `org.freedesktop.portal.Desktop`, LordOS doesn't take it over and says so in the log.
 - **GTK 3.** Outside Flatpak it doesn't read the portal: it reads GSettings.
-  - lord-server passes `GSETTINGS_BACKEND=keyfile` to the apps and writes the same keys to
+  - axia-server passes `GSETTINGS_BACKEND=keyfile` to the apps and writes the same keys to
     `~/.config/glib-2.0/settings/keyfile`, without deleting what the apps store. GLib watches that
     file, so GTK 3 also changes live.
   - The `LordOS`/`LordOS-dark` theme (`assets/gtk/`, installed in `/usr/share/themes`) is Adwaita
@@ -303,7 +303,7 @@ own profiles, only when the switch is turned (never by itself at login):
 
 *Switch off: the same Chromium profile with the LordOS frame.*
 
-- **Who writes:** `lord-server`, as the user, in C (`server/src/hw/brframe.c`, exposed as
+- **Who writes:** `axia-server`, as the user, in C (`server/src/hw/brframe.c`, exposed as
   `lord.browserFrame` in `ui/js_hw.c`; the page is `apps/settings/BrowserFrame.jsx`, the logic
   `sdk/browserframe.js`). No program is run and JS passes no path: only `on`/`off` and which
   browser. The folders are fixed (`$XDG_CONFIG_HOME` or `~/.config`, and `~`); every file is opened
@@ -369,11 +369,11 @@ like any other Linux app.
 ### How it starts (`server/src/wl/xwayland.c`)
 
 - At the start of a user session (not the login screen, not app mode), if `/usr/bin/Xwayland`
-  exists, lord-server reserves a display: the lock file `/tmp/.X<n>-lock` and the socket
+  exists, axia-server reserves a display: the lock file `/tmp/.X<n>-lock` and the socket
   `/tmp/.X11-unix/X<n>` with mode **0600** (only this user's programs can connect; no abstract
   socket, no TCP). It sets `DISPLAY=:<n>` (and `_JAVA_AWT_WM_NONREPARENTING=1`, see below) for the
   apps it starts. **Nothing else runs.**
-- When the first X11 client connects, lord-server starts Xwayland with a fixed argument list:
+- When the first X11 client connects, axia-server starts Xwayland with a fixed argument list:
 
   ```
   /usr/bin/Xwayland :<n> -rootless -listenfd 3 -wm 5 -nolisten tcp -extension XTEST
@@ -384,20 +384,20 @@ like any other Linux app.
   window manager's connection. This is the fourth launcher exception (`AGENTS.md`): the binary must
   be a root-owned file nobody else can write; there are no arguments from JS or from anyone; the
   only trigger is a connection to the session's own X socket.
-- Xwayland runs in its own scope (`lordos-xwayland.scope`, never lord-server's), in an empty network
+- Xwayland runs in its own scope (`lordos-xwayland.scope`, never axia-server's), in an empty network
   namespace inside a user namespace that maps only the user (it has no network at all), with
-  `no_new_privs`, a minimal environment and its log in `~/.cache/lordos/xwayland.log`. **XTEST is
+  `no_new_privs`, a minimal environment and its log in `~/.cache/axia/xwayland.log`. **XTEST is
   off**: an X11 app can't type or click into another one with synthetic input.
 - **Off when unused.** The window manager is an X client too, so Xwayland's own `-terminate` never
   fires: 10 s after the last X window closes, the window manager asks the X-Resource extension
   whether any other client is still connected (a clipboard tool without windows) and, if none,
-  stops Xwayland. The socket stays in lord-server, so the next X11 app starts it again (about a
+  stops Xwayland. The socket stays in axia-server, so the next X11 app starts it again (about a
   second). Three failed starts in a row → X11 apps are refused for a minute (logged).
 
 ### The window manager (`server/src/wl/xwm.c`, `x11wire.c`)
 
 Our own, in C: it speaks the X11 protocol itself (no libxcb or libX11, dependency policy), fully
-asynchronously, so lord-server never waits on Xwayland while Xwayland waits on the compositor.
+asynchronously, so axia-server never waits on Xwayland while Xwayland waits on the compositor.
 
 - **Windows.** It redirects the root's children (Composite, manual: rootless Xwayland then gives each
   top-level window a `wl_surface` and says which with `WL_SURFACE_ID`), takes SubstructureRedirect
@@ -489,7 +489,7 @@ display.
 - **The selection goes to the focused client, its owner included.** `offer_selection` and `prim_offer_to`
   used to skip the client that set the selection; the protocol says the client with the keyboard gets every
   new selection. Now it does, and `dev_set_selection` offers the new selection at once (a receive from the
-  owner is forwarded to its own source). Found by `lordos-testbench` (`docs/PAPER-VALIDATION.md`).
+  owner is forwarded to its own source). Found by `axia-testbench` (`docs/PAPER-VALIDATION.md`).
 - **`zwp_idle_inhibit_manager_v1`**: a video player or a presentation creates an inhibitor on its surface;
   while that surface is mapped, `wl_idle_inhibited()` is true and `main.c` resets the idle timers (screen off,
   lock, sleep; Settings → Battery) on every loop.

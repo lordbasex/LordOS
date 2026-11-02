@@ -78,7 +78,7 @@
   "today": "Today",
   "toggleSidebar": "Show or hide calendars",
   "unavailable": "Calendars are not available",
-  "unavailableHint": "The mail and calendar service (lord-maild) is not running or not installed.",
+  "unavailableHint": "The mail and calendar service (axia-maild) is not running or not installed.",
   "untitled": "New event",
   "view.day": "Day",
   "view.month": "Month",

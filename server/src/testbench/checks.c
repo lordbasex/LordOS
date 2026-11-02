@@ -1,4 +1,4 @@
-/* checks.c — lordos-testbench's protocol checklist: every global the compositor advertises that a
+/* checks.c — axia-testbench's protocol checklist: every global the compositor advertises that a
  * desktop app relies on, bound at the advertised version and exercised (create, use, see the event
  * that must come back, destroy). A protocol error ends the connection; the check that was running is
  * then the one named as failed, with the compositor's error. */
@@ -433,7 +433,7 @@ int checks_run(void) {
     if (wl_display_get_error(dpy)) return died();
 
     /* the clipboard, through the compositor and back */
-    snprintf(clip_token, sizeof clip_token, "lordos-testbench-%ld", (long)getpid());
+    snprintf(clip_token, sizeof clip_token, "axia-testbench-%ld", (long)getpid());
     c = begin("clipboard round trip");
     struct wl_data_device_manager *ddm = bind("wl_data_device_manager", &wl_data_device_manager_interface, 3);
     if (!ddm) set(c, CK_FAIL, "%s", "WL_DATA_DEVICE_MANAGER NOT OFFERED");

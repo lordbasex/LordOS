@@ -5,7 +5,7 @@ markdown notes that are read with formatting and a table of contents, accept ima
 and emoji, and can be placed on the desktop as sticky notes (widgets) that move and resize. They
 save themselves in the home folder.
 
-## Screenshots (VM 118, real lord-server)
+## Screenshots (VM 118, real axia-server)
 
 | | |
 |---|---|

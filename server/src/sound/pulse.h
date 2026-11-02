@@ -64,7 +64,7 @@ void ts_u32(TsOut *t, uint32_t v);
 void ts_u8(TsOut *t, uint8_t v);
 void ts_u64(TsOut *t, uint64_t v);      /* 'U' (usec) */
 void ts_bool(TsOut *t, int v);
-void ts_timeval(TsOut *t, uint32_t sec, uint32_t usec);   /* 'T' (latency, lord-media) */
+void ts_timeval(TsOut *t, uint32_t sec, uint32_t usec);   /* 'T' (latency, axia-media) */
 void ts_str(TsOut *t, const char *s);   /* NULL → 'N' */
 void ts_arb(TsOut *t, const void *p, uint32_t n);
 void ts_ss(TsOut *t, uint8_t format, uint8_t channels, uint32_t rate);

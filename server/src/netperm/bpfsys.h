@@ -1,4 +1,4 @@
-/* bpfsys.h — the bare minimum of the bpf() syscall for lord-netperm: maps, loading programs,
+/* bpfsys.h — the bare minimum of the bpf() syscall for axia-netperm: maps, loading programs,
  * attaching them to a cgroup with a bpf_link and reading a ring buffer (BPF_MAP_TYPE_RINGBUF).
  * No libbpf or bcc.
  *

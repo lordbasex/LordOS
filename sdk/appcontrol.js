@@ -101,7 +101,7 @@ export function runningApps() {
 }
 
 // Force Quit, without asking the app: a Linux app's or an isolated app's process gets SIGKILL from
-// lord-server (lord.wayland.kill: only its own client of this user, never lord-server; an X11 window
+// axia-server (lord.wayland.kill: only its own client of this user, never axia-server; an X11 window
 // is asked to close instead, since every X11 app shares Xwayland); a built-in app that runs inside
 // the session closes without its close guard. Returns '' or an error code.
 export function forceQuit(key) {

@@ -4,7 +4,7 @@
 import { t } from '@lordos/sdk';
 import { GLYPH_KINDS } from './glyphs.jsx';
 
-// Fields of each template: k = key (stable, lord-vault uses it: "password" goes into the report,
+// Fields of each template: k = key (stable, axia-vault uses it: "password" goes into the report,
 // "totp" gives codes, "expiry" warns before it expires), t = type.
 const F = (k, type = 'text', extra = {}) => ({ k, t: type, ...extra });
 
