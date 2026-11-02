@@ -29,7 +29,7 @@ terminal-box: "terminal_box_*.png"
     left = 50%-280
     top = 50%-110
     width = 560
-    height = 344
+    height = 396
     item_font = "Inter Regular 16"
     item_color = "#B9B6D9"
     selected_item_font = "Inter SemiBold 16"

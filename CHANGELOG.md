@@ -41,6 +41,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Files: the folder's name appeared twice, in the title bar and in the toolbar. It stays in the title bar and the toolbar keeps the space ([#10](https://github.com/lordbasex/LordOS/issues/10)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
+- The ISO's boot menu showed six of its seven entries: the last one, copy to RAM, was off the list. The list is taller now.
 - Install in free space: a partition ending off the 1 MiB alignment, as on a disk filled to its last sector, was reported as a damaged table.
 - `lordos-fetch` and the system report showed a 16 GB board as 17 GB: memory is now counted in binary sizes.
 - A stopped `lord-media` no longer stays a zombie until the next video or song: helpers are waited for on
