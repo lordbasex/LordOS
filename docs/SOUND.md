@@ -284,3 +284,19 @@ does no harm.
   Today there are 3 synthesized sounds.
 - **Repeated events.** Changes in our own streams (meter, sounds) generate a few extra `state`
   events, although they aren't shown. A few per second when turned on, not continuous.
+
+## Volume
+
+An output starts at 80 % and every slider stops at 100 %: past that the gain is digital and loud sound clips, whatever the card or headphones. `lordos-volume.conf` sets the start, and a saved volume stays. Sliders are cubic, so 80 % is a linear 0.512.
+
+Measured on a Raspberry Pi 5 with a full-scale 1 kHz tone on a null sink, its monitor taken after the volume (2026-10-31):
+
+| Slider | Peak | Clipped samples |
+|---|---|---|
+| 80 % | 0.511 | 0 % |
+| 90 % | 0.728 | 0 % |
+| 100 % | 0.999 | 0 % |
+| 108 % | 1.000 | 32 % |
+| 125 % | 1.000 | 57 % |
+
+This checks the digital path only. What a sound card does after it needs a cable from its output to its input.

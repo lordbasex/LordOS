@@ -3,7 +3,11 @@
  *   lord.wm.grab(node, edges, { inset, minW, minH, maxW, maxH, minTop }) → bool
  *       edges 0 = move; 1 top, 2 bottom, 4 left, 8 right (like xdg_toplevel.resize).
  *       Only with a button held down; lord-server tracks it until it is released.
- *   lord.wm.cancel()
+ *   lord.wm.cancel()                 also stops a scripted move
+ *   lord.wm.script(node, { rx, ry, periodMs, inset, minTop, areas }) → bool
+ *       LordBench's desktop scene (docs/BENCHMARK.md): the node moves along a figure of eight, rx × ry px,
+ *       one turn every periodMs (500–60000), one step per frame through the drag's own path (grab.c),
+ *       with no button held; pointer input or cancel() stops it. No end notice: the scene's window closes.
  *   lord.wm.pointer() → { x, y, active, edges }: the pointer now and the drag in progress (no
  *       arguments, read only). The theme polls it while a window moves, for the snapping preview.
  * On release: __lordWm('end', { node, edges, dx, dy, dw, dh }) with the node's change.
@@ -31,12 +35,7 @@ static double num(JSContext *c, JSValueConst o, const char *k, double def, doubl
     return d < lo ? lo : d > hi ? hi : d;
 }
 
-static JSValue f_grab(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t;
-    int32_t node = 0, edges = 0;
-    if (argc < 2 || JS_ToInt32(c, &node, argv[0]) || JS_ToInt32(c, &edges, argv[1])) return JS_FALSE;
-    if (edges < 0 || edges > 15 || (edges & 3) == 3 || (edges & 12) == 12) return JS_FALSE;
-    JSValueConst o = argc > 2 ? argv[2] : JS_UNDEFINED;
+static GrabLimits limits(JSContext *c, JSValueConst o) {
     GrabLimits lim = {
         .inset = (float)num(c, o, "inset", 0, 0, 64),
         .min_w = (float)num(c, o, "minW", 120, 32, 8192),
@@ -57,7 +56,27 @@ static JSValue f_grab(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_FreeValue(c, a);
     }
     JS_FreeValue(c, areas);
+    return lim;
+}
+
+static JSValue f_grab(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t node = 0, edges = 0;
+    if (argc < 2 || JS_ToInt32(c, &node, argv[0]) || JS_ToInt32(c, &edges, argv[1])) return JS_FALSE;
+    if (edges < 0 || edges > 15 || (edges & 3) == 3 || (edges & 12) == 12) return JS_FALSE;
+    GrabLimits lim = limits(c, argc > 2 ? argv[2] : JS_UNDEFINED);
     return JS_NewBool(c, grab_begin(node, edges, &lim) == 0);
+}
+
+/* LordBench's scene: lord.wm.script(node, { rx, ry, periodMs, inset, minTop, areas }) */
+static JSValue f_script(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t node = 0;
+    if (argc < 2 || JS_ToInt32(c, &node, argv[0]) || node <= 0 || !JS_IsObject(argv[1])) return JS_FALSE;
+    GrabLimits lim = limits(c, argv[1]);
+    float rx = (float)num(c, argv[1], "rx", 0, 0, 4000), ry = (float)num(c, argv[1], "ry", 0, 0, 4000);
+    float period = (float)num(c, argv[1], "periodMs", 6000, 500, 60000);
+    return JS_NewBool(c, grab_script_begin(node, &lim, rx, ry, period) == 0);
 }
 
 static JSValue f_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -117,6 +136,7 @@ static const JSCFunctionListEntry wm_funcs[] = {
     JS_CFUNC_DEF("grab", 3, f_grab),
     JS_CFUNC_DEF("cancel", 0, f_cancel),
     JS_CFUNC_DEF("pointer", 0, f_pointer),
+    JS_CFUNC_DEF("script", 2, f_script),
 };
 
 void js_wm_register(JSContext *c, JSValue lord) {

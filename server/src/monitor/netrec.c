@@ -169,6 +169,27 @@ static void total_tick(long long now) {
     nh_add(hist, now, NULL, rx, tx);
 }
 
+/* (0.8.5) The machine's byte counters right now, every interface but lo (the menu bar's network
+ * item: one small file read per second while it is shown). 0 ok. */
+int netrec_totals(uint64_t *rx, uint64_t *tx) {
+    char txt[8192];
+    if (mon_read_small("/proc/net/dev", txt, sizeof txt) <= 0) return -1;
+    *rx = *tx = 0;
+    for (char *l = txt; l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
+        char *colon = strchr(l, ':'), *nl = strchr(l, '\n');
+        if (!colon || (nl && colon > nl)) continue;
+        char *s = l;
+        while (*s == ' ') s++;
+        if (colon - s == 2 && !strncmp(s, "lo", 2)) continue;
+        unsigned long long v[16];
+        char *p = colon + 1;
+        for (int i = 0; i < 16; i++) v[i] = strtoull(p, &p, 10);
+        *rx += v[0];
+        *tx += v[8];
+    }
+    return 0;
+}
+
 void netrec_tick(void) {
     if (!netrec_enabled()) return;
     double t = mono_ms();

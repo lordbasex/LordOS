@@ -7,8 +7,9 @@
  *                           { name, path, size, model, vendor, transport, removable, parts: [...] }
  *                           (no loop, ram, zram, sr, dm or md, and not the disk the live system booted from)
  *   install-run <json>      installs (in a separate process): wipes the disk, GPT with BIOS boot
- *                           (1 MiB), ESP (512 MiB, FAT32) and ext4 root; copies the live system
- *                           (unsquashfs), configures it and installs grub for UEFI and BIOS.
+ *                           (1 MiB, x86-64 only), ESP (512 MiB, FAT32) and ext4 root; copies the live
+ *                           system (unsquashfs), configures it and installs grub: UEFI and BIOS on
+ *                           x86-64, UEFI only on arm64.
  *                           Progress: "LOG progress <phase> <done> <total>", phases partition,
  *                           copy, configure, bootloader.
  *   install-reboot          reboots (only on the live system, to finish the wizard)
@@ -51,6 +52,18 @@
 #define SQUASHFS    LIVE_MEDIUM "/live/filesystem.squashfs"
 #define TARGET      "/run/lordos-install/target"
 #define MIN_DISK    (8ull << 30)               /* 8 GiB */
+
+/* What the architecture decides. x86-64: a BIOS boot partition and grub for both firmwares; arm64 is
+ * UEFI only. The root partition's GPT type is the architecture's own (Linux root, x86-64 or ARM64). */
+#if defined(__x86_64__)
+#define INSTALL_BIOS     1
+#define GRUB_EFI_TARGET  "--target=x86_64-efi"
+#elif defined(__aarch64__)
+#define INSTALL_BIOS     0
+#define GRUB_EFI_TARGET  "--target=arm64-efi"
+#else
+#error "the disk installer knows x86-64 and arm64"
+#endif
 
 static int is_live(void) { return access(SQUASHFS, R_OK) == 0; }
 
@@ -544,21 +557,26 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     if (why) { explicit_bzero(&pl, sizeof pl); admin_err(why, NULL); return; }
     if (disk_busy(pl.disk)) { admin_err("install.diskBusy", "disk", pl.disk, NULL); explicit_bzero(&pl, sizeof pl); return; }
 
-    char dev[48], bios[48], esp[48], root[48];
+    char dev[48], esp[48], root[48];
     snprintf(dev, sizeof dev, "/dev/%s", pl.disk);
-    part_path(pl.disk, 1, bios, sizeof bios);
-    part_path(pl.disk, 2, esp, sizeof esp);
-    part_path(pl.disk, 3, root, sizeof root);
+    part_path(pl.disk, INSTALL_BIOS ? 2 : 1, esp, sizeof esp);
+    part_path(pl.disk, INSTALL_BIOS ? 3 : 2, root, sizeof root);
     admin_log("install.installingTo", "dev", dev, NULL);
 
-    /* 1. partition: GPT with BIOS boot (1 MiB), ESP (512 MiB) and root */
+    /* 1. partition: GPT with BIOS boot (1 MiB, x86-64 only), ESP (512 MiB) and root */
     progress("partition", 0, 4);
     { const char *const a[] = { "/usr/sbin/wipefs", "-a", dev, NULL }; if (run(a)) FAIL("install.wipeFailed"); }
     { const char *const a[] = { "/usr/sbin/sgdisk", "--zap-all", dev, NULL }; run(a); }
+#if INSTALL_BIOS
     { const char *const a[] = { "/usr/sbin/sgdisk", "-n", "1:0:+1M", "-t", "1:ef02", "-c", "1:biosboot",
                                 "-n", "2:0:+512M", "-t", "2:ef00", "-c", "2:EFI",
                                 "-n", "3:0:0", "-t", "3:8304", "-c", "3:LordOS", dev, NULL };
       if (run(a)) FAIL("install.partitionFailed"); }
+#else
+    { const char *const a[] = { "/usr/sbin/sgdisk", "-n", "1:0:+512M", "-t", "1:ef00", "-c", "1:EFI",
+                                "-n", "2:0:0", "-t", "2:8305", "-c", "2:LordOS", dev, NULL };
+      if (run(a)) FAIL("install.partitionFailed"); }
+#endif
     progress("partition", 1, 4);
     { const char *const a[] = { "/usr/bin/udevadm", "settle", "--timeout=10", NULL }; run(a); }
     for (int i = 0; i < 50 && (access(esp, F_OK) || access(root, F_OK)); i++) usleep(200000);
@@ -688,17 +706,21 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     progress("configure", ++step, steps);
     progress("configure", steps, steps);
 
-    /* 4. boot: grub for UEFI (removable path, works on any firmware) and for BIOS */
-    progress("bootloader", 0, 3);
-    { const char *const a[] = { "/usr/sbin/grub-install", "--target=x86_64-efi", "--efi-directory=/boot/efi", "--removable", "--no-nvram", NULL };
+    /* 4. boot: grub for UEFI (removable path, works on any firmware) and, on x86-64, for BIOS */
+    const int boot_steps = INSTALL_BIOS ? 3 : 2;
+    int boot_step = 0;
+    progress("bootloader", 0, boot_steps);
+    { const char *const a[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--removable", "--no-nvram", NULL };
       if (in_target(a)) FAIL("install.grubEfiFailed"); }
-    progress("bootloader", 1, 3);
+    progress("bootloader", ++boot_step, boot_steps);
+#if INSTALL_BIOS
     { const char *const a[] = { "/usr/sbin/grub-install", "--target=i386-pc", dev, NULL };
       if (in_target(a)) FAIL("install.grubBiosFailed"); }
-    progress("bootloader", 2, 3);
+    progress("bootloader", ++boot_step, boot_steps);
+#endif
     { const char *const a[] = { "/usr/sbin/grub-mkconfig", "-o", "/boot/grub/grub.cfg", NULL };
       if (in_target(a)) FAIL("install.grubConfigFailed"); }
-    progress("bootloader", 3, 3);
+    progress("bootloader", ++boot_step, boot_steps);
     umount_target();
     explicit_bzero(&pl, sizeof pl);
     admin_ok("install.done", "dev", dev, NULL);

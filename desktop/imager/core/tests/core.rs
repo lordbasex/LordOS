@@ -52,6 +52,7 @@ fn names_and_tags() {
     assert_eq!(image_kind("a.iso"), 1);
     assert_eq!(image_kind("a.zip"), 0);
     assert!(valid_tag("v0.8.4-beta") && valid_tag("v1.0.0") && !valid_tag("v0.8") && !valid_tag("v0.8.4-") && !valid_tag("v0.8.4/../x"));
+    assert!(valid_tag("v0.8.4.1-beta") && valid_tag("v0.8.4.1") && !valid_tag("v0.8.4.1.2") && !valid_tag("v0.8.4.") && !valid_tag("v0.8.4.-beta"));
 }
 
 #[test]

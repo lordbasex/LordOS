@@ -3,7 +3,7 @@
 // View, Text, Image, ScrollView, TextInput, Button, Toggle, Segmented, SearchField, Lumo,
 // LordOSLogo, useTheme, useLocale, t, tOptional, formatDate, formatNumber, createStore, useStore,
 // useKeyboard, typeScale, spacing. Styles are LordOS's (React Native-like objects, arrays of them)
-// turned into CSS; colors and sizes are Lord Default's (themes/default/tokens.js). docs/IMAGER.md.
+// turned into CSS; colors and sizes are Lord Flow's (themes/default/tokens.js). docs/IMAGER.md.
 import { createElement as h, useEffect, useMemo, useState, useSyncExternalStore, useRef } from 'react';
 import { catalogs } from './catalogs.js';
 
@@ -20,7 +20,7 @@ export function createStore(initial) {
 }
 export const useStore = (s) => useSyncExternalStore(s.subscribe, s.get);
 
-// ---- theme: Lord Default, light and dark (themes/default/tokens.js) ----
+// ---- theme: Lord Flow, light and dark (themes/default/tokens.js) ----
 
 const ACCENTS = { azul: '#0a84ff', violeta: '#bf5af2', rosa: '#ff375f', naranja: '#ff9f0a', verde: '#30d158', grafito: '#8e8e93' };
 function makeTheme(mode) {

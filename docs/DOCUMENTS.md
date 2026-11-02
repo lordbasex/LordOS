@@ -62,7 +62,7 @@ In the style of a classic document viewer:
   - note 🗨 (a text at a point);
   - freehand ✎.
 
-  ❖Z undoes the last annotation. Everything is saved **as a copy**, "name (anotado).pdf" next to
+  ❖Z undoes the last annotation. Everything is saved **as a copy**, "name (annotated).pdf" (the suffix in the interface language) next to
   the original, with ❖S or File → Save a copy. The original is never touched.
 - **Forms:** text fields, checkboxes, radio buttons and lists are filled in place, and saved with
   the copy.
@@ -96,7 +96,7 @@ How it draws:
   - shows the progress in the status bar;
   - at the end it says how many files came out and how many were skipped for safety.
 - **Compress:** the selection goes to a `.zip` alongside: "name.zip" if it's a single item, or
-  "Archivo.zip". It handles recursive folders, symbolic links as links and UTF-8 names.
+  "Archive.zip" (translated, `docs.archiveName`). It handles recursive folders, symbolic links as links and UTF-8 names.
 - **Formats read** by libarchive: zip, tar (gz, xz, zst, bz2, lzma, lz), 7z, cpio, iso, ar, rar
   (list and extract only, as libarchive allows) and standalone `.gz/.xz/.zst/.bz2`. It only writes
   zip.
@@ -151,7 +151,7 @@ formats).
 | text and code | the first lines | — |
 | font (`.ttf/.otf/.ttc`) | a sample in several sizes | FreeType in lord-doc |
 | archive | file count, size and the first entries | — |
-| audio and video | a frame or the cover, if the SDK has `media.poster` (the media agent); otherwise, the icon | media agent |
+| audio and video | a frame or the cover through `media.poster` (`MEDIA.md`); without lord-media, the icon | lord-media |
 | file inside an archive | the same, after extracting only that one to the cache | lord-doc |
 
 The arrows go to the next one; Space or Esc close it.
@@ -325,5 +325,6 @@ server/build/doc-test server/build/lord-doc pdf file.pdf 900   # open, draw and 
   - ZWJ sequences (❤️‍🔥, 👩‍💻) show as their parts, because the text engine doesn't join them yet;
   - in Linux apps it types by pasting, because there's no Wayland `text-input`.
 - **Untested:**
-  - Quick Preview of audio and video with `media.poster`: lord-media isn't built on VM 116;
+  - Quick Preview of audio and video with `media.poster` was not measured here (VM 116 had no lord-media
+    when this was written; `media.poster` exists now, `MEDIA.md`);
   - printing from Photos (it belongs to the media agent; the API is ready: `print.open({ image })`).

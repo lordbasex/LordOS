@@ -58,9 +58,18 @@ static unsigned char *map_file(const char *path, size_t *size) {
 
 static unsigned be16(const unsigned char *d, size_t n, size_t off) { return off + 2 <= n ? (unsigned)(d[off] << 8 | d[off + 1]) : 0; }
 
-static int load(Font *f, const char *path, int index) {
+/* Whether text drawn since the last call may land differently when moved by whole pixels: only
+ * draw_fast with a font whose em is a power of two of at most 2048 units keeps every pen position an
+ * exact binary fraction at a whole font size; textlayout.c (shaping, other scripts' fonts) is not
+ * checked (paint.c's drag layer, layer_part_exact). */
+static int drew_inexact;
+int text_drew_inexact(void) { int r = drew_inexact; drew_inexact = 0; return r; }
+
+/* a font already in memory (mapped: munmap it if it isn't a font) */
+static int load_bytes(Font *f, unsigned char *data, size_t size, int index, int mapped) {
     memset(f, 0, sizeof *f);
-    f->data = map_file(path, &f->size);
+    f->data = data;
+    f->size = size;
     if (!f->data) return -1;
     int off = stbtt_GetFontOffsetForIndex(f->data, index);
     if (off < 0) off = 0;
@@ -76,12 +85,19 @@ static int load(Font *f, const char *path, int index) {
         f->descent = -500;
     } else {
         otf_free(&f->otf);
-        munmap(f->data, f->size);
+        if (mapped) munmap(f->data, f->size);
         f->data = NULL;
         return -1;
     }
-    snprintf(f->path, sizeof f->path, "%s", path);
     f->index = index;
+    return 0;
+}
+
+static int load(Font *f, const char *path, int index) {
+    size_t size = 0;
+    unsigned char *data = map_file(path, &size);
+    if (load_bytes(f, data, size, index, 1)) return -1;
+    snprintf(f->path, sizeof f->path, "%s", path);
     return 0;
 }
 
@@ -96,6 +112,19 @@ int text_init(const char *dir) {
         }
     }
     nfonts = NFONTS;
+    cache_cap = 4096;
+    cache = calloc(cache_cap, sizeof *cache);
+    return cache ? 0 : -1;
+}
+
+/* LordBench's helper (bench/lbui.c), which opens no files: one interface font built into the binary
+ * fills the four Inter slots; there is no monospace or brand font (they would be opened by path). */
+int text_init_mem(const unsigned char *data, size_t size) {
+    for (int i = 0; i < NFONTS; i++)
+        if (load_bytes(&fonts[i], (unsigned char *)data, size, 0, 0)) return -1;
+    nfonts = NFONTS;
+    font_dir[0] = 0;
+    mono_font[0] = mono_font[1] = brand_font[0] = brand_font[1] = -1;
     cache_cap = 4096;
     cache = calloc(cache_cap, sizeof *cache);
     return cache ? 0 : -1;
@@ -424,6 +453,7 @@ static void draw_fast(Canvas *c, const char *s, int font, float size, float line
     if (k != 1) for (int i = 0; i < n; i++) lines[i].width *= k;
     float lh = text_line_height(size, line_h);
     Font *f = &fonts[font];
+    if (!f->upem || (f->upem & (f->upem - 1)) || f->upem > 2048) drew_inexact = 1;
     float scale = stbtt_ScaleForMappingEmToPixels(&f->info, size);
     float asc = f->ascent * scale, desc = f->descent * scale;
     for (int i = 0; i < n; i++) {
@@ -448,7 +478,7 @@ static void draw_fast(Canvas *c, const char *s, int font, float size, float line
 void text_draw(Canvas *c, const char *s, float weight, float size, float line_h,
                float x, float y, float box_w, int align, int nowrap, uint32_t argb) {
     int font = font_for(weight);
-    if (text_needs_layout(s, font)) { text_layout_draw(c, s, font, size, line_h, x, y, box_w, align, nowrap, argb); return; }
+    if (text_needs_layout(s, font)) { drew_inexact = 1; text_layout_draw(c, s, font, size, line_h, x, y, box_w, align, nowrap, argb); return; }
     draw_fast(c, s, font, size, line_h, x, y, box_w, align, nowrap, 0, argb);
 }
 
@@ -541,7 +571,7 @@ static int line_ranges(const char *s, int font, float size, float box_w, int now
 
 static void draw_lines(Canvas *c, const char *s, int font, float size, float line_h,
                        float x, float y, float box_w, int align, int nowrap, int max_lines, uint32_t argb) {
-    if (text_needs_layout(s, font)) text_layout_draw_n(c, s, font, size, line_h, x, y, box_w, align, nowrap, max_lines, argb);
+    if (text_needs_layout(s, font)) { drew_inexact = 1; text_layout_draw_n(c, s, font, size, line_h, x, y, box_w, align, nowrap, max_lines, argb); }
     else draw_fast(c, s, font, size, line_h, x, y, box_w, align, nowrap, max_lines, argb);
 }
 

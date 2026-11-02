@@ -8,9 +8,10 @@ keywords: janelas, maximizar, minimizar, mover, tamanho, trocar de app
 
 - **Mover:** arraste a barra de título.
 - **Mudar o tamanho:** arraste uma borda ou um canto.
-- **Botões** (no alto à esquerda no Lord Default): fechar (vermelho), minimizar (amarelo) e
+- **Botões** (no alto à esquerda no Lord Flow): fechar (vermelho), minimizar (amarelo) e
   maximizar (verde). Um **clique duplo** na barra de título também maximiza ou volta.
 - **O menu Janela** da barra de menus faz o mesmo com a janela em primeiro plano.
+- **No Lord Classic** não há barra de menus no alto: os menus de cada app (Arquivo, Editar, Visualizar, Ir…, Janela e Ajuda) ficam numa faixa embaixo do título da janela.
 - **Voltar a uma janela minimizada:** o ícone dela no Dock.
 - **Várias janelas de um app:** ❖N na maioria (Arquivos, Terminal, Editor). O Dock mostra
   quantas existem.

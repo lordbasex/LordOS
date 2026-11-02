@@ -12,8 +12,12 @@
 #define MAP_MAX_W 2048
 #define MAP_MAX_H 2048
 #define MAP_MAX_DOTS 256
+#define MAP_MAX_ARCS 512
 
 typedef struct { float lon, lat, r; int sel, idle; } MapDot;   /* idle: no traffic now (dimmed arc) */
+/* (0.8.5) one app's arc to a place: its own color and lift (a fraction of the length), so the apps that
+ * reach the same country get arcs apart */
+typedef struct { float lon, lat, lift; uint32_t color; int sel, idle; } MapArc;
 
 typedef struct {
     int w, h;
@@ -23,6 +27,8 @@ typedef struct {
     double hlon, hlat;
     int ndots;
     MapDot dots[MAP_MAX_DOTS];
+    int narcs;                          /* 0: one arc per dot, in the accent color */
+    MapArc arcs[MAP_MAX_ARCS];
 } MapReq;
 
 void map_init(const char *assets_dir);

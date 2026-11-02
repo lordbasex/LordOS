@@ -9,6 +9,9 @@ import {
   Markdown, Toggle, LordOSLogo, session, lordosUpdate, restartNeeded, updatePrefs, setUpdatePrefs,
 } from '@lordos/sdk';
 import { Suggested } from './suggested.js';
+import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
+import { sysPkgKey, snapshotDate } from './syspkg.js';
+import { AdminRescue, isNotAdmin } from './rescue.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -33,7 +36,7 @@ function runJob(action, arg, title) {
   };
   return admin.run(action, arg, onLog).then(
     (ok) => { state.set((s) => ({ ...s, job: null, msg: { ok: true, text: statusText(ok) } })); bump(); refreshApps(); return true; },
-    (e) => { state.set((s) => ({ ...s, job: null, msg: { ok: false, text: e.message } })); bump(); return false; },
+    (e) => { state.set((s) => ({ ...s, job: null, msg: { ok: false, text: e.message, notAdmin: isNotAdmin(e) } })); bump(); return false; },
   );
 }
 
@@ -64,11 +67,27 @@ function PkgIcon({ app, name, size = 48 }) {
   return h(LetterIcon, { size, name: app?.name || name });
 }
 
+// A package's name as the Updates list and the plans show it: LordOS's data packages in words
+// (syspkg.js), every other package by its name.
+const pkgLabel = (name) => { const k = sysPkgKey(name); return k ? t(`${k}.name`) : name; };
+// The line under it: for a data package, what it is and its date (in the user's region when the
+// version is a date); otherwise the versions and the package's summary.
+function pkgLine(u) {
+  const k = sysPkgKey(u.name);
+  if (!k) return `${u.from} → ${u.to} · ${u.summary}`;
+  const d = snapshotDate(u.to);
+  return t(`${k}.summary`, { date: d ? formatDate(d, 'numeric') : u.to });
+}
+
 function Progress() {
   const th = useTheme();
   const { job, msg } = useStore(state);
   if (!job && !msg) return null;
-  if (!job) return h(Text, { style: { fontSize: 12, color: msg.ok ? '#30d158' : '#ff453a', marginBottom: 10 } }, msg.text);
+  if (!job) {
+    return h(View, null,
+      h(Text, { style: { fontSize: 12, color: msg.ok ? '#30d158' : '#ff453a', marginBottom: 10, textAlign: 'start' } }, msg.text),
+      msg.notAdmin ? h(AdminRescue) : null);
+  }
   const f = job.total ? Math.min(1, job.done / job.total) : 0;
   const phase = job.phase ? t(`store.phase.${job.phase}`) : t('store.working');
   return h(View, { style: boxStyle(th, { gap: 6, marginBottom: 4 }) },
@@ -85,7 +104,7 @@ function PlanView({ plan }) {
   if (!plan.ok) return h(Text, { style: { fontSize: 12, color: '#ff453a' } }, (plan.error && errorText(plan.error)) || t('store.plan.impossible'));
   const by = (a) => plan.items.filter((i) => i.action === a);
   const line = (label, list) => (list.length ? h(Text, { style: { fontSize: 12, color: th.text, lineHeight: 1.4 } },
-    `${label}: ${list.slice(0, 14).map((i) => i.name).join(', ')}${list.length > 14 ? ` ${t('store.plan.more', { count: list.length - 14 })}` : ''}`) : null);
+    `${label}: ${list.slice(0, 14).map((i) => pkgLabel(i.name)).join(', ')}${list.length > 14 ? ` ${t('store.plan.more', { count: list.length - 14 })}` : ''}`) : null);
   const delta = plan.installedDelta;
   return h(View, { style: { gap: 4 } },
     line(t('store.plan.install', { count: by('install').length }), by('install')),
@@ -98,7 +117,7 @@ function PlanView({ plan }) {
 
 // ---- package page ----
 
-function Details({ name, onBack }) {
+function Details({ name, onBack, onRemoved, extras = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
@@ -111,12 +130,12 @@ function Details({ name, onBack }) {
   // the matching installed desktop app (for "Open")
   const desk = app && launcher.find((a) => a.kind === 'linux' && (`${a.desktopId}.desktop` === app.id || a.desktopId === app.id));
   const ask = (p) => setPlan(p);
-  const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name] }) });
+  const doInstall = () => ask({ kind: 'install', p: lord.pkg.plan({ install: [name, ...extras] }) });
   const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name] }) });
   const confirm = () => {
     const extra = plan.p.items.some((i) => i.action === 'remove' && !i.requested);
-    if (plan.kind === 'install') runJob('pkg-install', extra ? `${name} --allow-remove` : name, t('store.job.install', { name: app?.name || name }));
-    else runJob('pkg-remove', extra ? `${name} --cascade` : name, t('store.job.remove', { name: app?.name || name }));
+    if (plan.kind === 'install') runJob('pkg-install', [name, ...extras, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
+    else runJob('pkg-remove', extra ? `${name} --cascade` : name, t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
     setPlan(null);
   };
   const desc = (info.appDescription || info.description || '').trim();
@@ -125,11 +144,11 @@ function Details({ name, onBack }) {
     ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() })
     : desk ? h(Button, { primary: true, label: t('store.open'), onClick: () => launchApp(desk.id) }) : null;
   return h(View, { style: { gap: spacing.xl } },
-    h(Button, { plain: true, small: true, label: `‹ ${t('store.back')}`, onClick: onBack, style: { alignSelf: 'flex-start', [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -6 } }),
+    onBack ? h(Button, { plain: true, small: true, label: `‹ ${t('store.back')}`, onClick: onBack, style: { alignSelf: 'flex-start', [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -6 } }) : null,
     h(Progress),
     // header: icon, name, summary and the actions under them (App Store style)
     h(View, { style: { flexDirection: 'row', gap: spacing.l, alignItems: 'flex-start' } },
-      h(View, { style: { borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' } }, h(PkgIcon, { app, name, size: 72 })),
+      h(View, { style: { borderRadius: 22, overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.22)' } }, h(PkgIcon, { app, name, size: 96 })),
       h(View, { style: { flex: 1, minWidth: 0, gap: spacing.xs } },
         h(Text, { style: { ...titleStyle(th), textAlign: 'start' } }, app?.name || name),
         h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, app?.summary || info.summary),
@@ -139,6 +158,12 @@ function Details({ name, onBack }) {
           info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doRemove() }),
           info.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158', marginLeft: spacing.xs } }, t('store.installedBadge')) : null))),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),
+    h(Facts, { items: [
+      [t('store.info.version'), info.version],
+      [t('store.info.size'), formatBytes(info.installedSize)],
+      [t('store.info.category'), catOf(app || {}) ? t(`store.cat.${catOf(app)}`) : ''],
+      [t('store.info.suite'), info.suite ? `Debian ${info.suite}` : ''],
+    ] }),
     plan && h(View, { style: boxStyle(th) },
       h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t(plan.kind === 'install' ? 'store.plan.titleInstall' : 'store.plan.titleRemove')),
       h(PlanView, { plan: plan.p }),
@@ -152,30 +177,30 @@ function Details({ name, onBack }) {
       h(Header, { th }, t('store.info.title')),
       h(GroupBox, null,
         h(InfoRow, { th, label: t('store.info.package'), value: name }),
-        h(InfoRow, { th, label: t('store.info.version'), value: info.version }),
         info.installed ? h(InfoRow, { th, label: t('store.info.installed'), value: info.installed }) : null,
-        h(InfoRow, { th, label: t('store.info.size'), value: formatBytes(info.installedSize) }),
-        info.suite ? h(InfoRow, { th, label: t('store.info.suite'), value: `Debian ${info.suite}` }) : null,
         info.homepage ? h(InfoRow, { th, label: t('store.info.homepage'), value: info.homepage }) : null)));
 }
 
 // ---- app grid ----
 
-function Card({ a, onOpen }) {
-  const th = useTheme();
-  return h(View, { onClick: onOpen, style: { width: 200, padding: 12, gap: 10, borderRadius: 10, backgroundColor: th.hover, border: `1px solid ${th.separator}`,
-    flexDirection: 'row', alignItems: 'center' } },
-    h(PkgIcon, { app: a.app || a, name: a.package || a.name, size: 44 }),
-    h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
-      h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' } }, (a.app || a).name || a.name),
-      h(Text, { style: { fontSize: 11, color: th.textDim, maxHeight: 28, overflow: 'hidden', lineHeight: 1.25 } }, (a.app || a).summary || a.summary || ''),
-      a.installed ? h(Text, { style: { fontSize: 11, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null));
+// The category a card names: the first of the Store's categories the app is in.
+const catOf = (a) => (a.categories || []).find((c) => CATS.includes(c));
+
+// A Debian app's card: Get (the app page and its plan), Open when it is installed and has a window,
+// View otherwise.
+function DebCard({ a, onOpen }) {
+  const launcher = useLauncherApps();
+  const app = a.app || a;
+  const name = a.package || a.name;
+  const desk = a.installed && launcher.find((l) => l.kind === 'linux' && app.id && (`${l.desktopId}.desktop` === app.id || l.desktopId === app.id));
+  const cat = catOf(app);
+  const action = desk ? h(Pill, { label: t('store.open'), onClick: () => launchApp(desk.id) })
+    : h(Pill, { label: a.installed ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(name) });
+  return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, kind: cat ? t(`store.cat.${cat}`) : '',
+    summary: app.summary || a.summary || '', note: a.size ? formatBytes(a.size) : '', action, onClick: () => onOpen(name) });
 }
 
-const Grid = ({ items, onOpen }) => h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } },
-  ...items.map((a) => h(Card, { key: `${a.package || a.name}:${a.id || ''}`, a, onOpen: () => onOpen(a.package || a.name) })));
-
-const Chips = ({ items }) => h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 } }, ...items);
+const Grid = ({ items, onOpen }) => h(CardGrid, null, ...items.map((a) => h(DebCard, { key: `${a.package || a.name}:${a.id || ''}`, a, onOpen })));
 
 // A drawn bag, monochrome, for the Store's empty states.
 function StoreGlyph() {
@@ -186,51 +211,71 @@ function StoreGlyph() {
     h(View, { style: { position: 'absolute', left: 4, top: 12, width: 40, height: 34, borderRadius: 7, backgroundColor: c } }));
 }
 
-const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
+export const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
+const categoryCounts = () => (ready() ? lord.pkg.categories() : {});
 
-function Discover({ query }) {
-  const th = useTheme();
-  const { gen } = useStore(state);
-  const [cat, setCat] = useState('Utility');
-  const [open, setOpen] = useState(null);
-  useEffect(() => setOpen(null), [query]);
+// No index yet (or no engine): say so, with the button that fetches the lists.
+function NoIndex() {
+  const { job } = useStore(state);
   if (!available()) return h(EmptyState, { mascot: 'confused', title: t('store.debian.unavailable'), style: { minHeight: 360 } });
-  if (!ready()) {
-    return h(View, { style: { gap: 12 } }, h(Progress),
-      h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.noIndexTitle'), hint: t('store.debian.noIndex'), style: { minHeight: 380 },
-        action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => runJob('pkg-update', '', t('store.job.update')) }) }));
-  }
-  if (open) return h(Details, { name: open, onBack: () => setOpen(null) });
-  const q = query.trim();
-  void gen;
-  if (q) {
-    const res = lord.pkg.search(q, { limit: 60, lang: lang2() });
-    const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
-    return h(View, { style: { gap: spacing.l } },
-      h(Progress),
-      h(Text, { style: { ...titleStyle(th), textAlign: 'start' } }, t('store.debian.results', { q })),
-      apps.length ? h(Grid, { items: apps.map((r) => ({ ...r, package: r.name })), onOpen: setOpen }) : null,
-      others.length ? h(View, { style: { marginTop: spacing.s } },
-        h(Header, { th }, t('store.debian.otherPackages')),
-        h(GroupBox, null, ...others.slice(0, 30).map((r) => h(View, { key: r.name, onClick: () => setOpen(r.name),
-          style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 44, paddingVertical: 6 } },
-          h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
-            h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.name),
-            h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.summary)),
-          r.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null,
-          h(Text, { style: { fontSize: 15, color: th.textDim } }, direction() === 'rtl' ? '‹' : '›'))))) : null,
-      res.length === 0 ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
-  }
-  const counts = lord.pkg.categories();
-  const list = lord.pkg.apps({ category: cat, limit: 60, lang: lang2() });
-  return h(View, { style: { gap: 16 } },
+  return h(View, { style: { gap: 12 } }, h(Progress),
+    h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.noIndexTitle'), hint: t('store.debian.noIndex'), style: { minHeight: 380 },
+      action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => !job && runJob('pkg-update', '', t('store.job.update')) }) }));
+}
+
+// Search results: apps as cards, other packages as rows.
+function Results({ q, onOpen }) {
+  const th = useTheme();
+  const res = lord.pkg.search(q, { limit: 60, lang: lang2() });
+  const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
+  return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    h(Suggested, { deb: { state, runJob, PlanView, boxStyle } }),
-    h(Text, { style: titleStyle(th) }, t('store.discover.title')),
-    h(Chips, { items: CATS.filter((c) => counts[c]).map((c) => h(View, { key: c, onClick: () => setCat(c), style: {
-        paddingHorizontal: 12, height: 26, justifyContent: 'center', borderRadius: 13, backgroundColor: c === cat ? th.accent : th.control } },
-      h(Text, { style: { fontSize: 12, color: c === cat ? '#fff' : th.text } }, `${t(`store.cat.${c}`)} · ${counts[c]}`))) }),
-    h(Grid, { items: list, onOpen: setOpen }));
+    apps.length ? h(Shelf, { title: t('store.debian.results', { q }) }, h(Grid, { items: apps.map((r) => ({ ...r, package: r.name })), onOpen })) : null,
+    others.length ? h(View, { style: { marginTop: spacing.s } },
+      h(Header, { th }, t('store.debian.otherPackages')),
+      h(GroupBox, null, ...others.slice(0, 30).map((r) => h(View, { key: r.name, onClick: () => onOpen(r.name),
+        style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 44, paddingVertical: 6 } },
+        h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
+          h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.name),
+          h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.summary)),
+        r.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null,
+        h(Text, { style: { fontSize: 15, color: th.textDim } }, direction() === 'rtl' ? '‹' : '›'))))) : null,
+    res.length === 0 ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
+}
+
+// Discover: what the page above it brings (`top`: the featured app and the AI shelf), the
+// suggestions for this computer, then a shelf per category with its first apps and "See all".
+function Discover({ query, onOpen, onCategory, top }) {
+  const { gen } = useStore(state);
+  void gen;
+  const q = query.trim();
+  if (!ready()) return h(View, { style: { gap: 26 } }, top, h(NoIndex));
+  if (q) return h(Results, { q, onOpen });
+  const counts = categoryCounts();
+  return h(View, { style: { gap: 26 } },
+    h(Progress),
+    top,
+    ...CATS.filter((c) => counts[c]).map((c) => h(Shelf, { key: c, title: t(`store.cat.${c}`), more: t('store.seeAll', { count: counts[c] }), onMore: () => onCategory(c) },
+      h(Grid, { items: lord.pkg.apps({ category: c, limit: 4, lang: lang2() }), onOpen }))));
+}
+
+// Store → For this computer: the hardware suggestions on their own page.
+function SuggestedPage() {
+  return h(View, { style: { gap: spacing.l } }, h(Progress), h(Suggested, { deb: { state, runJob, PlanView, boxStyle }, page: true }));
+}
+
+// One category: all its apps (the search narrows them).
+function Category({ cat, query, onOpen }) {
+  const { gen } = useStore(state);
+  void gen;
+  if (!ready()) return h(NoIndex);
+  const q = query.trim().toLowerCase();
+  const list = lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() })
+    .filter((a) => !q || `${a.name} ${a.summary || ''} ${a.package}`.toLowerCase().includes(q));
+  return h(View, { style: { gap: spacing.l } },
+    h(Progress),
+    list.length ? h(Grid, { items: list.slice(0, q ? 200 : 400), onOpen })
+      : h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }));
 }
 
 // LordOS itself (docs/UPDATES.md): "LordOS <version> is available", its release notes and Update.
@@ -299,12 +344,7 @@ function Updates() {
   const [plan, setPlan] = useState(null);
   const [prefs, setPrefs] = useState(updatePrefs);
   void gen;
-  if (!ready()) {
-    return available()
-      ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.noIndexTitle'), hint: t('store.debian.noIndex'), style: { minHeight: 380 },
-        action: h(Button, { primary: true, label: t('store.debian.update'), onClick: () => !job && runJob('pkg-update', '', t('store.job.update')) }) })
-      : h(EmptyState, { mascot: 'confused', title: t('store.debian.unavailable'), style: { minHeight: 360 } });
-  }
+  if (!ready()) return h(NoIndex);
   const ups = lord.pkg.upgrades();
   const own = lordosUpdate(lang2());
   const others = ups.filter((u) => u.name !== 'lordos');
@@ -312,7 +352,7 @@ function Updates() {
   const auto = (on) => { setUpdatePrefs({ autoCheck: on }); setPrefs(updatePrefs()); };
   return h(View, { style: { gap: 12 } },
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8 } },
-      h(Text, { style: { flex: 1, ...titleStyle(th), textAlign: 'start' } }, t('store.updates.title')),
+      h(View, { style: { flex: 1 } }),
       h(Button, { label: t('store.debian.update'), disabled: !!job, onClick: () => !job && runJob('pkg-update', '', t('store.job.update')) }),
       ups.length ? h(Button, { primary: !own?.available, label: t('store.updates.all'), disabled: !!job,
         onClick: () => !job && setPlan(lord.pkg.plan({ upgrade: true })) }) : null),
@@ -335,8 +375,8 @@ function Updates() {
       h(GroupBox, null, ...others.map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
         h(PkgIcon, { name: u.name, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
-          h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, u.name),
-          h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, `${u.from} → ${u.to} · ${u.summary}`)),
+          h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, pkgLabel(u.name)),
+          h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, pkgLine(u))),
         h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size)))))) : null,
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.m, paddingHorizontal: spacing.xs } },
       h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
@@ -364,9 +404,15 @@ function packageOfApp(a) {
 
 export const debian = {
   available: ready,
+  categoryCounts,
+  Details,
   Discover,
+  Category,
+  SuggestedPage,
   Updates,
   Status,
+  // the last job was refused with "not an administrator" (a page that shows the error itself)
+  Refused: () => (useStore(state).msg?.notAdmin ? h(AdminRescue) : null),
   installFile: (path) => runJob('pkg-install-file', path, t('store.job.installFile')).then((ok) => { if (!ok) throw new Error(state.get().msg?.text || ''); }),
   removeApp(a) {
     const name = packageOfApp(a);
@@ -374,4 +420,7 @@ export const debian = {
   },
   canRemove: (a) => !!packageOfApp(a),
   Progress,
+  PlanView,
+  state,
+  runJob,
 };

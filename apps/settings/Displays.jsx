@@ -8,7 +8,8 @@
 import {
   View, Text, useTheme, useLocale, useSettings, Slider, Toggle, admin, useDisplays, applyDisplay, DisplayGlyph, addListener,
   arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, typeScale, spacing,
-  nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime,
+  nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
+  identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Section, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -37,30 +38,57 @@ function useWidth(ref, fallback) {
   return w;
 }
 
-// The arrangement (docs/DISPLAYS.md): every active display at its place in the desktop, proportional to
-// its logical size, drawn as a small screen with its name and resolution. Drag one to move it next to
-// the others (lord-server snaps it: edges touch, no overlap); click one to choose it below. The white
-// bar marks the main display (menu bar, Dock).
-function Arrangement({ outs, sel, onSelect, mirror, t }) {
+// The arrangement (docs/DISPLAYS.md, "Numbers, identify and snapping"): every active display at its
+// place in the desktop, proportional to its logical size, drawn as a small screen with its number
+// (with several displays), name and resolution. Dragging is magnetic (sdk/displaylayout.js): edges
+// stick edge to edge and tops/bottoms, lefts/rights and centers align within 12 preview px; on drop
+// the display always touches another and never overlaps one, and lord-server keeps that position.
+// A click selects a display and shows its number on the real screen (identifyDisplays). The white bar
+// marks the main display (menu bar, Dock).
+function Arrangement({ outs, sel, onSelect, mirror, nums, t }) {
   const act = outs.filter((o) => o.active && o.w);
   const box = useRef(null);
   const W = useWidth(box, 520), H = 180;
-  const [drag, setDrag] = useState(null);       // { id, x, y } in logical px while dragging
+  const [drag, setDrag] = useState(null);       // { id, x, y, view } in logical px while dragging
+  const [flash, setFlash] = useState(null);     // the tile just identified
   const st = useRef(null);
+  const actRef = useRef(act);
+  actRef.current = act;
+  const several = act.length > 1 && !mirror;
+  const identify = (id) => {
+    if (!identifyDisplays([id])) return;
+    setFlash(id);
+    setTimeout(() => setFlash((f) => (f === id ? null : f)), IDENTIFY_MS);
+  };
   useEffect(() => {
+    // where the dragged display wants to be, from the pointer, in logical px
+    const want = (d, e) => ({ x: d.ox + (e.x - d.px) / d.view.k, y: d.oy + (e.y - d.py) / d.view.k });
+    const rectsOf = (d) => {
+      const list = actRef.current;
+      return { rects: list.map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })), i: list.findIndex((o) => o.id === d.id) };
+    };
     const offMove = addListener('pointermove', (e) => {
       const d = st.current;
       if (!d) return;
       if (!d.moved && Math.hypot(e.x - d.px, e.y - d.py) < 4) return;
       d.moved = true;
-      const r = arrangeDisplay(d.id, d.ox + (e.x - d.px) / d.k, d.oy + (e.y - d.py) / d.k, false);
-      if (r) setDrag({ id: d.id, x: r.x, y: r.y });
+      const { rects, i } = rectsOf(d);
+      if (i < 0) return;
+      const w = want(d, e);
+      const p = snapDisplay(rects, i, w.x, w.y, SNAP_PREVIEW_PX / d.view.k);
+      setDrag({ id: d.id, x: p.x, y: p.y, ok: displayPlacementOk(rects, i, p.x, p.y), view: d.view });
     });
     const offUp = addListener('pointerup', (e) => {
       const d = st.current;
       st.current = null;
       if (!d) return;
-      if (d.moved) arrangeDisplay(d.id, d.ox + (e.x - d.px) / d.k, d.oy + (e.y - d.py) / d.k, true);
+      if (!d.moved) { if (d.identify) d.identify(d.id); return; }
+      const { rects, i } = rectsOf(d);
+      if (i < 0) { setDrag(null); return; }
+      const w = want(d, e);
+      const p = resolveDrop(rects, i, w.x, w.y, SNAP_PREVIEW_PX / d.view.k);
+      setDrag({ id: d.id, x: p.x, y: p.y, ok: true, view: d.view });
+      arrangeDisplay(d.id, p.x, p.y, true);
       setTimeout(() => setDrag(null), 400);   // until the new list arrives
     });
     return () => { offMove(); offUp(); };
@@ -72,31 +100,50 @@ function Arrangement({ outs, sel, onSelect, mirror, t }) {
   // mirror: the displays are drawn one behind the other; extend: at their place
   const pos = (o, i) => (mirror ? { x: i * 18, y: i * 14 } : drag && drag.id === o.id ? drag : { x: o.x, y: o.y });
   const boxes = act.map((o, i) => ({ o, ...pos(o, i) }));
-  const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y));
-  const x1 = Math.max(...boxes.map((b) => b.x + b.o.w)), y1 = Math.max(...boxes.map((b) => b.y + b.o.h));
-  const k = Math.min((W - 56) / Math.max(1, x1 - x0), (H - 40) / Math.max(1, y1 - y0));
-  const offX = (W - (x1 - x0) * k) / 2, offY = (H - (y1 - y0) * k) / 2;
-  const movable = !mirror && act.length > 1;
+  // the preview's scale and offset: frozen while dragging, so the tile follows the pointer
+  let view = drag && drag.view;
+  if (!view) {
+    const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y));
+    const x1 = Math.max(...boxes.map((b) => b.x + b.o.w)), y1 = Math.max(...boxes.map((b) => b.y + b.o.h));
+    const k = Math.min((W - 56) / Math.max(1, x1 - x0), (H - 40) / Math.max(1, y1 - y0));
+    view = { k, x0, y0, offX: (W - (x1 - x0) * k) / 2, offY: (H - (y1 - y0) * k) / 2 };
+  }
+  const { k, x0, y0, offX, offY } = view;
+  const movable = several;
   return (
     <View ref={box} style={frame}>
       {boxes.map(({ o, x, y }) => {
-        const on = o.id === sel;
+        const on = o.id === sel, lit = o.id === flash, moving = drag && drag.id === o.id;
         const w = Math.max(28, o.w * k - 3), h = Math.max(18, o.h * k - 3);
+        const n = several ? nums[o.id] : 0;
         return (
           <View key={o.id}
-            onMouseDown={(e) => { onSelect(o.id); if (movable) st.current = { id: o.id, px: e.x, py: e.y, ox: o.x, oy: o.y, k, moved: false }; }}
+            onMouseDown={(e) => { onSelect(o.id); if (several) st.current = { id: o.id, px: e.x, py: e.y, ox: o.x, oy: o.y, view, moved: false, identify: movable ? identify : null }; }}
             style={{ position: 'absolute', left: offX + (x - x0) * k - 3, top: offY + (y - y0) * k - 3, width: w + 6, height: h + 6, padding: 1,
-              borderRadius: 8, cursor: movable ? 'grab' : 'pointer', border: `2px solid ${on ? t.accent : 'transparent'}` }}>
+              borderRadius: 8, cursor: movable ? 'grab' : 'pointer', zIndex: moving ? 2 : 1, opacity: moving && !drag.ok ? 0.7 : 1,
+              border: `2px solid ${on || lit ? t.accent : 'transparent'}` }}>
             <View style={{ flex: 1, borderRadius: 5, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 1,
-              background: on ? 'linear-gradient(160deg, #3d7be0, #7b46cf)' : 'linear-gradient(160deg, #4f6fae, #5d4790)',
-              boxShadow: '0 3px 10px rgba(0,0,0,0.3)' }}>
+              background: lit ? 'linear-gradient(160deg, #6aa4ff, #a57cf0)' : on ? 'linear-gradient(160deg, #3d7be0, #7b46cf)' : 'linear-gradient(160deg, #4f6fae, #5d4790)',
+              boxShadow: lit ? '0 0 0 3px rgba(255,255,255,0.55), 0 3px 10px rgba(0,0,0,0.3)' : '0 3px 10px rgba(0,0,0,0.3)' }}>
               {o.main ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 5, backgroundColor: 'rgba(255,255,255,0.85)' }} /> : null}
-              <Text style={{ fontSize: 11, fontWeight: 600, color: '#fff', textAlign: 'center', whiteSpace: 'nowrap' }}>{o.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: w - 6 }}>
+                {n ? <NumberBadge n={n} size={16} /> : null}
+                {w > 54 || !n ? <Text style={{ fontSize: 11, fontWeight: 600, color: '#fff', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}>{o.name}</Text> : null}
+              </View>
               {h > 44 ? <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.82)', textAlign: 'center', whiteSpace: 'nowrap' }}>{`${o.mode.w} × ${o.mode.h}`}</Text> : null}
             </View>
           </View>
         );
       })}
+    </View>
+  );
+}
+
+// A display's number in a small white circle (the arrangement's tiles and the display's header).
+function NumberBadge({ n, size = 16, color = '#fff', textColor = '#2c3e70' }) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: Math.round(size * 0.66), fontWeight: 700, color: textColor, textAlign: 'center' }}>{String(n)}</Text>
     </View>
   );
 }
@@ -142,13 +189,18 @@ function ScaleTiles({ value, rec, onPick, t, tr }) {
 }
 
 // The selected display: its picture, name and size line (first row of its box).
-function DisplayHeader({ cur, sizeLine, several, t, tr }) {
+function DisplayHeader({ cur, sizeLine, several, n, t, tr }) {
   return (
     <View style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s }}>
       <DisplayGlyph size={36} color={t.accent} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start', whiteSpace: 'nowrap' }}>{cur.name}</Text>
+          {n ? (
+            <View style={{ height: 16, paddingHorizontal: 6, borderRadius: 8, justifyContent: 'center', backgroundColor: t.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)' }}>
+              <Text style={{ fontSize: 10, fontWeight: 500, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('prefs.display.number', { n })}</Text>
+            </View>
+          ) : null}
           {cur.main && several ? (
             <View style={{ height: 16, paddingHorizontal: 6, borderRadius: 8, justifyContent: 'center', backgroundColor: t.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)' }}>
               <Text style={{ fontSize: 10, fontWeight: 500, color: t.textDim, whiteSpace: 'nowrap' }}>{tr('prefs.display.mainLabel')}</Text>
@@ -268,13 +320,14 @@ export function DisplaysSettings() {
   const sizeLine = [cur.connector, cur.diagonal ? tr('prefs.display.inches', { n: (cur.diagonal / 10).toFixed(1) }) : '', `${mode.w} × ${mode.h}`, looks].filter(Boolean).join(' · ');
   const scales = [100, 125, 150, 175, 200].map((n) => [n, n === rec ? tr('prefs.display.scaleRecommended', { n }) : tr('prefs.display.scaleN', { n })]);
   const several = act.length > 1 || outs.length > 1;
+  const nums = displayNumbers(outs);
   return (
     <Stack>
-      <ArrangementBlock outs={outs} sel={cur.id} onSelect={setSel} mirror={d.mirror} t={t}
-        hint={act.length > 1 && !d.mirror ? tr('prefs.display.arrangeHint') : ''} />
+      <ArrangementBlock outs={outs} sel={cur.id} onSelect={setSel} mirror={d.mirror} nums={nums} t={t} tr={tr}
+        hint={act.length > 1 && !d.mirror ? tr('prefs.display.arrangeHint') : ''} canIdentify={act.length > 1 && !d.mirror} />
 
       <Section>
-        <DisplayHeader cur={cur} sizeLine={sizeLine} several={several} t={t} tr={tr} />
+        <DisplayHeader cur={cur} sizeLine={sizeLine} several={several} n={act.length > 1 && !d.mirror ? nums[cur.id] : 0} t={t} tr={tr} />
         {several ? (
           <SettingRow label={tr('prefs.display.useAsMain')} hint={cur.main ? tr('prefs.display.mainHint') : ''} disabled={!cur.active || d.mirror}>
             <Toggle small on={!!cur.main} onChange={(on) => { if (on && !cur.main) setMainDisplay(cur.id); }} />
@@ -335,12 +388,17 @@ export function DisplaysSettings() {
   );
 }
 
-// The arrangement with its hint under it (like a section footer).
-function ArrangementBlock({ hint, ...p }) {
+// The arrangement with its hint and the Identify button under it (like a section footer).
+function ArrangementBlock({ hint, canIdentify, tr, ...p }) {
   return (
     <View style={{ gap: 6 }}>
       <Arrangement {...p} />
-      {hint ? <Note>{hint}</Note> : null}
+      {hint || canIdentify ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s }}>
+          <View style={{ flex: 1, minWidth: 0 }}>{hint ? <Note>{hint}</Note> : null}</View>
+          {canIdentify ? <Button small label={tr('prefs.display.identify')} onClick={() => identifyDisplays()} /> : null}
+        </View>
+      ) : null}
     </View>
   );
 }

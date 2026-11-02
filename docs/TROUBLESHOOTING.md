@@ -168,3 +168,20 @@ itself, and `vmtoolsd` does not touch it. No upstream report ties `open-vm-tools
 lag: [open-vm-tools#696](https://github.com/vmware/open-vm-tools/issues/696) was closed as a
 VMware Workstation bug. The VMware report above was the GPU presentation bug, and it reproduced
 on Proxmox, where `open-vm-tools` is inactive.
+
+## Known issues in 0.8.5
+
+From the release notes (`CHANGELOG.md`, 0.8.5-beta, "Known issues and limitations"):
+
+- **A black rectangle between the boot menu and the splash (legacy BIOS).** When the menu's 5 s run out
+  (or Enter is pressed) GRUB loads the kernel and the initrd from the disc and shows its terminal area,
+  painted black, until the kernel starts: a few seconds on BIOS, barely visible on UEFI. Harmless; 0.8.4's
+  ISO does the same.
+- **Remote desktop: black corners on a window being dragged.** Only in the frames sent to the browser;
+  the monitor shows them right. Being looked at ([REMOTE.md](REMOTE.md)).
+- **llama.cpp on a GPU** is not tested on real hardware yet; without a Vulkan device it runs on the CPU.
+- **Searching "displays"** lists the Help article on touchpads and touch screens before Settings →
+  Displays; **Settings → Displays** cuts the name of a small display in the arrangement without an
+  ellipsis.
+- **Steam** isn't in the Store: it needs i386 multiarch, which LordOS's package engine doesn't do yet
+  ([ROADMAP.md](ROADMAP.md)).

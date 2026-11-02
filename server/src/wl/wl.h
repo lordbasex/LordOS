@@ -28,17 +28,24 @@ int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, con
 /* While lord-server moves or resizes a window (ui/grab.c): no app receives the pointer
  * (they are sent leave) and only the button count is tracked. */
 void wl_pointer_grab(int nbuttons, const int *down);
-int  wl_key(int code, int value, const KeyInfo *k);   /* 1 if the key went to the focused app */
+/* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
+ * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
+int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
 
 /* From JS (lord.wayland) */
 void wl_set_focus(int id);              /* 0: no Wayland app has the keyboard */
+void wl_focus_terminal(int on);         /* the app with the keyboard is a terminal emulator: ❖C is Ctrl+Shift+C */
 void wl_close(int id);                  /* asks the app to close the window */
+void wl_close_all(int ms);              /* every app asked to close, then waits for them: at most ms */
+const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
+void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
 int  wl_count(void);
+int  wl_idle_inhibited(void);             /* idle-inhibit: a shown surface asks the screen to stay on */
 void wl_output_resized(void);               /* headless: one display of ui.width × ui.height */
 void wl_remap_all(void);                    /* a new JS context (theme switched): announce the open windows again */
 /* The displays (docs/DISPLAYS.md): one wl_output (+ xdg-output) each. x, y, w, h: logical rect in the
@@ -56,11 +63,19 @@ void wl_set_pointer_scale(int pct);         /* the display under the pointer: cu
 void wl_paint_begin(void);
 void wl_paint_keep(void);                /* saves the windows noted so far (paint.c, «what is below») */
 void wl_paint_kept(void);                /* and notes them again in another frame */
+void wl_paint_save(void);                /* keeps the frame's list of windows (LORD_PAINT_VERIFY) */
+void wl_paint_restore(void);             /* and puts it back */
 void wl_paint_holes(int on);             /* 0: wl_paint only notes the window, without opening the hole */
+int  wl_draws_meet(Rect r);              /* GPU path: an app window noted below the UI (layer 0) meets r (physical px of the view being painted) */
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip);  /* GPU path: windows painted until wl_tf_end are in a transformed node's raster */
+void wl_tf_end(void);
+void wl_tf_nested(int d);                /* +1 / -1: inside another transform: no quad */
+void wl_tf_open_holes(Canvas *c);        /* in the canvas the raster goes to, before it is blended */
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op);
 void wl_paint_popups(Canvas *c);
 
 /* Presentation (main.c). */
+int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu to draw (the buffer-age scissor) */
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);

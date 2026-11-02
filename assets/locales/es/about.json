@@ -1,4 +1,7 @@
 {
+  "bootTime": "Tiempo de inicio",
+  "bootToDesktop": "{s} s hasta el escritorio",
+  "bootToLogin": "{s} s hasta la pantalla de inicio",
   "build": "Compilación {b}",
   "buildLabel": "Compilación",
   "channelAlpha": "Alfa",
@@ -33,8 +36,11 @@
   },
   "server": "Servidor gráfico",
   "systemApp": "App del sistema",
+  "systemReport": "Informe del sistema…",
   "tagline": "Un escritorio GNU/Linux libre, rápido y seguro, construido sobre Debian y Wayland.",
   "uptime": "Encendido hace",
   "version": "Versión {v}",
-  "versionChannel": "Versión {v} · {channel}"
+  "versionChannel": "Versión {v} · {channel}",
+  "case": "Caja",
+  "caseArgonV5": "Argon ONE V5"
 }

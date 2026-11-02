@@ -1,7 +1,7 @@
-// Tokens of the "Classic" theme. The base keys (text, accent, windowBg…) are the contract with the
+// Tokens of the "Lord Classic" theme. The base keys (text, accent, windowBg…) are the contract with the
 // apps (sdk/theme.js); the shape keys (controlRadius, menuHighlight, selection, inputFocus,
 // buttonBorder, popupBg) restyle the SDK's shared controls, so every app takes this look without
-// being changed. The rest belongs to this theme (docs/DESIGN.md, "Classic").
+// being changed. The rest belongs to this theme (docs/DESIGN.md, "Lord Classic").
 import { lordosWallpapers } from '@lordos/sdk';
 
 // The same names as the default theme's, so the user's accent survives a theme switch.

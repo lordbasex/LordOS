@@ -1,5 +1,6 @@
 {
   "id": "backup",
+  "version": "0.8.5",
   "name": "Backups",
   "description": "Scheduled backups of the home folder to an external disk or a folder, with restore by date",
   "size": [

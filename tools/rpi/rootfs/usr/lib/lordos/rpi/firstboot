@@ -184,7 +184,10 @@ if [ -e "$STATE/firstboot-pending" ]; then
     fi
     if [ "$OK" = 1 ]; then
         log "creating user $U (from $(basename "$F"))"
-        useradd --create-home --shell /bin/bash --user-group --comment "${FULL:-$U}" -G sudo,audio,video,input,render "$U"
+        # lpadmin: an administrator manages printers too (CUPS, docs/PRINTING.md), as on the ISO
+        GROUPS_U=sudo,audio,video,input,render
+        for g in lpadmin plugdev; do getent group "$g" > /dev/null && GROUPS_U="$GROUPS_U,$g"; done
+        useradd --create-home --shell /bin/bash --user-group --comment "${FULL:-$U}" -G "$GROUPS_U" "$U"
         if [ -n "$HASH" ]; then usermod -p "$HASH" "$U"
         else printf '%s:%s\n' "$U" "$PASS" | chpasswd; fi       # chpasswd: yescrypt, like Debian
         : > "/var/lib/systemd/linger/$U"

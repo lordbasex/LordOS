@@ -91,6 +91,7 @@ typedef struct { float x0, y0, x1, y1; } Box;
 typedef struct {
     Affine own, world, inv;
     uint64_t sig;               /* paint.c: geometry of its subtree in the last damage pass (own_tf) */
+    uint8_t live, live_known;   /* paint.c: what decided its raster's kind in the last damage pass */
 } NodeTf;
 
 typedef struct Node {
@@ -109,6 +110,8 @@ typedef struct Node {
     int measure_valid;
     float measure_maxw, measure_w, measure_h;
     uint8_t paint_dirty;        /* its style or text changed */
+    unsigned gen;               /* bumped with paint_dirty and never cleared: a transformed subtree's
+                                 * cached raster compares it (paint.c tf_check) */
     Box prev_box;               /* what it occupied on screen in the last frame */
     NodeTf *tf;
 } Node;
@@ -158,6 +161,9 @@ void  node_detach(Node *c);
 void  node_set_text(Node *n, const char *s);
 void  node_invalidate(Node *n);
 void  node_moved(Node *n);          /* only left/top changed (window drag): no repaint of its content */
+/* after a style change (lord.setStyle): before = the style, ext_before = its StyleExt values (NULL
+ * if it had none) before the change; places, remeasures or repaints only what the change needs */
+void  node_restyled(Node *n, const Style *before, const StyleExt *ext_before);
 int   node_gather_text(const Node *n, char *buf, int size);
 int   node_children_ordered(Node *n, Node **out, int max);
 void  damage_add(Box b);
@@ -204,6 +210,7 @@ typedef struct {
 /* The pointer is valid until the next call (the cache may grow). */
 const Glyph *text_glyph(uint32_t cp, int font, float size);
 int   text_font_add(const char *path);
+int   text_drew_inexact(void);                    /* text drawn since the last call may not move exactly; resets */
 int   text_font_load(const char *path, int index);
 int   text_font_has(int font, uint32_t cp);
 uint32_t text_font_glyph(int font, uint32_t cp);          /* glyph index, 0 = doesn't have it */
@@ -214,6 +221,8 @@ const Glyph *text_glyph_id(int font, uint32_t gid, float size);
 const Glyph *text_glyph_color(int font, uint32_t gid, int max_w, int max_h);
 void  text_font_vmetrics(int font, float size, float *asc, float *desc);
 int   text_init(const char *font_dir);
+/* For LordBench's helper, which opens no files: one interface font already in memory (it must stay there) */
+int   text_init_mem(const unsigned char *data, size_t size);
 /* Weight + TEXT_MONO picks the monospaced font (JetBrains Mono) in text_measure/text_draw and in
  * lord.measureText: this way the font travels with the weight without changing the signatures. */
 #define TEXT_MONO 1000.0f
@@ -280,8 +289,71 @@ int   paint_damage(Node *root);     /* computes ui.damage; 0 if there is nothing
 /* after paint_damage: the rectangles to repaint (1 = just ui.damage), each inside ui.damage;
  * see "Several damaged rectangles" in paint.c */
 int   paint_damage_rects(Box *out, int max);
+/* damage gathered over several frames (a display whose flip was pending): the blur rule again,
+ * on the tree as it is now (paint.c, main.c paint_out) */
+void  paint_damage_settle(DamageList *l);
 extern int paint_multi_damage;      /* 1: several rectangles (LORD_DAMAGE=multi, tests); 0 by default */
+extern int paint_tf_nocache;        /* tests: a reference paint that neither reads nor fills the
+                                     * transformed subtrees' raster cache (engine-test) */
 void  paint_root(Canvas *c, Node *root);
+void  paint_root_clear(Canvas *c, Node *root, uint32_t rgb);   /* canvas_clear + paint_root */
+void  paint_root_full(Canvas *c, Node *root);  /* everything, no drag layer or skipped nodes (checks only) */
+/* The copy of what is below a dragged window (paint.c, docs/WINDOWS.md). paint_below_switch (1 by
+ * default): a frame may use it where 001633b's rule painted everything, when that gives the same
+ * pixels. paint_below_verify (tests): each such frame is painted again the old way and the pixels that
+ * differ are added to paint_below_bad (paint_below_checked counts the frames). */
+extern int  paint_below_switch, paint_below_verify;
+extern long paint_below_bad, paint_below_checked;
+/* why a frame did not switch: an ancestor of the window paints over it (border, rounded corners), a
+ * blurred or a transformed node before it meets the frame's box, the last build didn't reach the
+ * window, or more to build than to paint */
+enum { BR_OK, BR_ANCESTOR, BR_BLUR, BR_TRANSFORM, BR_UNREACHED, BR_COST, BR_N };
+typedef struct { long full, part, switched, refused[BR_N]; } BelowStats;
+void  paint_below_stats(BelowStats *s);    /* builds (whole, part) and switched frames since the last call */
+/* GPU drag (docs/GPU.md, "The dragged window on the GPU"): paint_root_clear's frame, except that where
+ * the dragged window lands (g->w) nothing is painted: the GPU composites the layer over the copy of what
+ * is below there, with the CPU's arithmetic. Only on frames that use that copy and only when nothing
+ * else would paint there (see paint.c); 1 if it was taken (the scene's g->w is then stale and only
+ * g->strip were painted), 0 if the whole clip was painted as paint_root_clear(c, root, 0) does.
+ * paint_gdrag_done: the GPU got g's textures (the dirty rectangles start again). LORD_GPU_VERIFY=N: every
+ * N-th taken frame also paints g->w on the CPU into g->ref, for the GPU to compare. */
+struct GpuDrag;
+int   paint_root_gdrag(Canvas *c, Node *root, struct GpuDrag *g);
+void  paint_gdrag_done(void);
+/* changes whenever a GpuDrag that paint_root_gdrag filled may no longer be submitted as it is: the drag layer began,
+ * ended or moved to another display, its buffers were reallocated or the textures need everything again. The
+ * frame pipeline (main.c) checks it before submitting a prepared GPU drag frame. */
+unsigned paint_gdrag_epoch(void);
+/* why a frame that used the copy was not composited on the GPU: the layer (invalid, re-rendered, app
+ * windows or invalid pixels in it, other opacity, a transform), its rectangle not inside the damage,
+ * an ancestor painting over it, an app window under it, a node painted after the window in the
+ * damage, or something changed while painting (post) */
+enum { GDRAG_R_LAYER, GDRAG_R_CLIP, GDRAG_R_ANCESTOR, GDRAG_R_APP, GDRAG_R_AFTER, GDRAG_R_POST,
+       GDRAG_R_FEED,                            /* the textures still lack more than GDRAG_FEED_PX (paint_gdrag_feed) */
+       GDRAG_R_N };
+/* GDRAG_R_LAYER split by its cause, in gdrag_gate's order: no window or not wanted, not valid (painted whole
+ * next), being resized, being rendered, capture mode, another display's, transformed, the window or an
+ * ancestor raw or hidden, app holes in it, app surfaces in it, a colour above its alpha, no buffer, not
+ * under the root, another opacity, a part that would make it paint whole */
+enum { GDRAG_L_GONE, GDRAG_L_INVALID, GDRAG_L_RESIZE, GDRAG_L_RENDERING, GDRAG_L_CAPTURE, GDRAG_L_VIEW, GDRAG_L_TRANSFORM, GDRAG_L_RAW,
+       GDRAG_L_HOLES, GDRAG_L_SURFACES, GDRAG_L_PREMUL, GDRAG_L_NOBUF, GDRAG_L_TREE, GDRAG_L_OPACITY, GDRAG_L_PART, GDRAG_L_SIZE, GDRAG_L_N };
+typedef struct { long frames, cut, strip_px, tried, refused[GDRAG_R_N], layer[GDRAG_L_N]; } GdragStats;
+void  paint_gdrag_stats(GdragStats *s);          /* since the last call */
+/* The last paint_root_* call: -1 GPU drag not tried (no copy used, or not a GPU drag call), 1 taken, 0 refused
+ * (*why a GDRAG_R_*, *sub a GDRAG_L_* when it is GDRAG_R_LAYER, else -1) */
+int   paint_gdrag_last(int *why, int *sub);
+/* the largest layer the GPU's self-test covered (gpu_gdrag_max); a taller one stays on the CPU. 0: no limit */
+void  paint_gdrag_limit(int w, int h);
+/* GPU drag's textures catching up (docs/GPU.md, "Uploads without a stall"): what of the layer and of the copy
+ * of what is below the GPU still lacks, in pixels (both; 0 nothing, or no layer on display view) */
+long  paint_gdrag_backlog(int view);
+/* Sends at most budget pixels of it, rectangles cut by rows, through up(ctx, which, px, w, h, r) (which:
+ * 0 the copy, 1 the layer; px w × h, stride w), and forgets what was sent. Each texture is asked first
+ * with an empty r. up returns 0 sent, 1 its texture held nothing of this (now it is ready for it: all of
+ * it is needed again), -1 failed (stop). Only the display that has the layer (view), and only while GPU drag
+ * could use it. Returns the pixels sent. */
+long  paint_gdrag_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
+                    void *ctx);
 Node *hit_test(Node *root, float x, float y);
 /* Capture mode (media/capture.c): protected nodes are painted black and app windows
  * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */

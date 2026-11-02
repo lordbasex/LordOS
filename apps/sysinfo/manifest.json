@@ -1,0 +1,19 @@
+{
+  "id": "sysinfo",
+  "version": "0.8.6",
+  "name": "System Information",
+  "description": "Every piece of hardware detected and what LordOS makes of it",
+  "size": [
+    960,
+    640
+  ],
+  "minSize": [
+    760,
+    480
+  ],
+  "dock": false,
+  "permissions": [
+    "system:read"
+  ],
+  "category": "System"
+}

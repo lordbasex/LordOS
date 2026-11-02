@@ -10,7 +10,7 @@
 //     and the clipboard isn't offered yet; a help line per restriction says what it covers.
 // The rules are saved by lord-server (lord.fw); this screen writes no files. Drawn like the
 // Settings sections: 13/600 headers, inset GroupBoxes with hairlines, footers.
-import { View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, spacing, typeScale, errorText } from '@lordos/sdk';
+import { View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, spacing, typeScale, errorText, netModel } from '@lordos/sdk';
 import { useState } from 'react';
 
 // Firewall id of a launcher app: the built-in ones run inside LordOS.
@@ -24,7 +24,12 @@ const LINUX_NOT_YET = ['no-clipboard'];
 // sound streams, notifications), except files: the app's view is built when it starts.
 const NEXT_LAUNCH = ['no-files'];
 const isLinux = (id) => id.startsWith('desktop:');
-const offered = (id) => (id === 'lordos' ? firewall.RESTRICTIONS.filter((f) => !DESKTOP_ALWAYS.includes(f))
+// (0.8.5) LordOS's components with their own scope (Mail, Store, Printers, Terminal, Blocklists): they
+// take restrictions like an app; the system services (system:*) and the VPN row never do
+const { COMPONENTS } = netModel;
+const COMPONENT_IDS = Object.keys(COMPONENTS).filter((id) => id.startsWith('lordos:') && !COMPONENTS[id].system);
+const NET_ONLY = ['no-internet', 'no-lan', 'no-network', 'no-incoming'];
+const offered = (id) => (COMPONENTS[id] ? NET_ONLY : id === 'lordos' ? firewall.RESTRICTIONS.filter((f) => !DESKTOP_ALWAYS.includes(f))
   : isLinux(id) ? firewall.RESTRICTIONS.filter((f) => !LINUX_NOT_YET.includes(f)) : firewall.RESTRICTIONS);
 
 function useAppIndex() {
@@ -45,7 +50,7 @@ function AppLabel({ id, apps, tr }) {
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
       {Icon ? <Icon size={24} /> : <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: t.control }} />}
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : a?.name || id.replace(/^(desktop|lpk):/, '')}</Text>
+        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : a?.name || id.replace(/^(desktop|lpk):/, '')}</Text>
         <Text style={{ fontSize: 10, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', fontFamily: 'monospace', textAlign: 'start' }}>{id}</Text>
       </View>
     </View>
@@ -56,7 +61,7 @@ function AppLabel({ id, apps, tr }) {
 function AddApp({ apps, exclude, onPick, tr }) {
   const t = useTheme();
   const [open, setOpen] = useState(false);
-  const choices = ['lordos', ...apps.keys()].filter((id) => !exclude.has(id));
+  const choices = ['lordos', ...COMPONENT_IDS, ...apps.keys()].filter((id) => !exclude.has(id));
   return (
     <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
       <View style={{ flexDirection: 'row' }}>
@@ -121,10 +126,10 @@ export function FirewallPrivacy() {
           <View style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: 7 }}>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('firewall.mode')}</Text>
-              <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{tr(st.mode === 'off' ? 'firewall.mode.offHint' : 'firewall.mode.silentHint')}</Text>
+              <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, textAlign: 'start' }}>{tr(st.mode === 'off' ? 'firewall.mode.offHint' : st.mode === 'deny' ? 'firewall.mode.denyHint' : 'firewall.mode.silentHint')}</Text>
             </View>
-            <Segmented small value={st.mode === 'off' ? 'off' : 'silent'} onChange={(m) => firewall.setMode(m)}
-              options={[['silent', tr('firewall.mode.silent')], ['off', tr('firewall.mode.off')]]} />
+            <Segmented small value={st.mode === 'off' || st.mode === 'deny' ? st.mode : 'silent'} onChange={(m) => firewall.setMode(m)}
+              options={[['silent', tr('firewall.mode.silent')], ['deny', tr('firewall.mode.deny')], ['off', tr('firewall.mode.off')]]} />
           </View>
         </GroupBox>
         {foot(statusText, status.daemon && status.bpf ? null : '#ff9f0a')}

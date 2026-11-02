@@ -15,7 +15,7 @@ Both are mounted by the SDK, so **every theme has them** without doing anything:
 | ![notes](search-notes.png) | |
 | «apples» finds the note by its content | |
 
-It opens with **❖Space** or **Ctrl+Space**, or with the ⌕ magnifier in the Lord Default theme's
+It opens with **❖Space** or **Ctrl+Space**, or with the ⌕ magnifier in the Lord Flow theme's
 menu bar. With the Terminal in front, Ctrl+Space is left to the program (in emacs it sets a
 mark); ❖Space works the same.
 
@@ -44,6 +44,7 @@ Sections are ordered by their best result; the calculator always goes on top.
 | Notes | `~/Notes/*/nota.md` (title from the Notes app's YAML header, and the content); the section only appears if the Notes app is present | `wm.open('notes', { args: { slug } })` |
 | Clipboard | texts from the history | copies again |
 | Store | `lord.pkg.search`: only AppStream apps that aren't installed, up to 5 | `wm.open('store', { args: { search } })` |
+| Help | the Help articles, through `registerSpotlightSource` (`sdk/help.js`; see `SYSTEM.md`, "Help") | the article in Help |
 
 **Relevance:**
 - For the name: prefix > word > substring > fuzzy (the letters in order).
@@ -70,7 +71,9 @@ Sections are ordered by their best result; the calculator always goes on top.
 | Chosen with ❖V and the 8 key: «360» was pasted into the Settings search box, which had focus | Settings → Clipboard |
 
 There is a single one for the whole session: the Terminal, LordOS's text fields and Linux apps
-(the compositor acts as the bridge; see `WAYLAND.md`). The history stores everything copied in
+(the compositor acts as the bridge; see `WAYLAND.md`), and since 0.8.3 X11 apps through Xwayland
+(the X window manager, `wl/xwm.c`, offers LordOS's clipboard to X only while an X window has the
+keyboard). The history stores everything copied in
 any of them: texts, links, colors, code, paths and images. For each entry it stores the origin
 and the time.
 
@@ -152,5 +155,8 @@ Sensitive content never enters the history, but it can still be pasted:
   still missing.
 - Formats that aren't text or PNG (HTML, `text/uri-list` with files): today they pass between
   Linux apps while the source app stays open, but they don't go into the history.
-- Search: searching file contents (today, names only), contacts and mail, which don't exist
-  yet, and «Lock screen», which doesn't exist (M8).
+- Search: searching file contents (today, names only), contacts and mail (the apps exist since
+  M9, but they are not search sources yet), and a «Lock screen» action (locking exists, ❖L, but
+  Search only offers dark/light mode and log out).
+- Known issue in 0.8.5: searching "displays" lists the Help article on touchpads and touch screens
+  before Settings → Displays.

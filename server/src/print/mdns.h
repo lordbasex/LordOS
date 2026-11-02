@@ -21,17 +21,21 @@ typedef struct {
 int mdns_browse(const char *const *types, int ntypes, int ms, MdnsSvc *out, int max);
 
 /* --- pieces for the tests --- */
+#define MDNS_MAX 256                /* records of each kind kept */
+enum { MDNS_T_A = 1, MDNS_T_PTR = 12, MDNS_T_TXT = 16, MDNS_T_SRV = 33 };
 typedef struct {
-    struct { char name[256], target[256], first[128]; } ptr[64];
-    struct { char name[256], host[256]; int port; } srv[64];
-    struct { char name[256]; char txt[1536]; } txt[64];
-    struct { char host[256]; char addr[16]; } a[64];
+    struct { char name[256], target[256], first[128]; } ptr[MDNS_MAX];
+    struct { char name[256], host[256]; int port; } srv[MDNS_MAX];
+    struct { char name[256]; char txt[1536]; } txt[MDNS_MAX];
+    struct { char host[256]; char addr[16]; } a[MDNS_MAX];
     int nptr, nsrv, ntxt, na;
 } MdnsCache;
 /* Adds the records of a reply packet. 0 on success, -1 invalid packet. */
 int  mdns_parse(const uint8_t *pkt, size_t len, MdnsCache *c);
 /* Builds the services of the requested types from what was gathered. */
 int  mdns_collect(const MdnsCache *c, const char *const *types, int ntypes, MdnsSvc *out, int max);
+/* One query with n questions (id 0: standard). Its length, 0 if it doesn't fit. */
+size_t mdns_query(uint8_t *q, size_t cap, const char *const *names, const int *types, int n, uint16_t id);
 /* Value of a TXT key ("" if it's not there). */
 const char *mdns_txt(const MdnsSvc *s, const char *key, char *out, size_t n);
 

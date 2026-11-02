@@ -124,5 +124,25 @@ eq('toggle: own deny under a deny wildcard → update to allow', toggleOp(wild, 
 eq('toggle: no name → the address', toggleOp([], { addr: '203.0.113.5', proto: 'udp', port: 443 }).rule.dst, '203.0.113.5');
 eq('toggle: restricted → nothing', toggleOp([], q, ['no-internet']), null);
 
+// (0.8.5) blocklists and the deny mode, the same order as rules.c (fw_rules_test's cases)
+const t = 'tracker.example';
+const L = { listed: true };
+eq('list: no rules → denied by the list', decide([], { names: [t], addr: '203.0.113.9' }, [], L), { action: 'deny', rule: null, by: 'list' });
+eq('list: off → none', decide([], { names: [t], addr: '203.0.113.9' }, [], {}), null);
+const broad = [{ id: 1, dir: 'out', dst: 'any', port: '', proto: '', action: 'allow' }, { id: 2, dir: 'out', dst: 'internet', port: '', proto: '', action: 'allow' }];
+eq('list: beats any/internet allow rules', decide(broad, { names: [t], addr: '203.0.113.9' }, [], L).by, 'list');
+const mine = [...broad, { id: 3, dir: 'out', dst: t, port: '', proto: '', action: 'allow' }];
+eq('list: the owner\'s allow for the name wins', decide(mine, { names: [t], addr: '203.0.113.9' }, [], L).rule?.id, 3);
+const net = [{ id: 4, dir: 'out', dst: '198.51.100.0/24', port: '', proto: '', action: 'allow' }];
+eq('list: an allow for the network wins', decide(net, { names: [], addr: '198.51.100.7' }, [], L).rule?.id, 4);
+eq('list: a restriction comes first', decide([], { names: [t], addr: '203.0.113.9' }, ['no-internet'], L).by, 'restricted');
+eq('toggle: listed → add an allow for the name', toggleOp([], { name: t, addr: '203.0.113.9', proto: 'tcp', port: 443 }, [], L), { op: 'add', rule: { dir: 'out', dst: t, port: '', proto: '', action: 'allow' } });
+const D = { mode: 'deny' };
+eq('deny mode: internet', decide([], { addr: '8.8.8.8' }, [], D), { action: 'deny', rule: null, by: 'mode' });
+eq('deny mode: LAN', decide([], { addr: '192.168.1.1' }, [], D).action, 'deny');
+eq('deny mode: loopback stays', decide([], { addr: '127.0.0.53', port: 53, proto: 'udp' }, [], D), null);
+eq('deny mode: ::1 stays', decide([], { addr: '::1' }, [], D), null);
+eq('deny mode: a rule allows', decide([{ id: 5, dir: 'out', dst: 'example.org', port: '', proto: '', action: 'allow' }], { names: ['example.org'], addr: '203.0.113.5' }, [], D).action, 'allow');
+
 console.log(`fwrule-input-test: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

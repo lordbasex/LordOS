@@ -12,6 +12,7 @@ import { createElement as h } from 'react';
 import { View, Text } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { useTheme } from './theme.js';
+import { noteTextField } from './textfocus.js';
 
 const EMPTY = { engine: '', preedit: '', candidates: [], selected: 0, converting: false, segments: null };
 export const imeState = createStore(EMPTY);
@@ -30,6 +31,7 @@ export const ime = {
     stack = [...stack.filter((e) => e.token !== token), { token, caret, inline }];
     if (prev && prev.token !== token) { native(() => lord.ime.reset()); clear(); }
     native(() => lord.ime.setContext(true));
+    noteTextField('ime', ime.caret);
   },
   detach(token) {
     const was = top();
@@ -38,6 +40,7 @@ export const ime = {
     native(() => lord.ime.setContext(false));       // discards the composition
     clear();
     if (stack.length) native(() => lord.ime.setContext(true));
+    noteTextField('ime', stack.length ? ime.caret : null);
   },
   caret: () => top()?.caret?.() || null,
   owner: () => top()?.token || null,

@@ -2,8 +2,9 @@
  * lord.themes, lord.quit and lord.measureText.
  *
  * Security rules: the server already runs as the session user (not root);
- * lord.fs works only inside the home folder and the user's mounted disks
- * (/media/$USER, /run/media/$USER; fsops_allowed): it lists and reads (up to 8 MB), writes (up to
+ * lord.fs reads the whole tree as the user except /proc, /sys, /dev and /run (fsops_readable;
+ * listing, reading up to 8 MB, stat, du, free, search), and changes things only inside the home
+ * folder and the user's mounted disks (/media/$USER, /run/media/$USER; fsops_allowed): it writes (up to
  * 32 MB), creates folders, renames, copies and moves (in a thread, fsops.c), and sends to the freedesktop
  * Trash; real deletion is only possible inside the Trash. Writing is atomic (temporary + rename),
  * doesn't follow symbolic links in the final file and can NOT touch ~/.local/share/applications,
@@ -11,6 +12,7 @@
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
  * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
  * lord.themes only accepts simple names. */
+#include "../hw/hw_admin.h"
 #include "js_sys.h"
 #include "js_err.h"
 #include "ui.h"
@@ -24,11 +26,13 @@
 #include "../app/app.h"
 #include "../ime.h"
 #include "../wl/wl.h"
+#include "../wl/keygrab.h"
 #include "../wl/xwayland.h"
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../remote/mirror.h"
 #include "../pkg/crypto.h"
+#include "../sysreport/sysreport.h"
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
 
 #include <ctype.h>
@@ -72,12 +76,33 @@ void js_sys_init(void) {
 
 /* Resolves a path (relative to the home folder or absolute) and checks that it doesn't leave the
  * allowed roots: the home folder and the user's mounts (/media/$USER, /run/media/$USER). */
+static int share_down;                  /* the last path refused was on a share that doesn't answer */
+static int gone(const char *full) { return share_down = fsops_share_down(full); }
+
 static int resolve_in_home(const char *path, char *out) {
     char full[PATH_MAX * 2];
     if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
     else snprintf(full, sizeof full, "%s/%s", home, path);
-    if (!realpath(full, out)) return -1;
+    if (gone(full) || !realpath(full, out)) return -1;
     return fsops_allowed(out) ? 0 : -1;
+}
+
+/* The same for reading only (list, read, stat, du, free, search): the whole tree as the session
+ * user except the pseudo-filesystems (fsops_readable; Files → This computer, 0.8.5). */
+static int resolve_readable(const char *path, char *out) {
+    char full[PATH_MAX * 2];
+    if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
+    else snprintf(full, sizeof full, "%s/%s", home, path);
+    if (gone(full) || !realpath(full, out)) return -1;
+    return fsops_readable(out) ? 0 : -2;      /* -2: exists, but one of the folders not read */
+}
+
+/* A folder Files shows with a lock: the system's permissions don't let this user open it, or it is
+ * one of the pseudo-filesystems lord.fs doesn't read (fsops_readable). */
+static int dir_locked(const char *path) {
+    char real[PATH_MAX];
+    if (!realpath(path, real) || !fsops_readable(real)) return 1;
+    return access(real, R_OK | X_OK) != 0;
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
@@ -120,9 +145,13 @@ static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
     const char *p = JS_ToCString(c, argv[0]);
     if (!p) return JS_EXCEPTION;
     char dir[PATH_MAX];
-    int bad = resolve_in_home(p, dir);
+    int bad = resolve_readable(p, dir);
     JS_FreeCString(c, p);
-    if (bad) return js_throw_code(c, "fs.outsideHome", NULL);
+    if (bad) {
+        /* an existing folder that is not read on purpose (/proc, /sys, /dev, /run) says so */
+        if (bad == -2) return js_throw_code(c, "fs.systemFolder", NULL);
+        return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
+    }
     DIR *d = opendir(dir);
     if (!d) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
     JSValue arr = JS_NewArray(c);
@@ -140,6 +169,8 @@ static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, e->d_name));
         JS_SetPropertyStr(c, o, "link", JS_NewBool(c, link));
         JS_SetPropertyStr(c, o, "dir", JS_NewBool(c, S_ISDIR(st.st_mode)));
+        /* a folder this user can't open (shown with a lock in This computer) */
+        if (S_ISDIR(st.st_mode) && dir_locked(fp)) JS_SetPropertyStr(c, o, "locked", JS_TRUE);
         JS_SetPropertyStr(c, o, "size", JS_NewFloat64(c, (double)st.st_size));
         JS_SetPropertyStr(c, o, "mtime", JS_NewFloat64(c, (double)st.st_mtime * 1000));
         JS_SetPropertyUint32(c, arr, i++, o);
@@ -148,8 +179,8 @@ static JSValue f_fs_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return arr;
 }
 
-/* lord.fs.read(path, 'text' | 'binary') — content of a regular file in $HOME
- * (UTF-8 text or ArrayBuffer). Used, for example, by the Terminal's profile importer. */
+/* lord.fs.read(path, 'text' | 'binary') — content of a regular file in $HOME, the user's disks or
+ * (read-only) the rest of the tree (resolve_readable) (UTF-8 text or ArrayBuffer). Used, for example, by the Terminal's profile importer. */
 static JSValue f_fs_read(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     const char *p = JS_ToCString(c, argv[0]);
@@ -158,9 +189,9 @@ static JSValue f_fs_read(JSContext *c, JSValueConst this_val, int argc, JSValueC
     int binary = mode && !strcmp(mode, "binary");
     if (mode) JS_FreeCString(c, mode);
     char path[PATH_MAX];
-    int bad = resolve_in_home(p, path);
+    int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
-    if (bad) return js_throw_code(c, "fs.outsideHome", NULL);
+    if (bad) return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     struct stat st;
     if (stat(path, &st) || !S_ISREG(st.st_mode)) return js_throw_code(c, "fs.notFile", NULL);
     if (st.st_size > FS_READ_MAX) return js_throw_code(c, "fs.tooLarge", "max", "8 MB", NULL);
@@ -204,6 +235,46 @@ void js_sys_cpu_name(char *out, size_t size) {
     free(txt);
 }
 
+/* This boot's time to the first frame, from lord-sessiond's /var/lib/lordos/boot-times.jsonl (root's,
+ * one JSON object a line, matched by this boot's id; docs/SESSIONS.md, "Boot time"). Read until found,
+ * then kept: it doesn't change during a boot. -1 if there's none (no lord-sessiond, an old one). */
+static double boot_secs = -1;
+static char boot_shown[12];
+static void boot_time_load(void) {
+    if (boot_secs >= 0) return;
+    char *id = read_small("/proc/sys/kernel/random/boot_id", 64, NULL);
+    if (!id) return;
+    id[strspn(id, "0123456789abcdef-")] = 0;
+    struct stat st;
+    int fd = open("/var/lib/lordos/boot-times.jsonl", O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_uid != 0 || (st.st_mode & 022) || st.st_size > 256 * 1024 || !id[0]) {
+        if (fd >= 0) close(fd);
+        free(id);
+        return;
+    }
+    char *txt = malloc((size_t)st.st_size + 1);
+    ssize_t n = txt ? read(fd, txt, (size_t)st.st_size) : -1;
+    close(fd);
+    if (n > 0) {
+        txt[n] = 0;
+        char key[64];
+        snprintf(key, sizeof key, "{\"bootId\":\"%s\",", id);
+        char *line = NULL;
+        for (char *q = txt; (q = strstr(q, key)); q++) if (q == txt || q[-1] == '\n') line = q;   /* the last one */
+        char *sec = line ? strstr(line, "\"seconds\":") : NULL, *sh = line ? strstr(line, "\"shown\":\"") : NULL;
+        char *eol = line ? strchr(line, '\n') : NULL;
+        if (sec && (!eol || sec < eol)) {
+            double v = atof(sec + 10);
+            if (v > 0 && v < 3600) {
+                boot_secs = v;
+                if (sh && (!eol || sh < eol)) { sh += 9; size_t k = strspn(sh, "abcdefghijklmnopqrstuvwxyz"); if (k < sizeof boot_shown) { memcpy(boot_shown, sh, k); boot_shown[k] = 0; } }
+            }
+        }
+    }
+    free(txt);
+    free(id);
+}
+
 static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
     struct utsname u;
@@ -238,6 +309,10 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(c, o, "memTotalKB", JS_NewFloat64(c, mem_total));
     JS_SetPropertyStr(c, o, "memAvailableKB", JS_NewFloat64(c, mem_avail));
     JS_SetPropertyStr(c, o, "uptime", JS_NewFloat64(c, uptime));
+    /* this boot: seconds from the kernel's start to the first frame on the monitor, and what it showed */
+    boot_time_load();
+    JS_SetPropertyStr(c, o, "bootSeconds", JS_NewFloat64(c, boot_secs));
+    JS_SetPropertyStr(c, o, "bootShown", JS_NewString(c, boot_shown));
     /* LordOS itself: package.json's version and channel ("beta"; empty for a stable release) and the build */
     JS_SetPropertyStr(c, o, "version", JS_NewString(c, LORD_VERSION));
     JS_SetPropertyStr(c, o, "channel", JS_NewString(c, LORD_CHANNEL));
@@ -256,8 +331,24 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
         if (g && (!strcmp(g->gr_name, "sudo") || !strcmp(g->gr_name, "admin") || !strcmp(g->gr_name, "wheel"))) is_admin = 1;
     }
     JS_SetPropertyStr(c, o, "admin", JS_NewBool(c, is_admin));
+    /* the board, where Settings has a page for it: "pi5" for a BCM2712 board (Pi 5, 500, CM5:
+     * Settings → Board firmware), "" otherwise */
+    size_t clen = 0;
+    char *compat = read_small("/proc/device-tree/compatible", 512, &clen);
+    JS_SetPropertyStr(c, o, "board", JS_NewString(c, compat && hw_is_bcm2712(compat, clen) ? "pi5" : ""));
+    free(compat);
     /* live system (ISO): the installer shows up there */
-    JS_SetPropertyStr(c, o, "live", JS_NewBool(c, access("/run/live/medium/live/filesystem.squashfs", F_OK) == 0));
+    int live = access("/run/live/medium/live/filesystem.squashfs", F_OK) == 0;
+    JS_SetPropertyStr(c, o, "live", JS_NewBool(c, live));
+    /* the live ISO's "Check this computer" boot entry (lordos.check=1): only a yes or no leaves here,
+     * and only on a live system. sdk/livestart.js opens System Information for it. */
+    int check = 0;
+    if (live) {
+        char *cmd = read_small("/proc/cmdline", 4096, NULL);
+        check = cmd && sysreport_cmdline_has(cmd, "lordos.check=1");
+        free(cmd);
+    }
+    JS_SetPropertyStr(c, o, "liveCheck", JS_NewBool(c, check));
     struct statvfs vs;                      /* system disk (/) */
     if (!statvfs("/", &vs)) {
         JS_SetPropertyStr(c, o, "diskTotal", JS_NewFloat64(c, (double)vs.f_blocks * vs.f_frsize));
@@ -302,7 +393,7 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
 }
 
 static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)this_val; (void)argc;
+    (void)this_val;
     size_t len;
     const char *txt = JS_ToCStringLen(c, &len, argv[0]);
     if (!txt) return JS_EXCEPTION;
@@ -316,8 +407,15 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     settings_path(path, sizeof path, "");
     FILE *f = fopen(tmp, "wb");
     int ok = f && fwrite(txt, 1, len, f) == len;
+    /* second argument true: on the disk before this returns (session restore, sdk/sessionrestore.jsx) */
+    int durable = argc > 1 && JS_ToBool(c, argv[1]) == 1;
+    if (f && durable) ok = fflush(f) == 0 && fsync(fileno(f)) == 0 && ok;
     if (f) ok = (fclose(f) == 0) && ok;
     if (ok) ok = rename(tmp, path) == 0;
+    if (ok && durable) {
+        int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (d >= 0) { fsync(d); close(d); }
+    }
     JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);
 }
@@ -918,7 +1016,7 @@ static int resolve_target(const char *path, char *out, size_t n, char *dir, size
     if (!base[0] || !strcmp(base, ".") || !strcmp(base, "..") || strlen(base) > 255) return -1;
     *slash = 0;
     char rdir[PATH_MAX];
-    if (!realpath(full[0] ? full : "/", rdir)) return -1;
+    if (gone(full) || !realpath(full[0] ? full : "/", rdir)) return -1;
     if (!fsops_allowed(rdir)) return -1;
     if ((size_t)snprintf(out, n, "%s/%s", rdir, base) >= n) return -1;
     if (dir && (size_t)snprintf(dir, dn, "%s", rdir) >= dn) return -1;
@@ -929,7 +1027,7 @@ static int resolve_target(const char *path, char *out, size_t n, char *dir, size
 int js_sys_resolve_target(const char *path, char *out, size_t n) { return resolve_target(path, out, n, NULL, 0); }
 
 static JSValue fs_path_error(JSContext *c, int r) {
-    return js_throw_code(c, r == -2 ? "fs.protected" : "fs.outsideHome", NULL);
+    return js_throw_code(c, r == -2 ? "fs.protected" : share_down ? "share.notResponding" : "fs.outsideHome", NULL);
 }
 
 /* lord.fs.write(path, text | ArrayBuffer): creates or replaces the file atomically. */
@@ -1003,10 +1101,8 @@ static JSValue f_fs_rename(JSContext *c, JSValueConst this_val, int argc, JSValu
     if (a) JS_FreeCString(c, a);
     if (b) JS_FreeCString(c, b);
     if (r) return fs_path_error(c, r);
-    struct stat st;
-    if (lstat(from, &st)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
-    if (!lstat(to, &st)) return js_throw_code(c, "fs.exists", NULL);
-    if (rename(from, to)) return js_throw_code(c, "sys.errno", "errno", lerr_errno(errno), NULL);
+    char err[256] = "";
+    if (fsops_rename(from, to, err, sizeof err)) return js_throw_line(c, err);
     return JS_TRUE;
 }
 
@@ -1135,6 +1231,23 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     if (!p) return JS_EXCEPTION;
     char target[PATH_MAX + 300];
     int r = resolve_target(p, target, sizeof target, NULL, 0);
+    if (r == -1) {
+        /* outside the writable roots: the same answer, read-only, where reading is allowed
+         * (its folder resolved, the last name kept, so a link is described, not followed) */
+        char full[PATH_MAX * 2], rdir[PATH_MAX];
+        if (p[0] == '/') snprintf(full, sizeof full, "%s", p); else snprintf(full, sizeof full, "%s/%s", home, p);
+        size_t len = strlen(full);
+        while (len > 1 && full[len - 1] == '/') full[--len] = 0;
+        char *slash = strrchr(full, '/');
+        const char *base = slash ? slash + 1 : "";
+        if (slash && !strcmp(full, "/")) { if (fsops_readable("/")) { snprintf(target, sizeof target, "/"); r = 1; } }
+        else if (slash && base[0] && strcmp(base, ".") && strcmp(base, "..")) {
+            *slash = 0;
+            if (realpath(full[0] ? full : "/", rdir) && fsops_readable(rdir) &&
+                (size_t)snprintf(target, sizeof target, "%s%s%s", rdir, strcmp(rdir, "/") ? "/" : "", base) < sizeof target &&
+                fsops_readable(target)) r = 1;
+        }
+    }
     JS_FreeCString(c, p);
     if (r == -1) return fs_path_error(c, r);
     struct statx sx;
@@ -1180,7 +1293,7 @@ static JSValue f_fs_du(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     if (argc > 1 && JS_IsNumber(argv[1])) JS_ToFloat64(c, &ms, argv[1]);
     if (ms > 3000) ms = 3000;
     char path[PATH_MAX];
-    int bad = resolve_in_home(p, path);
+    int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
     if (bad) return fs_path_error(c, -1);
     FsDu d;
@@ -1199,7 +1312,7 @@ static JSValue f_fs_free(JSContext *c, JSValueConst this_val, int argc, JSValueC
     const char *p = JS_ToCString(c, argv[0]);
     if (!p) return JS_EXCEPTION;
     char path[PATH_MAX];
-    int bad = resolve_in_home(p, path);
+    int bad = resolve_readable(p, path);
     JS_FreeCString(c, p);
     if (bad) return fs_path_error(c, -1);
     struct statvfs vs;
@@ -1237,7 +1350,7 @@ static JSValue f_fs_search(JSContext *c, JSValueConst this_val, int argc, JSValu
     (void)this_val;
     const char *p = JS_ToCString(c, argv[0]), *q = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;
     char path[PATH_MAX];
-    int bad = !p || !q || resolve_in_home(p, path);
+    int bad = !p || !q || resolve_readable(p, path);
     Acc a = { c, JS_NewArray(c), 0 };
     if (!bad) fs_search(path, q, opt_int(c, argc > 2 ? argv[2] : JS_UNDEFINED, "limit", 200, 1000),
                         opt_int(c, argc > 2 ? argv[2] : JS_UNDEFINED, "depth", 8, 16), hit_cb, &a);
@@ -1337,6 +1450,7 @@ static JSValue f_wl_focus(JSContext *c, JSValueConst this_val, int argc, JSValue
     int32_t id = 0;
     JS_ToInt32(c, &id, argv[0]);
     wl_set_focus(id);
+    wl_focus_terminal(argc > 1 && JS_ToBool(c, argv[1]));
     return JS_UNDEFINED;
 }
 
@@ -1348,12 +1462,23 @@ static JSValue f_wl_close(JSContext *c, JSValueConst this_val, int argc, JSValue
     return JS_UNDEFINED;
 }
 
+/* lord.wayland.kill(id) → '' or an error code: Force Quit of a Linux app's window (wl_kill: its own
+ * process only, same user, never X11 or lord-server). */
+static JSValue f_wl_kill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    int32_t id = 0;
+    if (JS_ToInt32(c, &id, argv[0]) || id <= 0) return JS_NewString(c, "sys.badArgument");
+    const char *err = wl_kill(id);
+    return JS_NewString(c, err ? err : "");
+}
+
 static JSValue f_wl_state(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     int32_t id = 0;
     JS_ToInt32(c, &id, argv[0]);
     wl_set_state(id, argc > 1 && JS_ToBool(c, argv[1]), argc > 2 && JS_ToBool(c, argv[2]));
     if (argc > 3) wl_set_minimized(id, JS_ToBool(c, argv[3]));
+    if (argc > 4) wl_set_parked(id, JS_ToBool(c, argv[4]));
     return JS_UNDEFINED;
 }
 
@@ -1377,12 +1502,31 @@ static JSValue f_wl_has_focus(JSContext *c, JSValueConst this_val, int argc, JSV
     return JS_NewBool(c, wl_has_key_focus());
 }
 
+/* lord.wayland.grabKeys(name) → bool: which fixed table of keys the shell keeps from apps, by name
+ * only (wl/keygrab.c). There is no way to pass a key. lord.wayland exists only in the session. */
+static JSValue f_wl_grab_keys(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsString(argv[0])) return JS_FALSE;
+    const char *name = JS_ToCString(c, argv[0]);
+    if (!name) return JS_FALSE;
+    int ok = keygrab_set(name);
+    JS_FreeCString(c, name);
+    return JS_NewBool(c, ok);
+}
+static JSValue f_wl_fullscreen(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, wl_fullscreen_active());
+}
+
 static const JSCFunctionListEntry wayland_funcs[] = {
+    JS_CFUNC_DEF("grabKeys", 1, f_wl_grab_keys),
+    JS_CFUNC_DEF("fullscreen", 0, f_wl_fullscreen),
     JS_CFUNC_DEF("paste", 0, f_wl_paste),
     JS_CFUNC_DEF("hasKeyboard", 0, f_wl_has_focus),
-    JS_CFUNC_DEF("focus", 1, f_wl_focus),
+    JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
-    JS_CFUNC_DEF("state", 4, f_wl_state),
+    JS_CFUNC_DEF("kill", 1, f_wl_kill),
+    JS_CFUNC_DEF("state", 5, f_wl_state),
     JS_CFUNC_DEF("info", 0, f_wl_info),
 };
 
@@ -1534,7 +1678,7 @@ static JSValue lpk_check(JSContext *c, JSValueConst arg, int install) {
     char path[PATH_MAX];
     int bad = resolve_in_home(p, path);
     JS_FreeCString(c, p);
-    if (bad) return js_throw_code(c, "fs.outsideHome", NULL);
+    if (bad) return js_throw_code(c, share_down ? "share.notResponding" : "fs.outsideHome", NULL);
     Lpk pk;
     char err[160];
     if (lpk_open(path, &pk, err, sizeof err)) return js_throw_line(c, err);
@@ -1693,6 +1837,16 @@ static JSValue f_apps_launch_with(JSContext *c, JSValueConst this_val, int argc,
     int ok = id && p && !resolve_in_home(p, path) && apps_launch_with(id, path) == 0;
     if (id) JS_FreeCString(c, id);
     if (p) JS_FreeCString(c, p);
+    return JS_NewBool(c, ok);
+}
+
+/* lord.apps.launchUri(id, uri): a vnc:// or rdp:// address for a Linux app that declares the scheme. */
+static JSValue f_apps_launch_uri(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc;
+    const char *id = JS_ToCString(c, argv[0]), *u = JS_ToCString(c, argv[1]);
+    int ok = id && u && apps_launch_uri(id, u) == 0;
+    if (id) JS_FreeCString(c, id);
+    if (u) JS_FreeCString(c, u);
     return JS_NewBool(c, ok);
 }
 
@@ -1919,8 +2073,17 @@ static JSValue f_session_power(JSContext *c, JSValueConst this_val, int argc, JS
     return JS_TRUE;
 }
 
+/* lord.session.onMonitor(): is this session the one lord-sessiond shows on the monitor (it holds the
+ * seat connection)? Only that session's requests reach lord-sessiond, so Restart and Shut Down are
+ * offered only there; a session seen only through the remote desktop doesn't have it. */
+static JSValue f_session_on_monitor(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, !greeter_mode && mirror_has_seat());
+}
+
 static const JSCFunctionListEntry session_funcs[] = {
     JS_CFUNC_DEF("managed", 0, f_session_managed),
+    JS_CFUNC_DEF("onMonitor", 0, f_session_on_monitor),
     JS_CFUNC_DEF("power", 1, f_session_power),
     JS_CFUNC_DEF("lock", 0, f_session_lock),
     JS_CFUNC_DEF("switchUser", 0, f_session_switch),
@@ -1957,6 +2120,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("linux", 1, f_apps_linux),
     JS_CFUNC_DEF("launch", 1, f_apps_launch),
     JS_CFUNC_DEF("launchWith", 2, f_apps_launch_with),
+    JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),
     JS_CFUNC_DEF("actions", 2, f_apps_actions),
     JS_CFUNC_DEF("launchAction", 2, f_apps_launch_action),
     JS_CFUNC_DEF("lastError", 0, f_apps_last_error),

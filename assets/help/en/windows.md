@@ -8,9 +8,10 @@ keywords: windows, maximize, minimize, move, resize, switch apps
 
 - **Move:** drag the title bar.
 - **Resize:** drag an edge or a corner.
-- **Buttons** (top left in Lord Default): close (red), minimize (yellow) and maximize (green). A
+- **Buttons** (top left in Lord Flow): close (red), minimize (yellow) and maximize (green). A
   **double-click** on the title bar also maximizes or restores.
 - **The Window menu** in the menu bar does the same for the window in front.
+- **In Lord Classic** there is no menu bar on top: an app's own menus (File, Edit, View, Go…, Window and Help) are in a strip under its title bar.
 - **Bring back a minimized window:** its icon in the Dock.
 - **Several windows of one app:** ❖N in most of them (Files, Terminal, Editor). The Dock shows
   how many there are.

@@ -37,6 +37,9 @@ void pgp_keyring_free(PgpKeyring *kr);
 int  pgp_verify_clearsigned(const PgpKeyring *kr, const char *msg, size_t len, int64_t now,
                             char **body, size_t *body_len, char *err, size_t errlen);
 
+/* An armored block ("-----BEGIN …") as binary packets in *out (malloc); returns its length or -1. */
+long pgp_dearmor(const char *in, size_t len, uint8_t **out);
+
 /* Base64 of the armor; returns bytes written or -1. */
 long pgp_base64_decode(const char *in, size_t len, uint8_t *out, size_t cap);
 

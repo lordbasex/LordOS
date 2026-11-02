@@ -11,6 +11,7 @@
 .prose li::marker{color:var(--brand)}
 .prose a{font-weight:600}
 .prose strong{color:var(--ink)}
+.prose a{overflow-wrap:anywhere}
 .prose code{font:600 .88em/1.4 var(--mono);background:var(--code-bg);color:var(--code-fg);padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
 .prose blockquote{margin:24px 0;padding:14px 20px;border-left:4px solid var(--accent);background:var(--brand-soft);border-radius:0 12px 12px 0;color:var(--ink)}
 .prose blockquote p:last-child{margin:0}
@@ -106,6 +107,25 @@
 .toc a{display:block;padding:5px 10px;border-left:2px solid var(--line);color:var(--ink-2);text-decoration:none;line-height:1.35}
 .toc a:hover,.toc a[aria-current]{color:var(--brand);border-left-color:var(--accent)}
 .toc-m{display:none}
+/* paper: the full CHANGELOG.md, one collapsible release each (build.mjs addChangelog) */
+.chlog{margin:28px 0 0}
+.chlog-lead{color:var(--muted)}
+.chlog-note{padding:12px 16px;border-left:4px solid var(--accent);background:var(--brand-soft);border-radius:0 12px 12px 0;color:var(--ink);font-size:15.5px}
+.chl{border:1px solid var(--line-2);border-radius:14px;background:var(--surface);margin:0 0 10px}
+.chl>summary{cursor:pointer;padding:14px 20px;list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;min-height:48px;border-radius:14px}
+.chl>summary::-webkit-details-marker{display:none}
+.chl>summary::before{content:"+";flex:0 0 auto;width:14px;color:var(--brand);font-weight:800;font-size:20px;line-height:1}
+.chl[open]>summary::before{content:"\2212"}
+.chl>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.prose .chl>summary h3{margin:0;font-size:19px}
+.chl-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;color:var(--subtle)}
+.chl-tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--chip);color:var(--ink-2);border:1px solid var(--chip-line)}
+.chl-dev,.chl-new{background:var(--brand-soft);color:var(--brand-ink)}
+.chl-body{padding:0 20px 8px 48px;font-size:16px}
+.chl-body h4{margin:22px 0 6px;font-size:17px}
+.prose h5{margin:18px 0 6px;font-size:16px;color:var(--ink)}
+.chl-gh{font-size:15px}
+@media (max-width:640px){.chl-body{padding-left:20px}}
 @media (max-width:960px){
   .paper{grid-template-columns:minmax(0,1fr);gap:0}
   .toc{display:none}
@@ -131,6 +151,7 @@
   .top,.foot,.toc,.toc-m,.paper-actions,.skip,.lbar,.lb,.anchor{display:none!important}
   body{background:#fff;color:#000;font-size:11pt}
   .paper{display:block;padding:0}
+  .chlog{display:none}
   .prose{font-size:11pt;color:#111}
   .prose h2{break-after:avoid;margin-top:28pt}
   .dia,.code,.table,figure{break-inside:avoid}
@@ -157,7 +178,7 @@ mark.ph{background:#FFE58A;color:#3A2A00;padding:1px 6px;border-radius:6px;font-
 .legal-nav .toc-t a:hover{color:var(--brand)}
 .legal-nav h2{margin:18px 0 6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle)}
 .legal-index h2{margin:44px 0 14px;font-size:clamp(22px,2.6vw,28px);font-weight:800}
-.lcards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.lcards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:14px}
 .lcards a{display:flex;flex-direction:column;gap:6px;height:100%;padding:18px 20px;border:1px solid var(--line-2);border-radius:16px;background:var(--surface);text-decoration:none;color:var(--ink)}
 .lcards a:hover{border-color:var(--accent)}
 .lcards strong{font-size:17px}
@@ -195,6 +216,7 @@ mark.ph{background:#FFE58A;color:#3A2A00;padding:1px 6px;border-radius:6px;font-
 .app ul{margin:0;padding:0 0 0 18px;color:var(--muted);font-size:14.5px;line-height:1.55}
 .app li::marker{color:var(--brand)}
 .iso{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);font-size:12.5px;font-weight:700}
+.iso.soon{background:var(--chip);color:var(--ink-2);border:1px solid var(--chip-line)}
 .app .g-card{margin-top:auto}
 .app .g-card img{box-shadow:0 8px 22px var(--shadow-2)}
 

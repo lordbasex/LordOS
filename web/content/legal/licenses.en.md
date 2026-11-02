@@ -42,6 +42,8 @@ On an installed system, every package's copyright and license is in `/usr/share/
 
 LordOS links some system libraries dynamically: libwayland and libxkbcommon (MIT), Mesa (MIT), OpenSSL 3 (Apache-2.0), libcrypt (LGPL-2.1+), Poppler, cairo, FreeType and fontconfig (GPL-2.0-or-later, LGPL, FTL), libarchive (BSD-2-Clause) and FFmpeg and libva (LGPL-2.1+; Debian's FFmpeg build is GPL-2.0-or-later). The `lord-doc` and `lord-media` helpers link Poppler and Debian's FFmpeg, so those two binaries, as distributed, are covered by the GPL; the MIT-licensed LordOS source they are built from is compatible with it.
 
+Since 0.8.7 `lordos` also depends on FreeRDP (Apache-2.0), rclone (MIT), fuse3 (LGPL-2.1, GPL-2.0) and the OpenSSH client (BSD). The Store's Disk Formats item, not preinstalled, brings ntfs-3g and exfatprogs (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, apfs-dkms (GPL-2.0). Moving wallpapers are public domain, CC0, CC BY and CC BY-SA, with credits in Settings and in their repository.
+
 ## Source code
 
 The source code of LordOS is in [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). If you need the corresponding source of a GPL component we distribute and can't find it, write to us through [our contact form](https://www.iperfex.com/contacto/?lang=en).

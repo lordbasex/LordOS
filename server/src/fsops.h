@@ -10,7 +10,17 @@
 /* Allowed roots: the home folder and the user's mounts (/media/$USER, /run/media/$USER). */
 void fsops_init(const char *home, const char *user);
 int  fsops_allowed(const char *real);          /* already resolved path (realpath) inside a root */
+/* Network shares (see fsops.c): a kernel file system name of a share, and whether a path lies on a
+ * share that stopped answering. Doesn't touch the path itself and waits under a second. */
+int fsops_share_fs(const char *fstype);
+int fsops_share_down(const char *path);
+int  fsops_readable(const char *real);         /* (0.8.5) read-only: the whole tree but /proc, /sys, /dev, /run */
 int  fsops_protected(const char *real);        /* folders JS does not write to (launcher, apps, settings) */
+int  fsops_protected_below(const char *real);  /* a protected path lies strictly below real (rule tables) */
+const char *fsops_home(void);                  /* the resolved home folder given to fsops_init */
+
+/* rename for lord.fs: refuses a protected path, a parent of one (as source or destination) and an existing target */
+int  fsops_rename(const char *from, const char *to, char *err, size_t errlen);
 
 /* ---- copy / move in a thread ---- */
 #define FSJOB_MAX 8
@@ -27,6 +37,8 @@ void fsjob_forget(int id);                      /* result already read: frees th
 
 /* ---- Trash ---- */
 int  fstrash_put(const char *real, char *err, size_t errlen);          /* moves to the matching trash */
+/* The same, for a name in an open folder (dirfd; real only names it). dest gets the item's id. */
+int  fstrash_put_at(int dirfd, const char *name, const char *real, char *dest, size_t destn, char *err, size_t errlen);
 /* List: calls fn for each item (id = real path inside .../files). */
 typedef void (*FsTrashFn)(void *ud, const char *id, const char *name, const char *orig, const char *date, int dir, double size);
 void fstrash_list(FsTrashFn fn, void *ud);

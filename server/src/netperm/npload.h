@@ -24,7 +24,10 @@
     X(np_events, BPF_MAP_TYPE_RINGBUF,  0,                 0,               NP_RINGBUF,      0) \
     X(np_snd,    BPF_MAP_TYPE_HASH,     4,                 4,               NP_MAX_SND,      0) \
     X(np_flows,  BPF_MAP_TYPE_LRU_HASH, sizeof(NpFlowKey), sizeof(NpFlow),  NP_MAX_FLOWS,    0) \
-    X(np_bound,  BPF_MAP_TYPE_LRU_HASH, sizeof(NpBoundKey), 1,              NP_MAX_BOUND,    0)
+    X(np_bound,  BPF_MAP_TYPE_LRU_HASH, sizeof(NpBoundKey), 1,              NP_MAX_BOUND,    0) \
+    X(np_blk4,   BPF_MAP_TYPE_LPM_TRIE, sizeof(NpLpm4Key), 1,               NP_MAX_BLK,      BPF_F_NO_PREALLOC) \
+    X(np_blk6,   BPF_MAP_TYPE_LPM_TRIE, sizeof(NpLpm6Key), 1,               NP_MAX_BLK,      BPF_F_NO_PREALLOC) \
+    X(np_sysc,   BPF_MAP_TYPE_HASH,     8,                 sizeof(NpCount), NP_MAX_SYS,      0)
 
 /* Each program: its section, kind and attach point. btf: the kernel function an LSM program
  * hooks (its id comes from /sys/kernel/btf/vmlinux). opt: 1 = the device, Bluetooth and traffic
@@ -56,6 +59,8 @@ static const NpProgSpec np_prog_specs[] = {
 #define NP_NSPECS (int)(sizeof np_prog_specs / sizeof np_prog_specs[0])
 
 static inline int np_attach_user(uint32_t attach) { return attach != BPF_CGROUP_INET_INGRESS && attach != BPF_CGROUP_INET_EGRESS; }
+/* (0.8.5) Only the accounting programs go to the essential system services' cgroups. */
+static inline int np_attach_system(uint32_t attach) { return !np_attach_user(attach); }
 
 /* The license the kernel sees: LSM programs must declare a GPL-compatible one (see bpfsys.h). */
 static inline const char *np_prog_license(const NpProgSpec *p) { return p->type == BPF_PROG_TYPE_LSM ? "Dual MIT/GPL" : "LordOS"; }

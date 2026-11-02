@@ -11,6 +11,7 @@
  *   - Leaves /run/lordos/netd.enabled: with that mark, the sessions' helpers never bring the
  *     network up themselves (while lord-netd restarts, the action answers with an error). */
 #include "sessiond.h"
+#include "../sec/cgroup.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -95,6 +96,7 @@ void sd_netd_start(void) {
         signal(SIGTERM, SIG_DFL);
         signal(SIGHUP, SIG_DFL);
         setsid();                               /* does not die with lord-sessiond (KillMode=process) */
+        cgroup_service_leaf("netd");            /* its own leaf: Monitor → Network counts its traffic (0.8.5) */
         char *const argv[] = { path, NULL };
         char *const env[] = { "PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8", NULL };
         execve(path, argv, env);

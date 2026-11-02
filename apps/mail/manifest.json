@@ -1,5 +1,6 @@
 {
   "id": "mail",
+  "version": "0.8.5",
   "name": "Mail",
   "description": "Mail with IMAP and SMTP accounts, conversations, offline search and safe HTML",
   "size": [1120, 640],

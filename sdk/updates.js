@@ -1,6 +1,7 @@
 // updates.js — updating LordOS in place (docs/UPDATES.md).
 //
 //   lordosUpdate(lang)   { installed, version, available, size, notes } of the lordos package, or null
+//   lordosUpdateWaiting() true when the last check found a newer lordos package
 //   restartNeeded()      null, or { packages: [...] } when an installed update needs a restart
 //   updatePrefs()        { autoCheck } (settings.json "updates"); setUpdatePrefs({ autoCheck })
 //
@@ -36,6 +37,13 @@ export function lordosUpdate(lang) {
     size: offered ? offered.size : info.size,
     notes: info.upgradable ? lord.pkg.releaseNotes('lordos', info.version) : null,
   };
+}
+
+// Is a newer lordos package waiting? The signed lists' last check, read when asked: nothing is fetched here.
+export function lordosUpdateWaiting() {
+  if (!has() || !lord.pkg.available()) return false;
+  const info = lord.pkg.info('lordos');
+  return !!(info && info.installed && info.upgradable);
 }
 
 // A restart is needed when a package asked for one (/run/reboot-required: a new kernel, or the

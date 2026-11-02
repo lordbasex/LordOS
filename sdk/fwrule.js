@@ -272,7 +272,18 @@ function destMatches(r, names, a, lan) {
   }
 }
 
-export function decide(rules, { names = [], addr = '', proto = 'tcp', port = 0, dir = 'out' } = {}, restricted = []) {
+// (0.8.5) opts: { listed } — a subscribed blocklist covers the destination: it denies unless the
+// winning rule names the destination (a domain, an address or a network), as rules.c's FwQuery.listed;
+// { mode } — 'deny' ("deny silently"): what no rule allows is denied, loopback excepted. Without a
+// deciding rule, list or deny mode the result stays null (the app's default: allowed).
+const isLoopback = (a) => {
+  if (!a) return false;
+  const b = Array.from(a.b);
+  if (a.fam === 4) return b[0] === 127;
+  if (b.slice(0, 10).every((x) => x === 0) && b[10] === 255 && b[11] === 255) return b[12] === 127;   /* ::ffff:127.x.y.z */
+  return b.slice(0, 15).every((x) => x === 0) && b[15] === 1;
+};
+export function decide(rules, { names = [], addr = '', proto = 'tcp', port = 0, dir = 'out' } = {}, restricted = [], opts = {}) {
   const a = addrBytes(addr);
   const lan = a ? isLan(addr) : false;
   const has = (f) => restricted.includes(f);
@@ -287,10 +298,16 @@ export function decide(rules, { names = [], addr = '', proto = 'tcp', port = 0, 
     if (!p.ok || (p.port && (port < p.lo || port > p.hi))) return false;
     return destMatches(r, ns, a, lan);
   });
-  if (!hits.length) return null;
+  const fallback = () => {
+    if (opts.listed) return { action: 'deny', rule: null, by: 'list' };
+    if (opts.mode === 'deny' && !isLoopback(a)) return { action: 'deny', rule: null, by: 'mode' };
+    return null;
+  };
+  if (!hits.length) return fallback();
   // as rules.c weighs them: an exact name also counts its labels (a CNAME chain's longest name wins)
   const spec = (r) => { const d = parseDest(r.dst); return d.ok && d.kind === 'domain' ? SC_EXACT + d.domain.split('.').length : specificity(r); };
   const best = [...hits].sort((x, y) => spec(y) - spec(x) || comparePrecedence(x, y))[0];
+  if (opts.listed && spec(best) < SC_CIDR) return { action: 'deny', rule: null, by: 'list' };
   return { action: best.action, rule: best, by: 'rule' };
 }
 
@@ -298,9 +315,9 @@ export function decide(rules, { names = [], addr = '', proto = 'tcp', port = 0, 
 // port and protocol, set to the other verdict; if dropping that rule already gives the other
 // verdict, it is removed instead of piling up rules (like the Monitor's per-app switch).
 //   → { op: 'add', rule } | { op: 'update', id, rule } | { op: 'remove', id } | null
-export function toggleOp(rules, { name, addr, proto = 'tcp', port = 0 }, restricted = []) {
+export function toggleOp(rules, { name, addr, proto = 'tcp', port = 0 }, restricted = [], opts = {}) {
   const q = { names: name ? [name] : [], addr, proto, port };
-  const now = decide(rules, q, restricted);
+  const now = decide(rules, q, restricted, opts);
   if (now?.by === 'restricted') return null;
   const allowedNow = now ? now.action === 'allow' : true;    // no rule: the mode ("ask" is applied as silent)
   const target = allowedNow ? 'deny' : 'allow';
@@ -308,7 +325,7 @@ export function toggleOp(rules, { name, addr, proto = 'tcp', port = 0 }, restric
   if (!dst) return null;
   const own = (rules || []).find((r) => (r.dir || 'out') === 'out' && r.dst === dst && !r.port && !r.proto);
   if (own) {
-    const without = decide(rules.filter((r) => r !== own), q, restricted);
+    const without = decide(rules.filter((r) => r !== own), q, restricted, opts);
     const allowedWithout = without ? without.action === 'allow' : true;
     if ((allowedWithout ? 'allow' : 'deny') === target) return { op: 'remove', id: own.id };
     return { op: 'update', id: own.id, rule: { dir: 'out', dst, port: '', proto: '', action: target } };

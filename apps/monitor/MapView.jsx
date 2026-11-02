@@ -6,7 +6,7 @@
 //
 // Mientras llega el cuadro nuevo se muestra el anterior corrido (y escalado, si cambió el zoom),
 // así que mover y acercar no esperan al dibujo. Las etiquetas son texto del motor: siempre nítidas.
-import { View, Text, Image, useTheme, useLocale, addListener, formatNumber, tOptional, useAppWindow, useStore, windows, settings } from '@lordos/sdk';
+import { View, Text, Image, useTheme, useLocale, addListener, formatNumber, tOptional, useAppWindow, useStore, useWindowHidden, settings } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseColor, canvas, dot } from './draw.js';
 import { COUNTRY_LL } from './countries.js';
@@ -21,9 +21,9 @@ import { C, useCardStyle } from './index.jsx';
 // moves and when nothing moves. Each dot is a small ready-made image, and each frame repaints only
 // the small boxes the dots left and entered (the engine's several damaged rectangles, 0.8.2; the
 // cost is in docs/MONITOR.md). With Reduce motion each busy arc gets two still arrows instead.
-const FLOW_FPS = 12, FLOW_FPS_BEHIND = 5, FLOW_ARCS = 12, FLOW_MIN = 256;   // FLOW_MIN: bytes per second that count as "moving"
-// 0 at FLOW_MIN, 1 from about 4 MB/s
-const flowLevel = (rate) => (rate > FLOW_MIN ? Math.max(0, Math.min(1, Math.log10(rate / FLOW_MIN) / 4.2)) : -1);
+const FLOW_FPS = 12, FLOW_FPS_BEHIND = 5, FLOW_ARCS = 12, FLOW_MIN = 1;   // FLOW_MIN: bytes per second that count as "moving"
+// any traffic moves (one slow dot up to 64 B/s), 1 from about 4 MB/s
+const flowLevel = (rate) => (rate >= FLOW_MIN ? Math.max(0, Math.min(1, Math.log10(Math.max(1, rate / 64)) / 4.8)) : -1);
 const bez = (a, k) => { const u = 1 - k; return [u * u * a.x0 + 2 * u * k * a.cx + k * k * a.x1, u * u * a.y0 + 2 * u * k * a.cy + k * k * a.y1]; };
 
 // One moving dot as a ready-made 9×9 image (a ring and the direction's color): the engine only
@@ -40,7 +40,7 @@ function FlowLayer({ arcs, w, h, paused }) {
   const t = useTheme();
   const { id, focused } = useAppWindow() || {};
   const fps = focused === false ? FLOW_FPS_BEHIND : FLOW_FPS;
-  const hidden = useStore(windows, (ws) => !!ws.find((x) => x.id === id)?.minimized);
+  const hidden = useWindowHidden(id);
   const motion = useStore(settings, (st) => !st.reduceMotion);
   // each moving dot: arc index, direction (1 sent, -1 received), phase offset, seconds per trip
   const dots = [];
@@ -182,6 +182,17 @@ export function MapView({ places, home, selected, onSelect, geoOn, fitKey }) {
     cc: p.cc, lon: COUNTRY_LL[p.cc][0], lat: COUNTRY_LL[p.cc][1], r: Math.min(11, 3 + 1.6 * Math.sqrt(Math.max(1, p.count))), sel: selected === p.cc, count: p.count,
     tx: p.rateTx || 0, rx: p.rateRx || 0, idle: (p.rateTx || 0) + (p.rateRx || 0) < FLOW_MIN,
   }));
+  // one arc per app and place, in the app's color; the apps that reach the same place get arcs apart
+  // (the busiest one lowest)
+  const arcs = [];
+  for (const p of places) {
+    const ll = COUNTRY_LL[p.cc];
+    if (!ll || !p.links) continue;
+    [...p.links.values()].sort((a, b) => b.bytes - a.bytes).forEach((l, k) => {
+      arcs.push({ cc: p.cc, app: l.app, lon: ll[0], lat: ll[1], lift: Math.min(0.62, 0.22 + 0.09 * k), color: l.color,
+        sel: selected === p.cc, tx: l.tx || 0, rx: l.rx || 0, idle: (l.tx || 0) + (l.rx || 0) < FLOW_MIN });
+    });
+  }
   const dark = t.mode === 'dark';
   const card = useCardStyle();
   const colors = {
@@ -189,7 +200,7 @@ export function MapView({ places, home, selected, onSelect, geoOn, fitKey }) {
     border: rgba(dark ? '#cfd6e6' : '#ffffff', dark ? (v && v.ppd > 6 ? 0.42 : 0.25) : 0.9),
     accent: rgba(t.accent, 1), homeColor: rgba('#30d158', 1), selColor: rgba('#ffd60a', 1),
   };
-  const dataKey = JSON.stringify([dots.map((d) => [d.cc, d.r, d.sel, d.idle]), home, colors]);
+  const dataKey = JSON.stringify([dots.map((d) => [d.cc, d.r, d.sel, d.idle]), arcs.map((a) => [a.cc, a.lift, a.color, a.sel, a.idle]), home, colors]);
   // pedir un cuadro cuando cambia la vista, el tamaño o los datos; retirarlo cuando esté listo
   const pending = useRef(0);
   // Mientras se mueve (arrastrar, dos dedos con inercia, pellizco): a lo sumo un cuadro cada 100 ms
@@ -199,16 +210,17 @@ export function MapView({ places, home, selected, onSelect, geoOn, fitKey }) {
   const [moving, setMoving] = useState(false);       // sin etiquetas mientras se mueve
   const markMoving = () => { movingAt.current = lord.now(); if (!moving) setMoving(true); };
   const latest = useRef(null);
-  latest.current = { w, h, colors, home, dots };
+  latest.current = { w, h, colors, home, dots, arcs };
   const frameRef = useRef(null);
   frameRef.current = frame;
   const pollT = useRef(0);
   // pide un cuadro de la vista vv (q: resolución) y lo va a buscar cuando esté listo
   const requestMap = (vv, q) => {
-    const { w: ww, h: hh, colors: cc, home: hm, dots: dd } = latest.current;
+    const { w: ww, h: hh, colors: cc, home: hm, dots: dd, arcs: aa } = latest.current;
     lastReq.current = lord.now();
     pending.current = lord.monitor.map({ width: Math.round(ww * q), height: Math.round(hh * q), lon: vv.lon - ww / 2 / vv.ppd,
-      lat: vv.lat + hh / 2 / vv.ppd, ppd: vv.ppd * q, ...cc, home: hm || null, dots: dd.map((d) => ({ lon: d.lon, lat: d.lat, r: d.r, sel: d.sel, idle: d.idle })) });
+      lat: vv.lat + hh / 2 / vv.ppd, ppd: vv.ppd * q, ...cc, home: hm || null, dots: dd.map((d) => ({ lon: d.lon, lat: d.lat, r: d.r, sel: d.sel, idle: d.idle })),
+      arcs: aa.map((a) => ({ lon: a.lon, lat: a.lat, lift: a.lift, color: rgba(a.color, 1), sel: a.sel, idle: a.idle })) });
     clearTimeout(pollT.current);
     const poll = () => {
       const f = lord.monitor.mapFrame();
@@ -249,9 +261,9 @@ export function MapView({ places, home, selected, onSelect, geoOn, fitKey }) {
     }
     if (best || !home) return best?.cc || null;
     const [hx, hy] = toXY(home.lon, home.lat);
-    for (const d of dots) {                                                // arcos
+    for (const d of arcs) {                                                // arcos
       const [x, y] = toXY(d.lon, d.lat);
-      const len = Math.hypot(x - hx, y - hy), cx = (hx + x) / 2, cy = (hy + y) / 2 - len * 0.3;
+      const len = Math.hypot(x - hx, y - hy), cx = (hx + x) / 2, cy = (hy + y) / 2 - len * d.lift;
       for (let i = 0; i <= 48; i++) {
         const k = i / 48, u = 1 - k;
         const px = u * u * hx + 2 * u * k * cx + k * k * x, py = u * u * hy + 2 * u * k * cy + k * k * y;
@@ -344,13 +356,13 @@ export function MapView({ places, home, selected, onSelect, geoOn, fitKey }) {
   const flowArcs = [];
   if (v && home) {
     const [hx, hy] = toXY(home.lon, home.lat);
-    for (const d of [...dots].filter((x) => !x.idle).sort((a, b) => b.tx + b.rx - (a.tx + a.rx)).slice(0, FLOW_ARCS)) {
+    for (const d of arcs.filter((x) => !x.idle).sort((a, b) => b.tx + b.rx - (a.tx + a.rx)).slice(0, FLOW_ARCS)) {
       const [x, y] = toXY(d.lon, d.lat);
       const len = Math.hypot(x - hx, y - hy);
       if (len < 6) continue;
-      const cx = (hx + x) / 2, cy = (hy + y) / 2 - len * 0.3;
+      const cx = (hx + x) / 2, cy = (hy + y) / 2 - len * d.lift;
       if (Math.max(hx, x, cx) < 0 || Math.min(hx, x, cx) > w || Math.max(hy, y, cy) < 0 || Math.min(hy, y, cy) > h) continue;   // off screen
-      flowArcs.push({ cc: d.cc, x0: hx, y0: hy, cx, cy, x1: x, y1: y, tx: d.tx, rx: d.rx });
+      flowArcs.push({ cc: `${d.cc}${d.app}`, x0: hx, y0: hy, cx, cy, x1: x, y1: y, tx: d.tx, rx: d.rx });
     }
   }
 

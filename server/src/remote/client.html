@@ -15,7 +15,8 @@
   #bar { position: fixed; top: 0; left: 50%; transform: translate(-50%, -34px); transition: transform .18s ease; z-index: 3;
          display: flex; gap: 10px; align-items: center; padding: 6px 10px 6px 12px; border-radius: 0 0 12px 12px;
          background: rgba(28,26,44,.92); border: 1px solid rgba(255,255,255,.12); border-top: 0; white-space: nowrap; }
-  #bar.show, #bar:hover { transform: translate(-50%, 0); }
+  #bar.show, #bar:hover, #bar.pinned { transform: translate(-50%, 0); }
+  #bar button.on { background: #6d4aff; }
   #bar button { border: 0; border-radius: 7px; padding: 5px 10px; color: #fff; background: #3a3754; cursor: pointer; font-size: 12px; }
   #bar button.red { background: #b4232f; }
   #lat { color: #a9a6c3; min-width: 52px; }
@@ -48,7 +49,7 @@
 <div id="wrap"><div id="stage"><video id="v" autoplay playsinline muted></video><canvas id="c" tabindex="0"></canvas></div></div>
 <div id="rcur"></div>
 <div id="bar"><span id="who">LordOS</span><span id="lat">…</span><span id="mode"></span>
-  <button id="snd" hidden>🔇</button><button id="fs">⛶</button><button id="out" class="red">✕</button></div>
+  <button id="snd" hidden>🔇</button><button id="pin">📌</button><button id="fs">⛶</button><button id="out" class="red">✕</button></div>
 <div id="again-note"><i></i><span id="again-text"></span></div>
 <div id="msg"><div id="card" role="alertdialog" aria-live="assertive"></div></div>
 <script>
@@ -60,6 +61,8 @@ const L = {
   en: {
     full: 'Full screen', out: 'Disconnect', conn: 'Connecting…', reconn: 'Reconnecting…', retry: 'Try again', signout: 'Sign out',
     sndOn: 'Turn sound on', sndOff: 'Turn sound off', video: 'Video', bye: 'The session ended.',
+    hwEnc: 'hardware', swEnc: 'software', pinOn: 'Keep this bar shown', pinOff: 'Let this bar hide',
+    vinfoTip: (comp, enc, ms) => `Screen composed on the ${comp}; video encoded in ${enc} (${ms} ms per frame). Frames a second: shown here / sent by the computer.`,
     unsupTitle: 'This browser can’t show the remote desktop',
     unsupText: 'The remote desktop arrives as live video over WebRTC. This browser is missing something it needs:',
     reqRtc: 'WebRTC (RTCPeerConnection) with data channels', reqCodec: 'H.264 or VP8 video decoding', reqSecure: 'A secure (https) page — this one is',
@@ -78,6 +81,8 @@ const L = {
   es: {
     full: 'Pantalla completa', out: 'Desconectar', conn: 'Conectando…', reconn: 'Reconectando…', retry: 'Reintentar', signout: 'Cerrar sesión',
     sndOn: 'Activar el sonido', sndOff: 'Silenciar', video: 'Video', bye: 'La sesión terminó.',
+    hwEnc: 'por hardware', swEnc: 'por software', pinOn: 'Dejar la barra fija', pinOff: 'Que la barra se esconda',
+    vinfoTip: (comp, enc, ms) => `Pantalla compuesta en la ${comp}; video codificado ${enc} (${ms} ms por cuadro). Cuadros por segundo: mostrados aquí / enviados por la computadora.`,
     unsupTitle: 'Este navegador no puede mostrar el escritorio remoto',
     unsupText: 'El escritorio remoto llega como video en vivo por WebRTC. A este navegador le falta algo que necesita:',
     reqRtc: 'WebRTC (RTCPeerConnection) con canales de datos', reqCodec: 'Decodificar video H.264 o VP8', reqSecure: 'Una página segura (https): esta lo es',
@@ -96,6 +101,8 @@ const L = {
   pt: {
     full: 'Tela cheia', out: 'Desconectar', conn: 'Conectando…', reconn: 'Reconectando…', retry: 'Tentar de novo', signout: 'Sair',
     sndOn: 'Ativar o som', sndOff: 'Silenciar', video: 'Vídeo', bye: 'A sessão terminou.',
+    hwEnc: 'por hardware', swEnc: 'por software', pinOn: 'Fixar a barra', pinOff: 'Deixar a barra se esconder',
+    vinfoTip: (comp, enc, ms) => `Tela composta na ${comp}; vídeo codificado ${enc} (${ms} ms por quadro). Quadros por segundo: mostrados aqui / enviados pelo computador.`,
     unsupTitle: 'Este navegador não consegue mostrar a área de trabalho remota',
     unsupText: 'A área de trabalho remota chega como vídeo ao vivo por WebRTC. Falta a este navegador algo de que ela precisa:',
     reqRtc: 'WebRTC (RTCPeerConnection) com canais de dados', reqCodec: 'Decodificar vídeo H.264 ou VP8', reqSecure: 'Uma página segura (https): esta é',
@@ -147,12 +154,31 @@ function fit() {
   ox = r.left; oy = r.top;
 }
 addEventListener('resize', fit);
-// The session takes the window's size (if the monitor is showing it, the monitor wins).
-let resizeTimer = 0;
+// The session takes the window's size (if the monitor is showing it, the monitor wins), and the video
+// this screen's refresh rate (60, 120, 144 Hz…), measured with animation frames once the page shows.
+let resizeTimer = 0, screenHz = 0;
+function sendSize() {
+  const m = { t: 'resize', w: Math.round(innerWidth) & ~1, h: Math.round(innerHeight) & ~1 };
+  if (screenHz) m.hz = screenHz;
+  send(m);
+}
 addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => send({ t: 'resize', w: Math.round(innerWidth) & ~1, h: Math.round(innerHeight) & ~1 }), 400);
+  resizeTimer = setTimeout(sendSize, 400);
 });
+function measureHz() {
+  let n = 0, t0 = 0;
+  const step = (t) => {
+    if (!t0) t0 = t;
+    if (t - t0 < 1000) { n++; requestAnimationFrame(step); return; }
+    const raw = n * 1000 / (t - t0);
+    if (document.hidden || raw < 24) return;          // a hidden tab is throttled: no measure
+    const hz = [30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 180, 240].reduce((a, b) => (Math.abs(b - raw) < Math.abs(a - raw) ? b : a));
+    if (hz !== screenHz) { screenHz = hz; sendSize(); setMode(); }
+  };
+  requestAnimationFrame(step);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) measureHz(); });
 
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 // Input goes over the WebRTC data channel when it's open (lower latency), else over the WebSocket.
@@ -220,7 +246,26 @@ function failure(why, detail) {
 // of still areas over data channels ----
 let pc = null, dcIn = null, vmode = false, codec = '', iceServers = [], offering = false, offersSent = 0, answersGot = 0, peerNo = 0;
 let playTimer = 0, discTimer = 0, restartTimer = 0, restartTries = 0, peerFails = 0, everPlayed = false, serverWhy = '';
-function setMode() { $('mode').textContent = vmode ? `${T.video} · ${codec.toUpperCase()}${rd.path ? ' · ' + rd.path.toUpperCase() : ''}` : ''; }
+// The top bar: codec and path, frames a second shown / what the computer encodes, this screen's
+// refresh rate, and how the computer makes the video (GPU or CPU composition, encoder in hardware or software)
+let vinfo = null, shownFps = 0;
+function setMode() {
+  if (!vmode) { $('mode').textContent = ''; $('mode').title = ''; return; }
+  const parts = [T.video, codec.toUpperCase() + (vinfo ? ' ' + (vinfo.hw ? T.hwEnc : T.swEnc) : '')];
+  if (rd.path) parts.push(rd.path.toUpperCase());
+  parts.push(vinfo ? `${shownFps}/${vinfo.fps} fps` : `${shownFps} fps`);   // shown by this browser / encoded
+  if (screenHz) parts.push(`${screenHz} Hz`);
+  if (vinfo) parts.push(vinfo.gpu ? 'GPU' : 'CPU');
+  $('mode').textContent = parts.join(' · ');
+  $('mode').title = vinfo ? T.vinfoTip(vinfo.gpu ? 'GPU' : 'CPU', vinfo.hw ? T.hwEnc : T.swEnc, vinfo.ms) : '';
+}
+setInterval(() => {
+  if (!vmode || !pc) return;
+  pc.getStats().then((st) => {
+    st.forEach((s) => { if (s.type === 'inbound-rtp' && s.kind === 'video') shownFps = Math.round(s.framesPerSecond || 0); });
+    setMode();
+  }).catch(() => {});
+}, 1000);
 function clearTimers() { clearTimeout(playTimer); clearTimeout(discTimer); clearTimeout(restartTimer); }
 function closePeer() {
   clearTimers();
@@ -390,12 +435,19 @@ function onTile(d) {
     queue = queue.then(() => { for (const [x, y, w, h] of r) ctx.clearRect(x, y, w, h); });
   }
 }
-$('snd').onclick = () => {
-  vid.muted = !vid.muted;
-  if (!vid.muted) vid.play().catch(() => {});
+function setSound(on) {
+  vid.muted = !on;
+  if (on) vid.play().catch(() => {});
   $('snd').textContent = vid.muted ? '🔇' : '🔊';
   $('snd').title = vid.muted ? T.sndOn : T.sndOff;
-};
+}
+// browsers only play sound after a gesture: the first click or key in the session turns it on, unless
+// the viewer already chose with the button (hidden in the top bar)
+let soundChosen = false;
+$('snd').onclick = () => { soundChosen = true; setSound(vid.muted); };
+const soundOnGesture = () => { if (!soundChosen && vid.muted && !$('snd').hidden) { soundChosen = true; setSound(true); } };
+$('c').addEventListener('pointerdown', soundOnGesture);
+$('c').addEventListener('keydown', soundOnGesture);
 
 // ---- the WebSocket: sign-in, signaling, cursor, clipboard. Reconnects with backoff, without a new
 // sign-in while the cookie lasts; if the cookie is gone, /desk sends the browser to the sign-in page ----
@@ -408,7 +460,7 @@ function connect() {
   helloSeen = false;
   ws = new WebSocket(`wss://${location.host}/ws?w=${w}&h=${h}&v=1`);
   ws.binaryType = 'arraybuffer';
-  ws.onopen = () => { rd.wsOpens++; send({ t: 'resize', w: w & ~1, h: h & ~1 }); };     // an existing session takes this size
+  ws.onopen = () => { rd.wsOpens++; sendSize(); measureHz(); };     // an existing session takes this size
   ws.onmessage = (e) => (typeof e.data === 'string' ? onText(JSON.parse(e.data)) : onBin(new Uint8Array(e.data)));
   ws.onclose = () => {
     ws = null;
@@ -439,6 +491,7 @@ function retryAll() {
 
 function onText(m) {
   if (m.t === 'size') { W = m.w; H = m.h; cv.width = W; cv.height = H; ctx.clearRect(0, 0, W, H); fit(); }
+  else if (m.t === 'vinfo') { vinfo = { hw: !!m.hw, gpu: !!m.gpu, fps: m.fps | 0, ms: Number(m.ms) || 0 }; setMode(); }
   else if (m.t === 'hello') {
     helloSeen = true;
     wsTries = 0;
@@ -598,6 +651,17 @@ function signOut() {
 }
 $('out').onclick = signOut;
 $('bar').classList.add('show'); hideT = setTimeout(() => $('bar').classList.remove('show'), 3000);
+// 📌 keeps the bar shown (remembered in this browser only)
+function setPin(on) {
+  $('bar').classList.toggle('pinned', on);
+  $('pin').classList.toggle('on', on);
+  $('pin').title = on ? T.pinOff : T.pinOn;
+  try { localStorage.setItem('lordos.rd.pin', on ? '1' : ''); } catch (e) {}
+}
+let pinned = false;
+try { pinned = localStorage.getItem('lordos.rd.pin') === '1'; } catch (e) {}
+setPin(pinned);
+$('pin').onclick = () => { pinned = !pinned; setPin(pinned); };
 const sup = support();
 if (!sup.rtc || !sup.codec || !sup.secure) unsupported(sup);
 else { waiting(T.conn); connect(); cv.focus(); }

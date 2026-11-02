@@ -6,9 +6,9 @@ interface and compositing are our own.
 
 | App | id | What it does |
 |---|---|---|
-| **Photos** | `photos` | Photo library of `~/Imágenes` with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy |
+| **Photos** | `photos` | Photo library of the pictures folder (XDG, `~/Pictures` in English) with thumbnails and a viewer: zoom, panning, rotation, full screen, slideshow, animated GIF and basic editing (crop, rotate, brightness and contrast) saved as a copy |
 | **Player** | `player` | Video with synced audio, time bar, volume, `.srt` and in-track subtitles, full screen, picture in picture; music library by artist and album with covers, queue, shuffle and repeat; media keys and the Control Center |
-| **Screenshots** | `screenshots` | Screen, window or area, timer, to the clipboard or to `~/Imágenes/Capturas`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
+| **Screenshots** | `screenshots` | Screen, window or area, timer, to the clipboard or to `~/Pictures/Screenshots`, floating thumbnail and annotation editor (arrow, box, text, blur); record the screen to MP4 with optional microphone |
 | **Camera** | `camera` | V4L2 preview, JPEG photo, H.264 + AAC video, mirror, choose camera |
 | **Recorder** | `recorder` | Record the microphone, waveform, list, rename, trim and export to Opus, MP3 or WAV |
 
@@ -77,7 +77,9 @@ We took the way the apps of popular desktop systems work, never their logos or t
   the background; images, edits and exports in the foreground). Workers exit on their own after
   20 s without work. A one-shot `MK_HWPROBE` helper lists, once per boot, which codecs VA-API
   decodes on the render nodes it gets (`lm_hwprobe.c`, for "Video in the browser": see
-  [VIDEO.md](VIDEO.md)).
+  [VIDEO.md](VIDEO.md)). A one-shot `MK_VBENCH` helper (0.8.6, LordBench) gets no fds at all: it makes
+  its test clips in memory and answers only fixed `MM_BENCH` records (`lm_vbench.c`, lord-server's side in
+  `bench/lbvideo.c`; see [BENCHMARK.md](BENCHMARK.md)).
 - **It never receives a path.** lord-server validates each path with the same rules as `lord.fs`
   (home folder and the user's mounts), opens the file and passes it the fd.
   - Outputs are created as temporary files next to the destination. When they finish well they're
@@ -107,9 +109,18 @@ We took the way the apps of popular desktop systems work, never their logos or t
 - **Hardware acceleration:** `hwaccel=vaapi|v4l2request|none`, selectable with
   `LORD_MEDIA_HWACCEL`; `LORD_MEDIA_HW=0` turns it off.
   - With VA-API, the driver (radeonsi or iHD) decodes and the NV12 frame is downloaded to scale it.
-  - `v4l2request` (Raspberry Pi 5 HEVC) is prepared: it needs the Raspberry Pi FFmpeg and creating
-    the device over fds (TODO in `lm_io.c`).
+  - `v4l2request` (Raspberry Pi 5 HEVC, 0.8.7): Raspberry Pi's FFmpeg, a DRM device over the render node and two exact
+    device files for this job only (`docs/WALLPAPERS.md`).
   - If there is no driver, the decoder carries on in software without interruption.
+  - (0.8.7) If the hardware decoder fails during a file, 8 decoder failures in a row or 8 frames in a row
+    that can't be read back from the hardware (`lm_hwfall.h`; counted apart, since a driver can decode every frame and
+    hand over none; a frame clears its own count, so one damaged packet changes nothing) make the player open a software
+    decoder and seek to where it was. A failure the decoder doesn't report is not seen. Tested with both failures faked after 30 frames
+    (`build/lord-media-hwfall`, `HWFALL=2` for the read-back, `build/media-test play`, the helper's sandbox on, VM 116 under
+    load from other jobs): a 640 × 360 H.264 clip with no audio, five runs of each, 119 frames received in 4 s and a largest gap
+    of 40–100 ms (decoder) and 38–61 ms (read-back) against 35–92 ms without a failure. With sound (a 1920 × 1080 H.264 and AAC file through PipeWire, 6 s, two runs with the decoder failure, one with each other case), the switch
+    is a seek: the audio left in the ring is dropped, the largest gap was 229–272 ms (decoder) and 309 ms (read-back) against 48 ms, playback ended 0.2–0.6 s
+    behind the run without a failure, and audio and video stayed in step (mean offset at most about 2 ms). That build fakes the failure on a software decoder: **it has not run on real VA-API hardware.**
 
 ### Video frames: a single copy
 
@@ -166,7 +177,7 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
 ### Protected windows
 
 `wm.setProtected(id, true)` (SDK) marks a window as protected, like the capture protection of other desktop systems
-(KeePassXC uses it). The future Passwords app will use it. It looks normal on screen and comes out
+(KeePassXC uses it). The Passwords app uses it (`"protected": true` in its manifest). It looks normal on screen and comes out
 **black** in:
 
 - **Screenshots** (`lord.media.screenshot`): the tree is painted again onto a separate canvas in
@@ -185,8 +196,9 @@ How it works:
 - The SDK sets the `protected` prop on the node of the window's content (`AppHost`).
 - The engine stores it in `Node.protect` (`lord.setProp(id, 'protected', bool)`).
 - The theme's frame (title included) stays visible, so an app that needs it sets a generic title.
-- The server doesn't allow capturing on the GPU path: screen recording composites on the CPU, the
-  same as when someone is watching through remote desktop.
+- Screen recording composites on the CPU. Since 0.8.4 a remote desktop viewer no longer does: the
+  GPU path reads the composed frame back (`gpu_read_next`), except while a protected window is on
+  screen, when the session composites on the CPU so the window can be painted black (`REMOTE.md`).
 - Screenshots has a menu item "Privacy → Protect the front window from screenshots" to use it with
   any window.
 
@@ -195,8 +207,8 @@ How it works:
 Screen, microphone and camera go through the system permissions (`sec/perms.c`, `PRIVACY.md`):
 
 - the SDK asks for the permission with `requestPermission` (the system draws the prompt);
-- `js_media.c` checks again in C that the saved decision is "allow": `permitted()`, the point
-  where the broker will hook in;
+- `js_media.c` checks again in C that the saved decision is "allow": `permitted()`; isolated `.lpk` apps go through the broker,
+  and their camera through `BOP_CAMERA` (`sec/brokercam.c`, `PRIVACY.md`);
 - while in use, the green and orange dots in the menu bar light up (`markDeviceUse`).
 
 ### Shortcuts (global, also with a Linux app in front)
@@ -263,10 +275,11 @@ Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `st
 - **"Open with":** Photos for images and Player for audio and video, both as the default option.
 - **Quick Preview:** the one in Files (from the documents agent) uses `media.poster`.
 - **Where things are saved:**
-  - screenshots in `~/Imágenes/Capturas`;
-  - camera in `~/Imágenes/Cámara`;
-  - recordings in `~/Música/Grabaciones`;
-  - with xdg-user-dirs the user's folders are respected.
+  - screenshots in `~/Pictures/Screenshots`;
+  - camera in `~/Pictures/Camera`;
+  - recordings in `~/Music/Recordings`;
+  - with xdg-user-dirs the user's folders are respected, and the subfolder's name follows the
+    language (`Capturas`, `Cámara`, `Grabaciones` in Spanish).
 - **Music library:** saved in `~/.cache/lordos/music.json`, by path, size and date. Only the tags
   of what changed are read again.
 
@@ -344,7 +357,8 @@ something changes), 0 dropped frames.
 
 - **VA-API measured on real hardware**, and dmabuf → EGL **zero-copy** on the GPU path. Test them
   on the AMD PC.
-- **Raspberry Pi 5:** HEVC through `v4l2request` over fds (Debian's FFmpeg doesn't have it).
+- **LordBench's video workloads with hardware decoding (maintainer's decision):** `MK_VBENCH` gets no fds and no ioctl
+  classes; a hardware workload needs the render node and `SANDBOX_IOCTL_DRM` for that job, which widens its sandbox.
 - **Image subtitles** (PGS, DVD): only text ones today.
 - **Playback speed** and saved **playlists**.
 - **Screenshots:** record only an area (today, the whole screen) and record system audio (today,

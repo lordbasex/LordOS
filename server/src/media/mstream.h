@@ -16,13 +16,17 @@ typedef struct {
 
 void mstream_init(const MStreamOut *out);
 /* How many viewers want this codec, with sound, and the lowest bit rate among them. 0 viewers stops it. */
-void mstream_want(int codec, int viewers, int audio, unsigned kbps);
+void mstream_want(int codec, int viewers, int audio, unsigned kbps, int fps);
 /* The session's screen changed (the frame stays valid until the next call or mstream_want(…, 0)). */
-void mstream_frame(const uint32_t *px, int stride, int w, int h);
+/* box: what changed since the last call (x0, y0, x1, y1), or NULL for all of it. */
+void mstream_frame(const uint32_t *px, int stride, int w, int h, const int *box);
 void mstream_keyframe(int codec);
 void mstream_tick(void);
 double mstream_timeout(void);           /* ms until mstream_tick has work, or -1 */
 int  mstream_active(void);              /* an encoder is running */
+/* The running encoder of that codec: hardware or not, frames a second, encoding time in 1/100 ms per
+ * frame. 0 if none runs. */
+int  mstream_info(int codec, int *hw, int *fps, long *enc100);
 /* "H.264 (VA-API) 30 fps 2.1 ms/frame" for the logs */
 void mstream_describe(int codec, char *out, size_t n);
 

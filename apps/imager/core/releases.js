@@ -10,7 +10,8 @@ export const downloadUrl = (tag, name) => `https://github.com/${REPO}/releases/d
 // The fingerprint docs/SIGNING.md publishes (SHA-256 of the DER public key)
 export const RELEASE_KEY_FINGERPRINT = 'c7155b8e6bbbb180f907381994d06af76d333016cd6f3facf67cadd053ea108e';
 
-const TAG = /^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[a-z0-9.]+)?$/;
+// v0.8.3-beta, and point updates with a fourth number: v0.8.4.1-beta
+const TAG = /^v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(\.[0-9]{1,4})?(-[a-z0-9.]+)?$/;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._+~-]{0,127}$/;
 
 // [{ tag, version, date, prerelease, image: {name,size}, sums: {name,size}, sig: {name,size} }],

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "catalog": "llama.cpp",
+  "kicker": {
+    "en": "Featured · Artificial Intelligence",
+    "es": "Destacada · Inteligencia Artificial",
+    "pt": "Destaque · Inteligência Artificial"
+  },
+  "title": {
+    "en": "Language models on your computer",
+    "es": "Modelos de lenguaje en tu equipo",
+    "pt": "Modelos de linguagem no seu computador"
+  },
+  "text": {
+    "en": "llama.cpp runs GGUF models on the CPU or a Vulkan GPU, with a chat in the terminal and an HTTP API with its own web page. It downloads the model the first time you run it.",
+    "es": "llama.cpp corre modelos GGUF en la CPU o en una GPU Vulkan, con un chat en la terminal y una API HTTP con su propia página web. Baja el modelo la primera vez que lo ejecutás.",
+    "pt": "O llama.cpp roda modelos GGUF na CPU ou numa GPU Vulkan, com um chat no terminal e uma API HTTP com sua própria página web. Ele baixa o modelo na primeira vez que você o executa."
+  },
+  "colors": ["#1c1638", "#3a2f8a"]
+}

@@ -3,7 +3,7 @@
 // La emulación (xterm-256color, color directo, mouse, imágenes en línea, marcas del shell)
 // y el dibujo están en C (server/src/term); esta app arma pestañas, paneles divididos,
 // perfiles, buscador, barra de herramientas, atajos y la ventana desplegable.
-import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, term, clipboard, addListener, registerDockMenu, t as tr } from '@lordos/sdk';
+import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, term, clipboard, addShortcuts, registerDockMenu, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
@@ -48,7 +48,8 @@ const isHotkey = (e) => {
   const hk = terminalSettings().hotkey;
   return (hk === 'F12' && e.code === 88 && !e.meta && !e.ctrl && !e.alt && !e.shift) || (hk === 'Super+`' && e.meta && e.code === 41);
 };
-addListener('keydown', (e) => { if (!e.repeat && isHotkey(e)) toggleHotkeyWindow(); });
+// it goes before the theme's table: with ❖` chosen here, the key is this window's
+addShortcuts([{ id: 'terminal.hotkey', keys: ['F12', 'Meta+`'], when: isHotkey, run: () => toggleHotkeyWindow() }]);
 
 const MODIFIER_CODES = new Set([29, 97, 42, 54, 56, 100, 125, 126, 58]);
 
@@ -233,8 +234,8 @@ function menus(wid, w) {
 
 export default function TerminalApp() {
   const t = useTheme();
-  const { id: wid, focused } = useAppWindow();
-  if (!getWin(wid)) ensureWin(wid);
+  const { id: wid, focused, args } = useAppWindow();
+  if (!getWin(wid)) ensureWin(wid, args);
   const w = useStore(wins, (x) => x[wid]);
   const allMeta = useStore(meta);
   const root = useRef(null);
@@ -345,7 +346,7 @@ export default function TerminalApp() {
       { label: actionLabel('clearBuffer'), onClick: () => run(wid, 'clearBuffer') },
       { label: actionLabel('find'), onClick: () => run(wid, 'find') },
       '-',
-      { label: actionLabel('preferences'), onClick: () => run(wid, 'preferences') },
+      { label: actionLabel('preferences'), hint: '❖,', onClick: () => run(wid, 'preferences') },
       { label: actionLabel('closePane'), onClick: () => closePane(wid, s) },
     ] });
   };

@@ -3,7 +3,7 @@
 //   | { type: 'tag', color } | { type: 'search', root, query }
 import { fs } from '@lordos/sdk';
 import { kindOf } from './kinds.js';
-import { tagStore } from './ops.js';
+import { tagStore, tagsOf, commentOf } from './ops.js';
 import { archiveEntries } from './archive.js';
 
 export const sameLoc = (a, b) => a && b && a.type === b.type && a.path === b.path && a.color === b.color && a.query === b.query && a.root === b.root && (a.inner || '') === (b.inner || '');
@@ -34,15 +34,20 @@ export function loadEntries(loc, { hidden, launcherApps }) {
 
 const collator = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
-export function sortEntries(list, sort) {
+// statOf: what a column needs beyond the listing (views.jsx); foldersFirst: Files → Settings
+export function sortEntries(list, sort, { statOf, foldersFirst = true } = {}) {
   const dir = sort.desc ? -1 : 1;
   const key = sort.by;
+  const num = { created: 'btime', opened: 'atime', changed: 'ctime' }[key];
+  const text = { perms: (e) => statOf?.(e)?.mode || '', owner: (e) => statOf?.(e)?.user || '', comments: (e) => commentOf(e.path), tags: (e) => (tagsOf(e.path)[0] || '') }[key];
   const cmp = (a, b) => {
-    if (a.dir !== b.dir && key !== 'kind') return a.dir ? -1 : 1;           // folders first
+    if (foldersFirst && a.dir !== b.dir && key !== 'kind') return a.dir ? -1 : 1;
     let r = 0;
     if (key === 'date') r = (a.mtime || 0) - (b.mtime || 0);
     else if (key === 'size') r = (a.dir ? -1 : a.size) - (b.dir ? -1 : b.size);
     else if (key === 'kind') r = collator(kindOf(a), kindOf(b));
+    else if (num) r = (statOf?.(a)?.[num] || 0) - (statOf?.(b)?.[num] || 0);
+    else if (text) r = collator(text(a), text(b));
     if (!r) r = collator(a.name, b.name);
     return r * dir;
   };

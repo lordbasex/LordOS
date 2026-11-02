@@ -35,9 +35,32 @@ export function DocGlyph({ size: s, kind, ext, dark }) {
 }
 
 // Icon of an entry: folder, thumbnail (images) or document.
+// A computer on the network: a screen on its stand; a way into it, a small one.
+function ComputerGlyph({ size, way }) {
+  const w = size * (way ? 0.7 : 0.86), h = w * 0.62;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: w, height: h, borderRadius: size * 0.08, backgroundColor: '#7c8db5', border: `${Math.max(1, size * 0.05)}px solid #4b5a7d` }} />
+      <View style={{ width: w * 0.16, height: size * 0.08, backgroundColor: '#4b5a7d' }} />
+      <View style={{ width: w * 0.46, height: Math.max(1, size * 0.05), borderRadius: 1, backgroundColor: '#4b5a7d' }} />
+    </View>
+  );
+}
+
 export function EntryIcon({ e, size, dark, thumb = true }) {
+  if (e.netWay?.mode === 'share') return <FolderGlyph size={size} />;
+  if (e.netHost || e.netWay) return <ComputerGlyph size={size} way={!!e.netWay} />;
   if (e.Icon) return <e.Icon size={size} />;
   const kind = kindOf(e);
+  if (kind === 'folder' && e.locked) {
+    // a folder the user can't open (This computer): the system's permissions say no
+    return (
+      <View style={{ width: size, height: size }}>
+        <FolderGlyph size={size} special={e.special} />
+        <Text style={{ position: 'absolute', right: 0, bottom: 0, fontSize: Math.max(9, Math.round(size * 0.32)) }}>🔒</Text>
+      </View>
+    );
+  }
   if (kind === 'folder') return <FolderGlyph size={size} special={e.special} />;
   if (thumb && isImage(e) && size >= 32 && e.size < 24 * 1024 * 1024) {
     return (

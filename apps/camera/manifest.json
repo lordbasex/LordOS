@@ -1,5 +1,6 @@
 {
   "id": "camera",
+  "version": "0.8.5",
   "name": "Camera",
   "description": "Webcam preview, photos and videos, with mirroring and camera choice",
   "size": [820, 560],

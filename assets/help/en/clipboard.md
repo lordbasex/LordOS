@@ -12,6 +12,7 @@ LordOS keeps what you copy in any app (Linux apps too): text, links, colors, cod
   where you were.
 - **❖⇧V:** the full history, with filters by kind, preview and actions: pin to the top, delete or
   copy again.
+- In Lord Flow, ❖V pastes in the app in front: use ❖⇧V there. See [Keyboard shortcuts](help:shortcuts).
 - **Pin:** pinned items always stay at the top and never expire.
 
 ## Privacy

@@ -1,5 +1,6 @@
 {
   "id": "contacts",
+  "version": "0.8.5",
   "name": "Contacts",
   "description": "Address books, groups and contact cards",
   "size": [880, 560],

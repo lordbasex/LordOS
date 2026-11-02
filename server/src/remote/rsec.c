@@ -575,6 +575,10 @@ int rs_browser_input(const RsJson *j, int W, int H, RsInput *in) {
         if (rs_json_num(j, "w", &a) || rs_json_num(j, "h", &b) || a < 640 || b < 480 || a > 3840 || b > 2400) return RS_IN_NONE;
         in->a = (int)(a & ~1LL);
         in->b = (int)(b & ~1LL);
+        /* optional: the browser screen's refresh rate (24..360 Hz), for the video's frame rate */
+        long long hz = 0;
+        if (!rs_json_num(j, "hz", &hz) && (hz < 24 || hz > 360)) return RS_IN_NONE;
+        in->v1 = (int32_t)hz;
         return in->type = RS_IN_RESIZE;
     }
     if (!strcmp(t, "ping")) {

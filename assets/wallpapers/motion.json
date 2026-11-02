@@ -1,0 +1,875 @@
+{
+ "format": 1,
+ "base": "https://raw.githubusercontent.com/lordbasex/LordOS-wallpapers/main",
+ "items": [
+  {
+   "id": "crown",
+   "section": "dynamic",
+   "name": "Crystal Crown",
+   "author": "Federico Pereira, LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 6.0,
+     "file": "crown/1080.hevc.mp4",
+     "size": 1529048,
+     "sha256": "78c79ceb6c1869e711c7df25a2f2955a800b2978d155a175d0d47f2ae56c7451"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 60.0,
+     "seconds": 6.0,
+     "file": "crown/2160.hevc.mp4",
+     "size": 3314029,
+     "sha256": "8e2fc72f1be285070c6d82f10bf78bc81f8f398cbc94f8cfe7290c2b53bb132a"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 6.0,
+     "file": "crown/1080.h264.mp4",
+     "size": 3125809,
+     "sha256": "48bb24797460ed413e469e46d70846ba01647140f7430f61c86281fef155dc41"
+    }
+   ]
+  },
+  {
+   "id": "landscape-canyon",
+   "section": "landscape",
+   "name": "Canyon clouds",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Timelapse_of_Clouds_over_Bellevue_Canyon.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "landscape-canyon/1080.hevc.mp4",
+     "size": 2849550,
+     "sha256": "ea5d2c8532dc8aae65657db5ab6486e14cd59b096d5b75d410ea5d20e5bead1b"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "landscape-canyon/1080.h264.mp4",
+     "size": 7069985,
+     "sha256": "71783696050ca2de556d0c5526bea6f0ddbecd4b3713785600e253385611c2f9"
+    }
+   ]
+  },
+  {
+   "id": "landscape-desert",
+   "section": "landscape",
+   "name": "Desert sunset",
+   "author": "Joshua Tree National Park, U.S. National Park Service",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Timelapse_Joshua_Tree_Clouds_and_Sunset_Near_West_Entrance.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-desert/1080.hevc.mp4",
+     "size": 6515924,
+     "sha256": "ae3f5147e34afedd86561cbbf67c88e4fc01c254791bb51b3403953543310e5a"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-desert/1080.h264.mp4",
+     "size": 9367199,
+     "sha256": "6ab180ec383d40273a82b5e97b46686ee2dfbc6a85c30d1501a369ed5de7d183"
+    }
+   ]
+  },
+  {
+   "id": "landscape-mountain",
+   "section": "landscape",
+   "name": "Last light",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Dying_Light_on_Okanagan_Mountain.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 24.0,
+     "seconds": 8.0,
+     "file": "landscape-mountain/1080.hevc.mp4",
+     "size": 2187119,
+     "sha256": "fcbd96b37efcfa10820f51a0ce2ba6f9a976713c58e426633e18d25f473cfcab"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 24.0,
+     "seconds": 8.0,
+     "file": "landscape-mountain/1080.h264.mp4",
+     "size": 5258358,
+     "sha256": "0d5b1ed96e9897f4995f43a2163819d629f0a82a1d8eb23df88a04db5ab7c1a7"
+    }
+   ]
+  },
+  {
+   "id": "landscape-cattails",
+   "section": "landscape",
+   "name": "Autumn reeds",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Autumn_Cattails_at_Sunset_in_East_Kelowna,_British_Columbia,_Canada.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "landscape-cattails/1080.hevc.mp4",
+     "size": 11135848,
+     "sha256": "53247a5d6a654a43d9e8e2558c0c527942d83914a494e29ebf4f5c504e27a7dd"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "landscape-cattails/1080.h264.mp4",
+     "size": 14573465,
+     "sha256": "01a8143a4ef79836a73e5d659a7cd77489a39a2ae0423091bcdf9865628d4087"
+    }
+   ]
+  },
+  {
+   "id": "landscape-reservoir",
+   "section": "landscape",
+   "name": "Reservoir",
+   "author": "Sillerkiil",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Drone_video_of_Paunk%C3%BCla_water_reservoir_in_Estonia.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-reservoir/1080.hevc.mp4",
+     "size": 9778123,
+     "sha256": "b5096e92851bced99a4b245bb225414bc447046aaaaeec42f327a72b20c1a759"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-reservoir/1080.h264.mp4",
+     "size": 15321649,
+     "sha256": "18cac3e8aa506401b97e5d8ac13d2c32c282b1601722db8629db5e1a0ec8b834"
+    }
+   ]
+  },
+  {
+   "id": "landscape-viaduct",
+   "section": "landscape",
+   "name": "Viaduct",
+   "author": "Capricorn4049",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "source": "https://commons.wikimedia.org/wiki/File:Landwasserviadukt,_aerial_video.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-viaduct/1080.hevc.mp4",
+     "size": 9096178,
+     "sha256": "f1cccb40ce4b157557315c5b79bc304f3b1f5088002198511cb52232a02e3d49"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-viaduct/2160.hevc.mp4",
+     "size": 23132452,
+     "sha256": "e1ea432aa1ef0baef99daef4487a923e98a112432aef1c9d537c34ad11aa1f7c"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 8.01,
+     "file": "landscape-viaduct/1080.h264.mp4",
+     "size": 14438011,
+     "sha256": "81f4cca646744160c983c17db8497739628e546994adbe456b674776b9a08ac6"
+    }
+   ]
+  },
+  {
+   "id": "landscape-aurora",
+   "section": "landscape",
+   "name": "Northern lights",
+   "author": "NASA's Scientific Visualization Studio",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Alaskan_Aurora_Time_Lapse_(SVS15077).webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "landscape-aurora/1080.hevc.mp4",
+     "size": 986352,
+     "sha256": "d5a7c3e4e40ee42540ba9cadbde0eb1e13dc2c6c3c5d63ba852bbd7181d1f0d2"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "landscape-aurora/2160.hevc.mp4",
+     "size": 2642268,
+     "sha256": "0042a982c11f0d2a585fad8fb5a9fed85aa00eeef75f61f76b413e570e30dc98"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "landscape-aurora/1080.h264.mp4",
+     "size": 4159578,
+     "sha256": "906c651ca2bf23e90734536b7b5a8fdb4ea6d0968b21b22d3a15b38ab9ae9561"
+    }
+   ]
+  },
+  {
+   "id": "urban-harbour",
+   "section": "urban",
+   "name": "Harbour city",
+   "author": "Johnny Xmas",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+   "source": "https://commons.wikimedia.org/wiki/File:Aerial_views_over_Circular_Quay_and_the_city_of_Sydney_Australia.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 7.96,
+     "file": "urban-harbour/1080.hevc.mp4",
+     "size": 11790236,
+     "sha256": "2275ade10f1b111ca300addee02c4b4262ff36f122fdc2ef69298344db29f464"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 23.98,
+     "seconds": 7.96,
+     "file": "urban-harbour/2160.hevc.mp4",
+     "size": 27477946,
+     "sha256": "97d8e38247a2f032f5bc4dc43240034c471e2673cc7122e13c292f9444852048"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 7.96,
+     "file": "urban-harbour/1080.h264.mp4",
+     "size": 17864866,
+     "sha256": "413d4ce2849ec0ae2ed970560d9973b0e5c9db411b1c58857558b9f1d7455be4"
+    }
+   ]
+  },
+  {
+   "id": "urban-midtown",
+   "section": "urban",
+   "name": "Midtown",
+   "author": "the Dronalist",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+   "source": "https://commons.wikimedia.org/wiki/File:Aerial_views_of_Midtown_Manhattan,_New_York_City,_USA.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "urban-midtown/1080.hevc.mp4",
+     "size": 3829447,
+     "sha256": "0e1c24e587b42c3ecb718bbff921fad87c898c39ad60c1bcdde5b450672535e2"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "urban-midtown/2160.hevc.mp4",
+     "size": 9023751,
+     "sha256": "8257a6fd2462f0fe6ade89159739174339359c38131765aa3fdfa8f6ac7a7da8"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "urban-midtown/1080.h264.mp4",
+     "size": 6462670,
+     "sha256": "2e7294c164f4cf7e08bf4a32b67d3716f4b13f7075dd8b2ae6d2935983454df8"
+    }
+   ]
+  },
+  {
+   "id": "urban-night-flight",
+   "section": "urban",
+   "name": "Night flight",
+   "author": "Evgeniy Starostin",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Night_flight_over_Vladivostok_%E2%81%84_%D0%9D%D0%B0%D0%B4_%D0%9D%D0%BE%D1%87%D0%BD%D1%8B%D0%BC_%D0%92%D0%BB%D0%B0%D0%B4%D0%B8%D0%B2%D0%BE%D1%81%D1%82%D0%BE%D0%BA%D0%BE%D0%BC.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "urban-night-flight/1080.hevc.mp4",
+     "size": 1254840,
+     "sha256": "a42fbd6644b8d3a7d52c8e3d483f2712356940d1938acdc56f4808cf8bce9ff4"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "urban-night-flight/2160.hevc.mp4",
+     "size": 4383546,
+     "sha256": "25cd57a072bdf1ec773cc7f4b82f9f2ddbefdd2c3511b987069182ce1104818e"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "urban-night-flight/1080.h264.mp4",
+     "size": 5153651,
+     "sha256": "2d75f560eeaa41f3838f745bb589383a0dfe7571bf6e3d7dcb1716fde9ace1c0"
+    }
+   ]
+  },
+  {
+   "id": "urban-airport",
+   "section": "urban",
+   "name": "Runway sunset",
+   "author": "NutzerAusBerlin",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Time-lapse_sunset_Berlin_Brandenburg_Airport.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "urban-airport/1080.hevc.mp4",
+     "size": 514981,
+     "sha256": "08d0c8cfe2862cc10caa2a69a8f37d8b157b3aaeb8c3aa0ca1d548c73aac26bd"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "urban-airport/1080.h264.mp4",
+     "size": 3066651,
+     "sha256": "101c541737c5ebaba55dac0bbd20d9e54457afc0f2c2bb4117358523c7cd13fe"
+    }
+   ]
+  },
+  {
+   "id": "urban-lighthouse",
+   "section": "urban",
+   "name": "Lighthouse",
+   "author": "JamesBromberger",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Orbit_around_Fremantle_South_Mole_Lighthouse_at_sunset.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7.97,
+     "file": "urban-lighthouse/1080.hevc.mp4",
+     "size": 4529881,
+     "sha256": "f30e8a9440518e090b16f00a6213ed0756c47f1b8561350e7a10b2c16000fbd6"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7.97,
+     "file": "urban-lighthouse/1080.h264.mp4",
+     "size": 7355489,
+     "sha256": "19c76356b0d92a4ee4de20c1974bec7172e5dd4b2e3dbee5e40782a7e8682e8e"
+    }
+   ]
+  },
+  {
+   "id": "underwater-surface",
+   "section": "underwater",
+   "name": "Ocean surface",
+   "author": "Mostafameraji",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Ocean_surface_waves_07.ogv",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 6.72,
+     "file": "underwater-surface/1080.hevc.mp4",
+     "size": 2435667,
+     "sha256": "964b642c2d30465069a3196e98b1d046b69dd783ea09da4f99ca94451e526b6e"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 6.72,
+     "file": "underwater-surface/1080.h264.mp4",
+     "size": 6838732,
+     "sha256": "fec681bae3228994f174af133990c9bcac7158e038861d473af7135479b905c2"
+    }
+   ]
+  },
+  {
+   "id": "underwater-jellyfish",
+   "section": "underwater",
+   "name": "Jellyfish",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_9_2024-01-11.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "underwater-jellyfish/1080.hevc.mp4",
+     "size": 1321640,
+     "sha256": "c2b9f6fb03c0d21d2ff0aa8b95a21c0d59a098906426dec807cd85b580ea0568"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "underwater-jellyfish/2160.hevc.mp4",
+     "size": 3852760,
+     "sha256": "b28ff7413289133f552079eedf0e367a01c40cc001c8d76d11c5bfd675ddf089"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "underwater-jellyfish/1080.h264.mp4",
+     "size": 4005857,
+     "sha256": "9eedcceb18d92e62089f1226c8980e58ad9033a7abde395caf9d1fe6788f492f"
+    }
+   ]
+  },
+  {
+   "id": "underwater-jellyfish-2",
+   "section": "underwater",
+   "name": "Drifting jellyfish",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_5_2024-01-11.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 59.94,
+     "seconds": 6.21,
+     "file": "underwater-jellyfish-2/1080.hevc.mp4",
+     "size": 443319,
+     "sha256": "42464b91467a68077e63e1afabaab5df9288f79ee82931c3923c73b6f444fa84"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 59.94,
+     "seconds": 6.21,
+     "file": "underwater-jellyfish-2/2160.hevc.mp4",
+     "size": 1339960,
+     "sha256": "b0d6938a2a898d48e82a1090dda0f543206c77f2b4795079c67c2ce283119e05"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 59.94,
+     "seconds": 6.21,
+     "file": "underwater-jellyfish-2/1080.h264.mp4",
+     "size": 1320300,
+     "sha256": "dd583a27cf25cb05e0213caf133f03f2977d7b20d5e4bc0d3b003b9546c3787b"
+    }
+   ]
+  },
+  {
+   "id": "underwater-stream",
+   "section": "underwater",
+   "name": "Stream",
+   "author": "jLasWilson",
+   "license": "CC0",
+   "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+   "source": "https://commons.wikimedia.org/wiki/File:Running_Stream_Of_Water.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "underwater-stream/1080.hevc.mp4",
+     "size": 11546358,
+     "sha256": "cde3be5ea4e84f5f4728fd51ec086eca03fd2b87bb66c3e66ca1708a0273bdf3"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 8.0,
+     "file": "underwater-stream/1080.h264.mp4",
+     "size": 18045111,
+     "sha256": "29603a7cadb81ede7d20f023ec66c8a384a8544a5e885215ea9754528d38f13e"
+    }
+   ]
+  },
+  {
+   "id": "earth-spin",
+   "section": "earth",
+   "name": "Blue marble",
+   "author": "NASA's Scientific Visualization Studio",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Spinning_Earth_with_clouds,_atmosphere,_and_night_lights_(SVS5570).webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "earth-spin/1080.hevc.mp4",
+     "size": 1467001,
+     "sha256": "16d7a4b1d43869be161ca5a48bdbd6f37d8863ed9b7871bae41cc8ca7b78aa81"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "earth-spin/2160.hevc.mp4",
+     "size": 3383660,
+     "sha256": "ca55b95121e611c925bd9b77bf66b76f425cd4cbb87861afdf940c5a10fbc77d"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 60.0,
+     "seconds": 8.0,
+     "file": "earth-spin/1080.h264.mp4",
+     "size": 2500866,
+     "sha256": "ab43f013ca44c7213ff60ada1a24080faa3ac4ace14a2afb7c3c8845d72f33b5"
+    }
+   ]
+  },
+  {
+   "id": "earth-night-lights",
+   "section": "earth",
+   "name": "Night lights",
+   "author": "NASA's Goddard Space Flight Center",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:BlackMarble_2016_rotating_globe_at_night.webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "earth-night-lights/1080.hevc.mp4",
+     "size": 598619,
+     "sha256": "d20d440e4365cd3ccfc8a1cc2d6454ceb1c7436f07d01e62e07497689ba2898b"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "earth-night-lights/2160.hevc.mp4",
+     "size": 2227672,
+     "sha256": "834cab26b7cddaedf2e9de1b2a9cd330b6abea89c9f7a12a3444dba2e08a19eb"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8.0,
+     "file": "earth-night-lights/1080.h264.mp4",
+     "size": 1061732,
+     "sha256": "a28a19a79ae39a78e13fe5a26962b09cf4c76a276aa038202a0d1c0922e2970c"
+    }
+   ]
+  },
+  {
+   "id": "earth-orbit",
+   "section": "earth",
+   "name": "Orbit",
+   "author": "NASA Johnson",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:View_of_Planet_Earth_(4K).webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "earth-orbit/1080.hevc.mp4",
+     "size": 1939796,
+     "sha256": "f5f66cab86c1d2359696954447e5c9c881711412411d49a6c0f77585d353fcd4"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "earth-orbit/2160.hevc.mp4",
+     "size": 3902837,
+     "sha256": "39ab3b5dc6852acd5166d8dad2d7325dd3d0c5bd65a031167f31b267aa1f37a7"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.98,
+     "seconds": 8.01,
+     "file": "earth-orbit/1080.h264.mp4",
+     "size": 3558053,
+     "sha256": "b4502324ca5c85e98534565385abad95655bfb4349d933cd64fbcfc901b01364"
+    }
+   ]
+  },
+  {
+   "id": "earth-aurora",
+   "section": "earth",
+   "name": "Aurora from space",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Aurora_Borealis_from_Space_(4K).webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 6.01,
+     "file": "earth-aurora/1080.hevc.mp4",
+     "size": 439134,
+     "sha256": "12177ac234d2c542e25873d199075241e8bb2f6f163a4dd2d484edcc109e5237"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 29.97,
+     "seconds": 6.01,
+     "file": "earth-aurora/2160.hevc.mp4",
+     "size": 1146860,
+     "sha256": "e334a592c04c477a8af11217723f4d354be5e1baa8944ee0d67c2be53fadc1c2"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 6.01,
+     "file": "earth-aurora/1080.h264.mp4",
+     "size": 2141648,
+     "sha256": "730a49ae1baf60ec82f07b58b2664abeaed2dc3ad930aa406d98dc72862bf5ff"
+    }
+   ]
+  },
+  {
+   "id": "earth-sun",
+   "section": "earth",
+   "name": "Solar flares",
+   "author": "NASA's Scientific Visualization Studio",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Large_Solar_Flares_Erupt_From_the_Sun_(SVS31361).webm",
+   "variants": [
+    {
+     "name": "1080.hevc",
+     "codec": "hevc",
+     "w": 1920,
+     "h": 1080,
+     "fps": 12.5,
+     "seconds": 6.0,
+     "file": "earth-sun/1080.hevc.mp4",
+     "size": 4917419,
+     "sha256": "81f0bb7e574f7391f7fb9593c56df2cb31b1d48e830b81f72e1a3b9751eaf911"
+    },
+    {
+     "name": "2160.hevc",
+     "codec": "hevc",
+     "w": 3840,
+     "h": 2160,
+     "fps": 12.5,
+     "seconds": 6.0,
+     "file": "earth-sun/2160.hevc.mp4",
+     "size": 14127223,
+     "sha256": "1dd0e403797b6599e6fda1bfed755df790b5e4fce10e3d09d78c3c688102dadc"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 12.5,
+     "seconds": 6.0,
+     "file": "earth-sun/1080.h264.mp4",
+     "size": 8864396,
+     "sha256": "b6e90854551e47beab07c977cf136d67ce906a11c7336ee181b2d3f548fb1ea0"
+    }
+   ]
+  }
+ ]
+}

@@ -17,7 +17,7 @@
   "navDownload": "Download",
   "navSupport": "Support",
   "navAbout": "About",
-  "badge": "Version 0.8.3 · Beta",
+  "badge": "Version 0.8.7 · Beta",
   "heroTitle": "The free, fast and secure Linux desktop.",
   "heroLead": "LordOS is a free GNU/Linux distribution based on Debian with its own desktop environment, display server and Wayland compositor written in C, its own interface engine, and native apps made to feel calm, clear and private.",
   "ctaDownload": "Download LordOS",
@@ -36,7 +36,7 @@
     ],
     [
       "A firewall you can see",
-      "Watch every connection on a live world map, then allow or block it per app."
+      "Watch every connection on a live world map, then allow or block it per app, or turn on blocklists of ad, tracker and malware sites."
     ],
     [
       "Passwords built in",
@@ -73,8 +73,8 @@
   ],
   "dlTitle": "Get LordOS",
   "dlLead": "Pay what you want, including nothing. Your support keeps LordOS free for everyone.",
-  "isoTitle": "PC (64-bit)",
-  "isoText": "Live and installable ISO for computers with an x86-64 processor. Try it without installing.",
+  "isoTitle": "PC and arm64",
+  "isoText": "Live and installable ISOs: one for 64-bit PCs, and one for arm64 UEFI machines and virtual machines, so far run only on emulated QEMU. Try it without installing.",
   "isoBtn": "Download ISO",
   "piTitle": "Raspberry Pi 5",
   "piText": "A ready-to-flash image for SD card or NVMe, with fan control and our own kernel.",
@@ -84,6 +84,12 @@
   "copy": "Copy",
   "copied": "Copied",
   "copyCmdLabel": "Copy the install command",
+  "imgTitle": "LordOS Imager",
+  "imgText": "Write LordOS to an SD card or a USB stick from the computer you already have, and set up the Raspberry Pi 5's first boot: its name, your account, Wi-Fi, remote access, appearance and cooling. Every official image is checked against the release signature before anything is erased.",
+  "imgMac": "Download for Mac",
+  "imgWin": "Download for Windows",
+  "imgLinux": "Download for Linux",
+  "imgNote": "It also comes with LordOS (App Launcher → System). Free and open source, it collects nothing.",
   "dlNote": "Downloads are published on GitHub Releases with SHA-256 checksums.",
   "verifyTitle": "Verify your download",
   "verifyText": "Every release is signed with the LordOS release key. Check the signature before you install. Key fingerprint (SHA-256):",
@@ -169,8 +175,20 @@
       "media": "Media",
       "system": "System",
       "privacy": "Privacy & security"
-    }
+    },
+    "upcoming": "Coming in {v} (in development)"
   },
   "debHintA": "On a server without a screen, add",
-  "debHintB": "and use it from your browser."
+  "debHintB": "and use it from your browser.",
+  "changelog": {
+    "title": "Changelog",
+    "lead": "The full notes of every release, newest first, exactly as kept in CHANGELOG.md. Open a release to read it.",
+    "note": "",
+    "unreleased": "Unreleased",
+    "inDev": "In development",
+    "yanked": "Withdrawn",
+    "latest": "Latest release",
+    "compare": "Changes on GitHub",
+    "released": "Released"
+  }
 }

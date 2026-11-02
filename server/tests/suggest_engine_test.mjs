@@ -163,12 +163,18 @@ const need = [
   ...['wifi', 'bluetooth', 'network', 'graphics', 'other'].flatMap((k) => texts.map((x) => `firmware.${k}.${x}`)),
   'title', 'subtitle', 'fixture', 'nonfreeBadge', 'installNonfree', 'confirmNonfree', 'dismiss', 'whatChanges', 'job', 'note.nonfree', 'note.firmware',
   'notify.title', 'notify.body', 'notify.open',
+  'argonCase.title', 'argonCase.why', 'argonCase.detail',
 ];
 for (const lang of ['en', 'es', 'pt']) {
   const cat = JSON.parse(fs.readFileSync(path.join(repo, `assets/locales/${lang}/store.json`), 'utf8'));
   eq(`${lang}: every suggestion text`, need.filter((k) => !(`suggest.${k}` in cat)), []);
 }
 eq('firmware kinds in the data are known', DATA.firmware.map.filter((m) => !['wifi', 'bluetooth', 'network', 'graphics', 'other'].includes(m.kind)).length, 0);
+
+const argon = evaluate(DATA, { caseFound: 'argon-one-v5' }, {});
+eq('a case found leads the list', argon[0] && [argon[0].id, argon[0].state], ['argonCase', 'setup']);
+eq('a case found is news once', fresh(argon, ['argonCase']).length, 0);
+eq('no case, no card', evaluate(DATA, { caseFound: null }, {}).some((s) => s.id === 'argonCase'), false);
 
 console.log(`suggest-engine-test: ${n - bad}/${n} ok`);
 process.exit(bad ? 1 : 0);

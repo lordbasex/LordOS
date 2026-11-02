@@ -54,6 +54,8 @@
   "bt.unblock": "Activar",
   "bt.visibleAs": "Visible como «{name}».",
   "bt.working": "Conectando…",
+  "defaults.automatic": "Automática ({name})",
+  "defaults.automaticPlain": "Automática",
   "defaults.cat.browser": "Navegador web",
   "defaults.cat.images": "Imágenes",
   "defaults.cat.mail": "Correo",
@@ -69,7 +71,7 @@
   "defaults.none": "Ninguna app instalada abre estos archivos",
   "defaults.other": "{id}",
   "defaults.tag": "{name} (por defecto)",
-  "display.arrangeHint": "Arrastrá una pantalla para ubicarla junto a las otras. La barra blanca marca la pantalla principal (barra de menú y Dock).",
+  "display.arrangeHint": "Arrastrá las pantallas para ordenarlas; se pegan borde con borde. Hacé clic en una para identificarla. La barra blanca marca la pantalla principal (barra de menú y Dock).",
   "display.arrangement": "Disposición",
   "display.brightness": "Brillo",
   "display.capture": "Capturas y compartir",
@@ -80,6 +82,7 @@
   "display.failed": "No se pudo usar ese modo. Sigue el anterior.",
   "display.hz": "{hz} Hz",
   "display.inches": "{n} pulgadas",
+  "display.identify": "Identificar",
   "display.keep": "Mantener",
   "display.keepBody": {
     "one": "La pantalla vuelve a la configuración anterior en {count} segundo.",
@@ -101,6 +104,7 @@
   "display.noBacklight": "Esta pantalla no permite cambiar el brillo (monitores externos y máquinas virtuales).",
   "display.noCrtc": "{connector}: conectada, pero la placa de video no puede manejar otra pantalla",
   "display.notOnMonitor": "Esta sesión no está en el monitor ahora (se está mirando desde la red), así que no se pueden cambiar sus pantallas. La Luz nocturna se aplica cuando vuelva.",
+  "display.number": "Pantalla {n}",
   "display.recommended": "Recomendado",
   "display.refresh": "Frecuencia de actualización",
   "display.resolution": "Resolución",
@@ -260,5 +264,6 @@
   "video.statusAuto": "Encendido: esta computadora no puede decodificar {codecs} por hardware ({reason}), así que se les pide H.264 a los sitios de video.",
   "video.statusHardware": "Apagado: esta computadora decodifica video VP9 y AV1 por hardware.",
   "video.statusNever": "Apagado: los sitios de video eligen el formato, aunque la computadora lo tenga que decodificar sin ayuda.",
-  "video.title": "Video en el navegador"
+  "video.title": "Video en el navegador",
+  "bt.searchAgain": "Buscar de nuevo"
 }

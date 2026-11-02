@@ -439,6 +439,7 @@ sudo cp -r themes assets /usr/local/lib/lordos/ && sudo chown -R root:root /usr/
 **VM 119** (172.17.0.54) as the client:
 
 - `chromium`, to test from a real browser;
+- on VM 125, `chromium` and `firefox-esr`, to test session restore's browser tabs (docs/SESSIONS.md);
 - the scratchpad's test clients (`ws_test.py`), which speak TLS and WebSocket with
   Python's standard library.
 
@@ -612,6 +613,7 @@ sudo usermod -aG lpadmin lord        # manage printers (LordOS administrators ha
 | `cups` (`cups-daemon`, `cups-client`, `cups-filters`…) | 2.4.10 | the queue and the drivers; LordOS speaks IPP to it over `/run/cups/cups.sock` |
 | `printer-driver-cups-pdf` | 3.0.2 | tests only: the virtual «PDF» printer (it leaves jobs in `~/PDF/`) |
 | `cups-ipp-utils` | 2.4.10 | tests only: `ippeveprinter`, an IPP Everywhere printer "on the network" |
+| `samba`, `nfs-kernel-server` | 0.8.7 | VM 125, for an hour on 2026-10-31: the test servers of Files → Network, inside a network namespace, with every unit masked so nothing listened on the LAN; purged afterwards (`FILES.md`, "Network") |
 | `avahi-daemon`, `avahi-utils` | 0.8 | CUPS announces and finds printers; in the tests, announcing the scanner (`avahi-publish`). LordOS's mDNS doesn't need it |
 | `libarchive-tools`, `zstd` | 3.7.4, 1.5.7 | tests only: building `.7z` and `.tar.zst` in `tests/doc_evil.sh` |
 | `strace` | — | only for debugging the helper |
@@ -1272,7 +1274,7 @@ See `WAYLAND.md` ("X11 apps (Xwayland)") and `PRIVACY.md` ("X11 apps"). Installe
 
 ## Step 35 — The Classic theme as a second full appearance (VM 119 `lordos-spot`, October 19)
 
-See `DESIGN.md` ("Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
+See `DESIGN.md` ("Lord Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
 `~/LordOS-classic`, built there (`make -C server`, `make -C server test`) and installed into
 `/usr/lib/lordos` (`lord-server`, `lord-media`, `lord-vault`, `lord-maild`, the theme bundles, the
 app host, the system apps, `assets/{fonts,locales,shell,icons,mascot,monitor,help}` and the wallpaper
@@ -1559,3 +1561,150 @@ binaries installed for one round, then this branch's again.
   `iptables-save` as before, the test accounts, both trees, the scripts, the `/tmp` files and the
   backup removed, `lordos.service` restarted on the package's binaries, at the login screen.
   VMs 115, 106 and 123 were not used.
+
+## Step 44 — 0.8.4 release test (VMs 116, 117, 120 and the Raspberry Pi, October 19–25)
+
+See `ISO.md`, "Release test (0.8.4 Beta, October 19–25)".
+
+- **VM 116:** installed `libsrtp2-dev` and `libusrsctp-dev` (with `libsrtp2-1`, `libusrsctp2`,
+  `libnss3-dev`, `libnspr4-dev`), which `lord-sessiond` now needs; they stay, for the next release
+  builds. The release tree in `~/LordOS-iso`, built there; ISO and `.deb` in
+  `/var/tmp/lordos-iso/out/` (the 0.8.2 and 0.8.3 ISOs there were removed to make room: identical
+  copies are in Proxmox's `local:iso`), `apt-get clean` run. Left stopped, as it was found on the
+  25th.
+- **Proxmox:** `local:iso/lordos-live-0.8.4-amd64.iso` added. A temporary typing helper in the
+  host's `/root` was removed afterwards.
+- **VMs 117 and 120:** a Proxmox snapshot `r084pre` first; then 120 got a fresh 0.8.3 install from
+  the 0.8.3 ISO (test user `rtester`, `openssh-server`, a sudoers drop-in, `lordos.sources` on
+  `apt-staging`, xterm, a Chromium profile opened once) and a snapshot `r084base`, and was upgraded
+  three times (Store with the first build; apt and Store again with the final build, back at
+  `r084base` each time; for the tests also `smartmontools` and `iptables`); 117 installed the 0.8.4
+  ISO. Both were rolled back to `r084pre` (ISO, boot order and disks as before: the earlier "Test
+  User" installs, at the login screen), the snapshots deleted, and both left stopped.
+- **Raspberry Pi 5 (172.17.0.24):** installed `libsrtp2-dev` and `libusrsctp-dev` (with `libsrtp2-1`,
+  `libusrsctp2`, `libnss3-dev`, `libnspr4-dev`) for the native build. Removed the old image work
+  folders `/var/tmp/lordos-rpi-v081` (an unpublished 0.8.1 build) and `-v082b` (its image is the
+  published 0.8.2 one, same SHA-256) to make room. Built the arm64 package and the image in
+  `/var/tmp/lordos-src-084` and `/var/tmp/lordos-rpi-v084c`. The installed LordOS went from 0.8.3 to
+  0.8.4 with apt (from staging, then the source put back on the live repository), migration 005;
+  `lordos`, `lord-netperm` and `lord-fand` restarted, no reboot. The firewall cut test ran as root
+  with a hand-made `lordos-session-0` cgroup (removed afterwards, with the empty
+  `/root/.config/lordos` it created); the first-run check used a loop device on a decompressed copy
+  of the image in `/var/tmp/r084-fr` (removed). Network, the `lordbasex` account and the SD
+  partitions untouched; the board was not reflashed.
+
+## Step 45 — 0.8.4.1 release test (VMs 116 and 120 and the Raspberry Pi, October 25)
+
+See `ISO.md`, "Release test (0.8.4.1 Beta, October 25)".
+
+- **VM 116:** started (it was stopped); the release tree in `~/LordOS-0841`, built and tested there;
+  the `.deb` and its SBOM in `/var/tmp/`. Nothing installed. Left stopped.
+- **VM 120:** a Proxmox snapshot `r0841pre` first; then a fresh 0.8.4 install from the 0.8.4 ISO
+  (test user `rtester`, `openssh-server`, a sudoers drop-in, `lordos.sources` on `apt-staging`) and
+  a snapshot `r0841base`; upgraded with the Store, then again with apt from `r0841base`. Rolled back
+  to `r0841pre` (the earlier "Test User" install, at the login screen; ISO and boot order as
+  before), both snapshots deleted, left stopped.
+- **Raspberry Pi 5 (172.17.0.24, the user's TEST SD with the 0.8.4 image):** clock set by hand
+  (the image had no time client), `debootstrap`, `xz-utils`, `curl`, `gpg`, `dosfstools`, `fdisk`,
+  `dpkg-dev`, `python3`, `dpkg-repack` and `file` installed for the native image build; the
+  installed LordOS kernels repacked with `dpkg-repack` into `/var/tmp/lordos-kernel/out` (`dpkg
+  --verify` clean first: the same files as the 0.8.4 image's). Tree in `/var/tmp/lordos-src-0841`,
+  image work folder `/var/tmp/lordos-rpi-v0841`. `lordos` 0.8.4 → 0.8.4.1 from staging (then the
+  source put back on the live repository). For the Settings test: a test-only account `rtest`
+  (sudo group) and the remote desktop turned on; both removed afterwards. Bootloader updated once
+  through Settings → Board firmware (2026/05/26 → 2026/09/25). Chromium and Firefox ESR installed
+  from Debian with the image's browser defaults, to check them (left installed). Network and
+  partitions untouched; the board was not reflashed.
+
+## Step 46 — Monitor → Network, second generation, for 0.8.5 (VM 118 `lordos-notes`, October 19)
+
+See `MONITOR.md` ("Network, second generation", "The menu bar network item", "Blocklists") and
+`FIREWALL.md` ("LordOS components in their own scopes", "The essential system services",
+"Blocklists"). On VM 118 (172.17.0.53), tree in `~/LordOS-netmon` (copied over SSH with `tar`: the
+VM has no rsync), built there (`make -C server`, `make -C server test`, `sudo build/npverify-test`)
+and installed over `/usr/local/lib/lordos` (`lord-server`, `lord-netperm`, the new `lord-fetch`,
+themes and assets) by `~/deploy-netmon-118.sh`, which first saved `/usr/local/lib/lordos` in
+`/var/backups/lordos-netmon-bak` and `~/.config/lordos` in `~/.config-lordos-backup-netmon`.
+`lord-sessiond` was not replaced (lord-netd isn't installed on this VM, so the network service row
+was not tested here). Nothing was installed with apt.
+
+- **Unit drop-in:** `/etc/systemd/system/lord-netperm.service.d/netmon084.conf` with
+  `RestrictAddressFamilies=AF_UNIX AF_PACKET AF_NETLINK` (this VM's unit predates 0.8.3's sock_diag);
+  removed at the end.
+- **Session:** the autologin session of `lord` (`/run/lordos/autologin-done` removed, the session's
+  lord-server ended, `lordos` restarted), English, dark and then light for the screenshots, the menu
+  bar item on (all in `settings.json`, restored at the end).
+- **Test traffic:** `curl` started from SSH inside `lordos-net-terminal.scope` (as a Terminal program)
+  and, for the A/B measurements, inside `app-lordos-npbench.scope`: HTTPS requests to public sites
+  every 4 s, two rate-limited downloads from Debian mirrors, and attempts to a listed scam domain
+  (denied by the list; while the lists were off for the A/B runs, a few requests to it went through).
+  `nc -z` to a listed domain checked that the owner's allow rule wins. The Store's "Check for
+  updates" for the Store's own row.
+- **Blocklists:** four catalog lists and one custom list downloaded over HTTPS from their sources;
+  copies in `~/.cache/lordos/fwlists`, removed at the end with `fwlists.json` and `fwlists.txt`.
+- **Measurements:** `iperf3` (already on this VM since step 28) through a veth pair `npb0`/`npb1`
+  into a private namespace `npb` (10.213.7.0/30), deleted after each run; eth0 and the network
+  configuration were not touched. For the A/B runs the 0.8.3 `lord-netperm` and main's build
+  (built in `~/LordOS-netmon-base`) were swapped in for a few minutes and the new build put back.
+- **Input and screenshots:** `lord-qmp-input.py 118 2987 1067` and `lord-type.py 118` from the
+  Proxmox host, `screendump` converted to PNG on the development machine.
+- **Undone at the end:** `/usr/local/lib/lordos` restored from the backup (`diff -r` empty), the
+  drop-in removed and `lord-netperm` restarted with the old binary, `~/.config/lordos` restored
+  (`diff -r` against the backup empty), the blocklist files and the test scopes removed, the trees,
+  scripts and backups deleted, `lordos` restarted to the login screen. The traffic history
+  (`~/.local/state/lordos/net-history.bin`) keeps the test minutes (app ids and byte counts only).
+  No Proxmox setting was touched.
+
+## Step 47 — 0.8.5: System Information's collector (VM 116 `lordos-gpu`, October 26)
+
+See `BENCHMARK.md` ("0.8.5 — System Information"). Built in `~/LordOS-085fs` (`make -C server
+build/lordos-sysreport build/sysreport-test`) and run from there as `lord`; nothing was installed
+over `/usr/local/lib/lordos`.
+
+- **Installed:** `usb.ids` (Debian, architecture `all`: the USB vendor and product names, read by
+  `lordos-sysreport`; `pci.ids` was already installed). The package recommends both.
+- **The app:** `lord-server` from that tree in an isolated headless session (`--headless 1280x800`,
+  its own `HOME`, `XDG_RUNTIME_DIR` and `dbus-run-session`, removed afterwards), driven and captured
+  over its own `remote.sock` (keys, clicks and the still frame's lossless tiles); the user's session
+  was not touched.
+- **Installed build (with the user's go-ahead):** `/usr/local/lib/lordos` replaced by the 0.8.5 test build
+  (backup of the previous one in `/usr/local/lib/lordos.1026.bak`), `lordos.service` restarted;
+  `lordos-sysreport`, `lordos-fetch` and `lordos-testbench` in `/usr/local/bin`, and
+  `/usr/share/applications/lordos-testbench.desktop`.
+- **lord-netperm (with the user's go-ahead to change the VM):** VM 116 had no per-app firewall service (System
+  Information → Checks reported it). Installed `/usr/local/lib/lordos/bin/lord-netperm` and
+  `/etc/systemd/system/lord-netperm.service` (the ISO's unit with that path), enabled and started; the network
+  kept working.
+
+## Step — 0.8.5 release: Raspberry Pi kernel and image on VM 116 (2026-10-27)
+
+To cross-build the LordOS Pi 5 kernel (`tools/rpi/build-kernel.sh`, pinned commit
+`234188315037848e5b07d65b85d38edc64095caa`) and the Pi image (`tools/rpi/build-img.sh`) on the x86-64
+VM 116, as `docs/RASPBERRY.md` lists:
+
+```sh
+sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross build-essential \
+  bc bison flex libssl-dev libelf-dev libdw-dev dwarves cpio kmod rsync dpkg-dev debhelper git \
+  qemu-user-static binfmt-support fdisk dosfstools e2fsprogs xz-utils curl gpg util-linux
+```
+
+## Step — 0.8.6 in development: LordBench on VM 116 (2026-10-27)
+
+See `BENCHMARK.md` ("Built so far"). Built in `~/LordOS-086` (`make -C server`, plus `build/lordbench-cli` to run
+it from a terminal) and run from there as `lord`; nothing was installed over `/usr/local/lib/lordos` and no
+package was added. The build uses `xz` (xz-utils, already installed: `dpkg-deb` depends on it) to compress the
+xz workload's fixed text (`build/gen/lb_corpus.h`). The app was checked in an isolated headless session of that
+tree (own `HOME`, `XDG_RUNTIME_DIR` and bus, driven over its `remote.sock`), removed afterwards.
+
+## Step — 0.8.7 in development: the arm64 live ISO on VM 116 (2026-10-30)
+
+`tools/iso/build-arm64.sh` and booting the result under emulation (`docs/ISO.md`, "The arm64 ISO"):
+
+```sh
+sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
+```
+
+`qemu-system-x86` was also installed on VM 116 earlier and was not recorded then:
+`sudo apt-get install -y --no-install-recommends qemu-system-x86`. The packages `build-arm64.sh` adds (debootstrap,
+squashfs-tools, xorriso, grub-common, grub-efi-arm64-bin, mtools, dosfstools) go into an overlay over the arm64 chroot,
+not on the VM and not into the chroot itself.

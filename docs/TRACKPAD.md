@@ -169,6 +169,9 @@ on):
 - the theme chooses with `registerGestureActions({ up, down, left, right })`:
   - `default` theme: up opens the app launcher, down closes it;
   - `classic` theme: the same with the start menu;
+- left and right switch desktops (`desktopSwipe`, [DESKTOPS.md](DESKTOPS.md)); swiping left brings the next one, and
+  with only one desktop they switch windows;
+- four fingers up (with four-finger swipes on) opens the Overview;
 - without a theme action, left and right switch windows (the rearmost comes to the front, or the
   front one goes to the back).
 
@@ -411,9 +414,9 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
 
 - **Isolated apps:** they don't have their own inertia for fine scrolling (Wayland apps do it
   themselves; LordOS's is for the theme's interface).
-- **CPU compositing:** each frame copies the whole screen to the graphics card's buffer
-  (`canvas_copy` in `main.c`). Copying only what changed would further lower the cost of panning the
-  map.
+- **CPU compositing:** each frame copies the bounding box of what changed to the graphics card's
+  buffer (`present_cpu` in `main.c`); copying only the separate damaged rectangles is written but
+  off by default (`LORD_DAMAGE=multi`), and would further lower the cost of panning the map.
 - **Missing gestures:**
   - drag lock (tap and drag that continues when the finger lifts for a moment);
   - edge scrolling for single-finger touchpads;

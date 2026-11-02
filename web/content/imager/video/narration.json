@@ -1,0 +1,165 @@
+{
+  "scenes": [
+    { "id": "intro", "kind": "title", "cues": [
+      { "en": "LordOS Imager writes LordOS to an SD card or a USB stick, and sets up the Raspberry Pi 5's first boot.",
+        "es": "LordOS Imager graba LordOS en una tarjeta SD o un pendrive y prepara el primer arranque de la Raspberry Pi 5.",
+        "pt": "O LordOS Imager grava o LordOS em um cartão SD ou pendrive e prepara o primeiro boot do Raspberry Pi 5." },
+      { "en": "Here is every step, screen by screen.",
+        "es": "Acá está cada paso, pantalla por pantalla.",
+        "pt": "Aqui está cada passo, tela por tela." }
+    ]},
+    { "id": "device", "shot": "01-device", "step": 1, "title": "Choose your device", "cues": [
+      { "box": [431, 156, 408, 362],
+        "en": "First, choose your device: Raspberry Pi 5 for an SD card, or PC for a live USB stick.",
+        "es": "Primero, elegí tu dispositivo: Raspberry Pi 5 para una tarjeta SD, o PC para un pendrive en vivo.",
+        "pt": "Primeiro, escolha o seu dispositivo: Raspberry Pi 5 para um cartão SD, ou PC para um pendrive ao vivo." },
+      { "box": [431, 552, 1123, 170],
+        "en": "For the Pi, 4 GB of memory is the minimum, 8 GB is comfortable and 16 GB is best.",
+        "say": "For the Pi, 4 gigabytes of memory is the minimum, 8 is comfortable, and 16 is best.",
+        "es": "Para la Pi, 4 GB de memoria es el mínimo, 8 GB es cómodo y 16 GB es lo mejor.",
+        "pt": "Para o Pi, 4 GB de memória é o mínimo, 8 GB é confortável e 16 GB é o melhor." }
+    ]},
+    { "id": "image", "shot": "02-image", "step": 2, "title": "Choose the system image", "cues": [
+      { "box": [431, 186, 1123, 154],
+        "en": "The latest LordOS release is already selected and marked Signed by LordOS.",
+        "es": "La última versión de LordOS ya viene elegida y marcada Firmada por LordOS.",
+        "pt": "A versão mais recente do LordOS já vem escolhida e marcada Assinada pelo LordOS." },
+      { "box": [431, 466, 1121, 128],
+        "en": "The download is kept for the next card. You can also use an image file of your own.",
+        "es": "La descarga se guarda para la próxima tarjeta. También podés usar un archivo de imagen propio.",
+        "pt": "O download fica guardado para o próximo cartão. Você também pode usar um arquivo de imagem seu." }
+    ]},
+    { "id": "storage", "shot": "04-storage", "step": 3, "title": "Choose the card or USB stick", "cues": [
+      { "box": [431, 155, 1123, 124],
+        "en": "Insert the card or the USB stick. It shows up by itself, with its name and size.",
+        "es": "Poné la tarjeta o el pendrive. Aparece sola, con su nombre y su tamaño.",
+        "pt": "Coloque o cartão ou o pendrive. Ele aparece sozinho, com nome e tamanho." },
+      { "box": [425, 442, 690, 36],
+        "en": "Only removable drives are listed. Your computer's own disks never appear here.",
+        "es": "Solo se muestran unidades extraíbles. Los discos de tu computadora nunca aparecen acá.",
+        "pt": "Só aparecem unidades removíveis. Os discos do seu computador nunca aparecem aqui." },
+      { "box": [431, 312, 1123, 101],
+        "en": "Read the red warning: everything on it will be erased.",
+        "es": "Leé el aviso en rojo: se borra todo lo que tenga.",
+        "pt": "Leia o aviso em vermelho: tudo o que houver nele será apagado." }
+    ]},
+    { "id": "general", "shot": "05-tab-general", "step": 4, "title": "Customise the first boot", "cues": [
+      { "box": [431, 172, 1123, 84],
+        "en": "Leave Prepare the first boot on, and the board starts ready. You can change it all later in Settings.",
+        "es": "Dejá activado Preparar el primer arranque y la placa arranca lista. Todo se puede cambiar después en Ajustes.",
+        "pt": "Deixe Preparar o primeiro boot ligado e a placa já inicia pronta. Tudo pode ser mudado depois em Ajustes." },
+      { "box": [431, 398, 1123, 46],
+        "en": "The computer name is how you'll find the board on your network: lordos-pi.local.",
+        "say": "The computer name is how you'll find the board on your network: lord O S pie dot local.",
+        "es": "El nombre de la computadora es cómo vas a encontrar la placa en tu red: lordos-pi.local.",
+        "pt": "O nome do computador é como você vai achar a placa na sua rede: lordos-pi.local." }
+    ]},
+    { "id": "user", "shot": "06-tab-user", "step": 4, "title": "User", "cues": [
+      { "box": [550, 276, 83, 46],
+        "en": "Create your administrator account. Only a one-way hash of the password goes on the card.",
+        "es": "Creá tu cuenta de administrador. A la tarjeta solo va un hash de un solo sentido de la contraseña.",
+        "pt": "Crie a sua conta de administrador. No cartão vai só um hash de mão única da senha." }
+    ]},
+    { "id": "wifi", "shot": "07-tab-wifi", "step": 4, "title": "Wi-Fi", "cues": [
+      { "box": [640, 276, 90, 46],
+        "en": "For Wi-Fi, the card keeps the network's derived key, never the password you typed.",
+        "es": "Del Wi-Fi, la tarjeta guarda la clave derivada de la red, nunca la contraseña que escribiste.",
+        "pt": "Do Wi-Fi, o cartão guarda a chave derivada da rede, nunca a senha que você digitou." }
+    ]},
+    { "id": "remote", "shot": "08-tab-remote", "step": 4, "title": "Remote access", "cues": [
+      { "box": [735, 276, 183, 46],
+        "en": "Remote access offers remote login with keys, and LordOS remote desktop on your local network.",
+        "es": "Acceso remoto ofrece el inicio de sesión remoto con claves y el escritorio remoto de LordOS en tu red local.",
+        "pt": "Acesso remoto oferece o login remoto com chaves e a área de trabalho remota do LordOS na sua rede local." }
+    ]},
+    { "id": "look", "shot": "09-tab-look", "step": 4, "title": "Appearance", "cues": [
+      { "box": [924, 276, 155, 46],
+        "en": "Pick a theme, light or dark, an accent color and a wallpaper.",
+        "es": "Elegí un tema, claro u oscuro, un color de acento y un fondo de pantalla.",
+        "pt": "Escolha um tema, claro ou escuro, uma cor de destaque e um papel de parede." }
+    ]},
+    { "id": "cooling", "shot": "10-tab-cooling", "step": 4, "title": "Cooling", "cues": [
+      { "box": [1084, 276, 113, 46],
+        "en": "Tell LordOS what keeps the board cool, and it picks the fan curve to match.",
+        "es": "Contale a LordOS qué enfría la placa y elige la curva del ventilador que corresponde.",
+        "pt": "Conte ao LordOS o que resfria a placa e ele escolhe a curva da ventoinha certa." },
+      { "box": [431, 427, 245, 282],
+        "en": "A closed case with its own fan on the board's fan connector? Choose Case with a fan.",
+        "es": "¿Una caja cerrada con su propio ventilador en el conector de la placa? Elegí Caja con ventilador.",
+        "pt": "Um gabinete fechado com ventoinha própria no conector da placa? Escolha Gabinete com ventoinha." }
+    ]},
+    { "id": "overclock", "shot": "11-tab-cooling-overclock", "step": 4, "title": "Mild overclock", "cues": [
+      { "box": [452, 900, 1081, 80],
+        "en": "With a fan, a mild overclock is on offer: 2.6 GHz, with no extra voltage.",
+        "say": "With a fan, a mild overclock is on offer: two point six gigahertz, with no extra voltage.",
+        "es": "Con ventilador, hay un overclock suave: 2,6 GHz, sin más voltaje.",
+        "pt": "Com ventoinha, há um overclock leve: 2,6 GHz, sem tensão extra." }
+    ]},
+    { "id": "more", "shot": "12-tab-more", "step": 4, "title": "More", "cues": [
+      { "box": [1202, 276, 88, 46],
+        "en": "And a promise: LordOS collects nothing.",
+        "es": "Y una promesa: LordOS no recopila nada.",
+        "pt": "E uma promessa: o LordOS não coleta nada." }
+    ]},
+    { "id": "profiles", "shot": "13-profiles", "step": 4, "title": "Profiles", "cues": [
+      { "en": "Save it all as a profile for the next card. Passwords are never saved.",
+        "es": "Guardá todo como perfil para la próxima tarjeta. Las contraseñas nunca se guardan.",
+        "pt": "Salve tudo como perfil para o próximo cartão. As senhas nunca são salvas." }
+    ]},
+    { "id": "summary", "shot": "14-write-summary", "step": 5, "title": "Check and write", "cues": [
+      { "box": [431, 155, 1123, 218],
+        "en": "Check the summary.",
+        "es": "Revisá el resumen.",
+        "pt": "Confira o resumo." }
+    ]},
+    { "id": "confirm", "shot": "15-write-confirm", "step": 5, "title": "Check and write", "cues": [
+      { "box": [890, 579, 202, 46],
+        "en": "Erase and write asks one last time. From there, the imager does it all by itself.",
+        "es": "Borrar y grabar pregunta una última vez. Desde ahí, el imager hace todo solo.",
+        "pt": "Apagar e gravar pergunta uma última vez. A partir daí, o imager faz tudo sozinho." }
+    ]},
+    { "id": "downloading", "shot": "16-downloading", "step": 5, "title": "Check and write", "cues": [
+      { "box": [431, 285, 1123, 115],
+        "en": "It checks the release signature and downloads the image.",
+        "es": "Verifica la firma de la versión y descarga la imagen.",
+        "pt": "Confere a assinatura da versão e baixa a imagem." }
+    ]},
+    { "id": "writing", "shot": "17-writing", "step": 5, "title": "Check and write", "cues": [
+      { "en": "It writes the card,",
+        "es": "Graba la tarjeta,",
+        "pt": "Grava o cartão," }
+    ]},
+    { "id": "verifying", "shot": "18-verifying", "step": 5, "title": "Check and write", "cues": [
+      { "en": "then reads it all back and compares, saves your settings and ejects it.",
+        "es": "después la lee entera y la compara, guarda tus ajustes y la expulsa.",
+        "pt": "depois lê tudo de volta e compara, salva os seus ajustes e ejeta." },
+      { "en": "Cancel is safe: the card is cleared, so it never looks half-written.",
+        "es": "Cancelar es seguro: la tarjeta se limpia para que nunca parezca grabada a medias.",
+        "pt": "Cancelar é seguro: o cartão é limpo para nunca parecer gravado pela metade." }
+    ]},
+    { "id": "done", "shot": "19-done", "step": 6, "title": "Done!", "cues": [
+      { "box": [431, 460, 1123, 490],
+        "en": "Done! Lumo lists what comes next, with the commands for remote login and remote desktop.",
+        "es": "¡Listo! Lumo te muestra lo que sigue, con los comandos para el inicio de sesión remoto y el escritorio remoto.",
+        "pt": "Pronto! O Lumo mostra o que vem depois, com os comandos para o login remoto e a área de trabalho remota." }
+    ]},
+    { "id": "splash", "screen": "docs/boot/splash-preview.png", "step": 7, "title": "The first boot", "cues": [
+      { "en": "Put the card in the Raspberry Pi 5 and connect the power supply last.",
+        "es": "Poné la tarjeta en la Raspberry Pi 5 y conectá la fuente al final.",
+        "pt": "Coloque o cartão no Raspberry Pi 5 e conecte a fonte por último." },
+      { "en": "The first boot applies your settings once, then deletes them from the card.",
+        "es": "El primer arranque aplica tus ajustes una sola vez y después los borra de la tarjeta.",
+        "pt": "O primeiro boot aplica os seus ajustes uma vez e depois os apaga do cartão." }
+    ]},
+    { "id": "greeter", "screen": "docs/screenshots/greeter.png", "step": 7, "title": "The first boot", "cues": [
+      { "en": "After about a minute, the login screen shows your account.",
+        "es": "En más o menos un minuto, la pantalla de inicio de sesión muestra tu cuenta.",
+        "pt": "Em cerca de um minuto, a tela de login mostra a sua conta." }
+    ]},
+    { "id": "end", "kind": "end", "cues": [
+      { "en": "LordOS Imager is free and open source. Welcome home!",
+        "es": "LordOS Imager es libre y de código abierto. ¡Bienvenida a casa!",
+        "pt": "O LordOS Imager é livre e de código aberto. Bem-vindo!" }
+    ]}
+  ]
+}

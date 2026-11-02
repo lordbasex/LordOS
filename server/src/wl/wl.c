@@ -16,12 +16,14 @@
  * its X windows are surfaces of one more client, with the toplevel or popup role given here
  * (wlx_attach). Not there yet: drag and drop, text-input (LordOS input methods inside Wayland apps). */
 #include "wl.h"
+#include "keygrab.h"
 #include "../keylag.h"
 
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +31,7 @@
 #include <sys/stat.h>
 #include <limits.h>
 #include <time.h>
+#include <signal.h>
 #include <unistd.h>
 #include <linux/input-event-codes.h>
 #include <wayland-server-core.h>
@@ -43,12 +46,14 @@
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "cursor-shape-v1-protocol.h"
 #include "fractional-scale-v1-protocol.h"
+#include "idle-inhibit-unstable-v1-protocol.h"
 #include "xdg-output-unstable-v1-protocol.h"
 #include "primary-selection-unstable-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
 #include "../outputs.h"
 #include "../cursor.h"
+#include "ptrlock.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include <drm/drm_fourcc.h>
@@ -89,6 +94,7 @@ struct Surf {
     int gx, gy, gw, gh, has_geom;
     char title[256], app_id[128];
     int maximized, fullscreen, activated, csd;
+    int dialog, min_w, min_h, max_w, max_h;     /* xdg_toplevel: a parent, and its size limits */
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
     struct wl_resource *kde;
     /* popup menu */
@@ -115,6 +121,8 @@ struct Surf {
     unsigned hole_sig;          /* GPU path: shape of the hole the UI left last time */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
+    uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
+    int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
      * enter/leave, bit = output slot) and the scale it should render at (fractional-scale-v1,
      * preferred_buffer_scale) */
@@ -157,7 +165,7 @@ static Surf *popups[32];
 static int npopups;
 
 /* GPU path: what is drawn below (layer 0) and above (layer 1) the UI, in order */
-typedef struct { int sid; float x, y; Rect clip; float op; } Draw;
+typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; } Draw;   /* sx, sy: a transformed window's scale */
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
@@ -183,8 +191,10 @@ static unsigned cursor_gen;
 
 /* zwp_pointer_constraints / zwp_relative_pointer */
 static struct wl_list rel_pointers;
-typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot; } Constraint;
+typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot, spent; } Constraint;
 static Constraint *constraint;      /* the only active (or pending) one */
+static void constraint_update(void);
+static void constraint_escape(void);
 static dev_t drm_dev;
 /* linux-dmabuf feedback objects (re-sent when the GPU comes or goes), the signature of the table
  * last sent, and the formats the last GPU context imported (accepted off the GPU, see dmabuf_usable) */
@@ -328,7 +338,8 @@ static void send_toplevel_configure(Surf *s) {
     }
     xdg_toplevel_send_configure(s->top, s->conf_w, s->conf_h, &states);
     wl_array_release(&states);
-    xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));
+    s->conf_serial = wl_display_next_serial(dpy);
+    xdg_surface_send_configure(s->xdg, s->conf_serial);
     s->sent_configure = 1;
 }
 
@@ -593,7 +604,7 @@ static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->parent) {
@@ -621,6 +632,7 @@ static void surface_gone(struct wl_resource *r) {
     if (fs_surf == s) { fs_surf = NULL; ui.dirty = 1; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (cursor_surf == s) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
     if (constraint && constraint->surf == s) { constraint->surf = NULL; constraint->active = 0; }
+    constraint_update();                /* s may have been the window with the keyboard */
     if (s->dmabuf) queue_release(s->dmabuf);
     gpu_tex_free(s->tex);
     free(s->px);
@@ -1004,6 +1016,25 @@ static const struct wl_keyboard_interface keyboard_impl = { .release = res_relea
 static const struct wl_touch_interface touch_impl = { .release = res_release };
 static void link_gone(struct wl_resource *r) { wl_list_remove(wl_resource_get_link(r)); }
 
+/* ---- idle-inhibit: a video player or a presentation keeps the screen on while its surface is shown ---- */
+static struct wl_list inhibitors;
+static void inh_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct zwp_idle_inhibitor_v1_interface inh_impl = { .destroy = inh_destroy };
+static void iim_create(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    struct wl_resource *i = wl_resource_create(c, &zwp_idle_inhibitor_v1_interface, wl_resource_get_version(r), id);
+    if (!i) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(i, &inh_impl, surface, link_gone);   /* the surface, only compared below */
+    wl_list_insert(&inhibitors, wl_resource_get_link(i));
+}
+static void iim_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct zwp_idle_inhibit_manager_v1_interface iim_impl = { .destroy = iim_destroy, .create_inhibitor = iim_create };
+static void bind_iim(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &zwp_idle_inhibit_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &iim_impl, NULL, NULL);
+}
+
 static void send_keymap(struct wl_resource *kb) {
     char *km = kb_keymap_string();
     if (!km) return;
@@ -1273,7 +1304,8 @@ static void offer_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r
 
 static void offer_selection(struct wl_resource *dev) {
     struct wl_client *c = wl_resource_get_client(dev);
-    if (selection && wl_resource_get_client(selection->res) == c) return;     /* it is its own */
+    /* the focused client gets every new selection, its own included (the protocol says so; its receive is
+     * forwarded to its own source) */
     const char *t = term_clipboard();
     int image = !selection && clip_is_image && clip_png;
     if (!selection && !image && !t[0]) { wl_data_device_send_selection(dev, NULL); return; }
@@ -1363,6 +1395,7 @@ static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct
     selection = s;
     clip_offer_gen++;
     if (s) read_selection(s);
+    offer_to_focus();                   /* the new selection, to the client with the keyboard (the owner, usually) */
 }
 static const struct wl_data_device_interface device_impl = { .start_drag = dev_drag, .set_selection = dev_set_selection, .release = res_release };
 
@@ -1448,7 +1481,6 @@ static void poffer_gone(struct wl_resource *r) { free(wl_resource_get_user_data(
 
 static void prim_offer_to(struct wl_resource *dev) {
     struct wl_client *c = wl_resource_get_client(dev);
-    if (prim_src && wl_resource_get_client(prim_src->res) == c) return;    /* its own */
     if (!prim_text || !prim_len) { zwp_primary_selection_device_v1_send_selection(dev, NULL); return; }
     struct wl_resource *o = wl_resource_create(c, &zwp_primary_selection_offer_v1_interface, wl_resource_get_version(dev), 0);
     if (!o) return;
@@ -1609,7 +1641,11 @@ static void position_popup(Surf *s, const Positioner *p) {
 /* ---- xdg_toplevel ---- */
 
 static void top_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) { (void)c; (void)r; (void)p; }
+static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) s->dialog = !!p;
+}
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
@@ -1641,7 +1677,16 @@ static void top_resize(struct wl_client *c, struct wl_resource *r, struct wl_res
     Surf *s = wl_resource_get_user_data(r);
     if (s && s->mapped) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
 }
-static void top_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) { (void)c; (void)r; (void)w; (void)h; }
+static void top_max_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) { s->max_w = w; s->max_h = h; }
+}
+static void top_min_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) { s->min_w = w; s->min_h = h; }
+}
 static void top_maximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
     if (s && s->mapped) emit(s, "maximize", "{}");
@@ -1653,6 +1698,11 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
+    if (s->parked || s->xmin) {      /* a hidden or minimized window is presented on nothing: it waits to come back */
+        s->fs_resume = 1;
+        send_toplevel_configure(s);
+        return;
+    }
     if (fs_surf) { fs_surf->fullscreen = 0; send_toplevel_configure(fs_surf); }
     fs_surf = s;
     s->fullscreen = 1;
@@ -1672,6 +1722,7 @@ static void enter_fullscreen(Surf *s) {
 }
 
 static void leave_fullscreen(Surf *s) {
+    if (s) s->fs_resume = 0;
     if (!s || s != fs_surf) return;
     fs_surf = NULL;
     s->fullscreen = 0;
@@ -1696,8 +1747,8 @@ static void top_minimize(struct wl_client *c, struct wl_resource *r) {
 }
 static const struct xdg_toplevel_interface toplevel_impl = {
     .destroy = top_destroy, .set_parent = top_parent, .set_title = top_title, .set_app_id = top_app_id,
-    .show_window_menu = top_menu, .move = top_move, .resize = top_resize, .set_max_size = top_size,
-    .set_min_size = top_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
+    .show_window_menu = top_menu, .move = top_move, .resize = top_resize, .set_max_size = top_max_size,
+    .set_min_size = top_min_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
     .set_fullscreen = top_fullscreen, .unset_fullscreen = top_unfullscreen, .set_minimized = top_minimize,
 };
 static void top_gone(struct wl_resource *r) {
@@ -1706,7 +1757,7 @@ static void top_gone(struct wl_resource *r) {
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
 }
 
 /* ---- xdg_popup ---- */
@@ -1774,7 +1825,11 @@ static void xs_geometry(struct wl_client *c, struct wl_resource *r, int32_t x, i
     s->p_gx = x; s->p_gy = y; s->p_gw = w; s->p_gh = h;
     s->p_geom = 1;
 }
-static void xs_ack(struct wl_client *c, struct wl_resource *r, uint32_t serial) { (void)c; (void)r; (void)serial; }
+static void xs_ack(struct wl_client *c, struct wl_resource *r, uint32_t serial) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s) s->acked_serial = serial;
+}
 static const struct xdg_surface_interface xdg_surface_impl = {
     .destroy = xs_destroy, .get_toplevel = xs_toplevel, .get_popup = xs_popup,
     .set_window_geometry = xs_geometry, .ack_configure = xs_ack,
@@ -1937,10 +1992,13 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s}",
-             t, a, alt, w, h, s->csd ? "true" : "false");
-    } else
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s}", t, a, w, h, s->csd ? "true" : "false");
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}",
+             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
+    } else {
+        int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}", t, a, w, h, s->csd ? "true" : "false",
+             s->dialog ? "true" : "false", fixed ? "true" : "false");
+    }
 }
 
 /* A new JS context (the theme was switched live): the windows that are still mapped are announced
@@ -1981,7 +2039,9 @@ static void surface_commit_role(Surf *s) {
         } else if (!s->content && s->mapped) {
             s->mapped = 0;
             emit(s, "unmap", "{}");
-        } else if (s->mapped && (w != s->conf_w || h != s->conf_h)) {
+        } else if (s->mapped && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
+            /* a commit made before the app read our last configure is its old size on the way out, not a
+             * resize of its own: taken as one, the window kept the size of a maximize just undone */
             emit(s, "geometry", "{\"width\":%d,\"height\":%d}", w, h);
             s->conf_w = w;
             s->conf_h = h;
@@ -2034,7 +2094,7 @@ static Rect rect_and(Rect a, Rect b) {
 }
 
 static void add_draw(int layer, Surf *s, float x, float y, Rect clip, float op) {
-    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ s->id, x, y, clip, op };
+    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ s->id, x, y, clip, op, 1, 1 };
 }
 
 /* Is the node (or an ancestor) a protected window? (screenshots, media/capture.c) */
@@ -2067,6 +2127,46 @@ static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *s
     }
 }
 
+/* GPU path, a window inside a transformed node (the Overview, the minimize effect): ui/paint.c rasterizes
+ * the node and blends the raster at its place, so the app's quad and its hole can't be where layout says.
+ * While the raster is painted, each surface is noted at the transformed box. Its alpha 0 in the raster
+ * keeps what the subtree paints over it (the Overview's hover border), and blending leaves the canvas as
+ * it was, so wl_tf_open_holes clears the same box in the canvas before the raster goes over it. Quad and
+ * hole are rounded to the same physical pixels. A rotation or a transform inside another one has no quad:
+ * the frame is drawn at its place with nothing in the content, never the window at its full size. */
+#define TF_HOLES 32
+static struct { int on, skip; float sx, sy, tx, ty, op; Rect outer; } tfv;
+static struct { float x, y, w, h; Rect clip; } tf_holes[TF_HOLES];
+static int ntf_holes;
+
+void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) {
+    const Node *n = node_get(node);
+    tfv.on = 1; tfv.skip = skip; tfv.sx = sx; tfv.sy = sy; tfv.tx = tx; tfv.ty = ty; tfv.op = op;
+    tfv.outer = n && n->parent ? node_clip(n->parent->id) : (Rect){ -65536, -65536, 65536, 65536 };
+    ntf_holes = 0;
+}
+void wl_tf_end(void) { tfv.on = 0; }
+void wl_tf_nested(int d) { tfv.skip += d; }
+
+static Rect tf_map(Rect r) {
+    float x0 = r.x0 * tfv.sx + tfv.tx, y0 = r.y0 * tfv.sy + tfv.ty, x1 = r.x1 * tfv.sx + tfv.tx, y1 = r.y1 * tfv.sy + tfv.ty;
+    return rect_and(tfv.outer, (Rect){ (int)floorf(fminf(x0, x1)), (int)floorf(fminf(y0, y1)), (int)ceilf(fmaxf(x0, x1)), (int)ceilf(fmaxf(y0, y1)) });
+}
+
+static Rect tf_pixels(float x, float y, float w, float h) {
+    return (Rect){ (int)lroundf(PVX(x)), (int)lroundf(PVY(y)), (int)lroundf(PVX(x + w)), (int)lroundf(PVY(y + h)) };
+}
+
+void wl_tf_open_holes(Canvas *c) {
+    Rect old = c->clip;
+    for (int i = 0; i < ntf_holes; i++) {
+        canvas_set_clip(c, rect_and(old, rect_and(phys_rect(tf_holes[i].clip), tf_pixels(tf_holes[i].x, tf_holes[i].y, tf_holes[i].w, tf_holes[i].h))));
+        canvas_clear(c, 0);
+    }
+    canvas_set_clip(c, old);
+    ntf_holes = 0;
+}
+
 /* CPU path: the buffer into its logical box (x, y, lw × lh) at the display's resolution. A client
  * that rendered at exactly that size (fractional-scale) is copied 1:1; others are scaled. */
 static void blit_surface(Canvas *c, const Surf *s, float x, float y, float sxk, float syk, float op) {
@@ -2080,7 +2180,22 @@ static void blit_surface(Canvas *c, const Surf *s, float x, float y, float sxk, 
 
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
-        if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
+        if (tfv.on) {
+            if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
+                float X = x * tfv.sx + tfv.tx, Y = y * tfv.sy + tfv.ty, W = s->lw * tfv.sx, H = s->lh * tfv.sy;
+                Rect m = tf_map(clip);
+                add_draw(0, s, X, Y, m, op * tfv.op);
+                draws[0][ndraws[0] - 1].sx = tfv.sx;
+                draws[0][ndraws[0] - 1].sy = tfv.sy;
+                tf_holes[ntf_holes].x = X; tf_holes[ntf_holes].y = Y; tf_holes[ntf_holes].w = W; tf_holes[ntf_holes].h = H;
+                tf_holes[ntf_holes++].clip = m;
+                Rect old = c->clip;                     /* in the raster */
+                canvas_set_clip(c, rect_and(rect_and(old, phys_rect(clip)),
+                                            (Rect){ (int)floorf(PVX(x)), (int)floorf(PVY(y)), (int)ceilf(PVX(x + s->lw)), (int)ceilf(PVY(y + s->lh)) }));
+                canvas_clear(c, 0);
+                canvas_set_clip(c, old);
+            }
+        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
         else if (s->content) {
             add_draw(0, s, x, y, clip, op);
             /* hole in the UI: what was painted below shows the window */
@@ -2110,6 +2225,33 @@ void wl_paint_kept(void) {
     for (int i = 0; i < nkept && ndraws[0] < 128; i++) draws[0][ndraws[0]++] = kept[i];
 }
 
+/* LORD_PAINT_VERIFY (main.c): its check repaint notes the app windows again; the frame keeps its list. */
+static Draw verify_draws[2][128];
+static int verify_n[2];
+void wl_paint_save(void) {
+    memcpy(verify_draws, draws, sizeof verify_draws);
+    memcpy(verify_n, ndraws, sizeof verify_n);
+}
+void wl_paint_restore(void) {
+    memcpy(draws, verify_draws, sizeof draws);
+    memcpy(ndraws, verify_n, sizeof ndraws);
+}
+
+/* GPU drag (ui/paint.c): whether an app window noted so far for layer 0 is drawn into r (physical px of the
+ * display being painted): its box as draw_surface gives it, one pixel more on each side for the
+ * filtering, cut by its clip. A window that is gone is not drawn. */
+int wl_draws_meet(Rect r) {
+    for (int i = 0; i < ndraws[0]; i++) {
+        const Draw *d = &draws[0][i];
+        const Surf *s = find(d->sid);
+        if (!s) continue;
+        Rect b = rect_and(phys_rect(d->clip), (Rect){ (int)floorf(PVX(d->x)) - 1, (int)floorf(PVY(d->y)) - 1,
+                                                      (int)ceilf(PVX(d->x + s->lw * d->sx)) + 1, (int)ceilf(PVY(d->y + s->lh * d->sy)) + 1 });
+        if (b.x0 < r.x1 && r.x0 < b.x1 && b.y0 < r.y1 && r.y0 < b.y1) return 1;
+    }
+    return 0;
+}
+
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op) {
     Surf *s = find(id);
     if (!s || s->role != R_TOPLEVEL) return;
@@ -2123,7 +2265,8 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
     }
     if (s->xw && s->mapped && s != fs_surf && !paint_capture_mode) xwm_place(s->xw, (int)lroundf(x), (int)lroundf(y));   /* X routes the pointer by it */
     if (s == fs_surf) return;                   /* presented by the compositor, on top of everything */
-    Rect clip = rect_and(node_clip(node), (Rect){ (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) });
+    Rect box = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
+    Rect clip = tfv.on ? box : rect_and(node_clip(node), box);  /* node_clip is the untransformed tree's */
     Rect old = canvas_push_clip(c, PVX(x), PVY(y), w * paint_view.k, h * paint_view.k);
     paint_tree(c, s, x - s->gx, y - s->gy, op, clip);
     canvas_set_clip(c, old);
@@ -2184,13 +2327,21 @@ static void fs_box(float *x, float *y, float *sx, float *sy) {
     *y = fy - fs_surf->gy * *sy;
 }
 
+int wl_gpu_layers_empty(void) { return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups; }
+
 void wl_gpu_draw_layer(int layer) {
     Rect all = { -65536, -65536, 65536, 65536 };
     if (layer == 0) {
         for (int i = 0; i < ndraws[0]; i++) {
             Draw *d = &draws[0][i];
             Surf *s = find(d->sid);
-            if (s && s->content) draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op);
+            if (!s || !s->content) continue;
+            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }
+            Rect p = tf_pixels(d->x, d->y, s->lw * d->sx, s->lh * d->sy);
+            GpuTex *t = surface_tex(s);
+            float sx, sy, sw, sh;
+            source_rect(s, &sx, &sy, &sw, &sh);
+            if (t) gpu_draw(t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), sx, sy, sw, sh, phys_rect(d->clip), d->op);
         }
         return;
     }
@@ -2308,7 +2459,6 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
     return NULL;
 }
 
-static void constraint_update(void);
 static void pointer_enter(Surf *s, float lx, float ly) {
     if (pointer_focus == s) return;
     if (!s || !pointer_focus || s->client != pointer_focus->client) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
@@ -2468,11 +2618,85 @@ static int system_meta_key(int code, const KeyInfo *k) {
     }
 }
 
+/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Lord Flow. grabbed[code]: its press went to
+ * the shell, so its release does too. remapped[code]: its press went to the app as Ctrl+key.
+ * grab_hold: the modifier of a switcher in progress; until it is released every key is the shell's,
+ * while modifiers still reach the app too, so it never keeps one stuck. */
+#define KEY_SLOTS 256
+static unsigned char grabbed[KEY_SLOTS], remapped[KEY_SLOTS];
+static unsigned grab_hold;
+static int focus_terminal;
+
+void wl_focus_terminal(int on) { focus_terminal = !!on; }
+
+static int is_modifier_key(int code) {
+    return code == KEY_LEFTSHIFT || code == KEY_RIGHTSHIFT || code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL ||
+           code == KEY_LEFTALT || code == KEY_RIGHTALT || code == KEY_LEFTMETA || code == KEY_RIGHTMETA;
+}
+
+/* Like wl_send_paste, for one key held down: the client repeats it on its own while Ctrl stays set.
+ * Super (core modifier 6, Mod4) is taken out so the app sees plain Ctrl. */
+static void send_remapped(int code, int press) {
+    unsigned t = now_ms();
+    uint32_t d, l, lk, g;
+    kb_mods(&d, &l, &lk, &g);
+    d &= ~(1u << 6);
+    uint32_t held = d | 1u << 2 | (focus_terminal ? 1u : 0);
+    struct wl_resource *kb;
+    FOR_CLIENT(&keyboards, key_focus->client, kb) {
+        if (press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), held, l, lk, g);
+        wl_keyboard_send_key(kb, wl_display_next_serial(dpy), t, (uint32_t)code,
+                             press ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+        if (!press) wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, lk, g);
+    }
+    mods_sent[0] = press ? held : d; mods_sent[1] = l; mods_sent[2] = lk; mods_sent[3] = g;
+}
+
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
-    if (k->meta && code == KEY_ESC && fs_surf) { if (value == 1) leave_fullscreen(fs_surf); return 1; }   /* ❖Esc exits */
+    unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
+    unsigned char *was_remapped = code >= 0 && code < KEY_SLOTS ? &remapped[code] : NULL;
+    unsigned mods = (k->shift ? KG_SHIFT : 0u) | (k->ctrl ? KG_CTRL : 0u) | (k->alt ? KG_ALT : 0u) | (k->meta ? KG_META : 0u);
+    if (was_grabbed && *was_grabbed) {
+        if (!value) *was_grabbed = 0;
+        return 0;
+    }
+    if (was_remapped && *was_remapped) {
+        if (value) return 1;                    /* apps repeat on their own (repeat_info) */
+        *was_remapped = 0;
+        if (key_focus) send_remapped(code, 0);
+        return 1;
+    }
+    if (grab_hold) {
+        if (!(mods & grab_hold)) grab_hold = 0;
+        if (is_modifier_key(code)) { if (key_focus && value != 2) send_key_to_focus(code, value); }
+        else if (value && was_grabbed) *was_grabbed = 1;
+        else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
+        return 0;
+    }
+    if (k->meta && code == KEY_ESC && !k->alt && (fs_surf || wl_pointer_locked())) {   /* ❖Esc exits; the shell learns ❖ was not alone */
+        if (value != 1) return 1;
+        if (wl_pointer_locked()) constraint_escape();
+        if (fs_surf) leave_fullscreen(fs_surf);
+        return 2;
+    }
     if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
     if (!key_focus) return 0;
+    if (value == 1 && was_grabbed) {
+        char letter = keygrab_letter(code, k->base);
+        int how = keygrab_match(code, letter, mods);
+        if (how == KG_HOLD && fs_surf && fs_surf->content) how = KG_PASS;   /* presented above the switcher */
+        if (how != KG_PASS) {
+            *was_grabbed = 1;
+            if (how == KG_HOLD) grab_hold = mods & (KG_ALT | KG_META);
+            return 0;
+        }
+        if (keygrab_is_remap(letter, mods) && !focus_is_lord_app()) {
+            *was_remapped = 1;
+            send_remapped(code, 1);
+            return 2;
+        }
+    }
     int super = code == KEY_LEFTMETA || code == KEY_RIGHTMETA;
     if (k->meta || super) {
         /* ❖ + key: LordOS shortcuts. An isolated LordOS app also gets the ones that are not the
@@ -2897,19 +3121,25 @@ static void constraint_send(Constraint *k, int on) {
     else { if (on) zwp_confined_pointer_v1_send_confined(k->res); else zwp_confined_pointer_v1_send_unconfined(k->res); }
 }
 
-/* Activated when the pointer enters its surface and released when it leaves. */
+/* Holds while the pointer is on its surface and the keyboard on its app (ptrlock.h). */
 static void constraint_update(void) {
     Constraint *k = constraint;
     if (!k || !k->surf) return;
     Surf *top = pointer_focus;
-    int want = top && (top == k->surf || top->parent == k->surf);
-    if (want && !k->active && k->oneshot >= 0) { k->active = 1; constraint_send(k, 1); cursor_gen++; }
-    else if (!want && k->active) {
-        k->active = 0;
-        constraint_send(k, 0);
-        if (k->oneshot) k->oneshot = -1;          /* oneshot: does not activate again */
-        cursor_gen++;
-    }
+    int on = top && (top == k->surf || top->parent == k->surf);
+    int kb = key_focus && key_focus->client == k->surf->client;
+    int what = ptrlock_step(&k->active, &k->spent, k->oneshot, on, kb);
+    if (what == PTRLOCK_SAME) return;
+    constraint_send(k, what == PTRLOCK_ON);
+    cursor_gen++;
+}
+
+/* ❖Esc: the way out that doesn't depend on the app. */
+static void constraint_escape(void) {
+    Constraint *k = constraint;
+    if (!k || ptrlock_escape(&k->active, &k->spent) == PTRLOCK_SAME) return;
+    constraint_send(k, 0);
+    cursor_gen++;
 }
 
 static void cons_gone(struct wl_resource *r) {
@@ -2997,10 +3227,17 @@ int wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *g
 
 /* ---- from JS ---- */
 
+/* A text field of the app with the keyboard took or lost focus: the on-screen keyboard's hint. */
+static void text_field_report(int on, int x, int y, int w, int h) {
+    if (!key_focus) return;
+    emit(key_focus, "textinput", "{\"on\":%s,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", on ? "true" : "false", x, y, w, h);
+}
+
 void wl_set_focus(int id) {
     if (!dpy) return;
     Surf *s = id ? find(id) : NULL;
     if (s && s->role != R_TOPLEVEL) s = NULL;
+    if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (fs_surf && fs_surf->content) s = fs_surf;      /* in fullscreen the keyboard is its own */
     if (s == key_focus) return;
     struct wl_resource *kb;
@@ -3011,6 +3248,7 @@ void wl_set_focus(int id) {
         dismiss_popups();
     }
     key_focus = s;
+    wl_textinput_focus(s ? s->client : NULL, s ? s->res : NULL);
     if (s) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);
         s->activated = 1;
@@ -3021,6 +3259,7 @@ void wl_set_focus(int id) {
     }
     /* X11: the X focus follows (and with it whether X apps may read LordOS's clipboard) */
     xwm_focus(s && s->xw ? s->xw : NULL);
+    constraint_update();                /* a pointer lock holds only with the keyboard (ptrlock.h) */
     wl_display_flush_clients(dpy);
 }
 
@@ -3029,6 +3268,62 @@ void wl_close(int id) {
     if (s && s->top) xdg_toplevel_send_close(s->top);
     else if (s && s->xw) xwm_close(s->xw);
     if (dpy) wl_display_flush_clients(dpy);
+}
+
+/* The session is ending: every window is asked to close as the user would, and the apps get up to
+ * ms to do it and leave. wl_stop() alone cuts their connection, which a browser records as a crash.
+ * An app that asks something back ("Save changes?") or doesn't answer is cut by wl_stop() as before. */
+void wl_close_all(int ms) {
+    if (!dpy) return;
+    struct wl_client *apps[MAX_SURF];
+    int napps = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !(s->xw || (s->top && s->mapped))) continue;
+        if (s->top) xdg_toplevel_send_close(s->top);
+        else xwm_close(s->xw);
+        if (s->client != xwl_client) {
+            int seen = 0;
+            for (int k = 0; k < napps && !seen; k++) seen = apps[k] == s->client;
+            if (!seen) apps[napps++] = s->client;
+        }
+    }
+    wl_display_flush_clients(dpy);
+    struct timespec t0, now;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (;;) {
+        /* what is left: X11 windows, and the processes of the Wayland ones */
+        int left = 0;
+        for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->xw) left++;
+        struct wl_client *c;
+        wl_client_for_each(c, wl_display_get_client_list(dpy))
+            for (int k = 0; k < napps; k++) if (apps[k] == c) left++;
+        if (!left) break;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        int spent = (int)((now.tv_sec - t0.tv_sec) * 1000 + (now.tv_nsec - t0.tv_nsec) / 1000000);
+        if (spent >= ms) break;
+        struct pollfd p = { wl_fd(), POLLIN, 0 };
+        poll(&p, 1, spent + 50 < ms ? 50 : ms - spent);
+        wl_dispatch();
+        wl_flush();
+    }
+}
+
+/* Force Quit (the crown menu): SIGKILL to the process that owns this Wayland window, for an app that
+ * stopped answering. Only a client of this session's user, never lord-server itself, never pid 1, and
+ * never an X11 window (its client is Xwayland, which every X11 app shares: those are asked to close).
+ * 0, or an error code for the interface. */
+const char *wl_kill(int id) {
+    Surf *s = find(id);
+    if (!s || !s->top) return s && s->xw ? "app.forceQuitX11" : "app.notFound";
+    pid_t pid = 0;
+    uid_t uid = (uid_t)-1;
+    gid_t gid;
+    wl_client_get_credentials(wl_resource_get_client(s->top), &pid, &uid, &gid);
+    if (pid <= 1 || pid == getpid() || uid != getuid()) return "app.forceQuitRefused";
+    if (kill(pid, SIGKILL)) return "app.forceQuitFailed";
+    fprintf(stderr, "wayland: force quit pid %d (window %d)\n", (int)pid, id);
+    return NULL;
 }
 
 void wl_set_state(int id, int maximized, int fullscreen) {
@@ -3040,10 +3335,43 @@ void wl_set_state(int id, int maximized, int fullscreen) {
 }
 
 /* Minimized by the theme: an X11 window goes to the bottom of X's stack (it never catches the
- * pointer there) and is marked iconic. Wayland apps aren't told (xdg-shell has no such event). */
+ * pointer there) and is marked iconic. Wayland apps aren't told (xdg-shell has no such event).
+ * Fullscreen is presented above everything, so it would stay on screen with the keyboard: it stops
+ * here and comes back with the window, as on a hidden desktop (wl_set_parked). */
 void wl_set_minimized(int id, int minimized) {
     Surf *s = find(id);
-    if (s && s->xw) { s->xmin = minimized; xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized); }
+    if (!s) return;
+    s->xmin = minimized;
+    if (minimized && s == fs_surf) {
+        leave_fullscreen(s);
+        s->fs_resume = 1;
+    } else if (!minimized && s->fs_resume && !s->parked) {
+        s->fs_resume = 0;
+        enter_fullscreen(s);
+    }
+    if (s->xw) xwm_set_state(s->xw, s->maximized, s->fullscreen, minimized);
+}
+
+/* On a hidden desktop (sdk/desktopmodel.js surfaceState; C knows nothing else about desktops). The window
+ * has no node there, so it can't be painted or reached with the pointer; this takes what doesn't depend
+ * on the node: the keyboard, and fullscreen, which is presented above everything and would keep both.
+ * Fullscreen comes back with the window, and one the app asks for meanwhile waits for it. */
+void wl_set_parked(int id, int parked) {
+    Surf *s = find(id);
+    if (!s || (!s->top && !s->xw) || s->parked == !!parked) return;
+    s->parked = !!parked;
+    if (parked) {
+        int resume = s == fs_surf || s->fs_resume;      /* wl_set_minimized runs first and may have kept it */
+        if (s == fs_surf) leave_fullscreen(s);
+        s->fs_resume = resume;
+        if (s == key_focus) wl_set_focus(0);
+        for (int i = npopups - 1; i >= 0; i--)
+            if (toplevel_of(popups[i]) == s && popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
+    } else if (s->fs_resume && !s->xmin) {
+        s->fs_resume = 0;
+        enter_fullscreen(s);
+    }
+    if (dpy) wl_display_flush_clients(dpy);
 }
 
 /* The screen changed size (headless session, docs/SESSIONS.md): new mode for the apps
@@ -3102,6 +3430,7 @@ int wl_start(void) {
     wl_global_create(dpy, &wl_seat_interface, 9, NULL, bind_seat);    /* 8: axis_value120, 9: relative_direction */
     wl_global_create(dpy, &wl_data_device_manager_interface, 3, NULL, bind_ddm);
     wl_list_init(&prim_devices);
+    wl_list_init(&inhibitors);
     wl_global_create(dpy, &zwp_primary_selection_device_manager_v1_interface, 1, NULL, bind_pdm);   /* middle-click paste */
     wl_global_create(dpy, &xdg_wm_base_interface, 6, NULL, bind_wm_base);
     wl_global_create(dpy, &zxdg_decoration_manager_v1_interface, 1, NULL, bind_decm);
@@ -3115,8 +3444,10 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
+    wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
+    wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
@@ -3213,7 +3544,7 @@ void wlx_detach(int sid) {
     if (!s) return;
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->role == R_POPUP) unmap_popup(s);
-    if (key_focus == s) key_focus = NULL;
+    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (fs_surf == s) { fs_surf = NULL; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (s->node) damage_node(s);
@@ -3287,4 +3618,14 @@ const char *wlx_primary(size_t *n, unsigned *gen) {
     *n = prim_len;
     *gen = prim_gen;
     return prim_text ? prim_text : "";
+}
+
+int wl_idle_inhibited(void) {
+    if (!inhibitors.next) return 0;     /* before wl_start */
+    struct wl_resource *r;
+    wl_resource_for_each(r, &inhibitors) {
+        struct wl_resource *sr = wl_resource_get_user_data(r);
+        for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->res == sr && surfs[i]->mapped) return 1;
+    }
+    return 0;
 }

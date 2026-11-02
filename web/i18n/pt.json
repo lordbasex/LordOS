@@ -17,7 +17,7 @@
   "navDownload": "Baixar",
   "navSupport": "Apoiar",
   "navAbout": "Sobre",
-  "badge": "Versão 0.8.3 · Beta",
+  "badge": "Versão 0.8.7 · Beta",
   "heroTitle": "O desktop Linux livre, rápido e seguro.",
   "heroLead": "LordOS é uma distribuição GNU/Linux livre baseada no Debian com ambiente de desktop, servidor gráfico e compositor Wayland próprios, escritos em C, motor de interface próprio e apps nativos pensados para ser calmos, claros e privados.",
   "ctaDownload": "Baixar LordOS",
@@ -36,7 +36,7 @@
     ],
     [
       "Um firewall que se vê",
-      "Veja cada conexão num mapa-múndi ao vivo e permita ou bloqueie por app."
+      "Veja cada conexão num mapa-múndi ao vivo e permita ou bloqueie por app, ou ative listas de bloqueio de publicidade, rastreadores e malware."
     ],
     [
       "Senhas incluídas",
@@ -73,8 +73,8 @@
   ],
   "dlTitle": "Obtenha o LordOS",
   "dlLead": "Pague quanto quiser, inclusive nada. Seu apoio mantém o LordOS gratuito para todos.",
-  "isoTitle": "PC (64 bits)",
-  "isoText": "ISO live e instalável para computadores com processador x86-64. Experimente sem instalar.",
+  "isoTitle": "PC e arm64",
+  "isoText": "ISOs live e instaláveis: uma para PCs de 64 bits e outra para máquinas e máquinas virtuais arm64 com UEFI, por enquanto testada só em QEMU emulado. Experimente sem instalar.",
   "isoBtn": "Baixar ISO",
   "piTitle": "Raspberry Pi 5",
   "piText": "Imagem pronta para gravar em SD ou NVMe, com controle de ventoinhas e kernel próprio.",
@@ -84,6 +84,12 @@
   "copy": "Copiar",
   "copied": "Copiado",
   "copyCmdLabel": "Copiar o comando de instalação",
+  "imgTitle": "LordOS Imager",
+  "imgText": "Grave o LordOS num cartão SD ou num pendrive a partir do computador que você já tem, e prepare o primeiro boot do Raspberry Pi 5: o nome, a sua conta, o Wi-Fi, o acesso remoto, a aparência e o resfriamento. Cada imagem oficial é verificada com a assinatura da versão antes de apagar qualquer coisa.",
+  "imgMac": "Baixar para Mac",
+  "imgWin": "Baixar para Windows",
+  "imgLinux": "Baixar para Linux",
+  "imgNote": "Também vem com o LordOS (Apps → Sistema). Livre e de código aberto, não coleta nada.",
   "dlNote": "Os downloads são publicados no GitHub Releases com somas SHA-256.",
   "verifyTitle": "Verifique o seu download",
   "verifyText": "Cada versão é assinada com a chave de publicação do LordOS. Confira a assinatura antes de instalar. Impressão digital da chave (SHA-256):",
@@ -169,8 +175,20 @@
       "media": "Mídia",
       "system": "Sistema",
       "privacy": "Privacidade e segurança"
-    }
+    },
+    "upcoming": "Chega na {v} (em desenvolvimento)"
   },
   "debHintA": "Num servidor sem tela, adicione",
-  "debHintB": "e use-o pelo navegador."
+  "debHintB": "e use-o pelo navegador.",
+  "changelog": {
+    "title": "Histórico de alterações",
+    "lead": "As notas completas de cada versão, da mais nova à mais antiga, exatamente como estão no CHANGELOG.md. Abra uma versão para lê-la.",
+    "note": "O histórico de alterações é mantido só em inglês: o que segue é o texto original do CHANGELOG.md.",
+    "unreleased": "Não publicada",
+    "inDev": "Em desenvolvimento",
+    "yanked": "Retirada",
+    "latest": "Versão mais recente",
+    "compare": "Alterações no GitHub",
+    "released": "Publicada"
+  }
 }

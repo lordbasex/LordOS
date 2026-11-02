@@ -1,5 +1,6 @@
 /* phttp.c — see phttp.h. */
 #include "phttp.h"
+#include "../sec/netconn.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -41,9 +42,9 @@ int phttp_lan_ipv4(const char *ip) {
 int phttp_tcp(const char *ip, int port, int timeout_ms) {
     struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons((uint16_t)port) };
     if (port < 1 || port > 65535 || inet_pton(AF_INET, ip, &a.sin_addr) != 1) return -1;
-    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    /* made and connected by the printers' connector, in lordos-net-print.scope (sec/netconn.h) */
+    int fd = netconn_socket(NC_PRINT, AF_INET, SOCK_STREAM, (struct sockaddr *)&a, sizeof a);
     if (fd < 0) return -1;
-    if (connect(fd, (struct sockaddr *)&a, sizeof a) && errno != EINPROGRESS) { close(fd); return -1; }
     struct pollfd p = { fd, POLLOUT, 0 };
     int err = 0;
     socklen_t el = sizeof err;

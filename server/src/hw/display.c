@@ -582,7 +582,9 @@ int display_arrange(uint32_t conn, int x, int y, int apply, int *sx, int *sy) {
     if (mv < 0) return -1;
     ORect r[OUT_MAX];
     for (int j = 0; j < D.cur.n; j++) r[j] = (ORect){ D.cur.o[j].v.x, D.cur.o[j].v.y, D.cur.o[j].v.w, D.cur.o[j].v.h };
-    int snap = 24;
+    /* a position that already touches and doesn't overlap (Settings snaps it, sdk/displaylayout.js)
+     * is kept exactly; anything else is snapped next to a display */
+    int snap = out_fits(r, D.cur.n, mv, x, y) ? 0 : 24;
     out_snap(r, D.cur.n, mv, x, y, snap, &r[mv].x, &r[mv].y);
     *sx = r[mv].x;
     *sy = r[mv].y;

@@ -46,7 +46,8 @@ top of the SDK: it doesn't use CodeMirror or Monaco, nor vendored TextMate gramm
   double click on a file that isn't an image, sound, video or archive opens it here
   (`wm.open('editor', { args: { path } })`). Closing the window or a tab with changes asks first.
   It rejects binary files and files larger than 8 MB.
-- **App menus** (in the theme's bar): File, Edit, View and Go, with their shortcuts.
+- **App menus** (in the theme's bar; in Lord Classic, since 0.8.5, in a strip under the window's title
+  bar): File, Edit, View and Go, with their shortcuts.
 - **Input methods:** the editor registers with `ime.attach`, so Japanese, Chinese and Korean
   type at the cursor (the composition and the candidates show up there).
 - **Its own icon:** a sheet with colored lines of code.
@@ -114,14 +115,15 @@ For the editor, these were added to the system:
 - **`fontFamily: 'monospace'`** in the engine (`style.c` and `text.c`; JetBrains Mono is loaded
   the first time it is used). The runtime used to drop `fontFamily`.
 - **`lord.fs.write`, `mkdir` and `rename`** (`server/src/ui/js_sys.c`):
-  - only inside the home folder, with the destination folder resolved with `realpath`;
+  - only inside the home folder (and, later, the user's mounts in `/media/$USER` and
+    `/run/media/$USER`), with the destination folder resolved with `realpath`;
   - they don't follow symlinks on the final file;
   - writing is atomic (temporary file in the same folder + `fsync` + `rename`) and keeps the
     permissions;
   - up to 32 MB;
   - they can't touch `~/.local/share/applications`, `~/.config/autostart`,
-    `~/.local/share/lordos/apps` or `~/.config/lordos/settings.json`, not even through a symlink
-    (tested): JS can't create a `.desktop` file, which is the only thing `lord.apps.launch` runs.
+    `~/.local/share/lordos/apps` or `~/.config/lordos/settings.json` (nor the other protected
+    files and folders added since, `FILES.md`), not even through a symlink (tested): JS can't create a `.desktop` file, which is the only thing `lord.apps.launch` runs.
 
 ## Performance (measured)
 

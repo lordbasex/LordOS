@@ -1,10 +1,11 @@
 {
   "id": "about",
+  "version": "0.8.5",
   "name": "About LordOS",
   "description": "System and graphics server information",
   "size": [
-    440,
-    650
+    490,
+    730
   ],
   "dock": true,
   "permissions": [

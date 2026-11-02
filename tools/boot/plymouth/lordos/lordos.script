@@ -1,7 +1,9 @@
 # lordos.script: the LordOS boot splash (Plymouth "script" module).
 #
 # The crown on a navy gradient with a soft violet glow, and a rounded progress bar that follows
-# Plymouth's boot progress, smoothed so it never jumps or goes back. No text messages: Esc shows
+# Plymouth's boot progress, smoothed so it never jumps or goes back. In the bottom right corner, the
+# time since the splash started, in seconds and milliseconds (lord-sessiond logs the time from the
+# kernel's start to the desktop's first frame; docs/RESULTS.md). No text messages: Esc shows
 # the text console as usual. The password field appears only when a disk asks for one (LUKS).
 # The images come from tools/boot/gen-boot-assets.py (1x, and @2x on 4K screens).
 # See docs/brand/README.md, "Boot splash".
@@ -91,7 +93,36 @@ fun draw_bar() {
     }
 }
 
+# ---- the boot timer, bottom right ----
+timer = Sprite();
+timer.SetOpacity(0);
+boot_s = 0;         # Plymouth's last duration (seconds since the splash started)
+since_s = 0;        # time since then, from the refresh calls (about 50 a second)
+timer_shown = -1;
+
+fun pad3(n) {
+    if (n < 10) return "00" + n;
+    if (n < 100) return "0" + n;
+    return "" + n;
+}
+
+fun draw_timer() {
+    if (!global.bar_visible) { timer.SetOpacity(0); return; }
+    t = global.boot_s + global.since_s;
+    ms = Math.Int(t * 1000);
+    if (ms <= global.timer_shown) return;      # never backwards when Plymouth's duration catches up
+    global.timer_shown = ms;
+    sec = Math.Int(ms / 1000);
+    text = sec + "." + pad3(ms - sec * 1000) + " s";
+    img_t = Image.Text(text, 0.80, 0.78, 0.95, 0.55, global.font_timer);
+    timer.SetImage(img_t);
+    timer.SetPosition(Window.GetX() + Window.GetWidth() - img_t.GetWidth() - 24 * global.scale,
+                      Window.GetY() + Window.GetHeight() - img_t.GetHeight() - 20 * global.scale, 20);
+    timer.SetOpacity(1);
+}
+
 fun boot_progress(duration, progress) {
+    if (duration > global.boot_s) { global.boot_s = duration; global.since_s = 0; }
     # Plymouth's progress is based on the previous boot's length; on a first boot (the live ISO, a
     # fresh card) it barely moves, so a time curve keeps the bar going: half at 8 s, two thirds at
     # 16 s, never past 95 % until Plymouth says so
@@ -107,6 +138,8 @@ fun refresh() {
         if (global.shown > global.target) global.shown = global.target;
     }
     draw_bar();
+    global.since_s = global.since_s + 0.02;
+    draw_timer();
 }
 
 fun quit() {
@@ -144,7 +177,8 @@ for (i = 0; i < max_bullets; i = i + 1) {
 # font names as literals (no number formatting in the script)
 font_small = "Sans 11";
 font_large = "Sans 12";
-if (scale == 2) { font_small = "Sans 22"; font_large = "Sans 24"; }
+font_timer = "Sans 10";
+if (scale == 2) { font_small = "Sans 22"; font_large = "Sans 24"; font_timer = "Sans 20"; }
 
 fun set_prompt(text) {
     if (text == "") { prompt.SetOpacity(0); return; }

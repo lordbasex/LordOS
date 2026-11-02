@@ -54,6 +54,8 @@
   "bt.unblock": "Ativar",
   "bt.visibleAs": "Visível como “{name}”.",
   "bt.working": "Conectando…",
+  "defaults.automatic": "Automático ({name})",
+  "defaults.automaticPlain": "Automático",
   "defaults.cat.browser": "Navegador",
   "defaults.cat.images": "Imagens",
   "defaults.cat.mail": "E-mail",
@@ -69,7 +71,7 @@
   "defaults.none": "Nenhum app instalado abre estes arquivos",
   "defaults.other": "{id}",
   "defaults.tag": "{name} (padrão)",
-  "display.arrangeHint": "Arraste uma tela para colocá-la ao lado das outras. A barra branca marca a tela principal (barra de menus e Dock).",
+  "display.arrangeHint": "Arraste as telas para organizá-las; elas se encaixam borda com borda. Clique em uma para identificá-la. A barra branca marca a tela principal (barra de menus e Dock).",
   "display.arrangement": "Disposição",
   "display.brightness": "Brilho",
   "display.capture": "Capturas e compartilhamento",
@@ -80,6 +82,7 @@
   "display.failed": "Não foi possível usar esse modo. O anterior continua.",
   "display.hz": "{hz} Hz",
   "display.inches": "{n} polegadas",
+  "display.identify": "Identificar",
   "display.keep": "Manter",
   "display.keepBody": {
     "one": "A tela volta à configuração anterior em {count} segundo.",
@@ -101,6 +104,7 @@
   "display.noBacklight": "Esta tela não permite mudar o brilho (monitores externos e máquinas virtuais).",
   "display.noCrtc": "{connector}: conectada, mas a placa de vídeo não consegue controlar outra tela",
   "display.notOnMonitor": "Esta sessão não está no monitor agora (está sendo vista pela rede), então suas telas não podem ser alteradas. A Luz noturna vale quando ela voltar.",
+  "display.number": "Tela {n}",
   "display.recommended": "Recomendado",
   "display.refresh": "Taxa de atualização",
   "display.resolution": "Resolução",
@@ -260,5 +264,6 @@
   "video.statusAuto": "Ligado: este computador não consegue decodificar {codecs} por hardware ({reason}), então os sites de vídeo recebem o pedido de H.264.",
   "video.statusHardware": "Desligado: este computador decodifica vídeo VP9 e AV1 por hardware.",
   "video.statusNever": "Desligado: os sites de vídeo escolhem o formato, mesmo quando o computador precisa decodificá-lo sem ajuda.",
-  "video.title": "Vídeo no navegador"
+  "video.title": "Vídeo no navegador",
+  "bt.searchAgain": "Procurar de novo"
 }

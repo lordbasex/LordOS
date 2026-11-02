@@ -1,6 +1,7 @@
 /* grab.c — window dragging in C: move and resize without JS per frame (grab.h). */
 #include "grab.h"
 #include "../cursor.h"
+#include "../bench/lbinput.h"
 
 #include <math.h>
 #include <string.h>
@@ -37,9 +38,18 @@ int grab_cursor(void) { return g.edges ? cursor_for_edges(g.edges) : CUR_MOVE; }
 
 static float dim_or(Dim d, float fallback) { return d.unit == UNIT_PX ? d.v : fallback; }
 
-int grab_begin(int node, int edges, const GrabLimits *lim) {
+/* LordBench's scripted move (grab_script_begin): the node follows the synthetic pointer (bench/lbinput.h), or
+ * without it the same path by the clock, one step per frame */
+static struct { int on; double t0; float rx, ry, period; } sc;
+
+static void script_off(void) {
+    sc.on = 0;
+    lbi_stop();
+}
+
+static int setup(int node, int edges, const GrabLimits *lim) {
     Node *n = node_get(node);
-    if (!n || !ptr_buttons || !n->s.absolute) return -1;
+    if (!n || !n->s.absolute) return -1;
     if (g.active) grab_cancel();
     memset(&g, 0, sizeof g);
     g.active = 1;
@@ -56,6 +66,41 @@ int grab_begin(int node, int edges, const GrabLimits *lim) {
     g.oy = n->ay - n->y;
     paint_layer_begin(node, g.edges != 0);
     return 0;
+}
+
+int grab_begin(int node, int edges, const GrabLimits *lim) {
+    if (!ptr_buttons) return -1;
+    script_off();
+    return setup(node, edges, lim);
+}
+
+int grab_script_begin(int node, const GrabLimits *lim, float rx, float ry, float period_ms) {
+    if (rx < 0 || ry < 0 || period_ms < 500) return -1;
+    if (setup(node, 0, lim)) return -1;
+    sc.on = 1;
+    sc.t0 = -1;
+    sc.rx = rx;
+    sc.ry = ry;
+    sc.period = period_ms;
+    lbi_start(rx, ry, period_ms);           /* if it fails, the clock drives it (no input latency) */
+    ui.dirty = 1;
+    return 0;
+}
+
+int grab_scripted(void) { return sc.on && g.active; }
+
+/* a figure of eight that starts and ends where the window was (lbi_path) */
+void grab_script_tick(double now_ms) {
+    if (!sc.on) return;
+    if (!g.active) { script_off(); return; }
+    float dx, dy;
+    if (lbi_fd() >= 0) {                    /* the synthetic pointer's newest position, if one came */
+        if (lbi_take(&dx, &dy)) grab_motion(g.px0 + dx, g.py0 + dy);
+        return;
+    }
+    if (sc.t0 < 0) sc.t0 = now_ms;
+    lbi_path(sc.rx, sc.ry, sc.period, now_ms - sc.t0, &dx, &dy);
+    grab_motion(g.px0 + dx, g.py0 + dy);
 }
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -105,6 +150,7 @@ void grab_motion(float px, float py) {
 
 int grab_finish(int *node, int *edges, float *dx, float *dy, float *dw, float *dh) {
     if (!g.active || ptr_buttons) return 0;
+    if (sc.on) { grab_cancel(); return 0; }         /* the person moved the pointer: the scene stops where it is */
     *node = g.node;
     *edges = g.edges;
     *dx = g.x - g.x0;
@@ -117,6 +163,7 @@ int grab_finish(int *node, int *edges, float *dx, float *dy, float *dw, float *d
 }
 
 void grab_cancel(void) {
+    script_off();
     if (!g.active) return;
     g.active = 0;
     paint_layer_end();

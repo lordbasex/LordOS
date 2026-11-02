@@ -54,6 +54,8 @@
   "bt.unblock": "Turn On",
   "bt.visibleAs": "Now discoverable as “{name}”.",
   "bt.working": "Connecting…",
+  "defaults.automatic": "Automatic ({name})",
+  "defaults.automaticPlain": "Automatic",
   "defaults.cat.browser": "Web browser",
   "defaults.cat.images": "Images",
   "defaults.cat.mail": "Email",
@@ -69,7 +71,7 @@
   "defaults.none": "No installed app can open these",
   "defaults.other": "{id}",
   "defaults.tag": "{name} (default)",
-  "display.arrangeHint": "Drag a display to place it next to the others. The white bar marks the main display (menu bar and Dock).",
+  "display.arrangeHint": "Drag the displays to arrange them; they snap edge to edge. Click one to identify it. The white bar marks the main display (menu bar and Dock).",
   "display.arrangement": "Arrangement",
   "display.brightness": "Brightness",
   "display.capture": "Screenshots and sharing",
@@ -80,6 +82,7 @@
   "display.failed": "That mode could not be used. The previous one is still active.",
   "display.hz": "{hz} Hz",
   "display.inches": "{n}-inch",
+  "display.identify": "Identify",
   "display.keep": "Keep",
   "display.keepBody": {
     "one": "Your display settings will go back to the previous ones in {count} second.",
@@ -101,6 +104,7 @@
   "display.noBacklight": "This display does not offer brightness control (external monitors and virtual machines).",
   "display.noCrtc": "{connector}: connected, but the graphics card cannot drive another display",
   "display.notOnMonitor": "This session is not on the monitor right now (it is being viewed from the network), so its displays cannot be changed. Night Light settings still apply when it returns.",
+  "display.number": "Display {n}",
   "display.recommended": "Recommended",
   "display.refresh": "Refresh rate",
   "display.resolution": "Resolution",
@@ -260,5 +264,6 @@
   "video.statusAuto": "On: this computer can’t decode {codecs} in hardware ({reason}), so video sites are asked for H.264.",
   "video.statusHardware": "Off: this computer decodes VP9 and AV1 video in hardware.",
   "video.statusNever": "Off: video sites choose the format, even when the computer has to decode it without help.",
-  "video.title": "Video in the browser"
+  "video.title": "Video in the browser",
+  "bt.searchAgain": "Search again"
 }

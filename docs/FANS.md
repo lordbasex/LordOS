@@ -173,7 +173,9 @@ config and socket); the unit never passes them.
   fan can be driven. Light and dark variants (`docs/polish/fans-*.png`).
 - The fan turns at a speed proportional to the real duty (eased; still at 0 %), and the fins warm
   from blue (40 °C) through amber (65 °C) to orange-red (80 °C). The rotors are turned with
-  `lord.setStyle` on their nodes at 20 frames per second, with no React render per frame; the timer
+  `lord.setStyle(id, 'rotate', degrees)` on their nodes at 20 frames per second, with no React render per
+  frame (until 0.8.6, they were sent as a `transform` key the engine doesn't have, so they
+  stood still between React renders and the session log got `js: unsupported style 'transform'`); the timer
   stops at 0 %, while the window is minimized and with **Appearance → Reduce motion** (a new
   setting, `reduceMotion`). Frames: `docs/polish/fans-anim-1.png` … `-5.png`.
 - The curve chart (`FanCurveChart`) shows the steps, the hysteresis band of each step (orange,
@@ -223,9 +225,7 @@ into a scratch folder and read; **none of them was executed**.
   USB ports and mic in and audio out ports"). The script also adds `usb_max_current_enable=1`,
   `dtparam=nvme`/`pciex1_gen=3`, and `PSU_MAX_CURRENT=5000` in the bootloader EEPROM.
 
-**Detection.** The case cannot be detected from software: it has no EEPROM, no I2C device, and its
-USB hub and DAC only appear after the USB-C controller is switched to host mode, and even then they
-are generic chips used by other products. So LordOS does **not** guess. Settings → Cooling on a
+**Detection.** The case has no EEPROM or I2C device, and its USB hub and DAC only appear after the USB-C controller is a host. So on a Raspberry Pi 5 with no case chosen, once, the Store's suggestions run the admin action `rpi-case-detect`: it loads the `dwc2` overlay until the next restart, writes nothing to the boot partition, and looks on that controller for the hub 1a86:8091 and the audio chip 0d8c:0014, as read on one Argon ONE V5. Found, the overlay stays, so the ports and sound work at once, and a card offers keeping them on. Not found, it is removed. A later unit with other chips isn't found, and is still chosen by hand. Settings → Cooling on a
 Raspberry Pi 5 shows **Case: None or another case / Argon ONE V5 case**; choosing the Argon runs
 the admin action `rpi-case argon-one-v5`, which writes `/boot/firmware/lordos-case.txt` (fixed
 text, included at the end of `config.txt` by the image) and takes effect after a restart. Any other
@@ -238,7 +238,7 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
 | `dtoverlay=dwc2,dr_mode=host` (front USB, audio) | `rpi-case argon-one-v5` → `lordos-case.txt` |
 | `dtparam=nvme`, `pciex1_gen=3` | already in the LordOS image's `config.txt` |
 | `usb_max_current_enable=1` | **not set**: it lets the board draw 1.6 A for USB, which is only safe with a 5 A supply; documented here instead |
-| `PSU_MAX_CURRENT=5000` in the bootloader EEPROM | **not done**: LordOS does not rewrite the EEPROM (later, if ever, as a separate admin action) |
+| `PSU_MAX_CURRENT=5000` in the bootloader EEPROM | **not done**: LordOS does not change the bootloader configuration (Settings → Board firmware, 0.8.4.1, only applies Raspberry Pi's bootloader updates, never `rpi-eeprom-config`) |
 | Power button daemon (GPIO 4 pulses) | not needed on the V5: the Raspberry Pi 5's own power button is handled by systemd-logind (Settings → Energy) |
 | IR remote (LIRC, `gpio-ir` on GPIO 23) | not on the V5 (not in its feature list); left for a case that has it |
 | OLED module, ZigBee module (optional add-ons) | not supported |
@@ -267,8 +267,9 @@ case gets nothing Argon-specific. The illustration shows the Argon only after it
 
 ## Not done or untested
 
-- The installed `.deb` and the unit on the real Raspberry Pi (tested with the unit's properties
-  through `systemd-run`, not as the packaged `lord-fand.service`).
+- The fan curve under the packaged `lord-fand.service` on the real Raspberry Pi: the packaged unit
+  runs there (the 0.8.4 update restarted it, `ISO.md`, "Release test (0.8.4 Beta)"), but the
+  measurements above were taken with the unit's properties through `systemd-run`.
 - Real PC motherboards (`nct67xx`, `it87`) and laptops: fake sysfs only.
 - The `rpi-case` action on the real board (it writes the boot partition; not run on the user's
   card) and the case's front USB ports and DAC with `dwc2` in host mode.

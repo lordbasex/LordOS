@@ -19,6 +19,9 @@
 #include "js_input.h"
 #include "js_fw.h"
 #include "js_backup.h"
+#include "js_clean.h"
+#include "js_lan.h"
+#include "js_rdesk.h"
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "js_net.h"
@@ -47,43 +50,7 @@ static JSRuntime *rt;
 static JSContext *ctx;
 static void set_screen_displays(JSValue screen);
 
-/* Minimal polyfills: the real event loop is lord-server's (main.c). */
-static const char prelude[] =
-    "(function(){\n"
-    "const g = globalThis;\n"
-    "const fmt = v => typeof v === 'string' ? v : v instanceof Error ? (v.message + '\\n' + (v.stack || '')) :\n"
-    "  (() => { try { return JSON.stringify(v); } catch (e) { return String(v); } })();\n"
-    "const out = p => (...a) => lord.log(p + a.map(fmt).join(' '));\n"
-    "g.console = { log: out(''), info: out(''), debug: out(''), warn: out('[warn] '), error: out('[error] ') };\n"
-    "g.performance = { now: () => lord.now() };\n"
-    "let nextId = 1; const timers = new Map();\n"
-    "const add = (fn, ms, args, repeat) => { const id = nextId++; ms = Math.max(0, +ms || 0);\n"
-    "  timers.set(id, { fn, args, at: lord.now() + ms, ms, repeat }); return id; };\n"
-    "g.setTimeout = (fn, ms, ...a) => add(fn, ms, a, false);\n"
-    "g.setInterval = (fn, ms, ...a) => add(fn, ms, a, true);\n"
-    "g.setImmediate = (fn, ...a) => add(fn, 0, a, false);\n"
-    "g.clearTimeout = g.clearInterval = g.clearImmediate = id => { timers.delete(id); };\n"
-    "g.queueMicrotask = fn => { Promise.resolve().then(fn); };\n"
-    "let frames = new Map(), frameId = 1;\n"
-    "g.requestAnimationFrame = fn => { const id = frameId++; frames.set(id, fn); return id; };\n"
-    "g.cancelAnimationFrame = id => { frames.delete(id); };\n"
-    "g.__lordTick = now => {\n"
-    "  const due = [];\n"
-    "  for (const [id, t] of timers) if (t.at <= now) due.push([id, t]);\n"
-    "  due.sort((a, b) => a[1].at - b[1].at || a[0] - b[0]);\n"
-    "  for (const [id, t] of due) {\n"
-    "    if (!timers.has(id)) continue;\n"
-    "    if (t.repeat) t.at = now + Math.max(t.ms, 1); else timers.delete(id);\n"
-    "    try { t.fn(...t.args); } catch (e) { console.error('timer:', e); }\n"
-    "  }\n"
-    "  now = lord.now(); let next = -1;\n"
-    "  for (const t of timers.values()) { const d = Math.max(0, t.at - now); if (next < 0 || d < next) next = d; }\n"
-    "  return next;\n"
-    "};\n"
-    "g.__lordWantsFrame = () => frames.size > 0;\n"
-    "g.__lordFrame = now => { const f = frames; frames = new Map();\n"
-    "  for (const fn of f.values()) { try { fn(now); } catch (e) { console.error('raf:', e); } } };\n"
-    "})();\n";
+#include "js_prelude.h"         /* the polyfills: console, timers, animation frames */
 
 static double now_ms(void) {
     struct timespec t;
@@ -141,6 +108,28 @@ static JSValue f_set_text(JSContext *c, JSValueConst this_val, int argc, JSValue
     return JS_UNDEFINED;
 }
 
+/* "js: unsupported style '<key>'" is logged once per key: a style sent every frame (an animation) would otherwise
+ * write a line per frame. The first STYLE_WARN_MAX keys are remembered (compared on their first
+ * STYLE_WARN_KEY - 1 bytes); the next new one is logged with a note that further unknown keys are not, and
+ * nothing after it. Main thread only (setStyle runs there). */
+#define STYLE_WARN_MAX 64
+#define STYLE_WARN_KEY 48
+
+static void style_warn(const char *key) {
+    static char seen[STYLE_WARN_MAX][STYLE_WARN_KEY];
+    static int nseen;                   /* STYLE_WARN_MAX + 1 once the last line was written */
+    for (int i = 0; i < nseen && i < STYLE_WARN_MAX; i++)
+        if (!strncmp(seen[i], key, STYLE_WARN_KEY - 1)) return;
+    if (nseen > STYLE_WARN_MAX) return;
+    if (nseen == STYLE_WARN_MAX) {
+        fprintf(stderr, "js: unsupported style '%s' (further unknown style keys are not logged)\n", key);
+        nseen++;
+        return;
+    }
+    snprintf(seen[nseen++], STYLE_WARN_KEY, "%s", key);
+    fprintf(stderr, "js: unsupported style '%s'\n", key);
+}
+
 static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Node *n = arg_node(c, argv[0]);
@@ -175,20 +164,9 @@ static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValu
         err = s ? style_set_string(&n->s, key, s) : -1;
         if (s) JS_FreeCString(c, s);
     }
-    if (err) fprintf(stderr, "js: unsupported style '%s'\n", key);
+    if (err) style_warn(key);
     JS_FreeCString(c, key);
-    /* the same value (e.g. React confirms the position left by a drag in C): nothing to repaint */
-    int ext_changed = n->s.ext && (!before.ext || memcmp(&ext_before, n->s.ext, STYLE_EXT_VALUES));
-    if (memcmp(&before, &n->s, sizeof before) || ext_changed) {
-        /* only the insets of an absolutely positioned node changed (a dot sliding along the Monitor's
-         * map, the map image while panning): its size and content are the same, so it's only placed
-         * again, like a window being dragged (no remeasuring of every ancestor, no repaint of its
-         * content; the old and new boxes are damaged by the paint pass) */
-        Style moved = before;
-        memcpy(moved.pos, n->s.pos, sizeof moved.pos);
-        if (!ext_changed && n->s.absolute && before.absolute && !memcmp(&moved, &n->s, sizeof moved)) node_moved(n);
-        else node_invalidate(n);
-    }
+    node_restyled(n, &before, before.ext ? &ext_before : NULL);     /* node.c (engine-test does the same) */
     return JS_UNDEFINED;
 }
 
@@ -328,11 +306,9 @@ static JSValue f_stats(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     long pages = 0, rss = 0;
     FILE *f = fopen("/proc/self/statm", "r");
     if (f) { if (fscanf(f, "%ld %ld", &pages, &rss) != 2) rss = 0; fclose(f); }
-    JSMemoryUsage mu;
-    JS_ComputeMemoryUsage(rt, &mu);
     JSValue o = JS_NewObject(c);
     JS_SetPropertyStr(c, o, "rssKB", JS_NewInt64(c, rss * 4));
-    JS_SetPropertyStr(c, o, "jsKB", JS_NewInt64(c, mu.malloc_size / 1024));
+    JS_SetPropertyStr(c, o, "jsKB", JS_NewInt64(c, (int64_t)(JS_GetMallocSize(rt) / 1024)));
     JS_SetPropertyStr(c, o, "nodes", JS_NewInt32(c, node_count()));
     JS_SetPropertyStr(c, o, "layoutMs", JS_NewFloat64(c, ui.layout_ms));
     JS_SetPropertyStr(c, o, "paintMs", JS_NewFloat64(c, ui.paint_ms));
@@ -366,8 +342,8 @@ static int eval(const char *src, size_t len, const char *name) {
     return ok ? 0 : -1;
 }
 
-static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
-    JSValue g = JS_GetGlobalObject(ctx), f = JS_GetPropertyStr(ctx, g, name), r = JS_UNDEFINED;
+static JSValue call_global_atom(JSAtom name, int argc, JSValueConst *argv) {
+    JSValue g = JS_GetGlobalObject(ctx), f = JS_GetProperty(ctx, g, name), r = JS_UNDEFINED;
     if (JS_IsFunction(ctx, f)) {
         r = JS_Call(ctx, f, g, argc, argv);
         if (JS_IsException(r)) { dump_exception(ctx); r = JS_UNDEFINED; }
@@ -375,6 +351,28 @@ static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
     JS_FreeValue(ctx, f);
     JS_FreeValue(ctx, g);
     return r;
+}
+
+static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
+    JSAtom a = JS_NewAtom(ctx, name);
+    JSValue r = call_global_atom(a, argc, argv);
+    JS_FreeAtom(ctx, a);
+    return r;
+}
+
+/* The globals called on every pass of the main loop: their atoms are made once per runtime (the
+ * function is still looked up on each call, so the recovery screen's replacements are the ones run) */
+enum { HOT_TICK, HOT_WANTS_FRAME, HOT_FRAME, HOT_N };
+static const char *const hot_name[HOT_N] = { "__lordTick", "__lordWantsFrame", "__lordFrame" };
+static JSAtom hot_atom[HOT_N];
+static JSRuntime *hot_rt;
+
+static JSValue call_hot(int which, int argc, JSValueConst *argv) {
+    if (hot_rt != rt) {
+        for (int i = 0; i < HOT_N; i++) hot_atom[i] = JS_NewAtom(ctx, hot_name[i]);
+        hot_rt = rt;
+    }
+    return call_global_atom(hot_atom[which], argc, argv);
 }
 
 /* Reads a bundle of LordOS's own code through the verified-code check (sec/codesig.c): the bytes
@@ -431,6 +429,9 @@ static void session_context(void) {
     js_imager_register(ctx, lord);     /* lord.imager: LordOS Imager (docs/IMAGER.md) */
 #endif
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
+    js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
+    js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
+    js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
@@ -611,6 +612,8 @@ int js_app_recovery(void) {
 void js_shutdown(void) {
     media_shutdown();                   /* the lord-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
+    if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
+    hot_rt = NULL;
     if (ctx) JS_FreeContext(ctx);
     if (rt) JS_FreeRuntime(rt);
     ctx = NULL;
@@ -619,7 +622,7 @@ void js_shutdown(void) {
 
 double js_tick(double now) {
     JSValue arg = JS_NewFloat64(ctx, now);
-    JSValue r = call_global("__lordTick", 1, &arg);
+    JSValue r = call_hot(HOT_TICK, 1, &arg);
     double next = -1;
     JS_ToFloat64(ctx, &next, r);
     JS_FreeValue(ctx, r);
@@ -628,7 +631,7 @@ double js_tick(double now) {
 }
 
 int js_wants_frame(void) {
-    JSValue r = call_global("__lordWantsFrame", 0, NULL);
+    JSValue r = call_hot(HOT_WANTS_FRAME, 0, NULL);
     int w = JS_ToBool(ctx, r);
     JS_FreeValue(ctx, r);
     return w;
@@ -636,7 +639,7 @@ int js_wants_frame(void) {
 
 void js_frame(double now) {
     JSValue arg = JS_NewFloat64(ctx, now);
-    JS_FreeValue(ctx, call_global("__lordFrame", 1, &arg));
+    JS_FreeValue(ctx, call_hot(HOT_FRAME, 1, &arg));
     drain_jobs();
 }
 
@@ -705,19 +708,28 @@ void js_key(int code, int value) {
         drain_jobs();
         return;
     }
-    if (wl_key(code, value, &k)) { drain_jobs(); return; }      /* the focused Wayland app */
-    if (value) {
+    int to_app = wl_key(code, value, &k);                       /* the focused Wayland app */
+    if (to_app == 1) { drain_jobs(); return; }
+    if (value && !to_app) {
         char commit[512];
         int used = ime_key(&k, commit, sizeof commit);
         if (commit[0]) ime_commit(commit);
         if (ime_changed()) ime_event();
         if (used) { drain_jobs(); return; }
     }
-    int flags = k.shift | k.ctrl << 1 | k.alt << 2 | k.altgr << 3 | k.meta << 4 | k.caps << 5 | k.dead << 6;
+    int flags = k.shift | k.ctrl << 1 | k.alt << 2 | k.altgr << 3 | k.meta << 4 | k.caps << 5 | k.dead << 6 | (to_app == 2) << 7;
     JSValueConst args[6] = { JS_NewInt32(ctx, code), JS_NewInt32(ctx, value), JS_NewString(ctx, k.key),
                              JS_NewString(ctx, k.chr), JS_NewString(ctx, k.base), JS_NewInt32(ctx, flags) };
     JS_FreeValue(ctx, call_global("__lordKey", 6, args));
     for (int i = 2; i < 5; i++) JS_FreeValue(ctx, args[i]);
+    drain_jobs();
+}
+
+/* A keyboard was plugged in, removed, or typed for the first time → __lordKeyboards(present). */
+void js_keyboards_event(int present) {
+    if (!ctx) return;
+    JSValueConst arg = JS_NewBool(ctx, present);
+    JS_FreeValue(ctx, call_global("__lordKeyboards", 1, &arg));
     drain_jobs();
 }
 
@@ -728,6 +740,13 @@ void js_media_event(int id, const char *type, const char *json) {
     JS_FreeValue(ctx, call_global("__lordMedia", 3, args));
     JS_FreeValue(ctx, args[1]);
     JS_FreeValue(ctx, args[2]);
+    drain_jobs();
+}
+
+/* The main loop ended (logout, or a signal): the session's last word (sdk/sessionrestore.jsx). */
+void js_before_exit(void) {
+    if (!ctx) return;
+    JS_FreeValue(ctx, call_global("__lordBeforeExit", 0, NULL));
     drain_jobs();
 }
 

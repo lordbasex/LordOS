@@ -1,5 +1,6 @@
 {
   "id": "photos",
+  "version": "0.8.5",
   "name": "Photos",
   "description": "Image viewer and library: zoom, rotate, slideshow and basic editing saved as a copy",
   "size": [980, 640],

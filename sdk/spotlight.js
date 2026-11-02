@@ -14,6 +14,7 @@ import { settings } from './settings.js';
 import { wm, getApp, windows } from './windows.js';
 import { useLauncherApps, launchApp } from './apps.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
+import { logOut } from './sessionrestore.jsx';
 import { TextInput, focusToken, restoreFocus } from './components.jsx';
 import * as fs from './fs.js';
 
@@ -24,19 +25,6 @@ export const spotlight = {
   close() { if (spotlightOpen.get()) { spotlightOpen.set(false); setTimeout(() => restoreFocus(prevFocus), 0); } },
   toggle() { if (spotlightOpen.get()) spotlight.close(); else spotlight.open(); },
 };
-
-// ❖Space and Ctrl+Space. With the Terminal in front, Ctrl+Space
-// is left to the program (in emacs it marks the start of a selection). Switching keyboard or
-// input method moved to ❖⌥Space / Ctrl+⌥Space (sdk/keyboard.js).
-addListener('keydown', (e) => {
-  if (e.key !== ' ' || e.repeat || e.alt || e.shift) return;
-  if (e.meta && !e.ctrl) spotlight.toggle();
-  else if (e.ctrl && !e.meta) {
-    const top = wm.focused();
-    if (!spotlightOpen.get() && top && String(top).split('#')[0] === 'terminal') return;
-    spotlight.toggle();
-  }
-});
 
 // ---- recent use (for ranking) ----
 
@@ -283,7 +271,7 @@ function buildResults(raw, apps) {
   }
 
   // apps
-  add('apps', apps.map((a) => ({ a, s: best(q, a.name, a.genericName, a.keywords, a.id, a.comment) }))
+  add('apps', apps.map((a) => ({ a, s: best(q, a.name, a.genericName, a.keywords, tOptional(`shell.spotlight.keywords.${a.id}`), a.id, a.comment) }))
     .filter((x) => x.s > 0).map((x) => ({ ...x, s: x.s + usageBoost(`app:${x.a.id}`) })).sort((x, y) => y.s - x.s).slice(0, 6)
     .map(({ a, s }) => ({ key: `app:${a.id}`, score: s, title: a.name, subtitle: a.comment || a.genericName || t(`store.kind.${a.kind}`),
       Icon: a.Icon, preview: { kind: 'app', app: a }, run: () => launchApp(a.id) })));
@@ -297,7 +285,7 @@ function buildResults(raw, apps) {
   // system actions
   const actions = [
     { id: 'dark', name: t('shell.spotlight.action.dark'), run: () => settings.set({ mode: settings.get().mode === 'dark' ? 'light' : 'dark' }) },
-    { id: 'logout', name: t('shell.menu.logout'), run: () => lord.quit() },
+    { id: 'logout', name: t('shell.menu.logout'), run: () => logOut() },
   ];
   add('actions', actions.map((x) => ({ ...x, s: best(q, x.name) })).filter((x) => x.s >= 40)
     .map((x) => ({ key: `action:${x.id}`, score: x.s + 5, title: x.name, subtitle: t('shell.spotlight.action.hint'), glyph: '⏎', run: x.run })));

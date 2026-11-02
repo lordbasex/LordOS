@@ -63,6 +63,7 @@ pub fn valid_tag(t: &str) -> bool {
     if t.len() < 6 || t.len() > 32 || !t.starts_with('v') { return false; }
     let (ver, pre) = match t[1..].split_once('-') { Some((v, p)) => (v, Some(p)), None => (&t[1..], None) };
     let parts: Vec<&str> = ver.split('.').collect();
-    if parts.len() != 3 || parts.iter().any(|p| p.is_empty() || p.len() > 4 || !p.bytes().all(|c| c.is_ascii_digit())) { return false; }
+    // three numbers, or four for a point release (v0.8.4.1-beta)
+    if !(parts.len() == 3 || parts.len() == 4) || parts.iter().any(|p| p.is_empty() || p.len() > 4 || !p.bytes().all(|c| c.is_ascii_digit())) { return false; }
     match pre { None => true, Some(p) => !p.is_empty() && p.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'.') }
 }

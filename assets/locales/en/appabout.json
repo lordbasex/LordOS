@@ -1,0 +1,9 @@
+{
+  "isolated": "Runs isolated, in its own process",
+  "linux": "Linux app",
+  "lordos": "LordOS app",
+  "package": "Installed app (.lpk)",
+  "system": "System app — part of LordOS, verified with it",
+  "title": "About {app}",
+  "version": "Version {v}"
+}

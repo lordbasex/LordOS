@@ -1,6 +1,7 @@
 /* input.c — evdev device detection and event reading. */
 #include "input.h"
 #include "platform/seat.h"
+#include "osk.h"
 #include "tp/tp.h"
 
 #include <errno.h>
@@ -34,6 +35,10 @@ static void add_device(Input *in, int fd, const char *path) {
     memset(d, 0, sizeof *d);                /* the slot may have belonged to one that was unplugged */
     d->fd = fd;
     ioctl(fd, EVIOCGNAME(sizeof d->name), d->name);
+    struct input_id id = {0};
+    ioctl(fd, EVIOCGID, &id);
+    d->bus = id.bustype;
+    d->keyboard = keyboard && osk_full_keyboard(keys, NLONGS(KEY_MAX + 1), d->name);
     unsigned long rel[NLONGS(REL_MAX + 1)] = {0};
     ioctl(fd, EVIOCGBIT(EV_REL, sizeof rel), rel);
     d->wheel_hires = HAS(rel, REL_WHEEL_HI_RES);
@@ -138,6 +143,29 @@ void input_dispatch(Input *in, int idx, InputHandler cb, void *ud) {
     for (;;) {
         ssize_t n = read(d->fd, evs, sizeof evs);
         if (n <= 0) break;
-        for (size_t i = 0; i < (size_t)n / sizeof evs[0]; i++) cb(ud, d, &evs[i]);
+        for (size_t i = 0; i < (size_t)n / sizeof evs[0]; i++) {
+            if (d->keyboard && evs[i].type == EV_KEY && evs[i].value == 1 && evs[i].code >= KEY_Q && evs[i].code <= KEY_M) d->typed = 1;
+            cb(ud, d, &evs[i]);
+        }
     }
+}
+
+/* Read once: the kind of computer doesn't change while it runs. No DMI (a Raspberry Pi): 0. */
+static int portable_computer(void) {
+    static int known = -1;
+    if (known < 0) {
+        int type = 0;
+        FILE *f = fopen("/sys/class/dmi/id/chassis_type", "r");
+        if (f) { if (fscanf(f, "%d", &type) != 1) type = 0; fclose(f); }
+        known = osk_chassis_portable(type);
+    }
+    return known;
+}
+
+int input_has_keyboard(const Input *in) {
+    for (int i = 0; i < in->count; i++) {
+        const InputDevice *d = &in->dev[i];
+        if (d->keyboard && osk_keyboard_counts(d->bus, portable_computer(), d->typed)) return 1;
+    }
+    return 0;
 }

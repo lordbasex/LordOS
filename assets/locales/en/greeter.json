@@ -1,4 +1,6 @@
 {
+  "bootTest": "Measuring the boot time: boot {k} of {n} done. Restarting in {s} s. Logging in also stops the test.",
+  "bootTestCancel": "Stop the test",
   "busy": "One moment…",
   "cancel": "Cancel",
   "confirmRestart": "There are open sessions: unsaved work will be lost. Restart anyway?",

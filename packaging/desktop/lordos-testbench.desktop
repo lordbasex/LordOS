@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Test Bench
+Name[es]=Banco de pruebas
+Name[pt]=Banco de testes
+Comment=Test pattern, frame timing, every key, the pointer and the Wayland protocols
+Comment[es]=Carta de ajuste, tiempos de cuadro, cada tecla, el puntero y los protocolos Wayland
+Comment[pt]=Padrão de teste, tempos de quadro, cada tecla, o ponteiro e os protocolos Wayland
+Exec=/usr/bin/lordos-testbench
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;

@@ -9,6 +9,7 @@
 #include "sessiond.h"
 #include "../sec/cgroup.h"
 #include "rsec.h"
+#include "../par.h"
 
 #include <crypt.h>
 #include <ctype.h>
@@ -22,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -32,6 +34,7 @@
 static char log_prefix[96] = "lord-sessiond";
 char sd_gpu_env[24];
 int sd_input_debug;
+char sd_tune_env[SD_TUNE_N][32];
 
 void sd_log_prefix(const char *prefix) { snprintf(log_prefix, sizeof log_prefix, "%s", prefix); }
 
@@ -316,7 +319,7 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         if (chdir(rd_conf.workdir)) { /* paths are absolute */ }
         /* GPU: the session uses it while it's on the monitor; lordos.gpu=0 (or the service's LORD_GPU)
          * turns it off in all of them */
-        char *env[8];
+        char *env[9 + SD_TUNE_N];
         int ne = 0;
         env[ne++] = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/games";
         env[ne++] = (char *)lang;
@@ -325,8 +328,16 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         env[ne++] = "LORDOS_SESSIOND=1";
         if (sd_gpu_env[0]) env[ne++] = sd_gpu_env;
         if (sd_input_debug && !greeter) env[ne++] = "LORD_INPUT_DEBUG=1";   /* key latency trace, never the login screen */
+        if (greeter) env[ne++] = "LORD_GPU_DRAG=0";   /* no windows to drag there: no self-test at boot */
+        for (int i = 0; i < SD_TUNE_N && !greeter; i++) if (sd_tune_env[i][0]) env[ne++] = sd_tune_env[i];
         env[ne] = NULL;
         if (!greeter) cgroup_delegate_session(uid, pw->pw_gid);   /* cgroup subtree for the apps (docs/SESSIONS.md) */
+        /* real-time priority for the compositor's threads: lord-server takes it in par_init and lowers
+         * the limit to 0 before it starts anything, so no app inherits it; a thread that runs 5 s
+         * without blocking gets SIGXCPU and goes back to the normal policy (par.h) */
+        struct rlimit rtp = { PAR_RT_PRIO, PAR_RT_PRIO }, rtt = { PAR_RT_TIME_US, RLIM_INFINITY };
+        setrlimit(RLIMIT_RTPRIO, &rtp);
+        setrlimit(RLIMIT_RTTIME, &rtt);
         const char *const a_user[] = { rd_conf.server, "--headless", size, "--user", user, "--theme", rd_conf.theme,
                                        "--fonts", rd_conf.fonts, "--shell", rd_conf.shell, NULL };
         const char *const a_greeter[] = { rd_conf.server, "--headless", size, "--greeter", "--user", user, "--theme", rd_conf.greeter_theme,
@@ -338,10 +349,10 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
 }
 
 static int wait_socket(const char *path, uid_t uid, int greeter) {
-    for (int i = 0; i < 200; i++) {               /* up to 20 s while the theme loads */
+    for (int i = 0; i < 1000; i++) {              /* up to 20 s while the theme loads, every 20 ms */
         int fd = greeter ? connect_path(path) : sd_session_connect(uid);
         if (fd >= 0) return fd;
-        usleep(100000);
+        usleep(20000);
     }
     return -1;
 }
@@ -357,14 +368,22 @@ int sd_session_get(const struct passwd *pw, int w, int h) {
         char rt[64];
         snprintf(rt, sizeof rt, "/run/user/%u", (unsigned)pw->pw_uid);
         struct stat st;
-        if (stat(rt, &st)) {
-            /* no logind session: the user's service manager creates /run/user/<uid>
-             * (and starts its PipeWire) */
+        char bus[80];
+        snprintf(bus, sizeof bus, "%s/bus", rt);
+        if (stat(bus, &st)) {
+            /* no logind session, or one whose service manager is still starting (autologin at
+             * boot): /run/user/<uid> comes first, from user-runtime-dir@, and the session bus
+             * socket a moment later, from user@. A session started before the bus has no Secret
+             * Service and no notification server for its whole life (lord-vault and notifyd
+             * connect once), and the first app asking for org.freedesktop.secrets gets
+             * gnome-keyring by D-Bus activation when it is installed. "systemctl start" returns
+             * once the manager is up (its dbus.socket listening); then wait for the socket. */
             char unit[64];
             snprintf(unit, sizeof unit, "user@%u.service", (unsigned)pw->pw_uid);
             const char *const a[] = { "/usr/bin/systemctl", "start", unit, NULL };
             sd_run_wait(a);
-            for (int i = 0; i < 50 && stat(rt, &st); i++) usleep(100000);
+            for (int i = 0; i < 50 && stat(bus, &st); i++) usleep(100000);
+            if (stat(bus, &st)) sd_log("no session bus at %s: the session starts without it", bus);
         }
         if (stat(rt, &st) || st.st_uid != pw->pw_uid) sd_log("no %s", rt);
         else {

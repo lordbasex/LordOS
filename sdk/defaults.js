@@ -5,7 +5,9 @@
 //
 //   DEFAULT_CATEGORIES                  [{ id, mimes, natives }]
 //   defaultFor(categoryId)              'lordos-photos.desktop' | 'org.gnome.Loupe.desktop' | null
+//   defaultInfo(categoryId)             { id, auto } for Settings: auto when the user chose nothing
 //   setDefaultFor(categoryId, id)       writes every MIME type of the category
+//   resetDefaultFor(categoryId)         back to automatic (removes the user's lines)
 //   candidatesFor(categoryId, linux)    [{ id, name, Icon, native }] that can be chosen
 //   defaultOpenerId(mime)               the default for one type (Files: "Open With", double click)
 import { getApp } from './windows.js';
@@ -35,6 +37,38 @@ export function defaultFor(id) {
   if (c.terminal) return lord.mime.terminal() || NATIVE('terminal');
   for (const m of c.mimes) { const d = lord.mime.get(m); if (d) return d; }
   return c.natives.find((n) => getApp(n)) ? NATIVE(c.natives.find((n) => getApp(n))) : null;
+}
+
+// lord.mime.resolve: { id, explicit, source: 'user'|'system'|'declared' } or null. The app
+// launchWith('') opens a file of that type with: the user's choice, else the system's default
+// (mimeapps.list/defaults.list), else the first installed app that declares the type.
+const resolve = (mime) => (api() && lord.mime.resolve ? lord.mime.resolve(mime) : null);
+
+// What Settings shows for a category: { id, auto } or null. auto: the user chose nothing, and this
+// is what opens these files (the system's default, else LordOS's own app, else the first installed
+// app that declares the type), so the order is the same as defaultOpenerId's.
+export function defaultInfo(id) {
+  const c = cat(id);
+  if (!c || !api()) return null;
+  if (c.terminal) return { id: defaultFor(id), auto: false };
+  const rs = c.mimes.map(resolve);
+  const mine = rs.find((r) => r && r.explicit);
+  if (mine) return { id: mine.id, auto: false };
+  const sys = rs.find((r) => r && r.source === 'system');
+  if (sys) return { id: sys.id, auto: true };
+  const native = c.natives.find((n) => getApp(n));
+  if (native) return { id: NATIVE(native), auto: true };
+  const first = rs.find(Boolean);
+  return first ? { id: first.id, auto: true } : null;
+}
+
+// Back to automatic: the user's lines for the category's types leave ~/.config/mimeapps.list.
+export function resetDefaultFor(id) {
+  const c = cat(id);
+  if (!c || c.terminal || !api() || !lord.mime.unset) return false;
+  let ok = true;
+  for (const m of c.mimes) ok = lord.mime.unset(m) && ok;
+  return ok;
 }
 
 export function setDefaultFor(id, desktopId) {
@@ -68,8 +102,11 @@ export function candidatesFor(id, linuxApps = []) {
 
 export function defaultOpenerId(mime) {
   if (!api() || !mime) return null;
-  const d = lord.mime.get(mime);
-  if (d) return d;
+  // the user's choice or the system's default, if that app is installed
+  const r = resolve(mime);
+  if (r && r.source !== 'declared') return r.id;
   const c = DEFAULT_CATEGORIES.find((x) => x.mimes.includes(mime) || (x.mimes[0] && mime.startsWith(`${x.mimes[0].split('/')[0]}/`) && x.id !== 'browser' && x.id !== 'mail'));
-  return c ? defaultFor(c.id) : null;
+  const d = c ? defaultFor(c.id) : null;
+  // then the category's (LordOS's own app), then the first installed app that declares the type
+  return d || (r ? r.id : null);
 }

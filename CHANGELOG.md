@@ -10,7 +10,2012 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-## [0.8.4] - Unreleased
+## [0.8.7-beta] - 2026-11-01
+
+- **Moving wallpapers** ([docs/WALLPAPERS.md](docs/WALLPAPERS.md)): short loops behind the desktop and the login screen, in Lord Flow and Lord Classic, chosen in Settings → Wallpaper by section (Dynamic, Landscape, Urban, Underwater, Earth, Random), per display, downloaded on demand and checked against a SHA-256 in the package. You can add your own video of up to 10 s. They need a compatible GPU: GPU composition and hardware decoding of the file's format, with no software mode. They pause when nobody sees them, in full screen, with no input, on low battery and under load. The collection is public domain, CC0, CC BY and CC BY-SA, with credits in Settings and in its repository.
+- **Hardware HEVC on the Raspberry Pi 5** (moved up from 0.8.8): `lord-media` drives the Pi 5's decoder through Raspberry Pi's FFmpeg, pinned on the Pi. Written for the moving wallpapers; see the measurements in the doc before relying on it.
+- **Login screen wallpaper:** Settings → Wallpaper has a Desktop or Login screen switch, for a video or a still image.
+- **Moving wallpapers, speed and choosing:** 1×, 0.75×, 0.5× and 0.25×; one click applies, with a spinner on the tile until the video plays.
+- **The login screen composes on the GPU:** `lordos-greeter` joins `render` and `video`.
+- **Files, from the pass on a real session:** menus show Ctrl for what Lord Classic takes (❖N, ❖D, ❖I, ❖A, ❖1 to ❖4); Network says it's looking instead of "empty folder"; a mounted share's name follows the interface's language; back and forward are ⌥← and ⌥→ on every layout; the Name column resizes; Lord Classic's notification panel keeps a notification's buttons; a server outside the local network explains why its folders aren't listed.
+- **Monitor, Voltage:** the first card draws the board with its power path in the color of the power state.
+- **Files, pinned servers:** the secondary click on a connected server in Locations pins it; it stays there, dim, and a click connects again. Passwords stay in the keyring. Folders and connected servers can be dragged to Favorites as shortcuts.
+- **Disk Formats:** APFS is an optional switch on its Store page, about 500 MB of compilers and headers; the item itself is about 2 MB. It can be added later from the same page; opening an APFS disk without it leads there. On arm64, which has no such driver, the error says so.
+
+- **App windows reopen where they were:** size, position, maximized and display, per app, in both themes, for LordOS and Linux apps. A display is known by its monitor's name and connector; if it's gone or the place is off screen, the window opens somewhere visible. Session restore, snapping and Dock assignments keep their say, and dialogs aren't affected.
+- **Files remembers:** each folder keeps its view and sort, with a default in Settings, and the sidebar's width is dragged from its edge and kept.
+
+- **Security review of the new connections (2026-11-01):** RDP refuses RDP's own security and sends no password to a server that asks for it; a changed RDP certificate shows both fingerprints, and an accepted TLS certificate outranks the system's list; every SSH key kept is one the person saw, and an answer counts only for the fingerprint on screen; `ssh-keyscan`, `openssl` and `rclone obscure` run read-only with a 15 s limit; VNC refuses a server that skips the password you gave and says it isn't encrypted; the SMB sign-in carries a target name and a MIC and needs the server's signature; HFS+ always mounts read-only; `.desktop` files can't take the helpers' firewall ids.
+
+- **Files connects to a server by asking who you are, not what its folders are called:** the sign-in sheet takes a user and password (or Guest), then lists the folders that server shows that user and mounts the one chosen. `lord-lan` does NTLMv2 and SMB 2 signing (`lan/smbauth.c`) with the password in one request and nowhere else; a server that can't list falls back to typing the name. Tested with vectors from the specifications and a real sign-in against a throwaway test server on the loopback; not against a desktop system's own file sharing.
+- **Connect to Server and Go to Folder:** the Go menu has every place with its shortcut, Recent Folders, Go to Folder with completion, and Connect to Server with history, favorites, a list of services and help. smb, nfs, sftp, ssh, ftp, ftps and WebDAV open as folders in Files; rclone and fuse3 come with LordOS. ssh also offers Terminal with the command typed and not run.
+- **Remote Desk, one app for RDP and VNC, drawn by LordOS itself:** no client window, X11 or toolkit. `lord-rdesk` is sandboxed and paints a picture the engine shows; VNC is our own RFB client and RDP uses libfreerdp's core. Connect to Server opens them.
+- **Disk Formats in the Store:** one item in the Commercial group, with every driver's license and source shown first, opens NTFS, exFAT, FAT, HFS+ and APFS volumes on the desktop. The drivers are free software. FAT keeps working for boot, the installer, the live USB and the Imager without it.
+- **Files → Settings:** what a new window shows, folders in tabs, tag names and which show, the sidebar's items, extensions, warnings, removing Trash items after 30 days (checked when Files opens), folders first and where a search looks.
+- **List view columns:** right click the header to show or hide Date Created, Last Opened, Changed, Comments, Tags, Permissions and Owner; drag a title to reorder, drag an edge to resize; sort by any of them; a wide list scrolls sideways. Get Info takes a comment.
+- **Open in Terminal** from the toolbar and the menus starts the Terminal app in that folder, in a window of its own.
+- **Store cards:** the action no longer touches the card's bottom edge: the card has room for its summary and foot, and the same padding on every side.
+
+- **The on-screen keyboard opens only when asked for** (2026-11-01, maintainer's decision): its button is always next to the clock, and ❖⌃K and Settings open it too; on the login and lock screens, its button next to the language. A text field taking focus no longer opens it, and the Off, Automatic and Always setting is gone.
+- **Cleaner's window moves:** its drag area was under the sidebar and the main pane, so the window couldn't be moved. It now moves from the top edge and the sidebar's top row, and a double click there maximizes it.
+- **Cleaner in Lord Classic** has the theme's minimize, maximize and close buttons at the end of the top edge, instead of Lord Flow's on the left.
+
+- **Release pass fixes** (2026-11-01): an unpinned Dock icon keeps its place when its window is raised or restored; Text Editor's Go to file panel takes the keyboard again after a minimize; the launcher finds Mail by its localized word; the Notes hint no longer names ❖N, which is Notifications in Lord Classic; Cleaner's confirmation no longer promises a password prompt that an administrator's session doesn't show.
+- **Lord Classic no longer loses a window's state when another window comes to the front** (2026-10-31, VM 125): the windows were in a list of unkeyed arrays since the snap preview went in, so a raise mounted the moved windows again, and unsaved text, tabs and scroll were gone.
+- **Lord Classic's Start menu has the keyboard over a Linux or isolated app** (2026-10-31, VM 125): it was in the popover layer, which doesn't take the keyboard, so with Mail, an X11 or a Wayland app in front its search stayed empty, Esc and Enter did nothing and the keys went to the app. It is in the overlay layer now, like Lord Flow's launcher.
+- **Minimizing a fullscreen Linux app works** (2026-10-31, VM 125): ❖M hid the window in the shell while the compositor kept presenting it with the keyboard. It leaves fullscreen as on a hidden desktop and comes back fullscreen when restored.
+- Paper, FAQ, feature pages and the apps page follow the work on 0.8.7, marked in development with 0.8.6-beta as the latest release: GPU drag, memory as what slows the Pi 5's GPU, Files → Network, session restore, keyboard shortcuts, pointer lock, the on-screen keyboard, the new closed admin actions and helpers. `docs/PAPER-VALIDATION.md` lists each claim, and `docs/FILES.md`, `docs/FIREWALL.md` and `docs/CLEANER-ROADMAP.md` no longer say the search awaits a decision or that Cleaner was never run on a Pi.
+- Overview: a window's full-size frame no longer catches the pointer in the grid, so a window whose cell lies under another window's real position can be hovered and picked.
+- **Overview: Linux windows are scaled on the GPU path** (2026-10-31, found on the Raspberry Pi 5): a window with an app surface refused the transformed raster, so it stayed at full size at its place in the grid, past the screen's edge. The quad and the hole now go at the scaled box, and the minimize effect of a Linux window shrinks too. A rotated transform, or one inside another, draws the frame with an empty content area, never the full window. The grid also scales a maximized window by the size it is drawn at, not by its size before maximizing, which let any maximized window run off the screen.
+- **GPU drag is on by default, and now covers the whole drag** (2026-10-31, Raspberry Pi 5; `docs/GPU.md`, "The whole drag"): the menu bar or the Dock in the damaged box used to refuse nearly every frame of a real drag; now they only shorten the window's rectangle. In 4 real 16 s drags each, on v087.22: alone the session's CPU fell from 58.1–60.6 % to 27.2–28.4 % of a core and the work per frame from 7.0 to 5.0 ms; under memory load 28.8–29.1 fps became 34.4–35.1 fps, 20.3 ms became 13.2 ms and 67 % became 45 %. `LORD_GPU_VERIFY=1` compared 1,662 frames, all `differ=0`. It costs a self-test of about 350 ms at the start of each user session (none at the login screen) and 0.6 ms more of GPU a frame in a drag. LordBench's Desktop impact doesn't see the gain. `LORD_GPU_DRAG=0` turns it off. It is verified on V3D and SVGA3D only: on a VMware virtual machine with SVGA3D, `LORD_GPU_VERIFY=1` compared 2,102 frames, all `differ=0`, and a drag over a clear area took 3.9–4.3 % of a core instead of 7.5–7.7 %.
+- **A layer past GPU drag's self-test no longer turns it off for the session**: that window is refused (`size`) and the next one uses it.
+- **The buffer-age scissor stays off** after its Raspberry Pi 5 run (5 runs without, 3 with, v087.22): the GPU's part rises from 1.51 to 2.58 ms alone, and under load 30.1–31.8 fps fall to 28.4–29.9 fps, pointer p99 from 63–66 ms to 83–95 ms (`docs/GPU.md`).
+- `lord-sessiond` passes `LORD_GPU_SCISSOR`, `LORD_GPU_DRAG`, `LORD_PIPELINE` and `LORD_GPU_VERIFY` from its service to user sessions, never to the login screen.
+- Cleaner measured on the Raspberry Pi 5 (`docs/CLEANER-TESTS.md`): 4.5–7.2 % of a core with the hero idle, 12.2–18.0 % scanning, 0.1 % closed.
+
+- **A Linux window no longer keeps the size of a maximize just undone** (2026-10-31, found on the Raspberry Pi 5): a commit the app made before it read the compositor's last configure counted as a resize of its own, so the Test Bench's first launch of a session ended 1920 wide and ran off the screen. `wl.c` now waits for the ack of the last configure.
+- About names the case once and shows the whole board name up to the revision; Settings shows it whole; Files → Network's long lines end in an ellipsis.
+
+- **The on-screen keyboard follows a field that moves** (2026-10-31): in Passwords at 1280x800 the master field could end up behind the panel docked at the top. An isolated app only said where its field was when it took the focus, so a strength row appearing, or the window shrinking for the keyboard, left the session with an old place; nothing planned again until a key was pressed. Isolated apps now report a new place after a commit or a resize, the shell plans again after its own commits (`onCommit` in the runtime, only with the panel open), a place given at another window size counts as unknown, and the panel goes to the top only if that clears the field. A place for the field already focused no longer reopens a panel the person hid.
+- **Overview: a minimized window with nothing to draw** shows its app icon and title instead of an empty frame. A Wayland app's last buffer still covers the placeholder; a LordOS app, which mounts again and has a translucent body, gets none (2026-10-31, Raspberry Pi 5: the icon showed through its cards).
+- **Desktops: the switch animation slides again.** It sent a CSS `transform` directly to `lord.setStyle`, which takes native properties: the windows only faded in, and the session log said `js: unsupported style 'transform'`. It sends `translateX` now.
+- **Screenshots says why it can't capture:** with the screen permission denied, or the app restricted, ❖⇧3, Print Screen, ❖⇧4 and recording did nothing. They now show a notice with a button to Privacy, or a toast under Do Not Disturb. The permission is unchanged.
+- **No usable display driver** (`docs/SESSIONS.md`): a card that opens but has no KMS, such as a render-only GPU, now counts as no display. lord-sessiond stops trying to start the login screen on it, logs why and leaves the message on the text console, and the boot splash ends without keeping its picture over that message.
+
+### Added
+
+- **Desktops** (in development; `docs/DESKTOPS.md`), in Lord Flow and Lord Classic, from one to nine, all displays together.
+  Each window has `w.desktop`; `useWindows`, `wm.focused` and the Wayland keyboard follow the desktop in view, and
+  bringing forward a window on another desktop switches to it. **A window on a hidden desktop never has the keyboard:**
+  `sync()` in `sdk/wayland.js` decides through `keyboardSurface` (`sdk/desktopmodel.js`), a Linux app's move, resize and
+  window-menu requests are refused from a hidden desktop, and because fullscreen keeps the keyboard in the compositor,
+  `lord.wayland.state` gained a fifth argument, `parked` (`wl_set_parked`): the window can't take the keyboard or fullscreen until
+  its desktop returns, and a fullscreen it had comes back with it. X11 windows go iconic through the minimized path. LordOS apps on a hidden
+  desktop stay mounted with `display: none` and keep their state; their text fields lose the focus. Picture-in-picture is sticky.
+  The app switcher lists every desktop and jumps; the Dock prefers a window on this desktop and otherwise jumps; Show Desktop,
+  Hide Others, Bring All to Front, window cycling and swipes work on this desktop. The window menu has **Move to Desktop**, and
+  closing a desktop moves its windows to the next. Session restore and live theme switches keep each window's desktop. A short
+  switch animation on cached rasters with no render per frame, none with Reduce motion, and no timer when idle.
+  `server/tests/desktop_model_test.mjs` (with the regression that focus never lands on a hidden desktop).
+- **Overview** (`sdk/overview.jsx`), shared by both themes, built from Lord Classic's task view, which it replaces: the live windows of
+  the desktop, including minimized ones, and a strip of desktops with miniatures; add and remove desktops, drag a window to a desktop.
+  With a Linux app in front its keys are now the shell's while it is open, which the task view lacked. Lord Flow: ⌃↑, ⌃↓ for the
+  windows of the app, ⌃← ⌃→ (also ❖⌃← ❖⌃→). Lord Classic: ❖Tab, ❖⌃D, ❖⌃← ❖⌃→, ❖⌃F4. Sideways swipes switch desktops, four fingers up
+  opens it. **Settings → Keyboard** turns Lord Flow's ⌃ arrows off, since they mean word movement in apps, with the new
+  key table `flow-desktops` in `keygrab.c`. Left and Right follow the layout in right-to-left languages.
+
+- **Files → Network** (in development; `docs/FILES.md`, "Network"). A Network place in the sidebar shows what is on the
+  local network by itself: computers, SMB shared folders, NFS exports, other network storage and services, with
+  name, address, kind and what can be done with each. Off until the page opens; one bounded pass (mDNS, then ports 445
+  and 2049 on this computer's own private links, at most the /24, at most 30 connections a second, port 22 and a reverse mDNS
+  name for machines that turned out to be there), IPv4 only. Everything that comes back is read by the new sandboxed helper `lord-lan`
+  (no sockets, no files, libc only; our own SMB2, NTLMSSP, DCE/RPC, ONC RPC parsers, `build/lan-test` under ASan/UBSan with
+  40,000 damaged answers). JS names no address: `lord.lan` is `start`, `stop`, `poll`.
+  Inside a session its sockets come from the `lan` connector, approved by the maintainer on 2026-10-31 (`docs/FIREWALL.md`,
+  "Files → Network and the connectors"). **SMB with a password** passed against one real desktop file share and one test server.
+- **Connecting to a share** from Files: the closed admin actions `share-mount` and `share-unmount` (approved in the
+  roadmap on 2026-10-25) mount SMB and NFS with the kernel's clients through `fsconfig()`, one call per option, with no
+  program, shell or extra package, only private IPv4 addresses, only under `/media/<user>`; the password can be
+  remembered in the keyring and nowhere else. Tested on VM 125 against a Samba and NFS server inside a network
+  namespace: guest, password, wrong password, NFS 4.2, ⏏ from the sidebar.
+
+### Fixed
+- **Found by the end-to-end run on the final build (VM 125):** an X11 window grew by twice its border width every time its state changed, so xterm got 4 px larger with each trip between Desktops (the window manager now removes the border, as Xwayland counts it in the surface). The on-screen keyboard follows light mode and the accent, as documented: it was mounted outside the theme and always drew the dark default. It opens by itself for fields of isolated apps (Passwords, Mail): the hint compared the app's id with the window's `linux#` id and was always dropped. A window lifted for the on-screen keyboard is saved for session restore where the person left it, not in its lifted, shrunk frame. A field focused while an isolated app's window opens reports its place again once laid out, and when a window's minimum size keeps it from shrinking enough the keyboard moves to the top of the display.
+- Shortcuts: a key pressed with no Linux app in front and released with one left the dispatcher waiting for its release, and the next
+  press of that key did nothing (`sdk/shortcuts.js`). Seen with the key that switches to a desktop holding a Linux window.
+- **A network mount that stops answering no longer freezes the interface.** `lord.fs` asks the server from a thread of
+  its own first (`fsops_share_down`, at most 800 ms, once), `fs_volumes` doesn't `statvfs` shares and the Trash skips them;
+  measured before: 30 s on SMB and over 100 s on NFSv4 with the thread blocked, after: never blocked in 24 samples.
+
+### Changed
+
+- `MdnsCache` keeps 256 records of each kind (64 before) and `mdns_query` is public, for `lord-lan`; printing's use is the same.
+- **Session restore** (`docs/SESSIONS.md`): apps open at logout, Restart or Shut Down come back with their frames,
+  maximized, minimized and snapped states; an empty desktop stays empty; after a power cut or a crash LordOS asks
+  first. Settings → Session: Always, Ask first, Off. Saved continuously in `settings.json` as typed Dock ids, never
+  commands, titles or Linux document paths, and reopened only through the Dock's launch paths. Tested on VM 125 with
+  a logout, reboots, a real shutdown, a forced power-off and `SIGKILL`.
+- **Browser tabs on restore**: the closed admin action `browser-restore on|off` writes fixed policy files for
+  Chromium and Firefox ESR. Pages came back on VM 125; after a forced power-off Chromium needs its own "Restore pages?".
+
+### Fixed
+
+- `SIGTERM` or `SIGINT` could end `lord-server` on a worker thread without leaving the main loop, skipping the end of
+  the session. They now always reach the loop.
+- The end of a session asks Wayland and X11 apps to close (up to 3 s) before disconnecting them, so browsers no longer
+  record a crash at logout.
+- Search's Log Out now also clears the clipboard history when that option is on, like the other logouts.
+
+### Decided
+
+- **The 0.8.7 plan** (2026-10-30, decided by the maintainer): the community hardware reports, LordBench's x86 PC
+  reference, hardware video decoding, GPU drag for the whole drag and the Pi 5 work under load all stay in 0.8.7, and
+  **Cleaner**, a new native storage and maintenance app, joins them (`docs/ROADMAP.md`).
+
+### The work on 0.8.7, in detail
+
+- **Argon ONE V5 case, found and offered:** Settings → Cooling never showed the case on a real image, because the boot partition is readable by root alone: the setting is now also kept in `/var/lib/lordos/case`. On a Raspberry Pi 5 with no case chosen, the new closed admin action `rpi-case-detect` turns the USB-C controller into a host until the next restart and looks for the case's hub and audio chip (seen on one Argon ONE V5: hub 1a86:8091, audio 0d8c:0014). If they are there, the front USB ports and sound work at once, and the Store's suggestions offer keeping them on; if not, the controller goes back. Nothing is installed and the vendor's script isn't used.
+- **Cleaner, from a full test with a real pointer on VM 125 (engine exact, reports fixed):** the result page shows what was freed and what went to the Trash together, and how much free space rose; emptying a large Trash reports what it freed; cancelling a confirmation keeps what was picked; selection size counts single items; Restore corrects the page; Select all is gone from duplicates, where one copy always stays; Smart keeps the oldest copy, and for similar images the largest picture; system cleanups appear in Activity; the system dialogs sit outside the list; the round button stops a full scan. The scroll thumb takes the pointer as soon as it is near the edge.
+- **Fixed:** Settings → Sound let volumes go to 150 %, which is digital gain and clips loud sound (heard at 108 % on a USB sound card, gain 1.25 over full scale). Volumes now stop at 100 %, and one above that comes back when the page opens. A new output starts at 80 % (`lordos-volume.conf`). Measured with a full-scale tone: nothing clipped at 80 % or 100 %, 32 % of samples at 108 %, 57 % at 125 % (`docs/SOUND.md`, "Volume").
+- **System Information on a Raspberry Pi:** the Computer page fills manufacturer, product, version, maker, chip and memory from the board's own revision code, with no network; the Raspberry Pi section appears only on one.
+- **Bluetooth:** Settings searches for 40 seconds, with a Search again button, instead of for as long as the page is open: while a search runs the kernel skips its background scan, the one that lets paired devices come back by themselves.
+- **Fixed:** the Bluetooth dialog showing a pairing code stayed open after the pairing ended, in Settings, until Cancel was pressed.
+- **About LordOS** shows the Argon ONE V5 case under Memory when it is chosen.
+- **Files → Network works in a session:** the maintainer approved the `lan` network connector on 2026-10-31 (firewall app `lordos:lan`), and the closed `browser-restore on|off` action for session restore.
+- **Fixed:** every login opened Files and About LordOS (About in Lord Classic): both themes had them hard-coded at start. A session now starts on an empty desktop.
+- **Cleaner, scan again and select all:** every result page (Cleanup, Large files, Storage, Duplicates) has "Start over", which returns to that section's first page without losing anything on disk, and "Scan again"; the full scan's board has both too. Select all covers a filtered list of large files, the categories of Cleanup and app leftovers. Duplicates and similar images have "Select copies", every copy but the first of each group, and lord-server still keeps one copy. A selection menu on each list offers smart selection, select all and deselect all, plus older or newer copies for duplicates, and shows how many items and bytes are selected. Categories chosen by name (AI models, project outputs) have a checkbox of their own, are never picked by smart selection, and the confirmation names the first five items and how many more. The round button now shows a running arc while it works, and the scroll bar of long lists can be dragged. After a cleanup the other sections' lists are dropped, so nothing offers a file that has gone; the result page offers emptying the Trash and says what that freed; Activity tells deleted items from those moved to the Trash. A project that came back to life after the scan is left alone: its idle time is judged again at the plan and before acting. The system cards also appear after an empty scan.
+- **Fixed:** `doc_recv` read uninitialized control data when `recvmsg` failed, which crashed intermittently when a scan was cancelled on arm64 (Raspberry Pi 5). It affected every helper on that channel.
+- **Monitor: a Voltage view** (2026-10-31; `docs/MONITOR.md`, "Voltage"). One component over several sources, and the tab exists only on machines that report something (not in a virtual machine).
+  - **Raspberry Pi 5, 500, CM5:** the 5 V input with a 5-minute trace, the board's rails with their currents, an estimated board power (the sum of the listed rails, which leaves out USB devices, the fan and regulator losses) and a clear state: normal, low, under-voltage now, happened since boot. Under-voltage is only the board's own alarm; a 5 V input under 4.8 V is LordOS's own "low" warning.
+  - **New closed admin action `rpi-pmic`** (`hw/hw_admin.c`): anyone, no arguments, read-only, BCM2712 only. It runs the fixed `/usr/bin/vcgencmd pmic_read_adc`, because `/dev/vcio` is root's, and parses it strictly in C (`hw_pmic_parse`; a closed list of rail names, and anything malformed, repeated, cut or out of range fails the reading). It also counts the kernel log's `Undervoltage detected!` lines (`hw_uv_log`, kernel facility only), the source for "since boot": on the LordOS kernel `rpi_volt` clears the firmware's own bits every 2 s. Only numbers and those names reach the session, and `apps/monitor/voltmodel.js` checks them again. `hw_is_bcm2712` moved to `hw/rpifw.c`, so that the Monitor can share it.
+  - **PCs and others:** `monitor/voltage.c` reads `in*_input` with labels from hwmon, and `voltage_now` of batteries and of adapters that expose it, world-readable and on the Monitor's thread. Inputs with no label are shown as raw values, never scaled, and a chip with no voltage driver shows nothing.
+  - Read about every 2 s only while the view is on screen: 6 reads in 12 s, 0 with another tab or the window minimized.
+  - Tests: `build/voltage-test` (fake trees of a desktop, a laptop, a Raspberry Pi 5 and a virtual machine, hostile values), the real `vcgencmd` output plus 30 damaged variants in `build/settings-hw-test`, and `tests/voltage_model_test.mjs`. Run in an isolated session on VM 116 with the real board's values as a fixture; not yet installed on the board, and not yet seen with a real under-voltage event, a real motherboard sensor chip or a real battery.
+- **Keyboard shortcuts per theme, and an app switcher** (2026-10-31; `docs/SHORTCUTS.md`):
+  - **One dispatcher** (`sdk/shortcuts.js`): it runs before every key listener, with a common base and a table per theme, and actions are named functions. A key it takes reaches nobody else, which ends the double actions: in Lord Classic ❖A, ❖N, ❖ arrows, ❖Tab and ❖V also fired in the app in front.
+  - **App switcher** for both themes, in the overlay layer: a centered strip of large app icons with the selected app's name, most recently used first. Hold the modifier, Tab moves, ⇧Tab goes back, Esc cancels, releasing switches. ❖Tab in Lord Flow, ⌥Tab in Lord Classic; ⌃Tab stays with the apps. ❖\` goes through an app's windows in Lord Flow.
+  - **Keys kept from apps** (`server/src/wl/keygrab.c`, `build/keygrab-test`): a fixed list per theme in `wl_key`, keyboard keys only, chosen by name with `lord.wayland.grabKeys` and out of reach of isolated apps, with the modifier's release handled so ⌥Tab and ⌥F4 work over a Linux app. With a fullscreen Linux app ⌥Tab stays with the app.
+  - **Lord Flow:** ❖M minimize, ❖H hide, ❖⌥H hide others, ❖⌥Esc Force Quit, ❖F11 show the desktop, ❖⌥D Dock auto-hide, ❖, the app's settings. ❖C, V, X, A, Z, F, T, W, N, L, R, P and S reach Linux apps as Ctrl, and as Ctrl+Shift in terminal emulators, to the focused client only. So over a Linux app ❖L is that app's (❖⌃Q locks) and ❖V pastes (❖⇧V is the clipboard). ❖V also pastes in LordOS apps inside the session, text fields and Text Editor included.
+  - **Lord Classic:** ❖D, ❖E, ❖I, ❖⇧S, ❖1…9, ⌃⇧Esc for Monitor, and ❖R opens Search, never a command box. Plain ⌃Q is never global.
+  - **Settings → Keyboard** lists the shortcuts of the theme in use, read only, and the Help article is rewritten (en, es, pt).
+  - **Fixed:** Hide Others skipped Linux windows; show desktop is now one SDK function for both themes.
+- **The pointer no longer disappears during Test Bench** (2026-10-31; `docs/GPU.md`, `docs/PAPER-VALIDATION.md`). Reported on the Raspberry Pi 5 and reproduced there with a virtual mouse and keyboard, reading the kernel's cursor plane after each step: Test Bench invites pressing every key of its drawn keyboard, and plain L was its pointer lock test. The lock hid the pointer and froze it, while buttons and relative motion still reached the bench; pressed with the pointer away from the window, it waited and took the pointer later, as it walked in. Without a keyboard (a Bluetooth one asleep) nothing let it go.
+  - **Test Bench:** the lock is now Ctrl+L, only with the pointer on the window, and it ends by itself after 10 s (`testbench/lockkey.h`).
+  - **Compositor, for every app:** a pointer lock or confinement holds only with the pointer on the surface and the keyboard on its app, so a window in the background can't hide the pointer as it passes over, and **❖Esc** always releases it (`wl/ptrlock.h`).
+  - **Tests:** `build/ptrlock-test` covers both rules.
+  - **Ruled out on the Pi:** a client killed or crashing while locked gives the cursor back at once, and clicks and motion work after a client dies; the cursor ioctls take 0.06 ms (p50) with the bench flipping every frame; a closed mouse path at 125 and 1000 Hz with the bench and its 3D view running ends exactly where it began, so nothing accumulates. LordBench's synthetic pointer isn't involved (it only reaches `grab_script_tick`). The pointer speeding up by itself, which the report also described, was not reproduced.
+
+- **System Information: a fuller Hardware page, and serial numbers on request** (2026-10-31; `docs/BENCHMARK.md`, "Serial numbers and peripherals", `docs/SETTINGS.md`).
+  - **Computer:** separate groups for the computer (manufacturer, product, type), the motherboard (manufacturer, product, version) and the firmware (BIOS or UEFI, vendor, version, date, Secure Boot). On a Raspberry Pi: model, revision, the bootloader's version and date from the device tree, and the chosen case (Argon ONE V5). The board version and the bootloader also go into the report (`machine.boardVersion`, `raspberryPi.bootloaderVersion`, `raspberryPi.bootloaderDate`); the schema of what is shared on GitHub doesn't list them yet, so that doesn't change.
+  - **Serial numbers:** a **Show** button, on this screen only. A new closed admin action, `hw-serial-numbers` (no arguments, read-only, administrators), reads `product_serial`, `board_serial` and a Pi's device tree serial, validated in C (`hw_serial_clean`). Nothing keeps them: no copy button, gone with **Hide** or when the page closes, and the window is protected meanwhile, so screenshots, recordings and remote desktop see black. The report still has no field for them.
+  - **Input and peripherals:** a new section with keyboards, mice, receivers and other USB devices, what sits behind a wireless receiver with its battery, built-in keyboards and touchpads, and BlueZ's paired devices with their connection state and battery. On screen only, with no address: a device's name can carry a person's, so `lord.sysinfo.peripherals()` is not part of `lord.sysinfo.report()`, `markdown()` or `lordos-sysreport`.
+  - **Audio** shows a name instead of ALSA's id: "Raspberry Pi HDMI 0 audio" for `vc4-hdmi-0`, and a USB card by its `usb.ids` entry or, without that list, ALSA's long name with the bus path dropped. This changes the `audio` strings in reports for those cards, so older community reports of them keep the old name.
+  - **Tests:** `sysreport-test` checks all of it over fake machines, with a person's name in a device, serials in every place and addresses in the input nodes; `settings-hw-test` covers `hw_serial_clean`; `sysinfo-model-test` the serial lines, the peripherals list and the firmware dates.
+
+- **On-screen keyboard, for a computer or Raspberry Pi with no physical keyboard** (2026-10-31; `docs/ON-SCREEN-KEYBOARD.md`, `docs/SETTINGS.md`).
+  - **What it is:** a tablet-style keyboard with large rounded keys, Shift (twice to lock), two pages of numbers and symbols, Backspace that repeats, Return, space and a hide button. It follows the theme, light and dark mode and the accent color, and speaks English, Spanish and Portuguese. The rows stay left to right in Arabic and Hebrew.
+  - **Where it types:** LordOS text fields, Linux apps (Wayland, and X11 through Xwayland), isolated apps, and the login and lock screens, so someone with no keyboard can log in. Those two screens always behave as Automatic and have a keyboard button of their own.
+  - **When it opens:** Settings → Keyboard → On-Screen Keyboard: Off, Automatic (a text field takes focus and no physical keyboard is attached) or Always. It also opens from a menu bar button, shown while there is no physical keyboard, from ❖⌃K, and from Show Keyboard in Settings.
+  - **Is a keyboard attached:** `lord.input.hasKeyboard()` answers from the devices `lord-server` really opened (`server/src/osk.c`), and plugging one in or out arrives as an event, with no polling. Power buttons, media keys, remotes and security tokens don't count. The PS/2 controller of a desktop PC, which reports a keyboard with nothing plugged in, counts only on a laptop or after typing.
+  - **Follows the layout:** what each key shows comes from the active XKB layout (`lord.input.keyLabels()`), and a tap goes down the same path as a physical key (`js_key`), so dead keys, compose and input methods work. The symbol pages offer only what the layout can type.
+  - **Doesn't cover the field:** the window with the field rises, or shrinks, and goes back when the keyboard closes. With no window to move (Search) the keyboard goes to the top of the display, and the login screen moves its own column.
+  - **Linux apps:** `zwp_text_input_v3` (`wl/wl_textinput.c`) tells it when a field takes focus and where the caret is; text keeps arriving on `wl_keyboard`. X11 apps, and Chromium by default, don't report fields, so there it opens from the menu bar.
+  - **Security:** `lord.input.tap` takes one key from a closed list, with no Ctrl, Alt, Super or function keys, so it can't be a shortcut, and only the theme and the login screen have it. An isolated app gets one broker call, `BOP_TEXT_FOCUS`, a hint with a position and no text, obeyed only for the window in front. Keys go only to the focused client. Nothing logs or keeps what is typed, there are no suggestions or history, and the panel is a `protected` node, black in screenshots, recordings and remote desktop.
+  - **Tests:** `build/osk-test` (devices, allowed keys, the queue, XKB labels of real layouts) and `tests/osk_model_test.mjs` (rows, symbols, opening rules, sizes, keeping the field in view).
+- **Cleaner: code projects, more rules, a clearer map, and a map that stays** (2026-10-31; `docs/CLEANER.md`, `docs/CLEANER-ARCHITECTURE.md`, `docs/CLEANER-SECURITY.md`). The table now has 61 rules, 18 more.
+  - **Build outputs of code projects:** the sandboxed `lord-clean` walks the home folder for Node (`node_modules`, idle 60 days, judged over the whole project), Rust, Maven, JavaScript, Python tool caches, Python virtual environments, Gradle and Dart. Each is proved by evidence next to or inside the folder, and `lord-server` checks that evidence again at the plan and right before acting (`clean_project_kind`). They are chosen one by one and go to the Trash, not the real delete, whose approval covers fixed roots only. Dot folders and `~/go`, `~/snap`, `~/Android` and `~/flutter` aren't entered.
+  - **New fixed rules:** Playwright, Puppeteer, the Go module download cache (only `cache/download`: extracted modules are read-only), JetBrains, Dart pub, the Maven repository and Flatpak app caches.
+  - **Your own files, reviewed:** installers in Downloads over 30 days, to the Trash; and videos of 100 MiB or more on the Desktop (over 7 days, following `XDG_DESKTOP_DIR`) and in `Videos/Screencasts`, to the Trash and chosen one by one.
+  - **Storage map:** bands in each tile for what rebuilds by itself and what to check first, and a line with free space, both amounts and what wasn't scanned.
+  - **During a scan** the three rules with the most found so far appear, with their sizes, and each step stays on screen a minimum time (2.6 s in a full scan, 1.8 s from a section) so its animation finishes on a nearly empty disk.
+  - **The storage map is kept between sessions:** `~/.cache/lordos/cleaner-map.txt`, mode 0600, folder names and sizes, on by default, with a switch in Settings and cleared with Clear in Activity. This changes the earlier claim of no history of paths: the Activity history still holds no path, but folder names now stay on disk. A saved map holds no candidates, so nothing can be acted on from it. A scan of another disk removes it.
+  - **Credit:** These ideas (evidence next to a folder, idle projects, bands on the map, the not scanned figure, live recommendations, keeping the last map) were written anew after reading the open source Vano disk analyzer by Estanislao Pérez Nartallo (Apache-2.0); no source code or text was copied.
+  - **Tests:** `clean-test` has no case for these yet (`docs/CLEANER-TESTS.md`).
+
+- **What slows the Pi 5's GPU under load: memory** (2026-10-31, measured with `build/gpu-contention` on the Pi 5 16 GB, build 0.8.6+v087.4, two runs; `docs/GPU.md`): GPU time per frame
+  stays at about 1.4 ms with all four cores spinning, and goes to 28 ms with four cores reading memory (3.7 ms writing), with the V3D clock at 1.15 GHz, no throttling and at most 44 °C.
+  No desktop change comes with this measurement; it says where the work on the desktop under load has to go.
+
+- **An arm64 live ISO** (2026-10-30; `docs/ISO.md`, "The arm64 ISO"): `lordos-live-<version>-arm64.iso` for generic UEFI arm64 machines and virtual machines, with the live desktop and the disk installer.
+  - **Build:** `tools/iso/build.sh` takes the architecture from the host; amd64 keeps its steps (`linux-image-amd64`, both grub platforms, BCJ x86). arm64 uses `linux-image-arm64`, `grub-efi-arm64-bin`, UEFI only, no BCJ. `tools/iso/build-arm64.sh` runs it from x86-64 in the arm64 chroot under qemu-user, through an overlay in a private mount namespace, so the chroot isn't changed.
+  - **Installer:** on arm64 no BIOS partition, ESP first, root with the Linux ARM64 partition type, `grub-install --target=arm64-efi` only; the wizard's Summary shows that layout (en, es, pt). The amd64 steps are the same.
+  - **Elsewhere:** the `lordos` package carries the GRUB theme on arm64 too, so `install.sh` also offers it on arm64 Debian; the Imager lists "Generic arm64 (USB stick)" with only the releases that have that ISO; the release notes list it. The site's download card stays amd64 until a release has the file.
+  - **Tested:** an unsigned development build on emulated QEMU (`virt`, edk2, virtio-gpu without 3D, CPU composition): reached the live desktop, installed through the wizard to a virtio disk and booted the result to a login and a desktop. Not tested: real hardware, a USB stick, a hypervisor with hardware acceleration, a 3D virtual GPU, sound, the browsers, a signed build.
+
+- **Cleaner's images were missing from the package** (2026-10-30, found booting the arm64 ISO): `mkdeb.sh` didn't copy `assets/cleaner`, so on any installed `.deb` or ISO Cleaner drew without its background, tiles and hero art, and the windows behind showed through. Fixed; checked by adding the folder on the installed test system.
+
+- **Cleaner's root actions and scope ran for the first time** (2026-10-30), in a throwaway emulated arm64 installed system: `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp` did what their rules say on planted files, and `lordos-cleaner.scope` appeared under the session (`docs/CLEANER-TESTS.md`). Two open bugs came out: a scan finds nothing in a live session (the overlay's file devices), and the system card can't be reached when a scan finds nothing.
+- **The buffer-age scissor, off by default** (`server/src/gpu/gscissor.c`, `LORD_GPU_SCISSOR=1`, `docs/GPU.md`): a frame
+  with only the UI (no app window, menu or cursor drawn by the GPU) composes the rectangle that changed plus what
+  changed since its buffer was last shown (`EGL_EXT_buffer_age`), instead of the whole output. A buffer of unknown age,
+  a frame not swapped and a direct scanout make the next frame whole. `build/engine-test` runs the same code over a
+  simulated three-buffer chain with undefined buffers: 7,567 frames (the GPU drag runs, the damage pipeline and the
+  fuzz), 0 differ; without the history it fails. A real EGL chain on llvmpipe (VM 116, a scratch driver, 1920 × 1080): 600
+  frames, every 20th read back, 0 pixels differ, 3.77 ms of composition against 8.80, on the CPU. **Not run on any GPU**:
+  no number for the Raspberry Pi 5 yet, which is why it stays off.
+- **`build/gpu-contention`, an experiment for what slows the GPU under CPU load** (`tests/gpu_contention.c`, the rules in
+  `src/gpu/gcontend.c`, tested in `build/engine-test`): a fixed frame under loads that stay in the caches, read or write
+  memory, on 1, 2, 4 and all cores, with a verdict. It ran on VM 116 on llvmpipe only, which proves the tool, not the
+  cause; the Raspberry Pi 5 run is pending.
+- **The player leaves a failing hardware decoder** (`lm_hwfall.h`, `docs/MEDIA.md`): 8 decoder failures in a row, or
+  8 frames in a row that can't be read back from the hardware, switch that file to software at the current position,
+  as a seek: with sound, what was left in the audio ring is dropped and playback ended 0.2–0.6 s behind. Tested with both failures faked on a software decoder
+  (`build/lord-media-hwfall`, VM 116, with and without sound) and `build/hwfall-test`; **not run on real VA-API
+  hardware**. No change to the sandbox and none to FFmpeg.
+
+- **Installing on a Debian with a root password left nobody as an administrator** (reported on an arm64 Debian 13
+  virtual machine). The Store then refused everything with "<user> is not an administrator", and LordOS has no way to
+  name an administrator from inside. `install.sh` now picks the user who logged in, or the only regular user, when it
+  runs as plain root; when the system has no member of `sudo`, `admin` or `wheel` it offers to make that user an
+  administrator; and it installs `sudo`. Uninstalling removes what it added. Tested with the 0.8.6 release on a clean
+  amd64 Debian 13 virtual machine with a root password, one regular user and no `sudo`: the user became an administrator,
+  and their services had the new group after a reboot (a logout was not enough on the reported machine). The login
+  screen then appeared; logging in on it was not part of this run.
+- **A system that already has nobody as an administrator can now get out of it from the Store** (2026-10-30, approved by the
+  maintainer). Fixing `install.sh` doesn't help a machine that already went through it: LordOS gave no way to name an
+  administrator from inside. When the Store is told "<user> is not an administrator" and no non-root account is in `sudo`,
+  `admin` or `wheel`, it now asks for the root password under the refusal (en, es, pt) and adds the session user to `sudo`,
+  effective after a restart, which it says.
+  - **Closed actions:** `admin-rescue` (the root password on the request, never a user name; the UI calls it with
+    `{ quiet: true }`) and the read-only `admin-rescue-status`, both open to non-administrators, since they are the only ones who
+    need them. Each decides again as root, with `src/users/admin_rescue.c` (`build/admin-rescue-test`).
+  - **Refused:** when any administrator exists, when the session account isn't a person's, when `sudo` (group or program) is
+    missing, and when root is locked or has no password. A wrong password costs 2 s, and a machine-wide lock allows one try at
+    a time. Runs only `/usr/sbin/usermod --append --groups sudo <session user>`.
+  - **Tested:** on an installed amd64 virtual machine with a throwaway root password: the whole path through the Store's form
+    (the refusal, a wrong password, the right one, Restart Now, and the refused action working after the restart); each refusal
+    above on the real system files; the form in a right-to-left session. The Store's "Check for updates" with no catalog showed no error at all before; it does now. Not tested: real hardware, arm64, a remote desktop session, the
+    missing-sudo and locked-root cards on screen (their helper answers were), and the audit log line of a wrong password.
+
+- **`install.sh` said SSH was left as it was, yet root can no longer log in over it.** The package's `PermitRootLogin no`
+  applies from the next sshd restart. The installer now says so, and warns of a lockout when the system has no
+  administrator. The warning with an administrator was seen on that virtual machine; the one without was not.
+
+- **`lord.fs` refuses a parent of a protected path** (2026-10-30, a bug found by Cleaner's audit): `trash`, `rename` and a
+  move of a folder that holds a protected path (`~/.config/lordos`, `~/.config`, `~/.local/share/lordos`) took the settings,
+  permissions and vaults with them. Those calls, a move or copy onto such a name and a restore onto it now answer
+  `fs.protected` (`fsops_protected_below`, `fsops_rename`). `lord.fs.rename` also uses `RENAME_NOREPLACE`, so the kernel
+  refuses an existing target with no gap after a check. Other folders, siblings of a protected path included, work as
+  before (`fsops-test`).
+
+- **Cleaner: its look and its cost** (2026-10-30; `docs/CLEANER.md`, numbers in `docs/CLEANER-TESTS.md`), in development, not in 0.8.6-beta:
+  - **Frame time.** The Scan hero repainted 87 % of the screen on every frame: the engine paints one box around a frame's changes, and the stars, the hero and the round button were far apart and reached the Dock's blur. Each now moves in frames of its own, on the frame callback. Measured on VM 116 on the CPU path with a viewer attached: `lord-server` 6,690 ms of CPU in 8 s before, 970 ms after; paint per frame p50 17.5 ms before, 0.61 ms after; p99 22.6 ms before, 9.6 ms after. Not measured on a Raspberry Pi 5 or a real display. An earlier figure of 100 ms in 10 s was wrong: a headless session paints only with a viewer, and that run had none.
+  - **Hero.** A redrawn crown with depth, pane and object as two layers, a shadow under the object, sparks. The rings stay still and their dots turn. The round button sits higher, its glow is still, and busy it is circled by two dots.
+  - **Bubbles.** Glass spheres with an icon and colour for what each folder is, their share of the level, a clearer check, and a matching icon in the side list. Folders are named by their real name and the user's own folder settings.
+  - **Review board.** It fills the window: the total, a bar of what it is made of, and cards with the real rules, files and folders behind each number, fitted to a small window.
+  - A small window keeps the hero above the round button. Seen in English, Spanish and Portuguese, right to left with a test language in English text, and in the three looks.
+  - **Fixed while reviewing this work:** motion kept its rate on frames that change nothing (in a session with a viewer it fell to about half; on a real display, by the code and not run, it could stall until something else woke the compositor); the bubbles view came out empty at the window's smallest size with many folders; the board's image previews stayed as icons until the board was opened again; "Others" offered review and show as if it were a folder; a folder named `constructor` got a broken icon; Settings showed the looks' raw keys.
+  - The site gets a Cleaner page and a FAQ entry, both marked in development.
+- **Cleaner: similar images, Apps, translated Downloads, old kernels, the update word** (2026-10-30; `docs/CLEANER.md`, states in `docs/CLEANER-ROADMAP.md`).
+  - **Similar images**, from the Duplicates section: pictures that look alike in chosen folders, with thumbnails. `lord-clean` decodes PNG, JPEG, GIF and BMP with the `stb_image` the project already carries, inside the same sandbox, never in `lord-server`, and a 64-bit difference hash decides. Within 6 bits and 2 % in proportions; each image joins the largest it resembles. lord-server checks every group and refuses one that doesn't hold together. Nothing is selected, it goes only to the Trash, and one image of each group stays. Limits: 20,000 images, 64 MiB, 40 megapixels. Not covered: WebP, HEIC, raw files and EXIF rotation.
+  - **Apps:** installed apps by size, removed by the package engine with `lord.pkg.plan` shown first, as in the Store, or `.lpk` removal. What removed LordOS apps left is a new rule, `app-leftovers`: the whole folder, named, to the Trash, only while no installed or system app has that id.
+  - **Translated Downloads folders:** the download rules follow `XDG_DOWNLOAD_DIR`, so `~/Descargas` works, and only a `$HOME/…` value that would pass as a rule's root counts. `userDirs()` now also gives `downloads`, so Duplicates offers that folder too.
+  - **Old kernels**, in Cleanup, for administrators: chosen in `sdk/oldkernels.js`, keeping the running kernel, the newest and one to go back to, through `lord.pkg.plan` and `pkg-remove`, with no new root action.
+  - **The update word:** the panel by the clock reads whether a newer `lordos` package is known, once, as it opens.
+  - **`/tmp`:** a new rule shows your own files there over a week old. Measured only, left out of the estimate: another program's use of them can't be ruled out.
+  - **Lists** know their box's real height, so a long list ends with its last row at the bottom.
+  - **Tested on VM 116:** `clean-test` 828 checks, `oldkernels-test`, measurements in `docs/CLEANER-TESTS.md`, and an isolated session driving the real app. **Not tested:** removing an app or a kernel (that session has no admin helper), the update word from a real pending update, an installed session, the Raspberry Pi.
+
+- **Cleaner, Phase 1** (2026-10-30; `docs/CLEANER.md`, `docs/CLEANER-SECURITY.md`, `docs/CLEANER-TESTS.md`): on top of the entries below.
+  - **Sections:** Scan, Cleanup, Large files, Storage, Duplicates, Activity and Settings. Large and old files filter by size, age and type. Storage covers `/`, the home folder and
+    the user's mounts, with a map, a folder list with logical and allocated sizes, and a summary by type, from a bounded tree in `lord-clean`. Duplicates are found by size, partial and
+    full SHA-256 in chosen folders, nothing is selected, and a byte comparison against the copy that stays runs right before acting. Activity keeps counts and sizes, never a path. A moved
+    item can be restored from its result.
+  - **Rules:** 41, each conditional on its folder: caches, developer tools (pip, npm, yarn, Go; pnpm's store to the Trash), browser caches for Firefox and Chromium families (only cache
+    folders, skipped while the profile's lock names a live process), temporary files, crash reports, logs, and shown-only items. AI models from Hugging Face and LM Studio move whole to the
+    Trash, one by one, named in the confirmation; Ollama is measured only, as its models share files.
+  - **System files:** closed admin actions `clean-status`, `clean-journal`, `clean-apt-cache` and `clean-var-tmp`, with no arguments.
+  - **Looks:** Aurora by default, following the system's mode, and Noche and Cristal, as data; animated without a React render per frame, stopped when the window isn't in front and with Reduce motion.
+    Built-in apps can draw their own window frame (`"ownFrame"` in the manifest).
+  - **Item by the clock:** a still item with a panel of real readings, read only while it is open.
+  - **Full scan:** a dashboard of tiles with the real path being read, a sidebar rail, a tint per section, then a review board; Storage opens on bubbles of the largest folders.
+  - **Measured on VM 116** (122,000 files, warm cache): a tree of 102,653 entries in 446 ms, duplicates in 5.1 s, a real delete of 20,000 files in 1.0 s (`docs/CLEANER-TESTS.md`). Paint cost on a display is not measured.
+
+- **Cleaner: cache rules, the real delete and the Trash** (2026-10-30, the delete approved by the maintainer that day):
+  rules for the thumbnails, font, graphics shader and media plugin caches, each at an explicit root and regenerable;
+  `temporary` (`.cache/tmp`, older than a week, reviewed, to the Trash); and `trash`, which measures the Trash and is emptied
+  with the real `fstrash_empty` on a thread, confirmed as irreversible. The delete exists only inside `lord.clean`, as the
+  session user, for regenerable rules: the name moves to a private one in a folder opened beneath the root, the object is
+  compared again, and only that object is unlinked. `build/clean-test` covers link swaps, a mount inside the root (in a
+  user and mount namespace), a file changed after the plan, and a fingerprint of everything outside the root.
+
+- **Cleaner, first slice** (2026-10-30; `docs/CLEANER-ARCHITECTURE.md`, each feature's state in `docs/CLEANER-ROADMAP.md`):
+  one rule, end to end, from a scan to the Trash.
+  - **`lord-clean`** (`server/src/clean/helper/`): a read-only scanner started like `lord-doc`. lord-server opens each
+    root as an `O_DIRECTORY` fd and passes it over `SCM_RIGHTS`; the helper lists it in `ro_dir_fds` and calls
+    `sandbox_apply_helper` (scope `lordos-cleaner`) before reading, and refuses to run without Landlock. It walks with
+    `openat2` (`RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_XDEV`) and `statx` at the lowest CPU and I/O priority,
+    bounded to 200,000 entries, 32 levels and 1,024 bytes of path. A limit reached, an unreadable folder or a name that
+    can't be shown marks the scan incomplete. Cancel kills the helper.
+  - **lord-server's side** (`server/src/clean/`, `lord.clean` in `ui/js_clean.c`): `start`, `poll`, `cancel`, paged
+    `results`, `plan`, `execute`, `status`, each on a thread with its input validated. Every record from the helper is
+    validated with `sec/json.c`, and `fsops_protected` is applied again. JS holds candidate ids and display paths only.
+    A plan stays in C, expires after ten minutes and runs once. Execution reopens each object from its root, compares
+    device, inode, size and modification time, and ends each item as done, skipped, changed, denied, failed, cancelled or
+    unsupported.
+  - **One rule** (`clean/rules.c`): `thumbnails`, `.cache/thumbnails`, `*.png`, regenerable, moved to the Trash. The table
+    is compiled and validated by a test; a root can't be a whole top-level folder or hold a protected path.
+  - **`fsops`:** `fstrash_put_at`, the same Trash for a name in an open folder, so a folder swapped for a link after the
+    check can't redirect the move; `fsops_protected_below`, for the rule table. `lord.fs`, `admin.c` and the broker are
+    unchanged. If a name is pointed at another file at the last moment, that file is put back and the item ends as
+    changed.
+  - Moving to the Trash doesn't free space and the app says so in the confirmation; space is measured again afterwards.
+  - **The app** (`apps/cleaner/`, `sdk/cleaner.js`, en/es/pt): built in, not isolated. Overview only: Scan, real counters
+    (no percentage until the total is known), list, selection, confirmation, result per item, free space before and after.
+    Its icon is in `web/src/app-icons/`.
+  - **Tested on VM 116:** `build/clean-test` against the real helper in throwaway folders under `/tmp` (rule table, symbolic
+    link and `..` escapes, a file changed between scan and execution, protected paths, hard links counted once, limits,
+    plan expiry, cancel); `make test`; and the whole flow by hand, seen on screen, in an isolated headless session with a
+    throwaway home folder (Landlock and seccomp active in the helper). The `lordos-cleaner` scope was refused there, as
+    that session has no `lord-sessiond`: entering it, the Raspberry Pi and right-to-left layout are not tested.
+
+- **Community hardware reports, first part** (2026-10-29; `docs/BENCHMARK.md`, "0.8.7 — Community hardware reports",
+  "Built so far"):
+  - **The report format:** `apps/sysinfo/hwreport.schema.json`, a versioned JSON Schema (`lordos-hwreport`, version 1)
+    that is an allow-list of what can be shared: a subset of System Information's report, the Compatibility rows and
+    the last LordBench peak and desktop results of the same LordOS version. No field for serials, UUIDs, MAC or IP
+    addresses, host, user or network names or paths. Validated by `tools/hwreport/jsonschema.mjs`, our own subset of
+    JSON Schema with no dependency (unknown keywords throw).
+  - **Live session flag:** the collector (`sysreport/sysreport.c`) records `software.live` (`/run/live`), in
+    `lord.sysinfo.report()`, `lordos-sysreport report --json` and the shared report; `build/sysreport-test` checks it.
+  - **Share on GitHub** in System Information → Report: a preview of the summary and of the exact file, then (on
+    every click, nothing remembered) `lordos-hwreport-<date>.json` and a self-contained `.html` page in Documents,
+    never over an existing file, the page opened in the default browser with the existing
+    `lord.apps.launchWith('', path)`. The page (no scripts, CSP `default-src 'none'`, light/dark, right to left for
+    RTL languages, everything escaped) explains what is shared and what never is, shows the summary and the steps,
+    and links to GitHub's new-issue form with the `hardware-report` template, title, version and the short summary
+    in the URL; the user attaches the JSON and submits it with their own account. LordOS sends nothing and holds no
+    token. Text in en, es and pt (`assets/locales/*/sysinfo.json`, `sysinfo.share.*`).
+  - **Issue form and workflow:** `.github/ISSUE_TEMPLATE/hardware-report.yml` and
+    `.github/workflows/hardware-report.yml` (`issues` opened/edited/labeled with `hardware-report`; `contents: read`,
+    `issues: write`; `actions/checkout` pinned by commit, sparse, no persisted credentials) run
+    `tools/hwreport/validate.mjs --github`: the issue is read from the event file (never through an expression or a
+    shell); only GitHub attachment links of a fixed form; the download is https-only to GitHub's attachment hosts
+    (each redirect checked), without credentials, at most 512 KB, strict UTF-8, with a timeout; `JSON.parse` with
+    depth, value-count and `__proto__` limits; schema validation; reference reports refused from issues; a privacy
+    scan (MAC, IP, UUID, e-mail, home paths); plausibility against the reference machines (per-unit ceilings, 50×
+    the fastest reference, mismatched versions, architecture, threads or live flag, future dates); one comment
+    updated on every edit with report values only in code spans; labels from fixed lists only
+    (`report:valid|check|invalid|missing`, `kind:*`, `gpu:*`, `cpu:*`, `live`/`installed`). Also a command line:
+    `node tools/hwreport/validate.mjs <report.json>...`.
+  - **The catalogue:** `tools/hwreport/catalog.mjs` builds, from the accepted reports in
+    `web/content/hardware/reports/` (validated; community ones need their issue number in `index.json`, which can
+    record the version that fixed a problem), the **lordos.org/hardware** page (`web/src/hardware.html`, en/es/pt in
+    `web/i18n/pages.json`; machines, graphics cards and drivers, known problems and the fix version; built, not
+    published, labelled in development) and `assets/hwreport/snapshot.json`, a compact, deterministic snapshot per
+    device key, component and LordOS version. Two fixtures are the project's own reference machines (VM 116 with its
+    real report, the Raspberry Pi 5 16 GB written from the documented machine), marked `"source": "reference"`.
+  - **The signed snapshot:** `tools/release/sign-hwsnapshot.sh` signs it on the maintainer's machine with the release
+    key (the same format as `code-manifest.sig`); it ships in its own package, `lordos-hwdata` (see "Newer hardware
+    snapshots between releases" below; a release build refuses it unsigned), so it updates through the signed APT
+    repository. New native call `lord.sysinfo.community()` (`ui/js_hw.c`, no arguments, no path from JS):
+    `sysreport/hwsnap.c` reads `<assets>/hwreport/snapshot.json` and its `.sig` without following links, verifies the
+    signature before parsing and checks the structure; JS gets the snapshot only then. The Compatibility panel shows,
+    for this machine's devices and the same LordOS version, what others confirmed, marked *Community* (or as a
+    reference machine), with a footer saying where the data comes from or why there is none.
+  - **Tests:** `server/tests/hwreport_test.mjs` (125 checks, in `run_suites.sh`) and `build/hwsnap-test` (43 checks,
+    in `make test`, including the built snapshot signed with a test key). Built on VM 116 with 0 warnings and
+    `make test` passing (23 suites, 0 failed); checked there in an isolated headless session with a test-key build
+    (community rows shown, a tampered snapshot refused, both share files written and the JSON valid).
+
+- **Newer hardware snapshots between releases** (2026-10-29, approved by the maintainer; `docs/BENCHMARK.md`, "Newer
+  snapshots between releases", `docs/UPDATES.md`, "The tested-hardware snapshot", `docs/RELEASING.md`, "A newer
+  hardware snapshot between releases"):
+  - **What changes for users:** System Information's Compatibility panel can learn about newly accepted hardware
+    reports without waiting for a LordOS release: a newer snapshot arrives as an ordinary update (the daily check
+    says "1 update is available", Store → Updates → *Update all* installs it) and the panel shows it the next time
+    it opens, with no restart. Nothing new connects or runs: it is the same package engine and repository as any
+    update, and the snapshot's own Ed25519 signature is still checked in C before the panel sees it.
+  - **The package:** `lordos-hwdata` (`Architecture: all`, `Multi-Arch: foreign`), built by the new
+    `tools/iso/mkdeb-hwdata.sh`: only `/usr/lib/lordos/assets/hwreport/snapshot.json` and `snapshot.json.sig`, a
+    copyright and a changelog. Version: the snapshot's date, `YYYY.MM.DD`, plus `.N` with `HWDATA_SERIAL=N` for a
+    second snapshot on the same date. Reproducible (file, changelog and archive times from that date), so the same
+    snapshot gives the same bytes. `REQUIRE_SIGNED_CODE=1` refuses a missing signature or one that doesn't verify
+    with `lordos-release.pub.pem`; any snapshot format other than 1 is refused until a `Breaks` for older `lordos`
+    versions is added.
+  - **`lordos`:** no longer ships `assets/hwreport/` and `Depends: lordos-hwdata (>= 2026.10.27)`. No
+    `Replaces`/`Breaks`: no released version (`v0.8.0-beta` to `v0.8.5-beta`, checked against the tags) shipped
+    those files. Updating from 0.8.5 or 0.8.6 brings `lordos-hwdata` in as a new dependency.
+  - **Images and installer:** `tools/iso/build.sh` and `tools/rpi/build-img.sh` build it and install it with
+    `lordos`. `tools/install/install.sh` takes the newest `lordos-hwdata_<version>_all.deb` listed in the release's
+    signed `SHA256SUMS` (or next to a `--deb` file), checks it like the main package and installs both; with none
+    it stops before apt unless a configured repository has it; `--uninstall` removes it too.
+  - **Repository and releases:** `tools/release/apt-repo.sh` adds a `lordos-hwdata` only if its snapshot verifies
+    with the release key (`LORDOS_HWDATA_PUB`, a test key, only for `staging`) and refuses a `lordos` that depends
+    on it while the pool has none. A snapshot alone between releases: `sign-hwsnapshot.sh` (which now prints the
+    package version), `mkdeb-hwdata.sh`, `apt-repo.sh build|publish|verify staging`, then `live`. The release
+    folder and the release notes' downloads table carry `lordos-hwdata_<date>_all.deb`.
+  - **In Store → Updates** (approved 2026-10-30): the update is shown as "Tested hardware list" ("Lista de
+    hardware probado", "Lista de hardware testado") with the line "Updated list of hardware tested with LordOS
+    (<date>)", the version read as a date in the user's region (`formatDate(…, 'numeric')`; a version that isn't
+    `YYYY.MM.DD[.N]` is shown as is), and the plans of *Update all* name it the same way. Only presentation: the
+    package name, what is installed and the admin actions are unchanged. The names come from a small table in
+    `apps/store/syspkg.js` (`sysPkgKey`, `snapshotDate`; the `lordos` package keeps its own card), the text from
+    `store.updates.hwdata.name`/`.summary` (en, es, pt). Test: `tests/store_syspkg_test.mjs` (36 checks: only that
+    package gets a label, versions with and without `.N`, impossible dates and other formats refused, the three
+    languages), run by `run_suites.sh`. Checked on screen on 2026-10-30 in en, es and pt, list and *Update all* plan, in
+    an isolated session of a test copy of the theme with `lord.pkg`'s answers faked (the renderer, the Store and the
+    translations are the real ones; there was no real update, and nothing was installed).
+  - **Tests:** `build/pkg-test` (8 new checks: the new dependency on update and *Update all*, a snapshot-only
+    upgrade, the date versions' order; 112 passed). Both packages built on VM 116 and checked with `dpkg-deb
+    --info`/`--contents`; `make -C server test` passed (23 suites, 0 failed). In a `debian:trixie` container: apt
+    refuses `lordos` alone and installs both, a newer snapshot upgrades in place; `install.sh`'s download and
+    `--deb` paths with a test-signed release; `apt-repo.sh build staging` offline with throwaway keys (every refusal,
+    the same bytes accepted again, amd64 and arm64 indexes, apt seeing the upgrade from the built repository). The
+    staging test with the real repository and keys is still to do.
+
+- **The boot medium in the hardware report** (2026-10-29; `docs/BENCHMARK.md`, "Built so far" under 0.8.7):
+  - **Collector:** `collect_boot` in `server/src/sysreport/sysreport.c` records `software.bootMedium` (`internal`,
+    `usb`, `sd`, `emmc`, `optical`, `network`, or `""` when unknown), `bootLinkMbps` (a USB medium's link speed, from
+    the USB device's `speed`; `null` otherwise) and `bootToRam` (a live session started with `toram`). No root and
+    world-readable files only: the mount under `/` (or live-boot's `/run/live/medium` in a live session) from
+    `/proc/self/mountinfo`, NFS/SMB as `network`, otherwise its `major:minor` through `/sys/dev/block` (links that
+    leave `/sys/devices` refused), partition to disk, device mapper and RAID `slaves` (at most 4 layers), btrfs's
+    anonymous device through its source; then the disk's sysfs path: `sr*` optical, a USB controller in the path
+    `usb`, NBD or an iSCSI session `network`, an MMC card by its `type` (`SD`/`MMC`; unknown is `""`), loop and RAM
+    disks `""`, the rest `internal`. A live session fetched over the network (`fetch=`, `netboot=`) with no medium
+    mounted is `network`. The kernel command line is only searched for those words. Only the class and the speed
+    leave the collector: never a device name, model, serial, mount point or path. In `lord.sysinfo.report()`,
+    `lordos-sysreport report --json` and, as *Started*, in its Markdown Overview.
+  - **Report and workflow:** the schema (`apps/sysinfo/hwreport.schema.json`) lists only the classes, a speed of
+    1–100,000 and the flag; `share.js` adds a `boot` row to the issue summary (`usb, 5000 Mbps`, `toram`);
+    `tools/hwreport/lib.mjs` adds a `boot:<class>` label from the fixed list, a *started from* note in the comment,
+    and flags a copy to memory on an installed system or a link speed on anything but USB (`boot-mismatch`).
+  - **App:** System Information → Software → *Started from* and the share preview's row (internal disk, USB drive,
+    SD card, built-in flash memory, DVD or CD, network; the speed; "copied to memory"); the page's "What is shared"
+    says the kind of drive is shared, never its name. en, es and pt.
+  - **Tests:** `build/sysreport-test` builds 23 fake trees (NVMe, USB 3, USB 2 behind a hub, `toram` with and without
+    the medium, `notoram`, SD, eMMC, an unknown MMC card, LUKS on NVMe, LVM on LUKS on USB, a device mapper loop,
+    btrfs, stacked mounts, DVD, NFS, iSCSI, NBD, a fetched live system, virtio, a loop device, an escaping link, a
+    bad USB speed) and checks the class, the speed, the flag, the Markdown row, and that no device name, serial,
+    mount point or command line reaches the JSON or the Markdown; `server/tests/hwreport_test.mjs` grows to 138
+    checks (the schema refuses a device name, a mount point, a text or zero speed and a text flag; the built report
+    keeps the class and drops an extra device field; the summary row; the label; the plausibility flags; the comment).
+    VM 116 reports `internal` (ext4 on its SCSI disk).
+- **Share on GitHub checked in a real session with a browser** (2026-10-29, VM 116, isolated headless session of the
+  branch, Debian's Chromium 156): the report and the page landed in Documents and `lord.apps.launchWith('', path)`
+  opened the page in the browser inside the session (`docs/hwreport-browser.png`); the JSON passed `validate.mjs`
+  (`report:valid … installed, boot:internal`) and the link carried only the title, version and summary. Found on the
+  way (documented in `docs/BENCHMARK.md`, nothing changed in the code): a fresh account has no `text/html` default
+  unless one is chosen in Settings → Default Apps (`defaults_lookup` reads only `mimeapps.list`/`defaults.list`;
+  the app then says where the page is), Debian's Chromium needs `xwayland` (absent on VM 116) unless started with
+  `--ozone-platform=wayland`, and an isolated test session must leave `LORDOS_SESSIOND` unset or the launcher fails
+  closed.
+- **Newer hardware snapshots between releases: design** (2026-10-29; `docs/BENCHMARK.md`, "Newer snapshots between
+  releases"): five options compared; the recommendation is a separate `Architecture: all` package, `lordos-hwdata`,
+  in the signed APT repository, which `lordos` depends on, updated between releases through the existing daily check
+  and Store → Updates, with the snapshot's own Ed25519 signature still checked in C, so no component gets a new
+  network power. Not implemented: it changes the release steps, the published repository and the ISO and Pi image
+  builds, and waits for the maintainer's approval.
+
+### Community hardware reports, the live USB
+
+- **A *Check this computer* boot entry on the live ISO.** It boots the live system into System Information on its
+  Performance tab, instead of the installer, so a PC can be checked without installing. The entry passes
+  `lordos.check=1`; `lord.system.info().liveCheck` tells the desktop (only a yes or no, only on a live system, only for
+  that whole word), and `sdk/livestart.js` picks the window. No measurement starts by itself, and the installer stays in
+  the launcher. The entry is in English like the rest of the menu. The other entries behave as before. The boot menu's
+  theme grew from 290 to 344 pixels high: GRUB takes padding and the selection band from that height, so at 290 the
+  sixth line didn't show, and the theme has no scrollbar. That height is the installed systems' theme too, with the
+  same position and item sizes; no installed system was booted with it.
+- **Tests:** `tests/livestart_test.mjs` (14 checks: what opens, the entry's options, the theme's room, worked out with
+  GRUB's own count), `build/sysreport-test` (6 more, whole words on the command line).
+- **Checked:** in QEMU with KVM and legacy BIOS, the build's `grub.cfg` shows the six lines at 1024×768, 800×600 and
+  640×480 (at 640×480, the BIOS fallback, the sixth line overlaps the keys hint), and Enter on the entry starts the kernel with the flag. The
+  0.8.6 live ISO booted with that command line and this branch's `lord-server` and bundles laid over it reached System
+  Information on Performance. On a system that isn't live the flag changes nothing (isolated session). Not tested: an ISO built from this branch, UEFI, the arm64 ISO, a USB stick or a real PC.
+- **The repository's labels:** `docs/RELEASING.md`, "The labels of hardware reports", lists the 33 labels and the steps
+  to create them; a test keeps the list equal to the code. All 33 exist.
+- **lordos.org/hardware** was built and checked in en, es and pt (in a browser, also at phone width with no sideways
+  scroll): the *in development* note, the two reference machines, the form's link. It isn't published.
+
+### Known issues and limitations
+
+- GPU drag is verified on V3D (Raspberry Pi 5) and SVGA3D (a VMware guest) only; on any other GPU only its self-test
+  guards it. It is declined while a Linux window is on screen. The VMware guest ran v087.27 in the last pass, not the
+  final v087.28, whose changes are in the shell, not in GPU drag.
+- Files → Network: SMB with a password passed against one real desktop file share and one test server, no others. No real NFS
+  server has been tried. Listing the shares of an SMB server outside the local network is refused.
+- Remote Desk: VNC and RDP were closed against a throwaway test machine. RDP to a real desktop system and RDP's shared
+  folders have not been verified in a real session.
+- A self-signed certificate on a connection must name the host it's used for.
+- Moving wallpapers copy each frame on its way to the screen: on the Raspberry Pi 5 at the login screen, 1080p at 60
+  fps, `lord-media` used 41 % of a core and `lord-server` 147 %. A zero-copy path is planned for 0.8.8. The Pi 5's
+  hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
+- Window memory across two displays is not tested.
+- HFS+ and APFS disks are read-only.
+- The session's remote socket accepts any process of the same user, so a program outside LordOS's app sandbox, running as
+  you, could read the screen and send input through it. Restricting it is planned for 0.8.7.1.
+- The live systems don't include Disk Formats: on them, mounting FAT, exFAT, NTFS, HFS+ or APFS from the desktop asks for it.
+- Switching theme closes and reopens LordOS windows: unsaved text in them is lost, with no warning.
+- A fullscreen X11 app came back windowed once after ❖M and restore, cause unknown; not reproduced in 13 later tries.
+- An X11 app started from the launcher on a system without `xwayland` (a Recommends, so `apt` installs it) fails with
+  no message; the reason is in `session.log`.
+- On the Raspberry Pi 5 an app keeping every core busy still halves the desktop's frame rate.
+- A graphics driver that loads more than 30 s after boot needs the service restarted; a display with KMS that fails
+  stays silent.
+- Volume keys had no effect in a VMware guest. Session restore doesn't reopen a Files folder.
+- The on-screen keyboard opened once on an empty desktop with no text field, not reproduced.
+- LordBench's x86 PC reference is still to be chosen.
+
+### Upgrading
+
+- **From 0.8.6:** Store → Updates or `sudo apt update && sudo apt upgrade`, then a restart. `lordos` now depends on
+  `lordos-hwdata`, which comes from the same repository. Tested from a 0.8.6 package on an amd64 VM against the signed staging repository: migration 006 ran once, a reinstall ran none, and the system came back after a restart.
+
+## [0.8.6-beta] - 2026-10-30
+
+### Added
+
+- **LordBench, first part (`docs/BENCHMARK.md`, "Built so far"):** System Information has a
+  **Performance** tab (on `lord.sysinfo.bench`) with a Quick test (less than a minute) and a Full test (adds storage and three minutes of
+  sustained load). The work runs in **`lord-bench`**, a new sandboxed helper launched by lord-server like `lord-doc`
+  and `lord-media` (its own folder only, no arguments, `sandbox_apply_helper` before any work, scope
+  `lordos-bench.scope`, 2 GB cap), which gets only the GPU's render node and an unnamed scratch file opened by
+  lord-server and answers only with fixed-size records lord-server checks.
+  - **Workloads**, each the median of three runs with its spread, on one core and on all:
+    - SHA-256 and a 256×256 matrix product;
+    - the package engine's xz decoder on a fixed 2 MB text generated at build time;
+    - QuickJS running a fixed script;
+    - **LordOS's own interface work** (`bench/lbui.c`, the engine's real code linked into `lord-bench`): layout and
+      paint of a fixed 1920×1080 scene built in C (529 nodes: a translucent top bar, a file manager with a 40-row
+      list, a settings window with a wrapped paragraph and controls, a notification and the Dock with backdrop
+      blur, shadows, a rotated badge, a half-transparent card), every node invalidated and the whole screen painted
+      each frame, in frames per second (`cpu.ui.1`; `cpu.ui.n` is the same with the paint's row bands on up to 8
+      threads, as lord-server's paint threads); and shaping fixed paragraphs in Latin, Arabic with embedded
+      left-to-right text, Devanagari, Thai and Chinese with kana (`bench/lbtext.h`) as the engine's text layout does
+      (bidi, script runs, each character's font, GSUB and GPOS, the visual order), in runs per second, one core
+      and all (`cpu.shape.1/n`). The helper opens no files: the scene is fixed data and the fonts are built into the
+      binary (`build/gen/lb_fonts.h`): LordOS's Inter and Debian 13's Noto Sans Arabic, Devanagari, Thai and CJK SC
+      subset to exactly those paragraphs with every layout feature kept (`tools/gen-lbfonts.py`, committed in
+      `server/src/bench/fonts` with their OFL licence; Inter pinned by its SHA-256 in `mk/lordbench.mk`, so a new
+      Inter fails the build until the references are measured again); `build/shape-test` gives the same glyph
+      positions with each subset as with the full system font, though the subsets shape about 12 % faster than the
+      full fonts (fewer lookups), so the workload is comparable only with itself. These four numbers measure
+      LordOS's engine with the machine: a reference value of one carries the LordOS version it was measured with and
+      gives a "×N" only to a result of that version (`ENGINE_IDS` in `apps/sysinfo/perf.js`). The paint threads of
+      `cpu.ui.n` start each run from a clean pool, and the shaping threads only read the shared script table (set
+      before they start; ThreadSanitizer had found a race there). `lord-bench` grows from 1.48 to 2.42 MB of code;
+      its sandbox, seccomp list and fds are unchanged;
+    - memory copy and triad bandwidth and a 64 MB pointer-chase latency;
+    - OpenGL ES 2 offscreen at 1920×1080 on the render node: the 3D scene, fill rate, texture upload and 8 layers;
+    - (Full only) sequential write and read and random 4 KiB reads on up to 1 GB;
+    - (Full only) a sustained all-core load sampled every 10 s with the temperature.
+  - **Guards**, read by lord-server:
+    - refused on battery below 30 %;
+    - waits for a quiet CPU, at most 30 s; otherwise the run is marked busy;
+    - stops within 2 °C of the passive trip point (10 °C of the critical one without one);
+    - the peak tests also stop when the x86 throttle counters grow or the Raspberry Pi firmware reports throttling;
+    - in the sustained test, throttling is recorded with its time and temperature instead.
+  - **Helper-sandbox self-test** (`sec.helper-sandbox`, repeated inside `lord-bench`): right after
+    `sandbox_apply_helper` and before any work, `lord-bench` tries six things that must fail, the Sandbox Probe's
+    helper tries plus two: a unix socket, an internet socket, exec, fork, a new file (`O_TMPFILE` in `/tmp`) and
+    reading `/etc/passwd`. None could change anything if it worked (exec is called with an invalid environment
+    pointer, so an allowed one fails with `EFAULT` before anything is replaced; a socket or unnamed file is closed at
+    once; a forked child only exits). Each try is a fixed record (`LB_MSG_SANDBOX`, checked by `lb_msg_valid`), the
+    result lists them as `sandboxTries` (id, refused, errno), the Stability verdict fails a run where one got
+    through or is missing (naming each try in the user's language, "run a program", …) and otherwise says that all
+    six were refused; on a kernel without Landlock the two file tries only warn, since the sandbox mask already
+    records that limit. `lordos-sysreport bench` checks the same six by name ("N of 6 tries refused", a
+    `NOT REFUSED` line for each one that worked or is missing) and exits with 3 when one got through. On VM 116 all six
+    were refused (`EPERM` from seccomp for the sockets, exec and fork; `EACCES` from Landlock for the files), and a
+    trace of a run shows the CPU workloads open no file.
+  - **Results:** shown as "×N" of each reference machine per category, never one score, with three verdicts:
+    - performance;
+    - compatibility, from the Compatibility tab;
+    - stability: stops, failed measurements, throttling, under-voltage, a sustained drop, a busy start and the
+      helper-sandbox self-test.
+
+    Each result also shows the change against the previous run and the conditions that differ, every recorded
+    condition, the boot time per LordOS version and **Save to Documents**. Nothing is sent anywhere.
+  - **Recorded conditions:** temperatures and trip points, power, governor, platform profile, GPU kind, disk kind,
+    composition and display modes. No names or identities.
+  - **Video:** a `lord-media` job (`MK_VBENCH`, `media/helper/lm_vbench.c`, launched by `bench/lbvideo.c` with no
+    fds) generates its own test clips in memory from a fixed synthetic picture (H.264, HEVC, VP9 and AV1 at 1080p;
+    H.264 and HEVC at 4K) and decodes each in software the way the player does, as frames per second; then the
+    remote desktop's own encoders (`lm_stream_sw_encoder`: H.264 and VP8) encode 1080p frames. Quick measures H.264
+    1080p and the H.264 encoder. lord-media answers only `MM_BENCH` records, checked by `lbv_record_valid`. Hardware
+    decoding is not measured (neither test machine has it).
+  - **Desktop impact** (its own button and result file, `lordbench-desktop.json`): System Information opens a scene
+    window and lord-server moves it along a figure of eight through the drag's own path (`lord.wm.script`,
+    `grab_script_begin` in `ui/grab.c`, no JS per frame; `wm.scriptMove`/`wm.stopScript` in the SDK). lord-server
+    records every frame it builds and every frame the display shows (`bench/lbframes.c`): 10 s alone, then 10 s
+    while `lord-bench` loads every core at the lowest priority (`LB_MODE_LOAD`, nice 19, idle I/O). Each phase gives
+    frames per second, the time to build a frame (median, 99th percentile) and the share of late frames (intervals
+    over 1.5 refresh periods); the verdict compares the 99th percentile with the refresh period in use and warns
+    above 5 % late (problem above 25 %). Frame times never come from a helper: `lb_msg_valid` refuses ids past
+    `LB_HELPER_LAST`.
+  - **Boot time test** (Performance → Boot time, administrators): 3, 5 or 10 boots in a row. The closed admin action
+    `boot-test <2..10>` writes `/var/lib/lordos/boot-test` in a fixed format (`bench/boottest.c`) and
+    `boot-test-cancel` (anyone) removes it; the session restarts as usual. At each boot's first frame lord-sessiond
+    records the boot with its number in the test and, while boots are left, restarts 30 s later. The login screen
+    shows the boot and the countdown with **Stop the test**, and a login stops it too. The count only goes down, a
+    state older than 30 minutes is discarded, and the action is refused in the live session. The Boot time group shows
+    each version's latest test (median and range). Checked by unit tests and by 3 boots in a row on the Pi 5
+    (2026-10-30; autologin, started from the state file, so the app's button and the login screen's countdown were not exercised).
+  - **References:** VM 116 (8 vCPU Xeon Silver 4108, llvmpipe) and a **Raspberry Pi 5 16 GB** (SD card, V3D), each a
+    real Full run (`apps/sysinfo/references.js`):
+    - VM 116: SHA-256 166/984 MB/s (one core/all), matrix product 3.3/19.9 GFLOP/s, memory copy 20.0 GB/s; software
+      decoding H.264 1080p 399 fps, AV1 1080p 201 fps, HEVC 4K 102 fps; H.264 encoder 106 fps. The interface
+      workloads, from a later Full run (2026-10-28): layout and paint 37.0 fps on one core and 39.9 fps with the
+      paint threads (a frame is about 28 ms, almost all of it paint: the layout of the 529 nodes takes 0.15 ms, and
+      only big row-local fills, shadows and blits are split into bands); shaping 619 runs/s on one core and 3,595 on
+      eight. A Quick run from a terminal now takes 46 s.
+    - Pi 5: SHA-256 933/3,693 MB/s, matrix product 2.26/5.99 GFLOP/s, memory copy 7.6 GB/s, latency 115 ns; V3D scene
+      795 fps, fill 2,455 Mpixel/s; SD card 66 MB/s write, 91 MB/s read; 3 minutes sustained at 5.86 → 5.88 GFLOP/s
+      with the fan, 55.6 °C at most; software decoding H.264 1080p 258 fps, AV1 1080p 159 fps, H.264 4K 55 fps,
+      HEVC 4K 57 fps; H.264 encoder 75 fps. Quick takes 34 s, Full 339 s. The interface workloads, from a later Full
+      run (2026-10-30, from a terminal over SSH without the monitor, the arm64 build of main with its helpers in a
+      temporary folder, the LordOS kernel 6.18.57-lordos.3, `ondemand`, 180 s sustained, 37.0 → 49.6 °C and 59.0 °C at
+      most, under-voltage alarm 0, all six sandbox tries refused, 358 s): layout and paint 39.22 fps on one core and
+      45.23 fps with the paint threads; shaping 628.3 runs/s on one core and 2,514.0 on four, with `"lordos":
+      "0.8.5-beta"`; its `notMeasured` list is gone. A second Full run without the sustained part (178 s) gave 39.37,
+      45.28, 628.8 and 2,513.4 (within 0.4 %), and the two Quick runs of 2026-10-29 were within 0.6 %. The rest of
+      that run was within 3.2 % of the 2026-10-27 reference except the matrix product on four cores and the sustained
+      load (+12 %: 6.72 and 6.55 GFLOP/s, same workload code, cause not looked for), random 4K reads (−10 %), xz (−4 %)
+      and the GPU upload (−4 to −5 %); the reference keeps its 2026-10-27 values for those (`docs/BENCHMARK.md`).
+  - **Desktop impact measured** on the Pi 5 with a 1920×1080 60 Hz monitor and GPU composition: alone 59.4 fps, frame
+    build 10.9 ms median and 13.0 ms p99, 1.0 % late; under the low-priority all-core load 24.0 fps, 20.1/29.3 ms,
+    96.5 % late. A stability problem found by LordBench; its cause and the fix are under Fixed ("The desktop under
+    load").
+  - **Pointer to screen** (desktop test): a synthetic pointer in lord-server (`bench/lbinput.c`) plays a 125 Hz mouse
+    that moves the scene's window: each event is stamped when it is made and announced on an eventfd the main loop
+    polls like an input device, the main loop applies the newest position once per frame as it does with a real
+    mouse, and each event's latency ends when the first frame showing it is presented (`bench/lbframes.c`). Median
+    and 99th percentile alone and under load (`comp.in50/in99`, `desk.in50/in99`); the verdict warns above three
+    refresh periods. It measures lord-server's part, not the mouse's; the positions only move LordBench's own window.
+    VM 116 without a monitor: 14.6/25.2 ms alone, 15.1/30.9 ms under load. Pi 5 without a monitor: about 16/27 ms
+    alone, 22/52 ms under load.
+  - **`lordos-sysreport bench [--quick | --full] [--json]`**: LordBench from a terminal, over SSH or in CI, through
+    lord-server's own code (`bench/lbrun.c`): the same guards, helpers and result file, which System Information then
+    shows. `lordos-sysreport` is now installed in `/usr/lib/lordos/bin` with `/usr/bin/lordos-sysreport` and
+    `lordos-fetch` as links (`tools/iso/mkdeb.sh`), because the helpers are only started from next to their own
+    binary. A quick run took 39 s on VM 116 (46 s with the interface workloads). On VM 116 (headless, with a remote viewer)
+    59.6 fps alone, p99 13.3 ms; p99 22.9 ms and 12.5 % late under load.
+  - **Boot measured:** the Pi 5 reaches the login screen on its monitor 5.99 s after the kernel starts (systemd: 2.1 s
+    kernel + 4.2 s userspace).
+  - **Pi limitation:** the LordOS Pi kernel exposes neither the firmware's `get_throttled` nor a cpufreq cooling
+    device, so the firmware's own flags can't be seen there (the under-voltage alarm is read); the sustained curve
+    and the temperature are the evidence instead, and the firmware's documented 80 °C limit now counts as
+    throttling (next item).
+  - **The Raspberry Pi firmware's throttling during a run** (`bench/lbcond.c`, `bench/lbrun.c`; `docs/BENCHMARK.md`,
+    "The Raspberry Pi firmware's throttling"; tested on fake sysfs trees and VM 116, and on the Pi 5 on 2026-10-29:
+    `piFirmware` `{"flags": false, "voltageAlarm": true, "underVoltage": false, "tempLimit": false, "tempLimitC": 80}`,
+    the alarm 0 before and after the run with the official supply).
+    Checked in Raspberry Pi's `rpi-6.18.y` source, the kernel LordOS ships: `drivers/firmware/raspberrypi.c` has no
+    `get_throttled` file any more, and the `rpi_volt` hwmon (`drivers/hwmon/raspberrypi-hwmon.c`, a module in
+    `bcm2712_defconfig`) asks the firmware every 2 s with the sticky bits cleared and exposes only
+    `in0_lcrit_alarm` (0444), "under-voltage in the last 2 s"; the capped, throttled and soft-limit bits are not
+    exposed without the mailbox, which LordBench never opens. So lord-server now: reads the alarm strictly (`0` or
+    `1`); still reads `get_throttled` where an older kernel has it, strictly (1-8 hex digits, optional `0x`,
+    `rpifw_parse_throttled`, masked to bits 0-3 "now" and 16-19 "has occurred"; anything else is unknown instead of
+    being half-parsed); knows a Pi from that hwmon, that file or the device tree's `raspberrypi,` compatible; and on a
+    Pi counts the hottest zone at or above 80 °C as the firmware's limit (Raspberry Pi documents progressive Arm
+    throttling from 80 °C; the Pi 5's thermal zone has no passive trip, so before this the guard waited for 100 °C).
+    Every guard sample of the run (once a second) is accumulated (`lb_rpi_watch`): "now" bits and the 80 °C limit
+    always count, while a sticky bit or alarm already set at the start counts only after it was seen clear and set
+    again, so an event from before the run is never blamed on it. Before, the alarm and the bits were only looked at
+    in the start and end snapshots, so an under-voltage in the middle of a run was lost. In a peak test, capped,
+    throttled, soft limit or the 80 °C limit stop the run as `throttled` (like the x86 counters); in the sustained
+    test the first one is recorded as `throttleAtS`/`throttleTempC`; under-voltage is never a stop and is recorded
+    on its own. A result on a Pi carries `piFirmware` (`flags`, `voltageAlarm`, `underVoltage`, `capped`,
+    `throttled`, `softLimit`, `tempLimit`, `tempLimitC`; what could not be read is left out, not `false`), and
+    `before`/`after` add `rpiUnderVoltageAlarm`. System Information → Performance: the Stability verdict uses
+    `piFirmware` for "The board reports throttling", a new "It reached 80 °C, where the board's firmware starts
+    slowing the processor down" and "The board reports low supply voltage" (older results keep the end's bits), and
+    Conditions has a new **Board firmware** row (en, es, pt). Machines that are not a Pi are unchanged.
+  - **Tests:** `tests/lordbench_test.c` (records, workloads, fake sysfs trees of an x86 laptop and a Pi 5, boot
+    history, the frame recorder and its pointer latency, the synthetic pointer's thread and eventfd, the video
+    records, the boot test state file, the interface scene with every style key known, each paragraph shaped with no
+    missing glyph and the same twice, the sandbox self-test's records, the Pi firmware's flags and alarm on a Pi 5 with
+    LordOS's kernel, a Pi known from its device tree and an older kernel with `get_throttled`, and the strict
+    `get_throttled` parser; 1,198 checks) and
+    `tests/sysinfo_perf_test.mjs` (62 checks, with the desktop verdict, the pointer latency notes, the video
+    category, the self-test in the stability verdict with and without Landlock, the engine workloads compared
+    only within one LordOS version, and `piFirmware` in the stability verdict).
+  - **Not built yet:** hardware video decoding and the x86 PC reference.
+- **Flatpak and Flathub design review, kept for the future** (`docs/FLATPAK.md`, no code; the maintainer decided on
+  2026-10-27 not to implement Flatpak for now, to keep the system stable, and it is not planned for any release): a
+  launcher-owned scope per Flatpak app so the
+  firewall and restrictions see it as itself, `flatpak run` arguments built in C, per-user installs through a closed
+  set of commands in their own network scope with Flathub's key pinned, and the exceptions to `AGENTS.md` the
+  maintainer has to approve before any code.
+
+- **A pixel-exact check for the dragged window's frames** (the groundwork for making a drag
+  frame cheaper on the Raspberry Pi; `docs/WINDOWS.md`, "Checking it"). Tests and debugging only: no frame changes.
+  - **`test_drag_exact`** in `build/engine-test` (`make -C server test`): LordBench's desktop scene (a 760×480 rounded
+    window with a shadow, a turning 72 px square and six cards with shadows and text, a rounded window below, a menu
+    bar and a Dock with backdrop blur, on a 1024×640 display) dragged along LordBench's figure of eight
+    (`lbi_path`) for 480 frames, painted as `main.c` paints a frame, plus four 60-frame runs for what makes the layer
+    paint again (a text that changes a child's size, a child moving inside the window, a terminal's blinking cursor,
+    a square turning across the window's edge). Each of the 725 frames is hashed (FNV-1a over the pixels) on the
+    CPU path and on the GPU path's canvas (`gpu_active()` on), and compared with `tests/drag_golden_cpu.txt` and
+    `tests/drag_golden_gpu.txt`, written from the current code (x86_64; `make drag-golden` writes another
+    architecture's): any change to a frame fails. The test also prints how many pixels differ from a full repaint:
+    when it was added, at most 2,265 per frame on the CPU path, with black pixels at the dragged window's rounded top
+    corners, and 70,940 on the GPU path, one level darker in the window's shadow (248 and 70,864 after the two corner
+    changes below). About 11 s on VM 116.
+  - **Three more runs** (the test's cases a reviewer found missing): `neg`, the window starting at (−200, −120) and
+    moving 6 px right and 4 px down a frame, so its left edge crosses x = 0 and its top y = 0 while the square turns;
+    `remove`, a badge inside the window removed (`node_detach`) at frame 35, after frames that only copy the layer
+    (the square turns every 10th frame), then the square turning again at frame 40; and `k2`, the whole drag on a
+    2048×1280 display at 200 %. These three add a column of boxes with odd widths, shadows and text centered at half
+    pixels. Their 183 hashes per path were written by `make drag-golden` on 001633b's code (the four functions the
+    test calls that 001633b lacks, `node_restyled`, `paint_root_clear`, `paint_root_full` and `paint_layer_parts`,
+    added beside it unchanged or as a no-op count; the first five runs' 725 hashes came out identical to the
+    committed ones, which checks that), and the current code passes all 908 on both paths. Each run catches a change
+    the first five miss (checked by breaking the code on purpose): partial repaints across x = 0 (`neg`, 42 of 61
+    frames), a node's part trusted after outside damage mapped through a stale `layer.at` (`remove`, 20 frames from
+    frame 40) and a part's box computed without the display scale (`k2`, 59 frames). The whole of `engine-test` takes
+    about 15 s on VM 116 (11 s before).
+  - **`LORD_PAINT_VERIFY=N`** (lord-server's environment): every N-th frame of each display is compared with a full
+    repaint of the tree into a scratch canvas (`paint_root_full`: no drag layer, no copy of what is below it, no
+    skipped node; the GPU path's list of app windows is kept), and the count of differing pixels goes to stderr.
+    Off by default.
+  - The drag line in `session.log` now says how many of the layer's renders were only a part of it
+    (`paint_layer_parts`). `lord.setStyle`'s decision of what to place or repaint moved to `node_restyled`
+    (`ui/node.c`), unchanged, so the test drives the same C path.
+- **LordBench: where a frame's time goes, measured per frame** (`docs/BENCHMARK.md`, "Frame
+  phases"). On the Pi 5 with its monitor a loaded frame is built in about 13 ms and still the monitor shows 30 frames a
+  second, 98 % of them late: the time outside the "build" number (JS before the frame, the GPU's own work, the wait
+  for the vblank) was not measured. lord-server now records, for every frame the main display shows, while
+  LordBench records or a scripted move runs (`bench/lbframes.c`, filled only by `main.c` and `gpu.c`; nothing comes
+  from a helper, and `lb_msg_valid` is unchanged since no new result id exists):
+  - the flip event to lord-server running (`wake`), that wake to `render()` (input, LordBench's scripted step, JS),
+    `render()` itself, its layout and paint, the UI texture's upload (time and pixels), GPU drag's texture uploads (time,
+    pixels, whether one was whole), `eglSwapBuffers`, the framebuffer and page flip ioctl, the GPU's finish time
+    after the flip was queued, the wait to the vblank, and wake to flip;
+  - the GPU's finish time is a native fence taken after `eglSwapBuffers` (`EGL_ANDROID_native_fence_sync`) and read
+    once at the frame's flip with `SYNC_IOC_FILE_INFO` (the sync file's signal time): one ioctl a frame, no wait, no
+    polling, and nothing at all while not recording; without the extension it is "unknown"; a frame scanned out
+    straight (a fullscreen app's buffer) has no upload, swap or GPU time of its own, so it records none and drops a
+    fence left from before instead of reporting the last composed frame's;
+  - each frame against the first vblank after it started: on time (shown within half a period of it), CPU-late
+    (the flip was queued after that vblank), GPU-late (queued before it, the GPU finished after it) or other;
+  - per frame whether the paint threads were on, whether GPU drag composed it or why not (each refusal and, for `layer`,
+    its cause: `invalid`, `rendering`, `holes`, `surfaces`, `premul`, `opacity`, `part` and the rest, `GDRAG_L_*` in
+    `ui/ui.h`), GPU drag's whole uploads and their pixels, and frames not shown (`gpu_frame_ex`'s -2).
+  LordBench's desktop result has them as `frames.phases.alone` and `frames.phases.load` (p50 and p99 in ms, and
+  counts), and the session log gets `lordbench: desktop alone|under load: phases, …`; the `drag (scripted): …` line
+  ends with the same text, and its GPU drag part now lists `… catching up` and the layer's causes. Without a monitor the
+  frame's end is its presentation, on the pacing grid. The System Information page is unchanged (it does not show
+  them). Checked on VM 116: `lordbench-test` (1,192 ok) feeds known frames and checks each class, percentile and
+  count, the text and a short buffer; and a desktop run in an isolated headless session of the worktree's
+  lord-server (a test theme moving one window with `lord.wm.script`, CPU composition, one viewer on its
+  `remote.sock`) wrote both phase objects in three runs (alone 601 frames, all on time; under load 720–721, 715–721 on time) and
+  the drag line. The
+  GPU fields (uploads, swap, fence) were 0 there: that path was built, not run.
+  The first phases on a GPU came from the Raspberry Pi 5 with its monitor (V3D, 1920×1080, 2026-10-29; p50/p99 in ms).
+  With the frame pipeline and GPU drag off (the defaults now): alone `renderMs` 8.15/11.57 (`paintMs` 6.31/9.56,
+  `uploadMs` 1.41/1.72, 0.971 Mpx a frame) and `gpuMs` 1.51/1.57; under load `renderMs` 13.25/18.92 (paint 8.55/13.11,
+  upload 4.24/5.25) and `gpuMs` 14.49/19.00, and of 374 frames 39 on time, 14 CPU-late and 320 GPU-late. With the
+  pipeline off and GPU drag on: under load render 13.20/18.25, GPU 14.19/18.25, 23 on time, 15 CPU-late, 327 GPU-late of
+  371. With the build's defaults then (the pipeline while frames are heavy, GPU drag on): under load render
+  13.85/19.07, GPU 15.63/23.38, `heldMs` 18.27/31.60, 148 on time, 1 CPU-late, 285 GPU-late of 436. So under load the
+  frame is late on the GPU's side: its time per frame goes from about 1.5 ms alone to 14–16 ms.
+- **Automatic default apps** (`docs/SETTINGS.md`, "Default Apps"): when you never chose
+  an app for a file type, a file of that type still opens. Before, `lord.apps.launchWith('', path)` only read the
+  `[Default Applications]` lines of the mimeapps.list files and, on a fresh account with none, nothing opened (Files
+  opened an `.html` in the Text Editor, and anything that asks for "the default app" got nothing). Now
+  `apps_default_for()` (`server/src/apps.c`) follows the freedesktop MIME Applications order: the user's own
+  `[Default Applications]` (an explicit choice), then what the system marks as default (`/etc/xdg/mimeapps.list`,
+  `/usr/local/share/applications/mimeapps.list`, `/usr/share/applications/mimeapps.list`, `defaults.list`), skipping
+  entries that aren't installed, then `[Added Associations]`, then the first installed app whose `MimeType` declares
+  the type, in `mimeinfo.cache` order and then by desktop id (deterministic); `[Removed Associations]` are honoured,
+  MIME subclasses and aliases are not followed. Only apps the launcher itself runs count: a `.desktop` in
+  `/usr/share/applications` or `~/.local/share/applications` that it lists (not Hidden, NoDisplay or Terminal,
+  TryExec found, OnlyShowIn/NotShowIn) with a `MimeType` and an `Exec` that takes a file (`%f %F %u %U`) and names a
+  program that exists. No path, argument or way to write `.desktop` files was added; the file still goes through
+  `launchWith`'s checks (a real path in the home or the user's mounts, one argument, no shell).
+  `lord.mime.resolve(mime)` returns `{ id, explicit, source }` and `lord.mime.unset(mime)` goes back to automatic
+  (removes the user's line from `[Default Applications]` and `[Added Associations]` of `~/.config/mimeapps.list`,
+  every other line kept, as GLib's reset does). **Settings → Default Apps** shows a category you never chose as
+  "Automatic (<app>)" ("Automática (…)", "Automático (…)"): the system's default, else LordOS's own app for it, else
+  the first installed app that declares the type; an explicit choice can go back with "Automatic". Files' default
+  (`defaultOpenerId`) uses the same order, so on a fresh account an `.html` file opens in the installed browser.
+  Tests: `build/defaults-test` (38 checks, in `make -C server test`) over a fake XDG tree: the user's choice wins
+  (also `lordos-<app>.desktop`, left to the theme), the system's lists in order with uninstalled entries skipped,
+  the first declaring app by id and by `mimeinfo.cache` (the user's first), Hidden/NoDisplay/Terminal/OnlyShowIn/a
+  missing TryExec/an Exec without a file code or with a missing program skipped, ids outside the launcher's folders
+  ignored, `[Removed]` and `[Added Associations]`, going back to automatic, no app → nothing, and that
+  `launchWith('')` really starts the chosen app with the file. Checked on VM 116 in an isolated headless session
+  with a fresh home and no mimeapps.list (2026-10-29): Settings → Default Apps showed "Automatic (Chromium Web
+  Browser)" for the web browser and "Automatic (Mail/Player/Photos/PDF Viewer/Text Editor)" for the rest;
+  choosing Chromium wrote the four browser types, "Automatic" removed them again; double-clicking `page.html` in
+  Files opened it in Chromium (the only installed app that declares `text/html` there).
+
+### Changed
+
+- **The frame pipeline and GPU drag are off by default, after the final Raspberry Pi 5 run** (2026-10-29;
+  `docs/BENCHMARK.md`, "The drag frame's cost"; `docs/GPU.md`). The Pi 5 16 GB with its
+  1920×1080 60 Hz HDMI monitor, the LordOS kernel 6.18.57-lordos.3, an autologin session and the arm64 build of this
+  branch; LordBench → Desktop impact, "under load" = all four cores busy at the lowest priority:
+
+  | Configuration | Runs | Alone fps | Pointer to screen p50 alone | Under load fps | Late under load | Pointer to screen p50 / p99 under load |
+  |---|---|---|---|---|---|---|
+  | Pipeline while frames are heavy, GPU drag on (the build's defaults then) | 2 | 60.0 | 42.1–42.5 ms | 33.0–36.2 | 65.8–81.6 % | 77.3–79.8 / 98.7–99.8 ms |
+  | `LORD_PIPELINE=0`, GPU drag on | 3 | 59.9 | 25.5–25.7 ms | 30.8–31.6 | 87.3–94.3 % | 48.8–49.0 / 66.1–79.4 ms |
+  | Both off (**the defaults now**) | 2 | 59.9 | 25.7–25.9 ms | 30.5–31.1 | 89.5–96.2 % | 48.5–49.0 / 66.3–80.6 ms |
+
+  - `LORD_PIPELINE` is now off unless set to `1` (while frames are heavy) or `2` (always): it gave 2–5 frames a second
+    under load but 17 ms more pointer latency alone and 29 ms more under load, and its auto mode engaged even alone at
+    60 fps. The code stays; the session log says `lord-server: frame pipeline off (LORD_PIPELINE: unset or 0 off, 1
+    while frames are heavy, 2 always)`.
+  - GPU drag is now off unless `LORD_GPU_DRAG=1`, and its self-test runs only then: it is correct on V3D (its
+    self-test passes, 11,373,321 pixels in 341 ms; `LORD_GPU_VERIFY=1` compared 138 frames, all equal) but gave no
+    measurable gain (30.5–31.1 fps under load off, 30.8–31.6 on; it composed about one frame in five). The log says
+    `gpu: GPU drag off (LORD_GPU_DRAG=1 turns it on): the dragged window is composed by the CPU`.
+  - With both off the frames are the ones measured in the last row; the goldens are unchanged. So on the Pi 5 an
+    all-core load still takes the desktop from 60 to about 31 frames a second. What remains is the GPU's time per
+    frame: 1.5 ms alone, 14–16 ms under load (`frames.phases`: 320 of 374 frames GPU-late), and the upload of about
+    1 Mpx a frame from 1.4 to about 4 ms, while `vcgencmd` every 2 s showed V3D at 0.86–1.15 GHz, the ARM cores at
+    1.8–2.4 GHz, 36.7–47.2 °C and `get_throttled=0x0` throughout: no clock or thermal throttling. Most likely memory
+    contention with the load; not proven (no memory-bandwidth counter was read). Next: fewer pixels uploaded and
+    composed per frame (a buffer-age scissor, PBO uploads) and finding what slows V3D under CPU load (`ROADMAP.md`).
+  - In the same run: the firmware's power alarm (System Information's and LordBench's reader, `hw/rpifw.c`) is present
+    on the Pi 5's LordOS kernel and reads 0 with the official supply (`piFirmware`: `voltageAlarm` true, `underVoltage`
+    false; `in0_lcrit_alarm` 0 before and after); the dragged window's rounded corners are clean on the monitor (no
+    black squares, over a window and over the wallpaper; `docs/WINDOWS.md`); `lordos-sysreport bench --quick` (two
+    runs): `cpu.ui.1` 39.3–39.4 fps, `cpu.ui.n` 45.4 fps, `cpu.shape.1` 630–632 runs/s, `cpu.shape.n` 2,522–2,527
+    runs/s (`docs/BENCHMARK.md`).
+  - Checked on VM 116 with the new defaults: `make -j8` with no warnings; `make test`: 23 passed, 0 failed, 13
+    skipped; `engine-test`: 6,907 checks, 0 failures, `drag_golden_{cpu,gpu}.txt` unchanged; `fpipe-test`: 61 checks
+    (unset, `0`, an empty or any other value off, `1` while frames are heavy, `2` always; the auto mode's tests now
+    ask for `1`); `lordbench-test`: 1,217 ok.
+
+- **The desktop under load, third step: a cheaper frame while a window is dragged** (`docs/BENCHMARK.md`, "The drag frame's cost"; `docs/WINDOWS.md`; `docs/GPU.md`). Steps 0–11 (the next two
+  entries), GPU drag (the third) and the Fixed entries for the black corners, the rotated node's repaint and
+  LordBench's turning square, measured together on the Raspberry Pi 5 with its 1920×1080 60 Hz monitor (GPU
+  composition, the session with the weight and the real-time priority, LordBench → Desktop impact, 2026-10-28); the
+  uploads in slices, the paint pool rule, the phase timing and the frame pipeline came after these runs:
+  - before this work, with the square turning (three runs): alone 53.2–58.1 fps (build p99 15.7–16.5 ms, 3.1–12.8 %
+    late), under load 23.6–25.1 fps (build p50 19.8–20.3 ms, 100 % late);
+  - with it and `LORD_GPU_DRAG=0` (two runs): alone 59.8–60.0 fps (build p99 11.3–11.6 ms, 0–0.3 % late), under load
+    30.1–30.3 fps (build p50 12.9 ms, 98.1–99.2 % late). Under load the build, the GPU's part and the flip still run
+    one after another and miss the 16.7 ms period, so the monitor shows every other vblank;
+  - with GPU drag on, the same build stalled (52 fps alone; its entry below);
+  - the frame pipeline was built after these runs; the final run with everything in this list (2026-10-29) has its own
+    entry at the top of Changed: with the frame pipeline and GPU drag off, the defaults now, alone 59.9 fps (build p50
+    8.03–8.13 ms, p99 11.42–11.57 ms, 0.17 % late, pointer to screen p50 25.7–25.9 ms) and under load 30.5–31.1 fps
+    (build p50 13.15–13.25 ms, 89.5–96.2 % late, pointer to screen p50 48.5–49.0 ms, p99 66.3–80.6 ms).
+  - Checked on VM 116 at the frame pipeline's commit: `make -j8` and lord-server with `GPU=0` (no EGL, GBM or GLES
+    linked): no warnings; `make test`: 23 passed, 0 failed, 13 skipped; `engine-test`: 6,883 checks, 0 failures (the
+    2,417 golden frames per path, the `gpu-drag` path and the pipelined drag runs); `fpipe-test`: 39 checks;
+    `lordbench-test`: 1,197 ok. The codename "G0" of the work became "GPU drag" everywhere (`LORD_GPU_DRAG`,
+    `gdrag_*`, LordBench's `gpuDrag` keys).
+- **Less work in a dragged window's frame, same pixels** (the first steps of making a
+  drag frame cheaper on the Raspberry Pi). Every frame of `test_drag_exact` keeps its golden hash on the CPU and GPU
+  paths (VM 116, x86_64) through these steps. The golden hashes were written again twice, each time after a
+  pixel-by-pixel comparison with the code before: for the approved corner change of step 9 (its own entry below) and
+  for the black-corner fix (Fixed). A third time, on the GPU path only, when this work was rebased onto the
+  partial-repaint fixes (Fixed, "Partial repaints that left stale areas"): their rule that a blurred surface is
+  repainted with the margin its blur samples (`blur_near`) changed frame 0 of three runs (`neg`, `mix`, `k2mix`),
+  where the first dragged frame's damage reaches the menu bar's or the blurred panel's margin, and nothing else. With
+  that one rule reverted every one of the 2,417 hashes matched the old file; the CPU path's file is unchanged; those
+  three frames differ from a full repaint by at most 2 levels (1,596, 8,778 and 40,180 pixels; 1,532, 8,400 and
+  38,099 before). What the steps save was measured on the Pi 5 only all together (the first entry
+  of this section).
+  - **No clear under the copy of what is below the window:** `paint_root_clear` (`ui/paint.c`) replaces
+    `canvas_clear` + `paint_root` in `main.c`, `app/appclient.c` and `engine-test`, and skips the clear when the drag
+    layer's copy of what is below (`below_copy`) is about to write every pixel of the same rectangle. That copy was
+    itself cleared to the same black before it was painted, so the GPU path's app-window holes stay the same.
+  - **`lord.stats()` no longer walks every JavaScript object:** `jsKB` comes from `JS_GetMallocSize`, a local
+    QuickJS addition (`THIRD_PARTY.md`) that returns the same `malloc_size` `JS_ComputeMemoryUsage` reported (checked
+    equal on a runtime with 100,000 objects, a 50,000-entry Map and after GC). About, Settings → General and System
+    Information poll it while they are open.
+  - **Only the changed part of the dragged window's layer is painted again:** a node inside the window that changes
+    (a style, a text, a transform such as LordBench's turning square, a child moving inside) now repaints only its old
+    and new boxes in the layer, with a 4 px margin (`layer_tree_part` in `ui/paint.c`), instead of the whole window
+    and its shadow. The layer is still painted whole for the window's own style or size, a part outside the layer or
+    bigger than half of it, and whenever the result can't be shown to be the same: the window moved by a fraction of
+    a physical pixel, the layer's box would change, a fractional display scale, positions or sizes that aren't
+    sixteenths of a pixel within ±4096 px, fractional font sizes, text drawn through `textlayout.c` or in a font
+    whose em isn't a power of two of at most 2048 units, as Inter's is (`text_drew_inexact`), an unchanged transformed node, an app window or a video inside
+    (`layer_part_exact`, `layer_note_exact`). A transformed node's image steps its bilinear weights from the first
+    pixel of each row, so a part cutting it on the left would change them; `canvas_affine_watch`/`canvas_affine_cut`
+    (`canvas.c`) report that and the layer is painted whole. In `test_drag_exact`'s first five runs 366 of the 611
+    layer renders are now parts (before: 6, the terminal's), and 438 of 738 with the three runs added later. Every golden hash is unchanged on both paths.
+    With neither the margin nor the watch, 160 frames per path fail; with the watch but no margin, they all pass.
+  - **GPU path: no app-hole walk for a window without app windows, and a faster sentinel fill** (`ui/paint.c`). The
+    layer's hole map now carries a flag, `layer.has_holes`, that is 0 only while the map stands for all zeros; then
+    `layer_holes` only turns the sentinel back into 0 (it no longer writes zeros over zeros) and `layer_paint` skips
+    the per-pixel walk that reopens app holes over the blit, which for a window with no app surface never wrote
+    anything. The flag is recomputed from what a whole-map pass wrote, a part pass can only raise it, and a part that
+    brings the first hole into a map that had none zeroes the rest of the map first, so the map is byte for byte what
+    the old code would have read. `layer_fill` fills one row with the sentinel and copies it to the others. Checked:
+    the golden hashes (GPU path), and a differential run of the frame against 001633b's `paint.c` with an app window
+    inside the dragged window (half of it an alpha-0 hole), present from the start and removed at frame 60, or
+    appended at frame 40, identical on both paths over 3,874 frame hashes; with the walk always skipped, 139 of them
+    differ.
+  - **A setStyle that only turns or scales a node no longer lays that node out again** (`node_restyled` in
+    `ui/node.c`). When the only change is `rotate`, `scaleX`, `scaleY` or `transformOriginX/Y` (what
+    `runtime/style.js` makes of a `transform`), the node already had its `StyleExt`, it isn't a text node and has no
+    text node above it, and its subtree has no text or image (at most 256 nodes), the node is marked for repaint and
+    placed again by its parent (`node_moved`) instead of `node_invalidate`: its own layout pass and the measure flags
+    are kept. That gives the same layout by construction: layout never reads the transform, `place()` computes every
+    node's matrix on each `layout_root`, the measure flag is read only by text nodes, and a subtree without text or
+    images lays out from styles and sizes alone. Its ancestors are still laid out again, as before, so the saving is
+    only that node's own pass (small: LordBench's square has one child). `setStyle(n, 'transform', …)` is
+    still not a key `lord.setStyle` takes and still changes and marks nothing. Checked by `test_transform_restyle` (`engine-test`): two copies of a tree, one through `node_restyled`
+    and one through `node_invalidate`, 120 frames of turns and scales on five nodes (a leaf, one with boxes inside,
+    one with text inside, one under a text node, one sized by flex) mixed with a column width moving by 0.3 px, a font
+    size and a root width moving by 0.2 px: every node's box, absolute position, matrices and text measure, and
+    every pixel, are equal; the 'transform' key changes nothing. The golden hashes are unchanged (the drag's square
+    now takes this path) and the frame against 001633b's `f_set_style` logic is identical in the differential run.
+  - **The JS timers no longer look at every pending timer on each pass of the main loop** (`ui/js_prelude.h`, the
+    polyfills moved out of `ui/js.c` unchanged otherwise). `__lordTick` keeps the earliest deadline (`minAt`, lowered
+    by every `setTimeout`/`setInterval`/`setImmediate`) and returns at once when nothing is due; when something is,
+    one pass collects the due timers without building an `[id, timer]` pair per timer and computes the next deadline.
+    Due timers still run by deadline, then by id, each at most once per tick, a timer set during the tick waits for
+    the next one, and one cleared before its turn doesn't run. Clearing the earliest timer marks `minAt` stale and it
+    is computed again before it is used, so the wait the tick returns to the main loop is the same number, not only
+    the same order. lord-server also makes the atoms of `__lordTick`, `__lordWantsFrame` and `__lordFrame` once per
+    runtime (`call_hot`) instead of on every call; the function is still looked up each time, so the recovery
+    screen's replacements are the ones run. Checked by `build/timer-order-test` (`make -C server test`): 400 seeded
+    random scripts run on this prelude and on 001633b's, in QuickJS, with timeouts, intervals and immediates at
+    equal, zero, negative, fractional, NaN and string delays, clears of pending, due, fired, unknown and string ids,
+    timers set and cleared from inside callbacks, callbacks that throw, and ticks whose `now` is behind the clock
+    `lord.now()` reads (a clock that moves on every read, so both must also read it the same number of times):
+    427,538 callbacks and 21.6 MB of trace (what runs, in which order, with which arguments, every value the tick
+    returns as `%.17g`, and what is logged) are identical. Breaking the code on purpose fails it: firing by id alone,
+    400 of 400 scripts differ; not recomputing after the earliest timer is cleared, 397. A tick with 200 timers
+    pending and none due: 158.75 µs before, 0.30 µs now (`build/timer-order-test bench`, VM 116, x86_64).
+  - **Fewer React renders and style conversions that change nothing** (`runtime/index.js`,
+    `apps/sysinfo/performance.jsx`). `applyProps` keeps, per node (a `WeakMap`, so the instance a ref sees is
+    unchanged), a copy of the flattened style it last converted, as keys and values in their order, and only when
+    every value is a primitive and no converted value is NaN. A render whose flattened style has the same keys in the
+    same order with the same values (`Object.is`) skips `normalize` and `applyStyle`: `normalize` is pure (no
+    direction, theme or state), so it would give an equal style and `applyStyle` would send no call. A style object
+    changed in place is still seen (the copy is compared, not the object), a different key order is not skipped
+    (later keys override earlier ones: `margin` then `marginTop`), and a NaN (a bad `#zz` color, a gradient without
+    an angle) keeps the old behaviour of re-sending that property on every render. Object values (a `transform`
+    list) are never skipped. LordBench's Performance view no longer re-renders on a 500 ms poll that brings the same
+    state, mode, step and progress as the last one (a result or a start error always counts as new). Checked by
+    `tests/runtime_props_test.mjs` (`make -C server test`; needs node and `node_modules`, so it is skipped on VM 116,
+    which has no node): fuzzed trees of 24 nodes (views, texts, images, an `Activity` that hides and shows half of
+    them, reorders and removals) over 8 seeds × 300 renders, with styles kept as the same object, copied, changed in
+    place, reordered, partly undefined, as arrays, with NaN, −0, overrides and transforms. The bundle with the skip and
+    the same bundle with it turned off send identical `lord.*` call sequences and end with identical styles (72,322
+    lines; 31,498 of 53,311 `applyProps` calls skipped; on the development machine, not VM 116). Breaking the skip on purpose fails it: without
+    the NaN rule all 8 seeds differ; in scratch runs, comparing keys without their order 6 of 6 seeds and comparing
+    the props' object instead of a copy 3 of 3. The Performance view rendered with a scripted run (waiting, three
+    steps, a mode change, cancelled) gives the same native call log with 001633b's view and this one, with 146
+    instead of 356 `applyProps` calls. No C code changed; the golden hashes and `engine-test` pass as before.
+  - **What is below the dragged window is painted again only where it changed, and copied where the old rule
+    painted everything** (`below_ready` in `ui/paint.c`; step 11, after the corner change in the next entry). The
+    copy of what is below the window was built whole on any change outside the window, and two changes within 8
+    frames stopped it for the rest of the drag, so a progress bar below or the menu bar's clock made every frame
+    paint the whole damaged box again (LordBench's Performance view polls every 500 ms; each render commits twice).
+    That rule is kept as a shadow, and on top of it:
+    - `damage_walk` knows the paint order around the window (`below_order`: the children of each of its ancestors,
+      stable by `zIndex`; anything unknown counts as before it), so a change painted after the window no longer
+      touches the copy. A change painted before it, and any damage from outside the tree, mark their boxes stale
+      (`DamageList`, built as up to four rectangles), and only those are painted again (`below_update`), each one
+      grown first to the whole reach of a backdrop blur it touches (the blur reads twice its radius around its box
+      and starts its grid at the clip) and to the whole image of a turned or scaled node (`canvas_blit_affine` steps
+      its rows from the first painted pixel), with the blurs and images the last build met; after the build the same
+      check runs with the ones it met now, and the copy is built whole if a part was not closed. The copy is built
+      whole when the order around the window changes (a signature of those children), the display's view or size
+      changes, or the stale part is more than half the screen.
+    - A frame where the old rule painted everything uses the copy anyway (`below_switch`, `paint_below_switch`)
+      when that gives the same pixels: the canvas was to be cleared to black; no blurred node before the window meets
+      the frame's box; no turned or scaled node before it meets the box with its image starting left of it; no
+      border strip or rounded-corner square of one of the window's ancestors meets it (those are painted after the
+      window, so over the copy they would be painted twice); the last build reached the window; and the stale part
+      costs less than the box.
+    - The old rule decides when the copy is rebuilt, so the pixels are the same as before (step 9's corners aside):
+      damage from outside the tree inside the window's boxes (a Linux app under the window's shadow) still keeps the
+      old copy until the old rule rebuilds it, and is repainted then. A frame uses the copy only when the window is
+      drawn and untransformed (no transform, every ancestor shown and visible), the copy's builds walk every node
+      (`LORD_DAMAGE=multi`'s cull is off for them), and a hidden window's copy is always built whole.
+    - `main.c`'s `drag: …` line ends with `below: … built whole, … in part, … frames switched to it (not: …
+      ancestor, … blur, … transform, … unreached, … cost)`, and LordBench's scripted move writes the layer's counters
+      and the same text in a `drag (scripted): …` line when it ends, for the Pi's session log.
+    - Checked on VM 116 (x86_64): `test_drag_exact` has nine more runs, 1,500 frames per path (a progress bar in the
+      window below changing width every 3 frames and its title every 30, with an app window and a blinking terminal
+      in it; the menu bar's text every 2 frames; a square turning on the desktop and one turned and still; a blurred
+      panel whose clock changes every 40 frames; the window below raised above the dragged one and back; all of
+      them at 100 % and at 200 %; both windows inside a rounded container with a border; a dot changing color on
+      the still square), whose hashes were written from e24af69 plus the corner change, with the GPU path's list of
+      app windows hashed with the pixels (the test's `wl_paint` now keeps that list as `wl.c` does and opens the
+      holes); the earlier 908 hashes per path are unchanged. All 2,417 frames per path match. 591 frames per path
+      use the copy where the old rule painted everything (refused: 30 for an ancestor, 358 for a blur, 153 for a
+      transform), and each of them is painted the old way on a copy of the canvas too (`paint_below_verify`):
+      0 pixels differ. The copy is built 19 times whole and 206 times in part, where the old code built it whole 32
+      times; with the switch off (`LORD_BELOW_SWITCH=0`), 17 whole and 20 in part, and the same hashes. Breaking it
+      on purpose fails the test (goldens and self-check): without the ancestor check, the transform check, the
+      growth of a part, the paint order (the nodes before the window counted as after it) or the outside damage. Without
+      the blur check nothing fails in these scenes (the blur would only read differently where the menu bar or the
+      Dock lies in its reach outside the box), so it stays as the safe side. The differential harnesses against
+      001633b's six files (3,390, 3,874 and 5,084 frame hashes) are identical. `make -C server test`: 23 passed.
+    - Not done: skipping the copy under the window's opaque middle (it would have to know, before the layer is
+      painted this frame, that the layer stays opaque there and that no ancestor's rounded corner reads it).
+- **The corners of rounded windows below a dragged window now match a full repaint** (step
+  9, the one pixel change of the drag-frame work's steps, approved by the maintainer on 2026-10-28; `ui/paint.c`). A drag frame
+  copies what is below the window and then walks the tree to the window, painting nothing before it; that walk still
+  saved and restored the corners of every rounded `overflow: hidden` node on the way, and the restore blended each
+  saved pixel over the same pixel, which leaves it one level darker where the corner's coverage is partial. Now
+  `paint_root` stamps the ancestors of the node the frame starts from (`skip_stamp`, up to 64 levels; deeper, every
+  node is walked as before), and a node before it that isn't one of them returns at once: no corner save or restore,
+  no walk of its children. The ancestors keep theirs, since the window is clipped by them. Checked on VM 116 before
+  the golden hashes were written again: every frame of `test_drag_exact` (1,816 on both paths) was compared pixel by
+  pixel with the frame of the code before (whose hashes equal 001633b's): 178,634 pixels in 1,686 frames differ, all
+  by exactly one level in one or more channels, 155,462 of them inside the corner squares of a rounded
+  `overflow: hidden` node (n = ceil(r) + 1 px, the square `canvas_corners_save` keeps) and 23,172 inside the Dock's
+  or the menu bar's backdrop blur, within the blur's reach of such a square. On the frames that are also compared
+  with a full repaint, none of the 9,619 differing pixels moved away from it and 9,132 now equal it. The pixels that
+  differ from a full repaint go down from 2,265 to 2,217 (CPU path) and from 70,940 to 70,882 (GPU path) in the long
+  run. `tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt` were then written again by `make drag-golden`, and the
+  same hashes came out of 001633b's code with only this change (and the test's entry points) added. The
+  differential harnesses against 001633b's `paint.c` (5,324 frame outputs in the largest) are still identical: their
+  scenes have no rounded `overflow: hidden` node below the window.
+- **The dragged window composited on the GPU, with the CPU's pixels ("GPU drag"; step
+  10, approved by the maintainer on 2026-10-28; `ui/paint.c`, `gpu/gpu.c`, `main.c`; `docs/GPU.md`, "The dragged
+  window on the GPU").** On the GPU
+  path a frame that uses the copy of what is below the window paints only the strips of its damaged box around
+  the window's rectangle W; the GPU writes W itself, from two textures of its own (the layer and the copy of what
+  is below), with one shader that does `blit_row`'s integer arithmetic (k = 256, `over_alpha`) in 24-bit floats,
+  where every value is an integer below 2^24 and every scaling a power of two, so the pixels are the CPU's bit for
+  bit. The textures get only what changed since the GPU last had them (the layer's part, the copy's partial
+  rebuilds), so the per-frame upload of the old and new window box (2.2–2.6 MB on the Pi) becomes the strips and
+  the layer's part.
+  - **When:** only after `below_ready` decided to use the copy (its decisions are unchanged), on the display that
+    owns the layer, one damaged box, no rotation and no fullscreen app; the layer valid and painted as it is (the
+    same opacity, no full render pending, no app window in it, no pixel with a colour above its alpha:
+    `layer.premul_bad`, checked where `layer_holes` already walks it); W is the blit cut by the ancestors' clips
+    and the box; no ancestor paints over W afterwards (`below_ancestors_ok`); no app window of layer 0 is drawn
+    into W (`wl_draws_meet`); the paint order around the window is known and no node painted after it that paints
+    anything meets the box (`damage_walk` notes them, grown by a backdrop blur's reach and a transform's edge).
+    Anything that changes while the strips are painted (the layer rendered again elsewhere, an app window) paints
+    W on the CPU in the same frame. Otherwise the frame is painted as before.
+  - **The GPU side** is off unless it proves itself: a `highp` fragment shader with at least 24-bit floats
+    (`glGetShaderPrecisionFormat`), then a self-test in `gpu_init` that draws every valid premultiplied (alpha,
+    colour ≤ alpha) over every destination value, and every source alpha over every destination alpha, into a
+    framebuffer (3,145,728 pixels in three 1024 × 1024 tiles), then a placement pass (below), and compares each
+    pixel with `canvas_blit` on the CPU (NEON on the Pi). One differing pixel turns GPU drag off. Since the Pi 5 run of
+    2026-10-29 GPU drag is off by default and `LORD_GPU_DRAG=1` turns it on (the first entry under Changed); the
+    self-test runs only then. `LORD_GPU_VERIFY=N` paints W on the CPU too every N-th GPU drag frame
+    and compares it with the framebuffer read back (`gpu-verify: frame N W=wxh differ=K worst=D`).
+  - **`main.c`** keeps, per display, that the scene and the UI texture are stale in W (`gdrag_on`, `gdragw`): W joins the
+    next frame's damage; a frame with no UI damage (the cursor, an app's new frame) draws the window again from the
+    textures if they are still that display's, else paints W on the CPU; direct scanout, a failed frame or the GPU
+    going away paint it again. A frame whose quad cannot be drawn (a failed upload, GPU drag turned off) is not shown
+    at all (`gpu_frame_ex` returns -2): the display keeps the frame before and the next one paints W on the CPU. `LORD_PAINT_VERIFY` leaves W out on GPU drag frames (`LORD_GPU_VERIFY` checks it). The
+    `drag: …` and `drag (scripted): …` lines end with `GPU drag: N of M frames (Q quads), strips … Mpx, uploaded below …
+    Mpx, layer … Mpx (not: … layer, … clip, … ancestor, … app, … after, … post)`.
+  - Checked on VM 116 (x86_64): `canvas-test` compares GPU drag's shader written in C (`canvas_gdrag_model`) with
+    `blit_row_c` and the SIMD row over all 8,421,376 valid (alpha, colour, destination) combinations, every alpha
+    pair, and 200,000 random pixels: 0 differ (NEON not run: no ARM machine was used). `engine-test` has a third
+    path, `gpu-drag`: the GPU path with GPU drag and a stub GPU that keeps the UI texture, the two textures (only their dirty
+    rectangles) and `main.c`'s bookkeeping, and writes W with `canvas_gdrag_model`; all 2,417 frames equal
+    `drag_golden_gpu.txt`, 250 of the 1,856 frames that use the copy are composited this way (refused: 436 layer,
+    287 app, 883 after: the big scene's window is mostly near the menu bar or the Dock). Four runs without goldens
+    are compared frame by frame with the GPU path: a 30-frame pause with no damage (54 of 61 GPU drag), two displays side
+    by side (150 of 240), the window over an app window below (5 of 180), and the window against a rounded,
+    bordered container's corner (15 of 90; 44 refused for the ancestor); the single-display ones as the GPU shows
+    them (the app windows under the UI texture, W written over both). Taking out the after-node, app-window or
+    ancestor check fails the test; the layer's own checks (app holes, invalid pixels) are not reached by these
+    scenes. `make test`: 23 passed, 0 failed, 13 skipped; `engine-test`: 3,688 checks, 0 failures. With GPU=0 the
+    build has no warnings.
+  - On VM 116 at runtime (llvmpipe forced with `LORD_GPU=1`, an isolated session lent the card by
+    `tests/seat_cycle.c`, a test scene moved by `lord.wm.script`): the self-test of that time (tiles only, in the
+    first drag frame) passes (75–113 ms); with
+    `LORD_GPU_VERIFY=1`, 1,481 of 1,483 frames were GPU drag and 0 pixels differed in any; across 4 GPU context
+    re-creations during the move, 1,328 GPU drag frames, 0 differ; with `LORD_PAINT_VERIFY=16`, 0 pixels differ from a
+    full repaint outside W in 92 checks. Layout and paint of a drag frame: 0.29–0.35 ms with GPU drag, 0.92 ms without
+    (llvmpipe's own composition dominates the rest, so this says nothing yet about the Pi). `tests/gpu_cycle.sh` 10
+    cycles: 38 fds and 226.6–227.6 MB throughout. A real screenshot of GPU drag frames was taken (seat-cycle's snapshot).
+    The Pi 5 is below.
+  - **With the real desktop GPU drag never composed a frame, fixed:** the list of nodes painted after the window
+    held 128 boxes and refused every frame once it was full, and LordOS's menu bar and Dock alone fill it
+    (`drag: … GPU drag: 0 of 250 frames … 248 after`). The list now grows as needed (up to 65,536 boxes, then the
+    frame is refused as before) and skips a box inside the one noted just before it (an icon inside its bar:
+    it meets the damaged box only if the bar does), so the menu bar and the Dock are 2 boxes. The decision is
+    the same for every frame that fit before. `engine-test`'s `pause` run now has 300 more nodes painted after
+    the window, each in its own box: with the old 128-box list it fails (`GPU drag composed 0 of 61`), with this one
+    54 of 61 frames, the same as the GPU path frame by frame.
+  - Checked again on VM 116 with the default theme (an isolated 1280 × 800 session lent the card by
+    `seat-cycle`, llvmpipe, driven over the remote desktop socket; real screenshots with QMP `screendump`):
+    the self-test of that time (tiles only) passes (3,145,728 pixels, 127–146 ms). Calculator dragged sideways in the band the menu bar
+    and the Dock leave free: 152 of 153 frames GPU drag, and along a figure of eight that reaches them, 7 of 153;
+    `LORD_GPU_VERIFY=1` compared 160 GPU drag frames with the CPU (W up to 462 × 592), 0 pixels differ in any.
+    LordBench's Desktop impact gets 1 GPU drag frame of 2,024 at 1280 × 800: its window, with its shadow, always
+    reaches the Dock's or the menu bar's blurred backdrop (1,377 refused for that) and its turning square
+    makes the layer be painted whole (646); result with GPU drag on: 72.3 fps alone (p50 12.0 ms, p99 16.7 ms),
+    63.8 fps under load (p50 14.4, p99 27.8 ms, 10.8 % late); `LORD_GPU_DRAG=0`: 73.9 fps, 12.0 / 16.7 ms alone,
+    62.0 fps, 14.8 / 26.3 ms, 15.6 % late under load (the same within llvmpipe's noise). `LORD_GPU=0` (CPU
+    composition): the same drags paint as before (no GPU drag tried) and LordBench gives 75.0 fps alone and under load
+    (p50 5.1 / 5.7 ms). After the runs the VM's normal session (`lordos.service`) was started again.
+  - **Fixed after an adversarial review of step 10** (on VM 116; the runtime runs above came before these fixes
+    and were not repeated, the VM's own session was left alone):
+    - *Wrong pixels under a rounded clipping box painted after the window.* A view with `overflow: hidden` and
+      rounded corners that paints nothing itself still saves and restores its corners around its children, which
+      darkens what is below them by about 1 level; `node_paints` did not count it, so GPU drag left it out inside W. It
+      now counts (`ui/paint.c`). New `engine-test` run `corner` (such a 200 × 150 box, radius 60, over the
+      window's path), compared frame by frame with the GPU path: without the fix 59 of its 91 frames differ; with
+      it 0 differ (its box is in every frame's damage: of 90 frames that use the copy, 89 are refused as `after`,
+      1 for the layer).
+    - *The pixel position no longer comes from `gl_FragCoord`*, which GLSL ES 1.00 makes `mediump`: with 16-bit
+      floats it cannot tell x or y from the next pixel past 1024. GPU drag has its own vertex shader that passes a
+      `highp` varying in pixels (`v_px`, the quad's corners on pixel edges) and the shader uses `floor(v_px)`. The
+      self-test gained a placement pass: a framebuffer as large as the largest output and at least 4096 × 2048
+      (else the largest the GPU allows, and the log says so), a copy of what is below that size and a layer at an
+      odd offset (37, 21) reaching its far edges, every pixel a different random value, compared with the CPU. A
+      layer or output past what it covered turns GPU drag off (`gpu_gdrag_ready(out)` refuses such an output up front).
+      Checked headless on VM 116 (a test driver that includes `gpu.c`, a surfaceless GLES2 context on llvmpipe):
+      the full self-test passes (11,373,321 pixels at 1920 × 1080, 17,678,025 for a 5120 × 2880 output); with the
+      same shader rounding `v_px` as 16-bit floats would, the tiles pass and the placement pass fails from x = 1024
+      on (6,207,545 pixels differ), so the old test alone would have passed it.
+    - *A failed GPU drag upload no longer shows a frame with a stale W:* when the quad cannot be drawn `gpu_frame_ex`
+      returns -2 before presenting, and `main.c` joins W to the damage and paints it on the CPU in the next frame
+      without trying GPU drag (`gdragcpu`), keeping the GPU on. Headless, with a layer larger than the self-test covered:
+      -2, nothing presented, GPU drag off; again with GPU drag off: -2. A real failed upload was not provoked, and `main.c`'s
+      side has only been built, not run.
+    - *`layer.premul_bad` on a layer rendered on the CPU path* (no hole map) was never computed: it is now set,
+      so GPU drag never trusts such a layer after the GPU comes back.
+    - `LORD_GPU_VERIFY`'s CPU reference walk paints on a scratch canvas of the scene's size (an ancestor's rounded
+      corner above or left of W read before its old W-sized buffer).
+    - The self-test runs in `gpu_init`, not in the first drag frame, and its outcome is kept per GL renderer and
+      version across contexts (a GPU restart does not run it again): 311–406 ms on llvmpipe the first time
+      (it was 75–146 ms without the placement pass), about 1 ms after. Stale GL errors are drained before it,
+      dithering is off for the quad, the error drain before an upload is bounded, and GPU drag's program and textures
+      are freed when it does not turn on.
+    - `make -j8` (GPU=1) and lord-server with GPU=0: no warnings; `make test`: 23 passed, 0 failed, 13 skipped;
+      `engine-test`: 3,690 checks, 0 failures, `drag_golden_{cpu,gpu}.txt` unchanged (250 of 1,856 frames that
+      use the copy still GPU drag); `canvas-test`: 8,621,376 cases, 0 differ.
+  - **On the Raspberry Pi 5 with its monitor** (V3D, 1920×1080 at 60 Hz, LordBench → Desktop impact, 2026-10-28,
+    with the build before the uploads in slices and the phase timing; three runs): with GPU drag on, 52.2–52.9 fps
+    alone (build p99 21.3–21.7 ms, 13.5–15.0 % late) and 25.8–27.5 fps under load, against 59.8–60.0 and
+    30.1–30.3 fps with `LORD_GPU_DRAG=0` in the same build. It stalled; its cause was not measured (the phases did not
+    exist yet). The next entry (the uploads in slices) and LordBench's phase timing (Added) were made for it.
+  - **On the Raspberry Pi 5 with the final build** (2026-10-29, with the uploads in slices): the self-test passes on
+    V3D (`gpu: GPU drag on: … self-test: 11373321 pixels, every valid premultiplied combination and a 4096x2048
+    placement pass, the same as the CPU's, 341 ms`), and with `LORD_GPU_VERIFY=1` the 138 GPU drag frames compared were
+    all `differ=0 worst=0`. It no longer stalls: with the frame pipeline off, 59.9 fps alone and 30.8–31.6 fps under
+    load (three runs) with GPU drag on, against 59.9 and 30.5–31.1 fps with it off (two runs). It composed only part of
+    the frames (138 of 601 alone, refused: `layer` 214, `after` 241, catching up 8; 80 of 436 under load). Correct,
+    but no measurable gain, so it is now **off by default** and `LORD_GPU_DRAG=1` turns it on (the first entry under
+    Changed).
+- **GPU drag's textures catch up between frames instead of inside one** (`docs/GPU.md`, "Uploads without a
+  stall"). A drag's start, or a copy of what is below built again whole, made the first GPU drag frame send the whole
+  copy (a screen, 8.3 MB at 1920 × 1080) and the layer; on V3D `glTexSubImage2D` converts to the GPU's tiled layout
+  on the CPU, inside the frame. Now a frame GPU drag would compose but whose textures lack more than 262,144 pixels
+  (`GDRAG_FEED_PX`, 1 MB) is painted by the CPU (`GDRAG_R_FEED`, "catching up"; the same pixels), and after its flip is
+  queued, while the CPU waits for the vblank, a slice of up to that many pixels goes up (`paint_gdrag_feed`,
+  `gpu_gdrag_feed`: rectangles cut by rows; each texture is asked first whether it holds that display's pixels at that
+  size, else it is allocated and all of it is sent in slices; GL errors left by earlier calls are cleared first, so
+  they cannot turn GPU drag off there). Only frames refused for that reason send slices. A GPU drag frame can still send a
+  texture whole when it finds one that is another display's or the wrong size (after the GPU context is made
+  again, or the layer's first frame within the budget), as before.
+  Each texture now knows whose pixels it holds; the dirty list keeps 16 rectangles and, when full, merges the two
+  whose box adds the fewest pixels (the last one used to grow, which could make a few small changes most of the
+  screen). Frames don't overlap (the next starts after the flip), so the textures need no second copy. Checked on
+  VM 116: `engine-test`'s stub GPU does the same (a texture made again is filled with a pattern no frame has); all
+  2,417 frames of `drag_golden_gpu.txt` match and the five extra runs match the GPU path frame by frame; no GPU drag
+  frame sent a texture whole, and the most one GPU drag frame sent fell from 934,022 to 170,330 pixels in the long run
+  (1024 × 640); 241 of 1,856 frames that use the copy are GPU drag (250 before: 9 catch up), 2,358,312 pixels went up
+  between frames; `pause` 45 of 61 (54), `two` 148 of 240 (150), `app` 2 of 180 (5), `ancedge` 12 of 90 (15),
+  `corner` 0 of 90. Not run on a GPU yet.
+- **The paint threads turn on by the whole frame too**: on when the frame (`render_frame`:
+  layout, paint, upload, submit) takes more than 60 % of a period, or painting more than 70 % as before; off after
+  60 frames in a row with painting under 25 % and the frame under 45 %. On the Pi 5 under load painting took about
+  7.5 ms (under 70 %) while the frame took about 13 ms, so the threads, which run at real-time priority, stayed off.
+  The pixels are the same (the pool's bands are exact). On VM 116 headless under load they were on for 0, 10 and 91
+  of 720–721 frames in three runs; the gain on the Pi is not measured yet.
+- **The frame pipeline: the next frame is painted while the flip is pending** (measured on the
+  Pi 5 and **off by default** since then, `LORD_PIPELINE=1` or `2` turns it on; `docs/GPU.md`, "The frame pipeline"; `src/fpipe.c` and `main.c`). A frame was started only
+  after the previous flip completed, so input, JS, layout, paint, the upload, the GPU and the flip ran one after
+  another; on the Pi 5 under an all-core load that chain (about 13 ms of CPU, 3–5 ms more) passes the 16.7 ms
+  period, every frame waits for the second vblank and the monitor shows 30 frames a second, 98 % late.
+  - Now, while the flip of frame N is pending, frame N+1's CPU part is done ahead: pointer input and LordBench's
+    scripted step are dispatched, the JS frame callbacks and the layout run and its damage is painted into the
+    display's scene (`out_prepare`), and at N's flip event only its upload, `gpu_frame_ex` (or the copy into the dumb
+    buffer) and the page flip are left (`out_submit`, through the same `out_present` a frame built at once uses;
+    `render_frame` is split into `out_paint` and `out_present`). GPU drag's textures catch up after the submission and
+    before the next frame is painted. At most one frame is prepared; with nothing pending a frame is still built and
+    flipped at once, so an idle desktop answers input as before.
+  - Only with one display that has real page flips, on the GPU and the CPU path; never without a monitor, with a
+    driver paced in software, or with several displays (each frame built and submitted at once there, as before).
+  - `LORD_PIPELINE`, read once at startup and named in the session log: unset, `0` or anything else off (the previous
+    behaviour exactly; the default since the Pi 5 run), `2` always, `1` on while frames are heavy: after 2 frames in a row whose CPU time passes 60 % of the
+    period, off after 60 in a row under 40 % or at the first frame after more than half a second without one
+    (`FPIPE_IDLE_MS`; an idle desktop gives no frames to count, and without this the pipeline stayed on through it, so
+    the first input after it was shown a vblank later; that frame counts as the first of the two heavy ones that
+    engage it again) (`fpipe_note`; `-d` logs each change), because when frames already fit a prepared frame shows
+    input one vblank later.
+  - The rules: what changes between a frame's paint and its submission goes into the next frame (the prepared one
+    is shown as a frame painted at that moment would have been; the cursor and a Linux app's new buffer are still
+    taken at submission). A prepare that paints nothing tries nothing more until the flip (no busy loop). A
+    prepared frame that can't be submitted as painted (the scene reallocated, the GPU context or output changed, or
+    for a GPU drag frame the drag layer began, ended, changed display or reallocated: the new `paint_gdrag_epoch`) is undone
+    into the next frame's damage, its GPU drag rectangle included, and that frame is built at once; `cpu_takeover`
+    (recording, protected windows for a remote viewer, a failed frame), `gpu_start`, `outputs_apply` (hotplug,
+    Settings → Displays) and `display_detach` (a session switch, before the card's master goes) undo it first, and
+    so does the screen going off (DPMS), so it is never shown stale when it comes back. Stopping the GPU for a
+    recording or protected windows (`cpu_switch`, whose `cpu_takeover` sets the dumb buffer with a modeset) never
+    runs in a render that only prepares, while the flip is pending; and nothing is prepared in a render whose
+    built frame still has GPU drag's catch-up queued (it would run between that prepared frame's paint and its upload).
+    Direct scanout, the remote desktop's read-back, the protected windows' black, `LORD_GPU_VERIFY` and the -2
+    path are decided at submission by the same code. The Linux apps' frame callbacks go with a submitted frame,
+    never with one only prepared. The theme's JS frame callbacks run once per frame shown: a prepare that painted
+    nothing (`FPIPE_EMPTY`) had run them, and when they asked for another frame (an animation callback that changes
+    nothing while an app's frames or the cursor keep the display flipping) the frame built after that flip ran them
+    again, twice per frame shown; that frame now skips them and they run with the next one (`fpipe_hold_callbacks`,
+    `Out.prep_js`). A prepared frame that is undone, or GPU drag's rectangle painted again on the CPU, joins the next
+    frame's damage as a second frame's, so `paint_out` applies the blur rule again (`paint_damage_settle`).
+    Checked on VM 116 after these two fixes (and the rebase onto the partial-repaint fixes): `make -j8` with no
+    warnings; `fpipe-test` 59 checks (new: the idle gap, at and past `FPIPE_IDLE_MS`, re-engaging after it, `2` and
+    `0` ignoring it, a heavy drag then 2 s idle then a click; and a display flipping for an app on the GPU path
+    while an animation callback changes nothing: 600 callbacks for 599 frames shown with the pipeline off, 1,200
+    with it before the fix, 601 after); `engine-test` 6,907 checks, 0 failures; `lordbench-test` 1,217 ok;
+    `make test` 23 passed, 0 failed, 13 skipped. The pipeline itself still has not run on a display.
+  - LordBench records a prepared frame at its submission: its prepare's paint, its submission's upload, swap and
+    flip ioctl, both as `renderMs`, and a new `heldMs` (prepared → submitted) with a `prepared` count, in
+    `frames.phases` and the `drag (scripted):` line (`… prepared ahead N (held for the flip p50/p99)`); such a
+    frame is on time when shown by the first vblank after the wake that submitted it, and the synthetic pointer's
+    events end at its own presentation (`lbf_painted`, `lbf_submitted`; `lbf_frame` gets its prepare plus its
+    submission).
+  - Checked on VM 116: `make -j8` and the changed files with `GPU=0`: no warnings; `make test`: 23 passed, 0 failed,
+    13 skipped; the new `fpipe-test` (39 checks: the switch, the auto mode's hysteresis, every decision, and a
+    display on a vblank grid where 13 ms of CPU, 1 ms to submit and 3 ms of GPU give 299 flips in 600 periods
+    without the pipeline and 598 with it, a 20 ms frame 299 and 475, and a light frame 599 either way with auto
+    never engaging); `engine-test` (6,883 checks, 0 failures) runs every drag case again with each frame presented
+    only after the next frame's changes, as a prepared frame is, and all 2,417 frames match
+    `drag_golden_gpu.txt`, unchanged, with no change between paint and submission moving the GPU drag epoch;
+    `lordbench-test` (1,197 ok) checks a prepared frame's phases, its class, a late one and the pointer's latency
+    across the pipeline. LordBench's desktop test in an isolated headless session with `LORD_PIPELINE=1` and `=0`:
+    the same results (60 fps alone and under load, `prepared 0`: no flips without a monitor). VM 116 has no free
+    DRM card (lord-sessiond holds its virtio-gpu card), so the pipeline itself had not run on a display then.
+  - **On the Raspberry Pi 5 with its monitor** (2026-10-29, GPU drag on in both, two runs each): with the pipeline
+    while frames are heavy, alone 60.0 fps (build p50 8.26–8.31, p99 11.90–11.98 ms, 0 % late), pointer to screen p50
+    42.1–42.5 ms; under load 33.0–36.2 fps (build p50 13.85–13.90, p99 19.07–19.36 ms, 65.8–81.6 % late), pointer to
+    screen p50 77.3–79.8, p99 98.7–99.8 ms; every frame was prepared ahead, alone too (held for the flip p50/p99 8.40/15.72
+    ms alone, 18.27/31.60 under load). With `LORD_PIPELINE=0`: alone 59.9 fps, pointer to screen p50 25.5–25.7 ms;
+    under load 30.8 fps (93.8–94.3 % late), pointer to screen p50 48.8–49.0, p99 66.1–66.3 ms. So it gave 2–5 frames a
+    second under load for 17 ms more pointer latency alone and 29 ms more under load, and its auto mode engaged even
+    alone at 60 fps (a frame of about 11.5 ms with the GPU's part passes 60 % of 16.7 ms): it is now **off by
+    default** (the first entry under Changed).
+- **`js: unsupported style '<key>'` is logged once per key** (`style_warn` in `ui/js.c`), not on every
+  `setStyle` call: a style an animation sends every frame wrote a line to the session log every frame (as
+  `transform` did before LordBench's square and the fans moved to `rotate`). The first 64
+  different keys are remembered; the 65th is logged with `(further unknown style keys are not logged)` and later
+  ones are not. Nothing else changes: the key is still ignored the same way (`docs/THEMES-GUIDE.md`).
+- **Docs for the frame-cost work** (2026-10-29, branch `perf-frame`): `FANS.md`, `BENCHMARK.md`, `WINDOWS.md`,
+  `GPU.md`, `ROADMAP.md`, `PAPER-VALIDATION.md`, the paper (§3.2, §7.2, §7.4, §10.2; en, es, pt; `docs/PAPER.md`
+  regenerated), the FAQ and "A desktop of its own" (en, es, pt) now say that dragged windows' corners no longer turn
+  black and that LordBench's square and the Cooling fans turn (the docs audit's "still there, fixed in development"
+  wording under Fixed is superseded), with the Pi 5 frame numbers measured so far and HTML comments marking where the final Pi 5 run's numbers go, each
+  next to a sentence that is true without them (all filled after that run on 2026-10-29, the first entry under Changed). The site's Markdown
+  renderer (`web/lib/md.mjs`) now drops HTML comments, so a marker left behind is never published.
+  `THIRD_PARTY.md` lists the QuickJS `JS_GetMallocSize` patch as a table row.
+- **Docs** (2026-10-28): `FANS.md` no longer says the Cooling fans turn in this build (the `transform` key the
+  engine lacks; fixed since), and `RASPBERRY.md` records that frame rates on the Pi 5's monitor were measured
+  by LordBench (two monitors and 4K still not).
+- **The 0.8.6 plan** (2026-10-28): `docs/ROADMAP.md` has a "Release 0.8.6" section listing what is
+  built and what is left for LordBench and for the desktop under load on the Pi 5.
+- **The 0.8.7 plan** (2026-10-29, decided by the maintainer): LordBench's x86 PC reference (a modest PC still to be
+  chosen) and hardware video decoding (VA-API on PCs, the Pi 5's HEVC decoder) move from 0.8.6 to a new "Release 0.8.7
+  (planned)" section of `docs/ROADMAP.md`, next to the community hardware reports. `BENCHMARK.md`,
+  `PAPER-VALIDATION.md` and the paper (§7.5; en, es, pt) say so.
+  (2026-10-30, decided by the maintainer) Two items of the desktop under load follow them: step 12 of GPU drag (the
+  dragged window composited on the GPU for the whole drag, also where the Dock or the menu bar overlap it) and the
+  next work on the Pi 5 under load (fewer pixels uploaded and composed per frame with a buffer-age scissor, PBO uploads
+  or a linear canvas; finding what slows V3D under an all-core CPU load, 14–16 ms of GPU a frame instead of 1.5;
+  optionally a 1000 Hz kernel tick). `ROADMAP.md` keeps a one-line note in 0.8.6 and lists them in 0.8.7 "moved from
+  0.8.6 on 2026-10-30"; `BENCHMARK.md`, `GPU.md` ("Pending"), `PAPER-VALIDATION.md`, the paper (§7.4; en, es, pt;
+  dated 2026-10-30), the FAQ and the own-desktop feature page (en, es, pt) say so.
+- **0.8.5-beta published** (2026-10-27): the GitHub release carries the live ISO, the Raspberry Pi 5 image
+  (`lordos-0.8.5-rpi5-arm64.img.xz`, the LordOS kernel 6.18.57-lordos.3 for the Pi 5; the Pi 4 still boots Raspberry
+  Pi's archive kernel), the amd64 and arm64 packages with their SBOMs, `install.sh` and the three desktop downloads of **LordOS Imager 0.8.5**
+  (the universal build, signed and notarized; the 64-bit installer; the Debian package). The Imager 0.8.5 is the first desktop build that reads point
+  releases (`v0.8.4.1-beta`) in its app update check and its release list. `SHA256SUMS` (11 files) is signed with the
+  release key. The site's downloads (`lordos.media`) now point to 0.8.5.
+- **Release files catch up with LordBench:** the Noto subsets built into `lord-bench` are in the package's `copyright`
+  file (license in `usr/share/doc/lordos/OFL-Noto.txt`) and the SBOM; `tools/results/collect.sh` writes `lordbench.json`
+  (`--no-lordbench` skips it); a table inside a list item keeps its lines in the release notes; System Information and
+  Settings move to version 0.8.6.
+
+### Fixed
+
+- **`lordos-sysreport bench --full` ran no sustained load** (2026-10-30; `server/src/sysreport/cli.c`): it passed
+  no sustained time to `lbrun_start`, so the sustained part was skipped (`"skipped": {"sustained.start": "mode"}`) and
+  a Full run from a terminal took 178 s on the Pi 5, although its help says 3 minutes of sustained load. It now passes
+  `CLI_SUSTAINED_S`, 180 s, the same as System Information's Full (`SUSTAINED_S` in `apps/sysinfo/performance.jsx`);
+  checked on the Pi 5 (18 samples over 180 s, 358 s in all). On VM 116: the build with no warnings, `make -C server
+  test` 23 passed, 0 failed, 13 skipped (`sysreport-test` 790 ok); `sysinfo-perf-test` 62 ok with the Pi 5's new
+  reference values.
+
+- **System Information's Raspberry Pi power and throttling rows** (2026-10-29; `server/src/hw/rpifw.c`,
+  `sysreport/sysreport.c`, `apps/sysinfo`; tested on fake sysfs trees and VM 116; the shared reader ran on the Pi 5 in
+  LordBench on 2026-10-29, the alarm present and reading 0, while System Information's rows were not looked at there): the
+  collector looked only for the firmware's `get_throttled` (`soc@107c000000:firmware` on the Pi 5), which the
+  `rpi-6.18.y` kernel LordOS ships doesn't have, so on a Pi 5 with LordOS the Power and Throttling rows were always
+  empty (and the Markdown report said nothing). System Information now reads the firmware the same way LordBench's
+  guards do, from one shared reader, **`hw/rpifw.c`** (`rpifw_read`, `rpifw_parse_throttled`; linked into
+  lord-server, `lordos-sysreport` and both tests; `bench/lbcond.c` uses it instead of its own copy): the `rpi_volt`
+  hwmon's `in0_lcrit_alarm`, exactly `0` or `1` (with an optional newline; anything else is unknown), and
+  `get_throttled` where an older kernel has it (directly under a `/sys/devices/platform` node or its
+  `<node>:firmware` child), strictly parsed (1-8 hex digits, optional `0x`, one optional newline, masked to the
+  eight known bits). World-readable sysfs only: no mailbox, no `vcgencmd`, no exec. What the kernel shows is
+  reported and what it doesn't is left out:
+  - **The LordOS kernel (rpi_volt only):** the Power row says "No under-voltage in the last few seconds" or
+    "Under-voltage in the last few seconds: use the official power supply" (the hwmon asks the firmware every 2 s and
+    clears the sticky bits, so it can't tell "since boot"); there is **no Throttling row** (the kernel doesn't expose
+    the capped, throttled and soft-limit bits), never a false "never slowed down".
+  - **An older kernel with `get_throttled` and no `rpi_volt`:** the rows as before, "now" and "since boot", and the
+    soft temperature limit now counts as slowed down too.
+  - **Both:** the sticky bits only cover the last 2 s window (`rpi_volt` clears them), so the rows say "in the last
+    few seconds" instead of "since boot".
+  - **Neither, or a value that doesn't parse:** model and revision only.
+  The report's JSON `raspberryPi` gains `underVoltageAlarm` (`true`, `false` or `null`; `throttled` stays the raw
+  bits or `null`); the Markdown report says "no under-voltage in the last 2 s (rpi_volt); throttling not reported by
+  this kernel" on the LordOS kernel, and the now/since-boot/last-2-s wording with the raw bits on older ones. The
+  rows' choice is `piStatus` in `apps/sysinfo/model.js`. Four new strings (en, es, pt). Tests:
+  `tests/sysreport_test.c` (the Pi 5 fixture now has the LordOS kernel's `rpi_volt` and an empty
+  `soc@107c000000:firmware`; thirteen small trees: that kernel with the alarm clear, set, `yes`, `01` and missing; an
+  older Pi 4 and Pi 5 kernel with `get_throttled` set, clear and "now"; both sources; a malformed value and a second
+  line; a Pi with neither; a machine that isn't a Pi with both files; 790 checks) and
+  `tests/sysinfo_model_test.mjs` (`piStatus`, 68 checks). `build/lordbench-test` still passes (1,198 checks).
+- **No black squares at the corners of a dragged window**. While any window was dragged, the
+  area just outside its rounded corners showed opaque black squares, on the CPU and the GPU path (seen on VM 116 with
+  Calculator; still windows were fine). The drag layer paints the window on a transparent canvas, and a rounded
+  `overflow: hidden` window saves its corner squares before its children paint and restores them afterwards
+  (`canvas_corners_restore`/`canvas_corners_restore4` in `server/src/canvas.c`). The restore mixed the saved pixel in
+  with `blend()`, which takes its source as opaque: the alpha came out as `over(a, dst)`, so the window's shadow
+  saved over transparency (or the GPU path's sentinel) came back opaque, its premultiplied colour near black, and
+  the layer was blitted over the desktop with those squares. The restore now mixes both premultiplied pixels in
+  every channel, alpha included (`mix_px`); where both are opaque, as on the screen's canvas, it gives `blend()`'s
+  pixel exactly, so still windows and everything else on an opaque canvas are unchanged. On the GPU path this also
+  gives transparent corners where a rounded window sits over a Linux app's hole (alpha 0), which were black before.
+  New `engine-test` check `test_drag_corners`: a rounded window with a shadow, a title bar and a status bar over a
+  light box, dragged three frames (one renders the layer, two copy it), on both paths, with one radius and with
+  per-corner radii; each corner square must equal a full repaint within 2 levels (before: 217 to 221 levels, all 12
+  corner pixels dark). The golden hashes of `test_drag_exact` were written again after a pixel-by-pixel comparison
+  of every frame with the code before: on the CPU path 498,743 pixels in the dragged window's corner squares and
+  445,199 inside the Dock's or the menu bar's backdrop blur, with such a square within the blur's reach, differed in
+  2,386 of 2,417 frames (GPU path: 498,692 and 431,316 in 2,387), none anywhere else. The pixels that differ from a
+  full repaint in the long run go down from 2,217 to 248 (CPU path) and from 70,882 to 70,864 (GPU path).
+
+- **A rotated or scaled node now repaints when its own style changes** (approved by the maintainer on 2026-10-28).
+  A node with its own `rotate`/`scaleX`/`scaleY` is painted into a cached raster (`tfl[]` in `server/src/ui/paint.c`).
+  `damage_walk` cleared the node's `paint_dirty` before its children, and `tf_check`, which runs after them, tested
+  that flag, so a change to the node's own background, border, radius or gradient (`lord.setStyle` or a React
+  render) kept the raster and the old look stayed on screen until something else re-rasterized it. `tf_check` now
+  compares the node's own style with the raster's every time (the same change as the partial-repaint fix below,
+  which found it independently with changes made while a subtree was hidden or unscaled; on this branch it first
+  kept the node's own flag for `tf_check`, which the stricter check replaces). A change of the transform alone still reuses the raster
+  (the compared style leaves the transform out). New `engine-test` check `test_transform_self_restyle` (a 40 × 40 box
+  rotated 15°, its background changed from red to blue, the centre pixel must be blue): it fails without the fix
+  (`ff0000`) and passes with it. The drag goldens (`server/tests/drag_golden_{cpu,gpu}.txt`) are unchanged: 2417
+  frames per path, the same per-frame hashes, 0 pixels differ in the 591 frames switched to the copy of what is
+  below; `make test` on VM 116: 23 passed, 0 failed, 13 skipped; `engine-test`: 3662 checks, 0 failures.
+- **GPU composition without `GL_EXT_unpack_subimage`** (approved by the maintainer on 2026-10-28;
+  `server/src/gpu/gpu.c`). The UI's damage was always uploaded with `GL_UNPACK_ROW_LENGTH_EXT`; a GLES2 driver
+  without that extension ignores it (`GL_INVALID_ENUM`) and reads each damaged rectangle narrower than the screen
+  with the wrong row length, so the uploaded pixels came out sheared. The log line also said "the whole canvas is
+  uploaded", which was not true. Now the extension is read from the GL extension list; without it the damage is
+  uploaded as whole rows in one call when the scene's rows are contiguous (they are: the scene is created with
+  `stride == width`), or one row at a time otherwise, and the log says so. With the extension (every Mesa driver,
+  so every machine LordOS has been tested on) nothing changes. Built with `GPU=1` and `GPU=0` on VM 116 with no
+  warnings; the fallback itself has not run on a driver that lacks the extension.
+
+- **LordBench's turning square and the Cooling page's fans now turn** (approved by the maintainer on 2026-10-28).
+  `apps/sysinfo/scene.jsx` and `sdk/cooling.jsx` called `lord.setStyle(n, 'transform', 'rotate(…deg)')`, and
+  `transform` is not a key the engine takes (it only logged `js: unsupported style 'transform'`), so the desktop
+  test's square never turned and the fans only jumped when React rendered them. They now send the engine's own
+  `rotate` key in degrees (the fans keep `toFixed(1)`, the same angle React sends). The desktop test's window is no
+  longer static: its layer is repainted (in part, where exact) every frame, so desktop-test numbers from before this
+  change measured a lighter scene and aren't comparable (on the Pi 5 with its monitor the turning square took the
+  test from about 59 to 53–58 fps alone before the frame-cost work, Changed).
+- **Partial repaints that left stale areas on screen** (the search for the 0.8.2 "grey rectangle", which keeps
+  several damaged rectangles off by default; `docs/MONITOR.md`, "0.8.6: the search for the grey rectangle"). Two new
+  `build/engine-test` suites compare every painted frame with a full repaint that bypasses the raster cache of
+  transformed subtrees (`paint_tf_nocache`, tests only): `test_damage_pipeline` runs the reported scene (Monitor's
+  moving map, a translucent, blurred Terminal minimized into the blurred Dock, the blurred menu bar, menus, the cursor)
+  through a copy of `main.c`'s whole bookkeeping (damage gathered while a page flip is pending, `paint_out`'s parts,
+  `present_cpu`'s per-buffer lists and copy, the cursor) with 0, 30 and 60 % of the flips pending, and checks every
+  presented buffer against the scene; `test_damage_fuzz` does the same with random trees and random changes (clipping,
+  rounded, shadows, translucent, blurred, scaled, rotated, faded, zIndex, hidden, moved, resized, re-parented,
+  destroyed). The double-buffer and cursor bookkeeping was right in every frame. The fuzz found seven bugs in the
+  paint engine, all with one box per frame **and** with several rectangles, each able to leave a wrong area until
+  something repainted it (before the fixes 11 of 12 seeds failed; now 1 of 48 in each mode, a single
+  1-pixel row of 17 pixels, plus a few levels on antialiased edges in a second rare case, both described in the
+  test; the 12 seeds `make test` runs pass):
+  - a node's border is drawn over its children; when a partial repaint started from an opaque child (the opaque-cover
+    shortcut), the parent's border was skipped, so a child overflowing its parent lost the parent's border line where
+    a small rectangle fell (`paint_node`);
+  - a transformed subtree's cached raster stayed valid after a change made while the subtree was hidden or had scale 1,
+    and came back with the old content (each node now has a generation counter, `Node.gen`, bumped by
+    `node_invalidate`, in the subtree's signature, and the node's own style is compared every time);
+  - a transform inside another transform: changes inside the inner subtree never reached the outer raster's
+    signature, so the outer raster stayed cached with old content;
+  - the raster's pixel grid moved with the subtree's extent, so a child moving inside an unclipped scaled subtree
+    resampled every edge of it outside the damage (the grid is now fixed to the node);
+  - when a blur, a terminal or an app window came into or left a transformed subtree, its raster changed resolution or
+    kind and every pixel of it changed, but only the node that came or went was damaged (the whole subtree is now);
+  - a blurred surface repainted with only its own box read, outside the repainted area, the last frame's final
+    pixels, including whatever is painted above it (a sibling's shadow, a menu, a window's border), while a full
+    repaint blurs only what lies below: its edges kept the difference. The margin its blur samples (twice the radius)
+    is now repainted with it (`blur_near`, in `blur_walk` and the several-rectangles rule); in `test_multi_damage`
+    this raises the pixels repainted per frame from 24,078 to 27,363;
+  - a display whose flip was pending gathers several frames' rectangles and `dlist_add` joins the ones that overlap;
+    a join, or an older frame's rectangle after a blurred node moved, could cut through a blurred node, whose blur
+    then depended on where the cut fell. `paint_out` now applies the blur rule again to damage gathered over more than
+    one frame, on the tree as it is painted (`paint_damage_settle`).
+  Which of these was the 0.8.2 report is not proven (the reported scene itself never failed), so several rectangles
+  stay **off by default** (`LORD_DAMAGE=multi`). Built with `make -j8` (no warnings), `make test` and
+  `build/engine-test` on VM 116.
+  **Checked on a running desktop** (VM 116, 2026-10-29; `docs/MONITOR.md`, "0.8.6: the search for the grey
+  rectangle"): an isolated headless session of the real default theme at 1280×800 (CPU composition), driven over its
+  remote desktop socket by a viewer that keeps its own copy of the screen from the tiles the session sends every
+  frame, so the copy holds exactly what the partial repaints left. The 0.8.2 scene: Monitor → Network with ten slow
+  downloads to mirrors in ten countries (the map's dots moving), a Terminal at 30 % transparency with blur over the
+  map, minimized into the Dock and restored 22 times, the Terminal's six menus opened and closed, 54 checks per run.
+  At each check a second connection makes the session repaint the whole screen and the two are compared (pixels that
+  changed within 2.2 s before or after are left out as animation; the downloads are paused for the check so the
+  dots are still). Six runs: this commit and the previous `main`, each with one box (the default) and with
+  `LORD_DAMAGE=multi`, and both builds again in the default mode with the scene still for 7 s before each check.
+  **No stale area in any run, before or after**: with the scene still, 0 differing pixels in 54 checks (this commit)
+  and 3 single pixels on the Dock's corner (the previous build); with the scene moving, only Monitor's live numbers
+  and charts that changed between the last partial frame and the full one, a few antialiased pixels of the Dock's
+  corner, whose blur takes in Monitor's live "Load" line (both builds, 1 to 7 pixels), and, in 5 of 108 checks of
+  this commit, a map arc that faded under the blurred Terminal in that gap (at most 3 levels of 255; gone with the
+  scene still). The 0.8.2 grey rectangle did not appear in either build, so it is still not reproduced. **Cost**
+  (the same sessions, one remote viewer, `lord-server` whole process, % of one core, 5 × 30 s, two batches): Monitor
+  → Network 56.7 / 57.2 % before, 58.7 / 59.7 % after (one box) and 59.2 / 58.1 → 57.2 / 58.0 % (several
+  rectangles); with the blurred Terminal over the map 35.8 / 36.4 → 38.0 / 37.7 % and 36.7 / 36.6 → 37.5 / 35.9 %;
+  layout and paint per frame (`LORD_FRAME_STATS`) the same within 0.1 ms in every case (14.6 to 14.8 ms). In these
+  sessions (`--profile`) every frame repainted one box of 64 to 79 % of the screen, also with `LORD_DAMAGE=multi`
+  (the moving dots, Monitor's live numbers and charts on both sides and its footer next to the blurred Dock never
+  stayed several rectangles), so the blur margin adds next to nothing there; the per-frame difference measured in
+  `test_multi_damage` (24,078 → 27,363 px) was not visible at the process level. Why the 0.8.2 VM 119 scene gave 5
+  to 11 rectangles and this one gave one: a translucent, blurred Terminal hidden behind Monitor (next entry).
+  LordBench's desktop mode in the headless harness (three runs each): 58.9-60.0 fps, build p50 1.25-1.26 ms and p99
+  5.9-7.6 ms before; 60.0 fps, p50 1.24-1.27 ms and p99 5.95-6.32 ms after.
+- **A blurred window hidden behind another no longer makes every frame repaint it** (`paint.c`, `blur_hidden`; both
+  damage modes). The blur rule (a change that touches a blurred surface or the margin its blur samples repaints the
+  whole surface and its margin) also held for a blurred surface covered whole by an opaque window above it, which
+  shows nothing of its blur. A translucent Terminal (30 % transparency, blur) behind Monitor → Network: every frame
+  of the moving dots repainted the hidden Terminal's body and margin, one box of 45 % of a 1280×800 screen (62 to
+  73 % when its margin met the Dock's, which then joined), even with `LORD_DAMAGE=multi`, where without it the dots
+  are a few rectangles under 1 % of the screen. Now a blurred node that an opaque node painted after it covers whole
+  (the same test as the opaque-cover skip: opaque background, opacity 1 down the tree, no transform, away from
+  rounded corners, clipped by its ancestors; CPU path without a dragged window) is left out of the rule; when the
+  window on top moves, turns translucent or closes, the change reaches the blurred one and the rule applies again.
+  A blurred Terminal in front of the map is still repainted whole with its margin every frame (75 to 80 % of the
+  screen when its margin meets the Dock's): that is the rule itself.
+  **Found** on VM 116: the sessions of the repaint check above (and their `--profile` numbers) had such a Terminal
+  behind Monitor, restored from a `lord-term-holder` left by an earlier run (the harness killed holders with a
+  pattern that never matched the holder's process name). **Measured** (VM 116, isolated headless session, 1280×800,
+  CPU composition, one remote viewer, `--profile`, last 150 frames): repainted per frame 46.4 → 14.5 % (one box) and
+  46.2 → 3.8 % in 5.6 rectangles (several), paint 5.6 → 2.0 ms and 5.2 → 1.7 ms per frame; `lord-server` (whole
+  process, % of one core, 5 × 30 s, two batches): 24.3 / 22.3 → 13.2 / 15.3 % (one box) and 21.5 / 21.7 → 15.0 /
+  14.3 % (several). With no hidden blurred window the frames are the same as before (Monitor → Network alone, one
+  box: 10.2 / 13.8 % per frame, the live charts). **Checked:** `test_hidden_blur_damage` in `build/engine-test`
+  (a blurred window under an opaque one with moving dots, both modes: every frame matches a full repaint while the
+  hidden window moves and the one on top moves away and back, turns translucent, closes and reopens; the hidden
+  window no longer joins the damage; a visible one is still repainted whole; three of its checks fail without the
+  change); `make test` and a full build without warnings on VM 116; and on a running desktop with the repaint
+  check above, the original scenario (54 checks per mode) and a new one with the Terminal hidden behind Monitor's
+  moving map, raised over it and sent back ten times (21 checks per mode): no stale area in either mode, only
+  Monitor's live numbers and charts and the clocks changing between the two copies.
+  **Rebased onto the frame-cost work and checked again** (2026-10-29, VM 116): `blur_hidden` stays off with a dragged
+  window, on the GPU path (so with GPU drag) and inside a transform; the damage of a frame the pipeline undoes, or of
+  GPU drag's rectangle repainted on the CPU, goes through `paint_damage_settle`, which applies the same rule to the
+  tree being painted. A build without warnings; `make test` (23 suites passed, 13 skipped for missing tools);
+  `engine-test` 7,010 checks, its drag runs printing exactly what main's build prints (the golden hashes of 2,417
+  drag frames per path unchanged); `fpipe-test` 61 checks; `lordbench-test` 1,217. The first check of the 0.8.2
+  scenario above never minimized the Terminal: with the leftover holder gone a fresh Terminal opens at another
+  place, and the scenario's click, placed for the restored one, missed its minimize button. The click now hits it,
+  and the rebased build was checked with the Terminal minimized into the Dock and restored 22 times: 0 differing
+  pixels outside Monitor's live numbers and charts and the clocks in all 54 checks, one box and several rectangles,
+  with the downloads paused 2.5 s and with the scene still 7 s before each check (four runs); the hidden-Terminal
+  scenario, 1 pixel (a Dock corner next to Monitor's live Load line) and 0. The live areas left out now also hold the
+  fresh Terminal's footer clock, Monitor's left-panel chart and the `curl` row's sparkline, which the restored
+  Terminal used to cover. `--profile` on the rebased build, the Terminal hidden behind Monitor → Network: 11.2 % of
+  the screen per frame in one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor alone: 9.1 % and 3.2 %.
+- **The desktop under load** (found by LordBench's desktop test; `docs/BENCHMARK.md`, "The desktop under load"): the
+  compositor's cgroup (`server`) had the same `cpu.weight` as every app scope, and nice values don't count between
+  cgroups, so an app keeping every core busy took half of the compositor's CPU even at nice 19. On a Raspberry Pi 5
+  the compositor's main thread waited 299 ms per second for a CPU under load (17 ms alone). Now lord-sessiond gives
+  the session's `server` leaf `cpu.weight` 1000 (apps and helpers keep 100), in the root-owned subtree it already
+  manages (`CG_SERVER_CPU_WEIGHT`, `sec/cgroup.c`). LordBench's desktop test under load on the Pi 5 without its
+  monitor, two runs each: 43–45 → 56–57 frames per second, late frames 31–33 % → 7–8 %, pointer to screen 32–33 →
+  22 ms median and 67–75 → 52–53 ms for the slowest 1 %; nothing changes without load. Checked on VM 116 that a new
+  session gets the weight. On the Pi's monitor with GPU composition the weight was measured only together with the
+  real-time priority (next entry). A 0.5 ms scheduler time slice
+  for the compositor's threads was also tried (it was in the previous commit) and removed: measured alone, it made no
+  difference; its first numbers had been inflated because the test tool also gave the slice to the load. What
+  remains is described there.
+- **The desktop under load, second step: a real-time priority for the compositor** (approved by the maintainer on
+  2026-10-28; `docs/BENCHMARK.md`, "The desktop under load"). With the weight, the compositor's main thread still
+  waited up to a scheduler tick each time it woke up under load. Now lord-sessiond starts the session's lord-server
+  with `RLIMIT_RTPRIO` 2 and `RLIMIT_RTTIME` 5 s (`remote/sess.c`); lord-server, right after dropping root and before
+  it starts any process or thread (`par_init`, `par.c`, moved there in `main.c`), puts its main thread and its paint
+  threads at `SCHED_RR` priority 2, gives the main thread `SCHED_RESET_ON_FORK` so everything it starts later gets the
+  normal policy, and lowers `RLIMIT_RTPRIO` to 0, soft and hard, so no app, helper or shell can ask for real time.
+  The root admin helper lowers its own limit to 0 as well (its download child drops to `nobody`). A thread that runs
+  5 s on real time without blocking gets `SIGXCPU` and every thread goes back to the normal policy; nothing is
+  killed. The session log says `compositor at real-time priority 2 (SCHED_RR, N threads)`. Checked on VM 116 with the
+  new lord-sessiond (main thread `SCHED_RR|SCHED_RESET_ON_FORK`, 7 paint threads `SCHED_RR`, every other thread and
+  child `SCHED_OTHER` with a limit of 0). LordBench's desktop test under load on VM 116, two runs each: late frames
+  2.65–2.92 % → 0.28 %, frame build p99 16.3–16.8 → 11.0–12.7 ms, pointer to screen p99 31.0–32.3 → 24.7–25.5 ms
+  (as without load); the load got the same CPU time. On the Pi 5 with its monitor (GPU composition), two runs: under
+  load 24.0 → 28.9–30.5 fps, frame build p50 20.1 → 15.4–16.2 ms, the main thread's wait for a CPU down to about
+  0.07 ms per second; still 94–98 % late, because under the load a frame takes 15–16 ms of the main thread's own CPU
+  time to build (7 ms alone) and misses the 16.7 ms refresh. That cause is not found yet; the frame-cost work
+  (Changed, "The desktop under load, third step") cuts that build to 12.9 ms with the scene's square turning, and the
+  frame pipeline is built for the rest.
+- **LordBench on the Raspberry Pi 5 measured no GPU:** inside `lord-bench`'s sandbox Mesa's loader could not identify
+  the V3D render node ("failed to retrieve device information") and every GPU measurement was skipped. The sandbox
+  now also allows reading `/sys/firmware/devicetree` and `/dev/dri` (read-only; the GPU is still reached only
+  through the render node fd lord-server opens), and the Pi reports a hardware GPU.
+- **Raspberry Pi image on an x86-64 host with an aarch64 `server/build`:** `tools/iso/mkdeb.sh` checks the
+  signed system code by running `lord-server --check-code`, which can't run an aarch64 binary on x86-64
+  (it failed as "the staged system code does not match code-manifest.json"). `CODE_CHECK_SERVER` now names
+  a `lord-server` built for the host from the same tree, and `tools/rpi/build-img.sh` asks for it instead of
+  failing later. Found building the 0.8.5 image; the check itself is unchanged (`docs/SIGNING.md`).
+- **Same build, unstripped binaries:** `mkdeb.sh` stripped with the host's `strip`, which can't read aarch64
+  binaries and whose errors are ignored, so that package shipped every binary with its symbols (17 MB
+  instead of 11 MB, the same files). It now uses `aarch64-linux-gnu-strip` when it packages arm64 on another
+  architecture, and stops if it is missing.
+- **Public docs corrected ahead of 0.8.6** (a read-only audit, each finding checked against the code and the
+  measurements):
+  - **Paper (en, es, pt; `docs/PAPER.md` regenerated):** §7.2 no longer says a dragged window's rounded corners stopped
+    turning black on the monitor; it says what the 0.8.5 fix did (on the GPU path only pixels inside an app surface are
+    taken for a Linux window's hole) and that small black squares can still show at the corners, on the CPU and GPU
+    paths. §10.2 lists them as a known limitation (fixed later in this release, see "No black squares at the corners of a dragged window"), and
+    the remote-desktop line no longer says the monitor shows them right. §7.4: the board results are "without a monitor
+    unless stated", and the CPU weight alone is said to have been measured on the monitor only together with the
+    real-time priority (it said the monitor measurement was pending, then gave it). The PDF/Markdown header writes the
+    organisation as iPERFEX, as in `meta.json` (`web/lib/papermd.mjs` no longer upper-cases it).
+  - **FAQ (en, es, pt):** "about thirty native apps" instead of "more than 35" (the paper says thirty-one); memory given
+    as the paper measured it (`lord-server` about 50 MB in a user session) instead of an unsourced "120 MB idle
+    session"; the Raspberry Pi 5 answers say the image shows the desktop on an HDMI monitor since 0.8.4.1 and that two
+    monitors and 4K are what is untested; "KDBX files" instead of a brand name; the LordBench answer says the desktop
+    under load is being fixed (as without load on VM 116; 24 → 29–30 fps on the Pi 5 with its monitor, the rest still
+    in progress) instead of "already fixed", and a doubled word in Spanish is gone.
+  - **Features (en, es, pt):** Linux apps no longer says a Flathub section is planned for 0.8.6 (Flatpak is not planned
+    for any release; `docs/FLATPAK.md`); A desktop of its own says the Pi 5 has been tested with one HDMI monitor (not
+    with two or 4K) instead of never with a monitor; Private by design adds `lord-fetch`, `lord-tls` and `lord-bench` to the sandboxed helpers; the Portuguese page puts its screenshot where the other two do.
+  - **`docs/BENCHMARK.md`:** the status lists what is built (interface and video workloads, desktop-impact mode, boot
+    test, `lordos-sysreport bench`, two of three references) and what is not (the x86 PC reference, a `checks`
+    subcommand); the CLI diagram shows `report | fetch | bench`; the design table notes xz instead of deflate and
+    software-only video decoding; the Pi 5 reference is the 16 GB board; the desktop test's turning element stays still
+    in this build (there is no `transform` style key; fixed later in this release with a `rotate` key); the Quick-run times
+    (33 s, then 39 s and 46 s from a terminal) are told apart; "not yet measured with the monitor" and "about 20 %
+    slower" are replaced by what was measured (a frame takes 15–16 ms instead of 7 ms under load, cause not measured).
+  - **`docs/ROADMAP.md`:** the black-corners item under Release 0.8.6 is unticked (fixed on `perf-frame`, merged later in this release);
+    "Pending before the final ISO" is marked done; LordBench's "Left:" adds detecting the Pi 5 firmware's throttling;
+    the Pi 5 report item says what is still missing. `docs/FLATPAK.md` points to the roadmap item's current title.
+  - **`docs/PAPER-VALIDATION.md`:** the Pi 5 load result is recorded as measured on the monitor with both changes;
+    one Full and four Quick runs; 34 folders in `apps/`.
+  - **`README.md`:** the "Measured, not promised" numbers are labelled as the pre-release 0.7.0 ISO test and joined by
+    the released 0.8.5-beta's (592 MB whole system, first frame 7.4 s after the kernel); the repository map adds
+    `lord-bench`.
+
+### Known issues and limitations
+
+- **Raspberry Pi 5 under an all-core load: about 31 frames a second.** Alone the desktop holds 60; with all four
+  cores busy at the lowest priority it runs at 30.5–31.1 fps, up from 24, with the pointer reaching the screen in
+  about 49 ms (`docs/BENCHMARK.md`, "The drag frame's cost"). The GPU's time per frame goes from 1.5 ms to 14–16 ms
+  with no clock or thermal throttling; memory contention is the likeliest cause, not proven. The next steps are
+  planned for 0.8.7 (`docs/ROADMAP.md`).
+- **The frame pipeline and GPU drag are built but off by default.** On the Pi 5 the pipeline gave 2–5 frames a
+  second under load for 17–29 ms more pointer latency, and GPU drag, correct on V3D, gave no measurable gain.
+  `LORD_PIPELINE=1` (or `2`) and `LORD_GPU_DRAG=1` turn them on for testing. GPU drag does not yet cover the whole
+  drag (where the Dock or the menu bar overlap the window); that is planned for 0.8.7.
+- **LordBench's comparisons.** There is no x86 PC reference yet (planned for 0.8.7), and video decoding is measured
+  in software only. The reference machines' layout, paint and shaping values were measured before this version and
+  are used only for results of the same LordOS version, so a 0.8.6 result leaves those four measurements out of its
+  ×N until the references are measured again.
+- **Raspberry Pi 5:** one 1920×1080 HDMI monitor has been measured; two monitors and 4K have not.
+- **llama.cpp on a GPU is not tested on real hardware yet** (as in 0.8.5): only the CPU path and the backend loading
+  (software Vulkan) were checked.
+- **Legacy BIOS: a black rectangle between the boot menu and the splash** while GRUB loads the kernel and the
+  initrd, as in 0.8.5; barely visible on UEFI.
+- **Searching "displays" in the search panel** opens the Help article on touchpads and touch screens before
+  Settings → Displays.
+- **Settings → Displays:** in the arrangement, the name of a small display is cut without an ellipsis.
+
+### Upgrading
+
+- **From 0.8.5 (and 0.8.4.1 to 0.8.1):** Store → Updates shows "LordOS 0.8.6 is available" with these notes;
+  **Update** installs it and a restart finishes it. `sudo apt update && sudo apt upgrade` does the same. This version
+  adds no migration (`ls /var/lib/lordos/migrations` is unchanged from 0.8.5); your settings are kept. Tested on
+  2026-10-30 with `apt` against `lordos.org/apt-staging`, on a live-session amd64 VM (no restart is possible there)
+  and on the Raspberry Pi 5 with a restart: no migration ran, the settings files were unchanged, and the Pi came back
+  with 0.8.6-beta build 20261030, its first frame 7.63 s after the kernel, in a release build with signed code. The
+  Store's own package engine and the Store → Updates screen were not exercised, and a second reinstall was not run.
+- The compositor's CPU weight and real-time priority are set when `lord-sessiond` starts a session, so they apply
+  after that restart.
+- Default apps you chose in Settings stay as they are; automatic defaults apply only to file types you never chose
+  an app for.
+
+### Release
+
+- **0.8.6-beta published** (2026-10-30): the GitHub release carries the live ISO
+  (`lordos-live-0.8.6-amd64.iso`), the Raspberry Pi 5 image (`lordos-0.8.6-rpi5-arm64.img.xz`), the amd64 and arm64
+  packages with their SBOMs, **LordOS Imager 0.8.6** and `SHA256SUMS`, and the apt repository is updated. The site's
+  downloads (`lordos.media`) now point to 0.8.6, and the docs, README, paper (en/es/pt), FAQ, features, legal and apps
+  pages describe it as the current release; the engine references stay tagged 0.8.5-beta.
+
+## [0.8.5-beta] - 2026-10-27
+
+### Added
+
+- **A curated catalog of AI apps in the LordOS repository.** `apt/catalog.json` lists
+  nine apps with their package, summary (en/es/pt), licence, vendor, architectures (amd64 and arm64) and
+  a pinned source; `apt/keys/` holds the vendors' APT keys, `apt/recipes/` LordOS's build recipes and
+  `apt/build.sh` checks and fetches them (`apt/README.md`, `docs/UPDATES.md` "Mirrored apps
+  (catalog)"). Claude Code, Claude Desktop, Visual Studio Code and Cursor come straight from their
+  vendors' signed APT repositories ("direct"): `apt/build.sh check` verifies the pinned key
+  fingerprint, the signed `InRelease`, the index hash and the package for each architecture. The other
+  five are verified on the maintainer's machine and published in `pool/catalog/` by
+  `tools/release/apt-repo.sh build … --catalog`: goose 1.56.0 and opencode 1.19.4 (the vendor's .deb,
+  pinned SHA-256), and three packages LordOS builds in `debian:trixie` containers with no network —
+  `llama.cpp` 0.7.0, the local model runner (`-hf` downloads GGUF models from Hugging Face over HTTPS;
+  every CPU variant built and the best one picked at run time, plus the Vulkan backend, loaded only
+  when a Vulkan device exists), `whisper.cpp` 1.9.5 (CPU) and `codex-cli` 0.164.0 (OpenAI's static binary,
+  its sigstore signature checked with cosign). Vendor packages are never modified; what their
+  maintainer scripts do when the Store installs them (VS Code, Claude Desktop and Cursor add their own
+  APT source) is documented.
+- **Store → Artificial Intelligence.** The catalog as a page of the Store: each app with its kind,
+  vendor and licence, dimmed on an architecture it doesn't support. An app from its vendor's repository
+  first says whose repository it adds and its key fingerprint, then adds it (`pkg-source-add`, the key
+  checked against the catalog's fingerprint) and fetches the lists; removing the app removes that
+  repository unless another installed catalog app uses it. An app LordOS builds that the lists don't
+  have yet offers to fetch them again instead of "package not found". Cursor's package always writes
+  its own source (`cursor.sources`, `Signed-By: /usr/share/keyrings/anysphere.gpg`), and a second entry
+  for the same repository with another `Signed-By` stops apt reading any source, so its catalog entry
+  names those files and LordOS writes the same ones (the key dearmored). Tested on the VMware machine:
+  llama.cpp installed from the Store (14 MB), `llama-server -hf ggml-org/Qwen3-0.6B-GGUF:Q8_0`
+  downloaded the model on first run and answered over its HTTP API on the CPU (about 33 tokens/s, no
+  Vulkan device); on VM 116, Cursor's and VS Code's sources added, Cursor installed (its own script
+  rewrote the same file), `apt update` and the Store's own update both clean, then removed.
+- **The Store's new look.** A sidebar in three groups (Store: Discover, For this computer, Installed,
+  Updates; Categories: Artificial Intelligence and Debian's ten categories, each with its count; LordOS
+  apps), the page's title, a back button and the search in a toolbar, and apps as cards in a grid
+  that fills the window: icon, name, category, two lines of summary, the download size and a Get,
+  Open or View button. Discover opens with a featured banner, then the AI shelf and a shelf per
+  category with "See all"; an app's page has a larger icon and a row of facts (version, size,
+  category, distribution). The hardware suggestions moved to their own page, For this computer,
+  which keeps the badge for new ones.
+- **A featured banner LordOS can change without a release.** Discover's banner comes from
+  `apt/featured/featured.json` and `apt/featured/banner.png` in the repository: `apt-repo.sh` checks
+  them (a schema 1 JSON object of at most 64 KB, a PNG of at most 2 MB) and publishes them signed with
+  the indexes (`main/featured/`), and the package engine takes them only from a source whose signed
+  Release says `Origin: LordOS`, checks their hashes, parses the JSON and the PNG signature, and keeps
+  them in `/var/lib/lordos/pkg/` (`lord.pkg.featured()`, read-only). The picture fills the banner
+  under a shade; while it isn't there yet the Store draws a skeleton of the banner (it pulses, unless
+  Reduce motion is on), and a system whose repository has no banner shows a catalog app instead.
+  Tested on VM 116 against lordos.org/apt-staging: the banner, its skeleton without the image, For
+  this computer, the categories and the cards.
+- **Store → Commercial.** Free-of-charge apps whose source code isn't public, from their makers'
+  signed APT repositories with the key LordOS pins: Google Chrome (amd64 and arm64), Edge and
+  Spotify (amd64). The page says before anything is installed that LordOS can't review or fix what they
+  do, and points to For this computer for graphics drivers. Their packages write their own APT
+  source: for Chrome and Edge the catalog names those files (`google-chrome.sources`,
+  `microsoft-edge.sources` and their keyrings) so the package's write changes nothing, and for
+  Spotify, which adds `spotify.list` unless that file exists, a new catalog field `optout` makes
+  `pkg-source-add` create it empty (only when missing; `pkg-source-remove` deletes it only while it
+  is still empty). Tested on the VMware machine with the admin action and LordOS's package engine:
+  the three sources added, the three apps installed (Chrome 156.0.8078.47, Edge 156.0.4314.50,
+  Spotify 1.2.95), `apt update` with no error or warning and the engine's update clean afterwards,
+  and Chrome's window opening in the session. Spotify's package also copies its key into
+  `/etc/apt/trusted.gpg.d/`, trusted by apt for any source without Signed-By (Debian's own sources
+  have one). Steam needs i386 multiarch, which LordOS's package engine doesn't do yet (roadmap).
+- **Root over SSH, as an advanced option.** Settings → Sharing → Advanced lets an administrator allow
+  root to log in over SSH with a public key only, or with a key or a password, for tests and
+  administration: the keys are pasted or imported from a `.pub` file and listed with their
+  fingerprints, root's password can be set, every change asks for your password again, and a warning
+  stays visible while it is on. Off by default, and off again with one click.
+- **The Store downloads over HTTPS.** LordOS's package engine now speaks HTTPS as well as HTTP: a small
+  sandboxed helper (`lord-tls`) checks the server's certificate and name and encrypts the download, so
+  repositories that only accept HTTPS work, and what you install is private on the network. Every
+  package is still checked against its signed index, as before; a secure download is never redirected
+  to plain HTTP.
+- **A guide to building an appearance.** `docs/THEMES-GUIDE.md` explains, for a React developer new to
+  LordOS, what a theme is, its parts (theme.json, tokens, the shell, window frames, menus, layers),
+  right-to-left, light and dark, several displays and the performance rules, how to build and test one,
+  and a checklist; `examples/theme-minimal/` is a small working theme to start from. It also says
+  plainly what is missing: a theme LordOS didn't sign doesn't load on a release build yet (no theme
+  package format or user trust decision exists).
+- **Settings → Displays: numbers, Identify and snapping.** With more than one display each one has a
+  number (the main display is 1); clicking a display in the arrangement, or Identify, shows its number
+  big on that monitor for a moment, so you know which screen is which. Dragging a display snaps it edge
+  to edge and aligns it with the others (side by side, stacked or offset), and a drop never leaves two
+  displays overlapping or apart. The server keeps a position that fits exactly, and a chain of three
+  displays is no longer pulled back onto the main one on every change.
+- **A fuller Window menu, in both themes.** Minimize, Zoom, Fill, Center; **Move & Resize** with the
+  left, right, top and bottom halves, the quarters and thirds, arrangements of two windows (left and
+  right, right and left, top and bottom, bottom and top) or four (quarters) with the windows behind it,
+  and Return to Previous Size; **Move to <display>** for every other display (a snapped window keeps
+  its zone, the rest keep their place relative to the screen); Bring All to Front; and the open
+  windows, the one in front checked.
+- **Dock: Open at Login and Assign To.** A Dock item's Options menu can open the app when you sign in
+  (started the same way as a Dock click) and, with more than one display, assign it to a display: its
+  new windows open there (kept by the display's name across boots).
+- **One place to choose the desktop style.** Settings → Appearance → Desktop style now lists every
+  installed theme, and the separate Themes page is gone (an old link to it opens Appearance).
+- **The app menu and Force Quit (Lord Flow).** Clicking the app's name in the menu bar opens its
+  menu: About <app> (its icon, name, own version and where it comes from), Settings… (the app's own,
+  ❖,), Hide <app>, Hide Others, Show All and Quit <app> (❖Q). The crown menu adds the Store, with how
+  many updates are waiting, Recent Items, and Force Quit…, which lists the open apps and ends the chosen
+  one without asking it: a Linux or isolated app's own process only (`lord.wayland.kill`, the same
+  user's client, never X11, which is asked to close), a built-in app without its close guard. In Lord
+  Classic, About <app> is in each window's Help menu.
+- **The themes are called Lord Flow and Lord Classic.** The menu bar and Dock theme (formerly Lord
+  Default) is now **Lord Flow**, and the taskbar and start menu theme (formerly Classic) is **Lord
+  Classic**, in every language. Only the names changed: your choice is kept.
+- **Menus inside the window in Lord Classic.** Lord Classic has no menu bar on top, so an app with menus
+  of its own (Files, Text Editor, Notes, Terminal, PDF Viewer, Photos, Screenshots, Mail, Passwords)
+  shows them in a strip under its title bar (File, Edit, View, Go…, then Window and Help), as desktop
+  apps do with a taskbar; apps without menus of their own get no strip.
+- **Every native app has its own version.** Each app's manifest now carries a version (all start at
+  0.8.5), the build refuses an app without a valid one, and Store → Installed shows it next to the app
+  ("LordOS app · 0.8.5"), so the apps can later be versioned and released apart from LordOS.
+- **Boot time, on the screen and on record.** The boot splash shows the time since it started, in
+  seconds and milliseconds, in the bottom right corner. About LordOS → Startup time shows how long this
+  boot took from the kernel's start to the login screen (or, with automatic login, the desktop). Every
+  boot is logged with the LordOS version and build (`journalctl -b -u lordos | grep "first frame"`) and
+  kept in `/var/lib/lordos/boot-times.jsonl` (the last 200 boots), so boots and versions can be compared;
+  `docs/RESULTS.md` explains how to check and compare them.
+- **`lordos-fetch`.** Type it in a terminal to see the LordOS crown beside a summary of your
+  computer: system, kernel, CPU, GPU, display, memory, disk, packages and how apps are isolated.
+  `lordos-fetch --share` leaves out your user and computer names, for a screenshot you'll post.
+- **System Information** (About LordOS → System Report…): every piece of hardware this computer has
+  and what LordOS makes of it. The graphics card is shown layer by layer (driver, display output,
+  render node, GPU context, composition, direct scanout) with the exact reason when the screen is
+  composed on the CPU, and a Compatibility panel says what works, what works with limits and what
+  wasn't checked. Its Report tab shows the exact text of a report (Markdown or JSON) before you copy
+  it or save it to Documents; nothing is sent anywhere. Its Checks tab checks LordOS's claims on this
+  computer (display server without root, Landlock, the per-app firewall, verified code, the remote
+  desktop closed when off, app scopes owned by the system) and says whether each was only found
+  configured or actually tried. **Run tests** starts a test app that tries, inside the same sandbox as
+  any isolated app, what it must not be able to do (your files, sockets, ptrace, leaving its scope,
+  exec), plus the decoders' sandbox and the requests the system must refuse.
+- **Linux video players can keep the screen on** (idle-inhibit), and an app that copies now sees its
+  own copy in the clipboard as the Wayland protocol says.
+- **Test Bench** (`lordos-testbench`): a test pattern window that checks the display server from the
+  outside: frame timing and when frames really reach the screen, every key of the keyboard, the
+  mouse and wheel, and the Wayland protocols the system offers. G draws a 3D scene and says whether a
+  real graphics card or the processor renders it; V plays generated video at 24, 30 or 60 frames a second;
+  L locks the pointer; its last report appears in System Information → Checks. Its frame times give the
+  average, the 99th percentile and the frames that missed the display's refresh budget. Keys LordOS keeps
+  for itself (Print Screen, the media keys, ❖ on its own) are outlined in purple.
+- **Versioned results.** `tools/results/collect.sh` writes the evidence for one machine into
+  `results/<version>/<machine>/`: the hardware report, the Test Bench's report, whole-system memory with
+  PSS per process, and the boot time, with the conditions and the exact commands (`docs/RESULTS.md`).
+  Releases attach them to the GitHub release.
+- **Monitor → Network shows ping (ICMP), raw IP and packet sockets** (the last two can see or forge
+  traffic: the row says so, with the protocol or ethertype and the interface), under the app that
+  opened them, and the remote
+  desktop's own UDP ports under Remote Desktop instead of an unknown "?".
+- **`lordos-sysreport report`** prints the hardware of this computer and what the system made of it,
+  as Markdown or `--json`, with no serial numbers, addresses or names: the base of System
+  Information.
+- **Files: This Computer and every disk.** The sidebar now has This Computer, to browse the whole
+  system read-only as your user (the system's own permissions decide; the kernel's `/proc`, `/sys`,
+  `/dev` and `/run` stay out), and every disk with a file system: one that isn't mounted shows
+  dimmed and a click mounts and opens it (an internal disk asks for an administrator, as in Disks);
+  a removable one can be ejected from its ⏏. Folders you can't write show no actions that would
+  change them.
+- **Monitor → Network, second generation.** The app list is now a tree: each app opens into the
+  sites and addresses it talks to, and each address into its ports, with what was sent and received
+  everywhere, a small live meter and an allow/block switch on every destination. One pop-up button
+  holds the whole view (group by app, domain, address, port or country; incoming or outgoing; TCP or
+  UDP; allowed, denied or with rules; sort by name, most or least traffic, most recent or most
+  connections), remembered for each user. The search turns `app:`, `domain:`, `ip:`, `port:`,
+  `proto:` and `country:` into chips you can combine, and the history zoom (1 h to 30 d) now also
+  shows each app's traffic for that window.
+- **LordOS's own parts have their own rows and rules.** Mail and the calendar sync, the Store and
+  updates, printers and scanners, the Terminal (with the names of the programs you run in it) and
+  the blocklist updates each run in a process of their own, so you can see and block each one
+  separately, and the kernel enforces it. Blocking the Store asks first, because security updates
+  stop. Name resolution, time synchronization, the network service and your VPN tunnels are shown
+  too, and are never blocked.
+- **Blocklists.** Settings → Privacy → Blocklists offers public lists of advertising, tracker,
+  malware and attacking sites, each with its source and licence; turn one on and LordOS downloads
+  it over HTTPS once a day, in a sandboxed downloader, and blocks those destinations for every app.
+  You can add your own list by its https address. A rule you write for a site always wins over a
+  list: switch a blocked site on in the Monitor and it stays allowed.
+- **Deny silently.** A new firewall mode: only what a rule allows can connect, and everything else is
+  denied and recorded (this computer's own services keep working). In Settings → Privacy and in the
+  new menu bar item.
+- **Network activity in the menu bar** (optional, off by default): upload and download rates in the
+  menu bar, and a panel with the last five minutes, the apps moving data now, what was recently
+  denied, the firewall mode, the blocklists and a link to the Monitor.
+
+### Fixed
+
+- **A session started at boot could live without its keyring service and its notifications.** With
+  automatic login, `lord-sessiond` started the session as soon as `/run/user/<uid>` existed, a few
+  milliseconds before the user's service manager opened the session bus, so `lord-vault` (the Secret
+  Service) and the notification server for Linux apps never got on the bus. Apps then got nothing, or,
+  when an app had pulled in gnome-keyring, that one by D-Bus activation, with its own "Choose password
+  for new keyring" window. `lord-sessiond` now starts `user@<uid>` and waits for the bus socket (up to
+  5 s) before starting the session. And when an app pulls in gnome-keyring, a drop-in shipped by the
+  lordos package (`gnome-keyring-daemon.service.d/lordos.conf`) keeps only its PKCS#11 component, so
+  LordOS's own keyring keeps the Secret Service. Tested on the VMware machine: after a reboot with
+  automatic login, `org.freedesktop.secrets` and `org.freedesktop.Notifications` belong to the LordOS
+  session, and Chrome asks through LordOS's own keyring prompt.
+- **The Store ignored a repository written as `Architectures: amd64,arm64`.** apt accepts commas there
+  (Cursor's package writes it that way); LordOS's package engine split only on spaces, so it dropped
+  that source and never saw the app's updates. Both are accepted now.
+- **Locking the screen and switching user are faster.** Handing the screen to the sign-in screen waited
+  for every input device to close, and the last close of a USB mouse stops its transfers: about 0.7 s for
+  VMware's virtual USB mouse, so a lock took 0.6 to 1.1 s there. Access is still cut at once
+  (EVIOCREVOKE); the close now happens on a short-lived thread. Measured on a VMware Fusion VM: 903 ms
+  → 141 ms from the lock to the sign-in screen. A slow hand-off is logged with the time of each step.
+- **A dragged window's corners on the GPU path.** While a window is dragged it is painted from a cached
+  layer, and on the GPU path every fully transparent pixel of that layer was taken for the hole of a
+  Linux app's window, including the pixels outside its rounded corners. Now only pixels inside an app
+  surface can be holes. (Black corners while dragging were also seen in remote-desktop frames; that path
+  is still being looked at.)
+- **Dock → Options → Assign To with two monitors of the same model.** The assignment was kept by the
+  display's name, which two identical monitors share: both showed as checked and new windows went to the
+  first. It is now kept by the connector (HDMI-A-1, DP-2…); an assignment saved by name still works
+  while that name belongs to one display. Verified on VM 118 with two displays of the same name: Notes
+  assigned to the second display opens there after being moved to the first and quit.
+- **The sign-in and lock screen with several displays.** It was laid out over the whole desktop, so the
+  clock, the user and the password field were cut at the seam between two displays; they now go on the
+  main display (the wallpaper still covers every display) and follow a display plugged in or out while it
+  shows. Verified on VM 118 with two displays.
+- **Monitor → Network: the map always shows the traffic.** The arc to a country with no traffic at that
+  moment was drawn almost transparent, so a selected app's destinations looked unconnected; arcs now stay
+  plainly visible. Any traffic moves dots along the arcs (orange out, green in), not only above 256 B/s,
+  so a slow app (a ping, a chat) shows its direction too. And the map follows the search and the filters
+  like the list does: all apps, the selected app, or only the connections the filters leave.
+  Short connections (a page, a download) used to close before their own rate was read, which left the
+  arcs still while the app moved megabytes: the app's own rate is now spread over its destinations.
+- **Monitor → Network: one color per app on the map.** Each app's arcs have their own color, shown as a
+  dot before the app in the list, and apps that reach the same country get separate arcs, so Chromium,
+  the Terminal and the Store can be told apart; the moving dots stay orange (out) and green (in).
+- **Monitor → Network: `ping` counts under the Terminal.** Ping and raw sockets carry no cgroup of their
+  own, so `ping` run in the Terminal showed as a separate, empty app; such sockets now take their
+  process's cgroup and appear under the app that ran them.
+- **Monitor → Network: a click on the empty space under the list clears the selection.**
+- **Two failed theme switches in a row could leave the session without a theme.** After a theme was
+  refused, the server still took it as the current one, so a second refused switch fell back to it.
+  Now the last theme that loaded stays the fallback.
+- **Apps whose launcher file has a space in its name didn't appear in Apps.** A package may name its
+  `.desktop` file freely (the LordOS Imager's is `LordOS Imager.desktop`), but the launcher skipped any
+  name with a space or another unusual character. Such a name now gets an id with those characters
+  turned into `-`, and the app is listed and launched from its real file. Also, an app installed in the
+  same second the list was last read now shows up (the folders' times are compared in nanoseconds).
+- **A see-through line around the Terminal.** The Terminal's window has a transparent background, so
+  its 1-pixel border and the line under its title bar let what was behind the window show through (a
+  colored line when it was over another window). Both are now drawn opaque for transparent apps, in
+  Lord Flow and Lord Classic.
+- **The login screen no longer stays running behind your session.** It was a whole display server
+  kept in memory after sign-in (about 53 MB of its own, 78 MB counting shared pages, measured in a
+  VMware VM). It now closes 10 seconds after a session takes the screen and starts again in a few
+  milliseconds when you lock, switch user or log out; the whole system went from 603 to 548 MB in use.
+  When you lock, the screen goes dark first and only then is the login screen started, so the unlocked
+  desktop is never left visible meanwhile. Also fixed: asking for the login screen twice on a lock (the
+  monitor handed over a second time), and its mode coming out empty when a request was retried.
+- **On virtual cards that don't wait for the screen's refresh, the desktop drew hundreds of frames a
+  second.** The VMware graphics driver (`vmwgfx`) completes each page flip at once, so the compositor and
+  every app followed it at 500–580 frames a second on a 60 Hz display, using CPU for frames nobody sees.
+  LordOS now notices flips that complete within an eighth of a refresh, again and again, and paces frames
+  to the display's refresh on a fixed grid (59.8 frames a second at 60 Hz measured, p99 18.4 ms); real
+  graphics cards are unaffected. The same grid also paces sessions without a monitor, so waiting in whole
+  milliseconds no longer turns 60 frames a second into 57.
+- **The package now depends on `libwayland-egl1` when the Test Bench is built with its 3D view**, so
+  `lordos-testbench` starts on a system that didn't have it.
+- **Remote desktop video came in blocks for the first minutes, and had no sound.** The browser's
+  bandwidth estimate was a fixed ceiling, so a new connection stayed near 3 Mbit/s for about three
+  minutes; it now reaches the top in about 10 s on a local network and still slows down on
+  congestion. Software H.264 keeps its deblocking filter. Drawing without a GPU (a remote-only
+  session, a virtual machine) is faster with the same pixels: the backdrop blur 2.5×, rounded
+  rectangles 2×, and `canvas.c` builds at -O3. The video now follows the browser screen's refresh rate
+  (60, 120, 144 Hz…) instead of a fixed 30: a video window under blurred windows went from 18 to 35
+  frames a second on a virtual machine without a GPU. Heavy frames paint on several threads (up to 8,
+  only while needed): a 1080p session went from 45 to 55–58 frames a second.
+- **The keyring box couldn't be answered when several apps asked at once:** every new request wiped
+  the field and Cancel brought it back for the next one. One answer now goes to all of them, and a
+  key listener that fails no longer keeps the key from the others. The page starts muted, as browsers
+  require, and its sound button hides in the top bar: the first click or key in the session now
+  turns the sound on.
+- **Files → This computer** shows `/proc`, `/sys`, `/dev` and `/run` with a lock and says why it
+  doesn't open them, instead of "outside your home folder".
+- **Restart… and Shut Down… in a session seen only through the remote desktop** showed the
+  countdown and then did nothing: only the session on the monitor can ask for them. They are now
+  offered only there.
+- **The Store now follows apt's priorities** (`/etc/apt/preferences.d`), choosing the same versions
+  as `apt`. On the Raspberry Pi image, "Update all" could take Raspberry Pi's builds of Chromium,
+  BlueZ and other Debian packages instead of Debian's; it no longer does, and Raspberry Pi's kernel
+  packages stay blocked as the image intends.
+- **LordOS Imager offered 0.8.3 as the newest Raspberry Pi image.** It only accepted release tags
+  with three numbers, so it skipped 0.8.4.1; point releases (`v0.8.4.1-beta`) are now listed and
+  downloaded, in LordOS and in the desktop app, and the desktop app's update check reads them too.
+- A monitor plugged in after boot now shows the login screen. The login screen never listened for the
+  kernel's display events, so a board booted without HDMI (a Raspberry Pi 5) stayed without video until
+  it was restarted. It now follows them like a session does, without the system bus.
+- The Store's package engine could not download packages with a `+` in their name (`kms++-utils`,
+  `libkms++0`) from lordos.org: the CDN reads a bare `+` as a space and answered 404. It now sends
+  `%2B`, as apt does, so Settings → Board firmware can install the bootloader tools from the LordOS
+  repository alone.
+
+### Known issues and limitations
+
+- **Remote desktop: black corners on a window being dragged.** While a window is dragged, the frames the
+  remote desktop sends can show its rounded corners black; the monitor itself shows them right (checked on
+  VM 116 against the display output). Being looked at.
+- **llama.cpp on a GPU is not tested on real hardware yet.** Its Vulkan backend is meant for AMD (Mesa
+  RADV), NVIDIA (the NVIDIA driver or NVK) and Intel GPUs and falls back to the CPU without one; only the
+  CPU path and the backend loading (software Vulkan) were checked.
+- **Legacy BIOS: a black rectangle between the boot menu and the splash.** The menu itself shows
+  normally; when its 5 s run out (or Enter is pressed), GRUB loads the kernel and the initrd (about
+  100 MB) from the disc and shows its terminal area, painted black, inside the theme's background until
+  the kernel starts: a few seconds on BIOS, which reads the disc slowly, and barely visible on UEFI.
+  Seen on QEMU with SeaBIOS; 0.8.4's ISO does the same. Small test images with the same GRUB, theme and
+  `grub.cfg` but no 900 MB system image show the menu and no rectangle; a background image set in each
+  entry and a hidden countdown widget in the theme did not change it.
+- **Searching "displays" in the search panel** opens the Help article on touchpads and touch screens before
+  Settings → Displays.
+- **Settings → Displays:** in the arrangement, the name of a small display is cut without an ellipsis.
+
+### Upgrading
+
+- **From 0.8.4.1 or 0.8.4 (and 0.8.3 to 0.8.1):** Store → Updates shows "LordOS 0.8.5 is available"
+  with these notes; **Update** installs it and a restart finishes it. `sudo apt update && sudo apt
+  upgrade` does the same. No migration runs (`ls /var/lib/lordos/migrations` is unchanged from 0.8.4);
+  your settings are kept. Tested before the release with the same package built as 0.8.5~rc2: a VMware
+  machine on 0.8.4.1 and a Raspberry Pi 5 on 0.8.4, both with apt, then a restart.
+- The Store's new Artificial Intelligence and Commercial pages add a maker's repository only when you
+  install one of its apps, and remove it when you remove the app.
+
+## [0.8.4.1-beta] - 2026-10-25
+
+An update of 0.8.4 for the Raspberry Pi 5: its bootloader from Settings, and a new Pi image with the
+HDMI fix, the browsers and the ISO's system packages (0.8.4 held its Pi image back).
+
+### Added
+
+- **Settings → Board firmware (Raspberry Pi 5).** A new page, only on a Raspberry Pi 5 (and Pi 500,
+  Compute Module 5), for the bootloader that lives in the board's EEPROM: the installed version, the
+  newest one available, whether it is up to date, and **Update**. After updating it says a restart
+  finishes the job and offers **Restart…**; the board installs the new bootloader as it starts,
+  keeping its recovery path. This is LordOS's replacement for the bootloader part of
+  `raspi-config` (ignore `rpi-eeprom-update`'s hint to run it). It runs only the system's
+  `rpi-eeprom-update` with a fixed set of options, through two closed admin actions: reading the
+  status is open to everyone, updating needs an administrator (`docs/SETTINGS.md`, "Board
+  firmware").
+- **The bootloader updater in the LordOS repository.** `rpi-eeprom` (the bootloader images and
+  `rpi-eeprom-update`) and the few Raspberry Pi packages it needs (`raspi-utils` and its parts,
+  `raspinfo`, `kms++`) are now mirrored in `lordos.org/apt` for arm64, copied from Raspberry Pi's
+  archive only after its signature and every file's SHA-256 check out against a pinned list
+  (`tools/release/rpi-mirror.list`). A Pi with only the LordOS and Debian repositories gets new
+  bootloaders with the usual updates; PCs never see these packages (`docs/UPDATES.md`, "Raspberry
+  Pi firmware packages").
+- **Browsers in the Raspberry Pi image.** Chromium and Firefox ESR come preinstalled, as on the ISO,
+  with the same defaults: a single bar with their tabs and LordOS's window buttons, the LordOS GTK
+  theme and the video settings of Settings → Displays → Video (the defaults are now one script
+  shared by both images, `tools/iso/browser-defaults.sh`).
+- **The rest of the ISO's system packages in the Pi image:** automatic time (`systemd-timesyncd`),
+  printing (`cups`, `avahi-daemon`), exFAT and NTFS drives, power profiles, the MIME database and
+  the GTK settings schemas. The first user is also allowed to manage printers (`lpadmin`), as on a PC.
+
+### Fixed
+
+- **Raspberry Pi 5 on an HDMI monitor stayed on the text console** ("no display device with KMS").
+  The firmware ignored the display driver line in the image's `config.txt` because it came before
+  the `display_auto_detect` and `camera_auto_detect` lines; it now comes after them. Together with
+  0.8.4's longer wait for the display driver, the desktop shows on HDMI at the first boot.
+- **The Pi image's clock.** The board keeps no time without a battery and the image had no network
+  time client, so it started months behind and every update failed with "not valid yet". It now
+  sets the time from the network at boot.
+
+### Known issues and limitations
+
+- **A monitor plugged in after boot stays black** until the board is restarted: the login screen
+  doesn't follow the kernel's display events yet. Connect the HDMI monitor before switching the board
+  on. Fixed for 0.8.5.
+- **A Pi set up from the 0.8.3 image** has no network time client: if Store → Updates fails, set the
+  time in Settings → Date & Time first, then install `systemd-timesyncd` from the Store.
+- **The bootloader release** (*Default* or *Latest*) is shown but not changed from Settings: it is
+  `/etc/default/rpi-eeprom-update`, a file of the `rpi-eeprom` package.
+- **Raspberry Pi archive on the Pi image.** The image still lists Raspberry Pi's archive, limited by
+  apt priorities to the firmware, kernel tools and utilities; the Store's own package engine does
+  not read apt priorities yet, so "Update all" there may take Raspberry Pi's builds of a few
+  packages (such as Chromium or BlueZ) instead of Debian's. `apt` follows the priorities.
+- **`install.sh` does not install browsers** (on a Raspberry Pi OS Lite or any Debian 13): install
+  Chromium or Firefox ESR from the Store if the system has none (`docs/INSTALL-DEBIAN.md`).
+
+### Upgrading
+
+- **From 0.8.4 (and 0.8.3 to 0.8.1):** Store → Updates shows "LordOS 0.8.4.1 is available" with
+  these notes; **Update** installs it and a restart finishes it. `sudo apt update && sudo apt
+  upgrade` does the same. No migration runs (`ls /var/lib/lordos/migrations` is unchanged from
+  0.8.4); your settings are kept. On a PC nothing else changes.
+- **Raspberry Pi 5:** after the update, Settings shows **Board firmware**. If it says
+  "The bootloader tools are not installed", **Install** adds `rpi-eeprom` from the LordOS
+  repository. The browsers and the other image packages above are not added to a board that is
+  already set up: install them from the Store.
+
+## [0.8.4-beta] - 2026-10-19
 
 ### Added
 
@@ -62,8 +2067,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   compared after writing; cancelling clears the card. In English, Spanish and Portuguese, with
   keyboard navigation. See [docs/IMAGER.md](docs/IMAGER.md).
 - **The LordOS Imager for other computers**: the same app for the three common desktop platforms (Tauri, about
-  6 MB), sharing the interface with the one in LordOS. Built from the source for now; signed
-  downloads will come with a release.
+  6 MB), sharing the interface with the one in LordOS, attached to this release as
+  `lordos_imager_0.8.4_universal.dmg` (both processor families, signed and notarized, so it opens
+  without warnings), `lordos_imager_0.8.4_amd64.deb` (needs udisks2 and a polkit agent) and
+  `lordos_imager_0.8.4_x64_setup.exe` (not code-signed yet, see Known issues), all listed in the
+  signed `SHA256SUMS`.
 - **First-run file on the Raspberry Pi** (`lordos-firstrun.txt` on the boot partition): read once on
   the first boot by `lordos-firstrun`, strictly validated (nothing is applied if any part is wrong),
   then overwritten and deleted. See [docs/RASPBERRY.md](docs/RASPBERRY.md), "First boot".
@@ -100,6 +2108,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Raspberry Pi 5 on an HDMI monitor: "LordOS could not show its desktop" on the first boot.** The
+  login screen gave up when the display driver (vc4) wasn't there yet as LordOS started, and the
+  board stayed on the text console. LordOS now loads the driver itself and waits up to 30 s for it,
+  and the session waits up to 30 s more for a display device before falling back.
 - **Two title bars in Chromium.** With «Use system title bar and borders» off, Chromium drew its own
   bar and LordOS still put its frame on top: the compositor now honors the frame an app asks for
   (xdg-decoration and the GTK 3 decoration protocol), also when it changes while the window is
@@ -121,6 +2133,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   session end 0.04–0.37 s after the rule changes, an HTTP/3 (QUIC) download 0.08 s.
 - **`build-kernel.sh` cross-compiles** the Pi kernel on an x86-64 Debian 13 (the arm64 Debian
   packages, no arm64 build dependencies needed).
+
+### Known issues and limitations
+
+- **The remote desktop needs a browser with WebRTC and H.264 or VP8 video.** Current desktop and
+  mobile browsers have both; a browser without them gets a page that lists what it needs, since
+  the image mode is gone (see Removed).
+- **No Raspberry Pi 5 image in this release.** The 0.8.3 image could stay on the text console on
+  an HDMI monitor at its first boot (see Fixed); the 0.8.4 image with the fix is built but has not
+  been booted on a board with a monitor yet, so it is not published until it has. Until then the
+  LordOS Imager offers the 0.8.3 image for the Pi, which may show that message on its first boot.
+  Raspberry Pi OS Lite plus `curl -fsSL https://lordos.org/install.sh | sh` gives a working
+  LordOS 0.8.4 on the Pi 5, and installed boards update as usual.
+- **Raspberry Pi 5 boards updated from the Store or `apt` keep their kernel.** The LordOS Pi kernel
+  is not in the APT repository yet (`docs/UPDATES.md`, "The Raspberry Pi kernel"), so the `-3`
+  kernel, which closes the connections of a blocked app, comes with the next Pi image. On a board
+  with the `-2` kernel the firewall still drops a blocked connection's packets, but the app only
+  sees it end at its own timeout, as in 0.8.3.
+- **The LordOS Imager:** the desktop downloads were tested writing to disk images, not yet to real
+  SD cards or USB sticks; the first-run file was applied to the 0.8.4 Pi image in a test (every
+  setting checked), not yet booted on a board. The installer for the third platform is not code-signed yet, so the system warns
+  before running it the first time; its SHA-256 is in the signed `SHA256SUMS`. Images up to 0.8.3
+  ignore the first-run file and start in setup mode.
+- **Existing Chromium profiles keep the LordOS frame** until you switch them (Settings → Appearance
+  lists them, with a button); new profiles and Firefox get the single bar.
+- Monitor → Network's second generation, listed for 0.8.4 in the roadmap, is not in this release.
+- The other known issues of 0.8.3 still apply.
+
+### Upgrading
+
+- **From 0.8.3, 0.8.2 or 0.8.1:** Store → Updates shows "LordOS 0.8.4 is available" with these
+  notes; **Update** installs it (with its two new libraries, `libsrtp2-1` and `libusrsctp2`), and a
+  restart finishes it. `sudo apt update && sudo apt upgrade` does the same (`apt-get upgrade` keeps
+  `lordos` back because of the new dependencies; `apt upgrade` or `apt-get install lordos` installs
+  it). The update runs migration 005 once (the preinstalled browsers' default bar; from older
+  versions the earlier migrations run first); `ls /var/lib/lordos/migrations` lists the ones
+  applied. Your settings are kept.
+- **Browsers after the update:** Firefox draws its single bar the next time it opens (unless you
+  chose «Title Bar» yourself); new Chromium profiles do too. To get it in an existing Chromium
+  profile, or to go back to the LordOS frame for both, use Settings → Appearance → «Browsers: tabs
+  in the title bar».
+- **Remote desktop after the update:** it is WebRTC video only. The «images only» switch is gone
+  from Settings → Sharing; nothing else changes in its settings (port, addresses, the lockout).
+  Where only the remote desktop's port is open, the video now connects over TCP on that port.
+- **Raspberry Pi 5:** `lordos` updates from the Store or `apt` like on a PC. The `-3` kernel comes
+  with the next Pi image (see Known issues); on an updated board `uname -r` still shows
+  `6.18.57-lordos-rpi-2712`. Building and installing it by hand next
+  to the old one is described in `docs/RASPBERRY.md`, "Switching kernels on a board".
+- **From 0.8.0 (once):** run `curl -fsSL https://lordos.org/install.sh | sh` (a system installed
+  from the 0.8.0 ISO has no `curl`: run `sudo apt update && sudo apt install -y curl` first). It
+  upgrades in place to 0.8.4, runs migrations 001 to 005 and adds the LordOS repository; from then
+  on new versions come through Store → Updates.
 
 ## [0.8.3-beta] - 2026-10-19
 
@@ -1188,7 +3251,12 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.3-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...HEAD
+[0.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...v0.8.7-beta
+[0.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...v0.8.6-beta
+[0.8.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4.1-beta...v0.8.5-beta
+[0.8.4.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.4-beta...v0.8.4.1-beta
+[0.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.3-beta...v0.8.4-beta
 [0.8.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.2-beta...v0.8.3-beta
 [0.8.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.1-beta...v0.8.2-beta
 [0.8.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.0-beta...v0.8.1-beta

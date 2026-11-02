@@ -147,7 +147,45 @@ void out_snap(const ORect *r, int n, int moving, int want_x, int want_y, int sna
     *y = by;
 }
 
+/* An edge of one on an edge of the other, along at least one pixel. */
+static int touching(ORect a, ORect b) {
+    if ((a.x + a.w == b.x || b.x + b.w == a.x) && (a.y < b.y + b.h && b.y < a.y + a.h)) return 1;
+    if ((a.y + a.h == b.y || b.y + b.h == a.y) && (a.x < b.x + b.w && b.x < a.x + a.w)) return 1;
+    return 0;
+}
+
+int out_fits(const ORect *r, int n, int moving, int x, int y) {
+    if (n < 2) return 1;
+    ORect m = { x, y, r[moving].w, r[moving].h };
+    int touch = 0;
+    for (int j = 0; j < n; j++) {
+        if (j == moving) continue;
+        if (overlaps(m, r[j])) return 0;
+        if (touching(m, r[j])) touch = 1;
+    }
+    return touch;
+}
+
+int out_valid(const ORect *r, int n) {
+    if (n <= 1) return 1;
+    if (n > 64) return 0;
+    for (int i = 0; i < n; i++)
+        for (int j = i + 1; j < n; j++) if (overlaps(r[i], r[j])) return 0;
+    /* joined: grow the set reached from r[0] through shared edges */
+    unsigned long long seen = 1;
+    for (int grew = 1; grew;) {
+        grew = 0;
+        for (int i = 0; i < n; i++) {
+            if (seen >> i & 1) continue;
+            for (int j = 0; j < n; j++)
+                if ((seen >> j & 1) && touching(r[i], r[j])) { seen |= 1ULL << i; grew = 1; break; }
+        }
+    }
+    return seen == (n == 64 ? ~0ULL : (1ULL << n) - 1);
+}
+
 void out_fix(ORect *r, int n) {
+    if (out_valid(r, n)) return;
     for (int i = 1; i < n; i++) out_snap(r, i + 1, i, r[i].x, r[i].y, 0, &r[i].x, &r[i].y);
 }
 

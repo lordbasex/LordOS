@@ -14,8 +14,33 @@ materials (SBOM) published with each release. The website summary is at
   added there in the same change that adds it.
 - The `.deb` carries a machine-readable `usr/share/doc/lordos/copyright` (Debian copyright format,
   written by `tools/iso/mkdeb.sh`), and each font ships its license text next to it
-  (`assets/fonts/*-LICENSE.txt`).
+  (`assets/fonts/*-LICENSE.txt`). The Noto subsets built into `lord-bench` have no files of their own:
+  their license is `usr/share/doc/lordos/OFL-Noto.txt`.
 - Debian packages keep their own `/usr/share/doc/<package>/copyright` on the installed system.
+- **Raspberry Pi packages mirrored in the LordOS APT repository** (arm64, since 0.8.4.1;
+  `tools/release/rpi-mirror.list`, [UPDATES.md](UPDATES.md), "Raspberry Pi firmware packages") are
+  copied byte for byte, each with its own `copyright` inside: `rpi-eeprom` (scripts BSD-3-Clause;
+  bootloader images under Raspberry Pi's binary licence, which allows redistribution of unmodified
+  binaries for use with Raspberry Pi devices with the notice), `raspi-utils` and its parts
+  (BSD-3-Clause) and `kms++` (MPL-2.0). For the MPL-2.0 binaries the corresponding source, the
+  `kms++` source package of the same version from Raspberry Pi's archive, is published next to them
+  at https://lordos.org/apt/pool/rpi/source/k/kms++/ (pinned in `rpi-mirror.list` with architecture
+  `source`, verified against Raspberry Pi's signed `Sources` index, kept in the append-only pool);
+  upstream is `https://github.com/tomba/kmsxx`. A new pinned kms++ version needs its `source` line too.
+- **Raspberry Pi's FFmpeg (0.8.7, Pi 5 image and updates on a Pi):** `ffmpeg` and its libraries come from Raspberry Pi's
+  archive, the only build that drives the Pi 5's HEVC decoder ([WALLPAPERS.md](WALLPAPERS.md)), with their own `copyright`
+  inside. Because the image carries the binaries, the source package of the same version is published at
+  https://lordos.org/apt/pool/rpi/source/f/ffmpeg/, pinned in `rpi-mirror.list` the same way. An image built with a newer
+  FFmpeg needs its new `source` line too.
+- **The app catalog (0.8.5, Store → Artificial Intelligence and Commercial;** `apt/catalog.json`,
+  `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
+  Apps delivered `direct` (Claude Code, Claude Desktop, Visual Studio Code, Cursor, Google Chrome,
+  Microsoft Edge, Spotify, all proprietary) are not redistributed by LordOS: the Store adds the
+  vendor's own signed APT repository with a pinned key, and the package comes from there under the
+  vendor's terms. The packages published in `pool/catalog/` are goose (Apache-2.0) and opencode (MIT),
+  the vendors' `.deb` files unmodified with a pinned SHA-256, and three LordOS builds: `llama.cpp` and
+  `whisper.cpp` (MIT), built from the upstream source tarball pinned by URL and SHA-256 in the
+  catalog, and `codex-cli` (Apache-2.0), OpenAI's static binary with its sigstore signature checked.
 
 ## The SBOM
 
@@ -26,7 +51,7 @@ document for a built package:
 |---|---|---|
 | `lordos` | the `.deb` itself: version, architecture, SHA-256, download URL on GitHub Releases, MIT | `dpkg-deb -f` |
 | Bundled code | QuickJS, Monocypher, stb_image, stb_image_write, stb_truetype, the EFF and SecLists word lists, react, react-reconciler, scheduler, the Unicode data | `third_party/*/VERSION`, the stb headers, `package-lock.json`, `server/src/ui/unidata.h` |
-| Fonts | Inter, Plus Jakarta Sans, JetBrains Mono (OFL-1.1), with the SHA-256 of each `.ttf` in the package | the font's revision (`fc-scan`, when fontconfig is installed) |
+| Fonts | Inter, Plus Jakarta Sans, JetBrains Mono (OFL-1.1), with the SHA-256 of each `.ttf` in the package; the Noto subsets built into `lord-bench` (OFL-1.1), with no checksum of their own | the font's revision (`fc-scan`, when fontconfig is installed); not versioned for the Noto subsets |
 | Data | DB-IP Lite Country (CC-BY-4.0) and Natural Earth (public domain), with the SHA-256 of the files in the package | not versioned |
 | Debian packages | every package in the `.deb`'s `Depends` (`DEPENDS_ON`) and `Recommends` (`OPTIONAL_DEPENDENCY_OF`), with a `pkg:deb/debian/…` purl | `dpkg-query` on the machine that runs the script |
 

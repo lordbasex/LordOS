@@ -31,6 +31,8 @@
 #include "../sec/cgroup.h"
 #include "proto.h"
 #include "rsec.h"
+#include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
+#include "../bench/boottest.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -58,6 +60,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -404,6 +407,13 @@ static void file_value(const char *path, const char *key, char *out, size_t n) {
 }
 
 static char greeter_mode[8] = "login", greeter_user[33];
+/* The login screen costs a lord-server (about 50 MB of its own memory, measured in a VM) and isn't
+ * needed while a session is on the monitor: it is stopped this long after a session takes the monitor,
+ * and started again for a lock, a user switch or a log out (sd_greeter_get starts it on demand). */
+#define GREETER_LINGER_S 10
+static double greeter_stop_at;
+static double greeter_asked_at;
+static int left_on_purpose;             /* the monitor was just taken from the session for a lock or a switch */         /* when the login screen was asked for (lock, switch), to log the wait */
 
 /* The last user whose session was shown on the monitor: the login screen preselects it. Kept in
  * SD_LAST_USER (root's, 0644) so it survives a reboot; only a valid user name is read back. */
@@ -436,6 +446,11 @@ static void save_last_user(const char *user) {
     if (!ok || rename(SD_LAST_USER ".new", SD_LAST_USER)) unlink(SD_LAST_USER ".new");
 }
 
+/* LordBench's boot time test (bench/boottest.h): after a test boot's first frame, when to restart (rd_now()
+ * seconds, 0 = not pending) and which boot of how many this one was */
+static double bt_reboot_at;
+static int bt_k, bt_n;
+
 static void greeter_reply_hello(void) {
     Str s = { 0 };
     sput(&s, "{\"t\":\"hello\",\"mode\":\"%s\",\"user\":\"%s\",\"last\":\"%s\",\"host\":\"", greeter_mode, greeter_user,
@@ -447,7 +462,12 @@ static void greeter_reply_hello(void) {
     file_value("/etc/default/keyboard", "XKBLAYOUT", layouts, sizeof layouts);
     file_value("/etc/default/keyboard", "XKBVARIANT", variants, sizeof variants);
     file_value("/etc/default/locale", "LANG", lang, sizeof lang);
-    sput(&s, "\",\"layouts\":\"%s\",\"variants\":\"%s\",\"lang\":\"%s\",\"users\":[", layouts, variants, lang);
+    sput(&s, "\",\"layouts\":\"%s\",\"variants\":\"%s\",\"lang\":\"%s\",", layouts, variants, lang);
+    if (bt_reboot_at > 0) {
+        double left = bt_reboot_at - rd_now();
+        sput(&s, "\"bootTest\":{\"k\":%d,\"n\":%d,\"in\":%d},", bt_k, bt_n, left > 0 ? (int)(left + 0.5) : 0);
+    }
+    sput(&s, "\"users\":[");
     setpwent();
     int first = 1, count = 0;
     struct passwd *pw;
@@ -488,8 +508,13 @@ static WorkKind pending;
 static char pending_user[33];
 
 static void set_mode(const char *mode, const char *user) {
-    snprintf(greeter_mode, sizeof greeter_mode, "%s", mode);
-    snprintf(greeter_user, sizeof greeter_user, "%s", user ? user : "");
+    /* through copies: callers may pass greeter_mode and greeter_user themselves (a retry), and an
+     * snprintf onto its own source is undefined (it left the mode empty) */
+    char m[sizeof greeter_mode], u[sizeof greeter_user];
+    snprintf(m, sizeof m, "%s", mode ? mode : "login");
+    snprintf(u, sizeof u, "%s", user ? user : "");
+    memcpy(greeter_mode, m, sizeof m);
+    memcpy(greeter_user, u, sizeof u);
 }
 
 /* In a child: the login screen (creates it if needed) to the monitor. */
@@ -584,7 +609,7 @@ static int start_worker(WorkKind kind, const char *user, char *pass) {
 
 static void show_greeter(const char *mode, const char *user) {
     set_mode(mode, user);
-    if (start_worker(W_GREETER, NULL, NULL)) pending = W_GREETER;
+    if (start_worker(W_GREETER, NULL, NULL)) { pending = W_GREETER; sd_log("login screen (%s) queued behind a running worker", greeter_mode); }
 }
 
 static void power(const char *what, const char *who) {
@@ -643,17 +668,108 @@ static int splash_up(void) {
     return stat(SD_FIRST_FRAME, &st) != 0;
 }
 
+/* Every boot's time to the first frame, kept across reboots to compare boots and versions:
+ * /var/lib/lordos/boot-times.jsonl (root's, 0644), one JSON object a line, the last BOOT_TIMES_MAX.
+ * Only values LordOS produces itself: no user or host names. About LordOS shows this boot's line
+ * (js_sys.c, matched by bootId). */
+#define BOOT_TIMES SD_STATE_DIR "/boot-times.jsonl"
+#define BOOT_TIMES_MAX 200
+static void record_boot_time(double secs, const char *what, int test_k, int test_n) {
+    char id[40] = "";
+    FILE *b = fopen("/proc/sys/kernel/random/boot_id", "re");
+    if (b) { if (!fgets(id, sizeof id, b)) id[0] = 0; fclose(b); }
+    id[strspn(id, "0123456789abcdef-")] = 0;
+    struct utsname u;
+    if (uname(&u)) u.release[0] = 0;
+    char rel[65];
+    snprintf(rel, sizeof rel, "%s", u.release);
+    for (char *q = rel; *q; q++) if (!isalnum((unsigned char)*q) && !strchr(".+~-_", *q)) *q = '_';
+    char line[400], test[48] = "";
+    if (test_k > 0) snprintf(test, sizeof test, ",\"test\":%d,\"testOf\":%d", test_k, test_n);     /* a boot time test's boot */
+    snprintf(line, sizeof line, "{\"bootId\":\"%s\",\"at\":%lld,\"seconds\":%.3f,\"shown\":\"%s\",\"version\":\"%s%s%s\",\"build\":\"%s\",\"kernel\":\"%s\"%s}\n",
+             id, (long long)time(NULL), secs, what, LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL, LORD_BUILD, rel, test);
+    /* the older lines, at most BOOT_TIMES_MAX - 1, then this one; written whole and renamed */
+    static char old[BOOT_TIMES_MAX * 400];
+    size_t n = 0;
+    int fd = open(BOOT_TIMES, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd >= 0) {
+        ssize_t r;
+        while (n < sizeof old - 1 && (r = read(fd, old + n, sizeof old - 1 - n)) > 0) n += (size_t)r;
+        close(fd);
+    }
+    old[n] = 0;
+    int lines = 0;
+    for (size_t i = 0; i < n; i++) if (old[i] == '\n') lines++;
+    char *keep = old;
+    while (lines >= BOOT_TIMES_MAX && (keep = strchr(keep, '\n'))) { keep++; lines--; }
+    if (!keep) keep = old + n;
+    mkdir(SD_STATE_DIR, 0755);
+    char tmp[] = SD_STATE_DIR "/.boot-times.XXXXXX";
+    int t = mkostemp(tmp, O_CLOEXEC);
+    if (t < 0) { sd_log("warning: %s: %s", BOOT_TIMES, strerror(errno)); return; }
+    size_t kl = strlen(keep);
+    int ok = (kl == 0 || write(t, keep, kl) == (ssize_t)kl) && write(t, line, strlen(line)) == (ssize_t)strlen(line);
+    ok = fchmod(t, 0644) == 0 && ok;
+    ok = close(t) == 0 && ok;
+    if (!ok || rename(tmp, BOOT_TIMES)) { unlink(tmp); sd_log("warning: could not write %s", BOOT_TIMES); }
+}
+
 static void first_frame(void) {
     if (!splash_up()) return;
     int f = open(SD_FIRST_FRAME, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0644);
     if (f < 0) { sd_log("warning: %s: %s", SD_FIRST_FRAME, strerror(errno)); return; }
     close(f);
-    sd_log("first frame on the monitor: the boot splash can go");
+    /* the boot time to the screen, from the kernel's start (CLOCK_BOOTTIME), for the log, About and
+     * the results (docs/RESULTS.md) */
+    struct timespec bt;
+    clock_gettime(CLOCK_BOOTTIME, &bt);
+    double secs = bt.tv_sec + bt.tv_nsec / 1e9;
+    const char *what = !has_monitor ? "none" : shown == 'u' ? "session" : "login";   /* autologin, login screen, no monitor */
+    sd_log("first frame on the monitor %.3f s after the kernel started (LordOS %s%s%s, build %s, %s): the boot splash can go",
+           secs, LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL, LORD_BUILD, what);
+    /* LordBench's boot time test: this boot's number, and another restart if any are left */
+    BootTest b, after;
+    struct stat bst;
+    int have = bt_read(BT_PATH, &b) == 0, k = 0;
+    int act = bt_next(have, &b, (long long)time(NULL), &k, &after);
+    if (!have && !lstat(BT_PATH, &bst)) { unlink(BT_PATH); sd_log("boot time test: %s is not valid; removed", BT_PATH); }
+    if (act == BT_STALE) { unlink(BT_PATH); sd_log("boot time test: the state is too old; removed"); }
+    else if (act == BT_LAST) { unlink(BT_PATH); sd_log("boot time test: boot %d of %d, the last one", k, b.total); }
+    else if (act == BT_AGAIN) {
+        if (bt_write(BT_PATH, &after)) { unlink(BT_PATH); sd_log("warning: boot time test: could not write %s; stopped", BT_PATH); }
+        else {
+            bt_reboot_at = rd_now() + BT_SETTLE_S;
+            bt_k = k;
+            bt_n = b.total;
+            sd_log("boot time test: boot %d of %d; restarting in %d s (a login at the login screen cancels it)", k, b.total, BT_SETTLE_S);
+        }
+    }
+    record_boot_time(secs, what, act == BT_LAST || act == BT_AGAIN ? k : 0, b.total);
+}
+
+/* the boot time test stops: no restart, the state file removed */
+static void boot_test_cancel(const char *why) {
+    if (bt_reboot_at <= 0) return;
+    bt_reboot_at = 0;
+    unlink(BT_PATH);
+    sd_log("boot time test cancelled (%s) after boot %d of %d", why, bt_k, bt_n);
+}
+
+/* the restart, if nobody cancelled meanwhile and the file still says what this boot wrote */
+static void boot_test_tick(void) {
+    if (bt_reboot_at <= 0 || rd_now() < bt_reboot_at) return;
+    bt_reboot_at = 0;
+    BootTest c;
+    if (bt_read(BT_PATH, &c) || c.total != bt_n || c.left != bt_n - bt_k) { sd_log("boot time test: cancelled meanwhile"); return; }
+    char who[64];
+    snprintf(who, sizeof who, "by the boot time test (boot %d of %d done)", bt_k, bt_n);
+    power("reboot", who);
 }
 
 /* No card with KMS (0.8.1): before this, the boot ended on a silent black screen. The message goes
  * to the text console (tty1, drawn by the firmware framebuffer if there is one) a few seconds
- * later, once the boot splash has quit. A grandchild does it, so nothing waits and nothing has to be
+ * later, once the boot splash has quit; 80 columns at most, the size of a text console. A grandchild
+ * does it, so nothing waits and nothing has to be
  * reaped here. */
 static void tell_no_display(void) {
     pid_t p = fork();
@@ -667,11 +783,11 @@ static void tell_no_display(void) {
     ioctl(t, KDSETMODE, KD_TEXT);
     static const char msg[] =
         "\033[2J\033[H\r\n"
-        "  LordOS could not show its desktop: no display device with kernel modesetting (KMS)\r\n"
-        "  was found.\r\n\r\n"
-        "  In a virtual machine, choose another display device (VirtIO GPU or standard VGA;\r\n"
-        "  on VMware itself, its default SVGA display works). On a PC, check that the graphics\r\n"
-        "  card has a kernel driver.\r\n\r\n"
+        "  LordOS could not show its desktop: no display device with kernel\r\n"
+        "  modesetting (KMS) was found.\r\n\r\n"
+        "  In a virtual machine, choose another display device: VirtIO GPU,\r\n"
+        "  standard VGA or SVGA. On a PC, check that the graphics card has a\r\n"
+        "  kernel driver.\r\n\r\n"
         "  Press Ctrl+Alt+F2 for a text console.\r\n";
     ssize_t w = write(t, msg, sizeof msg - 1);
     (void)w;
@@ -697,6 +813,9 @@ static void from_worker(void) {
     if (n <= 0) { if (fd >= 0) close(fd); return; }
     char user[40];
     if (!strcmp(buf, "show g") && fd >= 0) {
+        greeter_stop_at = 0;
+        if (greeter_asked_at) sd_log("monitor: the login screen (%s), %.0f ms after the screen went dark", greeter_mode, (rd_now() - greeter_asked_at) * 1000);
+        greeter_asked_at = 0;
         set_shown('g', NULL);
         if (sd_mon_show(fd, "-", keep_lend())) { sd_mon_lost(); set_shown('-', NULL); }
         return;
@@ -705,7 +824,7 @@ static void from_worker(void) {
         sd_log("monitor: %s's session", user);
         set_shown('u', user);
         if (sd_mon_show(fd, user, keep_lend())) { sd_mon_lost(); set_shown('-', NULL); show_greeter("login", NULL); }
-        else save_last_user(user);
+        else { save_last_user(user); greeter_stop_at = rd_now() + GREETER_LINGER_S; }
         return;
     }
     if (fd >= 0) close(fd);
@@ -747,6 +866,24 @@ static void session_power(const char *j) {
     power(what, who);
 }
 
+/* Lock and switch user: the login screen isn't kept running behind a session (it is stopped a few
+ * seconds after a session takes the monitor, greeter_stop_at), and starting it takes a moment. So the
+ * monitor is taken from the session first: input revoked, its framebuffers removed (the screen goes
+ * dark), and only then is the login screen asked for. An unlocked desktop is never left on the screen
+ * while it starts. */
+static void leave_for_greeter(const char *mode) {
+    char user[40];
+    snprintf(user, sizeof user, "%s", shown_user);
+    greeter_stop_at = 0;
+    greeter_asked_at = rd_now();
+    left_on_purpose = 1;                /* the closed connection isn't the session ending (monitor_event) */
+    double t0 = rd_now();
+    sd_mon_lost();
+    sd_log("monitor: taken from %s in %.0f ms", user, (rd_now() - t0) * 1000);
+    set_shown('-', NULL);
+    show_greeter(mode, user);
+}
+
 /* Requests from the session being shown: lock, switch user, restart or shut down; from the login screen:
  * log in, restart or shut down. */
 static void from_shown(int type, const char *j) {
@@ -759,9 +896,9 @@ static void from_shown(int type, const char *j) {
             sd_log("%s locked the screen", shown_user);
             struct passwd *lp = sd_valid_username(shown_user) ? getpwnam(shown_user) : NULL;
             if (lp) rd_tokens_drop_uid(lp->pw_uid);        /* locking also signs that user's browsers out */
-            show_greeter("lock", shown_user);
+            leave_for_greeter("lock");
         }
-        else if (strstr(j, "\"switch\"")) { sd_log("%s is switching user", shown_user); show_greeter("switch", shown_user); }
+        else if (strstr(j, "\"switch\"")) { sd_log("%s is switching user", shown_user); leave_for_greeter("switch"); }
         return;
     }
     if (type != RP_GREETER || shown != 'g') return;
@@ -772,8 +909,12 @@ static void from_shown(int type, const char *j) {
         char u[40] = "", pass[300] = "";
         jstr(j, "user", u, sizeof u);
         jstr(j, "pass", pass, sizeof pass);
+        boot_test_cancel("a login at the login screen");
         if (!sd_valid_username(u) || start_worker(W_LOGIN, u, pass)) sd_mon_greeter("{\"t\":\"busy\"}");
         explicit_bzero(pass, sizeof pass);
+    } else if (!strcmp(t, "bootTestCancel")) {
+        boot_test_cancel("from the login screen");
+        greeter_reply_hello();
     } else if (!strcmp(t, "power")) {
         char what[16] = "";
         jstr(j, "a", what, sizeof what);
@@ -782,7 +923,8 @@ static void from_shown(int type, const char *j) {
 }
 
 static void monitor_event(void) {
-    if (sd_mon_read(from_shown) == 0) return;
+    left_on_purpose = 0;
+    if (sd_mon_read(from_shown) == 0 || left_on_purpose) { left_on_purpose = 0; return; }
     /* the session being shown ended: it logged out, or the login screen crashed */
     char was = shown;
     sd_mon_lost();
@@ -1222,6 +1364,16 @@ int main(int argc, char **argv) {
             if ((p == cmd || p[-1] == ' ') && (p[19] == 0 || p[19] == ' ' || p[19] == '\n')) sd_input_debug = 1;
         if (k && !strcmp(k, "1")) sd_input_debug = 1;
         if (sd_input_debug) sd_log("key latency trace on for user sessions (lordos.inputdebug=1)");
+        /* GPU switches that are off by default, for a measurement: only root sets the service's environment,
+         * and the login screen never gets them (docs/GPU.md) */
+        static const char *const tune[SD_TUNE_N] = { "LORD_GPU_SCISSOR", "LORD_GPU_DRAG", "LORD_PIPELINE", "LORD_GPU_VERIFY" };
+        for (int i = 0; i < SD_TUNE_N; i++) {
+            const char *v = getenv(tune[i]);
+            if (v && strlen(v) < 10) {
+                snprintf(sd_tune_env[i], sizeof sd_tune_env[i], "%s=%s", tune[i], v);
+                sd_log("user sessions get %s", sd_tune_env[i]);
+            }
+        }
     }
     sd_log("sessions with %s%s%s", rd_conf.server, sd_gpu_env[0] ? ", " : "", sd_gpu_env);
     int wk[2];
@@ -1281,7 +1433,12 @@ int main(int argc, char **argv) {
         if (r > 0 && lfd >= 0 && (p[1].revents & POLLIN)) accept_remote();
         if (r > 0 && p[2].fd >= 0 && p[2].fd == sd_mon_fd() && p[2].revents) monitor_event();
         if (r > 0 && p[3].fd >= 0 && (p[3].revents & POLLIN)) sd_mon_hotplug();     /* hotplug */
+        if (greeter_stop_at && rd_now() >= greeter_stop_at) {
+            greeter_stop_at = 0;
+            if (shown == 'u' && worker_pid < 0 && pending == W_NONE) stop_greeters("a session is on the monitor");
+        }
         if (rd_shared->lockout_dirty) save_lockout();
+        boot_test_tick();
         deliver_notices();
         if (rd_shared->version != seen) { seen = rd_shared->version; write_status(); }
         else {

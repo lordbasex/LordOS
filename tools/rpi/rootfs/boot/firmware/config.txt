@@ -1,14 +1,12 @@
-# config.txt — LordOS for Raspberry Pi 5 (the only supported board). See docs/RASPBERRY.md.
+# config.txt - LordOS for Raspberry Pi 5 (the only supported board). See docs/RASPBERRY.md.
 # Read by the board firmware before the kernel. It can be edited with the card in another machine.
 
 [all]
 arm_64bit=1
 # no rainbow square at power-on: the LordOS boot splash (Plymouth) is the first thing on the screen
 disable_splash=1
-# initramfs with the same name as the kernel (kernel_2712.img → initramfs_2712, kernel8.img → initramfs8)
+# initramfs with the same name as the kernel (kernel_2712.img -> initramfs_2712, kernel8.img -> initramfs8)
 auto_initramfs=1
-# Full KMS: vc4 drives HDMI (the display) and v3d the 3D GPU. lord-server uses KMS without libdrm.
-dtoverlay=vc4-kms-v3d
 max_framebuffers=2
 # the firmware does not touch the modes: the kernel picks them (KMS)
 disable_fw_kms_setup=1
@@ -17,6 +15,10 @@ disable_overscan=1
 display_auto_detect=1
 camera_auto_detect=1
 dtparam=audio=on
+# Full KMS: vc4 drives HDMI (the display) and v3d the 3D GPU. lord-server uses KMS without libdrm.
+# It must come AFTER camera_auto_detect/display_auto_detect: on the Pi 5 the firmware ignored a
+# dtoverlay line placed before them (no display at all, found on real hardware in 0.8.3/0.8.4).
+dtoverlay=vc4-kms-v3d
 
 [pi5]
 # NVMe through the M.2 HAT (or the official base): external PCIe on. Gen 3 doubles the speed;
@@ -32,5 +34,5 @@ dtparam=pciex1_gen=3
 arm_boost=1
 
 [all]
-# the case's extras, written by Settings → Cooling (admin action rpi-case, docs/FANS.md)
+# the case's extras, written by Settings -> Cooling (admin action rpi-case, docs/FANS.md)
 include lordos-case.txt

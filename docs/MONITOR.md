@@ -11,7 +11,11 @@ Phase 1 was read-only. Since then the Network tab holds per-app firewall rules (
 0.8.1, the Processes tab can stop a process and show its details ("Process actions"). In 0.8.2
 each destination of an app has its own allow/block switch, the traffic chart reaches back 30 days
 ("Traffic history"), the Disks tab shows each disk's temperature and health, and the session can
-notify when a disk gets too hot or less healthy ("Disk temperature and health").
+notify when a disk gets too hot or less healthy ("Disk temperature and health"). In 0.8.3 the
+remote desktop is a row of its own and blocking an app cuts the connections it had open. In 0.8.5
+(0.8.5-beta, released 2026-10-27) the Network tab became a tree with a view menu and search chips, LordOS's own
+components and the system's services got rows of their own, and the menu bar network item and the
+blocklists arrived ("Network, second generation").
 
 ## Tabs
 
@@ -23,12 +27,18 @@ notify when a disk gets too hot or less healthy ("Disk temperature and health").
 | Network | apps with connections, map, summary or detail of the chosen app (see below) |
 | Disks | total read and write; one row per disk (model, `/dev`, size, temperature, health, rates); the chosen disk's temperature over the last 30 minutes and its health, with "Open in Disks" (see "Disk temperature and health") |
 | Processes | sortable table (CPU, memory, threads, PID, user), search, "Mine" / "All"; Stop and Get Info for the selected process (see "Process actions") |
+| Cooling | the cooling hardware drawn live, the active fan profile, a temperature and fan history and "full speed" (`apps/monitor/Cooling.jsx`, see `FANS.md`) |
+| Voltage | (0.8.7) only on machines that report something: the input rail or battery with a trace, the board's power state and rails, motherboard sensors, batteries and adapters (`apps/monitor/Voltage.jsx`, see "Voltage") |
 
 Charts pause with the mouse over them and show a crosshair with the values at that instant, as in
 TangoOS. Time always runs left to right, also in Arabic and Hebrew; the rest of the window mirrors
 itself.
 
 ### Network
+
+Since 0.8.5 the left column is a tree with a view menu, search chips and rows for LordOS's own
+parts and the system's services: see "Network, second generation (0.8.5)" below. What follows is
+the rest of the tab, and the first generation of the list.
 
 - **Left:** search (by app, address or country) and one row per app with its icon, number of
   connections, a traffic bar (received in green, sent in orange, relative to the app that moved
@@ -40,7 +50,17 @@ itself.
   **each one's own allow/block switch** (see "Per-destination switches"); a click on a row selects
   it in the right panel. Since 0.8.3 the app's name gets the row's whole width and wraps to two
   lines (the connection count and the denied badge sit next to the traffic bar; the column is
-  336 px and the Data and Rule columns are narrower). At the bottom, the machine's traffic:
+  336 px and the Data and Rule columns are narrower). Since 0.8.5 the list covers what sits below TCP and
+  UDP too (`conn.c`): TCP and UDP from `sock_diag`; ICMP "ping" sockets from `/proc/net/icmp` and `icmp6`,
+  shown as "ICMP (ping)" without a destination (the kernel keeps none for an unconnected ping socket);
+  raw IP sockets from `/proc/net/raw` and `raw6`, with their IP protocol (ICMP, IGMP, GRE, ESP, OSPF,
+  VRRP…); and packet sockets from `/proc/net/packet`, with the ethertype (ALL, IPv4, ARP, IPv6, EAPOL,
+  LLDP…) and the interface. Raw and packet sockets need `CAP_NET_RAW` and can see or forge traffic, so
+  the row says so. `build/conn-dump` prints one reading for checking it by hand (on VM 116: a ping, a raw
+  ICMP socket and an ARP packet socket on eth0, the last two from a process given `CAP_NET_RAW`). The remote desktop's bridge runs as the user but isn't dumpable, so
+  its sockets can't be traced to a pid; `conn.c` gives the sockets in `lordos.service`'s root-owned
+  `supervisor` group to Remote Desktop (its WebRTC UDP ports), instead of an unknown "?". At the bottom,
+  the machine's traffic:
   - the current download and upload speed;
   - two pills with what was sent (↑, orange) and received (↓, green) in the visible minute;
   - a **mirrored chart** of the last 60 s (`TrafficChart.jsx`, `drawMirror` in `draw.js`): one bar
@@ -69,8 +89,18 @@ itself.
 
   **Direction of the traffic.** While bytes move, dots travel along each arc: sent (orange) from
   "This computer" to the place, received (green) back. The higher the rate, the more dots (1 to 4
-  each way) and the faster they go (3.4 s to 1 s per trip, on a log scale from 256 B/s to about
-  4 MB/s). An idle arc has no dots and is drawn dimmed (`idle` in the map request, `map.c`). The
+  each way) and the faster they go (3.4 s to 1 s per trip, on a log scale from 64 B/s to about
+  4 MB/s); any traffic at all moves (one slow dot each way below 64 B/s, 0.8.5). An idle arc has no
+  dots and is drawn thinner, still plainly visible (`idle` in the map request, `map.c`). The map
+  follows the list: every app's places, the selected app's, or, with a search or a filter (direction,
+  protocol, status, chips), only the places of the connections the list shows. A click on the empty space
+  under the list clears the selection (0.8.5). Each app has its own
+  arc per place, in its own color (the dot before it in the list; the order apps first reached the
+  internet, twelve colors), lifted apart when several apps reach the same country (`arcs` in the map
+  request: color and lift per arc). A host's own rate misses short connections, so what the app's rate
+  doesn't account for is spread over its internet hosts by their bytes. Sockets the kernel reports
+  without a cgroup (ping and raw sockets from /proc/net, packet sockets) take their process's
+  (`/proc/<pid>/cgroup`, `conn.c`). The
   dots are small ready-made images (a ring and the direction's color, drawn once) moved with
   `lord.setStyle`, no React render per frame: 12 frames per second with the window in front, 5
   behind it, at most the 12 busiest arcs and only those on screen; the timer stops with the window
@@ -101,11 +131,139 @@ itself.
     by app");
   - with a country chosen: bytes, apps and addresses (with ports and app).
 
-Hosts are shown as IPs. There is no reverse DNS: asking for an IP's name sends it to the DNS
+Hosts are shown by the name the system resolver gave the app (see "Per-destination switches"), or
+as IPs when there is none. There is no reverse DNS: asking for an IP's name sends it to the DNS
 server, and this app's rule is that no address leaves the machine.
 
 **"This computer"** is placed by the time zone (`/etc/localtime` → coordinates from
 `/usr/share/zoneinfo/zone1970.tab`), without the network.
+
+### Network, second generation (0.8.5)
+
+![Monitor → Network: the tree, a listed destination and the system rows](monitor-net2-tree.png)
+
+**Rows for LordOS's own parts.** Everything built in that uses the network is a row of its own,
+backed by its own process and cgroup scope, so its rules are enforced by the kernel like any app's
+(`FIREWALL.md`, "LordOS components in their own scopes"):
+
+| Row | Firewall id | Its traffic |
+|---|---|---|
+| Mail and calendars | `lordos:mail` | lord-maild's servers (Mail, Calendar, Contacts, Reminders sync), made by Mail's connector |
+| Store and updates | `lordos:store` | the package engine's downloads (the Store, Settings → General, the daily update check) |
+| Printers and scanners | `lordos:print` | IPP and eSCL to network printers and scanners, and their mDNS discovery |
+| Terminal | `lordos:terminal` | the shell of every terminal and every program it starts; the detail lists the programs by name |
+| Blocklist updates | `lordos:lists` | the daily blocklist downloads (`lord-fetch`) |
+| VPN | `lordos:vpn` | the counters of LordOS's own VPN interfaces (Settings → Network); not blockable |
+| Name resolution (DNS) | `system:dns` | systemd-resolved; shown, never blockable |
+| Time synchronization | `system:time` | systemd-timesyncd; shown, never blockable |
+| Network service | `system:network` | lord-netd's own leaf (DHCP, Wi-Fi, the VPN daemons); shown, never blockable |
+
+Apps that never touch the network (Calculator, Notes…) never appear: a row exists only for traffic.
+The essential system rows show "System" instead of a connection count and a dash instead of a switch.
+Blocking the Store asks first, because no security update arrives while it is blocked:
+
+![Blocking the Store and updates asks first](monitor-net2-store-warning.png)
+
+The **"LordOS" row** is now what is left in lord-server itself, close to zero; every socket a
+component's connector made counts as that component's, also in the open-connections list (the
+socket's cgroup, `INET_DIAG_CGROUP_ID`, mapped to the session's scopes: conn.c `cgApp`).
+
+![The rows: Terminal with its program, the system services and the Store](monitor-net2-components.png)
+
+**The tree.** Each app opens into its destinations (the name the system resolver gave, or the
+address), a name with several addresses opens into them, and each address into its ports (TCP 443,
+UDP 443…). Every row has its received and sent bytes, a tiny up/down meter of its current rate
+(log scale), and, for a destination, its own allow/deny switch with a hint when something else
+decides it (another rule, the app's default, a restriction, the deny mode or a blocklist: "Blocked
+by the list Scam sites"). Long lists fold after eight rows ("N more…"). For an address reached
+through a CNAME chain the row shows the shortest name (usually the one the app asked for) and
+searches every name of the chain. The per-port bytes come from lord-netperm (np_flows is per
+address and port since 0.8.5; COUNTS sends each address's eight busiest ports).
+
+**The view menu** (one pop-up button at the top of the column) holds the whole view, kept per user in
+`settings.monitor.netView`:
+
+- group by: apps, domains, addresses, ports or countries (the tree's levels follow: a domain opens
+  into its apps and their ports, a port into its apps and their destinations…);
+- direction: all, outgoing, incoming; protocol: all, TCP, UDP and QUIC; status: everything,
+  allowed, denied, with rules;
+- sort by: name, most traffic, least traffic, most recent, most connections;
+- "Show network activity in the menu bar" and "Blocklists…" (Settings → Privacy).
+
+![The view menu](monitor-net2-view-menu.png) ![Grouped by port](monitor-net2-ports.png)
+
+**Search with chips.** Typing `app:firefox`, `domain:example.com`, `ip:10.0.0.0/8`, `port:443`,
+`proto:udp` (or `quic`) or `country:AR` and a space turns the token into a chip; Enter turns every
+word (an address or network becomes an IP chip, a number a port, `tcp`/`udp` a protocol, two
+capital letters a country, a name with a dot a domain, anything else an app). Chips of different
+kinds combine (app *and* domain), two of the same kind are alternatives; the rest of the text
+matches anywhere. Backspace in an empty field removes the last chip. There is no city chip: there
+is no city-level IP database with a compatible licence (see "Map").
+
+![Two chips: port 443 and domain debian.org](monitor-net2-chips.png)
+
+**The time range.** The traffic chart's zoom (1 h, 24 h, 7 d, 30 d, with ‹ ›) now also drives the
+list: in a history window it shows each app's bytes in that window, from the history file. The
+history never keeps destinations (see "Traffic history", Privacy), so in a window the rows have no
+children; the live view keeps the tree.
+
+The pure part (tokens, filters, grouping, sorting, the saved view) is `sdk/netmodel.js`, tested by
+`server/tests/netmodel_test.mjs`; the tab is `apps/monitor/Network.jsx` and `apps/monitor/NetTree.jsx`.
+
+### The menu bar network item (0.8.5)
+
+Optional and off by default (Settings → Privacy → Monitor → "Network activity in the menu bar", or
+the view menu). It shows the upload and download rates in the status area, rounded ("↑5K ↓231K",
+"0" under 1 KB/s), updated every other second and only redrawn when the rounded value changes.
+Its panel:
+
+- the sent (up) and received (down) graph of the last five minutes, 60 bars of 5 s, and their totals;
+- the apps moving data now, with their rates;
+- **Recently denied** in the last ten minutes, with a count, the same destination grouped (×N);
+- the firewall mode: Allow silently, Deny silently, Off (`FIREWALL.md`, "The modes"). The ask mode
+  is not offered until it exists; rule profiles come with the rules manager (its own release after
+  0.8.5, `ROADMAP.md`);
+- the blocklists (lists on, entries) and "Open Monitor…".
+
+While the item is shown it reads `lord.monitor.netTotals()` (one read of `/proc/net/dev`) once
+per second, without the Monitor's sampling thread; lord-netperm's notices are read only while the
+panel is open. Hidden, it costs nothing. `sdk/netstatus.jsx`.
+
+![The panel](menubar-network-panel.png) ![Deny silently cut the open download; DNS still works](menubar-network-deny.png)
+
+### Blocklists (0.8.5)
+
+Settings → Privacy → Blocklists (`apps/monitor/Blocklists.jsx`): the curated catalog by topic, each
+list with its source, its licence, how many entries it had and when it was downloaded; a checkbox
+turns it on, "Update Now" downloads again, and your own lists take an https address and a format.
+How they are downloaded, checked and enforced is in `FIREWALL.md`, "Blocklists". The Monitor shows
+the lists in its summary, "On the list …" under a destination, and "by a blocklist" in Recently
+denied.
+
+![Settings → Privacy → Blocklists](settings-blocklists.png)
+
+![Malware lists on, and your own list by its https address](settings-blocklists-malware.png) ![A custom address list, downloaded and checked](settings-blocklists-custom.png)
+
+### Measurements (0.8.5, VM 118, 4 vCPU Xeon Silver 4108, kernel 6.12)
+
+Same session, same test traffic (curl in an app scope: a 120 KB/s download and HTTPS requests every
+4 s), main's build (0.8.3 + 0.8.4 so far) against this one, 30 s each, lord-server's CPU in % of
+one core:
+
+| | main | this build |
+|---|---|---|
+| Monitor open on Network, traffic | 17.1 / 16.1 % | 14.8 / 14.0 % (the tree, chips, system rows; 4 blocklists on) |
+| desktop idle, menu bar item off | 2.65 % (the VM's previous install) | 2.93 % (4 blocklists on) |
+| desktop idle, menu bar item on | — | 2.95 % |
+| desktop with traffic, item on / its panel open | — | 0.97 % / 3.87 % |
+
+Memory with 4 lists (379,991 names, 19,405 networks): lord-netperm 13.8 MB (2.9 MB without lists),
+lord-server 142 MB with the Monitor open (131 MB on main). The per-packet cost is in `FIREWALL.md`
+("Measurements, 0.8.5").
+
+**Before** (main, no lists: the scam site connects) **and after:**
+
+![Before](monitor-net2-before.png) ![After, light](monitor-net2-tree-light.png)
 
 ### Remote desktop (0.8.3)
 
@@ -158,7 +316,8 @@ edits (`FIREWALL.md`, "Rules by app"); there is no new enforcement:
   switch never moves under the pointer.
 - **What the switch shows** is what the app's rules decide for that destination right now:
   `sdk/fwrule.js` `decide()` runs the same order as `fw_decide` (restrictions, then the most
-  specific matching rule; no rule: the mode, which allows). When another rule decides, the row
+  specific matching rule; no rule: the mode, which allows — since 0.8.5 the "Deny silently" mode and the
+  blocklists can also decide, `decide()`'s `mode` and lists). When another rule decides, the row
   says which ("By the rule \*.example.com", "Follows this app's default"); a restriction ("no
   internet") locks the switch and says so.
 - **What a click does** (`toggleOp()`): it writes the rule for exactly that name (or address),
@@ -327,6 +486,67 @@ protected list, a stale start time refused while the process survives, TERM and 
 children, the session and PID 1 refused, and the Get Info JSON (a pipe and a listening TCP socket
 among the open files; no private parts when not the owner; "gone" for another start time).
 
+## Voltage (0.8.7)
+
+The first card draws the machine's board, a small single-board computer on the Pi and a motherboard elsewhere, with the way from the power input to the processor in the color of the power state: green, amber or red. It is our own drawing, with no maker's marks, and it doesn't move.
+
+One view with several sources (`apps/monitor/voltmodel.js` turns them into one list). It shows only what the machine
+really reports: nothing is estimated except the board power, which says so. The tab itself exists only if there is
+something to show (each sample's `volt`, decided by `volt_read` when the Monitor's thread starts); in a virtual machine it
+is not there.
+
+| Source | Where | Privilege |
+|---|---|---|
+| Raspberry Pi 5, 500, CM5 power chip | `rpi-pmic` admin action: fixed `/usr/bin/vcgencmd pmic_read_adc` | root (`/dev/vcio` is 0600), through the helper |
+| The board's under-voltage alarm | hwmon `rpi_volt` `in0_lcrit_alarm`, or `get_throttled` on older kernels (`hw/rpifw.c`) | none |
+| Motherboard and other chips | `/sys/class/hwmon/*/in*_input` with `in*_label` | none |
+| Batteries, adapters | `/sys/class/power_supply/*/voltage_now` (`voltage_min_design`) | none |
+
+**`rpi-pmic`** (`hw/hw_admin.c`, anyone, no arguments, read-only, BCM2712 only) runs the fixed program with one fixed
+word and parses its text strictly (`hw_pmic_parse`): every line must be exactly `NAME_V volt(N)=D.DDDV` or `NAME_A
+current(N)=D.DDDA`, the input rail must be there, and anything malformed, repeated, cut or over 30 V or 30 A fails the
+whole reading. Rail names come from a closed list in C; a well-formed line of an unknown rail is left out. It answers
+`uv <count|-1> <last_s|-1> <RAIL>=<uV>,<uA|-1> ...`: numbers and those names, never the program's text.
+`apps/monitor/voltmodel.js` (`parsePmic`) checks that line again.
+
+**States.** Under-voltage is only ever the board's own alarm; LordOS doesn't decide it from a number:
+
+| State | When |
+|---|---|
+| Under-voltage now | the alarm is on (`rpi_volt`'s window is the last 2 s) |
+| Low | the 5 V input reads under **4.8 V** (`LOW_5V`) and the alarm is off. This is LordOS's own line, a warning that the supply or the cable is weak; it isn't a limit of the board |
+| Happened since boot | an alarm earlier and none now |
+| Normal | the alarm is off and the input is at 4.8 V or more |
+
+"Since boot" needed a source of its own. `rpi_volt` asks the firmware every 2 s and clears its "has occurred" bits, so on
+the LordOS kernel those bits never mean "since boot" (`hw/rpifw.h`). The kernel does log each alarm, as `<driver> <device>:
+Undervoltage detected!`, so `rpi-pmic` also counts those lines in `/dev/kmsg` (`hw_uv_log`: kernel facility only, only that
+exact shape) and answers the count and the last time. That log is a ring: very old messages can be gone, and the view says
+so. Without `rpi_volt`, `get_throttled`'s own bit is used. An alarm seen while the view is open also counts.
+
+**Board power** is the sum of volts × amps of the rails with both readings. It leaves out USB devices, the fan and the
+regulators' losses, so the real draw is higher, and the view says it is an estimate of the listed rails.
+
+**hwmon.** The chip's name and `inN` are shown as the kernel gives them, labels when it has them. Many motherboards have no
+labels without a per-board configuration, and those inputs are the value at the chip's pin, before the board's resistor
+dividers: they are shown as raw, never scaled, and get no trace. A raw 0 is an empty pin and is left out. The Raspberry Pi
+5's `rp1_adc` inputs appear the same way. A hwmon that only mirrors a `power_supply` device is left to the battery list. A
+processor with no sensor driver has no `in*_input` at all, so nothing is shown for it. A value that isn't a strict integer
+in range is left out (`volt_parse_int`), not guessed.
+
+**Reading.** `monitor/voltage.c` runs on the Monitor's thread, because a slow embedded controller must not hold a frame. It
+reads only after `lord.monitor.wantVoltage(true)`, at most every 1.9 s; `apps/monitor/Voltage.jsx` asks only while the view
+is mounted and its window isn't minimized, and calls `rpi-pmic` once per cycle. The trace starts over when the view opens.
+With the tab elsewhere or the window minimized nothing is read. `lord.monitor.voltage()` takes no arguments.
+
+**Tested.** `vcgencmd`'s real text from a Raspberry Pi 5 (`tests/settings_hw_test.c`, with 30 damaged variants; the board's
+driver module holds the exact "Undervoltage detected!" text) and the sysfs layout of the same board. On fake trees: a desktop,
+a laptop, hostile values (`build/voltage-test`), and the model (`tests/voltage_model_test.mjs`). The whole view ran in an
+isolated session on VM 116 with that board's values as a fixture: the four states, the desktop and laptop lists, and
+6 reads in 12 s on screen against 0 with another tab or the window minimized; on the same VM with its real sysfs, a virtual
+machine, there is no tab. Not yet tested: installed on the real Raspberry Pi, a real under-voltage event, a real motherboard
+sensor chip, a real battery or adapter.
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)
@@ -389,7 +609,8 @@ bottom of the tab (`settings.monitor.diskAlerts`):
 ## Architecture
 
 ```
-apps/monitor/            index.jsx (tabs), Network.jsx (Network), MapView.jsx (map), Chart.jsx,
+apps/monitor/            index.jsx (tabs), Network.jsx (Network), NetTree.jsx (0.8.5: the tree, chips and
+                         view menu), Blocklists.jsx (0.8.5: Settings → Privacy → Blocklists), MapView.jsx (map), Chart.jsx,
                          TrafficChart.jsx (mirrored sent/received chart), History.jsx (zoom and
                          history windows), draw.js (pixels),
                          icons.jsx, Privacy.jsx, countries.js (generated)
@@ -397,6 +618,8 @@ apps/monitor/Processes.jsx   the Processes tab, its context menu, the stop sheet
 apps/monitor/DisksTab.jsx    the Disks tab: rates, temperature and health per disk, the chosen disk's cards
 sdk/smart.js, sdk/smartparse.js   SMART summaries and smartctl's JSON → one model (Disks app too)
 sdk/diskwatch.js         notices when a disk gets too hot or less healthy
+sdk/netmodel.js          (0.8.5) search tokens, filters, the tree, sorting and the component rows (pure)
+sdk/netstatus.jsx        (0.8.5) the menu bar network item and the blocklists' hourly update check
 sdk/monitor.js           useMonitor(), stores monitorSamples / monitorProcesses / monitorConnections /
                          monitorDetail; monitor.watchProcess(), monitor.stopProcess()
 server/src/ui/js_monitor.c   lord.monitor (read-only, validated API)
@@ -411,7 +634,12 @@ server/src/monitor/procctl.c the protected list, proc_signal() (pidfd) and the G
 server/src/monitor/proc_admin.c  the root helper's proc-signal / proc-info (administrators)
 assets/monitor/          land.bin (Natural Earth 1:50m), geoip-country.mmdb.xz (DB-IP Lite)
 tools/gen-monitor-data.py    generates that data, countries.js and the country names
-tests/mmdb_test.c, tests/map_bench.c   reader test and map benchmark
+apps/monitor/RemoteDesktop.jsx  (0.8.3) the remote desktop row and its detail
+apps/monitor/Cooling.jsx     the Cooling tab (lord.fan, see FANS.md)
+apps/monitor/Voltage.jsx, voltmodel.js   (0.8.7) the Voltage tab and its pure model
+server/src/monitor/voltage.c  hwmon, batteries and adapters, read on the Monitor's thread
+apps/monitor/Firewall.jsx, FwRules.jsx, RuleSheet.jsx   Settings → Privacy's firewall sections and the rule sheet
+server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchmark
 ```
 
 ### lord.monitor
@@ -431,12 +659,16 @@ tests/mmdb_test.c, tests/map_bench.c   reader test and map benchmark
 | `signal(pid, st, 'TERM' \| 'KILL')` | stops one of the user's own processes: `null`, or an error code (`proc.gone`, `proc.protected…`, `proc.notOwn`, `proc.denied`) |
 | `watchDisks(on)` | (0.8.2) with the Monitor closed, the thread wakes every 30 s and reads only the disk sensors |
 | `diskTemps()` | (0.8.2) `{ t, disks: [{ name, model, rota, sensor, temp, tempT, tempMax, tempCrit, tempIdle, awake }] }` or `null` if nothing new; it does not keep the 4 Hz sampling alive |
+| `wantVoltage(on)` | (0.8.7) Monitor → Voltage is on screen: the thread reads the voltages about every 2 s (see "Voltage") |
+| `voltage()` | (0.8.7) `{ board, alarm, sinceBoot, chips: [{ dev, name, in: [{ i, v, label }] }], supplies: [{ name, battery, v, min }] }` or `null` if nothing new |
+
+| `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
+| `netTotals()` | (0.8.5) `{ t, rx, tx }`: the machine's byte counters now (every interface but `lo`), without the sampling thread (the menu bar item) |
+| `historyEnable(on)` / `historyClear()` | the "Keep a traffic history" setting; deletes the history |
 
 Each disk in `sample().disk.disks` carries the same fields (`sensor`: `"nvme"`, `"drivetemp"` or
 `null`; `temp` in °C or `null`; `tempT`: when it was read; `tempIdle`: a spinning disk at rest, not
 read; `awake`: I/O in the last minute).
-| `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
-| `historyEnable(on)` / `historyClear()` | the "Keep a traffic history" setting; deletes the history |
 
 No function takes paths or commands: the only arguments are booleans, a language code (letters,
 digits, `-` and `_`, up to 15), a PID with its start time (integers), `'TERM'` or `'KILL'`, and the
@@ -462,8 +694,9 @@ history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
 ### Connections
 
 `conn.c` does the same as `ss`: a `NETLINK_SOCK_DIAG` dump for TCP and UDP, IPv4 and IPv6, with
-`INET_DIAG_INFO` (`tcpi_bytes_acked` and `tcpi_bytes_received` come from `tcp_info`). No root
-needed. For other users' sockets, only how many there are is counted.
+`INET_DIAG_INFO` (`tcpi_bytes_acked` and `tcpi_bytes_received` come from `tcp_info`). Since 0.8.5 it
+also reads ICMP "ping", raw IP and packet sockets from `/proc/net/{icmp,icmp6,raw,raw6,packet}` (see
+"Network" above). No root needed. For other users' sockets, only how many there are is counted.
 
 **Bytes per app (0.8.1).** `tcp_info` only exists for TCP and only while the socket is open, so up
 to 0.8.0 UDP — and with it QUIC: HTTP/3, a browser playing a video — counted nothing, and a closed
@@ -486,6 +719,9 @@ listening one) or `out`. Scope: `internet`, `lan` (private, CGNAT, link-local, U
 
 **From process to app** (`js_monitor.c`, on the screen thread with the list from `apps.c`):
 
+0. (0.8.5) a socket made in one of the session's scopes is that scope's app (`cgApp`, from the
+   socket's cgroup id; conn.c reads the session's scope ids every 5 s): Mail's connector, the
+   Terminal's programs, an app's own sockets;
 1. `lord-server` itself is **LordOS** (native apps and the Store run inside it);
 2. otherwise, the `.desktop` whose `Exec` program (`DesktopApp.bin`) matches the executable,
    `argv[0]` or the process name;
@@ -555,12 +791,14 @@ With `Uint32Array` it costs one pixel per write.
 ## Privacy
 
 Settings → Privacy → **Monitor** (registered with `registerPrivacySection` if the page exists) has
-three switches, saved in `settings.monitor`, and a button:
+four switches, saved in `settings.monitor`, and a button:
 
 - `connections`: see each app's connections. When off, the thread doesn't query sock_diag.
 - `geo`: place them on the map. When off, the country database isn't loaded.
 - `history` (0.8.2, on by default): keep the traffic history (bytes per minute and per hour, never
   addresses; see "Traffic history"). **Clear History** deletes it.
+- `menuItem` (0.8.5, off by default): the network activity item in the menu bar (see "The menu bar
+  network item").
 
 ## Phase 2
 
@@ -577,6 +815,11 @@ three switches, saved in `settings.monitor`, and a button:
   the system resolver returned; an app with its own encrypted DNS is held only by address rules.
   Screenshots: [light](firewall-domain-rules-monitor-light.png),
   [dark](firewall-domain-rules-monitor-dark.png).
+- **Host names** without asking anyone (0.8.2): `lord-netperm` learns them from the system resolver
+  and its notices carry them (`hosts`); the destinations are listed by those names.
+- (0.8.2) Each destination's own switch and the traffic history; (0.8.3) blocking cuts the open
+  connections; (0.8.5) the tree, the "Deny silently" mode, the blocklists and LordOS's own components
+  as rows of their own (see "Network, second generation").
 
 **Planned:**
 
@@ -584,9 +827,6 @@ three switches, saved in `settings.monitor`, and a button:
 - **Connection alerts** (the "ask" mode, `FIREWALL.md`) and rules per country.
 - **Devices:** `monitor.deviceUsers()` → `[{ kind: 'camera' | 'microphone', app, name, pid }]` and
   the `monitorDevices` store (already exported, empty).
-- **Host names** without asking anyone: `lord-netperm` already learns them from the system
-  resolver; its notices don't carry them to the session yet. The Network tab shows a `host` /
-  `hosts` field as soon as a notice brings one.
 - Usage alerts (the history is in place since 0.8.2).
 
 ## Measurements
@@ -657,6 +897,124 @@ frame, exactly as in 0.8.1; `LORD_DAMAGE=multi` in its environment turns on the 
 path described here (with the clipped-subtree skip and the per-rectangle present, which follow the
 same switch). The measurements below are with it on. The 9×9 dot images and the map frame's opaque
 color (below, "The Monitor's side") stay on.
+
+**0.8.6: the search for the grey rectangle (still off by default).** Two new `build/engine-test`
+suites compare every frame with a full repaint that bypasses the transformed subtrees' raster cache
+(`paint_tf_nocache`): `test_damage_pipeline` runs the reported scene (Monitor's moving map, a
+translucent, blurred Terminal minimized into a blurred Dock with the default theme's frame and
+`fxStyle` transform, a blurred menu bar, menus, title changes, the cursor) through a copy of
+`main.c`'s bookkeeping (each frame's rectangles gathered while a flip is pending, `paint_out`'s
+parts, `present_cpu`'s per-buffer lists and copy, the cursor), with 0, 30 and 60 % of the flips
+pending; it also checks every presented buffer against the scene. `test_damage_fuzz` does the same
+with random trees and random changes. The pipeline's double-buffer and cursor bookkeeping was
+right in every frame. The fuzz found seven engine bugs, all in **both** damage modes (one box or
+several), each able to leave a stale area until something repainted it, and all are fixed
+(CHANGELOG, 0.8.6): a parent's border lost where an opaque child started a partial repaint; cached
+rasters of transformed subtrees kept after a change made while hidden, unscaled or inside a nested
+transform; a raster grid that moved with the subtree's extent; a raster changing kind (a blur
+coming in) outside the damage; blurs taking in what is painted above them from outside the
+repainted area; and several frames' rectangles cutting through a blurred node. Which one the 0.8.2
+report was is not proven (the reported scene itself never failed), so `LORD_DAMAGE=multi` is still
+needed to turn the several-rectangles path on. The margin of a blurred surface is now repainted
+with it: in `test_multi_damage` the pixels repainted per frame went from 24,078 to 27,363.
+
+**The 0.8.2 integration test, repeated (VM 116, 2026-10-29).** An isolated headless session of the
+real default theme (own home, runtime folder and bus; 1280×800, CPU composition), driven over its
+remote desktop socket. The viewer subscribes to the video with lossless tiles and keeps its own copy
+of the screen from them; for the test, the VM copy of `mirror.c` sends the changed tiles every frame
+instead of only once the screen is still (`LORD_TEST_TILES`, never committed), so the copy is exactly
+what the partial repaints left. At each check a second connection makes the session repaint the whole
+screen (`cb.refresh`), and the copy before is compared with the copy after; pixels that changed within
+2.2 s before or after are left out as animation. The scene: Monitor → Network with ten slow downloads
+to mirrors in ten countries, a Terminal at 30 % transparency with blur over the map, minimized into the
+Dock and restored 22 times while the dots move, then its six menus; the downloads pause for each check
+(2.5 s, or 7 s for the still runs) so the map stops. 54 checks per run, six runs:
+
+| Build | Mode | Scene at the check | Differing pixels outside Monitor's live numbers |
+|---|---|---|---|
+| previous `main` | one box | still 7 s | 3 (one pixel each, the Dock's corner) |
+| this commit | one box | still 7 s | **0** |
+| previous `main` | one box | still 2.5 s | 1 |
+| this commit | one box | still 2.5 s | 389 (an arc fading under the blurred Terminal, ≤ 3 levels; 2 pixels on the Dock's corner) |
+| previous `main` | several (`multi`) | still 2.5 s | 6 (the Dock's corner) |
+| this commit | several (`multi`) | still 2.5 s | 505 (the arc, ≤ 3 levels; 7 on the Dock's corner) |
+
+No stale area in any run. The Dock's corner pixels (1 to 7, antialiased) change with Monitor's
+"Load" line, which the Dock's blur takes in; the arc is a connection whose line faded between the
+last partial frame and the full one; both are the scene changing between the two copies, and neither
+appears when the scene is still for 7 s. The grey rectangle did not appear in either build, so the
+0.8.2 report is still not reproduced, and several rectangles stay off by default.
+
+Cost, the same sessions with one viewer (`lord-server` whole process, % of one core, 5 × 30 s, two
+batches, the build alternated):
+
+| Scene | Mode | Before | After |
+|---|---|---|---|
+| Monitor → Network, dots moving | one box | 56.7 / 57.2 % | 58.7 / 59.7 % |
+| Monitor → Network, dots moving | several | 59.2 / 58.1 % | 57.2 / 58.0 % |
+| the same with the blurred Terminal over the map | one box | 35.8 / 36.4 % | 38.0 / 37.7 % |
+| the same with the blurred Terminal over the map | several | 36.7 / 36.6 % | 37.5 / 35.9 % |
+
+Layout and paint per frame (`LORD_FRAME_STATS`) were the same within 0.1 ms in every row (14.6 to
+14.8 ms). `--profile` shows why: in these sessions every frame repainted one box of 64 to 79 % of the
+screen, also with `LORD_DAMAGE=multi`, so the blur margin adds next to nothing. The reason, found
+afterwards (next section): those sessions had a translucent, blurred Terminal hidden behind Monitor,
+and the blur rule repainted it whole every frame. Most of the process's CPU here is the remote
+desktop's frame comparison and the session itself, not paint. LordBench's desktop mode in the headless harness (`perf-theme.js`, three runs each):
+58.9–60.0 fps, build p50 1.25–1.26 ms, p99 5.9–7.6 ms before; 60.0 fps, p50 1.24–1.27 ms, p99
+5.95–6.32 ms after.
+
+**A blurred window hidden behind Monitor (0.8.6, VM 116).** Why the repeated scene gave one box of
+64 to 79 % per frame where VM 119 gave 5 to 11 small rectangles: the harness left the Terminal's
+session holder (`lord-term-holder`) of an earlier run alive (it killed holders with a pattern that
+never matched the holder's process name), so each new session restored a Terminal window at 30 %
+transparency with blur, and Monitor opened over it. A debug build printing `multi_rects`' steps
+showed three blurred nodes every frame: the menu bar, the Dock and the hidden Terminal's body
+(858×437 at 211,201, opacity 1, fully under Monitor's opaque window). The dots' rectangles all
+touched that body's blur margin, so the blur rule joined them into the body and its margin, 918×497
+(44.6 % of the screen); when the Terminal sat lower, its margin met the Dock's and the Dock joined
+too (62 to 73 %; with the Terminal in front of the map, 75 to 80 %, which is the rule itself). The
+one-box mode grew its box the same way. A fresh session with no Terminal gave the expected 5 to 10
+rectangles under 1 % of the screen.
+
+The blur rule now leaves out a blurred node that an opaque node painted after it covers whole
+(`blur_hidden` in `paint.c`, the opaque-cover skip's test in paint order; CPU path without a dragged
+window). The same scene, Terminal opened first and Monitor → Network over it, ten downloads, one
+remote viewer, `--profile` over the last 150 frames, and `lord-server`'s CPU (whole process, % of
+one core, 5 × 30 s, two batches):
+
+| Mode | Repainted per frame | Paint per frame | CPU before | CPU after |
+|---|---|---|---|---|
+| one box | 46.4 → 14.5 % | 5.6 → 2.0 ms | 24.3 / 22.3 % | 13.2 / 15.3 % |
+| several (`multi`) | 46.2 % in 1 → 3.8 % in 5.6 rectangles | 5.2 → 1.7 ms | 21.5 / 21.7 % | 15.0 / 14.3 % |
+
+Without a hidden blurred window nothing changes (Monitor → Network alone, one box: 10.2 and 13.8 %
+of the screen per frame, the live charts). Visual check with the same tools, both modes: the 0.8.2
+scenario (54 checks) and a new one where the Terminal is hidden behind the moving map, raised over it
+from the Dock and sent back behind it ten times (21 checks): no stale area, only Monitor's live
+numbers and charts and the clocks changing between the partial and the full copy.
+`build/engine-test` `test_hidden_blur_damage` covers it (three of its checks fail without the change).
+
+Checked again after rebasing onto the frame-cost work (2026-10-29). `blur_hidden` stays off with a
+dragged window, on the GPU path (so with GPU drag) and inside a transform; a frame the pipeline undoes
+and GPU drag's rectangle repainted on the CPU join the next frame's damage, and `paint_damage_settle`
+applies the rule, this one included, to the tree being painted. That first check of the 0.8.2
+scenario had a flaw: with no leftover holder, a fresh Terminal opens at 240,153, and the scenario's
+minimize click (placed for the restored Terminal) missed its button, so its 54 checks ran with the
+Terminal over the map, never minimized. With the click on the button, the rebased build, both modes:
+
+| Scenario | One box | Several rectangles |
+|---|---|---|
+| 0.8.2 (22 minimize/restore cycles, menus; 54 checks), downloads paused 2.5 s | 0 | 0 |
+| the same, scene still 7 s before each check | 0 | 0 |
+| Terminal hidden behind the map, raised and sent back 10 times (21 checks) | 1 (a Dock corner next to the live Load line) | 0 |
+
+(Pixels differing between the partial and the full copy outside Monitor's live numbers and charts
+and the clocks. The fresh Terminal no longer covers Monitor's left-panel chart, the `curl` row's
+sparkline or its own footer clock, so those were added to the live areas.) `--profile` on the rebased
+build, Terminal hidden behind Monitor → Network, last 150 frames: 11.2 % of the screen per frame in
+one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor → Network alone: 9.1 % and
+3.2 % in 6.1 rectangles.
 
 VM 119: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio` GPU without 3D, CPU compositing, 1280×800.
 Network tab in front, ten slow downloads to mirrors in ten countries (arcs to 8–11 countries, about

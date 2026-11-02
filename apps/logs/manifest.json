@@ -1,5 +1,6 @@
 {
   "id": "logs",
+  "version": "0.8.5",
   "name": "Logs",
   "description": "System, app and LordOS logs, with filters and live updates",
   "size": [1040, 640],

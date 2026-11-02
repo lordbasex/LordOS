@@ -10,9 +10,9 @@ Picture a building with a guard at every apartment door instead of one at the st
 
 ## What you see and decide
 
-- **Monitor → Network** lists the apps with connections, how much each one sent and received, and a world map with an arc to each country they talk to. Each app has a **Rule** switch: turn it off and the app is denied the network at once, with allowed and denied counters coming straight from the kernel.
+- **Monitor → Network** lists the apps with connections, how much each one sent and received, and a world map with an arc to each country they talk to. Each app has a **Rule** switch: turn it off and the app is denied the network at once, with allowed and denied counters coming straight from the kernel. Open an app and every name it reached (or address, when the system resolver gave no name) has its own allow/block switch that says what decides it right now. The chart zooms out from the live minute to 1 hour, 24 hours, 7 days and 30 days, from a small history kept in your home folder: bytes per minute and per hour, never an address, a name or a country.
 - **Settings → Privacy → App network access** has a mode and two lists:
-  - **Silent** (the default): whatever has no rule is allowed and recorded, so you can review it in the Monitor. **Off**: only your explicit denials and restrictions apply.
+  - **Silent** (the default): whatever has no rule is allowed and recorded, so you can review it in the Monitor. **Off**: only your explicit denials and restrictions apply. **Deny silently** (since 0.8.5): only what a rule allows can connect, and everything else is denied and recorded, while this computer's own services keep working.
   - **Trusted apps**: allowed without recording. An explicit denial you set still wins.
   - **Restricted apps**: tick what an app may not do. The network restrictions are **no internet** (LAN only), **no LAN**, **no network at all** and **no incoming connections**. The others take away devices and data (see [Beyond the network](#beyond-the-network)).
 
@@ -41,7 +41,13 @@ Each program finds which app the calling process belongs to (by the cgroup ances
 
 **3. Your rules become kernel maps.** You change rules in the session; `lord-server` saves them to `~/.config/lordos/firewall.json` and sends `lord-netperm` a single message with no data: `RELOAD`. The service then reads the file itself, strictly validated, and compiles the rules into hash and longest-prefix-match maps. The rules never travel over the socket.
 
-**4. Nothing runs per packet.** The checks run when a connection is opened or a port is bound, not for every packet. Measured on a test VM: about **0.5 µs** per UDP connect, TCP within noise, and no change in throughput (`docs/FIREWALL.md`).
+**4. Decided at connect time, enforced on every packet.** The decision is made when a connection is opened or a port is bound: about **0.5 µs** per UDP connect on a test VM, TCP within noise. Since 0.8.3 the same decision is also applied to each packet of an app whose rules deny something, so a new rule cuts connections that are already open (see the next section). That costs about 150 ns per packet, 1.6 % of one core at 104,000 packets a second, and about 30 ns for an app without a deny rule; TCP throughput is unchanged within noise (`docs/FIREWALL.md`).
+
+## Blocking an app cuts what is already open
+
+Since 0.8.3, turning an app's rule off, adding a deny rule for a destination or a restriction such as "no internet" doesn't only stop new connections: a video that was already playing stops too. The kernel drops the packets of the connections the new rule denies, and `lord-netperm` closes those sockets, so the app sees the connection end instead of a stall. Only what the new rule denies is cut: other destinations, the local network under "no internet", and the clients of a server the app runs keep working. Switching back to allow works again at once, and the Monitor shows the dropped bytes as "Blocked traffic".
+
+On a Raspberry Pi 5 the closing needs the LordOS kernel built with socket destroy (`6.18.57-lordos.3`); with an older one the packets are still dropped, but the app only sees the connection end at its own timeout.
 
 ## Does it work per domain?
 
@@ -61,13 +67,24 @@ The same Restricted apps list can also take away the camera, the microphone, the
 
 [[diagram:restrictions]]
 
-- **LordOS's isolated apps** (`.lpk` apps and Passwords): all eight, in the broker that already mediates everything they get.
+- **LordOS's isolated apps** (`.lpk` apps, Passwords and, since 0.8.2, Mail, Calendar, Contacts and Reminders): all eight, in the broker that already mediates everything they get.
 - **Built-in apps** (the "LordOS" row): camera, microphone, screen and notifications. That row is the desktop itself, so files, USB, clipboard and Bluetooth are restricted per app instead.
-- **Linux apps opened from the app launcher:** the camera, USB, ALSA capture and framebuffer devices are refused in the kernel (`cgroup/dev`); Bluetooth sockets by a BPF LSM program; the microphone and PipeWire cameras by LordOS's PipeWire guard, live, with each client identified by its socket's credentials; notifications by LordOS's notification server, which asks the bus who is calling and drops the notification if it can't tell; and "no access to your files" starts the app, from its next launch, in its own namespaces with an empty home folder and Landlock. Screen capture was never available to them: there is no capture protocol and no X server.
+- **Linux apps opened from the app launcher:** the camera, USB, ALSA capture and framebuffer devices are refused in the kernel (`cgroup/dev`); Bluetooth sockets by a BPF LSM program; the microphone and PipeWire cameras by LordOS's PipeWire guard, live, with each client identified by its socket's credentials; notifications by LordOS's notification server, which asks the bus who is calling and drops the notification if it can't tell; and "no access to your files" starts the app, from its next launch, in its own namespaces with an empty home folder and Landlock. Screen capture was never available to them: there is no capture protocol, and X11 apps (through Xwayland since 0.8.3) only see each other, never Wayland apps or LordOS's screen.
+
+## New in 0.8.5
+
+These came with LordOS 0.8.5-beta, released on 27 October 2026.
+
+- **Monitor → Network, second generation.** The app list is now a tree: each app opens into the sites and addresses it talks to, and each address into its ports, with what was sent and received, a small live meter and an allow/block switch on every destination. One button groups the view by app, domain, address, port or country and filters it by direction, protocol and rule; the search turns `app:`, `domain:`, `ip:`, `port:`, `proto:` and `country:` into chips you can combine.
+- **Ping, raw and packet sockets are shown** under the app that opened them. Raw IP and packet sockets can see or forge traffic, and the row says so, with the protocol or ethertype and the interface.
+- **LordOS's own parts get their own rows and rules.** Mail and the calendar sync, the Store and updates, printers and scanners, the Terminal (with the names of the programs you run in it) and the blocklist updates each run in a process of their own, in their own scope, so you can see and block each one separately and the kernel enforces it. Blocking the Store asks first, because security updates stop. Name resolution, time synchronization, the network service and your VPN tunnels are shown too, and are never blocked. In 0.8.7, the network search in Files gets a row of its own. The traffic of a mounted network share has none: the kernel's client opens its own sockets, outside any app.
+- **Blocklists.** Settings → Privacy → Blocklists offers public lists of advertising, tracker, malware and attacking sites, each with its source and licence. Turn one on and LordOS downloads it over HTTPS once a day, in a sandboxed downloader that only gets an already connected socket, checks every line twice and blocks those destinations for every app. A rule you write for a site always wins over a list, and an address is only blocked when every name the system resolver gave for it is listed, so a shared server isn't cut by accident.
+- **Deny silently**, the mode above, also from a new menu bar item.
+- **Network activity in the menu bar** (optional, off by default): upload and download rates, and a panel with the last five minutes, the apps moving data now, what was recently denied, the firewall mode and the blocklists.
 
 ## The skeptical reader's questions
 
-**Does it apply to Linux apps too?** Yes. That is one of its main points: Chromium, Firefox or any app opened from the app launcher has its own scope and its own rules. Built-in LordOS apps and programs started from the Terminal count together as "LordOS".
+**Does it apply to Linux apps too?** Yes. That is one of its main points: Chromium, Firefox or any app opened from the app launcher has its own scope and its own rules. Built-in LordOS apps and programs started from the Terminal count together as "LordOS"; since 0.8.5 the Terminal and LordOS's own network parts get rows of their own.
 
 **Can an app escape its scope?** It was tried. A Linux app can't write itself into another cgroup, because every `cgroup.procs` file in the session's tree belongs to root. It can still ask the user's systemd manager to start a new process outside the tree (`systemd-run --user`). LordOS closes that too: `lord-netperm` also attaches its programs to each user's `user@<uid>.service`, and any process there is held to the strictest union of the restrictions of that user's running restricted apps. Tested with `systemd-run --user --scope`, a transient service and `setsid`: all denied.
 
@@ -77,14 +94,14 @@ The same Restricted apps list can also take away the camera, the microphone, the
 
 **What happens if the service stops?** Its links are closed and everything is allowed. The desktop doesn't depend on it. On the final ISO the service was running with its seven network programs attached.
 
-**Is the service itself dangerous?** It is kept small on purpose: it runs no programs, takes no arguments, has no internet sockets of its own (its unit only allows Unix and packet sockets), and accepts one message type. It uses its own loader over the `bpf()` system call, with the programs compiled into the binary; no libbpf or bcc.
+**Is the service itself dangerous?** It is kept small on purpose: it runs no programs, takes no arguments, has no internet sockets of its own (its unit only allows Unix, packet and netlink sockets; netlink is how it closes the connections a rule denies), and accepts one message type. It uses its own loader over the `bpf()` system call, with the programs compiled into the binary; no libbpf or bcc.
 
 ## Honest limits
 
-- **ICMP** (ping) is only blocked by "no network". **Incoming connections to a port that is already open**, and `listen` without `bind`, aren't checked: that would need a per-packet hook.
+- **ICMP** (ping) is only blocked by "no network". `listen` without `bind` is decided as an outgoing connection. (Incoming connections to a port that is already open are decided per packet since 0.8.3.)
 - **The `user@` union is coarse:** while a restricted app runs, every process in that user's systemd manager is held to the union of restrictions.
 - **A brand-new scope** is registered within microseconds, but a connection made before that would pass under default rules.
-- **The Monitor lists destinations as IPs and countries;** the name the system resolver gave appears when you open "Allow / Block this domain". The Monitor never does reverse DNS, so no address leaves the machine just because you looked at it.
+- **The Monitor shows the names the system resolver gave** for each destination, or the address when it gave none. It never does reverse DNS, so no address leaves the machine just because you looked at it.
 - **Domain rules don't see apps that use their own encrypted DNS** (see above).
 - **What the restrictions don't cover for Linux apps:** Bluetooth through BlueZ on the system bus (only raw Bluetooth sockets are refused), the system bus in general, the clipboard, and programs started outside the app launcher. A new PipeWire client of a restricted app has a few milliseconds before the guard restricts it, and while a camera- or Bluetooth-restricted app runs, your own audio services can't open a new camera or Bluetooth socket either.
 - **The rules file can be edited by unsandboxed Linux apps**, since they run as you, unless they are restricted with "no access to your files". Installed `.lpk` apps can't reach it.

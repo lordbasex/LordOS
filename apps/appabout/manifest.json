@@ -1,0 +1,18 @@
+{
+  "id": "appabout",
+  "version": "0.8.5",
+  "name": "About App",
+  "description": "About one app: its name, version and where it comes from",
+  "size": [
+    340,
+    300
+  ],
+  "minSize": [
+    300,
+    260
+  ],
+  "dock": false,
+  "permissions": [],
+  "category": "System",
+  "hidden": true
+}

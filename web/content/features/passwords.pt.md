@@ -50,7 +50,7 @@ Vários métodos podem conviver. Por padrão, o cofre se tranca sozinho depois d
 
 - **Aberto no login.** O `lord-sessiond` confere sua senha de login, entrega-a uma única vez ao `lord-vault` para abrir o chaveiro da sessão e apaga a própria cópia.
 - **Os apps do LordOS** guardam seus segredos com o `keyring` do SDK. Cada app vê só os próprios itens. Para os apps `.lpk` instalados, o `lord-server` define o dono a partir da identidade verificada do app, então um app não consegue se passar por outro. Se um app pede um item de outro app, o sistema pergunta a você antes.
-- **Os apps Linux** usam o Secret Service padrão do freedesktop sobre D-Bus, servido por código próprio do LordOS. O Chromium foi testado de ponta a ponta: salvou um login, reiniciou, buscou a chave dele no chaveiro do LordOS e preencheu o login.
+- **Os apps Linux** usam o Secret Service padrão do freedesktop sobre D-Bus, servido por código próprio do LordOS. O Chromium foi testado de ponta a ponta: salvou um login, reiniciou, buscou a chave dele no chaveiro do LordOS e preencheu o login. Desde a 0.8.5 uma sessão iniciada com o computador espera o seu barramento de sessão, então com o login automático o chaveiro do LordOS tem o Secret Service desde o início, e se um app traz o gnome-keyring, só a parte PKCS#11 dele roda; na VM de teste o Chrome então pediu pelo aviso do chaveiro do próprio LordOS.
 
 [[shot:4]]
 

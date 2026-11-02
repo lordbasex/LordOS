@@ -550,6 +550,37 @@ static JSValue f_icon(JSContext *c, JSValueConst this_val, int argc, JSValueCons
 
 /* lord.pkg.releaseNotes(name, version) → Markdown text or null: the release notes a source publishes
  * for that version (ReleaseNotes in its signed Release, stored by pkg-update; docs/UPDATES.md). */
+/* lord.pkg.featured(): the Store's banner the last update verified (pkg.c, featured_valid), as
+ * { data: <the JSON object>, image: path or null }, or null without one. No arguments, read-only. */
+static JSValue f_featured(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    int fd = open(PKG_DIR "/featured.json", O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return JS_NULL;
+    struct stat st;
+    char *buf = NULL;
+    size_t got = 0;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size <= (64 << 10) && (buf = malloc((size_t)st.st_size + 1))) {
+        while (got < (size_t)st.st_size) {
+            ssize_t r = read(fd, buf + got, (size_t)st.st_size - got);
+            if (r <= 0) break;
+            got += (size_t)r;
+        }
+        buf[got] = 0;
+    }
+    close(fd);
+    if (!buf || got != (size_t)st.st_size) { free(buf); return JS_NULL; }
+    JSValue data = JS_ParseJSON(c, buf, got, "featured.json");
+    free(buf);
+    if (JS_IsException(data)) { JS_FreeValue(c, JS_GetException(c)); return JS_NULL; }
+    if (!JS_IsObject(data)) { JS_FreeValue(c, data); return JS_NULL; }
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "data", data);
+    struct stat is;
+    int img = !lstat(PKG_DIR "/featured.png", &is) && S_ISREG(is.st_mode);
+    JS_SetPropertyStr(c, o, "image", img ? JS_NewString(c, PKG_DIR "/featured.png") : JS_NULL);
+    return o;
+}
+
 static JSValue f_release_notes(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     char name[129], ver[129];
@@ -609,6 +640,7 @@ static JSValue f_reboot_required(JSContext *c, JSValueConst this_val, int argc, 
 
 static const JSCFunctionListEntry pkg_funcs[] = {
     JS_CFUNC_DEF("releaseNotes", 2, f_release_notes),
+    JS_CFUNC_DEF("featured", 0, f_featured),
     JS_CFUNC_DEF("rebootRequired", 0, f_reboot_required),
     JS_CFUNC_DEF("available", 0, f_available),
     JS_CFUNC_DEF("lastUpdate", 0, f_last_update),

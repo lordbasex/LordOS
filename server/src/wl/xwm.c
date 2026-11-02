@@ -663,6 +663,10 @@ static void on_map_request(const uint8_t *p) {
     if (!w->managed) {
         w->managed = 1;
         w->placed = 0;
+        /* Xwayland's surface includes the border, and the surface's size is what comes back as the
+         * window's: with a border, each configure would grow the window by twice its width */
+        int32_t no_border = 0;
+        configure(id, XCF_Border, &no_border, 1);
         uint32_t ext[4] = { 0, 0, 0, 0 };
         change_prop(id, AT(NET_FRAME_EXTENTS), XA_CARDINAL, 32, ext, 4);
         set_wm_state(w, 1);                                 /* NormalState */
@@ -1104,6 +1108,9 @@ void xwm_surface_gone(XWin *w) {
     if (!w) return;
     for (XWin *o = X.wins; o; o = o->next) if (o == w) { w->sid = 0; w->surface_res = 0; return; }
 }
+
+int xwm_is_dialog(const XWin *w) { return w->transient || w->wtype == AT(NET_WM_WINDOW_TYPE_DIALOG); }
+int xwm_is_fixed(const XWin *w) { return w->hints.min_w > 0 && w->hints.min_w == w->hints.max_w && w->hints.min_h > 0 && w->hints.min_h == w->hints.max_h; }
 
 void xwm_place(XWin *w, int x, int y) {
     if (!X.ready || !w->managed || w->minimized) return;

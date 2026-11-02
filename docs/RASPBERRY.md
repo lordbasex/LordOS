@@ -25,6 +25,39 @@ This document gathers what's needed to build the image, write it, develop on the
 > previous one stays installed and bootable (see "Switching kernels on a board"). Cross-compiled on
 > VM 116, installed on the Pi 5 and verified there: `verify-board`, the firewall cut test (15/15,
 > TCP and QUIC closed in 0.04–0.37 s) and `make -C server test`.
+>
+> **Update (2026-10-25, 0.8.4.1):** the Pi 5 image shows the login screen and the desktop on an HDMI
+> monitor from the first boot (the display driver line in `config.txt` now comes after
+> `display_auto_detect`/`camera_auto_detect`, plus 0.8.4's longer wait for the display driver;
+> `CHANGELOG.md`, 0.8.4.1, Fixed). The image also brings Chromium, Firefox ESR and the ISO's system
+> packages, and the bootloader is updated from Settings → Board firmware. A monitor plugged in after
+> boot is followed since 0.8.5 (the login screen listens for the kernel's display events too). Frame rates with GPU composition on a 1920×1080 monitor
+> were measured with LordBench's desktop test (`BENCHMARK.md`, "The desktop under load"). **Still not measured:**
+> two monitors and 4K.
+>
+> **Update (2026-10-27, 0.8.5):** released with the image `lordos-0.8.5-rpi5-arm64.img.xz`. A Pi 5 on
+> 0.8.4 updated to the same package built as `0.8.5~rc2` with `apt` and restarted (no migration;
+> `CHANGELOG.md`, 0.8.5, Upgrading). What changes on the Pi: the login screen follows a monitor plugged
+> in after boot (`SESSIONS.md`), the Store follows apt's priorities so "Update all" no longer takes
+> Raspberry Pi's builds of Debian packages, and packages with a `+` in their name (`kms++-utils`,
+> `libkms++0`) download from lordos.org, so Settings → Board firmware can install the bootloader tools
+> from the LordOS repository alone (`PACKAGES.md`). Still not measured: the same as above.
+>
+> **Update (2026-10-30, 0.8.6):** released with the image `lordos-0.8.6-rpi5-arm64.img.xz` (783,667,748
+> bytes, sha256 `a81a2e068870099ac70aef8eaa08d0f1e33c0b3825f18f231f2e43ee251ea613`). A Pi 5 on 0.8.5 updated to 0.8.6 with `apt` against
+> `lordos.org/apt-staging` and restarted: no migration ran, the settings files are unchanged, and it
+> came back with 0.8.6-beta build 20261030, the first frame 7.63 s after the kernel, in a release build
+> with signed code (`UPDATES.md`, "Release tests"). The Store's own package engine and the Store → Updates
+> screen were not exercised, and a second reinstall was not run. The test suites were not rerun on the
+> Pi for 0.8.6. Results are in `results/0.8.6-beta/pi5-16gb-hdmi/` (`RESULTS.md`). Still not
+> measured: the same as above.
+>
+> **Not tested:** the `lordos-0.8.6-rpi5-arm64.img.xz` file itself was not written to a card or booted. Its package is
+> the one tested on the Pi above, built in the same run.
+>
+> **Update (2026-11-01, 0.8.7):** the image is `lordos-0.8.7-rpi5-arm64.img.xz`. FFmpeg now comes from Raspberry Pi's
+> archive, pinned in the image and by a migration on upgrades, and `lord-media` drives the Pi 5's HEVC decoder with it
+> (`WALLPAPERS.md`, `MEDIA.md`).
 
 ## Models
 
@@ -56,7 +89,16 @@ SD card or an NVMe, and the same image boots on the Pi 5 and the Pi 4.
 ### What it ships
 
 - **Debian 13 (trixie) arm64**, minbase, with the same LordOS packages as the ISO: PipeWire,
-  wpa_supplicant, OpenVPN, Noto, foot, FeatherPad.
+  wpa_supplicant, OpenVPN, Noto, foot, FeatherPad, automatic time (`systemd-timesyncd`: the board
+  has no clock that keeps time without a battery, and without it the clock started months behind,
+  so every signed package index was refused as "not valid yet"), printing (`cups`, `avahi-daemon`),
+  exFAT and NTFS drives, power profiles, the MIME database and the GSettings schemas (since 0.8.4.1).
+- **Chromium and Firefox ESR** (Debian's arm64 builds, since 0.8.4.1), with the ISO's defaults from
+  the same script, `tools/iso/browser-defaults.sh`: Chromium's `master_preferences` with
+  `custom_chrome_frame` and the GTK theme, Firefox's `/etc/firefox-esr/lordos.js` (`inTitlebar` 1),
+  so both draw a single bar with LordOS's window buttons; the GTK themes, the video extension and
+  the video settings (`video-optimize`, Settings → Displays → Video) come with the lordos package.
+  Measured cost in `ISO.md`, "Release test (0.8.4.1 Beta, October 25)".
 - **The LordOS build of the Raspberry Pi kernel** (see "The LordOS kernel"), when
   `tools/rpi/build-kernel.sh` has built it; otherwise Raspberry Pi's archive kernel, with a loud
   warning (it has no Landlock, BPF LSM or BTF):
@@ -68,15 +110,26 @@ SD card or an NVMe, and the same image boots on the Pi 5 and the Pi 4.
   these packages (`/etc/apt/preferences.d/raspberrypi`):
   - `raspi-firmware`: the boot files, device trees and overlays in `/boot/firmware`;
   - `firmware-brcm80211`: Wi-Fi (CYW43455);
-  - `rpi-eeprom` and `raspi-utils` (`vcgencmd`, `pinctrl`), if available.
+  - `rpi-eeprom` and `raspi-utils` (`vcgencmd`, `pinctrl`), if available;
+  - (0.8.7) `ffmpeg` and its libraries, for the Pi 5's hardware HEVC (`WALLPAPERS.md`).
 
-  Everything else comes from Debian, Mesa included.
+  Everything else comes from Debian, Mesa included. Since 0.8.4.1 `rpi-eeprom` and what it needs
+  are also in the LordOS repository (`UPDATES.md`, "Raspberry Pi firmware packages"): the same
+  files, so either source updates the bootloader images; with both, `apt` takes the Raspberry Pi
+  archive's copy (priority 990) and the result is the same `.deb`. Since 0.8.5 the Store's package
+  engine follows `/etc/apt/preferences.d` like `apt` (`PACKAGES.md`, "How it resolves"); until then
+  its "Update all" could take Raspberry Pi's builds of packages Debian also has (Chromium, BlueZ…).
+- **The bootloader** (in the board's EEPROM) is updated from **Settings → Board firmware**
+  (`SETTINGS.md`, "Board firmware"), not `raspi-config`: `rpi-eeprom-update`'s hint to run
+  `raspi-config` doesn't apply on LordOS.
 - **Bluetooth** (the CYW43455's Bluetooth half, on a UART; see "Bluetooth"), from Debian: `bluez`,
   `bluez-firmware` (the chip's patch, `brcm/BCM4345C0.hcd`), `libspa-0.2-bluetooth` (headsets in
   PipeWire) and `rfkill`, plus our SCO-routing helper (`lordos-rpi-bt@hciN`).
 - **Debian 13's Mesa:** v3d (GLES 3.1), v3dv (Vulkan) and kmsro (vc4 for the display, v3d for
   rendering). lord-server is compiled with `GPU=1`.
-- **The same LordOS package as the ISO.** Built by `tools/iso/mkdeb.sh` with `DEB_ARCH=arm64`.
+- **The same LordOS package as the ISO.** Built by `tools/iso/mkdeb.sh` with `DEB_ARCH=arm64`, installed with
+  the same `lordos-hwdata` package (0.8.7, `tools/iso/mkdeb-hwdata.sh`, `Architecture: all`: the signed
+  tested-hardware snapshot it depends on).
 - **Partitions:** MBR, in the layout Raspberry Pi Imager and the firmware expect:
 
   | Partition | Size | What it holds |
@@ -584,7 +637,7 @@ The order of `card0` and `card1` depends on which driver loads first.
     `card1`.
   - `LORD_CARD=/dev/dri/cardN` pins it, and lord-server's `--card` still works.
 - **`lordos.service.d/rpi.conf`** waits up to 10 s for a connector to appear in `/sys/class/drm`
-  (`wait-kms`). If lord-sessiond starts before vc4 is loaded, without this it would only see v3d.
+  (`wait-kms`, up to 30 s, and it asks for `vc4` with `modprobe`; lord-sessiond then waits up to 30 s more for a card with KMS before showing the "no display" text). If lord-sessiond starts before vc4 is loaded, without this it would only see v3d.
 - **GBM and EGL** are created on the display card (vc4), as always. Mesa recognizes it (kmsro) and
   renders with v3d. Scanout buffers are created on vc4 and v3d imports them. lord-server doesn't need
   to know anything about this.
@@ -661,7 +714,7 @@ files weren't touched.
 
   Recommended: option 1. Add
   `ffmpeg libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libavfilter10` to
-  `/etc/apt/preferences.d/raspberrypi` (verify the names with `apt-cache policy` on the board).
+  `/etc/apt/preferences.d/raspberrypi` (verify the names with `apt-cache policy` on the board). Done in 0.8.7 (`WALLPAPERS.md`).
 - **Decoded frames** are DRM PRIME:
   - **NV12 or P030 with the `BROADCOM_SAND128` modifier**: the Pi's "column" format;
   - `av_hwframe_map` / `AVDRMFrameDescriptor` give the fd, offset, pitch and modifier.
@@ -782,7 +835,8 @@ the per-app firewall was off on the Pi; `build-img.sh` enables it now. **The Lor
 BPF LSM** (`CONFIG_BPF_LSM` is not set, and no BTF), so "No Bluetooth" for Linux apps isn't enforced
 on the Pi (`lord-netperm` reports `"bluetooth":false`); the network and device programs work. Turning
 on `CONFIG_BPF_LSM` and `CONFIG_DEBUG_INFO_BTF` in `build-kernel.sh` is pending. **The image has not
-been booted on a board yet.**
+been booted on a board yet.** (Later: both options are on since 0.8.1's `-2+lordos` kernel, see "The
+LordOS kernel".)
 
 ## Results on the board (2026-10-18)
 
@@ -798,7 +852,7 @@ on the development machine.
 | NEON (`build/canvas-test`) | ✅ "NEON matches C". blit 9.90 → 4.33 ms/screen, mask 11.09 → 5.49 ms/screen (2.0–2.3×) |
 | `make -C server test-full` | ⚠️ media-test probe/wave/sandbox ✅. `doc_evil.sh` 20/25: the 5 failures are the filesystem confinement checks (`~/.ssh`, home, `/tmp`), because **the Raspberry Pi kernel has no Landlock** (`# CONFIG_SECURITY_LANDLOCK is not set`, `/sys/kernel/security/lsm` = `capability`). seccomp works on aarch64 (`seccomp=1(tsync)`, no sockets, no fork). `sandbox-test` skipped for the same reason |
 | arm64 `.deb` (`DEB_ARCH=arm64 tools/iso/mkdeb.sh`) | ✅ 5.0 MB; dependencies resolve on Raspberry Pi OS (its `+rpt` FFmpeg keeps the Debian package names) |
-| lordos.service | ✅ `lord-sessiond: display: /dev/dri/card1` (vc4; v3d is card0, `drmcard.h` picks the right one). With nothing connected the login screen stays headless (`kms: no monitor connected`) instead of crash-looping. lord-server now keeps the lent card and retries on the next DRM uevent (`main.c`, parked fds): **compiled, not yet tried with a monitor** |
+| lordos.service | ✅ `lord-sessiond: display: /dev/dri/card1` (vc4; v3d is card0, `drmcard.h` picks the right one). With nothing connected the login screen stays headless (`kms: no monitor connected`) instead of crash-looping. lord-server keeps the lent card and retries on the next DRM uevent (`main.c`, parked fds). Until 0.8.5 the login screen never opened the uevent socket (`hw_start` ran only in sessions), so a monitor plugged in after boot stayed black until a restart; the login screen now starts `hw` without the bus. Retry checked on the board with `echo change > /sys/class/drm/card1/uevent` (the greeter tries the card again) |
 | Idle (login screen, headless) | lord-server 36 MB RSS, 0.6 % CPU; lord-sessiond 4.4 + 2.5 MB; system total 450 MB used of 16 GB; 38–43 °C, `throttled=0x0`, 2.4 GHz |
 | EGL/GBM | `V3D 7.1.10.2`, OpenGL ES 3.1 (`eglinfo -p gbm`). LordOS's GPU path on screen not exercised (no monitor) |
 | Video (FFmpeg CLI) | HEVC 1080p30 through `rpi-hevc-dec` (`/dev/video19`, `-hwaccel drm -hwaccel_output_format drm_prime`): 300 frames in 0.54 s with 0.12 s of CPU. Software, 4 threads: HEVC 1080p 251 fps, H.264 1080p ~420 fps (synthetic `testsrc2` clip: real content is heavier). lord-media only knows VA-API, so inside LordOS HEVC is software for now |
@@ -827,11 +881,13 @@ Notes for the image:
   ships the LordOS kernel with `CONFIG_SECURITY_LANDLOCK=y` ("The LordOS kernel").
 - The image takes Mesa (25.0.7) and FFmpeg (7.1.5) from Debian. Debian's FFmpeg has no V4L2-request
   decoding, so the hardware HEVC seen above needs the Raspberry Pi FFmpeg pinned (option 1 in
-  "Video").
+  "Video"). (Since 0.8.7 the image pins it.)
 
 Still to do on the board: everything in the checklist that needs a monitor (items 1, 2, 4–8, 10, 15
 with screenshots, 16 HDMI audio, 17), the desktop session, and booting the built image from a
-second SD card or an NVMe.
+second SD card or an NVMe. (Later: a 0.8.4 image was booted from a test SD card for the 0.8.4.1
+release test, `ISO.md`, and the desktop shows on HDMI since 0.8.4.1, see the status at the top; the
+measurements with a monitor are still to do.)
 
 ## Server portability audit (aarch64)
 
@@ -862,7 +918,7 @@ EGL/GLES/GBM ones. What follows is the result.
 - **Page size (16K on the Pi 5):** there's no hardcoded 4096 in `mmap`, shm or buffers.
   - Dumb buffers use `CREATE_DUMB`'s `size` and `pitch`.
   - WASM memory reserves and protects in multiples of 64 KiB (a multiple of 16K).
-  - The Monitor uses `sysconf(_SC_PAGESIZE)` (`monitor/mon.c:443`).
+  - The Monitor uses `sysconf(_SC_PAGESIZE)` (`monitor/mon.c`).
   - The dmabuf feedback does `memfd` + `mmap` of an arbitrary size, which is valid.
 - **Unaligned reads and endianness:**
   - the OpenType, MaxMind DB, xz, PNG/JPEG (stb), thbrk and IME readers read byte by byte in
@@ -894,6 +950,6 @@ EGL/GLES/GBM ones. What follows is the result.
 | `server/src/kms.c` `read_scanout_formats` | `IN_FORMATS` with `UNIVERSAL_PLANES` untested on vc4. If it fails, it stays as before |
 | `server/src/drmcard.h` | `GETCONNECTOR` forces an EDID read per card at startup (~50 ms). Hotplug: if HDMI is plugged in after boot, lord-sessiond has already chosen the card (vc4 anyway, because it has connectors) |
 | `server/src/sec/sandbox.c` | seccomp: check on the board that no `.lpk` app dies from a syscall that arm64 glibc uses and x86 doesn't. Landlock: the Raspberry Pi kernel might not have it; `cmdline.txt` asks for `lsm=landlock,…`. The shared helper profile (`sandbox_apply_helper`) uses the same list and is fine on arm64, but has no `ioctl`: hardware video (V4L2 on the Pi, VA-API on the PC) inside the sandbox needs it (the sandbox agent was told) |
-| `server/src/monitor/mon.c:703` | The Monitor's "model name" stays empty on ARM. The Monitor agent was told (`js_sys.c`'s `arm_cpu_name` would do) |
-| `server/src/install/install.c:677` | The installer uses `grub-install --target=x86_64-efi`. On the Pi it doesn't apply (it's not live, the installer doesn't appear), but it's what would have to change for an ARM64/UEFI installer |
+| `server/src/monitor/mon.c` | The Monitor's "model name" stayed empty on ARM. Fixed: `lord.monitor.info().cpuModel` now comes from `js_sys_cpu_name()`, the same one About uses (`js_monitor.c`) |
+| `server/src/install/install.c` | Done in 0.8.7, for the generic arm64 ISO (`ISO.md`, "The arm64 ISO"): `--target=arm64-efi`, no BIOS partition. On the Pi it doesn't apply (it's not live, the installer doesn't appear) |
 | page size | Some third-party program (not LordOS) assumes 4K: Widevine, box64, old jemalloc. If needed, `kernel=kernel8.img` in `config.txt` (4K, a bit slower) |

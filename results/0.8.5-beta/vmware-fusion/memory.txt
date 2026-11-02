@@ -1,0 +1,21 @@
+# free -m (whole system; 'used' excludes the reclaimable page cache)
+               total        used        free      shared  buff/cache   available
+Mem:            4861         592        3749           3         743        4268
+Swap:           2047           0        2047
+
+# PSS per process, MB (shared pages divided among the processes that map them)
+# only processes this user can read; run with sudo for all
+     9.9  wireplumber
+     6.3  pipewire
+     2.6  pipewire-pulse
+     1.4  bash
+     1.3  xdg-permission-
+     1.1  pipewire
+     0.9  dbus-daemon
+     0.5  mpris-proxy
+     0.3  awk
+     0.3  sort
+     0.3  tail
+     0.2  sh
+     0.2  sh
+    25.1  total of the processes listed

@@ -1,5 +1,6 @@
 {
   "id": "pdf",
+  "version": "0.8.5",
   "name": "PDF Viewer",
   "description": "Preview-style PDF viewer: thumbnails, outline, search, annotations, forms and printing",
   "size": [980, 680],

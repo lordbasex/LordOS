@@ -145,6 +145,7 @@ function FileDialog({ t, tr, mode, start, initialName, onPick, onCancel }) {
 
 // List with search (go to file, choose language).
 function Picker({ t, title, placeholder, items, onPick, onCancel, render = (x) => x.label }) {
+  const { focused } = useAppWindow();   // back from a minimize, the field takes the keyboard again
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const shown = useMemo(() => {
@@ -156,7 +157,7 @@ function Picker({ t, title, placeholder, items, onPick, onCancel, render = (x) =
       <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 480, padding: 12, gap: 8, borderRadius: 12,
         backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
         {title && <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, marginLeft: 4 }}>{title}</Text>}
-        <TextInput value={q} onChange={(v) => { setQ(v); setSel(0); }} placeholder={placeholder} autoFocus onCancel={onCancel}
+        <TextInput key={focused ? 'on' : 'off'} value={q} onChange={(v) => { setQ(v); setSel(0); }} placeholder={placeholder} autoFocus onCancel={onCancel}
           onSubmit={() => shown[sel] && onPick(shown[sel])}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') { setSel((s) => Math.min(shown.length - 1, s + 1)); return true; }

@@ -1,14 +1,14 @@
 LordOS es software libre y las contribuciones son bienvenidas: código, documentación, traducciones, pruebas en hardware real y buenos reportes de errores. Esta página explica cómo participar y las pocas reglas que sigue toda contribución.
 
-## Por ahora: el repositorio es privado
+## Cómo participar
 
-Hasta que el repositorio sea público, todavía no podemos aceptar pull requests. Mientras tanto podés:
+El repositorio es público en [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). Podés:
 
-- probar LordOS y [reportar problemas](/legal/issues/) por [nuestro formulario de contacto](https://www.iperfex.com/contacto/?lang=es);
+- probar LordOS y [reportar problemas](/legal/issues/) en [GitHub Issues](https://github.com/lordbasex/LordOS/issues);
 - probarla en tu hardware y contarnos qué funciona y qué no;
-- cuando el repositorio [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS) sea público, **seguirlo** (watch) o darle una **estrella** para enterarte de las versiones y las discusiones.
+- **seguir** (watch) el repositorio o darle una **estrella** para enterarte de las versiones.
 
-## Cuando el repositorio sea público: fork y pull request
+## Fork y pull request
 
 1. Hacé un **fork** del repositorio en GitHub y creá una rama para tu cambio.
 2. Hacé tu cambio, con pruebas cuando tenga sentido, y corré las suites de pruebas (ver más abajo).

@@ -1,5 +1,6 @@
 {
   "id": "disks",
+  "version": "0.8.5",
   "name": "Disks",
   "description": "Disks and USB sticks: usage, health (SMART), mount, format, erase and create a bootable USB",
   "size": [960, 620],

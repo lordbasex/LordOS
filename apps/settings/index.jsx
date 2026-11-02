@@ -3,9 +3,10 @@
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
 import {
-  standaloneDesktop, View, Text, Image, useTheme, useSettings, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  standaloneDesktop, View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, wm,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -27,6 +28,7 @@ import { CoolingSettings } from './Cooling.jsx';
 import { NotificationsSettings } from './Notifications.jsx';
 import { DateTimeSettings } from './DateTime.jsx';
 import { DefaultAppsSettings } from './DefaultApps.jsx';
+import { FirmwareSettings } from './Firmware.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
 
 export function Icon({ size: s }) {
@@ -122,13 +124,15 @@ function StyleThumb({ id, accent, dark }) {
   );
 }
 
-// Desktop style: the two full appearances (Lord Default and Classic), switched live. The open app
-// windows come back in the new one (sdk/index.js themes.use), Settings on this page.
+// Desktop style: every installed theme (Lord Flow and Lord Classic first; the login screen's is hidden),
+// switched live. The open app windows come back in the new one (sdk/index.js themes.use), Settings on
+// this page. Since 0.8.5 this is the only place to choose a theme (there is no separate Themes page).
 function StylePicker() {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const list = themes.list().filter((th) => th.id === 'default' || th.id === 'classic');
-  if (list.length < 2) return null;
+  const order = (id) => (id === 'default' ? 0 : id === 'classic' ? 1 : 2);
+  const list = [...themes.list()].sort((a, b) => order(a.id) - order(b.id) || a.name.localeCompare(b.name));
+  if (!list.length) return null;
   const pick = (id) => {
     wm.open('settings', { args: { section: 'appearance' } });
     themes.use(id);
@@ -136,8 +140,8 @@ function StylePicker() {
   return (
     <Section title={tr('settings.style.title')} footer={tr('settings.style.hint')}>
       <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
-        {['default', 'classic'].map((id) => {
-          const th = list.find((x) => x.id === id);
+        {list.map((th) => {
+          const id = th.id;
           return (
             <View key={id} onClick={() => { if (!th.current) pick(id); }} style={{ alignItems: 'center', gap: 6 }}>
               <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${th.current ? t.accent : 'transparent'}` }}>
@@ -203,6 +207,127 @@ function Appearance() {
 // A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
 const wallpaperName = (w) => (w.nameKey && tOptional(w.nameKey)) || w.name;
 
+// While a chosen wallpaper is starting; it turns only then.
+function TileSpinner() {
+  const [a, setA] = useState(0);
+  useEffect(() => { const id = setInterval(() => setA((x) => (x + 30) % 360), 80); return () => clearInterval(id); }, []);
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <Text style={{ fontSize: 22, color: '#fff', transform: `rotate(${a}deg)` }}>⟳</Text>
+    </View>
+  );
+}
+
+function MotionTile({ it, on, avail, percent, busy, onClick }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
+  return (
+    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: 108, opacity: avail ? 1 : 0.45 }}>
+      <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
+        <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+          <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {busy || percent != null ? <TileSpinner /> : null}
+          {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
+        </View>
+      </View>
+      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 108 }}>{name}</Text>
+    </View>
+  );
+}
+
+// Moving wallpapers: downloaded on demand, played only with a compatible GPU.
+function MotionWallpapers({ login }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const codecs = useCodecs();
+  const downloads = useStore(motionDownloads);
+  const busy = useStore(motionBusy);
+  const [scope, setScope] = useState('*');
+  const [msg, setMsg] = useState('');
+  const [pick, setPick] = useState(false);
+  const [credits, setCredits] = useState(false);
+  const can = codecs.length > 0;
+  const displays = screenDisplays() || [];
+  const main = displays[0] || { w: 1920, h: 1080 };
+  const motion = s.motion || {};
+  const cur = motion[scope] || null;
+  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m }); };
+  const select = (it) => {
+    setMsg('');
+    const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
+    if ((s.motionFiles || {})[it.id]) { apply(); return; }
+    const v = variantFor(it, codecs, main);
+    if (!v) return;
+    downloadMotion(it, v).then(apply, (e) => setMsg(errorText(e)));
+  };
+  const curItem = motionItems.find((x) => x.id === cur);
+  const addFile = (path) => {
+    setPick(false);
+    media.probe(path).then((info) => {
+      const why = userVideoProblem(info, codecs);
+      if (why) { setMsg(tr(`settings.motion.problem.${why}`)); return; }
+      const id = `user:${Date.now()}`;
+      set({ motionUser: [...(s.motionUser || []), { id, name: path.split('/').pop(), path }] });
+      choose(id);
+    });
+  };
+  return (
+    <>
+      <Section title={tr('settings.motion.title')} footer={can ? tr('settings.motion.hint') : undefined}>
+        {!can ? <Note>{tr('settings.motion.needsGpu')}</Note> : null}
+        {msg ? <Note tone="warn">{msg}</Note> : null}
+        {can && displays.length > 1 ? (
+          <SettingRow label={tr('settings.motion.display')}>
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, d.name || String(d.id)])]} />
+          </SettingRow>
+        ) : null}
+        {can ? (
+          <>
+            {login ? null : <><SettingRow label={tr('settings.motion.speed')}>
+              <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
+            </SettingRow></>}
+            {!login && cur ? (
+              <SettingRow label={curItem ? (tOptional(`settings.motion.item.${curItem.id}`) || curItem.name) : tr('settings.motion.random')}>
+                <Actions>
+                  {curItem ? <Button small label={tr('settings.motion.remove')} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} /> : null}
+                  <Button small label={tr('settings.motion.none')} onClick={() => choose(null)} />
+                </Actions>
+              </SettingRow>
+            ) : null}
+            <Actions style={{ paddingVertical: spacing.s }}>
+              {login ? <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setMsg(tr('settings.motion.loginReset')); }, (e) => setMsg(errorText(e)))} /> : null}
+              {login ? null : <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />}
+              {login ? null : <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />}
+              <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
+            </Actions>
+          </>
+        ) : null}
+      </Section>
+      {MOTION_SECTIONS.map((sec) => (
+        <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
+            {motionItems.filter((it) => it.section === sec).map((it) => (
+              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} />
+            ))}
+          </View>
+        </Section>
+      ))}
+      {credits ? (
+        <Section title={tr('settings.motion.credits')}>
+          <View style={{ gap: 6, paddingVertical: spacing.s }}>
+            {motionItems.map((it) => (
+              <Text key={it.id} style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tOptional(`settings.motion.item.${it.id}`) || it.name} — ${it.author} — ${it.license} — ${it.source}`}</Text>
+            ))}
+          </View>
+        </Section>
+      ) : null}
+      {pick ? <FilePicker onPick={(p) => addFile(Array.isArray(p) ? p[0] : p)} onClose={() => setPick(false)} /> : null}
+    </>
+  );
+}
+
 // Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
 function Wallpapers() {
   const t = useTheme();
@@ -210,12 +335,22 @@ function Wallpapers() {
   const [s, set] = useSettings();
   const list = t.wallpapers || [];
   if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;
-  const cur = findWallpaper(list, s.wallpaper);
+  const [target, setTarget] = useState('desktop');
+  const login = target === 'login';
+  const [note, setNote] = useState('');
+  const shown = login ? s.loginWallpaper : s.wallpaper;
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
+  const stillPick = (id) => {
+    if (!login) { set({ wallpaper: id, motion: {} }); return; }
+    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.motion.loginDone')); }, (e) => setNote(errorText(e)));
+  };
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
     .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
   const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
   return (
     <Stack>
+      {!standaloneDesktop && <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />}
+      {note ? <Note>{note}</Note> : null}
       <Section>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
           <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
@@ -227,12 +362,13 @@ function Wallpapers() {
           </View>
         </View>
       </Section>
+      <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
         <Section key={c} title={catName(c)}>
           {/* 108 px items with 10 px gaps: a category of five fits on one row in the default window */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
             {ws.map((w) => (
-              <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ alignItems: 'center', gap: 6, width: 108 }}>
+              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: 108 }}>
                 <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
                   <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
                     <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -394,6 +530,22 @@ function KeyCap({ label, active }) {
   );
 }
 
+// The shortcuts in use with this theme (sdk/shortcuts.js): read only.
+function ShortcutsList() {
+  const { t: tr } = useLocale();
+  const t = useTheme();
+  useStore(shortcutsRev);
+  return shortcutList().map(({ group, items }) => (
+    <Section key={group} title={tr(`settings.kb.shortcuts.${group}`)} footer={group === 'apps' ? tr('settings.kb.shortcuts.note') : undefined}>
+      {items.map((it) => (
+        <SettingRow key={it.id} label={it.label}>
+          <Text style={{ fontSize: typeScale.body, color: t.textDim }}>{it.keys}</Text>
+        </SettingRow>
+      ))}
+    </Section>
+  ));
+}
+
 function Keyboard() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -441,38 +593,42 @@ function Keyboard() {
         ))}
       </Section>
       {keyboard.active()?.ime && keyboard.missingDictionary() && <Note tone="warn">{tr('settings.ime.noDict')}</Note>}
+      <Section title={tr('settings.osk.title')} footer={tr('settings.osk.hint')}>
+        <Actions style={{ paddingVertical: spacing.s }}>
+          <Button small label={tr('settings.osk.show')} onClick={() => osk.show()} />
+        </Actions>
+      </Section>
       <Section title={tr('settings.kb.test')} footer={tr('settings.kb.testHint')}>
         <View style={{ paddingVertical: spacing.s }}>
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
-    </Stack>
-  );
-}
-
-function Themes() {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const list = themes.list();
-  return (
-    <Stack>
-      <Section footer={tr('settings.themes.hint')}>
-        {list.map((th) => (
-          <SettingRow key={th.id} icon={<Badge glyph="◧" color={th.current ? t.accent : '#8e8e93'} size={28} />} label={th.name} hint={th.description}>
-            {th.current
-              ? <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.accent }}>{tr('settings.themes.current')}</Text>
-              : <Button small label={tr('settings.themes.use')} onClick={() => themes.use(th.id)} />}
+      {themes.current() === 'default' && (
+        <Section title={tr('settings.kb.desktopArrows.title')} footer={tr('settings.kb.desktopArrows.hint')}>
+          <SettingRow label={tr('settings.kb.desktopArrows.label')}>
+            <Toggle value={s.desktopArrows !== false} onChange={(v) => set({ desktopArrows: v })} />
           </SettingRow>
-        ))}
-      </Section>
+        </Section>
+      )}
+      <ShortcutsList />
     </Stack>
   );
 }
 
 function Session() {
   const { t: tr } = useLocale();
+  useSettings();
+  const mode = restoreMode();
   return (
     <Stack>
+      <Section footer={tr('settings.session.restoreHint')}>
+        <SettingRow label={tr('settings.session.restore')}>
+          <PopUp value={mode} onChange={setRestoreMode} options={['always', 'ask', 'off'].map((m) => [m, tr(`settings.session.restore.${m}`)])} />
+        </SettingRow>
+        <SettingRow label={tr('settings.session.browsers')} hint={tr('settings.session.browsersHint')} disabled={mode === 'off'}>
+          <Toggle small on={restoreBrowsers()} onChange={(v) => { if (mode !== 'off') setRestoreBrowsers(v); }} />
+        </SettingRow>
+      </Section>
       <Section footer={tr(session.managed() ? 'settings.session.hintManaged' : 'settings.session.hint')}>
         <SettingRow label={tr('shell.menu.logout')}>
           <Button small label={tr('shell.menu.logout')} onClick={() => session.quit()} />
@@ -519,16 +675,33 @@ function FanGlyph() {
   );
 }
 
+// A chip: a square body with three pins on each side.
+function ChipGlyph() {
+  return (
+    <View style={{ width: 14, height: 14, direction: 'ltr' }}>
+      <View style={{ position: 'absolute', left: 3, top: 3, width: 8, height: 8, borderRadius: 1.5, backgroundColor: '#fff' }} />
+      {[4, 6.5, 9].map((y) => (
+        <View key={y}>
+          <View style={{ position: 'absolute', left: 0, top: y - 0.5, width: 3, height: 1.5, backgroundColor: '#fff' }} />
+          <View style={{ position: 'absolute', left: 11, top: y - 0.5, width: 3, height: 1.5, backgroundColor: '#fff' }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫']],
-  [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['themes', Themes, '#ff9f0a', '◧'], ['session', Session, '#ff453a', '↪']],
+  [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
-// Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor)
-const sectionShown = (id, hasPad) => (id !== 'trackpad' || hasPad) && (!standaloneDesktop || !['sharing', 'users', 'cooling'].includes(id));
+// Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor); Board firmware
+// only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
+const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
+const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'trackpad' || hasPad) && (id !== 'firmware' || pi5) && (!standaloneDesktop || !['sharing', 'users', 'cooling', 'firmware'].includes(id));
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -576,15 +749,17 @@ export default function Settings() {
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
   const setSection = (s) => {
-    if (standaloneDesktop && ['sharing', 'users', 'cooling'].includes(s)) s = 'general';
+    if (standaloneDesktop && ['sharing', 'users', 'cooling', 'firmware'].includes(s)) s = 'general';
     lastSection = s; setSectionState(s);
   };
-  useEffect(() => { if (args?.section && SECTIONS.some(([id]) => id === args.section)) setSection(args.section); }, [args?.nonce]);
+  // 'themes' (the old Themes page, links from older help) now opens Appearance
+  useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
   const q = query.trim().toLowerCase();
   // Trackpad only if there is a touchpad (lord-sessiond lends them with the monitor)
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
-  const visible = (id) => sectionShown(id, hasPad) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const [pi5] = useState(isPi5);
+  const visible = (id) => sectionShown(id, hasPad, pi5) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>

@@ -21,9 +21,9 @@ build/lord-server: $(MAILC_OBJ)
 $(MAILC_OBJ): $(wildcard src/mail/*.h) src/ui/js_mail.h
 # the connector's policy: allowed endpoints and the public-address check for remote images
 test: build/mailc-test
-build/mailc-test: tests/mailc_test.c src/mail/mailc.c src/mail/mailc.h src/doc/wire.c src/sec/json.c
+build/mailc-test: tests/mailc_test.c src/mail/mailc.c src/mail/mailc.h src/doc/wire.c src/sec/json.c $(NETCONN_SRC)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/mailc_test.c src/mail/mailc.c src/doc/wire.c src/sec/json.c -lpthread -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/mailc_test.c src/mail/mailc.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC) -lpthread -lm
 	./$@ || { rm -f $@; exit 1; }
 # hostile servers: HTTP chunk sizes / Content-Length / header limits and IMAP literal sizes,
 # over a socketpair (no network). Needs the OpenSSL headers (net.c), like lord-maild.
@@ -56,6 +56,6 @@ build/lord-maild: $(LMD_SRC) build/obj/mail/mimg.o $(MAIL_HDR) src/sec/sandbox.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LMD_SRC) build/obj/mail/mimg.o $(shell pkg-config --libs openssl) -lpthread -lm
 # manual driver for lord-maild (not in `make test`): build/maild-cli '{"op":"status"}' --wait 5
-build/maild-cli: tests/maild_cli.c src/mail/mailc.c src/doc/wire.c src/sec/json.c src/mail/mailc.h
+build/maild-cli: tests/maild_cli.c src/mail/mailc.c src/doc/wire.c src/sec/json.c src/mail/mailc.h $(NETCONN_SRC)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/maild_cli.c src/mail/mailc.c src/doc/wire.c src/sec/json.c -lpthread -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/maild_cli.c src/mail/mailc.c src/doc/wire.c src/sec/json.c $(NETCONN_SRC) -lpthread -lm

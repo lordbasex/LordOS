@@ -282,6 +282,10 @@ static void test_json(void) {
     CHECK(jin("{\"t\":\"resize\",\"w\":1921,\"h\":1080}", 1280, 800, &in) == RS_IN_RESIZE && in.a == 1920);
     CHECK(jin("{\"t\":\"resize\",\"w\":100000,\"h\":1080}", 1280, 800, &in) == RS_IN_NONE);
     CHECK(jin("{\"t\":\"resize\",\"w\":100,\"h\":100}", 1280, 800, &in) == RS_IN_NONE);
+    CHECK(jin("{\"t\":\"resize\",\"w\":1920,\"h\":1080}", 1280, 800, &in) == RS_IN_RESIZE && in.v1 == 0);
+    CHECK(jin("{\"t\":\"resize\",\"w\":1920,\"h\":1080,\"hz\":144}", 1280, 800, &in) == RS_IN_RESIZE && in.v1 == 144);
+    CHECK(jin("{\"t\":\"resize\",\"w\":1920,\"h\":1080,\"hz\":1000}", 1280, 800, &in) == RS_IN_NONE);
+    CHECK(jin("{\"t\":\"resize\",\"w\":1920,\"h\":1080,\"hz\":-60}", 1280, 800, &in) == RS_IN_NONE);
     CHECK(jin("{\"t\":\"ping\",\"ts\":123}", 1280, 800, &in) == RS_IN_PING && in.ts == 123);
     CHECK(jin("{\"t\":\"ack\"}", 1280, 800, &in) == RS_IN_NONE);       /* the image path's ack is gone (0.8.4) */
     CHECK(jin("{\"t\":\"clip\",\"text\":\"h\\u00e9\\ud83d\\udc51\\n\"}", 1280, 800, &in) == RS_IN_CLIP && in.tlen == 8 &&

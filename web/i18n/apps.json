@@ -1,10 +1,14 @@
 {
   "mail": {
     "category": "productivity",
-    "isolated": false,
+    "isolated": true,
     "icon": "apps/mail/index.jsx",
     "screenshot": "docs/screenshots/mail.png",
-    "name": {"en": "Mail", "es": "Mail", "pt": "Mail"},
+    "name": {
+      "en": "Mail",
+      "es": "Mail",
+      "pt": "Mail"
+    },
     "tagline": {
       "en": "Your IMAP and SMTP accounts in one calm, safe inbox",
       "es": "Tus cuentas IMAP y SMTP en una bandeja tranquila y segura",
@@ -36,10 +40,14 @@
   },
   "calendar": {
     "category": "productivity",
-    "isolated": false,
+    "isolated": true,
     "icon": "apps/calendar/index.jsx",
     "screenshot": "docs/screenshots/calendar.png",
-    "name": {"en": "Calendar", "es": "Calendario", "pt": "Calendário"},
+    "name": {
+      "en": "Calendar",
+      "es": "Calendario",
+      "pt": "Calendário"
+    },
     "tagline": {
       "en": "Day, week and month views of all your calendars",
       "es": "Tus calendarios por día, semana y mes",
@@ -68,10 +76,14 @@
   },
   "contacts": {
     "category": "productivity",
-    "isolated": false,
+    "isolated": true,
     "icon": "apps/contacts/index.jsx",
     "screenshot": "docs/contacts-light.png",
-    "name": {"en": "Contacts", "es": "Contactos", "pt": "Contatos"},
+    "name": {
+      "en": "Contacts",
+      "es": "Contactos",
+      "pt": "Contatos"
+    },
     "tagline": {
       "en": "Address books, groups and contact cards",
       "es": "Libretas de direcciones, grupos y fichas de contacto",
@@ -100,10 +112,14 @@
   },
   "reminders": {
     "category": "productivity",
-    "isolated": false,
+    "isolated": true,
     "icon": "apps/reminders/index.jsx",
     "screenshot": "docs/reminders-light.png",
-    "name": {"en": "Reminders", "es": "Recordatorios", "pt": "Lembretes"},
+    "name": {
+      "en": "Reminders",
+      "es": "Recordatorios",
+      "pt": "Lembretes"
+    },
     "tagline": {
       "en": "To-do lists with due dates, priorities and flags",
       "es": "Listas de tareas con fechas, prioridades y banderas",
@@ -135,7 +151,11 @@
     "isolated": false,
     "icon": "apps/notes/index.jsx",
     "screenshot": "docs/notes-editing.png",
-    "name": {"en": "Notes", "es": "Notas", "pt": "Notas"},
+    "name": {
+      "en": "Notes",
+      "es": "Notas",
+      "pt": "Notas"
+    },
     "tagline": {
       "en": "Markdown notes that can also live on your desktop",
       "es": "Notas en markdown que también pueden vivir en tu escritorio",
@@ -167,7 +187,11 @@
     "isolated": false,
     "icon": "apps/editor/index.jsx",
     "screenshot": "docs/editor-light.png",
-    "name": {"en": "Text Editor", "es": "Editor de texto", "pt": "Editor de texto"},
+    "name": {
+      "en": "Text Editor",
+      "es": "Editor de texto",
+      "pt": "Editor de texto"
+    },
     "tagline": {
       "en": "A fast code editor with projects, tabs and multiple cursors",
       "es": "Un editor de código rápido con proyectos, pestañas y varios cursores",
@@ -202,7 +226,11 @@
     "isolated": false,
     "icon": "apps/pdf/index.jsx",
     "screenshot": "docs/pdf-annotations.png",
-    "name": {"en": "PDF Viewer", "es": "Visor de PDF", "pt": "Visualizador de PDF"},
+    "name": {
+      "en": "PDF Viewer",
+      "es": "Visor de PDF",
+      "pt": "Visualizador de PDF"
+    },
     "tagline": {
       "en": "Read, search, annotate and fill in PDFs",
       "es": "Leé, buscá, anotá y completá tus PDF",
@@ -237,7 +265,11 @@
     "isolated": false,
     "icon": "apps/calculator/index.jsx",
     "screenshot": "docs/qa/calculator.png",
-    "name": {"en": "Calculator", "es": "Calculadora", "pt": "Calculadora"},
+    "name": {
+      "en": "Calculator",
+      "es": "Calculadora",
+      "pt": "Calculadora"
+    },
     "tagline": {
       "en": "A simple calculator you can drive from the keyboard",
       "es": "Una calculadora simple que podés usar con el teclado",
@@ -266,7 +298,11 @@
     "isolated": false,
     "icon": "apps/characters/index.jsx",
     "screenshot": "docs/characters-app.png",
-    "name": {"en": "Emoji & Symbols", "es": "Emojis y símbolos", "pt": "Emojis e símbolos"},
+    "name": {
+      "en": "Emoji & Symbols",
+      "es": "Emojis y símbolos",
+      "pt": "Emojis e símbolos"
+    },
     "tagline": {
       "en": "Every emoji and Unicode symbol, one click away",
       "es": "Todos los emojis y símbolos Unicode, a un clic",
@@ -298,7 +334,11 @@
     "isolated": false,
     "icon": "apps/fonts/index.jsx",
     "screenshot": "docs/fonts-installed.png",
-    "name": {"en": "Fonts", "es": "Tipografías", "pt": "Tipografias"},
+    "name": {
+      "en": "Fonts",
+      "es": "Tipografías",
+      "pt": "Tipografias"
+    },
     "tagline": {
       "en": "Preview, install and remove fonts",
       "es": "Previsualizá, instalá y quitá tipografías",
@@ -330,7 +370,11 @@
     "isolated": false,
     "icon": "apps/scanner/index.jsx",
     "screenshot": "docs/qa/scanner.png",
-    "name": {"en": "Scanner", "es": "Escáner", "pt": "Scanner"},
+    "name": {
+      "en": "Scanner",
+      "es": "Escáner",
+      "pt": "Scanner"
+    },
     "tagline": {
       "en": "Scan from network scanners, no drivers needed",
       "es": "Escaneá desde escáneres de red, sin drivers",
@@ -362,7 +406,11 @@
     "isolated": false,
     "icon": "apps/photos/index.jsx",
     "screenshot": "docs/screenshots/photos.png",
-    "name": {"en": "Photos", "es": "Fotos", "pt": "Fotos"},
+    "name": {
+      "en": "Photos",
+      "es": "Fotos",
+      "pt": "Fotos"
+    },
     "tagline": {
       "en": "Your picture library, with a viewer and simple edits",
       "es": "Tu biblioteca de imágenes, con visor y edición simple",
@@ -394,7 +442,11 @@
     "isolated": false,
     "icon": "apps/player/index.jsx",
     "screenshot": "docs/screenshots/player.png",
-    "name": {"en": "Player", "es": "Reproductor", "pt": "Reprodutor"},
+    "name": {
+      "en": "Player",
+      "es": "Reproductor",
+      "pt": "Reprodutor"
+    },
     "tagline": {
       "en": "Videos and music in one player",
       "es": "Videos y música en un solo reproductor",
@@ -429,7 +481,11 @@
     "isolated": false,
     "icon": "apps/camera/index.jsx",
     "screenshot": "docs/camera.png",
-    "name": {"en": "Camera", "es": "Cámara", "pt": "Câmera"},
+    "name": {
+      "en": "Camera",
+      "es": "Cámara",
+      "pt": "Câmera"
+    },
     "tagline": {
       "en": "Take photos and videos with your webcam",
       "es": "Sacá fotos y grabá videos con tu cámara web",
@@ -461,7 +517,11 @@
     "isolated": false,
     "icon": "apps/recorder/index.jsx",
     "screenshot": "docs/recorder.png",
-    "name": {"en": "Voice Recorder", "es": "Grabadora", "pt": "Gravador"},
+    "name": {
+      "en": "Voice Recorder",
+      "es": "Grabadora",
+      "pt": "Gravador"
+    },
     "tagline": {
       "en": "Record voice memos in a click",
       "es": "Grabá notas de voz con un clic",
@@ -490,7 +550,11 @@
     "isolated": false,
     "icon": "apps/screenshots/index.jsx",
     "screenshot": "docs/screenshots-panel.png",
-    "name": {"en": "Screenshots", "es": "Capturas", "pt": "Capturas"},
+    "name": {
+      "en": "Screenshots",
+      "es": "Capturas",
+      "pt": "Capturas"
+    },
     "tagline": {
       "en": "Capture and record your screen",
       "es": "Capturá y grabá tu pantalla",
@@ -522,33 +586,40 @@
     "isolated": false,
     "icon": "apps/files/index.jsx",
     "screenshot": "docs/screenshots/files.png",
-    "name": {"en": "Files", "es": "Archivos", "pt": "Arquivos"},
+    "name": {
+      "en": "Files",
+      "es": "Archivos",
+      "pt": "Arquivos"
+    },
     "tagline": {
-      "en": "Browse your home folder, disks and USB sticks",
-      "es": "Recorré tu carpeta personal, discos y pendrives",
-      "pt": "Navegue pela sua pasta pessoal, discos e pendrives"
+      "en": "Browse your home folder, every disk and the whole system",
+      "es": "Recorré tu carpeta personal, cada disco y todo el sistema",
+      "pt": "Navegue pela sua pasta pessoal, cada disco e todo o sistema"
     },
     "features": {
       "en": [
         "Tabs and four views: icons, list, columns, gallery",
         "Quick Preview with the Space bar",
         "Color tags, search and Recents",
-        "Trash with restore",
-        "Compress and extract archives"
+        "This computer: the whole system, read-only, as your user",
+        "Every disk in the sidebar, mounted with a click; trash and archives",
+        "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
         "Vista rápida con la barra espaciadora",
         "Etiquetas de color, búsqueda y Recientes",
-        "Papelera con restauración",
-        "Comprimí y extraé archivos comprimidos"
+        "Este equipo: todo el sistema, solo lectura, como tu usuario",
+        "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
+        "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
         "Visualização rápida com a barra de espaço",
         "Etiquetas de cor, busca e Recentes",
-        "Lixeira com restauração",
-        "Compacte e extraia arquivos compactados"
+        "Este computador: todo o sistema, só leitura, como seu usuário",
+        "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
+        "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização"
       ]
     }
   },
@@ -557,7 +628,11 @@
     "isolated": false,
     "icon": "apps/settings/index.jsx",
     "screenshot": "docs/screenshots/settings-general.png",
-    "name": {"en": "Settings", "es": "Ajustes", "pt": "Ajustes"},
+    "name": {
+      "en": "Settings",
+      "es": "Ajustes",
+      "pt": "Ajustes"
+    },
     "tagline": {
       "en": "Every setting of your desktop in one place",
       "es": "Todos los ajustes de tu escritorio en un solo lugar",
@@ -566,24 +641,27 @@
     "features": {
       "en": [
         "Network, Wi-Fi, VPN and Bluetooth",
-        "Displays, Night Light, sound and notifications",
-        "Appearance, themes, wallpaper and the Dock",
-        "Privacy, app permissions and network access",
-        "Users, remote desktop and updates"
+        "Displays (numbered, with Identify), Night Light, sound and notifications",
+        "Appearance: desktop style (Lord Flow or Lord Classic), wallpaper and the Dock",
+        "Privacy, app permissions, network access and blocklists",
+        "Users, remote desktop and updates",
+        "New in 0.8.7: moving wallpapers, session restore and an on-screen keyboard"
       ],
       "es": [
         "Red, Wi-Fi, VPN y Bluetooth",
-        "Pantallas, luz nocturna, sonido y notificaciones",
-        "Apariencia, temas, fondo de pantalla y el Dock",
-        "Privacidad, permisos de apps y acceso a la red",
-        "Usuarios, escritorio remoto y actualizaciones"
+        "Pantallas (numeradas, con Identificar), luz nocturna, sonido y notificaciones",
+        "Apariencia: estilo de escritorio (Lord Flow o Lord Classic), fondo de pantalla y el Dock",
+        "Privacidad, permisos de apps, acceso a la red y listas de bloqueo",
+        "Usuarios, escritorio remoto y actualizaciones",
+        "Nuevo en 0.8.7: fondos en movimiento, restaurar la sesión y un teclado en pantalla"
       ],
       "pt": [
         "Rede, Wi-Fi, VPN e Bluetooth",
-        "Telas, luz noturna, som e notificações",
-        "Aparência, temas, papel de parede e o Dock",
-        "Privacidade, permissões de apps e acesso à rede",
-        "Usuários, área de trabalho remota e atualizações"
+        "Telas (numeradas, com Identificar), luz noturna, som e notificações",
+        "Aparência: estilo da área de trabalho (Lord Flow ou Lord Classic), papel de parede e o Dock",
+        "Privacidade, permissões de apps, acesso à rede e listas de bloqueio",
+        "Usuários, área de trabalho remota e atualizações",
+        "Novo na 0.8.7: fundos em movimento, restauração da sessão e um teclado na tela"
       ]
     }
   },
@@ -592,7 +670,11 @@
     "isolated": false,
     "icon": "apps/monitor/icons.jsx",
     "screenshot": "docs/monitor-overview.png",
-    "name": {"en": "Monitor", "es": "Monitor", "pt": "Monitor"},
+    "name": {
+      "en": "Monitor",
+      "es": "Monitor",
+      "pt": "Monitor"
+    },
     "tagline": {
       "en": "See what your computer is doing, and who it talks to",
       "es": "Mirá qué está haciendo tu computadora y con quién habla",
@@ -602,23 +684,26 @@
       "en": [
         "Live CPU, memory, network and disk charts",
         "Processes you can sort and search",
-        "Each app's connections on a world map",
-        "Block an app's network access with one switch",
-        "Temperatures and fans in the Cooling tab"
+        "Each app's sites, addresses and ports as a tree, and on a world map",
+        "Allow or block an app, or one destination, with a switch",
+        "Temperatures and fans in the Cooling tab",
+        "New in 0.8.7: a Voltage view on machines that report voltages"
       ],
       "es": [
         "Gráficos en vivo de CPU, memoria, red y disco",
         "Procesos que podés ordenar y buscar",
-        "Las conexiones de cada app en un mapa del mundo",
-        "Bloqueá el acceso a la red de una app con un interruptor",
-        "Temperaturas y ventiladores en la pestaña Refrigeración"
+        "Los sitios, direcciones y puertos de cada app en un árbol y en un mapa del mundo",
+        "Permití o bloqueá una app, o un destino, con un interruptor",
+        "Temperaturas y ventiladores en la pestaña Refrigeración",
+        "Nuevo en 0.8.7: una vista Voltaje en las máquinas que informan voltajes"
       ],
       "pt": [
         "Gráficos ao vivo de CPU, memória, rede e disco",
         "Processos que você pode ordenar e pesquisar",
-        "As conexões de cada app em um mapa-múndi",
-        "Bloqueie o acesso à rede de um app com um botão",
-        "Temperaturas e ventoinhas na aba Resfriamento"
+        "Os sites, endereços e portas de cada app em uma árvore e em um mapa-múndi",
+        "Permita ou bloqueie um app, ou um destino, com um botão",
+        "Temperaturas e ventoinhas na aba Resfriamento",
+        "Novo na 0.8.7: uma visão Tensão nas máquinas que informam tensões"
       ]
     }
   },
@@ -627,7 +712,11 @@
     "isolated": false,
     "icon": "apps/terminal/index.jsx",
     "screenshot": "docs/screenshots/terminal.png",
-    "name": {"en": "Terminal", "es": "Terminal", "pt": "Terminal"},
+    "name": {
+      "en": "Terminal",
+      "es": "Terminal",
+      "pt": "Terminal"
+    },
     "tagline": {
       "en": "A fast native terminal with its own emulator",
       "es": "Una terminal nativa y rápida, con emulador propio",
@@ -662,7 +751,11 @@
     "isolated": false,
     "icon": "apps/store/index.jsx",
     "screenshot": "docs/screenshots/store.png",
-    "name": {"en": "Store", "es": "Tienda", "pt": "Loja"},
+    "name": {
+      "en": "Store",
+      "es": "Tienda",
+      "pt": "Loja"
+    },
     "tagline": {
       "en": "Find, install and update LordOS and Debian apps",
       "es": "Buscá, instalá y actualizá apps de LordOS y de Debian",
@@ -670,25 +763,28 @@
     },
     "features": {
       "en": [
-        "Debian apps by category, with search",
+        "Debian apps by category, as cards in a grid, with search",
+        "Artificial Intelligence and Commercial apps from their makers' signed repositories",
         "See exactly what changes before you install",
-        "Install LordOS apps (.lpk) without root",
-        "All updates in one click",
-        "Open a .deb or .lpk from Files to install it"
+        "Install LordOS apps (.lpk) without root, or a .deb or .lpk from Files",
+        "All updates in one click, over HTTPS from https:// sources",
+        "New in 0.8.7: Disk Formats, one item for disks from other systems"
       ],
       "es": [
-        "Apps de Debian por categoría, con búsqueda",
+        "Apps de Debian por categoría, como tarjetas en una grilla, con búsqueda",
+        "Apps de Inteligencia Artificial y Comerciales desde los repositorios firmados de sus fabricantes",
         "Mirá exactamente qué cambia antes de instalar",
-        "Instalá apps de LordOS (.lpk) sin root",
-        "Todas las actualizaciones con un clic",
-        "Abrí un .deb o .lpk desde Archivos para instalarlo"
+        "Instalá apps de LordOS (.lpk) sin root, o un .deb o .lpk desde Archivos",
+        "Todas las actualizaciones con un clic, por HTTPS desde fuentes https://",
+        "Nuevo en 0.8.7: Disk Formats, un solo ítem para discos de otros sistemas"
       ],
       "pt": [
-        "Apps do Debian por categoria, com busca",
+        "Apps do Debian por categoria, como cartões em uma grade, com busca",
+        "Apps de Inteligência Artificial e Comerciais dos repositórios assinados dos fabricantes",
         "Veja exatamente o que muda antes de instalar",
-        "Instale apps do LordOS (.lpk) sem root",
-        "Todas as atualizações com um clique",
-        "Abra um .deb ou .lpk pelo Arquivos para instalá-lo"
+        "Instale apps do LordOS (.lpk) sem root, ou um .deb ou .lpk pelo Arquivos",
+        "Todas as atualizações com um clique, por HTTPS de fontes https://",
+        "Novo na 0.8.7: Disk Formats, um único item para discos de outros sistemas"
       ]
     }
   },
@@ -697,7 +793,11 @@
     "isolated": false,
     "icon": "apps/disks/icons.jsx",
     "screenshot": "docs/disks.png",
-    "name": {"en": "Disks", "es": "Discos", "pt": "Discos"},
+    "name": {
+      "en": "Disks",
+      "es": "Discos",
+      "pt": "Discos"
+    },
     "tagline": {
       "en": "Manage disks and USB sticks safely",
       "es": "Administrá discos y pendrives de forma segura",
@@ -732,7 +832,11 @@
     "isolated": false,
     "icon": "apps/backup/index.jsx",
     "screenshot": "docs/backup-browse.png",
-    "name": {"en": "Backups", "es": "Copias de seguridad", "pt": "Cópias de segurança"},
+    "name": {
+      "en": "Backups",
+      "es": "Copias de seguridad",
+      "pt": "Cópias de segurança"
+    },
     "tagline": {
       "en": "Scheduled backups of your home folder",
       "es": "Copias programadas de tu carpeta personal",
@@ -764,7 +868,11 @@
     "isolated": false,
     "icon": "apps/logs/index.jsx",
     "screenshot": "docs/logs.png",
-    "name": {"en": "Logs", "es": "Registros", "pt": "Registros"},
+    "name": {
+      "en": "Logs",
+      "es": "Registros",
+      "pt": "Registros"
+    },
     "tagline": {
       "en": "Read system, app and LordOS logs",
       "es": "Leé los registros del sistema, de las apps y de LordOS",
@@ -796,7 +904,11 @@
     "isolated": false,
     "icon": "apps/clock/index.jsx",
     "screenshot": "docs/clock-world.png",
-    "name": {"en": "Clock", "es": "Reloj", "pt": "Relógio"},
+    "name": {
+      "en": "Clock",
+      "es": "Reloj",
+      "pt": "Relógio"
+    },
     "tagline": {
       "en": "World clock, alarms, timer and stopwatch",
       "es": "Reloj mundial, alarmas, temporizador y cronómetro",
@@ -828,7 +940,11 @@
     "isolated": false,
     "icon": "apps/help/index.jsx",
     "screenshot": "docs/help-welcome.png",
-    "name": {"en": "Help", "es": "Ayuda", "pt": "Ajuda"},
+    "name": {
+      "en": "Help",
+      "es": "Ayuda",
+      "pt": "Ajuda"
+    },
     "tagline": {
       "en": "Help and tips for every part of LordOS",
       "es": "Ayuda y consejos para cada parte de LordOS",
@@ -860,7 +976,11 @@
     "isolated": true,
     "icon": "apps/passwords/index.jsx",
     "screenshot": "docs/polish/passwords-after-light.png",
-    "name": {"en": "Passwords", "es": "Contraseñas", "pt": "Senhas"},
+    "name": {
+      "en": "Passwords",
+      "es": "Contraseñas",
+      "pt": "Senhas"
+    },
     "tagline": {
       "en": "Passwords, 2FA codes and secrets in an encrypted vault",
       "es": "Contraseñas, códigos 2FA y secretos en una bóveda cifrada",
@@ -890,5 +1010,167 @@
       ]
     }
   },
-  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: only apps/passwords/manifest.json has \"process\": \"isolated\" (built into assets/sysapps/passwords by tools/build-theme.mjs). No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/).."
+  "sysinfo": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/sysinfo/index.jsx",
+    "screenshot": "docs/sysinfo-graphics.png",
+    "name": {
+      "en": "System Information",
+      "es": "Información del sistema",
+      "pt": "Informações do sistema"
+    },
+    "tagline": {
+      "en": "Every piece of hardware, and what LordOS makes of it",
+      "es": "Todo el hardware de tu computadora y qué hace LordOS con él",
+      "pt": "Todo o hardware do seu computador e o que o LordOS faz com ele"
+    },
+    "features": {
+      "en": [
+        "Opens from About LordOS → System Report…",
+        "The graphics card layer by layer, with the reason when the screen is composed on the CPU",
+        "Compatibility: what works, what works with limits and what wasn't checked",
+        "Checks of LordOS's claims on this computer, with a Sandbox Probe that tries what an isolated app must not do",
+        "Performance: LordBench, quick and full tests of the processor, memory, graphics, video and disk, shown against reference machines, never as one score",
+        "Reports in Markdown or JSON, shown before you copy or save them; nothing is sent",
+        "New in 0.8.7: computer, motherboard, firmware and peripherals, serial numbers only on request, and sharing a hardware report on GitHub"
+      ],
+      "es": [
+        "Se abre desde Acerca de LordOS → Informe del sistema…",
+        "La placa de video capa por capa, con el motivo cuando la pantalla se compone en la CPU",
+        "Compatibilidad: qué funciona, qué funciona con límites y qué no se comprobó",
+        "Verificaciones de lo que LordOS afirma, en esta computadora, con la Prueba del aislamiento, que intenta lo que una app aislada no debe poder hacer",
+        "Rendimiento: LordBench, pruebas rápida y completa del procesador, la memoria, los gráficos, el video y el disco, frente a máquinas de referencia, nunca como un único puntaje",
+        "Informes en Markdown o JSON, que ves antes de copiarlos o guardarlos; no se envía nada",
+        "Nuevo en 0.8.7: computadora, placa madre, firmware y periféricos, números de serie solo si los pedís, y compartir un reporte de hardware en GitHub"
+      ],
+      "pt": [
+        "Abre em Sobre o LordOS → Relatório do sistema…",
+        "A placa de vídeo camada por camada, com o motivo quando a tela é composta na CPU",
+        "Compatibilidade: o que funciona, o que funciona com limites e o que não foi verificado",
+        "Verificações do que o LordOS afirma, neste computador, com o Teste do isolamento, que tenta o que um app isolado não deve conseguir fazer",
+        "Desempenho: o LordBench, testes rápido e completo do processador, da memória, dos gráficos, do vídeo e do disco, frente a máquinas de referência, nunca como uma única pontuação",
+        "Relatórios em Markdown ou JSON, que você vê antes de copiar ou salvar; nada é enviado",
+        "Novo na 0.8.7: computador, placa-mãe, firmware e periféricos, números de série só se você pedir, e compartilhar um relatório de hardware no GitHub"
+      ]
+    }
+  },
+  "imager": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/imager/index.jsx",
+    "screenshot": "docs/imager/native-13-review.png",
+    "name": {
+      "en": "LordOS Imager",
+      "es": "LordOS Imager",
+      "pt": "LordOS Imager"
+    },
+    "tagline": {
+      "en": "Write LordOS to an SD card or a USB stick, ready for its first boot",
+      "es": "Grabá LordOS en una tarjeta SD o un pendrive, listo para su primer arranque",
+      "pt": "Grave o LordOS num cartão SD ou pendrive, pronto para a primeira inicialização"
+    },
+    "features": {
+      "en": [
+        "For the Raspberry Pi 5, or a PC from a USB stick",
+        "Official images checked against the release signature before anything is erased",
+        "Only SD cards and USB drives: internal disks are never shown",
+        "Set up the first boot: name, language, account, Wi-Fi, SSH, look and cooling",
+        "Every card is read back and compared after writing"
+      ],
+      "es": [
+        "Para la Raspberry Pi 5, o una PC desde un pendrive",
+        "Las imágenes oficiales se verifican con la firma de la versión antes de borrar nada",
+        "Solo tarjetas SD y unidades USB: los discos internos nunca aparecen",
+        "Prepará el primer arranque: nombre, idioma, cuenta, Wi-Fi, SSH, aspecto y refrigeración",
+        "Cada tarjeta se vuelve a leer y se compara después de grabarla"
+      ],
+      "pt": [
+        "Para o Raspberry Pi 5, ou um PC a partir de um pendrive",
+        "As imagens oficiais são verificadas com a assinatura da versão antes de apagar qualquer coisa",
+        "Só cartões SD e unidades USB: os discos internos nunca aparecem",
+        "Prepare a primeira inicialização: nome, idioma, conta, Wi-Fi, SSH, aparência e resfriamento",
+        "Cada cartão é lido de volta e comparado depois da gravação"
+      ]
+    }
+  },
+  "_notes": "Apps: every folder in apps/ except about (system info dialog), installer (live-ISO only) and README.md. There is no 'linux' folder in apps/ (the Linux-window bridge is registered in sdk/wayland.js), and there is no separate privacy or firewall app: Privacy and the per-app firewall are Settings sections (Monitor registers them with registerPrivacySection) plus Monitor's Network tab, so only Passwords is in the privacy category. Names come from assets/locales/{en,es,pt}/apps.json. Isolation: apps/passwords and, since 0.8.2, apps/mail, apps/calendar, apps/contacts and apps/reminders have \"process\": \"isolated\" in their manifest (built into assets/sysapps/<id> by tools/build-theme.mjs; apps/sysprobe is isolated too but hidden, a test app of System Information). System Information (sysinfo, released in 0.8.5) and LordOS Imager (imager, 0.8.4) were added on 2026-10-26; their icons were exported with tools/web/render-icons.mjs. No app in apps/ ships as an .lpk; the only .lpk definitions are examples/apps/fractal and the tests/lpk-legit and tests/lpk-evil fixtures, none of them user-facing apps, so they are not included. ICONS (DOUBT): the desktop does not use an SVG or PNG for built-in apps. tools/build-theme.mjs takes the exported Icon React component from each apps/<id>/index.jsx, and the Dock draws app.Icon (themes/default/components/Dock.jsx). The icons are drawn in code with Views and gradients. So 'icon' points to the source file that draws it: apps/<id>/index.jsx, or apps/disks/icons.jsx (DisksIcon) and apps/monitor/icons.jsx (MonitorIcon). The repo has no icon files for these apps; to show them on the website someone must render them to SVG or PNG (for example, crop the Dock in docs/screenshots/*.png or export from a headless lord-server). Only .lpk apps use a real file (manifest icon, e.g. examples/apps/fractal/icon.png). SCREENSHOTS: most docs/polish/*-after-light.png captures are in Spanish (checked: backup, calculator, camera, characters, monitor), so I used them only for Passwords, which is in English. I visually checked that every other pick is English and shows the main window: the curated docs/screenshots/*.png (files, mail, calendar, photos, player, store, terminal, settings-general), plus English gallery entries (variant normal), mostly dark. Calculator and Scanner use docs/qa/*.png (English, dark). The Scanner shot only shows the 'Choose a scanner' empty state, because no English capture with a scanner exists. docs/screenshots/README.md lists passwords.png, but that file is missing. COPY: every bullet comes from the app's manifest and docs (MAIL.md, MEDIA.md, DOCUMENTS.md, SYSTEM.md, PRINTING.md, PACKAGES.md, TERMINAL.md, MONITOR.md, NOTES.md, EDITOR.md, FILES.md, PASSWORDS.md, SETTINGS.md) or the app's code (calculator keyboard and parentheses, Contacts .vcf import, Settings pages in apps/settings/)..",
+  "cleaner": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/cleaner/index.jsx",
+    "screenshot": "docs/cleaner-review.png",
+    "name": {
+      "en": "Cleaner",
+      "es": "Limpieza",
+      "pt": "Limpeza"
+    },
+    "tagline": {
+      "en": "See what uses your disk and remove what can safely go",
+      "es": "Mira qué ocupa tu disco y quita lo que se puede quitar",
+      "pt": "Veja o que ocupa seu disco e remova o que pode sair"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.7",
+        "A scan only reads; nothing changes until you confirm",
+        "Caches, large files, a storage map, exact duplicates and similar images",
+        "Each file is checked again right before acting"
+      ],
+      "es": [
+        "Nuevo en 0.8.7",
+        "Un análisis solo lee; nada cambia hasta que confirmes",
+        "Cachés, archivos grandes, mapa del disco, copias exactas e imágenes parecidas",
+        "Cada archivo se comprueba otra vez antes de actuar"
+      ],
+      "pt": [
+        "Novo na 0.8.7",
+        "Uma análise só lê; nada muda até você confirmar",
+        "Caches, arquivos grandes, mapa do disco, cópias exatas e imagens parecidas",
+        "Cada arquivo é verificado de novo antes de agir"
+      ]
+    }
+  },
+  "remote-desk": {
+    "category": "system",
+    "isolated": false,
+    "icon": "apps/remote-desk/index.jsx",
+    "screenshot": "docs/remote-desk-computers.png",
+    "name": {
+      "en": "Remote Desk",
+      "es": "Remote Desk",
+      "pt": "Remote Desk"
+    },
+    "tagline": {
+      "en": "Another computer's screen over RDP or VNC, drawn by LordOS itself",
+      "es": "La pantalla de otra computadora por RDP o VNC, dibujada por LordOS",
+      "pt": "A tela de outro computador por RDP ou VNC, desenhada pelo LordOS"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.7",
+        "RDP and VNC in one app",
+        "Saved computers on cards",
+        "Shared folders over RDP, read-only if you choose; not yet verified in a real session",
+        "Full screen with its own bar",
+        "No client window, X11 or toolkit"
+      ],
+      "es": [
+        "Nuevo en 0.8.7",
+        "RDP y VNC en una sola app",
+        "Computadoras guardadas en tarjetas",
+        "Carpetas compartidas por RDP, de solo lectura si querés; todavía sin verificar en una sesión real",
+        "Pantalla completa con su propia barra",
+        "Sin ventana de cliente, X11 ni toolkit"
+      ],
+      "pt": [
+        "Novo na 0.8.7",
+        "RDP e VNC em um só app",
+        "Computadores salvos em cartões",
+        "Pastas compartilhadas por RDP, somente leitura se quiser; ainda sem verificar numa sessão real",
+        "Tela cheia com barra própria",
+        "Sem janela de cliente, X11 ou toolkit"
+      ]
+    }
+  }
 }

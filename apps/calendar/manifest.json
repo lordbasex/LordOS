@@ -1,5 +1,6 @@
 {
   "id": "calendar",
+  "version": "0.8.5",
   "name": "Calendar",
   "description": "Day, week and month views of your local and synced calendars",
   "size": [960, 600],

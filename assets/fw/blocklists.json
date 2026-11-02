@@ -1,0 +1,43 @@
+{
+  "note": "The curated blocklist catalog (docs/FIREWALL.md, \"Blocklists\"). Each list's licence was checked on the date given, from the list file's own header and its project's licence file, before it was added. LordOS ships no list data: each user's machine downloads the lists it enables. Lists over FWL_LIST_DOMAINS entries (fw/fwlists.h) are not offered.",
+  "lists": [
+    { "id": "ads", "topic": "ads", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/ads-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 234000 },
+    { "id": "tracking", "topic": "trackers", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/tracking-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 144000 },
+    { "id": "unified-hosts", "topic": "ads", "kind": "domains", "format": "hosts", "sub": 0,
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+      "source": "Unified hosts (Steven Black)", "homepage": "https://github.com/StevenBlack/hosts",
+      "license": "MIT", "checked": "2026-10-19", "approx": 71000 },
+    { "id": "phishing", "topic": "malware", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/phishing-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 190000 },
+    { "id": "scam", "topic": "malware", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/scam-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 8500 },
+    { "id": "ransomware", "topic": "malware", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/ransomware-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 1900 },
+    { "id": "cryptomining", "topic": "malware", "kind": "domains", "format": "domains", "sub": 0,
+      "url": "https://blocklistproject.github.io/Lists/alt-version/crypto-nl.txt",
+      "source": "The Block List Project", "homepage": "https://github.com/blocklistproject/Lists",
+      "license": "MIT (list file), Unlicense (repository)", "checked": "2026-10-19", "approx": 1300 },
+    { "id": "attackers", "topic": "malware", "kind": "ips", "format": "ips", "sub": 0,
+      "url": "https://raw.githubusercontent.com/stamparm/ipsum/master/levels/3.txt",
+      "source": "IPsum, level 3 (addresses on 3 or more public lists)", "homepage": "https://github.com/stamparm/ipsum",
+      "license": "Unlicense", "checked": "2026-10-19", "approx": 18000 }
+  ],
+  "rejected": [
+    { "list": "a malware URL feed with fair-use terms only (no stated licence)", "why": "licence not clear" },
+    { "list": "a botnet controller address list (CC0)", "why": "empty when checked (2026-10-19)" },
+    { "list": "The Block List Project's malware list", "why": "2.6 million entries, over the size limit" },
+    { "list": "lists under non-commercial licences", "why": "LordOS may be used commercially" }
+  ]
+}

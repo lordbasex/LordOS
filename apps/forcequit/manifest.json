@@ -1,0 +1,18 @@
+{
+  "id": "forcequit",
+  "version": "0.8.5",
+  "name": "Force Quit",
+  "description": "Ends an app that stopped answering",
+  "size": [
+    420,
+    460
+  ],
+  "minSize": [
+    360,
+    320
+  ],
+  "dock": false,
+  "permissions": [],
+  "category": "System",
+  "hidden": true
+}

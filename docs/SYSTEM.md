@@ -62,6 +62,8 @@ All are in the closed table of `admin.c` (macro `DISK_ADMIN_ACTIONS` in `disk/di
 |---|---|---|
 | `disk-smart` | `disk` | Reads health. `LOG smart {…}` (summary), one `LOG attr {…}` per ATA attribute and `OK <ms>` |
 | `disk-mount` | `device` | Mounts at `/media/<user>/<label>` with `mount(2)`: `nosuid,nodev`, and on FAT, exFAT and NTFS (`ntfs3`) with the user's `uid=`/`gid=`. ISO 9660 and UDF are read-only. `OK <folder>` |
+| `share-mount` | `smb\|nfs`, private IPv4, share or export path, user, domain, password (one per line; the UI sends it with `{ quiet: true }`) | anyone. Mounts a network share at `/media/<user>/<share> on <address>` with the kernel's `cifs` or `nfs` client through `fsopen`/`fsconfig`/`fsmount`/`move_mount`, one call per option: `nosuid,nodev`, soft, short timeouts, SMB 2 or later. Everything is validated as root (`lan/lanaddr.c`); no names, no program, no shell. `OK <folder>` (`FILES.md`, "Network") |
+| `share-unmount` | folder | anyone. Only `/media/<user>/<one folder>`, and only if `/proc/self/mountinfo` says the last mount there is `cifs`, `smb3`, `nfs` or `nfs4` |
 | `disk-unmount` | `device` or `disk` | Unmounts whatever is under `/media` or `/run/media` (`umount2`) and removes the empty folder |
 | `disk-eject` | `disk` | Unmounts everything, flushes caches (`BLKFLSBUF`) and sends `START STOP UNIT` (eject). Over USB it also powers the device off (`/sys/block/<d>/device/delete`), like "Power Off" in GNOME Disks |
 | `disk-format` | `device\nfat32\|exfat\|ext4\|ntfs\nlabel` | **Whole disk:** wipes the signatures (first and last MiB) and writes our own MBR table with one partition from 1 MiB. A `loop` image without `partscan` gets it turned on. Then the fixed-path `mkfs` runs. On ext4 the root belongs to the user (`-E root_owner=uid:gid`) |
@@ -77,6 +79,10 @@ All are in the closed table of `admin.c` (macro `DISK_ADMIN_ACTIONS` in `disk/di
 Long actions send `LOG progress phase=<table|mkfs|erase|write|verify> done=<n> total=<n>`, which
 the app shows as a bar.
 
+Since 0.8.5 Files' sidebar lists every disk too and uses the same actions:
+`disk-mount` when an unmounted one is clicked (an internal disk asks for an administrator, as here),
+and `disk-eject` or `disk-unmount` from its ⏏ (`FILES.md`).
+
 ### Security
 
 - **The same rules for all of them, on the root side (`target()` in `disk_admin.c`):**
@@ -90,7 +96,7 @@ the app shows as a bar.
   down to the real disks. Only `disk-smart` and the `smart-*` actions accept it: they only read,
   or start the disk's own self-test, which does not change data.
 - **Who can:**
-  - internal disks, only an administrator (group `sudo`);
+  - internal disks, only an administrator (groups `sudo`, `admin` or `wheel`);
   - removable ones (USB, `removable=1`, `mmc` cards), any session user, like udisks with active
     sessions;
   - reading SMART, anyone.
@@ -306,13 +312,14 @@ Tested on VM 119:
 | Package | For | In the ISO |
 |---|---|---|
 | `dosfstools` | FAT32 (`mkfs.fat`, `fatlabel`) | already there (the installer uses `mkfs.vfat` for the EFI partition) |
-| `exfatprogs` | exFAT (`mkfs.exfat`, `exfatlabel`) | added to the ISO list |
+| `exfatprogs` | exFAT (`mkfs.exfat`, `exfatlabel`) | no: comes with the Store's Disk Formats item (0.8.7) |
 | `e2fsprogs` | ext4 (`mkfs.ext4`, `e2label`) | already in Debian base |
-| `ntfs-3g` | NTFS (`mkfs.ntfs`, `ntfslabel`) | optional: without it, the app does not offer NTFS |
+| `ntfs-3g` | NTFS (`mkfs.ntfs`, `ntfslabel`) | no: comes with the Store's Disk Formats item (0.8.7); without it, the app does not offer NTFS |
 | `smartmontools` | the full SMART report and self-tests (`smartctl`) | no: installed from the app the first time (0.8.2) |
 
 Mounting needs no package: `vfat`, `exfat`, `ntfs3`, `ext4` and `iso9660` are Debian kernel
-modules.
+modules. Since 0.8.7 `disk-mount` refuses FAT, exFAT, NTFS, HFS+ and APFS without the Disk Formats item
+([FILES.md](FILES.md), "Disks' file systems").
 
 ### Pending
 
@@ -403,7 +410,8 @@ In the **Backups** tab: snapshots by day, the tree of each one (with real sizes)
 - **The same rules as `lord.fs`:** it only writes in the home folder and the user's disks
   (`fsops_allowed`, on the resolved folder), never in protected places (`fsops_protected`:
   `~/.local/share/applications`, `~/.config/autostart`, `~/.local/share/lordos/apps`,
-  `settings.json`, `permisos.json`, `backup.json`). A `.desktop` file planted in a backup is not
+  `settings.json`, `permisos.json`, `backup.json`, and also `firewall.json`, the blocklists, the
+  Mail accounts and cache and the Passwords vaults, the whole list in `server/src/fsops.c`). A `.desktop` file planted in a backup is not
   restored, not even through a link in the home folder that points to a protected folder.
 - **No escapes through the backup:** the requested path is validated (`bk_rel_valid`) and its
   resolved folder must stay inside the snapshot.
@@ -710,6 +718,8 @@ dismissNotification(id);
 - Clicking the banner runs the first action; the × closes it.
 - `notifyHistory`: the last 50 of the session, in memory only.
 - Up to three actions per notification. The API is stable: Clock and Backups use it.
+- Linux apps reach the same banners through the session's `org.freedesktop.Notifications` server
+  (`server/src/hw/notifyd.c`), with per-app settings in Settings → Notifications (`SETTINGS.md`).
 
 ### Screenshots
 

@@ -18,7 +18,7 @@ The trick is a common language. Linux apps speak **Wayland**, a protocol for "he
 
 ## Opening them
 
-Apps with a `.desktop` file appear in the app launcher, the Classic theme's start menu and Search, with their icons. Clicking one goes through a deliberately narrow door in `lord-server`:
+Apps with a `.desktop` file appear in the app launcher, the Lord Classic theme's start menu and Search, with their icons. Clicking one goes through a deliberately narrow door in `lord-server`:
 
 1. The interface can only pass the **id** of a `.desktop` file that is already installed in `/usr/share/applications` or `~/.local/share/applications`, never a command.
 2. `lord-server` re-reads that file, checks it is a real, visible, non-terminal application, and builds the command from its `Exec` line by the specification, without a shell and without arguments from the caller. "Open With" in Files may add exactly one file, only if the app declares the file types it handles and the file is in your home folder or on a disk you mounted.
@@ -29,13 +29,18 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 ## How they look and behave
 
 - **The frame.** Apps that ask the compositor to draw their frame (Qt apps, foot, Chromium with its system title bar) get the theme's frame. GTK 3 apps such as Firefox get it through a second decoration protocol LordOS also speaks. GTK 4 apps that draw their own bar keep it, and LordOS trims their shadow.
+- **Browsers with a single bar.** Since 0.8.4, the preinstalled Chromium and Firefox draw one bar with their tabs and the window buttons inside it, on the side the LordOS theme uses (left in Lord Flow, right in Lord Classic), following a theme or light/dark change live. One switch in Settings → Appearance, "Browsers: tabs in the title bar", puts both back under the LordOS frame. The compositor honours whichever frame an app asks for, even when it changes while the window is open.
 - **Light and dark, live.** LordOS serves the "Settings" desktop portal itself on the session bus, so GTK 4 and libadwaita apps follow the mode, accent colour and button order. GTK 3 apps follow through the GSettings keyfile, and LordOS ships a matching GTK theme. Both change live when you switch modes.
 - **One clipboard.** Text copied in a Linux app pastes in LordOS and the other way round; images stay available after the source app closes and appear in the clipboard history (❖V).
+- **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says.
+- **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
 - **Sharp at any scale.** Each display is a separate `wl_output`, and fractional scaling lets GTK 4, Qt 6 and Chromium render sharp at 125–175 %.
 - **Touchpad gestures.** LordOS's own touchpad driver passes pinch, swipe and hold gestures to Linux apps, so pinch-to-zoom works in browsers.
-- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion.
+- **Games and GPU apps.** With a GPU, apps can hand LordOS GPU buffers directly (`linux-dmabuf`), use real fullscreen, lock the pointer and get raw mouse motion. In 0.8.7, a lock holds only with the pointer on the window and the keyboard on its app, and ❖Esc always releases it.
 - **Notifications** from Linux apps arrive through the standard notifications service, which `lord-server` provides, and can be configured per app in Settings.
 - **Passwords:** the standard Secret Service is served by LordOS's keyring, so browsers can keep their secrets there without another keyring daemon.
+- **Force Quit** (since 0.8.5): in Lord Flow, the crown menu's Force Quit… lists the open apps and ends the chosen one without asking it. For a Linux app it ends only that app's own process; an X11 app is asked to close instead.
+- **Default apps without choosing** (since 0.8.6): when you haven't chosen an app for a file type, the file opens with the system's default or the first installed app that declares its type, shown as "Automatic" in Settings → Default Apps. Apps you chose stay as they are.
 
 [[shot:2]]
 
@@ -43,7 +48,9 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 
 ## Which Wayland protocols are there
 
-`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1` and `wp_cursor_shape_manager_v1`.
+`wl_compositor`, `wl_subcompositor`, `wl_shm`, `wl_output` (one per display), `xdg_wm_base` with popups, `wl_seat` (pointer, keyboard, touch), `wl_data_device_manager` (clipboard), `zxdg_decoration_manager_v1`, the KDE server-decoration protocol, `zxdg_output_manager_v1`, `wp_fractional_scale_v1`, `wp_viewporter`, `zwp_linux_dmabuf_v1`, `wp_presentation`, `zwp_relative_pointer_manager_v1`, `zwp_pointer_constraints_v1`, `zwp_pointer_gestures_v1`, `wp_cursor_shape_manager_v1`, `zwp_primary_selection_device_manager_v1` (since 0.8.3), `zwp_idle_inhibit_manager_v1` (since 0.8.5) and, in 0.8.7, `zwp_text_input_manager_v3`, for the on-screen keyboard.
+
+**Check it from the outside** (since 0.8.5): the **Test Bench** (`lordos-testbench`) is a test-pattern window that checks the display server as any app sees it: frame timing and when frames really reach the screen, every key of the keyboard, the mouse and wheel, and the Wayland protocols the system offers.
 
 Deliberately absent: any protocol that lets an app capture the screen or other apps' windows.
 
@@ -57,9 +64,13 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 
 **What about X11-only apps?** Since LordOS 0.8.3 Beta they open through Xwayland, started only when one of them connects, with the theme's window frame, their icon in the Dock and the shared clipboard. They get the same per-app identity, firewall and Monitor attribution as Wayland apps; apps with device or file restrictions get no X display. XTerm, a Java Swing app and an SDL game were tested.
 
-**And Flatpak?** LordOS doesn't use or integrate it, and it hasn't been tested.
+**And Flatpak?** LordOS doesn't use or integrate it today. It is not planned for any release: to keep the system stable it is not being built, and a design review for the future, with what Flatpak apps would need to follow LordOS's model (their own identity in the firewall and Monitor, their permissions shown in Settings → Privacy and LordOS's own prompts), is kept in `docs/FLATPAK.md`.
 
-**Why do packages come over HTTP?** LordOS's package engine has no TLS of its own, so `https://` sources are fetched over `http://`. The safety comes from the signatures and hashes: every index must carry a valid signature from a trusted key, can't be expired or older than the one already stored, and every file is checked against its SHA-256 before it is used. Someone on the network can see which packages you download, but can't change them.
+**And apps like Chrome or Spotify?** (since 0.8.5) Store → Commercial installs free-of-charge apps whose source code isn't public from their makers' signed repositories, with the key LordOS pins, and says so before anything is installed.
+
+**Do packages come over HTTPS?** Since LordOS 0.8.5, yes for `https://` sources: a small sandboxed helper, `lord-tls`, checks the server's certificate and name and encrypts the download, so someone on the network can't see which packages you download, and a secure download is never sent back to plain HTTP. Up to 0.8.4.1 they came over `http://`. Either way the safety comes from the signatures and hashes: every index must carry a valid signature from a trusted key, can't be expired or older than the one already stored, and every file is checked against its SHA-256 before it is used, so nobody on the network can change them.
+
+**What is the Artificial Intelligence category?** (since 0.8.5) A Store page with a short list of AI tools chosen by LordOS: coding agents (Claude Code, Codex, goose, opencode), editors (Visual Studio Code, Cursor), the Claude desktop app, llama.cpp to run language models on your computer and whisper.cpp to turn speech into text. The apps whose maker has a signed repository install from it: the Store tells you first which repository it adds, and checks the maker's key against the fingerprint LordOS pins. The others come from LordOS's own signed repository, built by LordOS from verified sources or copied after checking the maker's signature. llama.cpp downloads a model the first time you run it (`llama-server -hf <user>/<model>-GGUF`); it runs on the CPU, and on a GPU through Vulkan, which hasn't been tested on real hardware yet.
 
 ## Honest limits
 

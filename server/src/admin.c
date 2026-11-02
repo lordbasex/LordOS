@@ -33,11 +33,14 @@
 #include "install/install.h"
 #include "remote/remote_admin.h"
 #include "remote/ssh_admin.h"
+#include "remote/ssh_root.h"
 #include "users/users_admin.h"
 #include "disk/disk.h"
 #include "imager/imager_admin.h"
 #include "logs/logs_admin.h"
 #include "hw/hw_admin.h"
+#include "clean/clean_admin.h"
+#include "lan/share_admin.h"
 #include "monitor/proc_admin.h"
 
 #include <ctype.h>
@@ -56,6 +59,7 @@
 #include <sys/file.h>
 #include <sys/inotify.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -393,12 +397,15 @@ static const struct { const char *name; ActionFn fn; int flags; } actions[] = {
     INSTALL_ADMIN_ACTIONS
     REMOTE_ADMIN_ACTIONS
     SSH_ADMIN_ACTIONS
+    SSH_ROOT_ACTIONS
     USERS_ADMIN_ACTIONS
     DISK_ADMIN_ACTIONS
     IMAGER_ADMIN_ACTIONS
     LOGS_ADMIN_ACTIONS
     HW_ADMIN_ACTIONS
+    CLEAN_ADMIN_ACTIONS
     PROC_ADMIN_ACTIONS
+    SHARE_ADMIN_ACTIONS
 #endif /* LORD_NETD: other modules' actions go above this line */
 };
 #define N_ACTIONS (sizeof actions / sizeof actions[0])
@@ -1012,6 +1019,10 @@ int admin_start(const char *user) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); }
         syscall(SYS_close_range, 4, ~0u, 0);
+        /* the real-time limit lord-sessiond gave the compositor (par.h) is not the helper's: the
+         * processes it drops to another user (the Store's download child) must not inherit it */
+        struct rlimit rtp = { 0, 0 };
+        setrlimit(RLIMIT_RTPRIO, &rtp);
         helper(3, user);
     }
     close(sv[1]);

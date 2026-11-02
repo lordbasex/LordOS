@@ -166,14 +166,17 @@ function firmwareSuggestions(data, facts, info, check) {
   return out;
 }
 
-const ORDER = { install: 0, unavailable: 1, installed: 2 };
+const ORDER = { setup: 0, install: 0, unavailable: 1, installed: 2 };
 
 // Every suggestion for these facts. info(name) → lord.pkg.info(name) (null: not in the index);
 // check(names) → whether an install plan can be made (lord.pkg.plan(...).ok), optional.
 export function evaluate(data, facts, { info = () => null, dismissed = [], check = null } = {}) {
   if (!data || !facts) return [];
   const no = new Set(arr(dismissed));
-  const all = [...ruleSuggestions(data, facts, info, check), ...usbSuggestions(data, facts, info, check), ...firmwareSuggestions(data, facts, info, check)];
+  // a case found on the board: nothing to install, one setting to keep (facts.caseFound, sdk/suggestions.js)
+  const found = facts.caseFound === 'argon-one-v5'
+    ? [{ id: 'argonCase', text: 'argonCase', params: {}, packages: [], install: [], state: 'setup', free: true, component: '', notes: [], icon: 'board' }] : [];
+  const all = [...found, ...ruleSuggestions(data, facts, info, check), ...usbSuggestions(data, facts, info, check), ...firmwareSuggestions(data, facts, info, check)];
   return all.filter((s) => !no.has(s.id))
     .map((s, i) => [s, i]).sort((a, b) => ORDER[a[0].state] - ORDER[b[0].state] || a[1] - b[1]).map(([s]) => s);
 }
@@ -191,5 +194,5 @@ export function firmwareFromLog(lines) {
 // The installable suggestions not notified yet (the badge and the one-time notification).
 export function fresh(list, notified = []) {
   const seen = new Set(arr(notified));
-  return arr(list).filter((s) => s.state === 'install' && !seen.has(s.id));
+  return arr(list).filter((s) => (s.state === 'install' || s.state === 'setup') && !seen.has(s.id));
 }

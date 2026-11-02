@@ -7,12 +7,14 @@ LordOS contiene software criptográfico. Esta página lo enumera y explica, en t
 - **Monocypher 4** (incluido en `third_party/`, CC0-1.0 o BSD-2-Clause): XChaCha20-Poly1305, Argon2id y BLAKE2b, que usan la bóveda de contraseñas, el llavero y las copias de seguridad cifradas;
 - SHA-256, SHA-512, Ed25519 y verificación de firmas RSA: para verificar las listas de paquetes firmadas de Debian, firmar y verificar paquetes `.lpk` y verificar las firmas de las versiones;
 - AES-128/256, SHA-1, HMAC y HKDF: para leer archivos de KeePass (KDBX), el protocolo Secret Service, las llaves de seguridad FIDO2 (con P-256) y los códigos de dos factores (TOTP);
-- X25519 y PBKDF2-HMAC-SHA1: las claves de WireGuard y la contraseña WPA2 de las redes Wi-Fi.
+- X25519 y PBKDF2-HMAC-SHA1: las claves de WireGuard y la contraseña WPA2 de las redes Wi-Fi;
+- NTLMv2 y la firma de SMB 2 para las carpetas compartidas, y el DES que el protocolo VNC exige para su contraseña.
 
 **Bibliotecas y programas de Debian** que usa LordOS:
 
-- **OpenSSL 3** (Apache-2.0), enlazado solo por `lord-sessiond` (el TLS del escritorio remoto) y `lord-maild` (TLS para IMAP, SMTP, CalDAV y CardDAV);
+- **OpenSSL 3** (Apache-2.0), enlazado solo por `lord-sessiond` (el TLS del escritorio remoto), `lord-maild` (TLS para IMAP, SMTP, CalDAV y CardDAV), `lord-fetch` (las descargas de las listas de bloqueo) y `lord-tls` (el HTTPS de la Tienda);
 - **OpenVPN**, **strongSwan** (IPsec/IKEv2), **OpenConnect** y **openfortivpn**, que LordOS inicia para las VPN que configurás (OpenVPN viene instalado; los demás son paquetes de Debian que sumás cuando los necesitás), y el WireGuard del kernel Linux, que LordOS configura por netlink;
+- **FreeRDP** para RDP en Remote Desk, y **rclone** y el cliente OpenSSH para conectarse a servidores desde Archivos;
 - **wpa_supplicant** para el Wi-Fi, y **OpenSSH** en la imagen para Raspberry Pi 5 (apagado de fábrica);
 - el kernel Linux, la verificación de firmas de apt, los navegadores web y otros paquetes de Debian, cada uno con su propia criptografía.
 
@@ -20,7 +22,7 @@ La lista completa de componentes incluidos y sus licencias está en [THIRD_PARTY
 
 ## Código fuente disponible públicamente
 
-LordOS es software libre. Su código fuente completo, incluido el de cada versión, va a ser público en [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS) cuando se abra el repositorio; mientras tanto, podés pedir el código fuente de cualquier versión a través de [nuestro formulario de contacto](https://www.iperfex.com/contacto/?lang=es). Los componentes de Debian los publica Debian en [sources.debian.org](https://sources.debian.org).
+LordOS es software libre. Su código fuente completo, incluido el de cada versión, es público en [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). Los componentes de Debian los publica Debian en [sources.debian.org](https://sources.debian.org).
 
 ## Restricciones de exportación, importación y uso
 

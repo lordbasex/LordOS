@@ -56,7 +56,9 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
 - Limits: the minimum size is the manifest's `minSize` (Linux apps, 160×100). The frame doesn't go
   above the work area (the menu bar) and 48 px always remain visible.
 - `xdg_toplevel.move` and `xdg_toplevel.resize` from apps that draw their own frame (GTK, Chromium
-  with CSD) use the same thing (`sdk/wayland.js`).
+  with CSD) use the same thing (`sdk/wayland.js`). Since 0.8.3 X11 apps under Xwayland that draw
+  their own frame ask with `_NET_WM_MOVERESIZE`, which the window manager for X (`wl/xwm.c`) turns
+  into the same request.
 - If the theme didn't mark the window's node (`wm.frameRef`), or the window is maximized,
   `beginMove` returns `false` and the theme can fall back to its old JS dragging.
 
@@ -67,16 +69,71 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   shadow are not repainted.
   - It is painted in its screen coordinates (a canvas with a shifted origin). That way the terminal
     and Linux apps keep recording where they are.
+  - Its rounded corners stay transparent outside the curve (0.8.6). A rounded
+    `overflow: hidden` window saves its corner squares before its children paint and restores them
+    after (`canvas_corners_restore`/`canvas_corners_restore4` in `canvas.c`). The restore used to mix
+    the saved pixel in with `blend()`, which takes its source as opaque, so on the layer's transparent
+    canvas the shadow saved there came back opaque and nearly black: black squares at the corners of
+    every dragged window, on the CPU and GPU paths (0.8.5 and before). It now mixes both premultiplied
+    pixels alpha included (`mix_px`); on an opaque canvas that is `blend()`'s pixel exactly, so nothing
+    else changes. `test_drag_corners` (`engine-test`) drags a rounded window with a shadow over a light
+    box on both paths, with one radius and with per-corner radii, and each corner square must equal a
+    full repaint within 2 levels (before the fix: 217–221 levels off).
 - **If something inside changes,** like a terminal line or the blinking cursor, only that part of
-  the layer is repainted. If a style inside changes, the whole layer is repainted.
+  the layer is repainted.
+- **If a node inside changes** (a style, a text, a transform such as LordBench's turning square, or a
+  child moving inside the window), only its old box (moved with the window) and its new one are
+  repainted in the layer, with a 4 px margin (`layer_tree_part`; 0.8.6). The window's
+  own style or size, a part outside the layer or bigger than half of it still repaint the whole layer.
+  That gives the same pixels as repainting it whole, and the layer is repainted whole whenever that
+  can't be shown (`layer_part_exact`, `layer_note_exact`):
+  - the window moved by whole physical pixels since the layer was painted whole, the layer's box and
+    offsets are the ones a full render would give, the display scale is whole, and positions, sizes,
+    paddings and borders are in sixteenths of a pixel within ±4096 px, so every coordinate the paint
+    derives from them is exact at both places;
+  - text uses whole font sizes and was drawn by `text.c`'s own path in a font whose em is a power of
+    two of at most 2048 units, as Inter's is (`text_drew_inexact`): glyph advances and kerning are then
+    exact too. Text through `textlayout.c` (shaping, other scripts' fonts) or in another font (Plus
+    Jakarta Sans and JetBrains Mono have 1000-unit ems) repaints the layer whole;
+  - a transformed node that didn't change, an app window or a video inside makes it repaint whole (a
+    transform composites through its matrix, which rounds differently at another place; painting an
+    app window registers it);
+  - a transformed node's image steps its bilinear weights along each row from its first pixel, so a
+    part whose left edge cuts that image would change them: `canvas_affine_watch` reports it and the
+    layer is painted whole instead (the margin keeps that from happening in LordBench's scene).
 - **What's below** (everything painted before the window: background, desktop, the other windows)
   is also saved once. Per frame:
   1. the region that changed is copied;
   2. the layer goes on top;
   3. what is above (menu bar, Dock) is painted normally, because its blur depends on what lies
      beneath it.
+
+  The walk to the window paints nothing before it. Only the window's ancestors are walked
+  (`skip_stamp` in `paint_root` notes them), because they clip it and restore their corners around it;
+  any other node before the window returns at once (0.8.6). Before, those nodes still
+  saved and restored their rounded corners over the copy, which left those corners one level darker
+  than a full repaint: the one pixel change of the drag-frame work, approved on 2026-10-28.
 - **If something below changes** (a clock, a video), the below part is rebuilt. If it changes very
-  often, it stops being used.
+  often, it stops being used. Since 0.8.6 both of those go further, with the same
+  pixels (`below_ready` in `ui/paint.c`, "The copy of what is below the dragged window"):
+  - **Only what changed is painted again** (`below_update`): the boxes of the nodes painted before the
+    window that changed, and damage from outside the tree (a terminal, an app window), as up to four
+    rectangles. `damage_walk` knows the paint order around the window (`below_order`: its ancestors'
+    children, stable by `zIndex`), so a change painted after it (the menu bar's clock, the Dock) no
+    longer touches the copy; when that order changes (a window raised), the copy is built whole. A
+    rectangle grows to the whole reach of a backdrop blur it touches (the blur reads around its box
+    and starts its grid at the clip) and to the whole image of a turned or scaled node (its rows step
+    their source position from the first painted pixel), so a part gives what a whole build gives.
+  - **The copy is used where the old rule painted everything**: when a frame's box meets no
+    blurred node painted before the window, no turned or scaled node before it whose image starts left
+    of the box, and no border or rounded-corner square of one of the window's ancestors (painted after
+    the window, over the copy they would be painted twice), the last build reached the window, and the
+    stale part is smaller than the frame's box. Otherwise the frame is painted whole, as before.
+    `paint_below_switch = 0` turns this off.
+  - The old rule still decides, as a shadow, when the copy is rebuilt, so the pixels are the same as
+    before: outside damage inside the window's boxes (a Linux app under the window's shadow) keeps the
+    old copy until that rule rebuilds it. The copy is used only while the window is drawn without a
+    transform, its builds walk every node, and a hidden window's copy is built whole.
 - **When resizing** the window is repainted every frame (its content reflows), but what's below is
   still saved.
 - **The damage** is the window's old region plus its new one.
@@ -85,10 +142,87 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   - the layer remembers where the app holes are: exact alpha 0, distinguished from an empty
     background thanks to a sentinel value. They are reopened over the blend and the app is recorded
     at its new place (`wl_paint_holes(0)`).
+  - a window with no app surface skips that work (0.8.6): `layer.has_holes` is 0
+    only while the hole map stands for all zeros, so `layer_holes` just turns the sentinel back into
+    0 and `layer_paint` doesn't walk the map. A part that brings the first hole into such a map zeroes
+    the rest of it first, so what is read is always what the full walk would have written. The
+    sentinel fill writes one row and copies it.
+  - **the GPU composites the window itself** (GPU drag, 0.8.6; `docs/GPU.md`, "The dragged
+    window on the GPU"): on a frame that uses the copy of what is below, the CPU paints only the strips
+    of the damaged box around the window's rectangle, and the GPU writes the rectangle from the layer
+    and the copy (two textures uploaded only where they changed) with `blit_row`'s own arithmetic, so
+    the pixels are the same. Not when an ancestor paints over the window, an app window is under it,
+    or the layer has an app window, would be painted whole or is past the self-test's size; then the frame is
+    painted as before. A node painted after it (the menu bar, the Dock) only shortens the rectangle. On by default
+    since the Pi 5 run of 2026-10-31; `LORD_GPU_DRAG=0` turns it off,
+    `LORD_GPU_VERIFY=N` compares it with the CPU every N-th frame. `engine-test`'s `gpu-drag` path checks it
+    against the GPU path's golden hashes.
 - **There's no layer** if there is a backdrop blur inside (`backdropFilter`), or a video on the GPU
   path.
 - **A `canvas_blit` detail:** opaque pixels are copied directly (same result as blending, without
   the math).
+
+### Checking it (0.8.6)
+
+- **`test_drag_exact`** (`server/tests/engine_test.c`, run by `make -C server test`) drags LordBench's
+  desktop scene along its figure of eight for 480 frames, plus seven short runs (a text that resizes a
+  child, a child moving inside the window, a terminal's blinking cursor, a square turning across the
+  window's edge, the window crossing x = 0 and y = 0 while the square turns, a child removed after
+  frames that only copy the layer and then the square turning again, and the drag on a display at
+  200 %; the last three with boxes and text at half pixels), on the CPU path and on the GPU path's
+  canvas. Every frame's hash must match
+  `server/tests/drag_golden_cpu.txt` and `drag_golden_gpu.txt`, written from the code before any change
+  to this path and written again at the corner change above (from 001633b plus that change alone) and at
+  the black-corner fix (only the dragged window's corner squares and the Dock's and menu bar's backdrop
+  blur within reach of them changed, compared pixel by pixel first: 498,743 and 445,199 pixels in 2,386
+  of 2,417 frames on the CPU path), and once more, on the GPU path only, when `main`'s partial-repaint fixes
+  were merged under this work (0.8.6, `docs/LAYERS.md`: a blurred surface is repainted with the margin its blur
+  samples): frame 0 of three runs (`neg`, `mix`, `k2mix`), where the first dragged frame's damage reaches the
+  menu bar's or the blurred panel's margin, changed and nothing else; with that one rule reverted (`blur_near`)
+  all 2,417 hashes match the old file again, the CPU path's file is unchanged, and those three frames differ
+  from a full repaint by at most 2 levels (in 1,596, 8,778 and 40,180 pixels; 1,532, 8,400 and 38,099 before).
+  A faster frame has to give exactly the same pixels. Before that rewrite every frame was compared pixel
+  by pixel with the earlier code's: 178,634 pixels in 1,686 of 1,816 frames differed, all by one
+  level, inside a rounded `overflow: hidden` node's corner squares (`ceil(r) + 1` px) or within the
+  Dock's and menu bar's backdrop blur reach of one, and none moved away from a full repaint. The hashes
+  are per architecture (x86_64 so far); `make -C server drag-golden` writes them, only on the reference
+  code. A run added
+  later gets its hashes the same way: the new test built against 001633b's code (with the few test entry
+  points it lacks added beside it, which must leave the earlier runs' hashes identical), never against
+  the code being checked.
+- **The copy of what is below** has nine more runs (1,500 frames): a progress bar in the window below
+  that changes width every 3 frames (as LordBench's Performance view does) with its title every 30,
+  an app window and a blinking terminal in it; the menu bar's text every 2 frames; a square turning on
+  the desktop and one turned and still; a blurred panel whose text changes every 40 frames; the
+  window below raised above the dragged one and back; all of them at 100 % and at 200 %; the windows
+  inside a rounded container with a border; and a dot changing color on the still square. Their
+  hashes come from the code before this part (e24af69 plus the corner change), and the GPU path's
+  list of app windows is hashed with each frame. Every frame that uses the copy where the old rule
+  painted everything is painted that old way too, on a copy of the canvas (`paint_below_verify`), and
+  the test fails if one pixel differs. `LORD_BELOW_SWITCH=0 build/engine-test` runs it without that.
+- **Against a full repaint** the test prints a second number, which may only go down: today a drag
+  frame differs from a full repaint in at most 248 pixels on the CPU path (the largest at the Dock's
+  rounded corners, under its backdrop blur, while the window is near it) and 70,864 on the GPU path
+  (one level darker in its shadow); before the corners' restore on the drag layer was fixed (black
+  squares outside the dragged window's rounded corners), 2,217 and 70,882; before the corner change,
+  2,265 and 70,940.
+- **`test_drag_corners`** checks the corners of a dragged rounded window against a full repaint (above).
+- **On the Raspberry Pi 5** with its monitor, LordBench's desktop test (its square turning) went from 53–58
+  to 59.8–60 fps alone and from 24–25 to 30 fps under load with this work and GPU drag off
+  (`docs/BENCHMARK.md`, "The drag frame's cost"). The final run (2026-10-29, GPU drag and the frame pipeline off,
+  the defaults now): 59.9 fps alone and 30.5–31.1 fps under load, the pointer on screen 25.7–25.9 ms after it moved
+  alone (p50) and 48.5–49.0 ms under load; with GPU drag on 30.8–31.6 fps, with the frame pipeline 33.0–36.2 fps
+  but 17–29 ms more pointer latency, so both stay off. Under load the frames are late on the GPU's side
+  (`docs/GPU.md`, "The frame pipeline"). Screenshots of the monitor during the scripted drag (crops of the dragged
+  window's lower corners, over another window and over the wallpaper): the rounded corners are clean, no black
+  squares.
+
+  ![A dragged window's lower-left corner over another window, Raspberry Pi 5 monitor](drag-corner-pi5-over-window.png)
+  ![A dragged window's lower-right corner over the wallpaper, Raspberry Pi 5 monitor](drag-corner-pi5-over-wallpaper.png)
+- **`LORD_PAINT_VERIFY=N`** in lord-server's environment repaints the whole tree every N-th frame of a
+  display into a scratch canvas, without the layer, and writes to stderr how many pixels differ from
+  the frame. Use N > 1 to check the partial repaints of the layer: the check repaint also notes where
+  the terminals are, so on the next frame a terminal's change repaints the whole layer.
 
 ### Resize edges (`sdk/windowshell.jsx`)
 
@@ -149,7 +283,11 @@ JS 0.20, layout 0.56, paint 11.43, present 0.61), max gap 36.9 ms; layer: 1023 p
 ```
 
 "work" is what lord-server spends per frame: the pointer and timer JS, layout, painting
-("paint") and presentation ("present").
+("paint") and presentation ("present"). Since 0.8.6 the line ends with what the copy
+of what is below did during the drag: `below: B built whole, P in part, S frames switched to it (not:
+… ancestor, … blur, … transform, … unreached, … cost)`, the last part counting the frames where the old
+rule painted everything and the copy could not be used, by reason. LordBench's scripted move (no
+button held) writes the layer's counters and the same text in a `drag (scripted): …` line when it ends.
 
 | Path | Window | Before | After |
 |---|---|---|---|
@@ -193,6 +331,23 @@ was checked against this path:
   clears `layout_ok` up to the root) and that gets the same box keeps its children's layout. Moving a
   window only changes its `left`/`top` (`grab.c` calls `node_moved`), so a frame of a drag lays out the
   desktop's top level and places the rest (`place()`), instead of laying out every window.
+- **A transform-only setStyle keeps the node's layout** (0.8.6; `node_restyled` in
+  `ui/node.c`). A change of only `rotate`, `scaleX`, `scaleY` or `transformOriginX/Y` on a node that
+  already has its `StyleExt`, with no text node above it and no text or image in its subtree, marks
+  it for repaint and has its parent place it again (`node_moved`) instead of `node_invalidate`.
+  Layout never reads the transform and `place()` recomputes every matrix, so the result is the same;
+  only that node's own layout pass is saved (its ancestors are laid out as before).
+  `test_transform_restyle` compares every node's layout and every pixel with the `node_invalidate`
+  path. `'transform'` itself is not a key `lord.setStyle` takes and changes nothing.
+- **A main-loop pass with no timer due doesn't walk the timers** (0.8.6;
+  `ui/js_prelude.h`). `__lordTick` keeps the earliest deadline and returns at once when it hasn't
+  come; when it has, one pass fires the due timers by deadline, then by id, as before. Clearing the
+  earliest timer marks that deadline stale and it is computed again before use, so the wait returned
+  to the main loop is the same number as before. lord-server makes the atoms of the three globals it
+  calls on every pass once per runtime. `build/timer-order-test` runs 400 random timer scripts on this
+  prelude and on the one before it and requires the same trace (callbacks, order, arguments, every
+  returned wait, logs). A tick with 200 timers pending and none due went from 158.75 µs to 0.30 µs
+  (VM 116).
 - **Text outside the clip is not laid out** (a list row scrolled away), and a cut "…" is remembered
   like a measurement.
 - **The node stays small:** the rare styles (per-side edges, per-corner radii, scale/rotate,
@@ -200,7 +355,10 @@ was checked against this path:
   memory as before (a node 240 bytes larger made the benchmark's drag about 40 % slower).
 - **Transforms:** a scaled or rotated subtree is painted into its own raster and composited; inside
   a dragged window it goes into the drag layer like anything else. A transformed window is not put in
-  the drag layer.
+  the drag layer. The raster is kept while only the transform changes, and painted again when a node
+  inside it, or the transformed node's own style (background, border, radius, gradient), changes:
+  `damage_walk` keeps the node's own `paint_dirty` for `tf_check`, which runs after the children
+  (`engine-test`'s `test_transform_self_restyle`).
 
 `build/engine-test bench` (`server/tests/engine_test.c`, in the `debian:trixie` build container, i9-10900,
 medians of 3 interleaved runs; "before" is the same benchmark built against the tree of checkpoint
@@ -223,7 +381,7 @@ still the Dock's blur.
 
 ## Snapping (0.8.3)
 
-A theme turns it on with `configureWindows({ snap: true })` (Classic does; Lord Default doesn't).
+A theme turns it on with `configureWindows({ snap: true })` (Lord Classic does; Lord Flow doesn't).
 The geometry is in `sdk/snap.js` (no runtime imports, tested by `server/tests/snap_test.mjs`), the
 window side in `sdk/windows.js`.
 
@@ -235,6 +393,14 @@ window side in `sdk/windows.js`.
   is going on, the SDK reads `lord.wm.pointer()` (`ui/js_wm.c`: the pointer and the drag's edges,
   no arguments, read only) every 90 ms and sets `snapPreview` when the zone changes; the theme draws
   it under the moving window. Crossing into a zone costs one rebuild of what is below the window.
+- **A scripted move (0.8.6, LordBench):** `wm.scriptMove(id, { rx, ry, periodMs })` asks lord-server to move
+  the window along a figure of eight through this same path (`lord.wm.script`, `grab_script_begin` in
+  `ui/grab.c`: the window painted once into a layer, one step per frame from the main loop, no button held
+  and no JS per frame). The positions come from LordBench's synthetic pointer (`bench/lbinput.c`, a 125 Hz
+  thread on an eventfd the main loop polls like a device; taken once per frame like a real mouse's motion), so
+  the test also measures pointer-to-screen latency; without that thread the path follows the clock. Pointer
+  input or `wm.stopScript()` stops it. Only System Information's desktop
+  scene uses it (`apps/sysinfo/scene.jsx`), to measure the compositor ([BENCHMARK.md](BENCHMARK.md)).
 - **On release** (`__lordWm('end')`) the SDK reads the pointer once more and snaps; the size from
   before the first snap is kept in `w.restore`. Dragging a snapped window away gives it that size
   back under the pointer, where it was grabbed. Resizing a snapped window keeps its new size.
@@ -244,10 +410,44 @@ window side in `sdk/windows.js`.
   Super+arrows (`snapNext` in `snap.js`), and `w.snapped` (the zone) for a theme that squares the
   corners of a snapped window.
 - **Measured** (VM 119, 1280×800, CPU path, a 960 × 600 Files window dragged in circles for 6 s
-  three times through QMP, about 52 moves per second): Classic 7.5–7.7 ms of work per frame (JS
-  0.35, paint 6.4–6.7) and Lord Default 13.1–13.4 ms (paint 12.1–12.3, its Dock's blur), both at
+  three times through QMP, about 52 moves per second): Lord Classic 7.5–7.7 ms of work per frame (JS
+  0.35, paint 6.4–6.7) and Lord Flow 13.1–13.4 ms (paint 12.1–12.3, its Dock's blur), both at
   the rate of the input. A drag that keeps crossing the top edge (the preview appearing and going)
   costs 9 ms per frame (JS 1.6). Without the preview polling, 6.3–6.6 ms.
+
+## Remembered places (0.8.7)
+
+Each app reopens where it was: size, position, maximized and display, per app, in `settings.windowPlaces` (`sdk/windowmemory.js`, the rules in `sdk/placemodel.js`, tests in `tests/place_model_test.mjs`). Flow and Classic share this, for LordOS apps and for Linux apps, whose position the compositor decides.
+
+- **Which display:** a place is kept relative to its display, and a display is known by its name from the EDID plus its connector, never by index. The same monitor on another port still matches, unless two identical monitors make that ambiguous. Monitors with the same name on the same connector can't be told apart.
+- **Display gone, or the place off screen:** the window goes to a visible area of a display that exists, sized to fit.
+- **What wins:** session restore's frames first, then this; a Dock assignment chooses the display and keeps the size. What a Linux app asks for doesn't override a remembered place, except a dialog (a transient or dialog window, or an `xdg_toplevel` with a parent), which isn't remembered at all.
+- **Snapped, keyboard-lifted:** the normal frame is saved, not the snapped or lifted one. Fullscreen and picture-in-picture save nothing.
+- **Fixed size:** a Linux window with equal minimum and maximum keeps the size it asks for, and only its position is remembered. A second window of an app opens 30 px along from the first.
+- Up to 200 apps are kept, oldest out first. Not on a live system.
+
+## The Window menu, the app menu and Force Quit (0.8.5)
+
+The same menus in both themes, built by the SDK (`sdk/windowmenu.js`, `sdk/appcontrol.js`); Lord Flow
+shows them in its menu bar (Window, the app's name, the crown menu), Lord Classic in each window's own
+Window and Help menus (its in-window menu strip, since it has no menu bar).
+
+- **Window menu** (`windowMenuItems`): Minimize, Zoom, Fill, Center; **Move & Resize** with the halves
+  (left, right, top, bottom), the quarters and thirds (the zones of `wm.snap`, see "Snapping"), the
+  arrangements of two windows (left and right, right and left, top and bottom, bottom and top) or four
+  (quarters) with the windows behind it (`wm.arrange`), and Return to Previous Size (`wm.snap(id,
+  'restore')`); **Move to <display>** for every other display (`wm.moveToDisplay`: a snapped window
+  keeps its zone, the rest keep their place relative to the screen); Bring All to Front; and the open
+  windows, the one in front checked.
+- **App menu** (`appMenuItems`, Lord Flow: a click on the app's name in the menu bar): About <app> (its
+  icon, name, own version and where it comes from; a system window, `apps/appabout`), Settings… (the
+  app's own, ❖,), Hide <app>, Hide Others, Show All and Quit <app> (❖Q). In Lord Classic, About <app>
+  is in each window's Help menu.
+- **Force Quit…** (the crown menu, a system window `apps/forcequit`) lists the open apps and ends the
+  chosen one without asking it (`forceQuit`): a Linux or isolated app's own process gets SIGKILL from
+  lord-server through `lord.wayland.kill(surface)` (`js_sys.c`), only that client of the same user and
+  never lord-server itself; an X11 window is only asked to close (every X11 app shares Xwayland); a
+  built-in app that runs in the session closes without its close guard.
 
 ## Pending
 

@@ -33,6 +33,11 @@ char *mon_detail_json(uint64_t *seq);
  * tempCrit, tempIdle}]} if newer than *seq; reading it does not keep the 4 Hz sampling alive. */
 void mon_watch_disks(int on);
 char *mon_disk_temps_json(uint64_t *seq);
+/* Monitor → Voltage (voltage.h): with on, the thread reads the voltages about every 2 s; JS asks for it only while
+ * the view is on screen. mon_voltage_json: the latest if newer than *seq. Every sample also says "volt": whether this
+ * machine has anything to show. */
+void mon_want_voltage(int on);
+char *mon_voltage_json(uint64_t *seq);
 /* Fixed data: CPU model, cores, location from the time zone, country database. */
 char *mon_info_json(void);
 

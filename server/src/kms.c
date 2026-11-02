@@ -13,6 +13,8 @@
 #include <time.h>
 #include <unistd.h>
 
+static uint64_t kms_now_ns(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec; }
+
 static int xioctl(int fd, unsigned long req, void *arg) {
     int r;
     do r = ioctl(fd, req, arg);
@@ -417,6 +419,7 @@ int kms_flip(Kms *k) {
     };
     if (xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) {
         k->flip_pending = 1;
+        k->flip_submit_ns = kms_now_ns();
         return 0;
     }
     /* Synchronous fallback if the driver does not support page flip. */
@@ -514,7 +517,7 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
         .crtc_id = k->crtc_id, .fb_id = fb, .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uintptr_t)data,
     };
     k->custom = 1;
-    if (!k->modeset_pending && xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_pending = 1; return 0; }
+    if (!k->modeset_pending && xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
     /* no page flip: synchronous modeset and notify right away */
     if (kms_set_fb(k, fb)) return -1;
     struct timespec t;

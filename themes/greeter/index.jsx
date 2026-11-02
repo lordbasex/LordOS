@@ -6,14 +6,15 @@
 // password, opening the session, rebooting, powering off) is requested with lord.greeter.send() and the answer
 // arrives through __lordGreeter: this JS never sees /etc/shadow.
 //
-// Requests: {t:'hello'} · {t:'login', user, pass} · {t:'power', a:'reboot'|'poweroff'}
-// Notices:  {t:'hello', mode, user, last, host, layouts, variants, lang, users:[{name, full, color, image, admin, open}]}
+// Requests: {t:'hello'} · {t:'login', user, pass} · {t:'power', a:'reboot'|'poweroff'} · {t:'bootTestCancel'}
+// Notices:  {t:'hello', mode, user, last, host, layouts, variants, lang, users:[{name, full, color, image, admin, open}],
+//            bootTest?:{k, n, in}} (a boot time test restarts in `in` seconds; a login cancels it)
 //           (last: the user whose session was last shown on the monitor)
 //           {t:'mode', mode:'login'|'lock'|'switch', user} · {t:'ok'} · {t:'fail', wait} · {t:'error'} · {t:'busy'}
-import { render, screen } from '@lordos/runtime';
+import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
-  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER,
+  lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, fs, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
@@ -29,6 +30,55 @@ globalThis.__lordGreeter = (json) => {
 
 const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#269653'], ['#e0609d', '#b83574'],
   ['#a77bf3', '#7a4fd6'], ['#4cc4d3', '#2391a3'], ['#f2c14e', '#d0961d']];
+
+// A looping video behind the clock, on the main display, when the file is there. It has no sound, and it only
+// covers the wallpaper once it plays: no file, no helper or a crash leave the still image, with nothing on screen.
+const LOGIN_PICKED = '/var/lib/lordos/wallpapers/login.mp4';      // chosen in Settings (wallpaper-login)
+const LOGIN_BUILTIN = '/usr/share/backgrounds/lordos/motion/crown';
+const LOGIN_STILL = '/var/lib/lordos/wallpapers/login-still';     // a still wallpaper's id: no video at all
+const loginStill = () => { try { return String(fs.read(LOGIN_STILL)).trim(); } catch (e) { return ''; } };
+const IDLE_MS = 300000;
+function LoginVideo({ box, stop }) {
+  const [id, setId] = useState(0);
+  useEffect(() => {
+    if (stop || settings.get().reduceMotion || !media.available()) return undefined;
+    let cur = 0, off = null, polls = 0, timer = 0, idle = 0, paused = false, last = Date.now();
+    const start = (codecs) => {
+      const files = [LOGIN_PICKED, ...codecs.map((c) => `${LOGIN_BUILTIN}.${c}.mp4`)];
+      for (const f of files) {
+        try { cur = media.play('greeter', f, { loop: true, audio: 0, hwOnly: 1, appName: 'LordOS' }); } catch (e) { cur = 0; }
+        if (cur) break;
+      }
+      if (!cur) return;
+      off = media.on(cur, (type, d) => {
+        if (type === 'state' && d.state === 'playing') setId(cur);
+        else if (type === 'error' || type === 'closed') setId(0);
+      });
+      // nobody at the screen for five minutes: it stops decoding until someone is back
+      idle = setInterval(() => {
+        const away = Date.now() - last > IDLE_MS;
+        if (away !== paused) { paused = away; media.control(cur, away ? 'pause' : 'play'); }
+      }, 5000);
+    };
+    const poll = () => {
+      let c = [];
+      try { c = motionCodecs(lord.media.hwDecode(), lord.media.composition()); } catch (e) { c = []; }
+      if (c.length) start(c);                // hardware only: otherwise the still image stays
+      else if (++polls < 40) timer = setTimeout(poll, 250);
+    };
+    poll();
+    const seen = () => { last = Date.now(); };
+    const offs = ['pointerdown', 'pointermove', 'keydown'].map((e) => addListener(e, seen));
+    return () => {
+      clearTimeout(timer); clearInterval(idle); offs.forEach((x) => x && x());
+      if (off) off();
+      setId(0);
+      if (cur) media.close(cur);
+    };
+  }, [stop]);
+  if (!id) return null;
+  return <MediaView media={id} style={{ position: 'absolute', left: box.left, top: box.top, width: box.width, height: box.height }} />;
+}
 
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; }
 
@@ -84,11 +134,11 @@ function RoundButton({ children, onClick, label }) {
   );
 }
 
-function Pill({ label, onClick }) {
+function Pill({ label, icon, onClick, keepFocus }) {
   return (
-    <View onClick={onClick} style={{ height: 26, paddingHorizontal: 10, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 5,
+    <View keepFocus={keepFocus} onClick={onClick} style={{ height: 26, paddingHorizontal: 10, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 5,
       backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
-      <Text style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+      {icon || <Text style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>}
     </View>
   );
 }
@@ -125,7 +175,10 @@ const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 function Greeter() {
   const { lang } = useStore(locale);
   const s = useStore(settings);
+  useStore(oskState);                   // the on-screen keyboard: nobody at this screen may have another
   const [now, setNow] = useState(() => new Date());
+  // a display plugged in or out while it shows: lay it out again on the main one
+  useEffect(() => onScreenChange(() => setNow(new Date())), []);
   const [info, setInfo] = useState({ users: [], host: '', mode: 'login', user: '' });
   const [sel, setSel] = useState('');
   const [pass, setPass] = useState('');
@@ -133,6 +186,7 @@ function Greeter() {
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
   const [menu, setMenu] = useState(null);         // 'lang' | 'kb'
+  const [entered, setEntered] = useState(false);  // the session is starting: the video stops
   const [confirm, setConfirm] = useState(null);   // 'reboot' | 'poweroff'
   const [ip, setIp] = useState(lanAddress());
   const timers = useRef([]);
@@ -152,7 +206,8 @@ function Greeter() {
   useEffect(() => {
     const on = (m) => {
       if (m.t === 'hello') {
-        setInfo((old) => ({ ...old, ...m }));
+        // a boot time test restarts soon (LordBench, bench/boottest.h): when, by this screen's clock
+        setInfo((old) => ({ ...old, ...m, bootTest: m.bootTest ? { ...m.bootTest, end: Date.now() + m.bootTest.in * 1000 } : null }));
         // system keyboard and language (/etc/default/keyboard and /etc/default/locale)
         const layouts = String(m.layouts || 'latam').split(',').filter(Boolean);
         const variants = String(m.variants || '').split(',');
@@ -183,7 +238,7 @@ function Greeter() {
         if (Date.now() - chosen.current > 10000) chosen.current = 0;   // a click from an earlier showing
         send({ t: 'hello' });                       // who has an open session, again
         setIp(lanAddress());
-      } else if (m.t === 'ok') { setPass(''); setMsg(''); setBusy(false); chosen.current = 0; }
+      } else if (m.t === 'ok') { setEntered(true); setPass(''); setMsg(''); setBusy(false); chosen.current = 0; osk.hide(); }
       else if (m.t === 'fail') {
         setPass(''); setBusy(false); doShake();
         setMsg(m.wait > 0 ? t('greeter.wait', { count: m.wait }) : t('greeter.wrong'));
@@ -210,19 +265,28 @@ function Greeter() {
   const anyOpen = info.users.some((u) => u.open);
   const power = (a) => { if (anyOpen && confirm !== a) setConfirm(a); else { setConfirm(null); send({ t: 'power', a }); } };
 
-  const H = screen.height, W = screen.width;
+  // with several displays the clock, the user and the buttons go on the main one (they used to be laid
+  // out over the whole desktop, cut at the seam); the wallpaper covers every display
+  const M = mainBox(), H = M.height, W = M.width;
   const clockSize = Math.round(Math.min(H * 0.17, W * 0.12));
   const avatarSize = Math.round(Math.max(76, Math.min(110, H * 0.12)));
   const kbs = keyboard.configured();
   const kbIdx = Math.min(s.keyboardIndex || 0, kbs.length - 1);
   const langs = languages().filter((l) => ['es', 'en', 'pt'].includes(l.id));
   const locked = info.mode === 'lock' && user && user.name === info.user;
+  // the column rises so the password stays above the on-screen keyboard
+  const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);
 
+  const still = loginStill();
   return (
     <ThemeProvider tokens={{ mode: 'dark', accent: '#ffffff', text: '#ffffff', textDim: 'rgba(255,255,255,0.55)',
-      inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)' }}>
-      <View style={{ width: W, height: H, direction: 'ltr' }}>
-        <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, GREETER_WALLPAPER), W, H) || 'assets/background.jpg'} style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, objectFit: 'cover' }} />
+      inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)',
+      panelBg: 'rgba(30,22,40,0.94)', control: 'rgba(255,255,255,0.18)', sidebarBg: 'rgba(255,255,255,0.09)' }}>
+      <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
+        <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
+          style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
+        {still ? null : <LoginVideo box={M} stop={entered} />}
+        <View style={{ position: 'absolute', left: M.left, top: M.top, width: W, height: H }}>
 
         {/* date and clock */}
         <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.085), width: W, alignItems: 'center' }}>
@@ -232,8 +296,18 @@ function Greeter() {
             letterSpacing: -Math.round(clockSize * 0.03) }}>{formatTime(now)}</Text>
         </View>
 
+        {/* LordBench's boot time test: which boot this was, the restart's countdown and a way to stop it */}
+        {info.bootTest ? (
+          <View style={{ position: 'absolute', left: Math.round(W / 2 - 230), top: 18, width: 460, padding: 12, gap: 8, borderRadius: 14,
+            backgroundColor: 'rgba(30,22,40,0.88)', border: '1px solid rgba(255,255,255,0.18)', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: '#fff', textAlign: 'center', lineHeight: 1.35 }}>
+              {t('greeter.bootTest', { k: info.bootTest.k, n: info.bootTest.n, s: Math.max(0, Math.ceil((info.bootTest.end - now.getTime()) / 1000)) })}</Text>
+            <Pill label={t('greeter.bootTestCancel')} onClick={() => send({ t: 'bootTestCancel' })} />
+          </View>
+        ) : null}
+
         {/* selected user and password */}
-        <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize, width: W, alignItems: 'center' }}>
+        <View style={{ position: 'absolute', left: 0, top: Math.round(H * 0.6) - avatarSize - lift, width: W, alignItems: 'center' }}>
           {user ? <Avatar user={user} size={avatarSize} /> : null}
           <Text style={{ marginTop: 14, fontSize: 16, fontWeight: 600, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
             {user ? user.full || user.name : t('greeter.noUsers')}</Text>
@@ -277,6 +351,7 @@ function Greeter() {
         <View style={{ position: 'absolute', right: 20, bottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pill label={lang.toUpperCase()} onClick={() => setMenu(menu === 'lang' ? null : 'lang')} />
           {kbs.length > 1 ? <Pill label={keyboard.label(kbs[kbIdx])} onClick={() => setMenu(menu === 'kb' ? null : 'kb')} /> : null}
+          <Pill keepFocus icon={<OskIcon color="rgba(255,255,255,0.85)" size={14} />} onClick={osk.toggle} />
           <RoundButton label={t('greeter.restart')} onClick={() => power('reboot')}>
             <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)' }}>↻</Text>
           </RoundButton>
@@ -296,6 +371,8 @@ function Greeter() {
           items={langs.map((l) => [l.id, l.name, l.id === lang])} /> : null}
         {menu === 'kb' ? <PopupList right={20 + 100} onClose={() => setMenu(null)} onPick={(i) => settings.set({ keyboardIndex: Number(i) })}
           items={kbs.map((k, i) => [String(i), keyboard.list().find((x) => x.id === k.layout)?.name || k.layout, i === kbIdx])} /> : null}
+        </View>
+        <OskPanel />
       </View>
     </ThemeProvider>
   );
@@ -307,4 +384,5 @@ function Root() {
   return createElement(Greeter, { key: lang });
 }
 
+startOsk();
 render(createElement(Root));

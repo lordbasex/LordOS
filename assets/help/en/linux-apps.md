@@ -14,7 +14,7 @@ open as regular desktop windows.
 - **Open them:** Apps, the Dock or Search, like any app.
 - **Open a file with one of them:** in [Files](help:files), right-click → “Open with”.
 - **Clipboard:** what you copy in a Linux app pastes in LordOS and the other way round, images too.
-- **Keyboard and touchpad:** they get the keys (❖ combinations still belong to LordOS) and the
+- **Keyboard and touchpad:** they get the keys (❖ combinations still belong to LordOS, except in Lord Flow, where [❖C, ❖V and others arrive as Ctrl](help:shortcuts)) and the
   pinch and swipe gestures.
 
 Apps that draw their own frame (for example GNOME apps with libadwaita) show without the theme's
@@ -26,5 +26,5 @@ frame. For safety, LordOS only opens installed apps (their `.desktop` files), ne
   browser's own tab strip: in Chromium, ⋮ menu → Settings → Appearance → turn off "Use system title
   bar and borders"; in Firefox, ☰ menu → More tools → Customize toolbar → uncheck "Title Bar".
 - **GTK and GNOME** follow LordOS's dark or light mode and accent color live, and put the window
-  buttons on the left, like the traffic lights (on the right with the Classic theme). GTK 3 apps use
+  buttons on the left, like the traffic lights (on the right with the Lord Classic theme). GTK 3 apps use
   the "LordOS" theme; their accent color is fixed.

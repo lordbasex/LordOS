@@ -3,6 +3,8 @@
   "fileName": "Screenshot {date}",
   "recName": "Screen recording {date}",
   "annotated": "annotated",
+  "refused": "Couldn't capture the screen",
+  "refused.open": "Open Privacy",
   "mode.full": "Entire screen",
   "mode.window": "Window",
   "mode.area": "Selection",

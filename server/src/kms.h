@@ -28,6 +28,7 @@ typedef struct {
     int custom;
     /* last flip: time (CLOCK_MONOTONIC, ns) and vblank number (wp_presentation) */
     uint64_t flip_ns;
+    uint64_t flip_submit_ns; /* when that flip was queued (CLOCK_MONOTONIC, ns) */
     unsigned flip_seq;
     /* hardware cursor (cursor plane, legacy ioctl) */
     uint32_t cursor_handle, cursor_w, cursor_h;

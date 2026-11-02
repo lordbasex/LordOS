@@ -72,6 +72,25 @@ static int ends_with(const char *s, size_t n, const char *suf) {
     return n >= k && !memcmp(s + n - k, suf, k);
 }
 
+int fw_component_ok(const char *name) {
+    static const char *const v[] = FW_COMPONENTS;
+    for (int i = 0; name && v[i]; i++) if (!strcmp(name, v[i])) return 1;
+    return 0;
+}
+
+int fw_component_scope(const char *scope, char *app, size_t n) {
+    size_t l = scope ? strlen(scope) : 0;
+    if (l <= 17 || strncmp(scope, "lordos-net-", 11) || strcmp(scope + l - 6, ".scope")) return -1;
+    char comp[32];
+    size_t cl = l - 11 - 6;
+    if (cl >= sizeof comp) return -1;
+    memcpy(comp, scope + 11, cl);
+    comp[cl] = 0;
+    if (!fw_component_ok(comp)) return -1;
+    int w = snprintf(app, n, "lordos:%s", comp);
+    return w < 0 || (size_t)w >= n ? -1 : 0;
+}
+
 int fw_app_canon(const char *in, char *out, size_t n) {
     if (!in || !out || !n) return -1;
     size_t len = strnlen(in, FW_APP_MAX);
@@ -168,6 +187,17 @@ int fw_addr_is_lan(int fam, const uint8_t *a) {
         static const uint8_t zero[16];
         if (!memcmp(a, zero, 15) && (a[15] == 0 || a[15] == 1)) return 1;     /* :: and ::1 */
         return (a[0] & 0xfe) == 0xfc || (a[0] == 0xfe && (a[1] & 0xc0) == 0x80) || a[0] == 0xff;
+    }
+    return 0;
+}
+
+int fw_addr_is_loopback(int fam, const uint8_t *a) {
+    if (!a) return 0;
+    if (fam == 6 && is_mapped4(a)) return a[12] == 127;
+    if (fam == 4) return a[0] == 127;
+    if (fam == 6) {
+        static const uint8_t zero[15];
+        return !memcmp(a, zero, 15) && a[15] == 1;
     }
     return 0;
 }
@@ -602,7 +632,7 @@ void fw_app_each(const FwStore *s, int (*cb)(void *u, const char *app, int trust
 }
 
 void fw_set_mode(FwStore *s, FwMode m) {
-    if (s && (m == FW_MODE_SILENT || m == FW_MODE_ASK || m == FW_MODE_OFF)) s->mode = m;
+    if (s && (m == FW_MODE_SILENT || m == FW_MODE_ASK || m == FW_MODE_OFF || m == FW_MODE_DENY)) s->mode = m;
 }
 
 FwMode fw_mode(const FwStore *s) { return s ? s->mode : FW_MODE_SILENT; }
@@ -694,7 +724,7 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
         if (lan == 1) consider(&p, a->lan, SC_NET);
         else if (lan == 0) consider(&p, a->inet, SC_NET);
         consider(&p, a->any, SC_ANY);
-        if (p.best) {
+        if (p.best && (p.dst >= SC_CIDR || !q->listed)) {
             d.verdict = p.best->r.action == FW_DENY ? FW_V_DENY : FW_V_ALLOW;
             d.reason = FW_BY_RULE;
             d.rule_id = p.best->r.id;
@@ -702,6 +732,9 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
             return d;
         }
     }
+
+    /* 2b. a subscribed blocklist: only a rule that names the destination (above) beats it */
+    if (q->listed) { d.verdict = FW_V_DENY; d.reason = FW_BY_LIST; d.record = 1; return d; }
 
     /* 3. trusted */
     if (a && a->trusted) { d.verdict = FW_V_ALLOW; d.reason = FW_BY_TRUSTED; return d; }
@@ -712,6 +745,10 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     case FW_MODE_SILENT: d.verdict = FW_V_ALLOW; d.record = 1; break;
     case FW_MODE_ASK: d.verdict = FW_V_ASK; break;
     case FW_MODE_OFF: d.verdict = FW_V_ALLOW; break;
+    case FW_MODE_DENY:
+        d.verdict = fam && fw_addr_is_loopback(fam, addr) ? FW_V_ALLOW : FW_V_DENY;
+        d.record = 1;
+        break;
     }
     return d;
 }
@@ -753,7 +790,7 @@ static void putf(Buf *b, const char *fmt, ...) {
     put(b, t, (size_t)n);
 }
 
-static const char *const MODE_NAMES[] = { "silent", "ask", "off" };
+static const char *const MODE_NAMES[] = { "silent", "ask", "off", "deny" };
 
 static int cmp_app(const void *x, const void *y) { return strcmp((*(App *const *)x)->id, (*(App *const *)y)->id); }
 
@@ -915,7 +952,7 @@ static int load_doc(FwStore *t, const JVal *root, char *err, size_t errlen) {
     if ((v = json_get(root, "mode"))) {
         const char *m = jstr(v, 8);
         int k = -1;
-        for (int i = 0; m && i < 3; i++) if (!strcmp(m, MODE_NAMES[i])) k = i;
+        for (int i = 0; m && i < 4; i++) if (!strcmp(m, MODE_NAMES[i])) k = i;
         if (k < 0) return jerr(err, errlen, "invalid mode");
         t->mode = (FwMode)k;
     }

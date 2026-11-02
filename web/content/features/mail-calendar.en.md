@@ -33,6 +33,7 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 
 - **Remote images are blocked** until you press *Load Images* for that message or *Always from this sender*. Even then, `lord-server` allows only those image hosts, on ports 80 and 443, for ten minutes, and refuses any address that isn't public (local network, loopback, cloud metadata and similar), checked on the address it actually connects to. Tracking pixels are counted and never shown.
 - **Deceptive links are flagged** in red with a warning when the visible text looks like an address but points somewhere else, or uses tricks like an IP address, `user@` or look-alike characters. Clicking shows the real destination. Mail never opens a browser by itself; you can copy the address.
+- **The apps themselves are isolated.** Since 0.8.2, Mail, Calendar, Contacts and Reminders each run as their own sandboxed process, like an installed `.lpk` app, and reach mail and the keyring only through broker requests allowed for these four apps alone. Since 0.8.5, the connections to your mail servers also come from a process of their own, so they get their own row and rules in Monitor → Network.
 - **Passwords never touch a file.** Mail stores account passwords in the system keyring (see Passwords) and hands them to `lord-maild` in memory only. The accounts file holds servers, user names, signatures and trusted certificate fingerprints, and the code refuses to write a password into it.
 
 [[shot:1]]

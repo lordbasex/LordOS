@@ -1,4 +1,4 @@
-// Tokens of the "Lord Default" theme. The base keys (text, accent, windowBg…) are the contract
+// Tokens of the "Lord Flow" theme. The base keys (text, accent, windowBg…) are the contract
 // with apps (see sdk/theme.js); the rest belongs to this theme.
 import { lordosWallpapers } from '@lordos/sdk';
 

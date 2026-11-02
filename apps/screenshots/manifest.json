@@ -1,5 +1,6 @@
 {
   "id": "screenshots",
+  "version": "0.8.5",
   "name": "Screenshots",
   "description": "Screenshots (screen, window or area) with annotations, and screen recording",
   "size": [440, 420],

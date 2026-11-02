@@ -41,6 +41,14 @@
         },
         {
           "label": {
+            "en": "LordOS Imager guide",
+            "es": "Guía de LordOS Imager",
+            "pt": "Guia do LordOS Imager"
+          },
+          "href": "/imager/"
+        },
+        {
+          "label": {
             "en": "Paper",
             "es": "Paper",
             "pt": "Paper"

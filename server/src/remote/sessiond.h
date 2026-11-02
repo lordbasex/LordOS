@@ -22,8 +22,10 @@
 /* created when the first session frame is on the monitor; lordos-splash-quit.service waits for it to
  * end the boot splash (plymouth quit --retain-splash). See docs/SESSIONS.md, "Boot splash". */
 #define SD_FIRST_FRAME SD_RUN_DIR "/first-frame"
+#define SD_NO_DISPLAY SD_RUN_DIR "/no-display"   /* lordos-splash: the console has to show, nothing else will */
 #define SD_GREETER_RUN SD_RUN_DIR "/greeter"        /* XDG_RUNTIME_DIR of the login screen */
 #define SD_SESSION_CONF "/etc/lordos/session.conf"   /* AUTOLOGIN=user (empty: login screen) */
+#define SD_STATE_DIR "/var/lib/lordos"               /* boot-times.jsonl (docs/SESSIONS.md, "Boot time") */
 #define SD_USERS_DIR "/var/lib/lordos/users"         /* avatars: <user>.json and <user>.png */
 #define SD_GREETER_USER "lordos-greeter"
 #define RD_DEFAULT_PORT 5673          /* "LORD" on a phone keypad */
@@ -129,6 +131,8 @@ void sd_cgroup_tick(void);                          /* restarts it if it died */
 
 /* "LORD_GPU=0" with lordos.gpu=0 on the kernel command line (or the service's LORD_GPU), or empty */
 extern char sd_gpu_env[24];
+#define SD_TUNE_N 4
+extern char sd_tune_env[SD_TUNE_N][32]; /* the service's LORD_GPU_SCISSOR, LORD_GPU_DRAG, LORD_PIPELINE, LORD_GPU_VERIFY for user sessions */
 extern int sd_input_debug;              /* LORD_INPUT_DEBUG=1 for user sessions (keylag.h) */
 
 /* ---- conn.c: one remote desktop connection (in a child process) ---- */

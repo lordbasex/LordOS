@@ -148,11 +148,26 @@ EOF
     run "tp-test" build/tp-test
     run "fan-test" build/fan-test
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
+    if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
+    if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
+    # which installed kernels Cleaner may offer (sdk/oldkernels.js)
+    if have node; then run "oldkernels-test (sdk/oldkernels.js)" node tests/oldkernels_test.mjs
+    else skip "oldkernels-test" "node"; fi
     # the Dock's pinned-list model (sdk/dockmodel.js)
+    if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
+    if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
+    else skip "osk-model-test (sdk/oskmodel.js)" node; fi
+    if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
     if have node; then run "dock-model-test (sdk/dockmodel.js)" node tests/dock_model_test.mjs
     else skip "dock-model-test" "node"; fi
+    # Desktops: what shows and who has the keyboard (sdk/desktopmodel.js)
+    if have node; then run "desktop-model-test (sdk/desktopmodel.js)" node tests/desktop_model_test.mjs
+    else skip "desktop-model-test" "node"; fi
+    # session restore's data rules (sdk/sessionmodel.js)
+    if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
+    else skip "session-model-test" "node"; fi
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi
@@ -168,6 +183,35 @@ EOF
     # the overlay scroll bar's model (sdk/scrollbar.js): geometry, thumb hit-test and drag, fade timing
     if have node; then run "scrollbar-model-test (sdk/scrollbar.js)" node tests/scrollbar_model_test.mjs
     else skip "scrollbar-model-test" "node"; fi
+    # (0.8.5) Monitor → Network's model (sdk/netmodel.js): search tokens, filters, the tree, sorting
+    if have node; then run "netmodel-test (sdk/netmodel.js)" node tests/netmodel_test.mjs
+    else skip "netmodel-test" "node"; fi
+    # (0.8.7) Monitor → Voltage's model (apps/monitor/voltmodel.js): the rpi-pmic line, states, sources, the trace
+    if have node; then run "voltage-model-test (apps/monitor/voltmodel.js)" node tests/voltage_model_test.mjs
+    else skip "voltage-model-test" "node"; fi
+    # (0.8.5) System Information's model (apps/sysinfo/model.js): GPU layers, CPU reasons, Compatibility
+    if have node; then run "sysinfo-model-test (apps/sysinfo/model.js)" node tests/sysinfo_model_test.mjs
+    else skip "sysinfo-model-test" "node"; fi
+    # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
+    if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
+    else skip "sysinfo-perf-test" "node"; fi
+    # (0.8.7) community hardware reports: the schema, Share on GitHub (apps/sysinfo/share.js), the workflow's
+    # checks (tools/hwreport/lib.mjs), the catalogue and its snapshot, the Compatibility panel's community data
+    if have node; then run "hwreport-test (tools/hwreport, apps/sysinfo/share.js)" node tests/hwreport_test.mjs
+    else skip "hwreport-test" "node"; fi
+    # (0.8.7) Store → Updates' names for LordOS's data packages (apps/store/syspkg.js): lordos-hwdata as a dated list
+    if have node; then run "store-syspkg-test (apps/store/syspkg.js)" node tests/store_syspkg_test.mjs
+    else skip "store-syspkg-test" "node"; fi
+    # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
+    if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
+    else skip "livestart-test" "node"; fi
+    # (0.8.5) Settings → Displays' arrangement (sdk/displaylayout.js): numbers, magnetic snap, valid drops
+    if have node; then run "display-layout-test (sdk/displaylayout.js)" node tests/display_layout_test.mjs
+    else skip "display-layout-test" "node"; fi
+    # (0.8.6) runtime/index.js's skip of unchanged styles sends the same lord.* calls as without it
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "runtime-props-test (runtime/index.js)" node tests/runtime_props_test.mjs
+    else skip "runtime-props-test" "node and the repository's node_modules (npm install)"; fi
 }
 
 full() {

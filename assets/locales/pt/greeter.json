@@ -1,4 +1,6 @@
 {
+  "bootTest": "Medindo o tempo de inicialização: inicialização {k} de {n} concluída. Reiniciando em {s} s. Entrar também interrompe o teste.",
+  "bootTestCancel": "Parar o teste",
   "busy": "Um momento…",
   "cancel": "Cancelar",
   "confirmRestart": "Há sessões abertas: o que não estiver salvo será perdido. Reiniciar mesmo assim?",

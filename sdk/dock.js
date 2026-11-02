@@ -22,9 +22,13 @@ import { useEffect } from 'react';
 import { addListener } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
-import { useWindows, wm, windowTitle, appIdOf, getApp, windows } from './windows.js';
+import { useWindows, wm, windowTitle, appIdOf, getApp, windows, setDisplayAssignment, isLiveSystem, activeDesktop, onActiveDesktop } from './windows.js';
+import { pickWindow } from './desktopmodel.js';
+import { desktopSuffix } from './desktops.js';
+import { screen, onScreenChange } from '@lordos/runtime';
 import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
+import { restoredIds } from './sessionrestore.jsx';
 import * as fs from './fs.js';
 import {
   parseDockId, toTypedId, normalizePinned, ensureItems, moveItem, pinItem, unpinItem, isLocked, isMovable, cleanActions,
@@ -61,6 +65,7 @@ const launcherKey = (id) => {
 // ---- pinned (in ~/.config/lordos/settings.json → dockPinned) ----
 
 let themeDefaults = [FIRST, LAUNCHER];
+const dockOpened = new Map();         // running unpinned and pinned groups, in the order they opened
 let shownFn = () => true;            // which pinned ids the Dock shows (installed), from the last render
 const fromSettings = () => {
   const raw = settings.get().dockPinned;
@@ -102,7 +107,7 @@ export const dock = {
 // Stored in settings.json. Left and right are physical sides of the screen, even with a
 // right-to-left language.
 export const DOCK_DEFAULTS = {
-  dockPosition: 'bottom',     // 'bottom' | 'left' | 'right' (Lord Default theme)
+  dockPosition: 'bottom',     // 'bottom' | 'left' | 'right' (Lord Flow theme)
   dockSize: 54,               // px of each icon (36–80)
   dockMagnify: true,          // magnification
   dockMagnifySize: 86,        // px of the largest icon when magnified (more than dockSize)
@@ -198,7 +203,10 @@ export function useDockEntries(defaults = [], opts = {}) {
     if (!a) continue;                          // pinned but uninstalled: hidden, keeps its place
     out.push(entry(id, a, groups.get(id) || []));
   }
-  for (const [id, ws] of groups) if (!pinned.includes(id)) out.push(entry(id, appFor(id), ws));
+  // an unpinned app keeps its place in the order it opened: wins is the stacking order, which every raise changes
+  for (const id of dockOpened.keys()) if (!groups.has(id)) dockOpened.delete(id);
+  for (const id of groups.keys()) if (!dockOpened.has(id)) dockOpened.set(id, true);
+  for (const id of dockOpened.keys()) if (!pinned.includes(id)) out.push(entry(id, appFor(id), groups.get(id)));
   if (opts.recents) {
     const have = new Set(out.map((e) => e.id));
     const rec = (s.dockRecentApps || []).map((x) => dockIdOf(x)).filter((x) => x && !have.has(x) && appFor(x)).slice(0, opts.recents);
@@ -219,13 +227,15 @@ export function launchDockItem(id) {
 }
 
 // Click on the icon: with no windows it opens the app; with windows it brings up the most recent one (if it
-// was already in front and there are several, it moves to the next, like ❖`).
+// was already in front and there are several, it moves to the next, like ❖`). A window on this desktop
+// comes first; with none here it jumps to the desktop of the app's latest window.
 export function dockActivate(e) {
   if (e.launcher) { e.onOpen?.(); return; }
   if (!e.windows.length) { if (!launchDockItem(e.id) && e.launcherId) launchApp(e.launcherId); return; }
   const top = wm.focused();
-  const idx = e.windows.findIndex((w) => w.id === top);
-  const next = idx >= 0 && e.windows.length > 1 ? e.windows[(idx + e.windows.length - 1) % e.windows.length] : e.windows[e.windows.length - 1];
+  const here = e.windows.filter(onActiveDesktop);
+  const idx = here.findIndex((w) => w.id === top);
+  const next = idx >= 0 && here.length > 1 ? here[(idx + here.length - 1) % here.length] : pickWindow(e.windows, activeDesktop.get());
   wm.focus(next.id);
 }
 
@@ -238,16 +248,13 @@ export function quitApp(wins) {
   for (const w of [...wins]) wm.close(w.id);
 }
 
-// ❖Q quits the app in front (only in the session: an isolated app never receives ❖Q).
-addListener('keydown', (e) => {
-  if (!e.meta || e.ctrl || e.alt || e.shift || e.repeat) return;
-  if (String(e.base || e.key || '').toLowerCase() !== 'q') return;
-  if (typeof lord !== 'undefined' && typeof lord.appId === 'string') return;
+// ❖Q quits the app in front (sdk/shortcuts.js: only in the session, an isolated app never receives ❖Q).
+export function quitFrontApp() {
   const top = wm.get(wm.focused());
   if (!top) return;
   const key = launcherIdOf(top);
   quitApp(windows.get().filter((w) => launcherIdOf(w) === key));
-});
+}
 
 // ---- quick actions ----
 
@@ -288,7 +295,7 @@ export function dockMenu(e, opts = {}) {
   if (quick.length) items.push(...quick, '-');
   if (e.windows.length) {
     for (const w of [...e.windows].reverse()) {
-      items.push({ label: windowTitle(w) || e.name, checked: w.id === top, hint: w.minimized ? '–' : '', onClick: () => wm.focus(w.id) });
+      items.push({ label: `${windowTitle(w) || e.name}${desktopSuffix(w)}`, checked: w.id === top, hint: w.minimized ? '–' : '', onClick: () => wm.focus(w.id) });
     }
     items.push('-');
   }
@@ -307,6 +314,20 @@ export function dockMenu(e, opts = {}) {
     // where the app lives, when Files can open it (a .lpk's folder; a .desktop of the user's own)
     if (p.kind === 'lpk' && getApp(p.key)?.dir) options.push({ label: t('shell.dock.showInFiles'), onClick: () => wm.open('files', { args: { path: getApp(p.key).dir } }) });
     if (p.kind === 'desktop' && e.app?.user) options.push({ label: t('shell.dock.showInFiles'), onClick: () => wm.open('files', { args: { path: '~/.local/share/applications' } }) });
+    // Open at Login (0.8.5): started through the same safe path as a Dock click, once per session
+    if (p.kind !== 'shell') {
+      const on = loginApps().includes(e.id);
+      options.push({ label: t('shell.dock.openAtLogin'), checked: on, onClick: () => settings.set({ loginApps: on ? loginApps().filter((x) => x !== e.id) : [...loginApps(), e.id] }) });
+    }
+    // Assign to a display (0.8.5): its new windows open there; by the display's connector (two monitors
+    // of the same model share a name), kept across boots
+    if (screen.displays.length > 1 && e.launcherId) {
+      const cur = assignedDisplay((settings.get().appDisplays || {})[e.launcherId]);
+      const set = (name) => { const m = { ...(settings.get().appDisplays || {}) }; if (name) m[e.launcherId] = name; else delete m[e.launcherId]; settings.set({ appDisplays: m }); };
+      options.push('-', { label: t('shell.dock.assignTo'), disabled: true });
+      screen.displays.forEach((d, i) => options.push({ label: t('shell.dock.assignDisplay', { n: i + 1, name: d.name || '' }).trim(), checked: cur === d, onClick: () => set(displayKey(d)) }));
+      options.push({ label: t('shell.dock.assignNone'), checked: !cur, onClick: () => set('') });
+    }
     if (options.length) items.push({ label: t('shell.dock.options'), submenu: options }, '-');
   }
   if (e.windows.length) {
@@ -422,3 +443,25 @@ addListener('keydown', (e) => {
   clearTimeout(holdTimer);
   if (dockDrag.get()) { endedAt = Date.now(); dockDrag.set(null); }
 });
+
+// ---- Open at Login and display assignments (0.8.5) ----
+const loginApps = () => (Array.isArray(settings.get().loginApps) ? settings.get().loginApps : []);
+// An assignment is the display's connector ("HDMI-A-1"); one saved before by name still works while
+// that name belongs to a single display.
+const displayKey = (d) => d.connector || d.name;
+function assignedDisplay(v) {
+  if (!v) return null;
+  const byConn = screen.displays.find((x) => x.connector && x.connector === v);
+  if (byConn) return byConn;
+  const byName = screen.displays.filter((x) => x.name === v);
+  return byName.length === 1 ? byName[0] : null;
+}
+setDisplayAssignment((key) => {
+  const d = assignedDisplay((settings.get().appDisplays || {})[key]);
+  return d ? d.id : null;
+});
+// once per session, a few seconds after it starts (never in the live system's first run, never in an
+// isolated app's process), each through launchDockItem: the same safe paths as a Dock click
+if (typeof lord !== 'undefined' && typeof lord.appId !== 'string' && typeof lord.greeter === 'undefined' && !isLiveSystem()) {
+  setTimeout(() => { for (const id of loginApps()) { if (restoredIds.has(id)) continue; try { launchDockItem(id); } catch (e) { /* uninstalled */ } } }, 3000);
+}

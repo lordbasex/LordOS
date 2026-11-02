@@ -19,14 +19,14 @@ Es la primera pregunta que tiene que hacerse un lector cuidadoso, así que acá 
 | Tipo de app | Proceso propio | Caja de arena (Landlock + seccomp) | cgroup por app | Broker y permisos | Firewall por app |
 |---|---|---|---|---|---|
 | Apps `.lpk` instaladas | sí | sí | sí, con límites de memoria y CPU | sí | sí |
-| Contraseñas (hoy la única app incluida con proceso propio) | sí | sí | sí | sí | sí |
-| Otras apps incluidas (Archivos, Ajustes, Mail, Terminal…) | no, corren dentro de `lord-server` | no | no (cuentan como "LordOS") | su uso de cámara, micrófono y pantalla se revisa en C | sí, como "LordOS" |
+| Contraseñas, Mail, Calendario, Contactos y Recordatorios (apps incluidas con proceso propio; las últimas cuatro desde 0.8.2) | sí | sí | sí | sí | sí |
+| Otras apps incluidas (Archivos, Ajustes, Terminal…) | no, corren dentro de `lord-server` | no | no (cuentan como "LordOS") | su uso de cámara, micrófono y pantalla se revisa en C | sí, como "LordOS" |
 | Apps de Linux abiertas desde el lanzador de apps (apt, la Tienda) | sí, un proceso común | **no** de forma predeterminada; con "sin acceso a tus archivos", espacios de nombres propios y Landlock | sí, `app-lordos-<id>.scope`, sin límites | **no** | **sí**, más las restricciones que fijes (cámara, micrófono, USB, Bluetooth, archivos, notificaciones) |
-| Programas iniciados desde la Terminal | sí | no | comparten el lugar de la Terminal en el árbol | no | como "LordOS" |
+| Programas iniciados desde la Terminal | sí | no | comparten el lugar de la Terminal en el árbol | no | como "Terminal", con sus propias reglas (desde 0.8.5; antes, como "LordOS") |
 
 O sea: **LordOS no encierra a las apps de Linux en una caja de arena de forma predeterminada.** Corren como tu usuario, exactamente como en cualquier sistema Debian, y pueden leer tu carpeta personal. Lo que LordOS les suma es atribución (el Monitor sabe qué app hizo cada conexión), el firewall por app que aplica el kernel y las restricciones que elijas para una app: sin cámara, sin micrófono, sin USB, sin sockets Bluetooth, sin notificaciones y "sin acceso a tus archivos", que desde su próximo inicio abre la app en sus propios espacios de nombres, con una carpeta personal vacía que solo tiene sus propias carpetas. LordOS no usa ni integra Flatpak, y no se probó.
 
-Las apps incluidas son parte del código propio del sistema y se revisan junto con él; no tienen el aislamiento por proceso que tienen los paquetes de terceros, con la excepción de Contraseñas, porque guarda tus secretos.
+Las apps incluidas son parte del código propio del sistema y se revisan junto con él; la mayoría no tiene el aislamiento por proceso que tienen los paquetes de terceros. Las excepciones son Contraseñas, porque guarda tus secretos, y, desde 0.8.2, Mail, Calendario, Contactos y Recordatorios, porque leen lo que llega de internet: cada una corre como su propio proceso aislado y llega al correo y a tu llavero solo con pedidos al broker permitidos para esa app y ninguna otra.
 
 ## Cómo funciona la caja de arena
 
@@ -80,13 +80,23 @@ Permisos que una app puede declarar: archivos, portapapeles, notificaciones, red
 
 **¿Y las apps que necesitan más privilegios?** No hay forma de que una app `.lpk` obtenga root ni capacidades extra. Todo lo que en LordOS necesita root pasa por una lista cerrada de acciones validadas (`server/src/admin.c`), y JavaScript no puede ejecutar comandos arbitrarios. Las apps de Linux se comportan como en cualquier sistema Debian: si un programa necesita `sudo`, lo corrés vos en la Terminal.
 
+## LordOS verifica su propio código antes de ejecutarlo
+
+Desde 0.8.2, cada paquete de código que LordOS ejecuta como propio (los temas con el shell y cada app nativa, la pantalla de inicio de sesión, el anfitrión de las apps aisladas y las apps del sistema que corren como proceso propio) figura con su SHA-256 en un manifiesto firmado con la clave de versiones de LordOS (Ed25519). `lord-server` verifica la firma con la clave pública compilada adentro, y el hash de cada paquete con la misma lectura con la que lo carga, así que no hay un momento en el que se pueda cambiar el archivo. Un paquete que no coincide no se ejecuta: el escritorio pasa a otro tema y lo avisa, o muestra una pantalla de recuperación que explica cómo repararlo, nunca una pantalla en blanco. Acerca de LordOS muestra "Verificado", o "Compilación de desarrollo" para un árbol de desarrollo sin firmar. Esto protege de los cambios hechos por procesos que no son root y de la modificación sin conexión; root todavía puede reemplazar el propio `lord-server`, algo que una fase posterior (fs-verity, imágenes A/B) debe cubrir.
+
+## Comprobalo en tu propia computadora (desde 0.8.5)
+
+Desde 0.8.5, **Información del sistema** (Acerca de LordOS → Informe del sistema…) tiene una pestaña Verificaciones que pone a prueba estas afirmaciones en la computadora que tenés adelante: el servidor gráfico sin root, Landlock, el firewall por app, el código verificado, el escritorio remoto cerrado cuando está apagado, los scopes de las apps en manos del sistema. Cada verificación dice si el mecanismo solo se encontró *configurado* o si de verdad se *probó*. **Probar** inicia la Prueba del aislamiento, una app de prueba oculta que arranca exactamente como cualquier app aislada e intenta, dentro de la misma caja de arena, lo que no debe poder hacer: tus archivos y los del sistema, sockets, `ptrace`, un espacio de nombres de usuario, `mount`, `exec`, salir de su scope. También intenta lo que la caja de arena de los decodificadores debe rechazar, y le pide al broker cosas que debe negar. La prueba nunca recibe un permiso ni acceso a la red, y no se envía nada a ningún lado.
+
+[[shot:6]]
+
 ## Los ayudantes que leen datos no confiables
 
-Los archivos que vienen de afuera son la puerta de entrada clásica. LordOS los abre en procesos chicos y separados que están todavía más encerrados que las apps: `lord-doc` (PDF, archivos comprimidos, fuentes), `lord-media` (video, música, fotos, cámara), `lord-maild` (correo, calendarios, contactos) y `lord-vault` (contraseñas). No tienen red, no pueden crear sockets, no pueden ejecutar programas y solo pueden crear hilos, no procesos. No abren rutas: `lord-server` abre los archivos y se los pasa como descriptores. Si seccomp no se puede aplicar, el ayudante termina en lugar de correr sin encierro. Un PDF malicioso puede tumbar a `lord-doc`, pero no al escritorio.
+Los archivos que vienen de afuera son la puerta de entrada clásica. LordOS los abre en procesos chicos y separados que están todavía más encerrados que las apps: `lord-doc` (PDF, archivos comprimidos, fuentes), `lord-media` (video, música, fotos, cámara), `lord-maild` (correo, calendarios, contactos) y `lord-vault` (contraseñas). No tienen red, no pueden crear sockets, no pueden ejecutar programas y solo pueden crear hilos, no procesos. No abren rutas: `lord-server` abre los archivos y se los pasa como descriptores. Si seccomp no se puede aplicar, el ayudante termina en lugar de correr sin encierro. Un PDF malicioso puede tumbar a `lord-doc`, pero no al escritorio. Desde la 0.8.5 `lord-fetch` (las listas de bloqueo del firewall) y `lord-tls` (el HTTPS de la Tienda) están encerrados de la misma forma y tampoco pueden crear sockets: solo reciben una conexión que `lord-server` o la Tienda abrió por ellos. Desde la 0.8.7 `lord-lan` lee de la misma forma lo que vuelve de la red local para Archivos → Red, sin sockets ni archivos, y `lord-rdesk`, la conexión de Remote Desk, queda aislado apenas se conecta: sin sockets nuevos y sin programas. El `lord-bench` de LordBench (desde la 0.8.6) corre sus pruebas bajo el mismo encierro.
 
 ## Ventanas protegidas
 
-Una ventana se puede marcar como protegida. La de Contraseñas lo está. Sus píxeles salen en negro en las capturas de LordOS, las grabaciones de pantalla, las miniaturas y el escritorio remoto, mientras el monitor real la muestra normal. Las apps de Linux no pueden capturar la pantalla a través de LordOS: el compositor no les ofrece ningún protocolo de captura, no hay servidor X, y a una app restringida también se le niega el dispositivo de framebuffer.
+Una ventana se puede marcar como protegida. La de Contraseñas lo está. Sus píxeles salen en negro en las capturas de LordOS, las grabaciones de pantalla, las miniaturas y el escritorio remoto, mientras el monitor real la muestra normal. Las apps de Linux no pueden capturar la pantalla a través de LordOS: el compositor no les ofrece ningún protocolo de captura, las apps X11 (con Xwayland desde 0.8.3) solo se ven entre ellas, nunca a las apps Wayland, la pantalla de LordOS ni Contraseñas, y a una app restringida también se le niega el dispositivo de framebuffer.
 
 [[shot:5]]
 

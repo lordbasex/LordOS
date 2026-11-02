@@ -5,7 +5,7 @@ import { standaloneDesktop } from '@lordos/sdk';
 // server is installed, the first time, with the package engine's own pkg-install action.
 import {
   View, Text, Button, Toggle, Segmented, TextInput, useTheme, useLocale, useStore, admin, remote, remoteViewers, sshLogin, remoteCidr,
-  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale,
+  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, Layer, useAppWindow, wm,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Message, StatusDot, tint } from './ui.jsx';
@@ -250,6 +250,127 @@ function SshSection({ isAdmin, ips, user, hostname }) {
   );
 }
 
+// Advanced: root over SSH (0.8.5, ssh-root* admin actions, server/src/remote/ssh_root.c; docs/REMOTE.md).
+// Off by default. Keys only (PermitRootLogin prohibit-password) or keys and password; every change asks
+// for the administrator's own password again, checked as root.
+function RootSshSection({ ips, hostname }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [st, setSt] = useState(null);             // { mode, password, keys: [{ type, fp, comment }] }
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [ask, setAsk] = useState(null);           // { label, run: (pw) => Promise } waiting for the admin password
+  const [pw, setPw] = useState('');
+  const [keyText, setKeyText] = useState('');
+  const [rootPw, setRootPw] = useState(['', '']);
+  const [picking, setPicking] = useState(false);
+  const win = useAppWindow();
+  const load = () => {
+    const s = { mode: 'off', password: false, keys: [] };
+    admin.run('ssh-root-status', '', (line) => {
+      const w = String(line).split(' ');
+      if (w[0] === 'mode') s.mode = w[1];
+      else if (w[0] === 'password') s.password = w[1] === 'set';
+      else if (w[0] === 'key') s.keys.push({ type: w[1], fp: w[2], comment: w.slice(3).join(' ') === '-' ? '' : w.slice(3).join(' ') });
+    }, { quiet: true }).then(() => setSt(s), () => setSt(s));
+  };
+  useEffect(load, []);
+  const confirm = (label, run) => { setMsg(null); setPw(''); setAsk({ label, run }); };
+  const go = () => {
+    const a = ask;
+    const p = pw;
+    setAsk(null);
+    setPw('');
+    setBusy(true);
+    a.run(p).then((ok) => setMsg({ ok: true, text: statusText(ok) }), (e) => setMsg({ ok: false, text: e.message })).finally(() => { setBusy(false); load(); });
+  };
+  if (!st) return null;
+  const setMode = (m) => {
+    if (m === st.mode) return;
+    confirm(tr(`settings.sharing.root.confirm.${m}`), (p) => admin.run('ssh-root', `${m}\n${p}`, null, { quiet: true }));
+  };
+  const addKey = () => {
+    const line = keyText.trim();
+    if (!line) return;
+    confirm(tr('settings.sharing.root.confirm.addKey'), (p) => admin.run('ssh-root-key', `add\n${p}\n${line}`, null, { quiet: true }).then((r) => { setKeyText(''); return r; }));
+  };
+  const setRootPassword = () => {
+    if (!rootPw[0] || rootPw[0] !== rootPw[1]) { setMsg({ ok: false, text: tr('settings.sharing.root.mismatch') }); return; }
+    const np = rootPw[0];
+    confirm(tr('settings.sharing.root.confirm.password'), (p) => admin.run('ssh-root-password', `${p}\n${np}`, null, { quiet: true }).then((r) => { setRootPw(['', '']); return r; }));
+  };
+  const on = st.mode !== 'off';
+  const target = ips[0] || hostname || '';
+  return (
+    <>
+      <Section title={tr('settings.sharing.root.title')} footer={tr('settings.sharing.root.footer')}>
+        <SettingRow label={tr('settings.sharing.root.mode')} hint={tr(`settings.sharing.root.modeHint.${st.mode}`)}>
+          <Segmented small value={st.mode} onChange={(m) => { if (!busy) setMode(m); }}
+            options={[['off', tr('settings.sharing.root.off')], ['key', tr('settings.sharing.root.keys')], ['password', tr('settings.sharing.root.keysAndPassword')]]} />
+        </SettingRow>
+        {on && target ? (
+          <Text style={{ paddingVertical: spacing.s, fontSize: typeScale.headline, fontWeight: 600, color: t.accent, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' }}>{`ssh root@${target}`}</Text>
+        ) : null}
+        <View style={{ paddingVertical: spacing.s, gap: 6 }}>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('settings.sharing.root.keysTitle')}</Text>
+          {st.keys.length ? st.keys.map((k) => (
+            <View key={k.fp} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{k.comment || k.type}</Text>
+                <Text style={{ fontSize: 11, color: t.textDim, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start' }}>{`${k.type} ${k.fp}`}</Text>
+              </View>
+              <Button small destructive label={tr('settings.sharing.root.remove')} disabled={busy}
+                onClick={() => confirm(tr('settings.sharing.root.confirm.removeKey'), (p) => admin.run('ssh-root-key', `remove\n${p}\n${k.fp}`, null, { quiet: true }))} />
+            </View>
+          )) : <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('settings.sharing.root.noKeys')}</Text>}
+          <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}>
+            <View style={{ flex: 1 }}><TextInput value={keyText} onChange={setKeyText} placeholder={tr('settings.sharing.root.keyPlaceholder')} /></View>
+            <Button small label={tr('settings.sharing.root.importFile')} disabled={busy} onClick={() => setPicking(true)} />
+            <Button small label={tr('settings.sharing.root.addKey')} disabled={busy || !keyText.trim()} onClick={addKey} />
+          </View>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('settings.sharing.root.createHint')}</Text>
+        </View>
+        {st.mode === 'password' ? (
+          <View style={{ paddingVertical: spacing.s, gap: 6 }}>
+            <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(st.password ? 'settings.sharing.root.passwordSet' : 'settings.sharing.root.passwordUnset')}</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}>
+              <View style={{ flex: 1 }}><TextInput secure value={rootPw[0]} onChange={(v) => setRootPw([v, rootPw[1]])} placeholder={tr('settings.sharing.root.newPassword')} /></View>
+              <View style={{ flex: 1 }}><TextInput secure value={rootPw[1]} onChange={(v) => setRootPw([rootPw[0], v])} placeholder={tr('settings.sharing.root.repeatPassword')} /></View>
+              <Button small label={tr('settings.sharing.root.setPassword')} disabled={busy || !rootPw[0]} onClick={setRootPassword} />
+            </View>
+          </View>
+        ) : null}
+        {ask ? (
+          <View style={{ marginVertical: spacing.s, padding: spacing.m, gap: spacing.s, borderRadius: 8, backgroundColor: 'rgba(255,159,10,0.14)' }}>
+            <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start', lineHeight: 1.4 }}>{ask.label}</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}>
+              <View style={{ flex: 1 }}><TextInput secure autoFocus value={pw} onChange={setPw} onSubmit={() => { if (pw) go(); }} placeholder={tr('settings.sharing.root.adminPassword')} /></View>
+              <Button small label={tr('settings.sharing.root.cancel')} onClick={() => { setAsk(null); setPw(''); }} />
+              <Button small primary label={tr('settings.sharing.root.authorize')} disabled={!pw} onClick={go} />
+            </View>
+          </View>
+        ) : null}
+      </Section>
+      {on ? <Note tone="warn">{tr('settings.sharing.root.activeWarning')}</Note> : null}
+      <Message msg={msg} />
+      {picking ? (() => {
+        // over this Settings window, in the modal layer (the page itself scrolls); starts in ~/.ssh
+        const g = wm.frame(wm.get(win.id) || {});
+        let start = fs.home();
+        try { if (fs.stat(`${start}/.ssh`)?.dir) start = `${start}/.ssh`; } catch (e) { /* no ~/.ssh */ }
+        return (
+          <Layer name="modal">
+            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+              <FilePicker title={tr('settings.sharing.root.importFile')} filter={/\.pub$/} start={start} onClose={() => setPicking(false)}
+                onPick={(paths) => { setPicking(false); const p = [].concat(paths)[0]; try { setKeyText(String(fs.read(p)).split('\n')[0].trim()); } catch (e) { setMsg({ ok: false, text: e.message }); } }} />
+            </View>
+          </Layer>
+        );
+      })() : null}
+    </>
+  );
+}
+
 export function SharingSettings() {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -315,6 +436,7 @@ export function SharingSettings() {
         ))}
       </Section>
       <SshSection isAdmin={isAdmin} ips={ips} user={info.user} hostname={info.hostname} />
+      {isAdmin && sshLogin.status().installed ? <RootSshSection ips={ips} hostname={info.hostname} /> : null}
     </Stack>
   );
 }

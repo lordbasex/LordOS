@@ -12,16 +12,16 @@ curl -fsSL https://lordos.org/install.sh | sh
 The script asks before changing anything. It reads the answers from the terminal (`/dev/tty`), so
 this works even though the script itself comes through a pipe.
 
-> **Status (2026-10-18):** 0.8.0-beta is published, but the repository is still private, so the download from
-> GitHub doesn't work publicly yet. Until then, use `--deb` with a package you already have (see
-> [Testing](#testing)).
+> **Status (2026-11-01):** the latest release is 0.8.7-beta, and the GitHub repository is now public, so
+> the installer can look up and download its release files. Without access to GitHub, use `--deb` with a
+> package you already have (see [Testing](#testing)).
 
 ## Requirements
 
 | | |
 |---|---|
 | System | Debian 13 (trixie). A derivative based on trixie (`ID_LIKE=debian`) works, with a warning: only Debian itself is tested. |
-| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. |
+| Architecture | `amd64` or `arm64`. On a Raspberry Pi 5 the [Raspberry Pi image](RASPBERRY.md) is the recommended path (tested kernel and boot setup); the installer says so and continues. An arm64 virtual machine doesn't need this page: since 0.8.7 there is an [arm64 live ISO](ISO.md). |
 | Rights | root, or a user who can use `sudo` |
 | Disk | at least 2 GB free on `/var` (the package plus the dependencies apt pulls in) |
 | Init | systemd running (Debian's default) |
@@ -48,7 +48,12 @@ this works even though the script itself comes through a pipe.
 5. **Sets up LordOS** like the ISO:
    - creates the `lordos-greeter` system user (the login screen's user) if it doesn't exist;
    - adds your user (the one who ran `sudo`, or `--user NAME`) to whichever of these groups exist:
-     `audio video input render lpadmin pipewire plugdev`. It does **not** add anyone to `sudo`;
+     `audio video input render lpadmin pipewire plugdev`. If the system has no administrator at all (a Debian
+     installed with a root password), it also offers to make that user one, by adding them to `sudo`: the Store
+     can't install or update without an administrator. Otherwise it does **not** add anyone to `sudo`.
+     A system installed before this (the Store refuses with "<user> is not an administrator" and nobody is one)
+     is rescued from the Store itself since 0.8.7: under the refusal it asks for the root password and adds
+     the session user to `sudo`, effective after a reboot;
    - generates the `en_US`, `es_ES` and `pt_BR` UTF-8 locales (the languages the interface ships).
      Your system language is not changed;
    - writes `/etc/lordos/session.conf` with an empty `AUTOLOGIN=`: the login screen, no automatic
@@ -68,7 +73,14 @@ this works even though the script itself comes through a pipe.
      (`NETWORK.md`). Only interfaces nobody manages get LordOS's DHCP;
    - **remote desktop**, which stays off (port 5673 closed; Settings → Sharing turns it on);
    - your home folder and your current desktop session. The display manager is only disabled for
-     the next boot; nothing is stopped while you are using it.
+     the next boot; nothing is stopped while you are using it;
+   - **browsers.** The ISO and the Raspberry Pi image preinstall Chromium and Firefox ESR; the
+     installer doesn't (decided in 0.8.4.1): it also runs on servers and VPSs, where a few hundred
+     megabytes of browsers are unwanted, and on a desktop Debian (or Raspberry Pi OS) the browser you
+     already have keeps working inside LordOS. Install one from the Store if the system has none.
+     Without the image's defaults (`tools/iso/browser-defaults.sh`) the browsers start with the
+     LordOS frame; Settings → Appearance → «Browsers: tabs in the title bar» switches them to their
+     own single bar.
 7. **Prints** what changed, how to start LordOS and how to uninstall.
 
 What it changed is recorded in `/var/lib/lordos-installer/state`, so `--uninstall` undoes exactly
@@ -91,8 +103,8 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- [options]
 |---|---|
 | `-y`, `--yes` | don't ask (also `LORDOS_YES=1`). With it, the display manager **is** disabled; add `--keep-display-manager` to avoid that |
 | `--version X` | install release `X` (`0.8.0-beta` or `v0.8.0-beta`) instead of the latest |
-| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified |
-| `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root with no `sudo`, nobody) |
+| `--deb FILE` | install a local `.deb`. If a `SHA256SUMS` is next to it, it is checked; otherwise the output says the checksum was not verified. (0.8.7) The `lordos-hwdata_<date>_all.deb` the package depends on (the signed tested-hardware snapshot) is taken from the same folder, checked the same way |
+| `--user NAME` | the user to set up (default: the user who ran `sudo`; as plain root, who logged in, or the only regular user) |
 | `--keep-display-manager` | leave the current display manager enabled; LordOS is not enabled at boot |
 | `--no-extras` | don't install the extra sound and font packages |
 | `--boot-splash` | set up the LordOS boot splash without asking (see "Boot splash (optional)") |
@@ -117,7 +129,7 @@ At the end the installer asks whether to show the LordOS boot splash (the crown 
   (`/etc/default/grub` and `/etc/default/grub.d/*.cfg`) don't already have `splash`/`nosplash` or a
   `GRUB_THEME`, and the terminal isn't `console`/`serial`, it writes its own drop-in
   `/etc/default/grub.d/lordos.cfg` (`splash` added to `GRUB_CMDLINE_LINUX_DEFAULT`,
-  `GRUB_GFXPAYLOAD_LINUX=keep` and, on amd64, the LordOS boot menu as `GRUB_THEME`) and runs
+  `GRUB_GFXPAYLOAD_LINUX=keep` and the LordOS boot menu as `GRUB_THEME`, on arm64 too since 0.8.7) and runs
   `update-grub`. `/etc/default/grub` itself is never edited. Without GRUB (systemd-boot, a
   Raspberry Pi), only the theme is set and the final message says to add `quiet splash` to the kernel
   command line.
@@ -141,7 +153,7 @@ curl -fsSL https://lordos.org/install.sh | sh -s -- --remote-desktop --remote-po
 installer enables `lordos.service` (as on any machine without one), so `lord-sessiond` starts at
 boot and serves the login screen and the sessions over the remote desktop. Apps, Linux apps, the
 firewall and the rest of the desktop work as on a PC; without a GPU everything is drawn on the CPU.
-The remote desktop has no audio yet.
+The remote desktop carries the session's sound (Opus over WebRTC) since 0.8.4.
 
 **What `--remote-desktop` does:**
 
@@ -229,7 +241,7 @@ sudo reboot
 | `LordOS needs Debian 13 (trixie)` | Debian 12 and testing/unstable are not supported: the package depends on trixie's library versions. |
 | Black screen or back to text after the reboot | Switch to tty2 (Ctrl+Alt+F2), log in, and look at `journalctl -b -u lordos`. To go back to your desktop meanwhile, see "Switching back" above. |
 | The previous desktop still appears | The display manager was kept (`--keep-display-manager` or "no" to the question). Disable it as shown in the final message. |
-| No sound | Log out and in again (the new groups and linger apply on the next login), and check `systemctl --user status pipewire wireplumber`. |
+| No sound | Reboot (the new groups and linger apply on the next boot; a logout was not enough on a reported machine), and check `systemctl --user status pipewire wireplumber`. |
 | Network changed | It shouldn't: interfaces managed by NetworkManager, ifupdown or systemd-networkd are left alone. If an interface nobody managed now has a DHCP address, that is LordOS's DHCP (`NETWORK.md`); Settings → Network turns it off. |
 
 ## For maintainers
@@ -245,7 +257,7 @@ sudo reboot
 - `shellcheck -s sh tools/install/install.sh` must be clean (also `-s dash`, Debian's `/bin/sh`).
 - Release layout the script expects: tag `vX`, assets `SHA256SUMS` (`sha256sum` format), the
   `lordos_<version>_<arch>.deb` files listed in it (the version inside the name doesn't have to match
-  the tag), and later `SHA256SUMS.sig`.
+  the tag), and `SHA256SUMS.sig` (required: without it the script stops).
 
 ### Testing
 

@@ -1,0 +1,145 @@
+{
+  "meta": ["Cómo usar LordOS Imager · LordOS", "Grabá LordOS en una tarjeta SD o un pendrive y prepará el primer arranque de la Raspberry Pi 5, pantalla por pantalla: dispositivo, imagen del sistema, almacenamiento, personalización, grabación y primer arranque."],
+  "kicker": "Guía · LordOS Imager",
+  "title": "Cómo usar LordOS Imager",
+  "lead": "Grabá LordOS en una tarjeta SD o un pendrive desde tu computadora y prepará el primer arranque de la Raspberry Pi 5. Pantalla por pantalla, en unos diez minutos.",
+  "version": "Versión {v} · libre y de código abierto · no recopila nada",
+  "alsoIn": "¿Ya usás LordOS? Está en Apps → Sistema.",
+  "hello": "¡Hola, soy Lumo! Te acompaño en cada pantalla.",
+  "heroAlt": "LordOS Imager: elegí tu dispositivo",
+  "needTitle": "Qué necesitás",
+  "need": [
+    ["Tu computadora", "Con LordOS Imager instalado y conexión a internet para la descarga."],
+    ["Una tarjeta SD o un pendrive", "Mejor de 16 GB o más (8 GB como mínimo). Se borra todo lo que tenga."],
+    ["Una Raspberry Pi 5", "Con 4 GB de memoria como mínimo; con 8 o 16 GB el escritorio va más fluido. Se recomiendan un ventilador y la fuente de 27 W."],
+    ["Unos diez minutos", "Casi todo es la descarga y la grabación, que avanzan solas."]
+  ],
+  "videoTitle": "Miralo primero",
+  "videoLead": "Un recorrido corto por cada paso, narrado en inglés, con subtítulos en inglés, español y portugués.",
+  "videoSoon": "Video muy pronto",
+  "videoSoonText": "Mientras tanto, cada paso está acá abajo con su captura.",
+  "videoCredit": "Narración: Kokoro TTS, voz Michael (Apache 2.0)",
+  "videoFallback": "Tu navegador no puede reproducir este video. Descargalo:",
+  "tocLabel": "Pasos",
+  "stepWord": "Paso",
+  "tipFrom": "El consejo de Lumo",
+  "open": "Ver más grande",
+  "steps": [
+    {
+      "id": "device", "title": "Elegí tu dispositivo",
+      "text": "Elegí **Raspberry Pi 5** para preparar una tarjeta SD para la placa, o **PC (pendrive USB)** para grabar el sistema en vivo para una computadora. Debajo de la Pi, una barra muestra cuánta memoria necesita.",
+      "points": ["4 GB es el mínimo, 8 GB es cómodo y 16 GB da el mejor rendimiento.", "Solo se pueden elegir las placas que LordOS realmente soporta."],
+      "shots": [["01-device", "Paso 1: el dispositivo, con la recomendación de memoria para la Raspberry Pi 5"]],
+      "tip": ["wave", "Sin adivinar", "Si tu placa todavía no está soportada, te lo digo en vez de dejarte grabar una tarjeta que no va a arrancar."]
+    },
+    {
+      "id": "image", "title": "Elegí la imagen del sistema",
+      "text": "La última versión de LordOS ya viene elegida y marcada **Firmada por LordOS**. La descarga se guarda, así la próxima tarjeta es más rápida.",
+      "points": ["Las versiones anteriores están a un clic.", "También podés usar un archivo de imagen propio (`.img`, `.img.xz` o `.iso`). Se graba y se verifica, pero nadie responde por su origen."],
+      "shots": [["02-image", "Paso 2: la última versión firmada de LordOS"]],
+      "tip": ["shield", "Solo imágenes firmadas", "Las imágenes oficiales se verifican con la clave de publicación de LordOS antes de borrar nada."]
+    },
+    {
+      "id": "storage", "title": "Elegí la tarjeta o el pendrive",
+      "text": "Poné la tarjeta SD (con un lector si tu computadora lo necesita) o conectá el pendrive. Aparece sola, con su nombre y su tamaño. Elegila y leé el aviso en rojo: se borra todo lo que tenga.",
+      "points": ["Solo se muestran unidades extraíbles. Los discos de tu computadora nunca aparecen acá.", "Una tarjeta demasiado chica o protegida contra escritura aparece en gris, con el motivo."],
+      "shots": [["04-storage", "Paso 3: la tarjeta SD elegida, con el aviso de borrado"]],
+      "tip": ["wave", "Se borra todo", "Copiá antes lo que quieras conservar de la tarjeta."]
+    },
+    {
+      "id": "customise", "title": "Personalizá el primer arranque",
+      "text": "Dejá activado **Preparar el primer arranque** y la placa arranca lista: su nombre, tu cuenta, el Wi-Fi, el acceso remoto, la apariencia y la refrigeración. Son siete pestañas y todo se puede cambiar después en Ajustes. (Para un pendrive de PC no hay nada que personalizar: este paso se saltea.)",
+      "subs": [
+        ["05-tab-general", "General", "El **nombre de la computadora** es cómo vas a encontrar la placa en tu red: acá `lordos-pi`, o sea `lordos-pi.local`. Después, el idioma, la zona horaria, la distribución del teclado y el país del Wi-Fi."],
+        ["06-tab-user", "Usuario", "Tu cuenta de administrador: nombre completo, nombre de usuario y una contraseña escrita dos veces. A la tarjeta solo va un hash de un solo sentido de la contraseña. El inicio de sesión automático es opcional."],
+        ["07-tab-wifi", "Wi-Fi", "El nombre de la red tal como aparece (las mayúsculas cuentan) y su contraseña. La tarjeta guarda la clave derivada de la red, nunca la contraseña que escribiste. También sirven las redes ocultas y abiertas."],
+        ["08-tab-remote", "Acceso remoto", "Inicio de sesión remoto (SSH): apagado, solo claves (lo recomendado) o contraseña y claves. También podés activar el escritorio remoto de LordOS; queda en tu red local."],
+        ["09-tab-look", "Apariencia", "Lord Flow o Lord Classic, claro u oscuro, un color de acento y un fondo de pantalla."],
+        ["10-tab-cooling", "Refrigeración", "Contale a LordOS qué enfría la placa y elige la curva del ventilador que corresponde. ¿No sabés cuál? Mirá [¿Qué refrigeración tengo?](#cooling)."],
+        ["11-tab-cooling-overclock", "Overclock suave", "Solo con ventilador: 2,6 GHz en lugar de 2,4 GHz, sin más voltaje. El aviso explica cómo deshacerlo."],
+        ["12-tab-more", "Más", "Bluetooth, la búsqueda automática de actualizaciones y una promesa: LordOS no recopila nada."],
+        ["13-profiles", "Perfiles", "Guardá estos ajustes para usarlos en la próxima tarjeta. Las contraseñas y las claves de Wi-Fi nunca se guardan: las escribís de nuevo."]
+      ],
+      "tip": ["shield", "Nada secreto en claro", "Tu contraseña y la del Wi-Fi nunca llegan a la tarjeta tal cual: solo un hash y una clave derivada."]
+    },
+    {
+      "id": "write", "title": "Revisá y grabá",
+      "text": "Un resumen de todo lo que elegiste y, al tocar **Borrar y grabar**, una última confirmación. Desde ahí el imager hace todo solo:",
+      "points": ["verifica la firma de la versión y después descarga la imagen (una descarga interrumpida se retoma);", "verifica la imagen, la graba y después lee toda la tarjeta y la compara;", "guarda los ajustes del primer arranque y expulsa la tarjeta."],
+      "shots": [["14-write-summary", "El resumen antes de grabar"], ["15-write-confirm", "La última confirmación"], ["16-downloading", "Descargando, con la velocidad y el tiempo restante"], ["17-writing", "Grabando la tarjeta"], ["18-verifying", "Leyendo la tarjeta y comparando"]],
+      "tip": ["run", "Dejala conectada", "Cancelar es seguro: la tarjeta se limpia para que nunca parezca grabada a medias. La descarga queda guardada."]
+    },
+    {
+      "id": "done", "title": "¡Listo!",
+      "text": "Lumo festeja y te muestra lo que sigue, con el nombre exacto de tu placa en la red y los comandos para el inicio de sesión remoto y el escritorio remoto. Un sonido y una notificación te avisan que terminó.",
+      "shots": [["19-done", "Listo: grabada, verificada y expulsada, con los próximos pasos"]]
+    },
+    {
+      "id": "firstboot", "title": "El primer arranque en la Raspberry Pi 5",
+      "text": "Poné la tarjeta en la placa, conectá el monitor, el teclado y el mouse, y después la fuente. Aparecen la corona de LordOS y una barra de progreso mientras el sistema crece hasta ocupar la tarjeta y aplica tus ajustes. En más o menos un minuto, la pantalla de inicio de sesión muestra tu cuenta.",
+      "points": ["Desde otra computadora de tu casa es `lordos-pi.local`.", "Inicio de sesión remoto: `ssh demo@lordos-pi.local`.", "Escritorio remoto, si lo activaste: `https://lordos-pi.local:5673`."],
+      "boot": [["docs/boot/splash-preview.png", "La pantalla de arranque durante el primer arranque"], ["docs/screenshots/greeter.png", "La pantalla de inicio de sesión (con cuentas de ejemplo)"]],
+      "tip": ["celebrate", "Bienvenida a casa", "El archivo de ajustes se aplica una sola vez y después se sobrescribe y se borra de la tarjeta."]
+    }
+  ],
+  "coolTitle": "¿Qué refrigeración tengo?",
+  "coolLead": "Elegí lo que tu placa tiene puesto. Define la curva del ventilador y la velocidad del procesador, y lo podés cambiar después en Ajustes.",
+  "cool": [
+    ["case-fan", "Caja con ventilador", "Una caja cerrada con su propio ventilador incorporado, enchufado al conector de ventilador de la placa. Muchas cajas de aluminio son así.", "¿Tenés una caja con ventilador? Elegí **Caja con ventilador**."],
+    ["active-cooler", "Disipador activo", "Un disipador chico con un ventilador encima, que se engancha directo sobre la placa.", "Elegí **Disipador activo**."],
+    ["passive", "Caja pasiva", "Una caja de metal o un disipador que enfría sin ningún ventilador.", "Elegí **Caja pasiva**."],
+    ["none", "Nada", "La placa sola. Funciona, pero con carga se frena sola en pocos minutos.", "Elegí **Nada**: un reloj más suave lo evita."]
+  ],
+  "profTitle": "Perfiles",
+  "profHead": ["Refrigeración", "Perfiles", "Qué hacen"],
+  "prof": [
+    ["Con ventilador (caja o disipador activo)", "**Equilibrado** (predeterminado), Rendimiento, Silencioso", "Equilibrado: el ventilador arranca a 55 °C. Rendimiento: desde 45 °C, y el procesador queda a toda velocidad. Silencioso: desde 60 °C."],
+    ["Caja pasiva", "**Equilibrado** (predeterminado), Conservador", "No hay ventilador que manejar. Conservador limita el reloj a 2,0 GHz."],
+    ["Nada", "**Conservador** (predeterminado), Equilibrado", "2,0 GHz, para que la placa sola no llegue a 85 °C y se frene."]
+  ],
+  "ocTitle": "Overclock suave (solo con ventilador)",
+  "ocText": "2,6 GHz en lugar de 2,4 GHz, sin más voltaje. No todas las placas son estables: si la tuya no arranca, abrí la partición de arranque de la tarjeta en otra computadora y borrá el bloque `lordos-firstrun` de `config.txt`.",
+  "optTitle": "Opciones de la app",
+  "optText": "**Opciones de la app**, abajo en la barra lateral: un sonido y expulsar al terminar, buscar actualizaciones de la app, idioma y apariencia, y la carpeta de descargas, con cuánto ocupa y un botón para vaciarla.",
+  "optShot": ["20-options", "Opciones de la app"],
+  "secTitle": "Seguro por diseño",
+  "secLead": "Lo que hace LordOS Imager para cuidar tu tarjeta, tu placa y a vos.",
+  "sec": [
+    ["Solo imágenes firmadas", "Antes de borrar nada, la lista de archivos de la versión se verifica con la clave de publicación de LordOS, y el SHA-256 de la imagen con esa lista. Mientras graba, la imagen se vuelve a calcular."],
+    ["Leída y comparada", "Después de grabar, se lee toda la tarjeta y se compara con lo que se grabó."],
+    ["Tu contraseña sigue siendo tuya", "Se convierte en un hash de un solo sentido antes de grabarse. El Wi-Fi se guarda como la clave derivada de la red."],
+    ["Se aplica una vez y se borra", "La placa revisa el archivo de ajustes de forma estricta, lo aplica una vez y después lo sobrescribe y lo borra. Un archivo inválido no aplica nada."],
+    ["Solo tarjetas y pendrives", "Los discos de tu computadora nunca aparecen, y tu computadora pide la aprobación de un administrador antes de abrir la unidad."],
+    ["No recopila nada", "Sin cuenta, sin datos de uso, sin informes de fallos. El imager solo habla con la página de versiones de LordOS para listar y descargar imágenes."]
+  ],
+  "secLink": "Cómo firma LordOS sus versiones",
+  "faqTitle": "Si algo no sale",
+  "faq": [
+    ["Mi tarjeta no aparece", "Solo aparecen unidades extraíbles: tarjetas SD y pendrives. Usá un lector si tu computadora no tiene ranura y esperá unos segundos: la lista se actualiza sola. Una tarjeta con la traba puesta, o de menos de 8 GB, aparece en gris con el motivo. Los discos de tu computadora nunca se muestran, a propósito."],
+    ["Dice que la firma no se pudo verificar", "Entonces no se grabó ni se borró nada. Los archivos descargados no coinciden con lo que firmó LordOS, casi siempre porque se cortó una descarga. Abrí **Opciones de la app → Descargas → Vaciar** y probá de nuevo. Si sigue pasando, avisanos (mirá la página de seguridad)."],
+    ["La placa no se conecta a mi Wi-Fi", "Revisá el nombre de la red (las mayúsculas cuentan), la contraseña y el país del Wi-Fi en **General**. Una red que solo acepta WPA3 necesita su contraseña en la placa: conectá un cable de red una vez y agregala en **Ajustes → Red**."],
+    ["No encuentro lordos-pi.local", "Dale un minuto o dos al primer arranque y fijate que tu computadora esté en la misma red (las redes de invitados suelen separar los equipos). La pantalla de inicio de sesión muestra la dirección de la placa en una esquina; podés usar esa dirección en lugar del nombre."],
+    ["¿Cómo entro por SSH?", "Si lo activaste: `ssh demo@lordos-pi.local` (con tu usuario y el nombre de tu computadora). Solo claves es lo más seguro. Lo podés activar o apagar después en **Ajustes → Compartir**. La cuenta root nunca inicia sesión."],
+    ["La placa no arranca después del overclock", "Poné la tarjeta en tu computadora, abrí su partición de arranque y borrá el bloque entre `# >>> lordos-firstrun` y `# <<< lordos-firstrun` de `config.txt`. La placa vuelve a arrancar a su velocidad normal."],
+    ["Me salteé la personalización. ¿Y ahora?", "La placa arranca en modo de configuración e inicia sesión sola. Creá tu cuenta en **Ajustes → Usuarios**; en el próximo arranque se borra la cuenta de configuración. Hasta entonces, no actives el escritorio remoto."],
+    ["¿Puedo grabar un pendrive para una PC?", "Sí: elegí **PC (pendrive USB)** en el paso 1. Graba el sistema en vivo de LordOS; arrancá la PC desde el pendrive para probarlo y después instalalo desde ahí."]
+  ],
+  "endTitle": "¿Listo? Bajá LordOS Imager",
+  "endText": "Libre y de código abierto. Cada imagen oficial se verifica con la firma de la versión antes de borrar nada.",
+  "endOther": "¿Preferís otra forma de grabar la tarjeta? Mirá la sección de descargas.",
+  "shotsNote": "Pantallas de LordOS Imager {v} con valores de ejemplo: usuario «demo», computadora «lordos-pi», red «HomeNetwork».",
+  "home": {
+    "title": "Cómo grabar LordOS en un pendrive o una tarjeta SD",
+    "lead": "Para la PC (ISO) y para la imagen de la Raspberry Pi 5.",
+    "badge": "Recomendado",
+    "steps": ["Elegí tu dispositivo y la última versión firmada de LordOS.", "Elegí la tarjeta o el pendrive y, para la Pi, prepará el primer arranque.", "Grabá: verifica la firma, graba y vuelve a leer la tarjeta."],
+    "guide": "Guía paso a paso",
+    "optTitle": "¿Preferís tu herramienta de siempre? Está bien.",
+    "optText": "Descargá la ISO o la imagen de la Raspberry Pi desde la versión, verificala con SHA256SUMS y grabala con cualquier app para grabar imágenes, o con `dd`. `/dev/sdX` es la tarjeta o el pendrive entero, no una partición.",
+    "optPc": "PC (ISO)",
+    "optPi": "Raspberry Pi 5",
+    "optVerify": "Cómo verificar la firma de SHA256SUMS",
+    "optPiSetup": "Sin LordOS Imager, la Pi arranca en modo de configuración. Para prepararla, poné `lordos-user.txt` y los archivos interruptor (`ssh`, `remote-desktop`) en la partición de arranque de la tarjeta antes del primer arranque.",
+    "optPiLink": "Archivos interruptor y lordos-user.txt"
+  }
+}

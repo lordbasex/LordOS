@@ -5,7 +5,7 @@ import { formatNumber, t } from './i18n.js';
 export const systemInfo = () => lord.system.info();
 
 // LordOS's own version, from the build (package.json "version" and "lordos": {"channel"}, see
-// server/Makefile): { version: '0.8.3', channel: 'Beta' (empty for a stable release), build }.
+// server/Makefile): { version: '0.8.4', channel: 'Beta' (empty for a stable release), build }.
 export function lordosVersion(info) {
   const i = info || systemInfo();
   const id = String(i.channel || '');
@@ -24,6 +24,11 @@ function usePoll(read, intervalMs) {
 }
 
 export const useSystemInfo = (intervalMs = 5000) => usePoll(systemInfo, intervalMs);
+// System Information's report (lord.sysinfo, server/src/sysreport; docs/BENCHMARK.md): the hardware,
+// what the kernel made of it and how this session composes the screen. null without the API.
+export function systemReport() {
+  try { return typeof lord !== 'undefined' && lord.sysinfo ? lord.sysinfo.report() : null; } catch (e) { return null; }
+}
 export const useServerStats = (intervalMs = 2000) => usePoll(() => lord.stats(), intervalMs);
 
 // CPU usage (0..1) computed between reads of /proc/stat.

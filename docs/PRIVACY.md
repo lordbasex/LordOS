@@ -37,13 +37,23 @@ Not every program on LordOS is sandboxed. This is exactly what applies to each k
 |---|---|---|---|---|---|
 | `.lpk` apps, Passwords, Mail, Calendar, Contacts, Reminders | own process (`lord-server --app <id>`) | yes | own (`app-lordos-lpk-<id>.scope`) | yes: every call is checked in `lord-server` | per app (`lpk:<id>`): network rules and every non-network restriction (broker) |
 | Other built-in apps | inside `lord-server` | no | `lord-server`'s | no broker: camera, microphone and screen are checked in C (`js_media.c`), notifications in `sdk/notify.js` | as "LordOS" (`lordos`): network rules; camera, microphone, screen and notifications restrictions |
-| Linux apps from the launcher | own process | no by default; with "no access to your files", their own user, mount and PID namespace plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`lord-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
-| Terminal programs | children of the Terminal's shell | no | `lord-server`'s | no | as "LordOS" (`lordos`): network rules |
+| Linux apps from the launcher | own process | no by default; with "no access to your files", or restricted from the microphone, camera, USB or Bluetooth, their own user, mount, PID and IPC namespaces plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`lord-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
+| Terminal programs | children of the Terminal's shell | no | `lordos-net-terminal.scope` (0.8.5; best effort, `lord-server`'s if it can't be placed) | no | as "Terminal" (`lordos:terminal`, 0.8.5): network rules, each program listed by name |
+| LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads | a connector (`lord-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `lord-fetch` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
 
-Flatpak and bubblewrap are not used. Namespaces are used in one place: a Linux app restricted
-with "no access to your files" starts in its own unprivileged user, mount and PID namespace,
-built by our own code in the launcher (`sec/sandbox.c`, `sandbox_files_isolate`), so it can't
-reach the session's sockets. The firewall's restrictions, where each one is enforced and what each
+Built-in apps reach files through `lord.fs`: since 0.8.5 its reading calls (`list`, `read`, `stat`,
+`du`, `free`, `search`) reach the whole tree as the session user (`fsops_readable`; the system's own
+permissions decide), except `/proc`, `/sys`, `/dev` and `/run` (Files → This Computer); writing is
+unchanged (the home folder and the user's mounts, with the deny list), there is no root mode, and an
+isolated app's broker keeps only its data folder.
+
+Flatpak and bubblewrap are not used. Namespaces are used in two places: a Linux app restricted
+with "no access to your files", or from the microphone, camera, USB or Bluetooth, starts in its own
+unprivileged user, mount, PID and IPC namespaces (its own view: a runtime folder with only the
+Wayland and PipeWire sockets, private `/tmp`, `/dev/shm` and devpts; only "no access to your files"
+also hides the home), built by our own code in the launcher (`sec/sandbox.c`,
+`sandbox_files_isolate`), so it can't reach the session's sockets; and Xwayland (0.8.3) runs in an
+empty network namespace (see [X11 apps](#x11-apps-083)). The firewall's restrictions, where each one is enforced and what each
 one doesn't cover are in [FIREWALL.md](FIREWALL.md#non-network-restrictions) and, for Linux apps,
 [FIREWALL.md, "Linux apps"](FIREWALL.md#linux-apps).
 
@@ -182,8 +192,9 @@ Our own code, without bubblewrap, flatpak or firejail. It uses kernel 6.12 featu
   (`unshare(CLONE_NEWNET)` needs `CAP_SYS_ADMIN`). Decision: the app stays in the machine's netns,
   and **without the `network` permission** seccomp rejects `socket(AF_INET/AF_INET6)` and Landlock
   (ABI ≥ 4) denies it TCP `bind`/`connect`. With the permission (declared **and** granted, decided
-  at launch), they are allowed. The monitoring agent adds per-cgroup nftables rules (defense in
-  depth) and attributes traffic by the scope's name.
+  at launch), they are allowed. On top of that, `lord-netperm`'s cgroup BPF programs enforce the
+  app's firewall rules in the kernel (defense in depth, see `FIREWALL.md`), and traffic is
+  attributed by the scope's name.
 - **`no_new_privs`**, all capabilities dropped (empty `capset` + `PR_CAPBSET_DROP`).
 - Its own **cgroup v2**, `app-lordos-lpk-<id>.scope`: `memory.high` 192 MB, `memory.max` 512 MB,
   `cpu.max` one core.
@@ -216,6 +227,18 @@ By contrast, the same app opened **in process** (the M7 mode) read `settings.jso
 `~/.config/lordos/robado.txt`. That's why a package is now never evaluated in the theme's context
 when app mode exists.
 
+### The Sandbox Probe, on the user's own computer (0.8.5)
+
+`build/sandbox-test` and the malicious app run on development machines. System Information → Checks →
+**Run tests** does the same kind of check on any installed system: it starts the system package
+`sysprobe` the way any isolated app starts, and in app mode `server/src/app/probe.c` (that package only)
+takes the same sandbox and tries what must fail (the home folder, system files, the root cgroup, sockets,
+`ptrace`, a user namespace, `mount`, `exec`), forks a child before the sandbox that takes the decoding
+helpers' profile and tries what must fail there, and asks the broker for what it must refuse. The result
+goes to lord-server as `BOP_PROBE` (only from that system package), which adds the process's
+`NoNewPrivs`, `Seccomp`, `CapEff` and cgroup. It never gets a permission or a network grant; see
+`BENCHMARK.md`, "Checks, part 2".
+
 ### `build/sandbox-test` (VM)
 
 ```
@@ -227,10 +250,21 @@ sandbox-test net: 14/14      the same, but an AF_INET socket opens (network perm
 sandbox-test helper: 17/17   see "Helpers" below
 ```
 
+## Cleaner's delete
+
+Cleaner is the only place in LordOS that deletes a file outside the Trash (approved by the maintainer on 2026-10-30;
+`CLEANER-SECURITY.md`). It runs in `lord-server` as the session user, only for a file a scan found under a `regenerable`
+rule's fixed root, from a plan the user confirmed, with a confirmation that says it can't be undone. JS can't name a path,
+`lord.fs` gained nothing, and the scans stay on this machine. Its history keeps counts and sizes, never a path. Three closed
+admin actions clean the operating system's own files, for administrators (`clean-journal`, `clean-apt-cache`, `clean-var-tmp`).
+
 ## Decoding helpers: `sandbox_apply_helper`
 
 A single sandbox for all of LordOS, no copies: the helpers that decode untrusted data
-(`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive) use
+(`lord-media`: video, photos, camera; `lord-doc`: Poppler and libarchive; and the other helpers:
+`lord-maild`, `lord-vault`, since 0.8.7 the network reader `lord-lan`, since 0.8.5 the blocklist downloader `lord-fetch` and the package
+engine's TLS relay `lord-tls`, since 0.8.6 LordBench's `lord-bench`, and since 0.8.7 Cleaner's
+scanner `lord-clean` and Remote Desk's `lord-rdesk`) use
 `sandbox_apply_helper(const SandboxHelperCfg *cfg)` from `server/src/sec/sandbox.h`:
 
 ```c
@@ -645,7 +679,13 @@ Now the subtree stays **root-owned** and the scopes are created by root:
 
 - `cgroup_delegate_session()` (`server/src/sec/cgroup.c`) creates `lordos-session-<uid>/server`
   and moves the session's `lord-server` there, but no longer chowns anything to the user
-  (`cgroup_harden_session`). At startup, `cgroup_service_init()` hardens the subtrees left by an
+  (`cgroup_harden_session`). Since 0.8.6 it also gives `server` `cpu.weight` 1000
+  against 100 for every scope, so a busy app can't take half of the compositor's CPU (nice values
+  don't count between cgroups; `BENCHMARK.md`, "The desktop under load"). lord-sessiond also starts the
+  session's lord-server with `RLIMIT_RTPRIO` 2 (and `RLIMIT_RTTIME` 5 s): lord-server puts its main and paint threads
+  at `SCHED_RR` 2 (`SCHED_RESET_ON_FORK` on the thread that starts things) and lowers the limit to 0, soft and hard,
+  before it starts any process, so no app, helper or shell can ask for real time (`par.c`; the root admin helper,
+  forked earlier, lowers its own to 0 too). At startup, `cgroup_service_init()` hardens the subtrees left by an
   older `lord-sessiond` (sessions survive a restart).
 - `lord-sessiond` forks a small root child (`server/src/remote/cgsup.c`) that listens on
   `/run/lordos/cgroup.sock` (`SOCK_SEQPACKET`, mode 0666; `SO_PEERCRED` decides). It serves one
@@ -808,7 +848,9 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   (`brokersrv_app_of_pid`). That client also receives ❖ combinations (❖N, ❖C, ❖A, ❖W…) together
   with the ❖ key itself, as an app inside the theme would. The system keeps ❖L, ❖⌃Q, ❖Q,
   ❖Space, ❖⌥Space, ❖V, ❖., ❖Tab, ❖`, ❖Esc, ❖⇧3/4/5 and ❖F1–F12 (`system_meta_key` in
-  `wl/wl.c`); a Linux app still gets no ❖ combination.
+  `wl/wl.c`) and those of the theme's fixed table (`wl/keygrab.c`, [SHORTCUTS.md](SHORTCUTS.md)), which
+  isolated apps cannot change: `lord.wayland` does not exist in their process. A Linux app still gets no ❖
+  combination, except Lord Flow's ❖ as Ctrl, sent as Ctrl to that client only.
 - **Keyboard layout:** the app compiles the keymap that the compositor sends over
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`
@@ -820,3 +862,12 @@ Tested in headless sessions on VM 116 (`lord-server --headless` as `lord`, real 
 through the remote desktop socket): the app's menu opens from the menu bar and its
 items run in the app (File → New entry), ❖N/❖A/❖C/❖W reach the app while ❖V opens the clipboard
 history, and ❖Q and Dock → Quit end the process.
+
+## Files → Network (0.8.7)
+
+The page sends nothing until it is opened, and stops when it closes. A pass stays on the local network: private
+IPv4 addresses on this computer's own links, never the internet, at most 30 connections a second. What it learns
+(names, addresses, shares) stays in lord-server's memory and is written nowhere. What other machines see: mDNS
+questions, TCP connections to ports 445, 2049 and 22, and on an SMB server one anonymous session attempt, which a
+server may log as a failed logon; an intrusion detector on the LAN may notice the sweep. Passwords go to the
+kernel and, only if asked, to the keyring. See `FILES.md`, "Network".

@@ -1,5 +1,6 @@
 {
   "id": "monitor",
+  "version": "0.8.5",
   "name": "Monitor",
   "description": "CPU, memory, network, disks, processes and each app's connections",
   "size": [

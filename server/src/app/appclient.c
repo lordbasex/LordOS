@@ -20,6 +20,7 @@
 #include "../keyboard.h"
 #include "../lpk.h"
 #include "../sec/sandbox.h"
+#include "probe.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -139,11 +140,10 @@ static void render(AppWin *w) {
     ui.width = (float)w->cw;
     ui.height = (float)w->ch;
     layout_root(root, (float)w->cw, (float)w->ch);
-    canvas_clear(&c, 0x00000000);
     /* every window shares node coordinates starting at 0,0: no "paint from the video" shortcut
      * (an empty damage box turns off media_cover_node/opaque_cover_node in paint_root) */
     ui.damage = (Box){ 0, 0, 0, 0 };
-    paint_root(&c, root);
+    paint_root_clear(&c, root, 0x00000000);
     b->busy = 1;
     wl_surface_attach(w->surf, b->b, 0, 0);
     wl_surface_damage_buffer(w->surf, 0, 0, w->cw, w->ch);
@@ -496,6 +496,22 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     mkdir(parent, 0700);
     snprintf(data, sizeof data, "%s/%.40s", parent, id);
     mkdir(data, 0700);
+
+    /* System Information's sandbox probe (probe.c): the system package `sysprobe` only. Same sandbox
+     * as any isolated app (the read-only folders below are the ones the main path gives), then it tries
+     * what must fail, reports over its broker and exits: no window, no app code. */
+    if (sys == 1 && !strcmp(id, PROBE_APP_ID)) {
+        char hd[PATH_MAX], lg[PATH_MAX];
+        snprintf(hd, sizeof hd, "%s", theme_bundle);
+        char *sl = strrchr(hd, '/');
+        if (sl) *sl = 0; else snprintf(hd, sizeof hd, ".");
+        snprintf(lg, sizeof lg, "%s/.local/share/lordos/locales", home ? home : "/nonexistent");
+        const char *pro[] = { fonts, hd, "/usr/share/fonts", lg, NULL };
+        SandboxConfig psb = { .id = id, .pkg_dir = dir, .data_dir = data, .runtime_dir = getenv("XDG_RUNTIME_DIR"), .ro_extra = pro, .network = 0 };
+        int hpid = -1, hfd = probe_helper_start(data, &hpid);   /* single-threaded, nothing loaded yet */
+        int mask = sandbox_apply(&psb);
+        return probe_main(home ? home : "/nonexistent", data, mask, hfd, hpid);
+    }
 
     if (text_init(fonts)) { fprintf(stderr, "lord-server --app: no fonts\n"); return 1; }
     { char a[PATH_MAX * 2]; snprintf(a, sizeof a, "%.*s/..", (int)(sizeof a - 4), fonts); js_sys_set_assets(a); }

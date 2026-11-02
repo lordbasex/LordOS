@@ -16,7 +16,7 @@
   "unread": "No leídos",
   "flagged": "Marcados",
   "addAccount": "Agregar cuenta",
-  "noAccounts": "Agregá una cuenta de correo para empezar. Sirve cualquier cuenta IMAP/SMTP; los proveedores populares, como Gmail y Yahoo, se configuran solos.",
+  "noAccounts": "Agregá una cuenta de correo para empezar. Sirve cualquier cuenta IMAP/SMTP; los proveedores populares se configuran solos.",
   "unavailable": "No está instalado el ayudante de Mail (lord-maild).",
   "empty": "No hay mensajes",
   "noSelection": "Ningún mensaje seleccionado",

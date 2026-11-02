@@ -43,6 +43,9 @@ export function MonitorPrivacy() {
         <Row label={tr('monitor.privacy.history')} hint={tr('monitor.privacy.historyHint')}>
           <Toggle small on={m.history !== false} onChange={(on) => put({ history: on })} />
         </Row>
+        <Row label={tr('monitor.privacy.menuItem')} hint={tr('monitor.privacy.menuItemHint')}>
+          <Toggle small on={m.menuItem === true} onChange={(on) => put({ menuItem: on })} />
+        </Row>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingVertical: 6 }}>
           <Button small label={cleared ? tr('monitor.privacy.cleared') : tr('monitor.privacy.clear')} disabled={cleared}
             onClick={() => { if (monitor.clearHistory()) setCleared(true); }} />

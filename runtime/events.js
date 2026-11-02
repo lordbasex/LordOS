@@ -1,6 +1,8 @@
 // events.js — mouse and keyboard events sent by lord-server, with DOM-style bubbling.
 // Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
 // onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe.
+// keepFocus on a View: a press inside it is not a click elsewhere: the global 'pointerdown' listeners
+// don't hear it, so a text field keeps the focus and an open menu stays (the on-screen keyboard).
 import { DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority } from 'react-reconciler/constants';
 import { translate, nativeKey, modifiers } from './keymap.js';
 
@@ -19,6 +21,11 @@ export function addListener(type, fn) {
   listeners[type].add(fn);
   return () => listeners[type].delete(fn);
 }
+
+// The shell's shortcut dispatcher (sdk/shortcuts.js): it sees each key first, and a key it takes
+// reaches no listener, so one key never fires twice.
+let keyFilter = null;
+export function setKeyFilter(fn) { keyFilter = fn; }
 
 function chainOf(id) {
   const out = [];
@@ -76,10 +83,13 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
   else if (type === 'down') run(DiscreteEventPriority, () => {
     down = chain;
     dispatch(chain, 'onMouseDown', makeEvent('mousedown', target, x, y, button));
+    if (chain.some((n) => n.props.keepFocus)) return;
     fire('pointerdown', makeEvent('pointerdown', target, x, y, button));
   });
   else if (type === 'up') run(DiscreteEventPriority, () => {
-    dispatch(chain, 'onMouseUp', makeEvent('mouseup', target, x, y, button));
+    // a press that began in a keepFocus surface which closed meanwhile doesn't release on what was below it
+    const stray = down?.some((n) => n.props.keepFocus) && !chain.some((n) => n.props.keepFocus);
+    if (!stray) dispatch(chain, 'onMouseUp', makeEvent('mouseup', target, x, y, button));
     fire('pointerup', makeEvent('pointerup', target, x, y, button));
     if (!down) return;
     const pressed = new Set(down);
@@ -103,7 +113,11 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
 // XKB layout is loaded only the code and value arrive and keymap.js is used as a fallback.
 globalThis.__lordKey = (code, value, key, chr, base, flags) => {
   const ev = key === undefined ? translate(code, value) : nativeKey(code, value, key, chr, base, flags);
-  run(DiscreteEventPriority, () => { for (const fn of listeners[ev.down ? 'keydown' : 'keyup']) fn(ev); });
+  // each listener on its own: one that throws doesn't take the key from the others (a text field)
+  run(DiscreteEventPriority, () => {
+    if (keyFilter) { try { if (keyFilter(ev)) return; } catch (e) { console.error('key filter:', e); } }
+    for (const fn of listeners[ev.down ? 'keydown' : 'keyup']) { try { fn(ev); } catch (e) { console.error('key listener:', e); } }
+  });
 };
 
 // Touchpad, touchscreen and remote-desktop trackpad (server/src/tp, docs/TRACKPAD.md):

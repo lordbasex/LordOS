@@ -7,6 +7,11 @@ from pathlib import Path
 import shutil
 
 REPO = Path(__file__).resolve().parents[2]
+DESKTOP_BINARIES = (
+    'lord-server', 'lord-vault', 'lord-maild', 'lord-doc', 'lord-media',
+    'lord-clean', 'lord-lan', 'lord-rdesk', 'lord-bench', 'lord-fetch',
+    'lordos-sysreport', 'lordos-fetch', 'lordos-testbench',
+)
 
 
 def install(prefix, libexecdir, destdir):
@@ -45,11 +50,11 @@ def install(prefix, libexecdir, destdir):
         if mode is not None:
             dst.chmod(mode)
 
-    for name in ['lord-server', 'lord-vault', 'lord-maild', 'lord-doc', 'lord-media']:
+    for name in DESKTOP_BINARIES:
         src = REPO / 'server/build' / name
         if src.is_file():
             copy(src, target / 'bin' / name, 0o755)
-    for name in ['fonts', 'locales', 'shell', 'icons', 'mascot', 'brand', 'monitor', 'help', 'wallpapers', 'gtk', 'store']:
+    for name in ['fonts', 'locales', 'shell', 'icons', 'mascot', 'brand', 'monitor', 'help', 'wallpapers', 'gtk', 'store', 'cleaner', 'hwreport', 'fw', 'browser']:
         shutil.copytree(REPO / 'assets' / name, target / 'assets' / name, dirs_exist_ok=True)
     copy(REPO / 'assets/app-host.bundle.js', target / 'assets/app-host.bundle.js')
     shutil.copytree(REPO / 'assets/sysapps', target / 'assets/sysapps', dirs_exist_ok=True)
@@ -74,6 +79,7 @@ def install(prefix, libexecdir, destdir):
     for file in ['LICENSE', 'THIRD_PARTY.md', 'README.md']:
         copy(REPO / file, stage / prefix.relative_to('/') / 'share/doc/lord-de' / file)
     copy(REPO / 'docs/STANDALONE.md', stage / prefix.relative_to('/') / 'share/doc/lord-de/docs/STANDALONE.md')
+    copy(REPO / 'server/src/bench/fonts/OFL.txt', stage / prefix.relative_to('/') / 'share/licenses/lord-de/OFL-Noto.txt')
     for file in ['LICENSE', 'LICENSE-SecLists']:
         for src in (REPO / 'third_party').rglob(file):
             copy(src, stage / prefix.relative_to('/') / 'share/licenses/lord-de/third_party' / src.relative_to(REPO / 'third_party'))

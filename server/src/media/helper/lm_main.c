@@ -52,6 +52,8 @@ int main(int argc, char **argv) {
         LM_LOG("the job didn't arrive");
         return 1;
     }
+    /* mp_send skips missing descriptors: a silent video has no audio ring, and its render node comes in the ring's place */
+    if (m.v[0] == MK_PLAY && mp_param_int(payload, "hw", 0) && fds[2] < 0 && fds[1] >= 0) { fds[2] = fds[1]; fds[1] = -1; }
     /* The shared sandbox (sec/sandbox.c, the same as lord-doc's), before reading a byte
      * of the file and before initializing VA-API: no network, nothing opened outside the system's libraries and
      * data (read-only), no /dev (devices arrive as fds) and with the
@@ -75,8 +77,21 @@ int main(int argc, char **argv) {
         if (st_render >= 0) ioctls |= SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF;
     }
     if (m.v[0] == MK_CAMERA) ioctls |= SANDBOX_IOCTL_V4L2 | (fds[1] >= 0 ? SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF : 0);
-    SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
-                             .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536 };
+    /* The Pi 5's HEVC decoder: the Raspberry Pi FFmpeg opens these by path, so only here is /dev reachable, and only
+     * the two exact files of that decoder, found from sysfs before the sandbox. */
+    static char dev_video[32], dev_media[32];
+    static const char *devs[3];
+    static const char *const ro_pi[] = { "/usr/lib", "/usr/lib64", "/lib", "/lib64", "/usr/share", "/etc/ld.so.cache",
+                                         "/sys/dev/char", "/sys/devices", "/sys/class", "/sys/bus", "/run/udev", NULL };   /* udev lists these folders to find the decoder */
+    int pi_hevc = m.v[0] == MK_PLAY && fds[2] >= 0 && lm_hwaccel_is(payload, "v4l2request") &&
+                  !lm_hevc_dec_paths(dev_video, sizeof dev_video, dev_media, sizeof dev_media);
+    if (pi_hevc) {
+        ioctls |= SANDBOX_IOCTL_V4L2 | SANDBOX_IOCTL_MEDIA;
+        devs[0] = dev_video;
+        devs[1] = dev_media;
+    }
+    SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = pi_hevc ? ro_pi : ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
+                             .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536, .dev_files = pi_hevc ? devs : NULL };
     if (m.v[0] == MK_WORKER) {                 /* thumbnails and probes: in the background (before the sandbox) */
         setpriority(PRIO_PROCESS, 0, 10);
         syscall(SYS_ioprio_set, 1, 0, (2 << 13) | 7);   /* IOPRIO_WHO_PROCESS, this process, best effort, lowest */
@@ -92,6 +107,7 @@ int main(int argc, char **argv) {
     case MK_AUDIOREC: lm_audiorec(payload, fds[0], fds[1]); break;
     case MK_HWPROBE: lm_hwprobe(fds, MP_MAX_FDS); break;
     case MK_STREAM: lm_stream(payload, st_ring, st_render); break;
+    case MK_VBENCH: lm_vbench(payload); break;
     default: LM_LOG("unknown kind %lld", (long long)m.v[0]); return 1;
     }
     return 0;

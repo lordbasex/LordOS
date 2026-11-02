@@ -1,5 +1,6 @@
 {
   "id": "fonts",
+  "version": "0.8.5",
   "name": "Fonts",
   "description": "Font viewer and manager: samples, character map, install and remove user fonts",
   "size": [960, 620],

@@ -306,32 +306,55 @@ static void disc(const MapReq *q, uint8_t *out, float cx, float cy, float rad, u
 }
 
 /* Arc: quadratic curve that rises towards the pole, stronger towards the destination. */
-static void arc(const MapReq *q, uint8_t *out, float x0, float y0, float x1, float y1, uint32_t c, float width, float alpha) {
+/* A quadratic arc from (x0,y0) to (x1,y1), lifted by 30 % of its length, fading in toward the place.
+ * Each arc first collects its own coverage (the strongest stamp per pixel, so the overlapping stamps
+ * don't darken it) in a mask over its bounding box, then blends once over whatever is below: land,
+ * borders and other arcs. (Before 0.8.5 it was blended only where the map was still fainter than the
+ * arc, which hid most of an arc over land.) */
+static void arc(const MapReq *q, uint8_t *out, float x0, float y0, float x1, float y1, float liftk, uint32_t c, float width, float alpha) {
+    static uint8_t *mask;
+    static size_t mcap;
     float len = hypotf(x1 - x0, y1 - y0);
     if (len < 2) return;
-    float lift = len * 0.3f, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 - lift;
+    float lift = len * liftk, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 - lift;
+    /* the control point bounds the curve */
+    int bx0 = (int)floorf(fminf(fminf(x0, x1), cx) - width - 1), bx1 = (int)ceilf(fmaxf(fmaxf(x0, x1), cx) + width + 1);
+    int by0 = (int)floorf(fminf(fminf(y0, y1), cy) - width - 1), by1 = (int)ceilf(fmaxf(fmaxf(y0, y1), cy) + width + 1);
+    if (bx0 < 0) bx0 = 0;
+    if (by0 < 0) by0 = 0;
+    if (bx1 > q->w) bx1 = q->w;
+    if (by1 > q->h) by1 = q->h;
+    if (bx0 >= bx1 || by0 >= by1) return;
+    int bw = bx1 - bx0, bh = by1 - by0;
+    size_t need = (size_t)bw * bh;
+    if (need > mcap) {
+        uint8_t *m = realloc(mask, need);
+        if (!m) return;
+        mask = m;
+        mcap = need;
+    }
+    memset(mask, 0, need);
     int steps = (int)(len / 0.8f) + 1;
     if (steps > 20000) steps = 20000;
-    float px = x0, py = y0;
     for (int i = 1; i <= steps; i++) {
         float t = (float)i / steps, u = 1 - t;
         float x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1;
-        if (!((x < -width && px < -width) || (y < -width && py < -width) || (x > q->w + width && px > q->w + width) || (y > q->h + width && py > q->h + width))) {
-            float a = alpha * (0.35f + 0.65f * t);
-            /* circular stamp of radius width/2, only where the pixel is still fainter */
-            for (int yy = (int)floorf(y - width); yy <= (int)ceilf(y + width); yy++)
-                for (int xx = (int)floorf(x - width); xx <= (int)ceilf(x + width); xx++) {
-                    if (xx < 0 || yy < 0 || xx >= q->w || yy >= q->h) continue;
-                    float d = hypotf(xx + 0.5f - x, yy + 0.5f - y), k = width / 2 + 0.5f - d;
-                    if (k <= 0) continue;
-                    uint8_t *p = out + ((size_t)yy * q->w + xx) * 4;
-                    float want = (k > 1 ? 1 : k) * a * ((c & 0xff) / 255.0f);
-                    if (p[3] / 255.0f < want) blend(p, c, (k > 1 ? 1 : k) * a * 0.6f);
-                }
-        }
-        px = x;
-        py = y;
+        float a = alpha * (0.45f + 0.55f * t);
+        for (int yy = (int)floorf(y - width); yy <= (int)ceilf(y + width); yy++)
+            for (int xx = (int)floorf(x - width); xx <= (int)ceilf(x + width); xx++) {
+                if (xx < bx0 || yy < by0 || xx >= bx1 || yy >= by1) continue;
+                float d = hypotf(xx + 0.5f - x, yy + 0.5f - y), k = width / 2 + 0.5f - d;
+                if (k <= 0) continue;
+                int v = (int)((k > 1 ? 1 : k) * a * 255 + 0.5f);
+                uint8_t *m = mask + (size_t)(yy - by0) * bw + (xx - bx0);
+                if (v > *m) *m = (uint8_t)(v > 255 ? 255 : v);
+            }
     }
+    for (int yy = 0; yy < bh; yy++)
+        for (int xx = 0; xx < bw; xx++) {
+            uint8_t m = mask[(size_t)yy * bw + xx];
+            if (m) blend(out + ((size_t)(yy + by0) * q->w + (xx + bx0)) * 4, c, m / 255.0f);
+        }
 }
 
 /* Meridians and parallels every 30° (every 10° when zoomed), very faint: the sea is map too. */
@@ -356,12 +379,19 @@ static void render(const MapReq *q, uint8_t *out) {
         borders(q, out);
     }
     float hx = (float)((q->hlon - q->lon0) * q->ppd), hy = (float)((q->lat0 - q->hlat) * q->ppd);
-    for (int pass = 0; pass < 2 && q->has_home; pass++)        /* selected ones last, on top */
+    for (int pass = 0; pass < 2 && q->has_home && q->narcs; pass++)        /* each app's arcs */
+        for (int i = 0; i < q->narcs; i++) {
+            const MapArc *a = &q->arcs[i];
+            if (!!a->sel != pass) continue;
+            float x = (float)((a->lon - q->lon0) * q->ppd), y = (float)((q->lat0 - a->lat) * q->ppd);
+            arc(q, out, hx, hy, x, y, a->lift, a->color, a->sel ? 2.4f : a->idle ? 1.4f : 2.0f, a->sel ? 1.0f : a->idle ? 0.55f : 0.9f);
+        }
+    for (int pass = 0; pass < 2 && q->has_home && !q->narcs; pass++)        /* selected ones last, on top */
         for (int i = 0; i < q->ndots; i++) {
             const MapDot *d = &q->dots[i];
             if (!!d->sel != pass) continue;
             float x = (float)((d->lon - q->lon0) * q->ppd), y = (float)((q->lat0 - d->lat) * q->ppd);
-            arc(q, out, hx, hy, x, y, d->sel ? q->sel_color : q->accent, d->sel ? 2.6f : d->idle ? 1.3f : 1.6f, d->sel ? 1.0f : d->idle ? 0.4f : 0.85f);
+            arc(q, out, hx, hy, x, y, 0.3f, d->sel ? q->sel_color : q->accent, d->sel ? 2.6f : d->idle ? 1.4f : 1.8f, d->sel ? 1.0f : d->idle ? 0.5f : 0.8f);
         }
     for (int pass = 0; pass < 2; pass++)
         for (int i = 0; i < q->ndots; i++) {

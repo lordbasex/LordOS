@@ -14,6 +14,7 @@ apps/quicknotes/
 ```json
 {
   "id": "quicknotes",
+  "version": "1.0.0",
   "name": "Quick Notes",
   "description": "Quick notes",
   "size": [500, 400],
@@ -21,6 +22,13 @@ apps/quicknotes/
   "permissions": []
 }
 ```
+
+`version` is required: the app's own version, in semver (`major.minor.patch`, optionally with a
+`-beta.1` or `~rc1` suffix). The build refuses an app without one (`tools/build-theme.mjs`), and the
+Store shows it next to the app (Installed: "LordOS app · 0.8.5"). The native apps started at `0.8.5`,
+the LordOS version they first shipped in; from then on an app's version changes when the app changes,
+apart from LordOS's, so the apps can later live in repositories of their own. An app added later starts
+at the release it first ships in (`cleaner` and `remote-desk`, 0.8.7).
 
 Optional fields: `"transparent": true` (the theme paints no background under the content; the
 app draws its own, e.g. the Terminal with transparency) and `"minSize": [width, height]`.
@@ -63,7 +71,7 @@ Store (see `docs/NATIVE-APPS.md`).
 | Terminal | `term.create/close/configure/key/paste/search/...` (see `docs/TERMINAL.md`), `clipboard.get/set`, `clipboardHistory` |
 | Keyboard | `useKeyboard(fn)` (only with the window in front), `TextInput`; `keyboard.list/configured/active/next/set` (XKB layouts) |
 | Language | `t('namespace.key', vars)`, `useLocale()`, `appName(app)`, `formatDate`, `formatTime`, `formatNumber`, `languages()`, `setLanguage(id)`, `direction()`, `textDirection(text)` — see `docs/LANGUAGES.md` |
-| Input methods | `TextInput` already uses them; for a custom field, `ime.attach(token, caret)` / `ime.detach(token)` and `useIme()` |
+| Input methods | `TextInput` already uses them; for a custom field, `ime.attach(token, caret)` / `ime.detach(token)` and `useIme()` (the on-screen keyboard also learns about the field and its caret from these) |
 | Administration | `admin.run('locale-gen' \| 'system-locale' \| 'timezone' \| 'langpack', arg, onLog)` → promise; `admin.busy` (progress) |
 | Files | `useDirectory(path)`, `fs.list`, `fs.read(path, { binary })` (max. 8 MB), `fs.write(path, text \| ArrayBuffer)` (atomic, max. 32 MB), `fs.mkdir`, `fs.rename`, `fs.copy`/`fs.move` (in the background: `fs.jobs()`), `fs.trash`/`trashList`/`restore`/`removeFromTrash`/`emptyTrash` (freedesktop Trash), `fs.stat`, `fs.du`, `fs.free`, `fs.search`, `fs.recent`, `fs.volumes`, `fs.join`, `fs.parent`, `fs.basename` — only in the home folder and on the user's mounted disks (`/media/$USER`, `/run/media/$USER`); writing to `~/.local/share/applications`, `~/.config/autostart`, `~/.local/share/lordos/apps` or the settings is not allowed, and deleting is only possible inside the Trash (see `docs/FILES.md`) |
 | Fonts | `lord.fonts.list({ rescan })` → `{ family, style, ps, weight, italic, mono, color }` of the installed fonts |
@@ -98,12 +106,12 @@ time, not as module constants, because the UI is remounted when the language cha
 
 ## Permissions
 
-`permissions` in the manifest is **declarative** for now: it documents what the app uses, but
-all apps run in the same JS context as the theme. Real isolation (one context or process per
-app, with permissions checked by the server) is pending work. What is real today: the server
-runs without root, `fs` doesn't leave the home folder and there is no API to run commands (the
-terminal can only open the user's shell).
+For an app built into the theme, `permissions` in the manifest is **declarative**: it documents what
+the app uses, and the app runs in the same JS context as the theme. Apps with `"process": "isolated"`
+and installed `.lpk` apps run as their own process, with permissions checked by the server
+(`docs/NATIVE-APPS.md`, `docs/PRIVACY.md`). For all of them the server runs without root and there is
+no API to run commands (the terminal can only open the user's shell).
 
-`fs` only writes inside the home folder and never to the folders the system uses to launch or
+`fs` only writes inside the home folder and the user's mounts and never to the folders the system uses to launch or
 install things (`.desktop`, autostart, installed apps), so an app can't turn a write into
 running a command.

@@ -18,8 +18,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { markdown, inline, frontMatter } from './lib/md.mjs';
+import { markdown, inline, frontMatter, slugify } from './lib/md.mjs';
 import { diagram } from './lib/diagram.mjs';
+import { paperMarkdown } from './lib/papermd.mjs';
+import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
+import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(WEB, '..');
@@ -33,6 +36,14 @@ const CONTENT = process.env.CONTENT_DIR ? path.resolve(process.env.CONTENT_DIR) 
 const TOOLS = process.env.WEB_TOOLS || process.env.ICON_DEPS || '';
 const FINGERPRINT = 'c7155b8e6bbbb180f907381994d06af76d333016cd6f3facf67cadd053ea108e';
 const GITHUB = 'https://github.com/lordbasex/LordOS';
+// the LordOS Imager downloads of the current release (package.json's version and channel)
+const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+// a package-only update (0.8.4.1) leaves the live ISO and the Imager on an earlier release: lordos.media
+const CHANNEL = PKG.lordos && PKG.lordos.channel ? '-' + PKG.lordos.channel : '';
+const MEDIA_VERSION = (PKG.lordos && PKG.lordos.media) || PKG.version;
+// the Imager is released only when it changes: lordos.imager names the release that holds its downloads
+const IMAGER_VERSION = (PKG.lordos && PKG.lordos.imager) || MEDIA_VERSION;
+const IMAGER_DL = `${GITHUB}/releases/download/v${IMAGER_VERSION}${CHANNEL}/lordos_imager_${IMAGER_VERSION}`;
 
 const r = (...p) => path.join(REPO, ...p);
 const read = (f) => fs.readFileSync(f);
@@ -112,6 +123,8 @@ const docCss = minCss(src('doc.css'));
 const docCssUrl = hashed(Buffer.from(docCss), 'doc', 'css');
 const homeCss = minCss(src('home.css').replace('__FONT_MEDIUM__', fontMedium));
 const homeCssUrl = hashed(Buffer.from(homeCss), 'home', 'css');
+const imagerCss = minCss(src('imager.css'));
+const imagerCssUrl = hashed(Buffer.from(imagerCss), 'imager', 'css');
 // [[PLACEHOLDER]] markers left by the content agents: highlighted when --allow-placeholders, else the build fails
 const ALLOW_PH = process.argv.includes('--allow-placeholders');
 const placeholders = new Map();
@@ -201,6 +214,34 @@ const paperDir = path.join(CONTENT, 'paper');
 const HAS_PAPER = !process.argv.includes('--no-paper') && LANGS.every((l) => fs.existsSync(path.join(paperDir, `paper.${l}.md`)));
 const paperMeta = HAS_PAPER && fs.existsSync(path.join(paperDir, 'meta.json')) ? readJson(path.join(paperDir, 'meta.json')) : {};
 const paperDiagrams = HAS_PAPER && fs.existsSync(path.join(paperDir, 'diagrams.json')) ? readJson(path.join(paperDir, 'diagrams.json')) : {};
+// CHANGELOG.md (repo root, English, Keep a Changelog): every release's full notes go on the paper page,
+// after the summary table of its Changelog section. Title, intro and link references are dropped;
+// each "## [x.y.z-beta] - date" becomes one release.
+const CHANGELOG_FILE = path.join(REPO, 'CHANGELOG.md');
+const changelog = HAS_PAPER && fs.existsSync(CHANGELOG_FILE) ? parseChangelog(fs.readFileSync(CHANGELOG_FILE, 'utf8')) : [];
+function parseChangelog(src) {
+  const refs = {};
+  src = src.replace(/\r\n/g, '\n').replace(/^\[([^\]]+)\]:\s+(\S+)[ \t]*$/gm, (_, k, u) => { refs[k.toLowerCase()] = u; return ''; });
+  // split on release headings outside fenced code
+  const rels = [];
+  let cur = null, fence = false;
+  for (const line of src.split('\n')) {
+    if (/^\s*```/.test(line)) fence = !fence;
+    if (!fence && /^## /.test(line)) { cur = { head: line.slice(3).trim(), lines: [] }; rels.push(cur); continue; }
+    if (cur) cur.lines.push(!fence && /^#{1,5} /.test(line) ? '#' + line : line); // ### Added -> h4, #### -> h5
+  }
+  return rels.map((r) => {
+    const m = r.head.match(/^\[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?/);
+    const label = m ? m[1] : r.head;
+    const unreleased = /^unreleased$/i.test(label);
+    const version = label.replace(/-beta$/i, '');
+    return {
+      label, version, unreleased, date: m && m[2] ? m[2] : '', yanked: /\[yanked\]/i.test(r.head),
+      beta: /-beta$/i.test(label), id: 'changelog-' + slugify(unreleased ? 'unreleased' : version),
+      url: refs[label.toLowerCase()] || '', body: r.lines.join('\n'),
+    };
+  });
+}
 const legalDir = path.join(CONTENT, 'legal');
 const legalIndex = fs.existsSync(path.join(legalDir, 'pages.json')) ? readJson(path.join(legalDir, 'pages.json')) : null;
 const hasPh = (text) => /\[\[[A-Z][A-Z0-9_]*\]\]/.test(text);
@@ -222,6 +263,12 @@ function legalDesc(p, l) {
   const m = plain.match(/^(.{40,220}?[.!?])(\s|$)/);
   return m ? m[1] : plain.slice(0, 200);
 }
+// the tested-hardware catalogue (0.8.7, tools/hwreport/catalog.mjs): accepted reports → /hardware/
+const hwDir = path.join(CONTENT, 'hardware/reports');
+const HAS_HW = fs.existsSync(hwDir);
+const hwModel = HAS_HW ? buildModel(readReports(hwDir)) : null;
+const verNum = (v) => String(v).split('.').map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
+const HW_IN_DEV = verNum(PKG.version) < verNum('0.8.7');      // Share on GitHub ships with 0.8.7
 const faqFile = path.join(CONTENT, 'faq/faq.json');
 const faqJson = fs.existsSync(faqFile) ? readJson(faqFile) : null;
 let faqHeld = 0;
@@ -230,6 +277,16 @@ if (faqJson && !ALLOW_PH) {
   faqJson.categories = (faqJson.categories || []).filter((c) => c.items.length);
 }
 const HAS_FAQ = !!(faqJson && (faqJson.categories || []).length);
+// the LordOS Imager guide (/imager/) and the download section's "How to write LordOS" block
+const imagerDir = path.join(CONTENT, 'imager');
+const HAS_GUIDE = LANGS.every((l) => fs.existsSync(path.join(imagerDir, `guide.${l}.json`)));
+const guideText = HAS_GUIDE ? Object.fromEntries(LANGS.map((l) => [l, readJson(path.join(imagerDir, `guide.${l}.json`))])) : {};
+const IMAGER_VIDEO_DIR = process.env.IMAGER_VIDEO_DIR ? path.resolve(process.env.IMAGER_VIDEO_DIR) : path.join(imagerDir, 'video');
+const imagerLinks = (l) => ({
+  mac: `${IMAGER_DL}_universal.dmg`, win: `${IMAGER_DL}_x64_setup.exe`, linux: `${IMAGER_DL}_amd64.deb`,
+  signing: builtPages().has('legal/code-signing') ? pageUrl(l, 'legal/code-signing') : `${GITHUB}/blob/main/docs/SIGNING.md`,
+  switchFiles: `${GITHUB}/blob/main/docs/RASPBERRY.md#switch-files`,
+});
 const footerFile = path.join(CONTENT, 'footer.json');
 const footerJson = fs.existsSync(footerFile) ? readJson(footerFile) : null;
 log(`content: ${legalPages.length} legal pages${legalHeld.length ? ` (held back, placeholders: ${legalHeld.join(', ')})` : ''}, FAQ ${HAS_FAQ ? 'yes' : 'no'}${faqHeld ? ` (${faqHeld} questions with placeholders hidden)` : ''}, footer.json ${footerJson ? 'yes' : 'no'}`);
@@ -274,7 +331,7 @@ ${alts}
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="${fontExtraBold}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="${fontMedium}" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="${cssUrl}">${doc ? `\n<link rel="stylesheet" href="${doc === 'home' ? homeCssUrl : docCssUrl}">` : ''}
+<link rel="stylesheet" href="${cssUrl}">${doc ? `\n<link rel="stylesheet" href="${doc === 'home' ? homeCssUrl : doc === 'imager' ? imagerCssUrl : docCssUrl}">` : ''}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="LordOS">
 <meta property="og:title" content="${esc(title)}">
@@ -378,7 +435,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -469,7 +526,7 @@ ${icons}
 </section>`;
 }
 
-const tpl = { home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -566,6 +623,8 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       return `<div class="laptop" id="hero-show" role="region" aria-roledescription="carousel" aria-label="${esc(H.carousel)}"><div class="lp-screen"><span class="lp-cam" aria-hidden="true"></span><div class="lp-display">${slides}</div></div><div class="lp-base" aria-hidden="true"><span class="lp-notch"></span></div>${ctl}</div><ul class="stats">${pills}</ul>`;
     })(),
     fingerprint: FINGERPRINT, banner: l === 'en' ? banner() : '',
+    writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: PKG.version, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
+    imagerMac: `${IMAGER_DL}_universal.dmg`, imagerWin: `${IMAGER_DL}_x64_setup.exe`, imagerLinux: `${IMAGER_DL}_amd64.deb`,
     faqServer: HAS_FAQ ? pageUrl(l, 'faq') + '#server-vps' : `${GITHUB}/blob/main/docs/INSTALL-DEBIAN.md#servers-and-vps`,
   }, t));
 
@@ -597,6 +656,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       const shot = a.shot ? `<a class="g-card" href="${a.shot.full.url}" data-w="${a.shot.full.w}" data-h="${a.shot.full.h}" data-cap="${esc(name)}" aria-label="${esc(t.apps.shotOpen + ': ' + name)}"><img src="${a.shot.thumb.url}" width="${a.shot.thumb.w}" height="${a.shot.thumb.h}" alt="${esc(name)}" loading="lazy" decoding="async"></a>` : '';
       return `<article class="app" id="app-${esc(a.id)}">
 <div class="app-head">${a.iconImg ? `<img src="${a.iconImg.url}" width="56" height="56" alt="" loading="lazy">` : ''}<div><h3>${esc(name)}</h3>${tag ? `<p class="app-tag">${esc(tag)}</p>` : ''}</div></div>
+${a.upcoming ? `<span class="iso soon">${esc(t.apps.upcoming.replace('{v}', a.upcoming))}</span>` : ''}
 ${a.isolated ? `<span class="iso" title="${esc(t.apps.isolatedTitle)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>${esc(t.apps.isolated)}</span>` : ''}
 ${feats.length ? `<ul>\n${feats.map((f) => `<li>${esc(f)}</li>`).join('\n')}\n</ul>` : ''}
 ${shot}
@@ -672,10 +732,79 @@ ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompar
     }, t));
   });
 
+  // The paper's Changelog section (id "changelog"; a translated heading is renamed to it) gets every
+  // release of CHANGELOG.md after its summary table, each one a collapsible <details> with the newest
+  // open. Release headings are h3 (in the table of contents), their Added/Fixed… h4 and below h5;
+  // every id is prefixed with the release's ("changelog-0-8-4-1-added") so none collides with the
+  // paper's. The notes are English only: es and pt pages say so and mark the block lang="en".
+  const addChangelog = (html, headings) => {
+    const C = t.changelog;
+    const isChl = (h) => h.level === 2 && (h.id === 'changelog' || /^(\d+\.\s*)?(changelog|historial de (cambios|versiones)|registro de cambios|hist[oó]rico de (vers[oõ]es|altera[cç][oõ]es|mudan[cç]as)|registro de altera[cç][oõ]es)$/i.test(h.text.trim()));
+    let sec = headings.find(isChl);
+    if (sec && sec.id !== 'changelog') {
+      html = html.replace(`<h2 id="${sec.id}">`, '<h2 id="changelog">').replaceAll(`href="#${sec.id}"`, 'href="#changelog"');
+      sec.id = 'changelog';
+    }
+    if (!sec) {
+      // the paper has no Changelog section in this language: add one at the end
+      sec = { level: 2, id: 'changelog', text: C.title };
+      headings.push(sec);
+      html += `\n<h2 id="changelog">${esc(C.title)}<a class="anchor" href="#changelog" aria-label="${esc(t.pages.anchorLabel || 'Link to this section')}">#</a></h2>`;
+    }
+    const taken = new Set(headings.map((h) => h.id));
+    const latest = changelog.find((r) => !r.unreleased && !r.yanked);
+    const fmt = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString(l === 'en' ? 'en-US' : l === 'es' ? 'es-AR' : 'pt-BR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    const relHeads = [];
+    const rels = changelog.map((r, k) => {
+      const pre = r.id;
+      const { html: inner } = markdown(r.body, {
+        anchorLabel: t.pages.anchorLabel,
+        link: (u) => (u.startsWith('#') ? `#${pre}-${u.slice(1)}` : ghLink(u)),
+        image: (url, alt) => esc(alt),
+      });
+      const body = inner.replace(/<h([4-6]) id="([^"]+)"/g, (_, n, x) => {
+        const id = `${pre}-${x}`;
+        if (taken.has(id)) console.warn('[web] changelog: duplicate id', id);
+        taken.add(id);
+        return `<h${n} id="${id}"`;
+      });
+      if (taken.has(pre)) console.warn('[web] changelog: id already used in the paper', pre);
+      taken.add(pre);
+      const name = r.unreleased ? C.unreleased : `${r.version}${r.beta ? ' Beta' : ''}`;
+      relHeads.push({ level: 3, id: pre, text: name });
+      const tags = [
+        r.unreleased ? `<span class="chl-tag chl-dev">${esc(C.inDev)}</span>` : '',
+        r === latest ? `<span class="chl-tag chl-new">${esc(C.latest)}</span>` : '',
+        r.yanked ? `<span class="chl-tag chl-yank">${esc(C.yanked)}</span>` : '',
+        r.date ? `<span class="chl-date">${esc(C.released)} <time datetime="${esc(r.date)}">${esc(fmt(r.date))}</time></span>` : '',
+      ].filter(Boolean).join('');
+      const gh = r.url ? `<p class="chl-gh"><a href="${esc(r.url)}" rel="noopener">${esc(C.compare)}</a></p>` : '';
+      return `<details class="chl"${k === 0 ? ' open' : ''}><summary><h3 id="${pre}">${esc(name)}</h3>${tags ? `<span class="chl-meta">${tags}</span>` : ''}</summary><div class="chl-body"${l === 'en' ? '' : ' lang="en"'}>\n${body}\n${gh}</div></details>`;
+    });
+    const block = `<!--chlog--><div class="chlog">
+<p class="chlog-lead">${inline(C.lead)}</p>${C.note ? `\n<p class="chlog-note">${esc(C.note)}</p>` : ''}
+${rels.join('\n')}
+</div><!--/chlog-->`;
+    // after the section's own content (the summary table), before the next ## heading
+    const start = html.indexOf('<h2 id="changelog"');
+    const next = html.indexOf('<h2 ', start + 1);
+    html = next < 0 ? `${html}\n${block}` : `${html.slice(0, next)}${block}\n${html.slice(next)}`;
+    const si = headings.indexOf(sec);
+    let ni = headings.findIndex((h, k) => k > si && h.level <= 2);
+    if (ni < 0) ni = headings.length;
+    headings.splice(ni, 0, ...relHeads);
+    return { html, headings };
+  };
+
   if (HAS_PAPER) {
     const { data: fm, body } = frontMatter(fs.readFileSync(path.join(paperDir, `paper.${l}.md`), 'utf8'));
     const meta = { ...fm, ...paperMeta };
-    const { html: bodyHtml, headings } = renderMd(body, paperDiagrams.diagrams || [], paperDiagrams.screenshots || meta.screenshots || []);
+    if (l === 'en') {         // docs/PAPER.md, the copy on GitHub, always follows the English paper
+      const md = paperMarkdown(body, meta, paperDiagrams.diagrams || []), dst = path.join(REPO, 'docs', 'PAPER.md');
+      if (!fs.existsSync(dst) || fs.readFileSync(dst, 'utf8') !== md) { fs.writeFileSync(dst, md); log('docs/PAPER.md regenerated from paper.en.md'); }
+    }
+    let { html: bodyHtml, headings } = renderMd(body, paperDiagrams.diagrams || [], paperDiagrams.screenshots || meta.screenshots || []);
+    if (changelog.length) ({ html: bodyHtml, headings } = addChangelog(bodyHtml, headings));
     const title = loc(meta.title, l) || fm.title || 'LordOS';
     const subtitle = loc(meta.subtitle, l) || fm.subtitle || '';
     // two-level table of contents from ## and ###
@@ -766,6 +895,17 @@ ${(c.items || []).map((it) => {
     }, t));
   }
 
+  // tested hardware (0.8.7)
+  if (HAS_HW) {
+    const H = t.pages.hardware;
+    const sec = renderSections(hwModel, H, esc, (k) => `${GITHUB}/issues/${k}`);
+    write(path.join(pageUrl(l, 'hardware'), 'index.html'), render(tpl.hardware, {
+      ...common('hardware', [`${H.title} · LordOS`, H.lead], true), ...sec,
+      status: HW_IN_DEV ? esc(H.statusDev.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
+      newIssue: `${GITHUB}/issues/new?template=hardware-report.yml`,
+    }, t));
+  }
+
   // about
   {
     const A = t.pages.about;
@@ -785,6 +925,17 @@ ${(c.items || []).map((it) => {
       people, work, liIcon: li, lumoWave: img.lumoWave,
       siteUrl: esc(team.company.site.replace('{lang}', l)), companyLinkedin: esc(team.company.linkedin),
       contactUrl: esc(team.company.contact.replace('{lang}', l)), supportUrl: prefix(l) + '#support',
+    }, t));
+  }
+}
+
+// the LordOS Imager guide, per language
+if (HAS_GUIDE) {
+  for (const l of LANGS) {
+    const t = dict[l];
+    const { main, meta } = imagerGuide({ content: imagerDir, repo: REPO, lang: l, t, g: guideText[l], version: MEDIA_VERSION, esc, webp, hashed, read, lumo: LUMO, pageUrl, prefix, links: imagerLinks(l), videoDir: IMAGER_VIDEO_DIR });
+    write(path.join(pageUrl(l, 'imager'), 'index.html'), render(tpl.imager, {
+      js: jsUrl, header: header(t, 'imager'), footer: footer(t, 'imager'), head: head(t, 'imager', meta, 'imager'), lightbox: render(tpl.lightbox, {}, t), main,
     }, t));
   }
 }
@@ -824,7 +975,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), 'about', ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>
@@ -854,12 +1005,14 @@ for (const f of html) {
     const msg = 'forbidden wording in ' + path.relative(DIST, f) + ': ' + s.match(/.{0,60}(operating system|sistema operativo|sistema operacional|\b(?:our|own|nuestro|propio|próprio|nosso)\s+X11\b|\bX11\s+(?:display\s+)?server\b|from scratch|desde cero|\bdo zero\b).{0,40}/i)[0];
     if (process.env.WEB_SKIP_WORDING) console.warn('[web] WARNING ' + msg); else throw new Error(msg);
   }
-  { const m = s.replace(/<[^>]+>/g, ' ').match(/.{0,70}(\bPi (4|400|500)\b|\bCM[45]\b).{0,50}/i); if (m) throw new Error(`only the Raspberry Pi 5 is supported; other models are not mentioned in website copy (${path.relative(DIST, f)}): …${m[0].trim()}…`); }
+  // CHANGELOG.md quoted verbatim on the paper (between <!--chlog--> marks) keeps its own history,
+  // which names other boards in two notes; every other check still covers it
+  { const m = s.replace(/<!--chlog-->[\s\S]*?<!--\/chlog-->/g, ' ').replace(/<[^>]+>/g, ' ').match(/.{0,70}(\bPi (4|400|500)\b|\bCM[45]\b).{0,50}/i); if (m) throw new Error(`only the Raspberry Pi 5 is supported; other models are not mentioned in website copy (${path.relative(DIST, f)}): …${m[0].trim()}…`); }
 }
 const jsSize = Buffer.byteLength(jsSrc) + Buffer.byteLength(themeSrc), cssSize = Buffer.byteLength(css);
 if (jsSize > 15 * 1024) throw new Error(`JS is ${jsSize} bytes (limit 15 KB)`);
 if (cssSize > 30 * 1024) throw new Error(`site.css is ${cssSize} bytes (limit 30 KB)`);
-for (const [n, c] of [['doc.css', docCss], ['home.css', homeCss]]) if (c.length > 30 * 1024) throw new Error(`${n} is ${c.length} bytes (limit 30 KB)`);
+for (const [n, c] of [['doc.css', docCss], ['home.css', homeCss], ['imager.css', imagerCss]]) if (c.length > 30 * 1024) throw new Error(`${n} is ${c.length} bytes (limit 30 KB)`);
 log(`built ${html.length} pages into web/dist (js ${jsSize} B, css ${cssSize} B, ${shots.length} gallery images, ${apps.length} apps); install.sh byte-identical`);
 
 // ---------- paper PDFs (headless Chromium prints the built page) ----------

@@ -1,6 +1,6 @@
 // Top menu bar: L menu, active app, Window menu, keyboard layout,
 // Control Center and clock.
-import { View, Text, useClock, wm, getApp, session, useAppMenus, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock } from '@lordos/sdk';
+import { View, Text, useClock, wm, getApp, session, useAppMenus, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems } from '@lordos/sdk';
 import { useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -37,7 +37,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
   const clock = useClock(format, 1000);
   useSettings();         // the active keyboard layout lives in the settings
   const [open, setOpen] = useState(null);
-  const refs = { logo: useRef(null), window: useRef(null), help: useRef(null) };
+  const refs = { logo: useRef(null), app: useRef(null), window: useRef(null), help: useRef(null) };
   const appRefs = useRef({});
   const app = focused ? getApp(focused) : null;
   const extra = useAppMenus(focused) || [];
@@ -55,8 +55,13 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
       { label: tr('shell.menu.about'), onClick: () => wm.open('about') },
       '-',
       { label: tr('shell.menu.settings'), onClick: () => wm.open('settings') },
+      ...(getApp('store') ? [(() => { const n = storeUpdates(); return { label: tr('shell.menu.store'), hint: n ? tr('shell.menu.storeUpdates', { count: n }) : undefined,
+        onClick: () => wm.open('store', n ? { args: { page: 'updates' } } : undefined) }; })()] : []),
       { label: tr('shell.menu.apps'), hint: 'F4', onClick: onLaunchpad },
       '-',
+      { label: tr('shell.menu.recent'), submenu: recentItems(10) },
+      '-',
+      ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), hint: '❖⌥Esc', onClick: () => wm.open('forcequit') }, '-'] : []),
       ...(session.managed() ? [
         { label: tr('shell.menu.lock'), hint: '❖L', onClick: () => session.lock() },
         { label: tr('shell.menu.switchUser'), onClick: () => session.switchUser() },
@@ -68,12 +73,10 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         { label: tr('shell.menu.shutdown'), onClick: () => session.shutdown() },
       ] : []),
     ] },
-    window: { items: [
-      { label: tr('shell.window.minimize'), disabled: !app, onClick: () => wm.minimize(focused) },
-      { label: tr('shell.window.maximize'), disabled: !app, onClick: () => wm.toggleMaximize(focused) },
-      '-',
-      { label: tr('shell.window.close'), disabled: !app, onClick: () => wm.close(focused) },
-    ] },
+    // the app menu under the app's name (About, Settings…, Hide, Quit; sdk/appcontrol.js)
+    app: { items: app ? appMenuItems(focused) : [{ label: tr('shell.menu.about'), onClick: () => wm.open('about') }] },
+    // Minimize, Zoom, Fill, Center, Move & Resize, Move to <display>, the open windows (sdk/windowmenu.js)
+    window: { items: windowMenuItems(app ? focused : null) },
     help: { items: [
       ...(getApp('help') ? [{ label: tr('shell.help.open'), onClick: () => wm.open('help') }, { label: tr('shell.help.tour'), onClick: () => help.startTour() }, '-'] : []),
       { label: tr('shell.menu.about'), onClick: () => wm.open('about') },
@@ -93,7 +96,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)}>
           <LordOSGlyph size={16} color={t.menuText} />
         </BarItem>
-        <BarItem t={t}><Label t={t} bold>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)}><Label t={t} bold>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
         {extra.map((m, i) => {
           const key = `app${i}`;
           const ref = { get current() { return appRefs.current[key]; } };

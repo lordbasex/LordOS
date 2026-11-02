@@ -11,6 +11,7 @@
 #include "pkg/deb.h"
 #include "pkg/idx.h"
 #include "pkg/pgp.h"
+#include "pkg/pin.h"
 #include "pkg/pkg.h"
 #include "pkg/resolve.h"
 #include "pkg/status.h"
@@ -315,6 +316,167 @@ static void test_resolver(const char *dir) {
     idx_close(&x);
 }
 
+/* apt's preferences: the Raspberry Pi image's pins (tools/rpi/rootfs/etc/apt/preferences.d/raspberrypi
+ * and build-img.sh's lordos-kernel), checked against what apt chooses. */
+static const char *PI_DEBIAN =
+    "Package: chromium\nVersion: 140.0-1~deb13u1\nArchitecture: arm64\nFilename: pool/c/chromium.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: c\n\n"
+    "Package: bluez\nVersion: 5.82-1\nArchitecture: arm64\nFilename: pool/b/bluez.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: b\n\n"
+    "Package: mesa\nVersion: 25.0-1\nArchitecture: arm64\nFilename: pool/m/mesa.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: m\n\n";
+static const char *PI_RPI =
+    "Package: chromium\nVersion: 1:141.0-1+rpt1\nArchitecture: arm64\nFilename: pool/c/chromium-rpt.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: c\n\n"
+    "Package: bluez\nVersion: 5.82-1+rpt2\nArchitecture: arm64\nFilename: pool/b/bluez-rpt.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: b\n\n"
+    "Package: rpi-eeprom\nVersion: 28.4-1\nArchitecture: all\nFilename: pool/r/rpi-eeprom.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: r\n\n"
+    "Package: raspi-config\nVersion: 2025\nArchitecture: all\nFilename: pool/r/raspi-config.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: r\n\n"
+    "Package: linux-image-rpi-2712\nVersion: 1:6.12.47-1+rpt1\nArchitecture: arm64\nFilename: pool/l/k.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: k\n\n";
+static const char *PI_LORDOS =
+    "Package: rpi-eeprom\nVersion: 28.3-1\nArchitecture: all\nFilename: pool/rpi/r/rpi-eeprom.deb\nSize: 9\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: r\n\n";
+static const char *PI_PREFS =
+    "# LordOS on Raspberry Pi\n"
+    "Package: *\nPin: origin archive.raspberrypi.com\nPin-Priority: 100\n\n"
+    "Package: raspi-firmware linux-image-rpi-* linux-image-*-rpi-* rpi-eeprom raspi-utils* raspberrypi-archive-keyring\n"
+    "Pin: origin archive.raspberrypi.com\nPin-Priority: 990\n";
+static const char *PI_KERNEL =
+    "Explanation: LordOS's own kernel\nPackage: linux-image-rpi-2712 linux-image-*+rpt-rpi-2712\nPin: version *\nPin-Priority: -1\n";
+
+static void write_text(const char *path, const char *text) {
+    FILE *f = fopen(path, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+static const char *cand_ver(const Idx *x, const char *name, const StPkg *inst) {
+    long c = pkg_candidate(x, name, strlen(name), inst);
+    return c < 0 ? "-" : idx_s(x, x->pkg[c].version);
+}
+
+/* (0.8.7) lordos-hwdata, the signed tested-hardware snapshot (tools/iso/mkdeb-hwdata.sh): an Architecture: all
+ * package that lordos depends on, whose versions are dates. Updating lordos from a release without it brings it
+ * in, and a newer snapshot alone is an ordinary upgrade (docs/BENCHMARK.md, "Newer snapshots between releases"). */
+static const char *HW_REPO =
+    "Package: lordos\nVersion: 0.8.7\nArchitecture: amd64\nDepends: libc6 (>= 2.38), lordos-hwdata (>= 2026.10.27)\nFilename: pool/main/l/lordos/lordos_0.8.7_amd64.deb\nSize: 9000\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: l\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.10.29\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.10.29_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.11.05.1\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.11.05.1_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n"
+    "Package: lordos-hwdata\nVersion: 2026.11.05\nArchitecture: all\nMulti-Arch: foreign\nFilename: pool/main/l/lordos-hwdata/lordos-hwdata_2026.11.05_all.deb\nSize: 3\nSHA256: 0000000000000000000000000000000000000000000000000000000000000000\nDescription: h\n\n";
+static const char *HW_OLD =        /* a 0.8.5 system: no lordos-hwdata */
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.5\nArchitecture: amd64\nDepends: libc6 (>= 2.38)\nDescription: l\n\n";
+static const char *HW_NEW =        /* 0.8.7 with an older snapshot */
+    "Package: libc6\nStatus: install ok installed\nVersion: 2.41\nArchitecture: amd64\nDescription: c\n\n"
+    "Package: lordos\nStatus: install ok installed\nVersion: 0.8.7\nArchitecture: amd64\nDepends: libc6 (>= 2.38), lordos-hwdata (>= 2026.10.27)\nDescription: l\n\n"
+    "Package: lordos-hwdata\nStatus: install ok installed\nVersion: 2026.10.29\nArchitecture: all\nDescription: h\n\n";
+
+static const char *item_ver(const Plan *p, const char *name) {
+    for (int i = 0; i < p->n; i++) if (!strcmp(p->items[i].name, name)) return p->items[i].version;
+    return "-";
+}
+
+static void test_hwdata(const char *dir) {
+    char idir[700], sp[700], err[200];
+    snprintf(idir, sizeof idir, "%s/hwidx", dir);
+    mkdir(idir, 0755);
+    CHECK(ver_cmp("2026.11.05.1", "2026.11.05") > 0 && ver_cmp("2026.11.05", "2026.10.29.9") > 0 && ver_cmp("2026.10.29", "2026.10.27") > 0,
+          "snapshot versions: the date, then .N for a second one that day");
+    IdxBuilder *b = idxb_new();
+    int s = idxb_source(b, "https://lordos.org/apt", "stable", "main", "stable", "LordOS", "LordOS", 0, 0, 500);
+    idxb_packages(b, s, HW_REPO, strlen(HW_REPO), "amd64");
+    CHECK(!idxb_write(b, idir, "amd64", err, sizeof err), "write hwdata index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, idir) && x.h->npkg == 4, "hwdata index: the all packages are in the amd64 one (%u)", x.map ? x.h->npkg : 0);
+    Status st = { 0 };
+    Plan p;
+    PlanOpts o = { 0 };
+    /* Store → Updates' LordOS card: pkg-install lordos brings the new dependency, its newest version */
+    snprintf(sp, sizeof sp, "%s/hwstatus-old", dir);
+    write_text(sp, HW_OLD);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 2, "old status");
+    const char *lo[] = { "lordos" };
+    plan_make(&x, &st, lo, 1, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 2 && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_INSTALL, "lordos-hwdata") && !strcmp(item_ver(&p, "lordos-hwdata"), "2026.11.05.1"),
+          "updating lordos installs lordos-hwdata 2026.11.05.1: %d %s %s", p.n, item_ver(&p, "lordos-hwdata"), p.err);
+    plan_free(&p);
+    /* Update all (pkg-upgrade) does the same */
+    o = (PlanOpts){ .upgrade_all = 1 };
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && has(&p, PA_UPGRADE, "lordos") && has(&p, PA_INSTALL, "lordos-hwdata"), "update all brings lordos-hwdata too: %s", p.err);
+    plan_free(&p);
+    status_free(&st);
+    /* between releases: only the snapshot is newer, an upgrade of one package */
+    snprintf(sp, sizeof sp, "%s/hwstatus-new", dir);
+    write_text(sp, HW_NEW);
+    memset(&st, 0, sizeof st);
+    CHECK(!status_load(&st, sp, "amd64") && st.n == 3, "new status");
+    plan_make(&x, &st, NULL, 0, NULL, 0, &o, &p);
+    CHECK(p.ok && p.n == 1 && has(&p, PA_UPGRADE, "lordos-hwdata") && !strcmp(item_ver(&p, "lordos-hwdata"), "2026.11.05.1"),
+          "a newer snapshot alone: one upgrade, %d %s", p.n, p.err);
+    plan_free(&p);
+    status_free(&st);
+    idx_close(&x);
+}
+
+static void test_pins(const char *dir) {
+    char root[600], path[700];
+    snprintf(root, sizeof root, "%s/pins", dir);
+    snprintf(path, sizeof path, "%s/etc", root); mkdir(root, 0755); mkdir(path, 0755);
+    snprintf(path, sizeof path, "%s/etc/apt", root); mkdir(path, 0755);
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d", root); mkdir(path, 0755);
+    pin_root = root;
+    IdxBuilder *b = idxb_new();
+    int deb = idxb_source(b, "http://deb.debian.org/debian", "stable", "main", "trixie", "Debian", "Debian", 0, 0, 500);
+    int rpi = idxb_source(b, "http://archive.raspberrypi.com/debian", "trixie", "main", "trixie", "Raspberry Pi Foundation", "Raspberry Pi Foundation", 0, 0, 500);
+    int lord = idxb_source(b, "https://lordos.org/apt", "stable", "rpi", "lordos", "LordOS", "LordOS", 0, 0, 500);
+    idxb_packages(b, deb, PI_DEBIAN, strlen(PI_DEBIAN), "arm64");
+    idxb_packages(b, rpi, PI_RPI, strlen(PI_RPI), "arm64");
+    idxb_packages(b, lord, PI_LORDOS, strlen(PI_LORDOS), "arm64");
+    char idir[700], err[200];
+    snprintf(idir, sizeof idir, "%s/pinidx", dir);
+    mkdir(idir, 0755);
+    CHECK(!idxb_write(b, idir, "arm64", err, sizeof err), "write pinned index: %s", err);
+    idxb_free(b);
+    Idx x;
+    CHECK(!idx_open(&x, idir) && !x.prio, "no preferences: source priorities only");
+    CHECK(!strcmp(cand_ver(&x, "chromium", NULL), "1:141.0-1+rpt1"), "without pins the newest wins (the old bug): %s", cand_ver(&x, "chromium", NULL));
+    idx_close(&x);
+
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d/raspberrypi", root); write_text(path, PI_PREFS);
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d/lordos-kernel", root); write_text(path, PI_KERNEL);
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d/ignored.list", root); write_text(path, "Package: *\nPin: version *\nPin-Priority: -1\n");
+    CHECK(!idx_open(&x, idir) && x.prio, "preferences read");
+    CHECK(!strcmp(cand_ver(&x, "chromium", NULL), "140.0-1~deb13u1"), "chromium from Debian: %s", cand_ver(&x, "chromium", NULL));
+    CHECK(!strcmp(cand_ver(&x, "bluez", NULL), "5.82-1"), "bluez from Debian: %s", cand_ver(&x, "bluez", NULL));
+    CHECK(!strcmp(cand_ver(&x, "rpi-eeprom", NULL), "28.4-1"), "rpi-eeprom pinned 990 to Raspberry Pi: %s", cand_ver(&x, "rpi-eeprom", NULL));
+    CHECK(!strcmp(cand_ver(&x, "raspi-config", NULL), "2025"), "only in Raspberry Pi's archive (100): still installable");
+    CHECK(!strcmp(cand_ver(&x, "linux-image-rpi-2712", NULL), "-"), "Raspberry Pi's kernel never (-1)");
+    CHECK(!strcmp(cand_ver(&x, "mesa", NULL), "25.0-1"), "untouched package");
+    /* installed versions */
+    StPkg deb_chr = { .name = "chromium", .version = "140.0-1~deb13u1" };
+    StPkg rpt_chr = { .name = "chromium", .version = "1:141.0-1+rpt1" };
+    StPkg old_chr = { .name = "chromium", .version = "139.0-1" };
+    CHECK(!strcmp(cand_ver(&x, "chromium", &deb_chr), "140.0-1~deb13u1"), "Debian's chromium installed: stays (no switch to +rpt)");
+    CHECK(!strcmp(cand_ver(&x, "chromium", &rpt_chr), "1:141.0-1+rpt1"), "an installed +rpt build is not downgraded below 1000");
+    CHECK(!strcmp(cand_ver(&x, "chromium", &old_chr), "140.0-1~deb13u1"), "an older chromium upgrades to Debian's");
+    StPkg rpt_cfg = { .name = "raspi-config", .version = "2024" };
+    CHECK(!strcmp(cand_ver(&x, "raspi-config", &rpt_cfg), "2025"), "same priority (100): the newer one upgrades");
+    /* a change in preferences.d is noticed without a new index */
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d/zz-rpt.pref", root);
+    write_text(path, "Package: chromium\nPin: release o=Raspberry Pi Foundation\nPin-Priority: 1001\n\nbroken stanza\n\nPackage: bluez\nPin: release v=1\nPin-Priority: 2000\n");
+    struct timespec ts = { 0, 20000000 };
+    nanosleep(&ts, NULL);
+    CHECK(idx_refresh(&x, idir) == 1, "preferences changed: priorities recomputed");
+    CHECK(!strcmp(cand_ver(&x, "chromium", &deb_chr), "1:141.0-1+rpt1"), "chromium pinned 1001 to Raspberry Pi: %s", cand_ver(&x, "chromium", &deb_chr));
+    StPkg new_chr = { .name = "chromium", .version = "1:150" };
+    CHECK(!strcmp(cand_ver(&x, "chromium", &new_chr), "1:141.0-1+rpt1"), "priority 1000 or more downgrades, as in apt");
+    CHECK(!strcmp(cand_ver(&x, "bluez", NULL), "5.82-1"), "release v= is not checked: never matches");
+    idx_close(&x);
+    /* the first specific pin naming a package decides; later ones for it are ignored */
+    snprintf(path, sizeof path, "%s/etc/apt/preferences.d/0-first", root);
+    write_text(path, "Package: /^chrom/\nPin: origin deb.debian.org\nPin-Priority: 600\n");
+    CHECK(!idx_open(&x, idir), "reopened");
+    CHECK(!strcmp(cand_ver(&x, "chromium", &deb_chr), "140.0-1~deb13u1"), "a /regex/ pin read first wins over zz-rpt.pref: %s", cand_ver(&x, "chromium", &deb_chr));
+    CHECK(!strcmp(cand_ver(&x, "chromium", &new_chr), "-"), "nothing newer than the installed one: no candidate");
+    idx_close(&x);
+    pin_root = dir;                     /* the other tests: no preferences */
+}
+
 static int cmd_plan(int argc, char **argv) {
     Idx x;
     Status st = { 0 };
@@ -397,7 +559,10 @@ int main(int argc, char **argv) {
     test_notes();
     test_crypto();
     test_compress();
+    pin_root = dir;                     /* never the machine's own /etc/apt/preferences */
     test_resolver(dir);
+    test_hwdata(dir);
+    test_pins(dir);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", dir);
     if (system(cmd)) {}

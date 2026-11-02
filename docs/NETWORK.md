@@ -35,6 +35,11 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
 - **What it is.** `lord-netd` is `admin.c` built with `LORD_NETD` (`server/src/net/netd.c` only has
   `main`). Its table has **only** the `net-*` actions, with the same validation, and it runs
   nothing those actions didn't already run. libc only.
+- **Its own cgroup leaf** (0.8.5): before its execve, the child moves itself into the root-owned
+  `lordos.service/netd` leaf (`cgroup_service_leaf`), next to lord-sessiond's `supervisor` leaf, so
+  Monitor → Network can count the network service's own traffic ("Network service", never
+  blockable; `FIREWALL.md`, "The essential system services"). A lord-netd adopted from before the
+  update stays where it was until it restarts.
 - **When it starts.** `lord-sessiond` starts it at boot, before the greeter
   (`server/src/remote/netsup.c`):
   - fixed path `<lord-sessiond's directory>/lord-netd`, root-owned and not writable by others
@@ -47,10 +52,10 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
   logs in.
 - **Sessions** bring nothing up. Each session's helper connects to `/run/lordos/netd.sock`
   (`SO_PEERCRED`: uid 0 only), introduces itself with `HELLO <user>` and forwards every `net-*`
-  action as it is. `lord-netd` works out again whether that user is an administrator (group sudo)
+  action as it is. `lord-netd` works out again whether that user is an administrator (groups sudo, admin or wheel)
   and applies `A_ANYONE` as before. Replies go back to the helper that asked; events
   (`net dhcp…`, `net wifi…`, `net vpn…`) go to every session. Settings → Network didn't change.
-- **A session's `net-restore`** answers `OK 0 interfaz(es): la red es del sistema (lord-netd)`.
+- **A session's `net-restore`** answers `OK net.restoreSystem` ("The network is managed by the system").
 - **Wi-Fi and VPN passwords** stay in `/etc/lordos/net/wifi` and `/etc/lordos/net/vpn` (root, 0600).
   They travel over the socket between two root processes and never go back to a session.
 - **If `lord-netd` exits,** `lord-sessiond` starts it again: it waits 1, 2, 4… up to 30 s, and goes
@@ -66,8 +71,8 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
   `/run/lordos/netd.lock` (`flock`) prevents two from running.
 - **Sessions reconnect:** when `lord-netd` restarts, each session's helper sees it come back with
   inotify on `/run/lordos` (the socket is created under another name and renamed once it listens)
-  and reconnects. An action in progress answers "la red del sistema se reinició: probá de nuevo"
-  ("the system network restarted: try again").
+  and reconnects. An action in progress answers `ERR netd.restarted` ("The system network service
+  restarted; try again").
 - **Without `lord-sessiond`** (a standalone `lord-server`, in development) there is no
   `/run/lordos/netd.enabled`, and the session's helper runs the network itself, as before (with
   `net-owner`). With that mark, a session never brings the network up on its own.
@@ -165,27 +170,30 @@ Field values:
 ## Actions (`admin.run('net-…', arg)`)
 
 The argument can have several lines (`\n`). "Anyone" means you don't need to be an administrator, as in NetworkManager.
+Replies are code lines, never prose (`server/src/admin.h`, `errcode.h`): `OK <code> key=value…` or
+`ERR <code> …`, which the UI translates with `t('status.<code>')` and `t('errors.<code>')`; a few
+replies carry only data (a count, a public key).
 
 | Action | Argument | Who | Response |
 |---|---|---|---|
-| `net-restore` | — | anyone | With `lord-netd`, it runs it by itself at boot; the one each session sends answers `OK 0 … la red es del sistema`. Without `lord-netd` (development) the first session applies it, noted in `/run/lordos/net-owner` while alive. It applies the configs in `/etc/lordos/net/if`, and free physical interfaces without a config go through DHCP (with Wi-Fi: wpa_supplicant plus the saved networks). `OK <n>` |
+| `net-restore` | — | anyone | With `lord-netd`, it runs it by itself at boot; the one each session sends answers `OK net.restoreSystem`. Without `lord-netd` (development) the first session applies it, noted in `/run/lordos/net-owner` while alive. It applies the configs in `/etc/lordos/net/if`, and free physical interfaces without a config go through DHCP (with Wi-Fi: wpa_supplicant plus the saved networks). `OK net.restored count=<n>` |
 | `net-up` / `net-down` | `if` | admin | `net-down` also stops its DHCP/wpa |
 | `net-config` | `if\nmethod=dhcp\|static\|off\naddress=ip/n\n…gateway=ip\ndns=ip…` | admin | Saves and applies. Rejects system interfaces. |
 | `net-manage` / `net-unmanage` | `if` | admin | Writes and deletes `/etc/systemd/network/00-lordos-<if>.network` (`Unmanaged=yes`) and runs `networkctl reload`. |
 | `net-wifi-scan` | `if` | anyone | One `LOG` per network with `{ ssid, bssid, freq, signal, security: open\|wep\|wpa\|wpa2\|wpa2/wpa3\|wpa3\|enterprise, known }`, then `OK <n>` (≈3–10 s) |
-| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK conectando…`. The result arrives as an EVENT. |
+| `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. |
 | `net-wifi-disconnect` | `if` | anyone | |
 | `net-wifi-forget` | `ssid` | admin | |
-| `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK importada`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR falta el programa de <tipo>…` |
-| `net-vpn-enable` | `openconnect\|fortinet` | admin | Installs `openconnect` or `openfortivpn` with LordOS's package engine (the same as `pkg-install`): `LOG progress …` and `OK n instalado(s)…`. If it was already there: `OK ya estaba instalado`. |
+| `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK vpn.imported`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR vpn.missingProgram type=<type> package=<package>` |
+| `net-vpn-enable` | `openconnect\|fortinet` | admin | Installs `openconnect` or `openfortivpn` with LordOS's package engine (the same as `pkg-install`): `LOG progress …` and the package engine's `OK`. If it was already there: `OK vpn.alreadyInstalled`. |
 | `net-vpn-credentials` | `name\nuser\npassword` | admin | OpenVPN only. Stored with mode 0600. |
-| `net-vpn-up` / `net-vpn-down` | `name` | anyone | WireGuard: `OK conectada`. OpenVPN: `OK conectando` and then an EVENT. |
+| `net-vpn-up` / `net-vpn-down` | `name` | anyone | WireGuard: `OK vpn.connected`. The others: `OK vpn.connecting` and then an EVENT. |
 | `net-vpn-delete` | `name` | admin | |
 | `net-vpn-status` | `name` or empty | anyone | One `LOG` per VPN and then `OK <n>`:<br>`{ name, type:'wireguard', ifname, active, peers: [{ publicKey, endpoint, lastHandshake (unix), rxBytes, txBytes }] }`<br>`{ name, type:'openvpn', ifname, running, active }`<br>`{ name, type:'ipsec'\|'pptp'\|'openconnect'\|'fortinet', ifname, running, active, address }` |
 
 VPN names accept `[A-Za-z0-9_-]`, up to 24 characters. The interface, lowercased and trimmed to 15 characters, is `wg-`, `ovpn-`, `ips-`, `ppp-`, `oc-` or `fvpn-` + the name.
 
-For every type other than WireGuard, `net-vpn-up` answers `OK conectando` and the result arrives as an EVENT. Only one IPsec can be connected at a time, because charon uses `/run/charon.pid`; the second one answers `ERR ya hay otra VPN IPsec conectada` ("another IPsec VPN is already connected").
+For every type other than WireGuard, `net-vpn-up` answers `OK vpn.connecting` and the result arrives as an EVENT. Only one IPsec can be connected at a time, because charon uses `/run/charon.pid`; the second one answers `ERR vpn.ipsecBusy` ("Another IPsec VPN is already connected").
 
 ### Import formats (IPsec, PPTP, OpenConnect, Fortinet)
 

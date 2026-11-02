@@ -126,7 +126,7 @@ static const char *basename_of(const char *p) { const char *s = strrchr(p, '/');
 
 /* ---- playback ---- */
 
-/* play(app, path, { loop, native, autoplay, audio, hw, volume, music, appName }) → id */
+/* play(app, path, { loop, native, autoplay, audio, hw, hwOnly, rate, volume, music, appName }) → id */
 static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 2) return JS_EXCEPTION;
@@ -147,8 +147,8 @@ static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     int hw = opt_int(c, o, "hw", 1, 0, 1);
     if (hw) render = media_render_fd();
     char params[256];
-    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
-             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, media_hwaccel());
+    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
+             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), opt_int(c, o, "rate", 100, 10, 100), media_hwaccel());
     int fds[3] = { in, ring, render };
     s->sock = media_spawn(MK_PLAY, params, fds, 3, &s->pid);
     close(in);
@@ -674,6 +674,13 @@ static JSValue f_hwaccel(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_NewString(c, media_hwaccel());
 }
 
+/* composition(): "gpu" when the GPU composes this session (main.c lord_composition). */
+const char *lord_composition(void);
+static JSValue f_composition(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewString(c, lord_composition());
+}
+
 /* hwDecode(): can this computer decode VP9/AV1 in hardware? The object from media/hwdec.c, or null
  * while it is being found out (the first call starts it; cached per boot). docs/VIDEO.md */
 static JSValue f_hwdecode(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -711,6 +718,7 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("protectedCount", 0, f_protected),
     JS_CFUNC_DEF("hwaccel", 0, f_hwaccel),
     JS_CFUNC_DEF("hwDecode", 0, f_hwdecode),
+    JS_CFUNC_DEF("composition", 0, f_composition),
 };
 
 /* A restriction was just added to the built-in apps: what it covers stops now, like revoking the

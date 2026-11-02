@@ -1,5 +1,6 @@
 {
   "id": "calculator",
+  "version": "0.8.5",
   "name": "Calculator",
   "description": "Calculator with keyboard input",
   "size": [

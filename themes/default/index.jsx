@@ -1,4 +1,4 @@
-// "Lord Default" theme — a menu bar and dock layout, with its own assets.
+// "Lord Flow" theme (id default) — a menu bar and dock layout, with its own assets.
 // The theme builds the desktop (wallpaper, bar, dock, app launcher, Control Center) and the
 // window frames. Apps come from apps/ through the SDK.
 import {
@@ -6,7 +6,9 @@ import {
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
-  findWallpaper, wallpaperSrc,
+  findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, cycleAppWindows, hideApp, hideOthers,
+  toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
+  openOverview, closeOverview, toggleOverview,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
@@ -40,8 +42,6 @@ const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s
 
 // chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame
 configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
-wm.open('files');
-wm.open('about');
 
 // Pinned by default (the user changes the Dock by dragging and with «Keep in Dock»: settings.dockPinned).
 const DOCK_DEFAULT = [...DOCK_ORDER, ...apps.filter((a) => a.dock && !DOCK_ORDER.includes(a.id)).map((a) => a.id)];
@@ -75,6 +75,32 @@ function useMinimizing(windows) {
     .filter((x) => x.win && x.win.minimized);
 }
 
+// Lord Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
+const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
+const minimizeFront = onFront(wm.minimize);
+const hideFront = onFront(hideApp);
+const hideOtherApps = onFront(hideOthers);
+const openForceQuit = () => wm.open('forcequit');
+const toggleDockAutohide = () => settings.set({ dockAutohide: !dockPrefs(settings.get()).dockAutohide });
+const frontSettings = () => { const id = wm.focused(); return id ? appSettingsItem(id) : null; };
+const openFrontSettings = () => frontSettings()?.onClick();
+const switchApps = (e) => openSwitcher(8, e.shift);
+const cycleWindows = (e) => cycleAppWindows(e.shift);
+
+const flowTable = (toggleLauncher) => [
+  { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
+  { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
+  { id: 'dockAutohide', keys: ['Meta+Alt+D'], run: toggleDockAutohide, label: 'shell.shortcuts.dockAutohide', group: 'system' },
+  { id: 'switchApps', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
+  { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: cycleWindows, label: 'shell.shortcuts.cycleWindows', group: 'windows' },
+  { id: 'minimize', keys: ['Meta+M'], run: minimizeFront, label: 'shell.shortcuts.minimize', group: 'windows' },
+  { id: 'hide', keys: ['Meta+H'], run: hideFront, label: 'shell.shortcuts.hide', group: 'windows' },
+  { id: 'hideOthers', keys: ['Meta+Alt+H'], run: hideOtherApps, label: 'shell.shortcuts.hideOthers', group: 'windows' },
+  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: openForceQuit, label: 'shell.shortcuts.forceQuit', group: 'apps' },
+  { id: 'appSettings', keys: ['Meta+,'], run: openFrontSettings, when: frontSettings, label: 'shell.shortcuts.appSettings', group: 'apps' },
+  ...flowDesktopKeys,
+];
+
 // The Dock's right-click menus open toward the inside of the screen, next to the icon.
 function DockMenu({ pos, at, items, onClose }) {
   return pos === 'bottom'
@@ -85,8 +111,9 @@ function DockMenu({ pos, at, items, onClose }) {
 function App() {
   const [s] = useSettings();
   const t = makeTheme(s);
-  const { windows, visible, focused } = useWindows();
+  const { windows, mounted, focused } = useWindows();
   const minimizing = useMinimizing(windows);
+  const minFx = (id) => { const m = minimizing.find((x) => x.win.id === id); return m ? { p: m.p, x: main.x + main.w / 2, y: main.y + main.h - 36 } : undefined; };
   const [launchpad, setLaunchpad] = useState(false);
   const [control, setControl] = useState(null);         // the display whose menu bar opened it
   const [context, setContext] = useState(null);
@@ -103,25 +130,18 @@ function App() {
   const all = screenDisplays();
   const bars = s.menuBarAllDisplays && !screen.mirror ? all : [main];
 
-  // F4 opens the app launcher; Super too, but only if released without being used in a shortcut
-  // (Super+T, Super+D... belong to the apps).
-  useEffect(() => {
-    let superAlone = false;
-    const offDown = addListener('keydown', (e) => {
-      if (e.code === 62 && !e.repeat) setLaunchpad((v) => !v);
-      if (e.code === 125 || e.code === 126) { if (!e.repeat) superAlone = true; } else superAlone = false;
-      if (e.key === 'Escape') { setControl(null); setContext(null); }
-    });
-    const offUp = addListener('keyup', (e) => {
-      if ((e.code === 125 || e.code === 126) && superAlone) setLaunchpad((v) => !v);
-      superAlone = false;
-    });
-    return () => { offDown(); offUp(); };
-  }, []);
+  // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
+  const toggleLauncher = () => { closeOverview(); setLaunchpad((v) => !v); };
+  useShortcuts({ grabs: flowGrabs(), table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setContext(null); } }), []);
 
-  // Trackpad: a 3-finger swipe up opens the app launcher and down closes it;
-  // left/right switch windows (the SDK does that). See docs/TRACKPAD.md.
-  useEffect(() => registerGestureActions({ up: () => setLaunchpad(true), down: () => setLaunchpad(false) }), []);
+  // Trackpad: a 3-finger swipe up opens the app launcher (4 fingers: the overview) and down closes
+  // them; left/right switch desktops, or windows with only one desktop. See docs/TRACKPAD.md.
+  useEffect(() => registerGestureActions({
+    up: (g) => { if (g.fingers >= 4) { setLaunchpad(false); openOverview(); } else setLaunchpad(true); },
+    down: () => { setLaunchpad(false); closeOverview(); },
+    left: desktopSwipe('left'), right: desktopSwipe('right'),
+  }), []);
 
   const wallpaper = findWallpaper(t.wallpapers, s.wallpaper);
   // Pinned and open apps; windows of the same app (Linux too) share a single icon. The app launcher
@@ -136,10 +156,11 @@ function App() {
           <Image key={d.id + ':' + d.x} src={wallpaperSrc(wallpaper, d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)} onContextMenu={(e) => setContext({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
+        {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
-        {visible.map((w) => <Window key={w.id} win={w} app={getApp(w.id)} t={t} focused={w.id === focused} />)}
-        {minimizing.map(({ win, p }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false}
-          fx={{ p, x: main.x + main.w / 2, y: main.y + main.h - 36 }} />)}
+        <OverviewBackdrop />
+        {mounted.map((w) => <Window key={w.id} win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />)}
+        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
         <DesktopWidgets layer="above" />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the
             order is the layers', not this tree's, and clicks follow it. Menus go to «popover»
@@ -169,11 +190,15 @@ function App() {
         )}
         {/* Restart… and Shut Down… (sdk/power.jsx): inside the ThemeProvider, so it takes the theme's colors */}
         <Layer name="modal"><PowerDialog /></Layer>
+        <AppSwitcher />
+        <OverviewChrome />
+        <DesktopHud />
         {control && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={control} onClose={() => setControl(null)} /></Layer>}
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
             { label: tr('shell.desktop.wallpaper'), onClick: () => setControl(main) },
             { label: tr('shell.desktop.openLaunchpad'), onClick: () => setLaunchpad(true) },
+            { label: tr('shell.desktops.overview'), onClick: () => toggleOverview() },
             '-',
             { label: tr('shell.menu.settings'), onClick: () => wm.open('settings') },
             { label: tr('shell.menu.about'), onClick: () => wm.open('about') },

@@ -34,6 +34,13 @@ void grab_motion(float x, float y);         /* once per frame, with the accumula
 /* Finished (the button was released): 1 and the node's change relative to the start. */
 int  grab_finish(int *node, int *edges, float *dx, float *dy, float *dw, float *dh);
 void grab_cancel(void);
+/* LordBench's desktop scene (bench/lbframes.h, docs/BENCHMARK.md): the window's node moves along a
+ * figure of eight (rx, ry px; one turn every period_ms) through the same path as a drag, one step per
+ * frame, with no button held and no JS per frame. Pointer input or grab_cancel() stops it. 0 if it
+ * started. main.c calls grab_script_tick() before deciding whether to draw. */
+int  grab_script_begin(int node, const GrabLimits *lim, float rx, float ry, float period_ms);
+int  grab_scripted(void);
+void grab_script_tick(double now_ms);
 
 /* paint.c: layer of the moving window and of what is below. When resizing (resize = 1) the
  * window is repainted every frame, but what is below is still saved. */
@@ -42,5 +49,6 @@ void paint_layer_end(void);
 void paint_layer_external_damage(void);     /* something changed inside (terminal, Linux app, video) */
 /* For drag measurements: times the layer was painted and times it was only copied (and resets to 0). */
 void paint_layer_stats(long *renders, long *blits);
+long paint_layer_parts(void);               /* of those renders, the ones of only a part (layer.part) */
 
 #endif

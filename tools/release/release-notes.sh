@@ -28,6 +28,11 @@ changelog=${LORDOS_CHANGELOG:-$root/CHANGELOG.md}
 
 tag=v$version
 filever=${LORDOS_FILE_VERSION:-${version%%-*}}
+# the Imager is released only when it changes: lordos.imager in package.json names the release that holds it
+imagerver=$(sed -n 's/.*"imager": *"\([0-9.]*\)".*/\1/p' "$root/package.json" | head -1)
+imagerver=${imagerver:-$filever}
+case $version in *-*) imagertag=v$imagerver-${version#*-} ;; *) imagertag=v$imagerver ;; esac
+imagerdl=https://github.com/lordbasex/LordOS/releases/download/$imagertag
 repo=https://github.com/lordbasex/LordOS
 blob=$repo/blob/$tag
 
@@ -60,7 +65,7 @@ printf '%s\n' "$section" |
         /^[[:space:]]*```/ { code = !code; emit($0); next }
         code { emit($0); next }
         /^[[:space:]]*$/ { emit(""); next }
-        /^(#|\||---)/ { emit($0); next }
+        /^(#|---)|^[[:space:]]*\|/ { emit($0); next }
         /^[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]/ { flush(); buf = $0; next }
         {
             if (buf == "") { buf = $0; next }
@@ -82,9 +87,14 @@ cat <<EOF
 | File | What it is |
 |---|---|
 | \`lordos-live-${filever}-amd64.iso\` | Live and installable image for 64-bit PCs (UEFI and BIOS). Write it to a USB stick as is; Secure Boot off. |
-| \`lordos-${filever}-rpi5-arm64.img.xz\` | Image for the Raspberry Pi 5, for Raspberry Pi Imager ("Use custom"), an SD card or an NVMe drive. |
+| \`lordos-live-${filever}-arm64.iso\` | Live and installable image for generic arm64 machines and virtual machines with UEFI. Secure Boot off. |
+| \`lordos-${filever}-rpi5-arm64.img.xz\` | Image for the Raspberry Pi 5, for the LordOS Imager (below) or Raspberry Pi Imager ("Use custom"), an SD card or an NVMe drive. |
 | \`lordos_${filever}_amd64.deb\` | The LordOS package for an existing Debian 13 on a PC (installed by \`install.sh\`, or with \`apt install ./…\`). |
 | \`lordos_${filever}_arm64.deb\` | The same package for Debian 13 on arm64. |
+| \`lordos-hwdata_<date>_all.deb\` | The signed tested-hardware snapshot for System Information's Compatibility panel, which the LordOS package depends on (both architectures; \`install.sh\` installs it with the package, or \`apt install ./lordos-hwdata_…_all.deb ./lordos_…\`). Newer ones arrive through Store → Updates between releases. |
+| [\`lordos_imager_${imagerver}_universal.dmg\`](${imagerdl}/lordos_imager_${imagerver}_universal.dmg) | LordOS Imager for Mac (both processor families, signed and notarized): writes LordOS to an SD card or a USB stick and prepares the Raspberry Pi 5's first boot. |
+| [\`lordos_imager_${imagerver}_x64_setup.exe\`](${imagerdl}/lordos_imager_${imagerver}_x64_setup.exe) | LordOS Imager for Windows (64-bit installer; not code-signed yet, so the system asks before running it). |
+| [\`lordos_imager_${imagerver}_amd64.deb\`](${imagerdl}/lordos_imager_${imagerver}_amd64.deb) | LordOS Imager for Linux (Debian 13 and similar, amd64; needs udisks2). |
 | \`install.sh\` | The one-line installer for Debian 13: \`curl -fsSL https://lordos.org/install.sh \| sh\`. It checks the signature before installing. |
 | \`SHA256SUMS\` | The SHA-256 of every file in this release. |
 | \`SHA256SUMS.sig\` | The Ed25519 signature of \`SHA256SUMS\` with the LordOS release key (base64). |

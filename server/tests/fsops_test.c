@@ -63,10 +63,108 @@ int main(void) {
     CHECK(fsops_allowed(H));
     CHECK(!fsops_allowed("/etc/passwd"));
     CHECK(!fsops_allowed("/tmp"));
+    /* reading only: the whole tree but the pseudo-filesystems (Files → This computer) */
+    CHECK(fsops_readable("/"));
+    CHECK(fsops_readable("/etc/passwd"));
+    CHECK(fsops_readable("/usr/share"));
+    CHECK(fsops_readable(H));
+    CHECK(fsops_readable("/run/media/nadie/USB"));
+    CHECK(fsops_readable("/procs"));
+    CHECK(!fsops_readable("/proc"));
+    CHECK(!fsops_readable("/proc/self/mem"));
+    CHECK(!fsops_readable("/sys/class"));
+    CHECK(!fsops_readable("/dev/sda"));
+    CHECK(!fsops_readable("/run/user/1000/bus"));
+    CHECK(!fsops_readable("/run/media/otro/USB"));
+    CHECK(!fsops_readable("relative/path"));
     path(a, ".local/share/applications/x.desktop");
     CHECK(fsops_protected(a));
     path(a, "Documentos/x.txt");
     CHECK(!fsops_protected(a));
+
+    /* a parent of a protected path can't be trashed, renamed, moved or restored over: that would take
+     * the protected path with it, or bring a crafted one in */
+    static const char *const dirs[] = { ".config", ".config/lordos", ".config/plain", ".local", ".local/share", ".local/share/lordos",
+                                         ".local/share/lordos/vault", "box", NULL };
+    for (int i = 0; dirs[i]; i++) { path(a, dirs[i]); mkdir(a, 0700); }
+    put(".config/lordos/settings.json", "{}");
+    put(".config/lordos/other.json", "{}");
+    put(".local/share/lordos/vault/v", "x");
+    put(".config/plain/a.txt", "a");
+    put("box/settings.json", "{\"evil\":1}");
+    static const char *const parents[] = { ".config/lordos", ".config", ".local/share/lordos", ".local/share", ".local", NULL };
+    for (int i = 0; parents[i]; i++) {
+        path(a, parents[i]);
+        CHECK(fsops_protected_below(a));
+        CHECK(fstrash_put(a, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+        path(b, "moved-away");
+        CHECK(fsops_rename(a, b, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+        CHECK(fsjob_start(a, b, 1, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+        CHECK(exists(parents[i]) && !exists("moved-away"));
+    }
+    CHECK(exists(".config/lordos/settings.json"));
+    /* nor can a folder take such a name */
+    path(a, ".config/lordos");
+    path(b, ".config/lordos-old");
+    char c2[512];
+    path(c2, "box");
+    CHECK(!rename(a, b));
+    CHECK(fsops_rename(c2, a, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    CHECK(fsjob_start(c2, a, 1, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    CHECK(fsjob_start(c2, a, 0, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    CHECK(!rename(b, a));
+    /* normal folders work as always, the protected path's siblings too */
+    path(a, ".config/plain");
+    CHECK(!fsops_protected_below(a));
+    path(b, ".config/plain2");
+    CHECK(!fsops_rename(a, b, err, sizeof err));
+    CHECK(exists(".config/plain2/a.txt"));
+    CHECK(!fstrash_put(b, err, sizeof err));
+    path(a, ".config/lordos/other.json");
+    CHECK(!fsops_protected_below(a));
+    path(b, ".config/lordos/renamed.json");
+    CHECK(!fsops_rename(a, b, err, sizeof err));
+    path(a, "box");
+    path(b, "box2");
+    CHECK(fsops_rename(a, a, err, sizeof err) == -1);       /* it exists */
+    CHECK(!fsops_rename(a, b, err, sizeof err));
+    /* rename checks both sides itself, whatever its caller resolved, and never replaces a target */
+    path(a, "box2/settings.json");
+    path(b, ".config/autostart/x.desktop");
+    CHECK(fsops_rename(a, b, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    path(c2, "box2/y.json");
+    CHECK(fsops_rename(b, c2, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    path(b, ".config");
+    CHECK(fsops_rename(a, b, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    CHECK(fsops_rename(b, c2, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+    put("box2/y.json", "target");
+    CHECK(fsops_rename(a, c2, err, sizeof err) == -1 && !strncmp(err, "fs.exists", 9));
+    {
+        char got[16] = "";
+        FILE *f = fopen(c2, "r");
+        if (f) { if (!fgets(got, sizeof got, f)) got[0] = 0; fclose(f); }
+        CHECK(!strcmp(got, "target") && exists("box2/settings.json"));
+    }
+    /* a trashed parent from before this check can't come back over the protected path */
+    path(a, ".config/plain3");
+    mkdir(a, 0700);
+    CHECK(!fstrash_put(a, err, sizeof err));
+    {
+        char t[512], info[512];
+        path(t, ".local/share/Trash/files/plain3");
+        path(info, ".local/share/Trash/info/plain3.trashinfo");
+        FILE *f = fopen(info, "w");
+        if (f) {
+            fprintf(f, "[Trash Info]\nPath=%s/.config/lordos\nDeletionDate=2026-01-01T00:00:00\n", H);
+            fclose(f);
+        }
+        path(a, ".config/lordos");
+        path(b, ".config/lordos-kept");
+        CHECK(!rename(a, b));
+        CHECK(fstrash_restore(t, err, sizeof err) == -1 && !strncmp(err, "fs.protected", 12));
+        CHECK(!rename(b, a));
+    }
+    fstrash_empty();
 
     /* copy a tree with a link and permissions */
     mkdir(strcat(strcpy(a, H), "/src"), 0750);

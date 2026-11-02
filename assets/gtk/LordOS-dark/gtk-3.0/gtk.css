@@ -13,7 +13,7 @@
 
 /* Traffic lights like LordOS's default frame: 13 px circles, 8 px apart, vertically centered;
  * the order comes from LordOS through the portal and GSettings (close,minimize,maximize: on the
- * left; the Classic theme asks for :minimize,maximize,close). GTK sizes a title button by its
+ * left; the Lord Classic theme asks for :minimize,maximize,close). GTK sizes a title button by its
  * 16 px icon (Chromium and Firefox do the same when they draw their tab strip with this theme), so
  * the button stays 16 px and the circle is a 13 px radial gradient inside it; the icon is the
  * glyph shown on hover, as in LordOS's frame. */

@@ -200,7 +200,9 @@ the automatic mode both go from 1080p to 720p). At 25 fps both play smoothly (1â
 - Firefox: AV1 off only (VP9 stays, no notice) until the extension is signed.
 - Automatic trusts the system probe: if VA-API lists VP9/AV1 but the browser doesn't actually use
   the hardware decoder, the video is still decoded in software; choose **Always** there.
-  Not tested on a machine with real hardware decoding (no GPU on the test host).
+  Not tested on a machine with real hardware decoding of VP9 or AV1 (no GPU on the test host). On a
+  Raspberry Pi 5 (0.8.4.1 release test, `ISO.md`) Automatic found that the board can't decode VP9 or
+  AV1 in hardware and asked the sites for H.264.
 - H.264 on YouTube stops at 1080p; with the optimization on, higher resolutions aren't offered.
 - The setting is system-wide (the browsers read system files); several users share it.
 - A policy change counts from the next page load; Firefox needs a restart.

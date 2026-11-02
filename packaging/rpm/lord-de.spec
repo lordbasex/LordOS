@@ -1,5 +1,5 @@
 Name:           lord-de
-Version:        0.8.3
+Version:        0.8.7
 Release:        1%{?dist}
 Summary:        Independent Wayland desktop derived from LordOS
 License:        MIT AND BSD-2-Clause AND CC0-1.0 AND OFL-1.1 AND CC-BY-4.0 AND CC-BY-3.0-US
@@ -9,6 +9,7 @@ Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  gcc
 BuildRequires:  make
 BuildRequires:  python3
+BuildRequires:  xz
 BuildRequires:  binutils
 BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(wayland-client)
@@ -16,6 +17,9 @@ BuildRequires:  pkgconfig(wayland-protocols)
 BuildRequires:  pkgconfig(xkbcommon)
 BuildRequires:  pkgconfig(libseat)
 BuildRequires:  pkgconfig(openssl)
+BuildRequires:  pkgconfig(freerdp3)
+BuildRequires:  pkgconfig(freerdp-client3)
+BuildRequires:  pkgconfig(winpr3)
 BuildRequires:  libxcrypt-devel
 Requires:       dbus-daemon
 Requires:       xkeyboard-config
@@ -54,7 +58,10 @@ python3 tools/desktop/check.py
 %{_datadir}/wayland-sessions/lord-de.desktop
 %{_datadir}/doc/lord-de/
 %{_datadir}/licenses/lord-de/third_party/
+%{_datadir}/licenses/lord-de/OFL-Noto.txt
 
 %changelog
+* Mon Nov 02 2026 Lord DE contributors - 0.8.7-1
+- Integrate LordOS 0.8.7 while preserving the independent desktop profile.
 * Fri Oct 23 2026 Lord DE contributors - 0.8.3-1
 - Extract an independent desktop profile with a Fedora session package.

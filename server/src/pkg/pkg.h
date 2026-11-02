@@ -13,6 +13,9 @@ void pkg_act_remove(const AdminReq *r, const char *arg, size_t len);
 void pkg_act_autoremove(const AdminReq *r, const char *arg, size_t len);
 void pkg_act_upgrade(const AdminReq *r, const char *arg, size_t len);
 void pkg_act_install_file(const AdminReq *r, const char *arg, size_t len);
+/* (0.8.5) a vendor repository from LordOS's catalog: sources_admin.c */
+void pkg_act_source_add(const AdminReq *r, const char *arg, size_t len);
+void pkg_act_source_remove(const AdminReq *r, const char *arg, size_t len);
 
 /* Privileged helper (admin.c) actions this module adds. */
 #define PKG_ADMIN_ACTIONS \
@@ -21,6 +24,8 @@ void pkg_act_install_file(const AdminReq *r, const char *arg, size_t len);
     { "pkg-remove", pkg_act_remove, A_FORK }, \
     { "pkg-upgrade", pkg_act_upgrade, A_FORK }, \
     { "pkg-autoremove", pkg_act_autoremove, A_FORK }, \
-    { "pkg-install-file", pkg_act_install_file, A_FORK },
+    { "pkg-install-file", pkg_act_install_file, A_FORK }, \
+    { "pkg-source-add", pkg_act_source_add, A_FORK }, \
+    { "pkg-source-remove", pkg_act_source_remove, A_FORK },
 
 #endif

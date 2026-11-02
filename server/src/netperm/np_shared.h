@@ -20,6 +20,10 @@
  *   np_events  RINGBUF                              NpEvent towards lord-netperm
  *   np_snd     HASH   ALSA minor (u32) → u32           every ALSA node in /sys/class/sound: NP_SND_CAPTURE for the
  *                                                     capture PCMs (/dev/snd/pcmC*D*c), NP_SND_OTHER for the rest
+ *   np_blk4    LPM    (list set, IPv4/n) → u8       (0.8.5) a user's subscribed blocklists: their networks and
+ *   np_blk6    LPM    (list set, IPv6/n) → u8         the addresses the resolver gave for their domains (NpApp.blk)
+ *   np_sysc    HASH   cgroup id → NpCount            (0.8.5) the essential system services' bytes (name
+ *                                                     resolution, time, the network service), counted only
  *
  * Besides the network, the same per-app policy carries the device restrictions (docs/FIREWALL.md,
  * "Linux apps"): "no camera", "no USB" and "no screen capture" (/dev/fb*) (cgroup/dev, by device
@@ -51,7 +55,9 @@ typedef uint64_t np_u64;
 #define NP_MAX_LPM    65536     /* entries of each trie */
 #define NP_MAX_SEEN   16384
 #define NP_MAX_BOUND  4096      /* (app, local port) of the apps' servers */
-#define NP_MAX_FLOWS  4096      /* (app, remote address) byte counters; the least recently used go first */
+#define NP_MAX_FLOWS  8192      /* (app, remote address, port) byte counters; the least recently used go first */
+#define NP_MAX_BLK    131072    /* entries of each blocklist trie (every user's sets together) */
+#define NP_MAX_SYS    16        /* system service cgroups counted (np_sysc) */
 #define NP_RINGBUF    (256u << 10)
 #define NP_REPEAT_NS  (5ull * 1000000000ull)   /* a repeated connection is reported again after 5 s */
 
@@ -84,8 +90,8 @@ enum { NP_P_ANY = 0, NP_P_TCP = 1, NP_P_UDP = 2, NP_P_OTHER = 3 };   /* like FwP
 enum { NP_D_OUT = 0, NP_D_IN = 1, NP_D_DEV = 2, NP_D_BT = 3, NP_D_CUT = 4 };   /* events: DEV = a device open, BT = a Bluetooth socket; CUT: np_seen key of a cut socket */
 enum { NP_V_ALLOW = 0, NP_V_DENY = 1 };
 enum { NP_K_RULE = 0, NP_K_ANY = 1, NP_K_LAN = 2, NP_K_INET = 3 };   /* NpEnt.kind */
-enum { NP_M_SILENT = 0, NP_M_OFF = 2 };                              /* "ask" is treated as silent */
-enum { NP_BY_RESTRICTED = 0, NP_BY_RULE = 1, NP_BY_TRUSTED = 2, NP_BY_MODE = 3 };
+enum { NP_M_SILENT = 0, NP_M_OFF = 2, NP_M_DENY = 3 };               /* "ask" is treated as silent */
+enum { NP_BY_RESTRICTED = 0, NP_BY_RULE = 1, NP_BY_TRUSTED = 2, NP_BY_MODE = 3, NP_BY_LIST = 4 };
 
 typedef struct {
     np_u16 port_lo, port_hi;    /* 0..65535 = any */
@@ -109,8 +115,11 @@ typedef struct {
     np_u8  mode;                /* NP_M_* */
     np_u8  has4, has6;          /* there are entries in np_lpm4 / np_lpm6 */
     np_u32 ngen;
-    np_u32 can_deny;            /* 1: a restriction or a deny entry exists (gen or tries): the packet
-                                 * filter (cgroup_skb) only decides for these apps */
+    np_u32 can_deny;            /* 1: a restriction, a deny entry (gen or tries), the deny mode or a
+                                 * blocklist set exists: the packet filter (cgroup_skb) only decides
+                                 * for these apps */
+    np_u32 blk;                 /* the user's blocklist set in np_blk4/np_blk6 (0: none) */
+    np_u32 pad0;
     NpEnt  gen[NP_GEN_MAX];     /* lan / internet / any rules, in order */
 } NpApp;
 
@@ -143,7 +152,12 @@ typedef struct {
     np_u64 cgid;
     np_u8  addr[16];            /* the remote address; IPv4 (also IPv4-mapped IPv6) in the first 4 */
     np_u8  fam;                 /* 4 or 6 */
-    np_u8  pad[7];
+    np_u8  proto;               /* (0.8.5) NP_P_TCP / NP_P_UDP / NP_P_OTHER */
+    np_u8  dir;                 /* (0.8.5) NP_D_OUT: port is the remote one; NP_D_IN: a port the app
+                                 * bound (np_bound), its local one */
+    np_u8  pad;
+    np_u16 port;                /* (0.8.5) host order; 0 when there is none (ICMP, a later fragment) */
+    np_u8  pad2[2];
 } NpFlowKey;
 
 typedef struct { np_u64 rx, tx, blocked; } NpFlow;
@@ -215,6 +229,15 @@ NP_INLINE int np_is_lan6(const np_u8 *a) {
     return 0;
 }
 
+/* Loopback, same as fw_addr_is_loopback (IPv4-mapped addresses already come as IPv4). */
+NP_INLINE int np_is_loop(int fam, const np_u8 *a) {
+    if (fam == 4) return a[0] == 127;
+    if (fam != 6) return 0;
+    np_u32 any = 0;                     /* without early exits: fewer paths for the verifier */
+    for (int i = 0; i < 15; i++) any |= a[i];
+    return (any | (np_u32)(a[15] ^ 1)) == 0;
+}
+
 NP_INLINE int np_ent_match(const NpEnt *e, int dir, int proto, int port) {
     if (e->dir != dir) return 0;
     if (e->proto != NP_P_ANY && e->proto != proto) return 0;
@@ -223,9 +246,12 @@ NP_INLINE int np_ent_match(const NpEnt *e, int dir, int proto, int port) {
 }
 
 /* The decision, in the same order as fw_decide: restrictions, rules (first the trie's list,
- * which already has domains and networks ordered, then lan/internet/any), trusted and mode.
- *   lan: 1 LAN, 0 internet, -1 unknown address (bind to an address that isn't local). */
-NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, int port, int lan, NpRes *r) {
+ * which already has domains and networks ordered), a subscribed blocklist, then lan/internet/any,
+ * trusted and mode.
+ *   lan: 1 LAN, 0 internet, -1 unknown address (bind to an address that isn't local).
+ *   listed: 1 if the address is in the app's blocklist set (np_blk4/np_blk6).
+ *   loop: 1 for a loopback address (127/8, ::1): the deny mode lets it through. */
+NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, int port, int lan, int listed, int loop, NpRes *r) {
     r->verdict = NP_V_DENY; r->reason = NP_BY_RESTRICTED; r->record = 1; r->rule_id = 0; r->flag = 0;
     np_u32 f = a->flags;
     if (f & NP_R_NO_NETWORK) { r->flag = NP_R_NO_NETWORK; return; }
@@ -244,6 +270,7 @@ NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, in
             }
         }
     }
+    if (listed) { r->reason = NP_BY_LIST; r->record = 1; return; }
     np_u32 ng = a->ngen;
     for (int i = 0; i < NP_GEN_MAX; i++) {
         if ((np_u32)i >= ng) break;
@@ -258,7 +285,8 @@ NP_INLINE void np_decide(const NpApp *a, const NpList *l, int dir, int proto, in
     r->verdict = NP_V_ALLOW;
     if (a->trusted) { r->reason = NP_BY_TRUSTED; return; }
     r->reason = NP_BY_MODE;
-    r->record = a->mode == NP_M_SILENT;
+    r->record = a->mode == NP_M_SILENT || a->mode == NP_M_DENY;
+    if (a->mode == NP_M_DENY && !loop) r->verdict = NP_V_DENY;
 }
 
 /* Does a list of entries deny anything? (NpApp.can_deny, computed by userspace.) */

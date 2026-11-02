@@ -10,12 +10,15 @@
  *                  in the requester's home folder; PNG or JPEG up to 4 MB)
  *                  (your own: anyone; someone else's: only an administrator)
  *   user-autologin name or empty                       (/etc/lordos/session.conf)
+ *   admin-rescue-status                                (anyone, read-only: LOG users.rescueState state=<word>)
+ *   admin-rescue   root password                       (anyone, only while nobody is an administrator)
  *
  * Root-side validation: names [a-z_][a-z0-9_-]*, only people's accounts (uid 1000 to
  * 59999), never your own account when deleting nor the last administrator. Passwords go through
  * chpasswd's standard input, never in argv. Avatars live in /var/lib/lordos/users
  * (read by the login screen, which can't get into home folders). */
 #include "users_admin.h"
+#include "admin_rescue.h"
 #include "homedirs.h"
 
 #include <crypt.h>
@@ -28,13 +31,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define USERS_DIR "/var/lib/lordos/users"
 #define SESSION_CONF "/etc/lordos/session.conf"
 #define ADMIN_GROUP "sudo"
+#define SUDO_BIN "/usr/bin/sudo"
+#define RUN_DIR "/run/lordos"
+#define RESCUE_LOCK RUN_DIR "/admin-rescue.lock"
+#define RESCUE_FAIL_DELAY 2             /* seconds, with the lock held: one try at a time, machine-wide */
 /* Printers (M9, docs/PRINTING.md): CUPS lets the lpadmin group administer printers. LordOS
  * administrators get it too; if CUPS isn't installed the group doesn't exist and it's
  * skipped without error. */
@@ -125,9 +134,14 @@ static int set_password(const char *user, const char *pass) {
     return rc;
 }
 
-static int check_password(const char *user, const char *pass) {
+/* The account has a password that can be typed (not locked, not empty). */
+static int has_password(const struct spwd *sp) {
+    return sp && sp->sp_pwdp && sp->sp_pwdp[0] && sp->sp_pwdp[0] != '!' && sp->sp_pwdp[0] != '*';
+}
+
+int users_check_password(const char *user, const char *pass) {
     struct spwd *sp = getspnam(user);
-    if (!sp || !sp->sp_pwdp || !sp->sp_pwdp[0] || sp->sp_pwdp[0] == '!' || sp->sp_pwdp[0] == '*') return 0;
+    if (!has_password(sp)) return 0;
     struct crypt_data cd;
     memset(&cd, 0, sizeof cd);
     const char *h = crypt_r(pass, sp->sp_pwdp, &cd);
@@ -266,7 +280,7 @@ void users_act_passwd(const AdminReq *r, const char *arg, size_t len) {
     int self = !strcmp(name, r->user);
     if (!person(name) || !valid_pass(pass)) admin_err("users.badNameOrPassword", NULL);
     else if (!self && !r->admin) admin_err("users.passwordNotAllowed", NULL);
-    else if (self && !check_password(name, old)) { sleep(1); admin_err("users.wrongPassword", NULL); }
+    else if (self && !users_check_password(name, old)) { sleep(1); admin_err("users.wrongPassword", NULL); }
     else if (set_password(name, pass)) admin_err("users.setPasswordFailed", NULL);
     else admin_ok("users.passwordChanged", NULL);
     explicit_bzero(buf, len);
@@ -350,4 +364,80 @@ void users_act_autologin(const AdminReq *r, const char *arg, size_t len) {
     if (arg[0] && !person(arg)) { admin_err("users.invalid", NULL); return; }
     if (autologin_set(arg)) admin_err("sys.writeFailed", "path", SESSION_CONF, NULL);
     else admin_ok(arg[0] ? "users.autologinOn" : "users.autologinOff", NULL);
+}
+
+/* ---- a system with no administrator (admin_rescue.h, docs/INSTALL-DEBIAN.md) ---- */
+
+/* Member of sudo, admin or wheel by the system's files right now, as admin.c's is_admin. Fails
+ * closed: a list of groups too long to read counts as an administrator. */
+static int admin_member(const struct passwd *pw) {
+    gid_t groups[256];
+    int n = 256;
+    if (getgrouplist(pw->pw_name, pw->pw_gid, groups, &n) < 0) return 1;
+    for (int i = 0; i < n; i++) {
+        struct group *g = getgrgid(groups[i]);
+        if (g && rescue_group_is_admin(g->gr_name)) return 1;
+    }
+    return 0;
+}
+
+static int any_admin(void) {
+    int found = 0;
+    setpwent();
+    struct passwd *pw;
+    while (!found && (pw = getpwent())) found = rescue_account_counts(pw->pw_uid, admin_member(pw));
+    endpwent();
+    return found;
+}
+
+static int sudo_ready(void) {
+    struct stat st;
+    return getgrnam(ADMIN_GROUP) && !stat(SUDO_BIN, &st) && S_ISREG(st.st_mode) && st.st_uid == 0;
+}
+
+/* Always read again as root: nothing here comes from the UI. */
+static RescueState rescue_now(const AdminReq *r) {
+    struct passwd *pw = person(r->user);
+    RescueFacts f = { .person = pw != NULL, .self_member = pw && admin_member(pw) };
+    f.any_admin = any_admin();
+    f.sudo_ready = sudo_ready();
+    f.root_password = has_password(getspnam("root"));
+    return rescue_state(&f);
+}
+
+void users_act_rescue_status(const AdminReq *r, const char *arg, size_t len) {
+    (void)arg;
+    if (len) { admin_err("admin.invalidArgument", NULL); return; }
+    admin_log("users.rescueState", "state", rescue_word(rescue_now(r)), NULL);
+    admin_ok("users.unchanged", NULL);
+}
+
+/* The argument is only the root password; the user is always r->user. Runs in a child (A_FORK): the
+ * lock (not waited for) and the delay hold every session to one try at a time. */
+void users_act_rescue(const AdminReq *r, const char *arg, size_t len) {
+    (void)len;
+    mkdir(RUN_DIR, 0755);
+    int lock = open(RESCUE_LOCK, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB)) {
+        if (lock >= 0) close(lock);
+        admin_err("users.rescueBusy", NULL);
+        return;
+    }
+    RescueState st = rescue_now(r);
+    const char *refused = rescue_refusal(st);
+    if (refused) admin_err(refused, NULL);
+    else if (!valid_pass(arg) || !users_check_password("root", arg)) {
+        syslog(LOG_AUTHPRIV | LOG_WARNING, "lord-admin: admin-rescue: wrong root password from %s", r->user);
+        sleep(RESCUE_FAIL_DELAY);
+        admin_err("users.rescueWrongPassword", NULL);
+    } else {
+        const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", ADMIN_GROUP, r->user, NULL };
+        if (admin_run(a) || !in_group(r->user, ADMIN_GROUP)) admin_err("users.groupFailed", NULL);
+        else {
+            print_group(r->user, 1);
+            syslog(LOG_AUTHPRIV | LOG_NOTICE, "lord-admin: admin-rescue: %s added to the %s group", r->user, ADMIN_GROUP);
+            admin_ok("users.rescueDone", "name", r->user, NULL);
+        }
+    }
+    close(lock);
 }

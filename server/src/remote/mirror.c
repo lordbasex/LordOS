@@ -18,6 +18,8 @@
 #include "proto.h"
 #include "../vault/vclient.h"
 #include "../media/mstream.h"
+#include "../par.h"
+#include "../canvas.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -50,6 +52,8 @@ typedef struct {
     /* the video path (docs/REMOTE.md, "Video (WebRTC)") */
     int vcodec, vaudio, vneed_key;  /* subscribed to the session's encoder (1 H.264, 2 VP8) */
     unsigned vkbps;
+    int vfps;                       /* the frame rate this viewer's screen shows (its refresh; 30 if unknown) */
+    int vinfo_sent;                 /* RP_VINFO went to it at least once */
     int vmode;                      /* the video plays: lossless tiles once still, damage right away */
 } Client;
 
@@ -136,7 +140,7 @@ static void notify_clients(void) {
 /* Who wants which encoder: viewers per codec, sound, and the slowest viewer's rate. */
 static void video_update(void) {
     for (int k = 1; k < MS_CODECS; k++) {
-        int n = 0, audio = 0;
+        int n = 0, audio = 0, fps = 0;
         unsigned kbps = 0;
         for (int i = 0; i < MAX_CLIENTS; i++) {
             const Client *c = &cl[i];
@@ -144,8 +148,9 @@ static void video_update(void) {
             n++;
             audio |= c->vaudio;
             if (!kbps || c->vkbps < kbps) kbps = c->vkbps;
+            if (c->vfps > fps) fps = c->vfps;     /* the fastest screen: a slower one shows what it can */
         }
-        mstream_want(k, n, audio, kbps ? kbps : 4000);
+        mstream_want(k, n, audio, kbps ? kbps : 4000, fps);
     }
 }
 
@@ -296,9 +301,12 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
             c->vcodec = d[0];
             c->vaudio = d[1] != 0;
             c->vkbps = k < 300 ? 300 : k > 20000 ? 20000 : k;
+            uint16_t hz;
+            memcpy(&hz, d + 2, 2);
+            c->vfps = hz >= 24 && hz <= 360 ? hz : 30;
             if (c->vcodec && c->vcodec != was) c->vneed_key = 1;
             video_update();
-            if (c->vcodec && fb) mstream_frame(fb, W, W, H);
+            if (c->vcodec && fb) mstream_frame(fb, W, W, H, NULL);
             else if (c->vcodec && cb.refresh) cb.refresh();     /* the first viewer: a whole frame */
         }
         break;
@@ -477,6 +485,13 @@ int mirror_clients(void) {
     return n;
 }
 
+/* The frame rate the remote viewers' screens show (the fastest), 0 without video viewers. */
+int mirror_fps(void) {
+    int f = 0;
+    for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && !cl[i].seat && cl[i].vcodec && cl[i].vfps > f) f = cl[i].vfps;
+    return f;
+}
+
 int mirror_watchers(void) {
     int n = 0;
     for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && !cl[i].seat && cl[i].vcodec) n++;
@@ -558,7 +573,33 @@ void mirror_dispatch(const struct pollfd *p, int n) {
     }
 }
 
-void mirror_frame(const uint32_t *px, int stride, int w, int h) {
+#define FULL_CHECK_MS 500           /* with damage hints, every tile is still compared this often */
+
+/* One frame's comparison, split by rows of tiles over the pool (par.h): every tile has its own bytes in
+ * fb, chg and each client's dirty map, so the rows don't share anything but "something changed". */
+typedef struct { const uint32_t *px; int stride, tx0, tx1; int any; } Cmp;
+static void cmp_rows(void *ctx, int ty0, int ty1) {
+    Cmp *k = ctx;
+    int any = 0;
+    for (int ty = ty0; ty < ty1; ty++)
+        for (int tx = k->tx0; tx < k->tx1; tx++) {
+            int x = tx * TILE, y = ty * TILE;
+            int tw = x + TILE > W ? W - x : TILE, th = y + TILE > H ? H - y : TILE;
+            int changed = 0;
+            for (int j = 0; j < th && !changed; j++)
+                changed = memcmp(fb + (size_t)(y + j) * W + x, k->px + (size_t)(y + j) * k->stride + x, (size_t)tw * 4) != 0;
+            if (!changed) continue;
+            for (int j = 0; j < th; j++)
+                memcpy(fb + (size_t)(y + j) * W + x, k->px + (size_t)(y + j) * k->stride + x, (size_t)tw * 4);
+            for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].dirty) cl[i].dirty[ty * TW + tx] = 1;
+            if (chg) chg[ty * TW + tx] = 1;
+            any = 1;
+        }
+    if (any) __atomic_store_n(&k->any, 1, __ATOMIC_RELAXED);
+}
+
+void mirror_frame(const uint32_t *px, int stride, int w, int h, const int *dmg) {
+    static double full_at;
     if (lfd < 0 || !mirror_watchers()) { free(fb); fb = NULL; return; }
     int resized = !fb || w != W || h != H, any = 0;
     int new_size = w != W || h != H;
@@ -579,27 +620,41 @@ void mirror_frame(const uint32_t *px, int stride, int w, int h) {
     } else {
         if (!chg) chg = calloc((size_t)TW * TH, 1);
         if (chg) memset(chg, 0, (size_t)TW * TH);
-        for (int ty = 0; ty < TH; ty++)
-            for (int tx = 0; tx < TW; tx++) {
-                int x = tx * TILE, y = ty * TILE;
-                int tw = x + TILE > W ? W - x : TILE, th = y + TILE > H ? H - y : TILE;
-                int changed = 0;
-                for (int j = 0; j < th && !changed; j++)
-                    changed = memcmp(fb + (size_t)(y + j) * W + x, px + (size_t)(y + j) * stride + x, (size_t)tw * 4) != 0;
-                if (!changed) continue;
-                for (int j = 0; j < th; j++)
-                    memcpy(fb + (size_t)(y + j) * W + x, px + (size_t)(y + j) * stride + x, (size_t)tw * 4);
-                for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].dirty) cl[i].dirty[ty * TW + tx] = 1;
-                if (chg) chg[ty * TW + tx] = 1;
-                any = 1;
-            }
+        /* only the tiles the compositor drew over (the whole screen now and then, in case) */
+        int tx0 = 0, ty0 = 0, tx1 = TW, ty1 = TH;
+        double t = now_ms();
+        if (dmg && t - full_at < FULL_CHECK_MS) {
+            tx0 = dmg[0] < 0 ? 0 : dmg[0] / TILE;
+            ty0 = dmg[1] < 0 ? 0 : dmg[1] / TILE;
+            tx1 = dmg[2] <= 0 ? 0 : (dmg[2] + TILE - 1) / TILE;
+            ty1 = dmg[3] <= 0 ? 0 : (dmg[3] + TILE - 1) / TILE;
+            if (tx1 > TW) tx1 = TW;
+            if (ty1 > TH) ty1 = TH;
+        } else full_at = t;
+        Cmp k = { px, stride, tx0, tx1, 0 };
+        if ((long)(ty1 - ty0) * (tx1 - tx0) >= 64 && canvas_parallel_on()) par_rows(ty0, ty1, cmp_rows, &k);
+        else cmp_rows(&k, ty0, ty1);
+        any = k.any;
     }
     if (any) {
         last_change = now_ms();
         send_damage();
         int video = 0;
         for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].vcodec) video = 1;
-        if (video) mstream_frame(fb, W, W, H);
+        if (video) {
+            /* the changed tiles' box: the encoder's slots copy only that */
+            int box[4] = { W, H, 0, 0 };
+            for (int ty = 0; chg && ty < TH; ty++)
+                for (int tx = 0; tx < TW; tx++) {
+                    if (!chg[ty * TW + tx]) continue;
+                    int x = tx * TILE, y = ty * TILE, x1 = x + TILE > W ? W : x + TILE, y1 = y + TILE > H ? H : y + TILE;
+                    if (x < box[0]) box[0] = x;
+                    if (y < box[1]) box[1] = y;
+                    if (x1 > box[2]) box[2] = x1;
+                    if (y1 > box[3]) box[3] = y1;
+                }
+            mstream_frame(fb, W, W, H, chg && box[2] > box[0] ? box : NULL);
+        }
     }
     for (int i = 0; i < MAX_CLIENTS; i++) pump(&cl[i]);
 }
@@ -631,10 +686,40 @@ static void send_damage(void) {
     }
 }
 
+/* What the viewers' top bar shows about the video (RP_VINFO): sent when it changes, checked once a second. */
+static int on_gpu;
+void mirror_composed_on_gpu(int on) { on_gpu = on != 0; }
+static void vinfo_update(void) {
+    static double at;
+    static unsigned char last[8];
+    double t = now_ms();
+    if (t - at < 1000) return;
+    at = t;
+    for (int k = 1; k <= 2; k++) {
+        int hw = 0, fps = 0;
+        long enc = 0;
+        if (!mstream_info(k, &hw, &fps, &enc)) continue;
+        uint16_t f = (uint16_t)fps, e = (uint16_t)(enc < 0 ? 0 : enc > 65535 ? 65535 : enc);
+        unsigned char m[8] = { (unsigned char)hw, (unsigned char)on_gpu, 0, 0, 0, 0, (unsigned char)k, 0 };
+        memcpy(m + 2, &f, 2);
+        memcpy(m + 4, &e, 2);
+        int fresh = memcmp(m, last, 8) != 0;
+        memcpy(last, m, 8);
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            Client *c = &cl[i];
+            if (c->fd < 0 || c->vcodec != k || (!fresh && c->vinfo_sent)) continue;
+            msg(c, RP_VINFO, m, 6, NULL, 0);
+            c->vinfo_sent = 1;
+            flush(c);
+        }
+    }
+}
+
 /* Video mode clients get their lossless tiles once the screen is still; the encoder may have a
  * frame waiting for a free slot. */
 void mirror_tick(void) {
     if (lfd < 0) return;
+    vinfo_update();
     if (still()) for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].vmode && cl[i].ready) pump(&cl[i]);
     mstream_tick();
 }

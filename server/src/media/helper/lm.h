@@ -43,6 +43,9 @@ int  lm_write_all(int fd, const void *p, size_t n);
 
 /* VA-API: FFmpeg device over the render node lord-server passed (or NULL). */
 AVBufferRef *lm_vaapi_device(int render_fd);
+int lm_hwaccel_is(const char *params, const char *name);
+/* /dev/videoN and /dev/mediaN of the Pi 5's HEVC decoder (rpi-hevc-dec) from sysfs; 0 if found. */
+int lm_hevc_dec_paths(char *video, size_t vn, char *media, size_t mn);
 /* Acceleration by name (parameter hwaccel=vaapi|v4l2request|none): NULL = software. */
 AVBufferRef *lm_hw_device(const char *accel, int fd);
 /* The name requested in the parameters ("vaapi" if it doesn't say; "none" if hw=0). */
@@ -101,5 +104,8 @@ void lm_camera(const char *params, int dev, int render);                /* lm_ca
 void lm_audiorec(const char *params, int out, int pulse);               /* lm_rec.c */
 void lm_hwprobe(const int *render, int n_render);                       /* lm_hwprobe.c */
 void lm_stream(const char *params, int ring, int render);               /* lm_stream.c */
+/* the remote desktop's software encoder with its own settings (libx264, or libvpx for VP8), for LordBench */
+AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps);
+void lm_vbench(const char *params);                                     /* lm_vbench.c */
 
 #endif

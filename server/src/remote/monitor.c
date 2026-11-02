@@ -15,6 +15,8 @@
 #include "../drmcard.h"
 
 #include <errno.h>
+#include <pthread.h>
+#include <time.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <linux/kd.h>
@@ -25,6 +27,7 @@
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* the card with a display (on the Pi 5 it's usually card1: card0 is v3d, without connectors; drmcard.h) */
@@ -53,11 +56,37 @@ static int useful(int fd) {
            (HAS(ev, EV_ABS) && HAS(abs, ABS_X) && HAS(abs, ABS_Y));
 }
 
+/* Nothing can be shown. The caller reports it on tty1 (sessiond.c tell_no_display); the file makes the
+ * boot splash end for real instead of keeping its last picture over that message (lordos-splash). */
+static int no_display(void) {
+    mkdir(SD_RUN_DIR, 0755);
+    int fd = open(SD_NO_DISPLAY, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (fd >= 0) close(fd);
+    return -1;
+}
+
 int sd_mon_open(void) {
-    if (drm_pick_card(card, sizeof card)) sd_log("no card with KMS; trying %s", card);
-    else sd_log("display: %s", card);
+    /* On ARM boards the display driver can show up well after boot (on a Raspberry Pi 5's first
+     * boot vc4 may come after lordos.service has started): wait up to 30 s for a card with KMS
+     * before giving up, instead of falling back to the text console for good. */
+    int tries = 0, none;
+    unlink(SD_NO_DISPLAY);
+    while ((none = drm_pick_card(card, sizeof card)) && tries < 150) {
+        if (!tries) sd_log("no card with KMS yet; waiting up to 30 s");
+        struct timespec ts = { 0, 200000000 };
+        nanosleep(&ts, NULL);
+        tries++;
+    }
+    /* A card that opens but has no KMS (a render-only GPU) can't show anything either: lord-server
+     * would fail on it, quietly, once per attempt, while this process and the unit look fine. */
+    if (none) {
+        sd_log("no usable display driver: no /dev/dri/card* with connectors and CRTCs after 30 s, the login screen will not start "
+               "(lspci -k shows the graphics driver; once it is fixed, restart lordos.service)");
+        return no_display();
+    }
+    sd_log("display: %s%s", card, tries ? " (after waiting)" : "");
     int fd = open(CARD, O_RDWR | O_CLOEXEC);
-    if (fd < 0) { sd_log("no monitor (%s: %s)", CARD, strerror(errno)); return -1; }
+    if (fd < 0) { sd_log("no usable display: %s: %s, the login screen will not start", CARD, strerror(errno)); return no_display(); }
     close(fd);
     hp = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (hp >= 0 && inotify_add_watch(hp, "/dev/input", IN_CREATE | IN_ATTRIB | IN_DELETE) < 0) { close(hp); hp = -1; }
@@ -97,40 +126,85 @@ static int send_msg(int type, const void *d, size_t n, const int *fds, int nfds)
  * last frame of an unlocked desktop. The session itself frees them when it handles RP_UNDISPLAY,
  * but that is asynchronous and a stuck or hostile session never does. Removing the one on the
  * screen turns that output off, which is what a switch shows anyway. */
-static void drop_framebuffers(int fd) {
+static int drop_framebuffers(int fd) {
+    int total = 0;
     for (int pass = 0; pass < 16; pass++) {
         uint32_t ids[64];
         struct drm_mode_card_res r = {0};
-        if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r) || !r.count_fbs) return;
+        if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r) || !r.count_fbs) return total;
         uint32_t n = r.count_fbs < 64 ? r.count_fbs : 64;
         r = (struct drm_mode_card_res){ .fb_id_ptr = (uint64_t)(uintptr_t)ids, .count_fbs = n };
-        if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r)) return;
+        if (ioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r)) return total;
         if (r.count_fbs < n) n = r.count_fbs;
         int removed = 0;
         for (uint32_t i = 0; i < n; i++) {
             uint32_t id = ids[i];
             if (!ioctl(fd, DRM_IOCTL_MODE_RMFB, &id)) removed++;
         }
+        total += removed;
         if (!removed) {
             sd_log("warning: %u framebuffer(s) of the leaving session could not be removed", n);
-            return;
+            return total;
         }
     }
+    return total;
+}
+
+/* Closing an input device can be slow: the last close of a USB HID device stops its transfers, about
+ * 0.7 s for VMware's virtual USB mouse, which held up every lock and switch. Access is already cut by
+ * EVIOCREVOKE, so the close happens on a short-lived thread and the hand-off doesn't wait for it. */
+static void *close_inputs(void *arg) {
+    int *fds = arg;
+    for (int i = 0; fds[i] >= 0; i++) close(fds[i]);
+    free(fds);
+    return NULL;
+}
+static void close_later(const int *fds, int n) {
+    int *list = n > 0 ? malloc(sizeof(int) * ((size_t)n + 1)) : NULL;
+    pthread_t th;
+    pthread_attr_t at;
+    if (list) {
+        memcpy(list, fds, sizeof(int) * (size_t)n);
+        list[n] = -1;
+        if (!pthread_attr_init(&at)) {
+            pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+            int ok = !pthread_create(&th, &at, close_inputs, list);
+            pthread_attr_destroy(&at);
+            if (ok) return;
+        }
+        free(list);
+    }
+    for (int i = 0; i < n; i++) close(fds[i]);         /* no thread: closed here, as before */
 }
 
 /* Takes the monitor away from the session that has it. */
 static void take_back(void) {
+    double t0 = rd_now();
     if (conn >= 0) send_msg(RP_UNDISPLAY, NULL, 0, NULL, 0);
+    double tsend = rd_now();
+    char slow[160] = "";
     for (int i = 0; i < nin; i++) {
+        double a = rd_now();
         ioctl(ins[i], EVIOCREVOKE, NULL);
-        close(ins[i]);
+        double e = rd_now();
+        if (e - a > 0.05 && strlen(slow) < sizeof slow - 40)
+            snprintf(slow + strlen(slow), sizeof slow - strlen(slow), " %.15s revoke %.0f", inname[i], (e - a) * 1000);
     }
+    close_later(ins, nin);
     nin = 0;
+    double t1 = rd_now(), t2 = t1;
+    int fbs = 0, had = drm >= 0;
     if (drm >= 0) {
-        drop_framebuffers(drm);
+        fbs = drop_framebuffers(drm);
+        t2 = rd_now();
         ioctl(drm, DRM_IOCTL_DROP_MASTER, NULL);
         close(drm);
     }
+    double t3 = rd_now();
+    /* a slow hand-off says where the time went (vmwgfx turns the output off on RMFB: about 1 s) */
+    if (had && t3 - t0 > 0.25)
+        sd_log("monitor: take back %.0f ms (notice %.0f, input %.0f%s, %d framebuffer(s) removed %.0f, release %.0f)",
+               (t3 - t0) * 1000, (tsend - t0) * 1000, (t1 - tsend) * 1000, slow, fbs, (t2 - t1) * 1000, (t3 - t2) * 1000);
     drm = -1;
     if (conn >= 0) close(conn);
     conn = -1;

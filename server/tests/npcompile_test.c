@@ -42,6 +42,9 @@ static const NpList *lpm(const NpCompiled *c, int fam, const uint8_t *addr) {
     return best ? &best->list : NULL;
 }
 
+/* 1: the destination is in a subscribed blocklist (np_blk4/np_blk6 hit; FwQuery.listed) */
+static int g_listed;
+
 /* What the BPF program does with a connection (np.bpf.c), with the app already compiled. */
 static NpRes kernel(const NpCompiled *c, int dir, int proto, int fam, const uint8_t *in, int port) {
     uint8_t addr[16] = { 0 };
@@ -53,7 +56,7 @@ static NpRes kernel(const NpCompiled *c, int dir, int proto, int fam, const uint
     if (fam == 4 && c->app.has4) l = lpm(c, 4, addr);
     if (fam == 6 && c->app.has6) l = lpm(c, 6, addr);
     NpRes r;
-    np_decide(&c->app, l, dir, proto, port, lan, &r);
+    np_decide(&c->app, l, dir, proto, port, lan, g_listed, np_is_loop(fam, addr), &r);
     return r;
 }
 
@@ -93,11 +96,12 @@ static int same(FwStore *s, DnsMap *names, const NpCompiled *c, const char *app,
     q.app = app; q.dir = dir; q.proto = proto; q.fam = fam; q.port = port;
     if (fam) memcpy(q.addr, addr, 16);
     q.hosts = hp; q.nhosts = nh;
+    q.listed = g_listed;
     *ref = fw_decide(s, &q);
     *got = kernel(c, dir == FW_IN ? NP_D_IN : NP_D_OUT, proto == FW_PROTO_TCP ? NP_P_TCP : NP_P_UDP, fam, addr, port);
     int rv = ref->verdict == FW_V_DENY ? NP_V_DENY : NP_V_ALLOW;   /* "ask" compiles as silent */
     int rr = ref->reason == FW_BY_RESTRICTED ? NP_BY_RESTRICTED : ref->reason == FW_BY_RULE ? NP_BY_RULE :
-             ref->reason == FW_BY_TRUSTED ? NP_BY_TRUSTED : NP_BY_MODE;
+             ref->reason == FW_BY_TRUSTED ? NP_BY_TRUSTED : ref->reason == FW_BY_LIST ? NP_BY_LIST : NP_BY_MODE;
     if (got->verdict != rv || got->reason != rr) return 0;
     if (rr == NP_BY_RULE && got->rule_id != ref->rule_id) return 0;
     if (rr == NP_BY_RESTRICTED && got->flag != ref->flag) return 0;
@@ -345,7 +349,8 @@ static void random_round(int *diffs, int *queries) {
     FwStore *s = fw_store_new();
     DnsMap *names = dnsmap_new(0);
     long long now = 5000;
-    fw_set_mode(s, pick(3) == 0 ? FW_MODE_OFF : pick(4) == 0 ? FW_MODE_ASK : FW_MODE_SILENT);
+    int m = pick(8);
+    fw_set_mode(s, m < 2 ? FW_MODE_OFF : m == 2 ? FW_MODE_ASK : m == 3 ? FW_MODE_DENY : FW_MODE_SILENT);
     for (int i = 0; i < NAPPS; i++) {
         int nr = pick(9);
         for (int k = 0; k < nr; k++) random_rule(s, APPS[i]);
@@ -370,6 +375,7 @@ static void random_round(int *diffs, int *queries) {
             FwDecision ref;
             NpRes got;
             (*queries)++;
+            g_listed = pick(5) == 0;
             if (!same(s, names, &c, APPS[i], dir, pick(2) ? FW_PROTO_TCP : FW_PROTO_UDP, fam, a, (uint16_t)port, now, &ref, &got)) {
                 if (*diffs < 5) fprintf(stderr, "diferencia: app %s ip %s port %d dir %d: ref %d/%d/%u, kernel %d/%d/%u\n", APPS[i],
                                         fam ? IPS[0] : "?", port, dir, ref.verdict, ref.reason, ref.rule_id, got.verdict, got.reason, got.rule_id);
@@ -378,6 +384,7 @@ static void random_round(int *diffs, int *queries) {
         }
         np_compiled_free(&c);
     }
+    g_listed = 0;
     dnsmap_free(names);
     fw_store_free(s);
 }

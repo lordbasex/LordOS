@@ -606,6 +606,8 @@ static int vmode;                      /* the video plays: the lossless refresh 
 static int tiles_lost;                 /* a refresh tile didn't fit the data channel: ask for them all again */
 static double tiles_lost_at;
 static Rtc *rtc;
+static int view_hz;                 /* the browser screen's refresh rate (resize "hz"), 0 unknown */
+static void video_want(void);
 static const char *rtc_dead;           /* RTC_WHY_* of a peer that just failed */
 static int resets;               /* peers made after the first; the current one is number resets + 1 */
 static double reset_at;
@@ -692,6 +694,15 @@ static void from_session(int type, const unsigned char *d, uint32_t n) {
             uint32_t smp;
             memcpy(&smp, d, 4);
             rtc_audio(rtc, d + 4, n - 4, smp);
+        }
+        break;
+    case RP_VINFO:
+        /* u8 hardware encoder, u8 GPU composition, u16 fps, u16 1/100 ms per frame: numbers only, to the page */
+        if (n >= 6) {
+            uint16_t f, e;
+            memcpy(&f, d + 2, 2);
+            memcpy(&e, d + 4, 2);
+            ws_text("{\"t\":\"vinfo\",\"hw\":%d,\"gpu\":%d,\"fps\":%u,\"ms\":%u.%02u}", d[0] != 0, d[1] != 0, (unsigned)f, e / 100u, e % 100u);
         }
         break;
     case RP_DAMAGE:
@@ -788,7 +799,12 @@ static void from_browser(const char *j, size_t n, int dc) {
             sess_send(RP_KEY, p, 3);
             break;
         }
-        case RS_IN_RESIZE: { uint16_t sz[2] = { (uint16_t)in.a, (uint16_t)in.b }; sess_send(RP_RESIZE, sz, 4); break; }
+        case RS_IN_RESIZE: {
+            uint16_t sz[2] = { (uint16_t)in.a, (uint16_t)in.b };
+            sess_send(RP_RESIZE, sz, 4);
+            if (in.v1 && in.v1 != view_hz) { view_hz = in.v1; if (rtc && rtc_media_ready(rtc)) video_want(); }
+            break;
+        }
         case RS_IN_PING: ws_text("{\"t\":\"pong\",\"ts\":%lld}", in.ts); break;
         case RS_IN_CLIP: sess_send(RP_SETCLIP, in.text, in.tlen); break;
         case RS_IN_RTC:
@@ -872,15 +888,21 @@ static int conns_full(void) {
     return n >= RD_MAX_CONNS;
 }
 
+/* this viewer takes the session's encoded video: u8 codec, u8 sound, u16 frames a second (the browser
+ * screen's refresh; 0 unknown), u32 kbit/s */
+static void video_want(void) {
+    unsigned char v[8] = { (unsigned char)rtc_codec(rtc), 1, 0, 0 };
+    uint16_t hz = (uint16_t)view_hz;
+    uint32_t k = 4000;
+    memcpy(v + 2, &hz, 2);
+    memcpy(v + 4, &k, 4);
+    sess_send(RP_VIDEO, v, 8);
+}
 static void rtc_signal(void *ud, const char *json) { (void)ud; ws_frame(1, json, strlen(json), NULL, 0); }
 static void rtc_state(void *ud, int st, const char *why) {
     (void)ud;
     if (st == RTC_CONNECTED) {
-        /* this viewer takes the session's encoded video: u8 codec, u8 sound, u16 0, u32 kbit/s */
-        unsigned char v[8] = { (unsigned char)rtc_codec(rtc), 1, 0, 0 };
-        uint32_t k = 4000;
-        memcpy(v + 4, &k, 4);
-        sess_send(RP_VIDEO, v, 8);
+        video_want();
     } else if (st == RTC_FAILED) rtc_dead = why ? why : RTC_WHY_SERVER;
 }
 static void rtc_message(void *ud, int chan, const uint8_t *p, size_t n, int binary) {
@@ -1256,7 +1278,11 @@ static void handle_ws(const RsReq *r, int logged, const char *user, uid_t uid) {
         if (drop_root(&me, parent)) { sd_log("could not drop privileges"); _exit(1); }
         sd_log("connected to %s's session", name);
         bridge(&me);
-        sd_log("disconnected");
+        if (rtc) {                          /* how the video went, for the log (docs/REMOTE.md) */
+            char st[160];
+            rtc_stats(rtc, st, sizeof st);
+            sd_log("disconnected (video: %s)", st);
+        } else sd_log("disconnected");
         _exit(0);
     }
     /* the root side keeps nothing of the connection: it only listens for "the session was locked" */

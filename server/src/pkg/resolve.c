@@ -65,23 +65,30 @@ static uint32_t hash(const char *s, size_t n) {
     return h;
 }
 
+/* apt's choice (pkgPolicy::GetCandidateVer): versions from the newest down, and only a strictly
+ * higher priority replaces the one chosen, so among equals the newest wins; the installed version
+ * counts at least 100 (dpkg's status, as in apt), and versions older than it only with 1000 or
+ * more; a negative priority never. -1 when nothing is available or the installed version is the
+ * best (it may not be in the index). */
 long pkg_candidate(const Idx *x, const char *name, size_t n, const StPkg *inst) {
     long first = idx_find(x, name, n);
     if (first < 0) return -1;
-    long best500 = -1, best100 = -1;
-    int inst_in_100 = 0;
+    long best = -1;
+    int max = 0, inst_seen = !inst;
     for (long i = first; i < (long)x->h->npkg && !strcmp(idx_s(x, x->pkg[i].name), idx_s(x, x->pkg[first].name)); i++) {
-        uint32_t prio = x->src[x->pkg[i].src].prio;
-        if (prio >= 500 && best500 < 0) best500 = i;
-        if (prio >= 100 && best100 < 0) best100 = i;
-        if (inst && prio >= 100 && prio < 500 && !strcmp(idx_s(x, x->pkg[i].version), inst->version)) inst_in_100 = 1;
+        int c = inst ? ver_cmp(idx_s(x, x->pkg[i].version), inst->version) : 1;
+        if (!inst_seen && c < 0) {      /* past the installed version, which no source carries */
+            inst_seen = 1;
+            if (100 > max) { max = 100; best = -1; }
+        }
+        int p = idx_prio(x, i);
+        if (p < 0) continue;
+        if (c == 0) { inst_seen = 1; if (p < 100) p = 100; }
+        if (c < 0 && p < 1000) continue;
+        if (p > max) { max = p; best = i; }
     }
-    if (!inst) return best500 >= 0 ? best500 : best100;
-    /* installed from backports (or newer than normal): stays on the highest version */
-    long c = best500;
-    if (inst_in_100 || c < 0 || ver_cmp(idx_s(x, x->pkg[c].version), inst->version) < 0) c = best100;
-    if (c >= 0 && ver_cmp(idx_s(x, x->pkg[c].version), inst->version) < 0) return -1;     /* never downgrade */
-    return c;
+    if (!inst_seen && 100 > max) best = -1;
+    return best;
 }
 
 static int node_get(S *s, const char *name, size_t n) {

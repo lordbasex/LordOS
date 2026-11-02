@@ -1,10 +1,10 @@
 // panels.jsx — context menu (with submenus), Quick Preview, Get Info and confirm.
 // All are drawn inside the window, with coordinates relative to it.
-import { View, Text, Button, ToolbarButton, Hairline, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ToolbarButton, Hairline, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
 import { EntryIcon, TagDots } from './glyphs.jsx';
-import { tagsOf } from './ops.js';
+import { tagsOf, commentOf, setComment } from './ops.js';
 import { QuickContent } from './quicklook.jsx';
 
 const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === ref?.current) return true; return false; };
@@ -108,6 +108,8 @@ export function InfoPanel({ e, onClose, openers }) {
   const t = useTheme();
   const [st, setSt] = useState(null);
   const [du, setDu] = useState(null);
+  const [comment, setCommentText] = useState('');
+  useEffect(() => { setCommentText(e ? commentOf(e.path) : ''); }, [e?.path]);
   useEffect(() => {
     setSt(null); setDu(null);
     if (!e || e.app) return undefined;
@@ -143,6 +145,12 @@ export function InfoPanel({ e, onClose, openers }) {
           {e.trash && <Row t={t} k={tr('files.info.deleted')} v={(e.deleted || '').replace('T', ' ')} />}
         </View>
       )}
+      {!e.trash && !e.app && !e.arc ? (
+        <View style={{ gap: 3 }}>
+          <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{tr('files.col.comments')}</Text>
+          <TextInput value={comment} onChange={(v) => { setCommentText(v); setComment(e.path, v); }} placeholder={tr('files.info.addComment')} />
+        </View>
+      ) : null}
       {openers?.length ? (
         <View style={{ gap: 4 }}>
           <View style={{ height: 1, backgroundColor: t.separator }} />

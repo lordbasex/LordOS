@@ -94,8 +94,9 @@ int doc_recv(int sock, DocMsg *m) {
     struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1, .msg_control = u.buf, .msg_controllen = sizeof u.buf };
     ssize_t r;
     do r = recvmsg(sock, &msg, MSG_CMSG_CLOEXEC); while (r < 0 && errno == EINTR);
-    /* fds first: if the message is invalid they still have to be closed */
-    for (struct cmsghdr *c = CMSG_FIRSTHDR(&msg); c; c = CMSG_NXTHDR(&msg, c)) {
+    /* fds first: if the message is invalid they still have to be closed. A failed recvmsg leaves msg_controllen as
+     * it was, over a buffer nothing wrote */
+    for (struct cmsghdr *c = r < 0 ? NULL : CMSG_FIRSTHDR(&msg); c; c = CMSG_NXTHDR(&msg, c)) {
         if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS) continue;
         int k = (int)((c->cmsg_len - CMSG_LEN(0)) / sizeof(int));
         int tmp[DOC_MAX_FDS];

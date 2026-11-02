@@ -70,7 +70,7 @@ editor, generator, first run); the shots below are from the first version.
 **Why this split.** Everything that touches plaintext vault data, parses untrusted files (KDBX,
 CSV, JSON, images with QR codes) or talks to the security key runs in one small helper that cannot
 open the network, sockets or paths, the same model as `lord-doc` and `lord-media`
-(`docs/PRIVACY.md`, "Ayudantes"). `lord-server` (the compositor) only relays: it never holds
+(`docs/PRIVACY.md`, "Decoding helpers"). `lord-server` (the compositor) only relays: it never holds
 the vault key and never parses the vault. The UI gets just what it shows:
 
 - the list view gets titles, user names, URLs, tags and flags, **never** a secret;
@@ -244,7 +244,9 @@ A separate vault, like the *login* keyring of other desktop systems:
 
 When the session starts without a password (autologin, remote desktop for now), the keyring stays
 locked; the first app that needs it triggers a system prompt (`<KeyringPrompt />`, mounted by
-`startShell`) asking for the login password.
+`startShell`) asking for the login password. When several apps ask at once (0.8.5, `sdk/vault.js`),
+the requests queue behind one box: one answer goes to all of them, a new request no longer wipes the
+field, and Cancel answers every queued request instead of bringing the box back for the next one.
 
 ### `lord.keyring` / SDK `keyring` (native apps)
 
@@ -265,7 +267,8 @@ await keyring.list('mail');                         // without secrets
   id, so the system can ask the user; `keyring.share(id, app)` records the user's decision
   (`shared`). Sharing is an admin operation (the Passwords app or a system prompt), never the
   asking app itself.
-- **Trust boundary:** built-in apps run in the shell's JavaScript context, so for them the owner
+- **Trust boundary:** built-in apps (other than the isolated system packages: Passwords, and since
+  0.8.2 Mail, Calendar, Contacts and Reminders) run in the shell's JavaScript context, so for them the owner
   string is passed by trusted system code, not enforced by a process boundary. For isolated `.lpk`
   apps the owner is set by `lord-server` from the broker (see below). The Passwords app process
   manages the keyring over its own vault channel, which only the system `passwords` package
@@ -341,6 +344,12 @@ sandboxed `lord-vault` authenticates and serves on it.
 - Items are entries of `login.lvault` with `x.ss = {attrs, ctype}`; non-UTF-8 secrets are stored
   base64.
 - If another service already owns the name (gnome-keyring, kwallet), LordOS does not take it.
+  Two things keep it LordOS's (0.8.5): `lord-sessiond` starts a session only once the user's session
+  bus exists (with automatic login it used to start a few milliseconds earlier, and `lord-vault` then
+  never got on the bus), and the lordos package ships
+  `/usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf`, which starts gnome-keyring (when
+  an app pulls it in) with only its PKCS#11 component. Its D-Bus activation file runs only when
+  nobody owns the name.
 - **Access control is the freedesktop one:** like gnome-keyring, any app of the session that can
   reach the bus can read the unlocked collection. Isolated `.lpk` apps cannot open the bus socket.
 - **Chromium:** current Chromium releases keep their saved logins in their own database and store

@@ -1,13 +1,15 @@
 // components.jsx — base controls for apps. They take colors from useTheme(), so they
 // adapt to any theme.
-import { View, Text, addListener, displayFor } from '@lordos/runtime';
+import { View, Text, addListener, displayFor, onCommit, onScreenChange } from '@lordos/runtime';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
-import { getApp, windows, openedAt } from './windows.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
+import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction } from './i18n.js';
 import { SCROLLBAR, scrollbarMode, thumbGeometry, offsetForThumb, nearEdge, hitThumb, barShown, barOpacity, hideTime, barWidth } from './scrollbar.js';
 import { ime, useIme, Preedit } from './ime.js';
+import { noteTextField } from './textfocus.js';
 
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
@@ -103,6 +105,10 @@ export function SectionTitle({ children }) {
 // contentStyle (optional): style of the scrolled content box (its padding).
 // gutter (0.8.1, optional): with "Always" only, keep a strip at the end for the bar.
 export const SCROLL_GUTTER = 11;
+// A TextInput asks the ScrollView it is in to show its caret: on focus, on typing, and when the view
+// changes height, as a window does when it shrinks for the on-screen keyboard. A wheel scroll with a
+// field focused doesn't ask.
+const ScrollReveal = createContext(null);
 export function ScrollView({ style, contentStyle, children, scrollRef, gutter }) {
   const t = useTheme();
   const mode = scrollbarMode(t.scrollBars);
@@ -185,15 +191,28 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
     return () => { a(); b(); };
   }, []);
 
-  if (scrollRef) scrollRef.current = { scrollTo: (v) => {
+  const jump = (v) => {
     const m = measure() || metrics;
     const to = Math.max(0, Math.min(Math.max(0, m.content - m.view), v));
     if (Math.round(to) !== Math.round(y)) scrolled();
     setOffset(Math.max(0, v));
-  }, offset: () => y, inner };
+  };
+  if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner };
+  const latestReveal = useRef(null);
+  latestReveal.current = (c, always) => {
+    if (!outer.current) return;
+    const [, oy, , h] = lord.getLayout(outer.current.id);
+    const resized = st.current.fieldView !== h;
+    st.current.fieldView = h;
+    if (!always && !resized) return;
+    const below = c.y + c.h + 12 - (oy + h), above = oy + 4 - c.y;
+    if (below > 0) jump(y + below); else if (above > 0) jump(y - above);
+  };
+  const reveal = useRef((c, always) => latestReveal.current?.(c, always)).current;
 
   const onMove = (e) => {
     if (!outer.current) return;
+    if (!geom) measure();                       // content that grew by itself has told nobody
     const [ox, oy, ow] = lord.getLayout(outer.current.id);
     const near = !!geom && nearEdge(e.x - ox, ow, rtl);
     const hover = !!geom && st.current.ui.shown && hitThumb(e.x - ox, e.y - oy, ow, geom, rtl);
@@ -216,7 +235,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
       setOffset((o) => Math.max(0, Math.min(mx, Math.min(o, max) + e.deltaY)));
     }} onMouseMove={onMove} onMouseLeave={() => { st.current.ui = { ...st.current.ui, near: false, hover: false }; update({ near: false, hover: false }); schedule(); }}
       style={[{ overflow: 'hidden', flex: 1 }, style]}>
-      <View ref={inner} style={[{ translateY: -y }, pad, contentStyle]}>{children}</View>
+      <View ref={inner} style={[{ translateY: -y }, pad, contentStyle]}><ScrollReveal.Provider value={reveal}>{children}</ScrollReveal.Provider></View>
       {geom && (
         <View onMouseDown={(e) => {
           if (!outer.current) return;
@@ -226,7 +245,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
           st.current.ui = { ...st.current.ui, dragging: true };
           show({ dragging: true });
         }} style={{ position: 'absolute', end: 0, top: geom.top, width: SCROLLBAR.hit, height: geom.size,
-          pointerEvents: shown ? 'auto' : 'none' }}>
+          pointerEvents: shown || ui.near ? 'auto' : 'none' }}>
           <View ref={thumb} style={{ position: 'absolute', end: SCROLLBAR.inset, top: 0, height: geom.size, width: w,
             borderRadius: t.scrollRadius != null ? Math.min(t.scrollRadius, w / 2) : w / 2, backgroundColor: thumbColor,
             ...(t.scrollThumbBorder ? { border: `1px solid ${t.scrollThumbBorder}` } : null), opacity: shown ? 1 : 0 }} />
@@ -241,13 +260,36 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter })
 let focused = null;          // token of the active TextInput
 let focusedNow = false;      // it got focus during the mouse event in progress
 const handlers = new Map();
+// A form: Tab and Shift+Tab go round its text fields, in the order they mounted. Without one, Tab does nothing.
+const FieldOrder = createContext(null);
+export function FormFields({ children }) {
+  const order = useRef([]).current;
+  return <FieldOrder.Provider value={order}>{children}</FieldOrder.Provider>;
+}
 const focusSubs = new Set();
-const setFocus = (tok) => { focused = tok; for (const fn of focusSubs) fn(); };
+const carets = new Map();    // token → where its caret is (also for password fields, off the input method)
+const setFocus = (tok) => {
+  focused = tok;
+  for (const fn of focusSubs) fn();
+  noteTextField('input', tok !== null ? () => carets.get(tok)?.() || null : null);
+};
 
 addListener('pointerdown', () => { if (!focusedNow) setFocus(null); focusedNow = false; });
 addListener('keydown', (e) => { if (focused && handlers.has(focused)) handlers.get(focused)(e); });
 
 export const hasTextFocus = () => focused !== null;
+
+// A field out of sight must not keep the keys: its window stays mounted (desktopmodel.js), so when the
+// window that was in front is minimized or leaves the desktop in view, the text focus goes with it.
+export const clearTextFocus = () => { if (focused !== null) setFocus(null); };
+let frontWas = null;
+function checkFront() {
+  const w = frontWas && wm.get(frontWas);
+  if (w && (w.minimized || !onActiveDesktop(w))) clearTextFocus();
+  frontWas = wm.focused();
+}
+windows.subscribe(checkFront);
+activeDesktop.subscribe(checkFront);
 
 // For a custom text field (for example, a note edited on the desktop): while it has
 // focus it receives the keys, and useKeyboard/the apps don't (as with a TextInput). Call from the
@@ -291,6 +333,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const allRef = useRef(selectAll);
   allRef.current = allSel;
   latest.current = { value, onChange, onSubmit, onCancel, onKeyDown };
+  const order = useContext(FieldOrder);
 
   useEffect(() => {
     // with focus, keys go through the input method (Korean, Japanese, Chinese)
@@ -300,24 +343,41 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
       if (focused === token && !secureRef.current) ime.attach(token, caretRect, { inline: true }); else ime.detach(token);
     };
     focusSubs.add(sync);
+    carets.set(token, caretRect);
     handlers.set(token, (e) => {
       const p = latest.current;
       if (p.onKeyDown && p.onKeyDown(e)) { setBlink(true); return; }
+      if (e.key === 'Tab' && order && order.length > 1 && !e.ctrl && !e.meta && !e.alt) {
+        const i = order.indexOf(token);
+        setFocus(order[(i + (e.shift ? order.length - 1 : 1)) % order.length]);
+        return;
+      }
       const all = allRef.current;
-      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || (e.ctrl && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
+      if (all && (e.char || e.key === 'Backspace' || e.key === 'Delete' || ((e.ctrl || e.meta) && e.base === 'v'))) { setAllSel(false); allRef.current = false; p.value = ''; }
       else if (all && /^Arrow|^Home$|^End$/.test(e.key || '')) { setAllSel(false); allRef.current = false; return; }
-      if (e.ctrl && e.base === 'v') { p.onChange(p.value + lord.clipboard.get().replace(/\n/g, ' ')); return; }
+      if ((e.ctrl || e.meta) && e.base === 'v') { p.onChange(p.value + lord.clipboard.get().replace(/\n/g, ' ')); return; }
       if (e.key === 'Backspace' || e.key === 'Delete') p.onChange(all ? '' : e.key === 'Delete' ? p.value : [...p.value].slice(0, -1).join(''));
       else if (e.key === 'Enter') p.onSubmit?.(p.value);
       else if (e.key === 'Escape') p.onCancel?.();
       else if (e.char) p.onChange(p.value + e.char);
       setBlink(true);
     });
+    order?.push(token);
     if (autoFocus) setFocus(token);
-    return () => { focusSubs.delete(sync); handlers.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
+    return () => { if (order) order.splice(order.indexOf(token), 1); focusSubs.delete(sync); handlers.delete(token); carets.delete(token); ime.detach(token); if (focused === token) setFocus(null); };
   }, []);
   const imeSt = useIme();
   const preedit = isFocused ? imeSt.preedit : '';
+  const reveal = useContext(ScrollReveal);
+  useEffect(() => {
+    if (!isFocused || !reveal) return undefined;
+    const look = (always) => { const c = carets.get(token)?.(); if (c) reveal(c, always); };
+    let later = 0;                                       // layout runs after the commit
+    const moved = () => { later = later || setTimeout(() => { later = 0; look(false); }, 60); };
+    const id = setTimeout(() => look(true), 30);         // the caret is drawn after this render
+    const off = onCommit(moved), offScreen = onScreenChange(moved);
+    return () => { clearTimeout(id); clearTimeout(later); off(); offScreen(); };
+  }, [isFocused, value]);
 
   useEffect(() => {
     if (!isFocused) return undefined;
@@ -440,8 +500,11 @@ export function AppHost({ id, focused }) {
 
 // Fullscreen and picture-in-picture windows (wm.setFullscreen / wm.setPip): above the
 // theme, without its frame. startShell places them; the theme doesn't have to do anything.
+// Fullscreen belongs to its desktop: on a hidden one it stays mounted and display: none, so the app
+// keeps its state. Picture-in-picture is on all of them.
 export function FloatingWindows() {
   const list = useStore(windows);
+  const desktop = useStore(activeDesktop);
   const fs = list.filter((w) => w.fullscreen && !w.minimized);
   const pips = list.filter((w) => w.pip && !w.minimized && !w.fullscreen);
   const drag = useRef(null);
@@ -456,7 +519,7 @@ export function FloatingWindows() {
     const offUp = addListener('pointerup', () => { drag.current = null; });
     const offKey = addListener('keydown', (e) => {
       if (e.key !== 'Escape' || hasTextFocus()) return;
-      const top = windows.get().filter((w) => w.fullscreen).pop();
+      const top = windows.get().filter((w) => w.fullscreen && onActiveDesktop(w)).pop();
       if (top) windows.set((ws) => ws.map((w) => (w.id === top.id ? { ...w, fullscreen: false } : w)));
     });
     return () => { offMove(); offUp(); offKey(); };
@@ -475,9 +538,10 @@ export function FloatingWindows() {
       ))}
       {fs.map((w) => {
         const d = displayFor(w);              // the display the window was on (docs/DISPLAYS.md)
+        const here = onDesktop(w, desktop);
         return (
-        <View key={w.id} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000' }}>
-          <AppHost id={w.id} focused />
+        <View key={w.id} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000', display: here ? 'flex' : 'none' }}>
+          <AppHost id={w.id} focused={here} />
         </View>
         );
       })}

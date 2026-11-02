@@ -11,8 +11,8 @@ body:
     id: version
     attributes:
       label: LordOS version
-      description: Open the About LordOS app and copy the version (for example "0.8.3 · Beta").
-      placeholder: 0.8.3 · Beta
+      description: Open the About LordOS app and copy the version (for example "0.8.4 · Beta").
+      placeholder: 0.8.4 · Beta
     validations:
       required: true
   - type: dropdown

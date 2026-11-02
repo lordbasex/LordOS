@@ -25,6 +25,7 @@
 #include <ftw.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,10 +46,11 @@ static int pathf(char *out, size_t n, const char *fmt, ...) {
     return r;
 }
 
-static char home[PATH_MAX], media1[PATH_MAX], media2[PATH_MAX];
+static char home[PATH_MAX], media1[PATH_MAX], media2[PATH_MAX], remote_root[PATH_MAX];
 
 void fsops_init(const char *h, const char *user) {
     pathf(home, sizeof home, "%s", h);
+    pathf(remote_root, sizeof remote_root, "%s/.local/share/lordos/remote", home);
     pathf(media1, sizeof media1, "/media/%s", user && *user ? user : "-");
     pathf(media2, sizeof media2, "/run/media/%s", user && *user ? user : "-");
 }
@@ -59,21 +61,48 @@ static int under(const char *p, const char *root) {
 }
 
 int fsops_allowed(const char *real) { return under(real, home) || under(real, media1) || under(real, media2); }
+const char *fsops_home(void) { return home; }
 
-int fsops_protected(const char *real) {
-    static const char *const protect[] = { "/.local/share/applications", "/.config/autostart",
+/* Reading only (0.8.5, Files → This computer): the whole tree as the session user, so the system's
+ * own permissions decide, except the kernel's and the runtime's pseudo-filesystems: /proc (this
+ * process's memory, environment and open files), /sys, /dev and /run (the session's sockets and
+ * runtime files; /run/media/$USER stays a root). Writing keeps fsops_allowed. */
+int fsops_readable(const char *real) {
+    if (fsops_allowed(real)) return 1;
+    if (real[0] != '/') return 0;
+    static const char *const pseudo[] = { "/proc", "/sys", "/dev", "/run", NULL };
+    for (int i = 0; pseudo[i]; i++) if (under(real, pseudo[i])) return 0;
+    return 1;
+}
+
+static const char *const protect[] = { "/.local/share/applications", "/.config/autostart",
                                            "/.local/share/lordos/apps", "/.config/lordos/settings.json",
                                            "/.config/lordos/permisos.json",
                                            "/.config/lordos/firewall.json", /* network permissions: an app does not write its own rules */
+                                           "/.config/lordos/fwlists.json",  /* (0.8.5) subscribed blocklists: only lord.fw */
+                                           "/.config/lordos/fwlists.txt",   /* their compiled entries, read by lord-netperm */
+                                           "/.cache/lordos/fwlists",        /* their downloads: only lord-server writes them */
                                            "/.config/lordos/backup.json",   /* Backups: decides where the data goes */
                                            "/.config/lordos/mail",          /* Mail accounts and trusted certificates: only lord.mail.saveConfig (docs/MAIL.md) */
                                            "/.local/share/lordos/mail",     /* Mail cache: only lord-maild writes it */
                                            "/.local/share/lordos/vault",    /* Passwords vaults: only lord-vault writes them (docs/PASSWORDS.md) */
                                            NULL };
+
+int fsops_protected(const char *real) {
     for (int i = 0; protect[i]; i++) {
         char p[PATH_MAX + 64];
         pathf(p, sizeof p, "%s%s", home, protect[i]);
         if (under(real, p)) return 1;
+    }
+    return 0;
+}
+
+/* Is a protected path strictly below real? (Cleaner's rule table: a rule's root must not hold one.) */
+int fsops_protected_below(const char *real) {
+    for (int i = 0; protect[i]; i++) {
+        char p[PATH_MAX + 64];
+        pathf(p, sizeof p, "%s%s", home, protect[i]);
+        if (strcmp(p, real) && under(p, real)) return 1;
     }
     return 0;
 }
@@ -83,6 +112,22 @@ static double now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &
 /* err buffers carry code lines (errcode.h): lord.fs throws them translated */
 static void seterr(char *e, size_t n, const char *code) { if (e && n) lerr_set(e, n, code, NULL); }
 static void seterrno(char *e, size_t n, int no) { if (e && n) lerr_set(e, n, "sys.errno", "errno", lerr_errno(no), NULL); }
+
+/* Moving a parent of a protected path takes the protected path with it, and a folder arriving under such a
+ * name brings its own: neither may happen through rename, move, Trash or restore. RENAME_NOREPLACE: the
+ * kernel refuses an existing target, with no gap between a check and the rename. */
+int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
+    if (fsops_protected(from) || fsops_protected(to) || fsops_protected_below(from) || fsops_protected_below(to)) {
+        seterr(err, errlen, "fs.protected");
+        return -1;
+    }
+    if (renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) {
+        if (errno == EEXIST) seterr(err, errlen, "fs.exists");
+        else seterrno(err, errlen, errno);
+        return -1;
+    }
+    return 0;
+}
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */
 
@@ -202,6 +247,7 @@ static void *job_main(void *arg) {
 
 int fsjob_start(const char *src, const char *dst, int move, char *err, size_t errlen) {
     struct stat st;
+    if ((move && fsops_protected_below(src)) || fsops_protected_below(dst)) { seterr(err, errlen, "fs.protected"); return -1; }
     if (lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
     if (!lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
     size_t n = strlen(src);
@@ -301,11 +347,15 @@ static void url_decode(const char *s, char *out, size_t n) {
     out[o] = 0;
 }
 
-int fstrash_put(const char *real, char *err, size_t errlen) {
+/* The object moved is `from` relative to dirfd (or a path with AT_FDCWD); real names it for the
+ * .trashinfo and for choosing the trash. dest (optional) gets the item's path inside the Trash. On
+ * failure errno says why. */
+static int trash_put(int dirfd, const char *from, const char *real, char *destout, size_t destn, char *err, size_t errlen) {
+    if (fsops_protected_below(real)) { seterr(err, errlen, "fs.protected"); errno = EPERM; return -1; }
     char dir[PATH_MAX], top[PATH_MAX];
     int rel;
-    if (trash_dir_for(real, dir, sizeof dir, top, sizeof top, &rel) || mkdirs_trash(dir)) { seterr(err, errlen, "fs.noTrash"); return -1; }
-    if (!strncmp(real, dir, strlen(dir))) { seterr(err, errlen, "fs.alreadyInTrash"); return -1; }
+    if (trash_dir_for(real, dir, sizeof dir, top, sizeof top, &rel) || mkdirs_trash(dir)) { seterr(err, errlen, "fs.noTrash"); errno = EIO; return -1; }
+    if (!strncmp(real, dir, strlen(dir))) { seterr(err, errlen, "fs.alreadyInTrash"); errno = EINVAL; return -1; }
     const char *base = strrchr(real, '/');
     base = base ? base + 1 : real;
     char name[NAME_MAX + 16], info[PATH_MAX + 300], dest[PATH_MAX + 300];
@@ -320,7 +370,7 @@ int fstrash_put(const char *real, char *err, size_t errlen) {
         fd = open(info, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (fd < 0 && errno != EEXIST) break;
     }
-    if (fd < 0) { seterr(err, errlen, "fs.trashEntryFailed"); return -1; }
+    if (fd < 0) { seterr(err, errlen, "fs.trashEntryFailed"); errno = EIO; return -1; }
     char path[PATH_MAX * 3], enc[PATH_MAX * 3], when[32];
     pathf(path, sizeof path, "%s", rel ? real + strlen(top) + 1 : real);
     url_encode(path, enc, sizeof enc);
@@ -330,21 +380,34 @@ int fstrash_put(const char *real, char *err, size_t errlen) {
     strftime(when, sizeof when, "%Y-%m-%dT%H:%M:%S", &tm);
     dprintf(fd, "[Trash Info]\nPath=%s\nDeletionDate=%s\n", enc, when);
     close(fd);
-    if (rename(real, dest)) {
+    if (renameat(dirfd, from, AT_FDCWD, dest)) {
         int e = errno;
         unlink(info);
         seterr(err, errlen, e == EXDEV ? "fs.trashOtherDisk" : "sys.errno");
         if (e != EXDEV) seterrno(err, errlen, e);
+        errno = e;
         return -1;
     }
+    if (destout) pathf(destout, destn, "%s", dest);
     return 0;
+}
+
+int fstrash_put(const char *real, char *err, size_t errlen) { return trash_put(AT_FDCWD, real, real, NULL, 0, err, errlen); }
+
+/* (Cleaner) The same Trash, for a name in an already open folder: a folder swapped for a link after
+ * the caller checked it can't redirect the move. */
+int fstrash_put_at(int dirfd, const char *name, const char *real, char *dest, size_t destn, char *err, size_t errlen) {
+    if (strchr(name, '/')) { seterr(err, errlen, "sys.badArgument"); errno = EINVAL; return -1; }
+    return trash_put(dirfd, name, real, dest, destn, err, errlen);
 }
 
 /* Known trash folders: the home one and those of the user's mounts. */
 typedef struct { char dirs[17][PATH_MAX]; int n; } TrashDirs;
 static void vol_dir_cb(void *ud, const char *path, const char *fs, double total, double avail) {
-    (void)fs; (void)total; (void)avail;
+    (void)total; (void)avail;
     TrashDirs *t = ud;
+    /* the Dock asks for the Trash on the interface's thread: a share that doesn't answer is left out */
+    if (fsops_share_fs(fs) && fsops_share_down(path)) return;
     if (t->n < 17) pathf(t->dirs[t->n++], PATH_MAX, "%s/.Trash-%u", path, (unsigned)getuid());
 }
 static TrashDirs *trash_dirs(void) {
@@ -451,7 +514,7 @@ int fstrash_restore(const char *id, char *err, size_t errlen) {
     if (!realpath(parent[0] ? parent : "/", rparent) || !fsops_allowed(rparent)) { seterr(err, errlen, "fs.trashOriginGone"); return -1; }
     char dest[PATH_MAX * 2];
     pathf(dest, sizeof dest, "%s/%s", rparent, sl + 1);
-    if (fsops_protected(dest)) { seterr(err, errlen, "fs.protected"); return -1; }
+    if (fsops_protected(dest) || fsops_protected_below(dest)) { seterr(err, errlen, "fs.protected"); return -1; }
     struct stat st;
     if (!lstat(dest, &st)) { seterr(err, errlen, "fs.trashRestoreExists"); return -1; }
     if (rename(id, dest)) { seterrno(err, errlen, errno); return -1; }
@@ -601,6 +664,130 @@ static void unescape_mount(char *s) {
     *o = 0;
 }
 
+int fsops_share_fs(const char *t) { return !strcmp(t, "fuse.rclone") || !strcmp(t, "cifs") || !strcmp(t, "smb3") || !strcmp(t, "nfs") || !strcmp(t, "nfs4"); }
+
+/* ---- shares that stopped answering ----
+ * lord.fs runs on the interface's thread, and a call on a network mount whose server went away
+ * blocks in the kernel: tens of seconds on SMB, minutes on NFSv4 even when soft (measured, docs/FILES.md).
+ * So before lord.fs touches a path under a share, a thread of its own asks the server (statvfs) and
+ * the caller waits at most SHARE_WAIT_MS. While that question hangs the share counts as down, without
+ * waiting. What it can't cover: a server that dies inside the SHARE_OK_MS an answer is trusted. */
+#define SHARE_WAIT_MS 800
+#define SHARE_OK_MS 3000
+#define SHARE_MAX 8
+
+typedef struct { char mnt[PATH_MAX]; int asking, ok; long long when; } ShareMount;
+static ShareMount sh[SHARE_MAX];
+static int nsh;
+static long long sh_read;
+static pthread_mutex_t sh_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t sh_cv;
+static pthread_once_t sh_once = PTHREAD_ONCE_INIT;
+
+static long long mono_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000LL + t.tv_nsec / 1000000;
+}
+
+static void sh_init(void) {
+    pthread_condattr_t a;
+    pthread_condattr_init(&a);
+    pthread_condattr_setclock(&a, CLOCK_MONOTONIC);
+    pthread_cond_init(&sh_cv, &a);
+    pthread_condattr_destroy(&a);
+}
+
+static void *sh_ask(void *arg) {
+    char mnt[PATH_MAX];
+    pthread_mutex_lock(&sh_mu);
+    snprintf(mnt, sizeof mnt, "%s", (char *)arg);
+    pthread_mutex_unlock(&sh_mu);
+    free(arg);
+    struct statvfs vs;
+    int ok = !statvfs(mnt, &vs);
+    pthread_mutex_lock(&sh_mu);
+    for (int i = 0; i < nsh; i++) {
+        if (strcmp(sh[i].mnt, mnt)) continue;
+        sh[i].asking = 0;
+        sh[i].ok = ok;
+        sh[i].when = mono_ms();
+    }
+    pthread_cond_broadcast(&sh_cv);
+    pthread_mutex_unlock(&sh_mu);
+    return NULL;
+}
+
+static void sh_reread(void) {
+    FILE *f = fopen("/proc/mounts", "r");
+    if (!f) return;
+    ShareMount fresh[SHARE_MAX];
+    int n = 0;
+    char line[4096];
+    size_t l1 = strlen(media1), l2 = strlen(media2);
+    while (n < SHARE_MAX && fgets(line, sizeof line, f)) {
+        char dev[1024], mnt[2048], fstype[64];
+        if (sscanf(line, "%1023s %2047s %63s", dev, mnt, fstype) != 3 || !fsops_share_fs(fstype)) continue;
+        unescape_mount(mnt);
+        size_t l3 = strlen(remote_root);
+        if (!((!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/') || (!strncmp(mnt, remote_root, l3) && mnt[l3] == '/'))) continue;
+        memset(&fresh[n], 0, sizeof fresh[n]);
+        snprintf(fresh[n].mnt, sizeof fresh[n].mnt, "%s", mnt);
+        for (int i = 0; i < nsh; i++) if (!strcmp(sh[i].mnt, mnt)) fresh[n] = sh[i];    /* an answer on its way stays */
+        n++;
+    }
+    fclose(f);
+    memcpy(sh, fresh, (size_t)n * sizeof sh[0]);
+    nsh = n;
+}
+
+int fsops_share_down(const char *path) {
+    if (!under(path, media1) && !under(path, media2) && !under(path, remote_root)) return 0;
+    pthread_once(&sh_once, sh_init);
+    pthread_mutex_lock(&sh_mu);
+    long long now = mono_ms();
+    if (now - sh_read > 2000 || !sh_read) { sh_reread(); sh_read = now; }
+    int k = -1;
+    for (int i = 0; i < nsh; i++) if (under(path, sh[i].mnt)) k = i;
+    if (k < 0) { pthread_mutex_unlock(&sh_mu); return 0; }
+    ShareMount *m = &sh[k];
+    int down = 0;
+    if (m->asking) down = 1;
+    else if (!m->when || now - m->when > SHARE_OK_MS) {
+        char *arg = strdup(m->mnt);
+        pthread_t th;
+        pthread_attr_t at;
+        pthread_attr_init(&at);
+        pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+        pthread_attr_setstacksize(&at, 128 * 1024);
+        sigset_t all, old;
+        sigfillset(&all);
+        pthread_sigmask(SIG_BLOCK, &all, &old);
+        int e = arg ? pthread_create(&th, &at, sh_ask, arg) : -1;
+        pthread_sigmask(SIG_SETMASK, &old, NULL);
+        pthread_attr_destroy(&at);
+        if (e) { free(arg); down = 1; }
+        else {
+            m->asking = 1;
+            char want[PATH_MAX];
+            snprintf(want, sizeof want, "%s", m->mnt);
+            struct timespec until;
+            clock_gettime(CLOCK_MONOTONIC, &until);
+            until.tv_nsec += SHARE_WAIT_MS * 1000000L;
+            if (until.tv_nsec >= 1000000000L) { until.tv_sec++; until.tv_nsec -= 1000000000L; }
+            for (;;) {
+                int r = pthread_cond_timedwait(&sh_cv, &sh_mu, &until);
+                int still = 0;
+                for (int i = 0; i < nsh; i++) if (!strcmp(sh[i].mnt, want)) { still = sh[i].asking; down = !still && !sh[i].ok; }
+                if (!still) break;
+                if (r == ETIMEDOUT) { down = 1; break; }
+            }
+        }
+    } else down = !m->ok;
+    pthread_mutex_unlock(&sh_mu);
+    return down;
+}
+
 void fs_volumes(FsVolFn fn, void *ud) {
     FILE *f = fopen("/proc/mounts", "r");
     if (!f) return;
@@ -610,11 +797,14 @@ void fs_volumes(FsVolFn fn, void *ud) {
         if (sscanf(line, "%1023s %2047s %63s", dev, mnt, fstype) != 3) continue;
         unescape_mount(mnt);
         size_t l1 = strlen(media1), l2 = strlen(media2);
-        int ok = (!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/');
+        size_t l3 = strlen(remote_root);
+        int ok = (!strncmp(mnt, media1, l1) && mnt[l1] == '/') || (!strncmp(mnt, media2, l2) && mnt[l2] == '/') || (!strncmp(mnt, remote_root, l3) && mnt[l3] == '/');
         if (!ok) continue;
         struct statvfs vs;
         double total = 0, avail = 0;
-        if (!statvfs(mnt, &vs)) { total = (double)vs.f_blocks * vs.f_frsize; avail = (double)vs.f_bavail * vs.f_frsize; }
+        /* never on a network mount: this runs on the interface's thread and a server that went away
+         * would hold it for as long as the file system's timeout */
+        if (!fsops_share_fs(fstype) && !statvfs(mnt, &vs)) { total = (double)vs.f_blocks * vs.f_frsize; avail = (double)vs.f_bavail * vs.f_frsize; }
         fn(ud, mnt, fstype, total, avail);
     }
     fclose(f);

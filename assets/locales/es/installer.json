@@ -49,6 +49,7 @@
   "summary.lang": "Idioma, región y hora",
   "summary.layout": "Particiones",
   "summary.layoutValue": "GPT: arranque BIOS 1 MB · EFI 512 MB (FAT32) · sistema (ext4) en el resto",
+  "summary.layoutValueEfi": "GPT: EFI 512 MB (FAT32) · sistema (ext4) en el resto",
   "summary.login": "Al arrancar aparece la pantalla de ingreso: se entra con este usuario y su contraseña. El inicio automático se puede prender en Ajustes → Usuarios. La contraseña también se usa para sudo y las tareas de administración.",
   "summary.swap": "Swap",
   "summary.user": "Usuario",

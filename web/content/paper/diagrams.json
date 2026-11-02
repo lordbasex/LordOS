@@ -17,9 +17,9 @@
             "pt": "Apps"
           },
           "sub": {
-            "en": "Built-in apps and the theme · isolated .lpk apps · Linux apps (GTK, Qt, browsers)",
-            "es": "Apps incluidas y el tema · apps .lpk aisladas · apps de Linux (GTK, Qt, navegadores)",
-            "pt": "Apps incluídos e o tema · apps .lpk isolados · apps Linux (GTK, Qt, navegadores)"
+            "en": "Built-in apps and the theme · isolated .lpk apps · Linux apps (GTK, Qt, browsers; X11 apps through Xwayland)",
+            "es": "Apps incluidas y el tema · apps .lpk aisladas · apps Linux (GTK, Qt, navegadores; apps X11 por Xwayland)",
+            "pt": "Apps incluídos e o tema · apps .lpk isolados · apps Linux (GTK, Qt, navegadores; apps X11 pelo Xwayland)"
           },
           "tone": "user"
         },
@@ -104,9 +104,9 @@
             "pt": "Processos de apps isolados"
           },
           "sub": {
-            "en": "lord-server --app <id>: one per .lpk app and Passwords; Landlock, seccomp, cgroup",
-            "es": "lord-server --app <id>: uno por app .lpk y Contraseñas; Landlock, seccomp, cgroup",
-            "pt": "lord-server --app <id>: um por app .lpk e Senhas; Landlock, seccomp, cgroup"
+            "en": "lord-server --app <id>: one per .lpk app, and Passwords, Mail, Calendar, Contacts and Reminders; Landlock, seccomp, cgroup",
+            "es": "lord-server --app <id>: uno por app .lpk, y Contraseñas, Correo, Calendario, Contactos y Recordatorios; Landlock, seccomp, cgroup",
+            "pt": "lord-server --app <id>: um por app .lpk, e Senhas, E-mail, Calendário, Contatos e Lembretes; Landlock, seccomp, cgroup"
           },
           "tone": "user"
         },
@@ -118,9 +118,9 @@
             "pt": "Ajudantes isolados"
           },
           "sub": {
-            "en": "lord-doc, lord-media, lord-maild, lord-vault: no sockets, no exec, files only as descriptors",
-            "es": "lord-doc, lord-media, lord-maild, lord-vault: sin sockets, sin exec, archivos solo como descriptores",
-            "pt": "lord-doc, lord-media, lord-maild, lord-vault: sem sockets, sem exec, arquivos só como descritores"
+            "en": "lord-doc, lord-media, lord-maild, lord-vault, lord-fetch: no sockets, no exec, files only as descriptors",
+            "es": "lord-doc, lord-media, lord-maild, lord-vault, lord-fetch: sin sockets, sin exec, archivos solo como descriptores",
+            "pt": "lord-doc, lord-media, lord-maild, lord-vault, lord-fetch: sem sockets, sem exec, arquivos só como descritores"
           },
           "tone": "ours"
         },
@@ -710,9 +710,9 @@
             "pt": "Broker no lord-server"
           },
           "sub": {
-            "en": ".lpk apps and Passwords: all eight restrictions, refused without a prompt",
-            "es": "Apps .lpk y Contraseñas: las ocho restricciones, rechazadas sin aviso",
-            "pt": "Apps .lpk e Senhas: as oito restrições, recusadas sem aviso"
+            "en": "Isolated apps (.lpk, Passwords, Mail, Calendar, Contacts, Reminders): all eight restrictions, refused without a prompt",
+            "es": "Apps aisladas (.lpk, Contraseñas, Correo, Calendario, Contactos, Recordatorios): las ocho restricciones, rechazadas sin preguntar",
+            "pt": "Apps isolados (.lpk, Senhas, E-mail, Calendário, Contatos, Lembretes): as oito restrições, recusadas sem perguntar"
           },
           "tone": "ours"
         },

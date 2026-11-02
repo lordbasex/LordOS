@@ -224,7 +224,20 @@ const char *media_hwaccel(void) {
     const char *e = getenv("LORD_MEDIA_HWACCEL");
     if (e && (!strcmp(e, "vaapi") || !strcmp(e, "v4l2request") || !strcmp(e, "none"))) return e;
     if (getenv("LORD_MEDIA_HW") && !strcmp(getenv("LORD_MEDIA_HW"), "0")) return "none";
-    return "vaapi";
+    /* the Pi 5: no VA-API, a stateless HEVC decoder */
+    static int pi = -1;
+    if (pi < 0) {
+        pi = 0;
+        for (int i = 0; i < 32 && !pi; i++) {
+            char p[64], name[32] = "";
+            snprintf(p, sizeof p, "/sys/class/video4linux/video%d/name", i);
+            FILE *f = fopen(p, "r");
+            if (!f) continue;
+            if (fgets(name, sizeof name, f) && !strncmp(name, "rpi-hevc-dec", 12)) pi = 1;
+            fclose(f);
+        }
+    }
+    return pi ? "v4l2request" : "vaapi";
 }
 
 int media_render_fd(void) {
@@ -245,7 +258,9 @@ int media_open_input(const char *path, char *real, size_t n) {
     if (!path || !*path || strlen(path) >= PATH_MAX) return -1;
     if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
     else snprintf(full, sizeof full, "%s/%s", media_home(), path);
-    if (!realpath(full, r) || !fsops_allowed(r)) return -1;
+    if (!realpath(full, r)) return -1;
+    /* the system's moving wallpapers are readable by anyone, the login screen too (docs/WALLPAPERS.md) */
+    if (strncmp(r, "/var/lib/lordos/wallpapers/", 27) && strncmp(r, "/usr/share/backgrounds/lordos/motion/", 37) && !fsops_allowed(r)) return -1;
     int fd = open(r, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode)) { if (fd >= 0) close(fd); return -1; }

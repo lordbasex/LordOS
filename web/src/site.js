@@ -225,6 +225,14 @@
     $$('.prose h2[id], .prose h3[id]').forEach(function (h) { io.observe(h); });
   }
 
+  // Paper: a link to a release's notes (or a heading inside them) opens its collapsed <details>
+  var openChl = function () {
+    var t1 = location.hash && d.getElementById(decodeURIComponent(location.hash.slice(1)));
+    var dt1 = t1 && t1.closest && t1.closest('details.chl');
+    if (dt1 && !dt1.open) { dt1.open = true; t1.scrollIntoView(); }
+  };
+  if ($('.chlog')) { openChl(); window.addEventListener('hashchange', openChl); }
+
   // FAQ search (the category chips are plain anchors)
   var fq = $('#faq-q');
   if (fq) {

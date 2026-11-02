@@ -55,8 +55,14 @@ void out_logical_box(const OutView *v, Rect r, float *x0, float *y0, float *x1, 
  * another display along an edge, never overlapping, edges aligned when within `snap` px. Others
  * stay where they are. Returns the position in *x, *y. */
 void out_snap(const ORect *r, int n, int moving, int want_x, int want_y, int snap, int *x, int *y);
+/* 1 if display `moving` at (x, y) overlaps no other and shares an edge (at least one pixel, not a
+ * corner) with one of them: a position Settings computed (sdk/displaylayout.js) that is kept as is. */
+int  out_fits(const ORect *r, int n, int moving, int x, int y);
+/* 1 if no two displays overlap and every display is joined to the others through shared edges. */
+int  out_valid(const ORect *r, int n);
 /* Displays that overlap or float apart (a scale or resolution changed, a display unplugged):
- * keep r[0] (the main one) and re-snap the others in order, each at its current position. */
+ * keep r[0] (the main one) and re-snap the others in order, each at its current position. A valid
+ * arrangement (out_valid) is left alone, so a chain like main ← 2 ← 1 is kept. */
 void out_fix(ORect *r, int n);
 /* Shift every display so the arrangement's top-left corner is (0, 0). Returns the bounding size. */
 void out_normalize(ORect *r, int n, int *bw, int *bh);

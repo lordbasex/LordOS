@@ -12,6 +12,9 @@
  *   - learns names only from the system resolver (npdns.c);
  *   - tells each lord-server about its apps' new connections over /run/lordos/netperm.sock
  *     (npproto.h). The only thing it accepts there is "reload my rules";
+ *   - (0.8.5) reads each user's subscribed blocklists (~/.config/lordos/fwlists.txt, the same
+ *     fixed-path reader) into np_blk4/np_blk6: their networks, and the addresses the resolver gave
+ *     for their domains; and counts the essential system services' bytes (np_sysc);
  *   - cuts the connections a rule now denies: the packet filter drops their packets in the
  *     kernel, and this process destroys their sockets over sock_diag netlink (npdiag.c, the only
  *     socket besides AF_UNIX and the DNS AF_PACKET one), right after a reload and whenever the
@@ -27,11 +30,13 @@
 #include "netperm/npload.h"
 #include "netperm/npproto.h"
 #include "fw/fwmap.h"
+#include "fw/fwlists.h"
 #include "errcode.h"
 #include "sec/json.h"
 
 #include <arpa/inet.h>
 #include <dirent.h>
+#include <malloc.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/bpf.h>
@@ -91,7 +96,18 @@ typedef struct {
     int dirty_counts;
     uint64_t user_cg;                   /* id of user@<uid>.service, or 0 if it isn't there (nor attached) */
     int ulinks[16], nulinks;            /* the programs attached to user@<uid>.service */
+    FwLists *lists;                     /* (0.8.5) the subscribed blocklists, NULL: none */
+    uint32_t blkset;                    /* its set in np_blk4/np_blk6 (NpApp.blk) */
+    FwMap blkin;                        /* installed entries: (fam, prefix, address) → BlkEnt */
+    int nlearned;                       /* entries from the resolver among them */
 } Session;
+
+typedef struct {
+    int learned;                        /* 1: an address the resolver gave for a listed name */
+    long long mark;                     /* the pass that last wanted it */
+} BlkEnt;
+
+#define BLK_LEARNED_MAX 16384           /* resolver addresses per user */
 
 typedef struct {
     int fd;
@@ -112,6 +128,10 @@ static struct {
     int bpf_ok;
     char bpf_err[200];                  /* a code line (errcode.h): the firewall page shows it translated */
     int m_np_cfg, m_np_apps, m_np_union, m_np_lpm4, m_np_lpm6, m_np_seen, m_np_counts, m_np_events, m_np_snd, m_np_flows, m_np_bound;
+    int m_np_blk4, m_np_blk6, m_np_sysc;
+    uint32_t next_blkset;
+    long long blk_pass;
+    struct { uint64_t cgid; int links[4], nlinks; uint64_t rx, tx; double rrx, rtx; } sys[3];   /* dns, time, network */
     int diag_fd;                        /* NETLINK_SOCK_DIAG (npdiag.c), -1 until first used */
     int diag_warned;                    /* the kernel can't destroy sockets: said once */
     int acct_ok;                        /* the traffic accounting programs loaded */
@@ -161,11 +181,11 @@ static long long mono(void) {
 
 /* ~/.config/lordos/firewall.json without following links: every folder and the file must belong
  * to the user, the file must be regular and at most FW_FILE_MAX. The home folder comes from /etc/passwd. */
-static char *read_user_rules(unsigned uid, size_t *len, char *why, size_t wn) {
+static char *read_user_file(unsigned uid, const char *file, size_t max, size_t *len, char *why, size_t wn) {
     struct passwd *pw = getpwuid(uid);
     if (!pw || pw->pw_dir[0] != '/') { snprintf(why, wn, "user without a home folder"); return NULL; }
     int fd = open(pw->pw_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    static const char *const parts[] = { ".config", "lordos", "firewall.json" };
+    const char *const parts[] = { ".config", "lordos", file };
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || st.st_uid != uid) { snprintf(why, wn, "odd home folder"); if (fd >= 0) close(fd); return NULL; }
     for (int i = 0; i < 3; i++) {
@@ -174,7 +194,7 @@ static char *read_user_rules(unsigned uid, size_t *len, char *why, size_t wn) {
         close(fd);
         if (nfd < 0) { snprintf(why, wn, errno == ENOENT ? "no rules" : "%s: %s", parts[i], strerror(errno)); return NULL; }
         fd = nfd;
-        if (fstat(fd, &st) || st.st_uid != uid || (last && (!S_ISREG(st.st_mode) || st.st_size > (off_t)FW_FILE_MAX))) {
+        if (fstat(fd, &st) || st.st_uid != uid || (last && (!S_ISREG(st.st_mode) || st.st_size > (off_t)max))) {
             snprintf(why, wn, "%s is not the user's or not a regular file", parts[i]);
             close(fd);
             return NULL;
@@ -197,7 +217,7 @@ static char *read_user_rules(unsigned uid, size_t *len, char *why, size_t wn) {
 static void load_rules(Session *s) {
     size_t len = 0;
     char why[160] = "", err[200] = "";
-    char *text = read_user_rules(s->uid, &len, why, sizeof why);
+    char *text = read_user_file(s->uid, "firewall.json", FW_FILE_MAX, &len, why, sizeof why);
     FwStore *n = fw_store_new();
     if (!n) { free(text); return; }
     if (text && fw_from_json(n, text, len, err, sizeof err)) {
@@ -211,6 +231,27 @@ static void load_rules(Session *s) {
     fw_store_free(s->store);
     s->store = n;
     logf_("uid %u: %zu rules, mode %d", s->uid, fw_rule_count(n), (int)fw_mode(n));
+}
+
+/* (0.8.5) ~/.config/lordos/fwlists.txt, the user's subscribed blocklists compiled by lord-server
+ * (fw/fwlists.h), through the same reader. A file that doesn't validate keeps the previous set. */
+static void load_lists(Session *s) {
+    size_t len = 0;
+    char why[160] = "", err[120] = "";
+    char *text = read_user_file(s->uid, "fwlists.txt", FWL_FILE_MAX, &len, why, sizeof why);
+    if (!text) {
+        if (strcmp(why, "no rules")) logf_("uid %u: blocklists: %s", s->uid, why);
+        fwl_free(s->lists);
+        s->lists = NULL;
+        return;
+    }
+    FwLists *l = fwl_load_text(text, len, err, sizeof err);
+    free(text);
+    if (!l) { logf_("uid %u: invalid fwlists.txt (%s); the previous blocklists stay in use", s->uid, err); return; }
+    fwl_free(s->lists);
+    s->lists = fwl_domains(l) || fwl_nets(l) ? l : (fwl_free(l), NULL);
+    if (s->lists) logf_("uid %u: blocklists: %zu names, %zu networks", s->uid, fwl_domains(s->lists), fwl_nets(s->lists));
+    malloc_trim(0);                     /* the file's text and the set's growth: back to the system */
 }
 
 /* ---- maps ------------------------------------------------------------------------------------ */
@@ -228,6 +269,9 @@ static int map_fd(const char *name) {
     if (!strcmp(name, "np_snd")) return G.m_np_snd;
     if (!strcmp(name, "np_flows")) return G.m_np_flows;
     if (!strcmp(name, "np_bound")) return G.m_np_bound;
+    if (!strcmp(name, "np_blk4")) return G.m_np_blk4;
+    if (!strcmp(name, "np_blk6")) return G.m_np_blk6;
+    if (!strcmp(name, "np_sysc")) return G.m_np_sysc;
     return -1;
 }
 #endif
@@ -301,6 +345,10 @@ static void sync_scope(Session *s, Scope *sc) {
     for (int i = 0; i < c.nnodes; i++) install(sc->idx, gen, &c.nodes[i]);
     prune(sc->idx, gen);
     sc->has_domains = c.has_domains;
+    /* the lists deny new connections in connect()/sendmsg(); an open connection to an address that
+     * just joined a list is cut by the sweep after the change (sync_blk), so the per-packet filter
+     * doesn't decide for every app because lists are on (it would cost every packet a decision) */
+    if (s->lists) c.app.blk = s->blkset;
     sc->app_v = c.app;
     if (bpfs_map_update(G.m_np_apps, &sc->cgid, &c.app, BPF_ANY)) logf_("np_apps: %s", strerror(errno));
     /* the counters' entry exists from the start: the accounting programs only add to existing
@@ -321,6 +369,107 @@ static void drop_scope(Scope *sc) {
     bpfs_map_delete(G.m_np_apps, &sc->cgid);
     bpfs_map_delete(G.m_np_counts, &sc->cgid);
     prune(sc->idx, 0);
+}
+
+/* ---- blocklists (0.8.5, docs/FIREWALL.md "Blocklists") --------------------------------------
+ *
+ * Each user with subscribed lists gets a set in np_blk4/np_blk6 (NpApp.blk of each of their apps):
+ * the lists' networks, and the addresses the system resolver gave for a listed name, as long as
+ * every name the resolver gave for that address is listed (a shared CDN address stays allowed).
+ * The whole set is recomputed on a reload and every 30 s (what the resolver forgot goes); a DNS
+ * answer updates its own addresses at once, before the app connects. The kernel decides with
+ * np_decide: a rule the owner wrote for that destination still wins. */
+
+static size_t blk_key(int fam, const uint8_t *addr, int prefix, unsigned char *k) {
+    memset(k, 0, 18);
+    k[0] = (unsigned char)fam;
+    k[1] = (unsigned char)prefix;
+    memcpy(k + 2, addr, fam == 4 ? 4 : 16);
+    return 18;
+}
+
+static int blk_map(uint32_t set, int fam, const uint8_t *addr, int prefix, int del) {
+    uint8_t one = 1;
+    if (fam == 4) {
+        NpLpm4Key k;
+        memset(&k, 0, sizeof k);
+        k.prefixlen = 32 + (uint32_t)prefix;
+        k.data[0] = (uint8_t)(set >> 24); k.data[1] = (uint8_t)(set >> 16); k.data[2] = (uint8_t)(set >> 8); k.data[3] = (uint8_t)set;
+        memcpy(k.data + 4, addr, 4);
+        return del ? bpfs_map_delete(G.m_np_blk4, &k) : bpfs_map_update(G.m_np_blk4, &k, &one, BPF_ANY);
+    }
+    NpLpm6Key k;
+    memset(&k, 0, sizeof k);
+    k.prefixlen = 32 + (uint32_t)prefix;
+    k.data[0] = (uint8_t)(set >> 24); k.data[1] = (uint8_t)(set >> 16); k.data[2] = (uint8_t)(set >> 8); k.data[3] = (uint8_t)set;
+    memcpy(k.data + 4, addr, 16);
+    return del ? bpfs_map_delete(G.m_np_blk6, &k) : bpfs_map_update(G.m_np_blk6, &k, &one, BPF_ANY);
+}
+
+static int blk_added;                   /* entries sync_blk installed (a sweep follows) */
+
+static void blk_want(Session *s, int fam, const uint8_t *addr, int prefix, int learned) {
+    unsigned char k[18];
+    size_t kl = blk_key(fam, addr, prefix, k);
+    void **slot = fwmap_slot(&s->blkin, k, kl, 1);
+    if (!slot) return;
+    BlkEnt *e = *slot;
+    if (e) {
+        e->mark = G.blk_pass;
+        if (!learned && e->learned) { e->learned = 0; s->nlearned--; }
+        return;
+    }
+    if ((learned && s->nlearned >= BLK_LEARNED_MAX) || blk_map(s->blkset, fam, addr, prefix, 0) || !(e = malloc(sizeof *e))) {
+        fwmap_take(&s->blkin, k, kl);
+        return;
+    }
+    e->learned = learned;
+    e->mark = G.blk_pass;
+    s->nlearned += learned;
+    *slot = e;
+    blk_added++;
+}
+
+/* An address the resolver now also gives for an unlisted name: no longer blocked. */
+static void blk_unwant_learned(Session *s, int fam, const uint8_t *addr) {
+    unsigned char k[18];
+    size_t kl = blk_key(fam, addr, fam == 4 ? 32 : 128, k);
+    BlkEnt *e = fwmap_get(&s->blkin, k, kl);
+    if (!e || !e->learned) return;
+    blk_map(s->blkset, fam, addr, fam == 4 ? 32 : 128, 1);
+    free(fwmap_take(&s->blkin, k, kl));
+    s->nlearned--;
+}
+
+static int blk_net_cb(void *u, int fam, const uint8_t *addr, int prefix) { blk_want(u, fam, addr, prefix, 0); return 0; }
+
+static int blk_dns_cb(void *u, int fam, const uint8_t *addr, const char (*names)[FW_NAME_MAX], int n) {
+    Session *s = u;
+    const char *p[DNSMAP_PER_IP];
+    for (int i = 0; i < n && i < DNSMAP_PER_IP; i++) p[i] = names[i];
+    if (fwl_block_names(s->lists, p, n < DNSMAP_PER_IP ? n : DNSMAP_PER_IP)) blk_want(s, fam, addr, fam == 4 ? 32 : 128, 1);
+    return 0;
+}
+
+static void sweep(unsigned uid);
+
+static void sync_blk(Session *s) {
+    if (!G.bpf_ok) return;
+    G.blk_pass++;
+    blk_added = 0;
+    if (s->lists) {
+        if (!s->blkset) s->blkset = ++G.next_blkset;
+        fwl_net_each(s->lists, blk_net_cb, s);
+        if (fwl_domains(s->lists)) dnsmap_each(G.names, NAMES_APP, mono(), blk_dns_cb, s);
+    }
+    FWMAP_EACH(&s->blkin, e) {
+        BlkEnt *b = e->val;
+        if (b->mark == G.blk_pass) continue;
+        blk_map(s->blkset, e->key[0], e->key + 2, e->key[1], 1);
+        s->nlearned -= b->learned;
+        free(fwmap_take(&s->blkin, e->key, e->klen));
+    }
+    if (blk_added) sweep(s->uid);       /* open connections to what was just added */
 }
 
 /* ---- user@<uid>.service: the systemd-run escape ------------------------------------------- */
@@ -398,6 +547,8 @@ static void sync_user_scope(Session *s) {
 static int scope_app(const char *name, char *app) {
     if (!strcmp(name, "server")) { snprintf(app, FW_APP_MAX, "lordos"); return 0; }
     size_t n = strlen(name);
+    /* (0.8.5) LordOS's own components that use the network: lordos-net-<name>.scope → lordos:<name> */
+    if (!strncmp(name, "lordos-net-", 11)) return fw_component_scope(name, app, FW_APP_MAX);
     if (n < 18 || strncmp(name, "app-lordos-", 11) || strcmp(name + n - 6, ".scope")) return -1;
     return fw_app_canon(name, app, FW_APP_MAX);
 }
@@ -450,6 +601,10 @@ static void scan_session(Session *s) {
 static void drop_session(int k) {
     Session *s = &G.sess[k];
     for (int i = 0; i < s->nsc; i++) drop_scope(&s->sc[i]);
+    fwl_free(s->lists);
+    s->lists = NULL;
+    sync_blk(s);                        /* with no lists: removes every entry */
+    fwmap_free(&s->blkin, free);
     drop_user_links(s);
     if (s->user_cg) { bpfs_map_delete(G.m_np_union, &s->user_cg); bpfs_map_delete(G.m_np_counts, &s->user_cg); }
     if (s->wd >= 0) inotify_rm_watch(G.ifd, s->wd);
@@ -520,8 +675,19 @@ static void scan_all(void) {
             snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);
             s->wd = inotify_add_watch(G.ifd, path, IN_CREATE | IN_DELETE | IN_ONLYDIR);
             load_rules(s);
+            load_lists(s);
+            sync_blk(s);
         }
         s->seen = 1;
+        /* a session that ended and started again has a new folder under the same name: watch the
+         * one there now (for the same folder this returns the same watch), or a new scope would only
+         * be found by the 5-second rescan (0.8.5: a component's scope connects right away) */
+        {
+            char path[160];
+            snprintf(path, sizeof path, CG_ROOT "/" CG_SERVICE "/%s", s->dir);
+            int wd = inotify_add_watch(G.ifd, path, IN_CREATE | IN_DELETE | IN_ONLYDIR);
+            if (wd >= 0) s->wd = wd;
+        }
         scan_session(s);
     }
     if (d) closedir(d);
@@ -615,6 +781,8 @@ static void reload_uid(unsigned uid) {
     for (int i = 0; i < G.nsess; i++) {
         if (G.sess[i].uid != uid) continue;
         load_rules(&G.sess[i]);
+        load_lists(&G.sess[i]);
+        sync_blk(&G.sess[i]);
         for (int k = 0; k < G.sess[i].nsc; k++) sync_scope(&G.sess[i], &G.sess[i].sc[k]);
         sync_union(&G.sess[i]);
     }
@@ -687,7 +855,7 @@ static int remote_of(const NpSock *k, uint8_t *a) {
  * address and whether the local port is one it bound (an incoming connection). 1 if denied. */
 static int user_denies(const Scope *sc, const NpSock *k, int *fam, uint8_t *addr, int *dir, int *port, NpRes *r) {
     const NpApp *a = &sc->app_v;
-    if (!a->can_deny) return 0;
+    if (!a->can_deny && !a->blk) return 0;
     *fam = remote_of(k, addr);
     int proto = k->proto == IPPROTO_TCP ? NP_P_TCP : NP_P_UDP, lan;
     NpList l;
@@ -718,7 +886,26 @@ static int user_denies(const Scope *sc, const NpSock *k, int *fam, uint8_t *addr
     *dir = NP_D_OUT;
     *port = k->dport;
     if (!bpfs_map_lookup(G.m_np_bound, &bk, &one)) { *dir = NP_D_IN; *port = k->sport; }
-    np_decide(a, have ? &l : NULL, *dir, proto, *port, lan, r);
+    int listed = 0;
+    if (a->blk) {
+        uint8_t v;
+        if (*fam == 4) {
+            NpLpm4Key key;
+            memset(&key, 0, sizeof key);
+            key.prefixlen = 64;
+            key.data[0] = (uint8_t)(a->blk >> 24); key.data[1] = (uint8_t)(a->blk >> 16); key.data[2] = (uint8_t)(a->blk >> 8); key.data[3] = (uint8_t)a->blk;
+            memcpy(key.data + 4, addr, 4);
+            listed = !bpfs_map_lookup(G.m_np_blk4, &key, &v);
+        } else {
+            NpLpm6Key key;
+            memset(&key, 0, sizeof key);
+            key.prefixlen = 160;
+            key.data[0] = (uint8_t)(a->blk >> 24); key.data[1] = (uint8_t)(a->blk >> 16); key.data[2] = (uint8_t)(a->blk >> 8); key.data[3] = (uint8_t)a->blk;
+            memcpy(key.data + 4, addr, 16);
+            listed = !bpfs_map_lookup(G.m_np_blk6, &key, &v);
+        }
+    }
+    np_decide(a, have ? &l : NULL, *dir, proto, *port, lan, listed, np_is_loop(*fam, addr), r);
     return r->verdict == NP_V_DENY;
 }
 
@@ -821,7 +1008,7 @@ static void sweep(unsigned uid) {
 /* ---- notices and counters -------------------------------------------------------------------- */
 
 static const char *by_name(int r) {
-    return r == NP_BY_RESTRICTED ? "restricted" : r == NP_BY_RULE ? "rule" : r == NP_BY_TRUSTED ? "trusted" : "mode";
+    return r == NP_BY_RESTRICTED ? "restricted" : r == NP_BY_RULE ? "rule" : r == NP_BY_TRUSTED ? "trusted" : r == NP_BY_LIST ? "list" : "mode";
 }
 
 static void on_event(void *u, const void *data, uint32_t len) {
@@ -912,6 +1099,46 @@ static void on_net_event(const NpEvent *evp, int cut) {
               ev.flag ? " " : "", ev.flag && flag ? flag : "");
 }
 
+/* ---- the essential system services (0.8.5) ----------------------------------------------------
+ *
+ * Name resolution, time and the network service are not apps and can't be blocked, but the Monitor
+ * shows their traffic: the accounting programs alone are attached to resolved's and timesyncd's
+ * cgroups (lord-netd's leaf, lordos.service/netd, is already under lordos.service), and np_sysc
+ * gets an entry for each, keyed by its cgroup id (the programs only add to existing entries). */
+static const struct { const char *id, *parent, *leaf; } SYS[3] = {
+    { "system:dns", CG_ROOT "/system.slice", "systemd-resolved.service" },
+    { "system:time", CG_ROOT "/system.slice", "systemd-timesyncd.service" },
+    { "system:network", CG_ROOT "/" CG_SERVICE, "netd" },
+};
+
+static void sync_system(void) {
+    if (!G.bpf_ok || G.acct_ok != 2) return;
+    for (int i = 0; i < 3; i++) {
+        int dfd = open(SYS[i].parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        uint64_t id = dfd >= 0 ? bpfs_cgroup_id(dfd, SYS[i].leaf) : 0;
+        if (id == G.sys[i].cgid) { if (dfd >= 0) close(dfd); continue; }
+        for (int k = 0; k < G.sys[i].nlinks; k++) close(G.sys[i].links[k]);
+        if (G.sys[i].cgid) bpfs_map_delete(G.m_np_sysc, &G.sys[i].cgid);
+        memset(&G.sys[i], 0, sizeof G.sys[i]);
+        if (!id) { if (dfd >= 0) close(dfd); continue; }
+        NpCount z = { 0, 0, 0, 0, 0 };
+        bpfs_map_update(G.m_np_sysc, &id, &z, BPF_ANY);
+        if (strcmp(SYS[i].leaf, "netd")) {
+            int cfd = openat(dfd, SYS[i].leaf, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            for (int p = 0; cfd >= 0 && p < G.nprogs && G.sys[i].nlinks < 4; p++) {
+                if (!np_attach_system(G.attach[p])) continue;
+                int l = bpfs_link_create(G.progs[p], cfd, G.attach[p]);
+                if (l < 0) { logf_("%s: could not attach the accounting: %s", SYS[i].leaf, strerror(errno)); break; }
+                G.sys[i].links[G.sys[i].nlinks++] = l;
+            }
+            if (cfd >= 0) close(cfd);
+        }
+        close(dfd);
+        G.sys[i].cgid = id;
+        logf_("counting %s (%s)", SYS[i].id, SYS[i].leaf);
+    }
+}
+
 /* ---- traffic per address (np_flows) ------------------------------------------------------- */
 
 typedef struct {
@@ -970,9 +1197,33 @@ static void idle_flows(void) {
     }
 }
 
-/* [["addr",rx,tx,rxRate,txRate,blocked],...] of one app, busiest first. */
+/* [["addr",rx,tx,rxRate,txRate,blocked,[[port,"tcp"|"udp"|"other","out"|"in",rx,tx,rxRate,txRate],...]],...]
+ * of one app, busiest address first (0.8.5: np_flows is per address and port; this folds the ports
+ * of each address together and lists its 8 busiest under it). */
+#define PORTS_PER_ADDR 8
+typedef struct { const NpFlowKey *k; uint64_t rx, tx, blocked; double rrx, rtx; int first, n; } AddrAgg;
+
+static int agg_cmp(const void *a, const void *b) {
+    const AddrAgg *x = a, *y = b;
+    double rx = x->rrx + x->rtx, ry = y->rrx + y->rtx;
+    if (rx != ry) return rx < ry ? 1 : -1;
+    uint64_t bx = x->rx + x->tx, by = y->rx + y->tx;
+    return bx < by ? 1 : bx > by ? -1 : 0;
+}
+
+static int same_addr(const NpFlowKey *a, const NpFlowKey *b) { return a->fam == b->fam && !memcmp(a->addr, b->addr, 16); }
+
+static int ref_addr_cmp(const void *a, const void *b) {
+    const NpFlowKey *x = ((const FlowRef *)a)->k, *y = ((const FlowRef *)b)->k;
+    if (x->fam != y->fam) return x->fam - y->fam;
+    int c = memcmp(x->addr, y->addr, 16);
+    if (c) return c;
+    return flow_cmp(a, b);
+}
+
 static size_t flows_json(uint64_t cgid, char *j, size_t cap) {
     static FlowRef refs[NP_MAX_FLOWS];
+    static AddrAgg agg[NP_MAX_FLOWS];
     int n = 0;
     FWMAP_EACH(&G.flows, e) {
         const NpFlowKey *k = (const NpFlowKey *)(const void *)e->key;
@@ -981,15 +1232,41 @@ static size_t flows_json(uint64_t cgid, char *j, size_t cap) {
         refs[n].k = k;
         refs[n++].f = e->val;
     }
-    qsort(refs, (size_t)n, sizeof refs[0], flow_cmp);
+    /* group by address (each group's ports busiest first) */
+    qsort(refs, (size_t)n, sizeof refs[0], ref_addr_cmp);
+    int na = 0;
+    for (int i = 0; i < n; i++) {
+        if (!na || !same_addr(agg[na - 1].k, refs[i].k)) {
+            AddrAgg *a = &agg[na++];
+            memset(a, 0, sizeof *a);
+            a->k = refs[i].k;
+            a->first = i;
+        }
+        AddrAgg *a = &agg[na - 1];
+        a->rx += refs[i].f->rx;
+        a->tx += refs[i].f->tx;
+        a->blocked += refs[i].f->blocked;
+        a->rrx += refs[i].f->rrx;
+        a->rtx += refs[i].f->rtx;
+        a->n++;
+    }
+    qsort(agg, (size_t)na, sizeof agg[0], agg_cmp);
     size_t w = 0;
     w += (size_t)snprintf(j + w, cap - w, "[");
-    for (int i = 0; i < n && i < FLOWS_PER_APP && w + 170 < cap; i++) {
+    for (int i = 0; i < na && i < FLOWS_PER_APP && w + 170 + PORTS_PER_ADDR * 80 < cap; i++) {
         char addr[INET6_ADDRSTRLEN] = "";
-        inet_ntop(refs[i].k->fam == 4 ? AF_INET : AF_INET6, refs[i].k->addr, addr, sizeof addr);
-        w += (size_t)snprintf(j + w, cap - w, "%s[\"%s\",%llu,%llu,%.0f,%.0f,%llu]", i ? "," : "", addr,
-                              (unsigned long long)refs[i].f->rx, (unsigned long long)refs[i].f->tx, refs[i].f->rrx, refs[i].f->rtx,
-                              (unsigned long long)refs[i].f->blocked);
+        inet_ntop(agg[i].k->fam == 4 ? AF_INET : AF_INET6, agg[i].k->addr, addr, sizeof addr);
+        w += (size_t)snprintf(j + w, cap - w, "%s[\"%s\",%llu,%llu,%.0f,%.0f,%llu,[", i ? "," : "", addr,
+                              (unsigned long long)agg[i].rx, (unsigned long long)agg[i].tx, agg[i].rrx, agg[i].rtx,
+                              (unsigned long long)agg[i].blocked);
+        for (int p = 0; p < agg[i].n && p < PORTS_PER_ADDR; p++) {
+            const FlowRef *r = &refs[agg[i].first + p];
+            const char *pr = r->k->proto == NP_P_TCP ? "tcp" : r->k->proto == NP_P_UDP ? "udp" : "other";
+            w += (size_t)snprintf(j + w, cap - w, "%s[%u,\"%s\",\"%s\",%llu,%llu,%.0f,%.0f]", p ? "," : "", r->k->port, pr,
+                                  r->k->dir == NP_D_IN ? "in" : "out", (unsigned long long)r->f->rx, (unsigned long long)r->f->tx,
+                                  r->f->rrx, r->f->rtx);
+        }
+        w += (size_t)snprintf(j + w, cap - w, "]]");
     }
     w += (size_t)snprintf(j + w, cap - w, "]");
     return w;
@@ -1025,6 +1302,20 @@ static void push_counts(void) {
             sc->rtx = rtx;
         }
     }
+    int sys_moved = 0;
+    for (int i = 0; i < 3; i++) {
+        if (!G.sys[i].cgid) continue;
+        NpCount c = { 0, 0, 0, 0, 0 };
+        bpfs_map_lookup(G.m_np_sysc, &G.sys[i].cgid, &c);
+        double rrx = dt > 0 && c.rx >= G.sys[i].rx ? (double)(c.rx - G.sys[i].rx) / dt : 0;
+        double rtx = dt > 0 && c.tx >= G.sys[i].tx ? (double)(c.tx - G.sys[i].tx) / dt : 0;
+        if (c.rx != G.sys[i].rx || c.tx != G.sys[i].tx || (rrx == 0) != (G.sys[i].rrx == 0) || (rtx == 0) != (G.sys[i].rtx == 0)) sys_moved = 1;
+        G.sys[i].rx = c.rx;
+        G.sys[i].tx = c.tx;
+        G.sys[i].rrx = rrx;
+        G.sys[i].rtx = rtx;
+    }
+    if (sys_moved) for (int i = 0; i < G.nsess; i++) G.sess[i].dirty_counts = 1;
     /* the per-address table only while bytes move (one batch call per second) */
     if (G.bpf_ok && G.acct_ok == 2) {
         if (bytes_moved) read_flows(dt);
@@ -1037,8 +1328,8 @@ static void push_counts(void) {
         for (int c = 0; c < G.ncl && !has_client; c++) has_client = G.cl[c].uid == s->uid;
         if (!has_client) continue;                                  /* stays dirty until someone connects */
         s->dirty_counts = 0;
-        size_t per = FW_APP_MAX * 2 + 200 + (size_t)FLOWS_PER_APP * 170;
-        size_t cap = 64 + (size_t)s->nsc * per, w = 0;
+        size_t per = FW_APP_MAX * 2 + 200 + (size_t)FLOWS_PER_APP * (170 + PORTS_PER_ADDR * 80);
+        size_t cap = 64 + (size_t)s->nsc * per + 3 * 160, w = 0;
         char *j = malloc(cap);
         if (!j) continue;
         j[w++] = '{';
@@ -1051,6 +1342,12 @@ static void push_counts(void) {
                                   (unsigned long long)sc->rx, (unsigned long long)sc->tx, sc->rrx, sc->rtx);
             w += flows_json(sc->cgid, j + w, cap - w - 40);
             w += (size_t)snprintf(j + w, cap - w, ",%llu]", (unsigned long long)sc->blocked);
+        }
+        /* the essential system services: the same shape, never a connection count or a rule */
+        for (int k = 0; k < 3; k++) {
+            if (!G.sys[k].cgid) continue;
+            w += (size_t)snprintf(j + w, cap - w, "%s\"%s\":[0,0,%llu,%llu,%.0f,%.0f,[],0]", w > 1 ? "," : "", SYS[k].id,
+                                  (unsigned long long)G.sys[k].rx, (unsigned long long)G.sys[k].tx, G.sys[k].rrx, G.sys[k].rtx);
         }
         j[w++] = '}';
         send_uid(s->uid, NP_MSG_COUNTS, j, w, 0);
@@ -1074,6 +1371,12 @@ static void on_dns(void *u, const uint8_t *pkt, size_t len) {
         if (!n) continue;
         for (int i = 0; i < G.nsess; i++) {
             Session *s = &G.sess[i];
+            if (s->lists && fwl_domains(s->lists)) {           /* blocklists: before the app connects */
+                const char *p[DNSMAP_PER_IP];
+                for (int k = 0; k < n; k++) p[k] = names[k];
+                if (fwl_block_names(s->lists, p, n)) blk_want(s, r->addr[a].fam, r->addr[a].addr, r->addr[a].fam == 4 ? 32 : 128, 1);
+                else blk_unwant_learned(s, r->addr[a].fam, r->addr[a].addr);
+            }
             for (int k = 0; k < s->nsc; k++) {
                 Scope *sc = &s->sc[k];
                 if (!sc->has_domains) continue;
@@ -1117,7 +1420,7 @@ static int bpf_setup(void) {
 #define NP_MKMAP(n, t, k, v, m, f) G.m_##n = bpfs_map_create(t, k, v, m, f, #n);
     NP_MAPS(NP_MKMAP)
 #undef NP_MKMAP
-    if (G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
+    if (G.m_np_blk4 < 0 || G.m_np_blk6 < 0 || G.m_np_sysc < 0 || G.m_np_bound < 0 || G.m_np_flows < 0 || G.m_np_snd < 0 || G.m_np_cfg < 0 || G.m_np_apps < 0 || G.m_np_union < 0 || G.m_np_lpm4 < 0 || G.m_np_lpm6 < 0 || G.m_np_seen < 0 || G.m_np_counts < 0 || G.m_np_events < 0) {
         lerr_set(G.bpf_err, sizeof G.bpf_err, "fw.bpfMaps", "errno", lerr_errno(errno), NULL);
         return -1;
     }
@@ -1296,10 +1599,12 @@ int main(int argc, char **argv) {
                 if (read(G.tfd, &x, sizeof x) < 0) {}
                 G.tick++;
                 attach_service();
+                sync_system();
                 if (G.dns) { npdns_tick(G.dns); watch_dns(); }
                 if (G.tick % 5 == 0) scan_all();    /* in case an inotify notice was lost */
                 if (G.tick % 30 == 0) {
                     dnsmap_expire(G.names, mono());
+                    for (int s = 0; s < G.nsess; s++) if (G.sess[s].lists || G.sess[s].blkin.n) sync_blk(&G.sess[s]);
                     for (int s = 0; s < G.nsess; s++)
                         for (int k = 0; k < G.sess[s].nsc; k++)
                             if (G.sess[s].sc[k].has_domains) sync_scope(&G.sess[s], &G.sess[s].sc[k]);

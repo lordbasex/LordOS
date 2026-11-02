@@ -1,0 +1,49 @@
+name: Hardware report
+description: Share what LordOS found on your computer (made with System Information → Report → Share on GitHub).
+title: "Hardware report: "
+labels: ["hardware-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing how LordOS runs on your hardware. **System Information → Report → Share on GitHub** fills in this form for you and saves the report file to your Documents folder.
+
+        The report holds the hardware, the drivers, what works and, if you ran it, LordBench's numbers. It never holds serial numbers, addresses, user or computer names, network names or your files. Reports and this issue are public.
+  - type: input
+    id: lordos
+    attributes:
+      label: LordOS version
+      description: Filled in by System Information.
+      placeholder: 0.8.7-beta
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Filled in by System Information. It is a short summary of the report; the full report is the file below.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Report file
+      description: Drag the `lordos-hwreport-….json` file from your Documents folder here (don't paste its text, and don't edit it). A check runs automatically and answers in a comment.
+      placeholder: Drop the .json file here
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else? (optional)
+      description: What worked or didn't that the report can't know, for example suspend, the webcam or a specific monitor.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: I attached the report file System Information saved, unchanged.
+          required: true
+        - label: I understand the report and this issue are public.
+          required: true

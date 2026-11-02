@@ -98,7 +98,7 @@ static void set_colors(struct SwsContext *s, const AVFrame *f) {
 
 int lm_out_present(AVFrame *f, int64_t pts) {
     AVFrame *sw = f, *tmp = NULL;
-    if (f->format == AV_PIX_FMT_VAAPI) {
+    if (f->format == AV_PIX_FMT_VAAPI || f->format == AV_PIX_FMT_DRM_PRIME) {
         tmp = av_frame_alloc();
         if (av_hwframe_transfer_data(tmp, f, 0) < 0) { av_frame_free(&tmp); return -1; }
         av_frame_copy_props(tmp, f);

@@ -6,12 +6,20 @@
  * the user's own processes (/proc/<pid>/fd → "socket:[inode]"), with a cache so they aren't walked
  * on every sample. For other users' sockets only how many there are is counted.
  *
+ * (0.8.5) Each socket's cgroup comes too (INET_DIAG_CGROUP_ID): a socket made in one of the session's
+ * scopes is that app's, whoever holds it now (lord-server holds the ones Mail's connector made, a
+ * program in the Terminal is the Terminal's), so the list says "scope": the app's firewall id, the
+ * same lord-netperm counts it under ("cgApp").
+ *
  * The country comes from the local database (mmdb.c). No address leaves the machine. */
 #include "monpriv.h"
+#include "../fw/rules.h"
+#include "../sec/cgroup.h"
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <limits.h>
 #include <linux/inet_diag.h>
@@ -19,6 +27,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/sock_diag.h>
 #include <linux/tcp.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -37,8 +46,13 @@ typedef struct {
     uint8_t src[16], dst[16];
     uint16_t sport, dport;
     uint64_t sent, recv;
+    uint64_t cg;                        /* the socket's cgroup id (0: the kernel didn't say) */
     int bytes;                          /* sent/recv valid (TCP with tcp_info) */
 } Sock;
+
+#ifndef INET_DIAG_CGROUP_ID
+#define INET_DIAG_CGROUP_ID 21
+#endif
 
 static Sock socks[MAX_SOCK];
 static int nsock;
@@ -84,6 +98,7 @@ static int dump(int fd, int fam, int proto) {
             /* attributes: tcp_info */
             int alen = (int)(h->nlmsg_len - NLMSG_LENGTH(sizeof *m));
             for (struct rtattr *a = (struct rtattr *)(m + 1); RTA_OK(a, alen); a = RTA_NEXT(a, alen)) {
+                if (a->rta_type == INET_DIAG_CGROUP_ID && RTA_PAYLOAD(a) >= 8) { memcpy(&s->cg, RTA_DATA(a), 8); continue; }
                 if (a->rta_type != INET_DIAG_INFO) continue;
                 const struct tcp_info *ti = RTA_DATA(a);
                 size_t need = offsetof(struct tcp_info, tcpi_bytes_received) + sizeof ti->tcpi_bytes_received;
@@ -98,6 +113,81 @@ static int dump(int fd, int fam, int proto) {
     }
 }
 
+/* What sock_diag doesn't dump, read from the tables the kernel keeps per network namespace (every
+ * socket, with uid and inode):
+ *   /proc/net/icmp, icmp6   ICMP "ping" sockets (ping(8) without privileges); an unconnected ping
+ *                           socket has no destination, only its echo identifier (kept as sport);
+ *   /proc/net/raw, raw6     raw IP sockets (CAP_NET_RAW: traceroute -I, a privileged ping, routing
+ *                           daemons); the "port" of the local address is the IP protocol (kept as sport);
+ *   /proc/net/packet        packet sockets (CAP_NET_RAW: DHCP clients, 802.1X, LLDP, capture tools):
+ *                           ethertype (sport) and interface index (dport).
+ * They can see or forge traffic below TCP and UDP, so the Monitor lists them. */
+#define PROTO_PACKET 254                /* not an IP protocol: a packet socket (AF_PACKET) */
+static void hex_addr(const char *h, int fam, uint8_t out[16]) {
+    memset(out, 0, 16);
+    int words = fam == 4 ? 1 : 4;
+    for (int w = 0; w < words; w++) {
+        unsigned long v = 0;
+        for (int k = 0; k < 8; k++) {
+            char c = h[w * 8 + k];
+            int d = c >= '0' && c <= '9' ? c - '0' : c >= 'A' && c <= 'F' ? c - 'A' + 10 : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1;
+            if (d < 0) return;
+            v = v << 4 | (unsigned long)d;
+        }
+        for (int k = 0; k < 4; k++) out[w * 4 + k] = (uint8_t)(v >> (8 * k));   /* each word in host (little-endian) order */
+    }
+}
+
+/* proto: IPPROTO_ICMP (icmp, icmp6) or IPPROTO_RAW (raw, raw6) */
+static void inet_table_read(const char *path, int fam, int proto) {
+    FILE *f = fopen(path, "re");
+    if (!f) return;
+    char line[512], la[64], ra[64];
+    unsigned st, uid;
+    unsigned long inode;
+    if (!fgets(line, sizeof line, f)) { fclose(f); return; }       /* the header */
+    while (nsock < MAX_SOCK && fgets(line, sizeof line, f)) {
+        if (sscanf(line, " %*s %63s %63s %x %*s %*s %*s %u %*s %lu", la, ra, &st, &uid, &inode) != 5 || !inode) continue;
+        char *lc = strchr(la, ':'), *rc = strchr(ra, ':');
+        if (!lc || !rc || (size_t)(lc - la) != (fam == 4 ? 8u : 32u)) continue;
+        Sock *k = &socks[nsock++];
+        memset(k, 0, sizeof *k);
+        k->inode = (uint32_t)inode;
+        k->uid = uid;
+        k->fam = (uint8_t)fam;
+        k->proto = (uint8_t)(proto == IPPROTO_ICMP && fam == 6 ? IPPROTO_ICMPV6 : proto);
+        k->state = (uint8_t)st;
+        hex_addr(la, fam, k->src);
+        hex_addr(ra, fam, k->dst);
+        k->sport = (uint16_t)strtoul(lc + 1, NULL, 16);
+        k->dport = (uint16_t)strtoul(rc + 1, NULL, 16);
+    }
+    fclose(f);
+}
+
+/* "sk RefCnt Type Proto Iface R Rmem User Inode" */
+static void packet_table_read(void) {
+    FILE *f = fopen("/proc/net/packet", "re");
+    if (!f) return;
+    char line[256];
+    unsigned type, eth, ifx, uid;
+    unsigned long inode;
+    if (!fgets(line, sizeof line, f)) { fclose(f); return; }
+    while (nsock < MAX_SOCK && fgets(line, sizeof line, f)) {
+        if (sscanf(line, " %*s %*s %u %x %u %*s %*s %u %lu", &type, &eth, &ifx, &uid, &inode) != 5 || !inode) continue;
+        Sock *k = &socks[nsock++];
+        memset(k, 0, sizeof *k);
+        k->inode = (uint32_t)inode;
+        k->uid = uid;
+        k->fam = 17;                         /* AF_PACKET */
+        k->proto = PROTO_PACKET;
+        k->state = (uint8_t)type;            /* SOCK_RAW 3 (with link header) or SOCK_DGRAM 2 */
+        k->sport = (uint16_t)eth;
+        k->dport = (uint16_t)ifx;
+    }
+    fclose(f);
+}
+
 static int sock_dump(void) {
     nsock = 0;
     int fd = socket(AF_NETLINK, SOCK_DGRAM | SOCK_CLOEXEC, NETLINK_SOCK_DIAG);
@@ -107,6 +197,13 @@ static int sock_dump(void) {
     for (int i = 0; i < 2; i++)
         for (int j = 0; j < 2; j++) ok |= !dump(fd, fams[i], protos[j]);
     close(fd);
+    if (ok) {
+        inet_table_read("/proc/net/icmp", 4, IPPROTO_ICMP);
+        inet_table_read("/proc/net/icmp6", 6, IPPROTO_ICMP);
+        inet_table_read("/proc/net/raw", 4, IPPROTO_RAW);
+        inet_table_read("/proc/net/raw6", 6, IPPROTO_RAW);
+        packet_table_read();
+    }
     return ok ? 0 : -1;
 }
 
@@ -192,7 +289,73 @@ static const char *const TCP_STATE[] = { "", "ESTABLISHED", "SYN_SENT", "SYN_REC
                                          "CLOSE", "CLOSE_WAIT", "LAST_ACK", "LISTEN", "CLOSING", "NEW_SYN_RECV" };
 
 /* Name and executable of a pid (small per-sample cache). */
-static struct { int pid; char name[64], exe[PATH_MAX]; } pinfo[256];
+/* ---- cgroup id → app (the session's scopes, rescanned every 5 s) ---- */
+
+static struct { uint64_t id; char app[FW_APP_MAX]; } scopes[256];
+static int nscopes;
+static double scopes_t;
+
+static uint64_t cg_id(int dfd, const char *name) {
+    struct { struct file_handle fh; unsigned char b[64]; } h;
+    h.fh.handle_bytes = sizeof h.b;
+    int mnt;
+    if (name_to_handle_at(dfd, name, &h.fh, &mnt, 0) || h.fh.handle_bytes < 8) return 0;
+    uint64_t id;
+    memcpy(&id, h.fh.f_handle, 8);
+    return id;
+}
+
+static void scopes_scan(void) {
+    if (mon_now_ms() - scopes_t < 5000 && scopes_t) return;
+    scopes_t = mon_now_ms();
+    nscopes = 0;
+    const char *self = cgroup_self();                   /* ".../lordos-session-<uid>/server" */
+    char dir[PATH_MAX];
+    if (!self[0] || (size_t)snprintf(dir, sizeof dir, "/sys/fs/cgroup%s", self) >= sizeof dir) return;
+    char *sl = strrchr(dir, '/');
+    if (!sl || strcmp(sl, "/server")) return;           /* not a LordOS session */
+    *sl = 0;
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    DIR *d = dfd >= 0 ? fdopendir(dup(dfd)) : NULL;
+    struct dirent *e;
+    while (d && (e = readdir(d)) && nscopes < 256) {
+        if (e->d_type != DT_DIR || e->d_name[0] == '.') continue;
+        char app[FW_APP_MAX];
+        if (!strncmp(e->d_name, "lordos-net-", 11)) { if (fw_component_scope(e->d_name, app, sizeof app)) continue; }
+        else if (!strncmp(e->d_name, "app-lordos-", 11)) { if (fw_app_canon(e->d_name, app, sizeof app)) continue; }
+        else if (!strcmp(e->d_name, "server")) snprintf(app, sizeof app, "lordos");
+        else continue;
+        uint64_t id = cg_id(dfd, e->d_name);
+        if (!id) continue;
+        scopes[nscopes].id = id;
+        snprintf(scopes[nscopes].app, sizeof scopes[nscopes].app, "%s", app);
+        nscopes++;
+    }
+    if (d) closedir(d);
+    if (dfd >= 0) close(dfd);
+    /* the remote desktop's bridge: forked by lord-sessiond after the sign-in, it runs as the user in
+     * lordos.service's root-owned `supervisor` group and isn't dumpable, so its sockets can't be traced to
+     * a pid; a socket of the user's in that group can only be the bridge's (its WebRTC UDP ports) */
+    char *up = strrchr(dir, '/');
+    if (up && nscopes < 256) {
+        *up = 0;
+        int pfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        struct stat st;
+        if (pfd >= 0 && !fstatat(pfd, "supervisor", &st, AT_SYMLINK_NOFOLLOW) && S_ISDIR(st.st_mode) && st.st_uid == 0) {
+            uint64_t id = cg_id(pfd, "supervisor");
+            if (id) { scopes[nscopes].id = id; snprintf(scopes[nscopes].app, sizeof scopes[nscopes].app, "remote-desktop"); nscopes++; }
+        }
+        if (pfd >= 0) close(pfd);
+    }
+}
+
+static const char *scope_app_of(uint64_t cg) {
+    if (!cg) return "";
+    for (int i = 0; i < nscopes; i++) if (scopes[i].id == cg) return scopes[i].app;
+    return "";
+}
+
+static struct { int pid; char name[64], exe[PATH_MAX]; uint64_t cg; } pinfo[256];   /* cg: the process's cgroup id */
 static int npinfo;
 
 static int proc_info(int pid) {
@@ -207,6 +370,16 @@ static int proc_info(int pid) {
     snprintf(p, sizeof p, "/proc/%d/exe", pid);
     ssize_t k = readlink(p, pinfo[i].exe, sizeof pinfo[i].exe - 1);
     pinfo[i].exe[k > 0 ? k : 0] = 0;
+    /* for sockets the kernel gives no cgroup for (ping and raw sockets from /proc/net, packet sockets):
+     * the owning process's own cgroup, "0::/<path>" (cgroup v2) */
+    char line[PATH_MAX], path[PATH_MAX + 32];
+    pinfo[i].cg = 0;
+    snprintf(p, sizeof p, "/proc/%d/cgroup", pid);
+    if (mon_read_small(p, line, sizeof line) > 3 && !strncmp(line, "0::/", 4)) {
+        line[strcspn(line, "\n")] = 0;
+        if (!strstr(line, "/..") && (size_t)snprintf(path, sizeof path, "/sys/fs/cgroup%s", line + 3) < sizeof path)
+            pinfo[i].cg = cg_id(AT_FDCWD, path);
+    }
     return i;
 }
 
@@ -232,12 +405,32 @@ void conn_scan(Buf *b, const Mmdb *geo) {
             if (socks[i].uid == me && socks[i].inode) map_find(socks[i].inode, 1);
     }
     npinfo = 0;
+    scopes_scan();
     int self = (int)getpid(), n = 0;
     mon_buf_printf(b, "{\"t\":%.0f,\"ok\":true,\"list\":[", mon_wall_ms());
     for (int i = 0; i < nsock; i++) {
         Sock *s = &socks[i];
         if (s->uid != me || !s->inode) continue;
         int fam = s->fam;
+        Slot *psl = NULL;
+        if (s->proto == PROTO_PACKET) {      /* no addresses: ethertype and interface */
+            psl = map_find(s->inode, 0);
+            int pp = psl ? psl->pid : -1, pq = pp > 0 ? proc_info(pp) : -1;
+            char ifn[IF_NAMESIZE] = "";
+            if (!if_indextoname(s->dport, ifn)) ifn[0] = 0;
+            mon_buf_printf(b, "%s{\"id\":%u,\"proto\":\"packet\",\"fam\":17,\"state\":\"%s\",\"dir\":\"packet\",\"ethertype\":%u,\"iface\":",
+                           n ? "," : "", s->inode, s->state == 3 ? "RAW" : "DGRAM", s->sport);
+            mon_buf_str(b, ifn);
+            mon_buf_printf(b, ",\"local\":\"\",\"lport\":0,\"remote\":\"\",\"rport\":0,\"scope\":\"local\",\"cc\":\"\",\"pid\":%d,\"self\":%s,\"name\":", pp, pp == self ? "true" : "false");
+            mon_buf_str(b, pq >= 0 ? pinfo[pq].name : "");
+            mon_buf_printf(b, ",\"exe\":");
+            mon_buf_str(b, pq >= 0 ? pinfo[pq].exe : "");
+            mon_buf_printf(b, ",\"cgApp\":");
+            mon_buf_str(b, scope_app_of(pq >= 0 ? pinfo[pq].cg : 0));
+            mon_buf_printf(b, ",\"sent\":null,\"recv\":null}");
+            n++;
+            continue;
+        }
         uint8_t src[16], dst[16];
         memcpy(src, s->src, 16);
         memcpy(dst, s->dst, 16);
@@ -250,13 +443,15 @@ void conn_scan(Buf *b, const Mmdb *geo) {
         char ls[INET6_ADDRSTRLEN], rs[INET6_ADDRSTRLEN];
         inet_ntop(fam == 4 ? AF_INET : AF_INET6, src, ls, sizeof ls);
         inet_ntop(fam == 4 ? AF_INET : AF_INET6, dst, rs, sizeof rs);
-        int tcp = s->proto == IPPROTO_TCP;
+        int tcp = s->proto == IPPROTO_TCP, icmp = s->proto == IPPROTO_ICMP || s->proto == IPPROTO_ICMPV6, raw = s->proto == IPPROTO_RAW;
         const char *dir;
-        if (tcp && s->state == 10) dir = "listen";
+        if (icmp) dir = "icmp";                                 /* a ping socket: no destination known */
+        else if (raw) dir = "raw";                              /* raw IP: sport holds the IP protocol */
+        else if (tcp && s->state == 10) dir = "listen";
         else if (!tcp && !s->dport) dir = "listen";             /* UDP without a destination: listening */
         else if (tcp && (listening_port[s->sport >> 3] & (1 << (s->sport & 7)))) dir = "in";
         else dir = "out";
-        int listening = !strcmp(dir, "listen");
+        int listening = !strcmp(dir, "listen") || icmp || raw;
         const char *sc = listening ? "local" : scope(fam, dst);
         char cc[3] = "";
         if (geo && !strcmp(sc, "internet")) mmdb_country(geo, dst, fam, cc);
@@ -264,11 +459,13 @@ void conn_scan(Buf *b, const Mmdb *geo) {
         int pid = sl ? sl->pid : -1, pi = pid > 0 ? proc_info(pid) : -1;
         mon_buf_printf(b, "%s{\"id\":%u,\"proto\":\"%s\",\"fam\":%d,\"state\":\"%s\",\"dir\":\"%s\",\"local\":\"%s\",\"lport\":%u,"
                       "\"remote\":\"%s\",\"rport\":%u,\"scope\":\"%s\",\"cc\":\"%s\",\"pid\":%d,\"self\":%s,\"name\":",
-                   n ? "," : "", s->inode, tcp ? "tcp" : "udp", fam, tcp && s->state < 13 ? TCP_STATE[s->state] : (s->dport ? "CONNECTED" : "UNCONN"),
+                   n ? "," : "", s->inode, tcp ? "tcp" : icmp ? "icmp" : raw ? "raw" : "udp", fam, tcp && s->state < 13 ? TCP_STATE[s->state] : (s->dport ? "CONNECTED" : "UNCONN"),
                    dir, ls, s->sport, listening ? "" : rs, s->dport, sc, cc, pid, pid == self ? "true" : "false");
         mon_buf_str(b, pi >= 0 ? pinfo[pi].name : "");
         mon_buf_printf(b, ",\"exe\":");
         mon_buf_str(b, pi >= 0 ? pinfo[pi].exe : "");
+        mon_buf_printf(b, ",\"cgApp\":");
+        mon_buf_str(b, scope_app_of(s->cg ? s->cg : pi >= 0 ? pinfo[pi].cg : 0));
         if (s->bytes) mon_buf_printf(b, ",\"sent\":%llu,\"recv\":%llu}", (unsigned long long)s->sent, (unsigned long long)s->recv);
         else mon_buf_printf(b, ",\"sent\":null,\"recv\":null}");
         n++;

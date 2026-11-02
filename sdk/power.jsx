@@ -18,12 +18,16 @@ import { spacing, typeScale, controlSize } from './controls.jsx';
 import { windows } from './windows.js';
 import { windowAppName } from './apps.js';
 import { remote } from './remote.js';
+import { flushSession, resumeSession } from './sessionrestore.jsx';
 
 export const POWER_SECONDS = 60;
 // null, or { action: 'reboot'|'poweroff', until (ms), state: 'ask'|'sent'|'denied'|'unavailable' }
 export const powerAsk = createStore(null);
 
-export const canPower = () => typeof lord.session !== 'undefined' && typeof lord.session.power === 'function' && lord.session.managed();
+// Only in the session on the monitor: lord-sessiond reads requests from that one alone, so a session
+// seen only through the remote desktop isn't offered Restart or Shut Down.
+export const canPower = () => typeof lord.session !== 'undefined' && typeof lord.session.power === 'function' && lord.session.managed()
+  && (typeof lord.session.onMonitor !== 'function' || lord.session.onMonitor());
 
 export function askPower(action) {
   if (action !== 'reboot' && action !== 'poweroff') return;
@@ -36,7 +40,7 @@ if (typeof lord.greeter === 'undefined') {
   globalThis.__lordGreeter = (json) => {
     let m = null;
     try { m = JSON.parse(json); } catch (e) { return; }
-    if (m && m.t === 'power' && m.ok === false && powerAsk.get()) powerAsk.set((p) => (p ? { ...p, state: 'denied' } : p));
+    if (m && m.t === 'power' && m.ok === false && powerAsk.get()) { resumeSession(); powerAsk.set((p) => (p ? { ...p, state: 'denied' } : p)); }
   };
 }
 
@@ -83,7 +87,9 @@ export function PowerDialog() {
   const confirm = () => {
     const p = powerAsk.get();
     if (!p || p.state !== 'ask' || blocked) return;
+    flushSession();                                // what is open, before anything starts closing
     const sent = canPower() && lord.session.power(p.action);
+    if (!sent) resumeSession();
     powerAsk.set({ ...p, state: sent ? 'sent' : 'unavailable' });
   };
 

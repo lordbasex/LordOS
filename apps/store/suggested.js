@@ -4,8 +4,9 @@
 // that isn't free says so before anything is installed, and is never preselected.
 import { createElement as h, useEffect, useState } from 'react';
 import {
-  View, Text, Button, useTheme, useStore, admin, typeScale, spacing, t, direction,
+  View, Text, Button, EmptyState, useTheme, useStore, admin, typeScale, spacing, t, direction,
   suggestions, refreshSuggestions, reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen,
+  fanCase,
 } from '@lordos/sdk';
 
 // ---- drawn glyphs (monochrome on a tinted tile) ----
@@ -79,6 +80,7 @@ function Card({ s, deb }) {
   const { job } = useStore(deb.state);
   const [plan, setPlan] = useState(null);
   const [more, setMore] = useState(false);
+  const [error, setError] = useState('');
   const isAdmin = admin.available();
   const nonfree = !s.free;
   const ask = () => setPlan(lord.pkg.plan({ install: s.install }));
@@ -109,7 +111,9 @@ function Card({ s, deb }) {
       h(View, { style: { alignItems: 'flex-end', gap: 2 } },
         s.state === 'install' ? h(Button, { primary: !nonfree, label: nonfree ? t('store.suggest.installNonfree') : t('store.install'), disabled: !isAdmin || !!job,
           onClick: () => isAdmin && !job && ask() }) : null,
+        s.state === 'setup' ? h(Button, { primary: true, label: t('store.suggest.keepOn'), disabled: !isAdmin, onClick: () => admin.run('rpi-case', 'argon-one-v5').then(() => { fanCase.set(() => 'argon-one-v5'); refreshSuggestions(); }, (e) => setError(e.message)) }) : null,
         s.state !== 'installed' ? h(Button, { plain: true, small: true, label: t('store.suggest.dismiss'), onClick: () => dismissSuggestion(s.id) }) : null)),
+    error ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, error) : null,
     !isAdmin && s.state === 'install' ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')) : null,
     plan && h(View, { style: { gap: spacing.s, marginTop: spacing.xs, paddingTop: spacing.s, borderTop: `1px solid ${th.separator}` } },
       nonfree ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', lineHeight: 1.4, textAlign: 'start' } }, t('store.suggest.confirmNonfree')) : null,
@@ -121,17 +125,19 @@ function Card({ s, deb }) {
 
 // ---- the section ----
 
-export function Suggested({ deb }) {
+// `page`: the Store's own page for it (0.8.5): no heading (the toolbar names it) and an empty state.
+export function Suggested({ deb, page }) {
   const th = useTheme();
   const { list, fixture, ready } = useStore(suggestions);
   const { gen } = useStore(deb.state);
   useEffect(() => { if (!suggestions.get().ready) refreshSuggestions(); }, []);
   useEffect(() => { if (ready) markSuggestionsSeen(list); }, [ready, list]);
   useEffect(() => { if (gen) reevaluateSuggestions(); }, [gen]);     // installed or removed something
+  if (page && ready && !list.length) return h(EmptyState, { mascot: 'celebrate', title: t('store.suggest.none'), hint: t('store.suggest.subtitle'), style: { minHeight: 320 } });
   if (!ready || !list.length) return null;
   return h(View, { style: { gap: spacing.s, marginBottom: spacing.s } },
     h(View, { style: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.s, flexWrap: 'wrap' } },
-      h(Text, { style: { fontSize: typeScale.title, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.suggest.title')),
+      page ? null : h(Text, { style: { fontSize: typeScale.title, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.suggest.title')),
       fixture ? h(View, { style: { paddingHorizontal: 8, height: 20, borderRadius: 10, justifyContent: 'center', backgroundColor: '#ff453a' } },
         h(Text, { style: { fontSize: 11, fontWeight: 700, color: '#fff' } }, t('store.suggest.fixture'))) : null),
     h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.4, textAlign: 'start', marginBottom: 2 } }, t('store.suggest.subtitle')),

@@ -6,19 +6,24 @@ their own. `lord-server` runs the theme with QuickJS and paints it with its C en
 
 | Theme | Style |
 |---|---|
-| `default` | Lord Default: menu bar, dock with magnification, app launcher, Control Center |
-| `classic` | Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and a task view (0.8.3) |
+| `default` | Lord Flow: menu bar, dock with magnification, app launcher, Control Center |
+| `classic` | Lord Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and the SDK's Overview (0.8.3) |
 
 ```sh
 npm install           # once (React + esbuild)
 npm run build         # bundles every theme, with the SDK and every app
 ```
 
-The user switches themes live from **Settings → Appearance → Desktop style** (Lord Default and
-Classic) or **Settings → Themes** (any installed theme), with no restart: the LordOS app windows that
-were open come back in the new theme. The choice is saved and respected on the next start.
+The user switches themes live from **Settings → Appearance → Desktop style**, which lists every
+installed theme (since 0.8.5 there is no separate Themes page), with no restart: the LordOS app
+windows that were open come back in the new theme. The choice is saved and respected on the next start.
 
 ## Creating a new theme
+
+The full guide, for a React developer new to LordOS, is [`docs/THEMES-GUIDE.md`](../docs/THEMES-GUIDE.md)
+(anatomy, the token contract, frames, menus, layers, building, the verified-code check, testing and
+a checklist); a small starting point is [`examples/theme-minimal/`](../examples/theme-minimal/).
+Note that a theme LordOS did not sign only loads on a development build (see the guide). In short:
 
 1. Copy `themes/classic` to `themes/mytheme` (`index.jsx` puts the pieces together; the frame,
    taskbar and panels are in `components/`, the colors and shape tokens in `tokens.js`).
@@ -60,7 +65,7 @@ were open come back in the new theme. The choice is saved and respected on the n
      When such an app asks for the window menu (right click on its own bar), `win.windowMenu` is
      `{ x, y }`: draw the theme's window menu there and call `wm.closeWindowMenu(win.id)` when it
      closes.
-4. `npm run build` and pick it in Settings → Themes.
+4. `npm run build` and pick it in Settings → Appearance → Desktop style.
 
 Images (`<Image src="assets/...">`) are resolved relative to the theme's folder.
 

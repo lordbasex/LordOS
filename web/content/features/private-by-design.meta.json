@@ -67,6 +67,14 @@
         "es": "Una ventana protegida sale en negro en una captura de LordOS.",
         "pt": "Uma janela protegida sai preta numa captura do LordOS."
       }
+    },
+    {
+      "file": "docs/sysinfo-probe.png",
+      "caption": {
+        "en": "System Information → Checks (since 0.8.5): the Sandbox Probe's tries, each refused or flagged.",
+        "es": "Información del sistema → Verificaciones (desde 0.8.5): los intentos de la Prueba del aislamiento, cada uno rechazado o señalado.",
+        "pt": "Informações do sistema → Verificações (desde a 0.8.5): as tentativas do Teste do isolamento, cada uma recusada ou sinalizada."
+      }
     }
   ],
   "diagrams": [
@@ -485,6 +493,22 @@
         "en": "Full design notes",
         "es": "Notas de diseño completas",
         "pt": "Notas de projeto completas"
+      }
+    },
+    {
+      "path": "server/src/sec/codesig.c",
+      "what": {
+        "en": "Verified system code",
+        "es": "Código del sistema verificado",
+        "pt": "Código do sistema verificado"
+      }
+    },
+    {
+      "path": "server/src/app/probe.c",
+      "what": {
+        "en": "The Sandbox Probe (since 0.8.5)",
+        "es": "La Prueba del aislamiento (desde 0.8.5)",
+        "pt": "O Teste do isolamento (desde a 0.8.5)"
       }
     }
   ]

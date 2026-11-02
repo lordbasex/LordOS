@@ -520,6 +520,18 @@ static JSValue f_broker_menus(JSContext *c, JSValueConst t, int argc, JSValueCon
     if (json) JS_FreeCString(c, json);
     return JS_UNDEFINED;
 }
+/* lord.broker.textFocus(on, y, h): tells the session a field took or lost focus. A hint only. */
+static JSValue f_broker_text_focus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int32_t y = -1, h = 0;
+    int on = argc > 0 && JS_ToBool(c, argv[0]), st;
+    if (argc > 1) JS_ToInt32(c, &y, argv[1]);
+    if (argc > 2) JS_ToInt32(c, &h, argv[2]);
+    char msg[48];
+    snprintf(msg, sizeof msg, "%d %d %d", on, y, h);
+    rpc(BOP_TEXT_FOCUS, msg, (uint32_t)strlen(msg), &st, NULL, NULL);
+    return JS_UNDEFINED;
+}
 static JSValue f_broker_device(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     const char *kind = JS_ToCString(c, argv[0]);
@@ -718,7 +730,7 @@ static const JSCFunctionListEntry clip_funcs[] = { JS_CFUNC_DEF("get", 0, f_clip
 static const JSCFunctionListEntry broker_funcs[] = {
     JS_CFUNC_DEF("request", 1, f_broker_request), JS_CFUNC_DEF("device", 2, f_broker_device), JS_CFUNC_DEF("state", 0, f_broker_state),
     JS_CFUNC_DEF("pick", 2, f_broker_pick), JS_CFUNC_DEF("fdRead", 1, f_fd_read), JS_CFUNC_DEF("fdWrite", 2, f_fd_write), JS_CFUNC_DEF("fdClose", 1, f_fd_close), JS_CFUNC_DEF("fdSize", 1, f_fd_size),
-    JS_CFUNC_DEF("menus", 1, f_broker_menus), JS_CFUNC_DEF("openApp", 3, f_broker_open_app),
+    JS_CFUNC_DEF("menus", 1, f_broker_menus), JS_CFUNC_DEF("textFocus", 3, f_broker_text_focus), JS_CFUNC_DEF("openApp", 3, f_broker_open_app),
     JS_CFUNC_DEF("micStart", 0, f_mic_start), JS_CFUNC_DEF("micStop", 0, f_mic_stop), JS_CFUNC_DEF("micLevel", 0, f_mic_level),
 };
 static const JSCFunctionListEntry locale_funcs[] = {

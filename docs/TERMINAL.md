@@ -43,7 +43,7 @@ that changed) is repainted.
 | ![regex](terminal-regex-search.png) | ![replay](terminal-session-replay.png) |
 | Regular-expression search | Instant Replay |
 | ![colors](terminal-true-color.png) | ![theme](terminal-theme-switch.png) |
-| SGR: bold, italic, underline, strikethrough, direct color | The same shell (PID 4126) is still alive after switching to the Classic theme |
+| SGR: bold, italic, underline, strikethrough, direct color | The same shell (PID 4126) is still alive after switching to the Lord Classic theme |
 | ![ligatures](terminal-ligatures.png) | ![emoji](terminal-emoji.png) |
 | Profile imported from another terminal emulator: Fira Code with ligatures, Dracula, a trigger that highlights "ERROR" | Ligatures, combining marks and color emoji; below, with mode 2027 (👍🏽 🇦🇷 👨‍👩‍👧 as one glyph) |
 | ![import](terminal-import-color-scheme.png) | ![keys](terminal-key-bindings.png) |
@@ -103,7 +103,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Dim inactive panes | ✅ | |
 | Multiple windows | ✅ | the SDK's window manager |
 | Dropdown window (hotkey window) | ✅ | F12 or ❖\` |
-| Transparency and blur | ✅ | |
+| Transparency and blur | ✅ | since 0.8.5 the window's 1-pixel border and the line under its title bar are drawn opaque in both themes, so nothing behind the window shows through them |
 | Status bar | ✅ | directory, process, exit code, size, time |
 | Toolbelt | ✅ | jobs, recent commands, captured output, clipboard, directories, profiles, notes |
 | Save/restore window arrangement | ✅ | in `settings.json` |
@@ -129,7 +129,7 @@ Status: ✅ done and tested in the VM · 🟡 partial · ⏳ pending · — does
 | Per-line timestamps | ✅ | ❖⇧E |
 | Ctrl/❖+click on paths and links | 🟡 | paths under `$HOME` open Files; URLs are copied (there is no browser) |
 | Instant Replay | ✅ | ❖⌥B, up to 1200 frames / 6 MB per session |
-| Log the session to a file, save the contents | ✅ | `~/.local/share/lordos/terminal/`, `~/Documentos` |
+| Log the session to a file, save the contents | ✅ | `~/.local/share/lordos/terminal/`, the documents folder (`XDG_DOCUMENTS_DIR`, in the user's language) |
 | Broadcast input to all panes | ✅ | ❖⌥I |
 | Alert when the command finishes | ✅ | ❖⌥A |
 
@@ -282,6 +282,10 @@ RemoteHost (user@host, for automatic profile switching) and define
   line without newlines: it's the same thing the user could type into that tmux.
 - `lord.fs.read()` (for the importer) reads regular files under `$HOME`, 8 MB maximum.
 - Fonts are only looked up in font folders; those in `~/.fonts` belong to the user.
+- (0.8.5) The shell enters `lordos-net-terminal.scope` before exec (`pty.c`), so it and every
+  program it starts are the firewall app "Terminal" (`lordos:terminal`): its own row in Monitor →
+  Network, with each program's name, and its own rules (`FIREWALL.md`, "LordOS components in their
+  own scopes"). Best effort: a terminal that can't be placed still opens.
 
 ## Tests
 

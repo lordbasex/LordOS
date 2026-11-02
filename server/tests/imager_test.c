@@ -125,6 +125,11 @@ static void names(void) {
     CHECK(img_valid_tag("v0.8.4-beta"));
     CHECK(img_valid_tag("v1.0.0"));
     CHECK(img_valid_tag("v0.8.10-rc.1"));
+    CHECK(img_valid_tag("v0.8.4.1-beta"));
+    CHECK(img_valid_tag("v0.8.4.1"));
+    CHECK(!img_valid_tag("v0.8.4.1.2"));
+    CHECK(!img_valid_tag("v0.8.4."));
+    CHECK(!img_valid_tag("v0.8.4.-beta"));
     CHECK(!img_valid_tag("0.8.4"));
     CHECK(!img_valid_tag("v0.8"));
     CHECK(!img_valid_tag("v0.8.4-"));

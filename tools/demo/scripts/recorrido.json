@@ -658,8 +658,8 @@
  {
   "chapter": "Temas",
   "chapter_es": "Cambiá todo el escritorio en vivo",
-  "en": "Finally, themes. A theme is a React app, and you can switch it live without closing anything. This is the Classic theme, with a taskbar and a start menu.",
-  "es": "Por último, los temas: un tema es una app de React y se cambia en vivo sin cerrar nada. Este es el tema Clásico, con barra de tareas y menú de inicio.",
+  "en": "Finally, themes. A theme is a React app, and you can switch it live without closing anything. This is the Lord Classic theme, with a taskbar and a start menu.",
+  "es": "Por último, los temas: un tema es una app de React y se cambia en vivo sin cerrar nada. Este es el tema Lord Classic, con barra de tareas y menú de inicio.",
   "actions": [
    [
     "key",

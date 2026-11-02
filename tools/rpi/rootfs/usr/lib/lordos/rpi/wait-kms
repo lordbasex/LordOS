@@ -1,13 +1,15 @@
 #!/bin/sh
-# wait-kms — waits (up to 10 s) for some DRM card to have a connector (vc4 on the Raspberry Pi).
+# wait-kms — waits (up to 30 s) for some DRM card to have a connector (vc4 on the Raspberry Pi).
 # With no monitor no connector is connected, but the connector still exists: it is enough for it to appear.
+# If udev hasn't loaded the display driver yet, ask for it (a no-op when it's built in or loaded).
+modprobe -q vc4 2>/dev/null || true
 i=0
-while [ $i -lt 100 ]; do
+while [ $i -lt 300 ]; do
     for c in /sys/class/drm/card*-*; do
         [ -e "$c/status" ] && exit 0
     done
     sleep 0.1
     i=$((i + 1))
 done
-echo "wait-kms: no card with connectors after 10 s" >&2
+echo "wait-kms: no card with connectors after 30 s (lord-sessiond keeps waiting another 30 s)" >&2
 exit 0

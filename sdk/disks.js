@@ -8,6 +8,8 @@
 // disk-erase, disk-write-image and disk-cancel. Change notifications (mountinfo and udev, no
 // polling) are only on while someone uses useDisks().
 import { useEffect, useState } from 'react';
+import { wm } from './windows.js';
+import { stat } from './fs.js';
 
 const listeners = new Set();
 let timer = null;
@@ -36,6 +38,16 @@ export const disks = {
     };
   },
 };
+
+// The formats that come with the Store's Disk Formats item (docs/FILES.md); lord-server asks the same in disk-mount.
+export const COMMERCIAL_FORMATS = ['vfat', 'exfat', 'ntfs', 'hfsplus', 'apfs'];
+const FORMATS_MARK = '/usr/lib/lordos/disk-formats.enabled';
+export const diskFormatsOn = () => { try { stat(FORMATS_MARK); return true; } catch (e) { return false; } };
+const there = (path) => { try { stat(path); return true; } catch (e) { return false; } };
+// APFS's driver is the item's optional part: the item can be in without it, and it can be added later on the same page
+const apfsMissing = () => there('/usr/lib/lordos/disk-formats.apfs') && !there('/usr/share/doc/apfs-dkms');
+export const needsDiskFormats = (fstype) => COMMERCIAL_FORMATS.includes(fstype) && (!diskFormatsOn() || (fstype === 'apfs' && apfsMissing()));
+export const openDiskFormats = () => wm.open('store', { args: { page: 'commercial', app: 'lordos-disk-formats' } });
 
 export function useDisks() {
   const [list, setList] = useState(disks.list);

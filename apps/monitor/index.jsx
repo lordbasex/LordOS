@@ -15,11 +15,13 @@ import { Glyph, MonitorIcon } from './icons.jsx';
 import { NetworkTab } from './Network.jsx';
 import { RemoteGlyph } from './RemoteDesktop.jsx';
 import { MonitorPrivacy } from './Privacy.jsx';
+import { BlocklistsPrivacy } from './Blocklists.jsx';
 import { FirewallPrivacy } from './Firewall.jsx';
 import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
 import { ProcessesTab, ProcessLayers } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
+import { VoltageTab } from './Voltage.jsx';
 
 export function Icon({ size }) { return <MonitorIcon size={size} />; }
 
@@ -32,6 +34,8 @@ if (typeof sdk.registerPrivacySection === 'function') sdk.registerPrivacySection
 if (typeof sdk.registerPrivacySection === 'function') sdk.registerPrivacySection({ id: 'firewall', order: 11, Component: FirewallPrivacy });
 // … and the rules of each app: domains, addresses and networks, with the app's default
 if (typeof sdk.registerPrivacySection === 'function') sdk.registerPrivacySection({ id: 'fwrules', order: 12, Component: FirewallRulesPrivacy });
+// … and (0.8.5) the subscribed blocklists (docs/FIREWALL.md, "Blocklists")
+if (typeof sdk.registerPrivacySection === 'function') sdk.registerPrivacySection({ id: 'blocklists', order: 13, Component: BlocklistsPrivacy });
 
 // ---- formats ----
 export const fmt = {
@@ -327,8 +331,22 @@ export function Cell({ col, children, color, bold }) {
 // as Mail or Passwords; the process is shown with the app's name and icon.
 export const isolatedAppOf = (item) => (typeof item?.app === 'string' && item.app.startsWith('lpk:') ? getApp(item.app.slice(4)) : null);
 
+// (0.8.5) LordOS's own components: the built-in app's icon (Mail, Store, Terminal) or a glyph
+function ComponentGlyph({ comp, size }) {
+  const t = useTheme();
+  const a = comp.icon ? getApp(comp.icon) : null;
+  if (a?.Icon) return <a.Icon size={size} />;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size * 0.24, backgroundColor: comp.system ? '#8e8e93' : t.accent, alignItems: 'center', justifyContent: 'center' }}>
+      <Glyph name={comp.glyph || 'network'} color="#fff" size={Math.round(size * 0.62)} />
+    </View>
+  );
+}
+
 export function AppGlyph({ item, size = 16 }) {
   if (item.app === 'lordos') return <LordOSLogo size={size} />;
+  const comp = sdk.netModel?.COMPONENTS?.[item.app];
+  if (comp) return <ComponentGlyph comp={comp} size={size} />;
   if (item.app === 'remote-desktop') return <RemoteGlyph size={size} />;
   const iso = isolatedAppOf(item);
   if (iso?.Icon) return <iso.Icon size={size} />;
@@ -396,9 +414,13 @@ export default function Monitor() {
   // which lists lord-server builds (without redrawing this window on every sample)
   useMonitor({ procs: tab === 'processes', conns: showConns, geo: showConns && prefs.geo !== false, everyMs: 0 });
   const ready = useStore(monitorSamples, (l) => l.length > 0);
+  // Voltage only exists where the machine reports something (not in a virtual machine, for one)
+  const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);
+  const view = tab === 'voltage' && !hasVolt ? 'overview' : tab;
   const tabs = [
     ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')],
     ['network', tr('monitor.network')], ['disks', tr('monitor.disks')], ['processes', tr('monitor.processes')], ['cooling', tr('monitor.tab.cooling')],
+    ...(hasVolt ? [['voltage', tr('monitor.tab.voltage')]] : []),
   ];
   if (!monitor.available()) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.unavailable')}</Text></View>;
@@ -408,24 +430,28 @@ export default function Monitor() {
       <Toolbar style={{ paddingHorizontal: 20 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, width: 110, whiteSpace: 'nowrap' }}>{tr('monitor.title')}</Text>
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Segmented value={tab} onChange={setTab} options={tabs} />
+          <Segmented value={view} onChange={setTab} options={tabs} />
         </View>
         <View style={{ width: 110 }} />
       </Toolbar>
       {!ready ? (
         <View style={{ flex: 1, padding: 20 }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.waiting')}</Text></View>
-      ) : tab === 'network' ? (
+      ) : view === 'network' ? (
         <Network prefs={prefs} />
-      ) : tab === 'cooling' ? (
+      ) : view === 'voltage' ? (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
+        </ScrollView>
+      ) : view === 'cooling' ? (
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
-      ) : tab === 'processes' ? (
+      ) : view === 'processes' ? (
         <ScrollView style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (
-        <Charts tab={tab} rate={focused === false ? 1000 : 250} />
+        <Charts tab={view} rate={focused === false ? 1000 : 250} />
       )}
       <View style={{ height: 1, backgroundColor: t.separator }} />
       <Footer />

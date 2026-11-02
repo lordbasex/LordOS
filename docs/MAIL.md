@@ -57,7 +57,10 @@ run in one sandboxed helper process, **`lord-maild`**.
 - **No socket of its own.** `lord-maild` cannot create sockets. To reach a server it sends
   `MR_CONNECT {host, port}`; `lord-server` (`mailc.c`) checks the endpoint against the accounts
   file and, if allowed, resolves it, connects (10 s timeout) on a thread of its own and passes the
-  connected socket back (`MQ_SOCK`). The allowed endpoints are exactly: each account's IMAP and
+  connected socket back (`MQ_SOCK`). (0.8.5) The socket itself is made and connected by Mail's connector
+  (`lord-server --net-connector mail`, in `lordos-net-mail.scope`), so Mail and the calendar sync
+  are their own app for the firewall and Monitor → Network ("Mail and calendars", `lordos:mail`;
+  `FIREWALL.md`, "LordOS components in their own scopes"); the endpoint check above is unchanged. The allowed endpoints are exactly: each account's IMAP and
   SMTP `host:port`, each DAV URL's `host:port`, and — for CalDAV/CardDAV discovery redirects inside
   the same provider (for example `pNN-caldav.icloud.com`) — other hosts of the same domain on port 443.
   So a malicious message that takes over `lord-maild` still cannot talk to anything else.
@@ -68,7 +71,8 @@ run in one sandboxed helper process, **`lord-maild`**.
   ranges behind v4-mapped, NAT64 and 6to4 addresses), checked on the address it actually connects
   to (no DNS rebinding). Redirects (at most 3) go through the same check; each image is capped at
   5 MB and 20 s. Tested by `build/mailc-test`.
-- **OpenSSL** is linked only by `lord-maild` and `lord-sessiond` (see `ARCHITECTURE.md`).
+- **OpenSSL** is linked only by `lord-maild`, `lord-sessiond` and, since 0.8.5, `lord-fetch` (the blocklist
+  downloader) and `lord-tls` (the package engine's HTTPS); see `ARCHITECTURE.md`.
   `lord-server` never links it.
 - **The compositor never waits**: requests are asynchronous (`lord.mail.poll()`), and inside
   `lord-maild` network work runs on account threads, never on the thread that reads the channel.

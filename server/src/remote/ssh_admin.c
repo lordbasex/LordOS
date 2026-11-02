@@ -33,7 +33,7 @@
 static const char allow_admins_text[] =
     "# LordOS · remote login (Settings → Sharing): only administrators. See docs/REMOTE.md.\n"
     "# Written by Settings; choose \"All users\" there to remove it.\n"
-    "AllowGroups sudo admin wheel\n";
+    "AllowGroups sudo admin wheel root\n";   /* root: only matters with root over SSH on (ssh_root.c) */
 
 int ssh_allow_text(const char *value, const char **text) {
     if (!strcmp(value, "all")) { *text = NULL; return 0; }

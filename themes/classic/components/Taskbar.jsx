@@ -12,7 +12,7 @@ import {
   View, Text, Layer, useSettings, useWindows, useClock, wm, windowTitle, formatTime, formatDate, t as tr,
   useDockEntries, dockActivate, dockMenu, useStore, dockDrag, beginDockDrag, registerDockTarget, dockDragJustEnded,
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
-  mainDisplay, screen,
+  mainDisplay, screen, toggleShowDesktop,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
@@ -43,8 +43,9 @@ export function useNet() {
   return net;
 }
 
-// "Show desktop": the windows it minimized, to bring them back on the next click.
-let hiddenByDesktop = [];
+// What the bar shows, in order: ❖1..❖9 open them (themes/classic/index.jsx).
+let barEntries = [];
+export const taskbarEntries = () => barEntries;
 
 function BarButton({ t, vert, active, onClick, onContextMenu, onMouseDown, onEnter, onLeave, children, refFn, width, style }) {
   const [hover, setHover] = useState(false);
@@ -61,6 +62,7 @@ function BarButton({ t, vert, active, onClick, onContextMenu, onMouseDown, onEnt
 
 export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onTaskView, quick, onQuick, notif, onNotif, unread, onEmptyTrash }) {
   const entries = useDockEntries(TASKBAR_DEFAULT);
+  barEntries = entries;
   const { focused, windows } = useWindows();
   const [jump, setJump] = useState(null);
   const [trashAt, setTrashAt] = useState(null);
@@ -185,7 +187,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
         <SearchGlyph color={t.text} size={17} />
       </BarButton>
       <BarButton t={t} vert={vert} active={taskView} refFn={tvRef} onClick={() => { hideTip(); onTaskView(); }}
-        onEnter={() => showTip(tr('shell.classic.taskView'), tvRef.current)} onLeave={hideTip}>
+        onEnter={() => showTip(tr('shell.desktops.overview'), tvRef.current)} onLeave={hideTip}>
         <TaskViewGlyph color={t.text} bg={t.mode === 'dark' ? '#2a2a30' : '#eceef2'} size={19} />
       </BarButton>
       {entries.map(appButton)}
@@ -206,11 +208,6 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
       {out ? <SpeakerGlyph color={t.text} size={16} level={level} muted={out.mute} /> : null}
     </View>
   );
-  const showDesktop = () => {
-    const vis = windows.filter((w) => !w.minimized);
-    if (vis.length) { hiddenByDesktop = vis.map((w) => w.id); vis.forEach((w) => wm.minimize(w.id)); }
-    else { hiddenByDesktop.forEach((id) => wm.focus(id)); hiddenByDesktop = []; }
-  };
   const tray = (
     <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2 }}>
       <PrivacyIndicators />
@@ -226,7 +223,7 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
         <TrayClock t={t} vert={vert} />
         <BellGlyph color={t.text} size={14} dot={unread ? t.accent : null} />
       </BarButton>
-      {vert ? null : <View onClick={showDesktop} style={{ width: 8, height: BAR_H, marginStart: 2, borderStartWidth: 1, borderColor: t.separator }} />}
+      {vert ? null : <View onClick={toggleShowDesktop} style={{ width: 8, height: BAR_H, marginStart: 2, borderStartWidth: 1, borderColor: t.separator }} />}
     </View>
   );
 

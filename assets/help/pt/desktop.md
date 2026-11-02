@@ -11,6 +11,7 @@ keywords: barra de menus, dock, launchpad, central de controle, fundo, widgets
 No alto da tela:
 
 - **O logotipo do LordOS:** Sobre, Ajustes, Aplicativos, bloquear a tela, trocar de usuário e sair
+- **Reabrir janelas:** os apps abertos ao sair, reiniciar ou desligar voltam ao lugar na próxima entrada. Depois de uma queda de energia, o LordOS pergunta antes. Escolha Sempre, Perguntar antes ou Desativado em Ajustes → Sessão.
   da sessão.
 - **Os menus do app em primeiro plano** (por exemplo Arquivo, Editar, Visualizar), e os menus
   Janela e Ajuda.
@@ -37,10 +38,10 @@ podem ficar coladas na área de trabalho como post-its.
 
 ## Temas
 
-O LordOS traz dois temas: **Lord Default** (barra de menus e Dock) e **Clássico** (barra de
+O LordOS traz dois temas: **Lord Flow** (barra de menus e Dock) e **Lord Classic** (barra de
 tarefas e menu iniciar). Eles mudam na hora em [Ajustes → Aparência](settings:appearance).
 
-No **Clássico**: o botão iniciar (ou Super) abre o menu iniciar, onde digitar pesquisa apps,
+No **Lord Classic**: o botão iniciar (ou Super) abre o menu iniciar, onde digitar pesquisa apps,
 configurações e arquivos; com o botão direito em um app você o fixa em Iniciar ou na barra de
 tarefas. Os ícones de rede e volume abrem as configurações rápidas, e o relógio as notificações e um
 calendário. Arraste uma janela até a borda esquerda ou direita para ocupar meia tela, até um canto

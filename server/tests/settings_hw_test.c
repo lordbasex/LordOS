@@ -346,9 +346,166 @@ static void test_power(void) {
     if (system(cmd)) { /* best effort */ }
 }
 
+/* What leaves the hw-serial-numbers action: real serials only, one safe line. */
+static void test_serial_clean(void) {
+    char o[64];
+    CHECK(!hw_serial_clean("PF1ABCDE\n", 9, o, sizeof o) && !strcmp(o, "PF1ABCDE"));
+    CHECK(!hw_serial_clean("  VMware-56 4d 12.ab/x:1_2\n", 27, o, sizeof o) && !strcmp(o, "VMware-56 4d 12.ab/x:1_2"));
+    CHECK(!hw_serial_clean("10000000deadbeef\0", 17, o, sizeof o) && !strcmp(o, "10000000deadbeef"));     /* a device tree string */
+    static const char *const no[] = { "", "\n", "   ", "To Be Filled By O.E.M.", "Default string", "Not Specified", "NONE", "unknown\n",
+                                       "System Serial Number", "Base Board Serial Number", "0123456789", "0000000000", "XXXXXXXX", "0" };
+    for (size_t i = 0; i < sizeof no / sizeof no[0]; i++) CHECK(hw_serial_clean(no[i], strlen(no[i]), o, sizeof o) == -1 && !o[0]);
+    /* anything that could end the protocol line or carry text of another kind */
+    static const char *const bad[] = { "AB\nLOG serial x", "A|B", "A;rm", "A$(x)", "A\tB", "A\"B", "A\xc3\xa9" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(hw_serial_clean(bad[i], strlen(bad[i]), o, sizeof o) == -1 && !o[0]);
+    CHECK(hw_serial_clean("A\0B", 3, o, sizeof o) == -1);                                    /* a NUL inside */
+    char l[80];
+    memset(l, 'a', sizeof l);
+    l[0] = 'b';
+    CHECK(hw_serial_clean(l, 64, o, sizeof o) == -1);                                        /* too long */
+    CHECK(!hw_serial_clean(l, 63, o, sizeof o) && strlen(o) == 63);
+}
+
 /* the admin helper's functions hw_admin.c calls (not used by the validators) */
 void admin_say(const char *kind, const char *fmt, ...) { (void)kind; (void)fmt; }
 int admin_run(const char *const argv[]) { (void)argv; return -1; }
+int admin_run_capture(const char *const argv[], char *out, size_t cap) { (void)argv; if (cap) out[0] = 0; return -1; }
+
+/* rpi-eeprom-update's report: the strict parser behind rpi-eeprom-status */
+
+/* Monitor → Voltage: vcgencmd pmic_read_adc as the owner's Raspberry Pi 5 printed it (firmware of 2026), then damage */
+static void test_pmic(void) {
+    static const char real[] =
+        " 3V7_WL_SW_A current(0)=0.00097593A\n"
+        "   3V3_SYS_A current(1)=0.12101530A\n"
+        "   1V8_SYS_A current(2)=0.27911600A\n"
+        "  DDR_VDD2_A current(3)=0.32791250A\n"
+        "  DDR_VDDQ_A current(4)=0.02549040A\n"
+        "   1V1_SYS_A current(5)=0.17761930A\n"
+        "    0V8_SW_A current(6)=0.35328660A\n"
+        "  VDD_CORE_A current(7)=2.49147000A\n"
+        "   3V3_DAC_A current(17)=0.00000000A\n"
+        "   3V3_ADC_A current(18)=0.00000000A\n"
+        "   0V8_AON_A current(16)=0.00268620A\n"
+        "      HDMI_A current(22)=0.00573870A\n"
+        " 3V7_WL_SW_V volt(8)=3.71648000V\n"
+        "   3V3_SYS_V volt(9)=3.31003300V\n"
+        "   1V8_SYS_V volt(10)=1.81098700V\n"
+        "  DDR_VDD2_V volt(11)=1.10842400V\n"
+        "  DDR_VDDQ_V volt(12)=0.60292980V\n"
+        "   1V1_SYS_V volt(13)=1.10439400V\n"
+        "    0V8_SW_V volt(14)=0.80292960V\n"
+        "  VDD_CORE_V volt(15)=0.85421160V\n"
+        "   3V3_DAC_V volt(20)=3.32508800V\n"
+        "   3V3_ADC_V volt(21)=3.32142500V\n"
+        "   0V8_AON_V volt(19)=0.80175740V\n"
+        "      HDMI_V volt(23)=5.16704000V\n"
+        "     EXT5V_V volt(24)=5.15096000V\n"
+        "      BATT_V volt(25)=0.00000000V\n"
+        ;
+    HwPmic p;
+    CHECK(!hw_pmic_parse(real, &p) && p.n == 14);
+    const HwPmicRail *ext = NULL, *core = NULL, *batt = NULL;
+    for (int i = 0; i < p.n; i++) {
+        if (!strcmp(p.r[i].name, "EXT5V")) ext = &p.r[i];
+        if (!strcmp(p.r[i].name, "VDD_CORE")) core = &p.r[i];
+        if (!strcmp(p.r[i].name, "BATT")) batt = &p.r[i];
+    }
+    CHECK(ext && ext->uv > 4000000 && ext->uv < 6000000 && ext->ua == -1);
+    CHECK(core && core->uv > 700000 && core->uv < 1100000 && core->ua > 0);
+    CHECK(batt && batt->uv == 0 && batt->ua == -1);
+    char line[768];
+    CHECK(!hw_pmic_line(&p, 2, 7265, line, sizeof line) && !strncmp(line, "uv 2 7265 ", 10) && strstr(line, " BATT=0,-1"));
+    CHECK(hw_pmic_line(&p, 0, -1, line, 20));
+    CHECK(!hw_pmic_parse("     EXT5V_V volt(24)=5.18312000V\n", &p) && p.n == 1 && p.r[0].uv == 5183120);
+    CHECK(!hw_pmic_parse("EXT5V_V volt(24)=5.1V\n", &p) && p.r[0].uv == 5100000);
+    /* well-formed but unknown rails are left out, never forwarded */
+    CHECK(!hw_pmic_parse("  NEW_RAIL_V volt(30)=1.00000000V\n  EXT5V_V volt(24)=5.00000000V\n", &p) && p.n == 1);
+    /* a current alone is dropped */
+    CHECK(!hw_pmic_parse(" VDD_CORE_A current(7)=0.80370000A\n EXT5V_V volt(24)=5.00000000V\n", &p) && p.n == 1);
+    static const char *const bad[] = {
+        "", "\n", "garbage\n", "error=1 error_msg=\"Command not registered\"\n",
+        " VDD_CORE_V volt(15)=0.82842410V\n",                     /* no input rail */
+        "  EXT5V_V volt(24)=5.18312000V",                          /* cut: no newline */
+        "  EXT5V_V volt(24)=5.18312000V\n  VDD_CORE_V volt(15)=0.8",
+        "  EXT5V_V volt(24)=5.18312000V\n  EXT5V_V volt(24)=5.18312000V\n",   /* repeated */
+        "  EXT5V_V volt(24)=5.18312000A\n", "  EXT5V_V current(24)=5.18312000V\n", "  EXT5V_A volt(24)=5.18312000V\n",
+        "  EXT5V_V volt(24)=-5.18312000V\n", "  EXT5V_V volt(24)=5.18312000 V\n", "  EXT5V_V volt(24)=5,18312000V\n",
+        "  EXT5V_V volt(24)=5V\n", "  EXT5V_V volt(24)=.5V\n", "  EXT5V_V volt(24)=5.V\n", "  EXT5V_V volt(24)=31.00000000V\n",
+        "  EXT5V_V volt(24)=999.00000000V\n", "  EXT5V_V volt(24)=5.1234567890123V\n", "  EXT5V_V volt()=5.1V\n", "  EXT5V_V volt(12345)=5.1V\n",
+        "  EXT5V_V volt(x)=5.1V\n", "  EXT5V_V  volt(24)=5.1V\n", "  ext5v_V volt(24)=5.1V\n", "  EXT5V;rm_V volt(24)=5.1V\n", "  EXT5V_V volt(24)=5.1V;\n",
+        "  EXT5V_V volt(24)=5.1V\n\n", "  EXT5V_V volt(24)=5.1V trailing\n",
+        "  EXT5V_V volt(24)=5.18312000000000000000000000000000000000000000000000000000000000V\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(hw_pmic_parse(bad[i], &p));
+    /* the kernel log */
+    long long last;
+    static const char log[] =
+        "6,100,1000000,-;Booting Linux\n"
+        "2,101,3726000000,-;raspberrypi-hwmon raspberrypi-hwmon: Undervoltage detected!\n"
+        " SUBSYSTEM=platform\n"
+        " DEVICE=+platform:raspberrypi-hwmon\n"
+        "6,102,3728000000,-;raspberrypi-hwmon raspberrypi-hwmon: Voltage normalised\n"
+        "2,103,7265500000,c;hwmon hwmon3: Undervoltage detected!\n";
+    CHECK(hw_uv_log(log, sizeof log - 1, &last) == 2 && last == 7265);
+    CHECK(hw_uv_log("6,1,5,-;all good\n", 16, &last) == 0 && last == -1);
+    CHECK(hw_uv_log("", 0, &last) == 0 && last == -1);
+    /* a user's text (facility 1 and up), or anything that isn't "<driver> <device>:" */
+    static const char fake[] =
+        "14,1,5,-;user user: Undervoltage detected!\n"
+        "2,2,5,-;Undervoltage detected!\n"
+        "2,3,5,-;a b c: Undervoltage detected!\n"
+        "2,4,5,-;x: Undervoltage detected!\n"
+        "2,5,5,-;a b: Undervoltage detected! again\n"
+        "x,6,5,-;a b: Undervoltage detected!\n"
+        "a b: Undervoltage detected!\n";
+    CHECK(hw_uv_log(fake, sizeof fake - 1, &last) == 0 && last == -1);
+}
+
+static void test_eeprom(void) {
+    /* as printed on the Raspberry Pi 5 (rpi-eeprom 28.34-1, 2026-10-25) */
+    const char *avail =
+        "*** UPDATE AVAILABLE ***\n\nRun \"sudo rpi-eeprom-update -a\" to install this update without a prompt.\n\n"
+        "To configure the bootloader update policy run \"sudo raspi-config\"\n\n"
+        "BOOTLOADER: update available\n"
+        "   CURRENT: Tue May 26 03:01:25 PM UTC 2026 (1779807685)\n"
+        "    LATEST: Fri Sep 25 03:59:09 PM UTC 2026 (1790351949)\n"
+        "   RELEASE: default (/usr/lib/firmware/raspberrypi/bootloader-2712/default)\n"
+        "            Use raspi-config to change the release.\n";
+    HwEeprom e;
+    CHECK(!hw_eeprom_parse(avail, &e) && e.update && e.current == 1779807685LL && e.latest == 1790351949LL && !strcmp(e.release, "default"));
+    const char *same =
+        "BOOTLOADER: up to date\n   CURRENT: Fri Sep 25 03:59:09 PM UTC 2026 (1790351949)\n"
+        "    LATEST: Fri Sep 25 03:59:09 PM UTC 2026 (1790351949)\n   RELEASE: latest (/usr/lib/firmware/raspberrypi/bootloader-2712/latest)\n"
+        "            Use raspi-config to change the release.\n";
+    CHECK(!hw_eeprom_parse(same, &e) && !e.update && e.current == e.latest && !strcmp(e.release, "latest"));
+    /* the running version unknown (a chroot): never "available" */
+    CHECK(!hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: unknown\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e) && !e.update && !e.current);
+    CHECK(hw_eeprom_parse("BOOTLOADER: update available\n   CURRENT: unknown\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    /* the verdict must agree with the numbers */
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1779807685)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: update available\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    /* the Pi 4's VL805 block after the bootloader's is not read */
+    CHECK(!hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n\n"
+                           "  VL805_FW: Dedicated VL805 EEPROM\n     VL805: up to date\n   CURRENT: 000138c0\n    LATEST: 000138c0\n", &e) && !e.update);
+    /* refused: missing lines, repeated lines, bad numbers, odd release names, nothing at all */
+    CHECK(hw_eeprom_parse("", &e) && hw_eeprom_parse("garbage\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (17903519490)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949) \n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (-1)\n    LATEST: x (1790351949)\n   RELEASE: default (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: Default;rm (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE: averyveryverylongname (/x)\n", &e));
+    CHECK(hw_eeprom_parse("BOOTLOADER: up to date\n   CURRENT: x (1790351949)\n    LATEST: x (1790351949)\n   RELEASE:  (/x)\n", &e));
+    test_pmic();
+    /* the board: BCM2712 in the device tree's compatible list */
+    static const char pi5[] = "raspberrypi,5-model-b\0brcm,bcm2712\0";
+    static const char pi4[] = "raspberrypi,4-model-b\0brcm,bcm2711\0";
+    static const char trick[] = "brcm,bcm2712x\0xbrcm,bcm2712\0";
+    CHECK(hw_is_bcm2712(pi5, sizeof pi5 - 1) && !hw_is_bcm2712(pi4, sizeof pi4 - 1) && !hw_is_bcm2712(trick, sizeof trick - 1));
+    CHECK(!hw_is_bcm2712("brcm,bcm271", 11) && !hw_is_bcm2712(NULL, 0));
+}
 
 static void test_admin(void) {
     CHECK(hw_time_valid("2026-10-18 03:15:00") && hw_time_valid("2028-02-29 23:59:59"));
@@ -379,11 +536,13 @@ static void test_admin(void) {
 
 int main(void) {
     test_admin();
+    test_eeprom();
     test_edid();
     test_modes();
     test_night();
     test_mimeapps();
     test_power();
+    test_serial_clean();
     printf("settings-hw: %d/%d passed\n", checks - fails, checks);
     return fails != 0;
 }

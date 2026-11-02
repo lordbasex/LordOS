@@ -19,14 +19,14 @@ Esta é a primeira pergunta que um leitor atento deve fazer, então aqui vai a r
 | Tipo de app | Processo próprio | Sandbox (Landlock + seccomp) | cgroup por app | Broker e permissões | Firewall por app |
 |---|---|---|---|---|---|
 | Apps `.lpk` instalados | sim | sim | sim, com limites de memória e CPU | sim | sim |
-| Senhas (hoje o único app incluído com processo próprio) | sim | sim | sim | sim | sim |
-| Outros apps incluídos (Arquivos, Ajustes, E-mail, Terminal…) | não, rodam dentro do `lord-server` | não | não (contam como "LordOS") | o uso de câmera, microfone e tela é conferido em C | sim, como "LordOS" |
+| Senhas, Mail, Calendário, Contatos e Lembretes (apps incluídos com processo próprio; os quatro últimos desde a 0.8.2) | sim | sim | sim | sim | sim |
+| Outros apps incluídos (Arquivos, Ajustes, Terminal…) | não, rodam dentro do `lord-server` | não | não (contam como "LordOS") | o uso de câmera, microfone e tela é conferido em C | sim, como "LordOS" |
 | Apps Linux abertos pelo lançador de apps (apt, a Loja) | sim, um processo comum | **não** por padrão; com "sem acesso aos seus arquivos", namespaces próprios e Landlock | sim, `app-lordos-<id>.scope`, sem limites | **não** | **sim**, mais as restrições que você definir (câmera, microfone, USB, Bluetooth, arquivos, notificações) |
-| Programas iniciados pelo Terminal | sim | não | dividem o lugar do Terminal na árvore | não | como "LordOS" |
+| Programas iniciados pelo Terminal | sim | não | dividem o lugar do Terminal na árvore | não | como "Terminal", com suas próprias regras (desde a 0.8.5; antes, como "LordOS") |
 
 Ou seja: **os apps Linux não ficam em sandbox por padrão.** Eles rodam como o seu usuário, exatamente como em qualquer sistema Debian, e podem ler sua pasta pessoal. O que o LordOS acrescenta para eles é a atribuição (o Monitor sabe qual app fez cada conexão), o firewall por app aplicado pelo kernel e as restrições que você escolher para um app: sem câmera, sem microfone, sem USB, sem sockets Bluetooth, sem notificações e "sem acesso aos seus arquivos", que a partir da próxima abertura inicia o app em namespaces próprios, com uma pasta pessoal vazia que só tem as pastas dele. O Flatpak não é usado nem integrado pelo LordOS, e não foi testado.
 
-Os apps incluídos fazem parte do código do próprio sistema, revisado junto com ele; eles não recebem o isolamento por processo que os pacotes de terceiros recebem, com Senhas como exceção, porque guarda seus segredos.
+Os apps incluídos fazem parte do código do próprio sistema, revisado junto com ele; a maioria não recebe o isolamento por processo que os pacotes de terceiros recebem. As exceções são Senhas, porque guarda seus segredos, e, desde a 0.8.2, Mail, Calendário, Contatos e Lembretes, porque leem o que chega da internet: cada um roda como seu próprio processo isolado e chega ao e-mail e ao seu chaveiro só por pedidos ao broker permitidos para aquele app e nenhum outro.
 
 ## Como o sandbox funciona
 
@@ -80,13 +80,23 @@ Permissões que um app pode declarar: arquivos, área de transferência, notific
 
 **E os apps que precisam de mais privilégios?** Não há como um app `.lpk` obter root ou capacidades extras. Tudo no LordOS que precisa de root passa por uma lista fechada de ações validadas (`server/src/admin.c`), e o JavaScript não consegue executar comandos arbitrários. Os apps Linux se comportam como em qualquer sistema Debian: se um programa precisa de `sudo`, você mesmo o executa no Terminal.
 
+## O LordOS verifica o próprio código antes de executá-lo
+
+Desde a 0.8.2, cada pacote de código que o LordOS executa como próprio (os temas com o shell e cada app nativo, a tela de login, o hospedeiro dos apps isolados e os apps do sistema que rodam como processo próprio) está listado com seu SHA-256 num manifesto assinado com a chave de versões do LordOS (Ed25519). O `lord-server` confere a assinatura com a chave pública compilada nele, e o hash de cada pacote a partir da mesma leitura com que o carrega, então não há um intervalo para trocar o arquivo. Um pacote que não confere não é executado: o desktop passa para outro tema e avisa, ou mostra uma tela de recuperação que explica como repará-lo, nunca uma tela em branco. Sobre o LordOS mostra "Verificado", ou "Compilação de desenvolvimento" para uma árvore de desenvolvimento sem assinatura. Isso protege contra alterações feitas por processos que não são root e contra modificação offline; o root ainda pode substituir o próprio `lord-server`, o que uma fase posterior (fs-verity, imagens A/B) deve cobrir.
+
+## Confira no seu próprio computador (desde a 0.8.5)
+
+Desde a 0.8.5, **Informações do sistema** (Sobre o LordOS → Relatório do sistema…) tem uma aba Verificações que testa estas afirmações no computador à sua frente: o servidor gráfico sem root, o Landlock, o firewall por app, o código verificado, a área de trabalho remota fechada quando está desligada, os escopos dos apps nas mãos do sistema. Cada verificação diz se o mecanismo só foi encontrado *configurado* ou se foi de fato *testado*. **Testar** inicia o Teste do isolamento, um app de teste oculto que começa exatamente como qualquer app isolado e tenta, dentro do mesmo sandbox, o que não deve conseguir fazer: os seus arquivos e os do sistema, sockets, `ptrace`, um namespace de usuário, `mount`, `exec`, sair do seu escopo. Ele também tenta o que o sandbox dos decodificadores deve recusar, e pede ao broker coisas que ele deve negar. O teste nunca recebe uma permissão nem acesso à rede, e nada é enviado a lugar nenhum.
+
+[[shot:6]]
+
 ## Os ajudantes que leem dados não confiáveis
 
-Arquivos vindos de fora são a porta de entrada clássica. O LordOS os abre em pequenos processos separados, trancados com ainda mais rigor que os apps: `lord-doc` (PDFs, arquivos compactados, fontes), `lord-media` (vídeo, música, fotos, câmera), `lord-maild` (e-mail, calendários, contatos) e `lord-vault` (senhas). Eles não têm rede, não conseguem criar sockets, não conseguem executar programas e só podem criar threads, não processos. Eles não abrem caminhos: o `lord-server` abre os arquivos e os passa como descritores. Se o seccomp não puder ser aplicado, o ajudante encerra em vez de rodar sem confinamento. Um PDF malicioso pode derrubar o `lord-doc`, mas não o desktop.
+Arquivos vindos de fora são a porta de entrada clássica. O LordOS os abre em pequenos processos separados, trancados com ainda mais rigor que os apps: `lord-doc` (PDFs, arquivos compactados, fontes), `lord-media` (vídeo, música, fotos, câmera), `lord-maild` (e-mail, calendários, contatos) e `lord-vault` (senhas). Eles não têm rede, não conseguem criar sockets, não conseguem executar programas e só podem criar threads, não processos. Eles não abrem caminhos: o `lord-server` abre os arquivos e os passa como descritores. Se o seccomp não puder ser aplicado, o ajudante encerra em vez de rodar sem confinamento. Um PDF malicioso pode derrubar o `lord-doc`, mas não o desktop. Desde a 0.8.5 o `lord-fetch` (as listas de bloqueio do firewall) e o `lord-tls` (o HTTPS da Loja) são trancados da mesma forma e também não conseguem criar sockets: só recebem uma conexão que o `lord-server` ou a Loja abriu para eles. Desde a 0.8.7 o `lord-lan` lê da mesma forma o que volta da rede local para Arquivos → Rede, sem sockets nem arquivos, e o `lord-rdesk`, a conexão do Remote Desk, fica isolado assim que conecta: sem sockets novos e sem programas. O `lord-bench` do LordBench (desde a 0.8.6) roda seus testes sob o mesmo confinamento.
 
 ## Janelas protegidas
 
-Uma janela pode ser marcada como protegida. A de Senhas é. Os pixels dela saem pretos nas capturas de tela do LordOS, nas gravações de tela, nas miniaturas e na área de trabalho remota, enquanto o monitor de verdade a mostra normalmente. Os apps Linux não conseguem capturar a tela pelo LordOS: o compositor não oferece a eles nenhum protocolo de captura de tela, não há servidor X, e um app restrito também tem o dispositivo de framebuffer negado.
+Uma janela pode ser marcada como protegida. A de Senhas é. Os pixels dela saem pretos nas capturas de tela do LordOS, nas gravações de tela, nas miniaturas e na área de trabalho remota, enquanto o monitor de verdade a mostra normalmente. Os apps Linux não conseguem capturar a tela pelo LordOS: o compositor não oferece a eles nenhum protocolo de captura de tela, os apps X11 (pelo Xwayland desde a 0.8.3) só veem uns aos outros, nunca os apps Wayland, a tela do LordOS ou Senhas, e um app restrito também tem o dispositivo de framebuffer negado.
 
 [[shot:5]]
 

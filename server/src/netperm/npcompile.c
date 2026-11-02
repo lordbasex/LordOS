@@ -198,7 +198,7 @@ int np_compile_app(FwStore *s, const char *app, uint32_t idx, DnsMap *names, con
     uint32_t keep = NP_R_NET_MASK | (strcmp(app, "lordos") ? NP_R_DEV_MASK : 0);
     a->flags = fw_restricted(s, app) & keep;
     a->trusted = (np_u8)(fw_is_trusted(s, app) != 0);
-    a->mode = fw_mode(s) == FW_MODE_OFF ? NP_M_OFF : NP_M_SILENT;
+    a->mode = fw_mode(s) == FW_MODE_OFF ? NP_M_OFF : fw_mode(s) == FW_MODE_DENY ? NP_M_DENY : NP_M_SILENT;
 
     int rc = -1;
     const FwRule **v = malloc(((size_t)R.n + 1) * sizeof *v);
@@ -240,7 +240,7 @@ int np_compile_app(FwStore *s, const char *app, uint32_t idx, DnsMap *names, con
         dnsmap_each(names, names_app, now, host_cb, &h);
         if (h.err) goto done;
     }
-    a->can_deny = (a->flags & NP_R_NET_MASK) || dom_deny || np_ents_deny(a->gen, a->ngen);
+    a->can_deny = (a->flags & NP_R_NET_MASK) || dom_deny || a->mode == NP_M_DENY || np_ents_deny(a->gen, a->ngen);
     for (int i = 0; i < out->nnodes; i++) {
         if (out->nodes[i].fam == 4) a->has4 = 1;
         else a->has6 = 1;

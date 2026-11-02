@@ -34,6 +34,8 @@
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 
+#include "lm_hwfall.h"
+
 #define VQ_MAX   6                   /* decoded frames waiting */
 #define AQ_MS    1000                /* decoded PCM waiting */
 #define PKTQ_MAX (24u << 20)         /* bytes of undecoded packets */
@@ -78,6 +80,10 @@ typedef struct {
     AVCodecContext *vdec, *adec, *sdec;
     AVBufferRef *hw;
     int hw_active;
+    LmHwFall hwf;                   /* consecutive decoding failures (lm_hwfall.h) */
+    int hw_resume;                  /* it went to software: seek to the clock */
+    int rate;                       /* percent of normal speed, moving wallpapers only: fewer frames to decode */
+    int hw_only;                    /* a moving wallpaper: no software decoding, the still image stays */
     SwrContext *swr;
     int out_ch;
     int64_t start_ms, dur_ms;
@@ -112,14 +118,15 @@ static Player P;
 static int64_t frame_ms(AVStream *st, const AVFrame *f) {
     int64_t ts = f->best_effort_timestamp != AV_NOPTS_VALUE ? f->best_effort_timestamp : f->pts;
     if (ts == AV_NOPTS_VALUE) return AV_NOPTS_VALUE;
-    return av_rescale_q(ts, st->time_base, (AVRational){ 1, 1000 }) - P.start_ms;
+    return (av_rescale_q(ts, st->time_base, (AVRational){ 1, 1000 }) - P.start_ms) * 100 / P.rate;
 }
 
 /* ---- decoders ---- */
 
 static enum AVPixelFormat get_hw_format(AVCodecContext *c, const enum AVPixelFormat *fmts) {
-    (void)c;
-    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == AV_PIX_FMT_VAAPI) return *p;
+    /* the format of the device we opened: a decoder can list both, and only one of them can start */
+    enum AVPixelFormat want = ((AVHWDeviceContext *)c->hw_device_ctx->data)->type == AV_HWDEVICE_TYPE_DRM ? AV_PIX_FMT_DRM_PRIME : AV_PIX_FMT_VAAPI;
+    for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) if (*p == want) return *p;
     P.hw_active = 0;                /* the decoder can't use VA-API: software */
     return fmts[0];
 }
@@ -139,7 +146,7 @@ static AVCodecContext *open_dec(int idx, int video) {
             for (int i = 0;; i++) {
                 const AVCodecHWConfig *cfg = avcodec_get_hw_config(codec, i);
                 if (!cfg) break;
-                if (cfg->device_type == AV_HWDEVICE_TYPE_VAAPI && (cfg->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
+                if ((cfg->device_type == AV_HWDEVICE_TYPE_VAAPI || cfg->device_type == AV_HWDEVICE_TYPE_DRM) && (cfg->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
                     c->hw_device_ctx = av_buffer_ref(P.hw);
                     c->get_format = get_hw_format;
                     c->extra_hw_frames = VQ_MAX + 4;
@@ -216,8 +223,40 @@ static void pq_push_front(PktQ *q, AVPacket *p) {
     q->bytes += (size_t)p->size;
 }
 
+/* The hardware decoder failed mid-file (a driver's error, a stream it took and can't follow): this file goes on in
+ * software, from the keyframe before what is on screen. Under P.mu, on the decoding thread, which owns
+ * P.vdec; frames still queued keep their own reference to the hardware's. */
+#ifdef LM_HWFALL_TEST
+static int hwf_tested;              /* build/lord-media-hwfall: the failure was faked once */
+#endif
+static void hw_to_software(void) {
+    if (P.hw_only) { LM_LOG("hardware decoder failed: stopping, this video is hardware only"); _exit(0); }
+    AVCodecContext *old = P.vdec;
+    AVBufferRef *hw = P.hw;
+    int active = P.hw_active;
+    P.hw = NULL;
+    P.hw_active = 0;
+    AVCodecContext *sw = open_dec(P.vi, 1);
+    if (!sw) {                              /* no software decoder: as it was */
+        P.hw = hw;
+        P.hw_active = active;
+        lm_hwfall_reset(&P.hwf);
+        LM_LOG("hardware decoder failing and no software decoder to take over");
+        return;
+    }
+    P.vdec = sw;
+    pthread_mutex_unlock(&P.mu);
+    avcodec_free_context(&old);
+    av_buffer_unref(&hw);
+    pthread_mutex_lock(&P.mu);
+    lm_hwfall_reset(&P.hwf);
+    P.hw_resume = 1;                        /* the main loop seeks to what is on screen (seek_to) */
+    LM_LOG("hardware decoder failed: going on in software");
+}
+
 static int decode_video(void) {
-    if (!P.vdec || P.cover) return 0;
+    /* just gone to software: nothing more until the seek, the packets queued follow frames this decoder hasn't seen */
+    if (!P.vdec || P.cover || P.hw_resume) return 0;
     int serial = P.serial, progress = 0;
     AVFrame *f = av_frame_alloc();
     while (f && P.vq_n < VQ_MAX) {
@@ -226,7 +265,20 @@ static int decode_video(void) {
         int r = avcodec_receive_frame(P.vdec, f);
         double dt = lm_now_ms() - t0;
         pthread_mutex_lock(&P.mu);
-        if (r < 0) break;
+#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 1  /* build/lord-media-hwfall: a decoder that fails after 30 frames */
+        if (r >= 0 && P.decoded >= 30 && P.decoded < 1000 && !hwf_tested) {
+            P.hw_active = 1;
+            av_frame_unref(f);
+            r = AVERROR_EXTERNAL;
+            if (P.hwf.fails == LM_HWFALL_ERRS - 1) hwf_tested = 1;
+        }
+#endif
+        if (r < 0) {
+            if (r != AVERROR(EAGAIN) && r != AVERROR_EOF) lm_hwfall_note(&P.hwf, 1);
+            break;
+        }
+        lm_hwfall_note(&P.hwf, 0);
+        if (P.hw_only && f->format != AV_PIX_FMT_DRM_PRIME && f->format != AV_PIX_FMT_VAAPI) { LM_LOG("no hardware decoder: stopping, this video is hardware only"); _exit(0); }
         progress = 1;
         P.dec_ms += dt;
         P.decoded++;
@@ -238,6 +290,7 @@ static int decode_video(void) {
         pthread_cond_broadcast(&P.cv);
     }
     av_frame_free(&f);
+    if (P.hw_active && lm_hwfall_due(&P.hwf)) { hw_to_software(); return 1; }
     if (P.vq_n >= VQ_MAX || serial != P.serial) return progress;
     AVPacket *pkt = pq_pop(&P.vq_pkt);
     if (!pkt) {
@@ -256,6 +309,7 @@ static int decode_video(void) {
     P.dec_ms += dt;
     if (r == AVERROR(EAGAIN) && serial == P.serial) pq_push_front(&P.vq_pkt, pkt);   /* comes back later */
     else av_packet_free(&pkt);
+    if (r < 0 && r != AVERROR(EAGAIN) && r != AVERROR_EOF) lm_hwfall_note(&P.hwf, 1);
     return 1;
 }
 
@@ -514,6 +568,9 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     int loop = (int)mp_param_int(params, "loop", 0);
     int autoplay = (int)mp_param_int(params, "autoplay", 1);
     int want_audio = (int)mp_param_int(params, "audio", 1);
+    P.hw_only = (int)mp_param_int(params, "hwonly", 0);
+    P.rate = (int)mp_param_int(params, "rate", 100);
+    if (P.rate < 10 || P.rate > 100) P.rate = 100;
 
     /* VA-API before seccomp (it loads the driver from /usr/lib) */
     char accel[24];
@@ -667,6 +724,21 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (late && !seek_wait) { P.dropped++; av_frame_free(&vf.f); continue; }
             int64_t clk = clock_ms();
             int r = lm_out_present(vf.f, vf.pts);
+            int hwframe = vf.f->format == AV_PIX_FMT_VAAPI || vf.f->format == AV_PIX_FMT_DRM_PRIME;
+#if defined(LM_HWFALL_TEST) && LM_HWFALL_TEST == 2  /* HWFALL=2: frames that can't be read back after 30 shown */
+            if (P.shown >= 30 && !hwf_tested) {
+                pthread_mutex_lock(&P.mu);
+                P.hw_active = hwframe = 1;
+                r = -1;
+                if (P.hwf.rb_fails == LM_HWFALL_ERRS - 1) hwf_tested = 1;
+                pthread_mutex_unlock(&P.mu);
+            }
+#endif
+            if (hwframe) {                                 /* < 0: it could not be read back */
+                pthread_mutex_lock(&P.mu);
+                lm_hwfall_note_rb(&P.hwf, r < 0);
+                pthread_mutex_unlock(&P.mu);
+            }
             if (r == 1) P.dropped++;
             else if (r == 0) {
                 P.shown++;
@@ -678,6 +750,11 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             if (!C.playing) break;
         }
         /* subtitles: sent as soon as they're decoded (the JS clock shows them) */
+        pthread_mutex_lock(&P.mu);
+        int resume = P.hw_resume;
+        P.hw_resume = 0;
+        pthread_mutex_unlock(&P.mu);
+        if (resume) { seek_to(clock_ms()); seek_wait = 1; }
         pthread_mutex_lock(&P.mu);
         for (int i = 0; i < P.sub_n; i++) {
             if (P.subs[i].serial != P.serial) continue;

@@ -335,6 +335,59 @@ static int deny_restricted(int fd, uint32_t reqid, const char *id, uint32_t flag
     return 1;
 }
 
+/* ---- System Information's sandbox probe (BOP_PROBE) ---- */
+
+static char probe_json[12288];
+static int probe_have;
+
+/* "Key:\tvalue" of /proc/<pid>/status, the first word, [0-9a-f] only */
+static void status_field(const char *st, const char *key, char *out, size_t n) {
+    out[0] = 0;
+    const char *p = st ? strstr(st, key) : NULL;
+    if (!p) return;
+    p += strlen(key);
+    while (*p == ' ' || *p == '\t') p++;
+    size_t o = 0;
+    while (o + 1 < n && ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'))) out[o++] = *p++;
+    out[o] = 0;
+}
+
+static void probe_store(int pid, const char *payload, uint32_t len) {
+    char path[64], st[8192] = "", cg[512] = "", nnp[8], sec[8], cap[24], mem[32] = "";
+    snprintf(path, sizeof path, "/proc/%d/status", pid);
+    int f = pid > 0 ? open(path, O_RDONLY | O_CLOEXEC) : -1;
+    if (f >= 0) { ssize_t n = read(f, st, sizeof st - 1); st[n > 0 ? n : 0] = 0; close(f); }
+    status_field(st, "\nNoNewPrivs:", nnp, sizeof nnp);
+    status_field(st, "\nSeccomp:", sec, sizeof sec);
+    status_field(st, "\nCapEff:", cap, sizeof cap);
+    snprintf(path, sizeof path, "/proc/%d/cgroup", pid);
+    f = pid > 0 ? open(path, O_RDONLY | O_CLOEXEC) : -1;
+    if (f >= 0) { ssize_t n = read(f, cg, sizeof cg - 1); cg[n > 0 ? n : 0] = 0; close(f); }
+    char *c = strstr(cg, "0::");
+    char scope[256] = "";
+    if (c) {
+        c += 3;
+        size_t k = strcspn(c, "\n");
+        if (k < sizeof scope && !memmem(c, k, "..", 2)) { memcpy(scope, c, k); scope[k] = 0; }
+    }
+    for (char *q = scope; *q; q++) if (*q == '"' || *q == '\\' || (unsigned char)*q < 0x20) *q = '_';
+    if (scope[0] == '/') {
+        char mp[400];
+        snprintf(mp, sizeof mp, "/sys/fs/cgroup%s/memory.max", scope);
+        f = open(mp, O_RDONLY | O_CLOEXEC);
+        if (f >= 0) { ssize_t n = read(f, mem, sizeof mem - 1); mem[n > 0 ? n : 0] = 0; mem[strcspn(mem, "\n")] = 0; close(f); }
+        for (char *q = mem; *q; q++) if (!((*q >= '0' && *q <= '9') || (*q >= 'a' && *q <= 'z'))) *q = '_';
+    }
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    int k = snprintf(probe_json, sizeof probe_json,
+                     "{\"probe\":%.*s,\"proc\":{\"noNewPrivs\":\"%s\",\"seccomp\":\"%s\",\"capEff\":\"%s\",\"cgroup\":\"%s\",\"memoryMax\":\"%s\"},\"at\":%lld}",
+                     (int)len, payload, nnp, sec, cap, scope, mem, (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+    probe_have = k > 0 && (size_t)k < sizeof probe_json;
+}
+
+const char *brokersrv_probe_result(void) { return probe_have ? probe_json : NULL; }
+
 static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) {
     int fd = a->fd;
     if (h->op == BOP_MAIL) { brokermail_handle((int)(a - apps), fd, h->reqid, a->id, payload, h->len, fds, nfds); return; }
@@ -475,6 +528,13 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
         }
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
+    case BOP_TEXT_FOCUS: {
+        int on = 0, y = 0, fh = 0;
+        if (sscanf(payload, "%d %d %d", &on, &y, &fh) == 3 && y >= -1 && y <= 32767 && fh >= 0 && fh <= 32767)
+            queue_evt("textfocus", "{\"app\":\"%s\",\"on\":%s,\"y\":%d,\"h\":%d}", a->id, on ? "true" : "false", y, fh);
+        send_reply(fd, h->reqid, BST_OK, NULL, 0);
+        break;
+    }
     case BOP_STATE: {
         static char st[STATE_MAX + 8192];
         size_t n = state_json(st, sizeof st);
@@ -518,6 +578,19 @@ static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) 
             clip_secret.deadline = mono_s() + secs;
         }
         explicit_bzero(payload, h->len);
+        send_reply(fd, h->reqid, BST_OK, NULL, 0);
+        break;
+    }
+    case BOP_PROBE: {
+        /* System Information's sandbox probe (app/probe.c): only the system package `sysprobe`, a
+         * bounded JSON payload; lord-server adds what only it can read about that process */
+        JDoc doc;
+        if (!a->sys || strcmp(a->id, "sysprobe") || !h->len || h->len > 8192 || json_parse(payload, h->len, &doc, NULL, 0)) {
+            send_reply(fd, h->reqid, BST_DENIED, NULL, 0);
+            break;
+        }
+        json_free(&doc);
+        probe_store(a->pid, payload, h->len);
         send_reply(fd, h->reqid, BST_OK, NULL, 0);
         break;
     }

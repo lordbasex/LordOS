@@ -22,6 +22,9 @@
  *   watchDisks(on)              disk temperatures with the Monitor closed (every 30 s; sdk/diskwatch.js)
  *   diskTemps()                 the latest { t, disks: [{ name, model, sensor, temp, tempMax, … }] } or
  *                               null if nothing new; it does not keep the 4 Hz sampling awake
+ *   wantVoltage(on)             Monitor → Voltage on screen: the thread reads the voltages about every 2 s
+ *   voltage()                   the latest { board, alarm, sinceBoot, chips, supplies } (monitor/voltage.c), or null
+ *                               if nothing new; the sample's "volt" says whether this machine has any
  *   historyEnable(on)           Settings → Privacy → Monitor → "Keep a traffic history" (0.8.2)
  *   history({ from, step, n, app })  bytes per bucket from the history file (monitor/nethist.c):
  *                               { res, oldest, now, rx: [n], tx: [n], top: [[app, rx, tx]] } or null;
@@ -45,9 +48,10 @@
 #include <strings.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
-static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps;
+static uint64_t seq_sample, seq_procs, seq_conns, seq_detail, seq_temps, seq_volt;
 
 static JSValue parse(JSContext *c, char *j, const char *what) {
     if (!j) return JS_NULL;
@@ -89,6 +93,17 @@ static JSValue f_watch_disks(JSContext *c, JSValueConst t, int argc, JSValueCons
 static JSValue f_disk_temps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     return parse(c, mon_disk_temps_json(&seq_temps), "<monitor.diskTemps>");
+}
+
+static JSValue f_want_voltage(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    mon_want_voltage(argc > 0 && JS_ToBool(c, argv[0]) > 0);
+    return JS_TRUE;
+}
+
+static JSValue f_voltage(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return parse(c, mon_voltage_json(&seq_volt), "<monitor.voltage>");
 }
 
 static JSValue f_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -268,7 +283,8 @@ static int color_prop(JSContext *c, JSValueConst o, const char *k, uint32_t *out
 }
 
 /* map({ width, height, lon, lat, ppd, land, border, accent, homeColor, selColor,
- *       home: { lon, lat } | null, dots: [{ lon, lat, r, sel, idle }] }) → request number */
+ *       home: { lon, lat } | null, dots: [{ lon, lat, r, sel, idle }],
+ *       arcs?: [{ lon, lat, lift, color, sel, idle }] }) → request number */
 static JSValue f_map(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsObject(argv[0])) return js_throw_code(c, "sys.badArgument", NULL);
@@ -311,6 +327,34 @@ static JSValue f_map(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         JS_FreeValue(c, d);
     }
     JS_FreeValue(c, dots);
+    /* arcs: [{ lon, lat, lift, color, sel, idle }] (optional, 0.8.5) */
+    JSValue arcs = JS_GetPropertyStr(c, o, "arcs");
+    n = 0;
+    if (JS_IsArray(c, arcs)) {
+        JSValue lv = JS_GetPropertyStr(c, arcs, "length");
+        JS_ToUint32(c, &n, lv);
+        JS_FreeValue(c, lv);
+    }
+    for (uint32_t i = 0; i < n && q.narcs < MAP_MAX_ARCS; i++) {
+        JSValue d = JS_GetPropertyUint32(c, arcs, i);
+        double lon, lat, lift;
+        uint32_t col;
+        if (JS_IsObject(d) && !num_prop(c, d, "lon", -180, 180, &lon) && !num_prop(c, d, "lat", -90, 90, &lat) &&
+            !num_prop(c, d, "lift", 0, 1, &lift) && !color_prop(c, d, "color", &col)) {
+            MapArc *m = &q.arcs[q.narcs++];
+            m->lon = (float)lon;
+            m->lat = (float)lat;
+            m->lift = (float)lift;
+            m->color = col;
+            JSValue sv = JS_GetPropertyStr(c, d, "sel"), iv = JS_GetPropertyStr(c, d, "idle");
+            m->sel = JS_ToBool(c, sv) > 0;
+            m->idle = JS_IsBool(iv) && JS_ToBool(c, iv) > 0;
+            JS_FreeValue(c, sv);
+            JS_FreeValue(c, iv);
+        }
+        JS_FreeValue(c, d);
+    }
+    JS_FreeValue(c, arcs);
     return JS_NewFloat64(c, (double)map_request(&q));
 }
 
@@ -454,7 +498,23 @@ static JSValue f_history_clear(JSContext *c, JSValueConst t, int argc, JSValueCo
     return JS_NewBool(c, h && nh_clear(h) == 0);
 }
 
+/* (0.8.5) netTotals() → { t, rx, tx }: the machine's byte counters now (the menu bar's network item),
+ * without starting the sampling thread. */
+static JSValue f_net_totals(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    uint64_t rx, tx;
+    if (netrec_totals(&rx, &tx)) return JS_NULL;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "t", JS_NewFloat64(c, ts.tv_sec * 1e3 + ts.tv_nsec / 1e6));
+    JS_SetPropertyStr(c, o, "rx", JS_NewFloat64(c, (double)rx));
+    JS_SetPropertyStr(c, o, "tx", JS_NewFloat64(c, (double)tx));
+    return o;
+}
+
 static const JSCFunctionListEntry monitor_funcs[] = {
+    JS_CFUNC_DEF("netTotals", 0, f_net_totals),
     JS_CFUNC_DEF("start", 0, f_start),
     JS_CFUNC_DEF("stop", 0, f_stop),
     JS_CFUNC_DEF("want", 3, f_want),
@@ -469,6 +529,8 @@ static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("signal", 3, f_signal),
     JS_CFUNC_DEF("watchDisks", 1, f_watch_disks),
     JS_CFUNC_DEF("diskTemps", 0, f_disk_temps),
+    JS_CFUNC_DEF("wantVoltage", 1, f_want_voltage),
+    JS_CFUNC_DEF("voltage", 0, f_voltage),
     JS_CFUNC_DEF("historyEnable", 1, f_history_enable),
     JS_CFUNC_DEF("history", 1, f_history),
     JS_CFUNC_DEF("historyClear", 0, f_history_clear),
@@ -478,7 +540,7 @@ void js_monitor_register(JSContext *c, JSValue lord, const char *assets_dir) {
     mon_init(assets_dir);
     map_init(assets_dir);
     mon_reset();                       /* new context: the previous one's start() calls don't count */
-    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = 0;
+    seq_sample = seq_procs = seq_conns = seq_detail = seq_temps = seq_volt = 0;
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, monitor_funcs, sizeof monitor_funcs / sizeof monitor_funcs[0]);
     JS_SetPropertyStr(c, lord, "monitor", o);

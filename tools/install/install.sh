@@ -25,10 +25,12 @@ STATE_DIR=/var/lib/lordos-installer
 STATE_FILE=$STATE_DIR/state
 SESSION_CONF=/etc/lordos/session.conf
 GREETER_USER=lordos-greeter
-# groups of the live ISO's user (tools/iso/build.sh), added only when they exist; sudo is not added
+# groups of the live ISO's user (tools/iso/build.sh), added only when they exist; sudo only through
+# ADMIN_GROUP, when the system would otherwise have no administrator (pick_admin)
 USER_GROUPS="audio video input render lpadmin pipewire plugdev"
+ADMIN_GROUP=""
 # what the ISO adds beyond the package's Depends/Recommends for sound, fonts and the session bus
-EXTRA_PKGS="dbus-user-session pipewire pipewire-pulse pipewire-alsa wireplumber rtkit alsa-ucm-conf
+EXTRA_PKGS="sudo dbus-user-session pipewire pipewire-pulse pipewire-alsa wireplumber rtkit alsa-ucm-conf
  fonts-noto-core fonts-noto-color-emoji fonts-dejavu-core libthai-data shared-mime-info"
 # locales the interface ships translations for (en is the default); only generated, never selected
 LOCALES="en_US.UTF-8 es_ES.UTF-8 pt_BR.UTF-8"
@@ -79,7 +81,8 @@ Options:
   -y, --yes                 do not ask for confirmation (also LORDOS_YES=1)
   --version X               install release X (for example 0.8.0-beta); default: the latest
   --deb FILE                install a local lordos_<version>_<arch>.deb instead of downloading;
-                            a SHA256SUMS file next to it is verified when present
+                            a SHA256SUMS file next to it is verified when present, and the
+                            lordos-hwdata_<date>_all.deb it needs is taken from the same folder
   --user NAME               the user to set up (default: the user who ran sudo)
   --keep-display-manager    do not disable the current display manager (LordOS is not
                             enabled at boot then; see the final message)
@@ -128,6 +131,13 @@ in_container() {
 }
 
 user_in_group() { id -nG "$1" 2>/dev/null | tr ' ' '\n' | grep -qx "$2"; }
+regular_users() { getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(nologin|false)$/ { print $1 }'; }
+has_admin_user() {
+    for g in sudo admin wheel; do
+        getent group "$g" 2>/dev/null | cut -d: -f4 | tr ',' '\n' | grep -qvxE 'root|' && return 0
+    done
+    return 1
+}
 
 state_get() {
     [ -r "$STATE_FILE" ] || return 0
@@ -247,6 +257,13 @@ pick_user() {
     if [ -z "$TARGET_USER" ]; then
         if [ "$(id -u)" -ne 0 ]; then TARGET_USER=$(id -un)
         elif [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then TARGET_USER=$SUDO_USER
+        else
+            # plain root, as after su or on a Debian installed with a root password: who logged in,
+            # or the only regular user there is
+            who=$(logname 2>/dev/null || true)
+            if [ -n "$who" ] && [ "$who" != root ] && getent passwd "$who" >/dev/null 2>&1; then TARGET_USER=$who
+            elif [ "$(regular_users | wc -l)" -eq 1 ]; then TARGET_USER=$(regular_users)
+            fi
         fi
     fi
     if [ -n "$TARGET_USER" ]; then
@@ -255,6 +272,19 @@ pick_user() {
     else
         warn "running as root without sudo: no user's groups will be changed (use --user NAME)."
     fi
+}
+
+# Installing and updating need an administrator (a member of sudo, admin or wheel: is_admin in
+# server/src/admin.c). A Debian installed with a root password has none, and LordOS has no way to
+# name one from inside, so without this nobody could use the Store.
+pick_admin() {
+    has_admin_user && return 0
+    if [ -z "$TARGET_USER" ]; then
+        warn "this system has no administrator: the Store can't install or update anything until one exists (run again with --user NAME)."
+        return 0
+    fi
+    getent group sudo >/dev/null 2>&1 || { warn "there is no sudo group: $TARGET_USER can't be made an administrator."; return 0; }
+    ADMIN_GROUP=sudo
 }
 
 # ---------------------------------------------------------------- download and verification
@@ -388,6 +418,57 @@ get_package() {
     fi
     check_deb_file "$DEB_PATH"
     ok "package: lordos $DEB_VERSION ($ARCH)"
+    get_hwdata
+}
+
+# (0.8.7) lordos depends on lordos-hwdata, the signed tested-hardware snapshot of System Information
+# (docs/BENCHMARK.md): an Architecture: all package in the same release, checked like the main one. On a
+# Debian system the LordOS repository is not there yet, so apt can only take it from here.
+get_hwdata() {
+    HW_PATH=""
+    HW_NEEDED=0
+    case "$(dpkg-deb -f "$DEB_PATH" Depends 2>/dev/null || true)" in *lordos-hwdata*) HW_NEEDED=1 ;; *) return 0 ;; esac
+    hwsums=""; hwbase=""; hwdir=""; hwsha=""
+    if [ -n "$LOCAL_DEB" ]; then
+        hwdir=$(dirname "$LOCAL_DEB")
+        [ -f "$hwdir/SHA256SUMS" ] && hwsums="$hwdir/SHA256SUMS"
+    else
+        hwsums="$TMP/SHA256SUMS"
+    fi
+    if [ -n "$hwsums" ]; then
+        hwbase=$(awk '{ n = $2; sub(/^\*/, "", n); print n }' "$hwsums" \
+            | grep -E '^lordos-hwdata_[0-9][0-9.]*_all\.deb$' | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    else
+        hwbase=$(for f in "$hwdir"/lordos-hwdata_*_all.deb; do [ -f "$f" ] && basename "$f"; done \
+            | grep -E '^lordos-hwdata_[0-9][0-9.]*_all\.deb$' | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    fi
+    # an upgrade with the LordOS repository already configured: apt takes it from there (install_package)
+    [ -n "$hwbase" ] || return 0
+    if [ -n "$LOCAL_DEB" ]; then
+        [ -f "$hwdir/$hwbase" ] || return 0
+        cp "$hwdir/$hwbase" "$TMP/$hwbase"
+    else
+        fetch "$base_url/$hwbase" "$TMP/$hwbase" || die "could not download $hwbase"
+    fi
+    if [ -n "$hwsums" ]; then
+        hwsha=$(sum_for "$hwsums" "$hwbase")
+        [ "$(sha256_of "$TMP/$hwbase")" = "$hwsha" ] || die "SHA-256 mismatch for $hwbase: the file is corrupted or not the released one. Nothing was installed."
+        ok "SHA-256 of $hwbase matches SHA256SUMS"
+    else
+        warn "no SHA256SUMS next to $LOCAL_DEB: the checksum of $hwbase was not verified (you provided this file)."
+    fi
+    chmod 644 "$TMP/$hwbase"
+    HW_PATH="$TMP/$hwbase"
+    if [ -n "$ROOT_TMP" ]; then
+        as_root install -m 644 "$HW_PATH" "$ROOT_TMP/$hwbase" || die "could not copy $hwbase for installation"
+        HW_PATH="$ROOT_TMP/$hwbase"
+    fi
+    if [ -n "$hwsha" ]; then
+        [ "$(sha256_of "$HW_PATH")" = "$hwsha" ] || die "SHA-256 mismatch for $hwbase after copying it: refusing to install"
+    fi
+    [ "$(dpkg-deb -f "$HW_PATH" Package 2>/dev/null || true)" = lordos-hwdata ] || die "$hwbase is not the lordos-hwdata package"
+    [ "$(dpkg-deb -f "$HW_PATH" Architecture 2>/dev/null || true)" = all ] || die "$hwbase is not an Architecture: all package"
+    ok "package: lordos-hwdata $(dpkg-deb -f "$HW_PATH" Version) (the tested-hardware snapshot)"
 }
 
 # ---------------------------------------------------------------- install
@@ -413,8 +494,11 @@ install_package() {
         && dpkg --compare-versions "$DEB_VERSION" lt "$was"; then
         die "the release offered ($DEB_VERSION) is older than the installed LordOS ($was): refusing to downgrade (use --version X to choose a version)"
     fi
-    # shellcheck disable=SC2086 # $extras is a list of package names
-    apt_install "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
+    if [ "$HW_NEEDED" = 1 ] && [ -z "$HW_PATH" ] && ! apt-cache show lordos-hwdata >/dev/null 2>&1; then
+        die "this release's lordos needs lordos-hwdata, which is neither next to it nor in a configured repository. Nothing was changed."
+    fi
+    # shellcheck disable=SC2086 # $extras is a list of package names; $HW_PATH is one path or empty
+    apt_install $HW_PATH "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
     if [ -n "$was" ]; then changed "package lordos $was replaced by $DEB_VERSION"
     else changed "package lordos $DEB_VERSION installed (with its Debian dependencies)"; fi
     if [ -n "$extras" ]; then changed "extra packages ensured:$extras"; fi
@@ -430,12 +514,16 @@ setup_greeter_user() {
         --shell /usr/sbin/nologin --comment LordOS "$GREETER_USER"
     state_set GREETER_CREATED 1
     changed "system user $GREETER_USER created (the login screen's user)"
+    # the login screen composes on the GPU and may decode its wallpaper in hardware (docs/WALLPAPERS.md)
+    for g in render video; do
+        getent group "$g" >/dev/null 2>&1 && as_root usermod -aG "$g" "$GREETER_USER"
+    done
 }
 
 setup_groups() {
     [ -n "$TARGET_USER" ] || return 0
     added=""
-    for g in $USER_GROUPS; do
+    for g in $USER_GROUPS $ADMIN_GROUP; do
         getent group "$g" >/dev/null 2>&1 || continue
         user_in_group "$TARGET_USER" "$g" && continue
         as_root usermod -aG "$g" "$TARGET_USER"
@@ -445,7 +533,7 @@ setup_groups() {
         prev=$(state_get GROUPS_ADDED)
         state_set GROUPS_USER "$TARGET_USER"
         state_set GROUPS_ADDED "$(printf '%s %s' "$prev" "$added" | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/ $//')"
-        changed "user $TARGET_USER added to:$added (takes effect at the next login)"
+        changed "user $TARGET_USER added to:$added (takes effect after a reboot: the user's services keep their old groups across a logout)"
     else
         ok "user $TARGET_USER already has the groups LordOS uses"
     fi
@@ -648,7 +736,13 @@ ssh_note() {
     if [ ! -x /usr/sbin/sshd ]; then
         ok "remote login (SSH): not installed (Settings > Sharing installs it and turns it on)"
     elif systemctl is-enabled -q ssh.service 2>/dev/null || systemctl is-enabled -q ssh.socket 2>/dev/null; then
-        ok "remote login (SSH): on, left as it was (Settings > Sharing turns it off)"
+        ok "remote login (SSH): on (Settings > Sharing turns it off)"
+        # the package's 10-lordos.conf says PermitRootLogin no, from the next sshd restart or reboot
+        if has_admin_user; then
+            warn "root can no longer log in over SSH: use an administrator's account and sudo (Settings > Sharing can allow root again)."
+        else
+            warn "root can no longer log in over SSH and this system has no administrator: without a local console you could be locked out. Create one before you reboot."
+        fi
     else
         ok "remote login (SSH): installed but off, left as it was (Settings > Sharing turns it on)"
     fi
@@ -765,6 +859,7 @@ do_install() {
     check_disk
     check_systemd
     pick_user
+    pick_admin
     DM_UNIT=""
     if has_systemd; then DM_UNIT=$(current_dm); fi
     dm_active=0
@@ -780,9 +875,10 @@ do_install() {
     else say "  1. Download the latest LordOS release for $ARCH from github.com/$REPO and verify its SHA-256"; fi
     case "$installed" in ii*) say "     (LordOS ${installed#ii } is already installed: it will be upgraded or reinstalled)" ;; esac
     say "  2. Install it with apt-get; its dependencies come from your Debian mirrors"
-    [ "$NO_EXTRAS" = 0 ] && say "     plus PipeWire, fonts and the user D-Bus session if missing"
+    [ "$NO_EXTRAS" = 0 ] && say "     plus sudo, PipeWire, fonts and the user D-Bus session if missing"
     say "  3. Create the $GREETER_USER system user (if missing) and generate the en/es/pt locales"
     [ -n "$TARGET_USER" ] && say "  4. Add $TARGET_USER to the groups that exist of: $USER_GROUPS"
+    [ -n "$ADMIN_GROUP" ] && say "     and make $TARGET_USER an administrator: this system has none, and the Store needs one"
     if has_systemd; then
         say "  5. Enable lordos.service, lord-netperm and lord-fand, and mask getty@tty1"
         if [ -n "$DM_UNIT" ] && [ "$KEEP_DM" = 0 ]; then
@@ -808,9 +904,15 @@ do_install() {
         ask "Turn remote desktop on?" 0 || { REMOTE=0; warn "remote desktop stays off"; }
     fi
     ask "Continue?" 0 || die "cancelled; nothing was changed"
+    if [ -n "$ADMIN_GROUP" ]; then
+        # asked on its own: a "no" keeps the rest of the install
+        ask "Make $TARGET_USER an administrator?" 0 || { ADMIN_GROUP=""; warn "$TARGET_USER stays a standard user: the Store can't install or update anything until an administrator exists."; }
+    fi
 
     TMP=$(mktemp -d)
     ROOT_TMP=""
+    HW_PATH=""
+    HW_NEEDED=0
     trap cleanup_tmp EXIT INT TERM
     step "Getting the package"
     get_package
@@ -956,6 +1058,11 @@ do_uninstall() {
             else
                 as_root env DEBIAN_FRONTEND=noninteractive apt-get remove -y -q lordos </dev/null
                 changed "package lordos removed (its /etc files are kept; --purge removes them)"
+            fi
+            # the tested-hardware snapshot it depended on (data only)
+            if [ "$(dpkg-query -W -f '${Status}' lordos-hwdata 2>/dev/null || true)" = "install ok installed" ]; then
+                as_root env DEBIAN_FRONTEND=noninteractive apt-get purge -y -q lordos-hwdata </dev/null &&
+                    changed "package lordos-hwdata removed"
             fi ;;
     esac
     gu=$(state_get GROUPS_USER)

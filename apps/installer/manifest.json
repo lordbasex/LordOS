@@ -1,5 +1,6 @@
 {
   "id": "installer",
+  "version": "0.8.5",
   "name": "Install LordOS",
   "description": "Installs LordOS to the disk from the live system",
   "size": [760, 560],

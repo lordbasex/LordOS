@@ -19,14 +19,14 @@ This is the first question a careful reader should ask, so here is the precise a
 | Kind of app | Own process | Sandbox (Landlock + seccomp) | Per-app cgroup | Broker and permissions | Per-app firewall |
 |---|---|---|---|---|---|
 | Installed `.lpk` apps | yes | yes | yes, with memory and CPU limits | yes | yes |
-| Passwords (the only built-in app in its own process today) | yes | yes | yes | yes | yes |
-| Other built-in apps (Files, Settings, Mail, Terminal…) | no, they run inside `lord-server` | no | no (they count as "LordOS") | their camera, microphone and screen use is checked in C | yes, as "LordOS" |
+| Passwords, Mail, Calendar, Contacts and Reminders (built-in apps in their own process; the last four since 0.8.2) | yes | yes | yes | yes | yes |
+| Other built-in apps (Files, Settings, Terminal…) | no, they run inside `lord-server` | no | no (they count as "LordOS") | their camera, microphone and screen use is checked in C | yes, as "LordOS" |
 | Linux apps opened from the app launcher (apt, the Store) | yes, a normal process | **no** by default; with "no access to your files", their own namespaces and Landlock | yes, `app-lordos-<id>.scope`, no limits | **no** | **yes**, plus the restrictions you set (camera, microphone, USB, Bluetooth, files, notifications) |
-| Programs started from the Terminal | yes | no | they share the Terminal's place in the tree | no | as "LordOS" |
+| Programs started from the Terminal | yes | no | they share the Terminal's place in the tree | no | as "Terminal", with its own rules (since 0.8.5; before, as "LordOS") |
 
 So: **Linux apps are not sandboxed by default.** They run as your user, exactly as on any Debian system, and can read your home folder. What LordOS adds for them is attribution (the Monitor knows which app made each connection), the kernel-enforced per-app firewall, and the restrictions you choose for an app: no camera, no microphone, no USB, no Bluetooth sockets, no notifications, and "no access to your files", which from its next launch starts the app in its own namespaces with an empty home folder holding only its own folders. Flatpak is not used or integrated by LordOS, and it hasn't been tested.
 
-Built-in apps are part of the system's own code, reviewed with it; they don't get the per-process isolation that third-party packages get, with Passwords as the exception because it holds your secrets.
+Built-in apps are part of the system's own code, reviewed with it; most don't get the per-process isolation that third-party packages get. The exceptions are Passwords, because it holds your secrets, and, since 0.8.2, Mail, Calendar, Contacts and Reminders, because they read what arrives from the internet: each one runs as its own sandboxed process and reaches mail and your keyring only through broker requests allowed for that app alone.
 
 ## How the sandbox works
 
@@ -80,13 +80,23 @@ Permissions an app can declare: files, clipboard, notifications, network, camera
 
 **What about apps that need more privileges?** There is no way for a `.lpk` app to get root or extra capabilities. Everything in LordOS that needs root goes through a closed list of validated actions (`server/src/admin.c`), and JavaScript can't run arbitrary commands. Linux apps behave as on any Debian system: if a program needs `sudo`, you run it yourself in the Terminal.
 
+## LordOS checks its own code before running it
+
+Since 0.8.2, every bundle LordOS runs as its own code (the themes with the shell and every native app, the login screen, the host of isolated apps and the system apps that run as their own process) is listed with its SHA-256 in a manifest signed with the LordOS release key (Ed25519). `lord-server` checks the signature with the public key compiled into it, and the hash of each bundle from the same read it loads, so there is no window to swap the file. A bundle that doesn't match is not run: the desktop falls back to another theme and says so, or shows a recovery screen that explains how to repair it, never a blank screen. About LordOS shows "Verified", or "Development build" for an unsigned development tree. This protects against changes by processes that aren't root and against offline modification; root can still replace `lord-server` itself, which a later phase (fs-verity, A/B images) is meant to cover.
+
+## Check it on your own computer (since 0.8.5)
+
+Since 0.8.5, **System Information** (About LordOS → System Report…) has a Checks tab that tests these claims on the computer in front of you: the display server without root, Landlock, the per-app firewall, verified code, the remote desktop closed when it's off, app scopes owned by the system. Each check says whether the mechanism was only found *configured* or was actually *tried*. **Run tests** starts the Sandbox Probe, a hidden test app that starts exactly like any isolated app and tries, inside the same sandbox, what it must not be able to do: your files and the system's, sockets, `ptrace`, a user namespace, `mount`, `exec`, leaving its scope. It also tries what the decoders' sandbox must refuse, and asks the broker for things it must deny. The probe never gets a permission or network access, and nothing is sent anywhere.
+
+[[shot:6]]
+
 ## The helpers that read untrusted data
 
-Files from outside are the classic way in. LordOS opens them in small separate processes that are locked in even harder than apps: `lord-doc` (PDFs, archives, fonts), `lord-media` (video, music, photos, camera), `lord-maild` (mail, calendars, contacts) and `lord-vault` (passwords). They have no network, can't create sockets, can't run programs and can only create threads, not processes. They don't open paths: `lord-server` opens files and passes them as file descriptors. If seccomp can't be applied, the helper exits rather than run unconfined. A malicious PDF can crash `lord-doc`, but not the desktop.
+Files from outside are the classic way in. LordOS opens them in small separate processes that are locked in even harder than apps: `lord-doc` (PDFs, archives, fonts), `lord-media` (video, music, photos, camera), `lord-maild` (mail, calendars, contacts) and `lord-vault` (passwords). They have no network, can't create sockets, can't run programs and can only create threads, not processes. They don't open paths: `lord-server` opens files and passes them as file descriptors. If seccomp can't be applied, the helper exits rather than run unconfined. A malicious PDF can crash `lord-doc`, but not the desktop. Since 0.8.5 `lord-fetch` (the firewall's blocklists) and `lord-tls` (the Store's HTTPS) are locked in the same way and can't create sockets either: they only get one connection that `lord-server` or the Store opened for them. Since 0.8.7 `lord-lan` reads what comes back from the local network for Files → Network the same way, with no sockets and no files, and `lord-rdesk`, Remote Desk's connection, is sandboxed once it has connected: no new sockets and no programs. LordBench's `lord-bench` (since 0.8.6) runs its workloads under the same lock.
 
 ## Protected windows
 
-A window can be marked protected. Passwords is. Its pixels come out black in LordOS screenshots, screen recordings, thumbnails and the remote desktop, while the real monitor shows it normally. Linux apps can't capture the screen through LordOS: the compositor doesn't offer any screen-capture protocol to them, there is no X server, and a restricted app is also denied the framebuffer device.
+A window can be marked protected. Passwords is. Its pixels come out black in LordOS screenshots, screen recordings, thumbnails and the remote desktop, while the real monitor shows it normally. Linux apps can't capture the screen through LordOS: the compositor doesn't offer any screen-capture protocol to them, X11 apps (through Xwayland since 0.8.3) only see each other, never Wayland apps, LordOS's screen or Passwords, and a restricted app is also denied the framebuffer device.
 
 [[shot:5]]
 

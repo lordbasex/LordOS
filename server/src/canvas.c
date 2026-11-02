@@ -19,6 +19,17 @@ static inline uint32_t blend(uint32_t dst, uint32_t src, uint32_t a) {
     return over_alpha(a, dst >> 24) << 24 | rb | g;
 }
 
+/* The corners' restore: a weight a of the saved pixel src and 255 - a of dst, both premultiplied, in
+ * every channel. blend() takes src as opaque (alpha a + dst's under it), which made what was saved
+ * over transparency opaque: on the drag layer, a window's shadow outside its rounded corners came back
+ * as black squares. Where both are opaque (the screen) this gives blend()'s pixel exactly. */
+static inline uint32_t mix_px(uint32_t dst, uint32_t src, uint32_t a) {
+    uint32_t ia = 255 - a;
+    uint32_t rb = (((src & 0xff00ff) * a + (dst & 0xff00ff) * ia) >> 8) & 0xff00ff;
+    uint32_t g  = (((src & 0x00ff00) * a + (dst & 0x00ff00) * ia) >> 8) & 0x00ff00;
+    return ((src >> 24) * a + (dst >> 24) * ia + 127) / 255 << 24 | rb | g;
+}
+
 static inline void put(uint32_t *p, uint32_t argb, uint32_t a) {
     if (a >= 255) *p = argb | 0xff000000u;
     else if (a) *p = blend(*p, argb, a);
@@ -115,6 +126,24 @@ static void mask_row_neon(uint32_t *row, const uint8_t *m, int n, uint32_t argb,
 #  define CANVAS_SIMD "C"
 #endif
 
+/* GPU drag's shader (gpu/gpu.c, fs_gdrag) in C, with the same float operations in the same order: a texel read
+ * back as c/255 and rounded, then the layer over the copy of what is below with integers held in
+ * floats. tests/canvas_test.c checks it against blit_row_c (and blit_row_neon) over every valid
+ * premultiplied combination; engine-test composes with it where the GPU would. */
+static float gdrag_fetch(uint32_t v) { return floorf((float)v / 255.0f * 255.0f + 0.5f); }
+uint32_t canvas_gdrag_model(uint32_t s, uint32_t d) {
+    float sc[4], dc[4], o[4];
+    for (int i = 0; i < 4; i++) { sc[i] = gdrag_fetch(s >> (8 * i) & 255); dc[i] = gdrag_fetch(d >> (8 * i) & 255); o[i] = dc[i]; }
+    if (sc[3] > 0.0f) {                         /* [3]: alpha, [0..2]: blue, green, red */
+        float ia = 255.0f - sc[3];
+        for (int i = 0; i < 3; i++) o[i] = sc[i] + floorf(dc[i] * ia * 0.00390625f);
+        o[3] = sc[3] + floorf((dc[3] * ia + 128.0f) * 257.0f * 0.0000152587890625f);
+    }
+    uint32_t r = 0;
+    for (int i = 0; i < 4; i++) r |= (uint32_t)floorf(o[i] / 255.0f * 255.0f + 0.5f) << (8 * i);
+    return r;
+}
+
 #ifdef LORD_CANVAS_TEST
 const char *canvas_test_simd(void) { return CANVAS_SIMD; }
 void canvas_test_blit_row(int simd, uint32_t *row, const uint32_t *s, int n, uint32_t k) {
@@ -134,6 +163,20 @@ static inline float rr_sdf(float px, float py, float cx, float cy, float hw, flo
 }
 
 static inline float cov_of(float d) { float c = 0.5f - d; return c <= 0 ? 0 : c >= 1 ? 1 : c; }
+
+/* The columns [s0, s1) of a rounded rectangle's row whose pixel centers lie between the corners
+ * (|px - cx| - lim <= 0, lim = hw - r: the qx of rr_sdf): there rr_sdf doesn't depend on px when the
+ * row is above or below the straight band. Empty (s0 = s1 = x1) if there are none. */
+static void mid_span(float cx, float lim, int x0, int x1, int *s0, int *s1) {
+    int a = (int)ceilf(cx - lim - 0.5f), b = (int)floorf(cx + lim - 0.5f) + 1;
+    if (a < x0) a = x0;
+    if (b > x1) b = x1;
+    /* the same float test as rr_sdf, so the span's edges agree exactly (pixels left out are only
+     * worked out per pixel, as before) */
+    while (a < b && fabsf(a + 0.5f - cx) - lim > 0) a++;
+    while (b > a && fabsf(b - 0.5f - cx) - lim > 0) b--;
+    if (a < b) { *s0 = a; *s1 = b; } else { *s0 = *s1 = x1; }
+}
 
 static float fix_radius(float r, float w, float h) {
     float m = (w < h ? w : h) * 0.5f;
@@ -182,7 +225,49 @@ void canvas_clear(Canvas *c, uint32_t rgb) {
     }
 }
 
+/* ---- parallel rows (lord-server sets canvas_parallel; tests and helpers stay serial) ----
+ * The row-local primitives (every pixel depends only on its own row: fills, strokes, gradients,
+ * blits, shadow masks) run as the same call on each thread with the clip cut to a band of rows,
+ * so the pixels are the same as on one thread. */
+static CanvasPar par_fn;
+static _Thread_local int in_band;
+void canvas_parallel(CanvasPar fn) { par_fn = fn; }
+int canvas_parallel_on(void) { return par_fn != NULL; }
+
+typedef struct { const Canvas *c; void (*draw)(Canvas *, const void *); const void *a; } Band;
+static void band_run(void *ctx, int j0, int j1) {
+    const Band *b = ctx;
+    Canvas c = *b->c;
+    if (j0 > c.clip.y0) c.clip.y0 = j0;
+    if (j1 < c.clip.y1) c.clip.y1 = j1;
+    in_band = 1;
+    if (c.clip.y0 < c.clip.y1) b->draw(&c, b->a);
+    in_band = 0;
+}
+/* Worth splitting: a pool, not already in a band, and enough pixels inside the clip. */
+static int banded(const Canvas *c, float x, float y, float w, float h) {
+    if (!par_fn || in_band) return 0;
+    int x0, y0, x1, y1;
+    if (!bounds(c, x, y, w, h, &x0, &y0, &x1, &y1)) return 0;
+    /* waking the pool costs tens of µs: only big jobs (about 512×512 and up) are worth it */
+    return y1 - y0 >= 64 && (long)(x1 - x0) * (y1 - y0) >= 262144;
+}
+static void in_bands(const Canvas *c, float y, float h, void (*draw)(Canvas *, const void *), const void *a) {
+    Band b = { c, draw, a };
+    int y0 = clampi((int)floorf(y), c->clip.y0, c->clip.y1), y1 = clampi((int)ceilf(y + h), c->clip.y0, c->clip.y1);
+    par_fn(y0, y1, band_run, &b);
+}
+
+typedef struct { float x, y, w, h, r, bw, angle, opacity; uint32_t argb, to; } ShapeArgs;
+static void rrect_band(Canvas *c, const void *p) { const ShapeArgs *a = p; canvas_rrect(c, a->x, a->y, a->w, a->h, a->r, a->argb); }
+static void stroke_band(Canvas *c, const void *p) { const ShapeArgs *a = p; canvas_rrect_stroke(c, a->x, a->y, a->w, a->h, a->r, a->bw, a->argb); }
+static void gradient_band(Canvas *c, const void *p) {
+    const ShapeArgs *a = p;
+    canvas_rrect_gradient(c, a->x, a->y, a->w, a->h, a->r, a->argb, a->to, a->angle, a->opacity);
+}
+
 void canvas_rrect(Canvas *c, float x, float y, float w, float h, float r, uint32_t argb) {
+    if (banded(c, x, y, w, h)) { ShapeArgs a = { x, y, w, h, r, 0, 0, 0, argb, 0 }; in_bands(c, y, h, rrect_band, &a); return; }
     uint32_t a = argb >> 24;
     int x0, y0, x1, y1;
     if (!a || w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &x0, &y0, &x1, &y1)) return;
@@ -207,7 +292,17 @@ void canvas_rrect(Canvas *c, float x, float y, float w, float h, float r, uint32
             }
         } else {
             float py = j + 0.5f;
+            /* between the corners the distance only depends on the row (once the row is outside the
+             * straight band): worked out once there, per pixel at the corners */
+            int s0 = x1, s1 = x1;
+            if (fabsf(py - cy) - (hh - r) > 0) mid_span(cx, hw - r, x0, x1, &s0, &s1);
             for (int i = x0; i < x1; i++) {
+                if (i == s0) {
+                    float cov = cov_of(rr_sdf(i + 0.5f, py, cx, cy, hw, hh, r));
+                    if (cov > 0) { uint32_t k = (uint32_t)(a * cov + 0.5f); for (; i < s1; i++) put(&row[i], argb, k); }
+                    i = s1 - 1;
+                    continue;
+                }
                 float cov = cov_of(rr_sdf(i + 0.5f, py, cx, cy, hw, hh, r));
                 if (cov > 0) put(&row[i], argb, (uint32_t)(a * cov + 0.5f));
             }
@@ -227,6 +322,11 @@ static inline uint32_t lerp_color(uint32_t a, uint32_t b, float t) {
 
 void canvas_rrect_gradient(Canvas *c, float x, float y, float w, float h, float r,
                            uint32_t from, uint32_t to, float angle_deg, float opacity) {
+    if (banded(c, x, y, w, h)) {
+        ShapeArgs a = { x, y, w, h, r, 0, angle_deg, opacity, from, to };
+        in_bands(c, y, h, gradient_band, &a);
+        return;
+    }
     int x0, y0, x1, y1;
     if (w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &x0, &y0, &x1, &y1)) return;
     r = fix_radius(r, w, h);
@@ -251,6 +351,7 @@ void canvas_rrect_gradient(Canvas *c, float x, float y, float w, float h, float 
 }
 
 void canvas_rrect_stroke(Canvas *c, float x, float y, float w, float h, float r, float bw, uint32_t argb) {
+    if (banded(c, x, y, w, h)) { ShapeArgs a = { x, y, w, h, r, bw, 0, 0, argb, 0 }; in_bands(c, y, h, stroke_band, &a); return; }
     uint32_t a = argb >> 24;
     int x0, y0, x1, y1;
     if (!a || bw <= 0 || w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &x0, &y0, &x1, &y1)) return;
@@ -262,6 +363,18 @@ void canvas_rrect_stroke(Canvas *c, float x, float y, float w, float h, float r,
         uint32_t *row = c->px + (size_t)j * c->stride;
         float py = j + 0.5f;
         int middle = py > y + edge && py < y + h - edge;
+        /* the span where both distances only depend on the row (rows outside both straight bands) */
+        int s0 = x1, s1 = x1;
+        if (!middle && fabsf(py - cy) - (hh - r) > 0 && fabsf(py - cy) - ((hh - bw) - ir) > 0) {
+            int a0, a1, b0, b1;
+            mid_span(cx, hw - r, x0, x1, &a0, &a1);
+            mid_span(cx, (hw - bw) - ir, x0, x1, &b0, &b1);
+            if (a0 < x1 && b0 < x1) {
+                s0 = a0 > b0 ? a0 : b0;
+                s1 = a1 < b1 ? a1 : b1;
+                if (s0 >= s1) s0 = s1 = x1;
+            }
+        }
         for (int i = x0; i < x1; i++) {
             float px = i + 0.5f;
             if (middle && px > x + bw + 1 && px < x + w - bw - 1) {
@@ -269,6 +382,12 @@ void canvas_rrect_stroke(Canvas *c, float x, float y, float w, float h, float r,
                  * edge (never backwards: with fractional coordinates that was a loop) */
                 int last = (int)ceilf(x + w - bw - 1 - 0.5f) - 1;
                 if (last > i) i = last;
+                continue;
+            }
+            if (i == s0) {                  /* between the corners: one value for the whole span */
+                float cov = cov_of(rr_sdf(px, py, cx, cy, hw, hh, r)) - cov_of(rr_sdf(px, py, cx, cy, hw - bw, hh - bw, ir));
+                if (cov > 0) { uint32_t k = (uint32_t)(a * cov + 0.5f); for (; i < s1; i++) put(&row[i], argb, k); }
+                i = s1 - 1;
                 continue;
             }
             float outer = cov_of(rr_sdf(px, py, cx, cy, hw, hh, r));
@@ -334,96 +453,195 @@ void canvas_shadow(Canvas *c, float x, float y, float w, float h, float r,
     if (m) canvas_alpha_mask(c, (int)roundf(x) + m->x0, (int)roundf(y) + m->y0, m->a, m->mw, m->mh, m->mw, argb);
 }
 
-/* Separable box blur, 3 passes ≈ Gaussian. */
-static void box_pass(uint32_t *buf, int n, int step, int rad, uint32_t *tmp) {
-    for (int i = 0; i < n; i++) tmp[i] = buf[(size_t)i * step];
-    int win = 2 * rad + 1;
-    int sa = 0, sr = 0, sg = 0, sb = 0;          /* with alpha: see canvas_backdrop_blur */
-    for (int k = -rad; k <= rad; k++) {
-        uint32_t p = tmp[clampi(k, 0, n - 1)];
-        sa += p >> 24; sr += (p >> 16) & 255; sg += (p >> 8) & 255; sb += p & 255;
-    }
-    for (int i = 0; i < n; i++) {
-        buf[(size_t)i * step] = (uint32_t)((sa / win) << 24 | (sr / win) << 16 | (sg / win) << 8 | (sb / win));
-        uint32_t add = tmp[clampi(i + rad + 1, 0, n - 1)], sub = tmp[clampi(i - rad, 0, n - 1)];
-        sa += (int)(add >> 24) - (int)(sub >> 24);
-        sr += (int)((add >> 16) & 255) - (int)((sub >> 16) & 255);
-        sg += (int)((add >> 8) & 255) - (int)((sub >> 8) & 255);
-        sb += (int)(add & 255) - (int)(sub & 255);
-    }
+/* Separable box blur, 3 passes ≈ Gaussian, edges repeated. Both directions slide a window sum
+ * (the vertical one row by row, for the cache) and divide through a table: dt[sum] = sum / win. */
+/* The backdrop blur's state, shared by its phases; each phase runs over rows (or columns) that are its
+ * own, on the pool when there is enough to do, with its own scratch buffers. */
+typedef struct {
+    Canvas *c;
+    int x0, y0, x1, y1, bx0, by0, bx1, by1, f, sw, sh, rad, cw, in0, in1;
+    float x, y, w, h, r, cx, cy, hw, hh, inv;
+    uint32_t *buf, *src;
+    const uint8_t *dt;          /* dt[sum] = sum / win */
+    int *sum;                   /* per column of the vertical pass */
+    int *cx0, *cx1, *cfx;       /* per output column: the two small columns and the fraction */
+} Blur;
+
+static void blur_phase(Blur *b, int n, long work, void (*fn)(void *, int, int)) {
+    if (par_fn && !in_band && n >= 8 && work >= 131072) par_fn(0, n, fn, b);
+    else fn(b, 0, n);
 }
 
-/* Bilinear sample of an XRGB buffer. */
-static uint32_t sample_rgb(const uint32_t *buf, int w, int h, float u, float v) {
-    if (u < 0) u = 0;
-    if (v < 0) v = 0;
-    if (u > w - 1) u = (float)(w - 1);
-    if (v > h - 1) v = (float)(h - 1);
-    int x0 = (int)u, y0 = (int)v, x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
-    int fx = (int)((u - x0) * 256), fy = (int)((v - y0) * 256);
-    uint32_t p00 = buf[(size_t)y0 * w + x0], p01 = buf[(size_t)y0 * w + x1];
-    uint32_t p10 = buf[(size_t)y1 * w + x0], p11 = buf[(size_t)y1 * w + x1];
-    uint32_t out = 0;
-    for (int s = 0; s < 32; s += 8) {
-        int a = (p00 >> s) & 255, b = (p01 >> s) & 255, c = (p10 >> s) & 255, d = (p11 >> s) & 255;
-        int top = a * 256 + (b - a) * fx, bot = c * 256 + (d - c) * fx;
-        out |= (uint32_t)(((top * 256 + (bot - top) * fy) >> 16) & 255) << s;
+/* the f×f average, row by row (each source pixel read once). Two channels share a 32-bit sum
+ * (red|blue, alpha|green: at most 16 × 255 each, f <= 4); f = 1 is a copy. */
+static void blur_down(void *ctx, int j0, int j1) {
+    Blur *b = ctx;
+    const Canvas *c = b->c;
+    int f = b->f, sw = b->sw, bx0 = b->bx0, bx1 = b->bx1, by0 = b->by0, by1 = b->by1;
+    if (f == 1) {
+        for (int j = j0; j < j1; j++) memcpy(b->buf + (size_t)j * sw, c->px + (size_t)(by0 + j) * c->stride + bx0, (size_t)sw * 4);
+        return;
     }
-    return out;
-}
-
-void canvas_backdrop_blur(Canvas *c, float x, float y, float w, float h, float r, int radius) {
-    int x0, y0, x1, y1;
-    if (radius < 1 || w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &x0, &y0, &x1, &y1)) return;
-    /* Margin so the edge takes color from outside, as in CSS. */
-    int m = radius * 2;
-    int bx0 = clampi(x0 - m, 0, c->w), by0 = clampi(y0 - m, 0, c->h);
-    int bx1 = clampi(x1 + m, 0, c->w), by1 = clampi(y1 + m, 0, c->h);
-    /* Blurred at reduced resolution: same visual result, much cheaper. */
-    int f = radius >= 12 ? 4 : radius >= 6 ? 2 : 1;
-    int sw = (bx1 - bx0 + f - 1) / f, sh = (by1 - by0 + f - 1) / f;
-    uint32_t *buf = malloc((size_t)sw * sh * 4);
-    uint32_t *tmp = malloc((size_t)(sw > sh ? sw : sh) * 4);
-    if (!buf || !tmp) { free(buf); free(tmp); return; }
-    for (int j = 0; j < sh; j++)
-        for (int i = 0; i < sw; i++) {
-            uint32_t acc[4] = {0}, n = 0;
-            for (int v = 0; v < f; v++) {
-                int py = by0 + j * f + v;
-                if (py >= by1) break;
-                const uint32_t *row = c->px + (size_t)py * c->stride;
-                for (int u = 0; u < f; u++) {
-                    int px = bx0 + i * f + u;
-                    if (px >= bx1) break;
-                    uint32_t p = row[px];
-                    acc[0] += (p >> 16) & 255; acc[1] += (p >> 8) & 255; acc[2] += p & 255; acc[3] += p >> 24;
-                    n++;
-                }
+    uint32_t *acc = malloc((size_t)sw * 2 * 4);
+    if (!acc) return;
+    int span = bx1 - bx0, full = span / f;
+    for (int j = j0; j < j1; j++) {
+        memset(acc, 0, (size_t)sw * 8);
+        int rows = by1 - (by0 + j * f) < f ? by1 - (by0 + j * f) : f;
+        for (int v = 0; v < rows; v++) {
+            const uint32_t *row = c->px + (size_t)(by0 + j * f + v) * c->stride + bx0;
+            for (int i = 0; i < full; i++) {
+                uint32_t rb = 0, ag = 0;
+                const uint32_t *q = row + (size_t)i * f;
+                for (int u = 0; u < f; u++) { rb += q[u] & 0x00ff00ffu; ag += (q[u] >> 8) & 0x00ff00ffu; }
+                acc[i * 2] += rb;
+                acc[i * 2 + 1] += ag;
             }
-            buf[(size_t)j * sw + i] = n ? (acc[3] / n) << 24 | (acc[0] / n) << 16 | (acc[1] / n) << 8 | (acc[2] / n) : 0;
+            for (int px = full * f; px < span; px++) {
+                acc[full * 2] += row[px] & 0x00ff00ffu;
+                acc[full * 2 + 1] += (row[px] >> 8) & 0x00ff00ffu;
+            }
         }
-    int rad = radius / (2 * f) > 0 ? radius / (2 * f) : 1;
-    for (int pass = 0; pass < 3; pass++) {
-        for (int j = 0; j < sh; j++) box_pass(buf + (size_t)j * sw, sw, 1, rad, tmp);
-        for (int i = 0; i < sw; i++) box_pass(buf + i, sh, sw, rad, tmp);
+        for (int i = 0; i < sw; i++) {
+            int cols = bx1 - (bx0 + i * f) < f ? bx1 - (bx0 + i * f) : f;
+            uint32_t n = (uint32_t)(cols * rows), rb = acc[i * 2], ag = acc[i * 2 + 1];
+            b->buf[(size_t)j * sw + i] = n ? ((ag >> 16) / n) << 24 | ((rb >> 16) / n) << 16 | ((ag & 0xffff) / n) << 8 | ((rb & 0xffff) / n) : 0;
+        }
     }
-    r = fix_radius(r, w, h);
-    float cx = x + w * 0.5f, cy = y + h * 0.5f, hw = w * 0.5f, hh = h * 0.5f;
-    float inv = 1.0f / f;
-    for (int j = y0; j < y1; j++) {
+    free(acc);
+}
+
+/* Separable box blur, 3 passes ≈ Gaussian, edges repeated. Both directions slide a window sum (the
+ * vertical one row by row over a range of columns, for the cache) and divide through dt. */
+static void blur_rows(void *ctx, int j0, int j1) {
+    Blur *b = ctx;
+    int w = b->sw, rad = b->rad;
+    const uint8_t *dt = b->dt;
+    uint32_t *tmp = malloc((size_t)w * 4);
+    if (!tmp) return;
+    for (int j = j0; j < j1; j++) {
+        uint32_t *row = b->buf + (size_t)j * w;
+        memcpy(tmp, row, (size_t)w * 4);
+        int sa = 0, sr = 0, sg = 0, sb = 0;
+        for (int k = -rad; k <= rad; k++) {
+            uint32_t p = tmp[clampi(k, 0, w - 1)];
+            sa += p >> 24; sr += (p >> 16) & 255; sg += (p >> 8) & 255; sb += p & 255;
+        }
+        for (int i = 0; i < w; i++) {
+            row[i] = (uint32_t)dt[sa] << 24 | (uint32_t)dt[sr] << 16 | (uint32_t)dt[sg] << 8 | dt[sb];
+            int ai = i + rad + 1, si = i - rad;
+            uint32_t add = tmp[ai < w ? ai : w - 1], sub = tmp[si > 0 ? si : 0];
+            sa += (int)(add >> 24) - (int)(sub >> 24);
+            sr += (int)((add >> 16) & 255) - (int)((sub >> 16) & 255);
+            sg += (int)((add >> 8) & 255) - (int)((sub >> 8) & 255);
+            sb += (int)(add & 255) - (int)(sub & 255);
+        }
+    }
+    free(tmp);
+}
+
+static void blur_copy(void *ctx, int j0, int j1) {
+    Blur *b = ctx;
+    memcpy(b->src + (size_t)j0 * b->sw, b->buf + (size_t)j0 * b->sw, (size_t)(j1 - j0) * b->sw * 4);
+}
+
+static void blur_cols(void *ctx, int i0, int i1) {
+    Blur *b = ctx;
+    int w = b->sw, h = b->sh, rad = b->rad;
+    const uint8_t *dt = b->dt;
+    const uint32_t *src = b->src;
+    int *sum = b->sum;
+    memset(sum + (size_t)i0 * 4, 0, (size_t)(i1 - i0) * 4 * sizeof(int));
+    for (int k = -rad; k <= rad; k++) {
+        const uint32_t *r = src + (size_t)clampi(k, 0, h - 1) * w;
+        for (int i = i0; i < i1; i++) {
+            uint32_t p = r[i];
+            int *s = sum + i * 4;
+            s[0] += p >> 24; s[1] += (p >> 16) & 255; s[2] += (p >> 8) & 255; s[3] += p & 255;
+        }
+    }
+    for (int j = 0; j < h; j++) {
+        uint32_t *out = b->buf + (size_t)j * w;
+        int aj = j + rad + 1, sj = j - rad;
+        const uint32_t *add = src + (size_t)(aj < h ? aj : h - 1) * w, *sub = src + (size_t)(sj > 0 ? sj : 0) * w;
+        for (int i = i0; i < i1; i++) {
+            int *s = sum + i * 4;
+            out[i] = (uint32_t)dt[s[0]] << 24 | (uint32_t)dt[s[1]] << 16 | (uint32_t)dt[s[2]] << 8 | dt[s[3]];
+            uint32_t a = add[i], d = sub[i];
+            s[0] += (int)(a >> 24) - (int)(d >> 24);
+            s[1] += (int)((a >> 16) & 255) - (int)((d >> 16) & 255);
+            s[2] += (int)((a >> 8) & 255) - (int)((d >> 8) & 255);
+            s[3] += (int)(a & 255) - (int)(d & 255);
+        }
+    }
+}
+
+/* Back to full size, over output rows y0 + [j0, j1): bilinear, in fixed point (8 bits of fraction),
+ * with each column's position worked out once and each small row interpolated across once (it serves
+ * f output rows), not per pixel. */
+static void blur_up(void *ctx, int j0, int j1) {
+    Blur *b = ctx;
+    Canvas *c = b->c;
+    int cw = b->cw, sw = b->sw, sh = b->sh, x0 = b->x0, x1 = b->x1, by0 = b->by0, in0 = b->in0, in1 = b->in1;
+    float x = b->x, y = b->y, w = b->w, h = b->h, r = b->r, inv = b->inv;
+    int *hr = malloc((size_t)cw * 8 * sizeof(int));
+    uint32_t *vrow = malloc((size_t)cw * 4);
+    if (!hr || !vrow) { free(hr); free(vrow); return; }
+    int *hrow[2] = { hr, hr + (size_t)cw * 4 }, hidx[2] = { -1, -1 };
+    uint8_t *vrow8 = (uint8_t *)vrow;
+    for (int j = b->y0 + j0; j < b->y0 + j1; j++) {
         uint32_t *row = c->px + (size_t)j * c->stride;
         float v = (j - by0 + 0.5f) * inv - 0.5f;
+        if (v < 0) v = 0;
+        if (v > sh - 1) v = (float)(sh - 1);
+        int ry0 = (int)v, ry1 = ry0 + 1 < sh ? ry0 + 1 : ry0, fy = (int)((v - ry0) * 256);
+        const int *top = NULL, *bot = NULL;
+        for (int want = 0; want < 2; want++) {
+            int ry = want ? ry1 : ry0, k = hidx[0] == ry ? 0 : hidx[1] == ry ? 1 : -1;
+            if (k < 0) {
+                /* reuse the slot that holds neither the other row of this pair nor the top one */
+                int keep = want ? (top == hrow[0] ? 0 : 1) : (hidx[0] == ry1 ? 0 : hidx[1] == ry1 ? 1 : -1);
+                k = keep == 0 ? 1 : 0;
+                const uint32_t *br = b->buf + (size_t)ry * sw;
+                int *hh2 = hrow[k];
+                for (int i = 0; i < cw; i++) {
+                    uint32_t p0 = br[b->cx0[i]], p1 = br[b->cx1[i]];
+                    for (int s = 0; s < 4; s++) {
+                        int a = (p0 >> (s * 8)) & 255, d = (p1 >> (s * 8)) & 255;
+                        hh2[i * 4 + s] = a * 256 + (d - a) * b->cfx[i];
+                    }
+                }
+                hidx[k] = ry;
+            }
+            if (want) bot = hrow[k]; else top = hrow[k];
+        }
+        /* the row of blurred pixels: the vertical step for every channel in one plain loop (bytes in
+         * memory order are the channels of a little-endian 0xAARRGGBB) */
+        for (int k = 0; k < cw * 4; k++) vrow8[k] = (uint8_t)(((top[k] << 8) + (bot[k] - top[k]) * fy) >> 16);
         int corner_row = j < y + r || j + 1 > y + h - r;
+        int m0 = corner_row ? x1 : in0, m1 = corner_row ? x1 : in1;
         for (int i = x0; i < x1; i++) {
+            if (i == m0) {                  /* inside the edges: no coverage to work out */
+                for (; i < m1; i++) {
+                    uint32_t p = vrow[i - x0], d = row[i];
+                    if ((p >> 24) >= 255) { row[i] = p; continue; }
+                    uint32_t pa = p >> 24;
+                    uint32_t prb = p & 0xff00ff, pg = p & 0xff00, ia = 255 - pa;
+                    uint32_t drb = (((d & 0xff00ff) * ia) >> 8) & 0xff00ff, dg = (((d & 0xff00) * ia) >> 8) & 0xff00;
+                    row[i] = over_alpha(pa, d >> 24) << 24 | (prb + drb) | (pg + dg);
+                }
+                if (i >= x1) break;
+            }
             uint32_t a = 255;
             if (corner_row || i < x + 1 || i + 1 > x + w - 1) {
-                float cov = cov_of(rr_sdf(i + 0.5f, j + 0.5f, cx, cy, hw, hh, r));
+                float cov = cov_of(rr_sdf(i + 0.5f, j + 0.5f, b->cx, b->cy, b->hw, b->hh, r));
                 if (cov <= 0) continue;
                 a = (uint32_t)(cov * 255 + 0.5f);
             }
+            uint32_t p = vrow[i - x0];
+            uint32_t d = row[i];
             /* premultiplied with its alpha: over the opaque UI it is the same as before; over the hole of
              * an app window (GPU path) it stays transparent and the app shows through */
-            uint32_t p = sample_rgb(buf, sw, sh, (i - bx0 + 0.5f) * inv - 0.5f, v), d = row[i];
             if (a >= 255 && (p >> 24) >= 255) { row[i] = p; continue; }
             uint32_t pa = ((p >> 24) * a + 127) / 255;
             uint32_t prb = (((p & 0xff00ff) * a) / 255) & 0xff00ff, pg = (((p & 0xff00) * a) / 255) & 0xff00;
@@ -432,8 +650,66 @@ void canvas_backdrop_blur(Canvas *c, float x, float y, float w, float h, float r
             row[i] = over_alpha(pa, d >> 24) << 24 | (prb + drb) | (pg + dg);
         }
     }
-    free(buf);
-    free(tmp);
+    free(hr);
+    free(vrow);
+}
+
+void canvas_backdrop_blur(Canvas *c, float x, float y, float w, float h, float r, int radius) {
+    Blur b = { .c = c, .x = x, .y = y, .w = w, .h = h };
+    if (radius < 1 || w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &b.x0, &b.y0, &b.x1, &b.y1)) return;
+    /* Margin so the edge takes color from outside, as in CSS. */
+    int m = radius * 2;
+    b.bx0 = clampi(b.x0 - m, 0, c->w); b.by0 = clampi(b.y0 - m, 0, c->h);
+    b.bx1 = clampi(b.x1 + m, 0, c->w); b.by1 = clampi(b.y1 + m, 0, c->h);
+    /* Blurred at reduced resolution: same visual result, much cheaper. */
+    b.f = radius >= 12 ? 4 : radius >= 6 ? 2 : 1;
+    b.sw = (b.bx1 - b.bx0 + b.f - 1) / b.f;
+    b.sh = (b.by1 - b.by0 + b.f - 1) / b.f;
+    b.rad = radius / (2 * b.f) > 0 ? radius / (2 * b.f) : 1;
+    int win = 2 * b.rad + 1;
+    b.cw = b.x1 - b.x0;
+    b.buf = malloc((size_t)b.sw * b.sh * 4);
+    b.src = malloc((size_t)b.sw * b.sh * 4);
+    uint8_t *dt = malloc((size_t)255 * win + 1);
+    b.sum = malloc((size_t)b.sw * 4 * sizeof(int));
+    b.cx0 = malloc((size_t)b.cw * 3 * sizeof(int));
+    if (!b.buf || !b.src || !dt || !b.sum || !b.cx0) goto out;
+    for (int k = 0; k <= 255 * win; k++) dt[k] = (uint8_t)(k / win);
+    b.dt = dt;
+    long small = (long)b.sw * b.sh;
+    blur_phase(&b, b.sh, (long)(b.bx1 - b.bx0) * (b.by1 - b.by0), blur_down);
+    for (int pass = 0; pass < 3; pass++) {
+        blur_phase(&b, b.sh, small, blur_rows);
+        blur_phase(&b, b.sh, small, blur_copy);
+        blur_phase(&b, b.sw, small, blur_cols);
+    }
+    b.r = fix_radius(r, w, h);
+    b.cx = x + w * 0.5f; b.cy = y + h * 0.5f; b.hw = w * 0.5f; b.hh = h * 0.5f;
+    b.inv = 1.0f / b.f;
+    b.cx1 = b.cx0 + b.cw;
+    b.cfx = b.cx1 + b.cw;
+    for (int i = b.x0; i < b.x1; i++) {
+        float u = (i - b.bx0 + 0.5f) * b.inv - 0.5f;
+        if (u < 0) u = 0;
+        if (u > b.sw - 1) u = (float)(b.sw - 1);
+        int a = (int)u;
+        b.cx0[i - b.x0] = a;
+        b.cx1[i - b.x0] = a + 1 < b.sw ? a + 1 : a;
+        b.cfx[i - b.x0] = (int)((u - a) * 256);
+    }
+    /* the columns whose coverage is whole on rows away from the corners: the same float tests as
+     * the per-pixel path (i < x + 1, i + 1 > x + w - 1) */
+    b.in0 = b.x0; b.in1 = b.x1;
+    while (b.in0 < b.x1 && b.in0 < x + 1) b.in0++;
+    while (b.in1 > b.in0 && b.in1 - 1 + 1 > x + w - 1) b.in1--;
+    if (b.in0 >= b.in1) b.in0 = b.in1 = b.x1;
+    blur_phase(&b, b.y1 - b.y0, (long)b.cw * (b.y1 - b.y0), blur_up);
+out:
+    free(b.buf);
+    free(b.src);
+    free(dt);
+    free(b.sum);
+    free(b.cx0);
 }
 
 void canvas_corners_save(Canvas *c, Corners *k, float x, float y, float w, float h, float r) {
@@ -469,13 +745,26 @@ void canvas_corners_restore(Canvas *c, Corners *k, float x, float y, float w, fl
                 float cov = cov_of(rr_sdf(px + 0.5f, py + 0.5f, cx, cy, hw, hh, r));
                 if (cov >= 1) continue;
                 uint32_t *d = &c->px[(size_t)py * c->stride + px];
-                *d = blend(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
+                *d = mix_px(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
             }
     free(k->buf);
     k->buf = NULL;
 }
 
+typedef struct { const void *src; int sw, sh, x, y, stride, opaque, sw_px, sh_px; float r, opacity, sx, sy, fw, fh, dx, dy, dw, dh; uint32_t argb; } BlitArgs;
+static void mask_band(Canvas *c, const void *p) { const BlitArgs *b = p; canvas_alpha_mask(c, b->x, b->y, b->src, b->sw, b->sh, b->stride, b->argb); }
+static void blit_band(Canvas *c, const void *p) { const BlitArgs *b = p; canvas_blit(c, b->src, b->sw, b->sh, b->x, b->y, b->r, b->opacity, b->opaque); }
+static void scaled_band(Canvas *c, const void *p) {
+    const BlitArgs *b = p;
+    canvas_blit_scaled(c, b->src, b->stride, b->sw_px, b->sh_px, b->sx, b->sy, b->fw, b->fh, b->dx, b->dy, b->dw, b->dh, b->opacity, b->opaque);
+}
+
 void canvas_alpha_mask(Canvas *c, int x, int y, const uint8_t *a, int w, int h, int stride, uint32_t argb) {
+    if (banded(c, (float)x, (float)y, (float)w, (float)h)) {
+        BlitArgs b = { .src = a, .x = x, .y = y, .sw = w, .sh = h, .stride = stride, .argb = argb };
+        in_bands(c, (float)y, (float)h, mask_band, &b);
+        return;
+    }
     uint32_t ca = argb >> 24;
     int x0 = clampi(x, c->clip.x0, c->clip.x1), x1 = clampi(x + w, c->clip.x0, c->clip.x1);
     int y0 = clampi(y, c->clip.y0, c->clip.y1), y1 = clampi(y + h, c->clip.y0, c->clip.y1);
@@ -487,6 +776,11 @@ void canvas_alpha_mask(Canvas *c, int x, int y, const uint8_t *a, int w, int h, 
 }
 
 void canvas_blit(Canvas *c, const uint32_t *src, int sw, int sh, int x, int y, float r, float opacity, int opaque) {
+    if (banded(c, (float)x, (float)y, (float)sw, (float)sh)) {
+        BlitArgs b = { .src = src, .sw = sw, .sh = sh, .x = x, .y = y, .r = r, .opacity = opacity, .opaque = opaque };
+        in_bands(c, (float)y, (float)sh, blit_band, &b);
+        return;
+    }
     int x0 = clampi(x, c->clip.x0, c->clip.x1), x1 = clampi(x + sw, c->clip.x0, c->clip.x1);
     int y0 = clampi(y, c->clip.y0, c->clip.y1), y1 = clampi(y + sh, c->clip.y0, c->clip.y1);
     if (x0 >= x1 || y0 >= y1) return;
@@ -541,6 +835,12 @@ void canvas_bitmap(Canvas *c, int x, int y, const char *const *rows, uint32_t fg
 void canvas_blit_scaled(Canvas *c, const uint32_t *src, int stride, int sw_px, int sh_px, float sx, float sy, float sw, float sh,
                         float dx, float dy, float dw, float dh, float opacity, int opaque) {
     if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0 || sw_px <= 0 || sh_px <= 0) return;
+    if (banded(c, dx, dy, dw, dh)) {
+        BlitArgs b = { .src = src, .stride = stride, .sw_px = sw_px, .sh_px = sh_px, .sx = sx, .sy = sy, .fw = sw, .fh = sh,
+                       .dx = dx, .dy = dy, .dw = dw, .dh = dh, .opacity = opacity, .opaque = opaque };
+        in_bands(c, dy, dh, scaled_band, &b);
+        return;
+    }
     if (sx == 0 && sy == 0 && sw == sw_px && sh == sh_px && stride == sw_px && dw == sw && dh == sh && dx == floorf(dx) && dy == floorf(dy)) {
         canvas_blit(c, src, sw_px, sh_px, (int)dx, (int)dy, 0, opacity, opaque);
         return;
@@ -748,7 +1048,7 @@ void canvas_corners_restore4(Canvas *c, Corners *k, float x, float y, float w, f
                 float cov = cov_of(rr4_sdf(px + 0.5f, py + 0.5f, cx, cy, hw, hh, r));
                 if (cov >= 1) continue;
                 uint32_t *d = &c->px[(size_t)py * c->stride + px];
-                *d = blend(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
+                *d = mix_px(*d, k->buf[((size_t)q * k->n + j) * k->n + i], (uint32_t)((1 - cov) * 255 + 0.5f));
             }
     free(k->buf);
     k->buf = NULL;
@@ -757,6 +1057,16 @@ void canvas_corners_restore4(Canvas *c, Corners *k, float x, float y, float w, f
 static inline uint32_t texel(const uint32_t *src, int sw, int sh, int x, int y) {
     return x < 0 || y < 0 || x >= sw || y >= sh ? 0 : src[(size_t)y * sw + x];
 }
+
+/* A row of canvas_blit_affine steps its source coordinates from the first pixel it paints, so where
+ * the clip cuts the image on the left changes the bilinear weights by a rounding. A partial repaint
+ * (paint.c's drag layer) watches its canvas: if an image there starts left of the repaint's own left
+ * edge x, the row began at x, where a wider clip would not have begun it, and the caller paints it
+ * all instead. */
+static const Canvas *affine_watch;
+static int affine_watch_x, affine_cut;
+void canvas_affine_watch(const Canvas *c, int x) { affine_watch = c; affine_watch_x = x; affine_cut = 0; }
+int canvas_affine_cut(void) { affine_watch = NULL; return affine_cut; }
 
 void canvas_blit_affine(Canvas *c, const uint32_t *src, int sw, int sh, const float inv[6], const float fwd[6], float opacity) {
     if (sw <= 0 || sh <= 0) return;
@@ -771,6 +1081,7 @@ void canvas_blit_affine(Canvas *c, const uint32_t *src, int sw, int sh, const fl
     if (!bounds(c, bx0 - 1, by0 - 1, bx1 - bx0 + 2, by1 - by0 + 2, &x0, &y0, &x1, &y1)) return;
     uint32_t k_op = (uint32_t)(opacity * 256 + 0.5f);
     if (!k_op) return;
+    if (c == affine_watch && x0 == affine_watch_x && (int)floorf(bx0 - 1) < x0) affine_cut = 1;
     for (int j = y0; j < y1; j++) {
         uint32_t *row = c->px + (size_t)j * c->stride;
         float dy = j + 0.5f;

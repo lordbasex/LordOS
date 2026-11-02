@@ -119,20 +119,14 @@ export const emoji = {
 
 export const panel = createStore(false);
 let target = null;
-let superDown = false;
 function openPanel() {
   const top = wm.focused();
   target = { text: focusToken(), ime: ime.owner(), linux: !!(top && String(top).startsWith('linux#')), caret: ime.caret() };
   panel.set(true);
 }
-addListener('keydown', (e) => {
-  if (e.code === 125 || e.code === 126) { superDown = true; return; }
-  const meta = superDown || e.meta;
-  if (meta && !e.repeat && ((e.code === 52 && !e.shift && !e.alt) || (e.code === 57 && e.ctrl))) {
-    if (panel.get()) panel.set(false); else openPanel();
-  } else if (e.key === 'Escape' && panel.get()) panel.set(false);
-});
-addListener('keyup', (e) => { if (e.code === 125 || e.code === 126) superDown = false; });
+// ❖. and ❖⌃Space: the keys are in sdk/shortcuts.js.
+export function toggleEmojiPanel() { if (panel.get()) panel.set(false); else openPanel(); }
+addListener('keydown', (e) => { if (e.key === 'Escape' && panel.get()) panel.set(false); });
 
 const GROUP_ICON = { recent: '🕘', smileys: '😀', people: '👋', animals: '🐻', food: '🍔', travel: '🚗', activities: '⚽', objects: '💡', symbols: '❤️', flags: '🏁' };
 const COLS = 9, CELL = 36;

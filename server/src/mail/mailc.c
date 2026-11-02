@@ -1,5 +1,6 @@
 /* mailc.c — see mailc.h. */
 #include "mailc.h"
+#include "../sec/netconn.h"
 #include "proto.h"
 #include "../doc/proto.h"
 #include "../doc/wire.h"
@@ -505,18 +506,16 @@ static int send_msg(uint32_t op, uint32_t id, const char *json, int fd) {
     return r;
 }
 
+/* The socket is made and connected by Mail's own connector, in lordos-net-mail.scope (0.8.5,
+ * sec/netconn.h): Mail and the calendar sync are their own app for the firewall and the Monitor. */
 static int connect_timeout(const struct addrinfo *ai, int ms) {
-    int fd = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, ai->ai_protocol);
+    int fd = netconn_socket(NC_MAIL, ai->ai_family, SOCK_STREAM, ai->ai_addr, ai->ai_addrlen);
     if (fd < 0) return -1;
-    int r = connect(fd, ai->ai_addr, ai->ai_addrlen);
-    if (r && errno != EINPROGRESS) { close(fd); return -1; }
-    if (r) {
-        struct pollfd p = { fd, POLLOUT, 0 };
-        if (poll(&p, 1, ms) != 1) { close(fd); return -1; }
-        int err = 0;
-        socklen_t el = sizeof err;
-        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &el) || err) { close(fd); return -1; }
-    }
+    struct pollfd p = { fd, POLLOUT, 0 };
+    if (poll(&p, 1, ms) != 1) { close(fd); return -1; }
+    int err = 0;
+    socklen_t el = sizeof err;
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &el) || err) { close(fd); return -1; }
     int fl = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
     return fd;

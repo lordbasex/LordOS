@@ -47,6 +47,10 @@ enum BrokerOp {
                          * come back as "mail" events, in chunks. See brokermail.c, docs/PRIVACY.md */
     BOP_SYS_OPEN,       /* (those same system apps only) payload "app\0new\0json": open another of them
                          * with these args (Mail → Calendar for an invitation, Contacts → a new message) */
+    BOP_PROBE,          /* (the system package `sysprobe` only, app/probe.c) payload: JSON of what its sandbox
+                         * refused; lord-server adds the process's own status and keeps it for lord.sysinfo */
+    BOP_TEXT_FOCUS,     /* payload "on y h": a text field of the app took or lost focus (window coordinates).
+                         * Only a hint for the on-screen keyboard: no text, and no way to press a key */
     BOP_EVENT = 100,    /* server → app, unrequested (reqid 0): payload "type\0json" */
 };
 
@@ -108,6 +112,8 @@ void brokersrv_pick_result(uint32_t reqid, const char *path);
 void brokersrv_menu_click(const char *app, const char *item);
 /* JSON of the menus an app published (for the system menu bar); "[]" if none. */
 const char *brokersrv_menus(const char *app);
+/* System Information's last sandbox probe (BOP_PROBE): JSON { probe, proc, at } or NULL. */
+const char *brokersrv_probe_result(void);
 /* The microphone (and later the camera) runs in lord-server: its PipeWire socket has to be
  * serviced in the main loop. */
 int  brokersrv_audio_pollfds(struct pollfd *pfd, int max);

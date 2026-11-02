@@ -17,6 +17,16 @@ flowchart TD
 
 O perfil `desktop` é padrão tanto no Makefile C quanto no compilador dos temas. O frontend usa uma capacidade de build, `standaloneDesktop`, em vez de inferir suporte à administração a partir de `/etc/os-release`. `lord.pkg` e `lord.imager` não são expostos no perfil independente. A API administrativa retorna indisponível e nenhum helper de root é criado.
 
+## Base upstream
+
+O fork incorpora o LordOS **0.8.7-beta**, até o commit `ab8afcb835422723518308e8ba9e5fa1b736c106` (integrado em 2 de novembro de 2026). O remoto `upstream` aponta para `https://github.com/lordbasex/LordOS.git`. A separação da distribuição continua no perfil `desktop`; o histórico original é preservado por merge.
+
+Desktops virtuais, Overview, restauração de janelas, as melhorias do compositor e os novos aplicativos acompanham essa base. A loja usa o layout atualizado, mas encaminha pacotes do sistema ao gerenciador da distribuição; o catálogo APT e seus instaladores não entram nos bundles do desktop.
+
+Os helpers de Cleaner, descoberta de rede, LordBench e informações de hardware são instalados junto ao compositor. O cliente RDP/VNC é opcional no build local: `sudo dnf install freerdp-devel` habilita sua compilação; o RPM inclui essa dependência de build. O build de LordBench também precisa de `xz` (`sudo dnf install xz`). A leitura das bibliotecas pelo sandbox contempla `/usr/lib64` e `/lib64`, usados pelo Fedora.
+
+Os recursos novos que exigem o helper administrativo do LordOS continuam indisponíveis: montagem privilegiada de compartilhamentos SMB/NFS, limpeza de arquivos do sistema, download do catálogo de vídeos de fundo e alterações no login da distribuição. Vídeos próprios para o desktop conservam os requisitos de GPU e decodificação por hardware do upstream; FFmpeg continua opcional no build.
+
 ## Alterações implementadas
 
 | Área | Desktop independente |
@@ -29,7 +39,7 @@ O perfil `desktop` é padrão tanto no Makefile C quanto no compilador dos temas
 | Teclado/mouse | Hotplug por inotify no desktop independente; a troca de TTY usa libseat. |
 | Localização | Lê `/etc/locale.conf` além do caminho legado. Na ausência de `SUPPORTED`, enumera locales instalados usando `locale -a`. Não executa locale-gen ou apt. |
 | Instalação | Suporta `PREFIX`, `LIBEXECDIR` e `DESTDIR`; instala apenas compositor, helpers de aplicativos, recursos e entrada de sessão. |
-| Helpers opcionais | Documentos: Poppler/libarchive; mídia: FFmpeg. São detectados no build. Vault é compilado; Mail depende de OpenSSL. |
+| Helpers opcionais | Documentos: Poppler/libarchive; mídia: FFmpeg; RDP/VNC: FreeRDP 3. São detectados no build. Vault é compilado; Mail e o downloader dependem de OpenSSL. |
 
 SHA-256 e o leitor xz ainda ficam em `server/src/pkg/crypto.c` e `xz.c`, porque também são utilizados por assinaturas, cofre, journal e mapas. Esses arquivos são primitivas compartilhadas, não um backend de pacotes Debian. Movê-los para uma pasta comum pode ser uma refatoração posterior.
 
@@ -41,7 +51,7 @@ Também valida os hashes dos bundles, instala em diretório temporário, verific
 
 No Fedora, instale `libasan` e `libubsan` para os testes com sanitização. `make -C server test` executa a suíte original. Parte dela testa componentes legados isoladamente; isso não significa que esses componentes entram no desktop. Testes dependentes de ferramentas ou dados externos podem ser pulados pela suíte upstream.
 
-A CI `.github/workflows/desktop-fedora.yml` reproduz o build e os testes em Fedora 44. O modo headless não exercita DRM/KMS, input físico, aceleração de GPU nem políticas SELinux.
+A CI `.github/workflows/desktop-fedora.yml` reproduz o build e os testes em Fedora 44, com variantes de compilação CPU e GPU. O modo headless não exercita DRM/KMS, input físico, aceleração de GPU nem políticas SELinux.
 
 ## Compatibilidade ainda a validar
 

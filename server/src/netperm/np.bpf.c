@@ -17,7 +17,8 @@
  *   cgroup/lsm_socket_create    "no Bluetooth": socket(AF_BLUETOOTH) (a per-cgroup LSM program,
  *                               BPF_LSM_CGROUP: the inet sock_create hook never sees that family)
  *   cgroup/skb_ingress, egress  traffic accounting for the Monitor: bytes per app (np_counts) and
- *                               per (app, remote address) (np_flows); and the cut of connections
+ *                               per (app, remote address, port) (np_flows), and (0.8.5) of the
+ *                               essential system services (np_sysc); and the cut of connections
  *                               opened before a rule changed: a packet whose connection the app's
  *                               current rules deny is dropped (counted as "blocked") and its socket
  *                               is reported once, so lord-netperm destroys it (SOCK_DESTROY).
@@ -59,6 +60,7 @@ static long (*bpf_skb_load_bytes)(const void *skb, unsigned int offset, void *to
 static unsigned long long (*bpf_skb_ancestor_cgroup_id)(void *skb, int level) = (void *)83;
 static unsigned long long (*bpf_get_socket_cookie)(void *ctx) = (void *)46;
 static struct bpf_sock *(*bpf_sk_fullsock)(struct bpf_sock *sk) = (void *)95;
+static unsigned long long (*bpf_skb_cgroup_id)(void *skb) = (void *)79;
 
 /* the maps: only their names (lord-netperm defines them, netperm.c) */
 char np_cfg[4] SEC("maps");
@@ -72,6 +74,9 @@ char np_events[4] SEC("maps");
 char np_snd[4] SEC("maps");
 char np_flows[4] SEC("maps");
 char np_bound[4] SEC("maps");
+char np_blk4[4] SEC("maps");
+char np_blk6[4] SEC("maps");
+char np_sysc[4] SEC("maps");
 
 #define AF_INET  2
 #define AF_INET6 10
@@ -143,6 +148,29 @@ NP_INLINE NpList *lookup_list(NpApp *app, int fam, const np_u8 *addr, int *lan) 
     return l;
 }
 
+/* (0.8.5) Is the address in the app's blocklist set (the user's subscribed lists: their networks
+ * and the addresses the resolver gave for their domains)? */
+NP_INLINE int lookup_blk(NpApp *app, int fam, const np_u8 *addr) {
+    if (!app->blk) return 0;
+    if (fam == 4) {
+        NpLpm4Key k;
+        k.prefixlen = 64;
+        k.data[0] = (np_u8)(app->blk >> 24); k.data[1] = (np_u8)(app->blk >> 16);
+        k.data[2] = (np_u8)(app->blk >> 8);  k.data[3] = (np_u8)app->blk;
+        k.data[4] = addr[0]; k.data[5] = addr[1]; k.data[6] = addr[2]; k.data[7] = addr[3];
+        return bpf_map_lookup_elem(&np_blk4, &k) != 0;
+    }
+    if (fam == 6) {
+        NpLpm6Key k;
+        k.prefixlen = 160;
+        k.data[0] = (np_u8)(app->blk >> 24); k.data[1] = (np_u8)(app->blk >> 16);
+        k.data[2] = (np_u8)(app->blk >> 8);  k.data[3] = (np_u8)app->blk;
+        for (int i = 0; i < 16; i++) k.data[4 + i] = addr[i];
+        return bpf_map_lookup_elem(&np_blk6, &k) != 0;
+    }
+    return 0;
+}
+
 /* fam 0: unknown address. addr: 16 bytes (IPv4 in the first 4). always_count: connect and
  * bind always count; sendto only the first time within NP_REPEAT_NS. */
 NP_INLINE int handle(int fam, np_u8 *addr, int port, int proto, int dir, int always_count) {
@@ -156,7 +184,7 @@ NP_INLINE int handle(int fam, np_u8 *addr, int port, int proto, int dir, int alw
     int lan = -1;
     NpList *l = lookup_list(app, fam, addr, &lan);
     NpRes r;
-    np_decide(app, l, dir, proto, port, lan, &r);
+    np_decide(app, l, dir, proto, port, lan, lookup_blk(app, fam, addr), np_is_loop(fam, addr), &r);
     int deny = r.verdict == NP_V_DENY;
 
     NpSeenKey sk;
@@ -422,81 +450,96 @@ NP_INLINE void report_cut(struct __sk_buff *skb, np_u64 cgid, const NpFlowKey *k
     bpf_ringbuf_output(&np_events, &ev, sizeof ev, 0);
 }
 
+/* (0.8.5) The essential system services (name resolution, time, the network service), which are
+ * not apps: lord-netperm attaches these programs to their own cgroups too and keys np_sysc by the
+ * socket's cgroup. They are only counted, never filtered: their traffic can't be blocked. */
+NP_INLINE int count_system(struct __sk_buff *skb, int in) {
+    np_u64 id = bpf_skb_cgroup_id(skb);
+    if (!id) return 1;
+    NpCount *c = bpf_map_lookup_elem(&np_sysc, &id);
+    if (!c) return 1;
+    np_u64 len = skb->len;
+    if (in) __sync_fetch_and_add(&c->rx, len);
+    else __sync_fetch_and_add(&c->tx, len);
+    return 1;
+}
+
 /* Only for apps lord-netperm knows (it creates their np_counts entry when the scope appears), so
  * nothing else (the login screen, the system) is counted, stored or filtered. Loopback isn't
  * counted or filtered. The skb starts at the IP header in both directions. Returns 1 (let it
  * through) or 0 (drop). An allowed packet adds its bytes to its app (the socket's cgroup, the
- * scope at cfg->level) and to the (app, remote address) pair; a dropped one to "blocked". */
+ * scope at cfg->level) and to the (app, remote address, port) flow (0.8.5: the port too: the
+ * remote one, or the local one of a port the app bound); a dropped one to "blocked". */
 NP_INLINE int filter(struct __sk_buff *skb, int in) {
     if (skb->ifindex == LOOPBACK_IFINDEX) return 1;
     np_u32 zero = 0;
     NpCfg *cfg = bpf_map_lookup_elem(&np_cfg, &zero);
     if (!cfg) return 1;
     np_u64 cgid = bpf_skb_ancestor_cgroup_id(skb, (int)cfg->level);
-    if (!cgid) return 1;
-    NpCount *c = bpf_map_lookup_elem(&np_counts, &cgid);
-    if (!c) return 1;
+    NpCount *c = cgid ? bpf_map_lookup_elem(&np_counts, &cgid) : 0;
+    if (!c) return count_system(skb, in);
     /* the IP header in one read (an IP packet is at least 20 bytes; IPv6 needs 40) */
     np_u8 h[40];
     if (bpf_skb_load_bytes(skb, 0, h, 20)) return 1;
     NpFlowKey k;
     __builtin_memset(&k, 0, sizeof k);
     k.cgid = cgid;
-    int v6 = h[0] >> 4 == 6;
+    np_u8 la[16];
+    __builtin_memset(la, 0, sizeof la);
+    int v6 = h[0] >> 4 == 6, l4 = -1, proto;
     if (v6) {
         if (bpf_skb_load_bytes(skb, 0, h, 40)) return 1;
         /* the remote address: the source when it comes in, the destination when it goes out */
         __builtin_memcpy(k.addr, in ? h + 8 : h + 24, 16);
+        __builtin_memcpy(la, in ? h + 24 : h + 8, 16);
         k.fam = 6;
+        proto = proto_of(h[6]);                                  /* next header (an extension header: no ports) */
+        l4 = 40;
     } else if (h[0] >> 4 == 4) {
         __builtin_memcpy(k.addr, in ? h + 12 : h + 16, 4);
+        __builtin_memcpy(la, in ? h + 16 : h + 12, 4);
         k.fam = 4;
+        proto = proto_of(h[9]);
+        if (!(((np_u32)h[6] << 8 | h[7]) & 0x1fff)) l4 = (h[0] & 0xf) * 4;   /* not a later fragment */
     } else return 1;
     np_u64 len = skb->len;
 
-    int deny = 0, proto = NP_P_OTHER, dir = NP_D_OUT, port = 0, lport = 0, rport = 0;
-    np_u8 la[16];
+    int lport = 0, rport = 0, rst = 0, dir = NP_D_OUT;
+    if (l4 >= 0 && proto != NP_P_OTHER) {
+        np_u8 p[14];                                             /* ports, and the TCP flags at 13 */
+        if (!bpf_skb_load_bytes(skb, (np_u32)l4, p, proto == NP_P_TCP ? 14 : 4)) {
+            int sport = p[0] << 8 | p[1], dport = p[2] << 8 | p[3];
+            lport = in ? dport : sport;
+            rport = in ? sport : dport;
+            rst = proto == NP_P_TCP && (p[13] & TCP_FLAG_RST);
+        }
+    }
+    int port = rport;
+    if (lport) {
+        NpBoundKey bk;
+        __builtin_memset(&bk, 0, sizeof bk);
+        bk.cgid = cgid;
+        bk.port = (np_u16)lport;
+        bk.proto = (np_u8)proto;
+        if (bpf_map_lookup_elem(&np_bound, &bk)) { dir = NP_D_IN; port = lport; }   /* a connection to the app's server */
+    }
+    int deny = 0;
     NpRes r;
+    __builtin_memset(&r, 0, sizeof r);
     NpApp *app = cfg->on ? bpf_map_lookup_elem(&np_apps, &cgid) : 0;
     if (app && app->can_deny) {
-        __builtin_memset(la, 0, sizeof la);
-        __builtin_memset(&r, 0, sizeof r);
-        int l4 = -1;
-        if (v6) {
-            __builtin_memcpy(la, in ? h + 24 : h + 8, 16);
-            proto = proto_of(h[6]);                              /* next header (an extension header: no ports) */
-            l4 = 40;
-        } else {
-            __builtin_memcpy(la, in ? h + 16 : h + 12, 4);
-            proto = proto_of(h[9]);
-            if (!(((np_u32)h[6] << 8 | h[7]) & 0x1fff)) l4 = (h[0] & 0xf) * 4;   /* not a later fragment */
-        }
-        int rst = 0;
-        if (l4 >= 0 && proto != NP_P_OTHER) {
-            np_u8 p[14];                                         /* ports, and the TCP flags at 13 */
-            if (!bpf_skb_load_bytes(skb, (np_u32)l4, p, proto == NP_P_TCP ? 14 : 4)) {
-                int sport = p[0] << 8 | p[1], dport = p[2] << 8 | p[3];
-                lport = in ? dport : sport;
-                rport = in ? sport : dport;
-                rst = proto == NP_P_TCP && (p[13] & TCP_FLAG_RST);
-            }
-        }
-        port = rport;
-        if (lport) {
-            NpBoundKey bk;
-            __builtin_memset(&bk, 0, sizeof bk);
-            bk.cgid = cgid;
-            bk.port = (np_u16)lport;
-            bk.proto = (np_u8)proto;
-            if (bpf_map_lookup_elem(&np_bound, &bk)) { dir = NP_D_IN; port = lport; }   /* a connection to the app's server */
-        }
         int lan = -1;
         NpList *l = lookup_list(app, k.fam, k.addr, &lan);
-        np_decide(app, l, dir, proto, port, lan, &r);
+        np_decide(app, l, dir, proto, port, lan, lookup_blk(app, k.fam, k.addr), np_is_loop(k.fam, k.addr), &r);
         /* a reset always goes through: it is what tells the other end the connection is over */
         deny = r.verdict == NP_V_DENY && !rst;
     }
 
+    /* the flow's port and protocol go into the key only after the decision: as stack values known
+     * to the verifier they would multiply the states it walks through np_decide */
+    k.proto = (np_u8)proto;
+    k.dir = (np_u8)dir;
+    k.port = (np_u16)port;
     NpFlow *f = bpf_map_lookup_elem(&np_flows, &k);
     if (!f) {
         NpFlow z = { 0, 0, 0 };

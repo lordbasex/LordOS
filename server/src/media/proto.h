@@ -35,6 +35,8 @@ enum {
                            with JSON {"vaapi":bool,"vendor":"…","vp9":bool,"av1":bool,"h264":bool,"hevc":bool} */
     MK_STREAM,          /* remote desktop live encoder (docs/REMOTE.md, "Video (WebRTC)"): fds = audio ring
                            (or -1), render node (or -1); params codec=h264|vp8, width, height, fps, kbps */
+    MK_VBENCH,          /* LordBench's video measurement (lm_vbench.c, docs/BENCHMARK.md): no fds; params full=0|1.
+                           Clips generated in memory; answers MM_BENCH records, then MM_STATE MS_DONE */
 };
 
 /* Jobs of the MK_WORKER helper (MM_JOB with v[0] = MW_*). */
@@ -83,7 +85,14 @@ enum {
     MM_AUDIO,           /* there's new PCM in the audio ring (or a seek: discard_to/serial) */
     MM_PACKET,          /* live encoder: id = 0 video, 1 audio; v[0] = total bytes, v[1] = offset of this
                            chunk, v[2] = pts (ms for video, 48 kHz samples for audio), v[3] = 1 keyframe */
+    MM_BENCH,           /* MK_VBENCH: id = measurement (VB_*); v[0] = VBR_*; v[1] = frames/s ×1000, v[2] = spread ×1000,
+                           v[3] = why skipped (VBS_*) */
 };
+
+/* MK_VBENCH's measurements, in order; lord-server maps them to its own ids (bench/lbvideo.c) */
+enum { VB_H264_1080, VB_HEVC_1080, VB_VP9_1080, VB_AV1_1080, VB_H264_2160, VB_HEVC_2160, VB_ENC_H264, VB_ENC_VP8, VB_COUNT };
+enum { VBR_STEP = 0, VBR_RESULT, VBR_SKIP };
+enum { VBS_NOCODEC = 1, VBS_FAILED, VBS_MODE };
 
 enum { MS_LOADING = 0, MS_PLAYING, MS_PAUSED, MS_ENDED, MS_RECORDING, MS_DONE, MS_FAILED };
 

@@ -42,6 +42,8 @@ Em um sistema instalado, o copyright e a licença de cada pacote estão em `/usr
 
 O LordOS se vincula dinamicamente a algumas bibliotecas do sistema: libwayland e libxkbcommon (MIT), Mesa (MIT), OpenSSL 3 (Apache-2.0), libcrypt (LGPL-2.1+), Poppler, cairo, FreeType e fontconfig (GPL-2.0-or-later, LGPL, FTL), libarchive (BSD-2-Clause) e FFmpeg e libva (LGPL-2.1+; a compilação do FFmpeg do Debian é GPL-2.0-or-later). Os auxiliares `lord-doc` e `lord-media` se vinculam ao Poppler e ao FFmpeg do Debian, por isso esses dois binários, como distribuídos, ficam cobertos pela GPL; o código-fonte do LordOS sob a licença MIT, a partir do qual eles são compilados, é compatível com ela.
 
+Desde a 0.8.7 o `lordos` também depende do FreeRDP (Apache-2.0), rclone (MIT), fuse3 (LGPL-2.1, GPL-2.0) e do cliente OpenSSH (BSD). O item Disk Formats da Loja, que não vem pré-instalado, traz ntfs-3g e exfatprogs (GPL-2.0), dosfstools (GPL-3.0) e, em amd64, apfs-dkms (GPL-2.0). Os fundos em movimento são de domínio público, CC0, CC BY e CC BY-SA, com créditos em Ajustes e no repositório deles.
+
 ## Código-fonte
 
 O código-fonte do LordOS está em [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). Se você precisar do código-fonte correspondente de um componente GPL que distribuímos e não o encontrar, escreva pelo [nosso formulário de contato](https://www.iperfex.com/contacto/?lang=pt).

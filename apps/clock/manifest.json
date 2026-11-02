@@ -1,5 +1,6 @@
 {
   "id": "clock",
+  "version": "0.8.5",
   "name": "Clock",
   "description": "World clock, alarms, timer and stopwatch",
   "size": [

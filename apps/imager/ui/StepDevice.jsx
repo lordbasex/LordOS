@@ -1,6 +1,6 @@
 // Step 1 — the device: the Raspberry Pi 5 (the only supported board), or a PC from a USB stick.
 import { View, Text, useTheme, useLocale, typeScale, spacing } from '@lordos/sdk';
-import { DEVICES, RAM_ADVICE } from '../core/catalog.js';
+import { DEVICES, RAM_ADVICE, deviceLabel } from '../core/catalog.js';
 import { chooseDevice } from '../state.js';
 import { Card, Badge, Group, SectionTitle } from './kit.jsx';
 import { BoardArt, PcArt } from './art.jsx';
@@ -45,10 +45,10 @@ export function DeviceStep({ s }) {
       <StepHeader title={tr('imager.device.title')} text={tr('imager.device.text')} />
       <View style={{ flexDirection: 'row', gap: spacing.l, flexWrap: 'wrap' }}>
         {supported.map((d) => (
-          <Card key={d.id} id={`dev-${d.id}`} label={d.name || tr('imager.device.pc')} selected={s.device === d.id} onClick={() => chooseDevice(d.id)}
+          <Card key={d.id} id={`dev-${d.id}`} label={deviceLabel(d, tr)} selected={s.device === d.id} onClick={() => chooseDevice(d.id)}
             style={{ width: 250, alignItems: 'center' }}>
             {d.kind === 'pi' ? <BoardArt size={130} /> : <PcArt size={130} />}
-            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, marginTop: 4 }}>{d.name || tr('imager.device.pc')}</Text>
+            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, marginTop: 4 }}>{deviceLabel(d, tr)}</Text>
             <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center', lineHeight: 1.4, alignSelf: 'stretch' }}>{tr(`imager.device.${d.id}.text`)}</Text>
             <Badge tone="ok">{tr(d.kind === 'pi' ? 'imager.device.supported' : 'imager.device.liveUsb')}</Badge>
           </Card>

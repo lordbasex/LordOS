@@ -85,9 +85,9 @@ static int find_value(const char *text, const char *grp, const char *mime, const
     return 0;
 }
 
-int mimeapps_default(const char *text, const char *mime, char *out, size_t n) {
+int mimeapps_entry(const char *text, const char *group, const char *mime, int idx, char *out, size_t n) {
     const char *v, *ve;
-    if (!text || !find_value(text, "Default Applications", mime, &v, &ve)) return -1;
+    if (!text || !group || idx < 0 || !find_value(text, group, mime, &v, &ve)) return -1;
     for (const char *p = v; p < ve;) {
         const char *s = memchr(p, ';', (size_t)(ve - p));
         if (!s) s = ve;
@@ -95,11 +95,15 @@ int mimeapps_default(const char *text, const char *mime, char *out, size_t n) {
         if (len && len < n) {
             memcpy(out, p, len);
             out[len] = 0;
-            if (desktop_id_valid(out)) return 0;
+            if (desktop_id_valid(out) && idx-- == 0) return 0;
         }
         p = s + 1;
     }
     return -1;
+}
+
+int mimeapps_default(const char *text, const char *mime, char *out, size_t n) {
+    return mimeapps_entry(text, "Default Applications", mime, 0, out, n);
 }
 
 static int list_has(const char *v, const char *ve, const char *id) {
@@ -193,6 +197,34 @@ char *mimeapps_set_default(const char *text, const char *mime, const char *id) {
     char *a = set_list(text, "Default Applications", mime, id, 0);
     if (!a) return NULL;
     char *b = set_list(a, "Added Associations", mime, id, 1);
+    free(a);
+    return b;
+}
+
+/* Copies `text` without mime's key line in group grp (every other line byte for byte). */
+static char *drop_key(const char *text, const char *grp, const char *mime) {
+    Buf b = { 0 };
+    const char *cur = text ? text : "", *gn;
+    size_t gl;
+    int inside = 0;
+    Line l;
+    puts_(&b, "");
+    while (next_line(&cur, &l)) {
+        const char *v, *ve;
+        if (group_of(&l, &gn, &gl)) inside = in_group(gn, gl, grp);
+        else if (inside && key_is(&l, mime, &v, &ve)) continue;
+        put(&b, l.p, (size_t)(l.end - l.p));
+        if (*l.end == '\n') puts_(&b, "\n");
+    }
+    if (b.oom) { free(b.p); return NULL; }
+    return b.p;
+}
+
+char *mimeapps_unset_default(const char *text, const char *mime) {
+    if (!mime_valid(mime)) return NULL;
+    char *a = drop_key(text, "Default Applications", mime);
+    if (!a) return NULL;
+    char *b = drop_key(a, "Added Associations", mime);
     free(a);
     return b;
 }

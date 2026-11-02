@@ -69,6 +69,8 @@
 typedef struct { uint16_t seq, len; uint8_t b[MTU + 64]; } Hist;
 typedef struct {
     uint32_t ssrc, ts_off, last_ts, packets, octets;
+    uint32_t last_in;           /* the encoder's last time (ms or samples), to keep the clock going forward */
+    int have_in;
     uint16_t seq;
     int pt;
     double last_ms;
@@ -145,8 +147,8 @@ struct Rtc {
     double sctp_t;
     Track v, a;
     /* congestion: the viewer's target */
-    unsigned kbps;
-    double rate_at, kf_at, lost;
+    unsigned kbps, remb;        /* remb: the browser's last estimate (kbit/s) */
+    double rate_at, kf_at, lost, congested_at;
     unsigned long nacks, plis, resent, dtls_rx;
     double last_sr, created, last_consent, stun_win;
     int stun_n, failed;
@@ -693,9 +695,20 @@ static void rtp_out(void *ud, const uint8_t *hdr, size_t hl, const uint8_t *data
 int rtc_media_ready(const Rtc *r) { return r && r->srtp_up && !r->failed && r->sel >= 0; }
 int rtc_codec(const Rtc *r) { return r ? r->codec : 0; }
 
+/* The session's encoder counts from its own start, and it starts again when the screen size changes
+ * (or after a crash) while this peer goes on: its time going back moves the offset instead, so the
+ * RTP timestamps keep going forward. Going back made the browser drop the new frames as old ones,
+ * freeze and ask for keyframes over and over. */
+static uint32_t track_ts(Track *t, uint32_t in, uint32_t step, uint32_t mul) {
+    if (t->have_in && (int32_t)(in - t->last_in) <= 0) t->ts_off += (t->last_in - in + step) * mul;
+    t->last_in = in;
+    t->have_in = 1;
+    return t->ts_off + in * mul;
+}
+
 void rtc_video(Rtc *r, const uint8_t *f, size_t n, uint32_t ms) {
     if (!rtc_media_ready(r) || !n) return;
-    PktCtx c = { r, &r->v, r->v.ts_off + ms * 90 };
+    PktCtx c = { r, &r->v, track_ts(&r->v, ms, 33, 90) };
     r->v.last_ts = c.ts;
     r->v.last_ms = now_ms();
     if (r->codec == RW_CODEC_H264) rw_h264_packetize(f, n, MTU, rtp_out, &c);
@@ -704,7 +717,7 @@ void rtc_video(Rtc *r, const uint8_t *f, size_t n, uint32_t ms) {
 
 void rtc_audio(Rtc *r, const uint8_t *p, size_t n, uint32_t samples) {
     if (!rtc_media_ready(r) || !n || n > MTU || r->of->am < 0) return;
-    PktCtx c = { r, &r->a, r->a.ts_off + samples };
+    PktCtx c = { r, &r->a, track_ts(&r->a, samples, 960, 1) };
     r->a.last_ts = c.ts;
     r->a.last_ms = now_ms();
     rtp_out(&c, NULL, 0, p, n, 0);
@@ -744,9 +757,11 @@ static void on_fb(void *ud, const RwFb *f) {
     case RW_FB_RR:
         if (f->ssrc != r->v.ssrc) break;
         r->lost = r->lost * 0.7 + f->lost_frac / 256.0 * 0.3;
-        if (f->lost_frac > 25) set_rate(r, r->kbps * 0.75);
-        else if (f->lost_frac > 5) set_rate(r, r->kbps * 0.92);
-        else if (f->lost_frac == 0 && t - r->rate_at > 1000) set_rate(r, r->kbps * 1.06 + 50);
+        if (f->lost_frac > 25) { r->congested_at = t; set_rate(r, r->kbps * 0.75); }
+        else if (f->lost_frac > 5) { r->congested_at = t; set_rate(r, r->kbps * 0.92); }
+        else if (f->lost_frac == 0 && t - r->rate_at > 1000)
+            /* no loss: up fast (a LAN reaches the top in about 10 s), slowly for 5 s after congestion */
+            set_rate(r, r->kbps * (t - r->congested_at > 5000 ? 1.25 : 1.06) + 50);
         break;
     case RW_FB_PLI:
     case RW_FB_FIR:
@@ -764,9 +779,16 @@ static void on_fb(void *ud, const RwFb *f) {
             if (h->len && h->seq == seq) { send_sel(r, h->b, h->len); r->resent++; }
         }
         break;
-    case RW_FB_REMB:
-        if (f->bitrate / 1000 < r->kbps) set_rate(r, (double)(f->bitrate / 1000));
+    case RW_FB_REMB: {
+        /* The browser's estimate only grows with what it receives, so as a fixed ceiling it kept a
+         * new connection at ~3 Mbit/s for minutes. It counts as congestion when it falls (the
+         * browser saw the delay grow) or right after loss; then it is a ceiling. */
+        unsigned b = (unsigned)(f->bitrate / 1000);
+        if (r->remb && b < r->remb * 0.85) r->congested_at = t;
+        if (t - r->congested_at < 5000 && b < r->kbps) set_rate(r, b);
+        r->remb = b;
         break;
+    }
     }
 }
 

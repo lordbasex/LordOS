@@ -11,7 +11,8 @@
  *     as fw_decide.
  *
  * "Just once" rules aren't compiled (there's nobody to delete them in the kernel; without ask
- * mode they don't appear). "Ask" mode is compiled as silent. */
+ * mode they don't appear). "Ask" mode is compiled as silent, "deny" (0.8.5) as NP_M_DENY.
+ * The blocklist set (NpApp.blk) is lord-netperm's: it sets it after compiling (fw/fwlists.h). */
 #ifndef LORD_NP_COMPILE_H
 #define LORD_NP_COMPILE_H
 

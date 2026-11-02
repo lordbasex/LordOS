@@ -13,6 +13,9 @@ typedef struct {
     char name[80];
     struct TpDevice *tp;          /* touchpad or touchscreen (tp/tp.c), or NULL */
     int wheel_hires, hwheel_hires;  /* high-resolution wheel (REL_*WHEEL_HI_RES): that one is sent */
+    int keyboard;                 /* a full keyboard (osk.h), not a power button or a token */
+    int bus;                      /* input_id.bustype */
+    int typed;                    /* a letter key was pressed on it since it appeared */
 } InputDevice;
 
 typedef struct {
@@ -33,5 +36,7 @@ int  input_add_fds(Input *in, const int *fds, int n);
 /* A device that disappeared (ENODEV, unplugged): only that one is closed. */
 void input_remove(Input *in, int idx);
 void input_dispatch(Input *in, int idx, InputHandler cb, void *ud);
+/* Is a keyboard someone can type on attached? (the on-screen keyboard's Automatic mode, osk.h) */
+int  input_has_keyboard(const Input *in);
 
 #endif

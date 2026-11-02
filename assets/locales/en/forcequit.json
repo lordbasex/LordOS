@@ -1,0 +1,7 @@
+{
+  "intro": "If an app stops answering for a while, choose it and click Force Quit. It ends without saving.",
+  "none": "No app is open",
+  "quit": "Force Quit",
+  "shortcut": "Also in the crown menu: Force Quit…",
+  "windows": "{count} windows"
+}

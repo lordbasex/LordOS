@@ -1,0 +1,145 @@
+{
+  "meta": ["How to use LordOS Imager · LordOS", "Write LordOS to an SD card or a USB stick and set up the Raspberry Pi 5's first boot, screen by screen: device, system image, storage, customisation, writing and the first boot."],
+  "kicker": "Guide · LordOS Imager",
+  "title": "How to use LordOS Imager",
+  "lead": "Write LordOS to an SD card or a USB stick from your computer and set up the Raspberry Pi 5's first boot. Screen by screen, in about ten minutes.",
+  "version": "Version {v} · free and open source · collects nothing",
+  "alsoIn": "Already on LordOS? It’s in App Launcher → System.",
+  "hello": "Hi, I'm Lumo! I'll walk you through every screen.",
+  "heroAlt": "LordOS Imager: choose your device",
+  "needTitle": "What you need",
+  "need": [
+    ["Your computer", "With LordOS Imager installed, and an internet connection for the download."],
+    ["An SD card or USB stick", "16 GB or more is best (8 GB at the very least). Everything on it will be erased."],
+    ["A Raspberry Pi 5", "4 GB of memory at least, 8 GB or 16 GB for a smoother desktop. A fan and the 27 W power supply are recommended."],
+    ["About ten minutes", "Most of it is the download and the write, which run by themselves."]
+  ],
+  "videoTitle": "Watch it first",
+  "videoLead": "A short tour of every step, narrated in English, with subtitles in English, Spanish and Portuguese.",
+  "videoSoon": "Video coming soon",
+  "videoSoonText": "Meanwhile, every step is below with its screenshot.",
+  "videoCredit": "Narration: Kokoro TTS, voice Michael (Apache 2.0)",
+  "videoFallback": "Your browser can't play this video. Download it:",
+  "tocLabel": "Steps",
+  "stepWord": "Step",
+  "tipFrom": "Lumo's tip",
+  "open": "Open larger",
+  "steps": [
+    {
+      "id": "device", "title": "Choose your device",
+      "text": "Pick **Raspberry Pi 5** to prepare an SD card for the board, or **PC (USB stick)** to write the live system for a computer. Under the Pi, a bar shows how much memory it needs.",
+      "points": ["4 GB is the minimum, 8 GB is comfortable and 16 GB gives the best performance.", "Only boards LordOS really supports can be chosen."],
+      "shots": [["01-device", "Step 1: the device, with the memory advice for the Raspberry Pi 5"]],
+      "tip": ["wave", "No guesswork", "If your board isn't supported yet, I say so instead of letting you write a card that won't start."]
+    },
+    {
+      "id": "image", "title": "Choose the system image",
+      "text": "The latest LordOS release is already selected and marked **Signed by LordOS**. The download is kept, so the next card is quicker.",
+      "points": ["Older releases are one click away.", "You can also use an image file of your own (`.img`, `.img.xz` or `.iso`). It's written and checked, but nobody vouches for where it came from."],
+      "shots": [["02-image", "Step 2: the latest signed LordOS release"]],
+      "tip": ["shield", "Only signed images", "Official images are checked against the LordOS release key before anything is erased."]
+    },
+    {
+      "id": "storage", "title": "Choose the card or USB stick",
+      "text": "Insert the SD card (with a card reader if your computer needs one) or plug in the USB stick. It shows up by itself, with its name and size. Select it and read the red warning: everything on it will be erased.",
+      "points": ["Only removable drives are listed. Your computer's own disks never appear here.", "A card that's too small or write-protected is shown greyed out, with the reason."],
+      "shots": [["04-storage", "Step 3: the SD card, selected, with the erase warning"]],
+      "tip": ["wave", "Everything on it goes", "Copy anything you want to keep from the card first."]
+    },
+    {
+      "id": "customise", "title": "Customise the first boot",
+      "text": "Leave **Prepare the first boot** on and the board starts ready: its name, your account, Wi-Fi, remote access, look and cooling. Seven tabs, and everything can be changed later in Settings. (For a PC stick there's nothing to customise: this step is skipped.)",
+      "subs": [
+        ["05-tab-general", "General", "The **computer name** is how you'll find the board on your network: here `lordos-pi`, so `lordos-pi.local`. Then the language, time zone, keyboard layout and Wi-Fi country."],
+        ["06-tab-user", "User", "Your administrator account: full name, user name and a password typed twice. Only a one-way hash of the password goes on the card. Automatic login is optional."],
+        ["07-tab-wifi", "Wi-Fi", "The network name exactly as it appears (capitals count) and its password. The card keeps the network's derived key, never the password you typed. Hidden and open networks work too."],
+        ["08-tab-remote", "Remote access", "Remote login (SSH): off, keys only (recommended) or password and keys. You can also turn on LordOS remote desktop; it stays on your local network."],
+        ["09-tab-look", "Appearance", "Lord Flow or Lord Classic, light or dark, an accent color and a wallpaper."],
+        ["10-tab-cooling", "Cooling", "Tell LordOS what keeps the board cool and it picks the fan curve to match. Not sure? See [Which cooling do I have?](#cooling)."],
+        ["11-tab-cooling-overclock", "Mild overclock", "Only with a fan: 2.6 GHz instead of 2.4 GHz, with no extra voltage. The warning explains how to undo it."],
+        ["12-tab-more", "More", "Bluetooth, automatic update checks, and a promise: LordOS collects nothing."],
+        ["13-profiles", "Profiles", "Save these settings to reuse them for the next card. Passwords and Wi-Fi keys are never saved: you type them again."]
+      ],
+      "tip": ["shield", "Nothing secret in clear", "Your password and your Wi-Fi password never reach the card as they are: only a hash and a derived key."]
+    },
+    {
+      "id": "write", "title": "Check and write",
+      "text": "A summary of everything you chose, then **Erase and write** asks one last time. From there the imager does it all by itself:",
+      "points": ["checks the release signature, then downloads the image (an interrupted download resumes);", "checks the image, writes it, then reads the whole card back and compares;", "saves the first-boot settings and ejects the card."],
+      "shots": [["14-write-summary", "The summary before writing"], ["15-write-confirm", "The last confirmation"], ["16-downloading", "Downloading, with speed and time left"], ["17-writing", "Writing to the card"], ["18-verifying", "Reading the card back and comparing"]],
+      "tip": ["run", "Leave it plugged in", "Cancel is safe: the card is cleared so it never looks half-written. The download is kept for next time."]
+    },
+    {
+      "id": "done", "title": "Done!",
+      "text": "Lumo celebrates and lists what comes next, with the exact name of your board on the network and the commands for remote login and remote desktop. A sound and a notification tell you it's finished.",
+      "shots": [["19-done", "Done: written, verified and ejected, with the next steps"]]
+    },
+    {
+      "id": "firstboot", "title": "The first boot on the Raspberry Pi 5",
+      "text": "Put the card in the board, connect the monitor, keyboard and mouse, then the power supply. The LordOS crown and a progress bar appear while the system grows to fill the card and applies your settings. After about a minute the login screen shows your account.",
+      "points": ["From another computer at home it's `lordos-pi.local`.", "Remote login: `ssh demo@lordos-pi.local`.", "Remote desktop, if you turned it on: `https://lordos-pi.local:5673`."],
+      "boot": [["docs/boot/splash-preview.png", "The boot screen while the first boot runs"], ["docs/screenshots/greeter.png", "The login screen (shown with example accounts)"]],
+      "tip": ["celebrate", "Welcome home", "The settings file is applied once, then overwritten and deleted from the card."]
+    }
+  ],
+  "coolTitle": "Which cooling do I have?",
+  "coolLead": "Pick what is physically on your board. It sets the fan curve and the clock speed, and you can change it later in Settings.",
+  "cool": [
+    ["case-fan", "Case with a fan", "A closed case with its own built-in fan, plugged into the board's fan connector. Many aluminium cases are like this.", "Have a case with a fan? Choose **Case with a fan**."],
+    ["active-cooler", "Active cooler", "A small heatsink with a fan on top that clips straight onto the board.", "Choose **Active cooler**."],
+    ["passive", "Passive case", "A metal case or a heatsink that cools without any fan.", "Choose **Passive case**."],
+    ["none", "Nothing", "A bare board. It works, but under load it slows itself down within minutes.", "Choose **Nothing**: a gentler clock avoids that."]
+  ],
+  "profTitle": "Profiles",
+  "profHead": ["Cooling", "Profiles", "What they do"],
+  "prof": [
+    ["With a fan (case or active cooler)", "**Balanced** (default), Performance, Quiet", "Balanced: the fan starts at 55 °C. Performance: from 45 °C, and the processor stays at full speed. Quiet: from 60 °C."],
+    ["Passive case", "**Balanced** (default), Conservative", "There's no fan to drive. Conservative caps the clock at 2.0 GHz."],
+    ["Nothing", "**Conservative** (default), Balanced", "2.0 GHz, so a bare board doesn't reach 85 °C and throttle."]
+  ],
+  "ocTitle": "Mild overclock (only with a fan)",
+  "ocText": "2.6 GHz instead of 2.4 GHz, with no extra voltage. Not every board is stable: if yours doesn't start, open the card's boot partition on another computer and delete the `lordos-firstrun` block in `config.txt`.",
+  "optTitle": "App options",
+  "optText": "**App options**, at the bottom of the sidebar: a sound and ejecting when finished, checking for app updates, language and appearance, and the download folder, with how much it uses and a button to clear it.",
+  "optShot": ["20-options", "App options"],
+  "secTitle": "Safe by design",
+  "secLead": "What LordOS Imager does to protect your card, your board and you.",
+  "sec": [
+    ["Signed images only", "Before anything is erased, the release's list of files is checked against the LordOS release key, and the image's SHA-256 against that list. While writing, the image is hashed again."],
+    ["Read back and compared", "After writing, the whole card is read back and compared with what was written."],
+    ["Your password stays yours", "It becomes a one-way hash before it's written. Wi-Fi is stored as the network's derived key."],
+    ["Applied once, then deleted", "The board checks the settings file strictly, applies it once, then overwrites and deletes it. An invalid file applies nothing."],
+    ["Only cards and USB drives", "Your computer's own disks are never listed, and your computer asks for an administrator's approval before the drive is opened."],
+    ["Nothing collected", "No account, no usage data, no crash reports. The imager only talks to the LordOS releases page to list and download images."]
+  ],
+  "secLink": "How LordOS signs its releases",
+  "faqTitle": "Troubleshooting",
+  "faq": [
+    ["My card isn't listed", "Only removable drives appear: SD cards and USB drives. Use a card reader if your computer has no slot, and wait a few seconds: the list updates by itself. A card whose lock switch is on, or one under 8 GB, is shown greyed out with the reason. Your computer's own disks are never shown, on purpose."],
+    ["It says the signature didn't verify", "Then nothing was written and nothing was erased. The downloaded files don't match what LordOS signed, usually because a download broke. Open **App options → Downloads → Clear** and try again. If it keeps happening, tell us (see the security page)."],
+    ["The board doesn't join my Wi-Fi", "Check the network name (capitals count), the password and the Wi-Fi country in **General**. A network that only accepts WPA3 needs its password on the board itself: connect a network cable once and add it in **Settings → Network**."],
+    ["I can't find lordos-pi.local", "Give the first boot a minute or two, and make sure your computer is on the same network (guest networks often keep devices apart). The login screen shows the board's address in its corner; you can use that address instead of the name."],
+    ["How do I log in with SSH?", "If you turned it on: `ssh demo@lordos-pi.local` (with your user name and computer name). Keys only is the safest choice. You can turn it on or off later in **Settings → Sharing**. The root account never logs in."],
+    ["The board doesn't start after the overclock", "Put the card in your computer, open its boot partition and delete the block between `# >>> lordos-firstrun` and `# <<< lordos-firstrun` in `config.txt`. The board starts at its normal speed again."],
+    ["I skipped Customise. Now what?", "The board starts in setup mode and logs in by itself. Create your account in **Settings → Users**; on the next start the setup account is removed. Don't turn on remote desktop until then."],
+    ["Can I write a USB stick for a PC?", "Yes: choose **PC (USB stick)** in step 1. It writes the LordOS live system; boot the PC from the stick to try it, then install it from there."]
+  ],
+  "endTitle": "Ready? Get LordOS Imager",
+  "endText": "Free and open source. Every official image is checked against the release signature before anything is erased.",
+  "endOther": "Prefer another way to write the card? See the download section.",
+  "shotsNote": "Screens from LordOS Imager {v} with demo values: user “demo”, computer “lordos-pi”, network “HomeNetwork”.",
+  "home": {
+    "title": "How to write LordOS to a USB stick or SD card",
+    "lead": "For the PC (ISO) and for the Raspberry Pi 5 image.",
+    "badge": "Recommended",
+    "steps": ["Choose your device and the latest signed LordOS.", "Pick the card or USB stick and, for the Pi, set up the first boot.", "Write: it checks the signature, writes and reads the card back."],
+    "guide": "Step-by-step guide",
+    "optTitle": "Prefer your usual tool? That's fine.",
+    "optText": "Download the ISO or the Raspberry Pi image from the release, check it against SHA256SUMS and write it with any image writer app, or with `dd`. `/dev/sdX` is the whole card or stick, not a partition.",
+    "optPc": "PC (ISO)",
+    "optPi": "Raspberry Pi 5",
+    "optVerify": "How to check the signature of SHA256SUMS",
+    "optPiSetup": "Without LordOS Imager the Pi starts in setup mode. To prepare it, put `lordos-user.txt` and the switch files (`ssh`, `remote-desktop`) on the card's boot partition before the first boot.",
+    "optPiLink": "Switch files and lordos-user.txt"
+  }
+}

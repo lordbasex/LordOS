@@ -1,5 +1,6 @@
 {
   "id": "recorder",
+  "version": "0.8.5",
   "name": "Voice Recorder",
   "description": "Voice memos: record, waveform, rename, trim and export to Opus, MP3 or WAV",
   "size": [800, 480],

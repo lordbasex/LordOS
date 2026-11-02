@@ -19,7 +19,7 @@ a 1080p one at 100 % is sharp on both. Tested on VM 118 (`lordos-notes`) with tw
 | ![gpu](displays-gpu.png) | ![unplugged](displays-unplugged.png) |
 | GPU path (llvmpipe, `LORD_GPU=1`): two EGL surfaces on one context, GTK at 150 % | The second display unplugged: its window came back to the main one |
 | ![classic](displays-classic.png) | |
-| The Classic theme: its bar on the main display, the second one is all work area | |
+| The Lord Classic theme: its bar on the main display, the second one is all work area | |
 
 The cursor plane is not in `screendump`; on the CPU path the cursor is drawn into the frame and
 shows in the captures.
@@ -40,10 +40,60 @@ shows in the captures.
 - The **main display** gets the menu bar and the Dock; with "Show menu bar on all displays" the
   menu bar is drawn on each one. The work area is per display.
 
-The math is in `server/src/outputs.c` (pure functions, `build/outputs-test`, 119 checks): scale
+The math is in `server/src/outputs.c` (pure functions, `build/outputs-test`, 131 checks): scale
 rounding and the recommended scale, logical ↔ physical, damage rectangles, mirrored views,
-snapping, fixing overlaps after a change, normalizing, the pointer across displays and the
+snapping, checking a dropped position (`out_fits`) and a whole arrangement (`out_valid`), fixing overlaps after a change, normalizing, the pointer across displays and the
 display with most of a window.
+
+## Numbers, identify and snapping (Settings → Displays)
+
+Like macOS's "Arrange Displays", with more than one display (extend mode):
+
+- **Numbers.** Every active display gets a number: the main display is **1**, the others follow in
+  the order `lord.display.list()` gives them (connector order). `displayNumbers(outputs)` in
+  `sdk/displaylayout.js` computes them; the arrangement's tiles show the number in a small circle
+  next to the name, and the selected display's header shows "Display 2" next to its name. Making
+  another display the main one renumbers them (the main one is always 1). No numbers in mirror mode
+  or with a single display.
+- **Identify.** Clicking a tile (without dragging it) or the **Identify** button under the
+  arrangement calls `identifyDisplays(ids?)` (`sdk/displaysui.jsx`, exported by `@lordos/sdk`): the
+  number is drawn big (a 120–240 px rounded badge, 30 % of the display's short side) centered on
+  the real display for 1.5 s, fading in (120 ms) and out (the last 450 ms) with `lord.setStyle`
+  on the overlay's opacity (no React render per frame; no fade with "Reduce motion"). The clicked
+  tile flashes (lighter fill, accent ring) for the same time. The badges are `<DisplayIdentify />`,
+  mounted by `startShell` in the `notification` layer (`sdk/index.js`, see `LAYERS.md`), so both
+  themes get it without code of their own. Each badge sits at its display's global logical
+  rectangle (`lord.screen.displays`, matched by connector), since the desktop is one space across
+  displays; it takes no clicks (`pointerEvents: 'none'`).
+- **Magnetic arrangement.** While a tile is dragged, `snapDisplay(rects, i, x, y, threshold)`
+  moves each axis independently to the nearest of these targets within 12 preview px (converted
+  to logical px with the preview's scale): edge to edge (its left on the other's right, its right
+  on the other's left, the same for top/bottom), starts aligned (tops or lefts), ends aligned
+  (bottoms or rights) and centers aligned. Only displays near on the other axis (no further than
+  the threshold) attract an axis, so a display far below another doesn't stick to its side. The
+  preview's scale is frozen during the drag, so the tile follows the pointer; it is dimmed while
+  its position would not be valid.
+- **On drop**, `resolveDrop(...)` returns the snapped position when it is valid (it overlaps no
+  display and shares an edge, at least one pixel and not just a corner, with one of them); otherwise
+  the nearest valid position: beside, above or below each display, with the position along that
+  edge kept (clamped so the edges share a pixel), aligned to the start, end or center when within
+  the threshold, or slid just past a display that is in the way. Any relative position is allowed:
+  side by side, stacked, or offset diagonally as long as edges touch.
+- **lord-server keeps it exactly.** `lord.display.arrange(conn, x, y, true)` (`display_arrange`)
+  checks the position with `out_fits` (the same rule as `placementOk` in the SDK); a fitting
+  position is kept as is (`out_snap` with no alignment), anything else is still snapped next to a
+  display with the old 24 px alignment. `out_fix`, run on every plan, leaves a valid arrangement
+  alone (`out_valid`: no overlaps and every display joined through shared edges), so a chain such as
+  main ← display 3 ← display 2 is no longer re-snapped onto the main display; only an arrangement
+  that overlaps or has floating displays (after a scale or resolution change, an unplug, or dragging
+  away the display in the middle of a chain) is re-snapped in order.
+- Tests: `server/tests/display_layout_test.mjs` (numbers, touching, the snap targets, drops on top,
+  in empty space, corner-only, three displays, and a sweep of about 25,000 drops that must all touch and
+  never overlap; run by `make -C server test` through `run_suites.sh` when node exists) and the
+  `out_fits`/`out_valid`/chain checks in `build/outputs-test`.
+- **Untested on real hardware:** the identify badges and the drag were not run on two displays yet
+  (no multi-display machine where this was written); VM 118's two virtio-gpu heads are the
+  intended check.
 
 ## How it is drawn
 
@@ -92,6 +142,9 @@ display with most of a window.
 - **Unplugging**: the theme gets the new `lord.screen.displays`; the SDK moves windows that are no
   longer on any display to the main one (centered) and keeps the others inside their display's
   work area.
+- **The login screen** follows the same DRM uevents since 0.8.5 (without the system bus), so a monitor
+  plugged in after boot shows it (a Raspberry Pi 5 booted without HDMI used to stay without video until
+  restarted), and it lays out its clock, users and buttons again on the main display.
 - **No free CRTC** (the card drives fewer displays than are connected): the display is listed as
   connected but not active, and Settings says so.
 - **Settings** changes are live with the 15 s "Keep these display settings?" countdown (mode,
@@ -110,8 +163,11 @@ display with most of a window.
   a window never goes under a menu bar but can go up to the top of a display without one.
 - System dialogs (permission prompts, Search, clipboard, keyring, print dialog, the display
   confirmation) go on the main display (`mainBox()`); fullscreen SDK windows cover their display.
-- Both themes: wallpaper per display, menu bar (default) or taskbar (classic) and Dock on the main
+- Both themes: wallpaper per display, menu bar (Lord Flow) or taskbar (Lord Classic) and Dock on the main
   display, the app launcher and Control Center on the main display (or the menu bar's display).
+- **Window menu → Move to <display>** (0.8.5, both themes, `sdk/windowmenu.js`): one item for every
+  other display; `wm.moveToDisplay(id, displayId)` (`sdk/windows.js`) keeps a snapped window in its zone
+  on the new display and keeps any other window's place relative to the work area, shrunk to fit.
 
 ## Wayland
 
@@ -197,9 +253,19 @@ head: `screendump file.ppm vga 1` in `qm monitor 118`.
   the capture paths ran (the permission prompt appeared on the main display). The remote desktop
   with two displays was not tested with a browser.
 - **Legacy Wayland clients at 125/150/175 %** get `scale = 2` and are downscaled (bilinear): not
-  pixel-exact. Xwayland is not part of LordOS.
+  pixel-exact. X11 apps (Xwayland, 0.8.3) are scaled the same way.
 - Apps' own cursor images (`wl_pointer.set_cursor`) are not scaled.
 - Different refresh rates: each display flips on its own vblank, but `wp_presentation` and frame
   callbacks follow the main display.
 - Per-display Night Light: the temperature is the same for all; if any display lacks a gamma LUT
   the software tint is used for all of them.
+
+## Assigning an app to a display (0.8.5)
+
+Dock → Options → Assign To lists the displays when there is more than one: an app assigned to one opens
+its new windows there, wherever the pointer is; "None" follows the pointer. The assignment is kept in
+`settings.appDisplays` by the display's connector (`HDMI-A-1`, `DP-2`, from `lord.screen.displays[].connector`),
+not its name, because two monitors of the same model share a name; a value saved by name before still
+works while it names a single display (`sdk/dock.js`, `assignedDisplay`). The sign-in and lock screen
+shows its clock, users and buttons on the main display and its wallpaper on every display
+(`themes/greeter`).

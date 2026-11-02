@@ -38,6 +38,10 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
 | `zxdg_decoration_manager_v1` | 1 | the app picks who draws the frame: server side (Qt, foot, Kitty, Alacritty: the theme's frame) or client side (Chromium with its own bar), also while it's open (0.8.4) |
 | `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
+| `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
+| `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
+| `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: only a hint for the on-screen keyboard; text keeps arriving on `wl_keyboard` (0.8.7, `wl_textinput.c`, see `ON-SCREEN-KEYBOARD.md`) |
+| `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
@@ -54,7 +58,7 @@ From the LordOS Terminal: every new tab has `WAYLAND_DISPLAY`, `XDG_SESSION_TYPE
 `foot &` is enough. Apps also receive LordOS's language and region (`LANG`, `LC_*`, see
 `LANGUAGES.md`).
 
-They also appear in the **app launcher**, in the Classic theme's start menu and in the Store (see
+They also appear in the **app launcher**, in the Lord Classic theme's start menu and in the Store (see
 `NATIVE-APPS.md` and `PACKAGES.md`): they are the apps with a `.desktop` in
 `/usr/share/applications` or `~/.local/share/applications`. They open with one click, and their
 window carries the same icon in the Dock as in the app launcher (they're recognized by the Wayland
@@ -65,7 +69,7 @@ app id or by `StartupWMClass`).
 | ![launchpad](app-launcher-linux-apps.png) | ![launched](app-launched-from-launcher.png) |
 | The app launcher with the installed Linux apps next to the LordOS apps, each with its own icon | FeatherPad opened with one click; it carries the same icon in the Dock |
 | ![classic](classic-theme-start-menu.png) | ![classic2](classic-theme-linux-app.png) |
-| Classic theme: the start menu with LordOS apps and Linux apps, grouped by category | FeatherPad running in the classic theme, with its icon in the taskbar |
+| Lord Classic theme: the start menu with LordOS apps and Linux apps, grouped by category | FeatherPad running in the Lord Classic theme, with its icon in the taskbar |
 
 ### The launcher (`server/src/apps.c`)
 
@@ -109,6 +113,14 @@ shell. The user approved it for M7. Limits:
   - `.lpk` packages are installed in another folder.
 
   So the interface can't invent a command: it can only pick an app that's already installed.
+- **File names with spaces (0.8.5):** a package may name its `.desktop` freely (`LordOS
+  Imager.desktop`). Its id is the file name with every character other than letters, digits, `.`, `_`
+  and `-` turned into `-` (`LordOS-Imager`), and the app is listed and launched from its real file;
+  the id rules above are unchanged. The two folders' modification times are compared in nanoseconds,
+  so an app installed in the same second the list was last read also shows up.
+- **Force Quit (0.8.5):** `lord.wayland.kill(surface)` sends SIGKILL only to the Wayland client that
+  owns that surface, a process of the same user, never `lord-server`; X11 windows are only asked to
+  close (`WINDOWS.md`, "The Window menu, the app menu and Force Quit").
 
 Icons: the `hicolor` PNG (64, 48, 128… px) or the one in `/usr/share/pixmaps` is used. Apps that
 only ship SVG (FeatherPad, GTK Demo) use the 64 px PNG Debian publishes in AppStream, which the
@@ -171,7 +183,7 @@ resizing (see `WINDOWS.md`).
 | ![chromium light](chromium-csd-light.png) | ![chromium dark](chromium-csd-dark.png) |
 | Chromium with its own bar (0.8.4 default): tabs in the title bar and LordOS's traffic lights on the left, from LordOS's GTK theme | The same in dark: it follows the mode live |
 | ![before](chromium-csd-before.png) | ![classic](chromium-csd-classic.png) |
-| Before 0.8.4: Chromium asked to draw its own bar and LordOS put its frame on top anyway (two bars) | The Classic theme: the buttons go to the right (`:minimize,maximize,close`), switched live |
+| Before 0.8.4: Chromium asked to draw its own bar and LordOS put its frame on top anyway (two bars) | The Lord Classic theme: the buttons go to the right (`:minimize,maximize,close`), switched live |
 | ![firefox](firefox-csd.png) | ![own theme](chromium-own-theme.png) |
 | Firefox ESR with its own bar: LordOS's order and side, drawn in Firefox's own style | Chromium with its «Classic» theme (not GTK): LordOS's order and side, Chromium's own buttons |
 | ![gtk dark](decorations-gtk-dark.png) | ![gtk light](decorations-gtk3-light.png) |
@@ -206,8 +218,8 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   maximize, restore and minimize from its own buttons, double click on its bar (the app asks to
   maximize);
 - **the window menu**: a right click on a GTK headerbar asks `xdg_toplevel.show_window_menu`, and
-  the theme shows its menu at that point (`w.windowMenu`, `wm.showWindowMenu`): Lord Default the
-  menu bar's Window items (Minimize, Zoom, Close Window), Classic its title bar menu plus **Snap
+  the theme shows its menu at that point (`w.windowMenu`, `wm.showWindowMenu`): Lord Flow the
+  menu bar's Window items (Minimize, Zoom, Close Window), Lord Classic its title bar menu plus **Snap
   layouts**, which opens the same flyout its maximize button shows on hover (an app's own maximize
   button can't). Chromium shows its own menu on its tab strip instead (with «Use system title bar
   and borders» in it);
@@ -220,7 +232,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
 | | |
 |---|---|
 | ![window menu](csd-window-menu.png) | ![snap layouts](csd-snap-layouts.png) |
-| GTK Demo (own frame): right click on its bar, Lord Default's window menu | Classic: the window menu's «Snap layouts» on an app with its own bar |
+| GTK Demo (own frame): right click on its bar, Lord Flow's window menu | Lord Classic: the window menu's «Snap layouts» on an app with its own bar |
 
 ### The browsers by default
 
@@ -267,7 +279,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   - The `LordOS`/`LordOS-dark` theme (`assets/gtk/`, installed in `/usr/share/themes`) is Adwaita
     with LordOS's colors, bar and traffic lights.
   - GTK 3 has no accent: its own stays blue.
-- **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Classic
+- **The buttons** go on the left in traffic-light order (`close,minimize,maximize:`). The Lord Classic
   theme asks for them on the right with the `gtkButtons` token (`:minimize,maximize,close`). GTK
   apps, Chromium and Firefox move them live when the theme changes.
 - **Qt/KDE.** They use the theme's frame (xdg-decoration). Qt 6 also reads `color-scheme` from the
@@ -463,10 +475,21 @@ display.
   the build installed before (October 18) and with the LordOS frame, so it isn't the frame. To
   investigate (two `wl_seat` bindings from the same client get the events twice).
 - SVG app icons (most modern GTK/Qt apps only ship SVG).
-- Opening files with a Linux app (`%f`/`%u`), `.desktop` actions and terminal apps.
+- Terminal apps (`Terminal=true`: neither listed nor launched). (Opening files with a Linux app,
+  `%f`/`%u`, and `.desktop` actions: done, see "The launcher" above; actions since 0.8.1.)
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
 - Drag and drop, `text-input` (LordOS input methods inside Wayland apps), activation
   (`xdg-activation`). (Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
+
+## Clipboard to its owner and idle-inhibit (0.8.5)
+
+- **The selection goes to the focused client, its owner included.** `offer_selection` and `prim_offer_to`
+  used to skip the client that set the selection; the protocol says the client with the keyboard gets every
+  new selection. Now it does, and `dev_set_selection` offers the new selection at once (a receive from the
+  owner is forwarded to its own source). Found by `lordos-testbench` (`docs/PAPER-VALIDATION.md`).
+- **`zwp_idle_inhibit_manager_v1`**: a video player or a presentation creates an inhibitor on its surface;
+  while that surface is mapped, `wl_idle_inhibited()` is true and `main.c` resets the idle timers (screen off,
+  lock, sleep; Settings → Battery) on every loop.

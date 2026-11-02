@@ -50,7 +50,7 @@ Varios métodos pueden convivir. Por defecto, la bóveda se cierra sola después
 
 - **Se abre al ingresar.** `lord-sessiond` verifica tu contraseña de ingreso, se la pasa una sola vez a `lord-vault` para abrir el llavero de la sesión y borra su copia.
 - **Las apps de LordOS** guardan sus secretos con el `keyring` del SDK. Cada app ve solo sus propios ítems. Para las apps `.lpk` instaladas, `lord-server` fija el dueño a partir de la identidad verificada de la app, así que una app no puede hacerse pasar por otra. Si una app pide un ítem de otra app, el sistema primero te pregunta a vos.
-- **Las apps de Linux** usan el Secret Service estándar de freedesktop por D-Bus, servido por código propio de LordOS. Chromium se probó de punta a punta: guardó un login, se reinició, buscó su clave en el llavero de LordOS y completó el login.
+- **Las apps de Linux** usan el Secret Service estándar de freedesktop por D-Bus, servido por código propio de LordOS. Chromium se probó de punta a punta: guardó un login, se reinició, buscó su clave en el llavero de LordOS y completó el login. Desde 0.8.5 una sesión que arranca con el equipo espera a su bus de sesión, así que con el ingreso automático el llavero de LordOS tiene el Secret Service desde el principio, y si una app trae gnome-keyring, solo corre su parte PKCS#11; en la VM de prueba Chrome pidió entonces la clave por el aviso del llavero de LordOS.
 
 [[shot:4]]
 

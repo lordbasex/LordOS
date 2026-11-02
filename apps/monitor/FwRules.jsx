@@ -12,7 +12,7 @@
 // The rules are saved by lord-server (lord.fw); this screen writes no files.
 import {
   View, Text, Button, Segmented, ScrollView, GroupBox, useTheme, useLocale, useStore, useLauncherApps, firewall, firewallState, fwRule,
-  spacing, typeScale, formatDate, formatTime, direction,
+  spacing, typeScale, formatDate, formatTime, direction, netModel,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { RuleSheet, destKind, RED, GREEN } from './RuleSheet.jsx';
@@ -32,7 +32,10 @@ function useAppIndex() {
   return byId;
 }
 
-export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos') : apps.get(id)?.name || id.replace(/^(desktop|lpk):/, ''));
+// (0.8.5) LordOS's own components with their own scope take rules too (Mail, Store, Printers, Terminal, Blocklists)
+const { COMPONENTS } = netModel;
+const COMPONENT_IDS = Object.keys(COMPONENTS).filter((id) => id.startsWith('lordos:') && !COMPONENTS[id].system);
+export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : apps.get(id)?.name || id.replace(/^(desktop|lpk):/, ''));
 
 function AppIcon({ a, size = 24 }) {
   const t = useTheme();
@@ -149,7 +152,7 @@ function AddApp({ apps, exclude, onPick }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [open, setOpen] = useState(false);
-  const choices = ['lordos', ...apps.keys()].filter((id) => !exclude.has(id));
+  const choices = ['lordos', ...COMPONENT_IDS, ...apps.keys()].filter((id) => !exclude.has(id));
   return (
     <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
       <View style={{ flexDirection: 'row' }}>

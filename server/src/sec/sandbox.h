@@ -22,6 +22,7 @@ typedef struct {
     const char *data_dir;       /* ~/.local/share/lordos/appdata/<id> (read and write) */
     const char *runtime_dir;    /* XDG_RUNTIME_DIR (for the Wayland socket; just what's needed) */
     const char *const *ro_extra;/* extra read-only folders (fonts, assets); NULL-terminated */
+    const char *const *dev_files;/* exact device files opened for read and write; NULL-terminated */
     int network;                /* 1 if the app declared and has the `network` permission */
 } SandboxConfig;
 
@@ -44,7 +45,7 @@ void sandbox_scope_name(const char *id, char *out, size_t n);
  * type byte of the ioctl number (_IOC_TYPE): only those types; never a generic ioctl nor
  * TIOCSTI. The helper can NOT open /dev (Landlock): it gets the device fds already
  * opened by lord-server. */
-enum { SANDBOX_IOCTL_DRM = 1, SANDBOX_IOCTL_V4L2 = 2, SANDBOX_IOCTL_DMABUF = 4 };
+enum { SANDBOX_IOCTL_DRM = 1, SANDBOX_IOCTL_V4L2 = 2, SANDBOX_IOCTL_DMABUF = 4, SANDBOX_IOCTL_MEDIA = 8 };
 
 typedef struct {
     const char *name;               /* cgroup scope name (e.g. "lord-media") */
@@ -57,6 +58,8 @@ typedef struct {
      * files (no truncation). That way the helper needs no path at all. */
     const int *ro_dir_fds;
     const int *rw_dir_fds;
+    /* exact device files a decoder library opens by path itself: the Pi 5's HEVC decoder only */
+    const char *const *dev_files;
 } SandboxHelperCfg;
 
 /* Callers can detect the ro_dir_fds/rw_dir_fds fields. */
@@ -68,6 +71,10 @@ typedef struct {
  * can't be applied, the process exits (fails closed). kcmp, if requested in extra_syscalls,
  * only works for comparing fds of the process itself (pid1 == pid2 == getpid()). */
 int sandbox_apply_helper(const SandboxHelperCfg *cfg);
+
+/* In a child right before execve of a system program that reads a server's bytes or a secret: only the system's folders,
+ * read-only, nothing to write but /dev/null; network 0 also means no TCP. Best effort on a kernel with no Landlock. */
+void sandbox_exec_child(int network);
 
 /* ---- "no access to your files" for Linux apps (the launcher, apps.c) ----
  * Landlock only: no seccomp, no capability changes, no network or scoping rules, so a normal

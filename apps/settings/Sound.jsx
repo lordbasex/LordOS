@@ -9,9 +9,11 @@ import { Stack, Section, SettingRow, Note, tint } from './ui.jsx';
 function Volume({ kind, item, width = 170 }) {
   const t = useTheme();
   const pct = Math.round(item.level * 100);
+  // past 100 % the gain is digital: anything loud clips, whatever the card or headphones
+  useEffect(() => { if (item.level > 1) sound.setVolume(kind, item.index, 1); }, [item.index, item.level > 1]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, direction: 'ltr' }}>
-      <Slider value={Math.min(1.5, item.level)} max={1.5} width={width} onChange={(v) => sound.setVolume(kind, item.index, v)} />
+      <Slider value={Math.min(1, item.level)} max={1} width={width} onChange={(v) => sound.setVolume(kind, item.index, v)} />
       <Text style={{ width: 40, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end' }}>{`${pct} %`}</Text>
       <Toggle small on={!item.mute} onChange={(on) => sound.setMute(kind, item.index, !on)} />
     </View>

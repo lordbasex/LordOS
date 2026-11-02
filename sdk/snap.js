@@ -1,7 +1,7 @@
 // snap.js — the geometry of window snapping (sdk/windows.js "Snapping", docs/WINDOWS.md), with no
 // runtime imports so it can be tested with node (server/tests/snap_test.mjs).
 
-export const SNAP_ZONES = ['left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'max',
+export const SNAP_ZONES = ['left', 'right', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'max',
   'left-third', 'center-third', 'right-third', 'left-two-thirds', 'right-two-thirds'];
 
 // The rectangle of a zone inside a work area `a` ({ x, y, w, h }). Halves and quarters round to
@@ -11,6 +11,8 @@ export function snapRect(zone, a) {
   switch (zone) {
     case 'left': return { x: a.x, y: a.y, w: hw, h: a.h };
     case 'right': return { x: a.x + hw, y: a.y, w: a.w - hw, h: a.h };
+    case 'top': return { x: a.x, y: a.y, w: a.w, h: hh };
+    case 'bottom': return { x: a.x, y: a.y + hh, w: a.w, h: a.h - hh };
     case 'top-left': return { x: a.x, y: a.y, w: hw, h: hh };
     case 'top-right': return { x: a.x + hw, y: a.y, w: a.w - hw, h: hh };
     case 'bottom-left': return { x: a.x, y: a.y + hh, w: hw, h: a.h - hh };

@@ -147,10 +147,18 @@ export function KeyringPrompt() {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setPw(''); setErr(''); }, [q.length]);
-  if (!q.length) return null;
   const cur = q[0];
-  const done = (ok) => { try { lord.vault.promptDone(cur.prompt, ok); } catch (e) { /* */ } prompts.set((l) => l.slice(1)); };
+  // a new prompt clears the field; more of them queuing up behind it doesn't (they used to wipe what
+  // was being typed)
+  useEffect(() => { setPw(''); setErr(''); }, [cur?.prompt]);
+  if (!q.length) return null;
+  // every queued prompt asks for the same keyring: one answer goes to all of them, so Cancel doesn't
+  // bring the same box back once per request an app made
+  const done = (ok) => {
+    const all = prompts.get();
+    for (const p of all) { try { lord.vault.promptDone(p.prompt, ok); } catch (e) { /* */ } }
+    prompts.set((l) => l.filter((p) => !all.includes(p)));
+  };
   const submit = async () => {
     setBusy(true);
     try { await vaultRequest('unlock', { v: 'login', method: 'session', password: pw }); setBusy(false); done(true); }

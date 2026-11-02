@@ -16,11 +16,41 @@
  *   lord.bt.state() / power(on) / discover(on) / pair(path) / connect(path) / disconnect(path)
  *          / forget(path) / answer(id, accept, value)
  *   lord.mime.get(mime) / set(mime, id) / guess(path) / terminal() / setTerminal(id)
+ *   lord.mime.resolve(mime)                     { id, explicit, source }: the app launchWith('') uses
+ *   lord.mime.unset(mime)                       back to the automatic choice
  *   lord.timedate.refresh()                     answer as __lordHw('timedate', …)
  *   lord.notifyd.closed(id, reason) / action(id, key)   back to the Linux app that notified
  *   lord.hwinfo.scan()                          read-only hardware facts for the Store's suggestions
  *                                               (hw/hwscan.c: DMI, device tree, PCI/USB IDs, virtio
  *                                               ports, missing firmware when the kernel log is readable)
+ *   lord.sysinfo.report()                       System Information (sysreport/: the same report as
+ *                                               lordos-sysreport, no serials, addresses or names) plus
+ *                                               session: how this session composes the screen and its
+ *                                               GPU context (gpu/gpu.h gpu_info, lord_composition)
+ *   lord.sysinfo.facts()                        the Checks tab's facts (sysreport/facts.c): lord-server's
+ *                                               uid/euid, its cgroup and who owns it, app scopes, and
+ *                                               whether anything listens on the remote desktop's port
+ *   lord.sysinfo.probe()                        the last sandbox probe's result (sec/brokersrv.c, BOP_PROBE:
+ *                                               the system package `sysprobe`, app/probe.c), or null
+ *   lord.sysinfo.markdown()                     the same report as Markdown, as lordos-sysreport prints it,
+ *                                               with a "This session" section (System Information's Report tab)
+ *   lord.sysinfo.peripherals()                  (0.8.7) keyboards, mice, receivers and other devices on this machine's USB
+ *                                               and input buses (sysreport/periph.c), for the Hardware tab only: their
+ *                                               names can carry a person's, so it is not part of report() or markdown()
+ *   lord.sysinfo.community()                    (0.8.7) the tested-hardware catalogue's snapshot for the Compatibility
+ *                                               panel: { state, snapshot } where snapshot is given only when
+ *                                               <assets>/hwreport/snapshot.json is signed with the key this build
+ *                                               trusts and well formed (sysreport/hwsnap.c); no arguments, no path
+ *                                               from JS; state 'ok' | 'missing' | 'unsigned' | 'bad-signature' | 'invalid'
+ *   lord.sysinfo.bench.start(mode, sustainedS) / poll() / cancel() / saved(which) / boots()
+ *                                               LordBench (bench/lbrun.c, the lord-bench helper): mode
+ *                                               'quick' | 'full' (then video in lord-media) | 'desktop'
+ *                                               (the compositor's frame times, alone and under load);
+ *                                               poll() → {state, step, progress, result}; saved(0|1) the
+ *                                               last or previous peak result, saved(2|3) the desktop ones;
+ *                                               boots() the boot times per LordOS version (lord-sessiond's history);
+ *                                               bootTest() the boot time test's state or null (bench/boottest.h;
+ *                                               started and stopped with the boot-test admin actions)
  *   lord.fan.status() / setProfile(p) / setCurve(pts) / force(v) / caseConfig()   (js_fan.c, lord-fand)
  *   lord.browserFrame.apply(on, which)          Settings → Appearance → "Browsers: tabs in the title bar":
  *                                               one preference in the user's Chromium/Firefox profiles
@@ -34,10 +64,22 @@
 #include "js_fan.h"
 #include "../hw/brframe.h"
 #include "../hw/bt.h"
+#include "../apps.h"
 #include "../hw/defaults.h"
 #include "../hw/display.h"
 #include "../hw/hw.h"
 #include "../hw/hwscan.h"
+#include "../gpu/gpu.h"
+#include "../sysreport/sysreport.h"
+#include "../sysreport/periph.h"
+#include "../sysreport/facts.h"
+#include "../sysreport/hwsnap.h"
+#include "../sec/codesig.h"
+#include "js_sys.h"
+#include "../bench/lbrun.h"
+#include "../bench/boottest.h"
+#include "../sec/broker.h"
+#include "lord_version.h"           /* build/gen: the version for the report */
 #include "../hw/mimeapps.h"
 #include "../hw/notifyd.h"
 #include "../hw/ppd.h"
@@ -291,6 +333,29 @@ static JSValue f_mime_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     return JS_NewBool(c, mime_valid(mime) && desktop_id_valid(id) && defaults_set(mime, id) == 0);
 }
 
+/* lord.mime.resolve(mime) → { id: 'x.desktop', explicit, source: 'user'|'system'|'declared' } or
+ * null: the app launchWith('', …) uses (apps_default_for); explicit only for the user's own choice. */
+static JSValue f_mime_resolve(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char mime[MIME_MAX], id[DESKTOP_ID_MAX];
+    if (!argc || arg_str(c, argv[0], mime, sizeof mime) || !mime_valid(mime)) return JS_NULL;
+    int r = apps_default_for(mime, id, sizeof id);
+    if (r <= 0) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "id", JS_NewString(c, id));
+    JS_SetPropertyStr(c, o, "explicit", JS_NewBool(c, r == APPS_DEFAULT_USER));
+    JS_SetPropertyStr(c, o, "source", JS_NewString(c, r == APPS_DEFAULT_USER ? "user" : r == APPS_DEFAULT_LISTED ? "system" : "declared"));
+    return o;
+}
+
+/* lord.mime.unset(mime): the user's choice for that type is removed (back to automatic). */
+static JSValue f_mime_unset(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char mime[MIME_MAX];
+    if (!argc || arg_str(c, argv[0], mime, sizeof mime)) return JS_FALSE;
+    return JS_NewBool(c, mime_valid(mime) && defaults_unset(mime) == 0);
+}
+
 static JSValue f_mime_guess(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char path[1024], mime[MIME_MAX];
@@ -314,6 +379,8 @@ static JSValue f_mime_set_terminal(JSContext *c, JSValueConst t, int argc, JSVal
 static const JSCFunctionListEntry mime_funcs[] = {
     JS_CFUNC_DEF("get", 1, f_mime_get),
     JS_CFUNC_DEF("set", 2, f_mime_set),
+    JS_CFUNC_DEF("resolve", 1, f_mime_resolve),
+    JS_CFUNC_DEF("unset", 1, f_mime_unset),
     JS_CFUNC_DEF("guess", 1, f_mime_guess),
     JS_CFUNC_DEF("terminal", 0, f_mime_terminal),
     JS_CFUNC_DEF("setTerminal", 1, f_mime_set_terminal),
@@ -365,6 +432,226 @@ static JSValue f_hwinfo_scan(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static const JSCFunctionListEntry hwinfo_funcs[] = { JS_CFUNC_DEF("scan", 0, f_hwinfo_scan) };
+
+/* ---- lord.sysinfo (System Information, docs/BENCHMARK.md) ---- */
+
+/* The report of this machine (or of the development fixture), with LordOS's version; NULL on OOM. */
+static SysReport *sysinfo_collect(void) {
+    SysReport *r = malloc(sizeof *r);
+    if (!r) return NULL;
+    sysreport_collect(r, hwscan_root(), NULL, NULL);      /* the same development fixtures as the Store's */
+    snprintf(r->sw.lordos, sizeof r->sw.lordos, "%s%s%s", LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL);
+    return r;
+}
+
+static JSValue f_sysinfo_report(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    const char *root = hwscan_root();
+    SysReport *r = sysinfo_collect();
+    if (!r) return JS_NULL;
+    JSValue v = json_or_null(c, sysreport_json(r));
+    free(r);
+    if (!JS_IsObject(v)) return v;
+    GpuInfo g;
+    gpu_info(&g);
+    JSValue s = JS_NewObject(c);
+    JS_SetPropertyStr(c, s, "composition", JS_NewString(c, lord_composition()));
+    JS_SetPropertyStr(c, s, "gpuInit", JS_NewString(c, g.why));
+    JS_SetPropertyStr(c, s, "renderer", JS_NewString(c, g.renderer));
+    JS_SetPropertyStr(c, s, "renderNode", JS_NewString(c, g.render_node));
+    JS_SetPropertyStr(c, s, "dmabuf", JS_NewBool(c, g.dmabuf));
+    JS_SetPropertyStr(c, s, "scanouts", JS_NewFloat64(c, (double)g.scanouts));
+    JS_SetPropertyStr(c, s, "fixture", JS_NewBool(c, root[0] != 0));
+    JS_SetPropertyStr(c, v, "session", s);
+    return v;
+}
+
+static JSValue f_sysinfo_markdown(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    SysReport *r = sysinfo_collect();
+    char *md = r ? sysreport_markdown(r) : NULL;
+    free(r);
+    if (!md) return JS_NULL;
+    GpuInfo g;
+    gpu_info(&g);
+    const char *comp = lord_composition();
+    char sess[512];
+    if (!strcmp(comp, "gpu"))
+        snprintf(sess, sizeof sess, "\n## This session\n\nThe screen is composed on the GPU (%s); %lu frames shown by direct scanout since the session started.\n",
+                 g.renderer, g.scanouts);
+    else
+        snprintf(sess, sizeof sess, "\n## This session\n\nThe screen is composed on the CPU (`%s`%s%s).\n",
+                 comp, !strcmp(comp, "gpu-off") && g.why[0] ? ", GPU: " : "", !strcmp(comp, "gpu-off") ? g.why : "");
+    size_t a = strlen(md), b = strlen(sess);
+    char *all = malloc(a + b + 1);
+    if (!all) { free(md); return JS_NULL; }
+    memcpy(all, md, a);
+    memcpy(all + a, sess, b + 1);
+    free(md);
+    JSValue v = JS_NewString(c, all);
+    free(all);
+    return v;
+}
+
+static JSValue f_sysinfo_facts(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    const char *root = hwscan_root();
+    SrFacts f;
+    sr_facts(&f, root);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "uid", JS_NewInt32(c, f.uid));
+    JS_SetPropertyStr(c, o, "euid", JS_NewInt32(c, f.euid));
+    JS_SetPropertyStr(c, o, "cgroup", JS_NewString(c, f.cgroup));
+    JS_SetPropertyStr(c, o, "leafRoot", f.leaf_root < 0 ? JS_NULL : JS_NewBool(c, f.leaf_root));
+    JS_SetPropertyStr(c, o, "parentRoot", f.parent_root < 0 ? JS_NULL : JS_NewBool(c, f.parent_root));
+    JS_SetPropertyStr(c, o, "appScopes", JS_NewInt32(c, f.app_scopes));
+    int l = sr_tcp_listening(root, 5673);   /* the remote desktop's port (docs/REMOTE.md) */
+    JS_SetPropertyStr(c, o, "remoteListening", l < 0 ? JS_NULL : JS_NewBool(c, l));
+    JS_SetPropertyStr(c, o, "fixture", JS_NewBool(c, root[0] != 0));
+    return o;
+}
+
+static JSValue f_sysinfo_probe(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    const char *j = brokersrv_probe_result();
+    return j ? JS_ParseJSON(c, j, strlen(j), "<probe>") : JS_NULL;
+}
+
+/* (0.8.7) the catalogue's snapshot, verified in C before JS sees any of it; read again on every call (the
+ * Compatibility tab asks once when it opens), so a package update is seen without restarting the session */
+static JSValue f_sysinfo_community(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char dir[4096], err[160] = "";
+    const char *assets = js_sys_assets();
+    JSValue o = JS_NewObject(c);
+    char *json = NULL;
+    size_t len = 0;
+    HwSnapState st = HWSNAP_MISSING;
+    if (assets && assets[0] == '/' && (size_t)snprintf(dir, sizeof dir, "%s/hwreport", assets) < sizeof dir)
+        st = hwsnap_load(dir, codesig_key(), &json, &len, err, sizeof err);
+    JS_SetPropertyStr(c, o, "state", JS_NewString(c, hwsnap_state_name(st)));
+    if (st == HWSNAP_OK) {
+        JSValue v = JS_ParseJSON(c, json, len, "<hwsnapshot>");
+        if (JS_IsException(v)) { JS_FreeValue(c, JS_GetException(c)); JS_SetPropertyStr(c, o, "state", JS_NewString(c, "invalid")); }
+        else JS_SetPropertyStr(c, o, "snapshot", v);
+    } else if (st != HWSNAP_MISSING) {
+        fprintf(stderr, "sysinfo: hardware snapshot not used: %s (%s)\n", hwsnap_state_name(st), err);
+    }
+    free(json);
+    return o;
+}
+
+/* ---- lord.sysinfo.bench (LordBench) ---- */
+
+/* what a result records about this session: how the screen is composed and each active display's
+ * connector, mode, refresh, scale and rotation (no names, vendors or identities) */
+static char *bench_session_json(JSContext *c) {
+    GpuInfo g;
+    gpu_info(&g);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "composition", JS_NewString(c, lord_composition()));
+    JS_SetPropertyStr(c, o, "gpuInit", JS_NewString(c, g.why ? g.why : ""));
+    JS_SetPropertyStr(c, o, "renderer", JS_NewString(c, g.renderer ? g.renderer : ""));
+    JSValue outs = JS_NewArray(c);
+    JSValue d = json_or_null(c, display_list_json());
+    JSValue list = JS_IsObject(d) ? JS_GetPropertyStr(c, d, "outputs") : JS_UNDEFINED;
+    uint32_t k = 0;
+    for (uint32_t i = 0; JS_IsArray(c, list) && i < 16; i++) {
+        JSValue e = JS_GetPropertyUint32(c, list, i);
+        if (!JS_IsObject(e)) { JS_FreeValue(c, e); break; }
+        JSValue act = JS_GetPropertyStr(c, e, "active");
+        if (JS_ToBool(c, act) > 0) {
+            JSValue x = JS_NewObject(c);
+            static const char *const keep[] = { "connector", "builtin", "mode", "scale", "rotation" };
+            for (int f = 0; f < 5; f++) JS_SetPropertyStr(c, x, keep[f], JS_GetPropertyStr(c, e, keep[f]));
+            JS_SetPropertyUint32(c, outs, k++, x);
+        }
+        JS_FreeValue(c, act);
+        JS_FreeValue(c, e);
+    }
+    JS_FreeValue(c, list);
+    JS_FreeValue(c, d);
+    JS_SetPropertyStr(c, o, "displays", outs);
+    JSValue str = JS_JSONStringify(c, o, JS_UNDEFINED, JS_UNDEFINED);
+    JS_FreeValue(c, o);
+    const char *s = JS_ToCString(c, str);
+    char *r = s ? strdup(s) : NULL;
+    if (s) JS_FreeCString(c, s);
+    JS_FreeValue(c, str);
+    return r;
+}
+
+static JSValue f_bench_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *mode = argc > 0 ? JS_ToCString(c, argv[0]) : NULL;
+    if (!mode) return JS_FALSE;
+    int sus = argc > 1 ? arg_int(c, argv[1], 0) : 0;
+    char *extra = bench_session_json(c);
+    int r = lbrun_start(mode, sus, extra);
+    free(extra);
+    JS_FreeCString(c, mode);
+    return JS_NewBool(c, r == 0);
+}
+
+static JSValue f_bench_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_or_null(c, lbrun_poll());
+}
+
+static JSValue f_bench_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    lbrun_cancel();
+    return JS_UNDEFINED;
+}
+
+static JSValue f_bench_saved(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int which = argc > 0 ? arg_int(c, argv[0], 0) : 0;
+    if (which < 0 || which > 3) return JS_NULL;
+    JSValue v = json_or_null(c, lbrun_saved(which));
+    if (JS_IsException(v)) { JS_FreeValue(c, JS_GetException(c)); return JS_NULL; }
+    return v;
+}
+
+static JSValue f_bench_boots(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_or_null(c, lbrun_boot_history("/var/lib/lordos/boot-times.jsonl"));
+}
+
+/* the boot time test's state (bench/boottest.h): {total, left, at} while one is set, else null */
+static JSValue f_bench_boot_test(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    BootTest b;
+    if (bt_read(BT_PATH, &b)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "total", JS_NewInt32(c, b.total));
+    JS_SetPropertyStr(c, o, "left", JS_NewInt32(c, b.left));
+    JS_SetPropertyStr(c, o, "at", JS_NewFloat64(c, (double)b.at));
+    return o;
+}
+
+static const JSCFunctionListEntry bench_funcs[] = {
+    JS_CFUNC_DEF("start", 2, f_bench_start),
+    JS_CFUNC_DEF("poll", 0, f_bench_poll),
+    JS_CFUNC_DEF("cancel", 0, f_bench_cancel),
+    JS_CFUNC_DEF("saved", 1, f_bench_saved),
+    JS_CFUNC_DEF("boots", 0, f_bench_boots),
+    JS_CFUNC_DEF("bootTest", 0, f_bench_boot_test),
+};
+
+static JSValue f_sysinfo_peripherals(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return json_or_null(c, periph_json(hwscan_root(), NULL));
+}
+
+static const JSCFunctionListEntry sysinfo_funcs[] = {
+    JS_CFUNC_DEF("report", 0, f_sysinfo_report),
+    JS_CFUNC_DEF("probe", 0, f_sysinfo_probe),
+    JS_CFUNC_DEF("facts", 0, f_sysinfo_facts),
+    JS_CFUNC_DEF("markdown", 0, f_sysinfo_markdown),
+    JS_CFUNC_DEF("peripherals", 0, f_sysinfo_peripherals),
+    JS_CFUNC_DEF("community", 0, f_sysinfo_community),
+};
 
 /* ---- lord.browserFrame (Settings → Appearance; hw/brframe.c, docs/WAYLAND.md) ---- */
 
@@ -439,6 +726,12 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);
     add(c, lord, "notifyd", nd_funcs, sizeof nd_funcs / sizeof nd_funcs[0]);
     add(c, lord, "hwinfo", hwinfo_funcs, sizeof hwinfo_funcs / sizeof hwinfo_funcs[0]);
+    add(c, lord, "sysinfo", sysinfo_funcs, sizeof sysinfo_funcs / sizeof sysinfo_funcs[0]);
+    JSValue si = JS_GetPropertyStr(c, lord, "sysinfo");
+    JSValue bo = JS_NewObject(c);
+    JS_SetPropertyFunctionList(c, bo, bench_funcs, sizeof bench_funcs / sizeof bench_funcs[0]);
+    JS_SetPropertyStr(c, si, "bench", bo);
+    JS_FreeValue(c, si);
     add(c, lord, "browserFrame", brf_funcs, sizeof brf_funcs / sizeof brf_funcs[0]);
     js_fan_register(c, lord);           /* lord.fan: Settings → Cooling and Monitor (js_fan.c) */
 }

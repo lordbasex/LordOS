@@ -1,13 +1,15 @@
 #!/bin/sh
-# build.sh — builds the LordOS live ISO (Debian 13 + LordOS), hybrid for USB and CD,
-# with BIOS and UEFI boot. See docs/ISO.md.
+# build.sh — builds the LordOS live ISO (Debian 13 + LordOS), hybrid for USB and CD. The architecture
+# is the build host's (dpkg --print-architecture): amd64 boots with BIOS and UEFI, arm64 with UEFI only
+# (on an x86-64 machine, tools/iso/build-arm64.sh runs this script in an arm64 chroot). See docs/ISO.md.
 #
 # Usage (as root, on Debian 13, from the root of the already built repository):
-#   make -C server -j"$(nproc)"          # lord-server and lord-sessiond (needs libssl-dev, libsrtp2-dev and libusrsctp-dev: the remote desktop is WebRTC only; clang for lord-netperm's BPF)
+#   make -C server -j"$(nproc)"          # lord-server and lord-sessiond (needs libssl-dev, freerdp3-dev, libsrtp2-dev and libusrsctp-dev: the remote desktop is WebRTC only; clang for lord-netperm's BPF)
 #   (the themes: npm run build on the development machine; the .bundle.js files travel with the tree)
 #   sudo tools/iso/build.sh [work folder]   # default /var/tmp/lordos-iso
 #
-# Result: <work>/out/lordos-live-<version>-amd64.iso and lordos_<version>_amd64.deb
+# Result: <work>/out/lordos-live-<version>-<arch>.iso, lordos_<version>_<arch>.deb and
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
 set -eu
 
 [ "$(id -u)" = 0 ] || { echo "build.sh: run as root (sudo)" >&2; exit 1; }
@@ -20,23 +22,31 @@ SUITE=trixie
 CH="$WORK/chroot"
 IMG="$WORK/image"
 OUT="$WORK/out"
-ISO="$OUT/lordos-live-$VERSION-amd64.iso"
-DEB="$OUT/lordos_${VERSION}_amd64.deb"
+ARCH=$(dpkg --print-architecture)
+case "$ARCH" in
+    amd64) PKG_KERNEL=linux-image-amd64; PKGS_GRUB="grub-efi-amd64-bin grub-pc-bin"; GRUB_DIR=x86_64-efi; SQUASHFS_BCJ="-Xbcj x86" ;;
+    # UEFI only. mksquashfs has no BCJ filter for 64-bit ARM ("arm" is the 32-bit instruction set)
+    arm64) PKG_KERNEL=linux-image-arm64; PKGS_GRUB="grub-efi-arm64-bin"; GRUB_DIR=arm64-efi; SQUASHFS_BCJ="" ;;
+    *) echo "build.sh: LordOS builds a live ISO for amd64 and arm64, not $ARCH" >&2; exit 1 ;;
+esac
+ISO="$OUT/lordos-live-$VERSION-$ARCH.iso"
+DEB="$OUT/lordos_${VERSION}_$ARCH.deb"
 T0=$(date +%s)
 
 for t in debootstrap mksquashfs xorriso grub-mkrescue mformat dpkg-deb; do
     command -v "$t" >/dev/null || { echo "build.sh: missing $t (see docs/ISO.md, build packages)" >&2; exit 1; }
 done
+[ -d "/usr/lib/grub/$GRUB_DIR" ] || { echo "build.sh: missing /usr/lib/grub/$GRUB_DIR (see docs/ISO.md, build packages)" >&2; exit 1; }
 
 # Live system packages. LordOS does not use GNOME or KDE: only what is below (xwayland only for X11 apps).
-PKGS_BASE="linux-image-amd64 initramfs-tools live-boot live-boot-initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
+PKGS_BASE="$PKG_KERNEL initramfs-tools live-boot live-boot-initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
  iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps"
 # gsettings-desktop-schemas: without it GTK 3 apps can't read gtk-theme from the keyfile backend
 # lord-server writes, and they draw light Adwaita instead of LordOS / LordOS-dark (docs/WAYLAND.md)
 PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core
- libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon exfatprogs ntfs-3g
+ libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland"
@@ -45,8 +55,8 @@ PKGS_FIRMWARE="firmware-amd-graphics firmware-misc-nonfree firmware-iwlwifi firm
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
 # preinstalled browsers (Linux apps; they draw their own bar with LordOS's window buttons, see docs/WAYLAND.md)
 PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
-# the disk installer (server/src/install): partition, format, copy and grub for UEFI and BIOS
-PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common grub-efi-amd64-bin grub-pc-bin"
+# the disk installer (server/src/install): partition, format, copy and grub (UEFI and BIOS on amd64, UEFI on arm64)
+PKGS_INSTALLER="gdisk dosfstools e2fsprogs squashfs-tools util-linux grub-common grub2-common $PKGS_GRUB"
 # the boot splash (the LordOS Plymouth theme comes in the lordos package; plymouth-label draws the
 # password prompt's text for encrypted disks)
 PKGS_SPLASH="plymouth plymouth-label"
@@ -64,8 +74,10 @@ umount_all
 rm -rf "$CH" "$IMG"
 mkdir -p "$CH" "$IMG/live" "$IMG/boot/grub" "$OUT"
 
-# 1. the LordOS package
+# 1. the LordOS packages: lordos and the tested-hardware snapshot it depends on (docs/BENCHMARK.md)
 sh tools/iso/mkdeb.sh "$DEB"
+HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
+echo "   $(basename "$HWDEB")"
 
 # 2. sistema base
 echo "== debootstrap $SUITE (minbase)"
@@ -97,27 +109,14 @@ in_ch apt-get update -q > "$WORK/apt.log" 2>&1
 in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_LORDOS $PKGS_FIRMWARE $PKGS_GPU $PKGS_APPS $PKGS_INSTALLER $PKGS_SPLASH $PKGS_VM \
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 cp "$DEB" "$CH/tmp/lordos.deb"
-in_ch apt-get install -y -q --no-install-recommends /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
-# Chromium: new profiles draw their own bar (tabs in the title bar) with the GTK theme, so the
-# window buttons are LordOS's traffic lights from LordOS's GTK theme (docs/WAYLAND.md). The user
-# goes back to the LordOS frame with «Use system title bar and borders» (Settings → Appearance).
-if [ -f "$CH/etc/chromium/master_preferences" ]; then
-python3 - "$CH/etc/chromium/master_preferences" <<'PY'
-import json, sys
-p = sys.argv[1]; d = json.load(open(p))
-d.setdefault("browser", {})["custom_chrome_frame"] = True
-d.setdefault("extensions", {}).setdefault("theme", {})["system_theme"] = 1   # 1 = GTK
-json.dump(d, open(p, "w"), indent=2)
-PY
-fi
-# Firefox ESR: its own bar too (the user changes it in Customize Toolbar > Title Bar)
+cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
+in_ch apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+# the browsers' defaults (their own bar with LordOS's window buttons), shared with the Pi image
+sh tools/iso/browser-defaults.sh "$CH"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
+install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$CH/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
-install -d "$CH/etc/firefox-esr"
-printf '%s\n' '// LordOS: Firefox draws its own bar, with the window buttons in LordOS'"'"'s order (see' \
-  '// docs/WAYLAND.md); 0 gives it the LordOS frame instead (Customize Toolbar > Title Bar).' \
-  'pref("browser.tabs.inTitlebar", 1);' > "$CH/etc/firefox-esr/lordos.js"
-rm -f "$CH/tmp/lordos.deb"
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
 
 # 3. configuration
 echo "== configuration"
@@ -144,6 +143,7 @@ mkdir -p "$CH/etc/lordos"
 printf '# Live ISO: logs in automatically as the lordos user. The installed system uses the login screen.\nAUTOLOGIN=lordos\n' > "$CH/etc/lordos/session.conf"
 # the login screen's system user (lord-sessiond also creates it if missing)
 in_ch useradd --system --home-dir /var/lib/lordos-greeter --create-home --shell /usr/sbin/nologin --comment LordOS lordos-greeter
+in_ch usermod -aG render,video lordos-greeter
 install -m 440 tools/iso/rootfs/etc/sudoers.d/lordos-live "$CH/etc/sudoers.d/lordos-live"
 mkdir -p "$CH/var/lib/systemd/linger"; : > "$CH/var/lib/systemd/linger/lordos"
 # user PipeWire (the packages already enable the global units; just in case)
@@ -178,9 +178,11 @@ KVER=$(ls "$CH/boot" | sed -n 's/^vmlinuz-//p' | sort -V | tail -1)
 cp "$CH/boot/vmlinuz-$KVER" "$IMG/live/vmlinuz"
 cp "$CH/boot/initrd.img-$KVER" "$IMG/live/initrd.img"
 rm -f "$IMG/live/filesystem.squashfs"
-mksquashfs "$CH" "$IMG/live/filesystem.squashfs" -comp xz -Xbcj x86 -b 1M -noappend -quiet > /dev/null
+# shellcheck disable=SC2086 # $SQUASHFS_BCJ: empty, or an option and its value
+mksquashfs "$CH" "$IMG/live/filesystem.squashfs" -comp xz $SQUASHFS_BCJ -b 1M -noappend -quiet > /dev/null
 
-# 5. grub (BIOS + UEFI in the same hybrid ISO). GRUB menus are English; the entries with a
+# 5. grub (BIOS + UEFI in the same hybrid ISO on amd64; UEFI on arm64: grub-mkrescue builds for the
+# platforms it finds in /usr/lib/grub). GRUB menus are English; the entries with a
 # language name pass lordos.lang to lordos-live-prep (English is the default).
 # The LordOS boot menu theme (dark, small crown, rounded selection); "safe mode" boots
 # without the splash (text), the other entries with it.
@@ -212,6 +214,10 @@ loadfont /boot/grub/themes/lordos/inter-semibold-16.pf2
 set theme=/boot/grub/themes/lordos/theme.txt
 menuentry "LordOS $VERSION (live)" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.lang=en
+    initrd /live/initrd.img
+}
+menuentry "Check this computer (nothing is installed)" {
+    linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 lordos.check=1 lordos.lang=en
     initrd /live/initrd.img
 }
 menuentry "LordOS $VERSION (safe mode: no GPU)" {

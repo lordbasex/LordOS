@@ -4,16 +4,15 @@ import { useState } from 'react';
 
 export function Icon({ size: s }) {
   const key = (x, y, c) => (
-    <View style={{ position: 'absolute', left: s * x, top: s * y, width: s * 0.16, height: s * 0.16,
-      borderRadius: s * 0.08, backgroundColor: c }} />
+    <View key={`${x}:${y}`} style={{ position: 'absolute', left: s * x, top: s * y, width: s * 0.15, height: s * 0.15,
+      borderRadius: s * 0.075, backgroundColor: c }} />
   );
   return (
     <View style={{ width: s, height: s, borderRadius: s * 0.225, background: 'linear-gradient(180deg, #3a3a40, #18181b)',
       boxShadow: `0 ${s * 0.04}px ${s * 0.12}px rgba(0,0,0,0.35)`, border: '1px solid rgba(255,255,255,0.12)' }}>
-      <View style={{ position: 'absolute', left: s * 0.16, right: s * 0.16, top: s * 0.14, height: s * 0.16,
+      <View style={{ position: 'absolute', left: s * 0.16, right: s * 0.16, top: s * 0.12, height: s * 0.15,
         borderRadius: s * 0.04, backgroundColor: '#9be7b0' }} />
-      {key(0.16, 0.42, '#71717a')}{key(0.42, 0.42, '#71717a')}{key(0.68, 0.42, '#ff9f0a')}
-      {key(0.16, 0.66, '#71717a')}{key(0.42, 0.66, '#71717a')}{key(0.68, 0.66, '#ff9f0a')}
+      {[0.34, 0.53, 0.72].flatMap((y) => [key(0.16, y, '#71717a'), key(0.425, y, '#71717a'), key(0.69, y, '#ff9f0a')])}
     </View>
   );
 }

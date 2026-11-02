@@ -224,7 +224,7 @@ recovers on its own or says why and what to do.
 
 | Channel | Content |
 |---|---|
-| video track | H.264 constrained baseline (packetization mode 1) or VP8, RTP over SRTP, 90 kHz clock; frames only when the screen changed, at most 30 per second, one more tiny frame 70 ms after the last change (browsers paint a lone frame late) |
+| video track | H.264 constrained baseline (packetization mode 1) or VP8, RTP over SRTP, 90 kHz clock; frames only when the screen changed, at most as many per second as the fastest viewer's screen refreshes (the page measures it: 60, 120, 144 Hz…; 30 if unknown, 240 at most), one more tiny frame 70 ms after the last change (browsers paint a lone frame late) |
 | audio track | Opus, 20 ms frames, mono 48 kHz, 64 kbit/s |
 | `input` data channel | the same JSON input messages as the WebSocket (`m`, `b`, `w`, `s`, `pz`, `k`, `clip`, `resize`), parsed by the same `rs_browser_input`; at most 256 KB per message |
 | `tiles` data channel | `[1][x,y,w,h u16][png]` a lossless tile; `[2][x,y,w,h…]` these areas changed (show the video there); `[3]` done |
@@ -242,14 +242,36 @@ the session's rectangle (`enc.c`, the only image code left); it keeps no copy of
 desktop sees (protected windows in black, from `media_composed`, or the GPU's read-back) goes to a
 live encoder: `lord-media` in `MK_STREAM` mode, through a sealed memfd of 3 slots, like the screen
 recording. It uses H.264 with VA-API when the card encodes it, else libx264 (`ultrafast`,
-`zerolatency`, CRF 22 with a bit-rate cap), or VP8 with libvpx (`realtime`) for browsers without
+`zerolatency`, CRF 22 with a bit-rate cap, and the deblocking filter that `ultrafast` turns off), or VP8 with libvpx (`realtime`) for browsers without
 H.264. Every viewer of the session gets the same encoded frames over the session socket
 (`RP_VFRAME`, `RP_AFRAME`); the bridge only packetizes and encrypts. The bit rate is the slowest
-viewer's: each bridge lowers its target on loss reported by the browser (receiver reports, REMB)
-and raises it slowly when there is none (300 kbit/s to 12 Mbit/s). A viewer that falls more than
+viewer's: each bridge lowers its target on loss reported by the browser (receiver reports) and
+raises it by 25 % a second when there is none (6 % for 5 s after congestion; 300 kbit/s to 12 Mbit/s).
+The browser's estimate (REMB) is a ceiling only when it falls by more than 15 % or right after loss:
+it only grows with what the browser receives, so as a fixed ceiling it kept a new connection near
+3 Mbit/s for about three minutes (video in blocks); now a LAN reaches the top in about 10 s. A viewer that falls more than
 3 MB behind skips frames until the next keyframe; a lost frame (PLI, FIR) asks for one, and the
 current screen is encoded again for it. Two users means two sessions, two `lord-server`s and two
 encoders, each as its own user.
+
+**The frame rate follows the viewer's screen.** The page measures its screen's refresh rate with
+animation frames (not while the tab is hidden) and sends it with its size (`resize`, `hz` 24–360). The
+session's encoder runs at the fastest viewer's rate (it starts again when that changes), and a session
+without a monitor composes at that rate too (at least 60); on the monitor, the monitor's own refresh
+paces composition. Measured on VM 116 (no GPU, 1280×800, a 60 fps video window under blurred windows):
+18 frames a second before 0.8.5's work on the CPU path, 35 after.
+
+**The page's top bar says how the video is made:** codec, encoder in hardware (VA-API) or software,
+path (UDP, TCP, relay), frames a second shown by the browser / encoded by the computer, the browser
+screen's refresh rate, and whether the session composes on the GPU or the CPU (hover: the encoding
+time per frame); 📌 keeps the bar shown (remembered in that browser). The session sends it as `RP_VINFO` (fixed-size numbers, when they change), the bridge
+turns it into `{"t":"vinfo"}` with numbers only.
+
+**Only what changed costs anything.** The compositor tells the mirror where it drew (`mirror_frame`'s
+damage box): only those 64×64 tiles are compared with the last frame (all of them twice a second
+anyway, in case), and each of the encoder's three input slots copies only what changed since it was
+last written. A session without a monitor reads the scene directly (no copy) unless a fullscreen app
+paints over it.
 
 **The GPU keeps composing.** Until 0.8.3 a remote viewer switched the session to CPU composition.
 Now `gpu_frame` reads the composed frame back (`gpu_read_next`) once, for the encoder and the tiles,
@@ -473,6 +495,38 @@ the same hour in the same way.
 
 ![The monitor composed on the GPU while a browser watches](remote-desktop-gpu-monitor.png)
 
+### Measurements (0.8.5, CPU reference)
+
+The reference for the CPU path, to compare later optimizations against. VM 116 (8 vCPUs, no GPU:
+the screen is composed on the CPU, H.264 encoded by software x264), viewed from Chrome on a Mac on
+the same LAN with a 60 Hz screen; the remote desktop's top bar reports the rate and the encoder
+(`Video · H264 por software · UDP · 26/60 fps · 60 Hz · CPU`). Same day, 2026-10-26, before and after
+the 0.8.5 work on the CPU path (only the tiles that changed, the frame rate following the viewer's
+refresh rate, the thread pool of `docs/GPU.md`, "The CPU path on several threads").
+
+| Measurement | Before | After |
+|---|---|---|
+| Remote desktop, 1280×800 test scene | ~18 fps | 55–58 fps |
+| Remote desktop, 1920×1080 session playing a 60 fps clip | 45 fps (one core at 100 %) | 55–58 fps (pool, about 2 cores) |
+| Backdrop blur of a window (radius 20) | 27.7 ms | 6.0 ms on 1 thread, 2.7 ms on 8 (same pixels) |
+| x264 per frame (1280–1568 px wide) | | 12–13 ms: the software encoder's ceiling is about 75–80 fps |
+
+YouTube in Chromium inside the session, watched over the remote desktop:
+
+| Video | Played | Dropped by the player | Remote desktop bar |
+|---|---|---|---|
+| 1080p, 24 fps | real time | under 1 % | 25–26 of 60 fps |
+| 1080p, 24 fps, AV1 (17 s read from the player's statistics, 12:08:18 → 12:08:35) | 386 frames, 23–24 fps | 0 new | 26 with the video alone, 38–54 when the sidebar's animated preview and the statistics graphs also change |
+| 1080p, 60 fps, AV1 (before the pool) | 38–44 fps | about 1 in 3 | lord-server saturated |
+
+- **The bar counts screen updates, not the video's frames:** a 24 fps video alone gives about 26; anything
+  else that moves adds to it. It reached what changed in every case above.
+- **AV1 at 60 fps is the hard case without a GPU:** Chromium decodes it in software (164–189 % of a
+  core) on the same machine that composes the screen. VP9 costs less (YouTube → Settings → Playback →
+  AV1 "only for SD").
+- Not measured yet: 120/144 Hz viewers, a real GPU (the read-back and VA-API encoding), the Raspberry
+  Pi 5 (no hardware H.264 encoder: x264 there too).
+
 ## Process and privileges
 
 1. `lord-sessiond` (root) accepts the connection. Refused addresses (blocked, not allowed, too many
@@ -574,8 +628,18 @@ The session's sound reaches the browser with the video (see [Video (WebRTC)](#vi
 session's `lord-server` records the monitor of the default output from PipeWire itself (the same
 `maudio.c` stream as the screen recorder's microphone, `@DEFAULT_MONITOR@`, mono 48 kHz) into a
 shared-memory ring, and the live encoder makes Opus of it (20 ms frames, 64 kbit/s, low delay). The
-page starts muted (browsers only play sound after a click) and has a sound button in its top bar.
+page starts muted (browsers only play sound after a click): the first click or key in the session
+turns it on, unless the viewer already chose with the sound button in its top bar.
 Still to do: stereo, and the microphone the other way (by permission).
+
+**Known issue (0.8.5):** while a window is dragged, the frames the remote desktop sends can show its
+rounded corners black; the monitor itself shows them right (checked on VM 116 against the display
+output). The same symptom on the monitor's GPU path was fixed in 0.8.5; the remote desktop's path is
+still being looked at.
+
+**Restart… and Shut Down…** are offered only in the session on the monitor (0.8.5): a session seen only
+through the remote desktop can't ask for them, and used to show the countdown and then do nothing
+(`SESSIONS.md`, "Restart and Shut Down from a session").
 
 ## Remote login (SSH)
 
@@ -698,3 +762,23 @@ the internet, use a VPN instead of opening the port.
 - ![lock: the browser goes back to the login](remote-desktop-web-locked.png)
 - ![remote login on (dark)](settings-sharing-ssh-dark.png)
 - ![remote login off (light)](settings-sharing-ssh-off-light.png)
+
+## Root over SSH (advanced, 0.8.5)
+
+Off by default. Settings → Sharing → **Advanced: root over SSH** offers three modes: **Off** (the shipped
+`10-lordos.conf` keeps `PermitRootLogin no`), **Keys only** (`PermitRootLogin prohibit-password`) and
+**Key or password** (`PermitRootLogin yes`), written as `/etc/ssh/sshd_config.d/05-lordos-root.conf`
+(sshd keeps the first value it reads, and 05 comes first), checked with `sshd -t` and reloaded. Root's
+allowed public keys are listed with their SHA-256 fingerprints; a key is pasted or imported from a `.pub`
+file and validated in C before it reaches `/root/.ssh/authorized_keys` (no options, a known key type, a
+blob that matches it); key pairs are made with `ssh-keygen -t ed25519` on the computer that connects, so
+the private key never leaves it. In the password mode root's password can be set (chpasswd, standard
+input). Every change asks for the administrator's own password again, checked as root. "Only
+administrators" (AllowGroups) includes root, which only matters with this on. A warning stays on the page
+while it is on. Actions: `ssh-root`, `ssh-root-key`, `ssh-root-password`, `ssh-root-status`
+(`server/src/remote/ssh_root.c`); tests: `build/ssh-root-test` (key lines and fingerprints, 17 checks,
+the same fingerprints as `ssh-keygen -l` for Ed25519 and RSA keys) and `tests/ssh_root_e2e.c` (run as
+root on a test machine: a wrong password refused, keys-only mode, a key added and a duplicate refused,
+`ssh root@` from another computer accepted with it, the key removed and the mode off, `ssh root@`
+refused; done on VM 116 on 2026-10-26).
+

@@ -1,17 +1,22 @@
 /* http.c — HTTP/1.1 client and downloads with dropped privileges (see http.h).
  *
- * The child (nobody) speaks HTTP: GET with Host, keep-alive, redirects (up to 5, only to
- * http://), Content-Length, chunked or until the connection closes, If-Modified-Since, and
- * a 30 s maximum time without data. It sends the parent messages over the pipe:
+ * The child (nobody) speaks HTTP: GET with Host, keep-alive, redirects (up to 5; http:// may go to
+ * https://, https:// never back to http://), Content-Length, chunked or until the connection closes,
+ * If-Modified-Since, and a 30 s maximum time without data. An https:// URL (0.8.5): the child connects
+ * the TCP socket itself and hands it to lord-tls (src/tls/tlsproxy.c: fixed path next to lord-server,
+ * no arguments, empty environment, the helpers' sandbox), which verifies the server's certificate and
+ * host name and relays plain HTTP over a socketpair; the HTTP code below is the same for both. It sends the parent messages over the pipe:
  *   [type 1 byte][item 4][length 4][data]   type H = "status date length", D = data, E = end
  * (E with text = error). A file: URL (a local repository) is read by the same child, as nobody. */
 #include "http.h"
 #include "../errcode.h"
 #include "crypto.h"
+#include "../sec/cgroup.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <grp.h>
 #include <netdb.h>
 #include <poll.h>
@@ -62,6 +67,8 @@ void http_format_date(int64_t t, char *out, size_t n) {
 
 typedef struct {
     int fd;
+    int tls;                            /* fd is lord-tls's plaintext end (an https:// connection) */
+    pid_t helper;                       /* lord-tls, or 0 */
     char host[256], port[8];
     char buf[16384];
     size_t pos, len;
@@ -87,10 +94,63 @@ static void conn_close(Conn *c) {
     if (c->fd >= 0) close(c->fd);
     c->fd = -1;
     c->pos = c->len = 0;
+    if (c->helper > 0) { kill(c->helper, SIGTERM); waitpid(c->helper, NULL, 0); }
+    c->helper = 0;
 }
 
-static int conn_open(Conn *c, const char *host, const char *port, char *err, size_t errlen) {
-    if (c->fd >= 0 && !strcmp(c->host, host) && !strcmp(c->port, port)) return 0;
+/* lord-tls: next to this binary (lord-server), root's and not writable by others */
+static int tls_helper_path(char *out, size_t cap) {
+    char exe[PATH_MAX];
+    ssize_t k = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (k <= 0) return -1;
+    exe[k] = 0;
+    char *slash = strrchr(exe, '/');
+    if (!slash) return -1;
+    *slash = 0;
+    if ((size_t)snprintf(out, cap, "%s/lord-tls", exe) >= cap) return -1;
+    struct stat st;
+    if (stat(out, &st) || !S_ISREG(st.st_mode) || (st.st_mode & 022) || (st.st_uid != 0 && st.st_uid != getuid())) return -1;
+    return 0;
+}
+
+/* Wraps the connected TCP socket `tcp` in TLS: lord-tls gets it as fd 3 and a socketpair as fd 4,
+ * reads "<host>\n" and answers '1' when the certificate checks out. Returns the plaintext end, or -1. */
+static int tls_start(Conn *c, int tcp, const char *host, char *err, size_t errlen) {
+    char path[PATH_MAX];
+    if (tls_helper_path(path, sizeof path)) { close(tcp); lerr_set(err, errlen, "pkg.http.noTls", NULL); return -1; }
+    int sp[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sp)) { close(tcp); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { close(tcp); close(sp[0]); close(sp[1]); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
+    if (pid == 0) {
+        int a = fcntl(tcp, F_DUPFD, 10), b = fcntl(sp[1], F_DUPFD, 10);
+        if (a < 0 || b < 0 || dup2(a, 3) != 3 || dup2(b, 4) != 4) _exit(127);
+        syscall(SYS_close_range, 5, ~0u, 0);
+        const char *const argv[] = { "lord-tls", NULL };
+        char *const envp[] = { NULL };
+        execve(path, (char *const *)argv, envp);
+        _exit(127);
+    }
+    close(tcp);
+    close(sp[1]);
+    c->helper = pid;
+    char line[300];
+    int ln = snprintf(line, sizeof line, "%s\n", host);
+    char ok = 0;
+    struct pollfd p = { sp[0], POLLIN, 0 };
+    if (write(sp[0], line, (size_t)ln) != ln || poll(&p, 1, 25000) != 1 || read(sp[0], &ok, 1) != 1 || ok != '1') {
+        close(sp[0]);
+        kill(pid, SIGTERM);
+        waitpid(pid, NULL, 0);
+        c->helper = 0;
+        lerr_set(err, errlen, "pkg.http.tlsFailed", "host", host, NULL);
+        return -1;
+    }
+    return sp[0];
+}
+
+static int conn_open(Conn *c, const char *host, const char *port, int tls, char *err, size_t errlen) {
+    if (c->fd >= 0 && c->tls == tls && !strcmp(c->host, host) && !strcmp(c->port, port)) return 0;
     conn_close(c);
     struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof hints);
@@ -110,6 +170,8 @@ static int conn_open(Conn *c, const char *host, const char *port, char *err, siz
     }
     freeaddrinfo(res);
     if (c->fd < 0) { lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
+    c->tls = tls;
+    if (tls && (c->fd = tls_start(c, c->fd, host, err, errlen)) < 0) return -1;
     snprintf(c->host, sizeof c->host, "%s", host);
     snprintf(c->port, sizeof c->port, "%s", port);
     return 0;
@@ -166,9 +228,10 @@ static int conn_line(Conn *c, char *out, size_t cap) {
     }
 }
 
-static int parse_url(const char *url, char *host, size_t hn, char *port, size_t pn, const char **path) {
-    if (strncmp(url, "http://", 7)) return -1;
-    const char *h = url + 7, *slash = strchr(h, '/');
+static int parse_url(const char *url, char *host, size_t hn, char *port, size_t pn, const char **path, int *tls) {
+    *tls = !strncmp(url, "https://", 8);
+    if (!*tls && strncmp(url, "http://", 7)) return -1;
+    const char *h = url + (*tls ? 8 : 7), *slash = strchr(h, '/');
     if (!slash) slash = h + strlen(h);
     size_t l = (size_t)(slash - h);
     const char *colon = memchr(h, ':', l);
@@ -183,7 +246,7 @@ static int parse_url(const char *url, char *host, size_t hn, char *port, size_t 
         memcpy(port, colon + 1, pl);
         port[pl] = 0;
         for (size_t i = 0; i < pl; i++) if (!isdigit((unsigned char)port[i])) return -1;
-    } else snprintf(port, pn, "80");
+    } else snprintf(port, pn, *tls ? "443" : "80");
     *path = *slash ? slash : "/";
     return 0;
 }
@@ -225,17 +288,28 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
     if (!strncmp(it->url, "file:", 5)) { get_file(c, it, idx); return; }
     char url[1100], err[200] = "", line[4096];
     snprintf(url, sizeof url, "%s", it->url);
+    int was_tls = 0;
     for (int redirects = 0;; redirects++) {
         char host[256], port[8];
         const char *path;
-        if (parse_url(url, host, sizeof host, port, sizeof port, &path)) {
-            lerr_set(err, sizeof err, strncmp(url, "https://", 8) ? "pkg.http.badUrl" : "pkg.http.httpsRedirect", NULL);
-            break;
-        }
+        int tls;
+        if (parse_url(url, host, sizeof host, port, sizeof port, &path, &tls)) { lerr_set(err, sizeof err, "pkg.http.badUrl", NULL); break; }
+        if (was_tls && !tls) { lerr_set(err, sizeof err, "pkg.http.downgrade", NULL); break; }   /* https never back to http */
+        was_tls = tls;
+        const char *defport = tls ? "443" : "80";
         int retry = c->fd >= 0;             /* a reused connection may have been closed */
     again:
-        if (conn_open(c, host, port, err, sizeof err)) break;
-        char req[1600], ims[80] = "";
+        if (conn_open(c, host, port, tls, err, sizeof err)) break;
+        /* '+' as %2B, as apt does: an S3 origin (lordos.org) reads a bare '+' as a space, so
+         * pool/rpi/k/kms++-utils/… would be a 404 */
+        char epath[3 * sizeof url];         /* every byte of the URL could be a '+' */
+        size_t en = 0;
+        for (const char *q = path; *q; q++) {
+            if (*q == '+') { memcpy(epath + en, "%2B", 3); en += 3; }
+            else epath[en++] = *q;
+        }
+        epath[en] = 0;
+        char req[3600], ims[80] = "";
         if (it->ims > 0) {
             char d[48];
             http_format_date(it->ims, d, sizeof d);
@@ -243,7 +317,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
         }
         int rl = snprintf(req, sizeof req, "GET %s HTTP/1.1\r\nHost: %s%s%s\r\nUser-Agent: LordOS-pkg/0.7\r\n"
                           "Accept-Encoding: identity\r\nConnection: keep-alive\r\n%s\r\n",
-                          path, host, strcmp(port, "80") ? ":" : "", strcmp(port, "80") ? port : "", ims);
+                          epath, host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", ims);
         if (rl >= (int)sizeof req || conn_write(c, req, (size_t)rl) || conn_line(c, line, sizeof line)) {
             conn_close(c);
             if (retry) { retry = 0; goto again; }
@@ -311,7 +385,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
         }
         if (close_after) conn_close(c);
         if (redirect && redirects < 5) {
-            if (location[0] == '/') snprintf(url, sizeof url, "http://%s%s%s%s", host, strcmp(port, "80") ? ":" : "", strcmp(port, "80") ? port : "", location);
+            if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
             else snprintf(url, sizeof url, "%s", location);
             continue;
         }
@@ -379,8 +453,11 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
         syscall(SYS_close_range, 4, ~0u, 0);
         signal(SIGPIPE, SIG_IGN);
         prctl(PR_SET_PDEATHSIG, SIGKILL);
+        /* (0.8.5) in lordos-net-store.scope, so the Store and the updates are their own app for the
+         * firewall and Monitor → Network (lordos:store); outside a LordOS session, where it is */
+        if (getenv("LORDOS_SESSIOND")) cgroup_enter_root("lordos-net-store.scope");
         if (drop_to_nobody()) _exit(2);
-        Conn c = { .fd = -1, .out = 3 };
+        Conn c = { .fd = -1, .out = 3, .tls = 0, .helper = 0 };
         for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i);
         conn_close(&c);
         _exit(0);

@@ -7,7 +7,9 @@ int main(void) {
     assert(admin_fd() == -1);
     static const char *const actions[] = {
         "pkg-install", "pkg-update", "net-restore", "net-manage", "install-run",
-        "locale-gen", "langpack", "ssh-set", "users-create", "disk-format"
+        "locale-gen", "langpack", "ssh-set", "users-create", "disk-format",
+        "pkg-source-add", "pkg-source-remove", "share-mount", "share-unmount",
+        "wallpaper-get", "wallpaper-login", "clean-apt", "ssh-root"
     };
     for (unsigned i = 0; i < sizeof actions / sizeof *actions; i++) {
         assert(!admin_known(actions[i]));

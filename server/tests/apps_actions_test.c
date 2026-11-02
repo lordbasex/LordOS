@@ -91,6 +91,20 @@ int main(void) {
     snprintf(path, sizeof path, "%s/main", home);
     CHECK("main Exec ran", appeared(path));
 
+    /* a package that names its file freely ("Lord Spaced App.desktop"): listed as Lord-Spaced-App,
+     * launched from its real file (0.8.5) */
+    snprintf(path, sizeof path, "%s/.local/share/applications/Lord Spaced App.desktop", home);
+    f = fopen(path, "w");
+    if (f) { fprintf(f, "[Desktop Entry]\nType=Application\nName=Spaced\nExec=/usr/bin/touch %s/spaced\n", home); fclose(f); }
+    const DesktopApp *list;
+    int na = apps_list("en", &list), found = 0;
+    for (int i = 0; i < na; i++) if (!strcmp(list[i].id, "Lord-Spaced-App")) found = 1;
+    CHECK("a file name with spaces is listed, its id sanitized", found);
+    CHECK("it launches", apps_launch("Lord-Spaced-App") == 0);
+    snprintf(path, sizeof path, "%s/spaced", home);
+    CHECK("its Exec ran", appeared(path));
+    CHECK("the raw name with spaces is not an id", apps_launch("Lord Spaced App") != 0);
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}

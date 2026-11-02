@@ -63,11 +63,12 @@ int img_valid_tag(const char *t) {
     size_t n = strlen(t);
     if (n < 6 || n > 32 || t[0] != 'v') return 0;
     const char *p = t + 1;
-    for (int part = 0; part < 3; part++) {
+    for (int part = 0; part < 4; part++) {      /* three numbers, or four for a point release (v0.8.4.1-beta) */
         int d = 0;
         while (*p >= '0' && *p <= '9') { p++; d++; }
         if (!d || d > 4) return 0;
         if (part < 2) { if (*p != '.') return 0; p++; }
+        else if (part == 2) { if (*p != '.') break; p++; }
     }
     if (!*p) return 1;
     if (*p != '-' || !p[1]) return 0;

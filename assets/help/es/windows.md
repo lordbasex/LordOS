@@ -8,9 +8,10 @@ keywords: ventanas, maximizar, minimizar, mover, tamaño, cambiar de app
 
 - **Mover:** arrastrá la barra de título.
 - **Cambiar el tamaño:** arrastrá un borde o una esquina.
-- **Botones** (arriba a la izquierda en Lord Default): cerrar (rojo), minimizar (amarillo) y
+- **Botones** (arriba a la izquierda en Lord Flow): cerrar (rojo), minimizar (amarillo) y
   maximizar (verde). Un **doble clic** en la barra de título también maximiza o vuelve atrás.
 - **El menú Ventana** de la barra de menú tiene lo mismo para la ventana del frente.
+- **En Lord Classic** no hay barra de menú arriba: los menús de cada app (Archivo, Edición, Visualización, Ir…, Ventana y Ayuda) están en una franja debajo del título de su ventana.
 - **Volver a una ventana minimizada:** su ícono en el Dock.
 - **Varias ventanas de una app:** ❖N en la mayoría (Archivos, Terminal, Editor). El Dock marca
   cuántas hay.

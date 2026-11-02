@@ -1,12 +1,14 @@
 // Store: LordOS apps (.lpk packages, no root) and Debian apps (our own package engine,
 // server/src/pkg; install and remove go through the administration helper).
 import {
-  View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox,
+  View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
   suggestions, unseenSuggestions, refreshSuggestions, standaloneDesktop,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { debian, useDebian } from './debian.js';
+import { AiDetail, AiDiscover, AiPage, catalogApp, catalogApps } from './ai.js';
+import { CATS, debian, useDebian } from './debian.js';
+import { GLYPH } from './ui.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
 // first of the usual names that exists, or the home folder itself.
@@ -188,6 +190,7 @@ function InstallFile({ path, onDone }) {
       )}
       {isDeb && !standaloneDesktop && <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, textAlign: 'start' }}>{tr('store.file.deb')}</Text>}
       <Message msg={msg} />
+      {!msg?.ok && <debian.Refused />}
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
         {(m || (isDeb && !standaloneDesktop)) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
@@ -207,7 +210,7 @@ function LordOSPage({ query }) {
   const shown = list.filter((p) => !q || `${p.name} ${p.description} ${p.id}`.toLowerCase().includes(q));
   return (
     <View>
-      <PageTitle title={tr('store.lordos.title')} subtitle={tr('store.lordos.subtitle')} />
+      <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' }}>{tr('store.lordos.subtitle')}</Text>
       {pick && <InstallFile path={pick} onDone={(cancel) => { if (cancel) setPick(null); setFiles(findPackageFiles().filter((f) => /\.lpk$/i.test(f.name))); }} />}
       <Message msg={msg} />
       <List title={tr('store.lordos.installedTitle')} count={shown.length || null} empty={tr('store.lordos.none')}>
@@ -281,10 +284,10 @@ function InstalledPage({ query }) {
   const apps = useLauncherApps();
   const q = query.trim().toLowerCase();
   const shown = apps.filter((a) => !q || `${a.name} ${a.comment || ''} ${a.id}`.toLowerCase().includes(q));
-  const kind = (a) => tr(`store.kind.${a.kind}`);
+  // the kind, and a LordOS app's or package's own version (manifest "version")
+  const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
   return (
     <View>
-      <PageTitle title={tr('store.installed.title')} />
       <List count={null} empty={tr('store.debian.none')}>
         {shown.map((a) => (
           <AppRow key={a.id} icon={<a.Icon size={32} />} name={a.name} detail={a.comment || a.genericName || ''} extra={kind(a)}>
@@ -301,44 +304,86 @@ function InstalledPage({ query }) {
 
 // ---- window ----
 
+// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'lordos' or 'cat:<Category>')
+// and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app). Back returns to
+// the page.
+const PAGE_GLYPH = { commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, lordos: GLYPH.lordos };
+
 export default function Store() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const { args } = useAppWindow();
   const [page, setPage] = useState('discover');
+  const [app, setApp] = useState(null);
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
   const deb = useDebian();
+  const launcher = useLauncherApps();
+  const go = (p) => { setApp(null); setPage(p); };
   useEffect(() => {
     if (args?.install) setFile(args.install);
-    if (args?.page) setPage(args.page);
-    if (args?.search) { setQuery(args.search); setPage('discover'); }       // from Search
+    if (args?.page) go(args.page);
+    if (args?.app) openAi(args.app);
+    if (args?.search) { setQuery(args.search); go('discover'); }       // from Search
   }, [args?.nonce]);
   const sug = useStore(suggestions);
   useEffect(() => { refreshSuggestions(); }, []);                  // the hardware may have changed since the last look
-  const unseen = page === 'discover' ? 0 : unseenSuggestions(sug.list).length;    // new suggestions (Discover's badge)
-  const pages = [
-    ['discover', tr('store.page.discover'), unseen || null],
-    ['lordos', tr('store.page.lordos')],
-    ['installed', tr('store.page.installed')],
-    ['updates', deb.upgrades?.length ? tr('store.page.updatesCount', { count: deb.upgrades.length }) : tr('store.page.updates')],
-  ];
-  const Page = { discover: debian.Discover, lordos: LordOSPage, installed: InstalledPage, updates: debian.Updates }[page];
+  const unseen = page === 'suggested' ? 0 : unseenSuggestions(sug.list).length;    // new suggestions (the page's badge)
+  const counts = debian.categoryCounts();
+  const cat = page.startsWith('cat:') ? page.slice(4) : null;
+  const openDeb = (name) => setApp({ name, ai: false });
+  const openAi = (name) => setApp({ name, ai: true });
+  const pageTitle = cat ? tr(`store.cat.${cat}`) : tr(`store.page.${page}`);
+  const appTitle = app && (app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
+  const searchable = !app && page !== 'updates' && page !== 'suggested';
+  const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
+  let body;
+  if (app) body = app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  else if (cat) body = <debian.Category cat={cat} query={query} onOpen={openDeb} />;
+  else if (page === 'discover') body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={query.trim() ? null : <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />} />;
+  else if (page === 'suggested') body = <debian.SuggestedPage />;
+  else if (page === 'ai') body = <AiPage query={query} onOpen={openAi} />;
+  else if (page === 'commercial') body = <AiPage section="commercial" query={query} onOpen={openAi} onPage={go} />;
+  else if (page === 'lordos') body = <LordOSPage query={query} />;
+  else if (page === 'installed') body = <InstalledPage query={query} />;
+  else body = <debian.Updates />;
+  const item = (id, label, detail, glyph) => (
+    <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => go(id)} />
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 210, backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 12, gap: 2 }}>
+      <View style={{ width: 210, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
-        <SearchField value={query} onChange={(v) => { setQuery(v); if (v && page !== 'discover' && page !== 'installed' && page !== 'lordos') setPage('discover'); }}
-          placeholder={tr('store.search')} style={{ marginBottom: 10 }} />
-        {pages.map(([id, label, detail]) => <SidebarItem key={id} label={label} detail={detail} selected={page === id} onClick={() => setPage(id)} />)}
-        <View style={{ flex: 1 }} />
-        <View style={{ paddingHorizontal: 10 }}><debian.Status /></View>
+        <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
+          <SectionTitle>{tr('store.section.store')}</SectionTitle>
+          {item('discover', tr('store.page.discover'), null, PAGE_GLYPH.discover)}
+          {!standaloneDesktop && item('suggested', tr('store.page.suggested'), unseen, PAGE_GLYPH.suggested)}
+          {item('installed', tr('store.page.installed'), launcher.length, PAGE_GLYPH.installed)}
+          {item('updates', tr('store.page.updates'), deb.upgrades?.length, PAGE_GLYPH.updates)}
+          {!standaloneDesktop && <SectionTitle>{tr('store.section.categories')}</SectionTitle>}
+          {!standaloneDesktop && item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
+          {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
+          {CATS.filter((c) => counts[c]).map((c) => item(`cat:${c}`, tr(`store.cat.${c}`), counts[c], GLYPH[c]))}
+          <SectionTitle>LordOS</SectionTitle>
+          {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
+          <View style={{ height: 12 }} />
+        </ScrollView>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 6 }}><debian.Status /></View>
       </View>
-      <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20 }}>
-        {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
-        <Page query={query} onPage={setPage} />
-        <View style={{ height: 20 }} />
-      </ScrollView>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Toolbar>
+          {app ? <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('store.back')} onClick={() => setApp(null)} /> : null}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{app ? appTitle : pageTitle}</Text>
+          </View>
+          {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={200} /> : null}
+        </Toolbar>
+        <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
+          {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
+          {body}
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </View>
     </View>
   );
 }

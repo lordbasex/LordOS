@@ -1,0 +1,7 @@
+{
+  "intro": "Se um app parar de responder por um tempo, escolha-o e clique em Forçar saída. Ele fecha sem salvar.",
+  "none": "Nenhum app aberto",
+  "quit": "Forçar saída",
+  "shortcut": "Também no menu da coroa: Forçar saída…",
+  "windows": "{count} janelas"
+}

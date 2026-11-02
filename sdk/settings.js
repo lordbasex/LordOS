@@ -10,6 +10,9 @@ const DEFAULTS = {
   browserTabsInTitlebar: true,   // 0.8.4, Settings → Appearance: Chromium and Firefox draw their own bar (browserframe.js)
   browserFramePending: false,    // that switch is still waiting for Chromium to quit
   scrollBars: 'auto',    // 0.8.3, Settings → Appearance → Show scroll bars: 'auto' | 'scrolling' | 'always'
+  motion: {},            // moving wallpaper per display: { '*': id, <display id>: id } (sdk/motion.jsx)
+  motionFiles: {},       // id → the variant on disk
+  motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
   wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
   keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
   keyboards: null,       // [{ layout, variant }] from xkb-data
@@ -17,6 +20,13 @@ const DEFAULTS = {
   language: null,        // interface language ('es', 'en', 'pt'…); null = the region's
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)
+  desktopCount: 1,            // 0.8.7, how many desktops (sdk/desktops.js)
+  desktopArrows: true,        // 0.8.7, Settings → Keyboard: Lord Flow's ⌃ arrows are the Desktops keys
+  sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
+  sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
+  remoteDesks: null,          // 0.8.7, the RDP and VNC apps' saved computers (no passwords)
+  files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
+  sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only
 };
 
 // Per-user settings migrations (docs/UPDATES.md, "Migrations"): when an update changes the shape or
@@ -53,6 +63,13 @@ settings.subscribe(() => {
   clearTimeout(pending);
   pending = setTimeout(() => lord.settings.save(JSON.stringify(settings.get(), null, 2)), 300);
 });
+
+// Now, not in 300 ms; durable: on the disk before this returns (session restore's marker must survive
+// a power cut). Blocks the frame for that write, so it's only for that.
+export function saveSettingsNow(durable = false) {
+  clearTimeout(pending);
+  return lord.settings.save(JSON.stringify(settings.get(), null, 2), durable);
+}
 
 export function useSettings() {
   return [useStore(settings), settings.set];

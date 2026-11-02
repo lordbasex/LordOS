@@ -130,7 +130,9 @@ static AVCodecContext *open_sw(Vid *e, const char *name, int fps) {
         av_dict_set(&o, "profile", "baseline", 0);
         av_dict_set(&o, "crf", "22", 0);
         av_dict_set(&o, "forced-idr", "1", 0);
-        av_dict_set(&o, "x264-params", "repeat-headers=1:annexb=1:aud=0:scenecut=0", 0);
+        /* ultrafast turns the deblocking filter off, which left video in visible blocks at a few
+         * Mbit/s; it costs ~5 % of the encoder (1280x800 on a 1.8 GHz Xeon: 88 → 84 fps, 2 threads) */
+        av_dict_set(&o, "x264-params", "repeat-headers=1:annexb=1:aud=0:scenecut=0:deblock=1", 0);
     } else {
         c->thread_count = 2;
         c->bit_rate = (int64_t)e->kbps * 1000;
@@ -150,6 +152,16 @@ static AVCodecContext *open_sw(Vid *e, const char *name, int fps) {
     if (r < 0) { avcodec_free_context(&c); return NULL; }
     e->name = name;
     return c;
+}
+
+AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps) {
+    Vid e;
+    memset(&e, 0, sizeof e);
+    e.codec = vp8 ? CODEC_VP8 : CODEC_H264;
+    e.w = w & ~1;
+    e.h = h & ~1;
+    e.kbps = kbps;
+    return open_sw(&e, vp8 ? "libvpx" : "libx264", fps);
 }
 
 static int vid_open(Vid *e, int codec, int w, int h, int fps, unsigned kbps, AVBufferRef *hw) {
@@ -282,7 +294,7 @@ void lm_stream(const char *params, int ring_fd, int render) {
     int w = (int)mp_param_int(params, "width", 0), h = (int)mp_param_int(params, "height", 0);
     int fps = (int)mp_param_int(params, "fps", 30);
     long kbps = mp_param_int(params, "kbps", 4000);
-    if (fps < 5 || fps > 60) fps = 30;
+    if (fps < 5 || fps > 240) fps = 30;
     if (kbps < 200 || kbps > 50000) kbps = 4000;
     char accel[24];
     AVBufferRef *hw = codec == CODEC_H264 ? lm_hw_device(lm_hw_accel(params, accel, sizeof accel), render) : NULL;

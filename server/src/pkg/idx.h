@@ -64,12 +64,16 @@ typedef struct {
     size_t str_len, desc_len, map_len;
     void *map;
     long mtime, ino;
+    int16_t *prio;                      /* each record's priority after apt's preferences (pin.c) */
+    unsigned long pin_stamp;
 } Idx;
 
 int  idx_open(Idx *x, const char *dir);          /* 0 ok */
 void idx_close(Idx *x);
 int  idx_refresh(Idx *x, const char *dir);       /* reopens if it changed on disk; 1 if it changed */
 static inline const char *idx_s(const Idx *x, uint32_t off) { return off < x->str_len ? x->str + off : ""; }
+/* A record's priority (apt's preferences applied; the source's own priority without them). */
+static inline int idx_prio(const Idx *x, long rec) { return x->prio ? x->prio[rec] : (int)x->src[x->pkg[rec].src].prio; }
 /* First package with that name (or -1); the next ones with the same name follow it. */
 long idx_find(const Idx *x, const char *name, size_t n);
 /* Range [*lo, *hi) of those that provide name. */

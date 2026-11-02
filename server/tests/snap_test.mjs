@@ -48,6 +48,14 @@ eq('middle', zoneAt(640, 400, a), null);
 eq('left taskbar: its own strip counts as the left edge', zoneAt(20, 400, areas[3]), 'left');
 eq('second display left edge', zoneAt(1281, 500, areas[2]), 'left');
 
+// the top and bottom halves (the Window menu's Move & Resize, 0.8.5) share the middle line
+{
+  const t = snapRect('top', areas[0]), b = snapRect('bottom', areas[0]);
+  eq('top + bottom fill the area', t.h + b.h, areas[0].h);
+  eq('top and bottom touch', t.y + t.h, b.y);
+  eq('top and bottom never overlap', overlap(t, b), false);
+}
+
 // Super+arrows
 eq('free → left', snapNext(null, 'left'), 'left');
 eq('free → up maximizes', snapNext(null, 'up'), 'max');

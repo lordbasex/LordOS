@@ -12,7 +12,7 @@
  *   state()                      { mode, trusted: [app], restricted: { app: [restriction] } }
  *   appRule(app)                 'allow' | 'deny' | null   (the {app, out, any} rule)
  *   setAppRule(app, v)           v: 'allow' | 'deny' | null (removes it); the Monitor's switch
- *   setTrusted(app, on) / setRestricted(app, [restriction]) / setMode('silent'|'ask'|'off')
+ *   setTrusted(app, on) / setRestricted(app, [restriction]) / setMode('silent'|'ask'|'off'|'deny')
  *   rules(app)                   [{ id, dir, dst, port, proto, action, when, lastMatch }]
  *                                when: Unix seconds of the decision; lastMatch: Unix seconds of the
  *                                last connection lord-netperm reported as decided by that rule
@@ -27,6 +27,15 @@
  *   blocks(app, restriction)     true if the app is restricted in it (sdk/notify.js asks before showing
  *                                a built-in app's notification)
  *
+ * (0.8.5) Subscribed blocklists (fw/fwsub.h; docs/FIREWALL.md, "Blocklists"):
+ *   lists()                      { lists: [{ id, url, format, custom, on, updated, tried, domains, nets,
+ *                                  truncated, error }], busy, domains, nets }
+ *   setList(id, on)              a catalog or custom list on or off
+ *   addList(url, format) → id    a custom list (https only; 'hosts' | 'domains' | 'ips'); throws fw.list.*
+ *   removeList(id)               a custom list
+ *   updateLists(force)           0 started, 1 nothing to do, -1 already running
+ *   listMatch([names], addr)     the id of the enabled list that covers that destination, or null
+ *
  * The non-network restrictions are enforced in C where the resource is handed out (sec/restrict.h:
  * the broker and js_media.c read this same store); adding one to a running app takes the camera
  * or the microphone away at once (restrict_changed).
@@ -35,10 +44,13 @@
 #include "js_fw.h"
 #include "../fw/rules.h"
 #include "../fw/fwmap.h"
+#include "../fw/fwsub.h"
+#include "js_sys.h"
 #include "../sec/restrict.h"
 #include "js_err.h"
 #include "../netperm/npproto.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -198,9 +210,13 @@ static void keep(char **slot, const unsigned char *p, size_t n) {
     *slot = s;
 }
 
-/* Reads whatever has arrived, without waiting. */
+static int lists_on;
+
+/* Reads whatever has arrived, without waiting; a blocklist job that ended makes lord-netperm read
+ * the new compiled lists. */
 static void pump(void) {
     ensure();
+    if (lists_on && fws_poll()) send_reload();
     if (sock < 0) return;
     if (!inbuf && !(inbuf = malloc(NP_OUT_MAX + 8))) return;
     for (;;) {
@@ -305,7 +321,7 @@ static int each_app(void *u, const char *app, int trusted, uint32_t flags) {
     return 0;
 }
 
-static const char *mode_name(FwMode m) { return m == FW_MODE_ASK ? "ask" : m == FW_MODE_OFF ? "off" : "silent"; }
+static const char *mode_name(FwMode m) { return m == FW_MODE_ASK ? "ask" : m == FW_MODE_OFF ? "off" : m == FW_MODE_DENY ? "deny" : "silent"; }
 
 static JSValue f_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
@@ -411,7 +427,8 @@ static JSValue f_set_mode(JSContext *c, JSValueConst t, int argc, JSValueConst *
     const char *s = JS_ToCString(c, argv[0]);
     snprintf(m, sizeof m, "%s", s ? s : "");
     if (s) JS_FreeCString(c, s);
-    FwMode mode = !strcmp(m, "silent") ? FW_MODE_SILENT : !strcmp(m, "ask") ? FW_MODE_ASK : !strcmp(m, "off") ? FW_MODE_OFF : (FwMode)-1;
+    FwMode mode = !strcmp(m, "silent") ? FW_MODE_SILENT : !strcmp(m, "ask") ? FW_MODE_ASK : !strcmp(m, "off") ? FW_MODE_OFF :
+                  !strcmp(m, "deny") ? FW_MODE_DENY : (FwMode)-1;
     if ((int)mode < 0) return js_throw_code(c, "fw.invalidMode", NULL);
     fw_set_mode(store, mode);
     return JS_NewBool(c, save() == 0);
@@ -605,7 +622,118 @@ const char *js_fw_counts(uint64_t *seq) {
     return counts_json;
 }
 
+/* ---- blocklists (0.8.5) ---- */
+
+static void lists_init(void) {
+    if (lists_on) return;
+    const char *h = getenv("HOME");
+    char real[PATH_MAX], self[PATH_MAX];
+    if (!h || !realpath(h, real)) return;
+    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (n <= 0) return;
+    self[n] = 0;
+    char *sl = strrchr(self, '/');
+    if (!sl) return;
+    *sl = 0;
+    if (!fws_init(real, js_sys_assets(), self)) lists_on = 1;
+}
+
+static JSValue f_lists(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    lists_init();
+    pump();
+    char *j = lists_on ? fws_json() : NULL;
+    if (!j) return JS_NULL;
+    JSValue v = JS_ParseJSON(c, j, strlen(j), "<fw.lists>");
+    free(j);
+    return v;
+}
+
+static int arg_list_id(JSContext *c, JSValueConst v, char *out) {
+    if (!JS_IsString(v)) return -1;
+    const char *s = JS_ToCString(c, v);
+    if (!s) return -1;
+    size_t n = strlen(s);
+    int ok = n > 0 && n < 32;
+    for (size_t i = 0; ok && i < n; i++) ok = (s[i] >= 'a' && s[i] <= 'z') || (s[i] >= '0' && s[i] <= '9') || s[i] == '-';
+    if (ok) memcpy(out, s, n + 1);
+    JS_FreeCString(c, s);
+    return ok ? 0 : -1;
+}
+
+static JSValue f_set_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char id[32];
+    if (argc < 2 || arg_list_id(c, argv[0], id)) return js_throw_code(c, "fw.list.unknown", NULL);
+    lists_init();
+    if (!lists_on || fws_set(id, JS_ToBool(c, argv[1]))) return js_throw_code(c, "fw.list.unknown", NULL);
+    return JS_TRUE;
+}
+
+static JSValue f_add_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return js_throw_code(c, "fw.list.badUrl", NULL);
+    lists_init();
+    if (!lists_on) return js_throw_code(c, "fw.list.unavailable", NULL);
+    const char *url = JS_ToCString(c, argv[0]), *fmt = JS_ToCString(c, argv[1]);
+    char id[32] = "", err[64] = "fw.list.badUrl";
+    int r = url && fmt && strlen(url) <= FWS_URL_MAX ? fws_add_custom(url, fmt, id, err, sizeof err) : -1;
+    if (url) JS_FreeCString(c, url);
+    if (fmt) JS_FreeCString(c, fmt);
+    if (r) return js_throw_code(c, err, NULL);
+    return JS_NewString(c, id);
+}
+
+static JSValue f_remove_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char id[32];
+    if (argc < 1 || arg_list_id(c, argv[0], id)) return js_throw_code(c, "fw.list.unknown", NULL);
+    lists_init();
+    if (!lists_on || fws_remove_custom(id)) return js_throw_code(c, "fw.list.unknown", NULL);
+    return JS_TRUE;
+}
+
+static JSValue f_update_lists(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    lists_init();
+    if (!lists_on) return JS_NewInt32(c, 1);
+    return JS_NewInt32(c, fws_update(argc > 0 && JS_ToBool(c, argv[0])));
+}
+
+/* listMatch([names], addr): up to 8 names (each checked by the set's own normalizer) and an
+ * address in text form, or null */
+static JSValue f_list_match(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (!lists_on) return JS_NULL;
+    const char *names[8] = { NULL };
+    int n = 0;
+    if (argc > 0 && JS_IsArray(c, argv[0])) {
+        for (uint32_t i = 0; i < 8; i++) {
+            JSValue v = JS_GetPropertyUint32(c, argv[0], i);
+            if (JS_IsString(v)) { const char *s = JS_ToCString(c, v); if (s && strlen(s) < FW_NAME_MAX) names[n++] = s; else if (s) JS_FreeCString(c, s); }
+            JS_FreeValue(c, v);
+        }
+    }
+    uint8_t a[16] = { 0 };
+    int fam = 0;
+    if (argc > 1 && JS_IsString(argv[1])) {
+        const char *s = JS_ToCString(c, argv[1]);
+        if (s && inet_pton(AF_INET, s, a) == 1) fam = 4;
+        else if (s && inet_pton(AF_INET6, s, a) == 1) fam = 6;
+        if (s) JS_FreeCString(c, s);
+    }
+    const char *id = fws_match(names, n, fam, fam ? a : NULL);
+    for (int i = 0; i < n; i++) JS_FreeCString(c, names[i]);
+    return id ? JS_NewString(c, id) : JS_NULL;
+}
+
 static const JSCFunctionListEntry fw_funcs[] = {
+    JS_CFUNC_DEF("lists", 0, f_lists),
+    JS_CFUNC_DEF("setList", 2, f_set_list),
+    JS_CFUNC_DEF("addList", 2, f_add_list),
+    JS_CFUNC_DEF("removeList", 1, f_remove_list),
+    JS_CFUNC_DEF("updateLists", 1, f_update_lists),
+    JS_CFUNC_DEF("listMatch", 2, f_list_match),
     JS_CFUNC_DEF("status", 0, f_status),
     JS_CFUNC_DEF("state", 0, f_state),
     JS_CFUNC_DEF("appRule", 1, f_app_rule),

@@ -5,7 +5,8 @@
 # Usage (as root, on Debian 13, from the repository root with the themes already built):
 #   sudo tools/rpi/build-img.sh [work folder]          # default /var/tmp/lordos-rpi
 #
-# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256) and lordos_<version>_arm64.deb
+# Result: <work>/out/lordos-<version>-rpi5-arm64.img.xz (+ .sha256), lordos_<version>_arm64.deb and
+# lordos-hwdata_<snapshot date>_all.deb (the signed tested-hardware snapshot, which lordos depends on)
 #
 # - On an arm64 host (the Pi 5 itself, an ARM server) everything is native. If server/build/lord-server
 #   is already aarch64 (make -C server on the Pi) it is used; otherwise it is built in the build chroot.
@@ -16,7 +17,9 @@
 # image before it grows on boot, 512), RPI_SSH=1 (SSH server on from the start, for development;
 # otherwise it ships off and the `ssh` switch file turns it on), RPI_KEY_NOCHECK=1 (do not verify
 # the Raspberry Pi archive key fingerprint; not recommended), KERNEL_DEBS (folder with the LordOS
-# kernel packages from tools/rpi/build-kernel.sh, default /var/tmp/lordos-kernel/out).
+# kernel packages from tools/rpi/build-kernel.sh, default /var/tmp/lordos-kernel/out), CODE_CHECK_SERVER
+# (an x86-64 host with an aarch64 server/build: a lord-server built for the host from the same tree,
+# used only to check the signed system code; docs/SIGNING.md).
 #
 # Kernel: the LordOS build of the Raspberry Pi kernel (with Landlock, the BPF LSM and BTF) when its
 # .debs are in $KERNEL_DEBS; otherwise Raspberry Pi's archive kernel, which has none of them (a loud
@@ -51,7 +54,7 @@ RPI="$ROOT/tools/rpi/rootfs"
 KERNEL_DEBS=${KERNEL_DEBS:-/var/tmp/lordos-kernel/out}
 T0=$(date +%s)
 
-for t in debootstrap dpkg-deb sfdisk losetup mkfs.vfat mkfs.ext4 xz curl gpg partx; do
+for t in debootstrap dpkg-deb sfdisk losetup mkfs.vfat mkfs.ext4 xz curl gpg partx python3; do
     command -v "$t" >/dev/null || { echo "build-img.sh: missing $t (see docs/RASPBERRY.md, build packages)" >&2; exit 1; }
 done
 case "$(uname -m)" in
@@ -64,10 +67,17 @@ esac
 # Packages. LordOS's and the sample apps are the same as the ISO's (tools/iso/build.sh); the
 # kernel and firmware change (Raspberry Pi) and there is no live-boot, grub or disk installer.
 PKGS_BASE="initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo locales tzdata
- iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps e2fsprogs fdisk dosfstools util-linux"
+ iproute2 iputils-ping less nano ca-certificates apt dpkg passwd procps e2fsprogs fdisk dosfstools util-linux
+ systemd-timesyncd"
 PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
- skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland"
+ skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
+ cups avahi-daemon power-profiles-daemon shared-mime-info gsettings-desktop-schemas"
+# The board has no clock that survives without a battery: systemd-timesyncd sets the time from the
+# network at boot (Settings → Date & Time, "Automatic time"); without it the clock starts months
+# behind and every signed package index is refused as "not valid yet". The rest is the same as the
+# ISO (printing, exFAT/NTFS drives, power profiles, the MIME database, and the GSettings schemas GTK
+# apps need to read LordOS's GTK theme).
 # Raspberry Pi: boot firmware (start*.elf are not used on the Pi 5: its firmware lives in the
 # EEPROM) and Wi-Fi (CYW43455, firmware-brcm80211); kernels below
 PKGS_RPI="raspi-firmware firmware-brcm80211 rsync"
@@ -87,15 +97,20 @@ for fl in 2712 v8; do
 done
 # Debian 13 Mesa: v3d (OpenGL ES 3.1 on the Pi 5), v3dv (Vulkan 1.2/1.3) and kmsro (vc4 + v3d)
 PKGS_GPU="libgl1-mesa-dri libegl1 libgles2 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools glmark2-es2-wayland"
-PKGS_APPS="foot featherpad qt6-wayland"
+# the same apps as the ISO, browsers included (Debian's arm64 builds; they draw their own bar with
+# LordOS's window buttons: tools/iso/browser-defaults.sh, docs/WAYLAND.md)
+PKGS_APPS="foot featherpad qt6-wayland chromium firefox-esr"
 # the SSH server ships off; the `ssh` switch file on the boot partition (rpi/firstboot) or RPI_SSH=1 turns it on
 PKGS_SSH="openssh-server"
 # the boot splash (the LordOS Plymouth theme comes in the lordos package; plymouth-label draws the
 # password prompt's text for encrypted disks). See docs/RASPBERRY.md, "Boot splash".
 PKGS_SPLASH="plymouth plymouth-label"
 # to build lord-server (only in the build chroot, not in the image)
+# (the same as the ISO's build packages, docs/ISO.md: lord-doc needs Poppler and libarchive, lord-media
+# FFmpeg, lord-netperm's BPF programs clang; without them make silently leaves those parts out)
 PKGS_BUILD="build-essential pkg-config libxkbcommon-dev libwayland-dev wayland-protocols libgbm-dev libegl-dev libgles-dev
- libssl-dev libcrypt-dev libsrtp2-dev libusrsctp-dev dpkg-dev file"
+ libssl-dev libcrypt-dev libsrtp2-dev libusrsctp-dev freerdp3-dev dpkg-dev file clang
+ libpoppler-glib-dev libarchive-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev"
 
 echo "== LordOS $VERSION: Raspberry Pi image in $WORK (host $(uname -m))"
 kernel_warning() {
@@ -160,11 +175,17 @@ is_aarch64() {      # aarch64 ELF (e_machine = 0xb7)
 [ -f themes/greeter/theme.bundle.js ] || { echo "build-img.sh: themes missing (npm run build on the development machine)" >&2; exit 1; }
 if is_aarch64 server/build/lord-server && is_aarch64 server/build/lord-sessiond; then
     echo "== lord-server: using server/build (already aarch64)"
+    # mkdeb.sh checks the signed system code with lord-server, which can't run here on x86-64
+    if [ "$NATIVE" = 0 ] && [ ! -x "${CODE_CHECK_SERVER:-}" ]; then
+        echo "build-img.sh: server/build is aarch64 on an $(uname -m) host: set CODE_CHECK_SERVER to a lord-server built for this host from the same tree" >&2; exit 1
+    fi
     DEB_ARCH=$ARCH sh tools/iso/mkdeb.sh "$DEB"
 else
     echo "== lord-server: building in an arm64 chroot ($BR)"
-    if [ ! -x "$BR/usr/bin/gcc" ]; then
-        bootstrap "$BR" "$WORK/buildroot-debootstrap.log"
+    # (re)install the build packages when the chroot is new or lacks some (an older chroot without clang or RDP's headers)
+    if [ ! -x "$BR/usr/bin/gcc" ] || [ ! -x "$BR/usr/bin/clang" ] || [ ! -d "$BR/usr/include/aarch64-linux-gnu/libavcodec" ] ||
+       [ ! -f "$BR/usr/include/freerdp3/freerdp/addin.h" ]; then
+        [ -x "$BR/usr/bin/gcc" ] || bootstrap "$BR" "$WORK/buildroot-debootstrap.log"
         mount_ch "$BR"
         in_root "$BR" apt-get update -q > "$WORK/buildroot-apt.log" 2>&1
         # shellcheck disable=SC2086
@@ -178,7 +199,7 @@ else
     # ls is split on purpose (zero, one or two file names)
     # shellcheck disable=SC2046
     tar -C "$ROOT" --exclude=server/build --exclude=node_modules -cf - \
-        package.json README.md server third_party assets themes tools \
+        package.json README.md server third_party assets themes tools packaging apt \
         $(cd "$ROOT" && ls code-manifest.json code-manifest.sig 2>/dev/null) | tar -C "$BR/src/LordOS" -xf -
     J=$(nproc)
     in_root "$BR" sh -c "cd /src/LordOS && make -C server -j$J GPU=1 RELEASE=${RELEASE:-0} && make -C server build/canvas-test" > "$WORK/build.log" 2>&1 || {
@@ -190,10 +211,18 @@ else
     in_root "$BR" sh -c "cd /src/LordOS && DEB_ARCH=$ARCH REQUIRE_SIGNED_CODE=${REQUIRE_SIGNED_CODE:-0} sh tools/iso/mkdeb.sh /tmp/lordos.deb" >> "$WORK/build.log" 2>&1 || {
         tail -20 "$WORK/build.log"; exit 1; }
     cp "$BR/tmp/lordos.deb" "$DEB"
+    # the package must be complete: the documents and media helpers and the firewall's BPF programs
+    for f in lord-doc lord-media; do
+        dpkg-deb -c "$DEB" | grep -q "/usr/lib/lordos/bin/$f\$" || { echo "build-img.sh: $f missing from the package (build packages, see $WORK/build.log)" >&2; exit 1; }
+    done
+    [ -s "$BR/src/LordOS/server/build/gen/np_bpf.h" ] || { echo "build-img.sh: lord-netperm built without its BPF programs (clang)" >&2; exit 1; }
     umount_ch "$BR"
 fi
 # mkdeb.sh (the same as the ISO's) takes the architecture from DEB_ARCH
 echo "   $(basename "$DEB") ($(du -h "$DEB" | cut -f1))"
+# the tested-hardware snapshot lordos depends on: the same Architecture: all package as the ISO's
+HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
+echo "   $(basename "$HWDEB")"
 
 # ---- 2. the image's system ----
 echo "== debootstrap $SUITE $ARCH (minbase)"
@@ -267,8 +296,11 @@ fi
 in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_RPI_EXTRA >> "$WORK/apt.log" 2>&1 ||
     echo "   warning: $PKGS_RPI_EXTRA were not installed (see $WORK/apt.log)"
 cp "$DEB" "$CH/tmp/lordos.deb"
-in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
-rm -f "$CH/tmp/lordos.deb"
+cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
+in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
+# the browsers' defaults, the same as the ISO's
+sh "$ROOT/tools/iso/browser-defaults.sh" "$CH"
 
 # ---- 3. configuration (same as the ISO, minus the live parts) ----
 echo "== configuration"
@@ -295,6 +327,7 @@ mkdir -p "$CH/etc/lordos"
 # until first boot nobody logs in automatically; rpi/firstboot decides (login screen or lordos)
 printf '# Raspberry Pi: set by /usr/lib/lordos/rpi/firstboot on first boot.\nAUTOLOGIN=\n' > "$CH/etc/lordos/session.conf"
 in_root "$CH" useradd --system --home-dir /var/lib/lordos-greeter --create-home --shell /usr/sbin/nologin --comment LordOS lordos-greeter
+in_root "$CH" usermod -aG render,video lordos-greeter
 in_root "$CH" systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service > /dev/null 2>&1 || true
 
 # first boot and wait for vc4
@@ -381,7 +414,7 @@ if [ "${RPI_SSH:-0}" = 1 ]; then in_root "$CH" systemctl enable ssh.service > /d
 umount_ch "$CH"
 
 # ---- 4. the image: MBR, 512 MiB FAT32 (bootfs) + ext4 (rootfs) ----
-echo "== imagen"
+echo "== image"
 ROOT_MB=$(( $(du -sm "$CH" | cut -f1) - $(du -sm "$CH/boot/firmware" | cut -f1) ))
 BOOT_MB=512
 SIZE_MB=$((4 + BOOT_MB + ROOT_MB * 115 / 100 + IMG_EXTRA_MB))

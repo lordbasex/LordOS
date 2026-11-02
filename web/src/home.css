@@ -61,6 +61,9 @@
 .dl-card h3{margin:0;font-size:20px}
 .dl-card p{margin:0;color:var(--night-text);font-size:15px;line-height:1.55}
 .dl-card .btn{margin-top:auto}
+.dl-imager{margin-top:18px}
+.dl-btns{display:flex;flex-wrap:wrap;gap:12px}
+.dl-btns .btn{margin-top:0;flex:1 1 200px}
 .cmd{margin-top:auto;border-radius:12px;background:#0B0B1C;border:1px solid var(--night-line);overflow:hidden}
 .cmd-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px;padding:5px 6px 5px 12px;border-bottom:1px solid var(--night-line);background:#121127}
 .cmd-t{display:inline-flex;align-items:center;gap:5px;font:600 12px/1 var(--mono);color:#A9A5CF}
@@ -138,3 +141,17 @@ pre::-webkit-scrollbar-thumb,.table::-webkit-scrollbar-thumb{background:#4A4775;
 .dl-hint{margin:-4px 0 8px!important;font-size:13.5px!important;color:var(--night-note)!important}
 .dl-hint a{color:#FFD60A}
 .dl-hint code{font:600 13px var(--mono);white-space:nowrap}
+/* how to write LordOS to a USB stick or SD card: the LordOS Imager (recommended) and your usual tool */
+.dl-write{display:flex;flex-direction:column;gap:22px;scroll-margin-top:80px}
+.dl-write-h{margin:0;font-size:clamp(24px,2.8vw,32px);letter-spacing:-.02em;font-weight:800}
+.dl-write .sub{margin-top:8px}
+.dl-write-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:18px}
+.dl-rec{border-color:#6E4BFF;box-shadow:0 0 0 3px rgba(110,75,255,.22)}
+.dl-badge{align-self:flex-start;margin:0!important;padding:4px 12px;border-radius:999px;background:#6E4BFF;color:#fff!important;font-weight:800;font-size:12.5px!important;letter-spacing:.04em;text-transform:uppercase}
+.dl-steps{margin:0 0 6px;padding-left:22px;display:grid;gap:6px;color:var(--night-text);font-size:15px;line-height:1.5}
+.dl-steps li::marker{color:#B9A8FF;font-weight:800}
+.dl-guide{margin:0!important}.dl-guide a{color:#FFD60A;font-weight:700}.dl-guide a:hover{color:#fff}
+.dl-own .cmd{margin-top:0}
+.dl-own code{font:600 13px var(--mono);color:#FFD60A}
+.dl-own .dl-hint{margin:0!important}
+@media (max-width:900px){.dl-write-grid{grid-template-columns:1fr}}

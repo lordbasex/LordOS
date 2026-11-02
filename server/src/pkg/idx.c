@@ -3,6 +3,7 @@
 #include "../errcode.h"
 #include "deb.h"
 #include "crypto.h"
+#include "pin.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -15,6 +16,19 @@
 #include <unistd.h>
 
 /* ---- reading ---- */
+
+/* Each record's priority under apt's preferences (none: the index's source priorities). */
+static void idx_pins(Idx *x) {
+    free(x->prio);
+    x->prio = NULL;
+    x->pin_stamp = pin_stamp();
+    PinSet *set = pin_load();
+    if (!set) return;
+    x->prio = malloc(sizeof *x->prio * (x->h->npkg ? x->h->npkg : 1));
+    if (x->prio)
+        for (long i = 0; i < (long)x->h->npkg; i++) x->prio[i] = (int16_t)pin_priority(set, x, i);
+    pin_free(set);
+}
 
 int idx_open(Idx *x, const char *dir) {
     memset(x, 0, sizeof *x);
@@ -51,11 +65,13 @@ int idx_open(Idx *x, const char *dir) {
     x->desc_len = h->len_desc;
     x->mtime = (long)st.st_mtime;
     x->ino = (long)st.st_ino;
+    idx_pins(x);
     return 0;
 }
 
 void idx_close(Idx *x) {
     if (x->map) munmap(x->map, x->map_len);
+    free(x->prio);
     memset(x, 0, sizeof *x);
 }
 
@@ -64,7 +80,11 @@ int idx_refresh(Idx *x, const char *dir) {
     snprintf(path, sizeof path, "%s/index.bin", dir);
     struct stat st;
     if (stat(path, &st)) { if (x->map) { idx_close(x); return 1; } return 0; }
-    if (x->map && (long)st.st_ino == x->ino && (long)st.st_mtime == x->mtime) return 0;
+    if (x->map && (long)st.st_ino == x->ino && (long)st.st_mtime == x->mtime) {
+        if (pin_stamp() == x->pin_stamp) return 0;
+        idx_pins(x);                    /* the preferences changed: same index, new priorities */
+        return 1;
+    }
     Idx n;
     if (idx_open(&n, dir)) return 0;
     idx_close(x);

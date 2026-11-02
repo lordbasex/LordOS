@@ -27,7 +27,7 @@ const includeApp = (id) => !standalone || !['imager', 'installer'].includes(id);
 const hostStorePlugin = {
   name: 'lord-de-host-store',
   setup(b) {
-    if (standalone) b.onResolve({ filter: /^\.\/debian\.js$/ }, (a) =>
+    if (standalone) b.onResolve({ filter: /^\.\/(debian|ai)\.js$/ }, (a) =>
       a.importer === path.join(root, 'apps/store/index.jsx')
         ? { path: path.join(root, 'apps/store/host.jsx') } : null);
   },
@@ -41,6 +41,12 @@ const appsPlugin = {
     b.onLoad({ filter: /.*/, namespace: 'lordos-apps' }, () => {
       const dir = path.join(root, 'apps');
       const ids = fs.readdirSync(dir).filter((d) => includeApp(d) && fs.existsSync(path.join(dir, d, 'manifest.json'))).sort();
+      // every native app carries its own version (semver, apps/README.md), shown in the Store; apps may
+      // move to repositories of their own and be versioned apart from LordOS
+      for (const id of ids) {
+        const v = JSON.parse(fs.readFileSync(path.join(dir, id, 'manifest.json'), 'utf8')).version;
+        if (typeof v !== 'string' || !/^\d+\.\d+\.\d+(?:[-~][0-9A-Za-z.]+)?$/.test(v)) throw new Error(`apps/${id}/manifest.json: "version" must be semver (e.g. "0.8.5"), got ${JSON.stringify(v)}`);
+      }
       const lines = ids.map((id, i) => {
         const base = path.join(dir, id);
         return `import * as A${i} from ${JSON.stringify(path.join(base, 'index.jsx'))};\n` +

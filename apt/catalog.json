@@ -1,0 +1,477 @@
+{
+  "schema": 1,
+  "apps": [
+    {
+      "id": "claude-code",
+      "package": "claude-code",
+      "name": "Claude Code",
+      "summary": {
+        "en": "Anthropic's coding agent for the terminal",
+        "es": "El agente de programación de Anthropic para la terminal",
+        "pt": "O agente de programação da Anthropic para o terminal"
+      },
+      "license": "Proprietary (Anthropic Commercial Terms of Service)",
+      "vendor": "Anthropic",
+      "homepage": "https://claude.com/product/claude-code",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "coding-agent",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://downloads.claude.ai/claude-code/apt/stable",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64",
+          "arm64"
+        ],
+        "key": "keys/anthropic.asc",
+        "fingerprint": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+        "package": "claude-code"
+      }
+    },
+    {
+      "id": "vscode",
+      "package": "code",
+      "name": "Visual Studio Code",
+      "summary": {
+        "en": "Microsoft's code editor, with extensions and an integrated terminal",
+        "es": "El editor de código de Microsoft, con extensiones y terminal integrada",
+        "pt": "O editor de código da Microsoft, com extensões e terminal integrado"
+      },
+      "license": "Proprietary (Microsoft Software License Terms; built from the MIT-licensed Code - OSS)",
+      "vendor": "Microsoft",
+      "homepage": "https://code.visualstudio.com",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "editor",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://packages.microsoft.com/repos/code",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64",
+          "arm64"
+        ],
+        "key": "keys/microsoft.asc",
+        "fingerprint": "BC528686B50D79E339D3721CEB3E94ADBE1229CF",
+        "package": "code"
+      }
+    },
+    {
+      "id": "claude-desktop",
+      "package": "claude-desktop",
+      "name": "Claude",
+      "summary": {
+        "en": "Anthropic's Claude desktop app",
+        "es": "La aplicación de escritorio Claude de Anthropic",
+        "pt": "O aplicativo de desktop Claude da Anthropic"
+      },
+      "license": "Proprietary (Anthropic Consumer or Commercial Terms of Service)",
+      "vendor": "Anthropic",
+      "homepage": "https://claude.ai/download",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "chat",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://downloads.claude.ai/claude-desktop/apt/stable",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64",
+          "arm64"
+        ],
+        "key": "keys/anthropic.asc",
+        "fingerprint": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+        "package": "claude-desktop"
+      }
+    },
+    {
+      "id": "cursor",
+      "package": "cursor",
+      "name": "Cursor",
+      "summary": {
+        "en": "Code editor built around AI agents, based on VS Code",
+        "es": "Editor de código centrado en agentes de IA, basado en VS Code",
+        "pt": "Editor de código centrado em agentes de IA, baseado no VS Code"
+      },
+      "license": "Proprietary (Anysphere Terms of Service)",
+      "vendor": "Anysphere",
+      "homepage": "https://cursor.com",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "editor",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://downloads.cursor.com/aptrepo",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64",
+          "arm64"
+        ],
+        "key": "keys/anysphere.asc",
+        "fingerprint": "380FF4BCDC34A4BD92A3565342A1772E62E492D6",
+        "package": "cursor",
+        "files": {
+          "sources": "cursor",
+          "keyring": "anysphere.gpg"
+        }
+      }
+    },
+    {
+      "id": "llama.cpp",
+      "package": "llama.cpp",
+      "name": "llama.cpp",
+      "summary": {
+        "en": "Run GGUF language models locally on the CPU or a Vulkan GPU: llama-cli, llama-server and tools",
+        "es": "Ejecuta modelos de lenguaje GGUF en tu equipo, en la CPU o una GPU Vulkan: llama-cli, llama-server y herramientas",
+        "pt": "Execute modelos de linguagem GGUF no seu computador, na CPU ou numa GPU Vulkan: llama-cli, llama-server e ferramentas"
+      },
+      "license": "MIT",
+      "vendor": "ggml.ai (ggml-org)",
+      "homepage": "https://github.com/ggml-org/llama.cpp",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "local-models",
+      "source": {
+        "type": "build",
+        "recipe": "llama.cpp",
+        "version": "0.7.0",
+        "revision": "1lordos1",
+        "source_date_epoch": 1792084399,
+        "tag": "v0.7.0",
+        "commit": "620d2225cc436ab0b001e3200e590e3b286ef9ab",
+        "build_number": 11669,
+        "url": "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.7.0.tar.gz",
+        "sha256": "55d67acf3ad2ad747a9bbeb75f9f0e173dbcc0d1753a471038a90c819421c5e1",
+        "inputs": [
+          {
+            "name": "llama-ui.tar.gz",
+            "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11669/llama-b11669-ui.tar.gz",
+            "sha256": "cce039b1e0941f069263e37b794648998524d84047ab7ee746f3c686a5cee259"
+          }
+        ],
+        "notes": {
+          "amd64": "GGML_NATIVE=OFF with GGML_BACKEND_DL and GGML_CPU_ALL_VARIANTS: every x86-64 CPU variant is built and the best one is loaded at run time from /usr/lib/llama.cpp; GGML_VULKAN=ON adds libggml-vulkan.so, loaded only when a Vulkan device exists. LLAMA_OPENSSL=ON, so -hf downloads models from Hugging Face over HTTPS. llama-server embeds upstream's prebuilt web UI of the same commit (b11669). Built with no network.",
+          "arm64": "Same as amd64, with the armv8.0 to armv9.2 CPU variants and the Vulkan backend. Built natively in a debian:trixie arm64 container (qemu on the Mac)."
+        }
+      }
+    },
+    {
+      "id": "goose",
+      "package": "goose",
+      "name": "goose",
+      "summary": {
+        "en": "Open source AI agent desktop app that works with any model",
+        "es": "Aplicación de escritorio de agente de IA de código abierto que funciona con cualquier modelo",
+        "pt": "Aplicativo de desktop de agente de IA de código aberto que funciona com qualquer modelo"
+      },
+      "license": "Apache-2.0",
+      "vendor": "Agentic AI Foundation (AAIF)",
+      "homepage": "https://goose-docs.ai",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "coding-agent",
+      "source": {
+        "type": "deb",
+        "version": "1.56.0",
+        "files": {
+          "amd64": {
+            "url": "https://github.com/aaif-goose/goose/releases/download/v1.56.0/goose_1.56.0_amd64.deb",
+            "sha256": "5e7a4431779e9836c45be203bd0e01a888971ad97fde982fcb4f245d2a93bb21"
+          },
+          "arm64": {
+            "url": "https://github.com/aaif-goose/goose/releases/download/v1.56.0/goose_1.56.0_arm64.deb",
+            "sha256": "b8e0b5a586a2bb526a3aa557a63a91de23f583aeac236466cfc86a544382f904"
+          }
+        }
+      }
+    },
+    {
+      "id": "codex-cli",
+      "package": "codex-cli",
+      "name": "Codex CLI",
+      "summary": {
+        "en": "OpenAI's coding agent for the terminal",
+        "es": "El agente de programación de OpenAI para la terminal",
+        "pt": "O agente de programação da OpenAI para o terminal"
+      },
+      "license": "Apache-2.0",
+      "vendor": "OpenAI",
+      "homepage": "https://github.com/openai/codex",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "coding-agent",
+      "source": {
+        "type": "binary",
+        "recipe": "codex-cli",
+        "version": "0.164.0",
+        "revision": "1lordos1",
+        "source_date_epoch": 1792730890,
+        "sigstore": {
+          "identity": "https://github.com/openai/codex/.github/workflows/rust-release.yml@refs/tags/rust-v0.164.0",
+          "issuer": "https://token.actions.githubusercontent.com"
+        },
+        "files": {
+          "amd64": {
+            "url": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-x86_64-unknown-linux-musl.tar.gz",
+            "sha256": "90dd0b03b28afcb7fa733a4f73b413db2916a47347efd43fb669cc1c774ee8e4",
+            "sigstore": {
+              "url": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-x86_64-unknown-linux-musl.sigstore",
+              "sha256": "772d7471f5e72260884112474c33e30c9d7b7cb4570e5eb34c9af7253d623d86",
+              "blob": "codex-x86_64-unknown-linux-musl"
+            }
+          },
+          "arm64": {
+            "url": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-aarch64-unknown-linux-musl.tar.gz",
+            "sha256": "29a507a2a3fd8f6cd94b96b762d281d299d15d7902dee6132d314b78cf9108eb",
+            "sigstore": {
+              "url": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-aarch64-unknown-linux-musl.sigstore",
+              "sha256": "dd132a24fbbcc7402120806b39e2437ca2bd5e4c94127357ce9ed863c3b55674",
+              "blob": "codex-aarch64-unknown-linux-musl"
+            }
+          }
+        },
+        "inputs": [
+          {
+            "name": "LICENSE",
+            "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.164.0/LICENSE",
+            "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+          },
+          {
+            "name": "NOTICE",
+            "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.164.0/NOTICE",
+            "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915"
+          }
+        ]
+      }
+    },
+    {
+      "id": "opencode",
+      "package": "opencode",
+      "name": "OpenCode",
+      "summary": {
+        "en": "Open source AI coding agent, desktop app",
+        "es": "Agente de programación con IA de código abierto, aplicación de escritorio",
+        "pt": "Agente de programação com IA de código aberto, aplicativo de desktop"
+      },
+      "license": "MIT",
+      "vendor": "Anomaly (opencode)",
+      "homepage": "https://opencode.ai",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "coding-agent",
+      "source": {
+        "type": "deb",
+        "version": "1.19.4",
+        "files": {
+          "amd64": {
+            "url": "https://github.com/anomalyco/opencode/releases/download/v1.19.4/opencode-desktop-linux-amd64.deb",
+            "sha256": "6f4b8ebe720b564157919364e1e72d5b8ec44a013cd2a58b4ec679b0805a8307"
+          },
+          "arm64": {
+            "url": "https://github.com/anomalyco/opencode/releases/download/v1.19.4/opencode-desktop-linux-arm64.deb",
+            "sha256": "4ca5b358d445e1f85ddfbfd52be438ebae9aa88414a1f501e2f38213fa3f7396"
+          }
+        }
+      }
+    },
+    {
+      "id": "whisper.cpp",
+      "package": "whisper.cpp",
+      "name": "whisper.cpp",
+      "summary": {
+        "en": "Local speech recognition with Whisper models: whisper-cli, whisper-server and tools",
+        "es": "Reconocimiento de voz local con modelos Whisper: whisper-cli, whisper-server y herramientas",
+        "pt": "Reconhecimento de fala local com modelos Whisper: whisper-cli, whisper-server e ferramentas"
+      },
+      "license": "MIT",
+      "vendor": "ggml.ai (ggml-org)",
+      "homepage": "https://github.com/ggml-org/whisper.cpp",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "speech",
+      "source": {
+        "type": "build",
+        "recipe": "whisper.cpp",
+        "version": "1.9.5",
+        "revision": "1lordos1",
+        "source_date_epoch": 1791308357,
+        "tag": "v1.9.5",
+        "commit": "d1be6fde11ac6e0407606b4e42fe72d34add8037",
+        "url": "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.5.tar.gz",
+        "sha256": "ff1a9053feb509ff9d7729703355541ae9690073a6b1c40eb692c962e0dc1720",
+        "notes": {
+          "amd64": "CPU only, GGML_NATIVE=OFF with GGML_BACKEND_DL and GGML_CPU_ALL_VARIANTS (best CPU variant loaded at run time from /usr/lib/whisper.cpp); SDL2 on for whisper-stream and whisper-command (microphone). Built with no network.",
+          "arm64": "Same as amd64 with the armv8.0 to armv9.2 CPU variants. Built natively in a debian:trixie arm64 container (qemu on the Mac)."
+        }
+      }
+    },
+    {
+      "id": "google-chrome",
+      "package": "google-chrome-stable",
+      "name": "Google Chrome",
+      "summary": {
+        "en": "Google's web browser, with sync across devices through a Google account",
+        "es": "El navegador web de Google, con sincronización entre dispositivos mediante una cuenta de Google",
+        "pt": "O navegador web do Google, com sincronização entre dispositivos por meio de uma conta Google"
+      },
+      "license": "Proprietary (Google Chrome Terms of Service)",
+      "vendor": "Google",
+      "homepage": "https://www.google.com/chrome/",
+      "arches": [
+        "amd64",
+        "arm64"
+      ],
+      "kind": "browser",
+      "section": "commercial",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://dl.google.com/linux/chrome-stable/deb",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64",
+          "arm64"
+        ],
+        "key": "keys/google.asc",
+        "fingerprint": "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+        "package": "google-chrome-stable",
+        "files": {
+          "sources": "google-chrome",
+          "keyring": "google-chrome.gpg"
+        }
+      }
+    },
+    {
+      "id": "microsoft-edge",
+      "package": "microsoft-edge-stable",
+      "name": "Microsoft Edge",
+      "summary": {
+        "en": "Microsoft's web browser, based on Chromium",
+        "es": "El navegador web de Microsoft, basado en Chromium",
+        "pt": "O navegador web da Microsoft, baseado no Chromium"
+      },
+      "license": "Proprietary (Microsoft Software License Terms for Microsoft Edge)",
+      "vendor": "Microsoft",
+      "homepage": "https://www.microsoft.com/edge",
+      "arches": [
+        "amd64"
+      ],
+      "kind": "browser",
+      "section": "commercial",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://packages.microsoft.com/repos/edge-stable",
+        "suite": "stable",
+        "components": [
+          "main"
+        ],
+        "arches": [
+          "amd64"
+        ],
+        "key": "keys/microsoft.asc",
+        "fingerprint": "BC528686B50D79E339D3721CEB3E94ADBE1229CF",
+        "package": "microsoft-edge-stable",
+        "files": {
+          "sources": "microsoft-edge",
+          "keyring": "microsoft-edge.gpg"
+        }
+      }
+    },
+    {
+      "id": "spotify",
+      "package": "spotify-client",
+      "name": "Spotify",
+      "summary": {
+        "en": "Music and podcast streaming, free with ads or with a Premium subscription",
+        "es": "Música y podcasts en streaming, gratis con anuncios o con una suscripción Premium",
+        "pt": "Música e podcasts em streaming, grátis com anúncios ou com uma assinatura Premium"
+      },
+      "license": "Proprietary (Spotify Terms of Use)",
+      "vendor": "Spotify",
+      "homepage": "https://www.spotify.com",
+      "arches": [
+        "amd64"
+      ],
+      "kind": "music",
+      "section": "commercial",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://repository.spotify.com",
+        "suite": "stable",
+        "components": [
+          "non-free"
+        ],
+        "arches": [
+          "amd64"
+        ],
+        "key": "keys/spotify.asc",
+        "fingerprint": "E1096BCBFF6D418796DE78515384CE82BA52C83A",
+        "package": "spotify-client",
+        "optout": "spotify.list"
+      }
+    },
+    {
+      "id": "disk-formats",
+      "package": "lordos-disk-formats",
+      "name": "Disk Formats",
+      "summary": {
+        "en": "Commercial format: opens NTFS, exFAT, FAT, HFS+ and APFS disks. The drivers are free software at no cost",
+        "es": "Formato comercial: abre discos NTFS, exFAT, FAT, HFS+ y APFS. Los controladores son software libre y sin costo",
+        "pt": "Formato comercial: abre discos NTFS, exFAT, FAT, HFS+ e APFS. Os drivers são software livre e sem custo"
+      },
+      "license": "Free software: GPL-2.0, LGPL-2.1, GPL-3.0",
+      "vendor": "LordOS",
+      "homepage": "https://lordos.org",
+      "arches": ["amd64", "arm64"],
+      "kind": "system",
+      "section": "commercial",
+      "drivers": [
+        { "id": "ntfs", "name": "NTFS (ntfs3, ntfs-3g)", "license": "GPL-2.0", "source": "https://github.com/tuxera/ntfs-3g" },
+        { "id": "exfat", "name": "exFAT (exfat, exfatprogs)", "license": "GPL-2.0", "source": "https://github.com/exfatprogs/exfatprogs" },
+        { "id": "fat", "name": "FAT (vfat, dosfstools)", "license": "GPL-3.0", "source": "https://github.com/dosfstools/dosfstools" },
+        { "id": "hfs", "name": "HFS+ (hfsplus)", "license": "GPL-2.0", "source": "https://kernel.org" },
+        { "id": "apfs", "name": "APFS (linux-apfs-rw)", "license": "GPL-2.0", "source": "https://github.com/linux-apfs/linux-apfs-rw", "arches": ["amd64"], "optional": ["apfs-dkms", "linux-headers-amd64"] }
+      ]
+    }
+  ]
+}

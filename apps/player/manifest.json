@@ -1,5 +1,6 @@
 {
   "id": "player",
+  "version": "0.8.5",
   "name": "Player",
   "description": "Videos and music: library by artist and album, queue, subtitles, full screen and picture in picture",
   "size": [960, 600],

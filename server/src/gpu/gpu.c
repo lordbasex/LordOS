@@ -14,6 +14,7 @@
  * softpipe) our own CPU path is faster. LORD_GPU=1 forces it (tests), LORD_GPU=0
  * turns it off, LORD_GPU_DEBUG=1 reports what it does. Built without Mesa (no -DLORD_GPU) these are stubs. */
 #include "gpu.h"
+#include "gscissor.h"
 #include "../outputs.h"
 
 #include <stdio.h>
@@ -26,6 +27,7 @@ int  gpu_init(Kms *k) { (void)k; return -1; }
 int  gpu_active(void) { return 0; }
 void gpu_shutdown(void) {}
 const char *gpu_renderer(void) { return ""; }
+void gpu_info(GpuInfo *i) { *i = (GpuInfo){ .why = "not-built", .renderer = "", .render_node = "" }; }
 int  gpu_formats(GpuFormat *out, int max) { (void)out; (void)max; return 0; }
 int  gpu_device(dev_t *dev) { (void)dev; return -1; }
 GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) { (void)t; (void)px; (void)w; (void)h; (void)opaque; return NULL; }
@@ -37,6 +39,23 @@ void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { (void)lost; (voi
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)px; (void)w; (void)h; return -1; }
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
+int  gpu_gdrag_ready(int out) { (void)out; return 0; }
+void gpu_gdrag_max(int *lw, int *lh) { *lw = *lh = 0; }
+void gpu_scissor_quiet(int out, int quiet) { (void)out; (void)quiet; }
+int  gpu_frame_ex(int out, const Canvas *s, const Rect *d, int n, const GpuDrag *g, int *drawn, void (*f)(int)) {
+    (void)out; (void)s; (void)d; (void)n; (void)g; (void)f;
+    if (drawn) *drawn = 0;
+    return -1;
+}
+int  gpu_gdrag_holds(int out) { (void)out; return 0; }
+void gpu_gdrag_stats(long *b, long *l, long *q) { *b = *l = *q = 0; }
+int  gpu_gdrag_feed(int out, int which, const uint32_t *px, int w, int h, Rect r) {
+    (void)out; (void)which; (void)px; (void)w; (void)h; (void)r;
+    return -1;
+}
+void gpu_frame_times(int out, GpuFrameTimes *t) { (void)out; *t = (GpuFrameTimes){ 0 }; }
+void gpu_fence_on(int on) { (void)on; }
+int  gpu_fence_time(int out, uint64_t *ns) { (void)out; *ns = 0; return 0; }
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect c, float o) {
     (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)c; (void)o;
 }
@@ -54,6 +73,7 @@ int  gpu_read_done(void) { return 0; }
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <time.h>
 #include <unistd.h>
 #include <gbm.h>
 #include <EGL/egl.h>
@@ -62,6 +82,7 @@ int  gpu_read_done(void) { return 0; }
 #include <GLES2/gl2ext.h>
 #include <drm/drm_fourcc.h>
 #include <drm/virtgpu_drm.h>
+#include <linux/sync_file.h>
 #include <sys/ioctl.h>
 
 /* Does the card have 3D acceleration? The kernel is asked before loading Mesa, so a machine
@@ -111,6 +132,10 @@ typedef struct {
     EGLSurface surf;
     GpuTex canvas;
     Shown front, pending;
+    GpuFrameTimes times;                /* the last frame's (gpu_frame_times) */
+    int fence;                          /* its native fence's fd + 1 (a sync file), 0 none (so a wiped GOut has none) */
+    GpuScissor sc;                      /* what the last frames changed (the buffer-age scissor) */
+    int sc_quiet, sc_busy;              /* this frame has only the UI (gpu_scissor_quiet); the last one didn't */
 } GOut;
 
 static struct {
@@ -125,6 +150,7 @@ static struct {
     GLuint prog[2], vbo;                /* 0 = sampler2D, 1 = samplerExternalOES */
     GLint u_tex[2], u_op[2], u_opaque[2], u_swap[2];
     int bgra, have_external;
+    int unpack_sub;                     /* GL_EXT_unpack_subimage: GL_UNPACK_ROW_LENGTH_EXT exists */
     char renderer[160];
     PFNEGLCREATEIMAGEKHRPROC create_image;
     PFNEGLDESTROYIMAGEKHRPROC destroy_image;
@@ -134,15 +160,42 @@ static struct {
     long frames, scanouts;
     char render_node[64];               /* where Mesa renders (on the Pi 5: v3d, not vc4) */
     unsigned gen;                       /* this context's generation (0 = none) */
+    int scissor;                        /* the buffer-age scissor: LORD_GPU_SCISSOR=1 and EGL_EXT_buffer_age */
+    /* GPU drag, the dragged window composited here (gpu_gdrag_ready): 0 off, 1 on (gdrag_setup, at gpu_init) */
+    int gdrag;
+    int gdragtout[2];                      /* the output whose pixels each texture holds (-1: none); what it
+                                         * still lacks is paint.c's dirty rectangles */
+    GLuint gdragprog, gdragtex[2];            /* 0: the copy of what is below, 1: the layer */
+    int gdragtw[2], gdragth[2];               /* their sizes (0: nothing uploaded) */
+    int gdraglw, gdraglh;                     /* the largest output the self-test's placement covered */
+    GLint gu_below, gu_layer, gu_bsize, gu_lrect, gu_swap;
+    /* EGL_ANDROID_native_fence_sync: when the GPU finished a frame (gpu_fence_on) */
+    PFNEGLCREATESYNCKHRPROC create_sync;
+    PFNEGLDESTROYSYNCKHRPROC destroy_sync;
+    PFNEGLDUPNATIVEFENCEFDANDROIDPROC dup_fence;
 } G;
+static int fence_wanted;                /* gpu_fence_on (outlives the context) */
 
 /* These outlive the context (G is wiped by gpu_shutdown). */
 static unsigned last_gen;
+static const char *last_why = "";       /* gpu_info: the last gpu_init's outcome */
+static unsigned long total_scanouts;
+static char last_renderer[160];         /* the software renderer that was turned down */
+static long sc_frames, sc_cut;          /* frames with the scissor on, and those that redrew less than the whole output */
+static double sc_px, sc_all_px;         /* what they composed, and what they would have without it */
+static long gdrag_bpx, gdrag_lpx, gdrag_quads;   /* GPU drag's uploads and quads since gpu_gdrag_stats (across contexts) */
 static void (*hook_lost)(void), (*hook_changed)(void);
 
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { hook_lost = lost; hook_changed = changed; }
 unsigned gpu_generation(void) { return G.on ? G.gen : 0; }
 int gpu_tex_current(const GpuTex *t) { return t && G.on && t->gen == G.gen; }
+
+static double mono_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
+}
+static void take_fence(GOut *o);
 
 static void dbg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void dbg(const char *fmt, ...) {
@@ -190,6 +243,8 @@ static void query_render_node(void) {
 
 /* ---- shaders ---- */
 
+static int gdrag_setup(void);
+
 static const char *vs_src =
     "attribute vec2 a_pos; attribute vec2 a_uv; varying vec2 v_uv;\n"
     "void main() { v_uv = a_uv; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
@@ -204,6 +259,38 @@ static const char *fs_ext =
     "uniform float u_op; uniform float u_opaque; uniform float u_swap;\n"
     "void main() { vec4 c = texture2D(u_tex, v_uv);\n"
     "  if (u_opaque > 0.5) c.a = 1.0; gl_FragColor = c * u_op; }\n";
+
+/* GPU drag: the layer over the copy of what is below, with blit_row's integer arithmetic (canvas.c, k = 256)
+ * in 24-bit floats: every value is an integer below 2^24 and scaling by 2^-8 or 2^-16 is exact, so
+ * floor gives the CPU's result bit for bit (docs/GPU.md, "The dragged window on the GPU"). Texels come
+ * back as c/255 even through 16-bit floats close enough that floor(c·255 + 0.5) is c again; the
+ * output c/255 is converted back to c by the framebuffer as the UI texture's is. The pixel comes from
+ * v_px, a highp varying in pixels (top-down) that vs_gdrag passes from the quad's corners, not from
+ * gl_FragCoord, which GLSL ES 1.00 makes mediump: with 16-bit floats it can't tell x or y from x + 1 past
+ * 1024. The self-test's placement part checks it. */
+#define GDRAG_TILE 1024                    /* the self-test's arithmetic tiles (GDRAG_TILE²) */
+#define GDRAG_LX 37                        /* and where its placement part puts the layer (odd) */
+#define GDRAG_LY 21
+static const char *vs_gdrag =
+    "attribute vec2 a_pos; attribute vec2 a_px; varying highp vec2 v_px;\n"
+    "void main() { v_px = a_px; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
+static const char *fs_gdrag =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp float\n#endif\n"
+    "precision highp float;\n"
+    "uniform highp sampler2D u_below, u_layer;\n"
+    "varying highp vec2 v_px;\n"
+    "uniform vec2 u_bsize; uniform vec4 u_lrect; uniform float u_swap;\n"
+    "vec4 fetch(highp sampler2D t, vec2 q, vec2 size) {\n"
+    "  vec4 c = texture2D(t, (q + 0.5) / size); if (u_swap > 0.5) c = c.bgra; return floor(c * 255.0 + 0.5); }\n"
+    "void main() {\n"
+    "  vec2 p = floor(v_px);\n"
+    "  vec4 d = fetch(u_below, p, u_bsize), s = fetch(u_layer, p - u_lrect.xy, u_lrect.zw), o = d;\n"
+    "  if (s.a > 0.0) {\n"
+    "    float ia = 255.0 - s.a;\n"
+    "    o.rgb = s.rgb + floor(d.rgb * ia * 0.00390625);\n"
+    "    o.a = s.a + floor((d.a * ia + 128.0) * 257.0 * 0.0000152587890625);\n"
+    "  }\n"
+    "  gl_FragColor = o / 255.0; }\n";
 
 static GLuint compile(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
@@ -352,6 +439,7 @@ static void out_texture(GOut *o) {
 
 static void out_teardown(GOut *o) {
     if (!o->used) return;
+    if (o->fence > 0) close(o->fence - 1);
     release(o, &o->pending);
     release(o, &o->front);
     if (o->surf && eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) glDeleteTextures(1, &o->canvas.id);
@@ -380,22 +468,31 @@ int gpu_add_output(Kms *k) {
 int gpu_active(void) { return G.on; }
 const char *gpu_renderer(void) { return G.renderer; }
 
+void gpu_info(GpuInfo *i) {
+    i->why = last_why;
+    i->renderer = G.on ? G.renderer : !strcmp(last_why, "software") ? last_renderer : "";
+    i->render_node = G.on ? G.render_node : "";
+    i->dmabuf = G.on && G.create_image != NULL;
+    i->scanouts = total_scanouts;
+}
+
 int gpu_init(Kms *k) {
     const char *env = getenv("LORD_GPU");
     G.debug = getenv("LORD_GPU_DEBUG") != NULL;
-    if (env && !strcmp(env, "0")) { fprintf(stderr, "gpu: off (LORD_GPU=0), CPU composition\n"); return -1; }
+    if (env && !strcmp(env, "0")) { fprintf(stderr, "gpu: off (LORD_GPU=0), CPU composition\n"); last_why = "env-off"; return -1; }
     G.k = k;
     char drv[64];
     if (!drm_accelerated(k->fd, drv, sizeof drv) && !(env && !strcmp(env, "1"))) {
         fprintf(stderr, "gpu: the card (%s) has no 3D acceleration: CPU composition (LORD_GPU=1 forces it)\n", drv);
+        last_why = "no-3d";
         return -1;
     }
     G.gbm = gbm_create_device(k->fd);
-    if (!G.gbm) { fprintf(stderr, "gpu: no GBM on the card, CPU composition\n"); return -1; }
+    if (!G.gbm) { fprintf(stderr, "gpu: no GBM on the card, CPU composition\n"); last_why = "no-gbm"; return -1; }
     PFNEGLGETPLATFORMDISPLAYEXTPROC get_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
     G.dpy = get_display ? get_display(EGL_PLATFORM_GBM_KHR, G.gbm, NULL) : eglGetDisplay((EGLNativeDisplayType)G.gbm);
     EGLint maj, min;
-    if (G.dpy == EGL_NO_DISPLAY || !eglInitialize(G.dpy, &maj, &min)) { fprintf(stderr, "gpu: EGL did not start, CPU composition\n"); goto fail; }
+    if (G.dpy == EGL_NO_DISPLAY || !eglInitialize(G.dpy, &maj, &min)) { fprintf(stderr, "gpu: EGL did not start, CPU composition\n"); last_why = "no-egl"; goto fail; }
     const char *exts = eglQueryString(G.dpy, EGL_EXTENSIONS);
     query_render_node();
     eglBindAPI(EGL_OPENGL_ES_API);
@@ -408,25 +505,34 @@ int gpu_init(Kms *k) {
         EGLint vid = 0;
         if (eglGetConfigAttrib(G.dpy, cfgs[i], EGL_NATIVE_VISUAL_ID, &vid) && vid == GBM_FORMAT_XRGB8888) cfg = cfgs[i];
     }
-    if (!cfg) { fprintf(stderr, "gpu: no XRGB8888 EGL config, CPU composition\n"); goto fail; }
+    if (!cfg) { fprintf(stderr, "gpu: no XRGB8888 EGL config, CPU composition\n"); last_why = "no-config"; goto fail; }
     static const EGLint ctx_attr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
     G.ctx = eglCreateContext(G.dpy, cfg, EGL_NO_CONTEXT, ctx_attr);
     G.cfg = cfg;
     G.gen = ++last_gen;
     if (last_gen == 0) G.gen = last_gen = 1;    /* 0 means "no context" */
-    if (G.ctx == EGL_NO_CONTEXT || out_setup(&G.out[0], k)) { fprintf(stderr, "gpu: could not create the context or the surface, CPU composition\n"); goto fail; }
+    if (G.ctx == EGL_NO_CONTEXT || out_setup(&G.out[0], k)) { fprintf(stderr, "gpu: could not create the context or the surface, CPU composition\n"); last_why = "no-context"; goto fail; }
 
     const char *rend = (const char *)glGetString(GL_RENDERER), *gl_exts = (const char *)glGetString(GL_EXTENSIONS);
     snprintf(G.renderer, sizeof G.renderer, "%s", rend ? rend : "?");
     int software = strstr(G.renderer, "llvmpipe") || strstr(G.renderer, "softpipe") || strstr(G.renderer, "swrast");
     if (software && !(env && !strcmp(env, "1"))) {
         fprintf(stderr, "gpu: the renderer is software (%s): CPU composition (LORD_GPU=1 forces it)\n", G.renderer);
+        last_why = "software";
+        snprintf(last_renderer, sizeof last_renderer, "%s", G.renderer);
         goto fail;
     }
     G.bgra = has_ext(gl_exts, "GL_EXT_texture_format_BGRA8888");
     G.have_external = has_ext(gl_exts, "GL_OES_EGL_image_external");
-    if (!has_ext(gl_exts, "GL_EXT_unpack_subimage")) dbg("no GL_EXT_unpack_subimage: the whole canvas is uploaded");
-    if (make_prog(0, fs_2d) || (G.have_external && make_prog(1, fs_ext))) { fprintf(stderr, "gpu: shaders failed, CPU composition\n"); goto fail; }
+    G.unpack_sub = has_ext(gl_exts, "GL_EXT_unpack_subimage");
+    {
+        const char *sc = getenv("LORD_GPU_SCISSOR");
+        int want = sc && !strcmp(sc, "1");
+        G.scissor = want && has_ext(exts, "EGL_EXT_buffer_age");
+        fprintf(stderr, "gpu: buffer-age scissor %s\n", G.scissor ? "on" : want ? "off: no EGL_EXT_buffer_age" : "off (LORD_GPU_SCISSOR=1 turns it on)");
+    }
+    if (!G.unpack_sub) dbg("no GL_EXT_unpack_subimage: damage is uploaded as whole rows");
+    if (make_prog(0, fs_2d) || (G.have_external && make_prog(1, fs_ext))) { fprintf(stderr, "gpu: shaders failed, CPU composition\n"); last_why = "shaders"; goto fail; }
     if (has_ext(exts, "EGL_EXT_image_dma_buf_import")) {
         G.create_image = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
         G.destroy_image = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
@@ -437,11 +543,21 @@ int gpu_init(Kms *k) {
         G.query_modifiers = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC)eglGetProcAddress("eglQueryDmaBufModifiersEXT");
     }
 
+    if (has_ext(exts, "EGL_ANDROID_native_fence_sync") && has_ext(exts, "EGL_KHR_fence_sync")) {
+        G.create_sync = (PFNEGLCREATESYNCKHRPROC)eglGetProcAddress("eglCreateSyncKHR");
+        G.destroy_sync = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress("eglDestroySyncKHR");
+        G.dup_fence = (PFNEGLDUPNATIVEFENCEFDANDROIDPROC)eglGetProcAddress("eglDupNativeFenceFDANDROID");
+        if (!G.create_sync || !G.destroy_sync || !G.dup_fence) G.create_sync = NULL;
+    }
+    dbg("native fences (frame phases): %s", G.create_sync ? "yes" : "no");
+
     out_texture(&G.out[0]);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     G.on = 1;
+    G.gdragtout[0] = G.gdragtout[1] = -1;
+    last_why = "on";
     if (G.debug) {
         GpuFormat f[64];
         int nf = gpu_formats(f, 64);
@@ -450,6 +566,8 @@ int gpu_init(Kms *k) {
     fprintf(stderr, "gpu: GPU composition (%s, EGL %d.%d, dmabuf %s, render %s, display %s)\n", G.renderer, maj, min,
             G.create_image ? (G.query_modifiers ? "with modifiers" : "yes") : "no",
             G.render_node[0] ? G.render_node : "the card's", k->driver[0] ? k->driver : drv);
+    /* GPU drag's self-test runs here, not in the first drag frame (once per renderer: gdrag_memo) */
+    G.gdrag = gdrag_setup();
     if (hook_changed) hook_changed();       /* windows re-import their buffers in this context */
     return 0;
 fail:
@@ -459,6 +577,9 @@ fail:
 
 void gpu_shutdown(void) {
     int was_on = G.on;
+    if (sc_frames) fprintf(stderr, "gpu: buffer-age scissor: %ld frames, %ld of them partial, composed %.1f Mpx of %.1f\n", sc_frames, sc_cut, sc_px / 1e6, sc_all_px / 1e6);
+    sc_frames = sc_cut = 0;
+    sc_px = sc_all_px = 0;
     if (was_on && hook_lost) {
         /* the compositor reads back and frees what it holds while the context still works */
         for (int i = 0; i < OUT_MAX; i++)
@@ -728,38 +849,577 @@ static void read_back(int W, int H) {
     rb.done = 1;
 }
 
-int gpu_frame(int out, const Canvas *scene, Rect dmg, void (*draw_layer)(int layer)) {
+/* Uploads r of px (sw wide, stride px a row) into the bound texture (texw wide). Without
+ * GL_EXT_unpack_subimage GLES2 reads rows of the upload's own width: whole rows then, in one call when
+ * they are contiguous in px, else one row at a time. Returns the pixels sent. */
+static long upload_rect(const uint32_t *px, int stride, int sw, int texw, Rect r) {
+    if (r.x1 <= r.x0 || r.y1 <= r.y0) return 0;
+    GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
+    if (G.unpack_sub) {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0, fmt, GL_UNSIGNED_BYTE,
+                        px + (size_t)r.y0 * stride + r.x0);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+        return (long)(r.x1 - r.x0) * (r.y1 - r.y0);
+    }
+    int w = sw < texw ? sw : texw;
+    if (stride == w) {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, r.y0, w, r.y1 - r.y0, fmt, GL_UNSIGNED_BYTE, px + (size_t)r.y0 * stride);
+        return (long)w * (r.y1 - r.y0);
+    }
+    for (int y = r.y0; y < r.y1; y++)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, r.x0, y, r.x1 - r.x0, 1, fmt, GL_UNSIGNED_BYTE, px + (size_t)y * stride + r.x0);
+    return (long)(r.x1 - r.x0) * (r.y1 - r.y0);
+}
+
+/* ---- GPU drag: the dragged window on the GPU ---- */
+
+static GLuint gdrag_texture(void) {
+    GLuint t = 0;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    return t;
+}
+
+/* Texture i gets output out's px (w × h, stride w): all of it if its size changed, it held another
+ * output's (or nothing) or full, else the n rectangles. */
+static long gdrag_upload(int i, int out, const uint32_t *px, int w, int h, const Rect *r, int n, int full) {
+    glBindTexture(GL_TEXTURE_2D, G.gdragtex[i]);
+    int other = G.gdragtout[i] != out;
+    G.gdragtout[i] = out;
+    if (full || other || G.gdragtw[i] != w || G.gdragth[i] != h) {
+        GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
+        if (G.gdragtw[i] != w || G.gdragth[i] != h) glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, px);
+        else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, fmt, GL_UNSIGNED_BYTE, px);
+        G.gdragtw[i] = w;
+        G.gdragth[i] = h;
+        return (long)w * h;
+    }
+    long sent = 0;
+    for (int k = 0; k < n; k++) {
+        Rect q = r[k];
+        if (q.x0 < 0) q.x0 = 0;
+        if (q.y0 < 0) q.y0 = 0;
+        if (q.x1 > w) q.x1 = w;
+        if (q.y1 > h) q.y1 = h;
+        sent += upload_rect(px, w, w, w, q);
+    }
+    return sent;
+}
+
+/* The GPU drag quad: the shader inside w (a framebuffer W × H px), blending and dithering off (it writes the
+ * result). The quad covers the framebuffer and carries each corner's pixel position (top-down) for v_px. */
+static void gdrag_draw(int W, int H, Rect w, float lx, float ly, float lw, float lh, float bw, float bh) {
+    glUseProgram(G.gdragprog);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, G.gdragtex[1]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, G.gdragtex[0]);
+    glUniform1i(G.gu_below, 0);
+    glUniform1i(G.gu_layer, 1);
+    glUniform2f(G.gu_bsize, bw, bh);
+    glUniform4f(G.gu_lrect, lx, ly, lw, lh);
+    glUniform1f(G.gu_swap, G.bgra ? 0.0f : 1.0f);
+    glDisable(GL_BLEND);
+    glDisable(GL_DITHER);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(w.x0, H - w.y1, w.x1 - w.x0, w.y1 - w.y0);
+    const GLfloat fw = (GLfloat)W, fh = (GLfloat)H;
+    const GLfloat v[] = { -1, -1, 0, fh,  1, -1, fw, fh,  -1, 1, 0, 0,  1, 1, fw, 0 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_SCISSOR_TEST);
+    glEnable(GL_DITHER);
+    glEnable(GL_BLEND);
+}
+/* The self-test's cases, in order: every valid premultiplied (alpha a, channel c ≤ a) with every
+ * destination channel d (three cases a pixel, one per colour channel, the destination alpha varying),
+ * then every (source alpha, destination alpha), then random valid pixels to fill the last tile. */
+typedef struct { int a, j, grid; uint32_t p, rng; } GdragGen;
+static int gdrag_gen_done(const GdragGen *g) { return g->a > 255 && g->grid >= 65536; }
+static void gdrag_gen(GdragGen *g, uint32_t *s, uint32_t *d) {
+    g->p++;
+    g->rng ^= g->rng << 13; g->rng ^= g->rng >> 17; g->rng ^= g->rng << 5;
+    if (g->a <= 255) {
+        uint32_t a = (uint32_t)g->a, n = (a + 1) * 256, sc = 0, dc = 0;
+        for (int k = 0; k < 3; k++) {
+            uint32_t j = (uint32_t)g->j + (uint32_t)k < n ? (uint32_t)g->j + (uint32_t)k : n - 1;
+            sc = sc << 8 | j >> 8;
+            dc = dc << 8 | (j & 255);
+        }
+        *s = a << 24 | sc;
+        *d = ((g->p * 151u + 7u) & 255u) << 24 | dc;
+        g->j += 3;
+        if ((uint32_t)g->j >= n) { g->a++; g->j = 0; }
+        return;
+    }
+    if (g->grid < 65536) {
+        uint32_t sa = (uint32_t)g->grid & 255, da = (uint32_t)g->grid >> 8, c = sa ? g->rng % (sa + 1) : 0;
+        *s = sa << 24 | c << 16 | (sa - c) << 8 | c / 2;
+        *d = da << 24 | (g->rng >> 8 & 0xffffff);
+        g->grid++;
+        return;
+    }
+    uint32_t a = g->rng >> 24, r = g->rng & 0xffffff;
+    *s = a << 24 | (a ? (r % (a + 1)) << 16 | ((r >> 8) % (a + 1)) << 8 | (r >> 16) % (a + 1) : 0);
+    *d = g->rng * 2654435761u;
+}
+
+/* One self-test pass in the bound fw × fh framebuffer: the layer lay (lw × lh) at (lx, ly)
+ * over bel (fw × fh), drawn where the layer is and compared with canvas_blit on the CPU into ref; the rest
+ * of the framebuffer must stay as cleared (0). rd (fw × fh × 4 bytes) may be bel's memory: it is read
+ * back after the upload. -1 on a GL error, else the pixels that differ (the first few logged). */
+static long gdrag_pass(int fw, int fh, const uint32_t *bel, const uint32_t *lay, int lx, int ly, int lw,
+                    int lh, uint32_t *ref, uint8_t *rd, const char *what) {
+    memcpy(ref, bel, (size_t)fw * fh * 4);
+    Canvas c;
+    canvas_init(&c, ref, fw, fh, fw);
+    canvas_blit(&c, lay, lw, lh, lx, ly, 0, 1, 0);
+    Rect w = { lx > 0 ? lx : 0, ly > 0 ? ly : 0, lx + lw < fw ? lx + lw : fw, ly + lh < fh ? ly + lh : fh };
+    for (int y = 0; y < fh; y++)
+        for (int x = 0; x < fw; x++)
+            if (x < w.x0 || x >= w.x1 || y < w.y0 || y >= w.y1) ref[(size_t)y * fw + x] = 0;
+    gdrag_upload(0, -1, bel, fw, fh, NULL, 0, 1);
+    gdrag_upload(1, -1, lay, lw, lh, NULL, 0, 1);
+    glViewport(0, 0, fw, fh);
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    gdrag_draw(fw, fh, w, (float)lx, (float)ly, (float)lw, (float)lh, (float)fw, (float)fh);
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(0, 0, fw, fh, GL_RGBA, GL_UNSIGNED_BYTE, rd);
+    if (glGetError() != GL_NO_ERROR) return -1;
+    long differ = 0;
+    for (int y = 0; y < fh; y++) {                  /* GL's rows are bottom to top */
+        const uint8_t *b = rd + (size_t)(fh - 1 - y) * fw * 4;
+        const uint32_t *e = ref + (size_t)y * fw;
+        for (int x = 0; x < fw; x++) {
+            uint32_t v = (uint32_t)b[4 * x + 3] << 24 | (uint32_t)b[4 * x] << 16 | (uint32_t)b[4 * x + 1] << 8 | b[4 * x + 2];
+            if (v != e[x] && differ++ < 4)
+                fprintf(stderr, "gpu: GPU drag self-test (%s): pixel (%d, %d): CPU %08x, GPU %08x\n", what, x, y, e[x], v);
+        }
+    }
+    return differ;
+}
+
+/* The self-test, two parts. Arithmetic: every case of gdrag_gen in 1024 × 1024 tiles (the layer over the
+ * copy, pixel for pixel). Placement: an fw × fh framebuffer (the output's size, at least 4096 × 2048 when
+ * the GPU allows it) and a copy of that size, with the layer at an odd offset reaching its far edges,
+ * every pixel a different random value: a texel read from the wrong place (gl_FragCoord or a varying
+ * with too few bits, the far rows and columns) shows. 0 if every pixel is the CPU's. */
+static int gdrag_selftest(int fw, int fh, long *cases, long *differ) {
+    enum { T = GDRAG_TILE, LX = GDRAG_LX, LY = GDRAG_LY };
+    *cases = *differ = 0;
+    size_t n = (size_t)fw * fh > (size_t)T * T ? (size_t)fw * fh : (size_t)T * T;
+    uint32_t *s = malloc(n * 4), *d = malloc(n * 4), *ref = malloc(n * 4);
+    GLuint ft = 0, fbo = 0;
+    for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) {}    /* only the test's own errors count */
+    int ok = s && d && ref;
+    if (ok) {
+        glGenTextures(1, &ft);
+        glBindTexture(GL_TEXTURE_2D, ft);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, T, T, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ft, 0);
+        ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    }
+    GdragGen g = { 0, 0, 0, 0, 2463534242u };
+    while (ok && !gdrag_gen_done(&g)) {
+        for (size_t i = 0; i < (size_t)T * T; i++) gdrag_gen(&g, &s[i], &d[i]);
+        long k = gdrag_pass(T, T, d, s, 0, 0, T, T, ref, (uint8_t *)d, "arithmetic");
+        if (k < 0) { ok = 0; break; }
+        *differ += k;
+        *cases += (long)T * T;
+    }
+    if (ok) {                                       /* placement */
+        glBindTexture(GL_TEXTURE_2D, ft);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fw, fh, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    }
+    if (ok) {
+        uint32_t r = 88172645u;
+        for (size_t i = 0; i < (size_t)fw * fh; i++) {
+            r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+            d[i] = r * 2654435761u;
+            uint32_t a = r >> 24;
+            s[i] = a << 24 | (a ? (r % (a + 1)) << 16 | ((r >> 8) % (a + 1)) << 8 | (r >> 16) % (a + 1) : 0);
+        }
+        long k = gdrag_pass(fw, fh, d, s, LX, LY, fw - LX, fh - LY, ref, (uint8_t *)d, "placement");
+        if (k < 0) ok = 0;
+        else {
+            *differ += k;
+            *cases += (long)(fw - LX) * (fh - LY);
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (fbo) glDeleteFramebuffers(1, &fbo);
+    if (ft) glDeleteTextures(1, &ft);
+    G.gdragtw[0] = G.gdragtw[1] = G.gdragth[0] = G.gdragth[1] = 0;    /* hold nothing of an output */
+    G.gdragtout[0] = G.gdragtout[1] = -1;
+    glDeleteTextures(2, G.gdragtex);
+    G.gdragtex[0] = gdrag_texture();
+    G.gdragtex[1] = gdrag_texture();
+    free(s); free(d); free(ref);
+    return ok && !*differ ? 0 : -1;
+}
+
+/* The self-test's outcome per GL renderer and version, kept across contexts (gpu_shutdown wipes G): a
+ * GPU restart, or a later context on the same driver, does not run it again. */
+static struct { char key[320]; int pass, w, h; } gdrag_memo;
+
+static void gdrag_teardown(void) {
+    if (G.gdragprog) glDeleteProgram(G.gdragprog);
+    glDeleteTextures(2, G.gdragtex);
+    G.gdragprog = G.gdragtex[0] = G.gdragtex[1] = 0;
+}
+
+/* GPU drag's program and textures in this context, and the self-test (or its earlier outcome). 1 = on. */
+static int gdrag_setup(void) {
+    const char *e = getenv("LORD_GPU_DRAG");
+    /* on by default since the Raspberry Pi 5 run of 2026-10-31, where it applies to the whole drag (docs/GPU.md) */
+    if (e && !strcmp(e, "0")) { fprintf(stderr, "gpu: GPU drag off (LORD_GPU_DRAG=0): the dragged window is composed by the CPU\n"); return 0; }
+    GOut *o = G.cur && G.cur->used ? G.cur : &G.out[0];
+    if (!o->used || !eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) return 0;
+    GLint range[2] = { 0, 0 }, prec = 0;
+    glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, range, &prec);
+    if (prec < 23 || range[1] < 24) {
+        fprintf(stderr, "gpu: GPU drag off: the fragment shader's floats have %d bits (24 needed)\n", (int)prec + 1);
+        return 0;
+    }
+    GLuint v = compile(GL_VERTEX_SHADER, vs_gdrag), f = compile(GL_FRAGMENT_SHADER, fs_gdrag);
+    GLint linked = 0;
+    if (v && f) {
+        G.gdragprog = glCreateProgram();
+        glAttachShader(G.gdragprog, v);
+        glAttachShader(G.gdragprog, f);
+        glBindAttribLocation(G.gdragprog, 0, "a_pos");
+        glBindAttribLocation(G.gdragprog, 1, "a_px");
+        glLinkProgram(G.gdragprog);
+        glGetProgramiv(G.gdragprog, GL_LINK_STATUS, &linked);
+    }
+    if (v) glDeleteShader(v);
+    if (f) glDeleteShader(f);
+    if (!linked) { gdrag_teardown(); fprintf(stderr, "gpu: GPU drag off: its shader did not build\n"); return 0; }
+    G.gu_below = glGetUniformLocation(G.gdragprog, "u_below");
+    G.gu_layer = glGetUniformLocation(G.gdragprog, "u_layer");
+    G.gu_bsize = glGetUniformLocation(G.gdragprog, "u_bsize");
+    G.gu_lrect = glGetUniformLocation(G.gdragprog, "u_lrect");
+    G.gu_swap = glGetUniformLocation(G.gdragprog, "u_swap");
+    G.gdragtex[0] = gdrag_texture();
+    G.gdragtex[1] = gdrag_texture();
+    G.gdragtout[0] = G.gdragtout[1] = -1;
+    /* the placement part's size: the largest output now, at least 4096 × 2048, within the GPU's limits */
+    GLint maxtex = 0, vp[2] = { 0, 0 };
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxtex);
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, vp);
+    int fw = 4096, fh = 2048;
+    for (int i = 0; i < OUT_MAX; i++)
+        if (G.out[i].used) {
+            if (G.out[i].W > fw) fw = G.out[i].W;
+            if (G.out[i].H > fh) fh = G.out[i].H;
+        }
+    int lw = maxtex < vp[0] ? maxtex : vp[0], lh = maxtex < vp[1] ? maxtex : vp[1];
+    if (fw > lw) fw = lw;
+    if (fh > lh) fh = lh;
+    const char *ver = (const char *)glGetString(GL_VERSION);
+    char key[sizeof gdrag_memo.key];
+    snprintf(key, sizeof key, "%s|%s", G.renderer, ver ? ver : "?");
+    if (!strcmp(key, gdrag_memo.key) && (!gdrag_memo.pass || (gdrag_memo.w >= fw && gdrag_memo.h >= fh))) {
+        if (!gdrag_memo.pass) {
+            gdrag_teardown();
+            fprintf(stderr, "gpu: GPU drag off: its self-test failed earlier with this renderer\n");
+            return 0;
+        }
+        G.gdraglw = gdrag_memo.w;
+        G.gdraglh = gdrag_memo.h;
+        dbg("GPU drag on: its self-test passed earlier with this renderer (%dx%d)", G.gdraglw, G.gdraglh);
+        return 1;
+    }
+    if (fw < 4096 || fh < 2048)
+        fprintf(stderr, "gpu: GPU drag self-test: placement in %dx%d, the largest framebuffer the GPU allows\n", fw, fh);
+    long cases = 0, differ = 0;
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    int bad = fw < GDRAG_TILE || fh < GDRAG_TILE ? -1 : gdrag_selftest(fw, fh, &cases, &differ);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    double ms = (t1.tv_sec - t0.tv_sec) * 1e3 + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+    if (bad && !differ) {                        /* no pixel differs: it did not run to the end */
+        gdrag_teardown();
+        fprintf(stderr, "gpu: GPU drag off: its self-test could not run (texture size, memory or framebuffer)\n");
+        return 0;
+    }
+    snprintf(gdrag_memo.key, sizeof gdrag_memo.key, "%s", key);
+    gdrag_memo.pass = !bad;
+    gdrag_memo.w = fw;
+    gdrag_memo.h = fh;
+    if (bad) {
+        gdrag_teardown();
+        fprintf(stderr, "gpu: GPU drag off: the self-test failed (%ld of %ld pixels differ from the CPU's, %.0f ms)\n", differ, cases, ms);
+        return 0;
+    }
+    G.gdraglw = fw;
+    G.gdraglh = fh;
+    fprintf(stderr, "gpu: GPU drag on: the dragged window is composed on the GPU (self-test: %ld pixels, every valid "
+                    "premultiplied combination and a %dx%d placement pass, the same as the CPU's, %.0f ms)\n", cases, fw, fh, ms);
+    return 1;
+}
+
+int gpu_gdrag_ready(int out) {
+    return G.on && G.gdrag == 1 && out >= 0 && out < OUT_MAX && G.out[out].used && G.out[out].W <= G.gdraglw &&
+           G.out[out].H <= G.gdraglh;
+}
+
+void gpu_gdrag_max(int *lw, int *lh) {
+    int on = G.on && G.gdrag == 1;
+    *lw = on ? G.gdraglw - GDRAG_LX : 0;
+    *lh = on ? G.gdraglh - GDRAG_LY : 0;
+}
+int gpu_gdrag_holds(int out) { return G.on && G.gdrag == 1 && out >= 0 && G.gdragtout[0] == out && G.gdragtout[1] == out; }
+
+void gpu_gdrag_stats(long *below_px, long *layer_px, long *quads) {
+    *below_px = gdrag_bpx;
+    *layer_px = gdrag_lpx;
+    *quads = gdrag_quads;
+    gdrag_bpx = gdrag_lpx = gdrag_quads = 0;
+}
+
+/* LORD_GPU_VERIFY: what the quad wrote in w, read back, against the CPU's pixels (RGB: the
+ * framebuffer has no alpha; a frame painted by the CPU shows "premultiplied over black", its RGB). */
+static void gdrag_verify(GOut *o, const GpuDrag *g) {
+    int ww = g->w.x1 - g->w.x0, wh = g->w.y1 - g->w.y0;
+    uint8_t *rd = malloc((size_t)ww * wh * 4);
+    if (!rd) return;
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadPixels(g->w.x0, o->H - g->w.y1, ww, wh, GL_RGBA, GL_UNSIGNED_BYTE, rd);
+    long differ = 0;
+    int worst = 0;
+    if (glGetError() == GL_NO_ERROR)
+        for (int y = 0; y < wh; y++) {
+            const uint8_t *b = rd + (size_t)(wh - 1 - y) * ww * 4;
+            const uint32_t *e = g->ref + (size_t)y * ww;
+            for (int x = 0; x < ww; x++) {
+                int dr = abs((int)b[4 * x] - (int)(e[x] >> 16 & 255)), dg = abs((int)b[4 * x + 1] - (int)(e[x] >> 8 & 255));
+                int db = abs((int)b[4 * x + 2] - (int)(e[x] & 255)), dm = dr > dg ? dr : dg;
+                if (db > dm) dm = db;
+                if (dm) differ++;
+                if (dm > worst) worst = dm;
+            }
+        }
+    else differ = -1;
+    fprintf(stderr, "gpu-verify: frame %ld W=%dx%d differ=%ld worst=%d\n", g->frame, ww, wh, differ, worst);
+    free(rd);
+}
+
+/* GPU drag off for this context, for a reason that would come back every frame */
+static int gdrag_off(const char *why) {
+    G.gdragtout[0] = G.gdragtout[1] = -1;
+    G.gdrag = 0;
+    fprintf(stderr, "gpu: GPU drag off: %s\n", why);
+    return 0;
+}
+
+/* The GPU drag part of a frame: the textures brought up to date, then the quad. 0 if it was not drawn. */
+static int gdrag_frame(GOut *o, int out, const GpuDrag *g) {
+    if (G.gdrag != 1) return 0;
+    int sane = g->w.x0 >= 0 && g->w.y0 >= 0 && g->w.x1 <= o->W && g->w.y1 <= o->H && g->w.x1 > g->w.x0 && g->w.y1 > g->w.y0;
+    /* coordinates past what the self-test's placement covered are not trusted */
+    int tested = o->W <= G.gdraglw && o->H <= G.gdraglh && g->lw <= G.gdraglw - GDRAG_LX && g->lh <= G.gdraglh - GDRAG_LY &&
+                 g->bw <= G.gdraglw && g->bh <= G.gdraglh;
+    if (g->lpx && g->bpx) {
+        if (!sane) return gdrag_off("a window rectangle outside the output");
+        if (!tested) return gdrag_off("a layer or output larger than its self-test covered");
+        for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) {}
+        double t0 = mono_ms();
+        /* another output's texture (or nothing yet), or full: all of it (paint.c sends what the textures
+         * lack between frames first, so this is rare) */
+        o->times.gdrag_full = g->bfull || g->lfull || G.gdragtout[0] != out || G.gdragtout[1] != out || G.gdragtw[0] != g->bw ||
+                           G.gdragth[0] != g->bh || G.gdragtw[1] != g->lw || G.gdragth[1] != g->lh;
+        long b = gdrag_upload(0, out, g->bpx, g->bw, g->bh, g->bdirty, g->nb, g->bfull);
+        long l = gdrag_upload(1, out, g->lpx, g->lw, g->lh, g->ldirty, g->nl, g->lfull);
+        gdrag_bpx += b;
+        gdrag_lpx += l;
+        o->times.gdrag_px = b + l;
+        o->times.gdrag_ms = mono_ms() - t0;
+        if (glGetError() != GL_NO_ERROR) return gdrag_off("an upload failed");
+    } else if (!sane || !tested || !gpu_gdrag_holds(out) || G.gdragtw[1] != g->lw || G.gdragth[1] != g->lh ||
+               G.gdragtw[0] != g->bw || G.gdragth[0] != g->bh)
+        return 0;
+    gdrag_draw(o->W, o->H, g->w, (float)g->lx, (float)g->ly, (float)g->lw, (float)g->lh, (float)g->bw, (float)g->bh);
+    gdrag_quads++;
+    if (g->ref) gdrag_verify(o, g);
+    return 1;
+}
+
+int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const GpuDrag *gdrag, int *gdrag_drawn,
+                 void (*draw_layer)(int layer)) {
+    if (gdrag_drawn) *gdrag_drawn = 0;
     if (!G.on || out < 0 || out >= OUT_MAX || !G.out[out].used) return -1;
     GOut *o = &G.out[out];
+    o->times = (GpuFrameTimes){ 0 };
     if (!eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) { fprintf(stderr, "gpu: eglMakeCurrent failed\n"); return -1; }
     G.cur = o;
     glViewport(0, 0, o->W, o->H);
     /* what changed in the UI */
-    if (dmg.x1 > dmg.x0 && dmg.y1 > dmg.y0) {
-        glBindTexture(GL_TEXTURE_2D, o->canvas.id);
-        GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
-        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, scene->stride);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, dmg.x0, dmg.y0, dmg.x1 - dmg.x0, dmg.y1 - dmg.y0, fmt, GL_UNSIGNED_BYTE,
-                        scene->px + (size_t)dmg.y0 * scene->stride + dmg.x0);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+    double t0 = mono_ms();
+    glBindTexture(GL_TEXTURE_2D, o->canvas.id);
+    for (int i = 0; i < n; i++) o->times.up_px += upload_rect(scene->px, scene->stride, scene->w, o->W, dmg[i]);
+    o->times.up_ms = mono_ms() - t0;
+    /* what this frame changes, the window GPU drag writes included */
+    Rect all = { 0, 0, o->W, o->H }, cur = { 0, 0, 0, 0 }, reg = all;
+    for (int i = 0; i < n; i++) cur = gsc_join(cur, dmg[i]);
+    if (gdrag) cur = gsc_join(cur, gdrag->w);
+    int partial = 0;
+    if (G.scissor) {
+        /* a frame with app windows, menus or a cursor is whole, and so is the one after it */
+        if (o->sc_quiet && !o->sc_busy) {
+            EGLint age = 0;
+            if (!eglQuerySurface(G.dpy, o->surf, EGL_BUFFER_AGE_EXT, &age)) age = 0;
+            reg = gsc_region(&o->sc, age, cur, o->W, o->H);
+            partial = 1;
+        }
+        o->sc_busy = !o->sc_quiet;
+        o->sc_quiet = 0;
     }
+    o->times.comp_px = gsc_area(reg);
     glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
-    Rect all = { 0, 0, o->W, o->H };
+    if (partial && o->times.comp_px) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(reg.x0, o->H - reg.y1, reg.x1 - reg.x0, reg.y1 - reg.y0);
+    }
+    if (!partial || o->times.comp_px) glClear(GL_COLOR_BUFFER_BIT);
+    if (partial) glDisable(GL_SCISSOR_TEST);
     if (draw_layer) draw_layer(0);
-    gpu_draw(&o->canvas, 0, 0, (float)o->W, (float)o->H, 0, 0, (float)o->W, (float)o->H, all, 1);
+    gpu_draw(&o->canvas, 0, 0, (float)o->W, (float)o->H, 0, 0, (float)o->W, (float)o->H, reg, 1);
+    /* the dragged window over the UI's stale rectangle: nothing of layer 0 is under it (paint.c checks).
+     * Not drawn, that rectangle is stale in the UI texture: nothing is shown (-2), the caller paints it */
+    if (gdrag) {
+        if (!gdrag_frame(o, out, gdrag)) {
+            rb.px = NULL;
+            gsc_reset(&o->sc);              /* the buffer was written and is not swapped */
+            o->sc_busy = 1;
+            return -2;
+        }
+        if (gdrag_drawn) *gdrag_drawn = 1;
+    }
     if (draw_layer) draw_layer(1);
     if (rb.px) {
         if (rb.w == o->W && rb.h == o->H) read_back(o->W, o->H);
         rb.px = NULL;
     }
+    double t1 = mono_ms();
     if (!eglSwapBuffers(G.dpy, o->surf)) { fprintf(stderr, "gpu: eglSwapBuffers failed\n"); return -1; }
+    double t2 = mono_ms();
+    if (G.scissor) {
+        gsc_push(&o->sc, partial ? cur : all);
+        sc_frames++;
+        sc_cut += o->times.comp_px < (long)o->W * o->H;
+        sc_px += (double)o->times.comp_px;
+        sc_all_px += (double)o->W * o->H;
+    }
+    o->times.swap_ms = t2 - t1;
+    take_fence(o);
     struct gbm_bo *bo = gbm_surface_lock_front_buffer(o->gs);
     if (!bo) { fprintf(stderr, "gpu: no GBM buffer\n"); return -1; }
     uint32_t fb = fb_for_bo(bo);
     if (!fb) { gbm_surface_release_buffer(o->gs, bo); return -1; }
     G.frames++;
-    return present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
+    int r = present(o, (Shown){ .kind = 1, .bo = bo, .fb = fb });
+    o->times.submit_ms = mono_ms() - t2;
+    return r;
+}
+
+void gpu_scissor_quiet(int out, int quiet) {
+    if (G.on && out >= 0 && out < OUT_MAX && G.out[out].used) G.out[out].sc_quiet = quiet;
+}
+
+void gpu_frame_times(int out, GpuFrameTimes *t) {
+    *t = G.on && out >= 0 && out < OUT_MAX && G.out[out].used ? G.out[out].times : (GpuFrameTimes){ 0 };
+}
+
+/* ---- GPU drag's textures between frames (paint_gdrag_feed) ---- */
+
+int gpu_gdrag_feed(int out, int which, const uint32_t *px, int w, int h, Rect r) {
+    if (!G.on || G.gdrag != 1 || out < 0 || out >= OUT_MAX || !G.out[out].used || which < 0 || which > 1) return -1;
+    GOut *o = &G.out[out];
+    /* a texture upload needs the context, not a given surface (G.cur is not updated by every
+     * eglMakeCurrent, so the context actually current is asked) */
+    if (eglGetCurrentContext() != G.ctx) {
+        if (!eglMakeCurrent(G.dpy, o->surf, o->surf, G.ctx)) return -1;
+        G.cur = o;
+    }
+    /* errors left by earlier calls (an import, the cursor) are not this upload's: without this one
+     * of them would turn GPU drag off below */
+    for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; i++) {}
+    glBindTexture(GL_TEXTURE_2D, G.gdragtex[which]);
+    if (G.gdragtout[which] != out || G.gdragtw[which] != w || G.gdragth[which] != h) {
+        if (G.gdragtw[which] != w || G.gdragth[which] != h) {     /* its storage, filled by the slices that follow */
+            GLenum fmt = G.bgra ? GL_BGRA_EXT : GL_RGBA;
+            glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, NULL);
+            G.gdragtw[which] = w;
+            G.gdragth[which] = h;
+        }
+        G.gdragtout[which] = out;
+        if (glGetError() != GL_NO_ERROR) { gdrag_off("a texture could not be made"); return -1; }
+        return 1;
+    }
+    Rect q = { r.x0 < 0 ? 0 : r.x0, r.y0 < 0 ? 0 : r.y0, r.x1 > w ? w : r.x1, r.y1 > h ? h : r.y1 };
+    long sent = upload_rect(px, w, w, w, q);
+    if (which) gdrag_lpx += sent;
+    else gdrag_bpx += sent;
+    if (sent && glGetError() != GL_NO_ERROR) { gdrag_off("an upload failed"); return -1; }
+    return 0;
+}
+
+/* ---- when the GPU finished a frame (LordBench's frame phases) ---- */
+
+void gpu_fence_on(int on) { fence_wanted = on != 0; }
+
+/* after eglSwapBuffers: a native fence that signals when everything submitted so far (the frame) is done */
+static void take_fence(GOut *o) {
+    if (o->fence > 0) { close(o->fence - 1); o->fence = 0; }
+    if (!fence_wanted || !G.create_sync) return;
+    EGLSyncKHR sy = G.create_sync(G.dpy, EGL_SYNC_NATIVE_FENCE_ANDROID, NULL);
+    if (sy == EGL_NO_SYNC_KHR) return;
+    glFlush();                              /* the fence's fd exists once it is flushed */
+    int fd = G.dup_fence(G.dpy, sy);
+    G.destroy_sync(G.dpy, sy);
+    o->fence = fd >= 0 ? fd + 1 : 0;
+}
+
+int gpu_fence_time(int out, uint64_t *ns) {
+    *ns = 0;
+    if (!G.on || out < 0 || out >= OUT_MAX || !G.out[out].used || G.out[out].fence <= 0) return 0;
+    GOut *o = &G.out[out];
+    struct sync_fence_info fi[4];
+    struct sync_file_info info;
+    memset(&info, 0, sizeof info);
+    memset(fi, 0, sizeof fi);
+    int ok = 0;
+    int fd = o->fence - 1;
+    if (!ioctl(fd, SYNC_IOC_FILE_INFO, &info) && info.num_fences > 0 && info.num_fences <= 4) {
+        info.sync_fence_info = (uint64_t)(uintptr_t)fi;
+        if (!ioctl(fd, SYNC_IOC_FILE_INFO, &info) && info.status == 1) {
+            for (uint32_t i = 0; i < info.num_fences; i++)       /* the last of its fences to signal */
+                if (fi[i].timestamp_ns > *ns) *ns = fi[i].timestamp_ns;
+            ok = *ns != 0;
+        }
+    }
+    close(fd);
+    o->fence = 0;
+    return ok;
+}
+
+int gpu_frame(int out, const Canvas *scene, Rect dmg, void (*draw_layer)(int layer)) {
+    return gpu_frame_ex(out, scene, &dmg, 1, NULL, NULL, draw_layer);
 }
 /* ---- direct scanout ---- */
 
@@ -790,6 +1450,9 @@ int gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) {
         return -1;
     }
     G.scanouts++;
+    total_scanouts++;
+    gsc_reset(&o->sc);                  /* the UI changed with nothing composed */
+    o->sc_busy = 1;
     if (G.debug && (G.scanouts == 1 || G.scanouts % 300 == 0)) dbg("direct scanout: %ld frames (composed %ld)", G.scanouts, G.frames);
     return present(o, s);
 }

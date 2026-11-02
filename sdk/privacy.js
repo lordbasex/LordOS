@@ -15,6 +15,7 @@ import { createStore, useStore } from './store.js';
 import { t, locale, direction } from './i18n.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
+import { osk } from './osk.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.perms) || null;
 
@@ -56,6 +57,8 @@ if (typeof globalThis !== 'undefined') {
       if (kind === 'prompt') {
         // perm 'keyring': the app asks for an item another app saved (owner); see docs/PASSWORDS.md
         queue.set((q) => [...q, { id: seq++, app: data.app, perm: data.perm, owner: data.owner, broker: data.reqid }]);
+      } else if (kind === 'textfocus') {
+        osk.appField(data.app, !!data.on, data.y, data.h);      // only a hint; sdk/osk.js
       } else if (kind === 'menu') {
         if (typeof globalThis.__lordApplyAppMenus === 'function') globalThis.__lordApplyAppMenus(data.app);
       } else if (kind === 'pick') {

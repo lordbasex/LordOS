@@ -10,9 +10,9 @@ Imaginate un edificio con un guardia en la puerta de cada departamento en lugar 
 
 ## Qué ves y qué decidís
 
-- **Monitor → Red** lista las apps con conexiones, cuánto mandó y recibió cada una, y un mapa del mundo con un arco hacia cada país con el que hablan. Cada app tiene un interruptor de **Regla**: si lo apagás, a la app se le niega la red al instante, con contadores de conexiones permitidas y denegadas que salen directo del kernel.
+- **Monitor → Red** lista las apps con conexiones, cuánto mandó y recibió cada una, y un mapa del mundo con un arco hacia cada país con el que hablan. Cada app tiene un interruptor de **Regla**: si lo apagás, a la app se le niega la red al instante, con contadores de conexiones permitidas y denegadas que salen directo del kernel. Si abrís una app, cada nombre al que llegó (o la dirección, cuando el resolvedor del sistema no dio nombre) tiene su propio interruptor para permitir o bloquear, que dice qué lo decide en ese momento. El gráfico se aleja del minuto en vivo a 1 hora, 24 horas, 7 días y 30 días, con un pequeño historial guardado en tu carpeta personal: bytes por minuto y por hora, nunca una dirección, un nombre ni un país.
 - **Ajustes → Privacidad → Red de las apps** tiene un modo y dos listas:
-  - **Silencioso** (el predeterminado): lo que no tiene regla se permite y se registra, para que lo revises en el Monitor. **Apagado**: solo valen tus denegaciones explícitas y las restricciones.
+  - **Silencioso** (el predeterminado): lo que no tiene regla se permite y se registra, para que lo revises en el Monitor. **Apagado**: solo valen tus denegaciones explícitas y las restricciones. **Denegar en silencio** (desde 0.8.5): solo se conecta lo que una regla permite, y todo lo demás se deniega y se registra, mientras los servicios propios de esta computadora siguen funcionando.
   - **Apps confiables**: se permiten sin registrar. Una denegación explícita que pongas igual gana.
   - **Apps restringidas**: marcás lo que una app no puede hacer. Las restricciones de red son **sin internet** (solo LAN), **sin LAN**, **sin red** y **sin conexiones entrantes**. Las demás quitan dispositivos y datos (ver [Más allá de la red](#mas-alla-de-la-red)).
 
@@ -41,7 +41,13 @@ Cada programa averigua a qué app pertenece el proceso que llama (por el cgroup 
 
 **3. Tus reglas se convierten en mapas del kernel.** Cambiás las reglas en la sesión; `lord-server` las guarda en `~/.config/lordos/firewall.json` y le manda a `lord-netperm` un único mensaje sin datos: `RELOAD`. Después el servicio lee el archivo por su cuenta, con validación estricta, y compila las reglas en mapas hash y de coincidencia por prefijo más largo. Las reglas nunca viajan por el socket.
 
-**4. Nada corre por paquete.** Los controles corren cuando se abre una conexión o se reserva un puerto, no en cada paquete. Medido en una VM de prueba: unos **0,5 µs** por connect UDP, TCP dentro del ruido, y sin cambios en el rendimiento (`docs/FIREWALL.md`).
+**4. Se decide al conectar y se aplica en cada paquete.** La decisión se toma cuando se abre una conexión o se reserva un puerto: unos **0,5 µs** por connect UDP en una VM de prueba, TCP dentro del ruido. Desde 0.8.3 la misma decisión se aplica también a cada paquete de una app cuyas reglas deniegan algo, así que una regla nueva corta las conexiones que ya están abiertas (ver la sección siguiente). Eso cuesta unos 150 ns por paquete, el 1,6 % de un núcleo a 104.000 paquetes por segundo, y unos 30 ns para una app sin reglas de denegación; el rendimiento de TCP no cambia más allá del ruido (`docs/FIREWALL.md`).
+
+## Bloquear una app corta lo que ya está abierto
+
+Desde 0.8.3, apagar la regla de una app, agregar una regla que deniega un destino o una restricción como "sin internet" no solo frena las conexiones nuevas: un video que ya se estaba reproduciendo también se corta. El kernel descarta los paquetes de las conexiones que la regla nueva deniega, y `lord-netperm` cierra esos sockets, así que la app ve que la conexión terminó en lugar de quedarse colgada. Solo se corta lo que la regla nueva deniega: los otros destinos, la red local con "sin internet" y los clientes de un servidor que corre la app siguen funcionando. Volver a permitir funciona al instante, y el Monitor muestra los bytes descartados como "Tráfico bloqueado".
+
+En una Raspberry Pi 5, el cierre necesita el kernel de LordOS compilado con la destrucción de sockets (`6.18.57-lordos.3`); con uno anterior los paquetes se descartan igual, pero la app recién ve que la conexión terminó cuando vence su propio tiempo de espera.
 
 ## ¿Funciona por dominio?
 
@@ -61,13 +67,24 @@ La misma lista de apps restringidas también puede quitar la cámara, el micróf
 
 [[diagram:restrictions]]
 
-- **Las apps aisladas de LordOS** (apps `.lpk` y Contraseñas): las ocho, en el broker que ya media todo lo que reciben.
+- **Las apps aisladas de LordOS** (apps `.lpk`, Contraseñas y, desde 0.8.2, Mail, Calendario, Contactos y Recordatorios): las ocho, en el broker que ya media todo lo que reciben.
 - **Las apps incluidas** (la fila "LordOS"): cámara, micrófono, pantalla y notificaciones. Esa fila es el escritorio mismo, así que archivos, USB, portapapeles y Bluetooth se restringen por app.
-- **Las apps de Linux abiertas desde el lanzador de apps:** los dispositivos de cámara, USB, captura ALSA y framebuffer se rechazan en el kernel (`cgroup/dev`); los sockets Bluetooth, con un programa BPF LSM; el micrófono y las cámaras de PipeWire, con la guardia de PipeWire de LordOS, en vivo, identificando a cada cliente por las credenciales de su socket; las notificaciones, con el servidor de notificaciones de LordOS, que le pregunta al bus quién llama y descarta la notificación si no lo puede saber; y "sin acceso a tus archivos" abre la app, desde su próximo inicio, en sus propios espacios de nombres con una carpeta personal vacía y Landlock. La captura de pantalla nunca estuvo a su alcance: no hay protocolo de captura ni servidor X.
+- **Las apps de Linux abiertas desde el lanzador de apps:** los dispositivos de cámara, USB, captura ALSA y framebuffer se rechazan en el kernel (`cgroup/dev`); los sockets Bluetooth, con un programa BPF LSM; el micrófono y las cámaras de PipeWire, con la guardia de PipeWire de LordOS, en vivo, identificando a cada cliente por las credenciales de su socket; las notificaciones, con el servidor de notificaciones de LordOS, que le pregunta al bus quién llama y descarta la notificación si no lo puede saber; y "sin acceso a tus archivos" abre la app, desde su próximo inicio, en sus propios espacios de nombres con una carpeta personal vacía y Landlock. La captura de pantalla nunca estuvo a su alcance: no hay protocolo de captura, y las apps X11 (con Xwayland desde 0.8.3) solo se ven entre ellas, nunca a las apps Wayland ni la pantalla de LordOS.
+
+## Nuevo en 0.8.5
+
+Esto llegó con LordOS 0.8.5-beta, publicada el 27 de octubre de 2026.
+
+- **Monitor → Red, segunda generación.** La lista de apps ahora es un árbol: cada app se abre en los sitios y direcciones con los que habla, y cada dirección en sus puertos, con lo enviado y lo recibido, un pequeño medidor en vivo y un interruptor para permitir o bloquear en cada destino. Un solo botón agrupa la vista por app, dominio, dirección, puerto o país y la filtra por dirección, protocolo y regla; la búsqueda convierte `app:`, `domain:`, `ip:`, `port:`, `proto:` y `country:` en etiquetas que podés combinar.
+- **Se muestran los sockets de ping, raw y de paquetes** debajo de la app que los abrió. Los sockets IP raw y de paquetes pueden ver o falsificar tráfico, y la fila lo dice, con el protocolo o el ethertype y la interfaz.
+- **Las partes propias de LordOS tienen sus propias filas y reglas.** Mail y la sincronización del calendario, la Tienda y las actualizaciones, las impresoras y los escáneres, la Terminal (con los nombres de los programas que corrés en ella) y las actualizaciones de las listas de bloqueo corren cada una en un proceso propio, en su propio scope, así que podés verlas y bloquearlas por separado y lo hace cumplir el kernel. Bloquear la Tienda pregunta antes, porque se frenan las actualizaciones de seguridad. La resolución de nombres, la sincronización de la hora, el servicio de red y tus túneles VPN también se muestran, y nunca se bloquean. En la 0.8.7, la búsqueda en la red de Archivos tiene su propia fila. El tráfico de un recurso de red montado no la tiene: el cliente del kernel abre sus propios sockets, fuera de cualquier app.
+- **Listas de bloqueo.** Ajustes → Privacidad → Listas de bloqueo ofrece listas públicas de sitios de publicidad, rastreadores, malware y ataques, cada una con su fuente y su licencia. Activás una y LordOS la descarga por HTTPS una vez por día, con un descargador aislado que solo recibe un socket ya conectado, revisa cada línea dos veces y bloquea esos destinos para todas las apps. Una regla que escribiste para un sitio siempre le gana a una lista, y una dirección solo se bloquea cuando todos los nombres que dio el resolvedor del sistema para ella están en la lista, así un servidor compartido no se corta por accidente.
+- **Denegar en silencio**, el modo de arriba, también desde un ítem nuevo de la barra de menús.
+- **Actividad de red en la barra de menús** (opcional, apagada de forma predeterminada): las velocidades de subida y bajada, y un panel con los últimos cinco minutos, las apps que mueven datos ahora, lo denegado hace poco, el modo del firewall y las listas de bloqueo.
 
 ## Las preguntas del lector escéptico
 
-**¿Se aplica también a las apps de Linux?** Sí. Es uno de sus puntos principales: Chromium, Firefox o cualquier app abierta desde el lanzador de apps tiene su propio scope y sus propias reglas. Las apps incluidas de LordOS y los programas iniciados desde la Terminal cuentan juntos como "LordOS".
+**¿Se aplica también a las apps de Linux?** Sí. Es uno de sus puntos principales: Chromium, Firefox o cualquier app abierta desde el lanzador de apps tiene su propio scope y sus propias reglas. Las apps incluidas de LordOS y los programas iniciados desde la Terminal cuentan juntos como "LordOS"; desde 0.8.5 la Terminal y las partes de red propias de LordOS tienen filas propias.
 
 **¿Puede una app escaparse de su scope?** Se probó. Una app de Linux no puede anotarse en otro cgroup, porque cada archivo `cgroup.procs` del árbol de la sesión es de root. Todavía puede pedirle al gestor systemd del usuario que arranque un proceso nuevo fuera del árbol (`systemd-run --user`). LordOS también cierra eso: `lord-netperm` engancha además sus programas al `user@<uid>.service` de cada usuario, y cualquier proceso ahí queda sujeto a la unión más estricta de las restricciones de las apps restringidas que ese usuario tenga corriendo. Probado con `systemd-run --user --scope`, un servicio transitorio y `setsid`: todos denegados.
 
@@ -77,14 +94,14 @@ La misma lista de apps restringidas también puede quitar la cámara, el micróf
 
 **¿Qué pasa si el servicio se detiene?** Se cierran sus enganches y todo queda permitido. El escritorio no depende de él. En la ISO final el servicio estaba corriendo con sus siete programas de red enganchados.
 
-**¿El servicio en sí es peligroso?** Se lo mantiene chico a propósito: no ejecuta programas, no recibe argumentos, no tiene sockets de internet propios (su unidad solo permite sockets Unix y de paquetes) y acepta un solo tipo de mensaje. Usa su propio cargador sobre la llamada al sistema `bpf()`, con los programas compilados dentro del binario; sin libbpf ni bcc.
+**¿El servicio en sí es peligroso?** Se lo mantiene chico a propósito: no ejecuta programas, no recibe argumentos, no tiene sockets de internet propios (su unidad solo permite sockets Unix, de paquetes y netlink; con netlink cierra las conexiones que una regla deniega) y acepta un solo tipo de mensaje. Usa su propio cargador sobre la llamada al sistema `bpf()`, con los programas compilados dentro del binario; sin libbpf ni bcc.
 
 ## Límites honestos
 
-- **ICMP** (ping) solo se bloquea con "sin red". **Las conexiones entrantes a un puerto que ya está abierto**, y `listen` sin `bind`, no se revisan: eso necesitaría un gancho por paquete.
+- **ICMP** (ping) solo se bloquea con "sin red". `listen` sin `bind` se decide como una conexión saliente. (Las conexiones entrantes a un puerto que ya está abierto se deciden por paquete desde 0.8.3.)
 - **La unión de `user@` es gruesa:** mientras corre una app restringida, cada proceso del gestor systemd de ese usuario queda sujeto a la unión de restricciones.
 - **Un scope recién creado** se registra en microsegundos, pero una conexión hecha antes pasaría con las reglas predeterminadas.
-- **El Monitor lista los destinos como IPs y países;** el nombre que dio el resolvedor del sistema aparece cuando abrís "Permitir / Bloquear este dominio". El Monitor nunca hace DNS inverso, así que ninguna dirección sale de la máquina solo porque la miraste.
+- **El Monitor muestra los nombres que dio el resolvedor del sistema** para cada destino, o la dirección cuando no dio ninguno. Nunca hace DNS inverso, así que ninguna dirección sale de la máquina solo porque la miraste.
 - **Las reglas por dominio no ven a las apps que usan su propio DNS cifrado** (ver arriba).
 - **Lo que las restricciones no cubren para las apps de Linux:** el Bluetooth a través de BlueZ en el bus del sistema (solo se rechazan los sockets Bluetooth directos), el bus del sistema en general, el portapapeles y los programas iniciados fuera del lanzador de apps. Un cliente nuevo de PipeWire de una app restringida tiene unos milisegundos antes de que la guardia lo restrinja, y mientras corre una app con la cámara o el Bluetooth restringidos, tus propios servicios de audio tampoco pueden abrir una cámara ni un socket Bluetooth nuevos.
 - **Las apps de Linux sin caja de arena pueden editar el archivo de reglas**, porque corren como vos, salvo que estén restringidas con "sin acceso a tus archivos". Las apps `.lpk` instaladas no llegan a él.

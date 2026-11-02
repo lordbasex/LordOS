@@ -1,5 +1,6 @@
 {
   "id": "editor",
+  "version": "0.8.5",
   "name": "Text Editor",
   "description": "TextMate-style code editor: project, tabs, multiple cursors, find and replace, syntax highlighting",
   "size": [900, 600],

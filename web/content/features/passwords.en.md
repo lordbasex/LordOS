@@ -50,7 +50,7 @@ Several methods can live side by side. The vault locks itself after 5 minutes of
 
 - **Opened at login.** `lord-sessiond` checks your login password, then hands it once to `lord-vault` to open the session keyring, and wipes its copy.
 - **LordOS apps** keep their secrets with the SDK's `keyring`. Each app sees only its own items. For installed `.lpk` apps, `lord-server` sets the owner from the app's verified identity, so an app can't claim to be another. If an app asks for another app's item, the system asks you first.
-- **Linux apps** use the standard freedesktop Secret Service over D-Bus, served by LordOS's own code. Chromium was tested end to end: it saved a login, restarted, fetched its key from LordOS's keyring and filled the login in.
+- **Linux apps** use the standard freedesktop Secret Service over D-Bus, served by LordOS's own code. Chromium was tested end to end: it saved a login, restarted, fetched its key from LordOS's keyring and filled the login in. Since 0.8.5 a session started at boot waits for its session bus, so with automatic login LordOS's keyring holds the Secret Service from the start, and if an app pulls in gnome-keyring, only its PKCS#11 part runs; on the test VM Chrome then asked through LordOS's own keyring prompt.
 
 [[shot:4]]
 

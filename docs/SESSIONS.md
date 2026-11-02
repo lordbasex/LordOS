@@ -54,7 +54,10 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
 - **Creation:** when creating a session, the monitor and the network take a per-user lock
   (`/run/lordos/spawn-<uid>.lock`). So two sessions of the same user are never created.
 - **`/run/user/<uid>`:** if it doesn't exist, `user@<uid>.service` is started, which also starts
-  its PipeWire.
+  its PipeWire. Since 0.8.5 `lord-sessiond` starts `user@<uid>` and waits for the user's session bus
+  socket (up to 5 s) before starting the session: with automatic login the session used to start a
+  few milliseconds before the bus existed, so `lord-vault` (the Secret Service) and the notification
+  server never got on it (`PASSWORDS.md`).
 - **GPU:**
   - by default, each session uses it while it's on the monitor;
   - with `lordos.gpu=0` on the kernel line (grub's safe mode) or `LORD_GPU=0` in the service,
@@ -81,6 +84,12 @@ watching, it goes back to the GPU on its own. It was like that in M7 too.
    - it revokes its input with `EVIOCREVOKE`: its fds stop working even if it doesn't close them;
    - it takes master away with `DROP_MASTER` on its own copy of the same open file;
    - only then does it give a new card and input to the incoming session.
+
+   Since 0.8.5 the revoked input fds are closed on a short-lived detached thread (`close_inputs` in
+   `monitor.c`): the last close of a USB mouse stops its transfers, about 0.7 s for VMware's virtual
+   USB mouse, and the hand-off used to wait for it. Access is still cut at once by `EVIOCREVOKE`.
+   Measured on a VMware Fusion VM: 903 ms → 141 ms from the lock to the sign-in screen. A slow
+   hand-off is logged with the time of each step.
 
 **Hot plugging and unplugging:**
 
@@ -112,6 +121,16 @@ put in graphics mode once (`KD_GRAPHICS`) and goes back to text when the service
 The card, the input and the monitor socket are never left open in the children (web
 connections, workers): `sd_mon_child()` closes them before dropping root.
 
+### No usable display driver
+
+`sd_mon_open` (`remote/monitor.c`) waits up to 30 s for a card with KMS, a connector and a CRTC
+(`drmcard.h`). A card that opens but has none of that, such as a render-only GPU, counts as no card:
+lord-server could not start on it. lord-sessiond logs `no usable display driver`, creates
+`/run/lordos/no-display`, writes what happened on tty1 (`tell_no_display`) and keeps running with no
+monitor, so remote desktop still works if it is on. `lordos.service` stays active for that reason: read
+the journal, not the unit's state. Once the driver is fixed, `systemctl restart lordos.service` picks the
+display up; a driver that loads later than the wait is not picked up by itself.
+
 ### Boot splash
 
 The boot splash (Plymouth, theme `lordos`; see `ISO.md` and `RASPBERRY.md`, "Boot splash") hands
@@ -134,7 +153,8 @@ the screen to LordOS without a black frame or a flash of the text console:
 4. **lord-sessiond** creates `/run/lordos/first-frame` (also at once when there is no monitor).
 5. **`lordos-splash-quit.service`** (wanted by `lordos.service`) waits for that file and runs
    `plymouth quit --retain-splash`: Plymouth closes its card without touching the screen, which
-   already shows LordOS. Without the file after 30 s it ends Plymouth anyway.
+   already shows LordOS. Without the file after 35 s it ends Plymouth anyway. With no usable display
+   (below) it ends Plymouth without `--retain-splash`, so the console shows.
 6. Plymouth's own `plymouth-quit.service` (a plain `plymouth quit`) is ordered after it by
    `plymouth-quit.service.d/lordos.conf`, so it can't end the splash early. There is no
    `Conflicts=` with it (the display-manager way): starting `plymouth-quit.service` by hand would
@@ -162,6 +182,13 @@ an admin helper. Its runtime is in `/run/lordos/greeter` and its home in
   - the keyboard, if the system has several (`/etc/default/keyboard`);
   - Restart and Shut Down. If there are open sessions, they ask for confirmation.
 - A wrong password shakes the field. After many attempts, it asks you to wait.
+- **Several displays (0.8.5):** the clock, the user and the password field go on the main display
+  (the wallpaper still covers every display), instead of being laid out over the whole desktop and
+  cut at the seam between two displays; they follow a display plugged in or out while the screen
+  shows. Verified on VM 118 with two displays.
+- **A monitor plugged in after boot (0.8.5):** the login screen follows the kernel's DRM uevents like
+  a session does, without the system bus (`main.c`), so a board booted without HDMI (a Raspberry Pi 5)
+  shows the login screen when a monitor is connected instead of staying without video.
 
 To request things, the JS uses `lord.greeter.send(json)`. That function only exists in greeter
 mode. The request travels like this:
@@ -183,7 +210,40 @@ greeter (JS) → RP_GREETER → lord-sessiond (root), over the login screen's so
 Failed attempts on the monitor are counted per user (`monitor:<user>`). The first two don't wait;
 after that the wait is 1, 2, 4… seconds, up to 5 minutes.
 
+### Boot time
+
+When the first frame of a boot reaches the monitor, `lord-sessiond` logs the seconds since the kernel
+started (`CLOCK_BOOTTIME`) with the LordOS version and build, and appends the same as one JSON line to
+`/var/lib/lordos/boot-times.jsonl` (`record_boot_time`: root's, 0644, written whole and renamed, the last
+200 boots, no user or host names). About LordOS shows this boot's line, found by the kernel's boot id
+(`boot_time_load` in `ui/js_sys.c`: the file must be root's and not writable by others). The boot splash
+shows its own timer (`tools/boot/plymouth/lordos/lordos.script`). How to check and compare boots:
+[RESULTS.md](RESULTS.md), "Boot time: check it yourself".
+
+**Boot time test (0.8.6, LordBench).** System Information → Performance can measure N boots in a row (2 to
+10). The admin action `boot-test <n>` writes `/var/lib/lordos/boot-test` (root's, a fixed format:
+`bench/boottest.c`) and the session restarts as usual. At each boot's first frame lord-sessiond records the
+boot with `"test":k,"testOf":n` and, while boots are left, writes the file again and restarts 30 s later
+(`boot_test_tick`). The login screen shows which boot it was and the countdown, with **Stop the test**; a login
+there also stops it, and so does `boot-test-cancel`. Before restarting, lord-sessiond reads the file again and
+restarts only if it still says what that boot wrote. A file older than 30 minutes (or from the future) is
+discarded and `left` only goes down, so the test always ends; it is refused in the live session.
+
 ### Lock, switch user and log out
+
+**The login screen runs only when it is shown (0.8.5).** It used to stay running behind the session
+after sign-in, a whole `lord-server` (about 53 MB of its own memory, 78 MB of PSS, measured in a VMware
+VM). Now `lord-sessiond` stops it 10 s after a session takes the monitor (`GREETER_LINGER_S`), and
+`sd_greeter_get` starts it again for a lock, a user switch or a log out; its socket is up in 8–22 ms
+and it reaches the monitor about 20 ms after it's asked for. On a lock or a switch the monitor is taken
+from the session **first** (`leave_for_greeter`: input revoked, its framebuffers removed, the screen
+dark), and only then is the login screen asked for, so an unlocked desktop never stays on the screen
+while it starts. Taking the monitor away is the slow part on some drivers: 1.18 s on VMware's
+`vmwgfx` (removing the framebuffer on the screen turns the output off), the same as before this change.
+Most of that was the input close; with it moved to a thread (see "The monitor" above) the lock to the
+sign-in screen measured 141 ms on a VMware Fusion VM.
+The log says both: `monitor: taken from <user> in N ms` and `monitor: the login screen (lock), N ms
+after the screen went dark`.
 
 - **Lock screen:** ❖L, ❖Ctrl+Q, or the logo menu → «Lock Screen».
   1. The session sends `RP_SESSION {"a":"lock"}` to all its viewers.
@@ -219,7 +279,7 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 ### Restart and Shut Down from a session
 
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
-User… and Log Out; the Classic theme has them behind a **Power** button at the bottom of its start
+User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
 menu. Before, they were only on the login screen. Sleep is not offered: suspend and resume with the
 card lent to a session has not been tested on real hardware yet.
 
@@ -227,7 +287,7 @@ card lent to a session has not been tested on real hardware yet.
 |---|---|
 | ![crown menu](session-power-menu-light.png) | ![crown menu, dark](session-power-menu-dark.png) |
 | ![restart confirmation](session-power-restart-light.png) | ![restart confirmation, dark](session-power-restart-dark.png) |
-| ![Classic start menu, Power](session-power-classic-light.png) | ![Classic, dark](session-power-classic-dark.png) |
+| ![Lord Classic start menu, Power](session-power-classic-light.png) | ![Lord Classic, dark](session-power-classic-dark.png) |
 
 - **The confirmation** (`sdk/power.jsx`, `<PowerDialog>`, in the `modal` layer; a theme renders it
   inside its `ThemeProvider`) says what will happen and counts down 60 seconds; at zero it does it,
@@ -246,10 +306,69 @@ card lent to a session has not been tested on real hardware yet.
     screen's channel (`RP_GREETER_IN`) and the sheet shows the refusal.
   - then the same closed path as the login screen: `systemctl reboot` or `poweroff`, fixed path,
     fixed environment, logged as `reboot requested by <user> (<n> other session(s) open)`.
+- **Only on the monitor's session** (0.8.5): the items appear only while the session holds
+  lord-sessiond's seat connection (`lord.session.onMonitor()`, which `session.canPower()` checks). A
+  session seen only through the remote desktop isn't offered them; before 0.8.5 it showed the
+  sheet and nothing happened at the end of the countdown.
 - **Tested on VM 122:** the menu items, the sheet in light and dark, the countdown, Cancel and
-  Escape (no restart after the minute), the Classic Power button, a real Shut Down (`qm start` back
+  Escape (no restart after the minute), the Lord Classic Power button, a real Shut Down (`qm start` back
   to the login screen) and a real Restart (back to the login screen). The refusal with other users
   logged in was checked in the code path only: it needs a second account's password on the VM.
+
+### Session restore
+
+Each window comes back on its desktop, with the desktop that was in view ([DESKTOPS.md](DESKTOPS.md), "What is kept").
+
+The apps open at the end of a session come back at the next login, each window where it was.
+Settings → Session → **Reopen windows when you log in**: Always (the default), Ask first or Off.
+
+| How the session ended | Always | Ask first | Off |
+|---|---|---|---|
+| Log out, Restart, Shut Down, `systemctl`, a signal to `lord-server` | reopens | asks | nothing |
+| Power cut, crash, `SIGKILL` | asks ("did not shut down properly") | asks | nothing |
+| Everything was closed | clean desktop | clean desktop | clean desktop |
+
+**What is saved.** `sdk/sessionrestore.jsx` keeps a debounced snapshot of the windows store (2 s, only when it
+changed) in `settings.sessionSaved`, in `settings.json`, which is already on `lord.fs`'s deny list; no new file.
+That write and the logout's are `lord.settings.save(text, true)`: fsynced, file and folder, because they must
+survive the power cut they are for. Each entry is a typed Dock id (`dockIdOfWindow`), a frame, maximized,
+minimized and the snap zone; never an Exec line, argv, environment, pid, title or a Linux app's document. A
+LordOS app's `args` are kept only for the fields listed per app in `sdk/sessionmodel.js`, without `nonce`. Left
+out: windows with no `.desktop`, hidden apps, Force Quit, About This App, the installer, the sandbox probe,
+Screenshots' editor, picture-in-picture. The file can be written by any program the user runs, so the list is
+validated again when it is read, the same rules (`server/tests/session_model_test.mjs`).
+
+**The marker.** `sessionSaved.clean` is false from the moment a session starts. It turns true in `flushSession()`
+(`session.quit`, Search's Log Out, the power dialog before it asks lord-sessiond; a refusal undoes it) or in
+`__lordBeforeExit`, which `main.c` calls after the main loop. A session that never gets there leaves it false,
+and that is what "unclean" means. Switching theme is not an end: the marker says `'theme'` and `themeReopen`
+does the work.
+
+Worker threads start before `main.c` blocks `SIGTERM`, so a signal used to end the process on one of them
+without leaving the loop (seen on VM 125: gone in under 300 ms, nothing written). A handler now forwards it to
+the main thread's signalfd, so every signal stop runs the normal end of a session, including `term_shutdown`.
+
+**Coming back.** Up to 12 windows, 450 ms apart, through the Dock's own path (`launchDockItem`: `launchApp`,
+`lord.apps.launchPackage`, `lord.apps.launch(desktop id)`). A LordOS app opens with `wm.open` and its frame. A
+Linux window is a new process, so its saved frame waits by Dock id and the first new window of that app takes it
+(90 s at most). What is already open is not opened twice (Open at Login, the Terminal's live sessions). The
+window that was in front ends in front. Nothing runs on a live system, the login screen or in an isolated app.
+
+**At the end of a session** `wl_close_all()` sends every window `xdg_toplevel.close` (or `WM_DELETE_WINDOW`) and
+waits up to 3 s for those apps to leave, before `wl_stop()`. Without it a browser records a crash. An app that
+doesn't answer (seen with a stopped one: 3.4 s in all) or asks something back is cut as before.
+
+**Browsers.** Settings → Session → **Browser tabs** runs the closed action `browser-restore on|off`
+(`hw_admin.c`), which writes fixed text only: `/etc/chromium/policies/recommended/lordos-session.json`
+(`RestoreOnStartup: 1`, recommended, so the user can still change it in the browser) and
+`/etc/firefox-esr/lordos-session.js` (`browser.startup.page` 3); `off` removes both, and so does `postrm`.
+These are machine-wide: the last session to apply its setting wins. On VM 125, Chromium and Firefox ESR
+brought their pages back after a logout and a reboot with no crash notice. After a forced power-off Firefox
+came back alone; Chromium shows its own "Restore pages?" and its button brought the tab back: LordOS can't
+answer that for it, and an app with no such feature loses what it had open (only the window returns).
+
+What doesn't come back: the state inside a Linux app, a Files window's current folder when it wasn't the one it
+opened with (only `args` are saved), a Terminal's shells after a reboot (a new one opens in its window).
 
 ## cgroups: one subtree per session
 
@@ -383,6 +502,7 @@ session. Everything that changes something goes through closed `admin.c` actions
 | `apps/settings/Users.jsx`              | Settings → Users                                          |
 | `/run/lordos/status.json`              | sessions, who's on the monitor and who's connected over the network |
 | `/run/lordos/first-frame`              | the first session frame of this boot is on the monitor (boot splash hand-off) |
+| `/run/lordos/no-display`               | no usable display: the boot splash ends without keeping its frame |
 | `tools/boot/lordos-splash`, `tools/boot/systemd/` | the boot splash hand-off: `deactivate`, `quit` and the units |
 | `/etc/lordos/session.conf`             | `AUTOLOGIN=`                                              |
 
@@ -399,7 +519,9 @@ session. Everything that changes something goes through closed `admin.c` actions
 
 ## Pending
 
-- **Multiple monitors:** a single connector is used, as before.
+- **Multiple monitors:** since 0.8.0 the session drives every display of the lent card
+  (`display_attach` → `outputs_apply` in `main.c`, see [DISPLAYS.md](DISPLAYS.md)); the lend/revoke
+  cycle with several real monitors is untested.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
 - **Testing with a real card** (AMD, on the live USB): in the VMs, the GPU could only be tested

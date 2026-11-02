@@ -6,7 +6,7 @@ LordOS is made by a small team, and we try to work the way serious open-source p
 
 **What we do:** a public [Security policy](/legal/security/) with a reporting channel, scope, safe harbour and target response times (acknowledgement within 3 business days, assessment within 10, fixes for serious problems usually within 30, coordinated disclosure at 90 days); a machine-readable [security.txt](/.well-known/security.txt); credits and advisories for fixed vulnerabilities; signed releases so fixes can be trusted.
 
-**Still missing:** a documented internal handling process (triage, severity scoring, fix and release steps); a public advisories page; CVE identifiers, through a CVE Numbering Authority or GitHub; GitHub private vulnerability reporting, which we will turn on when the repository is public.
+**Still missing:** a documented internal handling process (triage, severity scoring, fix and release steps); a public advisories page; CVE identifiers, through a CVE Numbering Authority or GitHub; GitHub private vulnerability reporting, which is not turned on yet.
 
 ## Open-source license compliance: ISO/IEC 5230 (OpenChain)
 

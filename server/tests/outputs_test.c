@@ -130,6 +130,28 @@ static void arrange_tests(void) {
     ORect g[2] = { { 0, 0, 1024, 768 }, { 1280, 0, 1920, 1080 } };
     out_fix(g, 2);
     CHECK(g[1].x == 1024 && g[1].y == 0);
+    /* fits: Settings' drops (sdk/displaylayout.js) touch an edge and overlap nothing */
+    ORect q[2] = { { 0, 0, 1280, 800 }, { 0, 0, 1920, 1080 } };
+    CHECK(out_fits(q, 2, 1, 1280, 0));
+    CHECK(out_fits(q, 2, 1, 1280, 799));            /* one shared pixel */
+    CHECK(out_fits(q, 2, 1, -320, 800));            /* stacked, centered */
+    CHECK(!out_fits(q, 2, 1, 1280, 800));           /* a corner only */
+    CHECK(!out_fits(q, 2, 1, 1281, 0));             /* a gap */
+    CHECK(!out_fits(q, 2, 1, 1000, 0));             /* overlapping */
+    /* such a position is kept exactly by out_snap without alignment (display_arrange uses snap 0) */
+    out_snap(q, 2, 1, -320, 800, 0, &x, &y);
+    CHECK(x == -320 && y == 800);
+    out_snap(q, 2, 1, 1280, 500, 0, &x, &y);
+    CHECK(x == 1280 && y == 500);
+    /* valid: joined through shared edges; a chain main ← 2 ← 1 is kept by out_fix */
+    ORect c[3] = { { 0, 0, 1280, 800 }, { 3200, 0, 1024, 768 }, { 1280, 0, 1920, 1080 } };
+    CHECK(out_valid(c, 3));
+    out_fix(c, 3);
+    CHECK(c[1].x == 3200 && c[1].y == 0 && c[2].x == 1280 && c[2].y == 0);
+    ORect gap[2] = { { 0, 0, 1280, 800 }, { 1300, 0, 1920, 1080 } };
+    CHECK(!out_valid(gap, 2));
+    ORect ov[2] = { { 0, 0, 1280, 800 }, { 1200, 0, 1920, 1080 } };
+    CHECK(!out_valid(ov, 2));
     /* normalize: the arrangement's corner becomes (0, 0) */
     ORect n[2] = { { 0, 0, 1280, 800 }, { -2560, -200, 2560, 1440 } };
     int bw, bh;

@@ -16,5 +16,6 @@ double   netrec_timeout(void);          /* ms until the next tick, -1 when off *
 NetHist *netrec_hist(void);             /* NULL when not allowed */
 long long netrec_now(void);             /* Unix time */
 void     netrec_shutdown(void);         /* writes the minute in progress */
+int      netrec_totals(uint64_t *rx, uint64_t *tx);   /* (0.8.5) every interface but lo, now; 0 ok */
 
 #endif

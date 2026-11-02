@@ -9,8 +9,12 @@
  *   1. the app's restrictions (FW_R_*): always deny;
  *   2. explicit rules: the one with the most specific destination wins; with the same specificity,
  *      deny beats allow;
+ *      2b. a subscribed blocklist (FwQuery.listed) denies, unless the winning rule names the
+ *          destination (a domain, an address or a network): lists beat lan/internet/any rules,
+ *          never a rule the owner wrote for that destination;
  *   3. trusted app: allow without logging or asking;
- *   4. mode: silent = allow and log, ask = pending, off = allow.
+ *   4. mode: silent = allow and log, ask = pending, off = allow, deny = deny and log (loopback
+ *      stays allowed).
  *
  * Lookups: hash table of apps; per app, a hash table of exact domains, a suffix table for
  * wildcards (the name's labels are walked from right to left), a binary prefix trie per family
@@ -32,7 +36,8 @@ typedef enum { FW_PROTO_ANY = 0, FW_PROTO_TCP = 1, FW_PROTO_UDP = 2 } FwProto;
 typedef enum { FW_ALLOW = 0, FW_DENY = 1 } FwAction;
 /* forever (saved) / until the app closes / just once (not saved) */
 typedef enum { FW_LIFE_FOREVER = 0, FW_LIFE_UNTIL_QUIT = 1, FW_LIFE_ONCE = 2 } FwLife;
-typedef enum { FW_MODE_SILENT = 0, FW_MODE_ASK = 1, FW_MODE_OFF = 2 } FwMode;
+/* deny (0.8.5, "deny silently"): what no rule allows is denied and recorded; loopback stays allowed */
+typedef enum { FW_MODE_SILENT = 0, FW_MODE_ASK = 1, FW_MODE_OFF = 2, FW_MODE_DENY = 3 } FwMode;
 
 typedef enum {
     FW_DST_ANY = 0,
@@ -89,10 +94,13 @@ typedef struct {
     uint16_t port;                  /* remote port (outbound) or local port (inbound) */
     const char *const *hosts;       /* names of that address for this app (dnsmap_lookup) */
     int      nhosts;
+    int      listed;                /* 1: a blocklist the user subscribed to covers this destination
+                                     * (fw/fwlists.h); denies unless a rule naming the destination
+                                     * (a domain, an address or a network) decides first */
 } FwQuery;
 
 typedef enum { FW_V_ALLOW = 0, FW_V_DENY = 1, FW_V_ASK = 2 } FwVerdict;
-typedef enum { FW_BY_RESTRICTED, FW_BY_RULE, FW_BY_TRUSTED, FW_BY_MODE } FwReason;
+typedef enum { FW_BY_RESTRICTED, FW_BY_RULE, FW_BY_TRUSTED, FW_BY_MODE, FW_BY_LIST } FwReason;
 
 typedef struct {
     FwVerdict verdict;
@@ -112,6 +120,14 @@ void     fw_store_free(FwStore *s);
  * desktop:<id>. 0 ok, -1 if it isn't a valid id (empty, too long, odd characters). */
 int fw_app_canon(const char *in, char *out, size_t n);
 
+/* (0.8.5) LordOS's own components that use the network, each in its own scope
+ * lordos-net-<name>.scope so the kernel enforces their rules (docs/MONITOR.md, "Native apps as
+ * their own rows"): their firewall id is "lordos:<name>". 1 if name is one of them. */
+#define FW_COMPONENTS { "mail", "store", "print", "terminal", "lists", "lan", NULL }
+int fw_component_ok(const char *name);
+/* "lordos-net-<name>.scope" of a known component → "lordos:<name>" in app. 0 ok, -1 otherwise. */
+int fw_component_scope(const char *scope, char *app, size_t n);
+
 /* Destination as text ("any", "lan", "internet", "example.com", "*.example.com", "10.0.0.0/8",
  * "2001:db8::1") → kind/wildcard/domain/fam/addr/prefix of r. 0 ok, -1 invalid. */
 int fw_parse_dest(const char *s, FwRule *r);
@@ -124,6 +140,8 @@ int fw_format_dest(const FwRule *r, char *out, size_t n);
 /* LAN: 0/8, 10/8, 100.64/10 (CGNAT), 127/8, 169.254/16, 172.16/12, 192.168/16, 224/4, 255.255.255.255;
  * ::, ::1, fc00::/7, fe80::/10, ff00::/8; ::ffff:a.b.c.d as its IPv4. */
 int fw_addr_is_lan(int fam, const uint8_t *addr);
+/* 127/8 and ::1 (and ::ffff:127.x.y.z): what the deny mode never denies. */
+int fw_addr_is_loopback(int fam, const uint8_t *addr);
 
 /* Adds a rule (validates and copies it). If there's already one with the same app/dir/destination/
  * ports/protocol, it replaces it and keeps its id. *id_out (optional) receives the id. 0 ok, -1

@@ -15,6 +15,7 @@ LordOS handles language across the whole system, not just in the interface. It s
 | Complex scripts | right to left (bidi), Arabic forms, marks, CJK, per-script font fallback | `server/src/ui/bidi.c`, `shape.c`, `otf.c`, `textlayout.c` |
 | Mirrored interface | with Arabic, Hebrew, Persian… the whole interface runs right to left | `direction` in `layout.c`, `sdk/i18n.js` |
 | Input methods | Korean (hangul), Japanese (kana + SKK), Chinese (pinyin) | `server/src/ime.c`, `sdk/ime.js` |
+| On-screen keyboard | shows the active XKB layout and sends real key codes, so layouts, dead keys and input methods work on it | `sdk/osk.js`, `ON-SCREEN-KEYBOARD.md` |
 
 Everything is managed from **Settings → Language & Region** and **Settings → Keyboard**.
 
@@ -116,15 +117,14 @@ node tools/i18n-pack.mjs new fr "Français" French zero-one-other fr_FR   # lord
 node tools/i18n-check.mjs lordos-lang-fr.json                           # missing keys and variables
 ```
 
-Then copy `lordos-lang-fr.json` to `~/Descargas` and use **Settings → Language & Region →
+Then copy `lordos-lang-fr.json` to your Downloads folder and use **Settings → Language & Region →
 Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slavic`, `polish`,
 `czech-slovak`, `arabic`. `node tools/i18n-pack.mjs export pt` exports an existing language in
 the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today: 391 keys,
-complete in es, en and pt. It also runs `tools/brand-check.mjs`, which fails when a third-party
-brand or product name (another operating system, its apps or features) shows up in the catalogs,
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en and pt, and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
+brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its
 `ALLOW` list.
@@ -287,7 +287,7 @@ ZWJ sequences and flags at every box width from 8 to 400 px (`make -C server tes
 If the language is right to left (`meta.json` → `"direction": "rtl"`; `i18n-pack` sets it
 automatically for ar, he, fa, ur…), **the whole interface flips**, as on popular desktop systems: menu bar, menus
 (they open to the left), windows (buttons on the right), Dock, tabs, Settings, Files and the
-Classic theme (start and taskbar on the right). The terminal's content stays left to right (see
+Lord Classic theme (start and taskbar on the right). The terminal's content stays left to right (see
 "In the terminal" below).
 
 The engine follows CSS: `direction: 'rtl' | 'ltr'` is inherited, flips the row axis and the
@@ -363,7 +363,7 @@ can drop).
 | ![scripts](files-world-scripts.png) | ![arabic](ui-arabic.png) |
 | Names in Arabic, Hebrew, Chinese, Japanese, Korean and mixed (bidi), with emoji | Arabic interface: bar, window, sidebar, columns and Dock mirrored |
 | ![menu](menu-arabic.png) | ![classic](classic-theme-arabic.png) |
-| Menu in Arabic: opens to the left, shortcut on the other side | Classic theme in Arabic; the terminal stays left to right |
+| Menu in Arabic: opens to the left, shortcut on the other side | Lord Classic theme in Arabic; the terminal stays left to right |
 | ![japanese](ime-japanese.png) | ![pinyin](ime-pinyin.png) |
 | Japanese in the Terminal: にほんご → 日本語 / にほんご / ニホンゴ | Pinyin: zhongguo → 中国, 中古, 中… (page 1 of 7) |
 | ![hangul](ime-hangul.png) | ![result](ime-terminal.png) |

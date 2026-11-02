@@ -201,6 +201,10 @@ static int parse_key(const uint8_t *b, size_t len, PgpKey *k) {
 
 static long dearmor(const char *in, size_t len, uint8_t **out);
 
+long pgp_dearmor(const char *in, size_t len, uint8_t **out) {
+    return len >= 5 && !memcmp(in, "-----", 5) ? dearmor(in, len, out) : -1;
+}
+
 int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) {
     uint8_t *buf;
     long n;

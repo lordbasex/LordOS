@@ -4,6 +4,7 @@
  * login shell (the one in /etc/passwd), just like any terminal emulator.
  * The child inherits no capabilities, blocked signals or descriptors from the server. */
 #include "term.h"
+#include "../sec/cgroup.h"
 #include "lord_version.h"           /* build/gen: LordOS version (Makefile, from package.json) */
 
 #include <errno.h>
@@ -51,6 +52,14 @@ static void child(int fd, const char *cwd, int id) {
     struct __user_cap_data_struct caps[2];
     memset(caps, 0, sizeof caps);
     syscall(SYS_capset, &hdr, caps);
+
+    /* (0.8.5) the shell and every program it runs in lordos-net-terminal.scope: one "Terminal" app
+     * for the firewall and Monitor → Network (lordos:terminal), each connection with its program's
+     * name. Best effort: a terminal that can't be placed still opens. */
+    if (getenv("LORDOS_SESSIOND")) {
+        CgroupLimits lim = { 0, 0, 0 };
+        cgroup_enter("lordos-net-terminal.scope", &lim);
+    }
 
     struct passwd *pw = getpwuid(getuid());
     const char *home = getenv("HOME");

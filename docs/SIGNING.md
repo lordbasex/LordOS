@@ -39,7 +39,8 @@ SHA-256 and Ed25519 are **our own code**, small and readable. Ed25519 follows th
 (`ed25519_sign`/`ed25519_public`) was added on top of the verification the package engine already
 had. The JSON reader is our own and strict (`server/src/sec/json.c`).
 
-**No OpenSSL:** by policy only `lord-sessiond` links it. `.lpk` verification happens in C, at
+**No OpenSSL:** by policy only `lord-sessiond`, `lord-maild` and (0.8.5) `lord-fetch` and `lord-tls` link it (`lord-rdesk` loads it through libfreerdp), never
+`lord-server`. `.lpk` verification happens in C, at
 install time (`lpk_check` in `js_sys.c`) and at load time (modification detection via
 `pkg_status`).
 
@@ -137,6 +138,9 @@ in `SHA256SUMS`, and `SHA256SUMS` is signed with the LordOS release key:
   or on a build VM. Keep an offline backup of it.
 - The Debian installer refuses to install when the signature is missing or invalid, before the
   `.deb` is downloaded.
+- Installed systems update from the signed APT repository on lordos.org (0.8.1), which has its own
+  OpenPGP key (`packaging/keys/lordos-archive-keyring.gpg`), because APT needs OpenPGP; see
+  [UPDATES.md](UPDATES.md).
 
 Checking a download by hand (OpenSSL 3):
 
@@ -169,7 +173,7 @@ development tree), lists the size and SHA-256 of every file LordOS runs as JavaS
 |---|---|
 | `themes/<theme>/theme.bundle.js` | the shell, the SDK, the React runtime and **every native app** (they are bundled into each theme), for `default`, `classic` and `greeter` (the login screen) |
 | `assets/app-host.bundle.js` | React + SDK of isolated app processes (`lord-server --app <id>`) |
-| `assets/sysapps/<id>/app.js` | system apps that run as their own sandboxed process (Passwords) |
+| `assets/sysapps/<id>/app.js` | system apps that run as their own sandboxed process (Passwords; Mail, Calendar, Contacts and Reminders since 0.8.2; System Information's Sandbox Probe `sysprobe` in 0.8.5) |
 
 ```json
 {
@@ -233,14 +237,16 @@ development state: without a valid signature nothing is loaded.
 - The bundle is **not run**. The refusal is logged (`code: REFUSED themes/default/theme.bundle.js:
   SHA-256 differs from the manifest — this LordOS component was modified and was not loaded` in the
   session log or the journal) and remembered for the session.
-- **A theme:** lord-server falls back to the default theme, then the classic one, and the desktop
+- **A theme:** at session start lord-server falls back to Lord Flow (`default`), then Lord Classic
+  (`classic`); on a theme switch it keeps the last theme that loaded (since 0.8.5, so two refused
+  switches in a row no longer leave the session without a theme). The desktop
   shows a notification: **"This LordOS component was modified and was not loaded"**, naming the file,
   with a Details button (About). The broken theme is not offered again in this session.
 - **Nothing left to load** (every theme, the login screen, or a bad manifest/signature): the built-in
   **recovery screen** — compiled into lord-server, so it is as trusted as lord-server itself — says
   what happened, lists the files and how to repair it (`sudo apt install --reinstall lordos`); in a
   session it has a Log Out button. Never a blank screen.
-- **An isolated system app** (Passwords): its window shows the same recovery screen instead of the app.
+- **An isolated system app** (Passwords, Mail, Calendar, Contacts, Reminders): its window shows the same recovery screen instead of the app.
 
 `lord.code.status()` (`ui/js_sec.c`) gives the SDK the state and the refusals; `sdk/codesig.js`
 shows the notification. `lord-server --check-code [<folder>] [--require-signed]` checks a whole tree
@@ -250,7 +256,7 @@ troubleshooting: `sudo /usr/lib/lordos/bin/lord-server --check-code`).
 | | |
 |---|---|
 | ![modified](system-apps-modified.png) | ![recovery](system-apps-recovery.png) |
-| One byte changed in the default theme: the classic theme loads and says so | Every theme modified: the recovery screen |
+| One byte changed in the default theme: the Lord Classic theme loads and says so | Every theme modified: the recovery screen |
 | ![about verified](system-apps-about-verified-dark.png) | ![about development](system-apps-about-dev-light.png) |
 | About: System app, Verified | About: Development build |
 | ![app recovery](system-apps-app-recovery.png) | |
@@ -307,11 +313,24 @@ noise of the build without the check (727–870 ms against 745–855 ms).
    `code-manifest.json`, signs it with `~/.config/lordos-release/release-ed25519.key.pem` into
    `code-manifest.sig` and verifies it against `lordos-release.pub.pem`). The bundles don't depend on
    the architecture, so one signature serves amd64 and arm64.
+   (0.8.7) Then `tools/release/sign-hwsnapshot.sh`: it rebuilds
+   `assets/hwreport/snapshot.json` (the tested-hardware catalogue's snapshot, `tools/hwreport/catalog.mjs`) and
+   signs it the same way into `assets/hwreport/snapshot.json.sig`. lord-server verifies it in C
+   (`sysreport/hwsnap.c`) before System Information shows any of it ([BENCHMARK.md](BENCHMARK.md), "0.8.7").
+   It ships in its own package, `lordos-hwdata` (`tools/iso/mkdeb-hwdata.sh`; `REQUIRE_SIGNED_CODE=1` refuses a
+   missing signature and checks it with `openssl` against `lordos-release.pub.pem`), which `lordos` depends on;
+   `tools/release/apt-repo.sh` checks the signature again before adding that package to the repository, and a
+   newer one can be published alone between releases ([RELEASING.md](RELEASING.md), "A newer hardware snapshot
+   between releases").
 2. The tree (with both files) goes to the build VMs; `make -C server RELEASE=1`.
 3. `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh` installs both files into `/usr/lib/lordos/` and runs
    `lord-server --check-code` on the staged tree: the `.deb` is not built if a bundle doesn't match
    or (release build) the signature is missing. The ISO and the Raspberry Pi image install that `.deb`
-   (`tools/rpi/build-img.sh` passes `RELEASE` and `REQUIRE_SIGNED_CODE` to its arm64 chroot).
+   (`tools/rpi/build-img.sh` passes `RELEASE` and `REQUIRE_SIGNED_CODE` to its arm64 chroot), together with
+   `lordos-hwdata` from `REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb-hwdata.sh`. An x86-64
+   host packaging an `server/build` already compiled for aarch64 can't run that `lord-server`, so it
+   sets `CODE_CHECK_SERVER` to a `lord-server` built for the host from the same tree: the check reads
+   only the bundles and the signature, which are the same on both architectures.
 
 See [RELEASING.md](RELEASING.md), step 3.
 

@@ -1,5 +1,6 @@
 {
   "id": "passwords",
+  "version": "0.8.5",
   "name": "Passwords",
   "description": "Passwords, 2FA codes, Wi-Fi, cards and secure notes in an encrypted vault; also the session keyring",
   "size": [

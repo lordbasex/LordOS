@@ -1,4 +1,6 @@
 {
+  "bootTest": "Midiendo el tiempo de arranque: arranque {k} de {n} listo. Reinicia en {s} s. Iniciar sesión también detiene la prueba.",
+  "bootTestCancel": "Detener la prueba",
   "busy": "Un momento…",
   "cancel": "Cancelar",
   "confirmRestart": "Hay sesiones abiertas: lo que no esté guardado se pierde. ¿Reiniciar igual?",

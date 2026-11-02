@@ -158,13 +158,18 @@ function fwPoll(force) {
   try {
     const p = api.poll();
     const status = api.status();
-    firewallState.set((s) => ({ ...s, status, counts: p.counts || {}, events: p.events.length ? [...s.events, ...p.events].slice(-200) : s.events }));
+    const at = Date.now();
+    firewallState.set((s) => ({ ...s, status, counts: p.counts || {}, events: p.events.length ? [...s.events, ...p.events.map((e) => ({ ...e, at }))].slice(-200) : s.events }));
   } catch (e) { /* no lord.fw */ }
 }
 const fwBump = (r) => { firewallState.set((s) => ({ ...s, rev: s.rev + 1 })); fwPoll(true); return r; };
 const fwCall = (fn, dflt) => { try { const api = fwApi(); return api ? fn(api) : dflt; } catch (e) { return dflt; } };
-// A rule can only be applied to an app with its own scope: LordOS, a .desktop app or an .lpk.
-const fwEnforceable = (app) => app === 'lordos' || /^(desktop|lpk):/.test(app || '');
+// A rule can only be applied to an app with its own scope: LordOS, a .desktop app, an .lpk or (0.8.5)
+// one of LordOS's own components with its own scope (lordos:mail, lordos:store, lordos:print,
+// lordos:terminal, lordos:lists). The essential system services (system:dns, system:time,
+// system:network) are shown but never take a rule.
+const fwEnforceable = (app) => app === 'lordos' || /^(desktop|lpk|lordos):/.test(app || '');
+const fwCallThrow = (fn) => { const api = fwApi(); if (!api) throw codeError('fw.list.unavailable'); return fn(api); };
 export const firewall = {
   available: () => !!fwApi(),
   enforceable: fwEnforceable,
@@ -181,6 +186,14 @@ export const firewall = {
   removeRule: (id) => fwBump(fwCall((f) => f.removeRule(id), false)),
   updateRule: (id, r) => fwBump(fwCall((f) => f.updateRule(id, r), false)),
   ruleApps: () => fwCall((f) => (f.ruleApps ? f.ruleApps() : []), []),
+  // (0.8.5) subscribed blocklists (docs/FIREWALL.md, "Blocklists"): lists() → { lists: [{ id, url, format,
+  // custom, on, updated, tried, domains, nets, truncated, error }], busy, domains, nets } | null
+  lists: () => fwCall((f) => (f.lists ? f.lists() : null), null),
+  setList: (id, on) => fwBump(fwCallThrow((f) => f.setList(id, !!on))),
+  addList: (url, format) => fwBump(fwCallThrow((f) => f.addList(url, format))),
+  removeList: (id) => fwBump(fwCallThrow((f) => f.removeList(id))),
+  updateLists: (force) => fwCall((f) => (f.updateLists ? f.updateLists(!!force) : 1), 1),
+  listMatch: (names, addr) => fwCall((f) => (f.listMatch ? f.listMatch(names || [], addr || '') : null), null),
   // the app whose rules Settings → Privacy shows open (the Monitor's "Rules for this app")
   focus: createStore(null),
   refresh: () => fwPoll(true),
@@ -267,4 +280,7 @@ export const monitor = {
   stopProcess,
   history,
   clearHistory,
+  // Monitor → Voltage (docs/MONITOR.md, "Voltage"): only while that view is on screen
+  wantVoltage: (on) => { if (available()) lord.monitor.wantVoltage(!!on); },
+  voltage: () => (available() ? lord.monitor.voltage() : null),
 };

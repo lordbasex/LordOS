@@ -1,5 +1,6 @@
 {
   "id": "scanner",
+  "version": "0.8.5",
   "name": "Scanner",
   "description": "Driverless network scanners (eSCL): preview, area, resolution and save as PDF, PNG or JPEG",
   "size": [860, 620],

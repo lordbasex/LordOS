@@ -16,7 +16,15 @@ export function HostPackages() {
 }
 
 export const useDebian = () => ({ upgrades: [], job: null, msg: null });
+export const CATS = [];
+export const catalogApps = () => [];
+export const catalogApp = () => null;
+export const AiDetail = HostPackages;
+export const AiPage = HostPackages;
+export const AiDiscover = () => null;
 export const debian = {
   Discover: HostPackages, Updates: HostPackages, Status: () => null,
+  Details: HostPackages, Category: HostPackages, SuggestedPage: HostPackages,
+  Refused: () => null, categoryCounts: () => ({}),
   canRemove: () => false,
 };

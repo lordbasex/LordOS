@@ -195,7 +195,6 @@ setTimeout(load, 0);
 
 export const clipboardPanel = createStore(false);       // false | 'quick' | 'full'
 let target = null;                                       // where to paste on choosing
-let superDown = false;
 function openPanel(mode) {
   if (!clipboardPanel.get()) {
     const top = wm.focused();
@@ -204,14 +203,11 @@ function openPanel(mode) {
   clipboardPanel.set(mode);
 }
 export const closeClipboardPanel = () => { clipboardPanel.set(false); setTimeout(() => restoreFocus(target?.text), 0); };
-addListener('keydown', (e) => {
-  if (e.code === 125 || e.code === 126) superDown = true;
-  else if (superDown && e.code === 47 && !e.repeat) {                       // V
-    const want = e.shift ? 'full' : 'quick';
-    if (clipboardPanel.get() === want) clipboardPanel.set(false); else openPanel(want);
-  } else if (e.key === 'Escape' && clipboardPanel.get()) clipboardPanel.set(false);
-});
-addListener('keyup', (e) => { if (e.code === 125 || e.code === 126) superDown = false; });
+// ❖V and ❖⇧V: the keys are in sdk/shortcuts.js.
+export function toggleClipboardPanel(mode) {
+  if (clipboardPanel.get() === mode) clipboardPanel.set(false); else openPanel(mode);
+}
+addListener('keydown', (e) => { if (e.key === 'Escape' && clipboardPanel.get()) clipboardPanel.set(false); });
 
 const FILTERS = ['all', 'text', 'link', 'image', 'code', 'color', 'file', 'pinned'];
 const TYPE_GLYPH = { text: '¶', link: '🔗', image: '🖼', code: '‹›', color: '●', file: '📁' };

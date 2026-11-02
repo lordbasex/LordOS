@@ -25,6 +25,8 @@ enum {
     RP_VFRAME = 40,     /* u8 codec (1 H.264, 2 VP8), u8 keyframe, u16 0, u32 ms + the encoded frame */
     RP_AFRAME = 41,     /* u32 first sample (48 kHz) + one Opus packet */
     RP_DAMAGE = 42,     /* video mode: u16 x, y, w, h per rectangle that changed in this frame */
+    RP_VINFO = 43,      /* u8 encoder in hardware (VA-API), u8 composed on the GPU, u16 the encoder's frames a
+                         * second, u16 encoding time per frame in 1/100 ms: shown in the page's top bar */
 };
 
 /* bridge → session */

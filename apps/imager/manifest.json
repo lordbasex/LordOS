@@ -1,5 +1,6 @@
 {
   "id": "imager",
+  "version": "0.8.5",
   "name": "LordOS Imager",
   "description": "Writes LordOS to an SD card or a USB stick and prepares the Raspberry Pi's first boot",
   "size": [960, 660],

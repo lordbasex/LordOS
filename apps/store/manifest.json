@@ -1,14 +1,15 @@
 {
   "id": "store",
+  "version": "0.8.5",
   "name": "Store",
   "description": "LordOS and Debian apps: search, install, update and remove",
   "size": [
-    880,
-    580
+    1080,
+    700
   ],
   "minSize": [
-    640,
-    420
+    720,
+    460
   ],
   "dock": true,
   "permissions": [

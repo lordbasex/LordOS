@@ -8,9 +8,10 @@ access" permission on Android and other systems. It is built in steps:
 | 1 | Rule store, the decision maker and the names learned from DNS (`server/src/fw`), with tests | **done** |
 | 2 | Enforce it in the kernel with cgroup hooks: the root service `lord-netperm` (`server/src/netperm`) | **done** (VM 122) |
 | 3 | Monitor: the "Rule" column and the counters | **done**: per-app switch, counters and "Allow / Block this domain" per destination |
-| 4 | Settings: "Trusted apps" and "Restricted apps" | **done**: lists and mode (silent / off) |
+| 4 | Settings: "Trusted apps" and "Restricted apps" | **done**: lists and mode (silent / off; deny since 0.8.5) |
 | 4b | Settings: network rules by app (domains, addresses, networks) | **done** (VM 122), see [Rules by app](#rules-by-app-settings-and-monitor) |
 | 5 | "Ask" mode | planned (see "The ask mode") |
+| 0.8.5 | Blocklists, the deny mode, LordOS's components and the system services as their own apps | **done** (VM 118), see [Blocklists](#blocklists-085), [components](#lordos-components-in-their-own-scopes-085) |
 
 Step 1 is C code only, with no daemon and without touching the kernel or the network (step 2,
 below, is the service that enforces it):
@@ -65,7 +66,7 @@ Destination details:
 `fw_app_canon` accepts:
 
 - `lordos` (lord-server and its built-in apps);
-- `desktop:<id>` (Linux apps with a `.desktop`);
+- `desktop:<id>` (Linux apps with a `.desktop`). Two ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`) and `desktop:lordos-rdesk` (the RDP and VNC apps). The launcher refuses a `.desktop` with either id (`app_scope_reserved`), so none can inherit their rules;
 - `lpk:<id>` (`.lpk` apps);
 - the absolute path of the executable (what the Monitor uses when it can't find a `.desktop`).
 
@@ -172,7 +173,7 @@ the app gives itself.
 | | PipeWire guard (`sec/pwguard.c`) | `Video/Source` nodes hidden from the app, its `Stream/Input/Video` streams destroyed | within 1 s | unit test only (no PipeWire camera node on the test VM) |
 | no USB | `lord-netperm`, `cgroup/dev` | `/dev/bus/usb/*` (189), `/dev/hidraw*` (dynamic, from `/proc/devices`), `/dev/ttyACM*` (166), `/dev/ttyUSB*` (188) | at once (next `open`) | `devices.sh` |
 | no Bluetooth | `lord-netperm`, `cgroup/lsm_socket_create` | `socket(AF_BLUETOOTH, …)` → `EPERM` | at once (new sockets) | `tests/fwlinux/bluetooth.sh` |
-| no screen capture | by design, and `lord-netperm` | the compositor offers no capture protocol, there's no X server, no screen-cast portal is installed; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh` |
+| no screen capture | by design, and `lord-netperm` | the compositor offers no capture protocol, Xwayland (0.8.3) sees only X windows and a restricted app gets no X display, no screen-cast portal is installed; `/dev/fb*` (29) is denied | always | `tests/fwlinux/screen.sh` |
 | no microphone | PipeWire guard | capture nodes (`Audio/Source*`, `Audio/Duplex`) and their ports hidden, the app's `Stream/Input/Audio` streams destroyed, including a recording already running | within 1 s | `tests/fwlinux/mic.sh` (`pw-record`, `parecord`, `arecord`) |
 | | `lord-netperm`, `cgroup/dev` | ALSA capture PCM nodes (`/dev/snd/pcmC*D*c`, from `/sys/class/sound`): recording from the card without PipeWire | at once (next `open`) | `mic.sh` |
 | no access to your files | the launcher (`apps.c`, `sec/sandbox.c`) | its own user, mount and PID namespace and Landlock (below) | at the next launch | `tests/fwlinux/files.sh` (a probe app, malicious `.desktop` files, `gtk4-print-editor`) |
@@ -231,10 +232,15 @@ D-Bus proxy per app in front of the system bus, which isn't built. `no-files` do
 system bus either (see below).
 
 **Screen capture.** No Linux app can copy the screen, restricted or not: the compositor
-(`wl/wl.c`) offers no screencopy, image-capture or dmabuf-export protocol, Xwayland isn't
-supported, and no `xdg-desktop-portal` screen-cast backend is installed, so PipeWire has no screen
-node. `screen.sh` checks all four on the running system (`build/wl-globals` lists the globals as
-a client sees them), and `no-screen` also denies `/dev/fb*`. If a screen-cast portal backend is
+(`wl/wl.c`) offers no screencopy, image-capture or dmabuf-export protocol, and no
+`xdg-desktop-portal` screen-cast backend is installed, so PipeWire has no screen node. Since 0.8.3
+X11 apps run through Xwayland, which is a Wayland client like any other: an X app can read other X
+apps' windows on the shared X display, but never a Wayland or LordOS window (rootless, no root
+picture), and a restricted app gets no X display at all (`PRIVACY.md`, "X11 apps"). `screen.sh`
+checks the compositor's globals (`build/wl-globals` lists them as a client sees them), the portal
+and PipeWire on the running system, and `no-screen` also denies `/dev/fb*`. (Its "no X server
+socket" check predates Xwayland: with the session's X socket in place since 0.8.3 that line fails
+and needs updating.) If a screen-cast portal backend is
 ever installed, this no longer holds and `screen.sh` fails.
 
 **The PipeWire guard (`sec/pwguard.c`).** `lord-server` keeps one connection of its own to the
@@ -387,6 +393,11 @@ instant); `GetConnectionCredentials` with a process fd would remove that race an
    | address or network | longer prefix, more specific: `/32` > `/24` > `/8` > `/0` |
    | `lan` / `internet` | lower than any network |
    | `any` | the lowest |
+
+   (0.8.5) **2b. A subscribed blocklist** (`FwQuery.listed`): when the destination is on one of the
+   user's blocklists, it is denied unless the winning rule names the destination (an exact or
+   wildcard domain, an address or a network): a list beats `lan`, `internet` and `any` rules, never
+   a rule the owner wrote for that destination. Trusted apps are not exempt. See "Blocklists".
 
    Ties are broken in this order:
    1. the smallest port range (a concrete port beats "any");
@@ -966,7 +977,15 @@ in the kernel. Before, it was the standalone `curl`, which can't be filtered.
 |---|---|
 | silent (default) | whatever has no rule is allowed, and each new connection is counted and reported to the Monitor (`record`) |
 | off | only explicit denials and restrictions apply; the rest is allowed without recording |
+| deny (0.8.5, "Deny silently") | whatever no rule allows is denied and recorded; loopback (127/8, `::1`) stays allowed, so the resolver's stub and local services keep working; trusted apps keep the network; the essential system services are not apps and are never affected |
 | ask | for now, the same as silent |
+
+The deny mode is `FW_MODE_DENY` in `fw/rules.c` and `NP_M_DENY` in `np_decide` (the last step: a
+rule, a restriction or a list decides first); with it every app's packet filter decides, so a
+connection that was open when the mode changed is cut ("Existing connections are cut"). It is offered
+in Settings → Privacy → App network and in the menu bar item. Tested: `fw-rules-test` (loopback,
+`::1`, a mapped `127.0.0.1`, a rule that allows, a trusted app, the file round trip) and the random
+comparison of `npcompile-test`, which now draws the deny mode too.
 
 ### The ask mode (next step)
 
@@ -1081,6 +1100,92 @@ programs:
 - Script: `bench-monred-118.sh` in the scratchpad (veth `npb0`/`npb1`, namespace `npb`, both
   removed afterwards); `iperf3` was installed on VM 118 for this (`VM-SETUP.md`).
 
+### LordOS components in their own scopes (0.8.5)
+
+Built-in parts that use the network used to run inside lord-server, so their traffic was
+"LordOS" and a rule could only take all of them at once. Since 0.8.5 each one has its own process in
+its own scope, `lordos-net-<name>.scope`, which lord-netperm reads as the firewall app
+`lordos:<name>` (`fw_component_scope`, a fixed list: `mail`, `store`, `print`, `terminal`,
+`lists`). The kernel attributes a socket to the cgroup of the process that *created* it, so:
+
+- **Connectors** (`server/src/sec/netconn.c`): for Mail (lord-maild's servers: Mail, Calendar,
+  Contacts, Reminders), printers and scanners (IPP and eSCL over TCP, the mDNS socket) and the
+  blocklist downloads, lord-server starts `lord-server --net-connector <name>`: the **same binary**
+  re-executed (like the terminal holders), fixed argv, `LANG` and `LORDOS_SESSIOND` only, the channel
+  on fd 3 and every other descriptor closed. It asks lord-sessiond to place it in its scope, waits a
+  quarter of a second so lord-netperm sees the new scope, and then only answers fixed-size requests:
+  family (IPv4/IPv6), type (stream/datagram), and an address and port to `connect()` to
+  (non-blocking; lord-server waits for the result). It returns the socket over SCM_RIGHTS and
+  lord-server checks it is the kind it asked for. It takes no names or paths, runs nothing, has
+  `no_new_privs`, is not dumpable and has 64 file descriptors; it only does what lord-server could
+  do itself, as the same user. **Fail closed:** in a LordOS session a connector that can't enter its
+  scope exits and the request fails (the traffic would otherwise be lord-server's and decided by
+  its rules). Outside a session (development, the tests) the socket is made in place, as before.
+- **Store and updates:** the package engine's download child (the root admin helper's fork that
+  drops to `nobody`) moves itself into `lordos-net-store.scope` before dropping root
+  (`cgroup_enter_root`: only from its session's `server` leaf, only itself, a root-owned scope;
+  lord-sessiond's placement service only places session users).
+- **Terminal:** the shell of each terminal (`term/pty.c`) enters `lordos-net-terminal.scope` before
+  exec, so every program started there is "Terminal" (the Monitor lists them by name). Best effort:
+  a terminal that can't be placed still opens.
+- **The network service:** lord-sessiond starts lord-netd in `lordos.service/netd`, its own leaf
+  (`cgroup_service_leaf`), so its traffic (DHCP, the VPN daemons) can be counted apart from
+  lord-sessiond's.
+
+Because these are ordinary firewall apps, every rule, restriction and switch works on them (Settings
+→ Privacy lists them, restrictions are the network ones). The Monitor shows the VPN tunnels from
+their interfaces' counters and never offers a switch for them.
+
+**What was tested on VM 118:** a program in the Terminal and the Store's download each had their own
+row with their own bytes; blocking the Store (after its warning) made a download in its scope fail
+with `denied out tcp 151.101.66.132:80 (rule)`; `netconn-test` checks the requests on both sides,
+the sockets, the real connector process (the test binary re-executed) and that a connector that
+can't enter its scope refuses. Mail and the printers use the same connector as the blocklists,
+which were tested live; Mail against a real server and a network printer were not (VM 118 has
+neither).
+
+### Files → Network and the connectors (0.8.7, approved 2026-10-31)
+
+Files → Network (`FILES.md`, "Network") uses the network for one thing: one bounded pass over the LAN while its page
+is open. By the rule above its sockets come from a connector of its own, approved by the maintainer on 2026-10-31.
+Borrowing `print` was rejected: file-share probes would show as "Printers and scanners" in the Monitor and follow that
+row's rules. Making the sockets in lord-server was rejected too: the traffic would be LordOS's own.
+
+**What was added:** a component `lan` (firewall app `lordos:lan`, scope `lordos-net-lan.scope`): the same connector,
+same fixed-size requests, no new request type, used by `lan.c` only for one unconnected UDP socket per link
+(`sendto` 224.0.0.251:5353, kept by lord-server) and TCP to ports 445, 2049, 111, 22 and mountd's on addresses
+`on_link` accepts. Connectors can't tell ports apart; `lan.c` is what bounds them. The change is `NC_LAN`, the name in
+`NAMES`, `FW_COMPONENTS` and `netconn_test`, a row in `sdk/netmodel.js` with its text in three languages, and
+`lan_socket` calling `netconn_socket`.
+
+### The essential system services (0.8.5)
+
+Name resolution, time and the network service are shown but can never be blocked: they are not in
+any app's scope, so no rule reaches them. The accounting programs alone (`cgroup/skb_ingress`,
+`skb_egress`) are also attached to `system.slice/systemd-resolved.service` and
+`systemd-timesyncd.service` (lord-netd's leaf is already under `lordos.service`), and `np_sysc`
+gets an entry for each, keyed by its cgroup id; a packet that isn't an app's is looked up there by
+its socket's cgroup (`bpf_skb_cgroup_id`) and only counted, never filtered. COUNTS carries them as
+`system:dns`, `system:time` and `system:network` for every user. lord-netd's DHCP client uses a
+raw socket for discovery, which the cgroup programs don't see: only its unicast renewals count.
+
+### Measurements, 0.8.5 (VM 118)
+
+`iperf3` through a veth pair into a private namespace (eth0 untouched), the client in an app scope,
+system CPU in % of one core over 15 s, 0.8.3's lord-netperm and this one interleaved twice:
+
+| | 0.8.3 | 0.8.5 |
+|---|---|---|
+| UDP 1 Gbit/s, 1200 B datagrams (104,000 packets/s), sending | 104, 109, 107, 102 % | 112, 117, 112, 110 % |
+| the same, receiving | 105, 101, 104, 98 % | 116, 116, 110, 114 % |
+| TCP (~22 Gbit/s) | 166, 163 % | 172, 168 % |
+
+About 0.6 µs more per packet at this extreme rate (the per-port flow key and the bound-port lookup
+on every packet): a video over QUIC at a few thousand packets per second costs well under 0.5 % of a
+core. Blocklists add nothing per packet: with four lists (399,396 entries) on and off, the same
+bench gave 105–115 % and 109–111 %, within run-to-run noise. A build without the per-port parsing
+gave the same numbers as this one, so the difference is not the port parsing itself.
+
 ### Known limits
 
 - **App scopes are root's now** (was: "Scopes belong to the user"). `lord-sessiond` creates the
@@ -1130,6 +1235,105 @@ programs:
   ![settings](firewall-settings.png)
 - "LAN only" from Settings: no internet, the gateway yes. ![LAN only](firewall-lan-only.png)
 
+
+## Blocklists (0.8.5)
+
+A curated catalog of public lists by topic (advertising, trackers, malware and attacks), domain-
+and address-based, that the owner turns on in Settings → Privacy → Blocklists, plus custom lists by
+https address. Lists are downloaded daily over HTTPS by an unprivileged, sandboxed helper, parsed
+strictly, checked again by lord-server, compiled into one file and enforced by lord-netperm in the
+existing per-app maps. They never override a rule the owner wrote for a destination.
+
+```
+assets/fw/blocklists.json        the catalog: id, topic, url, format, licence, source, date checked
+server/src/fw/fwlists.{c,h}      raw parsers, the set (hashes), the compiled file's reader
+server/src/fw/fwsub.{c,h}        lord-server: subscriptions, the download job, compiling
+server/src/fetch/fetch.c         lord-fetch, the downloader (OpenSSL), fetchproto.h its protocol
+server/src/ui/js_fw.c            lord.fw.lists / setList / addList / removeList / updateLists / listMatch
+apps/monitor/Blocklists.jsx      Settings → Privacy → Blocklists
+tests/fwlists_test.c, fwsub_test.c
+```
+
+### The catalog and its licences
+
+Each list was added only after its licence was checked (the list file's own header and its
+project's licence file, 2026-10-19), and the catalog records what was found; LordOS ships no list
+data, each machine downloads what its owner turns on.
+
+| List | Topic | Format | Source | Licence |
+|---|---|---|---|---|
+| Advertising (domains) | ads | domains | The Block List Project | MIT (list file), Unlicense (repository) |
+| Advertising and malware (unified hosts) | ads | hosts | Unified hosts (Steven Black) | MIT |
+| Trackers and analytics | trackers | domains | The Block List Project | MIT, Unlicense |
+| Phishing sites, Scam sites, Ransomware, Hidden crypto mining | malware | domains | The Block List Project | MIT, Unlicense |
+| Attacking addresses | malware | addresses | IPsum, level 3 | Unlicense |
+
+Left out: a malware URL feed whose terms are fair use without a stated licence; a botnet controller
+address list (CC0) that was empty when checked; The Block List Project's malware list (2.6 million
+entries, over the size limit); lists under non-commercial licences.
+
+### Downloading: lord-fetch
+
+- **Who connects:** lord-server resolves the list's host and connects through the blocklists'
+  connector, so the socket is `lordos:lists`'s (its own row and rules). Only `https://` addresses
+  (`fws_split_url`: a host name with a dot, an optional port, a printable path; no user info, no
+  addresses in brackets).
+- **lord-fetch** (`server/src/fetch/fetch.c`): posix_spawned by the job thread from lord-server's
+  folder (root's or the user's, not writable by others), no arguments, `LANG` only, the channel
+  (lord-doc's framing) on fd 3. It loads the CA bundle and then calls `sandbox_apply_helper` (scope
+  `lordos-fetch.scope`, 256 MB; no socket, connect, bind or exec; no files). For each list it gets the
+  connected socket and `{host, path, format, sub}`; it speaks TLS 1.2 or later with the certificate
+  checked against the system CA store and the host name (mail/net.c, never relaxed), sends one
+  HTTP/1.1 GET with `Accept-Encoding: identity`, and reads at most 16 MB with deadlines
+  (mail/http.c). A redirect comes back to lord-server, which follows at most three, https only.
+- **Strict parsing, in the helper** (`fwl_parse_raw`): a NUL byte, a line over 1024 bytes or a body
+  over 16 MB reject the list; comments (`#`, `!`, `;`, `//`, inline ` #`) are dropped; a hosts file
+  only maps names to `0.0.0.0`, `127.0.0.1`, `::` or `::1`; a domain list has one name per line
+  (`*.name` and `||name^` mean the name and its subdomains); an address list has an address or a
+  CIDR network first on the line (other columns ignored; host bits must be 0). Skipped and counted:
+  localhost names, names without a dot, LAN networks (it would cut the machine off its own network)
+  and networks broader than /8 or /16. More than 10 % unparsable lines (over 20) reject the list as
+  the wrong format. At most 300,000 names or 100,000 networks per list (the rest is cut and said).
+  What comes back is normalized lines (`d name`, `s name`, `n cidr`), each once, in a sealed memfd.
+- **lord-server checks it again** (every line with the same validator) before keeping a copy in
+  `~/.cache/lordos/fwlists/<id>.txt` with its state (`<id>.json`: when, how many, the last error).
+- **Daily:** `sdk/netstatus.jsx` asks once an hour (`lord.fw.updateLists`); lord-server downloads
+  only the enabled lists whose copy is more than 20 hours old, and a list that failed is tried again
+  after an hour. Turning a list on downloads it at once if there's no copy.
+
+### Compiling and enforcing
+
+- **One file:** the job thread writes every enabled list's lines into `~/.config/lordos/fwlists.txt`
+  (header `lordos-fwlists 1`, at most 32 MB) and keeps a set of hashes for the Monitor's "on the list
+  …" (`lord.fw.listMatch`); when the job ends lord-server sends the usual RELOAD. The three files
+  are on `lord.fs`'s deny list.
+- **lord-netperm** reads `fwlists.txt` with the same fixed-path, no-links, user-owned, size-limited
+  reader as `firewall.json`, and any invalid line keeps the previous set. Names are kept as 64-bit
+  hashes (keyed per process) in sorted arrays, about 10 bytes a name: 380,000 names and 19,000
+  networks take 13.8 MB of lord-netperm's memory.
+- **In the kernel:** each user with lists gets a set in `np_blk4`/`np_blk6` (LPM tries keyed by
+  set and address), and each of their apps carries it (`NpApp.blk`). The set holds the lists'
+  networks and, from the system resolver's answers, the addresses of listed names; an address is
+  only added when **every** name the resolver gave for it is listed, so an address a tracker shares
+  with a site that isn't listed (a shared CDN) stays allowed. A DNS answer updates its addresses at
+  once, before the app connects; every 30 s the whole set is recomputed (what the resolver forgot
+  goes); learned addresses are capped at 16,384 per user. `np_decide` checks the set after the
+  rules naming the destination and before `lan`/`internet`/`any`.
+- **No per-packet cost:** lists don't make the packet filter decide for every app: `connect()` and
+  `sendmsg()` deny, and after each change that adds entries a sweep cuts the sockets already open
+  to them (as for rules).
+
+**What lists can't see:** the same as domain rules ("What domain rules can't see"): an app with its
+own encrypted DNS is only checked by address.
+
+**Tested:** `fwlists-test` (hosts, domains and address formats, every rejection rule, the set and its
+lookups, CNAME-style shared addresses, the file reader, 20,000 mutated lists; also under ASan and
+UBSan) and `fwsub-test` (URL parsing, the catalog and config, compiling seeded copies, custom lists,
+and lord-fetch refusing bad requests and a peer without TLS, without network). On VM 118: two lists
+downloaded over HTTPS (8,527 names and 19,405 networks), then all four; `curl` from the Terminal to
+a listed domain and to a listed address failed with `denied out tcp … (list)`; switching that
+domain's row on in the Monitor wrote `{"app":"lordos:terminal","dst":"nationalityship.com","action":"allow"}`
+and the next connection went through; switching it off removed the rule.
 
 ## Rules by app (Settings and Monitor)
 
@@ -1264,8 +1468,8 @@ What remains of steps 3 and 4 (the original design; what's done is above, in "`l
 - **The counters:**
   - "allowed" and "denied" come from `FwDecision.verdict`;
   - those with `record = 1` are the ones silent mode leaves for review;
-  - each connection carries the `verdict` (today fixed at `'allow'`, see `docs/MONITOR.md`,
-    "Phase 2").
+  - each connection carries the `verdict` (fixed at `'allow'` in this design; it is the kernel's
+    verdict since step 2, see `docs/MONITOR.md`, "Phase 2").
 
 ### Step 4: Settings
 
@@ -1273,7 +1477,8 @@ What remains of steps 3 and 4 (the original design; what's done is above, in "`l
   - **Trusted apps:** `fw_set_trusted`;
   - **Restricted apps:** `fw_set_restricted`, with a checkbox per restriction from the table
     above.
-- **The mode selector:** silent / ask / off.
+- **The mode selector:** silent / ask / off (built as silent / off, plus deny in 0.8.5; ask is
+  still to come).
 - **Outside the network:** the non-network restrictions are queried with `fw_blocks` (through
   `sec/restrict.h`) before `perms.c`, by the broker for isolated apps and by `js_media.c` and
   `sdk/notify.js` for the built-in apps. Exactly what is enforced where is in

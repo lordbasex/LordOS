@@ -11,8 +11,8 @@ keywords: appearance, dark mode, light, color, accent, theme, wallpaper, transpa
 - **Transparency:** bars and menus with blur. Turning it off saves work on slow computers.
 - **Wallpaper:** [Settings → Wallpaper](settings:wallpaper).
 - **Desktop style:** [Settings → Appearance](settings:appearance) changes the whole desktop live,
-  without closing apps: **Lord Default** (menu bar on top and Dock) or **Classic** (a centered
+  without closing apps: **Lord Flow** (menu bar on top and Dock) or **Lord Classic** (a centered
   taskbar with a start menu, quick settings and notifications). The open windows come back in the
-  new style. [Settings → Themes](settings:themes) lists every installed theme.
+  new style. Any other theme installed appears here too.
 
 Every app takes the theme's colors, including those installed from the Store.

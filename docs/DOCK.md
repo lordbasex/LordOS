@@ -10,7 +10,7 @@ In **Settings → Desktop & Dock** you choose:
 
 Which apps are in the Dock, and in which order, is up to you: see "Customizing the Dock" below.
 
-In the Classic theme, the same section chooses the taskbar position: bottom, top, left or right.
+In the Lord Classic theme, the same section chooses the taskbar position: bottom, top, left or right.
 Everything is applied live, without restarting, and is saved in
 `~/.config/lordos/settings.json`.
 
@@ -23,7 +23,7 @@ Everything is applied live, without restarting, and is saved in
 | ![menu](dock-right-menu.png) | ![revealed](dock-hidden-revealed.png) |
 | Right click with the Dock on the right: the menu opens inward | Auto-hide: it appears when the pointer reaches the edge (without the Dock: [`dock-hidden.png`](dock-hidden.png)) |
 | ![classic](dock-classic-left-with-bar.png) | ![classic, start](dock-classic-left.png) |
-| Classic theme with the bar on the left (only icons, and the time at the bottom) | Its start menu opens next to the bar |
+| Lord Classic theme with the bar on the left (only icons, and the time at the bottom) | Its start menu opens next to the bar |
 
 ## Settings (`sdk/dock.js`: `DOCK_DEFAULTS`, `dockPrefs(settings)`)
 
@@ -35,8 +35,10 @@ Everything is applied live, without restarting, and is saved in
 | `dockMagnifySize` | from the size up to 128 (px of the largest icon) | 86 |
 | `dockAutohide` | `true`/`false` | `false` |
 | `dockRecents` | `true`/`false`: the last 3 used apps that are not pinned, after a separator line | `false` |
-| `taskbarPosition` | `bottom`, `top`, `left`, `right` (Classic theme) | `bottom` |
-| `taskbarAlign` | `center`, `start`: where the taskbar's buttons go when it is at the bottom or top (Classic theme, 0.8.3) | `center` |
+| `taskbarPosition` | `bottom`, `top`, `left`, `right` (Lord Classic theme) | `bottom` |
+| `taskbarAlign` | `center`, `start`: where the taskbar's buttons go when it is at the bottom or top (Lord Classic theme, 0.8.3) | `center` |
+| `loginApps` | Dock item ids opened when the session starts (Options › Open at Login, 0.8.5) | `[]` |
+| `appDisplays` | app → display connector (`HDMI-A-1`, `DP-2`…) its new windows open on (Options › Assign To, 0.8.5) | `{}` |
 
 The SDK records recent apps in `dockRecentApps` every time an app opens a window
 (`useDockEntries(defaults, { recents: 3 })`).
@@ -58,7 +60,7 @@ Every app can go in the Dock: LordOS apps, installed `.lpk` packages and Linux a
 | ![left](dock-customize-left.png) | ![rtl](dock-customize-rtl.png) |
 | Reordering with the Dock on the left | Arabic: the bottom Dock reads right to left (Files on the right, the Trash on the left) |
 | ![classic](dock-customize-classic.png) | |
-| Classic theme: Firefox dragged from the start menu, with the drop line | |
+| Lord Classic theme: Firefox dragged from the start menu, with the drop line | |
 
 **Adding an app:**
 
@@ -123,7 +125,7 @@ dock.isPinned(id) · dock.canRemove(id) · dock.canMove(id)
 
 The methods take a typed id or a plain launcher id. Both themes use the same calls and the same
 drag logic (`beginDockDrag`, `registerDockTarget`, `dockDrag`, `dockPoof`): the Dock draws the gap
-and the poof; the Classic taskbar draws a drop line, unpins with the same drag-out-and-hold, pins
+and the poof; the Lord Classic taskbar draws a drop line, unpins with the same drag-out-and-hold, pins
 from the start menu (drag, or right click → Pin to taskbar) and keeps its Start button fixed (the
 launcher item isn't shown there). The model is tested by `server/tests/dock_model_test.mjs` (in
 `make test` when node is installed).
@@ -140,9 +142,17 @@ launcher item isn't shown there). The model is tested by `server/tests/dock_mode
 From the top: the app's **quick actions**, its windows (when it runs), the app's own items
 (`registerDockMenu`, e.g. the Terminal's New Window and New Tab) or New Window, **Options ›**
 (Keep in Dock / Remove from Dock; Show in Files for a `.lpk` and for the user's own `.desktop`
-files), then Show All Windows, Hide and Quit, or Open. The menu follows `DESIGN.md`'s look, is
+files; Open at Login and, with more than one display, Assign To, see below), then Show All Windows, Hide and Quit, or Open. The menu follows `DESIGN.md`'s look, is
 keyboard navigable (↑ ↓ Home End, Enter or Space, → opens a submenu and ← closes it, Escape) and
 scrolls when it is taller than the screen.
+
+**Open at Login and Assign To (0.8.5).** Options › **Open at Login** (every item except the
+shell's own) adds the item to `settings.loginApps`; once per session, about 3 s after it starts, each
+one is opened through `launchDockItem`, the same paths as a Dock click (never in the live system's
+first run, in the sign-in screen or in an isolated app's process; an uninstalled one is skipped).
+With more than one display, Options › **Assign To** lists them ("None" follows the pointer): the
+app's new windows open on that display, kept in `settings.appDisplays` by the display's connector
+(`sdk/dock.js`, `assignedDisplay`; see `DISPLAYS.md`, "Assigning an app to a display").
 
 Quick actions are generic. An app declares them in its manifest or from its module:
 
@@ -179,7 +189,7 @@ arguments). A Linux app shows its `.desktop`'s desktop actions, run through the 
   permanent and can't be undone.
 - **Drives:** dropping a removable drive to eject it isn't supported: Files has no draggable drive
   items, so there is nothing to drop; eject stays in Files and Disks.
-- **Classic theme:** the Trash is the last button of the taskbar, with the same click, drop, menu
+- **Lord Classic theme:** the Trash is the last button of the taskbar, with the same click, drop, menu
   and confirmation.
 
 ## Work area
@@ -226,17 +236,17 @@ left stays on the left.
 - On the sides, the order is always top to bottom.
 - The Dock's menus open toward the inside of the screen with `side` (in `Menu.jsx`), without the
   flip that other menus do in RTL.
-- In the Classic theme the bar is also physical; the start menu and the jump list stick to the
+- In the Lord Classic theme the bar is also physical; the start menu and the jump list stick to the
   side of the bar.
 
 Settings says so below "Position on screen".
 
 ## Pending
 
-- Minimize effect (genie or scale): the engine doesn't have `transform: scale` yet.
-- Auto-hide for the Classic theme's bar.
+- A genie minimize effect: the Lord Flow theme's is a scale towards the Dock (`useMinimizing` in
+  `themes/default/index.jsx`, `transform: scale` from a cached raster; `DESIGN.md`).
+- Auto-hide for the Lord Classic theme's bar.
 - Dragging the Dock to another edge with the mouse (⇧ on the separator).
 - Quick actions for `.lpk` apps (they would need to reach the isolated process through the broker).
 - Ejecting a drive by dropping it on the Trash (Files has no draggable drive items yet).
-- "Open at Login" in the Options submenu (LordOS has no login items yet).
-- The Classic taskbar shows a drop line, without the Dock's sliding neighbours.
+- The Lord Classic taskbar shows a drop line, without the Dock's sliding neighbours.

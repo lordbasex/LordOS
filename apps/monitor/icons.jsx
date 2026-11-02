@@ -122,6 +122,52 @@ export function Glyph({ name, color, size = 13 }) {
           <View style={{ position: 'absolute', left: s * 0.06, right: s * 0.06, top: s * 0.48, height: b, backgroundColor: color }} />
         </View>
       );
+    // (0.8.5) LordOS's own components and the system services (Monitor → Network rows)
+    case 'printer':
+      return (
+        <View style={box}>
+          <View style={{ width: s * 0.56, height: s * 0.26, borderTopLeftRadius: 1, borderTopRightRadius: 1, border: `${b}px solid ${color}`, borderBottomWidth: 0 }} />
+          <View style={{ width: s * 0.92, height: s * 0.38, borderRadius: 2, backgroundColor: color }} />
+          <View style={{ width: s * 0.56, height: s * 0.24, border: `${b}px solid ${color}`, borderTopWidth: 0 }} />
+        </View>
+      );
+    case 'shield':
+      return (
+        <View style={box}>
+          <View style={{ width: s * 0.72, height: s * 0.86, borderTopLeftRadius: s * 0.12, borderTopRightRadius: s * 0.12, borderBottomLeftRadius: s * 0.36,
+            borderBottomRightRadius: s * 0.36, border: `${b}px solid ${color}`, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: s * 0.3, height: b * 1.2, backgroundColor: color }} />
+          </View>
+        </View>
+      );
+    case 'tunnel':
+      return (
+        <View style={box}>
+          <View style={{ width: s * 0.86, height: s * 0.62, borderTopLeftRadius: s * 0.43, borderTopRightRadius: s * 0.43, border: `${b}px solid ${color}`, borderBottomWidth: 0,
+            alignItems: 'center', justifyContent: 'flex-end' }}>
+            <View style={{ width: s * 0.4, height: s * 0.36, borderTopLeftRadius: s * 0.2, borderTopRightRadius: s * 0.2, backgroundColor: color }} />
+          </View>
+          <View style={{ width: s, height: b, backgroundColor: color }} />
+        </View>
+      );
+    case 'dns':
+      return (
+        <View style={box}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={{ width: s * 0.86, height: s * 0.24, marginTop: i ? s * 0.06 : 0, borderRadius: 1.5, border: `${b}px solid ${color}`, justifyContent: 'center' }}>
+              <View style={{ width: s * 0.1, height: s * 0.1, marginLeft: s * 0.08, borderRadius: s * 0.05, backgroundColor: color }} />
+            </View>
+          ))}
+        </View>
+      );
+    case 'clock':
+      return (
+        <View style={box}>
+          <View style={{ width: s * 0.92, height: s * 0.92, borderRadius: s * 0.46, border: `${b}px solid ${color}` }} />
+          <View style={{ position: 'absolute', left: s * 0.47, top: s * 0.2, width: b, height: s * 0.32, backgroundColor: color }} />
+          <View style={{ position: 'absolute', left: s * 0.47, top: s * 0.5, width: s * 0.24, height: b, backgroundColor: color }} />
+        </View>
+      );
     default:
       return <View style={box} />;
   }
