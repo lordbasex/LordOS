@@ -1785,6 +1785,15 @@ static JSValue f_apps_packages(JSContext *c, JSValueConst this_val, int argc, JS
     return arr;
 }
 
+/* lord.apps.packagedStamp() → when the third root last changed, in ms; 0 if it isn't there. One stat: the shell
+ * asks every few seconds, so that what dpkg did behind its back shows without a new session. */
+static JSValue f_apps_packaged_stamp(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    struct stat st;
+    if (stat(pkgapp_root(), &st)) return JS_NewFloat64(c, 0);
+    return JS_NewFloat64(c, (double)st.st_mtim.tv_sec * 1000.0 + (double)(st.st_mtim.tv_nsec / 1000000));
+}
+
 /* File of an installed app (rel validated, without leaving its folder). */
 static char *lpk_read(const char *id, const char *rel, size_t max, size_t *len) {
     const char *root = lpk_root();
@@ -2135,6 +2144,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("inspectPackage", 1, f_apps_inspect),
     JS_CFUNC_DEF("installPackage", 1, f_apps_install),
     JS_CFUNC_DEF("removePackage", 1, f_apps_remove),
+    JS_CFUNC_DEF("packagedStamp", 0, f_apps_packaged_stamp),
     JS_CFUNC_DEF("loadPackage", 1, f_apps_load),
     JS_CFUNC_DEF("packageFile", 2, f_apps_file),
     JS_CFUNC_DEF("launchPackage", 1, f_apps_launch_package),

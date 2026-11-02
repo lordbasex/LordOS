@@ -194,7 +194,7 @@ static void wm_ping(void *d, struct xdg_wm_base *w, uint32_t serial) { (void)d; 
 static const struct xdg_wm_base_listener wm_listener = { wm_ping };
 
 /* New toplevel with server-side decoration (the theme draws the frame). Returns it or NULL. */
-static AppWin *win_create(int key, const char *title, int w, int h) {
+static AppWin *win_create(int key, const char *title, int w, int h, int own_size) {
     AppWin *a = NULL;
     for (int i = 0; i < MAX_WINS && !a; i++) if (!wins[i].used) a = &wins[i];
     if (!a) return NULL;
@@ -211,6 +211,9 @@ static AppWin *win_create(int key, const char *title, int w, int h) {
     xdg_toplevel_set_app_id(a->top, app_id_str);    /* the Dock groups every window by this id */
     snprintf(a->title, sizeof a->title, "%s", title && title[0] ? title : app_id_str);
     xdg_toplevel_set_title(a->top, a->title);
+    /* a window the app sized itself (a panel, a request) isn't the app's main window: as a child of it, the
+     * shell gives it this size and leaves the place it remembers for the app alone (sdk/wayland.js) */
+    if (own_size) { AppWin *m = win_by_key(0); if (m && m != a) xdg_toplevel_set_parent(a->top, m->top); }
     if (decman) {
         a->deco = zxdg_decoration_manager_v1_get_toplevel_decoration(decman, a->top);
         zxdg_toplevel_decoration_v1_set_mode(a->deco, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
@@ -245,7 +248,8 @@ static JSValue f_win_open(JSContext *c, JSValueConst t, int argc, JSValueConst *
     if (argc > 2) JS_ToInt32(c, &h, argv[2]);
     if (w < 160 || w > 8192) w = 640;
     if (h < 100 || h > 8192) h = 480;
-    AppWin *a = next_key < 1 << 20 ? win_create(next_key, title, w, h) : NULL;
+    int own_size = argc > 3 && JS_ToBool(c, argv[3]) > 0;
+    AppWin *a = next_key < 1 << 20 ? win_create(next_key, title, w, h, own_size) : NULL;
     if (title) JS_FreeCString(c, title);
     if (!a) return JS_NewInt32(c, -1);
     next_key++;
@@ -285,7 +289,7 @@ static JSValue f_win_title(JSContext *c, JSValueConst t, int argc, JSValueConst 
     return JS_UNDEFINED;
 }
 static const JSCFunctionListEntry win_funcs[] = {
-    JS_CFUNC_DEF("open", 3, f_win_open), JS_CFUNC_DEF("attach", 2, f_win_attach),
+    JS_CFUNC_DEF("open", 4, f_win_open), JS_CFUNC_DEF("attach", 2, f_win_attach),
     JS_CFUNC_DEF("close", 1, f_win_close), JS_CFUNC_DEF("setTitle", 2, f_win_title),
 };
 
@@ -535,7 +539,7 @@ int app_main(const char *id, const char *theme_bundle, const char *fonts) {
     app_id_str = id;
     int mw = 640, mh = 480, nw = 0, nh = 0;
     manifest_pair(dir, "size", &mw, &mh);    /* the size the app asks for in its manifest */
-    AppWin *main_win = win_create(0, id, mw, mh);
+    AppWin *main_win = win_create(0, id, mw, mh, 0);
     if (!main_win) return 1;                 /* the main window (key 0) */
     if (manifest_pair(dir, "minSize", &nw, &nh)) xdg_toplevel_set_min_size(main_win->top, nw, nh);
     wl_display_roundtrip(dpy);               /* first configure */

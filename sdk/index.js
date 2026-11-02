@@ -72,7 +72,7 @@ export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnectio
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule
 export * as netModel from './netmodel.js';        // (0.8.5) Monitor → Network: search tokens, filters, the tree
 export { packages, packageList, refreshPackages, packageFile, loadWasm } from './packages.js';
-import { refreshPackages, packageList as packageListOf } from './packages.js';
+import { refreshPackages, forgetGonePackaged, packageList as packageListOf } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList,
@@ -235,6 +235,7 @@ export function startShell(element) {
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
   startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
   registerStatusItem('osk', OskStatus, 6);
+  watchPackaged();                      // an app dpkg installed or removed shows without a new session
   startWindowMemory();                  // each app reopens where it was (windowmemory.js, docs/WINDOWS.md)
   startSessionRestore();                // the apps that were open come back (sessionrestore.jsx, docs/SESSIONS.md)
   setTimeout(reportRefusedCode, 800);   // "This LordOS component was modified and was not loaded" (docs/SIGNING.md)
@@ -243,6 +244,20 @@ export function startShell(element) {
 // A screen-share grant doesn't outlive its app, even one removed with dpkg behind the shell's back.
 function sweepUninstalledGrants() {
   try { sweepShareGrants(new Set(packageListOf.get().map((p) => p.id)), linuxIds()); } catch (e) { /* next session */ }
+  try { forgetGonePackaged(); } catch (e) { /* next session */ }
+}
+
+// A packaged app comes and goes with dpkg, behind the shell's back: one stat every few seconds, and only a change reads the list.
+function watchPackaged() {
+  if (typeof lord === 'undefined' || typeof lord.apps?.packagedStamp !== 'function') return;
+  let last = lord.apps.packagedStamp();
+  setInterval(() => {
+    const now = lord.apps.packagedStamp();
+    if (now === last) return;
+    last = now;
+    refreshPackages();
+    sweepUninstalledGrants();
+  }, 5000);
 }
 
 // After Settings → Appearance switched theme: the windows that were open replace the ones the new

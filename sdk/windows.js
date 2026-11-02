@@ -166,7 +166,7 @@ export const listApps = () => [...registry.values()].filter((a) => !a.builtin &&
 export const workArea = (d) => workAreaOf(d);
 
 function place(appId, count, frame) {
-  if (frame) return { ...frame, minimized: false, maximized: false };
+  if (frame) return { ...frame, ownSize: true, minimized: false, maximized: false };
   const kept = memory && appId !== 'linux' ? memory(appId) : null;
   if (kept) return { ...kept, minimized: false };
   const [sw, sh] = registry.get(appId)?.size || [640, 420];

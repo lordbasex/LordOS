@@ -17,6 +17,8 @@ import { locale } from './i18n.js';
 import { setPackageApps, windows, wm, appIdOf } from './windows.js';
 import { iconFromFile } from './apps.js';
 import { forgetShareGrants } from './share.js';
+import { settings } from './settings.js';
+import { perms } from './privacy.js';
 
 const h = React.createElement;
 const shared = {
@@ -158,6 +160,19 @@ export const packages = {
     return ok;
   },
 };
+
+// dpkg removes a packaged app behind the shell's back, so the shell keeps the ids it has seen and forgets the permissions
+// of those gone (a grant is forgotten by the share sweep). The app's data stays, as it does for every app.
+export function forgetGonePackaged() {
+  const now = packageList.get().filter((p) => p.packaged).map((p) => p.id);
+  const seen = Array.isArray(settings.get().packagedSeen) ? settings.get().packagedSeen : [];
+  for (const id of seen) {
+    if (now.includes(id)) continue;
+    for (const row of perms.list()) if (row.app === id && row.state !== 'ask') perms.set(id, row.perm, 'ask');
+  }
+  const next = [...now].sort();
+  if (JSON.stringify(next) !== JSON.stringify(seen)) settings.set({ packagedSeen: next });
+}
 
 // File of an installed app (ArrayBuffer) and its already instantiated WebAssembly module.
 export const packageFile = (appId, path) => lord.apps.packageFile(appId, path);

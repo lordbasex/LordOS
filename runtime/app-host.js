@@ -79,7 +79,7 @@ function syncWindows() {
   const ids = new Set(list.map((w) => w.id));
   for (const w of list) {
     if (!keys.has(w.id)) {
-      const k = AW.open(w.title || '', w.w, w.h);
+      const k = AW.open(w.title || '', w.w, w.h, !!w.ownSize);
       if (k >= 0) keys.set(w.id, k);
     }
     const k = keys.get(w.id);
