@@ -1,0 +1,14 @@
+{
+  "folder": "Caméra",
+  "photoName": "Photo {date}",
+  "videoName": "Vidéo {date}",
+  "photo": "Photo",
+  "video": "Vidéo",
+  "mirror": "Miroir",
+  "none": "Aucune caméra trouvée",
+  "denied": "L’app Caméra n’est pas autorisée à utiliser la caméra. Modifiez cela dans Réglages → Confidentialité.",
+  "error": "Impossible d’utiliser la caméra : {error}",
+  "noneHint": "Branchez une caméra USB : elle apparaît ici d’elle-même, sans redémarrer l’app.",
+  "deniedTitle": "Aucun accès à la caméra",
+  "errorTitle": "Impossible d’ouvrir la caméra"
+}
