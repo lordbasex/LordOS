@@ -2506,6 +2506,7 @@ int main(int argc, char **argv) {
         double tpd = tp_timeout(now_ms());
         if (tpd >= 0 && (delay < 0 || tpd < delay)) delay = tpd;
         share_tick();                       /* the API: its limits, the grant still holding */
+        wl_fullscreen_allow(!share_holder());
         share_text_pump();
         if (share_text_len) delay = 0;
         double shd = share_timeout();

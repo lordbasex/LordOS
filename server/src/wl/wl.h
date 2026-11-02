@@ -82,6 +82,7 @@ int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
+void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
 int  wl_wants_frame(void);                  /* an app changed its content */
 void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns);   /* a flip finished (wp_presentation) */

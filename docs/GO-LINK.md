@@ -3,7 +3,7 @@
 The design of **go-link Desk for LordOS** and of the public **screen-sharing API** it needs. go-link Desk (desk.go-link.org) is the
 maintainer's own remote desktop project, MIT, in a separate repository. On LordOS it is an optional third-party app in the Store:
 recommended, not privileged, not part of LordOS. The person installs it or doesn't.
-Stages 1 and 2, the screen-sharing API and packaged apps with a companion, are built: [SCREEN-SHARING.md](SCREEN-SHARING.md) and [PACKAGED-APPS.md](PACKAGED-APPS.md), with what was tested. The rest is design: it isn't built and it hasn't been tested.
+The screen-sharing API, packaged apps with a companion and live media are built: [SCREEN-SHARING.md](SCREEN-SHARING.md) and [PACKAGED-APPS.md](PACKAGED-APPS.md), with what was tested. Section 11 says where each stage stands.
 
 How to read it:
 
@@ -30,8 +30,7 @@ These are the maintainer's, final, and this document builds on them.
 | Delivery | `.deb` for amd64 and arm64 published first at desk.go-link.org with a signature, verified and mirrored byte for byte to the LordOS APT repository, a Store item, updates through APT, the app's own updater off, a published version never re-uploaded. |
 | Schedule | The API ships in **LordOS 0.8.7.1**, a package update through the Store and APT with no new ISO, before Machines in 0.8.8. The app requires 0.8.7.1 or later. |
 
-Non-goals: replacing 5673, viewing a LordOS machine from a native LordOS viewer (the Linux version's Connect opens the website,
-go-link:`docs/architecture.md:273`, and so does this one), and the video call, which the Linux version doesn't have either (go-link:`pkg/camera/camera_other.go:8`).
+Non-goal: replacing 5673. Earlier versions of this document also left out a native viewer and the video call; the maintainer asked for both, and section 7 has them. A call is the visitor's to start, as on every platform: this viewer doesn't place calls.
 
 ## 2. What the code says today
 
@@ -290,7 +289,7 @@ permission and the indicator.
 | Icon in the top bar, by the clock | same menu as on the other platforms: the code, Disconnect, Open, Settings, Check for updates (opens the Store), Test my connection, About, Quit; red while a session lasts. The API is `statusItem` with the `status-item` permission ([PACKAGED-APPS.md](PACKAGED-APPS.md)) |
 | Visible as an app | in Applications and the Dock, with go-link's icon |
 | Update | off, by APT |
-| Connect to another computer | native, in the same window, as in go-link: the viewer's tabs and panels, with the picture shown through the engine's MediaView path. Not designed yet |
+| Connect to another computer | native, in the same window, as in go-link: the viewer's tabs and panels, with the picture and sound through live media ([PACKAGED-APPS.md](PACKAGED-APPS.md)). The engine passes what arrives, a sandboxed `lord-media` decodes it, and the app shows it in a `MediaView` |
 | MCP for assistants, terminal | their views are copied too; what they run are other programs, which the sandbox's write rule doesn't allow today. Open: D9 |
 
 ## 8. Changes in go-link, by package
@@ -340,9 +339,9 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 | Signaling server in the middle, rewriting the SDP on both sides | Linked devices are protected: the proofs cover the fingerprints (go-link:`docs/security.md:82`). The person sees the request and decides | **Residual DTLS risk:** a code session has no such proof. The visitor's name is only declared. A server that controls both sides can read a session the person accepted, believing it was someone else. Proposed fix: a short code from both fingerprints, read out by voice, D5 |
 | A fake visitor | Knock, 60-second question, one at a time, name shown as declared (go-link:`docs/security.md:26-31`) | The scammer on the phone, go-link's own warning and panel stand against it |
 | TURN relay | Only DTLS and SRTP | Size and timing |
-| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: nothing to write but Downloads and its own data, no `AF_UNIX`, no exec. The engine doesn't parse video | It can read the home's visible files and send them out (D2, D10). While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
+| A bug in Pion or the engine, reached from the network | The sandbox of 3.3: nothing to write but Downloads and its own data, no `AF_UNIX`, no exec. The engine doesn't parse video: in a session to another computer, what a stranger's computer sends is decoded in `lord-media`'s sandbox | It can read the home's visible files and send them out (D2, D10). While a share runs, the attacker holds what fd 4 grants: the picture and any input given. The indicator and Stop remain, and system surfaces and protected windows stay out of reach |
 | A visitor with control abuses the desktop | Permission boxes, the panel, Stop, 4.7's drops | They can do what the person can do in ordinary windows. That is what control means |
-| A visitor presses Allow, or changes their own permissions | System surfaces take no API input | The app's own panel is an ordinary window: drop injected input to the app's own windows too. To decide in stage 3 |
+| A visitor presses Allow, or changes their own permissions | System surfaces take no API input, and neither do the windows of the app holding the share: clicks, scrolling and keys aimed at them are dropped (`share_is_holder`, `server/src/main.c`). So a visitor can't accept for themselves, tick a permission or set a password | A Linux app's windows aren't covered, only a package's |
 | Another app abuses the API | Scope identity, prompt, root-owned store, indicator, no frames without it, one holder, no resize on a monitor session, rate limits, never blocks the compositor | **An unsandboxed Linux app runs as the user.** It can attach to an approved app, or edit its files. The permission is consent, not a sandbox, for Linux apps. Their isolation is what it is (`docs/PRIVACY.md:40`) |
 | An app hides or fakes the indicator | Drawn by the shell, `notification` layer, frames only after it shows | A fullscreen surface's own drawing can imitate one; it can't remove the real one. `xdg_popup`s paint above everything (`docs/LAYERS.md`): to test that one can't sit on the badge |
 | Same-uid access to `remote.sock` | Refused since `2825555c` (D6) | Root |
@@ -354,23 +353,11 @@ build is `CGO_ENABLED=0 -tags headless,lordos`. Today's tags make that a small s
 
 **Not covered:** root on the machine, a compromised kernel, or the person accepting a scammer knowingly.
 
-## 11. Staged plan
+## 11. Status
 
-Estimates are estimates, one person full time, not commitments. Stages 1 and 2 are built; the rest hasn't started. The stages run in order except where noted.
+The stages run in order except where noted. Percentages are of what each stage's "done when" asks, as of @DATE@, and only count what ran. Details of each test are in section 12.
 
-| Stage | Work | Done when | Estimate |
-|---|---|---|---|
-| **0. Proof of concept** | `lord-desk`, a throwaway Go program on a test VM with a test session and no real data: connects to `remote.sock` as the same user (finding 2), sends `RP_VIDEO`, reads `RP_VFRAME`, feeds Pion through go-link's signaling, with the measurement build's auto-accept. No API, no app, no sandbox | A browser at desk.go-link.org shows the session live with the code, H.264 and VP8; a lost frame recovers through `RP_KEYFRAME`; a protected window is black; the encoder stops when the viewer leaves; latency, CPU and bit rate written down | 3–5 days |
-| **1. API** (LordOS 0.8.7.1) | `share.c`, `share.sock`, permissions, `share-grant`, indicator, stop shortcut, section 5, input rules; tests and fuzz run as for 5673 | A test client passes every state of 4.6; every row of section 5 on a VM, with the page's message; a browser on 5673 behaves as before when no share exists (the 5673 tests, and the same measurements before and after); revoke cuts within a second | 3–4 weeks |
-| **2. Companion** (LordOS 0.8.7.1, needs D1) | Third root, `BOP_COMPANION`, `sandbox_exec_companion`, catalog check | A test package with a Go binary runs with Pion working; checks inside it: nothing written outside Downloads, nothing read outside the home folder, no `AF_UNIX`, no exec; a changed byte refuses to start; the same manifest in a home `.lpk` is ignored | 2 weeks |
-| **3. Engine** | Section 8's packages in go-link | `make check` passes for other platforms with no change in their files beyond build lines; go-link's tests pass; a headless run against the API serves a browser, with acceptance answered over the socket, and the app gone means refusal | 2–3 weeks |
-| **4. App** | React app and all pages | The go-link functions of section 7 work on amd64 and arm64, in all themes, right to left included | 2 weeks |
-| **5. Measurements and review** | VM 116, a real GPU with VA-API, Raspberry Pi 5; a security review of the API and companion; an attack run like `docs/REMOTE.md`'s | Numbers per machine in this document; findings fixed; go/no-go on claims for each machine | 1–2 weeks |
-| **6. Delivery** | Section 9, the privacy page, the Store text | A signed version installs from the Store on a clean 0.8.7.1, updates through APT and uninstalls clean; the file in the pool is byte-identical to the one at desk.go-link.org | 1 week |
-
-Stages 1 and 2 are what LordOS 0.8.7.1 must carry, and they are about 5–6 weeks by estimate. If only stage 1 fits, the app's `Depends`
-moves to the release with the companion. Machines isn't blocked either way. Stage 5 needs hardware with VA-API, which has never been
-measured.
+@TABLE@
 
 ## 12. What has been tested
 
