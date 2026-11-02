@@ -82,6 +82,7 @@
 #include "lord_version.h"           /* build/gen: the version for the report */
 #include "../hw/mimeapps.h"
 #include "../hw/notifyd.h"
+#include "../hw/pkagent.h"
 #include "../hw/ppd.h"
 
 #include <fcntl.h>
@@ -305,6 +306,17 @@ static JSValue f_bt_answer(JSContext *c, JSValueConst t, int argc, JSValueConst 
     if (argc > 2 && !JS_IsUndefined(argv[2]) && !JS_IsNull(argv[2]) && arg_str(c, argv[2], value, sizeof value)) return JS_FALSE;
     return JS_NewBool(c, bt_answer(id, accept, value) == 0);
 }
+
+/* The authentication prompt can only be cancelled from here: no way to read or submit the field. */
+static JSValue f_polkit_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc >= 1) pkagent_cancel(arg_int(c, argv[0], -1));
+    return JS_UNDEFINED;
+}
+
+static const JSCFunctionListEntry polkit_funcs[] = {
+    JS_CFUNC_DEF("cancel", 1, f_polkit_cancel),
+};
 
 static const JSCFunctionListEntry bt_funcs[] = {
     JS_CFUNC_DEF("state", 0, f_bt_state),
@@ -722,6 +734,7 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "display", display_funcs, sizeof display_funcs / sizeof display_funcs[0]);
     add(c, lord, "power", power_funcs, sizeof power_funcs / sizeof power_funcs[0]);
     add(c, lord, "bt", bt_funcs, sizeof bt_funcs / sizeof bt_funcs[0]);
+    add(c, lord, "polkit", polkit_funcs, sizeof polkit_funcs / sizeof polkit_funcs[0]);
     add(c, lord, "mime", mime_funcs, sizeof mime_funcs / sizeof mime_funcs[0]);
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);
     add(c, lord, "notifyd", nd_funcs, sizeof nd_funcs / sizeof nd_funcs[0]);

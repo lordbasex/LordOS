@@ -8,6 +8,7 @@
 //   battery       store with lord.power.state(); low-battery notice; battery in the menu bar
 //   idle          screen off / lock / sleep after N minutes (deadlines live in lord-server)
 //   bluetooth     store with lord.bt.state(); pairing requests (<BluetoothPrompt />)
+//   polkit        a Linux app's request for administrator rights (<PolkitPrompt />)
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -328,6 +329,48 @@ export function BluetoothPrompt() {
           onClick: () => valid && answer(true) })])));
 }
 
+// ---- A Linux app asks for administrator rights (polkit, server/src/hw/pkagent.c) ----
+//
+// lord-server owns the password field: keys of this computer go straight to it, never through here.
+// This only draws what lord-server reports, a character count included, and can only cancel: the
+// keyboard's Enter is the only way to submit, so nothing injected can.
+
+export const polkitPrompt = createStore(null);
+
+function asker(p) {
+  const id = p.who?.startsWith('desktop:') ? p.who.slice(8) : '';
+  const app = id ? linuxAppFor(id) : null;
+  return app ? shortAppName(app) : id || p.comm || t('passwords.polkit.unknown');
+}
+
+export function PolkitPrompt() {
+  const p = useStore(polkitPrompt);
+  const th = useSystemTokens();
+  if (!p) return null;
+  const row = (label, value) => value ? h(View, { style: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' } },
+    h(Text, { style: { width: 86, fontSize: 12, color: th.textDim } }, label),
+    h(Text, { style: { flex: 1, fontSize: 12, color: th.text, direction: 'ltr' } }, value)) : null;
+  const note = p.state === 'check' ? t('passwords.polkit.checking')
+    : p.wrong ? t('passwords.polkit.wrong')
+      : p.keyboard ? t('passwords.polkit.typeHere') : t('passwords.polkit.noKeyboard');
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100002 } },
+  h(View, { style: { width: 420, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
+    boxShadow: '0 20px 60px rgba(0,0,0,0.5)' } },
+  h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('passwords.polkit.title', { app: asker(p) })),
+  h(Text, { style: { fontSize: 12, color: th.textDim, lineHeight: 1.4 } }, p.message),
+  row(t('passwords.polkit.program'), p.command || p.program),
+  row(t('passwords.polkit.runAs'), p.asUser),
+  row(t('passwords.polkit.action'), p.action),
+  row(t('passwords.polkit.account'), p.account),
+  h(View, { style: { height: 30, borderRadius: 7, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: th.control,
+    border: `1px solid ${th.separator}` } },
+  h(Text, { style: { fontSize: 13, color: th.text, direction: 'ltr' } }, '•'.repeat(Math.min(p.count, 40)))),
+  h(Text, { style: { fontSize: 12, color: p.wrong ? '#ff453a' : th.textDim } }, note),
+  h(View, { style: { flexDirection: 'row', justifyContent: 'flex-end' } },
+    h(View, { style: { width: 110 } }, h(DialogButton, { label: t('passwords.cancel'), onClick: () => lord.polkit.cancel(p.id), th })))));
+}
+
 // ---- Linux apps' notifications (org.freedesktop.Notifications, server/src/hw/notifyd.c) ----
 
 const fromLinux = new Map();            // D-Bus id → our notification id
@@ -365,6 +408,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'ppd': powerProfiles.set(data); break;
     case 'ppd-result': for (const fn of ppdResults) { try { fn(data); } catch (e) { console.log(`ppd: ${e}`); } } break;
     case 'timedate': timedate.set(data); break;
+    case 'polkit': polkitPrompt.set(data); break;
     case 'notify': linuxNotify(data); break;
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     default: break;

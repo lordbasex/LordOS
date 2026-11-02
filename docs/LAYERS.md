@@ -46,7 +46,7 @@ in it, so an empty part of a layer lets the click through to whatever is below.
 | `notification` | 70 | notification banners, the clipboard toast, the remote desktop badge, the displays' Identify numbers (0.8.5, they never take clicks) |
 | `tooltip` | 80 | tooltips (the Dock's and the Lord Classic taskbar's names) |
 | `drag` | 90 | drag images, the Dock's «poof» |
-| `system` | 100 | permission prompts, the keyring password prompt, Bluetooth pairing, «Keep this display?», the file chooser |
+| `system` | 100 | permission prompts, the keyring password prompt, the administrator password prompt, Bluetooth pairing, «Keep this display?», the file chooser |
 | `input` | 110 | the input method's candidate window, the on-screen keyboard (`ON-SCREEN-KEYBOARD.md`) |
 
 Inside one layer, what opened last is on top. The lock screen and the login screen are another

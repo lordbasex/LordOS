@@ -20,6 +20,7 @@
  *                               can't be a shortcut. Nothing here logs or keeps what is typed. */
 #include "js_input.h"
 #include "js.h"
+#include "../hw/pkagent.h"
 #include "../keyboard.h"
 #include "../osk.h"
 #include "../tp/tp.h"
@@ -123,6 +124,7 @@ static JSValue f_tap(JSContext *c, JSValueConst this, int argc, JSValueConst *ar
 void js_input_flush(void) {
     OskTap t;
     while (osk_pop(&t)) {
+        if (pkagent_blocks_injected(1)) continue;   /* the authentication prompt takes only physical keys */
         if (t.level & OSK_LEVEL_ALTGR) js_key(KEY_RIGHTALT, 1);
         if (t.level & OSK_LEVEL_SHIFT) js_key(KEY_LEFTSHIFT, 1);
         js_key(t.code, 1);
