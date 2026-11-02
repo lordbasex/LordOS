@@ -694,5 +694,6 @@
   "install.free.noTable": "le disque n’a pas de table de partitions",
   "install.free.tableDamaged": "la table des partitions présente des problèmes, ou n’a pas pu être lue avec certitude",
   "install.free.tableFull": "la table des partitions est pleine",
-  "install.free.verifyFailed": "La table des partitions n’a pas le résultat attendu ; elle a donc été rétablie"
+  "install.free.verifyFailed": "La table des partitions n’a pas le résultat attendu ; elle a donc été rétablie",
+  "install.noFirstAccount": "Ce système a déjà son premier compte"
 }

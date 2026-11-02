@@ -28,6 +28,8 @@ eq('live, an older server without the field', liveStartWindow({ live: true }, al
 eq('check: System Information on Performance', liveStartWindow({ live: true, liveCheck: true }, all), ['sysinfo', { args: { tab: 'perf' } }]);
 eq('check without the app: the installer', liveStartWindow({ live: true, liveCheck: true }, without('sysinfo')), ['installer']);
 eq('live without the installer', liveStartWindow({ live: true }, without('installer')), null);
+eq('OVA first boot: the installer, on an installed system', liveStartWindow({ live: false, firstAccount: true }, all), ['installer']);
+eq('OVA first boot without the installer', liveStartWindow({ live: false, firstAccount: true }, without('installer')), null);
 
 const build = fs.readFileSync(path.join(root, 'tools/iso/build.sh'), 'utf8');
 const entries = [...build.matchAll(/^menuentry "([^"]*)" \{\n\s*linux ([^\n]*)\n\s*initrd [^\n]*\n\}/gm)];

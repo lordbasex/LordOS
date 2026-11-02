@@ -12,7 +12,8 @@ The releases page is the project's public changelog: every release is documented
 - `package.json` carries the version without the suffix (`"version": "0.8.0"`) and the channel
   separately (`"lordos": {"channel": "beta"}`; empty for a stable release). The file names use
   that version: `lordos_0.8.0_amd64.deb`, `lordos-live-0.8.0-amd64.iso`,
-  `lordos-0.8.0-rpi5-arm64.img.xz` and, since 0.8.7, `lordos-live-0.8.7-arm64.iso`.
+  `lordos-0.8.0-rpi5-arm64.img.xz`, since 0.8.7 `lordos-live-0.8.7-arm64.iso` and, since 0.8.8,
+  `lordos-0.8.8-amd64.ova`.
 - **An update of a published version** that only fixes it or completes it (no features planned for
   the next version) adds a fourth number: `0.8.4.1-beta` after `0.8.4-beta`, package `0.8.4.1`. dpkg
   sorts it after `0.8.4` and before `0.8.5`, so Store → Updates and apt offer it like any version.
@@ -61,6 +62,9 @@ The releases page is the project's public changelog: every release is documented
      `make -C server RELEASE=1` (it only runs code signed with the release key, with no development
      mode).
    - Build the ISO on the build VM (`sudo REQUIRE_SIGNED_CODE=1 tools/iso/build.sh`, [ISO.md](ISO.md)),
+     then, in the same folder, the OVA from that ISO's system (0.8.8; `sudo tools/iso/build-ova.sh`, needs `qemu-utils` and
+     `libarchive13t64`; it writes `lordos-<version>-amd64.ova` and its `.sha256` next to the ISO. It has no signature of its
+     own: `SHA256SUMS` covers it. Check it with `VBoxManage import`, and with `ovftool`, which reads it like VMware does),
      the arm64 ISO (0.8.7; `sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/iso/build-arm64.sh`, in a copy of the same
      signed tree, because it compiles `server/build` for aarch64),
      (the first release that ships it also adds arm64 to the ISO card in `web/src/home.html` and the file name in

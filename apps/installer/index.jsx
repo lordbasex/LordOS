@@ -2,6 +2,8 @@
 // It only shows up in the live session ("live": true in the manifest). What needs root is done by
 // the administration helper with closed actions (server/src/install): install-disks, install-run
 // (validates everything again on the root side) and install-reboot. See docs/ISO.md.
+// On the OVA image's first boot the same wizard, without the disk, makes the person's account on the
+// running system (install-account): lord.system.info().firstAccount.
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, useTheme, useLocale, useStore, createStore,
   admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
@@ -40,7 +42,8 @@ const RESERVED = ['root', 'daemon', 'bin', 'sys', 'sync', 'games', 'man', 'lp', 
 const ascii = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const suggestUser = (full) => (ascii(full).split(/\s+/)[0] || '').replace(/[^a-z0-9_-]/g, '').slice(0, 32);
 
-const STEPS = ['welcome', 'language', 'keyboard', 'disk', 'user', 'summary', 'install'];
+const FIRST_ACCOUNT = (() => { try { return !!lord.system.info().firstAccount; } catch (e) { return false; } })();
+const STEPS = ['welcome', 'language', 'keyboard', ...(FIRST_ACCOUNT ? [] : ['disk']), 'user', 'summary', 'install'];
 
 function Card({ children, style }) {
   const t = useTheme();
@@ -91,7 +94,7 @@ function Welcome() {
     <View style={{ alignItems: 'center', gap: 12, paddingTop: 32 }}>
       <Lumo pose="wave" size={128} />
       <Text style={{ fontSize: 26, fontWeight: 600, color: t.text, marginTop: 8 }}>{tr('installer.welcome.title')}</Text>
-      <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', maxWidth: 480, lineHeight: 1.45 }}>{tr('installer.welcome.text')}</Text>
+      <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', maxWidth: 480, lineHeight: 1.45 }}>{tr(FIRST_ACCOUNT ? 'installer.account.welcome' : 'installer.welcome.text')}</Text>
       {!admin.available() && <Text style={{ fontSize: 12, color: '#ff453a' }}>{tr('installer.needAdmin')}</Text>}
     </View>
   );
@@ -242,7 +245,7 @@ function DiskStep() {
 
 const userErrors = (s, tr) => ({
   fullname: !s.fullname.trim() ? tr('installer.user.errFull') : /[:,\n]/.test(s.fullname) ? tr('installer.user.errFullChars') : null,
-  user: !RE_USER.test(s.user) ? tr('installer.user.errUser') : RESERVED.includes(s.user) ? tr('installer.user.errReserved') : null,
+  user: !RE_USER.test(s.user) ? tr('installer.user.errUser') : RESERVED.includes(s.user) || (FIRST_ACCOUNT && s.user === 'lordos') ? tr('installer.user.errReserved') : null,
   pass: !s.pass ? tr('installer.user.errPass') : null,
   pass2: s.pass !== s.pass2 ? tr('installer.user.errPass2') : null,
   host: !RE_HOST.test(s.host) ? tr('installer.user.errHost') : null,
@@ -308,9 +311,11 @@ function Summary() {
   const arm64 = useSystemInfo(60000).arch === 'aarch64';     // UEFI only: no BIOS boot partition (install.c)
   const beside = s.mode === 'free';
   const rows = [
-    [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr(beside ? 'installer.summary.kept' : 'installer.summary.erased')}`],
-    [tr('installer.summary.layout'), beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
-    [tr('installer.summary.swap'), s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
+    ...(FIRST_ACCOUNT ? [] : [
+      [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr(beside ? 'installer.summary.kept' : 'installer.summary.erased')}`],
+      [tr('installer.summary.layout'), beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
+      [tr('installer.summary.swap'), s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
+    ]),
     [tr('installer.summary.lang'), `${p.lang} · ${p.region}.UTF-8 · ${p.zone}`],
     [tr('installer.summary.keyboard'), kbName(p.kb)],
     [tr('installer.summary.user'), `${s.fullname} · ${s.user} · ${tr('installer.summary.admin')}`],
@@ -350,7 +355,7 @@ function Install() {
     <View style={{ gap: 14, paddingTop: 32, alignItems: 'center' }}>
       <Icon size={72} />
       <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: t.text }}>
-        {s.done ? tr('installer.done.title') : s.error ? tr('installer.error.title') : tr('installer.install.title')}</Text>
+        {s.done ? tr(FIRST_ACCOUNT ? 'installer.account.doneTitle' : 'installer.done.title') : s.error ? tr('installer.error.title') : tr(FIRST_ACCOUNT ? 'installer.account.working' : 'installer.install.title')}</Text>
       {!s.error && (
         <View style={{ width: 460, gap: 6 }}>
           <View style={{ height: 8, borderRadius: 4, backgroundColor: t.control, direction: 'ltr' }}>
@@ -364,7 +369,7 @@ function Install() {
       <View style={{ width: 520, gap: 2 }}>
         {s.log.slice(-4).map((l, i) => <Text key={i} style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{statusText(l)}</Text>)}
       </View>
-      {s.done && <Text style={{ fontSize: 12, color: t.text, maxWidth: 480, textAlign: 'center' }}>{tr('installer.done.usb')}</Text>}
+      {s.done && <Text style={{ fontSize: 12, color: t.text, maxWidth: 480, textAlign: 'center' }}>{tr(FIRST_ACCOUNT ? 'installer.account.doneText' : 'installer.done.usb')}</Text>}
     </View>
   );
 }
@@ -373,13 +378,16 @@ function startInstall() {
   const s = wiz.get();
   const p = plan(s);
   set({ step: STEPS.indexOf('install'), progress: null, log: [], error: null, done: false });
-  const job = {
+  const job = FIRST_ACCOUNT ? {
+    user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
+    lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
+  } : {
     mode: s.mode, ...(s.mode === 'free' ? { freeStart: s.disk.freeStart, freeEnd: s.disk.freeEnd } : {}),
     disk: s.disk.name, user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
     lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '', swap: s.swap,
   };
   set({ pass: '', pass2: '' });            // the password doesn't stay in the UI
-  admin.run('install-run', JSON.stringify(job), (line) => {
+  admin.run(FIRST_ACCOUNT ? 'install-account' : 'install-run', JSON.stringify(job), (line) => {
     const m = /^progress (\w+) (\d+) (\d+)$/.exec(line);
     if (m) set({ progress: { phase: m[1], done: Number(m[2]), total: Number(m[3]) } });
     else wiz.set((st) => ({ ...st, log: [...st.log, line].slice(-30) }));
@@ -392,7 +400,9 @@ export default function Installer() {
   const { id } = useAppWindow();
   const s = useStore(wiz);
   const name = STEPS[s.step];
-  useEffect(() => wm.setCloseGuard(id, () => !(name === 'install' && !s.done && !s.error)), [id, name, s.done, s.error]);
+  // the first boot isn't over until the account exists: without it there is nothing to log in with
+  useEffect(() => wm.setCloseGuard(id, () => (FIRST_ACCOUNT ? s.done : !(name === 'install' && !s.done && !s.error))), [id, name, s.done, s.error]);
+  useEffect(() => { if (FIRST_ACCOUNT) wm.setTitle(id, tr('installer.account.title')); }, [id, tr]);
   const e = userErrors(s, tr);
   const canNext = {
     welcome: admin.available(), language: true, keyboard: true,
@@ -400,12 +410,12 @@ export default function Installer() {
     user: !Object.values(e).some(Boolean), summary: true,
   }[name];
   const Body = { welcome: Welcome, language: Language, keyboard: Keyboard, disk: DiskStep, user: UserStep, summary: Summary, install: Install }[name];
-  const steps = STEPS.slice(1, 6);
+  const steps = STEPS.slice(1, -1);
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ width: 200, backgroundColor: t.sidebarBg, paddingHorizontal: 16, paddingTop: 20, gap: 4 }}>
         <Hairline edge="end" />
-        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, marginBottom: 12, paddingHorizontal: 4 }}>{tr('installer.title')}</Text>
+        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, marginBottom: 12, paddingHorizontal: 4 }}>{tr(FIRST_ACCOUNT ? 'installer.account.title' : 'installer.title')}</Text>
         {steps.map((st) => {
           const i = STEPS.indexOf(st);
           const cur = i === s.step, past = i < s.step;
@@ -429,7 +439,7 @@ export default function Installer() {
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 16, paddingVertical: 14 }}>
           <Hairline edge="top" />
           {name !== 'install' && s.step > 0 && <Button label={tr('installer.back')} onClick={() => set({ step: s.step - 1 })} />}
-          {name === 'summary' && <Button primary label={tr('installer.summary.install')} onClick={startInstall} />}
+          {name === 'summary' && <Button primary label={tr(FIRST_ACCOUNT ? 'installer.account.create' : 'installer.summary.install')} onClick={startInstall} />}
           {name !== 'summary' && name !== 'install' && <Button primary disabled={!canNext} label={tr('installer.next')} onClick={() => canNext && set({ step: s.step + 1 })} />}
           {name === 'install' && s.error && <Button label={tr('installer.back')} onClick={() => set({ step: STEPS.indexOf('summary'), error: null })} />}
           {name === 'install' && s.done && <Button primary label={s.rebooting ? tr('installer.done.rebooting') : tr('installer.done.reboot')}

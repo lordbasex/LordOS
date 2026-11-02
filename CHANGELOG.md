@@ -27,6 +27,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - Settings → Wallpaper: your own PNG or JPEG picture on the desktop and on the login screen, in every theme. It is converted by a process running as you, and the login screen gets its own copy in a system folder, so it never reads your home ([#13](https://github.com/lordbasex/LordOS/issues/13)).
+- An OVA image for amd64 (`lordos-<version>-amd64.ova`, `tools/iso/build-ova.sh`): open it in VirtualBox or VMware. It has no default account or password: on its first boot the installer's screens ask you to create your own.
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - `.local` names resolve: `libnss-mdns` on the images and in the `lordos` package's recommended list.
 - `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.

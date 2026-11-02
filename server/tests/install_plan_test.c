@@ -33,6 +33,11 @@ int main(void) {
     /* an unknown mode parses and validate() refuses it first of all, before looking at any disk */
     T(parse_plan("{\"mode\":\"FREE\",\"disk\":\"sda\"}", &p) == 0);
     T(!strcmp(validate(&p), "install.badMode"));
+    /* install-account is not a mode: on its own action it never reaches a disk, and here it is refused */
+    T(parse_plan("{\"mode\":\"account\",\"disk\":\"sda\"}", &p) == 0);
+    T(!strcmp(validate(&p), "install.badMode"));
+    /* outside the OVA's first boot the action does nothing (no such marker on a test machine) */
+    T(!is_first_account());
     /* bad region numbers */
     T(parse_plan("{\"mode\":\"free\",\"freeStart\":-5}", &p) != 0);
     T(parse_plan("{\"mode\":\"free\",\"freeEnd\":99999999999999999999999}", &p) != 0);
