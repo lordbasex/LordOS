@@ -132,8 +132,8 @@ function MoreDrivers({ a }) {
 }
 
 const useHere = () => { const info = useSystemInfo(60000); return DEB_ARCH[info.arch] || info.arch || ''; };
-// The catalog's sections: "ai" (entries without a section) and "commercial" (free of charge, no
-// source code: the page says so before anything is installed).
+// The catalog's sections: "ai" (entries without a section), "commercial" (free of charge, no
+// source code: the page says so before anything is installed) and "remote" (third-party remote access).
 const sectionOf = (a) => a.section || 'ai';
 export const catalogApps = (section) => (catalog.apps || []).filter((a) => !section || sectionOf(a) === section);
 export const catalogApp = (pkg) => (catalog.apps || []).find((x) => x.package === pkg);
@@ -170,7 +170,7 @@ export function AiPage({ query, onOpen, onPage, section = 'ai' }) {
   const apps = catalogApps(section).filter((a) => !q || `${a.name} ${summary(a)} ${a.vendor || ''}`.toLowerCase().includes(q));
   const missing = apps.some((a) => !offered(a.package) && !(a.source && a.source.delivery === 'direct'));
   return h(View, { style: { gap: spacing.l } },
-    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, textAlign: 'start' } }, t(section === 'commercial' ? 'store.commercial.intro' : 'store.ai.intro')),
+    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, textAlign: 'start' } }, t(section === 'commercial' ? 'store.commercial.intro' : section === 'remote' ? 'store.remote.intro' : 'store.ai.intro')),
     missing ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.ai.refresh')) : null,
     h(debian.Progress),
     h(CardGrid, null, ...apps.map((a) => h(AiCard, { key: a.id, a, here, onOpen }))),

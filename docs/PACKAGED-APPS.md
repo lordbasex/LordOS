@@ -40,7 +40,7 @@ compositor's:
 Any failure stops there: nothing of the package runs, and the app hears why on fd 3. A changed byte gives `sig.fileModified`.
 
 **Descriptors:** 3, a `SOCK_SEQPACKET` socket to the app, one JSON text per message, 64 KB at most. 4, a connection to the sharing API tied to `lpk:<id>`, only if the manifest declares
-`screen-share`. 5, the home folder, open for listing it. 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
+`screen-share`. 5, the home folder, open for listing it. 6, where live media links arrive ("Live media"). 0, 1 and 2 are `/dev/null`. Nothing else, and the environment is `HOME`, `LANG` and `LORD_APP_ID`.
 
 **It ends with the app:** when the app's broker connection goes, lord-server sends SIGKILL and reaps it; the end of fd 3 is there for a clean exit; and `PR_SET_PDEATHSIG` covers lord-server
 dying. A companion that keeps dying is started 5 times at most per run of the app.
@@ -72,6 +72,29 @@ whole home folder. `flock` is allowed, on what it can open. `execveat` stays in 
 out of Landlock's reach to run.
 
 **What it can do if compromised:** read the visible files of the home folder and send them out, write in Downloads and its own data, and, while a share runs, what fd 4 grants. It can't change anything else.
+
+## Live media
+
+A companion is a sandbox with no decoder of its own and an app has no way to run one, so a program that receives video would have nowhere to show it. The system does that part. It's general, and knows nothing about go-link. Code: `server/src/media/live.h`,
+`media/helper/lm_live.c`, `lm_link.c`, `sec/brokercam.c`, `ui/js_brokercam.c`, `pkg/lordlive` on the other side.
+
+```js
+const id = media.live('my-app', 7);        // what the companion hands over under tag 7
+<MediaView media={id} style={{ flex: 1 }} />
+await media.liveMic('my-app', id, true);   // asks for the microphone; lord-server checks it again
+const cam = await media.camera('my-app', dev, { width: 640, height: 480, link: 7, codec: 'h264', kbps: 600 });
+media.close(id);
+```
+
+- **The app asks, the companion gets its end.** `media.live` starts a `lord-media` of its own and makes a `SOCK_STREAM` pair. One end goes to that helper. The other goes to the companion over **fd 6**, a `SOCK_SEQPACKET` socket only `lord-server` writes to, as
+  `live <tag>` or `camera <tag>` with the descriptor beside it. Tags are the app's own numbers, 1 to 99999. Neither names a path or a process. An app with no companion running gets an error and no helper starts. At most 4 streams and cameras per app.
+- **What goes over a link** (`live.h`): a 16-byte header with a checked length, 8 MB at most. To the helper: the codec (`h264`, `vp8`), one encoded picture, one Opus packet, a keyframe request for a camera. From it: a request for a keyframe when the decoder loses the picture, Opus of the
+  microphone, encoded pictures of the camera. Both ends are nonblocking, neither trusts the other, and a length out of bounds ends the link.
+- **Pictures** go to the same frame slots as a camera: a read-only ring the app maps, drawn by the same `<MediaView>`, scaled in the helper to the box. `info` gives the picture's size and `stats` what was decoded, shown and dropped, every 2 seconds.
+- **Sound** goes to a ring whose PipeWire stream is `lord-server`'s, as a player's. It's a playback stream of the app, in Monitor and volume as any other. More than 200 ms waiting is dropped: late sound is worse than none.
+- **The microphone and the camera** ask the same permissions, with the same restrictions, as anywhere else, and light the same indicators. `lord-server` opens both. Revoking the camera kills that helper at once, and revoking the microphone stops the stream's, with an event for the app.
+- **The decoder** is `lord-media`'s software H.264 and VP8, in the helper's sandbox: no network, no files, no exec. It's what reads a stranger's data, so it's there and not in the compositor, the app or the engine. No hardware decoding on this path.
+- **Its cost isn't the app's.** The helper runs in `app-lordos-media.scope`, outside the app's one core and 512 MB.
 
 ## An item by the clock
 
