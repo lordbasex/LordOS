@@ -670,5 +670,6 @@
   "companion.notListed": "La signature ne couvre pas le compagnon",
   "companion.notVerified": "Ce paquet n’est pas signé par un auteur vérifié",
   "companion.root": "Un compagnon ne s’exécute jamais en tant que root",
-  "companion.sandbox": "Le bac à sable du compagnon n’a pas pu être appliqué : il n’a donc pas été lancé"
+  "companion.sandbox": "Le bac à sable du compagnon n’a pas pu être appliqué : il n’a donc pas été lancé",
+  "install.noFirstAccount": "Ce système a déjà son premier compte"
 }

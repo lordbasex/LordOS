@@ -19,6 +19,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- An OVA image for amd64 (`lordos-<version>-amd64.ova`, `tools/iso/build-ova.sh`): open it in VirtualBox or VMware. It has no default account or password: on its first boot the installer's screens ask you to create your own.
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.
 - French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).

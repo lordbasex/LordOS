@@ -87,6 +87,7 @@ cat <<EOF
 | File | What it is |
 |---|---|
 | \`lordos-live-${filever}-amd64.iso\` | Live and installable image for 64-bit PCs (UEFI and BIOS). Write it to a USB stick as is; Secure Boot off. |
+| \`lordos-${filever}-amd64.ova\` | Virtual machine image for VirtualBox and VMware: open it and the machine is imported. You create your own account on its first boot. |
 | \`lordos-live-${filever}-arm64.iso\` | Live and installable image for generic arm64 machines and virtual machines with UEFI. Secure Boot off. |
 | \`lordos-${filever}-rpi5-arm64.img.xz\` | Image for the Raspberry Pi 5, for the LordOS Imager (below) or Raspberry Pi Imager ("Use custom"), an SD card or an NVMe drive. |
 | \`lordos_${filever}_amd64.deb\` | The LordOS package for an existing Debian 13 on a PC (installed by \`install.sh\`, or with \`apt install ./…\`). |

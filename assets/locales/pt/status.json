@@ -146,5 +146,7 @@
   "install.free.installing": "Instalando no espaço livre de {dev}",
   "install.free.rollingBack": "Restaurando a tabela de partições",
   "install.free.rolledBack": "A tabela de partições ficou como estava",
-  "install.free.rollbackFailed": "Não foi possível restaurar a tabela de partições: há uma cópia em {path}. Não reinicie: salve-a primeiro"
+  "install.free.rollbackFailed": "Não foi possível restaurar a tabela de partições: há uma cópia em {path}. Não reinicie: salve-a primeiro",
+  "install.creatingAccount": "Criando a conta {user}",
+  "install.accountDone": "A conta está pronta"
 }

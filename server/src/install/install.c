@@ -15,7 +15,11 @@
  *                           partition in free space of a GPT disk, grub in EFI/LordOS on its ESP.
  *                           Progress: "LOG progress <phase> <done> <total>", phases partition,
  *                           copy, configure, bootloader.
- *   install-reboot          reboots (only on the live system, to finish the wizard)
+ *   install-account <json>  the OVA image's first boot: same plan without disk, mode and swap. It only
+ *                           works while /etc/lordos/first-account exists (tools/iso/build-ova.sh), and
+ *                           does the install-run steps that make the person's account on the running
+ *                           system; the setup account goes at the next boot (lordos-live-prep)
+ *   install-reboot          reboots (only on the live system or after install-account, to finish the wizard)
  *
  * The install-run JSON: { mode ("erase", the default, or "free"), disk, user, fullname, password,
  * hostname, lang, locale, timezone, kblayout, kbvariant, swap (MiB, 0 = no swap), and in mode free
@@ -57,6 +61,9 @@
 #define SQUASHFS    LIVE_MEDIUM "/live/filesystem.squashfs"
 #define TARGET      "/run/lordos-install/target"
 #define MIN_DISK    FSP_MIN_BYTES              /* 8 GiB */
+/* The OVA's first boot: pending, then done (lordos-live-prep removes the setup account and this file) */
+#define FIRST_ACCOUNT       "/etc/lordos/first-account"
+#define FIRST_ACCOUNT_DONE  "/etc/lordos/first-account.done"
 
 /* What the architecture decides. x86-64: a BIOS boot partition and grub for both firmwares; arm64 is
  * UEFI only. The root partition's GPT type is the architecture's own (Linux root, x86-64 or ARM64). */
@@ -73,6 +80,7 @@
 #endif
 
 static int is_live(void) { return access(SQUASHFS, R_OK) == 0; }
+static int is_first_account(void) { return access(FIRST_ACCOUNT, F_OK) == 0; }
 
 /* ---- utilities ---- */
 
@@ -405,18 +413,14 @@ static int locale_supported(const char *name) {
     return found;
 }
 
-static const char *validate(Plan *pl) {
-    if (fsp_mode(pl->mode) < 0) return "install.badMode";
-    Disk disks[32];
-    int n = list_disks(disks, 32), found = 0;
-    for (int i = 0; i < n; i++) if (!strcmp(disks[i].name, pl->disk)) { found = 1; if (disks[i].size < MIN_DISK) return "install.diskTooSmall"; }
-    if (!found) return "install.diskNotListed";
+/* What the person chose: the account, the computer's name, language, zone and keyboard. */
+static const char *validate_person(Plan *pl) {
     static const char *const reserved[] = { "root", "daemon", "bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp",
         "proxy", "www-data", "backup", "list", "irc", "nobody", "systemd-network", "messagebus", "pipewire", "sudo", "admin", NULL };
     if (!re_user(pl->user)) return "install.badUser";
     for (int i = 0; reserved[i]; i++) if (!strcmp(pl->user, reserved[i])) return "install.userReserved";
     struct passwd *pw = getpwnam(pl->user);
-    if (pw && strcmp(pl->user, "lordos")) return "install.userTaken";
+    if (pw && (strcmp(pl->user, "lordos") || is_first_account())) return "install.userTaken";
     for (const unsigned char *p = (const unsigned char *)pl->fullname; *p; p++) if (*p < 0x20 || *p == ':' || *p == ',' || *p == 0x7f) return "install.badFullName";
     if (!pl->password[0]) return "install.noPassword";
     if (!re_host(pl->hostname)) return "install.badHostname";
@@ -431,6 +435,17 @@ static const char *validate(Plan *pl) {
     snprintf(p, sizeof p, "/usr/share/X11/xkb/symbols/%s", pl->kblayout);
     if (access(p, R_OK)) return "install.unknownKbLayout";
     if (!re_simple(pl->kbvariant, 36, "_-", 1)) return "install.badKbVariant";
+    return NULL;
+}
+
+static const char *validate(Plan *pl) {
+    if (fsp_mode(pl->mode) < 0) return "install.badMode";
+    Disk disks[32];
+    int n = list_disks(disks, 32), found = 0;
+    for (int i = 0; i < n; i++) if (!strcmp(disks[i].name, pl->disk)) { found = 1; if (disks[i].size < MIN_DISK) return "install.diskTooSmall"; }
+    if (!found) return "install.diskNotListed";
+    const char *why = validate_person(pl);
+    if (why) return why;
     if (pl->swap < 0 || pl->swap > 16384) return "install.badSwap";
     if (fsp_mode(pl->mode) == 1) {
         /* every rule of the free space mode, from the disk itself (freespace.c) */
@@ -441,7 +456,6 @@ static const char *validate(Plan *pl) {
     }
     return NULL;
 }
-
 /* ---- install-run steps ---- */
 
 static void progress(const char *phase, int done, int total) { admin_say("LOG", "progress %s %d %d", phase, done, total); }   /* i18n-ok */
@@ -597,6 +611,71 @@ static void free_abort(void) {
 
 #define FAIL(...) do { free_abort(); admin_err(__VA_ARGS__, NULL); umount_target(); explicit_bzero(&pl, sizeof pl); return; } while (0)
 
+/* The steps both ways of making the person's account share, under TARGET: the new system in
+ * install-run, the running one (a bind mount) in install-account. Returns an error code or NULL. */
+static const char *setup_person(Plan *pl, int *step, int steps) {
+    writef(TARGET "/etc/hostname", 0644, "%s\n", pl->hostname);
+    writef(TARGET "/etc/hosts", 0644, "127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n", pl->hostname);
+
+    /* the user, with their password hashed here (yescrypt) */
+    { const char *const a[] = { "/usr/sbin/useradd", "-m", "-s", "/bin/bash", "-c", pl->fullname, "-G", "sudo,audio,video,input,render,pipewire", pl->user, NULL };
+      if (in_target(a)) return "install.userFailed"; }
+    /* CUPS printer administrator (lpadmin group, docs/PRINTING.md); if CUPS didn't come in
+     * the image, the group doesn't exist and nothing happens */
+    { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "lpadmin", pl->user, NULL }; if (in_target(a)) { /* no CUPS */ } }
+    { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "plugdev", pl->user, NULL }; if (in_target(a)) { /* no plugdev group */ } }   /* FIDO2 keys (docs/PASSWORDS.md) */
+    char *salt = crypt_gensalt_ra("$y$", 0, NULL, 0);
+    struct crypt_data cd;
+    memset(&cd, 0, sizeof cd);
+    const char *hash = salt ? crypt_r(pl->password, salt, &cd) : NULL;
+    free(salt);
+    if (!hash || hash[0] == '*') return "install.hashFailed";
+    if (set_shadow(pl->user, hash) || set_shadow("root", "*")) { explicit_bzero(&cd, sizeof cd); return "install.passwordFailed"; }
+    explicit_bzero(&cd, sizeof cd);
+    explicit_bzero(pl->password, sizeof pl->password);
+    mkdir(TARGET "/var/lib/systemd/linger", 0755);
+    { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/var/lib/systemd/linger/%s", pl->user); write_file(p, "", 0644); }
+    mkdir(TARGET "/etc/lordos", 0755);
+    /* lord-sessiond (docs/SESSIONS.md): the user logs in through the login screen; autologin
+     * is turned on in Settings → Users (AUTOLOGIN=). USER= is for the pre-M8
+     * lordos-session. */
+    writef(TARGET "/etc/lordos/session.conf", 0644, "# Written by the LordOS installer. See docs/SESSIONS.md\n"
+           "# AUTOLOGIN=user logs in automatically at boot; empty: login screen\nAUTOLOGIN=\nUSER=%s\n", pl->user);
+    progress("configure", ++*step, steps);
+
+    /* language, region, time zone and keyboard */
+    { char p[PATH_MAX], line[256]; snprintf(p, sizeof p, TARGET "/etc/locale.gen");
+      FILE *f = fopen(p, "r"); int has = 0; size_t ll = strlen(pl->locale);
+      while (f && fgets(line, sizeof line, f)) if (!strncmp(line, pl->locale, ll) && line[ll] == ' ') has = 1;
+      if (f) fclose(f);
+      if (!has) { f = fopen(p, "a"); if (f) { fprintf(f, "%s UTF-8\n", pl->locale); fclose(f); }
+                  const char *const a[] = { "/usr/sbin/locale-gen", NULL }; in_target(a); } }
+    writef(TARGET "/etc/default/locale", 0644, "LANG=%s\n", pl->locale);
+    { char zp[PATH_MAX]; snprintf(zp, sizeof zp, "/usr/share/zoneinfo/%s", pl->timezone);
+      unlink(TARGET "/etc/localtime"); if (symlink(zp, TARGET "/etc/localtime")) admin_log("install.timezoneWarning", NULL);
+      writef(TARGET "/etc/timezone", 0644, "%s\n", pl->timezone); }
+    writef(TARGET "/etc/default/keyboard", 0644, "XKBMODEL=\"pc105\"\nXKBLAYOUT=\"%s\"\nXKBVARIANT=\"%s\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n", pl->kblayout, pl->kbvariant);
+    progress("configure", ++*step, steps);
+
+    /* the user's LordOS settings: chosen language and keyboard */
+    uid_t uid; gid_t gid;
+    if (target_ids(pl->user, &uid, &gid)) return "install.userMissing";
+    { char p[PATH_MAX];
+      snprintf(p, sizeof p, TARGET "/home/%s/.config", pl->user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos", pl->user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos/settings.json", pl->user);
+      writef(p, 0644, "{\n  \"language\": \"%s\",\n  \"keyboards\": [{ \"layout\": \"%s\", \"variant\": \"%s\" }],\n  \"keyboardIndex\": 0\n}\n", pl->lang, pl->kblayout, pl->kbvariant);
+      if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      snprintf(p, sizeof p, TARGET "/home/%s/.config/locale.conf", pl->user);
+      writef(p, 0644, "LANG=%s\n", pl->locale); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL); }
+    /* Escritorio, Documentos, Descargas… in the chosen language and ~/.config/user-dirs.dirs (the
+     * same list as Settings → Users and the live system: users/homedirs.c) */
+    { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/home/%s", pl->user);
+      if (homedirs_create(p, uid, gid, pl->locale)) admin_log("install.homedirsWarning", NULL); }
+    progress("configure", ++*step, steps);
+    return NULL;
+}
+
 void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     (void)r; (void)len;
     Plan pl;
@@ -675,8 +754,6 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
                       : "# /etc/fstab — generated by the LordOS installer\n"
                         "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n%s", ru, eu, swapline))
         FAIL("sys.writeFailed", "path", "/etc/fstab");
-    writef(TARGET "/etc/hostname", 0644, "%s\n", pl.hostname);
-    writef(TARGET "/etc/hosts", 0644, "127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n", pl.hostname);
     progress("configure", ++step, steps);
 
     /* drop the live-only bits: live-boot, the test user and its passwordless sudo */
@@ -687,62 +764,8 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     { const char *const a[] = { "/usr/sbin/userdel", "-r", "lordos", NULL }; in_target(a); }
     progress("configure", ++step, steps);
 
-    /* the user, with their password hashed here (yescrypt) */
-    { const char *const a[] = { "/usr/sbin/useradd", "-m", "-s", "/bin/bash", "-c", pl.fullname, "-G", "sudo,audio,video,input,render,pipewire", pl.user, NULL };
-      if (in_target(a)) FAIL("install.userFailed"); }
-    /* CUPS printer administrator (lpadmin group, docs/PRINTING.md); if CUPS didn't come in
-     * the image, the group doesn't exist and nothing happens */
-    { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "lpadmin", pl.user, NULL }; if (in_target(a)) { /* no CUPS */ } }
-    { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "plugdev", pl.user, NULL }; if (in_target(a)) { /* no plugdev group */ } }   /* FIDO2 keys (docs/PASSWORDS.md) */
-    char *salt = crypt_gensalt_ra("$y$", 0, NULL, 0);
-    struct crypt_data cd;
-    memset(&cd, 0, sizeof cd);
-    const char *hash = salt ? crypt_r(pl.password, salt, &cd) : NULL;
-    free(salt);
-    if (!hash || hash[0] == '*') FAIL("install.hashFailed");
-    if (set_shadow(pl.user, hash) || set_shadow("root", "*")) { explicit_bzero(&cd, sizeof cd); FAIL("install.passwordFailed"); }
-    explicit_bzero(&cd, sizeof cd);
-    explicit_bzero(pl.password, sizeof pl.password);
-    mkdir(TARGET "/var/lib/systemd/linger", 0755);
-    { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/var/lib/systemd/linger/%s", pl.user); write_file(p, "", 0644); }
-    mkdir(TARGET "/etc/lordos", 0755);
-    /* lord-sessiond (docs/SESSIONS.md): the user logs in through the login screen; autologin
-     * is turned on in Settings → Users (AUTOLOGIN=). USER= is for the pre-M8
-     * lordos-session. */
-    writef(TARGET "/etc/lordos/session.conf", 0644, "# Written by the LordOS installer. See docs/SESSIONS.md\n"
-           "# AUTOLOGIN=user logs in automatically at boot; empty: login screen\nAUTOLOGIN=\nUSER=%s\n", pl.user);
-    progress("configure", ++step, steps);
-
-    /* language, region, time zone and keyboard */
-    { char p[PATH_MAX], line[256]; snprintf(p, sizeof p, TARGET "/etc/locale.gen");
-      FILE *f = fopen(p, "r"); int has = 0; size_t ll = strlen(pl.locale);
-      while (f && fgets(line, sizeof line, f)) if (!strncmp(line, pl.locale, ll) && line[ll] == ' ') has = 1;
-      if (f) fclose(f);
-      if (!has) { f = fopen(p, "a"); if (f) { fprintf(f, "%s UTF-8\n", pl.locale); fclose(f); }
-                  const char *const a[] = { "/usr/sbin/locale-gen", NULL }; in_target(a); } }
-    writef(TARGET "/etc/default/locale", 0644, "LANG=%s\n", pl.locale);
-    { char zp[PATH_MAX]; snprintf(zp, sizeof zp, "/usr/share/zoneinfo/%s", pl.timezone);
-      unlink(TARGET "/etc/localtime"); if (symlink(zp, TARGET "/etc/localtime")) admin_log("install.timezoneWarning", NULL);
-      writef(TARGET "/etc/timezone", 0644, "%s\n", pl.timezone); }
-    writef(TARGET "/etc/default/keyboard", 0644, "XKBMODEL=\"pc105\"\nXKBLAYOUT=\"%s\"\nXKBVARIANT=\"%s\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n", pl.kblayout, pl.kbvariant);
-    progress("configure", ++step, steps);
-
-    /* the user's LordOS settings: chosen language and keyboard */
-    uid_t uid; gid_t gid;
-    if (target_ids(pl.user, &uid, &gid)) FAIL("install.userMissing");
-    { char p[PATH_MAX];
-      snprintf(p, sizeof p, TARGET "/home/%s/.config", pl.user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
-      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos", pl.user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
-      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos/settings.json", pl.user);
-      writef(p, 0644, "{\n  \"language\": \"%s\",\n  \"keyboards\": [{ \"layout\": \"%s\", \"variant\": \"%s\" }],\n  \"keyboardIndex\": 0\n}\n", pl.lang, pl.kblayout, pl.kbvariant);
-      if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
-      snprintf(p, sizeof p, TARGET "/home/%s/.config/locale.conf", pl.user);
-      writef(p, 0644, "LANG=%s\n", pl.locale); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL); }
-    /* Escritorio, Documentos, Descargas… in the chosen language and ~/.config/user-dirs.dirs (the
-     * same list as Settings → Users and the live system: users/homedirs.c) */
-    { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/home/%s", pl.user);
-      if (homedirs_create(p, uid, gid, pl.locale)) admin_log("install.homedirsWarning", NULL); }
-    progress("configure", ++step, steps);
+    { const char *why = setup_person(&pl, &step, steps);
+      if (why) FAIL(why); }
 
     /* swap as a file */
     if (pl.swap > 0) {
@@ -816,12 +839,47 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     admin_ok("install.done", "dev", dev, NULL);
 }
 
+/* The OVA's first boot. No disk and no copy: the system is already there, and the person's account is
+ * made in it with install-run's own steps. TARGET is the running system (a private bind mount, so
+ * nothing else needs mounting: these steps only touch /etc and /home). lordos, the setup account the
+ * session runs as, can't be removed from inside it: it loses what lets it log in here and
+ * lordos-live-prep removes it on the next boot. */
+void install_act_account(const AdminReq *r, const char *arg, size_t len) {
+    (void)r; (void)len;
+    Plan pl;
+    if (!is_first_account()) { admin_err("install.noFirstAccount", NULL); return; }
+    if (parse_plan(arg, &pl)) { admin_err("install.badPlan", NULL); return; }
+    const char *why = validate_person(&pl);
+    if (why) { explicit_bzero(&pl, sizeof pl); admin_err(why, NULL); return; }
+    admin_log("install.creatingAccount", "user", pl.user, NULL);
+    mkdir("/run/lordos-install", 0700);
+    mkdir(TARGET, 0755);
+    umount_target();
+    if (mount("/", TARGET, NULL, MS_BIND, NULL) || mount(NULL, TARGET, NULL, MS_PRIVATE, NULL))
+        FAIL("install.mountFailed", "path", "/", "errno", lerr_errno(errno));
+    int step = 0;
+    const int steps = 3;
+    progress("configure", step, steps);
+    why = setup_person(&pl, &step, steps);
+    if (why) {                                  /* nothing half made is left in the way of a new try */
+        const char *const a[] = { "/usr/sbin/userdel", "-r", pl.user, NULL };
+        in_target(a);
+        FAIL(why);
+    }
+    /* last, and in this order: until the first file is written the setup still logs in */
+    unlink("/var/lib/systemd/linger/lordos");
+    if (write_file(FIRST_ACCOUNT_DONE, "", 0644) || unlink(FIRST_ACCOUNT)) FAIL("sys.writeFailed", "path", FIRST_ACCOUNT);
+    umount_target();
+    explicit_bzero(&pl, sizeof pl);
+    admin_ok("install.accountDone", NULL);
+}
+
 /* Reboots without waiting around: a separate process (outlives the helper, which dies with
  * lord-server when the session shuts down) asks systemd to reboot without blocking (--no-block) and, if
  * after 20 s the system is still alive and nobody killed it, does sync + reboot(2). */
 void install_act_reboot(const AdminReq *r, const char *arg, size_t len) {
     (void)r; (void)arg; (void)len;
-    if (!is_live() && access("/run/live", F_OK)) { admin_err("install.liveOnly", NULL); return; }
+    if (!is_live() && access("/run/live", F_OK) && access(FIRST_ACCOUNT_DONE, F_OK)) { admin_err("install.liveOnly", NULL); return; }
     sync();
     pid_t pid = fork();
     if (pid == 0) {

@@ -155,11 +155,11 @@ export const getApp = (id) => registry.get(appIdOf(id));
 // A system app: built into LordOS (apps/), verified with it and not removable (docs/SIGNING.md,
 // "Verified system code"). Packages (.lpk) and Linux apps never are.
 export const isSystemApp = (id) => { const a = getApp(id); return !!(a && a.system && !a.package); };
-// Live system (ISO): apps with "live": true in their manifest (the installer) only exist there.
+// Live system (ISO) or the OVA's first boot: apps with "live": true in their manifest (the installer) only exist there.
 // "hidden": true (System Information's Sandbox Probe) keeps an app out of the launcher and search.
 let live = null;
 export const isLiveSystem = () => {
-  if (live === null) { try { live = !!lord.system.info().live; } catch (e) { live = false; } }
+  if (live === null) { try { const i = lord.system.info(); live = !!(i.live || i.firstAccount); } catch (e) { live = false; } }
   return live;
 };
 export const listApps = () => [...registry.values()].filter((a) => !a.builtin && !a.hidden && (!a.live || isLiveSystem()));
