@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
 - The pointer no longer jumps back to the middle of the screen on Intel laptops with a motion sensor: it was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).

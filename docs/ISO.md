@@ -77,7 +77,7 @@ now safe at 640×480.
 **No KMS display.** LordOS draws through kernel modesetting. QEMU's VMware-compatible display is
 refused by `vmwgfx` ("unsupported hypervisor", "no pitchlock"), and Debian's kernel has no
 `simpledrm`, so there is no `/dev/dri/card0` with any firmware: the boot ended on a black screen.
-Since 0.8.1 `vmwgfx` loads only on VMware itself (`/etc/modprobe.d/lordos-vmwgfx.conf`, DMI vendor
+Since 0.8.1 `vmwgfx` loads only on VMware itself and, since 0.8.8, on VirtualBox, whose default VMSVGA display needs it (VirtualBox 7.2.22, 0.8.7 ISO: VMSVGA showed no desktop, VBoxSVGA and VBoxVGA did). Before, it loaded only on VMware (`/etc/modprobe.d/lordos-vmwgfx.conf`, DMI vendor
 check), so the firmware framebuffer stays, and lord-sessiond writes on the text console that no
 display device with KMS was found and which display to choose instead. On VMware itself `vmwgfx`
 works (the user's VMware machine reaches the desktop with UEFI and, since 0.8.1, BIOS).
