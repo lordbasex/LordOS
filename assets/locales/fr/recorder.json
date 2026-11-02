@@ -1,0 +1,22 @@
+{
+  "folder": "Enregistrements",
+  "name": "Enregistrement {date} {time}",
+  "all": "Tous les enregistrements",
+  "empty": "Aucun enregistrement pour le moment",
+  "hint": "Appuyez sur le bouton rouge (ou R) pour enregistrer avec le microphone",
+  "denied": "Enregistreur vocal n’est pas autorisé à utiliser le microphone",
+  "play": "Lire",
+  "pause": "Pause",
+  "rename": "Renommer",
+  "trim": "Découper",
+  "cancelTrim": "Annuler le découpage",
+  "saveTrim": "Enregistrer la copie découpée",
+  "trimmed": "découpé",
+  "export": "Exporter en",
+  "exportBtn": "Exporter",
+  "working": "Exportation…",
+  "exported": "« {name} » enregistré",
+  "exportError": "Impossible d’exporter",
+  "renameError": "Impossible de renommer (ce nom existe-t-il déjà ?)",
+  "emptyTitle": "Choisissez ou créez un enregistrement"
+}
