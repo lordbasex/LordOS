@@ -9,7 +9,9 @@
 #include "netpriv.h"
 #include "../admin.h"
 
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -63,7 +65,18 @@ int dns_set(const char *ifname, const char *servers, const char *domains_in, int
     snprintf(copy, sizeof copy, "%s", servers ? servers : "");
     for (char *t = strtok(copy, " "); t && n < (int)sizeof buf - 64; t = strtok(NULL, " ")) n += snprintf(buf + n, sizeof buf - (size_t)n, "nameserver %s\n", t);
     if (*domains && !strstr(domains, "~.") && n < (int)sizeof buf - 300) n += snprintf(buf + n, sizeof buf - (size_t)n, "search %s\n", domains);
-    return write_file_atomic("/etc/resolv.conf", buf, (size_t)n, 0644);
+    /* In place, and only when it changes: a sandboxed program's Landlock rule holds this file, not
+     * its name, so a new file at every DHCP renewal would take its name resolution away. */
+    size_t have = 0;
+    char *old = read_file("/etc/resolv.conf", sizeof buf, &have);
+    int same = old && have == (size_t)n && !memcmp(old, buf, have);
+    free(old);
+    if (same) return 0;
+    int fd = open("/etc/resolv.conf", O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return write_file_atomic("/etc/resolv.conf", buf, (size_t)n, 0644);
+    int ok = pwrite(fd, buf, (size_t)n, 0) == n && ftruncate(fd, n) == 0;
+    ok = close(fd) == 0 && ok;
+    return ok ? 0 : -1;
 }
 
 void dns_revert(const char *ifname) {

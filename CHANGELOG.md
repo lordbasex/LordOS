@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- A sandboxed helper lost name resolution at the first DHCP renewal: `/etc/resolv.conf` was replaced by a new file each time, even with the same contents. It is now written in place, and only when it changes.
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
