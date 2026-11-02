@@ -12,6 +12,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Firefox looked frozen: tabs, the toolbar and pages ignored the mouse. The compositor ignored `wl_surface.set_input_region`, so the pointer went to Firefox's content surface, which has asked for no input, instead of the window below it ([#11](https://github.com/lordbasex/LordOS/issues/11)).
+- Files: the folder's name appeared twice, in the title bar and in the toolbar. It stays in the title bar and the toolbar keeps the space ([#10](https://github.com/lordbasex/LordOS/issues/10)).
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
