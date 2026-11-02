@@ -19,6 +19,7 @@ import { PrivacySettings } from './Privacy.jsx';
 import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
+import { SwitcherSettings } from './Switcher.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
 // hardware pages (docs/SETTINGS.md)
 import { DisplaysSettings } from './Displays.jsx';
@@ -610,6 +611,7 @@ function Keyboard() {
           </SettingRow>
         </Section>
       )}
+      <SwitcherSettings tr={tr} />
       <ShortcutsList />
     </Stack>
   );

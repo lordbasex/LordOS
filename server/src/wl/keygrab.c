@@ -53,7 +53,7 @@ static const Grab classic[] = {
     { KG_META, 'e', 0, KG_TAKE },
     { KG_META, 'i', 0, KG_TAKE },
     { KG_META, 'r', 0, KG_TAKE },
-    { KG_META | KG_SHIFT, 's', 0, KG_TAKE },
+    { KG_META | KG_SHIFT, 's', 0, KG_TAKE }, { KG_META, 'w', 0, KG_TAKE },
     { KG_META, 0, KEY_LEFT, KG_TAKE }, { KG_META, 0, KEY_RIGHT, KG_TAKE },
     { KG_META, 0, KEY_UP, KG_TAKE }, { KG_META, 0, KEY_DOWN, KG_TAKE },
     { KG_META, 0, KEY_1, KG_TAKE }, { KG_META, 0, KEY_2, KG_TAKE }, { KG_META, 0, KEY_3, KG_TAKE },
@@ -66,10 +66,29 @@ static const Grab classic[] = {
 static const Grab *table;
 static size_t count;
 static int remaps;
+/* Which modifier holds the app switcher, from Settings → Keyboard: a profile's "+tab-meta", "+tab-alt" or
+ * "+tab-both". No suffix: what the table says. */
+static int tab_set, tab_meta, tab_alt;
 
-int keygrab_set(const char *profile) {
-    if (!profile) return 0;
-    if (!profile[0]) { table = NULL; count = 0; remaps = 0; return 1; }
+int keygrab_set(const char *name) {
+    if (!name) return 0;
+    char profile[32];
+    const char *plus = strchr(name, '+');
+    size_t len = plus ? (size_t)(plus - name) : strlen(name);
+    if (len >= sizeof profile) return 0;
+    memcpy(profile, name, len);
+    profile[len] = 0;
+    int set = 0, meta = 0, alt = 0;
+    if (plus) {
+        set = 1;
+        if (!strcmp(plus, "+tab-meta")) meta = 1;
+        else if (!strcmp(plus, "+tab-alt")) alt = 1;
+        else if (!strcmp(plus, "+tab-both")) meta = alt = 1;
+        else return 0;
+    }
+    if (strcmp(profile, "flow") && strcmp(profile, "flow-desktops") && strcmp(profile, "classic") && profile[0]) return 0;
+    tab_set = set; tab_meta = meta; tab_alt = alt;
+    if (!profile[0]) { table = NULL; count = 0; remaps = 0; tab_set = 0; return 1; }
     if (!strcmp(profile, "flow")) { table = flow; count = sizeof flow / sizeof flow[0]; remaps = 1; return 1; }
     if (!strcmp(profile, "flow-desktops")) { table = flow_desktops; count = sizeof flow_desktops / sizeof flow_desktops[0]; remaps = 1; return 1; }
     if (!strcmp(profile, "classic")) { table = classic; count = sizeof classic / sizeof classic[0]; remaps = 0; return 1; }
@@ -93,6 +112,11 @@ char keygrab_letter(int code, const char *base) {
 }
 
 int keygrab_match(int code, char letter, unsigned mods) {
+    if (tab_set && code == KEY_TAB) {
+        unsigned m = mods & (unsigned)~KG_SHIFT;
+        if (m == KG_META) return tab_meta ? KG_HOLD : KG_PASS;
+        if (m == KG_ALT) return tab_alt ? KG_HOLD : KG_PASS;
+    }
     for (size_t i = 0; i < count; i++) {
         const Grab *g = &table[i];
         if (g->mods != mods) continue;

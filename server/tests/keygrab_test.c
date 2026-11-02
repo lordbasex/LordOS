@@ -30,6 +30,19 @@ int main(void) {
     CHECK(keygrab_match(KEY_F4, 0, KG_META | KG_CTRL) == KG_TAKE);
     CHECK(keygrab_match(KEY_D, 'd', KG_META | KG_CTRL) == KG_TAKE);
     CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
+    /* the switcher's keys, from Settings → Keyboard */
+    CHECK(keygrab_set("flow+tab-alt"));
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_HOLD);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT | KG_SHIFT) == KG_HOLD);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_PASS);
+    CHECK(keygrab_set("classic+tab-both"));
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_HOLD);
+    CHECK(keygrab_set("classic+tab-meta"));
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_PASS);
+    CHECK(keygrab_match(0, 'w', KG_META) == KG_TAKE);
+    CHECK(!keygrab_set("flow+tab-x"));
+    CHECK(!keygrab_set("flow+x"));
     CHECK(!keygrab_set("flow "));
     CHECK(!keygrab_set("alt+x"));
     CHECK(!keygrab_set(NULL));

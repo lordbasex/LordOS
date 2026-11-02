@@ -14,7 +14,7 @@ import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text, direction,
-  useShortcuts, runShortcut, AppSwitcher, openSwitcher, toggleShowDesktop, spotlight, launchApp, dockActivate,
+  useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
@@ -108,7 +108,7 @@ function SnapPreview({ t }) {
 
 // Lord Classic's own shortcuts (the common ones are in sdk/shortcuts.js). `ui` is a ref to what the
 // shell's state offers at that moment.
-const switchApps = (e) => openSwitcher(2, e.shift);
+const switchApps = (e) => openSwitcher(switcherHold(e), e.shift);
 const openFiles = () => launchApp('files');
 const openSettings = () => launchApp('settings');
 const openMonitor = () => launchApp('monitor');
@@ -133,11 +133,11 @@ const classicTable = (ui) => {
     { id: 'settings', keys: ['Meta+I'], run: openSettings, label: 'shell.shortcuts.settings', group: 'system' },
     { id: 'monitor', keys: ['Ctrl+Shift+Escape'], run: openMonitor, label: 'shell.shortcuts.monitor', group: 'system' },
     { id: 'captureArea', keys: ['Meta+Shift+S'], run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
-    { id: 'switchApps', keys: ['Alt+Tab', 'Alt+Shift+Tab'], run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
+    { id: 'switchApps', keys: switcherKeys('alt'), run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
     { id: 'snap', keys: ['Meta+ArrowLeft', 'Meta+ArrowRight', 'Meta+ArrowUp', 'Meta+ArrowDown'], show: ['❖←→↑↓'], run: snapFront, repeat: true, label: 'shell.shortcuts.snap', group: 'windows' },
     { id: 'closeWindow', keys: ['Alt+F4'], run: closeFront, label: 'shell.shortcuts.closeWindow', group: 'windows' },
     { id: 'taskbar', keys: ['Meta+1', 'Meta+2', 'Meta+3', 'Meta+4', 'Meta+5', 'Meta+6', 'Meta+7', 'Meta+8', 'Meta+9'], show: ['❖1…9'], run: openTaskbarItem, label: 'shell.shortcuts.taskbarItem', group: 'apps' },
-    ...classicDesktopKeys,
+    ...classicDesktopKeys.map((k) => (k.id === 'overview' && switcherKeys('alt').includes('Meta+Tab') ? { ...k, keys: ['Meta+W'] } : k)),
   ];
 };
 
@@ -169,7 +169,7 @@ function App() {
   // what is open. The rest of the keys are in classicTable.
   const ui = useRef(null);
   ui.current = { toggle, focused };
-  useShortcuts({ grabs: 'classic', table: classicTable(ui), onSuperTap: () => { closeOverview(); toggle('start'); } });
+  useShortcuts({ grabs: switcherGrabs('classic'), table: classicTable(ui), onSuperTap: () => { closeOverview(); toggle('start'); } });
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setPanel(null); setDesk(null); } }), []);
   // the overview takes the place of the open panels
   useEffect(() => { if (taskView) setPanel(null); }, [taskView]);

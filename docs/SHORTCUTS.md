@@ -56,6 +56,15 @@ state whichever window ends up in front. A key pressed before the switcher opene
 in the app. With a fullscreen Linux app the switcher does not open and ⌥Tab stays with the app: a
 fullscreen surface is presented above every layer.
 
+## The app switcher
+
+`sdk/appswitcher.jsx`, the same in both themes, with its rules in `sdk/switchermodel.js`. While the modifier is held: Tab or → and ← move, ⇧Tab goes back, **1 to 9** go straight to an app,
+**Z, the key under Esc, or ↓** move through the selected app's windows in a row below it (↑ goes back), Enter or letting go switches, Esc cancels. The keys go by position, so they're the same in every layout.
+A Linux or isolated app's window in that row is its real surface, drawn smaller and live; a window the shell draws itself shows its app's icon.
+
+Settings → Keyboard (`settings.switcher`): which keys open it (the theme's, ❖Tab, ⌥Tab or both; the grab profile gets `+tab-meta`, `+tab-alt` or `+tab-both`), apps from everywhere, this desktop or this display,
+leaving out apps with everything minimized, numbers, the windows row, size, a look (System, Glass, Solid, High contrast, Custom colors) and apps that never show. In Lord Classic, when ❖Tab opens the switcher, the Overview moves to ❖W.
+
 ## Stopping a screen share
 
 ⌃⌥⇧Esc ends a share of the screen-sharing API ([SCREEN-SHARING.md](SCREEN-SHARING.md)). `on_input` in `server/src/main.c` handles it

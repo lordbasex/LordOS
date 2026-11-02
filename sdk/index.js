@@ -13,7 +13,8 @@ export { t, tOptional, useLocale, locale, languages, appName, formatDate, format
 export { keyboard } from './keyboard.js';
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
 import { resetShortcuts } from './shortcuts.js';
-export { AppSwitcher, openSwitcher, cycleAppWindows } from './appswitcher.jsx';
+export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
+export { switcherPrefs, SWITCHER_DEFAULTS, validColor } from './switchermodel.js';
 export { RemoteDeskApp } from './remotedesk.jsx';
 export { osk, oskState, startOsk } from './osk.js';
 export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';

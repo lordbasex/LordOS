@@ -6,7 +6,7 @@ import {
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
-  findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, cycleAppWindows, hideApp, hideOthers,
+  findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
   openOverview, closeOverview, toggleOverview,
 } from '@lordos/sdk';
@@ -84,14 +84,14 @@ const openForceQuit = () => wm.open('forcequit');
 const toggleDockAutohide = () => settings.set({ dockAutohide: !dockPrefs(settings.get()).dockAutohide });
 const frontSettings = () => { const id = wm.focused(); return id ? appSettingsItem(id) : null; };
 const openFrontSettings = () => frontSettings()?.onClick();
-const switchApps = (e) => openSwitcher(8, e.shift);
+const switchApps = (e) => openSwitcher(switcherHold(e), e.shift);
 const cycleWindows = (e) => cycleAppWindows(e.shift);
 
 const flowTable = (toggleLauncher) => [
   { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
   { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
   { id: 'dockAutohide', keys: ['Meta+Alt+D'], run: toggleDockAutohide, label: 'shell.shortcuts.dockAutohide', group: 'system' },
-  { id: 'switchApps', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
+  { id: 'switchApps', keys: switcherKeys('meta'), run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: cycleWindows, label: 'shell.shortcuts.cycleWindows', group: 'windows' },
   { id: 'minimize', keys: ['Meta+M'], run: minimizeFront, label: 'shell.shortcuts.minimize', group: 'windows' },
   { id: 'hide', keys: ['Meta+H'], run: hideFront, label: 'shell.shortcuts.hide', group: 'windows' },
@@ -132,7 +132,7 @@ function App() {
 
   // F4 opens the app launcher; ❖ too, but only if released without being used in a shortcut.
   const toggleLauncher = () => { closeOverview(); setLaunchpad((v) => !v); };
-  useShortcuts({ grabs: flowGrabs(), table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
+  useShortcuts({ grabs: switcherGrabs(flowGrabs()), table: flowTable(toggleLauncher), onSuperTap: toggleLauncher, appsPaste: true });
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { setControl(null); setContext(null); } }), []);
 
   // Trackpad: a 3-finger swipe up opens the app launcher (4 fingers: the overview) and down closes
