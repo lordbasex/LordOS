@@ -223,8 +223,24 @@ int fsp_parse_print(const char *text, FspTable *t) {
     return 0;
 }
 
+/* sgdisk -v's note that a partition doesn't end on the alignment says nothing about the table, and a
+ * disk filled to its last sector always has one. Exactly that text and no other: returns what follows
+ * it, or NULL. */
+static const char *alignment_note(const char *s) {
+    uint64_t n;
+    const char *r;
+    if (!prefixed(s, "Caution: Partition ", &r) || number(r, &r, &n) || !prefixed(r, " doesn't end on a ", &r)) return NULL;
+    if (number(r, &r, &n) || !prefixed(r, "-sector boundary. This may\n", &r)) return NULL;
+    return prefixed(r, "result in problems with some disk encryption tools.\n", &r) ? r : NULL;
+}
+
 int fsp_verify_clean(const char *text) {
-    while (*text == '\n' || *text == ' ') text++;
+    for (;;) {
+        while (*text == '\n' || *text == ' ') text++;
+        const char *after = alignment_note(text);
+        if (!after) break;
+        text = after;
+    }
     if (strncmp(text, "No problems found.", 18)) return -1;
     if (strstr(text, "Caution") || strstr(text, "Warning") || strstr(text, "Problem:")) return -1;
     return 0;

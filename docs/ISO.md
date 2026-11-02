@@ -337,7 +337,7 @@ when `install-disks` says the disk qualifies:
 | Nothing mounted, swapped or held (device-mapper, md) on the disk | `install.free.busy` |
 
 A sound table means all of this agrees: both GPT headers and both entry arrays, read directly from
-the disk, with their CRCs; `sgdisk -v` says "No problems found." with no warning; `sgdisk -p` has only
+the disk, with their CRCs; `sgdisk -v` says "No problems found." with no warning but its note that a partition doesn't end on the alignment; `sgdisk -p` has only
 the lines a healthy GPT prints; and the two descriptions match, partition by partition. sgdisk answers
 0 on a corrupt table, so its exit code means nothing here. An MBR disk never reaches sgdisk. Anything
 unknown is a refusal: at worst, erasing is the only option offered.

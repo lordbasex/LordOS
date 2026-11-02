@@ -109,6 +109,18 @@ static void verify(void) {
     T(fsp_verify_clean("Caution! After loading partitions, the CRC doesn't check out!\nNo problems found.\n") != 0);
     T(fsp_verify_clean("\n****\nFound invalid GPT and valid MBR; converting MBR to GPT format\nin memory. \n****\n\n\nNo problems found. 1 free\n") != 0);
     T(fsp_verify_clean("No problems found. Warning! but\n") != 0);
+    /* a partition off its alignment is a note about performance, not about the table (a full disk gave "damaged") */
+#define END_NOTE "\nCaution: Partition 2 doesn't end on a 2048-sector boundary. This may\nresult in problems with some disk encryption tools.\n"
+#define CLEAN "\nNo problems found. 2014 free sectors (1007.0 KiB) available in 1\nsegments, the largest of which is 2014 (1007.0 KiB) in size.\n"
+    T(fsp_verify_clean(END_NOTE CLEAN) == 0);
+    T(fsp_verify_clean(END_NOTE END_NOTE CLEAN) == 0);
+    T(fsp_verify_clean("\nCaution: Partition 3 doesn't begin on a 2048-sector boundary. This may\nresult in degraded performance on some modern (2009 and later) hard disks.\n" CLEAN) != 0);
+    T(fsp_verify_clean(END_NOTE) != 0);                                 /* a note alone proves nothing */
+    T(fsp_verify_clean(END_NOTE "Identified 1 problems!\n") != 0);
+    T(fsp_verify_clean(CLEAN END_NOTE) != 0);                           /* after the verdict: not the known shape */
+    T(fsp_verify_clean("\nCaution: Partition 2 doesn't end on a 2048-sector boundary. This may\nresult in something else.\n" CLEAN) != 0);
+    T(fsp_verify_clean("\nCaution: Partition 2 overlaps partition 3 boundary. This may\nresult in problems with some disk encryption tools.\n" CLEAN) != 0);
+    T(fsp_verify_clean("\nCaution: Partition x doesn't end on a 2048-sector boundary. This may\nresult in problems with some disk encryption tools.\n" CLEAN) != 0);
 }
 
 static FspTable table(uint64_t last, unsigned lsec) {
