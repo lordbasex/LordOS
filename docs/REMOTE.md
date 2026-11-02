@@ -25,6 +25,16 @@ The port is **5673**, which spells "LORD" on a phone keypad.
 
 ![Settings → Sharing](remote-desktop-settings.png)
 
+## The screen-sharing API
+
+Apps have another door, with consent and an indicator ([SCREEN-SHARING.md](SCREEN-SHARING.md)). One door at a time per session: while an
+app shares, a sign-in here is told so and the page retries every 30 s; while a viewer is connected here, a share can't start. Nothing else
+about 5673 changed.
+
+**5673 and the lock.** Locking cuts every connected browser (the bridge acts on the lock message) and ends that user's cookies, but
+`remote.sock` itself goes on giving frames to root, and a new sign-in with the account's password isn't checked against the lock: it sees
+the desktop while the monitor shows the login screen. A user switch doesn't cut a connected viewer.
+
 ## Settings → Sharing
 
 - The switch («Allow access from the network»), with the `remote-enable` and `remote-disable`
