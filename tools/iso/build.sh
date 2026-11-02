@@ -46,7 +46,7 @@ PKGS_BASE="$PKG_KERNEL initramfs-tools live-boot live-boot-initramfs-tools syste
 PKGS_LORDOS="libwayland-server0 libwayland-client0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core
- libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon
+ libpoppler-glib8t64 libarchive13t64 poppler-data cups avahi-daemon libnss-mdns
  libavcodec61 libavformat61 libavutil59 libswscale8 libswresample5 libva2 libva-drm2 mesa-va-drivers
  bluez libspa-0.2-bluetooth power-profiles-daemon systemd-timesyncd shared-mime-info
  gsettings-desktop-schemas xwayland pciutils usbutils"

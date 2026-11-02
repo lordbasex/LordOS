@@ -686,7 +686,7 @@
   "install.free.needUefi": "this computer started in BIOS mode, and this needs UEFI",
   "install.free.noBootTool": "this image has no efibootmgr",
   "install.free.noEsp": "the disk has no EFI partition",
-  "install.free.noRoom": "there is no free region of at least 8 GB",
+  "install.free.noRoom": "there is no unpartitioned region of at least 8 GB; an empty partition doesn’t count, delete it first",
   "install.free.noTable": "the disk has no partition table",
   "install.free.tableDamaged": "the partition table has problems, or could not be read with certainty",
   "install.free.tableFull": "the partition table is full",

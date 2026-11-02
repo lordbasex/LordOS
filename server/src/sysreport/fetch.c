@@ -186,6 +186,12 @@ static void bytes_text(unsigned long long v, char *out, size_t n) {
     else snprintf(out, n, "%.1f GB", v / 1e9);
 }
 
+/* Memory comes in binary sizes: a 16 GB board has 15.8 GiB usable, which in thousands reads "17 GB". */
+static void mem_text(unsigned long long v, char *out, size_t n) {
+    double g = v / 1073741824.0;
+    snprintf(out, n, g >= 10 ? "%.0f GB" : "%.1f GB", g);
+}
+
 static int add(Line *ls, int n, const char *label, const char *value) {
     if (n >= LINES_MAX || !value || !value[0]) return n;
     snprintf(ls[n].label, sizeof ls[n].label, "%s", label);
@@ -235,8 +241,8 @@ char *fetch_render(const SysReport *r, const FetchLive *l, FetchColor c) {
         n = add(ls, n, "GPU", v);
     }
     if (r->mem.total_kb) {
-        bytes_text(l->mem_used_kb * 1024ULL, a, sizeof a);
-        bytes_text(r->mem.total_kb * 1024ULL, b2, sizeof b2);
+        mem_text(l->mem_used_kb * 1024ULL, a, sizeof a);
+        mem_text(r->mem.total_kb * 1024ULL, b2, sizeof b2);
         snprintf(v, sizeof v, "%s / %s (%d %%)", a, b2, (int)(l->mem_used_kb * 100 / r->mem.total_kb));
         n = add(ls, n, "Memory", v);
     }

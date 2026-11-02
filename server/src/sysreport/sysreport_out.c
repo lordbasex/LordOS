@@ -214,6 +214,12 @@ static void size_text(unsigned long long bytes, char *out, size_t n) {
     else snprintf(out, n, "%.0f MB", bytes / 1e6);
 }
 
+/* Memory comes in binary sizes (fetch.c, mem_text). */
+static void mem_size_text(unsigned long long bytes, char *out, size_t n) {
+    if (bytes >= 1ULL << 30) snprintf(out, n, "%.0f GB", bytes / 1073741824.0);
+    else snprintf(out, n, "%.0f MB", bytes / 1048576.0);
+}
+
 static void two(char *out, size_t n, const char *a, const char *b) {
     snprintf(out, n, "%s%s%s", a, a[0] && b[0] ? " " : "", b);
 }
@@ -268,8 +274,8 @@ char *sysreport_markdown(const SysReport *r) {
     hb_printf(&b, "| Instructions |"); cell(&b, c->flags); hb_printf(&b, "\n\n");
 
     hb_printf(&b, "## Memory\n\n");
-    size_text(r->mem.total_kb * 1024ULL, t, sizeof t);
-    size_text(r->mem.swap_kb * 1024ULL, u, sizeof u);
+    mem_size_text(r->mem.total_kb * 1024ULL, t, sizeof t);
+    mem_size_text(r->mem.swap_kb * 1024ULL, u, sizeof u);
     hb_printf(&b, "%s, swap %s", t, r->mem.swap_kb ? u : "none");
     for (int i = 0; i < r->mem.zram_n; i++) {
         size_text(r->mem.zram_kb[i] * 1024ULL, u, sizeof u);
