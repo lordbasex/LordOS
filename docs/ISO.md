@@ -437,11 +437,13 @@ What `install-run` validates on the root side, without trusting the interface:
 
 `lordos-<version>-amd64.ova` is a virtual machine that is already installed. Open it in VirtualBox or VMware (double click) and start it.
 
+**Sizing a virtual machine** (Proxmox, VirtualBox, VMware and others): at least 4 CPUs and 4 GB of memory. 2 CPUs are too few for good performance. With many apps open, 16 GB of memory is the ideal.
+
 It is a standard OVA, amd64 only: an OVF 1.0 descriptor, a SHA-256 manifest and a stream-optimized VMDK.
 
 | | |
 |---|---|
-| Machine | 2 CPUs, 4 GB of memory, a 32 GB dynamic disk (SCSI, LSI Logic), one E1000 network adapter on NAT |
+| Machine | 4 CPUs, 4 GB of memory, a 32 GB dynamic disk (SCSI, LSI Logic), one E1000 network adapter on NAT |
 | Firmware | the descriptor leaves the hypervisor's default, BIOS. The disk has both boot paths, like an installed system, so UEFI works too |
 | Display on VirtualBox | VBoxSVGA, through the optional `vbox:Machine` section. Other hypervisors ignore that section (`ovf:required="false"`) and read only the standard ones |
 | Size | about 1.2 GB; the imported disk grows as it is used |

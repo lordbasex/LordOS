@@ -245,12 +245,12 @@ cat > "$OVF" <<EOF
         <vssd:VirtualSystemType>vmx-14</vssd:VirtualSystemType>
       </System>
       <Item>
-        <rasd:Caption>2 virtual CPUs</rasd:Caption>
+        <rasd:Caption>4 virtual CPUs</rasd:Caption>
         <rasd:Description>Number of virtual CPUs</rasd:Description>
-        <rasd:ElementName>2 virtual CPUs</rasd:ElementName>
+        <rasd:ElementName>4 virtual CPUs</rasd:ElementName>
         <rasd:InstanceID>1</rasd:InstanceID>
         <rasd:ResourceType>3</rasd:ResourceType>
-        <rasd:VirtualQuantity>2</rasd:VirtualQuantity>
+        <rasd:VirtualQuantity>4</rasd:VirtualQuantity>
       </Item>
       <Item>
         <rasd:AllocationUnits>MegaBytes</rasd:AllocationUnits>
@@ -293,7 +293,7 @@ cat > "$OVF" <<EOF
     <vbox:Machine ovf:required="false" version="1.16-linux" uuid="{$UUID_VM}" name="LordOS $VERSION" OSType="Debian_64" snapshotFolder="Snapshots">
       <ovf:Info>VirtualBox machine configuration: the VBoxSVGA display</ovf:Info>
       <Hardware>
-        <CPU count="2">
+        <CPU count="4">
           <HardwareVirtExLargePages enabled="true"/>
           <PAE enabled="false"/>
           <LongMode enabled="true"/>

@@ -143,9 +143,9 @@
             "pt": "Do que eu preciso para rodar o LordOS?"
           },
           "a": {
-            "en": "A 64-bit PC (x86-64) or a Raspberry Pi 5, a USB stick of at least 1 GB for the ISO, and a disk of at least 8 GB to install it. A 3D graphics card is optional: without one, LordOS draws with the CPU.",
-            "es": "Una PC de 64 bits (x86-64) o una Raspberry Pi 5, un pendrive de al menos 1 GB para la ISO y un disco de al menos 8 GB para instalarla. La placa de video 3D es opcional: sin ella, LordOS dibuja con la CPU.",
-            "pt": "Um PC de 64 bits (x86-64) ou um Raspberry Pi 5, um pendrive de pelo menos 1 GB para a ISO e um disco de pelo menos 8 GB para instalar. A placa de vídeo 3D é opcional: sem ela, o LordOS desenha com a CPU."
+            "en": "A 64-bit PC (x86-64) or a Raspberry Pi 5, a USB stick of at least 1 GB for the ISO, and a disk of at least 8 GB to install it. A 3D graphics card is optional: without one, LordOS draws with the CPU. In a virtual machine, give it at least 4 CPUs and 4 GB of memory, ideally 16 GB if you use many apps.",
+            "es": "Una PC de 64 bits (x86-64) o una Raspberry Pi 5, un pendrive de al menos 1 GB para la ISO y un disco de al menos 8 GB para instalarla. La placa de video 3D es opcional: sin ella, LordOS dibuja con la CPU. En una máquina virtual, asignale al menos 4 CPU y 4 GB de memoria; lo ideal son 16 GB si usás muchas apps.",
+            "pt": "Um PC de 64 bits (x86-64) ou um Raspberry Pi 5, um pendrive de pelo menos 1 GB para a ISO e um disco de pelo menos 8 GB para instalar. A placa de vídeo 3D é opcional: sem ela, o LordOS desenha com a CPU. Em uma máquina virtual, use pelo menos 4 CPUs e 4 GB de memória; o ideal são 16 GB se você usa muitos apps."
           }
         },
         {
