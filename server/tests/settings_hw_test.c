@@ -520,6 +520,9 @@ static void test_admin(void) {
     CHECK(!hw_rpi_case_text("") && !hw_rpi_case_text("argon") && !hw_rpi_case_text("none ") && !hw_rpi_case_text("../x"));
     CHECK(hw_backlight_name_valid("intel_backlight") && hw_backlight_name_valid("amdgpu_bl1") && hw_backlight_name_valid("acpi_video0"));
     CHECK(!hw_backlight_name_valid("../x") && !hw_backlight_name_valid(".x") && !hw_backlight_name_valid("a/b") && !hw_backlight_name_valid(""));
+    CHECK(hw_kbdlight_name_valid("smc::kbd_backlight") && hw_kbdlight_name_valid("dell::kbd_backlight"));
+    CHECK(!hw_kbdlight_name_valid("input0::capslock") && !hw_kbdlight_name_valid("::kbd_backlight"));
+    CHECK(!hw_kbdlight_name_valid("../x::kbd_backlight") && !hw_kbdlight_name_valid("") && !hw_kbdlight_name_valid(NULL));
     /* video-optimize: closed values only, fixed text out */
     char cr[1024], ff[512];
     CHECK(!hw_video_files("auto off no no", cr, sizeof cr, ff, sizeof ff));

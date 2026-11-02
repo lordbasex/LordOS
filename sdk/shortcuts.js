@@ -29,6 +29,7 @@ import { toggleClipboardPanel, clipboardPanel } from './clipboard.js';
 import { toggleEmojiPanel } from './emoji.jsx';
 import { quitFrontApp } from './dock.js';
 import { hasNowPlaying, mediaToggle, mediaNext, mediaPrev, mediaStop } from './media.js';
+import { volumeUp, volumeDown, volumeMute, brightnessUp, brightnessDown, keyLightUp, keyLightDown } from './hwkeys.js';
 import { wm } from './windows.js';
 import { switcherOpen, switcherKey } from './appswitcher.jsx';
 
@@ -37,6 +38,7 @@ const NAMED = {
   1: 'Escape', 15: 'Tab', 41: '`', 51: ',', 52: '.', 57: 'Space', 62: 'F4', 87: 'F11', 88: 'F12', 99: 'PrintScreen',
   103: 'ArrowUp', 105: 'ArrowLeft', 106: 'ArrowRight', 108: 'ArrowDown',
   163: 'MediaNext', 164: 'MediaPlayPause', 165: 'MediaPrev', 166: 'MediaStop', 200: 'MediaPlay', 201: 'MediaPause',
+  113: 'VolumeMute', 114: 'VolumeDown', 115: 'VolumeUp', 224: 'BrightnessDown', 225: 'BrightnessUp', 229: 'KeyLightDown', 230: 'KeyLightUp',
 };
 for (let d = 1; d <= 9; d++) NAMED[d + 1] = String(d);
 const LETTERS = { 16: 'q', 17: 'w', 18: 'e', 19: 'r', 20: 't', 21: 'y', 22: 'u', 23: 'i', 24: 'o', 25: 'p', 30: 'a', 31: 's', 32: 'd',
@@ -93,6 +95,13 @@ export const BASE = [
   { id: 'mediaNext', keys: ['MediaNext'], run: mediaNext, when: hasNowPlaying },
   { id: 'mediaPrev', keys: ['MediaPrev'], run: mediaPrev, when: hasNowPlaying },
   { id: 'mediaStop', keys: ['MediaStop'], run: mediaStop, when: hasNowPlaying },
+  { id: 'volumeMute', keys: ['VolumeMute'], run: volumeMute },
+  { id: 'volumeDown', keys: ['VolumeDown'], run: volumeDown, repeat: true },
+  { id: 'volumeUp', keys: ['VolumeUp'], run: volumeUp, repeat: true },
+  { id: 'brightnessDown', keys: ['BrightnessDown'], run: brightnessDown, repeat: true },
+  { id: 'brightnessUp', keys: ['BrightnessUp'], run: brightnessUp, repeat: true },
+  { id: 'keyLightDown', keys: ['KeyLightDown'], run: keyLightDown, repeat: true },
+  { id: 'keyLightUp', keys: ['KeyLightUp'], run: keyLightUp, repeat: true },
 ];
 
 // ---- the dispatcher ----

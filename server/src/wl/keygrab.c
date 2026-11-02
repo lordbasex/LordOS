@@ -129,3 +129,17 @@ int keygrab_match(int code, char letter, unsigned mods) {
 int keygrab_is_remap(char letter, unsigned mods) {
     return remaps && mods == KG_META && letter && strchr("cvxazftwnlrps", letter) != NULL;
 }
+
+/* Player, sound, screen and keyboard light, and Print Screen (Screenshots). A laptop sends these from its
+ * top row with no modifier, so an app in front must not swallow them. */
+int keygrab_system_key(int code) {
+    switch (code) {
+    case KEY_PLAYPAUSE: case KEY_NEXTSONG: case KEY_PREVIOUSSONG: case KEY_STOPCD: case KEY_PLAYCD: case KEY_PAUSECD:
+    case KEY_MUTE: case KEY_VOLUMEDOWN: case KEY_VOLUMEUP:
+    case KEY_BRIGHTNESSDOWN: case KEY_BRIGHTNESSUP: case KEY_KBDILLUMDOWN: case KEY_KBDILLUMUP:
+    case KEY_SYSRQ:
+        return 1;
+    default:
+        return 0;
+    }
+}

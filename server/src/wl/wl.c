@@ -2710,9 +2710,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
         if (value != 2 && (focus_is_lord_app() ? super || !system_meta_key(code, k) : super && !value)) send_key_to_focus(code, value);
         return 0;
     }
-    /* media keys and Print Screen: always LordOS's (Player, Screenshots) */
-    if (code == KEY_PLAYPAUSE || code == KEY_NEXTSONG || code == KEY_PREVIOUSSONG || code == KEY_STOPCD || code == KEY_PLAYCD ||
-        code == KEY_PAUSECD || code == KEY_SYSRQ) return 0;
+    if (keygrab_system_key(code)) return 0;
     if (value == 2) return 1;                   /* apps repeat on their own (repeat_info) */
     send_key_to_focus(code, value);
     return 1;

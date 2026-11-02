@@ -10,7 +10,7 @@ never fires twice.
 `runtime/events.js` calls the filter set with `setKeyFilter` before any `addListener('keydown')`, and only
 `startShell` sets it: an isolated app's process has no dispatcher. The tables:
 
-- `BASE` in `sdk/shortcuts.js`: search, keyboard layout, clipboard, emoji, lock, quit and the media keys.
+- `BASE` in `sdk/shortcuts.js`: search, keyboard layout, clipboard, emoji, lock, quit, the media keys, and volume, mute, screen brightness and keyboard light (`sdk/hwkeys.js`), which `keygrab_system_key` keeps from apps.
 - A theme's table, given to `useShortcuts({ grabs, table, onSuperTap, appsPaste })` from its root component
   (`flowTable` in `themes/default/index.jsx`, `classicTable` in `themes/classic/index.jsx`).
 - `addShortcuts(entries)` from a module: Screenshots and the Terminal's drop-down window. `runShortcut(id)`

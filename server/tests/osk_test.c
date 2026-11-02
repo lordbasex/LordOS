@@ -94,6 +94,18 @@ static void test_labels(void) {
     CHECK(!kb_has_altgr());
     kb_labels_end();
 
+    /* French (Macintosh), issue #12: the keys around the letters are the same as on any layout */
+    CHECK(!kb_set("fr", "mac"));
+    KeyInfo mk;
+    kb_key(KEY_ESC, 1, &mk);
+    CHECK(!strcmp(mk.key, "Escape"));
+    kb_key(KEY_ESC, 0, &mk);
+    kb_key(KEY_F11, 1, &mk);
+    CHECK(!strcmp(mk.key, "F11"));
+    kb_key(KEY_F11, 0, &mk);
+    kb_key(KEY_VOLUMEUP, 1, &mk);
+    CHECK(!mk.key[0] && !mk.chr[0]);        /* no name: the code decides (sdk/shortcuts.js) */
+    kb_key(KEY_VOLUMEUP, 0, &mk);
     CHECK(!kb_set("latam", ""));
     CHECK(kb_labels_begin());
     CHECK(kb_has_altgr());

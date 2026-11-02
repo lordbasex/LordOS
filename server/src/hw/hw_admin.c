@@ -82,6 +82,37 @@ void hw_act_brightness(const AdminReq *r, const char *arg, size_t len) {
     else admin_say("OK", "%ld", v);   /* i18n-ok */
 }
 
+/* ---- keyboard light ---- */
+
+/* The kernel's name for it: "<device>::kbd_backlight". */
+int hw_kbdlight_name_valid(const char *n) {
+    static const char tail[] = "::kbd_backlight";
+    size_t l = n ? strlen(n) : 0, t = sizeof tail - 1;
+    return hw_backlight_name_valid(n) && l > t && !strcmp(n + l - t, tail);
+}
+
+void hw_act_keyboard_light(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char a[128], name[72];
+    long v;
+    if (arg_copy(arg, len, a, sizeof a) || sscanf(a, "%71s %ld", name, &v) != 2 || !hw_kbdlight_name_valid(name)) {
+        admin_err("admin.invalidArgument", NULL);
+        return;
+    }
+    char link[PATH_MAX], real[PATH_MAX];
+    snprintf(link, sizeof link, "/sys/class/leds/%s", name);
+    if (!realpath(link, real) || strncmp(real, "/sys/devices/", 13)) { admin_err("hw.noBacklight", NULL); return; }
+    char p[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/max_brightness", real);
+    long max = read_long(p);
+    if (max <= 0 || v < 0 || v > max) { admin_err("hw.outOfRange", "max", lerr_int(max), NULL); return; }
+    char val[32];
+    snprintf(val, sizeof val, "%ld\n", v);
+    snprintf(p, sizeof p, "%s/brightness", real);
+    if (write_file(p, val)) admin_err("hw.brightnessFailed", "errno", lerr_errno(errno), NULL);
+    else admin_say("OK", "%ld", v);   /* i18n-ok */
+}
+
 /* ---- power profile ---- */
 
 static int file_ok(const char *path) {

@@ -115,7 +115,9 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
 - **Brightness.** Read from `/sys/class/backlight` (anyone can), written through the closed admin
   action `display-brightness <name> <value>`: the name must be a real backlight under `/sys/devices`
   and the value within `0..max_brightness`. External monitors (DDC/CI) and virtual machines have
-  none; the row says so. Untested on hardware (the VM has no backlight).
+  none; the row says so. Untested on hardware (the VM has no backlight). A keyboard's brightness keys
+  go the same way (`sdk/hwkeys.js`), and its light keys through `keyboard-light <name> <value>`
+  (`*::kbd_backlight` LEDs); neither has run on hardware.
 - **Night Light.** A color temperature from 6500 K (off) down to 1900 K, from a blackbody fit
   (`night_temp_rgb`) normalized so that 6500 K is neutral. It goes into the CRTC's gamma LUT
   (`DRM_IOCTL_MODE_SETGAMMA`) when the card has one: free, and the cursor and direct scanout are
@@ -425,6 +427,7 @@ All in `server/src/hw/hw_admin.c`, in the `actions` table through `HW_ADMIN_ACTI
 | Action | Argument | Who | Does |
 |---|---|---|---|
 | `display-brightness` | `<backlight> <value>` | anyone | writes `/sys/class/backlight/<name>/brightness` (real device under `/sys/devices`, `0..max`) |
+| `keyboard-light` | `<led> <value>` | anyone | writes `/sys/class/leds/<name>/brightness`, only for a `*::kbd_backlight` under `/sys/devices` (`0..max`) |
 | `power-profile` | `performance` \| `balanced` \| `power-saver` | anyone | `/usr/bin/powerprofilesctl set`, or the cpufreq governor and EPP |
 | `power-suspend` | — | anyone | `/usr/bin/systemctl suspend` |
 | `power-buttons` | `<power> <lid> <lid-on-ac>` (`suspend`, `hibernate`, `poweroff`, `ignore`) | admin | generates `/etc/systemd/logind.conf.d/lordos.conf`, `systemctl reload systemd-logind` |

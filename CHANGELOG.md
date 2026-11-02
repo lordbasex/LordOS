@@ -13,6 +13,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Fixed
 
 - Wi-Fi stayed off after a reboot when its driver finished loading after the network service started, or udev renamed it late: an interface now gets its saved state whenever it appears, not only at the moment of boot. Turning on an interface saved as off keeps it on ([#8](https://github.com/lordbasex/LordOS/issues/8)).
+- The volume, mute, screen brightness and keyboard light keys did nothing, on any layout and in every theme, and went to the app in front: they now work, without Fn on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)).
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
