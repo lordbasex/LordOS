@@ -27,7 +27,7 @@ fi
 out="${HOME:-/tmp}/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 [ -w "${HOME:-/nonexistent}" ] || out="/tmp/lordos-issue-$(date +%Y%m%d-%H%M%S).txt"
 MAX=60000
-exec 3>&2
+exec 3>&2 </dev/null                # nothing below may wait for the keyboard
 step() { printf '  %s\n' "$1" >&3; }
 echo "Collecting the report, it takes about half a minute:" >&2
 host=$(hostname 2>/dev/null)
@@ -45,6 +45,33 @@ clean() {
     { if [ -n "$host" ] && [ "$host" != localhost ]; then sed "s/$host/<host>/g"; else cat; fi; } |
     { if [ -n "$user" ] && [ "$user" != root ]; then sed "s/\b$user\b/<user>/g"; else cat; fi; }
 }
+# A bar on the terminal, only there: green, with a spinner, the percentage and the seconds.
+bar() {   # done total
+    [ -t 3 ] || return 0
+    pct=$(( $1 * 100 / $2 )); fill=$(( pct * 30 / 100 )); i=0; b=
+    while [ "$i" -lt 30 ]; do if [ "$i" -lt "$fill" ]; then b="$b█"; else b="$b░"; fi; i=$((i + 1)); done
+    spin=$(( ${spin:-0} + 1 ))
+    case $(( spin % 10 )) in 0) c=⠋;; 1) c=⠙;; 2) c=⠹;; 3) c=⠸;; 4) c=⠼;; 5) c=⠴;; 6) c=⠦;; 7) c=⠧;; 8) c=⠇;; *) c=⠏;; esac
+    printf '\r  \033[36m%s\033[0m \033[32m%s\033[0m %3d%%  %d/%d packages, %ds ' "$c" "$b" "$pct" "$1" "$2" "$(( $(date +%s) - start ))" >&3
+}
+bar_end() { [ -t 3 ] && printf '\r\033[K' >&3; return 0; }
+
+# Files that differ from their package, in batches: dpkg --verify says nothing while it works, so one call can't show progress
+# or be stopped in parts. A batch that sticks is given up on, and the whole check ends after 90 seconds.
+verify_files() {
+    list=$(mktemp) || return 0
+    dpkg-query -W -f='${binary:Package}\n' 2>/dev/null > "$list"
+    total=$(wc -l < "$list"); n=0; start=$(date +%s)
+    while [ "$n" -lt "$total" ]; do
+        batch=$(sed -n "$((n + 1)),$((n + 25))p" "$list")
+        timeout -k 2 15 dpkg --verify $batch 2>/dev/null || [ "$?" -ne 124 ] || printf 'a batch took too long, after %s packages\n' "$n"
+        n=$((n + 25)); [ "$n" -gt "$total" ] && n=$total
+        bar "$n" "$total"
+        if [ $(( $(date +%s) - start )) -gt 90 ]; then echo "stopped after 90 s, at $n of $total packages"; break; fi
+    done
+    bar_end; rm -f "$list"
+}
+
 section() { printf '\n### %s\n\n```text\n' "$1"; }
 end() { printf '```\n'; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -120,7 +147,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
     fi
     step "every installed file, this is the slow one"
     echo "-- files changed since their packages were installed (c: a setting)"
-    if have dpkg; then timeout --foreground 120 dpkg --verify 2>/dev/null | grep -E '^..5' | head -n 60; echo "check ended: $?"; fi
+    if have dpkg; then verify_files | grep -E '^..5' | head -n 60; fi
     echo "-- kernel"
     t=$(cat /proc/sys/kernel/tainted 2>/dev/null); echo "tainted: ${t:-unknown}"
     for f in /sys/module/*/taint; do [ -s "$f" ] && read -r v < "$f" && [ -n "$v" ] && printf '%s: %s\n' "$(basename "$(dirname "$f")")" "$v"; done
