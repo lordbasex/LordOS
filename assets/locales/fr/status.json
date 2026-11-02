@@ -142,5 +142,9 @@
   "wifi.connecting": "Connexion à {ssid}…",
   "wifi.disconnected": "Déconnecté",
   "wifi.forgotten": "Réseau oublié",
-  "share.granted": "Autorisation enregistrée."
+  "share.granted": "Autorisation enregistrée.",
+  "install.free.installing": "Installation dans l’espace libre de {dev}",
+  "install.free.rollingBack": "Rétablissement de la table des partitions",
+  "install.free.rolledBack": "La table des partitions est rétablie",
+  "install.free.rollbackFailed": "La table des partitions n’a pas pu être rétablie : une copie se trouve dans {path}. Ne redémarrez pas : enregistrez-la d’abord"
 }

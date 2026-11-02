@@ -72,7 +72,7 @@ PKGS_BASE="initramfs-tools systemd-sysv udev kmod dbus dbus-user-session sudo lo
 PKGS_LORDOS="libwayland-server0 libxkbcommon0 xkb-data pipewire pipewire-pulse pipewire-alsa wireplumber rtkit polkitd pkexec
  alsa-ucm-conf wpasupplicant openvpn fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji libthai-data
  skkdic rime-data-pinyin-simp fonts-dejavu-core xwayland
- cups avahi-daemon power-profiles-daemon shared-mime-info gsettings-desktop-schemas"
+ cups avahi-daemon libnss-mdns power-profiles-daemon shared-mime-info gsettings-desktop-schemas"
 # The board has no clock that survives without a battery: systemd-timesyncd sets the time from the
 # network at boot (Settings → Date & Time, "Automatic time"); without it the clock starts months
 # behind and every signed package index is refused as "not valid yet". The rest is the same as the

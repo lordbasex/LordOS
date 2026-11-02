@@ -333,11 +333,11 @@ when `install-disks` says the disk qualifies:
 | A GPT with a plain protective MBR: not MBR, not a hybrid MBR, not a blank disk | `install.free.mbr`, `install.free.hybridMbr`, `install.free.noTable` |
 | A sound table (below) | `install.free.tableDamaged` |
 | Exactly one EFI partition, on FAT, with 32 MB free and no `EFI/LordOS` folder yet | `install.free.noEsp`, `manyEsps`, `espNotFat`, `espUnreadable`, `espFull`, `espHasLordOS` |
-| A free region of at least 8 GB (the size an erase install requires of the disk), after aligning it, and a free table slot | `install.free.noRoom`, `install.free.tableFull` |
+| An unpartitioned region of at least 8 GB (the size an erase install requires of the disk), after aligning it, and a free table slot; an existing empty partition doesn't count, it has to be deleted first | `install.free.noRoom`, `install.free.tableFull` |
 | Nothing mounted, swapped or held (device-mapper, md) on the disk | `install.free.busy` |
 
 A sound table means all of this agrees: both GPT headers and both entry arrays, read directly from
-the disk, with their CRCs; `sgdisk -v` says "No problems found." with no warning; `sgdisk -p` has only
+the disk, with their CRCs; `sgdisk -v` says "No problems found." with no warning but its note that a partition doesn't end on the alignment; `sgdisk -p` has only
 the lines a healthy GPT prints; and the two descriptions match, partition by partition. sgdisk answers
 0 on a corrupt table, so its exit code means nothing here. An MBR disk never reaches sgdisk. Anything
 unknown is a refusal: at worst, erasing is the only option offered.

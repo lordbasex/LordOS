@@ -690,7 +690,7 @@
   "install.free.needUefi": "este computador iniciou em modo BIOS, e isto precisa de UEFI",
   "install.free.noBootTool": "esta imagem não tem efibootmgr",
   "install.free.noEsp": "o disco não tem partição EFI",
-  "install.free.noRoom": "não há uma região livre de pelo menos 8 GB",
+  "install.free.noRoom": "não há uma região sem partições de pelo menos 8 GB; uma partição vazia não conta, apague-a primeiro",
   "install.free.noTable": "o disco não tem tabela de partições",
   "install.free.tableDamaged": "a tabela de partições tem problemas, ou não pôde ser lida com certeza",
   "install.free.tableFull": "a tabela de partições está cheia",

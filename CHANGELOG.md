@@ -20,18 +20,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - VirtualBox's default VMSVGA display reached no desktop: the driver it needs was kept for VMware ([#9](https://github.com/lordbasex/LordOS/issues/9)).
 - Wi-Fi's country rules on the images: the regulatory database was missing, so the kernel couldn't load them.
 - Settings: the Ctrl arrows switch for Desktops showed off and couldn't be turned off.
+- Install in free space: a partition ending off the 1 MiB alignment, as on a disk filled to its last sector, was reported as a damaged table.
+- `lordos-fetch` and the system report showed a 16 GB board as 17 GB: memory is now counted in binary sizes.
 - The pointer no longer jumps back to the middle of the screen on Intel laptops with a motion sensor: it was read as a tablet ([#2](https://github.com/lordbasex/LordOS/issues/2)).
 
 ### Added
 
 - Settings → Wallpaper: your own PNG or JPEG picture on the desktop and on the login screen, in every theme. It is converted by a process running as you, and the login screen gets its own copy in a system folder, so it never reads your home ([#13](https://github.com/lordbasex/LordOS/issues/13)).
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
+- `.local` names resolve: `libnss-mdns` on the images and in the `lordos` package's recommended list.
 - `lordos-issue`: what a bug report needs, with names and addresses replaced, ready to paste into an issue, with an integrity check. `lord-server --check-apps` shows each app's signature state.
 - French is now a built-in interface language, selectable in Settings, in the installer, on the login screen and from a boot entry ([#5](https://github.com/lordbasex/LordOS/issues/5)).
 - Settings: Desktops in Desktop & Dock (how many, the Ctrl arrows, the four finger swipe), and Mouse & Trackpad always shows, with a mouse's speed and wheel direction.
 - Terminal: ❖+click or Ctrl+click on a web address opens it in the default browser.
 - Install in free space: on a GPT disk with an EFI partition, booted through UEFI, the installer can add LordOS beside what is there, as one new partition, leaving every existing partition as it was ([#7](https://github.com/lordbasex/LordOS/issues/7)).
-- Broadcom Wi-Fi firmware on the ISOs, so the 2015 MacBook Pro's BCM43602 works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - App switcher: 1 to 9 go straight to an app, the selected app's windows show live in a row, Z or the key under Esc moves through them; Settings → Keyboard chooses the keys, which apps show, size and look.
 
 ### Added

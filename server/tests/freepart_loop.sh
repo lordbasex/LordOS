@@ -149,6 +149,19 @@ gptbase; attach; mkfs.ext4 -q -F "${LOOP}p1"; detach; refuse "ESP not FAT" insta
 gptbase; refuse "ESP never formatted" install.free.espNotFat
 gptbase; fat; sgdisk -n 2:$((DATA_E + 1)):+15G -t 2:8300 "$IMG" 2>/dev/null >/dev/null || sgdisk -n 2:$((DATA_E + 1)):+10G -t 2:8300 "$IMG" >/dev/null; refuse "less than 8 GB free" install.free.noRoom
 
+echo "== partitions off their alignment: a note from sgdisk -v, not a damaged table"
+gptbase; fat; sgdisk -d 3 -n 3:$DATA_S:0 -t 3:8300 -c 3:data "$IMG" >/dev/null; refuse "full disk, last partition ends unaligned" install.free.noRoom
+gptbase; fat; sgdisk -d 3 -n 3:$DATA_S:$((DATA_E - 5)) -t 3:8300 -c 3:data "$IMG" >/dev/null
+sgdisk -v "$IMG" | grep -q 'Caution: Partition 3' && ok "sgdisk does note it" || bad "the image has no note"
+attach
+out=$("$CLI" probe "$L" --uefi | tail -1); echo "  $out"
+case "$out" in *ptable=gpt*esps=1*why=-) ok "qualifies with a partition off its alignment" ;; *) bad "unaligned: $out" ;; esac
+"$CLI" create "$L" --uefi | sed 's/^/  /'
+sgdisk -p "$LOOP" | tail -3 | sed 's/^/  /'
+want "unaligned: the new partition" 8304 "$(sgdisk -p "$LOOP" | awk '$1 == 2 { print $6 }')"
+want "unaligned: the old one where it was" "$DATA_S $((DATA_E - 5))" "$(sgdisk -p "$LOOP" | awk '$1 == 3 { print $2, $3 }')"
+detach
+
 echo "== 4K logical sectors"
 fresh
 LOOP=$(losetup --find --show -P -b 4096 "$IMG"); L=${LOOP#/dev/}
