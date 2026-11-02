@@ -142,6 +142,8 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh,
  * bottom) before showing it; gpu_read_done says whether it did. */
 void gpu_read_next(uint32_t *px, int w, int h);
 int  gpu_read_done(void);
+/* The same on its own thread (gpucap.h): the compositor doesn't wait, and gpucap_fd says when it arrived. */
+void gpu_read_thread(int w, int h);
 
 /* Direct scanout of a fullscreen dmabuf (without composing). done(data) is called when
  * the buffer leaves the screen. 0 if the flip was sent. */

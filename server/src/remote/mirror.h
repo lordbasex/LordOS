@@ -69,6 +69,7 @@ void mirror_composed_on_gpu(int on);    /* how the session composes now (shown t
 double mirror_timeout(void);
 /* Should this composed frame be read back? Once per frame, only with the GPU composing. */
 int mirror_capture_due(void);
+void mirror_capture_skip(void);         /* a frame went by with the last capture still under way */
 /* Session text clipboard (called on every loop iteration; sends only if it changed). */
 void mirror_clipboard(const char *text, unsigned gen);
 

@@ -553,6 +553,8 @@ int mirror_capture_due(void) {
     return 1;
 }
 
+void mirror_capture_skip(void) { capture_late = 1; }
+
 /* The API's holder came or went, or changed its rate. Starting: a whole frame, as for a first viewer. */
 void mirror_share_changed(void) {
     video_update();

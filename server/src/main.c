@@ -36,6 +36,7 @@
 #include "ui/ui.h"
 #include "wl/wl.h"
 #include "gpu/gpu.h"
+#include "gpu/gpucap.h"
 #include "remote/mirror.h"
 #include "remote/share.h"
 #include "remote/sharewire.h"
@@ -1756,6 +1757,25 @@ static void cursor_mark(Server *s) {
 }
 
 /* The CPU part of a display's frame: its damage painted into the scene (paint_out), and what GPU drag did. */
+/* A frame the capture thread finished (gpucap.c) goes to the viewers from the main loop. */
+static Out *captured_out;
+static void capture_arrived(Server *s) {
+    int w, h;
+    const uint32_t *px = gpucap_take(&w, &h);
+    if (!px) return;
+    Out *o = captured_out;
+    if (o && gpu_active() && o->gpu >= 0 && o->scene.w == w && o->scene.h == h) {
+        Cur k;
+        cursor_now(s, &k, out_scale(o));
+        int cx, cy;
+        pointer_phys(s, o, &cx, &cy);
+        mirror_composed_on_gpu(1);
+        mirror_frame(px, w, w, h, NULL);
+        mirror_cursor(cx, cy, k.mode, k.px, k.w, k.h, k.hx, k.hy, k.gen);
+    }
+    gpucap_release();
+}
+
 static Rect out_paint(Server *s, Out *o, int i, const Out *feed) {
     /* GPU drag with no UI damage: the GPU draws the window again from its textures, if they are still this
      * display's; otherwise its rectangle is painted by the CPU now */
@@ -1779,8 +1799,11 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
         /* the remote desktop watches: the composed frame is read back once for every viewer */
         static uint32_t *rb;
         static size_t rb_n;
-        int readback = o == feed && mirror_watchers() > 0 && mirror_capture_due();
-        if (readback) {
+        int readback = o == feed && mirror_watchers() > 0, threaded = readback && gpucap_on();
+        if (threaded && !gpucap_idle()) { mirror_capture_skip(); readback = 0; }
+        else if (readback) readback = mirror_capture_due();
+        if (readback && threaded) { captured_out = o; gpu_read_thread(o->scene.w, o->scene.h); }
+        else if (readback) {
             size_t need = (size_t)o->scene.w * o->scene.h;
             if (need > rb_n) { free(rb); rb = malloc(need * 4); rb_n = rb ? need : 0; }
             if (rb) gpu_read_next(rb, o->scene.w, o->scene.h);
@@ -2598,6 +2621,8 @@ int main(int argc, char **argv) {
         if (pbase >= 0) pfd[n++] = (struct pollfd){ portal_fd(), (short)(POLLIN | (portal_wants_write() ? POLLOUT : 0)), 0 };
         int lgbase = logs_fd() >= 0 ? n : -1;                    /* app Registros: consultas e inotify */
         if (lgbase >= 0) pfd[n++] = (struct pollfd){ logs_fd(), POLLIN, 0 };
+        int capbase = gpucap_fd() >= 0 ? n : -1;                 /* a shared frame arrived from its thread */
+        if (capbase >= 0) pfd[n++] = (struct pollfd){ gpucap_fd(), POLLIN, 0 };
         int lbibase = lbi_fd() >= 0 ? n : -1;                    /* LordBench's synthetic pointer, like a device */
         if (lbibase >= 0) pfd[n++] = (struct pollfd){ lbi_fd(), POLLIN, 0 };
         int mbase = n, nm = mirror_pollfds(pfd + n, 12);
@@ -2665,6 +2690,7 @@ int main(int argc, char **argv) {
         if (dkbase >= 0 && pfd[dkbase].revents && disk_watch_dispatch()) js_disk_event("change");
         if (sbase >= 0 && pfd[sbase].revents) snd_dispatch();
         if (pbase >= 0 && pfd[pbase].revents) portal_dispatch();
+        if (capbase >= 0 && pfd[capbase].revents) capture_arrived(&s);
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */

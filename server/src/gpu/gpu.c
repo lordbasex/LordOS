@@ -62,6 +62,7 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float
 int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d; (void)done; (void)data; return -1; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
 void gpu_read_next(uint32_t *px, int w, int h) { (void)px; (void)w; (void)h; }
+void gpu_read_thread(int w, int h) { (void)w; (void)h; }
 int  gpu_read_done(void) { return 0; }
 
 #else
@@ -78,8 +79,9 @@ int  gpu_read_done(void) { return 0; }
 #include <gbm.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 #include <GLES2/gl2ext.h>
+#include "gpucap.h"
 #include <drm/drm_fourcc.h>
 #include <drm/virtgpu_drm.h>
 #include <linux/sync_file.h>
@@ -506,8 +508,11 @@ int gpu_init(Kms *k) {
         if (eglGetConfigAttrib(G.dpy, cfgs[i], EGL_NATIVE_VISUAL_ID, &vid) && vid == GBM_FORMAT_XRGB8888) cfg = cfgs[i];
     }
     if (!cfg) { fprintf(stderr, "gpu: no XRGB8888 EGL config, CPU composition\n"); last_why = "no-config"; goto fail; }
+    /* ES 3 for the frames of a screen share (gpucap.c); everything else here is ES 2 and works on both */
+    static const EGLint ctx3_attr[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
     static const EGLint ctx_attr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-    G.ctx = eglCreateContext(G.dpy, cfg, EGL_NO_CONTEXT, ctx_attr);
+    G.ctx = eglCreateContext(G.dpy, cfg, EGL_NO_CONTEXT, ctx3_attr);
+    if (G.ctx == EGL_NO_CONTEXT) G.ctx = eglCreateContext(G.dpy, cfg, EGL_NO_CONTEXT, ctx_attr);
     G.cfg = cfg;
     G.gen = ++last_gen;
     if (last_gen == 0) G.gen = last_gen = 1;    /* 0 means "no context" */
@@ -522,6 +527,7 @@ int gpu_init(Kms *k) {
         snprintf(last_renderer, sizeof last_renderer, "%s", G.renderer);
         goto fail;
     }
+    gpucap_start(G.dpy, cfg, G.ctx);
     G.bgra = has_ext(gl_exts, "GL_EXT_texture_format_BGRA8888");
     G.have_external = has_ext(gl_exts, "GL_OES_EGL_image_external");
     G.unpack_sub = has_ext(gl_exts, "GL_EXT_unpack_subimage");
@@ -586,6 +592,7 @@ void gpu_shutdown(void) {
             if (G.out[i].used && eglMakeCurrent(G.dpy, G.out[i].surf, G.out[i].surf, G.ctx)) { hook_lost(); break; }
     }
     if (G.dpy != EGL_NO_DISPLAY && G.dpy) {
+        gpucap_stop();
         for (int i = OUT_MAX - 1; i >= 0; i--) out_teardown(&G.out[i]);
         eglMakeCurrent(G.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
         if (G.ctx) eglDestroyContext(G.dpy, G.ctx);
@@ -826,9 +833,10 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float
     glDisable(GL_SCISSOR_TEST);
 }
 
-static struct { uint32_t *px; int w, h, done; } rb;
+static struct { uint32_t *px; int w, h, done, thread; } rb;
 
-void gpu_read_next(uint32_t *px, int w, int h) { rb.px = px; rb.w = w; rb.h = h; rb.done = 0; }
+void gpu_read_next(uint32_t *px, int w, int h) { rb.px = px; rb.w = w; rb.h = h; rb.done = 0; rb.thread = 0; }
+void gpu_read_thread(int w, int h) { rb.px = (uint32_t *)1; rb.w = w; rb.h = h; rb.done = 0; rb.thread = 1; }
 int gpu_read_done(void) { return rb.done; }
 
 /* RGBA bytes, bottom row first (GL) → 0xAARRGGBB words, top row first; opaque. */
@@ -1312,7 +1320,10 @@ int gpu_frame_ex(int out, const Canvas *scene, const Rect *dmg, int n, const Gpu
     }
     if (draw_layer) draw_layer(1);
     if (rb.px) {
-        if (rb.w == o->W && rb.h == o->H) read_back(o->W, o->H);
+        if (rb.w == o->W && rb.h == o->H) {
+            if (rb.thread) gpucap_kick(o->W, o->H);
+            else read_back(o->W, o->H);
+        }
         rb.px = NULL;
     }
     double t1 = mono_ms();
