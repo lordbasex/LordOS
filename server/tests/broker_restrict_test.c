@@ -38,7 +38,7 @@ static void check(int ok, const char *what) { total++; printf("%s: %s\n", ok ? "
 static int spawned;
 int pkgapp_dir(const char *id, char *out, size_t n) { (void)id; (void)out; (void)n; return -1; }
 int pkgapp_manifest(const char *dir, const char *id, void *m) { (void)dir; (void)id; (void)m; return -1; }
-int app_companion_spawn(const char *id, int net, int share, int *fd) { (void)id; (void)net; (void)share; (void)fd; spawned++; return -1; }
+int app_companion_spawn(const char *id, int net, int share, int *fd, int *link) { (void)id; (void)net; (void)share; (void)fd; (void)link; spawned++; return -1; }
 int share_companion(const char *id, int may_input) { (void)id; (void)may_input; spawned++; return -1; }
 int statusitem_clean(const char *app, const char *json, size_t len, char *out, size_t n) { (void)app; (void)json; (void)len; snprintf(out, n, "{}"); return 0; }
 int statusitem_id_ok(const char *id) { (void)id; return 1; }
@@ -84,6 +84,7 @@ MAudio *maudio_open(int capture, const char *app, const char *title, const char 
 void maudio_close(MAudio *a) { if (a && a->open) { a->open = 0; mics_closed++; } }
 int maudio_pollfd(const MAudio *a, short *events) { (void)a; *events = 0; return -1; }
 void maudio_service(MAudio *a) { (void)a; }
+void maudio_playing(MAudio *a, int on) { (void)a; (void)on; }
 void maudio_mic_drain(MAudio *a) { (void)a; }
 
 static MediaSrc srcs[4];

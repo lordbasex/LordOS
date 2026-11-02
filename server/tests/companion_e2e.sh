@@ -50,8 +50,11 @@ direct() {
   python3 - "$B/lord-server-pkgtest" "$@" <<'X'
 import os,socket,subprocess,sys
 a,b=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
+c,d=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
 def child():
     os.dup2(b.fileno(),3)
+    os.dup2(d.fileno(),6)
+    os.set_inheritable(6,True)
 p=subprocess.Popen([sys.argv[1],'--companion',sys.argv[2],'0'],preexec_fn=child,pass_fds=(3,) if False else (),close_fds=False,stderr=subprocess.DEVNULL)
 b.close()
 a.settimeout(8)
