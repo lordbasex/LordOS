@@ -16,7 +16,7 @@ export function SwitcherSettings({ tr }) {
   const [s, set] = useSettings();
   const p = switcherPrefs(s.switcher);
   const put = (patch) => set({ switcher: { ...p, ...patch } });
-  const opts = (key, ids) => ids.map((id) => ({ value: id, label: tr(`settings.kb.switcher.${key}.${id}`) }));
+  const opts = (key, ids) => ids.map((id) => [id, tr(`settings.kb.switcher.${key}.${id}`)]);
   const open = runningApps();
   const apps = useLauncherApps();
   const rows = [...open.map((g) => ({ key: g.key, name: g.name })),
@@ -26,10 +26,10 @@ export function SwitcherSettings({ tr }) {
   return (
     <>
       <Section title={tr('settings.kb.switcher.title')} footer={metaInClassic ? `${tr('settings.kb.switcher.hint')} ${tr('settings.kb.switcher.hintOverview')}` : tr('settings.kb.switcher.hint')}>
-        <SettingRow label={tr('settings.kb.switcher.keys')}><Segmented value={p.keys} onChange={(v) => put({ keys: v })} options={opts('keys', ['theme', 'meta', 'alt', 'both'])} /></SettingRow>
-        <SettingRow label={tr('settings.kb.switcher.scope')}><Segmented value={p.scope} onChange={(v) => put({ scope: v })} options={opts('scope', ['all', 'desktop', 'display'])} /></SettingRow>
-        <SettingRow label={tr('settings.kb.switcher.size')}><Segmented value={p.size} onChange={(v) => put({ size: v })} options={opts('size', ['s', 'm', 'l'])} /></SettingRow>
-        <SettingRow label={tr('settings.kb.switcher.skin')}><Segmented value={p.skin} onChange={(v) => put({ skin: v })} options={opts('skin', ['system', 'glass', 'solid', 'contrast', 'custom'])} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.keys')}><Segmented small value={p.keys} onChange={(v) => put({ keys: v })} options={opts('keys', ['theme', 'meta', 'alt', 'both'])} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.scope')}><Segmented small value={p.scope} onChange={(v) => put({ scope: v })} options={opts('scope', ['all', 'desktop', 'display'])} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.size')}><Segmented small value={p.size} onChange={(v) => put({ size: v })} options={opts('size', ['s', 'm', 'l'])} /></SettingRow>
+        <SettingRow label={tr('settings.kb.switcher.skin')}><Segmented small value={p.skin} onChange={(v) => put({ skin: v })} options={opts('skin', ['system', 'glass', 'solid', 'contrast', 'custom'])} /></SettingRow>
         {p.skin === 'custom' && <ColorRow label={tr('settings.kb.switcher.customBg')} value={p.customBg} onChange={(v) => put({ customBg: v })} />}
         {p.skin === 'custom' && <ColorRow label={tr('settings.kb.switcher.customAccent')} value={p.customAccent} onChange={(v) => put({ customAccent: v })} />}
         <SettingRow label={tr('settings.kb.switcher.numbers')}><Toggle value={p.numbers} onChange={(v) => put({ numbers: v })} /></SettingRow>
