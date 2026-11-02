@@ -1,0 +1,2 @@
+{ "id": "pkgtest", "version": "1.0", "name": "Package test", "icon": "icon.png", "companion": "bin/engine",
+  "size": [320, 200], "permissions": ["network", "screen-share", "remote-input", "status-item"] }
