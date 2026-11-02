@@ -66,18 +66,29 @@ def customize(root):
     write(root, '/etc/anaconda/conf.d/90-axia.conf',
           '[User Interface]\nhidden_webui_pages =\nhidden_spokes =\n'
           'webui_web_engine = /usr/libexec/axia/installer-browser\n')
-    installer = root / 'usr/share/applications/liveinst.desktop'
-    write(root, str(installer.relative_to(root)), installer.read_text().replace('NoDisplay=true', 'NoDisplay=false'))
+    # One way in: the helper checks the media and the disks, then starts liveinst (which stays hidden)
+    # and explains a failed installation from Anaconda's logs. The shell opens it on live media.
+    write(root, '/usr/libexec/axia/axia-install', (HERE / 'axia-install.py').read_text(), 0o755)
+    write(root, '/usr/libexec/axia/axia-install-root', (HERE / 'axia-install-root').read_text(), 0o755)
+    write(root, '/usr/share/applications/org.axia.Install.desktop',
+          '[Desktop Entry]\nType=Application\nName=Install Axia DE\nName[pt]=Instalar o Axia DE\n'
+          'Name[pt_BR]=Instalar o Axia DE\nName[es]=Instalar Axia DE\n'
+          'Comment=Check the media and install Axia DE on this computer\n'
+          'Comment[pt]=Verificar a mídia e instalar o Axia DE neste computador\n'
+          'Comment[pt_BR]=Verificar a mídia e instalar o Axia DE neste computador\n'
+          'Exec=/usr/libexec/axia/axia-install\nIcon=/usr/libexec/axia/assets/icons/axia-icon-128.png\n'
+          'Categories=System;\nTerminal=false\n')
     write(root, '/usr/share/anaconda/post-scripts/99-axia.ks',
           '%post --erroronfail\n'
           'cat > /etc/gdm/custom.conf <<\'EOF\'\n' + normal_gdm + 'EOF\n'
           'rm -f /usr/share/polkit-1/rules.d/20-livesys-axia.rules\n'
+          'rm -f /usr/share/applications/org.axia.Install.desktop /usr/libexec/axia/axia-install /usr/libexec/axia/axia-install-root\n'
           'systemctl set-default graphical.target\n'
           '%end\n')
     write(root, '/usr/share/doc/axia-de/ISO-README.txt',
           'Fedora 44 + Axia DE 0.8.7 (experimental, unofficial remix).\n'
           'GDM is retained for login; Axia DE is the default desktop.\n'
-          'Use Install to Hard Drive in the app launcher, or run liveinst.\n'
+          'Install Axia DE opens by itself; it is also in the app launcher.\n'
           'The installer creates the account for the installed system.\n'
           'For Wi-Fi, run nm-connection-editor or nmtui in Terminal.\n')
 

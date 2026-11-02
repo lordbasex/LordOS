@@ -1,0 +1,22 @@
+#!/bin/sh
+# Root side of Install Axia DE (axia-install.py), live media only. pkexec runs it for the live user
+# without a password (20-livesys-axia.rules). Two fixed actions; nothing the caller passes reaches a
+# shell or a path.
+set -u
+case "${1:-}" in
+check)
+    # the boot media against the checksum implanted in the ISO: progress on stdout, result on stderr
+    dev=$(realpath /run/initramfs/livedev) || exit 2
+    exec checkisomd5 --gauge "$dev"
+    ;;
+logs)
+    # Anaconda's logs (root's files in /tmp) as a tar stream
+    cd /tmp || exit 2
+    files=$(for f in anaconda.log packaging.log program.log storage.log dbus.log anaconda-tb-*; do [ -f "$f" ] && printf '%s\n' "$f"; done)
+    [ -n "$files" ] || exit 0
+    printf '%s\n' "$files" | exec tar -cf - -T -
+    ;;
+*)
+    exit 2
+    ;;
+esac

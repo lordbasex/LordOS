@@ -38,6 +38,11 @@ polkit.addRule(function(action, subject) {
     if (subject.local && subject.user === 'liveuser' &&
         action.id.indexOf('org.fedoraproject.pkexec.liveinst') === 0)
         return 'yes';
+    // Install Axia DE's root helper: the media check and Anaconda's logs (tools/fedora-live)
+    if (subject.local && subject.user === 'liveuser' &&
+        action.id === 'org.freedesktop.policykit.exec' &&
+        action.lookup('program') === '/usr/libexec/axia/axia-install-root')
+        return 'yes';
 });
 EOF
 restorecon -F /usr/share/polkit-1/rules.d/20-livesys-axia.rules

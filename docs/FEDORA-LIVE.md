@@ -21,7 +21,13 @@ O resultado inclui a ISO, um arquivo `.iso.sha256` e um `.iso.json` com os hashe
 
 ## Sessão e instalação
 
-O livesys do Fedora cria o usuário live e faz login automático no Axia DE. No launcher há **Install to Hard Drive / Instalar no disco rígido**; o mesmo instalador pode ser aberto com `liveinst` no Terminal.
+O livesys do Fedora cria o usuário live e faz login automático no Axia DE. Ao iniciar, a sessão abre **Instalar o Axia DE** (`tools/fedora-live/axia-install.py`, com o auxiliar de root `axia-install-root` liberado por polkit só para o usuário live), que também fica no launcher:
+
+- confere o pendrive com a soma de verificação gravada na ISO (`checkisomd5`), o que detecta uma gravação corrompida antes da cópia dos arquivos;
+- mostra a memória e os discos, com aviso abaixo de 2 GB de RAM ou 20 GB de disco;
+- abre o instalador do Fedora (`liveinst`, Anaconda) e, quando ele fecha, lê os logs do Anaconda: numa falha, diz a causa provável (leitura do pendrive, falta de espaço ou outra), mostra as linhas do erro e salva um relatório em `~/axia-instalacao-*.tar.gz`.
+
+O facilitador e seu atalho são removidos do sistema instalado pelo script pós-instalação.
 
 A configuração do Anaconda volta a mostrar a criação de usuário e a escolha de data/hora. O GNOME Initial Setup é removido: a conta real deve ser criada no instalador. Um script pós-instalação restaura a configuração normal do GDM, com Axia DE como sessão padrão e autenticação normal.
 

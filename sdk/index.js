@@ -22,7 +22,7 @@ export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe,
 export { ime, useIme } from './ime.js';
 export { wayland } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, APP_CATEGORIES, appCategory } from './apps.js';
-import { windowIcon as windowIconOf } from './apps.js';
+import { windowIcon as windowIconOf, linuxAppFor as linuxAppOf, launchApp as launchAppOf } from './apps.js';
 import { ImeOverlay } from './ime.js';
 import { startOsk } from './osk.js';
 import { startWindowMemory } from './windowmemory.js';
@@ -95,7 +95,7 @@ import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
 import { maybeStartTour } from './help.js';
-import { getApp as getAppOf, wm as wmOf, windows as windowsStore } from './windows.js';
+import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
 export { systemInfo, systemReport, lordosVersion, useSystemInfo, useServerStats, useCpuUsage, formatBytes, formatDuration } from './system.js';
 export * as fs from './fs.js';
@@ -211,6 +211,8 @@ export function startShell(element) {
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();
   render(createElement(LocaleRoot, null, element));
+  // live media: the installation helper opens by itself (tools/fedora-live/axia-install.py)
+  if (isLiveSystemOf()) setTimeout(() => { const a = linuxAppOf('org.axia.Install'); if (a) launchAppOf(a.id); }, 1500);
   startAlarms();                        // Clock alarms and timer, with the app closed
   startMail();                          // new-mail notifications and passwords on demand (docs/MAIL.md)
   startReminders();                     // calendar and reminder alarms, with the apps closed
