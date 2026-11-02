@@ -29,7 +29,7 @@ for (const v of ['2026.10.27.0', '2026.10.27.100', '2026.10.27.', '2026.13.01', 
   eq(`not a date ${JSON.stringify(v)}`, snapshotDate(v), null);
 
 // every language has both strings, and the summary takes the date
-for (const lang of ['en', 'es', 'pt']) {
+for (const lang of ['en', 'es', 'pt', 'fr']) {
   const cat = JSON.parse(fs.readFileSync(path.join(here, `../../assets/locales/${lang}/store.json`), 'utf8'));
   eq(`${lang} name`, typeof cat['updates.hwdata.name'] === 'string' && cat['updates.hwdata.name'].length > 0, true);
   eq(`${lang} summary has {date}`, /\{date\}/.test(cat['updates.hwdata.summary'] || ''), true);

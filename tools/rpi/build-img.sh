@@ -310,6 +310,7 @@ es_AR.UTF-8 UTF-8
 es_MX.UTF-8 UTF-8
 en_US.UTF-8 UTF-8
 pt_BR.UTF-8 UTF-8
+fr_FR.UTF-8 UTF-8
 EOF
 in_root "$CH" locale-gen > /dev/null
 echo 'LANG=en_US.UTF-8' > "$CH/etc/default/locale"     # English by default, like the ISO
@@ -444,7 +445,7 @@ cat > "$WORK/mnt/etc/fstab" <<EOF
 PARTUUID=$PARTUUID_ROOT  /              ext4  defaults,noatime  0 1
 PARTUUID=$PARTUUID_BOOT  /boot/firmware vfat  defaults,umask=0077  0 2
 EOF
-# lordos.gpu=0 (safe mode, everything on the CPU) and lordos.lang=en|pt can be added here, as on the ISO.
+# lordos.gpu=0 (safe mode, everything on the CPU) and lordos.lang=en|pt|fr can be added here, as on the ISO.
 # The boot splash: quiet splash (Plymouth), no serial console for it, no kernel logo or blinking cursor;
 # the console is tty1, where Plymouth draws and where Esc shows the boot messages. Removing "splash"
 # boots in text as before (docs/RASPBERRY.md, "Boot splash").

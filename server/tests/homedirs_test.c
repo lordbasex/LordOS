@@ -61,9 +61,11 @@ int main(void) {
     static const char *const es[6] = { "Escritorio", "Documentos", "Descargas", "Música", "Imágenes", "Videos" };
     static const char *const en[6] = { "Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos" };
     static const char *const pt[6] = { "Área de trabalho", "Documentos", "Downloads", "Música", "Imagens", "Vídeos" };
+    static const char *const fr[6] = { "Bureau", "Documents", "Téléchargements", "Musique", "Images", "Vidéos" };
     lang("es_AR.UTF-8", es, "XDG_DOCUMENTS_DIR=\"$HOME/Documentos\"", "es_AR");
     lang("en_US.UTF-8", en, "XDG_DOWNLOAD_DIR=\"$HOME/Downloads\"", "en_US");
     lang("pt_BR.UTF-8", pt, "XDG_DESKTOP_DIR=\"$HOME/Área de trabalho\"", "pt_BR");
+    lang("fr_FR.UTF-8", fr, "XDG_DESKTOP_DIR=\"$HOME/Bureau\"", "fr_FR");
     lang("C.UTF-8", en, "XDG_PICTURES_DIR=\"$HOME/Pictures\"", "en_US");    /* no language: English */
 
     /* ~/.config is a symlink elsewhere: nothing is written through it */

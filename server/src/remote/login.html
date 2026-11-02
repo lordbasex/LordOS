@@ -55,7 +55,7 @@
 </form>
 <div class="foot" id="foot"></div>
 <div class="bl"><i></i><span id="host"></span></div>
-<div class="br"><button type="button" class="pill" data-l="es">ES</button><button type="button" class="pill" data-l="en">EN</button><button type="button" class="pill" data-l="pt">PT</button></div>
+<div class="br"><button type="button" class="pill" data-l="es">ES</button><button type="button" class="pill" data-l="en">EN</button><button type="button" class="pill" data-l="pt">PT</button><button type="button" class="pill" data-l="fr">FR</button></div>
 <script>
   const L = {
     en: { user: 'Username', pass: 'Password', e1: 'Wrong username or password.', e2: 'Too many attempts. Wait a while and try again.',
@@ -82,6 +82,14 @@
           days: ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'],
           months: ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
           date: (w, d, m) => `${w}, ${d} de ${m}`, h12: false },
+    fr: { user: 'Utilisateur', pass: 'Mot de passe', e1: 'Utilisateur ou mot de passe incorrect.', e2: 'Trop de tentatives. Patientez un moment, puis réessayez.',
+          e3: 'La session a été verrouillée. Reconnectez-vous.',
+          e4: 'Trop de tentatives échouées depuis cet ordinateur : il est bloqué pendant un moment. Un administrateur peut le débloquer dans Réglages → Partage.',
+          e5: 'Les noms d’utilisateur comportent des minuscules, des chiffres, - et _ (32 caractères au maximum).', e6: 'Saisissez votre mot de passe.',
+          foot: 'Bureau à distance LordOS · connexion chiffrée. Si votre navigateur signale un problème de certificat, comparez son empreinte avec celle de Réglages → Partage.',
+          days: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+          months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+          date: (w, d, m) => `${w} ${d} ${m}`, h12: false },
   };
   const $ = (id) => document.getElementById(id);
   let lang = (() => { try { return localStorage.getItem('lordos-lang'); } catch (e) { return null; } })() || (navigator.language || 'en').slice(0, 2);

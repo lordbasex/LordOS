@@ -95,6 +95,7 @@ user_dirs() {         # user folders by language, like Settings' user-add
     case "$2" in
         en) set -- "$1" Desktop Documents Downloads Music Pictures Videos ;;
         pt) set -- "$1" "Área de trabalho" Documentos Downloads Música Imagens Vídeos ;;
+        fr) set -- "$1" Bureau Documents Téléchargements Musique Images Vidéos ;;
         *)  set -- "$1" Escritorio Documentos Descargas Música Imágenes Videos ;;
     esac
     u=$1; shift
@@ -162,12 +163,12 @@ if [ -e "$STATE/firstboot-pending" ]; then
     F=""
     [ -f "$BOOT/lordos-user.txt" ] && F="$BOOT/lordos-user.txt"
     LANG_UI=en     # English by default, like the ISO
-    for a in $(cat /proc/cmdline); do case "$a" in lordos.lang=es) LANG_UI=es ;; lordos.lang=pt) LANG_UI=pt ;; esac; done
+    for a in $(cat /proc/cmdline); do case "$a" in lordos.lang=es) LANG_UI=es ;; lordos.lang=pt) LANG_UI=pt ;; lordos.lang=fr) LANG_UI=fr ;; esac; done
     U=""; FULL=""; HASH=""; PASS=""; HOST=""; TZ_=""; KB=""; KBV=""
     if [ -n "$F" ]; then
         U=$(kv user "$F"); FULL=$(kv fullname "$F" | tr -d ':,' | tr -d '\000-\037')
         HASH=$(kv password_hash "$F"); PASS=$(kv password "$F"); HOST=$(kv hostname "$F")
-        L=$(kv lang "$F"); case "$L" in es|en|pt) LANG_UI=$L ;; esac
+        L=$(kv lang "$F"); case "$L" in es|en|pt|fr) LANG_UI=$L ;; esac
         TZ_=$(kv timezone "$F"); KB=$(kv keyboard "$F"); KBV=$(kv keyboard_variant "$F")
         wifi_from "$F"
     elif [ -f "$BOOT/userconf.txt" ]; then
@@ -192,7 +193,7 @@ if [ -e "$STATE/firstboot-pending" ]; then
         else printf '%s:%s\n' "$U" "$PASS" | chpasswd; fi       # chpasswd: yescrypt, like Debian
         : > "/var/lib/systemd/linger/$U"
         user_dirs "$U" "$LANG_UI"
-        case "$LANG_UI" in es) LOC=es_ES.UTF-8 ;; pt) LOC=pt_BR.UTF-8 ;; *) LOC=en_US.UTF-8 ;; esac
+        case "$LANG_UI" in es) LOC=es_ES.UTF-8 ;; pt) LOC=pt_BR.UTF-8 ;; fr) LOC=fr_FR.UTF-8 ;; *) LOC=en_US.UTF-8 ;; esac
         printf 'LANG=%s\n' "$LOC" > /etc/default/locale
         H=$(getent passwd "$U" | cut -d: -f6)
         install -d -o "$U" -g "$U" "$H/.config" "$H/.config/lordos"

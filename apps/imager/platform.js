@@ -123,7 +123,7 @@ export const platform = {
   defaults() {
     const s = settings.get();
     const kb = keyboard.active?.() || {};
-    const lang = ['en', 'es', 'pt'].includes(s.language) ? s.language : 'en';
+    const lang = ['en', 'es', 'pt', 'fr'].includes(s.language) ? s.language : 'en';
     let zone = '';
     try { zone = lord.time.zone() || ''; } catch { /* keep empty */ }
     const region = (s.region || '').split('_')[1] || '';

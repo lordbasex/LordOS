@@ -165,7 +165,7 @@ const need = [
   'notify.title', 'notify.body', 'notify.open',
   'argonCase.title', 'argonCase.why', 'argonCase.detail',
 ];
-for (const lang of ['en', 'es', 'pt']) {
+for (const lang of ['en', 'es', 'pt', 'fr']) {
   const cat = JSON.parse(fs.readFileSync(path.join(repo, `assets/locales/${lang}/store.json`), 'utf8'));
   eq(`${lang}: every suggestion text`, need.filter((k) => !(`suggest.${k}` in cat)), []);
 }

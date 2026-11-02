@@ -25,6 +25,7 @@ export const LANGUAGES = [
   { id: 'en', name: 'English', locale: 'en_US.UTF-8' },
   { id: 'es', name: 'Español', locale: 'es_ES.UTF-8' },
   { id: 'pt', name: 'Português', locale: 'pt_BR.UTF-8' },
+  { id: 'fr', name: 'Français', locale: 'fr_FR.UTF-8' },
 ];
 
 // Coolers and what each one allows (lordos-firstrun checks the same in C)

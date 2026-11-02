@@ -118,6 +118,26 @@ const L = {
     media: 'A conexão está estabelecida, mas nenhuma imagem chegou.', mediaWhat: 'Este navegador talvez não consiga reproduzir vídeo H.264 ou VP8 agora (decodificação por hardware desligada ou um codec bloqueado). Tente outro navegador.',
     wsdown: 'Não é possível alcançar o computador: a conexão caiu.', wsdownWhat: 'Verifique se o computador está ligado e na rede. Esta página continua tentando sozinha.',
   },
+  fr: {
+    full: 'Plein écran', out: 'Se déconnecter', conn: 'Connexion…', reconn: 'Reconnexion…', retry: 'Réessayer', signout: 'Fermer la session',
+    sndOn: 'Activer le son', sndOff: 'Couper le son', video: 'Vidéo', bye: 'La session est terminée.', busy: '{app} partage cette session. Réessayez lorsque ce partage sera terminé.',
+    hwEnc: 'par le matériel', swEnc: 'par logiciel', pinOn: 'Garder cette barre affichée', pinOff: 'Laisser cette barre se masquer',
+    vinfoTip: (comp, enc, ms) => `Écran composé sur le ${comp} ; vidéo encodée ${enc} (${ms} ms par image). Images par seconde : affichées ici / envoyées par l’ordinateur.`,
+    unsupTitle: 'Ce navigateur ne peut pas afficher le bureau à distance',
+    unsupText: 'Le bureau à distance arrive sous forme de vidéo en direct via WebRTC. Il manque à ce navigateur un élément nécessaire :',
+    reqRtc: 'WebRTC (RTCPeerConnection) avec canaux de données', reqCodec: 'Décodage vidéo H.264 ou VP8', reqSecure: 'Une page sécurisée (https) : celle-ci l’est',
+    unsupWhat: 'Ouvrez cette adresse dans un navigateur à jour, sur ordinateur ou sur mobile, avec WebRTC activé. Les extensions ou réglages de confidentialité qui désactivent WebRTC provoquent aussi ce problème.',
+    failTitle: 'Impossible de se connecter au bureau à distance', why: 'Pourquoi', what: 'Que faire', details: 'Détails',
+    noroute: 'La connexion vidéo n’a jamais atteint cet ordinateur : aucune vérification de connexion n’est arrivée par UDP, ni par le port TCP {port}. Un pare-feu, un VPN ou le réseau qui vous sépare bloque les deux.',
+    norouteWhat: 'Autorisez UDP, ou au moins le port TCP {port}, entre ce navigateur et l’ordinateur. Pour vous connecter d’un réseau à l’autre, un administrateur peut ajouter un relais (TURN) dans Réglages → Partage sur l’ordinateur.',
+    dtls: 'La connexion a abouti, mais le canal vidéo chiffré (DTLS) n’a pas pu être établi.',
+    dtlsWhat: 'Réessayez. Si le problème persiste, un élément intermédiaire (un proxy ou un logiciel de sécurité) modifie la connexion.',
+    lost: 'La connexion a été perdue et n’a pas été rétablie.', lostWhat: 'Vérifiez le réseau des deux côtés. Une fois le réseau rétabli, réessayez : votre session reste ouverte.',
+    server: 'L’ordinateur n’a pas pu lancer la connexion vidéo.', serverWhat: 'Réessayez. Si le problème persiste, désactivez puis réactivez le bureau à distance dans Réglages → Partage.',
+    offer: 'L’ordinateur a refusé la proposition de connexion de ce navigateur ou n’y a pas répondu.', offerWhat: 'Mettez à jour le navigateur et réessayez. Si le problème persiste, une extension modifie peut-être la page.',
+    media: 'La connexion est établie, mais aucune image n’est arrivée.', mediaWhat: 'Ce navigateur ne peut peut-être pas lire la vidéo H.264 ou VP8 pour le moment (décodage matériel désactivé ou codec bloqué). Essayez un autre navigateur.',
+    wsdown: 'L’ordinateur est injoignable : la connexion a été perdue.', wsdownWhat: 'Vérifiez que l’ordinateur est allumé et connecté au réseau. Cette page continue d’essayer toute seule.',
+  },
 };
 const T = L[(navigator.language || 'en').slice(0, 2)] || L.en;
 const $ = (id) => document.getElementById(id);
