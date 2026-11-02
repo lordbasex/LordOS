@@ -531,6 +531,28 @@ int mirror_viewers(void) {
     return n;
 }
 
+/* Reading a frame back stops the compositor while it lasts, so it happens only as often as the encoder
+ * can use it, not on every frame. LORD_CAPTURE_FPS changes the rate. A change that a skipped frame
+ * left out is asked for again by mirror_tick, so the last picture of a change always arrives. */
+#define CAPTURE_FPS 30
+#define CAPTURE_GRACE_MS 20
+static double capture_at;
+static int capture_late;
+static double capture_ms(void) {
+    static int env = -1;
+    if (env < 0) { const char *e = getenv("LORD_CAPTURE_FPS"); env = e ? atoi(e) : 0; }
+    int f = env > 0 ? env : CAPTURE_FPS, v = mirror_fps();
+    if (v > 0 && v < f) f = v;
+    return 1000.0 / f;
+}
+int mirror_capture_due(void) {
+    double t = now_ms();
+    if (t - capture_at + 2 < capture_ms()) { capture_late = 1; return 0; }
+    capture_at = t;
+    capture_late = 0;
+    return 1;
+}
+
 /* The API's holder came or went, or changed its rate. Starting: a whole frame, as for a first viewer. */
 void mirror_share_changed(void) {
     video_update();
@@ -770,6 +792,10 @@ static void vinfo_update(void) {
  * frame waiting for a free slot. */
 void mirror_tick(void) {
     if (lfd < 0) return;
+    if (capture_late && now_ms() - capture_at >= capture_ms() + CAPTURE_GRACE_MS && cb.refresh) {
+        capture_late = 0;
+        if (mirror_watchers()) cb.refresh();
+    }
     vinfo_update();
     if (still()) for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0 && cl[i].vmode && cl[i].ready) pump(&cl[i]);
     mstream_tick();
@@ -778,6 +804,11 @@ void mirror_tick(void) {
 double mirror_timeout(void) {
     if (lfd < 0) return -1;
     double best = mstream_timeout();
+    if (capture_late) {
+        double d = capture_at + capture_ms() + CAPTURE_GRACE_MS - now_ms();
+        if (d < 0) d = 0;
+        if (best < 0 || d < best) best = d;
+    }
     for (int i = 0; i < MAX_CLIENTS; i++) {
         const Client *c = &cl[i];
         if (c->fd < 0 || !c->vmode || !c->ready || !c->dirty) continue;

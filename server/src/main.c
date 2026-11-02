@@ -1779,7 +1779,7 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
         /* the remote desktop watches: the composed frame is read back once for every viewer */
         static uint32_t *rb;
         static size_t rb_n;
-        int readback = o == feed && mirror_watchers() > 0;
+        int readback = o == feed && mirror_watchers() > 0 && mirror_capture_due();
         if (readback) {
             size_t need = (size_t)o->scene.w * o->scene.h;
             if (need > rb_n) { free(rb); rb = malloc(need * 4); rb_n = rb ? need : 0; }
