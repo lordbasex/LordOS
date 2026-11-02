@@ -83,6 +83,7 @@
 #include "../hw/mimeapps.h"
 #include "../hw/notifyd.h"
 #include "../hw/pkagent.h"
+#include "portal.h"
 #include "../hw/ppd.h"
 
 #include <fcntl.h>
@@ -316,6 +317,36 @@ static JSValue f_polkit_cancel(JSContext *c, JSValueConst t, int argc, JSValueCo
 
 static const JSCFunctionListEntry polkit_funcs[] = {
     JS_CFUNC_DEF("cancel", 1, f_polkit_cancel),
+};
+
+/* lord.portal.chosen(id, paths | null): the answer to an app's file dialog (ui/portal.c). */
+#define PORTAL_MAX_PATHS 256
+static JSValue f_portal_chosen(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_UNDEFINED;
+    int id = arg_int(c, argv[0], -1);
+    const char *paths[PORTAL_MAX_PATHS];
+    int n = 0;
+    if (argc > 1 && JS_IsArray(c, argv[1])) {
+        uint32_t len = 0;
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        JS_ToUint32(c, &len, lv);
+        JS_FreeValue(c, lv);
+        for (uint32_t i = 0; i < len && n < PORTAL_MAX_PATHS; i++) {
+            JSValue v = JS_GetPropertyUint32(c, argv[1], i);
+            const char *s = JS_ToCString(c, v);
+            JS_FreeValue(c, v);
+            if (!s) continue;
+            if (s[0] == '/') paths[n++] = s; else JS_FreeCString(c, s);
+        }
+    }
+    portal_file_chosen(id, paths, n);
+    for (int i = 0; i < n; i++) JS_FreeCString(c, paths[i]);
+    return JS_UNDEFINED;
+}
+
+static const JSCFunctionListEntry portal_funcs[] = {
+    JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
 };
 
 static const JSCFunctionListEntry bt_funcs[] = {
@@ -735,6 +766,7 @@ void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "power", power_funcs, sizeof power_funcs / sizeof power_funcs[0]);
     add(c, lord, "bt", bt_funcs, sizeof bt_funcs / sizeof bt_funcs[0]);
     add(c, lord, "polkit", polkit_funcs, sizeof polkit_funcs / sizeof polkit_funcs[0]);
+    add(c, lord, "portal", portal_funcs, sizeof portal_funcs / sizeof portal_funcs[0]);
     add(c, lord, "mime", mime_funcs, sizeof mime_funcs / sizeof mime_funcs[0]);
     add(c, lord, "timedate", td_funcs, sizeof td_funcs / sizeof td_funcs[0]);
     add(c, lord, "notifyd", nd_funcs, sizeof nd_funcs / sizeof nd_funcs[0]);

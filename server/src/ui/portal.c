@@ -1,4 +1,4 @@
-/* portal.c — our own org.freedesktop.portal.Settings (without xdg-desktop-portal): GTK, GNOME
+/* portal.c — our own org.freedesktop.portal.Settings and FileChooser (without xdg-desktop-portal): GTK, GNOME
  * (libadwaita) and Qt apps read from here the dark/light mode, the accent color, the order of the
  * title bar buttons and the GTK 3 theme, and follow LordOS's changes live (SettingChanged).
  * Uses Passwords' own D-Bus client (vault/dbus.c). See docs/WAYLAND.md, "GTK and GNOME apps".
@@ -7,6 +7,8 @@
  * GSETTINGS_BACKEND=keyfile and writes those same keys to ~/.config/glib-2.0/settings/keyfile, which
  * GLib watches: GTK 3 also changes live (without dconf or running gsettings). */
 #include "portal.h"
+#include "../hw/hw.h"
+#include "../hw/jbuf.h"
 #include "../vault/dbus.h"
 
 #include <fnmatch.h>
@@ -142,6 +144,11 @@ static const char introspect_xml[] =
     "  <signal name=\"SettingChanged\"><arg type=\"s\" name=\"namespace\"/><arg type=\"s\" name=\"key\"/><arg type=\"v\" name=\"value\"/></signal>\n"
     "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
     " </interface>\n"
+    " <interface name=\"org.freedesktop.portal.FileChooser\">\n"
+    "  <method name=\"OpenFile\"><arg type=\"s\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <method name=\"SaveFile\"><arg type=\"s\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"in\"/><arg type=\"o\" direction=\"out\"/></method>\n"
+    "  <property name=\"version\" type=\"u\" access=\"read\"/>\n"
+    " </interface>\n"
     " <interface name=\"org.freedesktop.DBus.Properties\">\n"
     "  <method name=\"Get\"><arg type=\"s\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"v\" direction=\"out\"/></method>\n"
     "  <method name=\"GetAll\"><arg type=\"s\" direction=\"in\"/><arg type=\"a{sv}\" direction=\"out\"/></method>\n"
@@ -149,6 +156,155 @@ static const char introspect_xml[] =
     " <interface name=\"org.freedesktop.DBus.Introspectable\"><method name=\"Introspect\"><arg type=\"s\" direction=\"out\"/></method></interface>\n"
     " <interface name=\"org.freedesktop.DBus.Peer\"><method name=\"Ping\"/></interface>\n"
     "</node>\n";
+
+/* ---- org.freedesktop.portal.FileChooser ----
+ * For apps that have no file dialog of their own and ask the desktop for one. The shell draws it
+ * (hw event "portal-file", sdk/filepicker.jsx) and answers with lord.portal.chosen. The answer goes
+ * only to the app that asked, on the Request object it was given. It says version 2 on purpose: the
+ * browsers want 3 before they leave their own dialog, so they keep it. */
+#define FC_IFACE  "org.freedesktop.portal.FileChooser"
+#define REQ_IFACE "org.freedesktop.portal.Request"
+#define MAX_PICKS 8
+#define MAX_PATTERNS 64
+
+typedef struct { int id; char sender[256], handle[400]; char *json; } Pick;
+static Pick picks[MAX_PICKS];
+static int npicks, pick_seq;
+
+static void pick_show(void) { hw_emit("portal-file", npicks ? picks[0].json : "null"); }
+
+static void pick_drop(int i) {
+    free(picks[i].json);
+    memmove(&picks[i], &picks[i + 1], sizeof picks[0] * (size_t)(npicks - i - 1));
+    npicks--;
+    if (i == 0) pick_show();
+}
+
+static void file_chooser(const DMsg *m, const char *mode) {
+    if (!m->sig || strcmp(m->sig, "ssa{sv}") || !m->sender) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    if (npicks >= MAX_PICKS) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "too many requests"); return; }
+    DRd r;
+    dr_init(&r, m);
+    dr_str(&r, NULL);                       /* the parent window: the dialog is the system's, over everything */
+    const char *title = dr_str(&r, NULL), *name = "", *token = "", *accept = "";
+    char folder[1024] = "";
+    int multiple = 0, directory = 0, every = 0, npat = 0;
+    const char *pat[MAX_PATTERNS];
+    size_t end = dr_arr(&r, 8);
+    while (!r.err && dr_more(&r, end)) {
+        dr_struct(&r);
+        const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
+        if (r.err) break;
+        if (!strcmp(k, "handle_token") && !strcmp(sig, "s")) token = dr_str(&r, NULL);
+        else if (!strcmp(k, "current_name") && !strcmp(sig, "s")) name = dr_str(&r, NULL);
+        else if (!strcmp(k, "accept_label") && !strcmp(sig, "s")) accept = dr_str(&r, NULL);
+        else if (!strcmp(k, "multiple") && !strcmp(sig, "b")) multiple = dr_bool(&r);
+        else if (!strcmp(k, "directory") && !strcmp(sig, "b")) directory = dr_bool(&r);
+        else if (!strcmp(k, "current_folder") && !strcmp(sig, "ay")) {
+            uint32_t n = 0;
+            const uint8_t *p = dr_bytes(&r, &n);
+            if (p && n < sizeof folder) { memcpy(folder, p, n); folder[n] = 0; }
+        } else if (!strcmp(k, "filters") && !strcmp(sig, "a(sa(us))")) {
+            size_t fe = dr_arr(&r, 8);
+            while (!r.err && dr_more(&r, fe)) {
+                dr_struct(&r);
+                dr_str(&r, NULL);
+                size_t pe = dr_arr(&r, 8);
+                while (!r.err && dr_more(&r, pe)) {
+                    dr_struct(&r);
+                    uint32_t kind = dr_u32(&r);
+                    const char *g = dr_str(&r, NULL);
+                    if (kind != 0) every = 1;       /* a type name: the dialog doesn't know types, it shows all */
+                    else if (npat < MAX_PATTERNS) pat[npat++] = g;
+                }
+            }
+        } else dr_skip(&r, sig);
+    }
+    if (r.err) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.InvalidArgs", "options"); return; }
+    Pick *p = &picks[npicks];
+    memset(p, 0, sizeof *p);
+    p->id = ++pick_seq;
+    snprintf(p->sender, sizeof p->sender, "%s", m->sender);
+    char who[256] = "", tok[65] = "";
+    size_t w = 0;
+    for (const char *s = m->sender + (m->sender[0] == ':'); *s && w + 1 < sizeof who; s++) who[w++] = *s == '.' ? '_' : *s;
+    size_t t = 0;
+    for (const char *s = token; *s && t + 1 < sizeof tok; s++)
+        if ((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '0' && *s <= '9') || *s == '_') tok[t++] = *s;
+    if (!t) snprintf(tok, sizeof tok, "lordos%d", p->id);
+    snprintf(p->handle, sizeof p->handle, "%s/request/%s/%s", OBJ_PATH, who, tok);
+    HBuf j = { 0 };
+    hb_printf(&j, "{\"id\":%d,\"mode\":\"%s\",\"multiple\":%s,\"title\":", p->id,
+              directory ? "folder" : mode, multiple ? "true" : "false");
+    hb_str(&j, title ? title : "");
+    hb_printf(&j, ",\"name\":");   hb_str(&j, name);
+    hb_printf(&j, ",\"accept\":"); hb_str(&j, accept);
+    hb_printf(&j, ",\"folder\":"); hb_str(&j, folder);
+    hb_printf(&j, ",\"patterns\":[");
+    if (!every) for (int i = 0; i < npat; i++) { if (i) hb_printf(&j, ","); hb_str(&j, pat[i]); }
+    hb_printf(&j, "]}");
+    p->json = hb_take(&j);
+    if (!p->json) { dbus_error(&conn, m, "org.freedesktop.portal.Error.Failed", "memory"); return; }
+    npicks++;
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, p->handle);
+    dbus_reply(&conn, m, "o", &b);
+    dw_free(&b);
+    if (npicks == 1) pick_show();
+}
+
+static void uri_of(DBuf *b, const char *path) {
+    static const char hex[] = "0123456789ABCDEF";
+    size_t n = strlen(path), o = 7;
+    char *u = malloc(n * 3 + 8);
+    if (!u) return;
+    memcpy(u, "file://", 7);
+    for (const unsigned char *s = (const unsigned char *)path; *s; s++) {
+        if ((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '0' && *s <= '9') || strchr("/-._~", *s)) u[o++] = (char)*s;
+        else { u[o++] = '%'; u[o++] = hex[*s >> 4]; u[o++] = hex[*s & 15]; }
+    }
+    u[o] = 0;
+    dw_str(b, u);
+    free(u);
+}
+
+void portal_file_chosen(int id, const char *const *paths, int n) {
+    int i = 0;
+    while (i < npicks && picks[i].id != id) i++;
+    if (i == npicks) return;
+    if (up) {
+        DBuf b;
+        dw_init(&b);
+        dw_u32(&b, n > 0 ? 0 : 1);          /* 0 success, 1 cancelled */
+        size_t a = dw_arr_begin(&b, 8);
+        if (n > 0) {
+            dw_struct(&b);
+            dw_str(&b, "uris");
+            dw_variant(&b, "as");
+            size_t u = dw_arr_begin(&b, 4);
+            for (int k = 0; k < n; k++) uri_of(&b, paths[k]);
+            dw_arr_end(&b, u);
+        }
+        dw_arr_end(&b, a);
+        DHdr h = { .type = DBUS_SIGNAL, .path = picks[i].handle, .iface = REQ_IFACE, .member = "Response",
+                   .dest = picks[i].sender, .sig = "ua{sv}" };
+        dbus_send(&conn, &h, &b);
+        dw_free(&b);
+        dbus_flush(&conn);
+    }
+    pick_drop(i);
+}
+
+static void request_close(const DMsg *m) {
+    for (int i = 0; i < npicks; i++)
+        if (!strcmp(picks[i].handle, m->path) && m->sender && !strcmp(picks[i].sender, m->sender)) {
+            pick_drop(i);
+            dbus_reply(&conn, m, NULL, NULL);
+            return;
+        }
+    dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no such request");
+}
 
 static void handle(const DMsg *m) {
     if (m->type != DBUS_CALL || !m->member) return;
@@ -177,12 +333,13 @@ static void handle(const DMsg *m) {
         dw_free(&b);
         return;
     }
+    if (!strcmp(iface, REQ_IFACE) && !strcmp(mem, "Close") && m->path) { request_close(m); return; }
     if (!m->path || strcmp(m->path, OBJ_PATH)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownObject", "no existe"); return; }
     if (!strcmp(iface, "org.freedesktop.DBus.Properties")) {
         DRd r;
         dr_init(&r, m);
         const char *pi = dr_str(&r, NULL);
-        if (r.err || strcmp(pi, IFACE)) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownInterface", "interfaz"); return; }
+        if (r.err || (strcmp(pi, IFACE) && strcmp(pi, FC_IFACE))) { dbus_error(&conn, m, "org.freedesktop.DBus.Error.UnknownInterface", "interfaz"); return; }
         DBuf b;
         dw_init(&b);
         if (!strcmp(mem, "Get")) {
@@ -203,6 +360,8 @@ static void handle(const DMsg *m) {
         dw_free(&b);
         return;
     }
+    if (!strcmp(iface, FC_IFACE) && !strcmp(mem, "OpenFile")) { file_chooser(m, "open"); return; }
+    if (!strcmp(iface, FC_IFACE) && !strcmp(mem, "SaveFile")) { file_chooser(m, "save"); return; }
     if (!strcmp(iface, IFACE) || !iface[0]) {
         if (!strcmp(mem, "ReadAll") && m->sig && !strcmp(m->sig, "as")) { read_all(m); return; }
         if (!strcmp(mem, "Read") && m->sig && !strcmp(m->sig, "ss")) { read_one(m, 1); return; }
@@ -235,7 +394,7 @@ int portal_start(void) {
         return -1;
     }
     up = 1;
-    fprintf(stderr, "portal: org.freedesktop.portal.Settings on the session bus\n");
+    fprintf(stderr, "portal: Settings and FileChooser on the session bus\n");
     return 0;
 }
 

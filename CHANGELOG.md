@@ -33,6 +33,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Fixed
 
 - Copying from a native Wayland app with a long clipboard type name reached no other app: the name was cut at 63 characters and the app dropped its data.
+- Linux apps with no file dialog of their own can now open and save files: LordOS answers `org.freedesktop.portal.FileChooser` with its own dialog, inside the home folder ([#4](https://github.com/lordbasex/LordOS/issues/4)).
 - Firefox looked frozen: tabs, the toolbar and pages ignored the mouse. The compositor ignored `wl_surface.set_input_region`, so the pointer went to Firefox's content surface, which has asked for no input, instead of the window below it ([#11](https://github.com/lordbasex/LordOS/issues/11)).
 - Wi-Fi stayed off after a reboot when its driver finished loading after the network service started, or udev renamed it late: an interface now gets its saved state whenever it appears, not only at the moment of boot. Turning on an interface saved as off keeps it on ([#8](https://github.com/lordbasex/LordOS/issues/8)).
 - The volume, mute, screen brightness and keyboard light keys did nothing, on any layout and in every theme, and went to the app in front: they now work, without Fn on a laptop's top row ([#12](https://github.com/lordbasex/LordOS/issues/12)).

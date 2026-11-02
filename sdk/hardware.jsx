@@ -24,6 +24,7 @@ import { linuxAppFor, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput } from './components.jsx';
+import { portalFile } from './filepicker.jsx';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -407,6 +408,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'ppd-result': for (const fn of ppdResults) { try { fn(data); } catch (e) { console.log(`ppd: ${e}`); } } break;
     case 'timedate': timedate.set(data); break;
     case 'polkit': polkitPrompt.set(data); break;
+    case 'portal-file': portalFile.set(data); break;
     case 'notify': linuxNotify(data); break;
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     default: break;

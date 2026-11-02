@@ -263,7 +263,7 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   theme, so the button stays 16 px and the circle is a 13 px radial gradient inside it; measured on
   the VM: 12–13 px circles, 21 px from center to center, like LordOS's own frame.
 - **GTK 4 / libadwaita (GNOME).** They read the mode, the accent and the button order from
-  **`org.freedesktop.portal.Settings`**. lord-server itself serves it (`server/src/ui/portal.c`)
+  **`org.freedesktop.portal.Settings`**, and **`org.freedesktop.portal.FileChooser`** for apps with no file dialog of their own (`OpenFile`, `SaveFile`, version 2 so browsers keep theirs; the dialog is the shell's, inside the home folder, and the answer goes only to the app that asked). lord-server itself serves both (`server/src/ui/portal.c`)
   on the session bus, without xdg-desktop-portal, with Passwords' own D-Bus client
   (`server/src/vault/dbus.c`). Keys:
   - `org.freedesktop.appearance`: `color-scheme`, `accent-color`, `contrast`;
