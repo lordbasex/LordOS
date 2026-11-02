@@ -1,4 +1,10 @@
 {
+  "account.create": "Create account",
+  "account.doneText": "Restart to finish, then sign in with your user and password.",
+  "account.doneTitle": "Your account is ready",
+  "account.title": "Set up LordOS",
+  "account.welcome": "LordOS is ready on this computer. To finish, choose your language and keyboard and create your own account. There is no default account or password.",
+  "account.working": "Creating your account…",
   "back": "Back",
   "disk.empty": "empty (no partitions)",
   "disk.eraseText": "LordOS uses the whole disk: every partition and all its data are erased. This cannot be undone.",

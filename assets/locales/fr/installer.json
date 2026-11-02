@@ -1,4 +1,10 @@
 {
+  "account.create": "Créer le compte",
+  "account.doneText": "Redémarrez pour terminer, puis connectez-vous avec votre utilisateur et votre mot de passe.",
+  "account.doneTitle": "Votre compte est prêt",
+  "account.title": "Configurer LordOS",
+  "account.welcome": "LordOS est prêt sur cet ordinateur. Pour terminer, choisissez la langue et le clavier, puis créez votre propre compte. Il n’y a ni compte ni mot de passe par défaut.",
+  "account.working": "Création de votre compte…",
   "back": "Retour",
   "disk.empty": "vide (aucune partition)",
   "disk.eraseText": "LordOS utilise tout le disque : toutes les partitions et toutes leurs données sont effacées. Cette action est irréversible.",

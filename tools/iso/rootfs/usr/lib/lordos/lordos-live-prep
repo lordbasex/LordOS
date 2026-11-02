@@ -11,8 +11,15 @@
 #                    tab instead of the installer. lord-server reads it (lord.system.info().liveCheck,
 #                    sdk/livestart.js); nothing is needed here either.
 set -u
-[ -d /run/live ] || exit 0          # only on the live system (live-boot)
 USER_NAME=lordos
+# The OVA image (docs/ISO.md): the person made their account on the first boot, in the session of the
+# setup account, which could not be removed from inside. Nothing logs in as it now.
+if [ -e /etc/lordos/first-account.done ]; then
+    pkill -KILL -u "$USER_NAME" 2>/dev/null || true
+    userdel -r "$USER_NAME" 2>/dev/null || userdel "$USER_NAME" 2>/dev/null || true
+    rm -f /etc/lordos/first-account.done
+fi
+[ -d /run/live ] || exit 0          # the rest only on the live system (live-boot)
 getent passwd "$USER_NAME" >/dev/null || exit 0
 
 LANG_UI=en

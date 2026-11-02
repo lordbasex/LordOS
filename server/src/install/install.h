@@ -6,12 +6,15 @@
 
 void install_act_disks(const AdminReq *r, const char *arg, size_t len);
 void install_act_run(const AdminReq *r, const char *arg, size_t len);
+void install_act_account(const AdminReq *r, const char *arg, size_t len);
 void install_act_reboot(const AdminReq *r, const char *arg, size_t len);
 
-/* Privileged helper actions (admin.c). They all answer ERR outside live mode. */
+/* Privileged helper actions (admin.c). They all answer ERR outside live mode, except install-account,
+ * which needs the OVA's first boot. */
 #define INSTALL_ADMIN_ACTIONS \
     { "install-disks", install_act_disks, 0 }, \
     { "install-run", install_act_run, A_FORK }, \
+    { "install-account", install_act_account, A_FORK }, \
     { "install-reboot", install_act_reboot, 0 },
 
 #endif

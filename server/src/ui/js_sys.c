@@ -351,6 +351,8 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
         free(cmd);
     }
     JS_SetPropertyStr(c, o, "liveCheck", JS_NewBool(c, check));
+    /* the OVA's first boot: the installer's account screens, until the person has an account */
+    JS_SetPropertyStr(c, o, "firstAccount", JS_NewBool(c, access("/etc/lordos/first-account", F_OK) == 0));
     struct statvfs vs;                      /* system disk (/) */
     if (!statvfs("/", &vs)) {
         JS_SetPropertyStr(c, o, "diskTotal", JS_NewFloat64(c, (double)vs.f_blocks * vs.f_frsize));
