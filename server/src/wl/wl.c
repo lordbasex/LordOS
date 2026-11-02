@@ -1143,7 +1143,7 @@ void wl_keymap_changed(void) {
 
 #define MAX_MIMES 32
 #define CLIP_MAX (16u << 20)
-typedef struct { struct wl_resource *res; char mimes[MAX_MIMES][64]; int nmimes; } Source;
+typedef struct { struct wl_resource *res; char mimes[MAX_MIMES][256]; int nmimes; } Source;
 static Source *selection;           /* source of the app owning the selection, or NULL (LordOS) */
 /* Bumped whenever the selection changes: an offer is only good for the selection it was made for,
  * and only while its client has the keyboard (an app can't keep an old offer to read later copies). */
@@ -1166,7 +1166,9 @@ static int text_mime(const char *m) {
 static void src_offer(struct wl_client *c, struct wl_resource *r, const char *mime) {
     (void)c;
     Source *s = wl_resource_get_user_data(r);
-    if (s->nmimes < MAX_MIMES) snprintf(s->mimes[s->nmimes++], sizeof s->mimes[0], "%s", mime);
+    /* Offered back as written: an app can recognize its own selection by the whole name, so a
+     * shortened one reads as someone else's and it drops the data. A name that doesn't fit is left out. */
+    if (s->nmimes < MAX_MIMES && strlen(mime) < sizeof s->mimes[0]) snprintf(s->mimes[s->nmimes++], sizeof s->mimes[0], "%s", mime);
 }
 static void src_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void src_actions(struct wl_client *c, struct wl_resource *r, uint32_t a) { (void)c; (void)r; (void)a; }
