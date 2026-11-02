@@ -37,6 +37,13 @@ const LOGIN_PICKED = '/var/lib/lordos/wallpapers/login.mp4';      // chosen in S
 const LOGIN_BUILTIN = '/usr/share/backgrounds/lordos/motion/crown';
 const LOGIN_STILL = '/var/lib/lordos/wallpapers/login-still';     // a still wallpaper's id: no video at all
 const loginStill = () => { try { return String(fs.read(LOGIN_STILL)).trim(); } catch (e) { return ''; } };
+// A picture of the user's own, kept there by wallpaper-login-image; the greeter never sees a home.
+function loginImage(still) {
+  const m = /^image:([0-9a-f]{16})$/.exec(still);
+  if (!m) return null;
+  const file = `/var/lib/lordos/wallpapers/login-${m[1]}.jpg`;
+  try { return fs.stat(file) ? file : null; } catch (e) { return null; }
+}
 const IDLE_MS = 300000;
 function LoginVideo({ box, stop }) {
   const [id, setId] = useState(0);
@@ -277,15 +284,17 @@ function Greeter() {
   // the column rises so the password stays above the on-screen keyboard
   const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);
 
-  const still = loginStill();
+  const marked = loginStill();
+  const image = loginImage(marked);
+  const still = marked.startsWith('image:') ? '' : marked;
   return (
     <ThemeProvider tokens={{ mode: 'dark', accent: '#ffffff', text: '#ffffff', textDim: 'rgba(255,255,255,0.55)',
       inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)',
       panelBg: 'rgba(30,22,40,0.94)', control: 'rgba(255,255,255,0.18)', sidebarBg: 'rgba(255,255,255,0.09)' }}>
       <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
-        <Image src={wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
+        <Image src={image || wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
           style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
-        {still ? null : <LoginVideo box={M} stop={entered} />}
+        {still || image ? null : <LoginVideo box={M} stop={entered} />}
         <View style={{ position: 'absolute', left: M.left, top: M.top, width: W, height: H }}>
 
         {/* date and clock */}

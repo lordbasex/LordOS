@@ -84,6 +84,20 @@ Decoding is in hardware; each frame is then read back and converted to BGRA in `
 
 Settings → Wallpaper has a switch at the top, Desktop or Login screen, and the same tiles choose for that target: a video (`wallpaper-login "<id> <variant>"`) or a still wallpaper (`wallpaper-login "still <id>"`, kept in `/var/lib/lordos/wallpapers/login-still`, shown with no video at all).
 
+## Your own pictures
+
+Settings → Wallpaper → Your pictures takes a PNG or JPEG, for the desktop or the login screen. Nothing shows the file itself: it is converted once to a baseline JPEG of at most 3840 pixels on its longest side, upright (EXIF orientation applied) and with no metadata, so the session and the login screen load something of a known size. GPS positions and camera details don't reach the login screen. The limits are 64 MB and 100 megapixels, read from the header before any memory is taken. WebP, GIF and BMP are refused.
+
+| Action | Who | What |
+|---|---|---|
+| `wallpaper-image "<path>"` | anyone | makes the user's copy, `~/.local/share/lordos/wallpapers/<name>.jpg` and `.thumb.jpg`, and answers its name, 16 hex digits |
+| `wallpaper-image "remove <name>"` | anyone | deletes that copy |
+| `wallpaper-login-image "<name>"` | admin | the login screen shows that copy: `/var/lib/lordos/wallpapers/login-<name>.jpg`, with `image:<name>` in `login-still` |
+
+Root never opens the user's file and never decodes it. A child gives up root for good (`setresuid`, no new privileges, a CPU limit, 30 s from the parent) and closes every file of the helper before it reads anything, so a link to a file only root can read fails, as it would for the user. The file must be a regular file and the last step of its path can't be a link (`O_NOFOLLOW`, and `O_NONBLOCK` so a pipe can't hang it). `wallpaper-login-image` takes a name, not a path; the child reconverts the copy and sends the bytes through a pipe, and root only checks that they are a finished JPEG of an allowed size before writing them to a root-owned file, readable by all, with a name that follows its content. So the greeter, a separate user with no access to any home, only reads a system folder, and a new choice is never hidden by an image cached under the old name. Every other choice for the login screen deletes the stored picture.
+
+A file that goes missing costs nothing: the desktop goes back to the default wallpaper, the login screen to its usual background. The remote login page keeps its built-in background. `server/tests/wallpaper_image_test.c` covers the conversion and the refusals.
+
 Settings offers 1×, 0.75×, 0.5× and 0.25×. A slower speed decodes fewer frames per second, and it applies to the desktop, not to the login screen.
 
 Choosing a still wallpaper turns the moving one off, since it would stay in front. A new player can start while the last one still holds the decoder, so a stop nobody asked for is retried four times, half a second apart; the tile shows a spinner until the video plays.

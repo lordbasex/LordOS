@@ -5,7 +5,7 @@
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -329,6 +329,68 @@ function MotionWallpapers({ login }) {
   );
 }
 
+// Pictures of the user's own. On the desktop a copy in their home is enough; the login screen gets one of its own.
+const MAX_IMAGES = 12;
+function UserImages({ login, curId, onChoose, onDefault, setNote }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const win = useAppWindow();
+  const [picking, setPicking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ids = s.wallpaperImages || [];
+  const images = ids.map((id) => findWallpaper([], id)).filter(Boolean);
+  const add = (path) => {
+    setPicking(false);
+    if (!path) return;
+    setBusy(true);
+    setNote('');
+    addWallpaperImage(path).then((id) => {
+      set({ wallpaperImages: [id, ...ids.filter((x) => x !== id)].slice(0, MAX_IMAGES) });
+      return onChoose(id);
+    }).catch((e) => setNote(errorText(e))).finally(() => setBusy(false));
+  };
+  const cur = ids.includes(curId) ? curId : null;
+  const remove = () => {
+    removeWallpaperImage(cur).then(() => {
+      set({ wallpaperImages: ids.filter((x) => x !== cur), ...(s.wallpaper === cur ? { wallpaper: DEFAULT_WALLPAPER } : {}) });
+    }, (e) => setNote(errorText(e)));
+  };
+  return (
+    <Section title={tr('settings.wallpaperCategory.mine')} footer={tr('settings.wallpaperImage.hint')}>
+      {images.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
+          {images.map((w) => (
+            <View key={w.id} onClick={() => { setNote(''); Promise.resolve(onChoose(w.id)).catch((e) => setNote(errorText(e))); }} style={{ alignItems: 'center', width: 108 }}>
+              <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${curId === w.id ? t.accent : 'transparent'}` }}>
+                <View style={{ width: 100, height: 56, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
+                  <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <Actions style={{ paddingVertical: spacing.s }}>
+        <Button small disabled={busy} label={tr(busy ? 'settings.wallpaperImage.working' : 'settings.wallpaperImage.choose')} onClick={() => setPicking(true)} />
+        {!login && cur && s.loginWallpaper !== cur ? <Button small label={tr('settings.wallpaperImage.remove')} onClick={remove} /> : null}
+        {login && cur ? <Button small label={tr('settings.motion.loginDefault')} onClick={onDefault} /> : null}
+      </Actions>
+      {picking ? (() => {
+        // over this Settings window, in the modal layer: the page itself scrolls
+        const g = wm.frame(wm.get(win.id) || {});
+        return (
+          <Layer name="modal">
+            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+              <FilePicker title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
+            </View>
+          </Layer>
+        );
+      })() : null}
+    </Section>
+  );
+}
+
 // Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
 function Wallpapers() {
   const t = useTheme();
@@ -340,10 +402,10 @@ function Wallpapers() {
   const login = target === 'login';
   const [note, setNote] = useState('');
   const shown = login ? s.loginWallpaper : s.wallpaper;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
   const stillPick = (id) => {
     if (!login) { set({ wallpaper: id, motion: {} }); return; }
-    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.motion.loginDone')); }, (e) => setNote(errorText(e)));
+    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }, (e) => setNote(errorText(e)));
   };
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
     .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
@@ -363,6 +425,9 @@ function Wallpapers() {
           </View>
         </View>
       </Section>
+      <UserImages login={login} curId={shown} setNote={setNote}
+        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : set({ wallpaper: id, motion: {} }))}
+        onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
       <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
         <Section key={c} title={catName(c)}>

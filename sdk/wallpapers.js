@@ -42,8 +42,20 @@ export function wallpaperSrc(w, width, height) {
   return list[list.length - 1].src;
 }
 
+// A picture of the user's own (Settings → Wallpaper): the id is `image:<name>`, and the copy lives in their home, made
+// by the wallpaper-image action. It works in every theme, because themes all go through findWallpaper and wallpaperSrc.
+export const USER_WALLPAPER = /^image:([0-9a-f]{16})$/;
+export const userWallpaperName = (id) => (USER_WALLPAPER.exec(id || '') || [])[1] || null;
+function userWallpaper(id) {
+  const name = userWallpaperName(id);
+  if (!name) return null;
+  const base = `${lord.fs.home()}/.local/share/lordos/wallpapers/${name}`;
+  try { if (!lord.fs.stat(`${base}.jpg`)) return null; } catch (e) { return null; }    // deleted: the default one
+  return { id, category: 'mine', nameKey: 'settings.wallpaperImage.name', name: 'Your picture', src: `${base}.jpg`, thumb: `${base}.thumb.jpg` };
+}
+
 // The wallpaper chosen in the settings, among a theme's list.
-export const findWallpaper = (list, id) => (list || []).find((w) => w.id === id)
+export const findWallpaper = (list, id) => (list || []).find((w) => w.id === id) || userWallpaper(id)
   || (list || []).find((w) => w.id === DEFAULT_WALLPAPER) || (list || [])[0] || null;
 
 // The small image for a picker (falls back to the full one for theme wallpapers without a thumb).
