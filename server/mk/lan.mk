@@ -1,15 +1,11 @@
 # Files → Network (docs/FILES.md, "Network"): lord-lan, the sandboxed helper that reads what the local
 # network answers (mDNS, SMB2, ONC RPC), and lord-server's side (src/lan: one bounded pass on a thread,
 # lord.lan in ui/js_lan.c, the share-* actions). libc only; our own code, no libsmbclient or libnfs.
-LAN_SRV_SRC := src/lan/lan.c src/lan/rconnect.c src/lan/rconnect_run.c src/lan/rconnect_pure.c src/lan/lanaddr.c src/lan/share_admin.c src/ui/js_lan.c src/ui/js_rdesk.c
-ifeq ($(PROFILE),desktop)
-LAN_SRV_SRC := $(filter-out src/lan/share_admin.c,$(LAN_SRV_SRC))
-endif
+LAN_SRV_SRC := src/lan/lan.c src/lan/rconnect.c src/lan/rconnect_run.c src/lan/rconnect_pure.c src/lan/lanaddr.c src/ui/js_lan.c src/ui/js_rdesk.c
 LAN_SRV_OBJ := $(LAN_SRV_SRC:src/%.c=build/obj/%.o)
 $(LAN_SRV_OBJ): $(wildcard src/lan/*.h) src/rdesk/proto.h src/ui/js_rdesk.h src/doc/wire.h src/print/mdns.h src/sec/json.h src/ui/js_lan.h src/admin.h src/errcode.h
 build/lord-server: $(LAN_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_lan.h src/ui/js_rdesk.h
-build/obj/admin.o: src/lan/share_admin.h
 
 LAN_HELPER_SRC := src/lan/lanhelper.c src/lan/smbauth.c src/pkg/crypto.c src/lan/lanparse.c src/lan/lanaddr.c src/print/mdns.c src/doc/wire.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
 all: build/lord-lan

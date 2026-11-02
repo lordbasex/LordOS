@@ -14,12 +14,12 @@ typedef struct {
     long uptime_s;                      /* -1 unknown */
     unsigned long long mem_used_kb;     /* MemTotal − MemAvailable */
     unsigned long long disk_used, disk_total;   /* the root file system, bytes */
-    int packages;                       /* Debian packages installed, -1 unknown */
+    int packages;                       /* RPM packages installed, -1 unknown */
     char shell[32];                     /* the login shell's name */
     char session[24];                   /* "Wayland", "X11", "" */
 } FetchLive;
 
-/* The live facts from <root> (proc, dpkg status) and this process (user, shell, disk). share: no
+/* The live facts from <root> (proc, the RPM database) and this process (user, shell, disk). share: no
  * user or host name. */
 void fetch_live(FetchLive *l, const char *root, int share);
 

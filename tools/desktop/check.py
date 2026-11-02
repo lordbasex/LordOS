@@ -15,7 +15,6 @@ def run(*args, **kwargs):
 
 
 def main():
-    assert json.loads((REPO / 'build-profile.json').read_text()) == 'desktop'
     symbols = run('nm', str(REPO / 'server/build/lord-server'))
     for symbol in ['pkg_act_install', 'pkg_act_update', 'install_act_run', 'net_act_restore',
                    'act_langpack', 'js_pkg_register', 'js_imager_register', 'pin_load',

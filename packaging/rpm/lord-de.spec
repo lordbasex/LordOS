@@ -42,13 +42,13 @@ It does not replace the display manager or enable system services.
 # dist.sh includes the frontend built from package-lock.json. No network access
 # or Node.js runtime is needed to compile or run this local RPM.
 %set_build_flags
-%make_build -C server PROFILE=desktop GPU=0
+%make_build -C server GPU=0
 
 %install
 python3 tools/desktop/install.py --prefix %{_prefix} --libexecdir %{_libexecdir} --destdir %{buildroot}
 
 %check
-%make_build -C server PROFILE=desktop GPU=0 test-platform
+%make_build -C server GPU=0 test-platform
 python3 tools/desktop/check.py
 
 %files

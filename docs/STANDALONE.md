@@ -15,11 +15,11 @@ flowchart TD
   Legacy[Perfil os: pacotes Debian, instalador, rede própria] -. fora da instalação .-> Server
 ```
 
-O perfil `desktop` é padrão tanto no Makefile C quanto no compilador dos temas. O frontend usa uma capacidade de build, `standaloneDesktop`, em vez de inferir suporte à administração a partir de `/etc/os-release`. `lord.pkg` e `lord.imager` não são expostos no perfil independente. A API administrativa retorna indisponível e nenhum helper de root é criado.
+O build tem um único perfil, o do desktop independente; o perfil `os` do LordOS foi removido do Makefile C e do compilador dos temas. O frontend ainda recebe a constante de build `standaloneDesktop`, sempre verdadeira. `lord.pkg` e `lord.imager` não existem mais. A API administrativa retorna indisponível e nenhum helper de root é criado.
 
 ## Base upstream
 
-O fork incorpora o LordOS **0.8.7-beta**, até o commit `ab8afcb835422723518308e8ba9e5fa1b736c106` (integrado em 2 de novembro de 2026). O remoto `upstream` aponta para `https://github.com/lordbasex/LordOS.git`. A separação da distribuição continua no perfil `desktop`; o histórico original é preservado por merge.
+O fork incorpora o LordOS **0.8.7-beta**, até o commit `ab8afcb835422723518308e8ba9e5fa1b736c106` (integrado em 2 de novembro de 2026). O remoto `upstream` aponta para `https://github.com/lordbasex/LordOS.git`. O histórico original é preservado por merge; o código de distribuição removido pode ser consultado nele.
 
 Desktops virtuais, Overview, restauração de janelas, as melhorias do compositor e os novos aplicativos acompanham essa base. A loja usa o layout atualizado, mas encaminha pacotes do sistema ao gerenciador da distribuição; o catálogo APT e seus instaladores não entram nos bundles do desktop.
 
@@ -33,7 +33,7 @@ Os recursos novos que exigem o helper administrativo do LordOS continuam indispo
 |---|---|
 | Pacotes | O resolver Debian, índices, dpkg e ações de instalação ficam fora do binário. A loja conserva `.lpk` e oferece abrir GNOME Software/Discover quando encontrados. |
 | Rede | Apenas observação por netlink; os drivers administrativos de DHCP, Wi-Fi e VPN do LordOS não são ligados ao compositor. Não há `net-restore` ao iniciar. |
-| Instalador e imagens | Instalador e Imager ficam fora dos temas e do binário. Scripts de ISO e Raspberry Pi não entram no RPM. |
+| Instalador e imagens | Instalador, Imager (C e Rust), firstrun do Raspberry Pi e scripts de ISO/RPi foram removidos. A ISO Fedora é gerada por `tools/fedora-live/`. |
 | Login | Entrada Wayland para o gerenciador existente; não instala nem habilita `lordos.service`. |
 | Dispositivos | DRM e evdev são abertos por libseat. Revogação da sessão libera input e GPU antes da confirmação; a reativação reabre os dispositivos e reutiliza o fluxo de reconexão do compositor. |
 | Teclado/mouse | Hotplug por inotify no desktop independente; a troca de TTY usa libseat. |
@@ -43,13 +43,19 @@ Os recursos novos que exigem o helper administrativo do LordOS continuam indispo
 
 SHA-256 e o leitor xz ainda ficam em `server/src/pkg/crypto.c` e `xz.c`, porque também são utilizados por assinaturas, cofre, journal e mapas. Esses arquivos são primitivas compartilhadas, não um backend de pacotes Debian. Movê-los para uma pasta comum pode ser uma refatoração posterior.
 
+## Remoção do legado Debian
+
+Removido do repositório: o motor de pacotes APT/dpkg (`server/src/pkg/`, exceto as primitivas `crypto.c` e `xz.c`), `lord-tls`, `apt/`, `packaging/{apt,debian,kernel,migrations,systemd,udev}`, o chaveiro do repositório LordOS, `tools/{iso,rpi,immutable,install,boot}`, a publicação do repositório APT e o SBOM do `.deb`. Também saíram as partes que só existiam na distribuição LordOS: `lord-netd` e os drivers de rede próprios (DHCP, Wi‑Fi, WireGuard, OpenVPN, IPsec), `lord-sessiond` (login, sessão e área de trabalho remota pelo navegador), o despachante `admin.c`, o instalador, o Imager e o tema `greeter`.
+
+A loja usa diretamente `apps/store/host.jsx`, que encaminha pacotes do sistema ao gerenciador do host. A detecção de mídia live usa `rd.live.image` (dracut), em vez do caminho do `live-boot` do Debian, e `lordos-fetch` conta pacotes com `rpm -qa`.
+
 ## Verificação
 
 `make check` compila o desktop, executa testes do ciclo de vida da sessão com um provedor simulado, verifica que nenhuma ação administrativa funciona e examina os símbolos do binário para impedir a ligação acidental de componentes do SO.
 
 Também valida os hashes dos bundles, instala em diretório temporário, verifica que nenhum serviço ou configuração de `/etc` foi instalado, confere o manifesto após a instalação e inicializa os temas sem monitor como usuário sem privilégios.
 
-No Fedora, instale `libasan` e `libubsan` para os testes com sanitização. `make -C server test` executa a suíte original. Parte dela testa componentes legados isoladamente; isso não significa que esses componentes entram no desktop. Testes dependentes de ferramentas ou dados externos podem ser pulados pela suíte upstream.
+No Fedora, instale `libasan` e `libubsan` para os testes com sanitização. `make -C server test` executa a suíte original, sem as suítes do código removido. Os validadores das ações de root (`*_admin.c`) continuam testados isoladamente, como base para um helper polkit; eles não entram no desktop. Testes dependentes de ferramentas ou dados externos podem ser pulados pela suíte upstream.
 
 A CI `.github/workflows/desktop-fedora.yml` reproduz o build e os testes em Fedora 44, com variantes de compilação CPU e GPU. O modo headless não exercita DRM/KMS, input físico, aceleração de GPU nem políticas SELinux.
 
@@ -69,7 +75,8 @@ A separação remove a necessidade dos serviços específicos do LordOS, mas nã
 - Integrar NetworkManager por D-Bus e autorização via polkit, sem assumir controle da rede do host.
 - Substituir as páginas administrativas restantes por adaptadores de serviços do host.
 - Publicar um RPM com build reproduzível do frontend conforme as regras de empacotamento do destino, dependências opcionais e assinatura própria do fork.
-- Extrair ou remover os diretórios legados da distribuição após estabilizar a sessão independente.
+- Substituir a delegação de cgroups pedida ao `lord-sessiond` (`src/sec/cgroup.c`) pelo gerenciador systemd do usuário.
+- Decidir o destino de `lord-netperm` e `lord-fand` como unidades systemd do Fedora, ou removê-los.
 - Expandir a matriz de testes para outras distribuições e arquiteturas.
 
 ## Referências de implementação

@@ -3,7 +3,7 @@
 set -eu
 cd "$(dirname "$0")/../.."
 npm ci
-LORD_PROFILE=desktop npm run build
+npm run build
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -27,7 +27,7 @@ with tarfile.open(out, 'w:gz') as archive:
     for path in ['server', 'runtime', 'sdk', 'apps', 'themes', 'assets', 'third_party',
                  'tests', 'tools/desktop', 'tools/build-theme.mjs', 'tools/code-manifest.mjs', 'packaging/desktop',
                  'packaging/rpm', 'Makefile', 'package.json', 'package-lock.json',
-                 'code-manifest.json', 'build-profile.json', 'LICENSE', 'THIRD_PARTY.md', 'README.md', 'docs/STANDALONE.md']:
+                 'code-manifest.json', 'LICENSE', 'THIRD_PARTY.md', 'README.md', 'docs/STANDALONE.md']:
         archive.add(root / path, arcname=f'{name}/{path}', filter=select)
 print(out)
 PY

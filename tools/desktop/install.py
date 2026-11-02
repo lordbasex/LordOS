@@ -25,15 +25,10 @@ def install(prefix, libexecdir, destdir):
     target = stage / root.relative_to('/')
     required = ['server/build/lord-server', 'server/build/lord-vault',
                 'themes/default/theme.bundle.js', 'themes/classic/theme.bundle.js',
-                'assets/app-host.bundle.js', 'code-manifest.json', 'server/build/gen/profile.h']
+                'assets/app-host.bundle.js', 'code-manifest.json']
     for rel in required:
         if not (REPO / rel).is_file():
             raise ValueError(f'missing {rel}; run npm ci && make first')
-    profile = (REPO / 'server/build/gen/profile.h').read_text()
-    if 'profile=desktop' not in profile:
-        raise ValueError('refusing to install a legacy OS build as Lord DE')
-    if (REPO / 'build-profile.json').read_text().strip() != '"desktop"':
-        raise ValueError('themes must be built with LORD_PROFILE=desktop')
     # Validate the complete install plan before copying any file.
     manifest = json.loads((REPO / 'code-manifest.json').read_text())
     code_paths = {f['path'] for f in manifest['files']}

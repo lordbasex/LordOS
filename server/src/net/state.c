@@ -255,18 +255,7 @@ char *net_interfaces_json(void) {
     for (int i = 0; i < l.n; i++) {
         Link *k = &l.v[i];
         const char *type = link_type(k);
-        char conf[128];
-        snprintf(conf, sizeof conf, NET_IF_DIR "/%s.conf", k->name);
-        const char *managed = managed_by_system(k->name) ? "system" : access(conf, F_OK) == 0 ? "lordos" : "none";
-#ifdef LORD_STANDALONE
-        managed = "system";
-#endif
-        if (!strcmp(type, "wireguard") || !strcmp(type, "tun")) {
-            /* those of LordOS's VPNs */
-            char meta[128];
-            snprintf(meta, sizeof meta, NET_RUN_DIR "/vpn/%s", k->name);
-            if (access(meta, F_OK) == 0) managed = "lordos";
-        }
+        const char *managed = "system";      /* the host distribution manages every interface */
         char master[IFNAMSIZ] = "";
         if (k->master) if_indextoname((unsigned)k->master, master);
         buf_printf(&b, "%s{\"name\":", i ? "," : "");

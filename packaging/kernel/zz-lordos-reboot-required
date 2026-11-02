@@ -1,9 +1,0 @@
-#!/bin/sh
-# A new kernel takes effect at the next boot: tell Store → Updates (and anything else that reads
-# the Debian convention /run/reboot-required) to offer a restart. Shipped by the lordos package;
-# run by the kernel packages' postinst with the kernel version as $1 (docs/UPDATES.md).
-set -e
-[ -d /run ] || exit 0
-touch /run/reboot-required 2>/dev/null || exit 0
-case "${1:-}" in *[!A-Za-z0-9.+~-]*|"") echo linux-image ;; *) echo "linux-image-$1" ;; esac >> /run/reboot-required.pkgs 2>/dev/null || true
-exit 0

@@ -3,15 +3,11 @@
 # links libc and the sandbox, the channel and the JSON reader lord-doc uses, fsops.c for fsops_protected,
 # so the list of protected paths has one home, and the stb_image the project already carries, for similar
 # images: the only decoding in Cleaner, built as lord-maild's (helper/lcimage.c).
-CLEAN_SRV_SRC := src/clean/clean.c src/clean/cleanfs.c src/clean/rules.c src/clean/clean_admin.c src/ui/js_clean.c
-ifeq ($(PROFILE),desktop)
-CLEAN_SRV_SRC := $(filter-out src/clean/clean_admin.c,$(CLEAN_SRV_SRC))
-endif
+CLEAN_SRV_SRC := src/clean/clean.c src/clean/cleanfs.c src/clean/rules.c src/ui/js_clean.c
 CLEAN_SRV_OBJ := $(CLEAN_SRV_SRC:src/%.c=build/obj/%.o)
 $(CLEAN_SRV_OBJ): $(wildcard src/clean/*.h) src/fsops.h src/doc/wire.h src/doc/proto.h src/sec/json.h src/ui/js_clean.h src/ui/js_err.h src/errcode.h
 build/lord-server: $(CLEAN_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_clean.h
-build/obj/admin.o: src/clean/clean_admin.h
 
 CLEAN_HELPER_SRC := src/clean/helper/lcmain.c src/clean/cleanfs.c src/doc/wire.c src/fsops.c src/pkg/crypto.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 all: build/lord-clean

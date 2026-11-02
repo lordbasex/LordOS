@@ -2174,12 +2174,10 @@ int main(int argc, char **argv) {
         }
         return app_main(argv[2], host, fonts);
     }
-#ifdef LORD_STANDALONE
     if (geteuid() == 0) {
         fprintf(stderr, "lord-de: start the desktop as your normal session user, without sudo\n");
         return 1;
     }
-#endif
     const char *card = NULL;               /* sin --card: la que tiene pantalla (drmcard.h) */
     const char *theme = "../themes/default/theme.bundle.js";
     const char *fonts = "../assets/fonts";
@@ -2254,16 +2252,7 @@ int main(int argc, char **argv) {
         if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
     }
 
-    /* Privileged helper (a closed set of actions: region, time zone, language packs). The
-     * login screen has none: what needs root is done by lord-sessiond. */
     const char *session_user = s.greeter ? NULL : user ? user : getenv("SUDO_USER");
-#ifndef LORD_STANDALONE
-    if (session_user && admin_start(session_user)) fprintf(stderr, "lord-server: no administration helper\n");
-    /* LordOS networking: with lord-sessiond the network belongs to the system (lord-netd brings it
-     * up at boot) and net-restore only confirms; without it (a standalone lord-server) this
-     * session's helper brings it up (see net_act_restore and docs/NETWORK.md) */
-    else if (session_user) admin_send("net-restore", "", 0);
-#endif
     if (!session_user && !s.greeter) session_user = getenv("USER");
     int ok = drop_privileges(user) == 0;
     if (ok && s.headless && getenv("HOME")) {

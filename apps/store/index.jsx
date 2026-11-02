@@ -6,8 +6,8 @@ import {
   suggestions, unseenSuggestions, refreshSuggestions, standaloneDesktop,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { AiDetail, AiDiscover, AiPage, catalogApp, catalogApps } from './ai.js';
-import { CATS, debian, useDebian } from './debian.js';
+// System packages belong to the host distribution's software manager (host.jsx).
+import { AiDetail, AiDiscover, AiPage, CATS, catalogApp, catalogApps, debian, useDebian } from './host.jsx';
 import { GLYPH } from './ui.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the

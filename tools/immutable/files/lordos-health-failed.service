@@ -1,8 +1,0 @@
-[Unit]
-Description=LordOS health check failed: restart to try again or fall back
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'echo "lordos: this version failed its health check; restarting in 5 s (systemd-boot counts the attempt)" > /dev/console; sleep 5'
-ExecStart=/usr/bin/systemctl --no-block reboot

@@ -337,18 +337,11 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     char *compat = read_small("/proc/device-tree/compatible", 512, &clen);
     JS_SetPropertyStr(c, o, "board", JS_NewString(c, compat && hw_is_bcm2712(compat, clen) ? "pi5" : ""));
     free(compat);
-    /* live system (ISO): the installer shows up there */
-    int live = access("/run/live/medium/live/filesystem.squashfs", F_OK) == 0;
+    /* live media: dracut's dmsquash-live, which Fedora's live images boot with */
+    char *cmd = read_small("/proc/cmdline", 4096, NULL);
+    int live = cmd && sysreport_cmdline_has(cmd, "rd.live.image");
+    free(cmd);
     JS_SetPropertyStr(c, o, "live", JS_NewBool(c, live));
-    /* the live ISO's "Check this computer" boot entry (lordos.check=1): only a yes or no leaves here,
-     * and only on a live system. sdk/livestart.js opens System Information for it. */
-    int check = 0;
-    if (live) {
-        char *cmd = read_small("/proc/cmdline", 4096, NULL);
-        check = cmd && sysreport_cmdline_has(cmd, "lordos.check=1");
-        free(cmd);
-    }
-    JS_SetPropertyStr(c, o, "liveCheck", JS_NewBool(c, check));
     struct statvfs vs;                      /* system disk (/) */
     if (!statvfs("/", &vs)) {
         JS_SetPropertyStr(c, o, "diskTotal", JS_NewFloat64(c, (double)vs.f_blocks * vs.f_frsize));
