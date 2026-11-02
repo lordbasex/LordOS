@@ -11,7 +11,9 @@ the media and input formats. Code: `server/src/remote/share.c`, `sharewire.c` (f
 `$XDG_RUNTIME_DIR/lordos/share.sock`, 0600, created only by a user session. **The login screen's `lord-server` doesn't create it.**
 The app's id comes from the peer's root-owned scope, read through `SO_PEERPIDFD` so a dead pid can't be reused, and is read again at
 each start. A process in no app scope gets `no_identity` and is closed: Terminal programs, `systemd-run --user`, anything the launcher
-didn't start. A kernel without `SO_PEERPIDFD` gets the same answer. The fd a companion would inherit is stage 2.
+didn't start. A kernel without `SO_PEERPIDFD` gets the same answer. A package's id is never taken from a socket: its process can't make one, and a Linux app
+whose scope reads `lpk-<x>` gets `no_identity`. A packaged app's companion doesn't use the socket: lord-server connects it at start and hands it fd 4, tied to `lpk:<id>`, only if
+the manifest declares `screen-share`; asking for input or the clipboard without `remote-input` in the manifest gets `denied` ([PACKAGED-APPS.md](PACKAGED-APPS.md)).
 
 ## Messages
 
@@ -115,4 +117,7 @@ On VM 116 (amd64, 2026-11-01), against isolated headless sessions with a test cl
 **Not tested:** the system prompt and its answer (a headless session has no person to ask); a real monitor, a real lock screen and a real
 `lord-sessiond`; the real bridge and page with `RP_BUSY`, and a browser on 5673 before and after; ⌃⌥⇧Esc; a click on the badge's Stop; protected
 windows; sensitive clipboard items; sound; `SHARE_TEXT` reaching a field; `FW_R_NO_SCREEN`; several displays; the GPU path; a badge under an
-`xdg_popup`. Settings and Monitor additions were built, not looked at. **Not done:** uninstalling doesn't call `share-forget` yet, and a companion's fd 4 is stage 2.
+`xdg_popup`. Settings and Monitor additions were built, not looked at.
+
+Uninstalling forgets a grant: Remove calls `share-forget`, and at each session start the shell forgets the grants of apps that are gone, for what dpkg removed. The rule is in
+`share_model_test.mjs`; the admin action wasn't run from a real shell.

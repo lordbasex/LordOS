@@ -27,6 +27,10 @@ typedef struct {
     int  (*restricted)(const char *id); /* the firewall forbids this app the screen */
 } ShareHost;
 
+/* A connection for a packaged app's companion (id without "lpk:"): the descriptor to hand it, as fd 4, or -1. There
+ * is no peer to ask who it is, so lord-server's word is what ties it to the app. */
+int share_companion(const char *id, int may_input);
+
 /* Not called for the login screen: that session has no listener at all. 0 on success. */
 int  share_start(const ShareHost *h);
 void share_stop(void);

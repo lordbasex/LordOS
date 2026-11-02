@@ -36,7 +36,8 @@
 #define SO_PEERPIDFD 77
 #endif
 
-#define MAX_CONN 4
+#define MAX_CONN 6
+#define MAX_SOCK_CONN 4                 /* the rest are companions' (share_companion): sockets can't take them all */
 #define IN_MAX (SW_MAX_MSG + 64 * 1024)
 #define OUT_MAX (8u << 20)              /* a client this far behind is cut */
 #define VIDEO_LIMIT (3u << 20)          /* this far behind it skips to the next keyframe, as a 5673 viewer */
@@ -58,6 +59,7 @@ typedef struct {
     int pidfd;
     char id[SG_ID_MAX], exe[SG_EXE_MAX];
     int flags, granted, codec, hz, hear, awake, need_key, cur_x, cur_y, cur_mode;
+    int companion, may_input;           /* connected by lord-server at spawn; manifest declares remote-input */
     unsigned kbps, clip_gen, token;
     double since;
     SwKeyLimit keys;
@@ -176,9 +178,13 @@ static pid_t pid_of_pidfd(int fd) {
 
 /* Who is at the other end, now: its scope and program. Asked at connection and again at each start. */
 static int identify(Conn *c) {
+    if (c->companion) return 0;         /* lord-server made this connection for this app */
     pid_t pid = pid_of_pidfd(c->pidfd);
     char id[SG_ID_MAX], lnk[64], exe[SG_EXE_MAX];
     if (pid <= 0 || appid_of_pid((unsigned)pid, id, sizeof id) != 0 || !sg_id_valid(id)) return -1;
+    /* an .lpk's process can't make a socket, and only a companion's fd 4 speaks for a package: a Linux app
+     * whose scope reads "lpk-<x>" doesn't inherit that package's grant */
+    if (!strncmp(id, "lpk:", 4)) return -1;
     snprintf(lnk, sizeof lnk, "/proc/%d/exe", (int)pid);
     ssize_t l = readlink(lnk, exe, sizeof exe - 1);
     if (l <= 0) return -1;
@@ -313,6 +319,8 @@ static void on_start(Conn *c, const SwMsg *m) {
     if (c->st != C_IDLE) { say(c, SHARE_REFUSED, SW_BAD_REQUEST); return; }
     int b = blocked_now();
     if (b) { say(c, SHARE_REFUSED, b); return; }
+    /* what a package's manifest doesn't declare, its companion can't ask for */
+    if (c->companion && !c->may_input && (m->flags & (SW_F_INPUT | SW_F_CLIPBOARD))) { say(c, SHARE_REFUSED, SW_DENIED); return; }
     c->flags = m->flags;
     c->codec = m->codec;
     c->hz = m->hz;
@@ -478,7 +486,7 @@ static void on_accept(void) {
     int pidfd = -1;
     socklen_t pl = sizeof pidfd;
     Conn *c = NULL;
-    for (int i = 0; i < MAX_CONN && !c; i++) if (cn[i].fd < 0) c = &cn[i];
+    for (int i = 0; i < MAX_SOCK_CONN && !c; i++) if (cn[i].fd < 0) c = &cn[i];
     uint8_t *in = c ? malloc(IN_MAX) : NULL;
     if (!in || getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &l) || cr.uid != getuid()) { free(in); close(fd); return; }
     /* a kernel without SO_PEERPIDFD gets the same answer as a process with no scope */
@@ -494,6 +502,27 @@ static void on_accept(void) {
         fprintf(stderr, "share: a process in no app scope was turned away\n");
         drop_conn(c);
     }
+}
+
+int share_companion(const char *id, int may_input) {
+    if (lfd < 0 || !id) return -1;
+    Conn *c = NULL;
+    for (int i = MAX_SOCK_CONN; i < MAX_CONN && !c; i++) if (cn[i].fd < 0) c = &cn[i];
+    char full[SG_ID_MAX];
+    if (!c || (size_t)snprintf(full, sizeof full, "lpk:%s", id) >= sizeof full || !sg_id_valid(full)) return -1;
+    int sv[2];
+    uint8_t *in = malloc(IN_MAX);
+    if (!in || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { free(in); return -1; }
+    fcntl(sv[0], F_SETFL, O_NONBLOCK);
+    memset(c, 0, sizeof *c);
+    c->fd = sv[0];
+    c->pidfd = -1;
+    c->in = in;
+    c->companion = 1;
+    c->may_input = may_input;
+    snprintf(c->id, sizeof c->id, "%s", full);
+    sw_key_init(&c->keys, now_ms());
+    return sv[1];
 }
 
 void share_dispatch(const struct pollfd *p, int n) {
