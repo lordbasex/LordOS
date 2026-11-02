@@ -1,0 +1,7 @@
+{
+  "intro": "Si une app ne répond plus pendant un moment, sélectionnez-la et cliquez sur Forcer à quitter. Elle se ferme sans enregistrer.",
+  "none": "Aucune app n’est ouverte",
+  "quit": "Forcer à quitter",
+  "shortcut": "Aussi dans le menu de la couronne : Forcer à quitter…",
+  "windows": "{count} fenêtres"
+}
