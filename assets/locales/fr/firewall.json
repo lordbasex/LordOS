@@ -67,7 +67,7 @@
   "lists.topic.malware": "Logiciels malveillants et attaques",
   "lists.topic.custom": "Vos propres listes",
   "lists.source": "{source} · licence : {license}",
-  "lists.updated": "{count} entrées · mise à jour {when}",
+  "lists.updated": "{count} entrées · mise à jour le {when}",
   "lists.pending": "Téléchargement…",
   "lists.about": "Environ {count} entrées",
   "lists.failed": "Non mise à jour : {error}",
