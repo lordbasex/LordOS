@@ -67,6 +67,15 @@ same package names), pinned from its archive for the Pi 5's hardware HEVC (`docs
 
 These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libfreerdp-client3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT), **fuse3** (LGPL-2.1, GPL-2.0) and openssh-client (BSD). The Store's Disk Formats item, not preinstalled, brings **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, **apfs-dkms** (GPL-2.0).
 
+New on the images in 0.8.8 (installed from Debian, not linked; each keeps its own `/usr/share/doc/<package>/copyright`):
+
+| Package | Images | What for | License |
+|---|---|---|---|
+| `polkitd`, `pkexec` | both ISOs and the Raspberry Pi image; dependencies of `lordos` | administrator rights for Linux apps that run `pkexec`, answered by LordOS's own prompt (`docs/PRIVACY.md`) | LGPL-2.0-or-later |
+| `libnss-mdns` | both ISOs and the Raspberry Pi image; recommended by `lordos` | `.local` names | LGPL-2.1-or-later |
+| `wireless-regdb` | both ISOs and the Raspberry Pi image | Wi-Fi's country rules for the kernel | ISC |
+| `firmware-brcm80211` | both ISOs (the Raspberry Pi image already had it, from Raspberry Pi's archive) | Broadcom Wi-Fi cards such as the BCM43602 | **non-free firmware** (Debian's `non-free-firmware`): Broadcom's binary licence, which allows redistribution unmodified; no source |
+
 ## Tools used to make website media (not shipped in LordOS)
 
 | Tool | Used for | License |

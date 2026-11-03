@@ -58,9 +58,14 @@ fullscreen surface is presented above every layer.
 
 ## The app switcher
 
-`sdk/appswitcher.jsx`, the same in both themes, with its rules in `sdk/switchermodel.js`. While the modifier is held: Tab or → and ← move, ⇧Tab goes back, **1 to 9** go straight to an app,
+`sdk/appswitcher.jsx`, the same in both themes, with its rules in `sdk/switchermodel.js`, mounted by each theme inside its
+`ThemeProvider`, in the overlay layer. Apps are grouped as the Dock groups them (`runningApps`), most recently used first. It
+opens on the previous app, and the dispatcher gives it every key while open. While the modifier is held: Tab or → and ← move, ⇧Tab goes back, **1 to 9** go straight to an app,
 **Z, the key under Esc, or ↓** move through the selected app's windows in a row below it (↑ goes back), Enter or letting go switches, Esc cancels. The keys go by position, so they're the same in every layout.
 A Linux or isolated app's window in that row is its real surface, drawn smaller and live; a window the shell draws itself shows its app's icon.
+Switching brings the app's top window, on this desktop if it has one. Listing apps from every desktop shows each one's desktop
+name, and choosing one elsewhere jumps there. ❖\` and ❖⇧\` in Lord Flow go through the visible windows of the app in front on this
+desktop.
 
 Settings → Keyboard (`settings.switcher`): which keys open it (the theme's, ❖Tab, ⌥Tab or both; the grab profile gets `+tab-meta`, `+tab-alt` or `+tab-both`), apps from everywhere, this desktop or this display,
 leaving out apps with everything minimized, numbers, the windows row, size, a look (System, Glass, Solid, High contrast, Custom colors) and apps that never show. In Lord Classic, when ❖Tab opens the switcher, the Overview moves to ❖W.
@@ -93,15 +98,6 @@ entries stop applying and leave Settings → Keyboard's list (`listed`), and `us
 
 A key pressed with no Linux app in front and released with one (the key that switched to its desktop) has its
 release delivered to that app, and the dispatcher never sees it: a new press of a key still marked counts as a press.
-
-## The app switcher
-
-`sdk/appswitcher.jsx`, mounted by each theme inside its `ThemeProvider`, in the overlay layer. Apps are
-grouped as the Dock groups them (`runningApps`), most recently used first. It opens on the previous app, and
-the dispatcher gives it every key while open: Tab, ⇧Tab and the arrows move, Enter or the modifier's release
-switches, Esc cancels. Switching brings the app's top window, on this desktop if it has one. It lists the apps of every
-desktop, with the desktop's name, and choosing one elsewhere jumps there. ❖\` and ❖⇧\` in Lord Flow go through the
-visible windows of the app in front on this desktop.
 
 ## Testing
 

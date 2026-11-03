@@ -32,7 +32,7 @@ but badly.
 | ![before](trackpad-map-before.png) | ![after](trackpad-map-after.png) |
 | Monitor → Network: the map before the pinch, with the pointer over Europe | After a pinch-out (scale ×3): zoom toward the pointer, which stays over the same place |
 | ![settings](trackpad-settings.png) | ![launchpad](trackpad-swipe-launcher.png) |
-| Settings → Trackpad (only appears if there is a touchpad) | Swiping up with three fingers opens the theme's app launcher |
+| Settings → Trackpad (before 0.8.8; the page is now Mouse & Trackpad and always shows) | Swiping up with three fingers opens the theme's app launcher |
 | ![chromium before](trackpad-browser-before.png) | ![chromium](trackpad-browser-pinch.png) |
 | Chromium 155 (Wayland) before | Pinch: Chromium zooms the page via `zwp_pointer_gestures_v1` |
 | ![windows](trackpad-swipe-windows.png) | ![remote](trackpad-remote-pinch.png) |
@@ -50,7 +50,7 @@ but badly.
 | `server/src/ui/js_input.c` | `lord.input.devices()`, `config()`, `configure(obj)` |
 | `runtime/events.js` | `__lordGesture` → fine `onWheel`, `onPinch`, `onSwipe` |
 | `sdk/trackpad.js` | Applies settings live, and the desktop actions on swipe |
-| `apps/settings/Trackpad.jsx` | Settings → Trackpad |
+| `apps/settings/Trackpad.jsx` | Settings → Mouse & Trackpad |
 | `tests/touchpad-sim/` | Touchpad simulated with uinput, and the scripted gestures |
 
 ## Detection
@@ -175,13 +175,21 @@ on):
 - without a theme action, left and right switch windows (the rearmost comes to the front, or the
   front one goes to the back).
 
-## Settings → Trackpad
+## Settings → Mouse & Trackpad
 
-It's in the Language & Keyboard group, and only appears if there is a touchpad. It's saved in
-`settings.trackpad` (`~/.config/lordos/settings.json`) and applied live:
-`sdk/trackpad.js` calls `lord.input.configure`.
+It's in the Language & Keyboard group and, since 0.8.8, always shows, with or without a touchpad (before, it was
+Trackpad and appeared only with one). It's saved in `settings.trackpad` (`~/.config/lordos/settings.json`) and applied
+live: `sdk/trackpad.js` calls `lord.input.configure`.
 
-Each row has a small drawing of the gesture that animates on mouse hover.
+At the top, **Mouse** applies to a mouse:
+
+| Setting (key) | Default |
+|---|---|
+| Speed (`mouseSpeed`, 0..1) | 0.5 |
+| Natural scrolling (`mouseNatural`: the content moves against the wheel's direction) | no |
+
+Without a touchpad, a note says the touchpad rows apply when one is connected. Each touchpad row has a small drawing
+of the gesture that animates on mouse hover.
 
 | Tab | Setting (key) | Default |
 |---|---|---|

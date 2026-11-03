@@ -44,6 +44,8 @@ LordOS links some system libraries dynamically: libwayland and libxkbcommon (MIT
 
 Since 0.8.7 `lordos` also depends on FreeRDP (Apache-2.0), rclone (MIT), fuse3 (LGPL-2.1, GPL-2.0) and the OpenSSH client (BSD). The Store's Disk Formats item, not preinstalled, brings ntfs-3g and exfatprogs (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, apfs-dkms (GPL-2.0). Moving wallpapers are public domain, CC0, CC BY and CC BY-SA, with credits in Settings and in their repository.
 
+Since 0.8.8 `lordos` also depends on polkit (`polkitd` and `pkexec`, LGPL-2.0-or-later), so Linux apps that ask for administrator rights get LordOS's administrator prompt, and recommends libnss-mdns (LGPL-2.1-or-later), which resolves `.local` names. The images add wireless-regdb (ISC), the database of Wi-Fi's country rules, and libnss-mdns; the ISOs also carry firmware-brcm80211, Broadcom Wi-Fi firmware that is non-free but redistributable, from Debian's `non-free-firmware` section (the Raspberry Pi image already had it for the board's own Wi-Fi).
+
 ## Source code
 
 The source code of LordOS is in [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). If you need the corresponding source of a GPL component we distribute and can't find it, write to us through [our contact form](https://www.iperfex.com/contacto/?lang=en).

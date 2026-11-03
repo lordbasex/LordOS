@@ -47,7 +47,7 @@ Estas son las únicas conexiones de red que hace una instalación nueva de LordO
 |---|---|---|---|
 | **DHCP y DNS** en tu red local | cuando hay un cable de red o una red Wi-Fi conectada | para obtener una dirección y resolver nombres; el DNS va a los servidores que te da tu red o los que configures | desconectate, o configurá una dirección y un DNS manuales en Ajustes → Red |
 | **Hora de red (NTP)** con `systemd-timesyncd`, contra el grupo público de servidores NTP de Debian | cuando la computadora está conectada | para mantener la hora correcta | Ajustes → Fecha y hora → desactivá "Ajustar la fecha y la hora automáticamente" |
-| **mDNS** (`avahi-daemon`, en PC; la imagen para Raspberry Pi no lo incluye) | solo en la red local | anuncia el nombre de la computadora para que otros dispositivos de tu red la encuentren, y responde consultas de nombres locales | `sudo systemctl disable --now avahi-daemon` |
+| **mDNS** (`avahi-daemon`, en las ISO y en la imagen para Raspberry Pi, con `libnss-mdns` para que se resuelvan los nombres `.local`) | solo en la red local | anuncia el nombre de la computadora para que otros dispositivos de tu red la encuentren, y responde consultas de nombres locales | `sudo systemctl disable --now avahi-daemon` |
 
 La zona horaria nunca se deduce a partir de la red. Nada de esta tabla llega al proyecto LordOS.
 

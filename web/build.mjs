@@ -244,6 +244,10 @@ function parseChangelog(src) {
 }
 const legalDir = path.join(CONTENT, 'legal');
 const legalIndex = fs.existsSync(path.join(legalDir, 'pages.json')) ? readJson(path.join(legalDir, 'pages.json')) : null;
+// guides (0.8.8): plain how-to pages at the site root, /requirements/ and /virtual-machine/, from content/guides
+const guideDir = path.join(CONTENT, 'guides');
+const guideIndex = fs.existsSync(path.join(guideDir, 'pages.json')) ? readJson(path.join(guideDir, 'pages.json')) : { pages: [] };
+const guidePages = (guideIndex.pages || []).filter((p) => LANGS.every((l) => fs.existsSync(path.join(guideDir, `${p.slug}.${l}.md`))));
 const hasPh = (text) => /\[\[[A-Z][A-Z0-9_]*\]\]/.test(text);
 // production: legal pages that still contain [[PLACEHOLDERS]] are left out (--allow-placeholders keeps them, highlighted)
 const legalAll = legalIndex ? (legalIndex.pages || []).filter((p) => LANGS.every((l) => fs.existsSync(path.join(legalDir, `${p.slug}.${l}.md`)))) : [];
@@ -435,7 +439,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -526,7 +530,7 @@ ${icons}
 </section>`;
 }
 
-const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -549,6 +553,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
 </div>`).join('\n');
   write(path.join(pageUrl(l, 'home'), 'index.html'), render(tpl.home, {
     ...common('home', null, 'home'), features, showcase, teaser: teaser(t),
+    vmGuide: pageUrl(l, 'virtual-machine'), reqUrl: pageUrl(l, 'requirements'),
     heroImg: (() => {
       // the desktop inside a laptop drawn in CSS, as a slideshow of real screenshots (site.js runs it;
       // without JS only the first slide shows). Slide 1 has light and dark variants that follow the theme.
@@ -842,6 +847,18 @@ ${rels.join('\n')}
     write(path.join(pageUrl(l, page), 'index.html'), render(tpl.legal, {
       ...common(page, [`${title} · LordOS`, loc(lp.description, l) || `${title} — lordos.org`], true),
       title: phOut(esc(phIn(title, 'legal/pages.json'))), updated: esc(fmtDate(updated)), updatedIso: esc(updated), nav, body: bodyHtml, indexUrl: pageUrl(l, 'legal'),
+    }, t));
+  }
+
+  // guides
+  for (const gp of guidePages) {
+    const { body } = frontMatter(fs.readFileSync(path.join(guideDir, `${gp.slug}.${l}.md`), 'utf8'));
+    const { html: bodyHtml } = renderMd(body, [], [], null, `guides/${gp.slug}.${l}.md`);
+    const title = loc(gp.title, l) || gp.slug;
+    const nav = `<ul>\n${guidePages.map((x) => `<li><a href="${pageUrl(l, x.slug)}"${x.slug === gp.slug ? ' aria-current="page"' : ''}>${esc(loc(x.title, l) || x.slug)}</a></li>`).join('\n')}\n</ul>`;
+    write(path.join(pageUrl(l, gp.slug), 'index.html'), render(tpl.guide, {
+      ...common(gp.slug, [`${title} · LordOS`, loc(gp.description, l) || `${title} — lordos.org`], true),
+      title: esc(title), lead: esc(loc(gp.description, l) || ''), nav, body: bodyHtml,
     }, t));
   }
 

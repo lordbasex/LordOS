@@ -59,6 +59,14 @@
         "es": "Un editor Qt 6 abierto desde la Terminal, con el marco del tema.",
         "pt": "Um editor Qt 6 aberto pelo Terminal, com a moldura do tema."
       }
+    },
+    {
+      "file": "docs/file-dialog.png",
+      "caption": {
+        "en": "The system file dialog (0.8.8). Linux apps without a dialog of their own get this same one through the file chooser portal.",
+        "es": "El diálogo de archivos del sistema (0.8.8). Las apps de Linux sin diálogo propio reciben este mismo a través del portal de selección de archivos.",
+        "pt": "O diálogo de arquivos do sistema (0.8.8). Os apps Linux sem diálogo próprio recebem este mesmo pelo portal de seleção de arquivos."
+      }
     }
   ],
   "diagrams": [

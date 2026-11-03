@@ -1,0 +1,22 @@
+{
+  "pages": [
+    {
+      "slug": "requirements",
+      "title": { "en": "System requirements", "es": "Requisitos del sistema", "pt": "Requisitos do sistema" },
+      "description": {
+        "en": "What each LordOS image needs: processor, memory, disk, firmware and display, for PCs, virtual machines and the Raspberry Pi 5.",
+        "es": "Qué necesita cada imagen de LordOS: procesador, memoria, disco, firmware y pantalla, para PC, máquinas virtuales y la Raspberry Pi 5.",
+        "pt": "O que cada imagem do LordOS precisa: processador, memória, disco, firmware e tela, para PCs, máquinas virtuais e o Raspberry Pi 5."
+      }
+    },
+    {
+      "slug": "virtual-machine",
+      "title": { "en": "Virtual machine (OVA)", "es": "Máquina virtual (OVA)", "pt": "Máquina virtual (OVA)" },
+      "description": {
+        "en": "Run LordOS in VirtualBox or VMware from the ready-made OVA image, step by step.",
+        "es": "Usá LordOS en VirtualBox o VMware con la imagen OVA lista, paso a paso.",
+        "pt": "Use o LordOS no VirtualBox ou no VMware com a imagem OVA pronta, passo a passo."
+      }
+    }
+  ]
+}

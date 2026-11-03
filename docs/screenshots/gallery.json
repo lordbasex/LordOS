@@ -7885,5 +7885,71 @@
       "es": "Remote Desk: ajustes de una computadora y carpetas compartidas",
       "pt": "Remote Desk: ajustes de um computador e pastas compartilhadas"
     }
+  },
+  {
+    "file": "docs/file-dialog.png",
+    "category": "privacy",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "The system file dialog in 0.8.8: it looks and works like Files, here choosing a wallpaper picture",
+      "es": "El diálogo de archivos del sistema en la 0.8.8: se ve y funciona como Archivos, acá eligiendo una imagen de fondo",
+      "pt": "O diálogo de arquivos do sistema na 0.8.8: parece e funciona como o Arquivos, aqui escolhendo uma imagem de fundo"
+    }
+  },
+  {
+    "file": "docs/wallpaper-your-pictures.png",
+    "category": "settings",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "Settings → Wallpaper: your own picture on the desktop, new in 0.8.8",
+      "es": "Ajustes → Fondo de pantalla: tu propia imagen en el escritorio, nuevo en la 0.8.8",
+      "pt": "Ajustes → Papel de parede: sua própria imagem na área de trabalho, novo na 0.8.8"
+    }
+  },
+  {
+    "file": "docs/desktop-dock-desktops.png",
+    "category": "settings",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "Settings → Desktop & Dock: how many desktops, the Ctrl arrows and the four-finger swipe",
+      "es": "Ajustes → Escritorio y Dock: cuántos escritorios, las flechas con Ctrl y el gesto de cuatro dedos",
+      "pt": "Ajustes → Mesa e Dock: quantas mesas, as setas com Ctrl e o gesto de quatro dedos"
+    }
+  },
+  {
+    "file": "docs/mouse-trackpad.png",
+    "category": "settings",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "Settings → Mouse & Trackpad: the mouse's speed and scrolling, and the trackpad's settings for when one is connected",
+      "es": "Ajustes → Mouse y trackpad: la velocidad y el desplazamiento del mouse, y los ajustes del trackpad para cuando haya uno",
+      "pt": "Ajustes → Mouse e trackpad: a velocidade e a rolagem do mouse, e os ajustes do trackpad para quando houver um"
+    }
+  },
+  {
+    "file": "docs/app-switcher.png",
+    "category": "desktop",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "The app switcher in 0.8.8: numbers 1 to 9 go straight to an app",
+      "es": "El selector de apps en la 0.8.8: los números del 1 al 9 van directo a una app",
+      "pt": "O seletor de apps na 0.8.8: os números de 1 a 9 vão direto para um app"
+    }
+  },
+  {
+    "file": "docs/files-documents.png",
+    "category": "apps",
+    "theme": "dark",
+    "variant": "normal",
+    "caption": {
+      "en": "Files in 0.8.8: the folder's name only in the title bar",
+      "es": "Archivos en la 0.8.8: el nombre de la carpeta solo en la barra de título",
+      "pt": "Arquivos na 0.8.8: o nome da pasta só na barra de título"
+    }
   }
 ]

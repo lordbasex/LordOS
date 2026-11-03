@@ -653,14 +653,37 @@ left for after 0.8.6, and the new native app:
   read a memory-bandwidth counter). Optional: a 1000 Hz kernel tick for the Pi 5 (moved from 0.8.6 on 2026-10-30).
   The scissor was run on the Pi 5 on 2026-10-31: slower on V3D, it stays off (`LORD_GPU_SCISSOR=1`, `GPU.md`).
 
-## Release 0.8.8 (planned)
+## Release 0.8.8-beta ✅ (2026-11-02)
 
-Only what is already decided:
-- [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
-  instead of reading each frame back and converting it.
+Released 2026-11-02 (`CHANGELOG.md`, "0.8.8-beta"; ISOs `lordos-live-0.8.8-amd64.iso` and
+`lordos-live-0.8.8-arm64.iso`, the Raspberry Pi 5 image `lordos-0.8.8-rpi5-arm64.img.xz` and, new, the OVA
+`lordos-0.8.8-amd64.ova` for VirtualBox and VMware). What shipped:
+- [x] **Screen sharing** for an app the launcher started (`SCREEN-SHARING.md`): its own socket, a system prompt on first
+  use, an indicator with Stop, and nothing on the login screen or while the session is locked.
+- [x] **Packaged apps with a companion** (`PACKAGED-APPS.md`): a root-owned app root in `/usr/lib/lordos-apps/<id>/`
+  for packages a Verified author signed, with one sandboxed helper per app, live media in `<MediaView>` and an item by
+  the clock (`status-item`).
+- [x] **Install in free space** beside another system on a GPT disk booted through UEFI (the copy and the reboot beside
+  another system were not run to the end; see the changelog's known issues).
+- [x] **The OVA** (`ISO.md`, "OVA"): 4 CPUs and 4 GB to start, a first-boot account setup; imported in VirtualBox and
+  VMware Fusion.
+- [x] **French** as a built-in interface language.
+- [x] Settings: your own wallpaper picture (desktop and login screen), Desktops in Desktop & Dock, Mouse & Trackpad always
+  shown, the app switcher's keys and look in Keyboard.
+- [x] The system file dialog looks and works like Files, and answers the FileChooser portal for Linux apps.
+- [x] Administrator rights for Linux apps through `pkexec`, with LordOS's own prompt (`lord-pkexec`).
+- [x] `lordos-issue` for bug reports, Broadcom Wi-Fi firmware and the regulatory database on the images, and `.local`
+  names through `libnss-mdns`.
+- [x] Fixes from the community reports: Firefox's input, Wi-Fi after a reboot, the volume and brightness keys,
+  VirtualBox's VMSVGA display, the pointer on Intel laptops with a motion sensor (`CHANGELOG.md`, "Fixed").
+- [x] Release tests (`ISO.md`, "Release test (0.8.8 Beta)"): every image built with `RELEASE=1` and signed code, the
+  server tests, the OVA in VirtualBox and VMware Fusion, and an in-place upgrade from 0.8.7 through the staging
+  repository. The arm64 ISO and the Pi 5 image were built but not booted for this release.
 
 ## Release 0.8.8-1 (planned)
 
+- [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`; moved from 0.8.8): showing the decoder's buffer
+  directly on the GPU, instead of reading each frame back and converting it.
 - [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; moved from 0.8.8 on 2026-11-02): with `lord-vm` and direct
   QMP.
 - [ ] **Unattended install** (first after 0.8.8): an optional boot entry, never the default, that installs from a config
@@ -678,8 +701,8 @@ Only what is already decided:
   attachments, a real USB disk and a real Linux app tested with it. The portal tested when two sessions start at once.
 - [ ] **Release checks left from 0.8.8:** an upgrade done from the Store's own screen ("LordOS <version> is available"
   with the notes, then "Restart required"), with a user who has logged in and changed settings, checking they survive;
-  `results-<version>.tar.gz` collected and attached; the OVA's first account on VMware Fusion (then "Not tried in
-  VMware" leaves the changelog); a download card for the OVA on lordos.org.
+  `results-<version>.tar.gz` collected and attached; the OVA's first account on VMware Fusion confirmed (then the changelog's OVA limitation drops it). The OVA's
+  download card and a requirements page reached lordos.org on 2026-11-03.
 
 ## Before 1.0
 

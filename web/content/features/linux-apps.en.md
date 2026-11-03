@@ -31,6 +31,9 @@ JavaScript in LordOS can't write `.desktop` files, so the interface can't invent
 - **The frame.** Apps that ask the compositor to draw their frame (Qt apps, foot, Chromium with its system title bar) get the theme's frame. GTK 3 apps such as Firefox get it through a second decoration protocol LordOS also speaks. GTK 4 apps that draw their own bar keep it, and LordOS trims their shadow.
 - **Browsers with a single bar.** Since 0.8.4, the preinstalled Chromium and Firefox draw one bar with their tabs and the window buttons inside it, on the side the LordOS theme uses (left in Lord Flow, right in Lord Classic), following a theme or light/dark change live. One switch in Settings → Appearance, "Browsers: tabs in the title bar", puts both back under the LordOS frame. The compositor honours whichever frame an app asks for, even when it changes while the window is open.
 - **Light and dark, live.** LordOS serves the "Settings" desktop portal itself on the session bus, so GTK 4 and libadwaita apps follow the mode, accent colour and button order. GTK 3 apps follow through the GSettings keyfile, and LordOS ships a matching GTK theme. Both change live when you switch modes.
+- **Open and save with LordOS's dialog** (since 0.8.8): Linux apps with no file dialog of their own ask through the standard FileChooser portal, and LordOS answers with its own dialog, which looks and works like Files, inside the home folder.
+- **Administrator rights through LordOS's prompt** (since 0.8.8): an app that asks with `pkexec`, such as a launcher updating itself, gets LordOS's administrator prompt, which names the app and the command, instead of stopping with error 127. Programs that ask polkit over D-Bus still find no agent.
+- **Clicks reach the right surface** (since 0.8.8): the compositor now honours the input region an app sets, so Firefox's tabs, toolbar and pages answer the mouse again.
 - **One clipboard.** Text copied in a Linux app pastes in LordOS and the other way round; images stay available after the source app closes and appear in the clipboard history (❖V).
 - **Select to copy, middle click to paste.** Since 0.8.3 the primary selection works between Wayland apps, and between them and X11 apps. Since 0.8.5 the app that copied also sees its own copy in the clipboard, as the Wayland protocol says.
 - **Videos keep the screen on** (since 0.8.5): a Linux video player can ask that the screen not dim or lock while it plays (`zwp_idle_inhibit_manager_v1`), and the idle timers wait while its window is shown.
@@ -84,7 +87,7 @@ Deliberately absent: any protocol that lets an app capture the screen or other a
 
 - [server/src/wl/wl.c](https://github.com/lordbasex/LordOS/blob/main/server/src/wl/wl.c): the Wayland compositor and its protocols
 - [server/src/apps.c](https://github.com/lordbasex/LordOS/blob/main/server/src/apps.c): the `.desktop` launcher
-- [server/src/ui/portal.c](https://github.com/lordbasex/LordOS/blob/main/server/src/ui/portal.c): the Settings portal for GTK and libadwaita
+- [server/src/ui/portal.c](https://github.com/lordbasex/LordOS/blob/main/server/src/ui/portal.c): the Settings portal for GTK and libadwaita, and the FileChooser portal
 - [sdk/wayland.js](https://github.com/lordbasex/LordOS/blob/main/sdk/wayland.js): Linux windows in the window manager
 - [server/src/pkg](https://github.com/lordbasex/LordOS/tree/main/server/src/pkg): the Debian package engine
 - [apps/store](https://github.com/lordbasex/LordOS/tree/main/apps/store): the Store

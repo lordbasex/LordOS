@@ -12,7 +12,8 @@ Before you write, check the [FAQ](/faq/) and the existing issues: someone may ha
 
 ## What to include in a bug report
 
-- **The LordOS version**, as shown in the About LordOS app (for example "0.8.7 · Beta").
+- **The output of `lordos-issue`** (from 0.8.8 on): run `lordos-issue` in a terminal. It writes `~/lordos-issue-<date>.txt` with names and addresses replaced, and sends nothing. Read it, then paste it into the report: it already holds the version and the hardware details below.
+- **The LordOS version**, as shown in the About LordOS app (for example "0.8.8 · Beta").
 - **How you installed it:** the ISO (live or installed), the Raspberry Pi 5 image, or the `.deb` on Debian 13.
 - **Your hardware:** the computer or board model, the graphics card, the amount of memory, and any device involved (printer, touchpad, Wi-Fi adapter, monitor).
 - **Steps to reproduce:** what you did, one step per line, starting from a fresh start if you can.

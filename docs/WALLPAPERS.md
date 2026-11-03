@@ -80,7 +80,7 @@ reads `/sys/class`, `/sys/bus` and `/run/udev`, and gets the V4L2 and media cont
 | Pi 5, login, trial build | 1080p60 H.264, software decode, CPU composition | about 156 % of one core |
 | Pi 5, login, 0.8.7 | 1080p60 HEVC, hardware decode, GPU composition | `lord-media` 41 %, `lord-server` 147 % of one core, 30 s, SoC 52 °C with its case |
 
-Decoding is in hardware; each frame is then read back and converted to BGRA in `lord-media`, and `lord-server` paints it. That copy is why the total stays high. Showing the decoder's buffer directly on the GPU is the next step, in 0.8.8.
+Decoding is in hardware; each frame is then read back and converted to BGRA in `lord-media`, and `lord-server` paints it. That copy is why the total stays high. Showing the decoder's buffer directly on the GPU is the next step, planned for a later release.
 
 Settings → Wallpaper has a switch at the top, Desktop or Login screen, and the same tiles choose for that target: a video (`wallpaper-login "<id> <variant>"`) or a still wallpaper (`wallpaper-login "still <id>"`, kept in `/var/lib/lordos/wallpapers/login-still`, shown with no video at all).
 

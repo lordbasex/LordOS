@@ -32,6 +32,12 @@ materials (SBOM) published with each release. The website summary is at
   inside. Because the image carries the binaries, the source package of the same version is published at
   https://lordos.org/apt/pool/rpi/source/f/ffmpeg/, pinned in `rpi-mirror.list` the same way. An image built with a newer
   FFmpeg needs its new `source` line too.
+- **Image packages new in 0.8.8** (`tools/iso/build.sh`, `tools/rpi/build-img.sh`; listed in `THIRD_PARTY.md`), from
+  Debian with their own `copyright`: `polkitd` and `pkexec` (LGPL-2.0-or-later; dependencies of `lordos`),
+  `libnss-mdns` (LGPL-2.1-or-later), `wireless-regdb` (ISC), on both ISOs and the Raspberry Pi image, and
+  `firmware-brcm80211` on both ISOs, from Debian's `non-free-firmware` component: Broadcom's binary-only firmware,
+  redistributed unmodified under its own licence, with no source to publish. The Raspberry Pi image already carried
+  it, from Raspberry Pi's archive.
 - **The app catalog (0.8.5, Store → Artificial Intelligence and Commercial;** `apt/catalog.json`,
   `apt/README.md`, [UPDATES.md](UPDATES.md), "Mirrored apps (catalog)") records each app's licence.
   Apps delivered `direct` (Claude Code, Claude Desktop, Visual Studio Code, Cursor, Google Chrome,

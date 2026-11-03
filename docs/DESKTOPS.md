@@ -89,8 +89,8 @@ showing. The last desktop can't be closed.
 | New desktop | Overview | ❖⌃D |
 | Close desktop | Overview | ❖⌃F4 |
 
-⌃ arrows are word movement in apps, in Linux apps and in the Terminal. **Settings → Keyboard → Use Ctrl + arrow
-keys for Desktops** turns them off (`settings.desktopArrows`): the entries stop applying and the theme asks for the
+⌃ arrows are word movement in apps, in Linux apps and in the Terminal. **Settings → Desktop & Dock → Desktops → Use Ctrl +
+arrow keys for Desktops** (Lord Flow only, `apps/settings/Desktops.jsx`) turns them off (`settings.desktopArrows`): the entries stop applying and the theme asks for the
 `flow` key table instead of `flow-desktops` (`server/src/wl/keygrab.c`), so the keys reach apps. ❖⌃ arrows stay. See
 [SHORTCUTS.md](SHORTCUTS.md).
 
@@ -100,7 +100,8 @@ desktop. There is no wrap at the ends: the indicator shows where you are.
 A sideways swipe switches desktops; with only one it switches windows as before ([TRACKPAD.md](TRACKPAD.md)). The
 themes register `desktopSwipe` with `registerGestureActions`. Swiping left brings the next desktop. Up with three
 fingers stays the launcher or the start menu, and with four it is the Overview, when four-finger swipes
-are on in Settings.
+are on: **Settings → Desktop & Dock → Desktops → Four finger swipe switches desktops** (`trackpad.swipe4`, also in
+Settings → Mouse & Trackpad).
 
 ## The switch
 

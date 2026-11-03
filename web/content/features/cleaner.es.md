@@ -37,7 +37,7 @@ Los archivos de caché regenerables bajo carpetas fijas se pueden borrar de verd
 
 ## Lo que cuesta su movimiento
 
-La app viene con tres aspectos, sigue el modo claro y oscuro, y funciona en inglés, español y portugués. Su diseño se invierte para los idiomas de derecha a izquierda, comprobado por ahora con un idioma de prueba con texto en inglés. Su movimiento corre solo con la ventana al frente y se detiene por completo con Reducir movimiento. Las partes que se mueven van en cuadros separados para que la pantalla se repinte lo menos posible; los números están en `docs/CLEANER-TESTS.md`. Se midieron en una máquina virtual y en una Raspberry Pi 5 con su monitor, donde la sesión tomó 4,5–7,2 % de un núcleo con la pantalla inicial quieta, 12,2–18,0 % analizando y 0,1 % con la app cerrada.
+La app viene con tres aspectos, sigue el modo claro y oscuro, y funciona en cuatro idiomas: inglés, español, portugués y francés. Su diseño se invierte para los idiomas de derecha a izquierda, comprobado por ahora con un idioma de prueba con texto en inglés. Su movimiento corre solo con la ventana al frente y se detiene por completo con Reducir movimiento. Las partes que se mueven van en cuadros separados para que la pantalla se repinte lo menos posible; los números están en `docs/CLEANER-TESTS.md`. Se midieron en una máquina virtual y en una Raspberry Pi 5 con su monitor, donde la sesión tomó 4,5–7,2 % de un núcleo con la pantalla inicial quieta, 12,2–18,0 % analizando y 0,1 % con la app cerrada.
 
 [[shot:2]]
 

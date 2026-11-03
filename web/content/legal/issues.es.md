@@ -12,7 +12,8 @@ Antes de escribir, revisá las [preguntas frecuentes](/faq/) y los issues que ya
 
 ## Qué incluir en un reporte de error
 
-- **La versión de LordOS**, como aparece en la app Acerca de LordOS (por ejemplo "0.8.7 · Beta").
+- **La salida de `lordos-issue`** (desde la 0.8.8): ejecutá `lordos-issue` en una terminal. Escribe `~/lordos-issue-<fecha>.txt` con los nombres y las direcciones reemplazados, y no envía nada. Leelo y después pegalo en el reporte: ya trae la versión y los datos del hardware de abajo.
+- **La versión de LordOS**, como aparece en la app Acerca de LordOS (por ejemplo "0.8.8 · Beta").
 - **Cómo la instalaste:** la ISO (live o instalada), la imagen para Raspberry Pi 5 o el `.deb` en Debian 13.
 - **Tu hardware:** el modelo de la computadora o de la placa, la placa de video, la memoria y cualquier dispositivo que tenga que ver (impresora, touchpad, adaptador Wi-Fi, monitor).
 - **Pasos para reproducirlo:** qué hiciste, un paso por línea, desde un arranque limpio si podés.

@@ -47,7 +47,7 @@ These are the only network connections a fresh LordOS installation makes without
 |---|---|---|---|
 | **DHCP and DNS** on your local network | when a network cable or Wi-Fi network is connected | to get an address and resolve names; DNS goes to the servers your network gives you or that you set | disconnect, or set a manual address and DNS in Settings → Network |
 | **Network time (NTP)** through `systemd-timesyncd`, to Debian's public NTP pool | when the computer is online | to keep the clock right | Settings → Date & Time → automatic time off |
-| **mDNS** (`avahi-daemon`, on PCs; the Raspberry Pi image does not include it) | on the local network only | announces the computer's name so other devices on your network can find it, and answers local name queries | `sudo systemctl disable --now avahi-daemon` |
+| **mDNS** (`avahi-daemon`, on the ISOs and the Raspberry Pi image, with `libnss-mdns` so `.local` names resolve) | on the local network only | announces the computer's name so other devices on your network can find it, and answers local name queries | `sudo systemctl disable --now avahi-daemon` |
 
 The time zone is never guessed from the network. Nothing in this table goes to the LordOS project.
 

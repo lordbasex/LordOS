@@ -311,19 +311,19 @@
     "features": {
       "en": [
         "Emoji by category, with search and skin tones",
-        "Search in English, Spanish and Portuguese",
+        "Search in English, Spanish, Portuguese and French",
         "Unicode symbols by block: arrows, math, currency…",
         "Quick picker in any app with ❖."
       ],
       "es": [
         "Emojis por categoría, con búsqueda y tonos de piel",
-        "Buscá en inglés, español y portugués",
+        "Buscá en inglés, español, portugués y francés",
         "Símbolos Unicode por bloque: flechas, matemática…",
         "Selector rápido en cualquier app con ❖."
       ],
       "pt": [
         "Emojis por categoria, com busca e tons de pele",
-        "Pesquise em inglês, espanhol e português",
+        "Pesquise em inglês, espanhol, português e francês",
         "Símbolos Unicode por bloco: setas, matemática…",
         "Seletor rápido em qualquer app com ❖."
       ]
@@ -603,7 +603,8 @@
         "Color tags, search and Recents",
         "This computer: the whole system, read-only, as your user",
         "Every disk in the sidebar, mounted with a click; trash and archives",
-        "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view"
+        "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view",
+        "New in 0.8.8: the system file dialog now looks and works like Files"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -611,7 +612,8 @@
         "Etiquetas de color, búsqueda y Recientes",
         "Este equipo: todo el sistema, solo lectura, como tu usuario",
         "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
-        "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista"
+        "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista",
+        "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -619,7 +621,8 @@
         "Etiquetas de cor, busca e Recentes",
         "Este computador: todo o sistema, só leitura, como seu usuário",
         "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
-        "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização"
+        "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização",
+        "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos"
       ]
     }
   },
@@ -645,7 +648,8 @@
         "Appearance: desktop style (Lord Flow or Lord Classic), wallpaper and the Dock",
         "Privacy, app permissions, network access and blocklists",
         "Users, remote desktop and updates",
-        "New in 0.8.7: moving wallpapers, session restore and an on-screen keyboard"
+        "New in 0.8.7: moving wallpapers, session restore and an on-screen keyboard",
+        "New in 0.8.8: your own wallpaper picture on the desktop and the login screen, Desktops in Desktop & Dock, Mouse & Trackpad, app switcher options and French"
       ],
       "es": [
         "Red, Wi-Fi, VPN y Bluetooth",
@@ -653,7 +657,8 @@
         "Apariencia: estilo de escritorio (Lord Flow o Lord Classic), fondo de pantalla y el Dock",
         "Privacidad, permisos de apps, acceso a la red y listas de bloqueo",
         "Usuarios, escritorio remoto y actualizaciones",
-        "Nuevo en 0.8.7: fondos en movimiento, restaurar la sesión y un teclado en pantalla"
+        "Nuevo en 0.8.7: fondos en movimiento, restaurar la sesión y un teclado en pantalla",
+        "Nuevo en 0.8.8: tu propia imagen de fondo en el escritorio y en la pantalla de inicio de sesión, Escritorios en Escritorio y Dock, Mouse y trackpad, opciones del selector de apps y francés"
       ],
       "pt": [
         "Rede, Wi-Fi, VPN e Bluetooth",
@@ -661,7 +666,8 @@
         "Aparência: estilo da área de trabalho (Lord Flow ou Lord Classic), papel de parede e o Dock",
         "Privacidade, permissões de apps, acesso à rede e listas de bloqueio",
         "Usuários, área de trabalho remota e atualizações",
-        "Novo na 0.8.7: fundos em movimento, restauração da sessão e um teclado na tela"
+        "Novo na 0.8.7: fundos em movimento, restauração da sessão e um teclado na tela",
+        "Novo na 0.8.8: sua própria imagem de fundo na área de trabalho e na tela de login, Áreas de trabalho em Mesa e Dock, Mouse e trackpad, opções do alternador de apps e francês"
       ]
     }
   },
@@ -728,21 +734,24 @@
         "Profiles with 16 color schemes",
         "Search with regular expressions",
         "Inline images and font ligatures",
-        "Sessions survive a restart; tmux integration"
+        "Sessions survive a restart; tmux integration",
+        "New in 0.8.8: ❖+click or Ctrl+click opens a web address in the default browser"
       ],
       "es": [
         "Pestañas, paneles divididos y ventana desplegable",
         "Perfiles con 16 esquemas de color",
         "Búsqueda con expresiones regulares",
         "Imágenes en línea y ligaduras tipográficas",
-        "Las sesiones sobreviven a un reinicio; integración con tmux"
+        "Las sesiones sobreviven a un reinicio; integración con tmux",
+        "Nuevo en 0.8.8: ❖+clic o Ctrl+clic abre una dirección web en el navegador predeterminado"
       ],
       "pt": [
         "Abas, painéis divididos e janela suspensa",
         "Perfis com 16 esquemas de cor",
         "Busca com expressões regulares",
         "Imagens em linha e ligaduras tipográficas",
-        "As sessões sobrevivem a um reinício; integração com tmux"
+        "As sessões sobrevivem a um reinício; integração com tmux",
+        "Novo na 0.8.8: ❖+clique ou Ctrl+clique abre um endereço da web no navegador padrão"
       ]
     }
   },
@@ -768,7 +777,8 @@
         "See exactly what changes before you install",
         "Install LordOS apps (.lpk) without root, or a .deb or .lpk from Files",
         "All updates in one click, over HTTPS from https:// sources",
-        "New in 0.8.7: Disk Formats, one item for disks from other systems"
+        "New in 0.8.7: Disk Formats, one item for disks from other systems",
+        "New in 0.8.8: a Remote access section, shown once the catalog has an app in it"
       ],
       "es": [
         "Apps de Debian por categoría, como tarjetas en una grilla, con búsqueda",
@@ -776,7 +786,8 @@
         "Mirá exactamente qué cambia antes de instalar",
         "Instalá apps de LordOS (.lpk) sin root, o un .deb o .lpk desde Archivos",
         "Todas las actualizaciones con un clic, por HTTPS desde fuentes https://",
-        "Nuevo en 0.8.7: Disk Formats, un solo ítem para discos de otros sistemas"
+        "Nuevo en 0.8.7: Disk Formats, un solo ítem para discos de otros sistemas",
+        "Nuevo en 0.8.8: una sección Acceso remoto, que aparece cuando el catálogo tiene una app ahí"
       ],
       "pt": [
         "Apps do Debian por categoria, como cartões em uma grade, com busca",
@@ -784,7 +795,8 @@
         "Veja exatamente o que muda antes de instalar",
         "Instale apps do LordOS (.lpk) sem root, ou um .deb ou .lpk pelo Arquivos",
         "Todas as atualizações com um clique, por HTTPS de fontes https://",
-        "Novo na 0.8.7: Disk Formats, um único item para discos de outros sistemas"
+        "Novo na 0.8.7: Disk Formats, um único item para discos de outros sistemas",
+        "Novo na 0.8.8: uma seção Acesso remoto, que aparece quando o catálogo tem um app nela"
       ]
     }
   },

@@ -4,7 +4,7 @@ LordOS is free software and contributions are welcome: code, documentation, tran
 
 The repository is public at [github.com/lordbasex/LordOS](https://github.com/lordbasex/LordOS). You can:
 
-- try LordOS and [report problems](/legal/issues/) on [GitHub Issues](https://github.com/lordbasex/LordOS/issues);
+- try LordOS and [report problems](/legal/issues/) on [GitHub Issues](https://github.com/lordbasex/LordOS/issues), with the output of `lordos-issue` (from 0.8.8 on: run it in a terminal; it writes `~/lordos-issue-<date>.txt` with names and addresses replaced, and sends nothing);
 - test it on your hardware and tell us what works and what doesn't;
 - **watch** or **star** the repository to hear about releases.
 
@@ -49,7 +49,7 @@ Use your real name (or the name you are publicly known by). Pull requests with c
 
 ## Translations
 
-LordOS ships in English, Spanish and Portuguese. Other languages are added as **language packs** built from the translation catalogs; see [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Corrections to the existing translations are welcome too.
+LordOS ships in four languages: English, Spanish, Portuguese and French (since 0.8.8). Other languages are added as **language packs** built from the translation catalogs; see [docs/LANGUAGES.md](https://github.com/lordbasex/LordOS/blob/main/docs/LANGUAGES.md). Corrections to the existing translations are welcome too.
 
 ## Code of conduct
 

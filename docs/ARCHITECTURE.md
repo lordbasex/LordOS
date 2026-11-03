@@ -203,7 +203,28 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   counts and decides them as that component (`sec/netconn.h`, `FIREWALL.md`, "LordOS components in
   their own scopes").
 
+- **Packaged apps' companions** (0.8.8): a native app a Verified author signed, installed by a `.deb` in the
+  root-owned `/usr/lib/lordos-apps/<id>/` and checked at every load, may run one signed helper program of its own,
+  started with the app and stopped with it, in a strict sandbox (`sandbox_exec_companion`). It may hand live media to a
+  sandboxed `lord-media` that the app shows in a `<MediaView>`, and reaches the screen-sharing API on a descriptor
+  `lord-server` gives it only when the manifest declares `screen-share`. See `PACKAGED-APPS.md`.
+
+- **`lord-pkexec`** (0.8.8): `/usr/bin/pkexec` is diverted to this small unprivileged front, which asks the session's
+  `lord-server` (`$XDG_RUNTIME_DIR/lordos-pkagent.sock`) to be the polkit authentication agent for its caller and then
+  becomes the real pkexec. `lord-server` draws the password prompt and hands the password to polkit's own setuid helper;
+  nothing of LordOS runs as root for it. See `PRIVACY.md`, "Authentication for Linux apps".
+
 `lord-server` can still run on its own, with its own DRM and evdev, for development.
+
+Sockets and services a user session's `lord-server` offers besides its own (0.8.8):
+
+- **Screen sharing:** `$XDG_RUNTIME_DIR/lordos/share.sock` (0600), the screen-sharing API for an app the launcher
+  started, separate from remote desktop, with a consent prompt, an indicator with Stop and grants in a root-owned
+  file. The login screen's `lord-server` doesn't create it, and it stops delivering while the session is locked or
+  away from the monitor. See `SCREEN-SHARING.md`.
+- **Its own xdg portal:** `org.freedesktop.portal.Settings` (mode, accent, button order) and
+  `org.freedesktop.portal.FileChooser` (the system file dialog for Linux apps) on the session bus
+  (`server/src/ui/portal.c`), without xdg-desktop-portal. See `WAYLAND.md`.
 
 Data shipped with LordOS for the Monitor (`MONITOR.md`): `assets/monitor/geoip-country.mmdb.xz`
 (DB-IP Lite Country, CC BY 4.0, read by our own MaxMind DB reader) and the Natural

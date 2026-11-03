@@ -17,6 +17,42 @@ To repair it, reinstall the package (your files and settings are not touched):
 sudo apt install --reinstall lordos
 ```
 
+## What to attach to a bug report
+
+Run this in a terminal (or, if the desktop doesn't start, on a text console with **Ctrl+Alt+F2**; it works on the
+live system too):
+
+```sh
+lordos-issue
+```
+
+It only reads and sends nothing. It saves `~/lordos-issue-<date>.txt` with the LordOS version, the hardware (PCI and
+USB devices, CPU, memory, disks, displays, input devices, network, sound and drivers), an integrity check (LordOS's
+signed code, each app's signature, changed files, kernel taint and software sources), failed services, firmware
+messages, the session's log and this boot's errors. Addresses, your user and computer names and home paths are
+replaced; serial numbers, Wi-Fi names and paired devices are left out. It asks for your password to read the kernel
+log and every package file; without it (or with `--no-root`) the report is shorter. `--print` also shows it.
+**Read the file before posting it**, since issues are public, and paste it in the issue form's **Logs** box
+([CONTRIBUTING.md](../CONTRIBUTING.md)).
+
+## Virtual machines
+
+- **VirtualBox's default display (VMSVGA) shows no desktop.** Fixed in 0.8.8 ([#9](https://github.com/lordbasex/LordOS/issues/9)):
+  the `vmwgfx` driver it needs is now loaded on VirtualBox too, so VMSVGA, VBoxSVGA and VBoxVGA all reach the desktop,
+  with BIOS and with EFI ([ISO.md](ISO.md), "Firmware and displays"). On 0.8.7 or earlier, pick VBoxSVGA in the
+  machine's display settings.
+- **VirtualBox says `VERR_ALREADY_EXISTS` when importing the OVA.** A folder from an earlier machine with the same name
+  is still in `VirtualBox VMs`: removing a machine with "Remove only" keeps its files. Change the machine's name on
+  the import screen, or delete that old folder.
+
+## A Linux app asks for administrator rights
+
+Since 0.8.8, a Linux app that runs `pkexec` (for example a launcher updating itself) gets LordOS's own password prompt,
+which names the app and the command; before, it stopped with error 127 ([#4](https://github.com/lordbasex/LordOS/issues/4)).
+`/usr/bin/pkexec` is diverted to `lord-pkexec` ([PRIVACY.md](PRIVACY.md), "Authentication for Linux apps"). The prompt
+takes a physical keyboard only, and programs that ask polkit over D-Bus directly still find no agent. After going
+back to a package older than 0.8.8, the diversion leaves a dangling link: remove it with `dpkg-divert --remove` by hand.
+
 ## Typing feels slow
 
 If keys show up late in one app (for example Chromium) but not in LordOS's own apps (Notes, the

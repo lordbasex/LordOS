@@ -21,8 +21,8 @@ erased.
 
 - **Linux and other Unix-like systems:**
   ```sh
-  sha256sum -c lordos-live-0.8.7-amd64.iso.sha256      # or: shasum -a 256 -c …
-  sudo dd if=lordos-live-0.8.7-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
+  sha256sum -c lordos-live-0.8.8-amd64.iso.sha256      # or: shasum -a 256 -c …
+  sudo dd if=lordos-live-0.8.8-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
   ```
   `/dev/sdX` is the whole USB stick (not a partition). On BSD-derived systems it is usually `/dev/rdiskN`: find
   it with the system disk tool and unmount it first.
@@ -41,7 +41,7 @@ motherboard. It works with **UEFI** and with **BIOS/Legacy**. **Secure Boot** ha
 | Check this computer (nothing is installed) | `lordos.check=1`: the session opens System Information on its Performance tab instead of the installer (0.8.7). Nothing is measured until the user asks. The interface is in English, like the first entry |
 | LordOS (safe mode: no GPU) | passes `lordos.gpu=0` → `LORD_GPU=0`: lord-server doesn't use the GPU path and composites on the CPU |
 | LordOS (Español) / LordOS (Português) / LordOS (Français) | `lordos.lang=es` / `lordos.lang=pt` / `lordos.lang=fr`: the interface in that language the first time |
-| LordOS (copy to RAM) | `toram`: copies the system to memory (~1 GB free is needed) and the USB stick can be removed |
+| LordOS (copy to RAM) | `toram`: copies the system to memory and the USB stick can be removed. The ISO is about 1.1 GB and all of it goes to memory, so give the machine at least 4 GB |
 
 The GRUB menu itself is in English (GRUB's default). Every entry except safe mode boots with the
 boot splash (`splash`); safe mode boots in text (`nosplash`).
@@ -50,8 +50,8 @@ boot splash (`splash`); safe mode boots in text (`nosplash`).
 
 The ISO boots with **UEFI** and with **legacy BIOS** (a hybrid image from `grub-mkrescue`: El
 Torito for BIOS and `efi.img` for UEFI). Secure Boot has to be off. For virtual machines the
-smoothest setup is UEFI firmware, 4 GB of memory, 2–4 processors and the "Debian 64-bit" guest
-type; legacy BIOS works too since 0.8.1.
+smoothest setup is UEFI firmware, at least 4 CPUs and 4 GB of memory (16 GB is the ideal with many apps;
+2 CPUs are too few) and the "Debian 64-bit" guest type; legacy BIOS works too since 0.8.1.
 
 **The 0.8.0 legacy BIOS bug.** On VMware Fusion with BIOS firmware (2 GB, 2 vCPUs, SVGA) the
 machine triple-faulted when the menu's 5 s timeout fired; with UEFI it booted. On Proxmox with
@@ -133,6 +133,9 @@ Measured on VM 116 (8 vCPUs, 4 GB) for an unsigned development build of the 0.8.
 | squashfs | 853 MB |
 | uncompressed system | 2.6 GB |
 | `lordos_0.8.6_arm64.deb` | 12.8 MB |
+
+These are the 0.8.6 development build's numbers. The 0.8.8-beta release files are larger:
+`lordos-live-0.8.8-arm64.iso` is 1,063,763,968 bytes and `lordos_0.8.8_arm64.deb` 22,288,464 bytes (about 22.3 MB).
 
 **Tested** with `qemu-system-aarch64` on VM 116 under TCG (no KVM: the host is x86-64): `virt` machine, `-cpu max`, 6
 vCPUs, 2.2 GB, edk2 2025.02 (`AAVMF_CODE.no-secboot.fd`, Secure Boot off), `virtio-gpu-pci` at 1280×800 without 3D,
@@ -476,6 +479,12 @@ The VMDK is cut at its end-of-stream marker. `qemu-img` pads the file after it, 
 
 ### Test (November 2)
 
+The released file is `lordos-0.8.8-amd64.ova`, 1,255,577,600 bytes, sha256
+`98ff7979993093840834e65b92f25dd8e4972451ce5e8d519007c80fb9f6d7a9`. On the maintainer's own computer it was imported in
+VirtualBox 7.2: the account was created in **Set up LordOS**, the machine restarted into the login screen and signed in
+with that password. It was also imported in VMware Fusion through Fusion's own import window, without problems; the
+first account there is not confirmed yet.
+
 The table below is from the first build, `lordos-0.8.7-amd64.ova`. The test build of 0.8.8, with test keys, is `lordos-0.8.8-amd64.ova`, 1,255,546,880 bytes, sha256 `997869abff6777e5540522020b5a1b3764a13af68d21a080d5a3054506de8112`: imported on VirtualBox 7.2.22, it reached **Set up LordOS** with VBoxSVGA (its own setting) and with VMSVGA, both BIOS.
 
 | Check | Result |
@@ -490,7 +499,7 @@ The table below is from the first build, `lordos-0.8.7-amd64.ova`. The test buil
 | `ovftool` 5.0.0 to a VMX | manifest and disk digests pass, conversion completes. Its guest type comes out as `otherlinux-64` with a warning |
 | VMware Fusion, headless, with that VMX (an earlier build, with the VMDK cut by hand the same way) | **Set up LordOS** at 1280×800, read over a local VNC port added for the test |
 
-Not tested: **Create account**, the reboot after it and the login screen, because that needs a password typed into the machine. VMware's own double click (Fusion's GUI import), VMware Workstation, VirtualBox before 7.2 and Windows or Linux hosts. Sound in the machine.
+Not tested: **Create account**, the reboot after it and the login screen on VMware Fusion (on VirtualBox they were tested with the released file, above), VMware Workstation, VirtualBox before 7.2 and Windows or Linux hosts. Sound in the machine.
 
 ## What it ships
 
@@ -658,6 +667,27 @@ The installer screenshots up to "Done" and those of the installed system are fro
 text was fixed (sha256 `daba6313…c8ec65`). That ISO has the same binaries; only those texts change.
 With the final ISO, UEFI boot, the network, ❖L/Enter and the installer summary were repeated. Nothing
 was installed in that repeat.
+
+## Release test (0.8.8 Beta, November 2)
+
+`lordos-live-0.8.8-amd64.iso` (1,091,844,096 bytes, sha256 `e9fc3f51303407718eb7635d073a917fbecd77b24a0fcd1bb1965ad2e682b836`),
+`lordos-live-0.8.8-arm64.iso` (1,063,763,968 bytes, sha256 `88667b7181aa00fee97e5b4a1253198720ca30a1bd150eb0a33e6fc1f11823f5`),
+`lordos-0.8.8-amd64.ova` (1,255,577,600 bytes, sha256 `98ff7979993093840834e65b92f25dd8e4972451ce5e8d519007c80fb9f6d7a9`) and
+`lordos-0.8.8-rpi5-arm64.img.xz` (811,565,352 bytes, sha256 `648e3d159616617ccbb31d80381c5fb990a1d722ea4c231769843783c16ffdc4`)
+are the 0.8.8-beta release files, with `lordos_0.8.8_amd64.deb` and `lordos_0.8.8_arm64.deb`, all built with `RELEASE=1`
+from signed code. The checksums are in the release's `SHA256SUMS`.
+
+| Test | Result |
+|---|---|
+| Server tests | 26 passed, 0 failed |
+| The released OVA in VirtualBox 7.2 on the maintainer's own computer | account created in **Set up LordOS**, restart, login with its password: works |
+| The released OVA in VMware Fusion, through its own import window | imported without problems; the first account there is not confirmed yet |
+| Update 0.8.7 → 0.8.8 with `apt` against lordos.org/apt-staging, a clean installed amd64 VM (VM 125) | installed; `/usr/bin/pkexec` diverted to `lord-pkexec`; a clean restart with no failed units; a reinstall ran no migration (0.8.8 adds none) |
+| Raspberry Pi 5 against apt-staging | arm64 index read, candidate 0.8.8 |
+| arm64 ISO | built, not booted for this release |
+| Raspberry Pi image | built, not flashed or booted for this release |
+
+Not checked: the Store's own update screen ("LordOS 0.8.8 is available", then "Restart required") on screen.
 
 ## Release test (0.8.7 Beta, November 1)
 

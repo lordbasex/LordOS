@@ -50,6 +50,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [TRACKPAD.md](TRACKPAD.md) | Touchpads, gestures and touchscreens |
 | [SESSIONS.md](SESSIONS.md) | Login screen, sessions, user switching, boot splash hand-off |
 | [REMOTE.md](REMOTE.md) | Remote desktop on the LAN (off by default, port 5673), SSH and root over SSH (0.8.5, advanced) |
+| [SCREEN-SHARING.md](SCREEN-SHARING.md) | The screen-sharing API for third-party apps: its own socket, consent prompt, indicator and grants (0.8.8) |
 | [LANGUAGES.md](LANGUAGES.md) | Languages, regions, complex scripts, input methods, error messages |
 
 ## Privacy and security
@@ -71,6 +72,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [NATIVE-APPS.md](NATIVE-APPS.md) | Installable native apps (`.lpk`) |
+| [PACKAGED-APPS.md](PACKAGED-APPS.md) | Native apps a signed `.deb` installs in `/usr/lib/lordos-apps/<id>/`, with one sandboxed companion program (0.8.8) |
 | [PACKAGES.md](PACKAGES.md) | Debian packages and the Store: our package engine, HTTPS downloads (0.8.5), the AI and Commercial catalogs |
 | [WASM.md](WASM.md) | WebAssembly apps |
 | [FILES.md](FILES.md) | Files |

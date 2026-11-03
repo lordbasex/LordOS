@@ -58,6 +58,11 @@ This document gathers what's needed to build the image, write it, develop on the
 > **Update (2026-11-01, 0.8.7):** the image is `lordos-0.8.7-rpi5-arm64.img.xz`. FFmpeg now comes from Raspberry Pi's
 > archive, pinned in the image and by a migration on upgrades, and `lord-media` drives the Pi 5's HEVC decoder with it
 > (`WALLPAPERS.md`, `MEDIA.md`).
+>
+> **Update (2026-11-03, 0.8.8):** the image is `lordos-0.8.8-rpi5-arm64.img.xz` (811,565,352 bytes, sha256
+> `648e3d159616617ccbb31d80381c5fb990a1d722ea4c231769843783c16ffdc4`), built for the release with `RELEASE=1` from
+> signed code. A Pi 5 read the arm64 index of `lordos.org/apt-staging` and found 0.8.8 as the candidate. The image
+> itself was not written to a card or booted for this release.
 
 ## Models
 
@@ -84,7 +89,8 @@ This document gathers what's needed to build the image, write it, develop on the
 ## The image
 
 `tools/rpi/build-img.sh` builds `lordos-<version>-rpi5-arm64.img.xz`. It is written the same way to an
-SD card or an NVMe, and the same image boots on the Pi 5 and the Pi 4.
+SD card or an NVMe. The Pi 5 is the only supported board: the image also carries a kernel for the Pi 4,
+but booting it there is untested (see "Models").
 
 ### What it ships
 

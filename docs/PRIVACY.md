@@ -141,6 +141,13 @@ open or save, it calls `fs.openFile()` / `fs.saveFile(name, data)`; lord-server 
 the app **only that fd** over SCM_RIGHTS. The app reads/writes the fd (`broker.fdRead/fdWrite`) and
 never sees the rest of the disk.
 
+The other system file dialog, `sdk/filepicker.jsx` (0.8.8), serves apps in the theme's context (Mail attachments,
+Settings → Wallpaper) and Linux apps through the `org.freedesktop.portal.FileChooser` portal. It looks and works like
+Files: Home, the user's folders and the local disks mounted for the user under `/media` and `/run/media` in the
+sidebar, network disks left out, a double click or Enter to open, Esc to cancel (`FILES.md`, "The system file
+dialog"). A portal answer goes only to the app that asked, and only for a path the person picked. The powerbox above
+keeps its own dialog for now; giving it the same look is planned (`ROADMAP.md`).
+
 ### Menus and revocation
 
 - **Menus:** `wm.setMenus(id, menus)` in an isolated app serializes the menus (with an id per item)

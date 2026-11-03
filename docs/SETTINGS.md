@@ -18,14 +18,18 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 | Bluetooth | with Network and Sound | `apps/settings/Bluetooth.jsx`, `hw/bt.c`, `hw/sysbus.c` |
 | Notifications | with Sound | `apps/settings/Notifications.jsx`, `sdk/notify.js`, `hw/notifyd.c` |
 | Date & Time | with Language & Region | `apps/settings/DateTime.jsx`, `hw/hw.c` (timedated) |
-| Default Apps | with Keyboard and Trackpad | `apps/settings/DefaultApps.jsx`, `sdk/defaults.js`, `hw/defaults.c`, `hw/mimeapps.c` |
+| Wallpaper → Your pictures (0.8.8) | with Appearance, Desktop & Dock | `apps/settings/index.jsx` (`Wallpapers`; a PNG or JPEG of your own for the desktop or the login screen, picked with the system file dialog), `sdk/settings.js` (`addWallpaperImage`, `removeWallpaperImage`); see `WALLPAPERS.md` |
+| Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Lord Flow only) and the four finger swipe; see `DESKTOPS.md` |
+| Keyboard → App switcher (0.8.8) | with Language & Region, Date & Time | `apps/settings/Switcher.jsx`: the keys, which apps show, size and look; see `SHORTCUTS.md` |
+| Mouse & Trackpad (0.8.8: always shown) | with Keyboard | `apps/settings/Trackpad.jsx`: a mouse's speed and natural scrolling (wheel direction), then the touchpad's rows when there is one; see `TRACKPAD.md` |
+| Default Apps | with Keyboard and Mouse & Trackpad | `apps/settings/DefaultApps.jsx`, `sdk/defaults.js`, `hw/defaults.c`, `hw/mimeapps.c` |
 | Energy (Battery) | with Privacy | `apps/settings/Power.jsx`, `hw/power.c`, `hw/ppd.c` |
 | Cooling | after Energy | `apps/settings/Cooling.jsx`, `sdk/cooling.jsx`, `ui/js_fan.c` → `lord-fand` (`server/src/fan/`); see `FANS.md` |
 | Board firmware | after Cooling, only on a Raspberry Pi 5 (BCM2712: Pi 5, Pi 500, CM5) | `apps/settings/Firmware.jsx`, `hw/hw_admin.c` (`rpi-eeprom-status`, `rpi-eeprom-update`) |
 
 Shared pieces: `apps/settings/ui.jsx` (a row with a hint, a pop-up button, the page header) on top of
 the SDK's `GroupBox` (`docs/DESIGN.md`). All text goes through `t()` in the `prefs` namespace
-(`assets/locales/{en,es,pt}/prefs.json`); `node tools/i18n-check.mjs` passes. Pages use
+(`assets/locales/{en,es,pt,fr}/prefs.json`); `node tools/i18n-check.mjs` passes. Pages use
 `textAlign: 'start'` and leading/trailing layout, so they mirror in Arabic and Hebrew; sliders and
 the time fields keep `direction: 'ltr'`.
 

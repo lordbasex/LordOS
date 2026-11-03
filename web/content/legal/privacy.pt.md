@@ -47,7 +47,7 @@ Estas são as únicas conexões de rede que uma instalação nova do LordOS faz 
 |---|---|---|---|
 | **DHCP e DNS** na sua rede local | quando um cabo de rede ou uma rede Wi-Fi está conectado | para obter um endereço e resolver nomes; o DNS vai para os servidores que a sua rede fornece ou que você define | desconecte, ou defina endereço e DNS manuais em Ajustes → Rede |
 | **Hora pela rede (NTP)** via `systemd-timesyncd`, para o pool público de NTP do Debian | quando o computador está on-line | para manter o relógio certo | Ajustes → Data e hora → desligue a hora automática |
-| **mDNS** (`avahi-daemon`, em PCs; a imagem para Raspberry Pi não o inclui) | apenas na rede local | anuncia o nome do computador para que outros dispositivos da sua rede o encontrem, e responde a consultas de nomes locais | `sudo systemctl disable --now avahi-daemon` |
+| **mDNS** (`avahi-daemon`, nas ISOs e na imagem para Raspberry Pi, com `libnss-mdns` para que os nomes `.local` sejam resolvidos) | apenas na rede local | anuncia o nome do computador para que outros dispositivos da sua rede o encontrem, e responde a consultas de nomes locais | `sudo systemctl disable --now avahi-daemon` |
 
 O fuso horário nunca é deduzido pela rede. Nada nesta tabela vai para o projeto LordOS.
 

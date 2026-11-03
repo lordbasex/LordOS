@@ -31,6 +31,9 @@
       "kicker": "Paper"
     },
     "lumoSays": "Lumo says",
+    "guides": {
+      "nav": "Guides"
+    },
     "legal": {
       "nav": "Legal",
       "updated": "Last updated",
@@ -124,7 +127,6 @@
       "kicker": "Hardware",
       "title": "Tested hardware",
       "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people share with System Information and from the project's own reference machines. So far it holds only the reference machines.",
-      "statusDev": "In development for LordOS 0.8.7 (the latest release is {release}): sharing reports from System Information is not released yet, so for now this catalogue holds only the project's reference machines.",
       "machinesTitle": "Machines",
       "gpusTitle": "Graphics cards and drivers",
       "problemsTitle": "Known problems",
@@ -227,6 +229,9 @@
       "kicker": "Paper"
     },
     "lumoSays": "Lumo cuenta",
+    "guides": {
+      "nav": "Guías"
+    },
     "legal": {
       "nav": "Legal",
       "updated": "Última actualización",
@@ -320,7 +325,6 @@
       "kicker": "Hardware",
       "title": "Hardware probado",
       "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente comparte con Información del Sistema y de las máquinas de referencia del propio proyecto. Por ahora tiene solo las máquinas de referencia.",
-      "statusDev": "En desarrollo para LordOS 0.8.7 (la última versión publicada es {release}): compartir reportes desde Información del Sistema todavía no está publicado, así que por ahora este catálogo tiene solo las máquinas de referencia del proyecto.",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Tarjetas gráficas y drivers",
       "problemsTitle": "Problemas conocidos",
@@ -423,6 +427,9 @@
       "kicker": "Paper"
     },
     "lumoSays": "Lumo conta",
+    "guides": {
+      "nav": "Guias"
+    },
     "legal": {
       "nav": "Jurídico",
       "updated": "Última atualização",
@@ -516,7 +523,6 @@
       "kicker": "Hardware",
       "title": "Hardware testado",
       "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilham com as Informações do Sistema e das máquinas de referência do próprio projeto. Por enquanto tem só as máquinas de referência.",
-      "statusDev": "Em desenvolvimento para o LordOS 0.8.7 (a última versão publicada é {release}): compartilhar relatórios pelas Informações do Sistema ainda não foi publicado, então por enquanto este catálogo tem só as máquinas de referência do projeto.",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Placas de vídeo e drivers",
       "problemsTitle": "Problemas conhecidos",

@@ -49,6 +49,22 @@
         },
         {
           "label": {
+            "en": "Virtual machine (OVA)",
+            "es": "Máquina virtual (OVA)",
+            "pt": "Máquina virtual (OVA)"
+          },
+          "href": "/virtual-machine/"
+        },
+        {
+          "label": {
+            "en": "System requirements",
+            "es": "Requisitos del sistema",
+            "pt": "Requisitos do sistema"
+          },
+          "href": "/requirements/"
+        },
+        {
+          "label": {
             "en": "Paper",
             "es": "Paper",
             "pt": "Paper"

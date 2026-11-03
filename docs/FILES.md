@@ -311,6 +311,27 @@ file:
 - if the `Exec` has no file field code, nothing is launched;
 - no shell, as always.
 
+## The system file dialog (0.8.8)
+
+When an app asks for a file through the system (Mail attachments, a contact's photo, importing `.ics` or `.vcf`, a
+picture for Settings → Wallpaper) the dialog looks and works like Files, built from Files' own pieces
+(`sdk/filepicker.jsx` on `sdk/fileparts.jsx` and `sdk/fileglyphs.jsx`; its rules are in `sdk/filepickermodel.js`):
+
+- **Sidebar:** Home and the user's folders under Favorites, and under Locations the local disks mounted for the user
+  in `/media` and `/run/media`. Network disks (`cifs`, `smb3`, `nfs`, `nfs4`, rclone and sshfs mounts, and the
+  servers Files connected under `~/.local/share/lordos/remote/`) are left out: one that goes away over the network
+  would hold the interface.
+- **List and path:** name, date and size, sorted by a click on the column title, with the path's crumbs above. It
+  never starts above the home folder or a disk.
+- **Keys and mouse:** a click selects, a double click opens a folder or picks a file; Enter does the same for the row
+  under the cursor (with none, it is the primary button); Esc cancels; the arrows move. Saving asks before replacing
+  a file.
+
+Local disks are new here: an app that asks through the dialog can now be given a file on one, when the person picks
+it. The same dialog answers `org.freedesktop.portal.FileChooser` for Linux apps with no file dialog of their own,
+inside the home folder (`WAYLAND.md`). Isolated `.lpk` apps keep the powerbox, which hands them only the chosen
+file's descriptor (`PRIVACY.md`, "Powerbox").
+
 ## Tests
 
 - `make -C server build/fsops-test && build/fsops-test` on a temporary home folder: 49/49. It covers:

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="guide" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<div class="wrap legal">
+<nav class="legal-nav" aria-label="{{t.pages.guides.nav}}">
+<p class="toc-t">{{t.pages.guides.nav}}</p>
+{{{nav}}}
+</nav>
+<main id="main" class="legal-main">
+<h1>{{{title}}}</h1>
+<article class="prose">
+{{{body}}}
+</article>
+</main>
+</div>
+
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>

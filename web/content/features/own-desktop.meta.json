@@ -51,6 +51,22 @@
         "es": "Tres apps de Linux abiertas junto a las nativas, cada una con su ícono en el Dock.",
         "pt": "Três apps Linux abertos ao lado dos nativos, cada um com seu ícone no Dock."
       }
+    },
+    {
+      "file": "docs/app-switcher.png",
+      "caption": {
+        "en": "The app switcher (0.8.8): numbers 1 to 9 go straight to an app; the selected app's windows can show live in a row.",
+        "es": "El selector de apps (0.8.8): los números del 1 al 9 van directo a una app; las ventanas de la app elegida se pueden ver en vivo en una fila.",
+        "pt": "O seletor de apps (0.8.8): os números de 1 a 9 vão direto para um app; as janelas do app escolhido podem aparecer ao vivo numa fileira."
+      }
+    },
+    {
+      "file": "docs/wallpaper-your-pictures.png",
+      "caption": {
+        "en": "Your own picture as the wallpaper (0.8.8), on the desktop and, separately, on the login screen.",
+        "es": "Tu propia imagen como fondo (0.8.8), en el escritorio y, por separado, en la pantalla de inicio de sesión.",
+        "pt": "Sua própria imagem como fundo (0.8.8), na área de trabalho e, separadamente, na tela de login."
+      }
     }
   ],
   "diagrams": [
