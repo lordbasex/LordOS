@@ -1,5 +1,5 @@
 // Settings → Desktop & Dock: the desktops (sdk/desktops.js, docs/DESKTOPS.md), the same in every theme.
-import { View, Text, Button, useSettings, Toggle, useStore, desktopList, setDesktopCount, themes, typeScale, useTheme, trackpad } from '@lordos/sdk';
+import { View, Text, Button, useSettings, Toggle, useStore, desktopList, setDesktopCount, themes, typeScale, useTheme, trackpad, TRACKPAD_DEFAULTS } from '@lordos/sdk';
 import { Section, SettingRow } from './ui.jsx';
 
 const MAX = 9;
@@ -8,7 +8,7 @@ export function DesktopsSection({ tr }) {
   const t = useTheme();
   const [s, set] = useSettings();
   const n = useStore(desktopList).length;
-  const pad = { ...(s.trackpad || {}) };
+  const pad = { ...TRACKPAD_DEFAULTS, ...(s.trackpad || {}) };   // swipe4 is off by default
   return (
     <Section title={tr('settings.dock.desktops.title')} footer={tr('settings.dock.desktops.hint')}>
       <SettingRow label={tr('settings.dock.desktops.count')}>
@@ -24,7 +24,7 @@ export function DesktopsSection({ tr }) {
         </SettingRow>
       )}
       <SettingRow label={tr('settings.dock.desktops.swipe')}>
-        <Toggle small on={pad.swipe4 !== false} onChange={(v) => trackpad.set({ swipe4: v })} />
+        <Toggle small on={!!pad.swipe4} onChange={(v) => trackpad.set({ swipe4: v })} />
       </SettingRow>
     </Section>
   );

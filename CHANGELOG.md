@@ -19,6 +19,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   or wrong stops it before any disk is touched, and the live system starts as usual.
   `tools/iso/make-auto-disk.sh` makes the small ISO with the file for a virtual machine.
 
+### Fixed
+
+- Settings → Desktop & Dock → Desktops showed the four finger swipe as on when it had never been changed, while it is
+  off by default (as Mouse & Trackpad showed it).
+
 ## [0.8.8-beta] - 2026-11-02
 
 ### Added
