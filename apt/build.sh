@@ -112,16 +112,21 @@ validate() {
     [ -z "$dup" ] || die "duplicate package names: $dup"
     for id in $(j '.apps[].id'); do
         is_name "$id" || die "bad id $id"
-        for f in package name license vendor homepage kind summary.en summary.es summary.pt source.type; do
+        for f in package name license vendor homepage kind summary.en summary.es summary.pt; do
             v=$(jf "$id" ".$f // empty")
             [ -n "$v" ] || die "$id: missing $f"
         done
+        # LordOS's own packages (Disk Formats) have no source: they are built in this repository and added to the
+        # pool as .debs with the release (tools/release/apt-repo.sh build … lordos-disk-formats_*.deb).
+        own=; [ -n "$(jf "$id" '.source // empty')" ] || own=1
+        [ -z "$own" ] || [ "$(jf "$id" .vendor)" = LordOS ] || die "$id: missing source.type"
         is_name "$(jf "$id" .package)" || die "$id: bad package name"
         for p in $(jf "$id" '(.extra_packages // [])[]'); do is_name "$p" || die "$id: bad extra package $p"; done
         is_https "$(jf "$id" .homepage)" || die "$id: homepage must be https"
         arches=$(jf "$id" '.arches[]')
         [ -n "$arches" ] || die "$id: no arches"
         for a in $arches; do case "$a" in amd64|arm64) ;; *) die "$id: unsupported arch $a" ;; esac; done
+        [ -z "$own" ] || continue
         type=$(jf "$id" .source.type)
         case "$type" in
             apt)
@@ -397,7 +402,7 @@ do_recipe() {
 
 # ---------------------------------------------------------------------------------------------------
 selected() {
-    if [ $# -eq 0 ]; then j '.apps[].id'; return; fi
+    if [ $# -eq 0 ]; then j '.apps[] | select(.source) | .id'; return; fi
     for id in "$@"; do [ -n "$(jf "$id" .id)" ] || die "no app $id in the catalog"; echo "$id"; done
 }
 
