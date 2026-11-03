@@ -370,8 +370,10 @@ export function PolkitPrompt() {
   h(Text, { style: { fontSize: 12, color: th.textDim, lineHeight: 1.4 } }, p.message),
   row(t('passwords.polkit.action'), p.action),
   row(t('passwords.polkit.account'), p.account),
-  h(View, { style: { height: 30, borderRadius: 7, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: th.control,
-    border: `1px solid ${asking ? th.accent : th.separator}`, direction: 'ltr' } },
+  // sunken into the dialog, and lit while the keys go here
+  h(View, { style: { height: 32, borderRadius: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: th.mode === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.32)', border: `1px solid ${asking ? th.accent : th.separator}`,
+    boxShadow: asking ? `0 0 0 3px ${th.accent}40` : 'none', direction: 'ltr' } },
   h(Text, { style: { fontSize: 13, color: th.text } }, '•'.repeat(Math.min(p.count, 40))),
   asking ? h(View, { style: { width: 1.5, height: 16, marginLeft: 1, backgroundColor: blink ? th.accent : 'transparent' } }) : null),
   h(Text, { style: { fontSize: 12, color: p.wrong ? '#ff453a' : th.textDim } }, note),
