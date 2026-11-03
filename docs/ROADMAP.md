@@ -663,6 +663,23 @@ Only what is already decided:
 
 - [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; moved from 0.8.8 on 2026-11-02): with `lord-vm` and direct
   QMP.
+- [ ] **Unattended install** (first after 0.8.8): an optional boot entry, never the default, that installs from a config
+  file (hashed password, SSH key, target disk) and stops if the config or the disk doesn't match. It lets install tests
+  run without a person at the keyboard.
+- [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
+  and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
+  the site and the release notes point at it.
+- [ ] **Store: "Third-party suites"**, a section of featured suites from other projects, starting with ArtCraft: its
+  official `.deb` with a pinned SHA-256, described in our own words.
+- [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint
+  of the interface while sharing, colour conversion on the GPU, the tile comparison off the main thread, and an
+  optional 720p stream. The asynchronous capture is on the branch `v089-capture-work`.
+- [ ] The system file dialog's look in the remaining callers (the access prompt, Passwords and Notes), and Mail
+  attachments, a real USB disk and a real Linux app tested with it. The portal tested when two sessions start at once.
+- [ ] **Release checks left from 0.8.8:** an upgrade done from the Store's own screen ("LordOS <version> is available"
+  with the notes, then "Restart required"), with a user who has logged in and changed settings, checking they survive;
+  `results-<version>.tar.gz` collected and attached; the OVA's first account on VMware Fusion (then "Not tried in
+  VMware" leaves the changelog); a download card for the OVA on lordos.org.
 
 ## Before 1.0
 
