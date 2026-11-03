@@ -7,6 +7,7 @@
 #   /usr/lib/lordos/bin/lord-netperm      per-app network permissions with cgroup BPF (root, own service)
 #   /usr/lib/lordos/bin/lord-netd         system networking (root; launched and watched by lord-sessiond)
 #   /usr/lib/lordos/bin/lord-fand         fan control by temperature (root, own service, enabled)
+#   /usr/lib/lordos/bin/lord-autoinstall  the live ISO's unattended install (root, lordos-autoinstall.service; docs/UNATTENDED.md)
 #   /usr/lib/lordos/bin/lord-pkexec       /usr/bin/pkexec on LordOS, no privilege (docs/PRIVACY.md); the real one
 #                                         is diverted to /usr/bin/pkexec.distrib by postinst
 #   /usr/lib/lordos/bin/lord-server       each session's server (looks for ../themes and ../assets)
@@ -70,6 +71,8 @@ install -m 755 server/build/lord-netperm "$L/bin/lord-netperm"
 install -m 755 server/build/lord-fand "$L/bin/lord-fand"
 # /usr/bin/pkexec on LordOS: postinst diverts the real one and links this (docs/PRIVACY.md, "Authentication for Linux apps")
 install -m 755 server/build/lord-pkexec "$L/bin/lord-pkexec"
+# the live ISO's unattended install (docs/UNATTENDED.md); its unit is enabled only on the ISO (tools/iso/build.sh)
+install -m 755 server/build/lord-autoinstall "$L/bin/lord-autoinstall"
 # strip for the package's architecture: the host's strip can't read another architecture's binaries
 # (an aarch64 server/build packaged on x86-64 by tools/rpi/build-img.sh), and its errors are ignored below
 STRIP=strip
@@ -97,7 +100,7 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
 [ -x server/build/lord-doc ] && install -m 755 server/build/lord-doc "$L/bin/lord-doc"
-"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lordos-firstrun" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lordos-firstrun" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
@@ -227,6 +230,7 @@ find "$PKG/usr/share/themes" -type d -exec chmod 755 {} +; find "$PKG/usr/share/
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-netperm.service "$PKG/usr/lib/systemd/system/lord-netperm.service"
 # fans by temperature from the first boot (docs/FANS.md): enabled by postinst, also in a chroot
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-fand.service "$PKG/usr/lib/systemd/system/lord-fand.service"
+install -m 644 tools/iso/rootfs/etc/systemd/system/lordos-autoinstall.service "$PKG/usr/lib/systemd/system/lordos-autoinstall.service"
 find "$L" -type d -exec chmod 755 {} +
 find "$L/themes" "$L/assets" "$L/migrations" "$L/apt" -type f -exec chmod 644 {} +
 

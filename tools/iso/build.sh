@@ -154,6 +154,7 @@ in_ch systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumbe
 in_ch systemctl enable lordos.service > /dev/null
 in_ch systemctl enable lord-netperm.service > /dev/null
 in_ch systemctl enable lord-fand.service > /dev/null     # fans by temperature (docs/FANS.md)
+in_ch systemctl enable lordos-autoinstall.service > /dev/null   # runs only with lordos.auto=1 (docs/UNATTENDED.md)
 in_ch systemctl mask getty@tty1.service > /dev/null
 # the boot splash: the LordOS theme (the initramfs below is built with it); docs/ISO.md, "Boot splash"
 in_ch plymouth-set-default-theme lordos
@@ -240,6 +241,10 @@ menuentry "LordOS $VERSION (Français)" {
 }
 menuentry "LordOS $VERSION (copy to RAM: the USB drive can be removed)" {
     linux /live/vmlinuz boot=live components quiet loglevel=3 splash vt.global_cursor_default=0 toram lordos.lang=en
+    initrd /live/initrd.img
+}
+menuentry "Install automatically (lordos-auto.conf: erases the disk it names)" {
+    linux /live/vmlinuz boot=live components loglevel=3 nosplash lordos.auto=1 lordos.lang=en console=tty1 console=ttyS0,115200
     initrd /live/initrd.img
 }
 EOF

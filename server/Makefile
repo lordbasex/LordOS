@@ -212,6 +212,17 @@ build/freespace-test: tests/freespace_test.c src/install/freespace.c src/install
 build/install-plan-test: tests/install_plan_test.c src/install/install.c src/install/freepart.c src/install/freespace.c src/users/homedirs.c src/install/install.h src/install/freepart.h src/install/freespace.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/install_plan_test.c src/install/freepart.c src/install/freespace.c src/users/homedirs.c -lcrypt
+# the unattended install (src/install/autoinstall.c, docs/UNATTENDED.md): lordos-auto.conf's reader and checks
+test: build/autoinstall-test
+AUTOINSTALL_SRC := src/install/autoinstall.c src/install/install.c src/install/freepart.c src/install/freespace.c src/users/homedirs.c
+build/autoinstall-test: tests/autoinstall_test.c $(AUTOINSTALL_SRC) src/install/install.h src/install/freepart.h src/install/freespace.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/autoinstall_test.c src/install/install.c src/install/freepart.c src/install/freespace.c src/users/homedirs.c -lcrypt
+	./$@ || { rm -f $@; exit 1; }
+ALL += build/lord-autoinstall
+build/lord-autoinstall: $(AUTOINSTALL_SRC) src/install/install.h src/install/freepart.h src/install/freespace.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(AUTOINSTALL_SRC) -lcrypt
 build/freepart-cli: tests/freepart_cli.c src/install/freepart.c src/install/freespace.c src/install/freepart.h src/install/freespace.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFP_TEST -o $@ tests/freepart_cli.c src/install/freepart.c src/install/freespace.c

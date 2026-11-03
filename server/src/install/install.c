@@ -21,6 +21,10 @@
  *                           system; the setup account goes at the next boot (lordos-live-prep)
  *   install-reboot          reboots (only on the live system or after install-account, to finish the wizard)
  *
+ * The unattended install (lord-autoinstall, autoinstall.c, docs/UNATTENDED.md) calls install-run's own code with
+ * install_set_unattended(1) and three more fields, refused from anywhere else: passwordHash (a crypt(3) hash
+ * the maintainer made, instead of password), sshKey (one authorized_keys line for the user) and autologin.
+ *
  * The install-run JSON: { mode ("erase", the default, or "free"), disk, user, fullname, password,
  * hostname, lang, locale, timezone, kblayout, kbvariant, swap (MiB, 0 = no swap), and in mode free
  * freeStart, freeEnd (the region install-disks reported, which has to still be it) }. Every field is validated here (root), without
@@ -294,7 +298,42 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
 
 /* ---- flat JSON of install-run ---- */
 
-typedef struct { char mode[16], disk[32], user[33], fullname[128], password[257], hostname[64], lang[16], locale[64], timezone[64], kblayout[24], kbvariant[40]; long swap; unsigned long long free_start, free_end; } Plan;
+typedef struct { char mode[16], disk[32], user[33], fullname[128], password[257], hostname[64], lang[16], locale[64], timezone[64], kblayout[24], kbvariant[40]; long swap; unsigned long long free_start, free_end;
+                 /* the unattended install only (install_set_unattended) */
+                 char password_hash[256], ssh_key[1024]; int autologin, has_extra; } Plan;
+
+static int unattended;
+void install_set_unattended(int on) { unattended = on; }
+
+/* A crypt(3) hash as /etc/shadow keeps it: yescrypt ($y$, Debian's default) or SHA-512 ($6$), only the
+ * characters crypt uses, and one crypt itself accepts as a setting. */
+int install_hash_ok(const char *h) {
+    size_t n = strlen(h);
+    if (n < 20 || n > 255) return 0;
+    if (strncmp(h, "$y$", 3) && strncmp(h, "$6$", 3)) return 0;
+    for (const char *p = h; *p; p++) if (!isalnum((unsigned char)*p) && !strchr("./$", *p)) return 0;
+    struct crypt_data cd;
+    memset(&cd, 0, sizeof cd);
+    const char *out = crypt_r("lordos-hash-check", h, &cd);
+    int ok = out && out[0] == '$' && !strncmp(out, h, 3);
+    explicit_bzero(&cd, sizeof cd);
+    return ok;
+}
+
+/* One authorized_keys line: a known key type, base64, an optional comment; no options, no control characters. */
+int install_ssh_key_ok(const char *k) {
+    static const char *const types[] = { "ssh-ed25519 ", "ssh-rsa ", "ecdsa-sha2-nistp256 ", "ecdsa-sha2-nistp384 ", "ecdsa-sha2-nistp521 ", "sk-ssh-ed25519@openssh.com ", NULL };
+    size_t n = strlen(k);
+    if (n < 40 || n > 1000) return 0;
+    const char *b = NULL;
+    for (int i = 0; types[i]; i++) if (!strncmp(k, types[i], strlen(types[i]))) b = k + strlen(types[i]);
+    if (!b) return 0;
+    const char *e = b;
+    while (isalnum((unsigned char)*e) || *e == '+' || *e == '/' || *e == '=') e++;
+    if (e - b < 16 || (*e && *e != ' ')) return 0;
+    for (const char *p = k; *p; p++) if ((unsigned char)*p < 0x20 || *p == 0x7f) return 0;
+    return 1;
+}
 
 /* Reads a JSON string (with escapes and \uXXXX → UTF-8). Returns the pointer past the closing quote. */
 static const char *jstring(const char *p, char *out, size_t n, int *ok) {
@@ -350,7 +389,7 @@ static int parse_plan(const char *s, Plan *pl) {
         /* the mode decides whether a disk gets erased: it is a string, once, or the plan is refused */
         if (!strcmp(key, "mode") && (*p != '"' || pl->mode[0])) return -1;
         if (*p == '"') {
-            char val[300];
+            char val[1100];
             p = jstring(p, val, sizeof val, &ok);
             if (!ok) return -1;
             struct { const char *k; char *dst; size_t n; } f[] = {
@@ -359,7 +398,9 @@ static int parse_plan(const char *s, Plan *pl) {
                 { "hostname", pl->hostname, sizeof pl->hostname }, { "lang", pl->lang, sizeof pl->lang },
                 { "locale", pl->locale, sizeof pl->locale }, { "timezone", pl->timezone, sizeof pl->timezone },
                 { "kblayout", pl->kblayout, sizeof pl->kblayout }, { "kbvariant", pl->kbvariant, sizeof pl->kbvariant },
+                { "passwordHash", pl->password_hash, sizeof pl->password_hash }, { "sshKey", pl->ssh_key, sizeof pl->ssh_key },
             };
+            if (!strcmp(key, "passwordHash") || !strcmp(key, "sshKey")) pl->has_extra = 1;
             for (size_t i = 0; i < sizeof f / sizeof *f; i++)
                 if (!strcmp(key, f[i].k)) { if (strlen(val) >= f[i].n) return -1; cpy(f[i].dst, f[i].n, val); }
         } else if (isdigit((unsigned char)*p) || *p == '-') {
@@ -374,10 +415,14 @@ static int parse_plan(const char *s, Plan *pl) {
                 *(key[4] == 'S' ? &pl->free_start : &pl->free_end) = u;
             }
             p = end;
-        } else if (!strncmp(p, "true", 4) || !strncmp(p, "null", 4)) p += 4;
-        else if (!strncmp(p, "false", 5)) p += 5;
+        } else if (!strncmp(p, "true", 4) || !strncmp(p, "null", 4)) {
+            if (!strcmp(key, "autologin")) { pl->has_extra = 1; pl->autologin = p[0] == 't'; }
+            p += 4;
+        } else if (!strncmp(p, "false", 5)) { if (!strcmp(key, "autologin")) pl->has_extra = 1; p += 5; }
         else return -1;
     }
+    /* the unattended fields come only from lord-autoinstall; the interface can't send them */
+    if (pl->has_extra && !unattended) return -1;
     return ok ? 0 : -1;
 }
 
@@ -422,7 +467,9 @@ static const char *validate_person(Plan *pl) {
     struct passwd *pw = getpwnam(pl->user);
     if (pw && (strcmp(pl->user, "lordos") || is_first_account())) return "install.userTaken";
     for (const unsigned char *p = (const unsigned char *)pl->fullname; *p; p++) if (*p < 0x20 || *p == ':' || *p == ',' || *p == 0x7f) return "install.badFullName";
-    if (!pl->password[0]) return "install.noPassword";
+    if (!pl->password[0] && !pl->password_hash[0]) return "install.noPassword";
+    if (pl->password_hash[0] && (pl->password[0] || !install_hash_ok(pl->password_hash))) return "install.badPasswordHash";
+    if (pl->ssh_key[0] && !install_ssh_key_ok(pl->ssh_key)) return "install.badSshKey";
     if (!re_host(pl->hostname)) return "install.badHostname";
     if (!re_simple(pl->lang, 10, "-", 0)) return "install.badLanguage";
     if (!locale_supported(pl->locale)) return "install.badRegion";
@@ -624,11 +671,15 @@ static const char *setup_person(Plan *pl, int *step, int steps) {
      * the image, the group doesn't exist and nothing happens */
     { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "lpadmin", pl->user, NULL }; if (in_target(a)) { /* no CUPS */ } }
     { const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "plugdev", pl->user, NULL }; if (in_target(a)) { /* no plugdev group */ } }   /* FIDO2 keys (docs/PASSWORDS.md) */
-    char *salt = crypt_gensalt_ra("$y$", 0, NULL, 0);
     struct crypt_data cd;
     memset(&cd, 0, sizeof cd);
-    const char *hash = salt ? crypt_r(pl->password, salt, &cd) : NULL;
-    free(salt);
+    const char *hash;
+    if (pl->password_hash[0]) hash = pl->password_hash;            /* unattended: made by the maintainer */
+    else {
+        char *salt = crypt_gensalt_ra("$y$", 0, NULL, 0);
+        hash = salt ? crypt_r(pl->password, salt, &cd) : NULL;
+        free(salt);
+    }
     if (!hash || hash[0] == '*') return "install.hashFailed";
     if (set_shadow(pl->user, hash) || set_shadow("root", "*")) { explicit_bzero(&cd, sizeof cd); return "install.passwordFailed"; }
     explicit_bzero(&cd, sizeof cd);
@@ -640,7 +691,7 @@ static const char *setup_person(Plan *pl, int *step, int steps) {
      * is turned on in Settings → Users (AUTOLOGIN=). USER= is for the pre-M8
      * lordos-session. */
     writef(TARGET "/etc/lordos/session.conf", 0644, "# Written by the LordOS installer. See docs/SESSIONS.md\n"
-           "# AUTOLOGIN=user logs in automatically at boot; empty: login screen\nAUTOLOGIN=\nUSER=%s\n", pl->user);
+           "# AUTOLOGIN=user logs in automatically at boot; empty: login screen\nAUTOLOGIN=%s\nUSER=%s\n", pl->autologin ? pl->user : "", pl->user);
     progress("configure", ++*step, steps);
 
     /* language, region, time zone and keyboard */
@@ -672,6 +723,16 @@ static const char *setup_person(Plan *pl, int *step, int steps) {
      * same list as Settings → Users and the live system: users/homedirs.c) */
     { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/home/%s", pl->user);
       if (homedirs_create(p, uid, gid, pl->locale)) admin_log("install.homedirsWarning", NULL); }
+    /* unattended: the maintainer's SSH key, for when remote login is turned on (Settings → Sharing) */
+    if (pl->ssh_key[0]) {
+        char p[PATH_MAX];
+        snprintf(p, sizeof p, TARGET "/home/%s/.ssh", pl->user);
+        mkdir(p, 0700);
+        if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+        snprintf(p, sizeof p, TARGET "/home/%s/.ssh/authorized_keys", pl->user);
+        if (writef(p, 0600, "%s\n", pl->ssh_key)) return "install.sshKeyFailed";
+        if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+    }
     progress("configure", ++*step, steps);
     return NULL;
 }

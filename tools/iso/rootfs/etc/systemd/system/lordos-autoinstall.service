@@ -1,0 +1,22 @@
+[Unit]
+Description=LordOS unattended install (lordos-auto.conf; docs/UNATTENDED.md)
+Documentation=file:///usr/share/doc/lordos/README.md
+# only from the live ISO's "Install automatically" boot entry, never on an installed system
+ConditionKernelCommandLine=lordos.auto=1
+ConditionPathExists=/run/live/medium/live/filesystem.squashfs
+After=systemd-udev-settle.service local-fs.target
+Wants=systemd-udev-settle.service
+# the login screen waits: when the install works the computer restarts or powers off first; when it
+# stops, the live system starts as usual and the reason stays on the console and in the journal
+Before=lordos.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/lordos/bin/lord-autoinstall
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=infinity
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
