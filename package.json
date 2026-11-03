@@ -5,7 +5,7 @@
   "description": "LordOS — React themes and apps for lord-server",
   "lordos": {
     "channel": "beta",
-    "media": "0.8.7",
+    "media": "0.8.8",
     "imager": "0.8.6"
   },
   "scripts": {
