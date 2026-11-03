@@ -715,6 +715,9 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
   two sessions start at once; `results-<version>.tar.gz` collected and attached with the next images.
 - [ ] Keys of laptops whose top row sends desktop actions instead of F3 and F4 (the overview, the app launcher):
   [#12](https://github.com/lordbasex/LordOS/issues/12).
+- [ ] **A thumbnail view in the system file dialog** (`sdk/filepicker.jsx`): a switch between the list and small
+  pictures, remembered, and thumbnails by default when the dialog only accepts images (wallpaper, Notes). One change
+  for every app, since 0.8.8.1 they all share the dialog: [#13](https://github.com/lordbasex/LordOS/issues/13).
 
 ## Before 1.0
 
