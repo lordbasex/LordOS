@@ -40,7 +40,9 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
     "arches": ["amd64", "arm64"],
     "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | …
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
-                                       // (Chrome, Edge, Spotify); missing = the AI section
+                                       // (Chrome, Edge, Spotify); "remote" = third-party remote access;
+                                       // "suites" = featured open source suites from other projects
+                                       // (ArtCraft); missing = the AI section
     "source": { "type": "…", … }       // one of the four below
   }]
 }

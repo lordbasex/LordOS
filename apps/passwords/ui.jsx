@@ -1,7 +1,7 @@
 // ui.jsx — small pieces of Passwords: category and item icons, sheets (dialogs), the strength
 // bar, a QR code image, a multi-line field, a file picker and pop-up menus. Spacing, type and
 // controls follow docs/DESIGN.md; icons are drawn (glyphs.jsx), never color emoji.
-import { View, Text, Image, useTheme, useStore, createStore, Button, ScrollView, TextInput, ToolbarButton, takeTextFocus, releaseTextFocus, fs, t, Overlay } from '@lordos/sdk';
+import { View, Text, Image, useTheme, useStore, createStore, Button, ScrollView, TextInput, ToolbarButton, takeTextFocus, releaseTextFocus, fs, t, Overlay, FilePicker as SysFilePicker } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { builtinById } from './templates.js';
 import { appMode } from './api.js';
@@ -229,66 +229,30 @@ export function TextArea({ value, onChange, placeholder, minHeight = 90, mono, s
 
 // ---- pick a file (home folder and the user's disks: USB sticks) ----
 
-export function FilePicker({ title, save, suggest = '', onPick, onClose, filter, inline }) {
-  const th = useTheme();
-  const [dir, setDir] = useState(null);            // null = places
-  const [name, setName] = useState(suggest);
-  const [sel, setSel] = useState(null);
-  // app process: the system's own dialog (powerbox) picks the file and hands over only its fd
+// The system file dialog everywhere: in the app process the powerbox (lord-server draws it and hands over
+// only the chosen file's fd), in the shell the same dialog drawn like Files (sdk/filepicker.jsx), over
+// the whole window. `inline` is kept for the callers: the dialog covers the window either way.
+export function FilePicker({ title, save, suggest = '', onPick, onClose, filter }) {
   useEffect(() => {
     if (!appMode) return;
     let r = null;
     try { r = lord.broker.pick(save ? 1 : 0, suggest || ''); } catch (e) { r = null; }
     if (r && r.fd >= 0) onPick({ fd: r.fd, name: r.name }); else onClose();
   }, []);
-  if (appMode) return null;
-  let entries = [];
-  let places = [];
-  if (dir === null) {
-    places = [{ name: t('passwords.picker.home'), path: fs.home(), icon: 'folder' }];
-    try { for (const v of fs.volumes()) places.push({ name: v.name || v.path, path: v.path, icon: 'drive' }); } catch (e) { /* no disks */ }
-  } else {
-    try { entries = fs.list(dir).filter((e) => e.dir || !filter || filter(e.name)); } catch (e) { entries = []; }
-  }
-  const up = () => { const h = fs.home(); if (dir === h || dir === null || !dir.includes('/')) setDir(null); else setDir(fs.parent(dir) || null); setSel(null); };
-  const choose = () => {
-    if (save) { if (dir && name) onPick(fs.join(dir, name)); return; }
-    if (sel) onPick(fs.join(dir, sel));
-  };
-  return (
-    <Sheet title={title} onClose={onClose} width={520} inline={inline} footer={[
-      <Button key="c" label={t('passwords.cancel')} onClick={onClose} />,
-      <Button key="o" primary label={save ? t('passwords.picker.save') : t('passwords.picker.open')} onClick={choose} />]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <ToolbarButton icon="‹" title={t('passwords.picker.up')} onClick={up} />
-        <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: th.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{dir === null ? t('passwords.picker.places') : dir}</Text>
+  const key = useRef(null);
+  if (!key.current) key.current = `p${++overlaySeq}`;
+  useEffect(() => {
+    if (appMode) return;
+    const node = (
+      <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 60, backgroundColor: 'rgba(0,0,0,0.25)' }}>
+        <SysFilePicker title={title} mode={save ? 'save' : 'open'} name={save ? suggest : ''} filter={filter ? { test: filter } : null}
+          onClose={onClose} onPick={(p) => onPick(Array.isArray(p) ? p[0] : p)} />
       </View>
-      <View style={{ height: inline ? 190 : 260, borderRadius: 8, border: `1px solid ${th.separator}`, overflow: 'hidden' }}>
-        <ScrollView style={{ flex: 1 }}>
-          {dir === null ? places.map((p) => (
-            <Row key={p.path} icon={p.icon} label={p.name} onClick={() => setDir(p.path)} />
-          )) : entries.map((e) => (
-            <Row key={e.name} icon={e.dir ? 'folder' : 'note'} label={e.name} selected={sel === e.name}
-              onClick={() => (e.dir ? (setDir(fs.join(dir, e.name)), setSel(null)) : (setSel(e.name), save && setName(e.name)))}
-              onDoubleClick={() => !e.dir && onPick(fs.join(dir, e.name))} />
-          ))}
-          {dir !== null && !entries.length && <Text style={{ fontSize: 12, color: th.textDim, margin: 10 }}>{t('passwords.picker.empty')}</Text>}
-        </ScrollView>
-      </View>
-      {save && <TextInput value={name} onChange={setName} placeholder={t('passwords.picker.name')} onSubmit={choose} />}
-    </Sheet>
-  );
-}
-
-function Row({ icon, label, onClick, onDoubleClick, selected }) {
-  const th = useTheme();
-  return (
-    <View onClick={onClick} onDoubleClick={onDoubleClick} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10,
-      marginHorizontal: 4, borderRadius: 6, backgroundColor: selected ? th.accent : 'transparent' }}>
-      <Glyph kind={icon} size={15} color={selected ? '#fff' : th.accent} />
-      <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? '#fff' : th.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</Text>
-    </View>
-  );
+    );
+    overlays.set((l) => (l.some((x) => x.key === key.current) ? l.map((x) => (x.key === key.current ? { key: x.key, node } : x)) : [...l, { key: key.current, node }]));
+  });
+  useEffect(() => () => overlays.set((l) => l.filter((x) => x.key !== key.current)), []);
+  return null;
 }
 
 // ---- small pop-up menu ----

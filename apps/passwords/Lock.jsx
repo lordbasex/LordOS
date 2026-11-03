@@ -57,12 +57,12 @@ function FileRow({ file, empty, button, onPick }) {
 // system dialog picks the file and the form stays.
 function Shell({ children, wide, picker }) {
   const th = useTheme();
-  const kids = React.Children.toArray(children);
-  const inline = picker && !appMode;
+  // the file dialog (picker) covers the window itself: it is only mounted here
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: th.windowBg, padding: 20 }}>
-      <View style={{ width: inline ? 500 : wide ? 460 : 360, maxWidth: '100%', gap: 14, alignItems: 'stretch' }}>
-        {inline ? [kids[0], <React.Fragment key="picker">{picker}</React.Fragment>] : [...kids, picker ? <React.Fragment key="picker">{picker}</React.Fragment> : null]}
+      <View style={{ width: wide ? 460 : 360, maxWidth: '100%', gap: 14, alignItems: 'stretch' }}>
+        {children}
+        {picker || null}
       </View>
     </View>
   );
@@ -121,7 +121,7 @@ export function UnlockView() {
   if (has('fido')) opts.push(['fido', t('passwords.method.fido')]);
   if (has('recovery')) opts.push(['recovery', t('passwords.method.recovery')]);
   return (
-    <Shell picker={picking && <FilePicker inline title={t('passwords.unlock.chooseKeyfile')} onClose={() => setPicking(false)} onPick={(p) => { setKeyfile(p); setPicking(false); }} />}>
+    <Shell picker={picking && <FilePicker title={t('passwords.unlock.chooseKeyfile')} onClose={() => setPicking(false)} onPick={(p) => { setKeyfile(p); setPicking(false); }} />}>
       <Head pic={<Padlock size={64} />} title={t('passwords.unlock.title')} sub={t('passwords.unlock.subtitle')} />
       {opts.length > 1 && <View style={{ alignItems: 'center' }}><Segmented appearance="neutral" options={opts} value={method} onChange={(m) => { setMethod(m); setErr(''); }} /></View>}
       {(method === 'password' || method === 'passkey') && (
@@ -199,7 +199,7 @@ export function CreateView() {
     setBusy(false);
   };
   return (
-    <Shell wide picker={picking && <FilePicker inline save suggest="contrasenas.key" title={t('passwords.create.chooseKeyPath')} onClose={() => setPicking(false)}
+    <Shell wide picker={picking && <FilePicker save suggest="passwords.key" title={t('passwords.create.chooseKeyPath')} onClose={() => setPicking(false)}
         onPick={(p) => { setKeyPath(p); setPicking(false); }} />}>
       <Head pic={<Padlock size={60} open />} title={t('passwords.create.title')} sub={t('passwords.create.subtitle')} />
       <View style={{ gap: 8, marginTop: 4 }}>
@@ -240,7 +240,7 @@ export function RecoveryView({ code, onDone }) {
   const [ok, setOk] = useState(false);
   const text = `${t('passwords.recovery.printTitle')}\n\n${code}\n\n${t('passwords.recovery.printBody')}\n`;
   return (
-    <Shell wide picker={saving && <FilePicker inline save suggest="clave-de-recuperacion.txt" title={t('passwords.recovery.save')} onClose={() => setSaving(false)}
+    <Shell wide picker={saving && <FilePicker save suggest="recovery-key.txt" title={t('passwords.recovery.save')} onClose={() => setSaving(false)}
         onPick={(p) => {
           try {
             if (typeof p === 'string') fs.write(p, text);

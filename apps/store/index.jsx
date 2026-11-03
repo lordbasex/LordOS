@@ -306,7 +306,7 @@ function InstalledPage({ query }) {
 // Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'lordos' or 'cat:<Category>')
 // and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app). Back returns to
 // the page.
-const PAGE_GLYPH = { remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, lordos: GLYPH.lordos };
+const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, lordos: GLYPH.lordos };
 
 export default function Store() {
   const t = useTheme();
@@ -344,6 +344,7 @@ export default function Store() {
   else if (page === 'ai') body = <AiPage query={query} onOpen={openAi} />;
   else if (page === 'commercial') body = <AiPage section="commercial" query={query} onOpen={openAi} onPage={go} />;
   else if (page === 'remote') body = <AiPage section="remote" query={query} onOpen={openAi} />;
+  else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
   else if (page === 'installed') body = <InstalledPage query={query} />;
   else body = <debian.Updates />;
@@ -364,6 +365,7 @@ export default function Store() {
           {item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {catalogApps('remote').length ? item('remote', tr('store.page.remote'), catalogApps('remote').length, PAGE_GLYPH.remote) : null}
+          {catalogApps('suites').length ? item('suites', tr('store.page.suites'), catalogApps('suites').length, PAGE_GLYPH.suites) : null}
           {CATS.filter((c) => counts[c]).map((c) => item(`cat:${c}`, tr(`store.cat.${c}`), counts[c], GLYPH[c]))}
           <SectionTitle>LordOS</SectionTitle>
           {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}

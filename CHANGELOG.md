@@ -19,6 +19,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   or wrong stops it before any disk is touched, and the live system starts as usual.
   `tools/iso/make-auto-disk.sh` makes the small ISO with the file for a virtual machine.
 
+- Store: **Third-party suites**, a section for open source suites from other projects that are worth having, starting
+  with ArtCraft (its launcher 0.14.0, which installs, updates and opens the Craft apps: a word processor, spreadsheets,
+  PDF tools, photo editing and more). The launcher's own `.deb` is mirrored with a pinned SHA-256, for amd64 and arm64.
+- The system file dialog, drawn like Files, everywhere: an isolated app's open and save prompt, Passwords (on its lock
+  screen too) and Notes use it now, so they reach the local disks mounted for you, and saving asks before replacing a
+  file. Passwords suggests English file names.
+
 ### Fixed
 
 - Settings → Desktop & Dock → Desktops showed the four finger swipe as on when it had never been changed, while it is

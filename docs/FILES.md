@@ -314,7 +314,8 @@ file:
 ## The system file dialog (0.8.8)
 
 When an app asks for a file through the system (Mail attachments, a contact's photo, importing `.ics` or `.vcf`, a
-picture for Settings → Wallpaper) the dialog looks and works like Files, built from Files' own pieces
+picture for Settings → Wallpaper, Notes' attachments and images, Passwords' files, and since 0.8.8-1 an isolated app's
+powerbox) the dialog looks and works like Files, built from Files' own pieces
 (`sdk/filepicker.jsx` on `sdk/fileparts.jsx` and `sdk/fileglyphs.jsx`; its rules are in `sdk/filepickermodel.js`):
 
 - **Sidebar:** Home and the user's folders under Favorites, and under Locations the local disks mounted for the user
@@ -329,8 +330,8 @@ picture for Settings → Wallpaper) the dialog looks and works like Files, built
 
 Local disks are new here: an app that asks through the dialog can now be given a file on one, when the person picks
 it. The same dialog answers `org.freedesktop.portal.FileChooser` for Linux apps with no file dialog of their own,
-inside the home folder (`WAYLAND.md`). Isolated `.lpk` apps keep the powerbox, which hands them only the chosen
-file's descriptor (`PRIVACY.md`, "Powerbox").
+inside the home folder (`WAYLAND.md`). Isolated `.lpk` apps keep the powerbox, drawn with this same dialog, which hands
+them only the chosen file's descriptor (`PRIVACY.md`, "Powerbox").
 
 ## Tests
 

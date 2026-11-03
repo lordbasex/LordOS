@@ -129,7 +129,7 @@ export function SettingsSheet({ onClose }) {
           <Hint>{t('passwords.set.memory', { kb: Math.round((st.status?.mem?.inUse || 0) / 1024), locked: Math.round((st.status?.mem?.locked || 0) / 1024) })}</Hint>
         </View>
       )}
-      {picking && <FilePicker save suggest="contrasenas.key" title={t('passwords.create.chooseKeyPath')} onClose={() => setPicking(false)} onPick={(p) => { setPath(p); setPicking(false); }} />}
+      {picking && <FilePicker save suggest="passwords.key" title={t('passwords.create.chooseKeyPath')} onClose={() => setPicking(false)} onPick={(p) => { setPath(p); setPicking(false); }} />}
     </Sheet>
   );
 }
@@ -243,7 +243,7 @@ export function ExportSheet({ onClose }) {
         </View>
       )}
       {err ? <Text style={{ fontSize: 12, color: RED }}>{err}</Text> : null}
-      {picking && <FilePicker save suggest={kind === 'csv' ? 'contrasenas.csv' : 'contrasenas-copia.lvault'} title={t('passwords.exp.title')} onClose={() => setPicking(false)} onPick={go} />}
+      {picking && <FilePicker save suggest={kind === 'csv' ? 'passwords.csv' : 'passwords-backup.lvault'} title={t('passwords.exp.title')} onClose={() => setPicking(false)} onPick={go} />}
     </Sheet>
   );
 }

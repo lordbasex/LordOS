@@ -472,6 +472,37 @@
         { "id": "hfs", "name": "HFS+ (hfsplus)", "license": "GPL-2.0", "source": "https://kernel.org" },
         { "id": "apfs", "name": "APFS (linux-apfs-rw)", "license": "GPL-2.0", "source": "https://github.com/linux-apfs/linux-apfs-rw", "arches": ["amd64"], "optional": ["apfs-dkms", "linux-headers-amd64"] }
       ]
+    },
+    {
+      "id": "artcraft-launcher",
+      "package": "artcraft-launcher",
+      "name": "ArtCraft",
+      "summary": {
+        "en": "Installs, updates and opens the Craft suite: a word processor, spreadsheets, PDF tools, photo editing and more, open source",
+        "es": "Instala, actualiza y abre la suite Craft: procesador de textos, hojas de cálculo, herramientas de PDF, edición de fotos y más, de código abierto",
+        "pt": "Instala, atualiza e abre a suíte Craft: processador de texto, planilhas, ferramentas de PDF, edição de fotos e mais, de código aberto",
+        "fr": "Installe, met à jour et ouvre la suite Craft : traitement de texte, tableur, outils PDF, retouche photo et plus, open source"
+      },
+      "license": "Apache-2.0",
+      "vendor": "Storytold",
+      "homepage": "https://github.com/storytold/craft-launcher",
+      "arches": ["amd64", "arm64"],
+      "kind": "creative-suite",
+      "section": "suites",
+      "source": {
+        "type": "deb",
+        "version": "0.14.0",
+        "files": {
+          "amd64": {
+            "url": "https://github.com/storytold/craft-launcher/releases/download/v0.14.0/artcraft-launcher-0.14.0-linux-x86_64.deb",
+            "sha256": "58f776f0889e91a4e2162291cee9eb1188706c17e4b839364d929a51859550e0"
+          },
+          "arm64": {
+            "url": "https://github.com/storytold/craft-launcher/releases/download/v0.14.0/artcraft-launcher-0.14.0-linux-aarch64.deb",
+            "sha256": "4c794ce8c4afb531a84a402657836320c1c905b120720314632ace39f024e429"
+          }
+        }
+      }
     }
   ]
 }
