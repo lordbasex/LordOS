@@ -148,6 +148,8 @@
   "menu.window": "Ventana",
   "packages.loadError": "No se pudo abrir la app: {error}",
   "picker.cancel": "Cancelar",
+  "picker.open": "Abrir",
+  "picker.readOnly": "Esta carpeta es de solo lectura.",
   "picker.choose": "Elegir ({n})",
   "picker.empty": "No hay archivos acá.",
   "picker.save": "Guardar",

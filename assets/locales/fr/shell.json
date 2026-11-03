@@ -148,6 +148,8 @@
   "menu.window": "Fenêtre",
   "packages.loadError": "L’app n’a pas pu être ouverte : {error}",
   "picker.cancel": "Annuler",
+  "picker.open": "Ouvrir",
+  "picker.readOnly": "Ce dossier est en lecture seule.",
   "picker.choose": "Choisir ({n})",
   "picker.empty": "Aucun fichier ici.",
   "picker.save": "Enregistrer",

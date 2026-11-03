@@ -1,14 +1,14 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
 // columns (Miller, with a preview) and gallery.
-import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, formatDate, formatTime, typeScale, t as tr } from '@lordos/sdk';
+import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots } from './glyphs.jsx';
 import { kindOf, isImage, isTextual } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
+import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 
-const when = (ms) => { if (!ms) return '—'; const d = new Date(ms); return `${formatDate(d, 'numeric')} ${formatTime(d)}`; };
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
 export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : tr(`files.kind.${kindOf(e)}`));
@@ -143,7 +143,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
   const title = (k) => tr(`files.col.${k === 'kind' && ctx.showFolder ? 'where' : k}`);
   const label = (k) => (
     <>
-      <Text style={{ fontSize: typeScale.caption, fontWeight: sort.by === k ? 600 : 500, color: sort.by === k ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{title(k)}</Text>
+      <Text style={listHeaderCell(t, sort.by === k)}>{title(k)}</Text>
       {sort.by === k && <Text style={{ fontSize: 8, color: t.textDim }}>{sort.desc ? '▼' : '▲'}</Text>}
     </>
   );
@@ -173,8 +173,7 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
     const odd = (alt.n++) % 2 === 1;
     rows.push(
       <View key={e.path} {...itemHandlers(e, ctx)}
-        style={{ flexDirection: 'row', alignItems: 'center', height: 24, paddingHorizontal: 10, borderRadius: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1,
-          backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? t.accent : odd ? (t.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)') : 'transparent' }}>
+        style={[listRowStyle(t, sel || ctx.dropTarget === e.path, odd), { opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
         <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
           <View onMouseDown={(ev) => { ev.stopPropagation(); if (e.dir && !e.trash) ctx.onToggleExpand(e.path); }} style={{ width: 14, alignItems: 'center' }}>
             {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
@@ -185,7 +184,7 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
         </View>
         {visible(ctx.columns).map((k) => (k === 'tags'
           ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
-          : <Text key={k} style={{ width: ctx.columns.width[k], paddingHorizontal: 8, fontSize: typeScale.callout, color: sel ? '#fff' : t.textDim, textAlign: cellAlign(k), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cellText(k, e, ctx)}</Text>))}
+          : <Text key={k} style={listCell(t, sel, ctx.columns.width[k], cellAlign(k))}>{cellText(k, e, ctx)}</Text>))}
       </View>,
     );
     if (open) {

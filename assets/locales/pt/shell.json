@@ -148,6 +148,8 @@
   "menu.window": "Janela",
   "packages.loadError": "Não foi possível abrir o app: {error}",
   "picker.cancel": "Cancelar",
+  "picker.open": "Abrir",
+  "picker.readOnly": "Esta pasta é só de leitura.",
   "picker.choose": "Escolher ({n})",
   "picker.empty": "Não há arquivos aqui.",
   "picker.save": "Salvar",

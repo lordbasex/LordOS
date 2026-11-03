@@ -35,7 +35,7 @@ export const DEFAULT_TOKENS = {
 // The surface of menus, tooltips and popovers for a theme (popupBg, or one for the mode).
 export const popupBg = (t) => t.popupBg || (t.mode === 'dark' ? '#2c2c31' : '#ffffff');
 
-const ThemeContext = createContext(DEFAULT_TOKENS);
+export const ThemeContext = createContext(DEFAULT_TOKENS);
 
 // The tokens of the outermost provider, the theme's. The on-screen keyboard is mounted beside the
 // theme's tree, not inside it (startShell's layers), and reads them here so it follows the mode and accent.

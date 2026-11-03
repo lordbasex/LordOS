@@ -23,6 +23,8 @@ import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
+import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth } from '../../sdk/fileparts.jsx';
+import { pathCrumbs } from '../../sdk/filepickermodel.js';
 
 export function Icon({ size: s }) {
   return (
@@ -136,43 +138,7 @@ function locTitle(loc, dirs) {
 
 // ---- window pieces ----
 
-// Source-list row: 28 px, accent-colored icon, a soft highlight when selected and the
-// accent when something is dragged over it.
-function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext, onPress }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <View onClick={onClick} onMouseDown={onPress} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
-      style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, borderRadius: 6,
-        backgroundColor: hot ? t.accent : selected ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover ? t.hover : 'transparent' }}>
-      <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
-      <Text style={{ flex: 1, fontSize: typeScale.body, color: hot ? '#fff' : dim ? t.textDim : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{label}</Text>
-      {trail && (hover || selected) ? (
-        <View onClick={(e) => { e.stopPropagation?.(); trail.onClick(); }} style={{ width: 18, alignItems: 'center' }}>
-          <Text style={{ fontSize: 12, color: t.textDim }}>{trail.glyph}</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-const SideTitle = ({ children, t, first }) => (
-  <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, marginHorizontal: 8, marginTop: first ? 6 : 14, marginBottom: 2 }}>{children}</Text>
-);
 const Dot = ({ color }) => <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />;
-const Glyph = ({ ch, t }) => <Text style={{ fontSize: 14, color: t.accent, textAlign: 'center' }}>{ch}</Text>;
-
-// Width of a box after layout, re-measured while the window is resized.
-function useWidth(ref, initial) {
-  const [w, setW] = useState(initial);
-  useEffect(() => {
-    const measure = () => { if (!ref.current) return; const lw = Math.round(lord.getLayout(ref.current.id)[2]); if (lw > 0) setW((x) => (Math.abs(x - lw) > 2 ? lw : x)); };
-    measure();
-    const id = setInterval(measure, 300);
-    return () => clearInterval(id);
-  }, []);
-  return w;
-}
-
 // Search scope chip ("Search: Home | “Folder”"), as in a search scope bar.
 function ScopeChip({ label, on, onClick, t }) {
   return (
@@ -731,16 +697,7 @@ export default function Files() {
   const job = jobs[0];
   const crumbs = (() => {
     if (loc.type !== 'dir') return [{ label: title, loc }];
-    const home = fs.home();
-    const remote = `${home}/.local/share/lordos/remote/`;
-    const base = loc.path.startsWith(remote) ? loc.path.split('/').slice(0, remote.split('/').length).join('/')
-      : loc.path === home || loc.path.startsWith(`${home}/`) ? home
-      : loc.path.startsWith('/run/media/') ? loc.path.split('/').slice(0, 5).join('/') : loc.path.startsWith('/media/') ? loc.path.split('/').slice(0, 4).join('/') : '/';
-    const rest = loc.path.slice(base.length).split('/').filter(Boolean);
-    const out = [{ label: base === home ? tr('files.place.home') : fs.basename(base), loc: { type: 'dir', path: base } }];
-    let acc = base;
-    for (const r of rest) { acc = `${acc}/${r}`; out.push({ label: r, loc: { type: 'dir', path: acc } }); }
-    return out;
+    return pathCrumbs(loc.path, fs.home()).map((c) => ({ label: c.home ? tr('files.place.home') : c.label, loc: { type: 'dir', path: c.path } }));
   })();
   const sideSel = (l) => sameLoc(l, baseLoc) && !debounced;
   const dirLoc = (p) => ({ type: 'dir', path: p });
@@ -776,8 +733,8 @@ export default function Files() {
     <ScrollView style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 10, paddingBottom: 12 }}>
         <SideTitle t={t} first>{tr('files.favorites')}</SideTitle>
-        {side('recent') && <SideItem t={t} label={tr('files.place.recent')} icon={<Glyph ch="◷" t={t} />} selected={sideSel({ type: 'recent' })} onClick={() => navigate({ type: 'recent' })} />}
-        {side('apps') && <SideItem t={t} label={tr('files.place.apps')} icon={<Glyph ch="⌘" t={t} />} selected={sideSel({ type: 'apps' })} onClick={() => navigate({ type: 'apps' })} />}
+        {side('recent') && <SideItem t={t} label={tr('files.place.recent')} icon={<PlaceGlyph ch="◷" t={t} />} selected={sideSel({ type: 'recent' })} onClick={() => navigate({ type: 'recent' })} />}
+        {side('apps') && <SideItem t={t} label={tr('files.place.apps')} icon={<PlaceGlyph ch="⌘" t={t} />} selected={sideSel({ type: 'apps' })} onClick={() => navigate({ type: 'apps' })} />}
         {dirs.filter((d) => side(d.label)).map((d) => (
           <SideItem key={d.path} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
             onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} hot={dropTarget === d.path} />
@@ -787,9 +744,9 @@ export default function Files() {
             drop={offline(f) ? undefined : { dropPath: f.path }} hot={dropTarget === f.path}
             onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(f.path) }] }); }} />
         ))}
-        {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<Glyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
+        {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<PlaceGlyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
-        {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<Glyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
+        {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<PlaceGlyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
           drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
         {side('computer') && <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />}
         {lan.available() && side('network') && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
@@ -895,16 +852,7 @@ export default function Files() {
         {/* path bar and status bar */}
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.m, overflow: 'hidden' }}>
           <Hairline edge="top" />
-          {crumbs.map((c, i) => (
-            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              {i > 0 && <Text style={{ fontSize: 11, color: t.textDim }}>{direction() === 'rtl' ? '‹' : '›'}</Text>}
-              <View onClick={() => navigate(c.loc)} {...(c.loc.type === 'dir' ? { dropPath: c.loc.path } : {})}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 20, paddingHorizontal: 4, borderRadius: 4 }}>
-                {c.loc.type === 'dir' ? <FolderGlyph size={13} /> : null}
-                <Text style={{ fontSize: typeScale.caption, color: i === crumbs.length - 1 ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{c.label}</Text>
-              </View>
-            </View>
-          ))}
+          <PathCrumbs t={t} crumbs={crumbs.map((c) => ({ label: c.label, folder: c.loc.type === 'dir', drop: c.loc.type === 'dir' ? { dropPath: c.loc.path } : null }))} onGo={(i) => navigate(crumbs[i].loc)} />
         </View>
         <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: spacing.m,
           backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.025)' }}>

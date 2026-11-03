@@ -1,0 +1,83 @@
+// filepickermodel.js — the system file dialog without a screen: where it may start, which disks it
+// lists, what a path's crumbs are, and what Enter and the primary button do.
+// node server/tests/filepicker_model_test.mjs
+
+// a disk that goes away over the network would hold the interface: the dialog lists local disks only
+const NETWORK_FS = ['cifs', 'smb3', 'nfs', 'nfs4', 'fuse.rclone', 'fuse.sshfs'];
+export const localDisks = (volumes, home) => (volumes || []).filter((v) => !NETWORK_FS.includes(v.fs) && !v.path.startsWith(`${home}/.local/share/lordos/remote/`));
+
+const inside = (path, root) => path === root || path.startsWith(`${root}/`);
+
+// start: empty, relative to the home folder, or absolute. Nothing above the home folder or a disk.
+export function startFolder(start, home, disks = []) {
+  const s = String(start || '').replace(/\/+$/, '');
+  if (!s) return home;
+  const path = s.startsWith('/') ? s : `${home}/${s}`;
+  if (path.split('/').includes('..')) return home;
+  return [home, ...disks.map((d) => d.path)].some((r) => inside(path, r)) ? path : home;
+}
+
+// Crumbs of a folder, from the place it belongs to: the home folder, a disk or a connected server.
+// Outside them (Files' This computer) they begin at /. The home folder's has home: true, for its name.
+export function pathCrumbs(path, home) {
+  const remote = `${home}/.local/share/lordos/remote/`;
+  const base = path.startsWith(remote) ? path.split('/').slice(0, remote.split('/').length).join('/')
+    : inside(path, home) ? home
+    : path.startsWith('/run/media/') ? path.split('/').slice(0, 5).join('/')
+    : path.startsWith('/media/') ? path.split('/').slice(0, 4).join('/') : '/';
+  const name = (p) => p.split('/').filter(Boolean).pop() || '/';
+  const out = [{ label: name(base), path: base, home: base === home }];
+  let acc = base;
+  for (const r of path.slice(base.length).split('/').filter(Boolean)) { acc = `${acc}/${r}`; out.push({ label: r, path: acc }); }
+  return out;
+}
+
+// The top bar shows the first crumb and the last ones; a null stands for what is left out.
+export const fitCrumbs = (crumbs, room = 5) => (crumbs.length <= room ? crumbs : [crumbs[0], null, ...crumbs.slice(2 - room)]);
+
+const collate = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+
+// Folders first and names as Files sorts them. sort: { by: 'name' | 'date' | 'size', desc }.
+export function sortRows(list, sort) {
+  const dir = sort.desc ? -1 : 1;
+  return [...list].sort((a, b) => {
+    if (!!a.dir !== !!b.dir) return a.dir ? -1 : 1;
+    const r = sort.by === 'date' ? (a.mtime || 0) - (b.mtime || 0) : sort.by === 'size' ? (a.dir ? 0 : a.size) - (b.dir ? 0 : b.size) : 0;
+    return (r || collate(a.name, b.name)) * dir;
+  });
+}
+
+// The row that many steps from the cursor; from nothing, the first or the last.
+export function stepRow(rows, cursor, by) {
+  if (!rows.length) return null;
+  const at = rows.findIndex((r) => r.path === cursor);
+  if (at < 0) return rows[by < 0 ? rows.length - 1 : 0];
+  return rows[Math.max(0, Math.min(rows.length - 1, at + by))];
+}
+
+// The files from the anchor to this row, whichever way (Shift+click).
+export function rangeOf(rows, anchor, path) {
+  const a = rows.findIndex((r) => r.path === anchor), b = rows.findIndex((r) => r.path === path);
+  if (a < 0 || b < 0) return null;
+  return rows.slice(Math.min(a, b), Math.max(a, b) + 1).filter((r) => !r.dir).map((r) => r.path);
+}
+
+export const validName = (name) => { const n = String(name || '').trim(); return !!n && !n.includes('/') && n !== '.' && n !== '..'; };
+
+// What the primary button does. Never enters a folder in folder mode: there it chooses it.
+//   mode, multiple, dir (in view), row (under the cursor, or null), chosen ([paths]), name (save), writable
+// → { pick } | { pickMany } | { go } | { save } | null, and null means the button is disabled.
+export function primaryAction({ mode, multiple, dir, row, chosen = [], name = '', writable = true }) {
+  if (mode === 'folder') return { pick: row?.dir ? row.path : dir };
+  if (mode === 'save') return writable && validName(name) ? { save: true } : null;
+  if (multiple) return chosen.length ? { pickMany: chosen } : row?.dir ? { go: row.path } : null;
+  if (!row) return null;
+  return row.dir ? { go: row.path } : { pick: row.path };
+}
+
+// Enter opens the row under the cursor, as a double click; with no row, it is the primary button.
+export function enterAction(a) {
+  if (a.row?.dir) return { go: a.row.path };
+  if (a.mode === 'open' && a.multiple && a.row && !a.chosen?.length) return { pickMany: [a.row.path] };
+  return primaryAction(a);
+}

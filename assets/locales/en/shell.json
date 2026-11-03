@@ -148,6 +148,8 @@
   "menu.window": "Window",
   "packages.loadError": "The app could not be opened: {error}",
   "picker.cancel": "Cancel",
+  "picker.open": "Open",
+  "picker.readOnly": "This folder is read-only.",
   "picker.choose": "Choose ({n})",
   "picker.empty": "No files here.",
   "picker.save": "Save",

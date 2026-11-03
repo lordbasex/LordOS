@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Changed
+
+- The system file dialog looks and works like Files, with Files' own icons, sidebar, list and path: Home, the user's folders and the local disks mounted for the user on the side, name, date and size in the list, a click selects and a double click opens, and Enter, Esc and the arrows work. Local disks are new here: apps that ask through the dialog can now be given a file on one, when the person picks it.
+
 ## [0.8.8-beta] - 2026-11-02
 
 ### Added
