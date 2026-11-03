@@ -145,7 +145,7 @@ The other system file dialog, `sdk/filepicker.jsx` (0.8.8), serves apps in the t
 Settings → Wallpaper) and Linux apps through the `org.freedesktop.portal.FileChooser` portal. It looks and works like
 Files: Home, the user's folders and the local disks mounted for the user under `/media` and `/run/media` in the
 sidebar, network disks left out, a double click or Enter to open, Esc to cancel (`FILES.md`, "The system file
-dialog"). A portal answer goes only to the app that asked, and only for a path the person picked. Since 0.8.8-1 the powerbox
+dialog"). A portal answer goes only to the app that asked, and only for a path the person picked. Since 0.8.8.1 the powerbox
 above draws this same dialog too (its title names the app); what the app receives is unchanged: only the fd.
 
 ### Menus and revocation

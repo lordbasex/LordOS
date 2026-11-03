@@ -314,7 +314,7 @@ file:
 ## The system file dialog (0.8.8)
 
 When an app asks for a file through the system (Mail attachments, a contact's photo, importing `.ics` or `.vcf`, a
-picture for Settings → Wallpaper, Notes' attachments and images, Passwords' files, and since 0.8.8-1 an isolated app's
+picture for Settings → Wallpaper, Notes' attachments and images, Passwords' files, and since 0.8.8.1 an isolated app's
 powerbox) the dialog looks and works like Files, built from Files' own pieces
 (`sdk/filepicker.jsx` on `sdk/fileparts.jsx` and `sdk/fileglyphs.jsx`; its rules are in `sdk/filepickermodel.js`):
 

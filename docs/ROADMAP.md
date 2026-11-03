@@ -680,31 +680,41 @@ Released 2026-11-02 (`CHANGELOG.md`, "0.8.8-beta"; ISOs `lordos-live-0.8.8-amd64
   server tests, the OVA in VirtualBox and VMware Fusion, and an in-place upgrade from 0.8.7 through the staging
   repository. The arm64 ISO and the Pi 5 image were built but not booted for this release.
 
-## Release 0.8.8-1 (planned)
+## Release 0.8.8.1-beta ✅ (2026-11-03)
 
-- [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`; moved from 0.8.8): showing the decoder's buffer
-  directly on the GPU, instead of reading each frame back and converting it.
-- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; moved from 0.8.8 on 2026-11-02): with `lord-vm` and direct
-  QMP.
-- [x] **Unattended install** (first after 0.8.8; done on 2026-11-03, `UNATTENDED.md`): an optional boot entry, never the
-  default, that installs from `lordos-auto.conf` (hashed password, SSH key, target disk and its exact size) and stops
-  before touching anything if the file or the disk doesn't match. An erase install ran to the end on VM 127. Left: mode
-  free, UEFI, a USB stick and the arm64 ISO.
+An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no new images.
+
+- [x] **Unattended install** (`UNATTENDED.md`): an optional boot entry, never the default, that installs from
+  `lordos-auto.conf` (hashed password, SSH key, target disk and its exact size) and stops before touching anything if
+  the file or the disk doesn't match. An erase install ran to the end on VM 127. The program ships in the package; the
+  boot entry comes with the next ISO.
+- [x] **Store: "Third-party suites"**, featured suites from other projects, starting with ArtCraft: its launcher's
+  official `.deb` with a pinned SHA-256, described in our own words.
+- [x] The system file dialog's look in the remaining callers (the powerbox, Passwords and Notes), and the FileChooser
+  portal answered for a Linux app's request on the update.
+- [x] Settings → Desktops showed the four finger swipe as on by default.
+- [x] **Release checks left from 0.8.8:** an upgrade done from the Store's own screen, with a user who has logged in and
+  changed settings, checking they survive. Done on 2026-11-03 too: the OVA's first account on VMware Fusion, and the
+  OVA's download card, a step-by-step page with screenshots and a requirements page on lordos.org.
+
+## Release 0.8.9 (planned)
+
+- [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; first, after 0.8.8.1): with `lord-vm` and direct QMP.
+- [ ] **A zero-copy path for moving wallpapers** (`WALLPAPERS.md`): showing the decoder's buffer directly on the GPU,
+  instead of reading each frame back and converting it.
+- [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint
+  of the interface while sharing, colour conversion on the GPU, the tile comparison off the main thread, and an
+  optional 720p stream. The asynchronous capture is on the branch `v089-capture-work` (drops went from 36 % to 23 %).
+- [ ] **Unattended install, the rest:** the boot entry on the new ISOs, and tests of the free space mode, UEFI, a USB
+  stick, `ssh_key`, `after = poweroff` and the arm64 ISO.
 - [ ] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO.
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
   and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
-  the site and the release notes point at it.
-- [ ] **Store: "Third-party suites"**, a section of featured suites from other projects, starting with ArtCraft: its
-  official `.deb` with a pinned SHA-256, described in our own words.
-- [ ] **Screen sharing on the Raspberry Pi 5 without dropped video frames** (the 0.8.8 known limitation): no CPU repaint
-  of the interface while sharing, colour conversion on the GPU, the tile comparison off the main thread, and an
-  optional 720p stream. The asynchronous capture is on the branch `v089-capture-work`.
-- [ ] The system file dialog's look in the remaining callers (the access prompt, Passwords and Notes), and Mail
-  attachments, a real USB disk and a real Linux app tested with it. The portal tested when two sessions start at once.
-- [ ] **Release checks left from 0.8.8:** an upgrade done from the Store's own screen ("LordOS <version> is available"
-  with the notes, then "Restart required"), with a user who has logged in and changed settings, checking they survive;
-  `results-<version>.tar.gz` collected and attached. Done on 2026-11-03: the OVA's first account on VMware Fusion, and
-  the OVA's download card, a step-by-step page with screenshots and a requirements page on lordos.org.
+  the site and the release notes point at it. It can ship on its own before 0.8.9.
+- [ ] Mail attachments, a real USB disk and a real Linux app tested with the system file dialog; the portal tested when
+  two sessions start at once; `results-<version>.tar.gz` collected and attached with the next images.
+- [ ] Keys of laptops whose top row sends desktop actions instead of F3 and F4 (the overview, the app launcher):
+  [#12](https://github.com/lordbasex/LordOS/issues/12).
 
 ## Before 1.0
 
@@ -1121,7 +1131,7 @@ Released 2026-11-02 (`CHANGELOG.md`, "0.8.8-beta"; ISOs `lordos-live-0.8.8-amd64
   - **Off by default**, visible while working (menu bar indicator, every call in the Monitor), and
     reviewed like the MCP study before it ships.
 
-- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.8-1): a **free desktop virtualization app**, with the polish and
+- [ ] **Virtual machines** (the plan is `VIRTUALIZATION.md`; the MVP starts in 0.8.9): a **free desktop virtualization app**, with the polish and
   way of working of the best commercial ones (not Proxmox's, which only contributes the pieces underneath: KVM, QEMU and drivers).
   A generic name and our own logo, icon and colors:
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,

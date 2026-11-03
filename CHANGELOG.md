@@ -10,6 +10,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.1-beta] - 2026-11-03
+
+An update of 0.8.8 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images:
+the 0.8.8 ISO, OVA and Raspberry Pi image stay current and update to this from the Store.
+
 ### Added
 
 - **Unattended install** ([docs/UNATTENDED.md](docs/UNATTENDED.md)): the live ISO's new boot entry, Install automatically,
@@ -18,7 +23,6 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   only as a yescrypt or SHA-512 hash; it can add an SSH key, automatic login and what to do afterwards. Anything missing
   or wrong stops it before any disk is touched, and the live system starts as usual.
   `tools/iso/make-auto-disk.sh` makes the small ISO with the file for a virtual machine.
-
 - Store: **Third-party suites**, a section for open source suites from other projects that are worth having, starting
   with ArtCraft (its launcher 0.14.0, which installs, updates and opens the Craft apps: a word processor, spreadsheets,
   PDF tools, photo editing and more). The launcher's own `.deb` is mirrored with a pinned SHA-256, for amd64 and arm64.
@@ -30,6 +34,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - Settings → Desktop & Dock → Desktops showed the four finger swipe as on when it had never been changed, while it is
   off by default (as Mouse & Trackpad showed it).
+
+### Known issues and limitations
+
+- **The unattended install needs a new ISO:** the program is in this package, but the boot entry that starts it is
+  on the live ISO, and there is no 0.8.8.1 ISO. It comes with the next images. Tested so far: an erase install from a
+  BIOS virtual machine; not yet the free space mode, UEFI, a USB stick or the arm64 ISO.
+- **Not tested in this update:** the FileChooser portal while two users' sessions start at the same moment.
+- Screen sharing on a Raspberry Pi 5 still drops video frames; the work on it continues for 0.8.9.
+
+### Upgrading
+
+- **From 0.8.8:** Store → Updates shows "LordOS 0.8.8.1 is available" with these notes; update, then restart when
+  it says "Restart required". With `apt`: `sudo apt update && sudo apt upgrade`.
 
 ## [0.8.8-beta] - 2026-11-02
 
@@ -3347,7 +3364,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...HEAD
+[0.8.8.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...v0.8.8.1-beta
 [0.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...v0.8.8-beta
 [0.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...v0.8.7-beta
 [0.8.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.5-beta...v0.8.6-beta
