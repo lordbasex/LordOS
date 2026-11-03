@@ -10,10 +10,6 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-### Changed
-
-- The system file dialog looks and works like Files, with Files' own icons, sidebar, list and path: Home, the user's folders and the local disks mounted for the user on the side, name, date and size in the list, a click selects and a double click opens, and Enter, Esc and the arrows work. Local disks are new here: apps that ask through the dialog can now be given a file on one, when the person picks it.
-
 ## [0.8.8-beta] - 2026-11-02
 
 ### Added
@@ -34,6 +30,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Broadcom Wi-Fi firmware on the ISOs, so a BCM43602 card works from the live system ([#3](https://github.com/lordbasex/LordOS/issues/3)).
 - `.local` names resolve: `libnss-mdns` on the images and in the `lordos` package's recommended list.
 
+
+### Changed
+
+- The system file dialog looks and works like Files, with Files' own icons, sidebar, list and path: Home, the user's folders and the local disks mounted for the user on the side, name, date and size in the list, a click selects and a double click opens, and Enter, Esc and the arrows work. Local disks are new here: apps that ask through the dialog can now be given a file on one, when the person picks it.
 ### Fixed
 
 - Copying from a native Wayland app with a long clipboard type name reached no other app: the name was cut at 63 characters and the app dropped its data.
@@ -63,6 +63,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **The session's remote socket takes only root:** `lord-sessiond` and its bridge connect as root, so a process of the same user can no longer read the screen or send input through `remote.sock`.
 
 ### Known issues and limitations
+
+- **Video while sharing the screen:** on a Raspberry Pi 5, sharing the screen drops frames from a video playing on it. Measured with AV1 at 1080p: 0.5 % without sharing, 36 % in a short sample with go-link. Playback without sharing is not affected.
 
 - **Install in free space has never run to the end.** The wizard, the disk checks and the rollback were tested, and nothing outside the free space was touched, but the copy, the boot loader, the firmware entry and a reboot beside another system need a password and were not run ([#7](https://github.com/lordbasex/LordOS/issues/7)).
 - **Administrator rights for Linux apps:** the prompt opens and cancels, but a password was never typed into it, so success, a wrong password and the three-try limit are untested. Only `pkexec` is covered: programs that ask polkit over D-Bus still find no agent. The prompt takes a physical keyboard only ([#4](https://github.com/lordbasex/LordOS/issues/4)).

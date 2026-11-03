@@ -54,14 +54,15 @@ started ([`results/0.8.5-beta/vmware-fusion`](results/0.8.5-beta/vmware-fusion))
 
 ## Get LordOS
 
-The latest release is **[0.8.7-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.7-beta)**
-(2026-11-01). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
+The latest release is **[0.8.8-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.8-beta)**
+(2026-11-02). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
 and on [lordos.org](https://lordos.org/#download).
 
-- **PC (64-bit):** a live and installable ISO, `lordos-live-0.8.7-amd64.iso`. Try it without installing.
+- **PC (64-bit):** a live and installable ISO, `lordos-live-0.8.8-amd64.iso`. Try it without installing.
+- **Virtual machine:** an OVA for VirtualBox and VMware, `lordos-0.8.8-amd64.ova`. Give any virtual machine at least 4 CPUs and 4 GB of memory, ideally 16 GB with many apps.
 - **Generic arm64 (UEFI):** a live and installable ISO for arm64 machines and virtual machines,
-  `lordos-live-0.8.7-arm64.iso`, new in 0.8.7. Tested on emulated QEMU only.
-- **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.7-rpi5-arm64.img.xz`,
+  `lordos-live-0.8.8-arm64.iso`, new in 0.8.7. Tested on emulated QEMU only.
+- **Raspberry Pi 5:** a ready-to-flash image for SD card or NVMe, `lordos-0.8.8-rpi5-arm64.img.xz`,
   with fan control and our own kernel. The Raspberry Pi 5 is the only supported board.
 - **Already running LordOS?** It updates in place from the signed repository on lordos.org.
 - **Already on Debian 13?** Install LordOS on top of your current system with one command:
