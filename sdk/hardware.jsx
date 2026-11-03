@@ -347,6 +347,14 @@ function asker(p) {
 export function PolkitPrompt() {
   const p = useStore(polkitPrompt);
   const th = useSystemTokens();
+  const asking = !!p && p.state === 'ask' && p.local;
+  const [blink, setBlink] = useState(true);
+  // a caret like every text field's, and it shows the keys go here
+  useEffect(() => {
+    if (!asking) return undefined;
+    const id = setInterval(() => setBlink((v) => !v), 530);
+    return () => clearInterval(id);
+  }, [asking]);
   if (!p) return null;
   const row = (label, value) => value ? h(View, { style: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' } },
     h(Text, { style: { width: 86, fontSize: 12, color: th.textDim } }, label),
@@ -362,9 +370,10 @@ export function PolkitPrompt() {
   h(Text, { style: { fontSize: 12, color: th.textDim, lineHeight: 1.4 } }, p.message),
   row(t('passwords.polkit.action'), p.action),
   row(t('passwords.polkit.account'), p.account),
-  h(View, { style: { height: 30, borderRadius: 7, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: th.control,
-    border: `1px solid ${th.separator}` } },
-  h(Text, { style: { fontSize: 13, color: th.text, direction: 'ltr' } }, '•'.repeat(Math.min(p.count, 40)))),
+  h(View, { style: { height: 30, borderRadius: 7, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: th.control,
+    border: `1px solid ${asking ? th.accent : th.separator}`, direction: 'ltr' } },
+  h(Text, { style: { fontSize: 13, color: th.text } }, '•'.repeat(Math.min(p.count, 40))),
+  asking ? h(View, { style: { width: 1.5, height: 16, marginLeft: 1, backgroundColor: blink ? th.accent : 'transparent' } }) : null),
   h(Text, { style: { fontSize: 12, color: p.wrong ? '#ff453a' : th.textDim } }, note),
   h(View, { style: { flexDirection: 'row', justifyContent: 'flex-end' } },
     h(View, { style: { width: 110 } }, h(DialogButton, { label: t('passwords.cancel'), onClick: () => lord.polkit.cancel(p.id), th })))));

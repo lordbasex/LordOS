@@ -258,7 +258,13 @@ function ListPopup({ t, title, items, sel, empty }) {
 // Keys of the popup lists; returns true if it used them.
 export function popupKey(wid, w, sid, e) {
   const p = w.popup;
-  if (!p || p.kind === 'quick' || p.kind === 'title' || p.kind === 'composer') return false;
+  if (!p) return false;
+  // these have a text field; with the focus out of it, Esc still closes them
+  if (p.kind === 'quick' || p.kind === 'title' || p.kind === 'composer') {
+    if (e.key !== 'Escape') return false;
+    patchWin(wid, () => ({ popup: null }));
+    return true;
+  }
   const items = p.items || [];
   if (e.key === 'Escape') { patchWin(wid, () => ({ popup: null })); return true; }
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
