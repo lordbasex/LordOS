@@ -21,20 +21,48 @@ shasum -a 256 -c SHA256SUMS --ignore-missing
 
 ## 2. Import it
 
-**VirtualBox:** File → Import Appliance, choose the `.ova` and click Import. The machine arrives with 4 CPUs, 4 GB of memory and its display already set.
+### VirtualBox
 
-**VMware Fusion:** File → Import, choose the `.ova` and pick where to save the machine. **VMware Workstation:** File → Open, choose the `.ova`. If VMware says the file doesn't meet the OVF specification, click Retry.
+File → Import Appliance, choose the `.ova` and click Finish. Under Settings you can see what the machine brings: 4 CPUs, 4 GB of memory and its display already set.
+
+![VirtualBox's Import Virtual Appliance window](docs/vm/virtualbox-import.png "VirtualBox: Import Virtual Appliance, with the machine's settings")
+
+### VMware Fusion
+
+File → Import, choose the `.ova` and click Continue. Give the machine a name and a folder, then Save. When the import ends, Finish starts it.
+
+![VMware Fusion: choosing the OVA](docs/vm/vmware-choose.png "VMware Fusion: choose the file, then Continue")
+
+![VMware Fusion: the summary after importing](docs/vm/vmware-finish.png "VMware Fusion: the imported machine, 4 CPU cores and 4 GB of memory")
+
+The first time it starts, Fusion may ask whether to upgrade the virtual machine. Either answer works; Upgrade is fine unless you also open it with an older version of VMware.
+
+![VMware Fusion asks to upgrade the machine](docs/vm/vmware-upgrade.png "VMware Fusion: Upgrade or Don't Upgrade, both work")
+
+On **VMware Workstation**: File → Open, choose the `.ova`. If VMware says the file doesn't meet the OVF specification, click Retry.
 
 ## 3. Create your account
 
 Start the machine. It opens **Set up LordOS** by itself:
 
+![Set up LordOS on its first start](docs/vm/virtualbox-welcome.png "The first start: Set up LordOS opens by itself")
+
 1. **Language & region** and **Keyboard**.
-2. **User**: your name, user name and password.
+2. **User**: your name, user name, password and the computer's name.
+
+![The User step](docs/vm/virtualbox-user.png "User: your name, user name and password")
+
 3. **Summary**, then **Create account**.
+
+![The Summary step](docs/vm/virtualbox-summary.png "Summary, then Create account")
+
 4. **Restart**. The login screen appears: sign in with the password you chose.
 
-Until the account exists, the machine runs a setup session with no password, reachable only from its own screen. Finish this step before leaving the machine running.
+![Your account is ready](docs/vm/virtualbox-ready.png "The account is made: Restart to finish")
+
+![The login screen after the restart](docs/vm/vmware-login.png "After the restart, the login screen (here in VMware Fusion)")
+
+It is the same in VirtualBox and in VMware. Until the account exists, the machine runs a setup session with no password, reachable only from its own screen. Finish this step before leaving the machine running.
 
 ## Adjusting the machine
 
@@ -42,7 +70,7 @@ With the machine off, in its settings:
 
 - **Processors and memory:** raise them if the host has room; 16 GB of memory is the ideal with many apps.
 - **Display:** on VirtualBox, VBoxSVGA comes set; VMSVGA works too.
-- **Network:** NAT, the default, is enough to browse and update. For other computers on your network to reach it (remote desktop, for example), use a bridged adapter.
+- **Network:** VirtualBox sets NAT, enough to browse and update; VMware Fusion picks a bridged connection, which puts the machine on your network. For other computers to reach it (remote desktop, for example), use a bridged adapter.
 
 ## If something goes wrong
 

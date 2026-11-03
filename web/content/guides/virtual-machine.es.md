@@ -21,20 +21,48 @@ shasum -a 256 -c SHA256SUMS --ignore-missing
 
 ## 2. Importala
 
-**VirtualBox:** Archivo → Importar servicio virtualizado, elegí el `.ova` y tocá Importar. La máquina llega con 4 CPU, 4 GB de memoria y la pantalla ya configurada.
+### VirtualBox
 
-**VMware Fusion:** Archivo → Importar, elegí el `.ova` y dónde guardar la máquina. **VMware Workstation:** Archivo → Abrir, elegí el `.ova`. Si VMware dice que el archivo no cumple la especificación OVF, tocá Reintentar.
+Archivo → Importar servicio virtualizado, elegí el `.ova` y tocá Terminar. En Configuración ves lo que trae la máquina: 4 CPU, 4 GB de memoria y la pantalla ya configurada. Las capturas están en inglés.
+
+![La ventana de importación de VirtualBox](docs/vm/virtualbox-import.png "VirtualBox: importar el servicio virtualizado, con la configuración de la máquina")
+
+### VMware Fusion
+
+Archivo → Importar, elegí el `.ova` y tocá Continuar. Poné un nombre y una carpeta para la máquina y tocá Guardar. Cuando termina la importación, Finalizar la arranca.
+
+![VMware Fusion: elegir la OVA](docs/vm/vmware-choose.png "VMware Fusion: elegí el archivo y tocá Continuar")
+
+![VMware Fusion: el resumen después de importar](docs/vm/vmware-finish.png "VMware Fusion: la máquina importada, 4 núcleos y 4 GB de memoria")
+
+La primera vez que arranca, Fusion puede preguntar si querés actualizar la máquina virtual. Cualquier respuesta funciona; actualizar está bien, salvo que también la abras con una versión anterior de VMware.
+
+![VMware Fusion pregunta si actualizar la máquina](docs/vm/vmware-upgrade.png "VMware Fusion: actualizar o no, las dos funcionan")
+
+En **VMware Workstation**: Archivo → Abrir, elegí el `.ova`. Si VMware dice que el archivo no cumple la especificación OVF, tocá Reintentar.
 
 ## 3. Creá tu cuenta
 
-Arrancá la máquina. Se abre sola **Configurar LordOS**:
+Arrancá la máquina. Se abre sola **Configurar LordOS** (en las capturas, en inglés):
+
+![Configurar LordOS en el primer arranque](docs/vm/virtualbox-welcome.png "El primer arranque: se abre sola la configuración")
 
 1. **Idioma y región** y **Teclado**.
-2. **Usuario**: tu nombre, el nombre de usuario y la contraseña.
+2. **Usuario**: tu nombre, el nombre de usuario, la contraseña y el nombre de la computadora.
+
+![El paso Usuario](docs/vm/virtualbox-user.png "Usuario: tu nombre, el nombre de usuario y la contraseña")
+
 3. **Resumen**, y después **Crear cuenta**.
+
+![El paso Resumen](docs/vm/virtualbox-summary.png "Resumen, y después Crear cuenta")
+
 4. **Reiniciar**. Aparece la pantalla de inicio de sesión: entrá con la contraseña que elegiste.
 
-Hasta que la cuenta exista, la máquina corre una sesión de configuración sin contraseña, a la que solo se llega desde su propia pantalla. Terminá este paso antes de dejarla prendida.
+![Tu cuenta está lista](docs/vm/virtualbox-ready.png "La cuenta está creada: reiniciá para terminar")
+
+![La pantalla de inicio de sesión después de reiniciar](docs/vm/vmware-login.png "Después de reiniciar, la pantalla de inicio de sesión (acá en VMware Fusion)")
+
+Es igual en VirtualBox y en VMware. Hasta que la cuenta exista, la máquina corre una sesión de configuración sin contraseña, a la que solo se llega desde su propia pantalla. Terminá este paso antes de dejarla prendida.
 
 ## Ajustar la máquina
 
@@ -42,7 +70,7 @@ Con la máquina apagada, en su configuración:
 
 - **Procesadores y memoria:** subilos si la computadora tiene lugar; con muchas apps, lo ideal son 16 GB de memoria.
 - **Pantalla:** en VirtualBox viene VBoxSVGA; VMSVGA también funciona.
-- **Red:** NAT, la opción por defecto, alcanza para navegar y actualizar. Para que otras computadoras de tu red lleguen a ella (por ejemplo, con escritorio remoto), usá un adaptador puente.
+- **Red:** VirtualBox usa NAT, que alcanza para navegar y actualizar; VMware Fusion elige una conexión en puente, que pone la máquina en tu red. Para que otras computadoras lleguen a ella (por ejemplo, con escritorio remoto), usá un adaptador puente.
 
 ## Si algo sale mal
 

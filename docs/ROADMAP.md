@@ -701,8 +701,8 @@ Released 2026-11-02 (`CHANGELOG.md`, "0.8.8-beta"; ISOs `lordos-live-0.8.8-amd64
   attachments, a real USB disk and a real Linux app tested with it. The portal tested when two sessions start at once.
 - [ ] **Release checks left from 0.8.8:** an upgrade done from the Store's own screen ("LordOS <version> is available"
   with the notes, then "Restart required"), with a user who has logged in and changed settings, checking they survive;
-  `results-<version>.tar.gz` collected and attached; the OVA's first account on VMware Fusion confirmed (then the changelog's OVA limitation drops it). The OVA's
-  download card and a requirements page reached lordos.org on 2026-11-03.
+  `results-<version>.tar.gz` collected and attached. Done on 2026-11-03: the OVA's first account on VMware Fusion, and
+  the OVA's download card, a step-by-step page with screenshots and a requirements page on lordos.org.
 
 ## Before 1.0
 

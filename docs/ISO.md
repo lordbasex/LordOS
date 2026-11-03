@@ -482,8 +482,9 @@ The VMDK is cut at its end-of-stream marker. `qemu-img` pads the file after it, 
 The released file is `lordos-0.8.8-amd64.ova`, 1,255,577,600 bytes, sha256
 `98ff7979993093840834e65b92f25dd8e4972451ce5e8d519007c80fb9f6d7a9`. On the maintainer's own computer it was imported in
 VirtualBox 7.2: the account was created in **Set up LordOS**, the machine restarted into the login screen and signed in
-with that password. It was also imported in VMware Fusion through Fusion's own import window, without problems; the
-first account there is not confirmed yet.
+with that password. It was also imported in VMware Fusion through Fusion's own import window (File → Import), without problems,
+and on 2026-11-03 the same steps passed there: the account created, the restart into the login screen and the sign-in.
+The screenshots of both are in `docs/vm/` and on lordos.org/virtual-machine/.
 
 The table below is from the first build, `lordos-0.8.7-amd64.ova`. The test build of 0.8.8, with test keys, is `lordos-0.8.8-amd64.ova`, 1,255,546,880 bytes, sha256 `997869abff6777e5540522020b5a1b3764a13af68d21a080d5a3054506de8112`: imported on VirtualBox 7.2.22, it reached **Set up LordOS** with VBoxSVGA (its own setting) and with VMSVGA, both BIOS.
 
@@ -681,7 +682,7 @@ from signed code. The checksums are in the release's `SHA256SUMS`.
 |---|---|
 | Server tests | 26 passed, 0 failed |
 | The released OVA in VirtualBox 7.2 on the maintainer's own computer | account created in **Set up LordOS**, restart, login with its password: works |
-| The released OVA in VMware Fusion, through its own import window | imported without problems; the first account there is not confirmed yet |
+| The released OVA in VMware Fusion, through its own import window | imported without problems; on 2026-11-03 the account, the restart and the sign-in passed there too |
 | Update 0.8.7 → 0.8.8 with `apt` against lordos.org/apt-staging, a clean installed amd64 VM (VM 125) | installed; `/usr/bin/pkexec` diverted to `lord-pkexec`; a clean restart with no failed units; a reinstall ran no migration (0.8.8 adds none) |
 | Raspberry Pi 5 against apt-staging | arm64 index read, candidate 0.8.8 |
 | arm64 ISO | built, not booted for this release |
