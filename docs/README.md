@@ -25,6 +25,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [ISO.md](ISO.md) | The live and installable ISO for 64-bit PCs: building, booting, final test results |
 | [RASPBERRY.md](RASPBERRY.md) | The Raspberry Pi 5 image, our kernel with Landlock, boot switch files |
 | [IMAGER.md](IMAGER.md) | LordOS Imager: writing LordOS to cards and sticks, in LordOS and on other computers, and the first-run file |
+| [UNATTENDED.md](UNATTENDED.md) | The unattended install: the ISO installs itself from `lordos-auto.conf`, for test machines |
 | [INSTALL-DEBIAN.md](INSTALL-DEBIAN.md) | Installing LordOS on an existing Debian 13 with one command |
 | [VM-SETUP.md](VM-SETUP.md) | The development VM, step by step |
 | [UPDATES.md](UPDATES.md) | Updating an installed system in place from the signed APT repository, and migrations |

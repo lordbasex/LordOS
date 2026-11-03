@@ -686,9 +686,11 @@ Released 2026-11-02 (`CHANGELOG.md`, "0.8.8-beta"; ISOs `lordos-live-0.8.8-amd64
   directly on the GPU, instead of reading each frame back and converting it.
 - [ ] **Machines, the MVP** (`VIRTUALIZATION.md`, "Phases"; moved from 0.8.8 on 2026-11-02): with `lord-vm` and direct
   QMP.
-- [ ] **Unattended install** (first after 0.8.8): an optional boot entry, never the default, that installs from a config
-  file (hashed password, SSH key, target disk) and stops if the config or the disk doesn't match. It lets install tests
-  run without a person at the keyboard.
+- [x] **Unattended install** (first after 0.8.8; done on 2026-11-03, `UNATTENDED.md`): an optional boot entry, never the
+  default, that installs from `lordos-auto.conf` (hashed password, SSH key, target disk and its exact size) and stops
+  before touching anything if the file or the disk doesn't match. An erase install ran to the end on VM 127. Left: mode
+  free, UEFI, a USB stick and the arm64 ISO.
+- [ ] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO.
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
   and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
   the site and the release notes point at it.

@@ -10,6 +10,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Unattended install** ([docs/UNATTENDED.md](docs/UNATTENDED.md)): the live ISO's new boot entry, Install automatically,
+  never the default, installs LordOS from `lordos-auto.conf` on a disk labelled `LORDOSAUTO`, with install-run's own
+  code. The file names the disk and its exact size, says `erase = yes` for an erase install, and carries the password
+  only as a yescrypt or SHA-512 hash; it can add an SSH key, automatic login and what to do afterwards. Anything missing
+  or wrong stops it before any disk is touched, and the live system starts as usual.
+  `tools/iso/make-auto-disk.sh` makes the small ISO with the file for a virtual machine.
+
 ## [0.8.8-beta] - 2026-11-02
 
 ### Added
