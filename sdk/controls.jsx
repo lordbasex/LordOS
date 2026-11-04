@@ -111,11 +111,16 @@ export function ToolbarDivider() {
   return <View style={{ width: 1, height: 18, marginHorizontal: 2, backgroundColor: t.separator }} />;
 }
 
-// "More" button that opens a small menu: items = [{ label, onClick, checked, disabled, destructive } | '-'].
-export function MenuButton({ icon = '⋯', label, title, items, small }) {
+// "More" button that opens a small menu: items = [{ label, onClick, checked, disabled, destructive, detail } | '-'].
+// Optional (0.8.8.4): detail (a second, dimmer line under an item's label), onOpenChange(open) (a card that shows the
+// button only on hover keeps it while its menu is open) and trigger(open) (draws the button itself: a pop-up field in a
+// form) with minWidth for the menu.
+export function MenuButton({ icon = '⋯', label, title, items, small, onOpenChange, trigger, minWidth = 200 }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const [open, setOpen] = useState(false);
+  const was = useRef(false);
+  useEffect(() => { if (was.current !== open) { was.current = open; onOpenChange?.(open); } }, [open]);
   const btn = useRef(null), menu = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -129,11 +134,12 @@ export function MenuButton({ icon = '⋯', label, title, items, small }) {
   // comes after the button, and not clipped by a scrolling parent
   return (
     <View ref={btn}>
-      <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />
+      {trigger ? <View onClick={() => setOpen((o) => !o)}>{trigger(open)}</View>
+        : <ToolbarButton icon={icon} label={label} title={open ? null : title} small={small} active={open} onClick={() => setOpen((o) => !o)} />}
       {open && (
         <Overlay anchor={btn}>
-          <View ref={menu} style={{ position: 'absolute', top: (small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,
-            minWidth: 200, paddingVertical: 5, paddingHorizontal: 5, borderRadius: t.menuRadius, backgroundColor: popupBg(t),
+          <View ref={menu} style={{ position: 'absolute', top: (trigger ? lord.getLayout(btn.current.id)[3] : small ? controlSize.small : controlSize.regular) + 4, [end ? 'right' : 'left']: 0,
+            minWidth, paddingVertical: 5, paddingHorizontal: 5, borderRadius: t.menuRadius, backgroundColor: popupBg(t),
             border: `1px solid ${t.separator}`, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
             {items.map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: t.separator }} />
               : <MenuRow key={it.label} it={it} onDone={() => setOpen(false)} />))}
@@ -151,10 +157,15 @@ function MenuRow({ it, onDone }) {
   const on = lit && t.menuHighlight !== 'subtle';     // 'subtle' (a theme token): a light fill, the text keeps its color
   return (
     <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: 24, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
+      style={{ height: it.detail ? 40 : 24, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: on ? t.accent : lit ? t.hover : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
-      <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', color: on ? '#fff' : it.destructive ? '#ff453a' : t.text }}>{it.label}</Text>
+      {it.detail ? (
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={{ fontSize: 13, whiteSpace: 'nowrap', color: on ? '#fff' : t.text }}>{it.label}</Text>
+          <Text style={{ fontSize: 11, whiteSpace: 'nowrap', color: on ? 'rgba(255,255,255,0.8)' : t.textDim }}>{it.detail}</Text>
+        </View>
+      ) : <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', color: on ? '#fff' : it.destructive ? '#ff453a' : t.text }}>{it.label}</Text>}
     </View>
   );
 }

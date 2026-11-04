@@ -126,6 +126,59 @@ Tested against a real Windows 11 Pro server with a local account: the sign-in, t
 
 Remote Desk (`apps/remote-desk`, `sdk/remotedesk.jsx`), one app for RDP and VNC with a switch between them, draws the remote screen with LordOS's own engine, as a media node. There is no client window, X11, Xwayland or toolkit. `lord.rdesk` (`ui/js_rdesk.c`) starts `lord-rdesk` (`rdesk/`) in `app-lordos-lordos-rdesk.scope`; it resolves and connects, then applies the helper sandbox (no new sockets, no exec, read-only `/etc/ssl` and `/usr/lib` for RDP), and paints BGRA into a memfd lord-server shares. The picture's size is sealed (`F_SEAL_SHRINK`, `F_SEAL_GROW`), lord-server takes at most 256 messages per poll and never blocks on the helper, and the scope has lord-server's memory limits (256 MB high, 512 MB max). VNC is our own RFB 3.8 client (`rdesk/rfb.c`: None and VNC auth, refusing a server that offers only None when a password was given, password wiped after the handshake, Raw, CopyRect, Hextile, resize; `tests/rdesk_test.c` with a fuzz run). VNC auth's DES is required by the protocol and is weak: the traffic is not encrypted. RDP allows only TLS and NLA (`FreeRDP_RdpSecurity` off, proved by `tests/rdesk_rdp_test.c`: no credentials go to a server that picks RDP's own security). A certificate that differs from the accepted one gets its own warning with both fingerprints (`sdk/remotecert.js`). RDP is libfreerdp's core with its software GDI, and its client library only for shared folders, handed the connected socket; `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` are dependencies of `lordos`. An unknown or changed certificate shows its fingerprint and the person decides; a trusted one is kept in settings with the address. Passwords reach the helper in one message and go to the keyring only if asked.
 
+### Remote Desk's window, credentials and pictures (0.8.8.4)
+
+**The window.** A sidebar with Favorites and Devices (it hides from the toolbar or View → Show Sidebar), and a toolbar
+with **+** (Add RDP Computer…, Add VNC Computer…), Pictures / List, sort (by name, by last connection, groups shown or
+not), Show (all, RDP, VNC, favorites) and a search field. The computers are cards with the picture of their last
+session, a pill with RDP or VNC, the name and the user name, in sections by group ("Saved PCs" is the default group,
+each section folds). On hover a card gets an accent outline, a **⋯** menu (Connect, Edit…, Duplicate, Export…, add or
+remove from Favorites, Remove) and a star. Double-click or Enter connects; each connection opens its own window
+(`args.connect`), so the list stays. The File, View and Connections menus repeat these, plus Import… / Export… of `.rdp`
+files (address, user name, screen mode, size, color depth, sound, administrative session; never a password) and, in a
+session, Disconnect, Send Ctrl+Alt+Del, Full Screen and Update the Picture.
+
+**The computer's sheet.** One **Host** field ("Name or IP address, e.g. 192.168.1.20 or pc.local", with an optional
+`:port`), a **Credentials** pop-up (Ask When Required, the saved credentials, Add Credentials…) and the tabs General
+(friendly name, group, reconnect if the connection is dropped, administrative session, swap mouse buttons), Display
+(resolution: automatic, the presets or the custom ones; the remote desktop's scale; color quality; full screen),
+Devices & Audio (play sound on this computer, on the remote computer or never; what isn't supported yet says so) and
+Folders. VNC shows General and Display only. There is no Domain field: a domain belongs to a credential, typed as
+`DOMAIN\user` or in the credential's optional Domain field. `user@example.com` stays whole (a full sign-in name).
+
+**Credentials.** Saved in Remote Desk Settings → Credentials (❖,): a user name, an optional domain and display name in
+settings, the password only in the keyring (`lan.remember('rdesk', <id>)`, service `rdesk://<id>/`). A password typed
+at sign-in goes to the keyring only after the computer accepted it. VNC uses only the password of a credential.
+Settings also has General (pictures on or off, delete them, new computers reconnect, forget trusted certificates),
+Resolutions (custom sizes) and Groups.
+
+**Migration.** `sdk/remotedeskmodel.js` (`migrate`, tested by `server/tests/remotedesk_test.mjs`) rewrites what older
+versions kept once (`remoteDesks.v = 2`): one id per computer, the user and domain moved to a credential, and the
+mistake the old form invited fixed: a host that isn't an address (no dots, not an IP) with a Domain that is one (an IP,
+or a dotted name starting with the host's name) becomes the friendly name, and the Domain the address. A password
+remembered under the old address (`legacy`) is still found and moves to the credential on first use.
+
+**"Couldn't find it" and "doesn't answer".** `lord-rdesk` reports a name that doesn't resolve (`getaddrinfo` failed) as
+`RS_NOTFOUND` ("Couldn't find “name” on the network. Check the name or use its IP address.") and an address that
+refuses or times out as `RS_UNREACHABLE`. An RDP session lost without the server saying why (`freerdp_error_info` 0)
+is `RS_DROPPED`: with "Reconnect if the connection is dropped" the window tries again up to three times with the
+password it still holds; a sign-out or a disconnect from the remote side ends the session.
+
+**Pictures.** 3 s after a session connects, and again at 12 s (after a sign-in), lord-server scales the shared picture
+down to 640 px wide and writes `~/.local/share/lordos/remote-desk/thumbs/<id>.png` (`rdesk/thumb.c`: the folder 0700,
+the file 0600, written beside it and renamed, no links followed; `tests/rdesk_thumb_test.c`). The device keeps when
+(`shot`), and the card loads `<file>#<shot>`: `ui/image.c` reads a `#<digits>` suffix as a version and loads the same
+cached image again when it changes. Removing a computer, changing its address or Settings → Delete All Pictures
+deletes the file.
+
+**Sound.** "On this computer" adds FreeRDP's `rdpsnd` channel with a device of our own (`rdesk/rdesksnd.c`,
+`sys:lordos`): it offers 16-bit PCM at 44.1 or 48 kHz and writes 48 kHz stereo into the audio ring that lord-server
+makes for the session (`media/maudio.c`, the same shared-memory ring as the media player's). The ring travels to the
+helper right after the job, before its sandbox; the helper never gets the PipeWire socket. lord-server owns the
+stream ("Remote Desk", with the computer's address, in Settings → Sound) and serves it from the session's media node.
+"On the remote computer" asks the server to keep the sound there. The microphone, clipboard, printers, cameras, smart
+cards and USB devices are not available yet. VNC has no sound.
+
 ## Views and the sidebar (0.8.7)
 
 Each folder keeps its view and sort in `settings.files.folderViews` (400 at most, oldest out first), so they survive closing and a restart; Network, Recents and the other places keep theirs too. A folder with none takes Settings → General's default view. The sidebar's width is dragged from its edge, between 150 and 360 px, and kept (`apps/files/viewprefs.js`).

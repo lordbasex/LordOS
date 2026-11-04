@@ -153,6 +153,7 @@ EOF
     run "install-plan-test" build/install-plan-test
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
+    if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs

@@ -10,6 +10,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Remote Desk, redesigned**: a sidebar with Favorites and Devices, cards with a picture of each computer's last session (taken a few seconds after every connection, kept only on this computer) or a list, sections by group, sort, a filter, search, and a ⋯ menu and a star on each card. Each connection opens its own window.
+- Remote Desk: **saved credentials** (user name, optional domain and display name; the password only in the keyring) chosen per computer, or "Ask When Required"; a password typed at sign-in is saved only once the computer accepts it. Remote Desk Settings (❖,) with General, Resolutions, Credentials and Groups.
+- Remote Desk: **sound from the remote computer** over RDP, played on this computer (or left on the remote one, or none), through LordOS's own audio path; the helper stays sandboxed.
+- Remote Desk: reconnect when an RDP connection drops, administrative sessions, the remote desktop's scale, color quality, custom resolutions, swapped mouse buttons, and import and export of `.rdp` files (never with a password).
+
+### Fixed
+
+- Remote Desk said "That computer does not answer." for a computer saved with its name in the address field and its IP in **Domain**, which the old form invited. The form now has a single **Host** field ("Name or IP address, e.g. 192.168.1.20 or pc.local"), the domain moved to the credentials, computers saved that way are corrected once, and a name that doesn't resolve gets its own message: "Couldn't find “name” on the network. Check the name or use its IP address."
+
 ## [0.8.8.3-beta] - 2026-11-05
 
 An update for 0.8.8, 0.8.8.1 and 0.8.8.2 through Store → Updates and `apt`: only the `lordos` package changes, with the fixes and ideas reported on GitHub since 0.8.8. Thanks to everyone who opened an issue. It also brings everything in 0.8.8.2 (Italian, preferred languages, the Raspberry Pi 500 in the Imager), which was not published on its own.
