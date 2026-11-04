@@ -122,6 +122,14 @@
         },
         {
           "label": {
+            "en": "Community (Reddit)",
+            "es": "Comunidad (Reddit)",
+            "pt": "Comunidade (Reddit)"
+          },
+          "href": "https://www.reddit.com/r/LordOS/"
+        },
+        {
+          "label": {
             "en": "GitHub",
             "es": "GitHub",
             "pt": "GitHub"

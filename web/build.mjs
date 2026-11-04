@@ -36,6 +36,8 @@ const CONTENT = process.env.CONTENT_DIR ? path.resolve(process.env.CONTENT_DIR) 
 const TOOLS = process.env.WEB_TOOLS || process.env.ICON_DEPS || '';
 const FINGERPRINT = 'c7155b8e6bbbb180f907381994d06af76d333016cd6f3facf67cadd053ea108e';
 const GITHUB = 'https://github.com/lordbasex/LordOS';
+// the community forum (r/LordOS): questions, feedback and every release announced
+const COMMUNITY = 'https://www.reddit.com/r/LordOS/';
 // the LordOS Imager downloads of the current release (package.json's version and channel)
 const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 // a package-only update (0.8.4.1) leaves the live ISO and the Imager on an earlier release: lordos.media
@@ -369,6 +371,7 @@ function header(t, page) {
     `<a href="${h('#download')}">${esc(t.navDownload)}</a>`,
     `<a href="${h('#support')}">${esc(t.navSupport)}</a>`,
     `<a href="${pageUrl(l, 'about')}"${cur('about')}>${esc(t.navAbout)}</a>`,
+    `<a href="${COMMUNITY}" rel="noopener">${esc(t.navCommunity)}</a>`,
     `<a href="${GITHUB}">GitHub</a>`,
   ].filter(Boolean).join('\n');
 
@@ -390,6 +393,7 @@ function header(t, page) {
     legalPages.length
       ? group(t.pages.legal.nav, [row(pageUrl(l, 'legal'), t.pages.legal.all, cur('legal')), ...legalLinks.map((x) => row(pageUrl(l, 'legal/' + x.slug), loc(x.title, l), cur('legal/' + x.slug)))], page.startsWith('legal'))
       : '',
+    row(COMMUNITY, t.navCommunity, ' rel="noopener"'),
     row(GITHUB, 'GitHub', ' rel="noopener"'),
   ].filter(Boolean).join('\n');
   const X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
