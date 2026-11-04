@@ -88,7 +88,10 @@ function maybeNotify() {
 
 let checking = false;
 function check() {
-  if (checking || !updatePrefs().autoCheck || !admin.available()) return;
+  // No readable package list (a new install, or an update that changed its format): build it now,
+  // even with the daily check off, or the Store shows only the LordOS catalog until someone checks.
+  const missing = !lord.pkg.available();
+  if (checking || !admin.available() || (!missing && !updatePrefs().autoCheck)) return;
   const last = lord.pkg.available() ? lord.pkg.lastUpdate() : 0;
   if (Date.now() / 1000 - last < DAY - 600) return;
   checking = true;
@@ -99,5 +102,5 @@ function check() {
 
 // Only in a user's desktop session (not the login screen or an isolated app's process).
 if (has() && typeof lord.admin !== 'undefined' && typeof lord.greeter === 'undefined') {
-  setTimeout(() => { check(); setInterval(check, 3600 * 1000); }, 5 * 60 * 1000);
+  setTimeout(() => { check(); setInterval(check, 3600 * 1000); }, lord.pkg.available() ? 5 * 60 * 1000 : 20 * 1000);
 }
