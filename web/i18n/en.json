@@ -318,14 +318,12 @@
       "monitor-cpu": "Monitor: each core of the Cortex-A76",
       "monitor-memory": "Monitor: memory in use",
       "monitor-network": "Monitor: network activity and every connection",
-      "monitor-map": "Monitor: the connections on a world map",
       "monitor-disks": "Monitor: the SD card's activity",
       "monitor-processes": "Monitor: processes",
       "monitor-cooling": "Monitor: temperature and the Argon's fan",
       "monitor-voltage": "Monitor: the board's voltages and power draw",
       "cleaner": "Cleaner: what fills the SD card",
-      "cleaner-review": "Cleaner: review before anything is removed",
-      "login": "The login screen"
+      "cleaner-review": "Cleaner: review before anything is removed"
     },
     "toolsTitle": "Four tools in the terminal",
     "toolsLead": "They come with LordOS, work over SSH too, and never send anything on their own.",
