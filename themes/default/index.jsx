@@ -8,7 +8,7 @@ import {
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
   findWallpaper, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
-  openOverview, closeOverview, toggleOverview,
+  openOverview, closeOverview, toggleOverview, LevelHud,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState } from 'react';
@@ -193,6 +193,7 @@ function App() {
         <AppSwitcher />
         <OverviewChrome />
         <DesktopHud />
+        <LevelHud />
         {control && <Layer name="popover"><ControlCenter t={t} top={MENU_H} area={control} onClose={() => setControl(null)} /></Layer>}
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
