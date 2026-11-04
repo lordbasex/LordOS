@@ -10,7 +10,11 @@ never fires twice.
 `runtime/events.js` calls the filter set with `setKeyFilter` before any `addListener('keydown')`, and only
 `startShell` sets it: an isolated app's process has no dispatcher. The tables:
 
-- `BASE` in `sdk/shortcuts.js`: search, keyboard layout, clipboard, emoji, lock, quit, the media keys, and volume, mute, screen brightness and keyboard light (`sdk/hwkeys.js`), which `keygrab_system_key` keeps from apps.
+- `BASE` in `sdk/shortcuts.js`: search, keyboard layout, clipboard, emoji, lock, quit, the media keys, and volume, mute, screen brightness and keyboard light (`sdk/hwkeys.js`), which `keygrab_system_key` keeps from apps. Each
+  of those presses shows the new level in a brief indicator (`sdk/levelhud.js`): a rounded translucent panel near the
+  bottom of the main display with a drawn icon (speaker or muted speaker, sun, keyboard light) and a bar of 16 segments.
+  It stays 1.5 s after the last press, so a held key keeps it up, then fades out in 0.2 s, or just goes with Reduce motion.
+  Both themes mount `<LevelHud />` next to `<DesktopHud />`; the login and lock screens don't.
 - A theme's table, given to `useShortcuts({ grabs, table, onSuperTap, appsPaste })` from its root component
   (`flowTable` in `themes/default/index.jsx`, `classicTable` in `themes/classic/index.jsx`).
 - `addShortcuts(entries)` from a module: Screenshots and the Terminal's drop-down window. `runShortcut(id)`

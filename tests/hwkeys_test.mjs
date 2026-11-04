@@ -1,7 +1,7 @@
 // hwkeys_test.mjs — the steps of a keyboard's volume, brightness and keyboard-light keys.
 //   node tests/hwkeys_test.mjs
 import assert from 'node:assert/strict';
-import { nextVolume, nextBacklight, nextKeyLight } from '../sdk/hwkeymodel.js';
+import { nextVolume, nextBacklight, nextKeyLight, levelFraction, litSegments, speakerWaves, hudOpacity, LEVEL_HUD_MS, LEVEL_HUD_FADE } from '../sdk/hwkeymodel.js';
 
 assert.equal(nextVolume(0.5, 1), 0.55);
 assert.equal(nextVolume(0.5, -1), 0.45);
@@ -27,5 +27,28 @@ assert.equal(nextKeyLight(0, 255, 1), 32);
 assert.equal(nextKeyLight(32, 255, -1), 0);    // off
 assert.equal(nextKeyLight(250, 255, 1), 255);
 assert.equal(nextKeyLight(0, 2, 1), 1);
+
+// the level indicator
+assert.equal(levelFraction(0.5), 0.5);
+assert.equal(levelFraction(1.3), 1);           // above 100 %: a full bar
+assert.equal(levelFraction(800, 1600), 0.5);
+assert.equal(levelFraction(5, 0), 0);
+assert.equal(levelFraction(NaN), 0);
+assert.equal(litSegments(0), 0);
+assert.equal(litSegments(1), 16);
+assert.equal(litSegments(0.5), 8);
+assert.equal(litSegments(0.01), 1);            // on, however low: one segment
+assert.equal(litSegments(0.99), 15);           // only a full level fills the bar
+assert.equal(litSegments(1 / 1600), 1);        // the screen's lowest step
+assert.equal(speakerWaves(0, false), 0);
+assert.equal(speakerWaves(0.2, false), 1);
+assert.equal(speakerWaves(0.5, false), 2);
+assert.equal(speakerWaves(1, false), 3);
+assert.equal(speakerWaves(1, true), 0);
+assert.equal(hudOpacity(0, false), 1);
+assert.equal(hudOpacity(LEVEL_HUD_MS - 1, false), 1);
+assert.equal(hudOpacity(LEVEL_HUD_MS + LEVEL_HUD_FADE / 2, false), 0.5);
+assert.equal(hudOpacity(LEVEL_HUD_MS + LEVEL_HUD_FADE, false), 0);
+assert.equal(hudOpacity(LEVEL_HUD_MS, true), 0);   // Reduce motion: no fade
 
 console.log('hwkeys: ok');

@@ -21,3 +21,39 @@ export function nextKeyLight(value, max, dir) {
   const step = Math.max(1, Math.round(max / 8));
   return Math.min(max, Math.max(0, value + dir * step));
 }
+
+// ---- the level indicator (sdk/levelhud.js) ----
+
+// How long it stays after the last press, and its fade out (none with Reduce motion).
+export const LEVEL_HUD_MS = 1500;
+export const LEVEL_HUD_FADE = 200;
+export const LEVEL_SEGMENTS = 16;
+
+// What the indicator shows for a level: a fraction of 0..1 (a volume above 100 % fills the bar).
+export function levelFraction(value, max = 1) {
+  if (!(max > 0) || !Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value / max));
+}
+
+// How many of the bar's segments are lit. Any level above zero lights at least one, and only a full
+// level lights them all.
+export function litSegments(fraction, n = LEVEL_SEGMENTS) {
+  const f = Math.min(1, Math.max(0, fraction || 0));
+  if (f <= 0) return 0;
+  if (f >= 1) return n;
+  return Math.min(n - 1, Math.max(1, Math.round(f * n)));
+}
+
+// The speaker's waves: 0 to 3, none when muted or silent.
+export function speakerWaves(fraction, muted) {
+  if (muted || !(fraction > 0)) return 0;
+  return fraction < 0.34 ? 1 : fraction < 0.67 ? 2 : 3;
+}
+
+// The panel's opacity `ms` after the last press: 1, then a linear fade, then 0 (hidden).
+export function hudOpacity(ms, reduceMotion) {
+  if (ms < LEVEL_HUD_MS) return 1;
+  if (reduceMotion) return 0;
+  const k = (ms - LEVEL_HUD_MS) / LEVEL_HUD_FADE;
+  return k >= 1 ? 0 : +(1 - k).toFixed(3);
+}
