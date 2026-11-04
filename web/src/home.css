@@ -56,7 +56,11 @@
 .dl{background:var(--night);color:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .dl .wrap{padding-top:80px;padding-bottom:80px;display:flex;flex-direction:column;gap:36px}
 .dl .sub{color:var(--night-text)}
-.dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+/* four cards: 2 × 2 on wide screens, one column on phones; every card as tall as the tallest, with its
+   button or command at the bottom so they line up */
+.dl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:18px}
+@media (max-width:720px){.dl-grid{grid-template-columns:minmax(0,1fr);grid-auto-rows:auto}}
+.dl-card .cmd{margin-top:auto}
 .dl-card{background:var(--night-card);border:1px solid var(--night-line);border-radius:18px;padding:26px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .dl-card h3{margin:0;font-size:20px}
 .dl-card p{margin:0;color:var(--night-text);font-size:15px;line-height:1.55}
