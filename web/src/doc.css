@@ -250,3 +250,11 @@ mark.ph{background:#FFE58A;color:#3A2A00;padding:1px 6px;border-radius:6px;font-
 .initials{background:linear-gradient(135deg,#B46CFF,#4F46E5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:38px}
 @media (max-width:640px){.apps-grid{grid-template-columns:1fr}}
 .table .ta-center{text-align:center}.table .ta-right{text-align:right}
+
+/* Explore: jump links to its two parts, each with its own filters */
+.x-jump{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 8px}
+.x-jump a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--chip-line);color:var(--ink);text-decoration:none;font-weight:600}
+.x-jump a:hover{color:var(--brand)}
+.x-part{padding-top:32px;scroll-margin-top:80px}
+.x-h{margin:0 0 6px;font:800 30px/1.15 var(--ff)}
+.x-sub{margin:0 0 14px;color:var(--ink-2);max-width:780px}

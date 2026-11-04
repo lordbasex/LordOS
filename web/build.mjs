@@ -30,7 +30,7 @@ const DIST = path.join(WEB, 'dist');
 const CACHE = path.join(WEB, '.cache');
 const SITE = 'https://lordos.org';
 const LANGS = ['en', 'es', 'pt'];
-const PAGES = ['home', 'apps', 'gallery'];
+const PAGES = ['home', 'explore', 'raspberry-pi'];   // apps and gallery are one page since 0.8.8.1 (Explore); their old addresses redirect
 const CONTENT = process.env.CONTENT_DIR ? path.resolve(process.env.CONTENT_DIR) : path.join(path.dirname(fileURLToPath(import.meta.url)), 'content');
 // headless Chromium for the paper PDFs: a folder whose node_modules has playwright
 const TOOLS = process.env.WEB_TOOLS || process.env.ICON_DEPS || '';
@@ -317,8 +317,8 @@ function render(tpl, vars, t) {
 function head(t, page, over, doc) {
   const meta = over || {
     home: [t.meta.title, t.meta.description],
-    gallery: [t.meta.galleryTitle, t.meta.galleryDescription],
-    apps: [t.apps.metaTitle, t.apps.metaDescription],
+    explore: [t.explore.metaTitle, t.explore.metaDescription],
+    'raspberry-pi': [t.pi.metaTitle, t.pi.metaDescription],
   }[page];
   const [title, desc] = meta;
   const ogImage = SITE + '/social-card.png';
@@ -366,8 +366,8 @@ function header(t, page) {
   const cur = (p) => (page === p ? ' aria-current="page"' : '');
   const links = [
     `<a href="${h('#features')}">${esc(t.navFeatures)}</a>`,
-    HAS_APPS ? `<a href="${pageUrl(l, 'apps')}"${cur('apps')}>${esc(t.navApps)}</a>` : '',
-    `<a href="${pageUrl(l, 'gallery')}"${cur('gallery')}>${esc(t.navGallery)}</a>`,
+    `<a href="${pageUrl(l, 'explore')}"${cur('explore')}>${esc(t.navExplore)}</a>`,
+    `<a href="${pageUrl(l, 'raspberry-pi')}"${cur('raspberry-pi')}>${esc(t.navRaspberry)}</a>`,
     HAS_PAPER ? `<a href="${pageUrl(l, 'paper')}"${cur('paper')}>${esc(t.pages.navPaper)}</a>` : '',
     HAS_FAQ ? `<a href="${pageUrl(l, 'faq')}"${cur('faq')}>${esc(t.pages.navFaq)}</a>` : '',
     `<a href="${h('#download')}">${esc(t.navDownload)}</a>`,
@@ -384,8 +384,8 @@ function header(t, page) {
     featureList.length
       ? group(t.navFeatures, [row(h('#features'), t.pages.allFeatures), ...featureList.map((m) => row(pageUrl(l, 'features/' + m.slug), loc(m.title, l), cur('features/' + m.slug)))], page.startsWith('features/'))
       : row(h('#features'), t.navFeatures),
-    HAS_APPS ? row(pageUrl(l, 'apps'), t.navApps, cur('apps')) : '',
-    row(pageUrl(l, 'gallery'), t.navGallery, cur('gallery')),
+    row(pageUrl(l, 'explore'), t.navExplore, cur('explore')),
+    row(pageUrl(l, 'raspberry-pi'), t.navRaspberry, cur('raspberry-pi')),
     HAS_PAPER ? row(pageUrl(l, 'paper'), t.pages.navPaper, cur('paper')) : '',
     HAS_FAQ ? row(pageUrl(l, 'faq'), t.pages.navFaq, cur('faq')) : '',
     row(h('#download'), t.navDownload),
@@ -445,7 +445,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -527,7 +527,7 @@ function teaser(t) {
 <p class="kicker">${esc(t.apps.teaserKicker)}</p>
 <h2 id="teaser-h" class="h2s">${esc(t.apps.teaserTitle)}</h2>
 <p>${esc(t.apps.teaserText)}</p>
-<a class="btn btn-primary" href="${pageUrl(t.lang, 'apps')}">${esc(t.apps.seeAll)}</a>
+<a class="btn btn-primary" href="${pageUrl(t.lang, 'explore')}#apps">${esc(t.apps.seeAll)}</a>
 </div>
 <ul class="teaser-icons">
 ${icons}
@@ -536,7 +536,8 @@ ${icons}
 </section>`;
 }
 
-const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
+const PI_ART = JSON.parse(src('pi-art.json'));   // the three drawings (our own, isometric): argon, pi500, pi5
+const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -652,9 +653,10 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
 <figcaption><span class="g-cap">${esc(cap)}</span><span class="g-tag">${esc(catLabel(s.category))}</span></figcaption>
 </figure>`;
   }).join('\n');
-  write(path.join(pageUrl(l, 'gallery'), 'index.html'), render(tpl.gallery, { ...common('gallery'), catButtons, shots: shotsHtml }, t));
+  const shotButtons = catButtons;
 
-  // apps
+  // apps (shown on Explore)
+  let appsHtml = { appButtons: '', sections: '', count: 0 };
   if (HAS_APPS) {
     const present = APP_CATS.filter((c) => apps.some((a) => a.category === c));
     const appCount = (n) => `<span class="n" aria-label="${n} apps">${n}</span>`;
@@ -681,7 +683,32 @@ ${c === 'thirdparty' ? `<p class="apps-note">${esc(t.apps.thirdpartyNote)}</p>` 
 ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompare(appName(y, l), l)).map(card).join('\n')}
 </div>
 </section>`).join('\n');
-    write(path.join(pageUrl(l, 'apps'), 'index.html'), render(tpl.apps, { ...common('apps', null, true), catButtons, sections }, t));
+    appsHtml = { appButtons: catButtons, sections, count: apps.length };
+  }
+  // Explore: the apps and the screenshots in one page, each with its own filters (site.js [data-filters])
+  const nPill = (n) => `<span class="n">${n}</span>`;
+  write(path.join(pageUrl(l, 'explore'), 'index.html'), render(tpl.explore, { ...common('explore', null, true),
+    appButtons: appsHtml.appButtons, sections: appsHtml.sections, shotButtons, shots: shotsHtml,
+    appsCount: nPill(appsHtml.count), shotsCount: nPill(shots.length) }, t));
+  // the old addresses of the two pages it replaces
+  for (const [old, frag] of [['apps', 'apps'], ['gallery', 'screenshots']]) {
+    const dest = SITE + pageUrl(l, 'explore') + '#' + frag;
+    write(path.join(pageUrl(l, old), 'index.html'), `<!doctype html>
+<html lang="${l}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(t.explore.title)} · LordOS</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="${SITE + pageUrl(l, 'explore')}">
+<meta http-equiv="refresh" content="0; url=${dest}">
+<link rel="stylesheet" href="${cssUrl}">
+</head>
+<body>
+<p class="moved"><a href="${dest}">${esc(t.explore.title)}</a></p>
+</body>
+</html>
+`);
   }
 
   // feature pages and paper share these helpers
@@ -692,6 +719,36 @@ ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompar
     const thumb = webp(f, 720), full = webp(f, 1600);
     return `<figure class="${cls}"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(cap)}" aria-label="${esc(t.gallery.open + ': ' + cap)}"><img src="${thumb.url}" width="${thumb.w}" height="${thumb.h}" alt="${esc(cap)}" loading="lazy" decoding="async"></a>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
   };
+  // Raspberry Pi: the boards, the Argon ONE V5 case, screenshots, LordBench and the terminal tools
+  {
+    const P = t.pi;
+    const aria = (svg, label) => svg.replace(/role="img" aria-label="[^"]*"/, `role="img" aria-label="${esc(label)}"`);
+    const rows = (list) => `<dl>${list.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
+    const card = (title, ver, list, extra = '') => `<article class="pi-card"><div class="pi-card-h"><h3>${esc(title)}</h3><span class="pi-ver">LordOS ${ver}</span></div>${rows(list)}${extra}</article>`;
+    const cards = card(P.pi5Title, '0.8.8.1', P.pi5Rows) + '\n' + card(P.pi500Title, '0.8.8', P.pi500Rows,
+      `<p class="pi-thanks">${esc(P.thanks).replace('{name}', '<strong>Steve Sande</strong>')}</p>`);
+    const shotList = ['desktop', 'login', 'power', 'cooling', 'about', 'network', 'cleaner']
+      .map((k) => shotFig(`docs/screenshots/pi/${k}.png`, P.shots[k], 'shot-fig pi-shot')).filter(Boolean);
+    const shotsSection = shotList.length ? `<section class="wrap pi-sec" aria-labelledby="pi-shots">
+<h2 id="pi-shots" class="pi-h2">${esc(P.shotsTitle)}</h2>
+<div class="pi-shots">
+${shotList.join('\n')}
+</div>
+</section>` : '';
+    const code = (s) => esc(s).replace(/(--share|\breport\b|bench --quick|--full)/g, '<code>$1</code>');
+    write(path.join(pageUrl(l, 'raspberry-pi'), 'index.html'), render(tpl.raspberry, { ...common('raspberry-pi', null, 'home'),
+      imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
+      fansUrl: GITHUB + '/blob/main/docs/FANS.md#argon-one-v5-case',
+      artArgon: aria(PI_ART.argon, P.artArgon), art500: aria(PI_ART.pi500, P.art500), artPi5: aria(PI_ART.pi5, P.artPi5),
+      testedLead: esc(P.testedLead).replace('{cmd}', '<code>lordos-issue</code>'),
+      cards, argonPoints: P.argonPoints.map(([b, x]) => `<li><strong>${esc(b)}</strong> ${esc(x)}</li>`).join('\n'),
+      shotsSection,
+      benchSteps: P.benchSteps.map(([h, x], i) => `<li><h3>${esc(h)}</h3><p>${esc(x)}</p>${i === 1 ? '<pre class="pi-pre">lordos-sysreport bench --quick\nlordos-sysreport bench --full --json</pre>' : ''}</li>`).join('\n'),
+      tools: P.tools.map(([c, x]) => `<article class="pi-tool"><h3><code>${esc(c)}</code></h3><p>${c === 'lordos-issue' || c === 'lordos-testbench' ? esc(x) : code(x)}</p></article>`).join('\n'),
+      browseLink: HAS_HW ? `<a class="pi-browse" href="${pageUrl(l, 'hardware')}">${esc(P.shareBrowse)}</a>` : '',
+    }, t));
+  }
+
   const diaStrings = { tones: t.pages.tones, legend: t.pages.legend, then: t.pages.then, connections: t.pages.connections };
   const renderMd = (srcText, diagrams, screenshots, usedShots, where = 'content') => { const res = markdown(phIn(srcText, where), {
     anchorLabel: t.pages.anchorLabel,
@@ -1000,7 +1057,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>

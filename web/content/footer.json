@@ -21,7 +21,7 @@
             "es": "Apps",
             "pt": "Apps"
           },
-          "href": "/apps/"
+          "href": "/explore/#apps"
         },
         {
           "label": {
@@ -29,7 +29,15 @@
             "es": "Galería",
             "pt": "Galeria"
           },
-          "href": "/gallery/"
+          "href": "/explore/#screenshots"
+        },
+        {
+          "label": {
+            "en": "Raspberry Pi",
+            "es": "Raspberry Pi",
+            "pt": "Raspberry Pi"
+          },
+          "href": "/raspberry-pi/"
         },
         {
           "label": {

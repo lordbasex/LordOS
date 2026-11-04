@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="raspberry-pi" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main">
+<section class="dl pi-hero" aria-labelledby="pi-h">
+<div class="wrap">
+<div class="pi-hero-txt">
+<p class="pi-eyebrow">{{t.pi.kicker}}</p>
+<h1 id="pi-h">{{t.pi.title}}</h1>
+<p class="sub">{{t.pi.lead}}</p>
+<div class="pi-cta">
+<a class="btn btn-violet" href="https://github.com/lordbasex/LordOS/releases">{{t.pi.download}}</a>
+<a class="btn pi-btn-line" href="{{{imagerUrl}}}">{{t.pi.guide}}</a>
+</div>
+</div>
+<div class="pi-art">
+<figure><div class="pi-art-box">{{{artArgon}}}</div><figcaption>{{t.pi.capArgon}}</figcaption></figure>
+<figure><div class="pi-art-box">{{{art500}}}</div><figcaption>{{t.pi.cap500}}</figcaption></figure>
+</div>
+</div>
+</section>
+
+<section class="wrap pi-sec" aria-labelledby="pi-tested">
+<h2 id="pi-tested" class="pi-h2">{{t.pi.testedTitle}}</h2>
+<p class="pi-lead">{{{testedLead}}}</p>
+<div class="pi-cards">
+{{{cards}}}
+</div>
+</section>
+
+<section class="pi-band" aria-labelledby="pi-argon">
+<div class="wrap pi-argon">
+<div class="pi-argon-art">{{{artPi5}}}</div>
+<div class="pi-argon-txt">
+<h2 id="pi-argon" class="pi-h2">{{t.pi.argonTitle}}</h2>
+<p>{{t.pi.argonText}}</p>
+<ul>
+{{{argonPoints}}}
+</ul>
+<p class="pi-more"><a href="{{{fansUrl}}}">{{t.pi.argonMore}}</a></p>
+</div>
+</div>
+</section>
+
+{{{shotsSection}}}
+
+<section class="wrap pi-sec" aria-labelledby="pi-bench">
+<h2 id="pi-bench" class="pi-h2">{{t.pi.benchTitle}}</h2>
+<p class="pi-lead">{{t.pi.benchLead}}</p>
+<ol class="pi-steps">
+{{{benchSteps}}}
+</ol>
+</section>
+
+<section class="wrap pi-sec" aria-labelledby="pi-tools">
+<h2 id="pi-tools" class="pi-h2">{{t.pi.toolsTitle}}</h2>
+<p class="pi-lead">{{t.pi.toolsLead}}</p>
+<div class="pi-tools">
+{{{tools}}}
+</div>
+</section>
+
+<section class="dl pi-share" aria-labelledby="pi-share">
+<div class="wrap pi-share-in">
+<div class="pi-share-txt">
+<h2 id="pi-share" class="pi-h2">{{t.pi.shareTitle}}</h2>
+<p class="sub">{{t.pi.shareText}}</p>
+<div class="cmd">
+<div class="cmd-bar"><span class="cmd-t" aria-hidden="true"><i></i><i></i><i></i>shell</span><button type="button" class="copy" data-copy="pi-issue-cmd" data-done="{{t.copied}}" aria-label="{{t.copyCmdLabel}}" hidden>{{t.copy}}</button></div>
+<pre id="pi-issue-cmd" tabindex="0">lordos-issue --print</pre>
+</div>
+<p class="pi-note">{{t.pi.shareAlt}}</p>
+</div>
+<div class="pi-share-btns">
+<a class="btn btn-violet" href="https://www.reddit.com/r/LordOS/" rel="noopener">{{t.pi.shareReddit}}</a>
+<a class="btn pi-btn-line" href="https://github.com/lordbasex/LordOS/issues/new?template=hardware-report.yml" rel="noopener">{{t.pi.shareGithub}}</a>
+{{{browseLink}}}
+</div>
+</div>
+</section>
+</main>
+
+{{{lightbox}}}
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>

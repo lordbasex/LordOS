@@ -256,43 +256,48 @@
     if (location.hash) { var t0 = d.getElementById(location.hash.slice(1)); if (t0 && t0.tagName === 'DETAILS') t0.open = true; }
   }
 
-  // Filters (gallery: category + appearance; apps: category). Items carry data-item.
-  var items = $$('[data-item]');
-  var more = $('#g-more');
+  // Filters (screenshots: category + appearance; apps: category). Items carry data-item. Each
+  // [data-filters] block (Explore has two: apps and screenshots) filters only its own items; a page
+  // without one is a single block.
   var PAGE = 48;
-  var state = { cat: 'all', theme: 'all', limit: PAGE };
-  var empty = $('#g-empty');
-  var apply = function () {
-    var shown = 0, matching = 0;
-    items.forEach(function (f) {
-      var t = f.getAttribute('data-theme');
-      var ok = (state.cat === 'all' || f.getAttribute('data-cat') === state.cat) &&
-               (state.theme === 'all' || !t || t === state.theme);
-      if (ok) matching++;
-      if (ok && more && shown >= state.limit) ok = false;
-      if (ok) shown++;
-      f.hidden = !ok;
-    });
-    if (empty) empty.hidden = matching > 0;
-    if (more) more.hidden = shown >= matching;
-  };
-  var group = function (sel, key) {
-    var btns = $$(sel);
-    btns.forEach(function (b) {
-      b.addEventListener('click', function () {
-        state[key] = b.getAttribute('data-' + key);
-        state.limit = PAGE;
-        btns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-        apply();
+  var scopes = $$('[data-filters]');
+  (scopes.length ? scopes : [d]).forEach(function (scope) {
+    var items = Array.prototype.slice.call(scope.querySelectorAll('[data-item]'));
+    var more = scope.querySelector('.g-more');
+    var empty = scope.querySelector('.g-empty');
+    var paged = more && scope.querySelector('.g-grid');
+    var state = { cat: 'all', theme: 'all', limit: PAGE };
+    var apply = function () {
+      var shown = 0, matching = 0;
+      items.forEach(function (f) {
+        var t = f.getAttribute('data-theme');
+        var ok = (state.cat === 'all' || f.getAttribute('data-cat') === state.cat) &&
+                 (state.theme === 'all' || !t || t === state.theme);
+        if (ok) matching++;
+        if (ok && paged && shown >= state.limit) ok = false;
+        if (ok) shown++;
+        f.hidden = !ok;
       });
-    });
-  };
-  if (items.length) {
+      if (empty) empty.hidden = matching > 0;
+      if (more) more.hidden = shown >= matching;
+    };
+    var group = function (sel, key) {
+      var btns = Array.prototype.slice.call(scope.querySelectorAll(sel));
+      btns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          state[key] = b.getAttribute('data-' + key);
+          state.limit = PAGE;
+          btns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+          apply();
+        });
+      });
+    };
+    if (!items.length) return;
     group('.g-cats .g-chip', 'cat');
     group('.g-themes .g-chip', 'theme');
-    if (more) $('button', more).addEventListener('click', function () { state.limit += PAGE; apply(); });
+    if (more) more.querySelector('button').addEventListener('click', function () { state.limit += PAGE; apply(); });
     apply();
-  }
+  });
 
   // Lightbox over every visible screenshot link (.g-card)
   var lb = $('#lightbox');
