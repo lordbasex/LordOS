@@ -31,6 +31,8 @@
   "forwarded": "Message transféré",
   "quoteHead": "Le {date}, {name} a écrit :",
   "offlineNotCached": "Ce message n’est pas encore téléchargé et le serveur est injoignable.",
+  "openTooBig": "Ce message est trop volumineux pour être affiché ici.",
+  "openFailed": "Impossible d’afficher ce message ({error}).",
   "working": "Traitement…",
   "cancel": "Annuler",
   "close": "Fermer",

@@ -31,6 +31,8 @@
   "forwarded": "Forwarded message",
   "quoteHead": "On {date}, {name} wrote:",
   "offlineNotCached": "This message is not downloaded yet and the server cannot be reached.",
+  "openTooBig": "This message is too large to show here.",
+  "openFailed": "This message could not be shown ({error}).",
   "working": "Working…",
   "cancel": "Cancel",
   "close": "Close",

@@ -260,8 +260,9 @@ void msg_open_cached(uint32_t id, Account *a, Folder *f, uint32_t uid) {
     if (pi >= 0) {
         size_t tl;
         char *t = mime_part_text(&o->mm->parts[pi], &tl);
-        if (t && tl > (2u << 20)) t[2u << 20] = 0;
-        jb_raw(&b, ",\"text\":"); jb_str(&b, t ? t : "");
+        if (t && tl > (2u << 20)) tl = 2u << 20;
+        /* by length: a NUL byte in the body must not cut the text short (jb_strn writes it as U+FFFD) */
+        jb_raw(&b, ",\"text\":"); jb_strn(&b, t ? t : "", t ? tl : 0);
         jb_printf(&b, ",\"flowed\":%s", strcasestr(o->mm->parts[pi].hdr, "format=flowed") && o->mm->parts[pi].hlen ? "true" : "false");
         free(t);
     }
@@ -302,7 +303,7 @@ void msg_open_cached(uint32_t id, Account *a, Folder *f, uint32_t uid) {
             if (pi < 0) {
                 size_t xl;
                 char *x = html_to_text(t, tl, &xl);
-                jb_raw(&b, ",\"text\":"); jb_str(&b, x ? x : "");
+                jb_raw(&b, ",\"text\":"); jb_strn(&b, x ? x : "", x ? xl : 0);
                 free(x);
             }
             free(t);

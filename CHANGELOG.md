@@ -26,6 +26,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Screenshots: a window picked with ❖⇧4 then Space, or an area, came out cropped at a display scale above 100 % (the selection was in logical pixels and the capture is at the display's full resolution). The whole window is captured now, at any scale ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - A maximized window clicked to bring it forward shrank to its own size: the slightest pointer movement during the click counted as dragging it out. It now has to move a few pixels with the button held first, in both themes and for apps that draw their own title bar ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - A full-screen screenshot showed a GPU-drawn app's window (a third-party browser, for example) as an empty frame with its shadow: its content is now read back from the GPU for the capture ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+- Mail: some messages, mostly newsletters, didn't open and showed **bad-json**. Their HTML layout nests tables several levels deep, and the check that lord-server makes on every reply of the mail helper stopped at 32 levels. It now accepts the depth the HTML view can produce. Also: a NUL byte can no longer cut a message's text short, a reply too large to show says so ("This message is too large to show here") instead of breaking the event queue, and a message that still can't be shown says so in your language ([#18](https://github.com/lordbasex/LordOS/issues/18)).
 
 ## [0.8.8.2-beta] - 2026-11-04
 

@@ -514,7 +514,8 @@ function MailMain() {
       } else setThread([]);
       // marked as read after a moment, like other mail apps
       if (!m.seen) setTimeout(() => mailRequest('flag', { acct: it.acct, folder: it.folder, uids: [it.uid], add: ['seen'] }).catch(() => {}), 1200);
-    } catch (e) { setMsg(null); setLoadErr(e.code === 'offline' ? t('mail.offlineNotCached') : e.message); }
+    } catch (e) { setMsg(null); setLoadErr(e.code === 'offline' ? t('mail.offlineNotCached') : e.code === 'too-big' ? t('mail.openTooBig')
+      : e.code === 'bad-json' || e.code === 'memory' ? t('mail.openFailed', { error: e.code }) : e.message); }
   };
 
   const selKey = sel ? `${sel.acct}|${sel.folder}|${sel.uid}` : null;

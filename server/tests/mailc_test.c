@@ -2,10 +2,14 @@
  * connector accepts for configured accounts, and the public-address check that keeps remote
  * images (hosts chosen by whoever sent the mail) away from loopback, LAN and link-local. */
 #include "mail/mailc.h"
+#include "mail/html.h"
+#include "doc/proto.h"
+#include "sec/json.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 
@@ -25,6 +29,67 @@ static int pub(const char *ip) {
         if (inet_pton(AF_INET, ip, &s4->sin_addr) != 1) return -1;
     }
     return mail_addr_public((struct sockaddr *)&ss);
+}
+
+/* The event queue (issue #18): lord-maild's replies are re-validated before JS sees them. A message
+ * view nests as deep as the HTML tree (HTML_JSON_DEPTH), broken JSON becomes an error the waiter
+ * sees, and a reply that would overflow the queue becomes "too-big" without spoiling the queue. */
+static void test_events(void) {
+    JBuf q;
+    jb_init(&q);
+    /* nested like a newsletter: {"html":{"blocks":[{"t":"tbl","c":[ … ]}]}} */
+    JBuf deep;
+    jb_init(&deep);
+    jb_raw(&deep, "{\"subject\":\"x\",\"html\":{\"v\":1,\"blocks\":[");
+    int frames = HTML_MAX_DEPTH - 1;
+    for (int i = 0; i < frames; i++) jb_raw(&deep, "{\"t\":\"blk\",\"s\":{\"_\":0,\"p\":[1,2,3,4]},\"c\":[");
+    jb_raw(&deep, "{\"t\":\"x\",\"x\":\"deep\",\"s\":{\"_\":0,\"b\":1}}");
+    for (int i = 0; i < frames; i++) jb_raw(&deep, "]}");
+    jb_raw(&deep, "]}}");
+    mail_ev_append(&q, 7, "done", deep.p, deep.n);
+    CHECK(strstr(q.p, "\"error\"") == NULL && strstr(q.p, "deep") != NULL);
+    mail_ev_append(&q, 8, "done", "{\"a\":1", 6);                 /* broken */
+    mail_ev_append(&q, 9, "done", "{\"a\":\"\\u0000\"}", 14);      /* refused by json_parse */
+    mail_ev_append(&q, 10, "done", "{\"a\":\"b\0c\"}", 11);        /* a raw NUL */
+    mail_ev_append(&q, 0, "evt", "{\"ev\":\"ready\"}", 14);
+    /* the whole queue, as JS gets it, is valid JSON (QuickJS has no 32-level limit; ours does) */
+    char *arr = malloc(q.n + 3);
+    arr[0] = '[';
+    memcpy(arr + 1, q.p, q.n);
+    arr[q.n + 1] = ']';
+    arr[q.n + 2] = 0;
+    JDoc d;
+    CHECK(!json_parse_depth(arr, q.n + 2, &d, NULL, 0, HTML_JSON_DEPTH + 16));
+    if (d.root) {
+        CHECK(d.root->len == 5);
+        int bad = 0;
+        for (const JVal *e = d.root->kid; e; e = e->next) {
+            const char *err = json_str(json_get(e, "data"), "error");
+            if (err && !strcmp(err, "bad-json")) bad++;
+        }
+        CHECK(bad == 3);
+        json_free(&d);
+    }
+    free(arr);
+
+    /* too big for the queue: one small error event in its place, and the queue keeps working */
+    size_t before = q.n;
+    size_t big = (size_t)DOC_JSON_MAX + 64;
+    char *huge = malloc(big);
+    if (huge) {
+        memset(huge, ' ', big);
+        huge[0] = '"';
+        huge[big - 1] = '"';
+        mail_ev_append(&q, 11, "done", huge, big);
+        CHECK(!q.oom);
+        CHECK(strstr(q.p + before, "{\"id\":11,\"type\":\"done\",\"data\":{\"error\":\"too-big\"}}") != NULL);
+        CHECK(q.n < before + 200);
+        mail_ev_append(&q, 12, "done", "{\"ok\":true}", 11);
+        CHECK(strstr(q.p, "\"id\":12") != NULL);
+        free(huge);
+    }
+    jb_free(&deep);
+    jb_free(&q);
 }
 
 int main(void) {
@@ -59,6 +124,7 @@ int main(void) {
     CHECK(!mail_endpoint_allowed(cfg, n, "icloud.com.evil.net", 443));
     CHECK(!mail_endpoint_allowed(cfg, n, "evilicloud.com", 443));
     CHECK(!mail_endpoint_allowed("not json", 8, "imap.example.com", 993));
+    test_events();
     printf("mailc-test: %d/%d checks ok\n", checks - fails, checks);
     return fails ? 1 : 0;
 }
