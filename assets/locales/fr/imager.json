@@ -61,7 +61,7 @@
   "device.ramTitle": "Mémoire",
   "device.rpi5.text": "BCM2712, 4 cœurs à 2,4 GHz. Carte SD ou NVMe.",
   "device.supported": "Pris en charge",
-  "device.text": "LordOS fonctionne sur le Raspberry Pi 5 et sur les PC 64 bits. Choisissez où cette carte ou cette clé sera utilisée.",
+  "device.text": "LordOS fonctionne sur le Raspberry Pi 5 et le Pi 500 et sur les PC 64 bits. Choisissez où cette carte ou clé sera utilisée.",
   "device.title": "Choisissez votre appareil",
   "done.another": "Écrire une autre carte",
   "done.custom": "Image non signée",
@@ -393,5 +393,17 @@
   "write.why": "Ce qui s’est passé",
   "general.moreLanguages": "Plus de langues",
   "general.langSince": "{name} nécessite une image LordOS {v} ou plus récente.",
-  "err.langImage": "Cette image ne peut pas démarrer dans cette langue : choisissez English, Español ou Português, ou une image plus récente."
+  "err.langImage": "Cette image ne peut pas démarrer dans cette langue : choisissez English, Español ou Português, ou une image plus récente.",
+  "device.pi": "Raspberry Pi",
+  "device.piCount": "{n} modèles pris en charge",
+  "device.piNext": "Vous choisissez ensuite le modèle. Ils utilisent la même image LordOS ; le modèle définit les conseils et les options de refroidissement.",
+  "device.allDevices": "Tous les appareils",
+  "device.modelTitle": "Quel Raspberry Pi ?",
+  "device.modelText": "Les deux utilisent la même image LordOS. Choisir le modèle affiche les conseils et vérifications adaptés.",
+  "device.rpi500.text": "8 Go · un Pi 5 dans un clavier. Carte SD ou disque USB.",
+  "device.rpi500.note": "8 Go suffisent pour un usage quotidien. Utilisez l’alimentation officielle de 27 W. Il n’a pas de ventilateur : un grand dissipateur intérieur le garde au frais.",
+  "device.testedByCommunity": "Pris en charge · testé par la communauté",
+  "cooling.noFanTitle": "Aucun ventilateur à configurer",
+  "cooling.noFan": "Le Raspberry Pi 500 n’a pas de connecteur de ventilateur : un grand dissipateur intérieur le garde au frais. Choisissez le profil ; LordOS affiche sa température dans Réglages → Refroidissement.",
+  "cooling.p.balancedPassiveHint": "Le processeur garde sa fréquence maximale (2,4 GHz) ; s’il chauffe trop, la carte ralentit d’elle-même. Par défaut."
 }

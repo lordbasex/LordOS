@@ -61,7 +61,7 @@
   "device.ramTitle": "Memory",
   "device.rpi5.text": "BCM2712, 4 cores at 2.4 GHz. SD card or NVMe.",
   "device.supported": "Supported",
-  "device.text": "LordOS runs on the Raspberry Pi 5 and on 64-bit PCs. Pick where this card or stick will be used.",
+  "device.text": "LordOS runs on the Raspberry Pi 5 and Pi 500 and on 64-bit PCs. Pick where this card or stick will be used.",
   "device.title": "Choose your device",
   "done.another": "Write another card",
   "done.custom": "Unsigned image",
@@ -393,5 +393,17 @@
   "write.why": "What happened",
   "general.moreLanguages": "More languages",
   "general.langSince": "{name} needs a LordOS {v} image or newer.",
-  "err.langImage": "This image can’t start in that language: choose English, Español or Português, or a newer image."
+  "err.langImage": "This image can’t start in that language: choose English, Español or Português, or a newer image.",
+  "device.pi": "Raspberry Pi",
+  "device.piCount": "{n} models supported",
+  "device.piNext": "Next you choose the model. They use the same LordOS image; the model sets the right tips and the cooling options.",
+  "device.allDevices": "All devices",
+  "device.modelTitle": "Which Raspberry Pi?",
+  "device.modelText": "Both use the same LordOS image. Choosing the model shows the right tips and checks.",
+  "device.rpi500.text": "8 GB · a Pi 5 inside a keyboard. SD card or USB drive.",
+  "device.rpi500.note": "8 GB is comfortable for daily use. Use the official 27 W power supply. It has no fan: a large heatsink inside keeps it cool.",
+  "device.testedByCommunity": "Supported · tested by the community",
+  "cooling.noFanTitle": "No fan to set up",
+  "cooling.noFan": "The Raspberry Pi 500 has no fan header: a large heatsink inside keeps it cool. Choose the profile; LordOS shows its temperature in Settings → Cooling.",
+  "cooling.p.balancedPassiveHint": "The processor keeps its full clock (2.4 GHz); if it gets too hot, the board slows down by itself. The default."
 }

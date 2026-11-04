@@ -42,6 +42,8 @@ function next() {
   if (s.step === 'customise' && s.customise && customiseProblems(s).length) { set({ showErrors: true }); return; }
   if (!canNext(s)) return;
   const dev = deviceById(s.device);
+  // a Raspberry Pi: first the kind of device, then which model (same step)
+  if (s.step === 'device' && dev.kind === 'pi' && s.devView !== 'pi') { set({ devView: 'pi' }); return; }
   let i = STEPS.indexOf(s.step) + 1;
   if (STEPS[i] === 'customise' && !dev.customise) i++;
   set({ step: STEPS[i], showErrors: false });
@@ -49,6 +51,7 @@ function next() {
 function back() {
   const s = app.get();
   if (isBusy(s.job)) return;
+  if (s.step === 'device' && s.devView === 'pi') { set({ devView: 'kind' }); return; }
   const dev = deviceById(s.device);
   let i = STEPS.indexOf(s.step) - 1;
   if (STEPS[i] === 'customise' && !dev.customise) i--;
@@ -173,7 +176,7 @@ function Footer({ s }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   if (s.step === 'done' || (s.step === 'write' && s.job)) return null;
-  const first = s.step === 'device';
+  const first = s.step === 'device' && s.devView !== 'pi';
   const isWrite = s.step === 'write';
   return (
     <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: t.separator }}>

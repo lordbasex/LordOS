@@ -15,7 +15,7 @@ function initial() {
   const d = platform.defaults();
   const cfg = { ...defaultConfig(), lang: d.lang, timezone: d.timezone, keyboard: d.keyboard, variant: d.variant, wifiCountry: d.country };
   return {
-    step: 'device', device: 'rpi5',
+    step: 'device', device: 'rpi5', devView: 'kind',   // devView: the kinds of device, or 'pi' (which Raspberry Pi)
     releases: { state: 'idle', list: [], error: null },
     image: null,                     // { official, release?, name, size, raw, path?, sums?, sig? }
     drive: null,
@@ -62,7 +62,12 @@ export function chooseDevice(id) {
   const s = app.get();
   if (s.device === id) return;
   const text = s.releases.all;
-  set({ device: id, image: null, releases: { ...s.releases, list: text ? parseReleases(text, id) : [] } });
+  const from = deviceById(s.device), to = deviceById(id);
+  // two Raspberry Pi models share the image: keep the one chosen
+  const same = from && to && String(from.image) === String(to.image);
+  // a board without a fan (the Pi 500) cools passively: no fan, case or overclock to pick
+  const cool = to && to.fan === false ? { cooler: 'passive', performance: 'balanced', overclock: false } : from && from.fan === false && s.cfg.cooler === 'passive' ? { cooler: '', performance: '', overclock: false } : {};
+  set({ device: id, ...(same ? {} : { image: null, releases: { ...s.releases, list: text ? parseReleases(text, id) : [] } }), cfg: { ...s.cfg, ...cool } });
 }
 
 export function officialImage(r) {

@@ -28,6 +28,27 @@ export function BoardArt({ size = 120, dim, fan }) {
   );
 }
 
+// A keyboard computer seen from above (the Raspberry Pi 500): a white body with rows of keys
+export function KeyboardArt({ size = 120, dim }) {
+  const s = size / 120;
+  const rows = [[13, 0], [13, 0], [12, 1], [12, 1]];
+  return (
+    <View style={{ width: size, height: size * 0.7, opacity: dim ? 0.45 : 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 116 * s, height: 50 * s, borderRadius: 6 * s, backgroundColor: '#f4f4f6', border: `${Math.max(1, s)}px solid #c9cbd3`,
+        boxShadow: '0 4px 10px rgba(0,0,0,0.3)', padding: 4 * s, gap: 2 * s }}>
+        {rows.map(([n, off], r) => (
+          <View key={r} style={{ flexDirection: 'row', gap: 2 * s, marginLeft: off * 3 * s }}>
+            {Array.from({ length: n }, (_, i) => <View key={i} style={{ width: 6.4 * s, height: 7 * s, borderRadius: 1.5 * s, backgroundColor: '#ffffff', border: `${Math.max(0.5, 0.6 * s)}px solid #d4d6de` }} />)}
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', gap: 2 * s, justifyContent: 'center' }}>
+          <View style={{ width: 52 * s, height: 7 * s, borderRadius: 1.5 * s, backgroundColor: '#ffffff', border: `${Math.max(0.5, 0.6 * s)}px solid #d4d6de` }} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // A round fan (the active cooler, a case fan)
 export function FanArt({ size = 40, style }) {
   const blades = [0, 60, 120, 180, 240, 300];

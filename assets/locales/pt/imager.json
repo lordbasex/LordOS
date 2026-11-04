@@ -61,7 +61,7 @@
   "device.ramTitle": "Memória",
   "device.rpi5.text": "BCM2712, 4 núcleos a 2,4 GHz. Cartão SD ou NVMe.",
   "device.supported": "Suportado",
-  "device.text": "O LordOS funciona no Raspberry Pi 5 e em PCs de 64 bits. Escolha onde este cartão ou pendrive será usado.",
+  "device.text": "O LordOS roda no Raspberry Pi 5 e no Pi 500 e em PCs de 64 bits. Escolha onde este cartão ou pendrive será usado.",
   "device.title": "Escolha o seu dispositivo",
   "done.another": "Gravar outro cartão",
   "done.custom": "Imagem sem assinatura",
@@ -393,5 +393,17 @@
   "write.why": "O que aconteceu",
   "general.moreLanguages": "Mais idiomas",
   "general.langSince": "{name} precisa de uma imagem do LordOS {v} ou mais nova.",
-  "err.langImage": "Esta imagem não pode iniciar nesse idioma: escolha English, Español ou Português, ou uma imagem mais nova."
+  "err.langImage": "Esta imagem não pode iniciar nesse idioma: escolha English, Español ou Português, ou uma imagem mais nova.",
+  "device.pi": "Raspberry Pi",
+  "device.piCount": "{n} modelos suportados",
+  "device.piNext": "Depois você escolhe o modelo. Usam a mesma imagem do LordOS; o modelo define as dicas e as opções de refrigeração.",
+  "device.allDevices": "Todos os dispositivos",
+  "device.modelTitle": "Qual Raspberry Pi?",
+  "device.modelText": "Os dois usam a mesma imagem do LordOS. Escolher o modelo mostra as dicas e verificações certas.",
+  "device.rpi500.text": "8 GB · um Pi 5 dentro de um teclado. Cartão SD ou disco USB.",
+  "device.rpi500.note": "8 GB bastam para o uso diário. Use a fonte oficial de 27 W. Não tem ventoinha: um dissipador grande por dentro o mantém frio.",
+  "device.testedByCommunity": "Suportado · testado pela comunidade",
+  "cooling.noFanTitle": "Não há ventoinha para configurar",
+  "cooling.noFan": "O Raspberry Pi 500 não tem conector de ventoinha: um dissipador grande por dentro o mantém frio. Escolha o perfil; o LordOS mostra a temperatura em Ajustes → Refrigeração.",
+  "cooling.p.balancedPassiveHint": "O processador mantém a velocidade máxima (2,4 GHz); se esquentar demais, a placa reduz a velocidade sozinha. O padrão."
 }

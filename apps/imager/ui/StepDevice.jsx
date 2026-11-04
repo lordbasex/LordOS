@@ -1,9 +1,11 @@
-// Step 1 — the device: the Raspberry Pi 5 (the only supported board), or a PC from a USB stick.
+// Step 1 — the device, in two views: the kind (Raspberry Pi, a PC or a generic arm64 machine from a USB
+// stick), then, for a Raspberry Pi, which model (the Pi 5 or the Pi 500: the same image, other tips and
+// cooling). Boards LordOS doesn't support yet are listed with their status.
 import { View, Text, useTheme, useLocale, typeScale, spacing } from '@lordos/sdk';
-import { DEVICES, RAM_ADVICE, deviceLabel } from '../core/catalog.js';
-import { chooseDevice } from '../state.js';
-import { Card, Badge, Group, SectionTitle } from './kit.jsx';
-import { BoardArt, PcArt } from './art.jsx';
+import { DEVICES, RAM_ADVICE, PI_MODELS, deviceById, deviceLabel } from '../core/catalog.js';
+import { chooseDevice, set } from '../state.js';
+import { Card, Badge, Group, SectionTitle, Press } from './kit.jsx';
+import { BoardArt, PcArt, KeyboardArt } from './art.jsx';
 
 export function StepHeader({ title, text }) {
   const t = useTheme();
@@ -35,22 +37,74 @@ function RamMeter() {
   );
 }
 
+const ModelArt = ({ d, size }) => (d.id === 'rpi500' ? <KeyboardArt size={size} /> : <BoardArt size={size} />);
+
 export function DeviceStep({ s }) {
+  const dev = deviceById(s.device);
+  return dev && dev.kind === 'pi' && s.devView === 'pi' ? <PiModels s={s} /> : <DeviceKinds s={s} />;
+}
+
+// The kinds of device: one Raspberry Pi card (its supported models under it), a PC, generic arm64
+function DeviceKinds({ s }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const supported = DEVICES.filter((d) => d.supported);
-  const other = DEVICES.filter((d) => !d.supported);
+  const dev = deviceById(s.device);
+  const pcs = DEVICES.filter((d) => d.supported && d.kind !== 'pi');
+  const piOn = dev && dev.kind === 'pi';
   return (
     <View>
       <StepHeader title={tr('imager.device.title')} text={tr('imager.device.text')} />
       <View style={{ flexDirection: 'row', gap: spacing.l, flexWrap: 'wrap' }}>
-        {supported.map((d) => (
+        <Card id="dev-pi" label={tr('imager.device.pi')} selected={piOn} onClick={() => { if (!piOn) chooseDevice(PI_MODELS[0].id); }}
+          style={{ width: 250, alignItems: 'center' }}>
+          <BoardArt size={130} />
+          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, marginTop: 4 }}>{tr('imager.device.pi')}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center', lineHeight: 1.4, alignSelf: 'stretch' }}>{PI_MODELS.map((d) => d.name.replace('Raspberry ', '')).join(' · ')}</Text>
+          <Badge tone="ok">{tr('imager.device.piCount', { n: PI_MODELS.length })}</Badge>
+        </Card>
+        {pcs.map((d) => (
           <Card key={d.id} id={`dev-${d.id}`} label={deviceLabel(d, tr)} selected={s.device === d.id} onClick={() => chooseDevice(d.id)}
             style={{ width: 250, alignItems: 'center' }}>
-            {d.kind === 'pi' ? <BoardArt size={130} /> : <PcArt size={130} />}
+            <PcArt size={130} />
             <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, marginTop: 4 }}>{deviceLabel(d, tr)}</Text>
             <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center', lineHeight: 1.4, alignSelf: 'stretch' }}>{tr(`imager.device.${d.id}.text`)}</Text>
-            <Badge tone="ok">{tr(d.kind === 'pi' ? 'imager.device.supported' : 'imager.device.liveUsb')}</Badge>
+            <Badge tone="ok">{tr('imager.device.liveUsb')}</Badge>
+          </Card>
+        ))}
+      </View>
+      {piOn ? (
+        <Group style={{ marginTop: spacing.xl }}>
+          <View style={{ paddingVertical: 10 }}><Text style={{ fontSize: typeScale.body, color: t.text, lineHeight: 1.45 }}>{tr('imager.device.piNext')}</Text></View>
+        </Group>
+      ) : (
+        <Group style={{ marginTop: spacing.xl }} footer={tr('imager.device.pcFooter')}>
+          <View style={{ paddingVertical: 10 }}><Text style={{ fontSize: typeScale.body, color: t.text, lineHeight: 1.45 }}>{tr('imager.device.pcText')}</Text></View>
+        </Group>
+      )}
+    </View>
+  );
+}
+
+// Which Raspberry Pi: the supported models as cards, what to know about the chosen one, the others
+function PiModels({ s }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const other = DEVICES.filter((d) => d.kind === 'pi' && !d.supported);
+  return (
+    <View>
+      <Press id="dev-back" label={tr('imager.device.allDevices')} onClick={() => set({ devView: 'kind' })}
+        style={{ alignSelf: 'flex-start', paddingVertical: 2, paddingHorizontal: 4, borderRadius: 5, marginBottom: spacing.s }}>
+        <Text style={{ fontSize: typeScale.callout, color: t.accent }}>{`‹ ${tr('imager.device.allDevices')}`}</Text>
+      </Press>
+      <StepHeader title={tr('imager.device.modelTitle')} text={tr('imager.device.modelText')} />
+      <View style={{ flexDirection: 'row', gap: spacing.l, flexWrap: 'wrap' }}>
+        {PI_MODELS.map((d) => (
+          <Card key={d.id} id={`dev-${d.id}`} label={d.name} selected={s.device === d.id} onClick={() => chooseDevice(d.id)}
+            style={{ width: 250, alignItems: 'center' }}>
+            <ModelArt d={d} size={130} />
+            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, marginTop: 4 }}>{d.name}</Text>
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center', lineHeight: 1.4, alignSelf: 'stretch' }}>{tr(`imager.device.${d.id}.text`)}</Text>
+            <Badge tone="ok">{tr(d.id === 'rpi500' ? 'imager.device.testedByCommunity' : 'imager.device.supported')}</Badge>
           </Card>
         ))}
       </View>
@@ -59,8 +113,8 @@ export function DeviceStep({ s }) {
           <RamMeter />
         </Group>
       ) : (
-        <Group style={{ marginTop: spacing.xl }} footer={tr('imager.device.pcFooter')}>
-          <View style={{ paddingVertical: 10 }}><Text style={{ fontSize: typeScale.body, color: t.text, lineHeight: 1.45 }}>{tr('imager.device.pcText')}</Text></View>
+        <Group style={{ marginTop: spacing.xl }}>
+          <View style={{ paddingVertical: 10 }}><Text style={{ fontSize: typeScale.body, color: t.text, lineHeight: 1.45 }}>{tr(`imager.device.${s.device}.note`)}</Text></View>
         </Group>
       )}
       <SectionTitle style={{ marginTop: spacing.xxl, marginBottom: spacing.s, fontSize: typeScale.body }}>{tr('imager.device.otherTitle')}</SectionTitle>

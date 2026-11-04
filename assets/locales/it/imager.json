@@ -61,7 +61,7 @@
   "device.ramTitle": "Memoria",
   "device.rpi5.text": "BCM2712, 4 core a 2,4 GHz. Scheda SD o NVMe.",
   "device.supported": "Supportato",
-  "device.text": "LordOS funziona sul Raspberry Pi 5 e sui PC a 64 bit. Scegli dove verrà usata questa scheda o chiavetta.",
+  "device.text": "LordOS funziona sul Raspberry Pi 5 e sul Pi 500 e sui PC a 64 bit. Scegli dove verrà usata questa scheda o chiavetta.",
   "device.title": "Scegli il tuo dispositivo",
   "done.another": "Scrivi un’altra scheda",
   "done.custom": "Immagine non firmata",
@@ -393,5 +393,17 @@
   "write.why": "Cosa è successo",
   "general.moreLanguages": "Altre lingue",
   "general.langSince": "{name} richiede un’immagine di LordOS {v} o più recente.",
-  "err.langImage": "Questa immagine non può avviarsi in quella lingua: scegli English, Español o Português, oppure un’immagine più recente."
+  "err.langImage": "Questa immagine non può avviarsi in quella lingua: scegli English, Español o Português, oppure un’immagine più recente.",
+  "device.pi": "Raspberry Pi",
+  "device.piCount": "{n} modelli supportati",
+  "device.piNext": "Poi scegli il modello. Usano la stessa immagine di LordOS; il modello imposta i consigli e le opzioni di raffreddamento.",
+  "device.allDevices": "Tutti i dispositivi",
+  "device.modelTitle": "Quale Raspberry Pi?",
+  "device.modelText": "Entrambi usano la stessa immagine di LordOS. Scegliere il modello mostra i consigli e i controlli giusti.",
+  "device.rpi500.text": "8 GB · un Pi 5 dentro una tastiera. Scheda SD o disco USB.",
+  "device.rpi500.note": "8 GB bastano per l’uso quotidiano. Usa l’alimentatore ufficiale da 27 W. Non ha ventola: un grande dissipatore interno lo tiene fresco.",
+  "device.testedByCommunity": "Supportato · testato dalla comunità",
+  "cooling.noFanTitle": "Nessuna ventola da configurare",
+  "cooling.noFan": "Il Raspberry Pi 500 non ha il connettore della ventola: un grande dissipatore interno lo tiene fresco. Scegli il profilo; LordOS mostra la sua temperatura in Impostazioni → Raffreddamento.",
+  "cooling.p.balancedPassiveHint": "Il processore mantiene la frequenza massima (2,4 GHz); se si scalda troppo, la scheda rallenta da sola. Predefinito."
 }

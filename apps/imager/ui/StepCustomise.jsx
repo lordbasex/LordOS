@@ -7,7 +7,7 @@ import { platform } from '../platform.js';
 import { app, set, setCfg, setSecrets } from '../state.js';
 import * as v from '../core/validate.js';
 import * as firstrun from '../core/firstrun.js';
-import { COOLERS, LANGUAGES, ACCENTS, THEMES, WALLPAPERS, profilesFor, defaultProfile, overclockAllowed, coolerHasFan, defaultConfig, langOnImage } from '../core/catalog.js';
+import { COOLERS, LANGUAGES, ACCENTS, THEMES, WALLPAPERS, profilesFor, defaultProfile, overclockAllowed, coolerHasFan, defaultConfig, langOnImage, deviceById } from '../core/catalog.js';
 import { Field, SwitchRow, Choice, Card, Group, Notice, PickList, Press, Badge } from './kit.jsx';
 import { CoolerArt, ThemeArt } from './art.jsx';
 import countries from '../data/countries.js';
@@ -322,11 +322,12 @@ function Cooling({ s }) {
   const { t: tr } = useLocale();
   const c = s.cfg;
   const profiles = c.cooler ? profilesFor(c.cooler) : [];
+  const noFan = deviceById(s.device)?.fan === false;   // the Pi 500: a heatsink inside, nothing to choose
   const pick = (cooler) => setCfg({ cooler, performance: profilesFor(cooler).includes(c.performance) ? c.performance : defaultProfile(cooler), overclock: overclockAllowed(cooler) && c.overclock });
   return (
     <View style={{ gap: spacing.xl }}>
-      <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.45 }}>{tr('imager.cooling.text')}</Text>
-      <View style={{ flexDirection: 'row', gap: spacing.m, flexWrap: 'wrap' }}>
+      {noFan ? <Notice tone="info" title={tr('imager.cooling.noFanTitle')}>{tr('imager.cooling.noFan')}</Notice> : <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.45 }}>{tr('imager.cooling.text')}</Text>}
+      {noFan ? null : <View style={{ flexDirection: 'row', gap: spacing.m, flexWrap: 'wrap' }}>
         {COOLERS.map((k) => (
           <Card key={k.id} id={`cool-${k.id}`} label={tr(`imager.cooling.${k.id}`)} selected={c.cooler === k.id} onClick={() => pick(k.id)} style={{ width: 150, alignItems: 'center', padding: 12 }}>
             <CoolerArt kind={k.id} size={96} />
@@ -334,13 +335,13 @@ function Cooling({ s }) {
             <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center', lineHeight: 1.35 }}>{tr(`imager.cooling.${k.id}Hint`)}</Text>
           </Card>
         ))}
-      </View>
+      </View>}
       {c.cooler ? (
         <View style={{ gap: 8 }}>
           <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text }}>{tr('imager.cooling.profile')}</Text>
           <Choice id="perf" label={tr('imager.cooling.profile')} value={c.performance} onChange={(performance) => setCfg({ performance })}
             options={profiles.map((p) => [p, tr(`imager.cooling.p.${p}`)])} />
-          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.45 }}>{tr(`imager.cooling.p.${c.performance}Hint`)}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.45 }}>{tr(`imager.cooling.p.${c.performance}${c.performance === 'balanced' && !coolerHasFan(c.cooler) ? 'Passive' : ''}Hint`)}</Text>
         </View>
       ) : <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('imager.cooling.unset')}</Text>}
       {coolerHasFan(c.cooler) ? (

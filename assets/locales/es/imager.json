@@ -61,7 +61,7 @@
   "device.ramTitle": "Memoria",
   "device.rpi5.text": "BCM2712, 4 núcleos a 2,4 GHz. Tarjeta SD o NVMe.",
   "device.supported": "Soportada",
-  "device.text": "LordOS funciona en la Raspberry Pi 5 y en PC de 64 bits. Elegí dónde se va a usar esta tarjeta o pendrive.",
+  "device.text": "LordOS funciona en la Raspberry Pi 5 y la Pi 500 y en PC de 64 bits. Elegí dónde se va a usar esta tarjeta o pendrive.",
   "device.title": "Elegí tu dispositivo",
   "done.another": "Grabar otra tarjeta",
   "done.custom": "Imagen sin firmar",
@@ -393,5 +393,17 @@
   "write.why": "Qué pasó",
   "general.moreLanguages": "Más idiomas",
   "general.langSince": "{name} necesita una imagen de LordOS {v} o más nueva.",
-  "err.langImage": "Esta imagen no puede arrancar en ese idioma: elegí English, Español o Português, o una imagen más nueva."
+  "err.langImage": "Esta imagen no puede arrancar en ese idioma: elegí English, Español o Português, o una imagen más nueva.",
+  "device.pi": "Raspberry Pi",
+  "device.piCount": "{n} modelos soportados",
+  "device.piNext": "Después elegís el modelo. Usan la misma imagen de LordOS; el modelo define los consejos y las opciones de refrigeración.",
+  "device.allDevices": "Todos los dispositivos",
+  "device.modelTitle": "¿Qué Raspberry Pi?",
+  "device.modelText": "Las dos usan la misma imagen de LordOS. Elegir el modelo muestra los consejos y controles adecuados.",
+  "device.rpi500.text": "8 GB · una Pi 5 dentro de un teclado. Tarjeta SD o disco USB.",
+  "device.rpi500.note": "8 GB alcanzan para el uso diario. Usá la fuente oficial de 27 W. No tiene ventilador: un disipador grande adentro la mantiene fresca.",
+  "device.testedByCommunity": "Soportada · probada por la comunidad",
+  "cooling.noFanTitle": "No hay ventilador para configurar",
+  "cooling.noFan": "La Raspberry Pi 500 no tiene conector de ventilador: un disipador grande adentro la mantiene fresca. Elegí el perfil; LordOS muestra su temperatura en Ajustes → Refrigeración.",
+  "cooling.p.balancedPassiveHint": "El procesador mantiene su velocidad máxima (2,4 GHz); si se calienta demasiado, la placa baja la velocidad sola. El predeterminado."
 }
