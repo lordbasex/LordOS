@@ -210,3 +210,22 @@ pre::-webkit-scrollbar-thumb,.table::-webkit-scrollbar-thumb{background:#4A4775;
 .pi-share-btns{flex:1 1 300px;display:flex;flex-direction:column;gap:12px}
 .pi-browse{color:var(--night-link);text-align:center;font-size:15px}
 @media (max-width:480px){.pi-card dl{grid-template-columns:1fr;gap:2px}.pi-card dd{margin-bottom:8px}}
+/* hero motion: a faint crown drifting with twinkling gems, a few stars, the two devices floating; still with reduced motion */
+.pi-hero{position:relative;overflow:hidden}
+.pi-hero .wrap{position:relative;z-index:1}
+.pi-sky{position:absolute;inset:0;pointer-events:none}
+.pi-crown{position:absolute;right:-60px;top:-40px;width:min(560px,70vw);animation:pi-drift 14s ease-in-out infinite alternate}
+.pi-crown path{fill:#fff;opacity:.07}
+.pi-crown .pi-band{fill:#7C5CFF;opacity:.35}
+.pi-gem{fill:#FFD60A;animation:pi-gem 3.2s ease-in-out infinite}
+@keyframes pi-gem{0%,100%{opacity:.25}50%{opacity:.85}}
+.pi-gem.g2{animation-delay:-1.1s}.pi-gem.g3{animation-delay:-2.2s}
+.pi-sky i{position:absolute;width:3px;height:3px;border-radius:50%;background:#C9C6E6;opacity:.2;animation:pi-twinkle 4s ease-in-out infinite}
+.pi-art .pi-art-box{animation:pi-float 6s ease-in-out infinite}
+.pi-art figure:nth-child(2) .pi-art-box{animation-delay:-3s}
+@keyframes pi-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes pi-drift{from{transform:translate(0,0) rotate(-4deg)}to{transform:translate(-30px,24px) rotate(3deg)}}
+@keyframes pi-twinkle{0%,100%{opacity:.15}50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){.pi-crown,.pi-gem,.pi-sky i,.pi-art .pi-art-box{animation:none}}
+.pi-lumo{flex:0 0 auto;width:120px;height:auto;animation:pi-float 5s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.pi-lumo{animation:none}}

@@ -129,6 +129,7 @@ const homeCss = minCss(src('home.css').replace('__FONT_MEDIUM__', fontMedium));
 const homeCssUrl = hashed(Buffer.from(homeCss), 'home', 'css');
 const imagerCss = minCss(src('imager.css'));
 const imagerCssUrl = hashed(Buffer.from(imagerCss), 'imager', 'css');
+const searchJsUrl = hashed(Buffer.from(src('search.js')), 'search', 'js');
 // [[PLACEHOLDER]] markers left by the content agents: highlighted when --allow-placeholders, else the build fails
 const ALLOW_PH = process.argv.includes('--allow-placeholders');
 const placeholders = new Map();
@@ -359,6 +360,21 @@ ${LANGS.filter((l) => l !== t.lang).map((l) => `<meta property="og:locale:altern
 }
 
 
+// the search dialog (search.js fills it): one field, suggested topics, results
+function searchDialog(t) {
+  const S = t.search;
+  const topics = S.topics.map(([label, href]) => `<a class="g-chip" href="${esc(sitePath(href, t.lang))}"${/^https?:/.test(href) ? ' rel="noopener"' : ''}>${esc(label)}</a>`).join('');
+  return `<dialog id="search" class="search" aria-label="${esc(S.label)}" data-kinds="${esc(JSON.stringify(S.kinds))}">
+<div class="search-field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg><input id="search-q" type="search" autocomplete="off" spellcheck="false" placeholder="${esc(S.placeholder)}" aria-label="${esc(S.label)}" role="combobox" aria-expanded="true" aria-controls="search-list"><kbd>Esc</kbd></div>
+<div class="search-body">
+<div id="search-sugg"><p class="search-h">${esc(S.suggested)}</p><div class="search-topics">${topics}</div></div>
+<ul id="search-list" role="listbox" aria-label="${esc(S.results)}"></ul>
+<p id="search-none" class="search-none" hidden>${esc(S.none)} <q></q></p>
+</div>
+<p class="search-foot">${esc(S.hint)}</p>
+</dialog>`;
+}
+
 function header(t, page) {
   const l = t.lang;
   const home = prefix(l);
@@ -405,6 +421,7 @@ function header(t, page) {
 ${links}
 </div>
 <div class="tools">
+<button type="button" class="gh-link search-btn" aria-label="${esc(t.search.label)}" title="${esc(t.search.label)} (Ctrl K)" data-src="${searchJsUrl}" data-index="/search-${t.lang}.json"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></button>
 <a class="gh-link" href="${GITHUB}" rel="noopener" aria-label="${esc(t.ghLabel)}" title="GitHub">${GH_MARK}</a>
 ${themeSwitch(t)}
 ${langMenu(t, page, false)}
@@ -412,6 +429,7 @@ ${langMenu(t, page, false)}
 </div>
 </nav>
 </header>
+${searchDialog(t)}
 <div class="drawer" id="drawer" aria-label="${esc(t.pages.menu)}">
 <label for="nav-cb" class="scrim" aria-hidden="true"></label>
 <div class="dpanel">
@@ -745,6 +763,7 @@ ${shotList.join('\n')}
       shotsSection,
       benchSteps: P.benchSteps.map(([h, x], i) => `<li><h3>${esc(h)}</h3><p>${esc(x)}</p>${i === 1 ? '<pre class="pi-pre">lordos-sysreport bench --quick\nlordos-sysreport bench --full --json</pre>' : ''}</li>`).join('\n'),
       tools: P.tools.map(([c, x]) => `<article class="pi-tool"><h3><code>${esc(c)}</code></h3><p>${c === 'lordos-issue' || c === 'lordos-testbench' ? esc(x) : code(x)}</p></article>`).join('\n'),
+      lumo: LUMO.wave || img.lumoWave,
       browseLink: HAS_HW ? `<a class="pi-browse" href="${pageUrl(l, 'hardware')}">${esc(P.shareBrowse)}</a>` : '',
     }, t));
   }
@@ -975,6 +994,32 @@ ${(c.items || []).map((it) => {
     write(path.join(pageUrl(l, 'faq'), 'index.html'), render(tpl.faq, {
       ...common('faq', [`${t.pages.faq.title} · LordOS`, t.pages.faq.lead], true), chips, sections, jsonld,
     }, t));
+  }
+
+  // search index (search.js): [kind, title, url, text] for every page a visitor may look for
+  {
+    const plain = (md) => String(md || '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_>#|]/g, '').replace(/\s+/g, ' ').trim();
+    const cut = (x, n = 220) => (x.length > n ? x.slice(0, n).replace(/\s\S*$/, '') + '…' : x);
+    const idx = [];
+    const add = (kind, title, url, text = '') => idx.push([kind, title, url, cut(plain(text))]);
+    add('page', t.navExplore, pageUrl(l, 'explore'), t.explore.lead);
+    add('page', t.pi.title, pageUrl(l, 'raspberry-pi'), `Raspberry Pi 5 Raspberry Pi 500 ${t.pi.lead}`);
+    add('page', t.pi.argonTitle, pageUrl(l, 'raspberry-pi') + '#pi-argon', t.pi.argonText);
+    add('page', t.pi.benchTitle, pageUrl(l, 'raspberry-pi') + '#pi-bench', `LordBench benchmark ${t.pi.benchLead}`);
+    add('page', t.pi.toolsTitle, pageUrl(l, 'raspberry-pi') + '#pi-tools', t.pi.tools.map((x) => x[0]).join(' '));
+    add('page', t.navDownload, pageUrl(l, 'home') + '#download', t.dlLead || '');
+    add('page', t.navSupport, pageUrl(l, 'home') + '#support', '');
+    add('page', t.navAbout, pageUrl(l, 'about'), '');
+    if (HAS_PAPER) add('page', t.pages.navPaper, pageUrl(l, 'paper'), '');
+    if (HAS_FAQ) add('page', t.pages.faq.title, pageUrl(l, 'faq'), t.pages.faq.lead);
+    if (HAS_HW) add('page', t.pages.hardware.title, pageUrl(l, 'hardware'), t.pages.hardware.lead);
+    if (HAS_GUIDE) add('guide', 'LordOS Imager', pageUrl(l, 'imager'), '');
+    for (const m of featureList) add('feature', loc(m.title, l), pageUrl(l, 'features/' + m.slug), loc(m.tagline, l));
+    for (const g of guidePages) add('guide', loc(g.title, l), pageUrl(l, g.slug), loc(g.description || g.lead, l));
+    if (HAS_FAQ) for (const c of faqJson.categories) for (const it of c.items || []) add('faq', loc(it.q, l), pageUrl(l, 'faq') + '#' + it.id, loc(it.a, l));
+    for (const a of apps) add('app', appName(a, l), pageUrl(l, 'explore') + '#app-' + a.id, (a.tagline && (a.tagline[l] || a.tagline.en)) || '');
+    for (const x of legalPages) add('legal', loc(x.title, l) || x.slug, pageUrl(l, 'legal/' + x.slug), '');
+    write(`search-${l}.json`, JSON.stringify(idx));
   }
 
   // tested hardware (0.8.7)

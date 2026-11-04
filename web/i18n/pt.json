@@ -361,6 +361,69 @@
         "Compartilhe",
         "Publique uma captura da aba Desempenho no r/LordOS, ou cole o JSON num relatório de hardware, com a sua placa, o seu case e a sua fonte. Assim vemos onde o LordOS é rápido e onde ainda não é."
       ]
+    ],
+    "lumoAlt": "Lumo, o mascote do LordOS, acenando"
+  },
+  "search": {
+    "label": "Buscar",
+    "placeholder": "Busque páginas, perguntas, apps…",
+    "suggested": "Temas sugeridos",
+    "results": "Resultados",
+    "none": "Nada encontrado para",
+    "hint": "↑ ↓ para mover · Enter para abrir · Esc para fechar · Ctrl K para buscar de qualquer página",
+    "kinds": {
+      "page": "Página",
+      "feature": "Recurso",
+      "guide": "Guia",
+      "faq": "Pergunta",
+      "app": "App",
+      "legal": "Legal"
+    },
+    "topics": [
+      [
+        "Raspberry Pi 5 e Pi 500",
+        "/raspberry-pi/"
+      ],
+      [
+        "Baixar o LordOS",
+        "/#download"
+      ],
+      [
+        "Guia do LordOS Imager",
+        "/imager/"
+      ],
+      [
+        "Requisitos do sistema",
+        "/requirements/"
+      ],
+      [
+        "Máquina virtual (OVA)",
+        "/virtual-machine/"
+      ],
+      [
+        "Instalar no Debian 13",
+        "/faq/#debian-one-liner"
+      ],
+      [
+        "Case Argon ONE V5",
+        "/raspberry-pi/#pi-argon"
+      ],
+      [
+        "LordBench",
+        "/raspberry-pi/#pi-bench"
+      ],
+      [
+        "Apps",
+        "/explore/#apps"
+      ],
+      [
+        "Segurança",
+        "/legal/security/"
+      ],
+      [
+        "Comunidade no Reddit",
+        "https://www.reddit.com/r/LordOS/"
+      ]
     ]
   }
 }

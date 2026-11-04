@@ -12,6 +12,22 @@
   };
 
   // Copy buttons
+  // Search: search.js (and the index) load the first time it is opened: the magnifier, Ctrl/⌘ K or "/"
+  var sb = $('.search-btn');
+  if (sb) {
+    var openSearch = function () {
+      if (window.__lordSearch) return window.__lordSearch.open();
+      var sc = d.createElement('script'); sc.src = sb.getAttribute('data-src');
+      sc.onload = function () { if (window.__lordSearch) window.__lordSearch.open(); };
+      d.head.appendChild(sc);
+    };
+    sb.addEventListener('click', openSearch);
+    d.addEventListener('keydown', function (e) {
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '');
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) { e.preventDefault(); openSearch(); }
+    });
+  }
+
   $$('[data-copy]').forEach(function (b) {
     if (!navigator.clipboard) return;
     b.hidden = false;
