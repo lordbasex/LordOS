@@ -10,7 +10,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-An update of 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes.
+## [0.8.8.2-beta] - 2026-11-04
+
+An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.
 
 ### Added
 
