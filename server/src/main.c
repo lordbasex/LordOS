@@ -2502,6 +2502,8 @@ int main(int argc, char **argv) {
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());
         if (hwd >= 0 && (delay < 0 || hwd < delay)) delay = hwd;
+        double bwd = hw_timeout(now_ms());  /* the battery's percentage, read again every 30 s (src/hw) */
+        if (bwd >= 0 && (delay < 0 || bwd < delay)) delay = bwd;
         /* Settings → Displays or a hotplug: displays, modes, scales, arrangement (between frames) */
         if (!s.headless && !any_flip_pending(&s) && display_take_resync()) outputs_apply(&s);
         netrec_tick();                      /* traffic history: every 5 s while on (monitor/netrec.c) */

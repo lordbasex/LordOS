@@ -278,6 +278,19 @@ static int jstr(const char *j, const char *key, char *out, size_t n) {
     return 0;
 }
 
+/* Value of "key":<whole number> in a flat JSON, between 0 and max (0 when missing or out of range). */
+static int jint(const char *j, const char *key, int max) {
+    char k[40];
+    snprintf(k, sizeof k, "\"%s\":", key);
+    const char *p = strstr(j, k);
+    if (!p) return 0;
+    p += strlen(k);
+    long v = 0;
+    int digits = 0;
+    for (; *p >= '0' && *p <= '9' && digits < 9; p++, digits++) v = v * 10 + (*p - '0');
+    return digits && v <= max ? (int)v : 0;
+}
+
 /* ---- state (Settings reads it) ---- */
 
 static int listening, lfd = -1;
@@ -407,6 +420,11 @@ static void file_value(const char *path, const char *key, char *out, size_t n) {
 }
 
 static char greeter_mode[8] = "login", greeter_user[33];
+/* A lock's idle state (docs/SETTINGS.md, "Display off, lock, sleep"): the locked session's screen was
+ * already off (the login screen stays dark until input), its display-off and sleep timeouts and the seconds
+ * left until sleep. The login screen keeps those deadlines, since the session no longer has the monitor.
+ * Only for "lock". */
+static int greeter_dark, greeter_off_s, greeter_sleep_s, greeter_sleep_left_s;
 /* The login screen costs a lord-server (about 50 MB of its own memory, measured in a VM) and isn't
  * needed while a session is on the monitor: it is stopped this long after a session takes the monitor,
  * and started again for a lock, a user switch or a log out (sd_greeter_get starts it on demand). */
@@ -515,14 +533,17 @@ static void set_mode(const char *mode, const char *user) {
     snprintf(u, sizeof u, "%s", user ? user : "");
     memcpy(greeter_mode, m, sizeof m);
     memcpy(greeter_user, u, sizeof u);
+    if (strcmp(m, "lock")) greeter_dark = greeter_off_s = greeter_sleep_s = greeter_sleep_left_s = 0;
 }
 
 /* In a child: the login screen (creates it if needed) to the monitor. */
 static void work_greeter(void) {
     int fd = sd_greeter_get(1280, 800);         /* takes the monitor's size when shown */
     if (fd < 0) _exit(1);
-    char msg[160];
-    snprintf(msg, sizeof msg, "greeter-in {\"t\":\"mode\",\"mode\":\"%s\",\"user\":\"%s\"}", greeter_mode, greeter_user);
+    char msg[256];
+    snprintf(msg, sizeof msg, "greeter-in {\"t\":\"mode\",\"mode\":\"%s\",\"user\":\"%s\",\"dark\":%s,\"off\":%d,\"sleep\":%d,"
+             "\"sleepLeft\":%d}", greeter_mode, greeter_user, greeter_dark ? "true" : "false", greeter_off_s, greeter_sleep_s,
+             greeter_sleep_left_s);
     sd_ctl_send(wk_w, "show g", fd);
     sd_ctl_send(wk_w, msg, -1);
     _exit(0);
@@ -612,8 +633,11 @@ static void show_greeter(const char *mode, const char *user) {
     if (start_worker(W_GREETER, NULL, NULL)) { pending = W_GREETER; sd_log("login screen (%s) queued behind a running worker", greeter_mode); }
 }
 
+/* "suspend" only comes from the login screen: the sleep deadline of a session locked on the monitor, which
+ * the login screen keeps while it has the monitor (a session's own sleep goes through its admin helper). */
 static void power(const char *what, const char *who) {
-    const char *verb = !strcmp(what, "reboot") ? "reboot" : !strcmp(what, "poweroff") ? "poweroff" : NULL;
+    const char *verb = !strcmp(what, "reboot") ? "reboot" : !strcmp(what, "poweroff") ? "poweroff"
+                     : !strcmp(what, "suspend") ? "suspend" : NULL;
     if (!verb) return;
     sd_log("%s requested %s", verb, who);
     pid_t pid = fork();
@@ -896,6 +920,11 @@ static void from_shown(int type, const char *j) {
             sd_log("%s locked the screen", shown_user);
             struct passwd *lp = sd_valid_username(shown_user) ? getpwnam(shown_user) : NULL;
             if (lp) rd_tokens_drop_uid(lp->pw_uid);        /* locking also signs that user's browsers out */
+            /* before the worker that sends the mode is forked (set_mode keeps them for "lock") */
+            greeter_dark = strstr(j, "\"dark\":true") != NULL;
+            greeter_off_s = jint(j, "off", 86400);
+            greeter_sleep_s = jint(j, "sleep", 86400);
+            greeter_sleep_left_s = jint(j, "sleepLeft", 86400);
             leave_for_greeter("lock");
         }
         else if (strstr(j, "\"switch\"")) { sd_log("%s is switching user", shown_user); leave_for_greeter("switch"); }

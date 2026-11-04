@@ -207,8 +207,8 @@ greeter (JS) → RP_GREETER → lord-sessiond (root), over the login screen's so
 |------------------------------------|---------------------------------------------------------------------------|
 | `{t:'hello'}`                      | `{t:'hello', mode, user, last, host, layouts, variants, lang, users:[…]}`  |
 | `{t:'login', user, pass}`          | `{t:'ok'}` and the monitor switches to the session · `{t:'fail', wait}` · `{t:'error'}` |
-| `{t:'power', a:'reboot'│'poweroff'}` | (`systemctl reboot` / `poweroff`, a closed list)                         |
-|                                    | `{t:'mode', mode:'login'│'lock'│'switch', user}` when shown                |
+| `{t:'power', a:'reboot'│'poweroff'│'suspend'}` | (`systemctl reboot` / `poweroff` / `suspend`, a closed list; `suspend` is the locked session's sleep time, SETTINGS.md) |
+|                                    | `{t:'mode', mode:'login'│'lock'│'switch', user, dark, off, sleep, sleepLeft}` when shown (the last four: a lock's idle state, SETTINGS.md "Display off, lock, sleep") |
 
 Failed attempts on the monitor are counted per user (`monitor:<user>`). The first two don't wait;
 after that the wait is 1, 2, 4… seconds, up to 5 minutes.

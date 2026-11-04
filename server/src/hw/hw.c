@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static const DisplayHost *host;
 static PowerState power;
@@ -19,11 +20,33 @@ static PowerState power;
 void hw_emit(const char *kind, const char *json) { if (host && host->event) host->event(kind, json); }
 const PowerState *hw_power(void) { return &power; }
 
+/* Many batteries send a uevent only when they start or stop charging, not as the charge goes down, so
+ * the percentage is also read again every POWER_POLL_MS while there is a battery, and sent only when it
+ * changed (issue #25: the menu bar stayed at 81 % while the battery said 74 %, and the low-battery
+ * notices never came). */
+#define POWER_POLL_MS 30000.0
+static double power_next;               /* CLOCK_MONOTONIC ms of the next read, 0 = none */
+static char power_last[4096];
+
+static double hw_now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+}
+
 static void power_changed(void) {
     power_read("/sys/class/power_supply", &power);
     char j[4096];
     power_json(&power, j, sizeof j);
+    power_next = power.has_battery ? hw_now_ms() + POWER_POLL_MS : 0;
+    if (!strcmp(j, power_last)) return;
+    snprintf(power_last, sizeof power_last, "%s", j);
     hw_emit("power", j);
+}
+
+double hw_timeout(double now) {
+    if (power_next <= 0) return -1;
+    return power_next > now ? power_next - now : 0;
 }
 
 static void td_signal(const DMsg *m) {
@@ -34,6 +57,8 @@ void hw_start(const DisplayHost *h, int with_bus) {
     host = h;
     display_init(h);
     power_read("/sys/class/power_supply", &power);
+    power_json(&power, power_last, sizeof power_last);
+    if (power.has_battery) power_next = hw_now_ms() + POWER_POLL_MS;
     if (uevent_open()) fprintf(stderr, "hw: no kernel uevents (hotplugged displays and batteries are not followed)\n");
     if (with_bus && notifyd_start(hw_emit)) fprintf(stderr, "hw: no notification server for Linux apps\n");
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
@@ -72,6 +97,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
 }
 
 void hw_events(void) {
+    if (power_next > 0 && hw_now_ms() >= power_next) power_changed();
     bt_flush_events();
     notifyd_tick();
     pwguard_tick();

@@ -27,6 +27,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - A maximized window clicked to bring it forward shrank to its own size: the slightest pointer movement during the click counted as dragging it out. It now has to move a few pixels with the button held first, in both themes and for apps that draw their own title bar ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - A full-screen screenshot showed a GPU-drawn app's window (a third-party browser, for example) as an empty frame with its shadow: its content is now read back from the GPU for the capture ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - Mail: some messages, mostly newsletters, didn't open and showed **bad-json**. Their HTML layout nests tables several levels deep, and the check that lord-server makes on every reply of the mail helper stopped at 32 levels. It now accepts the depth the HTML view can produce. Also: a NUL byte can no longer cut a message's text short, a reply too large to show says so ("This message is too large to show here") instead of breaking the event queue, and a message that still can't be shown says so in your language ([#18](https://github.com/lordbasex/LordOS/issues/18)).
+### Added
+
+- Settings → Energy: shorter sleep times, 10 and 20 min on the power adapter and 5 and 10 min on battery ([#17](https://github.com/lordbasex/LordOS/issues/17)).
+
+### Fixed
+
+- With "Require password after the display turns off", the login screen turned the display back on and kept it on, and the computer never went to sleep. Now the screen stays off when it locks, the password is asked for when you wake it, the lock screen turns the display off again after the same time, and the computer still sleeps at the chosen time. A sleep time shorter than the lock time also locks first ([#23](https://github.com/lordbasex/LordOS/issues/23)).
+- The battery percentage in the menu bar and in Settings → Energy didn't follow the battery on laptops whose battery reports no change events while it discharges, so the low-battery notices at 20 %, 10 % and 5 % never came. It is now read again every 30 seconds ([#25](https://github.com/lordbasex/LordOS/issues/25)).
 
 ## [0.8.8.2-beta] - 2026-11-04
 

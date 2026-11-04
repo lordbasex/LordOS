@@ -83,7 +83,10 @@ export function PowerSettings() {
   const hasBattery = !!b?.hasBattery;
   const offOpts = [[0, tr('prefs.power.never')], [mins(1), duration(tr, 1)], [mins(2), duration(tr, 2)], [mins(3), duration(tr, 3)], [mins(5), duration(tr, 5)],
     [mins(10), duration(tr, 10)], [mins(15), duration(tr, 15)], [mins(30), duration(tr, 30)], [mins(60), duration(tr, 60)]];
-  const sleepOpts = [[0, tr('prefs.power.never')], [mins(15), duration(tr, 15)], [mins(30), duration(tr, 30)], [mins(60), duration(tr, 60)], [mins(120), duration(tr, 120)], [mins(180), duration(tr, 180)]];
+  // shorter choices for a quicker sleep: 10 and 20 min on power, 5 and 10 min on battery (#17)
+  const sleepList = (list) => [[0, tr('prefs.power.never')], ...list.map((m) => [mins(m), duration(tr, m)])];
+  const sleepACOpts = sleepList([10, 15, 20, 30, 60, 120, 180]);
+  const sleepBatteryOpts = sleepList([5, 10, 15, 30, 60, 120, 180]);
   const lockOpts = [[0, tr('prefs.power.immediately')], [5, tr('prefs.power.secs', { s: 5 })], [60, duration(tr, 1)], [300, duration(tr, 5)], [900, duration(tr, 15)], [3600, duration(tr, 60)], [-1, tr('prefs.power.never')]];
   return (
     <Stack>
@@ -105,11 +108,11 @@ export function PowerSettings() {
           <PopUp value={p.lockDelay} options={lockOpts} onChange={(lockDelay) => patch({ lockDelay })} />
         </SettingRow>
         <SettingRow label={hasBattery ? tr('prefs.power.sleepAC') : tr('prefs.power.sleep')}>
-          <PopUp value={p.sleepAC} options={sleepOpts} onChange={(sleepAC) => patch({ sleepAC })} />
+          <PopUp value={p.sleepAC} options={sleepACOpts} onChange={(sleepAC) => patch({ sleepAC })} />
         </SettingRow>
         {hasBattery && (
           <SettingRow label={tr('prefs.power.sleepBattery')}>
-            <PopUp value={p.sleepBattery} options={sleepOpts} onChange={(sleepBattery) => patch({ sleepBattery })} />
+            <PopUp value={p.sleepBattery} options={sleepBatteryOpts} onChange={(sleepBattery) => patch({ sleepBattery })} />
           </SettingRow>
         )}
       </GroupBox>

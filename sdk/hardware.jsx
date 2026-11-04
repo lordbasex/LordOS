@@ -249,18 +249,26 @@ function DialogButton({ label, onClick, primary, th, dark = th.mode !== 'light' 
 
 // ---- idle: screen off, lock, sleep ----
 
+let idleLocks = false;                  // "require password" is on (a lock deadline was set)
 export function applyIdle() {
   if (!has('display')) return;
   const p = powerPrefs();
   const ac = battery.get()?.onAC !== false;
   const off = ac ? p.offAC : p.offBattery;
   const lock = p.lockDelay < 0 || !off ? 0 : off + p.lockDelay;
+  idleLocks = lock > 0;
   call(() => lord.display.setIdle(off || 0, lock, (ac ? p.sleepAC : p.sleepBattery) || 0));
 }
 
+const managed = () => typeof lord.session !== 'undefined' && lord.session.managed();
 function onIdle(stage) {
-  if (stage === 'lock' && typeof lord.session !== 'undefined' && lord.session.managed()) lord.session.lock();
-  if (stage === 'sleep') admin.run('power-suspend', '', undefined, { quiet: true }).catch((e) => console.log(`suspender: ${e.message}`));
+  if (stage === 'lock' && managed()) lord.session.lock();
+  if (stage !== 'sleep') return;
+  // the login screen of a locked session has no admin helper: lord-sessiond suspends (docs/SESSIONS.md)
+  if (typeof lord.greeter !== 'undefined') { lord.greeter.send(JSON.stringify({ t: 'power', a: 'suspend' })); return; }
+  // sleep came before the lock deadline (a short sleep time): lock first, so waking up asks for the password
+  if (idleLocks && managed()) lord.session.lock();
+  admin.run('power-suspend', '', undefined, { quiet: true }).catch((e) => console.log(`suspender: ${e.message}`));
 }
 
 // ---- battery: low-battery notice and the menu bar item ----
