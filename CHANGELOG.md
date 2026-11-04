@@ -3383,7 +3383,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...HEAD
+[0.8.8.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...v0.8.8.2-beta
 [0.8.8.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...v0.8.8.1-beta
 [0.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...v0.8.8-beta
 [0.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.6-beta...v0.8.7-beta
