@@ -2,10 +2,10 @@ What each LordOS image needs. If a figure here and another page disagree, this p
 
 ## At a glance
 
-| | PC (ISO) | Virtual machine | Raspberry Pi 5 | Debian 13 package |
+| | PC (ISO) | Virtual machine | Raspberry Pi 5 / Raspberry Pi 500 | Debian 13 package |
 |---|---|---|---|---|
 | File | `lordos-live-<version>-amd64.iso` | `lordos-<version>-amd64.ova`, or an ISO | `lordos-<version>-rpi5-arm64.img.xz` | `install.sh` |
-| Processor | 64-bit Intel or AMD (amd64) | at least 4 CPUs | Raspberry Pi 5 | amd64 or arm64 |
+| Processor | 64-bit Intel or AMD (amd64) | at least 4 CPUs | Raspberry Pi 5 or Raspberry Pi 500 | amd64 or arm64 |
 | Memory | 4 GB minimum, 8 GB recommended | 4 GB minimum, 16 GB ideal | 4 GB works, 8 or 16 GB recommended | as for a PC |
 | Storage | 8 GB disk minimum, 32 GB recommended | 32 GB disk (the OVA's grows as used) | SD card of 16 GB (8 GB minimum) or NVMe | 2 GB free in `/var` |
 | To install from | a USB stick of 2 GB or more | the OVA file | an SD card or NVMe drive | a Debian 13 system |
@@ -32,9 +32,9 @@ What each LordOS image needs. If a figure here and another page disagree, this p
 
 Step by step: [Virtual machine (OVA)](/virtual-machine/).
 
-## Raspberry Pi 5
+## Raspberry Pi 5 and Raspberry Pi 500
 
-- **Board:** Raspberry Pi 5 with 4, 8 or 16 GB. 4 GB works; 8 or 16 GB is recommended. Other Raspberry Pi models are not supported.
+- **Board:** Raspberry Pi 5 with 4, 8 or 16 GB. 4 GB works; 8 or 16 GB is recommended. The **Raspberry Pi 500** (a Pi 5 built into a keyboard) uses the same image and works too: tested by Steve Sande, thank you! Other Raspberry Pi models are not supported.
 - **Storage:** an SD card of 16 GB or more (8 GB minimum), or an NVMe drive on the M.2 HAT+, which is faster.
 - **Power and cooling:** the official 27 W power supply (5 V, 5 A) and active cooling are recommended.
 
@@ -48,4 +48,4 @@ The [LordOS Imager](/imager/) writes the image and prepares the first boot.
 
 - 32-bit processors.
 - Starting with Secure Boot on.
-- Raspberry Pi models other than the Pi 5.
+- Raspberry Pi models other than the Pi 5 and the Pi 500.

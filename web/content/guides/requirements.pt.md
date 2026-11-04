@@ -2,10 +2,10 @@ O que cada imagem do LordOS precisa. Se um número desta página não bater com 
 
 ## Resumo
 
-| | PC (ISO) | Máquina virtual | Raspberry Pi 5 | Pacote para Debian 13 |
+| | PC (ISO) | Máquina virtual | Raspberry Pi 5 / Raspberry Pi 500 | Pacote para Debian 13 |
 |---|---|---|---|---|
 | Arquivo | `lordos-live-<versão>-amd64.iso` | `lordos-<versão>-amd64.ova`, ou uma ISO | `lordos-<versão>-rpi5-arm64.img.xz` | `install.sh` |
-| Processador | Intel ou AMD de 64 bits (amd64) | pelo menos 4 CPUs | Raspberry Pi 5 | amd64 ou arm64 |
+| Processador | Intel ou AMD de 64 bits (amd64) | pelo menos 4 CPUs | Raspberry Pi 5 ou Raspberry Pi 500 | amd64 ou arm64 |
 | Memória | 4 GB mínimo, 8 GB recomendado | 4 GB mínimo, ideal 16 GB | 4 GB funciona, 8 ou 16 GB recomendado | o mesmo que num PC |
 | Armazenamento | disco de 8 GB mínimo, 32 GB recomendado | disco de 32 GB (o da OVA cresce com o uso) | cartão SD de 16 GB (8 GB mínimo) ou NVMe | 2 GB livres em `/var` |
 | Para instalar | um pendrive de 2 GB ou mais | o arquivo OVA | um cartão SD ou um disco NVMe | um sistema com Debian 13 |
@@ -32,9 +32,9 @@ O que cada imagem do LordOS precisa. Se um número desta página não bater com 
 
 Passo a passo: [Máquina virtual (OVA)](/pt/virtual-machine/).
 
-## Raspberry Pi 5
+## Raspberry Pi 5 e Raspberry Pi 500
 
-- **Placa:** Raspberry Pi 5 de 4, 8 ou 16 GB. 4 GB funciona; 8 ou 16 GB é o recomendado. Os outros modelos de Raspberry Pi não são suportados.
+- **Placa:** Raspberry Pi 5 de 4, 8 ou 16 GB. 4 GB funciona; 8 ou 16 GB é o recomendado. O **Raspberry Pi 500** (um Pi 5 dentro de um teclado) usa a mesma imagem e também funciona: testado por Steve Sande, obrigado! Os outros modelos de Raspberry Pi não são suportados.
 - **Armazenamento:** um cartão SD de 16 GB ou mais (8 GB mínimo), ou um disco NVMe no M.2 HAT+, que é mais rápido.
 - **Alimentação e refrigeração:** recomendam-se a fonte oficial de 27 W (5 V, 5 A) e refrigeração ativa.
 
@@ -48,4 +48,4 @@ O [LordOS Imager](/pt/imager/) grava a imagem e prepara a primeira inicializaç�
 
 - Processadores de 32 bits.
 - Iniciar com o Secure Boot ativado.
-- Modelos de Raspberry Pi que não sejam o Pi 5.
+- Modelos de Raspberry Pi que não sejam o Pi 5 e o Pi 500.

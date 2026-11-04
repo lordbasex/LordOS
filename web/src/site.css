@@ -99,6 +99,10 @@ h1,h2,h3{text-wrap:balance}
 .nav-links a:hover{color:var(--brand)}
 .nav-links [aria-current]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
 .tools{display:flex;gap:6px;align-items:center}
+/* the repository link: a round icon button beside the theme switch, the size of the language chip */
+.gh-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:40px;height:40px;border-radius:999px;border:1.5px solid var(--chip-line);color:var(--ink-2);text-decoration:none}
+.gh-link:hover{color:var(--brand)}
+.gh-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
 /* mobile menu: hamburger + drawer (CSS-only toggle; site.js adds dialog behaviour) */
 .nav-cb{position:absolute!important;width:1px;height:1px;opacity:0;pointer-events:none}
