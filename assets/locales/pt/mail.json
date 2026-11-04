@@ -31,6 +31,8 @@
   "forwarded": "Mensagem encaminhada",
   "quoteHead": "Em {date}, {name} escreveu:",
   "offlineNotCached": "Esta mensagem ainda não foi baixada e o servidor não está acessível.",
+  "openTooBig": "Esta mensagem é grande demais para ser exibida aqui.",
+  "openFailed": "Não foi possível exibir esta mensagem ({error}).",
   "working": "Aguarde…",
   "cancel": "Cancelar",
   "close": "Fechar",

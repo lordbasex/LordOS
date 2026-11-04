@@ -31,6 +31,8 @@
   "forwarded": "Messaggio inoltrato",
   "quoteHead": "Il giorno {date}, {name} ha scritto:",
   "offlineNotCached": "Questo messaggio non è ancora stato scaricato e il server non è raggiungibile.",
+  "openTooBig": "Questo messaggio è troppo grande per essere mostrato qui.",
+  "openFailed": "Impossibile mostrare questo messaggio ({error}).",
   "working": "Elaborazione…",
   "cancel": "Annulla",
   "close": "Chiudi",

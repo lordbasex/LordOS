@@ -27,6 +27,10 @@
 #define HTML_MAX_INPUT (8u << 20)
 #define HTML_MAX_NODES 40000
 #define HTML_MAX_DEPTH 48
+/* Deepest JSON nesting of a message view that carries this tree: each block frame adds an object
+ * and its "c" array, plus the message, "html", "blocks" and a text node with its "s". Whoever
+ * validates that JSON (mailc.c) must accept at least this many levels. */
+#define HTML_JSON_DEPTH (2 * HTML_MAX_DEPTH + 8)
 #define HTML_MAX_REMOTE 200
 #define HTML_MAX_LINKS 1000
 

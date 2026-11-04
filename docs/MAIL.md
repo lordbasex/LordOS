@@ -194,6 +194,16 @@ their own colors are shown on their own light "paper" (also in dark mode), other
   address can be copied. `mailto:` opens a compose window.
 - There is no browser fallback: if HTML is missing or empty, the plain text part is shown, with
   links clickable and quoted lines dimmed.
+- **Every message opens with valid JSON.** Bodies are converted to UTF-8 from their charset
+  (Latin-1, windows-125x, ISO-8859, KOI8, UTF-16/32; unknown charsets are read as UTF-8), and any
+  byte that is still not valid UTF-8 becomes U+FFFD; NUL bytes are dropped (and the text is written
+  by length, so one can never cut it short); control characters are escaped.
+  lord-server re-validates every reply of lord-maild before JavaScript sees it (`mailc.c`), with a
+  nesting limit that fits the HTML tree (`HTML_JSON_DEPTH`, twice `HTML_MAX_DEPTH` plus a few):
+  deeply nested newsletter tables used to pass the parser's default 32 levels and the message
+  showed "bad-json" ([#18](https://github.com/lordbasex/LordOS/issues/18)). A reply too large for
+  the queue (16 MB) arrives as `too-big` ("This message is too large to show here") and never
+  spoils the other events.
 
 ### Compose
 

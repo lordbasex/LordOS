@@ -37,8 +37,9 @@ typedef struct { char *p; size_t n, cap; int oom; } JBuf;
 void jb_init(JBuf *b);
 void jb_free(JBuf *b);
 void jb_raw(JBuf *b, const char *s);
+void jb_rawn(JBuf *b, const char *s, size_t n);   /* n bytes as they are (already JSON) */
 void jb_printf(JBuf *b, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
-void jb_str(JBuf *b, const char *s);        /* "text" with escapes (invalid UTF-8 → U+FFFD) */
+void jb_str(JBuf *b, const char *s);        /* "text" with escapes (invalid UTF-8 and NUL → U+FFFD) */
 void jb_strn(JBuf *b, const char *s, size_t n);
 void jb_num(JBuf *b, double v);             /* JSON number (no NaN/Inf) */
 

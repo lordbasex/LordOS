@@ -14,7 +14,7 @@ typedef struct Block { struct Block *next; size_t used, cap; unsigned char data[
 typedef struct {
     const char *s, *end, *start;
     Block *blocks;
-    int depth;
+    int depth, max_depth;
     const char *why;
 } P;
 
@@ -150,7 +150,7 @@ static JVal *container(P *p, int obj) {
     if (!v) { fail(p, "out of memory"); return NULL; }
     memset(v, 0, sizeof *v);
     v->type = obj ? J_OBJ : J_ARR;
-    if (++p->depth > MAX_DEPTH) { fail(p, "nested too deeply"); return NULL; }
+    if (++p->depth > p->max_depth) { fail(p, "nested too deeply"); return NULL; }
     p->s++;
     ws(p);
     JVal **tail = &v->kid;
@@ -202,7 +202,11 @@ static JVal *value(P *p) {
 }
 
 int json_parse(const char *text, size_t len, JDoc *doc, char *err, size_t errlen) {
-    P p = { .s = text, .end = text + len, .start = text };
+    return json_parse_depth(text, len, doc, err, errlen, MAX_DEPTH);
+}
+
+int json_parse_depth(const char *text, size_t len, JDoc *doc, char *err, size_t errlen, int max_depth) {
+    P p = { .s = text, .end = text + len, .start = text, .max_depth = max_depth > 0 ? max_depth : MAX_DEPTH };
     doc->root = NULL;
     doc->mem = NULL;
     JVal *v = value(&p);

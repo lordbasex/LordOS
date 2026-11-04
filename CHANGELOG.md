@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- Mail: some messages, mostly newsletters, didn't open and showed **bad-json**. Their HTML layout nests tables several levels deep, and the check that lord-server makes on every reply of the mail helper stopped at 32 levels. It now accepts the depth the HTML view can produce. Also: a NUL byte can no longer cut a message's text short, a reply too large to show says so ("This message is too large to show here") instead of breaking the event queue, and a message that still can't be shown says so in your language ([#18](https://github.com/lordbasex/LordOS/issues/18)).
+
 ## [0.8.8.2-beta] - 2026-11-04
 
 An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.

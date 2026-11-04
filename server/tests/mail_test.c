@@ -781,11 +781,162 @@ static void test_vcard(void) {
     }
 }
 
+/* ---- message view: tricky messages (issue #18) ----
+ * Builds the reply JSON the way msgview.c's msg_open_cached does (subject, first text/plain by
+ * length, sanitized text/html, text from the HTML when there is no plain part) and checks it with
+ * the parser lord-server's mailc.c uses to re-validate lord-maild's replies. Before the fix a
+ * newsletter with a few nested tables went past json_parse's 32 levels and Mail showed "bad-json". */
+
+static char *view_json(const char *raw, size_t len, size_t *olen) {
+    MimeMsg *mm = malloc(sizeof *mm);
+    mime_parse(raw, len, mm);
+    const char *h, *bd;
+    size_t hl, bl;
+    mime_split(raw, len, &h, &hl, &bd, &bl);
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"subject\":");
+    char *v = mime_header_dup(h, hl, "Subject");
+    if (v) { if (strlen(v) > 4000) v[4000] = 0; char d[4096]; mime_decode_words(v, d, sizeof d); jb_str(&b, d); free(v); }
+    else jb_raw(&b, "\"\"");
+    int hi = -1, pi = -1;
+    for (int i = 0; i < mm->nparts; i++) {
+        if (strcmp(mm->parts[i].type, "text")) continue;
+        if (!strcmp(mm->parts[i].subtype, "html") && hi < 0) hi = i;
+        if (!strcmp(mm->parts[i].subtype, "plain") && pi < 0) pi = i;
+    }
+    if (pi >= 0) {
+        size_t tl;
+        char *t = mime_part_text(&mm->parts[pi], &tl);
+        if (t && tl > (2u << 20)) tl = 2u << 20;
+        jb_raw(&b, ",\"text\":"); jb_strn(&b, t ? t : "", t ? tl : 0);
+        free(t);
+    }
+    if (hi >= 0) {
+        size_t tl;
+        char *t = mime_part_text(&mm->parts[hi], &tl);
+        if (t) {
+            HtmlStats st;
+            size_t jl;
+            char *j = html_sanitize(t, tl, &jl, &st, NULL, NULL);
+            if (j) { jb_raw(&b, ",\"html\":"); jb_raw(&b, j); free(j); }
+            if (pi < 0) {
+                size_t xl;
+                char *x = html_to_text(t, tl, &xl);
+                jb_raw(&b, ",\"text\":"); jb_strn(&b, x ? x : "", x ? xl : 0);
+                free(x);
+            }
+            free(t);
+        }
+    }
+    jb_raw(&b, "}");
+    free(mm);
+    if (b.oom) { jb_free(&b); return NULL; }
+    *olen = b.n;
+    return b.p;
+}
+
+/* Parses with the message-view nesting limit; the "text" (or "") goes to text. */
+static int view_ok(const char *raw, size_t len, char *text, size_t cap) {
+    size_t n;
+    char *j = view_json(raw, len, &n);
+    if (!j) return 0;
+    JDoc d;
+    char err[128];
+    int ok = !json_parse_depth(j, n, &d, err, sizeof err, HTML_JSON_DEPTH + 2);
+    if (!ok) fprintf(stderr, "view JSON refused: %s\n", err);
+    if (ok && text) { const char *t = json_str(d.root, "text"); snprintf(text, cap, "%s", t ? t : ""); }
+    if (ok) json_free(&d);
+    free(j);
+    return ok;
+}
+
+static void test_view(void) {
+    char text[4096];
+    /* latin1 body, 8-bit Subject without encoded words */
+    static const char latin1[] = "Subject: Informaci\xf3n\r\nContent-Type: text/plain; charset=iso-8859-1\r\n"
+                                 "Content-Transfer-Encoding: 8bit\r\n\r\nOl\xe1 se\xf1or, \xbf" "c\xf3mo est\xe1s?\r\n";
+    CHECK(view_ok(latin1, sizeof latin1 - 1, text, sizeof text));
+    CHECK(strstr(text, "Olá señor, ¿cómo estás?") != NULL);
+
+    /* windows-1252 quoted-printable: curly quotes and the euro sign live in 0x80..0x9f */
+    static const char cp1252[] = "Subject: =?windows-1252?Q?=93Oferta=94_=80?=\r\nContent-Type: text/plain; charset=\"windows-1252\"\r\n"
+                                 "Content-Transfer-Encoding: quoted-printable\r\n\r\n=93quoted=94 =80 10 caf=E9=\r\n end\r\n";
+    CHECK(view_ok(cp1252, sizeof cp1252 - 1, text, sizeof text));
+    CHECK(strstr(text, "\xe2\x80\x9cquoted\xe2\x80\x9d \xe2\x82\xac 10 café end") != NULL);
+
+    /* declared UTF-8 but invalid; and an unknown charset */
+    static const char badutf[] = "Subject: \xff\xfe\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nbad \xff\xfe \xc3( \xed\xa0\x80 \xf4\x90\x80\x80 ok\r\n";
+    CHECK(view_ok(badutf, sizeof badutf - 1, text, sizeof text));
+    CHECK(strstr(text, "\xef\xbf\xbd") != NULL && strstr(text, " ok") != NULL);
+    static const char unk[] = "Content-Type: text/plain; charset=x-made-up\r\n\r\n\x80\x81\x9f\xff caf\xe9\r\n";
+    CHECK(view_ok(unk, sizeof unk - 1, text, sizeof text));
+
+    /* NUL and control bytes in a binary body: neither cut the text short nor break the JSON */
+    static const char ctl[] = "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: binary\r\n\r\n"
+                              "before\0after \x01\x02\x07\x08\x0b\x0c\x1b[0m\x7f \"q\" \\ end\r\n";
+    CHECK(view_ok(ctl, sizeof ctl - 1, text, sizeof text));
+    CHECK(strstr(text, "beforeafter") != NULL);           /* the charset step drops the NUL, the rest stays */
+    CHECK(strstr(text, "\"q\" \\ end") != NULL);
+
+    /* HTML only, latin1, with NUL and control bytes inside the markup */
+    static const char hctl[] = "Content-Type: text/html; charset=iso-8859-1\r\n\r\n<p>Ma\xf1" "ana\0 <b>x\x01y</b>\x1b</p><img alt=\"a\0b\x02\" src=\"cid:z\">\r\n";
+    CHECK(view_ok(hctl, sizeof hctl - 1, text, sizeof text));
+    CHECK(strstr(text, "Mañana") != NULL);
+
+    /* a newsletter: tables nested in tables (the real-world case of #18), and nesting past the
+     * sanitizer's own limit, which must still fit the validator's */
+    for (int levels = 4; levels <= 80; levels += 76) {
+        JBuf hb;
+        jb_init(&hb);
+        jb_raw(&hb, "MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary=\"B\"\r\n\r\n--B\r\n"
+                    "Content-Type: text/plain; charset=utf-8\r\n\r\nplain\r\n--B\r\nContent-Type: text/html; charset=utf-8\r\n\r\n");
+        for (int i = 0; i < levels; i++) jb_raw(&hb, "<table width=600 style=\"background:#fff\"><tr><td style=\"padding:4px\"><div><span style=\"color:red\">");
+        jb_raw(&hb, "<a href=\"https://example.com/\"><b>deep</b></a>");
+        for (int i = 0; i < levels; i++) jb_raw(&hb, "</span></div></td></tr></table>");
+        jb_raw(&hb, "\r\n--B--\r\n");
+        CHECK(view_ok(hb.p, hb.n, NULL, 0));
+        size_t n;
+        char *j = view_json(hb.p, hb.n, &n);
+        JDoc d;
+        if (levels == 4) CHECK(j && json_parse(j, n, &d, NULL, 0) != 0);     /* past the old 32 levels */
+        free(j);
+        jb_free(&hb);
+    }
+
+    /* huge HTML (beyond HTML_MAX_INPUT and HTML_MAX_NODES): still one valid reply, cut short */
+    {
+        size_t cap = (size_t)10 << 20, n = 0;
+        char *big = malloc(cap);
+        n += (size_t)snprintf(big, cap, "Content-Type: text/html; charset=windows-1252\r\n\r\n");
+        static const char row[] = "<tr><td bgcolor=#eee>\x93row\x94 &amp; \x80 caf\xe9 <img src=\"https://t.example/p.gif\" width=1 height=1></td></tr>";
+        memcpy(big + n, "<table>", 7);
+        n += 7;
+        while (n + sizeof row < cap) { memcpy(big + n, row, sizeof row - 1); n += sizeof row - 1; }
+        CHECK(view_ok(big, n, text, sizeof text));
+        CHECK(strstr(text, "\xe2\x80\x9crow\xe2\x80\x9d & \xe2\x82\xac café") != NULL);
+        free(big);
+    }
+
+    /* JSON writer: every byte value inside a string gives text json_parse accepts */
+    {
+        unsigned char all[512];
+        for (int i = 0; i < 512; i++) all[i] = (unsigned char)(i & 0xff);
+        JBuf b;
+        jb_init(&b);
+        jb_strn(&b, (const char *)all, sizeof all);
+        JDoc d;
+        CHECK(!json_parse(b.p, b.n, &d, NULL, 0));
+        if (d.root) { CHECK(d.root->type == J_STR && strlen(d.root->str) == d.root->len); json_free(&d); }
+        jb_free(&b);
+    }
+}
+
 int main(void) {
     alarm(300);                 /* never hang a `make test`: SIGALRM kills a runaway parser */
     clock_t t0 = clock();
     static const struct { const char *name; void (*fn)(void); } parts[] = {
-        { "imap", test_imap }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard },
+        { "imap", test_imap }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard }, { "view", test_view },
     };
     for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
         int before = fails;

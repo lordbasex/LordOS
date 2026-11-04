@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../doc/wire.h"
+
 int   mail_available(void);                 /* 0 if the helper binary is there */
 int   mail_start(void);                     /* 0 if running (starts it if needed) */
 /* Request: JSON text + fds of files (mail_request takes ownership). id > 0 or -1. */
@@ -51,6 +53,12 @@ void  mail_owner_clear_wake(void);
 /* Sealed memfd with a copy of one of the owner's images (ARGB32, w*h*4 bytes), or -1. */
 int   mail_image_fd(int owner, int handle, int *w, int *h);
 void  mail_image_release_as(int owner, int handle);
+
+/* Appends one event {"id","type","data"} to a queue (used by the reader thread; public for the
+ * test). data is lord-maild's JSON: re-validated (nesting up to HTML_JSON_DEPTH and more), replaced
+ * by {"error":"bad-json","detail":…} if it isn't JSON, and by {"error":"too-big"} if the queue
+ * would pass its size limit; the queue always stays valid JSON. */
+void  mail_ev_append(JBuf *dst, int id, const char *type, const char *data, size_t dlen);
 
 /* Pure check used by the connector and its test: is host:port allowed by this config JSON? */
 int   mail_endpoint_allowed(const char *config_json, size_t len, const char *host, int port);

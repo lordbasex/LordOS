@@ -5,6 +5,7 @@
 #include "../doc/proto.h"
 #include "../doc/wire.h"
 #include "../sec/json.h"
+#include "html.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -255,17 +256,43 @@ static int allowed_now(const char *host, int port) {
 
 /* ---- events ---- */
 
-static void ev_append(JBuf *dst, int id, const char *type, const char *data, size_t dlen) {
+/* Re-validation limit for the helper's JSON: deeper than json_parse's default, because a message
+ * view carries the HTML tree of html.h (newsletters nest tables several levels deep). */
+#define MAIL_REPLY_DEPTH (HTML_JSON_DEPTH + 8)
+
+void mail_ev_append(JBuf *dst, int id, const char *type, const char *data, size_t dlen) {
+    size_t mark = dst->n;
     if (dst->n) jb_raw(dst, ",");
     jb_printf(dst, "{\"id\":%d,\"type\":\"%s\"", id, type);
     if (data && dlen) {
         jb_raw(dst, ",\"data\":");
         /* the helper's JSON is re-validated before JS sees it */
         JDoc d;
-        if (!json_parse(data, dlen, &d, NULL, 0)) { json_free(&d); char *tmp = malloc(dlen + 1); if (tmp) { memcpy(tmp, data, dlen); tmp[dlen] = 0; jb_raw(dst, tmp); free(tmp); } else jb_raw(dst, "null"); }
-        else jb_raw(dst, "{\"error\":\"bad-json\"}");
+        char err[96] = "";
+        if (json_parse_depth(data, dlen, &d, err, sizeof err, MAIL_REPLY_DEPTH)) {
+            JBuf e;
+            jb_init(&e);
+            jb_raw(&e, "{\"error\":\"bad-json\",\"detail\":");
+            jb_str(&e, err);
+            jb_raw(&e, "}");
+            jb_raw(dst, e.oom || !e.p ? "{\"error\":\"bad-json\"}" : e.p);
+            jb_free(&e);
+        } else {
+            json_free(&d);
+            jb_rawn(dst, data, dlen);
+        }
     }
     jb_raw(dst, "}");
+    if (dst->oom) {
+        /* the queue would pass its limit: drop this event's half-written text (the queue must stay
+         * valid JSON) and tell the waiter, instead of losing every later event too */
+        dst->oom = 0;
+        dst->n = mark;
+        if (dst->p) dst->p[mark] = 0;
+        if (dst->n) jb_raw(dst, ",");
+        jb_printf(dst, "{\"id\":%d,\"type\":\"%s\",\"data\":{\"error\":\"too-big\"}}", id, type);
+        if (dst->oom) { dst->oom = 0; dst->n = mark; if (dst->p) dst->p[mark] = 0; }
+    }
 }
 
 static void owner_signal(void) {
@@ -286,7 +313,7 @@ static int route_take(int id) {
 static int pim_event(const char *data, size_t dlen) {
     JDoc d;
     int ok = 0;
-    if (data && dlen && !json_parse(data, dlen, &d, NULL, 0)) {
+    if (data && dlen && !json_parse_depth(data, dlen, &d, NULL, 0, MAIL_REPLY_DEPTH)) {
         const char *ev = json_str(d.root, "ev");
         ok = ev && (!strcmp(ev, "pim-changed") || !strcmp(ev, "ready"));
         json_free(&d);
@@ -301,13 +328,13 @@ static void ev_push_to(int owner, int id, const char *type, const char *data, si
     int sig = 0;
     if (owner == -2) { /* dropped */ }
     else if (owner > 0) {
-        if (owner <= MAIL_OWNERS && owners[owner].used) { ev_append(&owners[owner].ev, id, type, data, dlen); sig = 1; }
+        if (owner <= MAIL_OWNERS && owners[owner].used) { mail_ev_append(&owners[owner].ev, id, type, data, dlen); sig = 1; }
     } else {
-        ev_append(&events, id, type, data, dlen);
+        mail_ev_append(&events, id, type, data, dlen);
         if (owner < 0) {
             int pim = !strcmp(type, "crash") || pim_event(data, dlen);
             for (int o = 1; o <= MAIL_OWNERS; o++)
-                if (owners[o].used && (owners[o].mask == MAIL_EV_ALL || pim)) { ev_append(&owners[o].ev, id, type, data, dlen); sig = 1; }
+                if (owners[o].used && (owners[o].mask == MAIL_EV_ALL || pim)) { mail_ev_append(&owners[o].ev, id, type, data, dlen); sig = 1; }
         }
     }
     if (strcmp(type, "evt") && strcmp(type, "crash") && pending > 0) pending--;

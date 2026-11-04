@@ -31,6 +31,8 @@
   "forwarded": "Mensaje reenviado",
   "quoteHead": "El {date}, {name} escribió:",
   "offlineNotCached": "Este mensaje todavía no se descargó y no se puede llegar al servidor.",
+  "openTooBig": "Este mensaje es demasiado grande para mostrarlo acá.",
+  "openFailed": "No se pudo mostrar este mensaje ({error}).",
   "working": "Un momento…",
   "cancel": "Cancelar",
   "close": "Cerrar",

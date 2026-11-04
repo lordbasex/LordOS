@@ -165,6 +165,7 @@ static void jb_put(JBuf *b, const char *s, size_t n) {
 }
 
 void jb_raw(JBuf *b, const char *s) { jb_put(b, s, strlen(s)); }
+void jb_rawn(JBuf *b, const char *s, size_t n) { jb_put(b, s, n); }
 
 void jb_printf(JBuf *b, const char *fmt, ...) {
     char tmp[512];
@@ -210,6 +211,7 @@ void jb_strn(JBuf *b, const char *str, size_t n) {
             if (ch == '\n') jb_put(b, "\\n", 2);
             else if (ch == '\t') jb_put(b, "\\t", 2);
             else if (ch == '\r') jb_put(b, "\\r", 2);
+            else if (!ch) jb_put(b, "\xef\xbf\xbd", 3);     /* NUL: U+FFFD (json_parse refuses an escaped NUL) */
             else jb_printf(b, "\\u%04x", ch);
             i++;
             continue;
