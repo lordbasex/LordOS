@@ -91,7 +91,8 @@ check_deb() {
     cd_f=$1; cd_pkg=$2; cd_ver=$3; cd_arch=$4
     cd_p=$(deb_field "$cd_f" Package); cd_v=$(deb_field "$cd_f" Version); cd_a=$(deb_field "$cd_f" Architecture)
     [ "$cd_p" = "$cd_pkg" ] || die "$cd_f is package $cd_p, expected $cd_pkg"
-    [ -z "$cd_ver" ] || [ "$cd_v" = "$cd_ver" ] || die "$cd_f is version $cd_v, expected $cd_ver"
+    # a vendor's Debian revision is accepted ("0.14.0-1" for 0.14.0): the pinned SHA-256 already fixes the exact file
+    case "$cd_v" in "$cd_ver"|"$cd_ver"-[0-9]*) ;; *) [ -z "$cd_ver" ] || die "$cd_f is version $cd_v, expected $cd_ver" ;; esac
     [ "$cd_a" = "$cd_arch" ] || [ "$cd_a" = all ] || die "$cd_f is for $cd_a, expected $cd_arch"
 }
 
