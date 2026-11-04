@@ -3,7 +3,8 @@
 //! identity (size, model, serial) is checked again right before it is opened; nothing is mounted
 //! on it while it's written.
 //!
-//! - `macos`: `diskutil` (external, physical disks; the boot disk and internal ones are left out). The
+//! - `macos`: `diskutil` (physical disks: external ones, and the built-in SD card slot, which macOS calls
+//!   internal but with removable media; the boot disk and the internal SSD are left out). The
 //!   device is opened directly when the user may (a disk image the user attached for testing), or
 //!   through the system's authorized-open helper, which asks for an administrator's approval and
 //!   hands back only that one open device.
@@ -56,6 +57,15 @@ fn in_test_dir(backing: &str) -> bool {
 /// LordOS images use an MBR partition table, which can't address more than 2 TiB: a larger drive is
 /// refused (it is also very unlikely to be a card or a stick).
 pub const MAX_DRIVE: u64 = 2 << 40;
+
+/// `macos`: whether a physical disk may be listed. An external disk always may (a card reader, a stick);
+/// an internal one only when its media is removable and it isn't the system's own media, which is how
+/// `diskutil` describes a Mac's built-in SD card slot ("Device Location: Internal", "Removable Media:
+/// Removable"). The internal SSD (fixed media, OS internal) never is. The boot disk is refused later.
+#[allow(dead_code)]
+pub(crate) fn mac_listable(internal: bool, removable_media: bool, os_internal: bool) -> bool {
+    !internal || (removable_media && !os_internal)
+}
 
 #[allow(dead_code)]
 fn run(cmd: &str, args: &[&str]) -> Result<String> {
@@ -121,7 +131,8 @@ mod mac {
     }
 
     pub fn list() -> Result<Vec<Drive>> {
-        let listing = run("/usr/sbin/diskutil", &["list", "-plist", "external"])?;
+        // physical, not only external: a Mac's built-in SD card slot is an internal disk with removable media
+        let listing = run("/usr/sbin/diskutil", &["list", "-plist", "physical"])?;
         let l = plist::from_bytes::<plist::Dictionary>(listing.as_bytes()).map_err(|e| Error::new("imager.listFailed", e.to_string()))?;
         let boot = boot_disks();
         let images = if test_dir().is_some() { image_files() } else { Default::default() };
@@ -133,7 +144,7 @@ mod mac {
             let image = s(&d, "BusProtocol") == "Disk Image";
             // APFS containers and other synthesized disks are not drives; a disk image only in a test run
             if virt && !(image && images.get(w).is_some_and(|f| in_test_dir(f))) { continue; }
-            if b(&d, "Internal") && !image { continue; }
+            if !image && !super::mac_listable(b(&d, "Internal"), b(&d, "RemovableMedia") || b(&d, "Removable"), b(&d, "OSInternalMedia")) { continue; }
             let id = s(&d, "DeviceIdentifier");
             let mut labels = vec![];
             let mut mounted = vec![];
@@ -439,4 +450,22 @@ mod win {
         Err(Error::new("imager.bootNotFound", d.id.clone()))
     }
     pub fn unmount_boot(_d: &Drive) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mac_sd_slot_is_listed_and_the_internal_ssd_is_not() {
+        // a USB card reader or stick
+        assert!(mac_listable(false, true, false));
+        assert!(mac_listable(false, false, false));
+        // the built-in SD card slot: internal, removable media, not the OS's own media
+        assert!(mac_listable(true, true, false));
+        // the internal SSD: internal, fixed media, OS internal
+        assert!(!mac_listable(true, false, true));
+        assert!(!mac_listable(true, false, false));
+        assert!(!mac_listable(true, true, true));
+    }
 }

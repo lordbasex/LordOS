@@ -122,8 +122,9 @@ user's folders). It writes nothing and runs nothing.
   the transport.
 - **Drives:** only removable, non-system drives are listed and accepted; the identity is checked
   again right before opening; nothing of the drive stays mounted.
-  - Mac download: `diskutil` (external, physical disks; the boot disk and internal ones are left
-    out). The raw device is opened by the system's authorized-open helper (`/usr/libexec/authopen`),
+  - Mac download: `diskutil` (physical disks: external ones, and the built-in SD card slot, which
+    macOS reports as internal with removable media; the boot disk and internal disks with fixed media
+    are left out). The raw device is opened by the system's authorized-open helper (`/usr/libexec/authopen`),
     which asks for an administrator's approval in the system's own dialog and hands back only that
     one open device; the app itself never runs as root.
   - Linux download: `lsblk` for the list; the device is opened through udisks2 (`OpenDevice`, which

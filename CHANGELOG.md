@@ -10,6 +10,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- LordOS Imager for Mac didn't list a card in the Mac's built-in SD card slot: macOS reports that slot as an
+  internal disk, and the Imager only looked at external ones. It now lists physical disks with removable media
+  too; the internal SSD and other fixed internal disks are still never shown. Reported by a user with an SD
+  card that showed up in other writers (`diskutil`: "internal, physical", FAT32, 15.9 GB).
+
 ## [0.8.8.1-beta] - 2026-11-03
 
 An update of 0.8.8 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images:
