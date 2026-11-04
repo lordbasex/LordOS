@@ -615,9 +615,13 @@ void mirror_dispatch(const struct pollfd *p, int n) {
         }
         Client *c = by_fd(p[i].fd);
         if (!c) continue;
+        /* what the peer sent before it closed is read first: lord-sessiond sends RP_UNDISPLAY and closes
+         * right after (a lock), and dropping on POLLHUP alone lost it, so the session kept a monitor it
+         * no longer had and ignored the next RP_DISPLAY (a black screen after logging in again) */
+        if (p[i].revents & POLLIN) read_client(c);
+        if (c->fd < 0) continue;
         if (p[i].revents & (POLLERR | POLLHUP)) { drop(c); continue; }
         if (p[i].revents & POLLOUT) { flush(c); pump(c); }
-        if (c->fd >= 0 && (p[i].revents & POLLIN)) read_client(c);
     }
 }
 

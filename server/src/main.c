@@ -940,10 +940,19 @@ static void parked_drop(void) {
  * the first frame is on the screen (docs/SESSIONS.md, "Boot splash"). */
 static int splash_wait;
 
+static void display_detach(void);
+
 static void display_attach(const int *fds, int n, int flags) {
     Server *s = remote_server;
     parked_drop();                      /* a new RP_DISPLAY replaces what was waiting */
-    if (!s->headless || n < 1) { for (int i = 0; i < n; i++) close(fds[i]); return; }
+    if (n < 1) return;
+    /* lord-sessiond lends the monitor only after taking it back, so a session still on the screen
+     * missed that: what it holds is stale (revoked input, no DRM master). Leave it and take the new one,
+     * or the screen stays black. */
+    if (!s->headless) {
+        fprintf(stderr, "monitor: lent again while still shown; leaving the old one first\n");
+        display_detach();
+    }
     Out *o0 = &s->out[0];
     out_free(o0);
     memset(o0, 0, sizeof *o0);
