@@ -65,9 +65,9 @@ export function t(key, vars = {}) {
 }
 export function tOptional(key, vars) { const r = t(key, vars); return r === key ? '' : r; }
 export function useLocale() { const l = useStore(locale); return { t, lang: l.lang }; }
-export const setLanguage = (lang) => { locale.set({ lang: ['en', 'es', 'pt', 'fr'].includes(lang) ? lang : 'en' }); document.documentElement.lang = locale.get().lang; };
+export const setLanguage = (lang) => { locale.set({ lang: ['en', 'es', 'pt', 'fr', 'it'].includes(lang) ? lang : 'en' }); document.documentElement.lang = locale.get().lang; };
 export const direction = () => 'ltr';
-const intlLang = () => ({ en: 'en-US', es: 'es-AR', pt: 'pt-BR', fr: 'fr-FR' }[locale.get().lang] || 'en-US');
+const intlLang = () => ({ en: 'en-US', es: 'es-AR', pt: 'pt-BR', fr: 'fr-FR', it: 'it-IT' }[locale.get().lang] || 'en-US');
 export function formatNumber(n, digits = null) {
   return new Intl.NumberFormat(intlLang(), digits == null ? {} : { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
 }

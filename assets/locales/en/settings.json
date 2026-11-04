@@ -515,5 +515,17 @@
   "motion.loginReset": "The login screen is back to its default video.",
   "wallpaperFor.desktop": "Desktop",
   "wallpaperFor.login": "Login screen",
-  "sharing.inUseBy": "In use by {app}. Remote desktop can’t sign in to this session until it ends."
+  "sharing.inUseBy": "In use by {app}. Remote desktop can’t sign in to this session until it ends.",
+  "lang.preferred": "Preferred languages",
+  "lang.primary": "Primary",
+  "lang.preferredHint": "The first language is used by LordOS and its apps (the login screen keeps its own, chosen there). When a text isn’t translated, the next ones are used, in order.",
+  "lang.add": "Add a language",
+  "lang.remove": "Remove the language",
+  "lang.up": "Move up",
+  "lang.down": "Move down",
+  "lang.search": "Search languages",
+  "lang.ready": "READY TO USE",
+  "lang.notYet": "NOT TRANSLATED YET",
+  "lang.notYetHint": "LordOS isn’t translated into {name} yet. You can already use its date and number formats with Region below, and ask for the language at github.com/lordbasex/LordOS/issues.",
+  "lang.none": "No language matches."
 }

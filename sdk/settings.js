@@ -18,7 +18,8 @@ const DEFAULTS = {
   keyboard: 'latam',     // before M5; now keyboards (see keyboard.js)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,
-  language: null,        // interface language ('es', 'en', 'pt', 'fr'…); null = the region's
+  language: null,        // interface language ('es', 'en', 'pt', 'fr', 'it'…); null = the region's
+  languages: null,       // preferred languages in order, the first is `language` (Settings → Language & Region); null = en, es, pt
   region: '',            // formats region ('es_AR'…); '' = the language's
   theme: null,           // id of the chosen theme (folder in themes/)
   desktopCount: 1,            // 0.8.7, how many desktops (sdk/desktops.js)

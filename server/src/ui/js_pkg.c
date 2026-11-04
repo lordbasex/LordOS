@@ -97,16 +97,17 @@ static int lang_of(const char *lang) {
     if (!strncmp(lang, "es", 2)) return 1;
     if (!strncmp(lang, "pt", 2)) return 2;
     if (!strncmp(lang, "fr", 2)) return 3;
+    if (!strncmp(lang, "it", 2)) return 4;
     return 0;
 }
 
 static const char *app_name(const IdxApp *a, int l) {
-    const char *s = l == 1 ? idx_s(&X, a->name_es) : l == 2 ? idx_s(&X, a->name_pt) : l == 3 ? idx_s(&X, a->name_fr) : "";
+    const char *s = l == 1 ? idx_s(&X, a->name_es) : l == 2 ? idx_s(&X, a->name_pt) : l == 3 ? idx_s(&X, a->name_fr) : l == 4 ? idx_s(&X, a->name_it) : "";
     return s[0] ? s : idx_s(&X, a->name);
 }
 
 static const char *app_summary(const IdxApp *a, int l) {
-    const char *s = l == 1 ? idx_s(&X, a->summary_es) : l == 2 ? idx_s(&X, a->summary_pt) : l == 3 ? idx_s(&X, a->summary_fr) : "";
+    const char *s = l == 1 ? idx_s(&X, a->summary_es) : l == 2 ? idx_s(&X, a->summary_pt) : l == 3 ? idx_s(&X, a->summary_fr) : l == 4 ? idx_s(&X, a->summary_it) : "";
     return s[0] ? s : idx_s(&X, a->summary);
 }
 

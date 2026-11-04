@@ -28,7 +28,7 @@ It is not a web page: a browser can't write a whole disk.
 | **Device** | Raspberry Pi 5 (the only supported board; Pi 500/CM5 and Pi 4/400 are listed as "not supported yet", Pi 3 and Zero 2 as "not planned") or **Generic arm64 (USB stick)**, which writes the arm64 live ISO and lists only the releases that have one, or **PC (USB stick)**, which writes the amd64 live ISO. For the Pi, the memory advice: 4 GB minimum, 8 GB comfortable, 16 GB for the best performance. |
 | **System image** | The latest LordOS release (version, date, download size, "Signed by LordOS"), older releases on request (since 0.8.5 point releases such as `v0.8.4.1-beta` are listed too: the tag is `v` and three numbers, or four for a point release, plus an optional suffix; `apps/imager/core/releases.js` and the desktop app's core), or **an image file of your own** (`.img`, `.img.xz`, `.iso`) with a clear warning that nobody vouches for it. Downloads are cached and resume after an interruption. |
 | **Storage** | Only removable drives (USB, SD cards): model, size, kind, labels, what is mounted. Internal disks and the disk the computer runs from are never listed, and "show all drives" doesn't exist. Too small, write-protected and over-2-TiB drives are shown disabled with the reason; a very large removable drive gets a warning. Erasing is spelled out before anything happens. |
-| **Customise** (Pi only) | A switch, then seven tabs: **General** (computer name, language, time zone, keyboard layout, Wi-Fi country), **User** (full name, user name, password with confirmation and a strength hint, automatic login), **Wi-Fi** (network name, password or open network, hidden network, a scan on LordOS), **Remote access** (SSH off / keys only / password and keys, keys pasted or from a `.pub` file; LordOS remote desktop on or off), **Appearance** (Lord Flow or Lord Classic, light or dark, accent, wallpaper), **Cooling** (case with a fan, active cooler, passive case, nothing; a profile; a mild overclock only with a fan), **More** (Bluetooth, automatic update checks, and the statement that LordOS collects nothing). Profiles save and load everything except secrets. |
+| **Customise** (Pi only) | A switch, then seven tabs: **General** (computer name, language: English, Español and Português as chips and "+ More languages" for the others, each only if the chosen image can start in it; time zone, keyboard layout, Wi-Fi country), **User** (full name, user name, password with confirmation and a strength hint, automatic login), **Wi-Fi** (network name, password or open network, hidden network, a scan on LordOS), **Remote access** (SSH off / keys only / password and keys, keys pasted or from a `.pub` file; LordOS remote desktop on or off), **Appearance** (Lord Flow or Lord Classic, light or dark, accent, wallpaper), **Cooling** (case with a fan, active cooler, passive case, nothing; a profile; a mild overclock only with a fan), **More** (Bluetooth, automatic update checks, and the statement that LordOS collects nothing). Profiles save and load everything except secrets. |
 | **Write** | A summary, then "Erase and write" asks once more. Download (if needed) → release signature → image check → write → read back and compare → first-run file → eject. Progress, speed and time left; Cancel at any time (the drive is wiped so it never looks half-written). |
 | **Done** | Lumo celebrates; next steps: put the card in the Pi 5, the first boot takes about a minute, then it is `hostname.local` on the network (`ssh user@hostname.local`, `https://hostname.local:5673`). A sound and a notification when it finishes. |
 
@@ -62,7 +62,7 @@ The interface imports only View, Text, Image, ScrollView, TextInput, Button, Lum
 useKeyboard, t, typeScale, spacing and a store from `@lordos/sdk`; in the desktop build those come
 from `web/sdk.jsx`, which draws them with HTML and Lord Flow's colors (light, dark or automatic).
 The texts are the same catalogs (`assets/locales/<lang>/imager.json`, plus errors, status, mascot
-and countries), so both apps speak English, Spanish, Portuguese and French identically.
+and countries), so both apps speak English, Spanish, Portuguese, French and Italian identically. The desktop app's language is the globe at the bottom of its sidebar (English, Español and Português first, then the others, then the computer's language).
 
 The writing rules exist twice, in C for LordOS (`server/src/imager/`) and in Rust for the desktop
 (`desktop/imager/core/`), and are tested against the same fixtures (a real signed `SHA256SUMS`, the
@@ -161,7 +161,7 @@ user's folders). It writes nothing and runs nothing.
 |---|---|---|
 | `version` | `1` | first |
 | `hostname` | RFC 1123 label | `[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?`, not only digits, not `localhost` |
-| `lang` | `en` \| `es` \| `pt` \| `fr` | the languages LordOS ships |
+| `lang` | `en` \| `es` \| `pt` \| `fr` \| `it` | the languages LordOS ships; `fr` from 0.8.8 images, `it` from 0.8.9 images (an older first-run program refuses the whole file, so the Imager only offers what the chosen image knows) |
 | `timezone` | `Area/City` | `[A-Za-z0-9_+-/]`, starts with a capital, no `..`; must exist in the image's zoneinfo |
 | `keyboard`, `keyboard_variant` | xkb layout and variant | `[a-z]{2,10}`; variant `[A-Za-z0-9_-]{0,32}`; the layout must exist in the image |
 | `wifi_country` | two capital letters | `cfg80211.ieee80211_regdom=` in `cmdline.txt` |
@@ -263,7 +263,7 @@ The overclock warns that not every board is stable and how to undo it (delete ou
   In the desktop app the browser's own focus does the same and every control has a screen-reader
   label, role and state (`aria-label`, `aria-checked`, `aria-selected`, `role="progressbar"`…).
   LordOS itself has no screen reader yet; the labels are in place for when it does.
-- **Texts:** every string is in English, Spanish, Portuguese and French (`node tools/i18n-check.mjs`).
+- **Texts:** every string is in English, Spanish, Portuguese, French and Italian (`node tools/i18n-check.mjs`).
 - **Never color alone:** problems carry text, the steps carry numbers and checkmarks.
 
 ## Building the desktop downloads

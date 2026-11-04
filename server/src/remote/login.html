@@ -55,7 +55,7 @@
 </form>
 <div class="foot" id="foot"></div>
 <div class="bl"><i></i><span id="host"></span></div>
-<div class="br"><button type="button" class="pill" data-l="es">ES</button><button type="button" class="pill" data-l="en">EN</button><button type="button" class="pill" data-l="pt">PT</button><button type="button" class="pill" data-l="fr">FR</button></div>
+<div class="br"><button type="button" class="pill" data-l="es">ES</button><button type="button" class="pill" data-l="en">EN</button><button type="button" class="pill" data-l="pt">PT</button><button type="button" class="pill" data-l="fr">FR</button><button type="button" class="pill" data-l="it">IT</button></div>
 <script>
   const L = {
     en: { user: 'Username', pass: 'Password', e1: 'Wrong username or password.', e2: 'Too many attempts. Wait a while and try again.',
@@ -89,6 +89,14 @@
           foot: 'Bureau à distance LordOS · connexion chiffrée. Si votre navigateur signale un problème de certificat, comparez son empreinte avec celle de Réglages → Partage.',
           days: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
           months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+          date: (w, d, m) => `${w} ${d} ${m}`, h12: false },
+    it: { user: 'Utente', pass: 'Password', e1: 'Nome utente o password errati.', e2: 'Troppi tentativi. Attendi un po’ e riprova.',
+          e3: 'La sessione è stata bloccata. Accedi di nuovo.',
+          e4: 'Troppi tentativi non riusciti da questo computer: è bloccato per un po’. Un amministratore può sbloccarlo in Impostazioni → Condivisione.',
+          e5: 'I nomi utente usano lettere minuscole, cifre, - e _ (fino a 32).', e6: 'Inserisci la password.',
+          foot: 'Desktop remoto di LordOS · connessione cifrata. Se il browser avvisa del certificato, confronta la sua impronta con quella in Impostazioni → Condivisione.',
+          days: ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'],
+          months: ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'],
           date: (w, d, m) => `${w} ${d} ${m}`, h12: false },
   };
   const $ = (id) => document.getElementById(id);

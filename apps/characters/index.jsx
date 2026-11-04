@@ -1,5 +1,5 @@
 // Emoji & Symbols: the window version of the system picker (❖.): emoji by category with search in
-// Spanish, English, Portuguese and French, skin tones and recents, plus the Unicode symbols by block. A
+// Spanish, English, Portuguese, French and Italian, skin tones and recents, plus the Unicode symbols by block. A
 // click picks one; "Copy" puts it on the clipboard.
 import {
   View, Text, Button, Segmented, ScrollView, SidebarItem, Toolbar, ToolbarSpacer, Hairline, SearchField, EmptyState, useTheme, clipboard, emoji,

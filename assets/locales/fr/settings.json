@@ -515,5 +515,17 @@
   "motion.loginReset": "L’écran de connexion utilise à nouveau sa vidéo par défaut.",
   "wallpaperFor.desktop": "Bureau",
   "wallpaperFor.login": "Écran de connexion",
-  "sharing.inUseBy": "Utilisée par {app}. Le bureau à distance ne peut pas se connecter à cette session tant qu’elle n’est pas terminée."
+  "sharing.inUseBy": "Utilisée par {app}. Le bureau à distance ne peut pas se connecter à cette session tant qu’elle n’est pas terminée.",
+  "lang.preferred": "Langues préférées",
+  "lang.primary": "Principale",
+  "lang.preferredHint": "La première langue est celle de LordOS et de ses apps (l’écran de connexion a la sienne, choisie sur cet écran). Si un texte n’est pas traduit, les suivantes sont utilisées, dans l’ordre.",
+  "lang.add": "Ajouter une langue",
+  "lang.remove": "Retirer la langue",
+  "lang.up": "Monter",
+  "lang.down": "Descendre",
+  "lang.search": "Rechercher une langue",
+  "lang.ready": "PRÊTES À L’EMPLOI",
+  "lang.notYet": "PAS ENCORE TRADUITES",
+  "lang.notYetHint": "LordOS n’est pas encore traduit en {name}. Vous pouvez déjà utiliser ses formats de date et de nombre avec Région, ci-dessous, et demander la langue sur github.com/lordbasex/LordOS/issues.",
+  "lang.none": "Aucune langue ne correspond."
 }

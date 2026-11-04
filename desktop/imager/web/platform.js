@@ -63,7 +63,7 @@ export const platform = {
     const o = {};
     if (role) o.role = role;
     if (label) o['aria-label'] = label;
-    if (selected !== undefined && (role === 'radio' || role === 'tab' || role === 'option' || role === 'switch')) o[role === 'switch' || role === 'radio' ? 'aria-checked' : 'aria-selected'] = !!selected;
+    if (selected !== undefined && (role === 'radio' || role === 'menuitemradio' || role === 'tab' || role === 'option' || role === 'switch')) o[role === 'switch' || role === 'radio' || role === 'menuitemradio' ? 'aria-checked' : 'aria-selected'] = !!selected;
     if (disabled) o['aria-disabled'] = true;
     if (invalid) o['aria-invalid'] = true;
     if (role === 'progressbar') { o['aria-valuenow'] = value; o['aria-valuemin'] = 0; o['aria-valuemax'] = 100; }

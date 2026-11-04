@@ -390,5 +390,8 @@
   "write.text": "Mantenha a unidade conectada. Isso leva alguns minutos.",
   "write.title": "Gravando em {name}",
   "write.untouchedText": "Nada foi alterado na unidade.",
-  "write.why": "O que aconteceu"
+  "write.why": "O que aconteceu",
+  "general.moreLanguages": "Mais idiomas",
+  "general.langSince": "{name} precisa de uma imagem do LordOS {v} ou mais nova.",
+  "err.langImage": "Esta imagem não pode iniciar nesse idioma: escolha English, Español ou Português, ou uma imagem mais nova."
 }

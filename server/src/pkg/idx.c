@@ -500,7 +500,7 @@ static size_t yaml_scalar(const char *v, size_t n, char *out, size_t cap) {
 
 typedef struct {
     char type[32], id[256], package[128], cats[256], icon[256];
-    char name[4][256], summary[4][512];
+    char name[5][256], summary[5][512];
     char *desc;
     size_t dlen, dcap;
     int icon_w;
@@ -522,6 +522,8 @@ static void app_store(IdxBuilder *b, App *a) {
     x->summary_pt = intern_z(b, a->summary[2]);
     x->name_fr = intern_z(b, a->name[3]);
     x->summary_fr = intern_z(b, a->summary[3]);
+    x->name_it = intern_z(b, a->name[4]);
+    x->summary_it = intern_z(b, a->summary[4]);
     x->categories = intern_z(b, a->cats);
     x->icon = intern_z(b, a->icon);
     x->desc = UINT32_MAX;
@@ -575,7 +577,8 @@ static int lang_slot(const char *k, size_t n) {
     if (n == 2 && !strncmp(k, "es", 2)) return 1;
     if (n == 2 && !strncmp(k, "pt", 2)) return 2;
     if (n == 2 && !strncmp(k, "fr", 2)) return 3;
-    if (n == 5 && !strncmp(k, "pt-BR", 5)) return 4;       /* if there's no pt */
+    if (n == 2 && !strncmp(k, "it", 2)) return 4;
+    if (n == 5 && !strncmp(k, "pt-BR", 5)) return 5;       /* if there's no pt */
     return -1;
 }
 
@@ -664,7 +667,7 @@ int idxb_appstream(IdxBuilder *b, const char *buf, size_t len) {
             }
             if (slot < 0 || !strcmp(top, "Description")) goto next;
             int is_name = !strcmp(top, "Name");
-            if (slot == 4) {                    /* pt-BR: only if there's no pt */
+            if (slot == 5) {                    /* pt-BR: only if there's no pt */
                 char *dst = is_name ? a.name[2] : a.summary[2];
                 if (dst[0]) goto next;
                 slot = 2;

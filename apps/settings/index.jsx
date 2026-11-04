@@ -6,9 +6,9 @@ import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
-  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton,
 } from '@lordos/sdk';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
 import { UsersSettings } from './Users.jsx';
@@ -500,8 +500,8 @@ function LanguageRegion() {
     lord.keyboard?.reloadCompose?.();
     set({ region: r });
   }
-  const pickLanguage = (id) => {
-    setLanguage(id);
+  // the first preferred language changed: its region too, if none was chosen
+  const primaryChanged = (id) => {
     const r = langs.find((l) => l.id === id)?.region;
     if (r && !s.region) useRegion(r);
   };
@@ -512,13 +512,7 @@ function LanguageRegion() {
   const langName = langs.find((l) => l.id === lang)?.name || lang;
   return (
     <Stack>
-      <Section title={tr('settings.lang.title')} footer={tr('settings.lang.hint')}>
-        {langs.map((l) => (
-          <SettingRow key={l.id} label={l.name} hint={`${l.english}${l.user ? ` · ${tr('settings.lang.pack')}` : ''}`} onClick={() => pickLanguage(l.id)}>
-            {l.id === lang ? <Text style={{ fontSize: 14, fontWeight: 600, color: t.accent }}>✓</Text> : null}
-          </SettingRow>
-        ))}
-      </Section>
+      <PreferredLanguages langs={langs} onPrimary={primaryChanged} />
       <Section title={tr('settings.region.title')} footer={tr('settings.region.hint')}>
         <SettingRow label={regionName || '—'}>
           <Button small label={tr('settings.change')} onClick={() => setShowRegions(!showRegions)} />
@@ -555,6 +549,109 @@ function LanguageRegion() {
       <AdminLog />
       <Message msg={msg} />
     </Stack>
+  );
+}
+
+// Preferred languages (docs/LANGUAGES.md): the first one is LordOS's language (its apps too; the
+// login screen keeps its own); when a text isn't translated the next ones are used, in order, then English. A row is
+// selected by clicking it; + adds a language (it becomes the first), − removes the selected one,
+// ↑ ↓ move it. Without a saved list: the current language, then English, Spanish and Portuguese.
+function PreferredLanguages({ langs, onPrimary }) {
+  const t = useTheme();
+  const { t: tr, lang } = useLocale();
+  useSettings();
+  const list = preferredLanguages().filter((id) => langs.some((l) => l.id === id));
+  const [sel, setSel] = useState(lang);
+  const [adding, setAdding] = useState(false);
+  const plus = useRef(null);
+  const save = (next) => {
+    const first = list[0];
+    setPreferredLanguages(next);
+    if (next[0] !== first) onPrimary(next[0]);
+  };
+  const at = list.indexOf(sel);
+  const move = (d) => {
+    const j = at + d;
+    if (at < 0 || j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[at], next[j]] = [next[j], next[at]];
+    save(next);
+  };
+  const remove = () => {
+    if (at < 0 || list.length < 2) return;
+    const next = list.filter((x) => x !== sel);
+    save(next);
+    setSel(next[Math.max(0, at - 1)]);
+  };
+  const add = (id) => { setAdding(false); setSel(id); save([id, ...list.filter((x) => x !== id)]); };
+  return (
+    <Section title={tr('settings.lang.preferred')} footer={tr('settings.lang.preferredHint')}>
+      {list.map((id, i) => {
+        const l = langs.find((x) => x.id === id);
+        const on = id === sel;
+        return (
+          <View key={id} onClick={() => setSel(id)} style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.m,
+            marginHorizontal: -6, paddingHorizontal: 6, borderRadius: 6, backgroundColor: on ? (t.mode === 'dark' ? 'rgba(10,132,255,0.22)' : 'rgba(10,132,255,0.12)') : 'transparent' }}>
+            <Text style={{ width: 130, fontSize: typeScale.body, fontWeight: i === 0 ? 600 : 400, color: t.text, textAlign: 'start' }}>{l.name}</Text>
+            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
+              {`${l.english}${l.user ? ` · ${tr('settings.lang.pack')}` : ''}`}</Text>
+            {i === 0 ? <Text style={{ fontSize: typeScale.caption, fontWeight: 600, color: t.accent }}>{tr('settings.lang.primary')}</Text> : null}
+          </View>
+        );
+      })}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4 }}>
+        <View ref={plus}><ToolbarButton small icon="+" title={tr('settings.lang.add')} onClick={() => setAdding(!adding)} /></View>
+        <ToolbarButton small icon="−" title={tr('settings.lang.remove')} disabled={list.length < 2 || at < 0} onClick={remove} />
+        <View style={{ flex: 1 }} />
+        <ToolbarButton small icon="↑" title={tr('settings.lang.up')} disabled={at <= 0} onClick={() => move(-1)} />
+        <ToolbarButton small icon="↓" title={tr('settings.lang.down')} disabled={at < 0 || at >= list.length - 1} onClick={() => move(1)} />
+      </View>
+      {adding ? (
+        <Overlay anchor={plus} onClose={() => setAdding(false)}>
+          <AddLanguage langs={langs} have={list} onAdd={add} />
+        </Overlay>
+      ) : null}
+    </Section>
+  );
+}
+
+// The + popover: a search field, the languages ready to use (bundled or installed packs not in the
+// list yet) and the ones LordOS isn't translated into, which can't be added: picking one says so and
+// how to ask for it.
+function AddLanguage({ langs, have, onAdd }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [q, setQ] = useState('');
+  const [missing, setMissing] = useState(null);
+  const fold = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const needle = fold(q.trim());
+  const match = (...xs) => !needle || xs.some((x) => fold(x).includes(needle));
+  const ready = langs.filter((l) => !have.includes(l.id) && match(l.name, l.english, l.id));
+  const later = LANGUAGE_NAMES.filter(([id, name, en]) => !langs.some((l) => l.id === id) && match(name, en, id));
+  const head = (text) => <Text style={{ paddingHorizontal: 8, paddingTop: 8, paddingBottom: 3, fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start' }}>{text}</Text>;
+  const row = (key, name, en, right, onClick) => (
+    <View key={key} onClick={onClick} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: 8, borderRadius: 5 }}>
+      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{name}</Text>
+      <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{`— ${en}`}</Text>
+      {right ? <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{right}</Text> : null}
+    </View>
+  );
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 30, width: 380, padding: 10, gap: 8, borderRadius: 10, backgroundColor: t.mode === 'dark' ? '#2a2b30' : '#ffffff',
+      border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('settings.lang.add')}</Text>
+      <SearchField value={q} onChange={(v) => { setQ(v); setMissing(null); }} placeholder={tr('settings.lang.search')} autoFocus />
+      <View style={{ height: 260, borderRadius: 8, border: `1px solid ${t.separator}`, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.15)' : '#fafafb' }}>
+        <ScrollView style={{ padding: 4 }}>
+          {ready.length ? head(tr('settings.lang.ready')) : null}
+          {ready.map((l) => row(l.id, l.name, l.english, l.user ? tr('settings.lang.pack') : '', () => onAdd(l.id)))}
+          {later.length ? head(tr('settings.lang.notYet')) : null}
+          {later.map(([id, name, en]) => row(id, name, en, '', () => setMissing(name)))}
+          {!ready.length && !later.length ? <Text style={{ padding: 10, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('settings.lang.none')}</Text> : null}
+        </ScrollView>
+      </View>
+      {missing ? <Note>{tr('settings.lang.notYetHint', { name: missing })}</Note> : null}
+    </View>
   );
 }
 

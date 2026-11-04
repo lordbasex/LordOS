@@ -390,5 +390,8 @@
   "write.text": "No desconectes la unidad. Tarda unos minutos.",
   "write.title": "Grabando en {name}",
   "write.untouchedText": "No se cambió nada en la unidad.",
-  "write.why": "Qué pasó"
+  "write.why": "Qué pasó",
+  "general.moreLanguages": "Más idiomas",
+  "general.langSince": "{name} necesita una imagen de LordOS {v} o más nueva.",
+  "err.langImage": "Esta imagen no puede arrancar en ese idioma: elegí English, Español o Português, o una imagen más nueva."
 }

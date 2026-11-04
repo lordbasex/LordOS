@@ -21,12 +21,28 @@ export const RAM_ADVICE = [
   { gb: 4, level: 'min' }, { gb: 8, level: 'comfortable' }, { gb: 16, level: 'max' },
 ];
 
+// The languages a LordOS image can start in (lordos-firstrun's lang=). English, Español and
+// Português are shown first; the others after them. since: the first image version whose first-run
+// program knows the language (an older one would refuse the whole file).
 export const LANGUAGES = [
-  { id: 'en', name: 'English', locale: 'en_US.UTF-8' },
-  { id: 'es', name: 'Español', locale: 'es_ES.UTF-8' },
-  { id: 'pt', name: 'Português', locale: 'pt_BR.UTF-8' },
-  { id: 'fr', name: 'Français', locale: 'fr_FR.UTF-8' },
+  { id: 'en', name: 'English', english: 'English', locale: 'en_US.UTF-8', core: true },
+  { id: 'es', name: 'Español', english: 'Spanish', locale: 'es_ES.UTF-8', core: true },
+  { id: 'pt', name: 'Português', english: 'Portuguese', locale: 'pt_BR.UTF-8', core: true },
+  { id: 'fr', name: 'Français', english: 'French', locale: 'fr_FR.UTF-8', since: '0.8.8' },
+  { id: 'it', name: 'Italiano', english: 'Italian', locale: 'it_IT.UTF-8', since: '0.8.9' },
 ];
+
+const vparts = (v) => String(v || '').replace(/^v/, '').split('-')[0].split('.').map((x) => Number(x) || 0);
+export function versionAtLeast(v, min) {
+  const a = vparts(v), b = vparts(min);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  return true;
+}
+// Can this image start in language l? An image file of unknown version only gets the core three.
+export function langOnImage(l, image) {
+  if (!l || !l.since) return true;
+  return !!(image?.official && image.release && versionAtLeast(image.release.version, l.since));
+}
 
 // Coolers and what each one allows (lordos-firstrun checks the same in C)
 export const COOLERS = [

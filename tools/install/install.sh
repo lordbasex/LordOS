@@ -33,7 +33,7 @@ ADMIN_GROUP=""
 EXTRA_PKGS="sudo dbus-user-session pipewire pipewire-pulse pipewire-alsa wireplumber rtkit alsa-ucm-conf
  fonts-noto-core fonts-noto-color-emoji fonts-dejavu-core libthai-data shared-mime-info"
 # locales the interface ships translations for (en is the default); only generated, never selected
-LOCALES="en_US.UTF-8 es_ES.UTF-8 pt_BR.UTF-8 fr_FR.UTF-8"
+LOCALES="en_US.UTF-8 es_ES.UTF-8 pt_BR.UTF-8 fr_FR.UTF-8 it_IT.UTF-8"
 KNOWN_DMS="gdm3 gdm sddm lightdm lxdm xdm slim nodm greetd ly"
 # remote desktop (--remote-desktop): the file Settings > Sharing and the Raspberry Pi switch file
 # write (server/src/remote/remote_admin.c, tools/rpi/rootfs/usr/lib/lordos/rpi/firstboot)
@@ -876,7 +876,7 @@ do_install() {
     case "$installed" in ii*) say "     (LordOS ${installed#ii } is already installed: it will be upgraded or reinstalled)" ;; esac
     say "  2. Install it with apt-get; its dependencies come from your Debian mirrors"
     [ "$NO_EXTRAS" = 0 ] && say "     plus sudo, PipeWire, fonts and the user D-Bus session if missing"
-    say "  3. Create the $GREETER_USER system user (if missing) and generate the en/es/pt/fr locales"
+    say "  3. Create the $GREETER_USER system user (if missing) and generate the en/es/pt/fr/it locales"
     [ -n "$TARGET_USER" ] && say "  4. Add $TARGET_USER to the groups that exist of: $USER_GROUPS"
     [ -n "$ADMIN_GROUP" ] && say "     and make $TARGET_USER an administrator: this system has none, and the Store needs one"
     if has_systemd; then

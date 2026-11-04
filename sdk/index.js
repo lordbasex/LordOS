@@ -9,8 +9,9 @@ export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, u
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { settings, useSettings } from './settings.js';
-export { t, tOptional, useLocale, locale, languages, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
+export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
+export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken } from './shortcuts.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';

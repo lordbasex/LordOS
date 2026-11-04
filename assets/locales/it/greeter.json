@@ -1,0 +1,19 @@
+{
+  "bootTest": "Misurazione del tempo di avvio: avvio {k} di {n} completato. Riavvio tra {s} s. Anche l’accesso interrompe il test.",
+  "bootTestCancel": "Interrompi il test",
+  "busy": "Un momento…",
+  "cancel": "Annulla",
+  "confirmRestart": "Ci sono sessioni aperte: il lavoro non salvato andrà perso. Riavviare comunque?",
+  "confirmShutdown": "Ci sono sessioni aperte: il lavoro non salvato andrà perso. Spegnere comunque?",
+  "error": "Impossibile aprire la sessione.",
+  "locked": "Schermo bloccato",
+  "noUsers": "Nessun utente",
+  "password": "Password",
+  "restart": "Riavvia",
+  "shutdown": "Spegni",
+  "wait": {
+    "one": "Troppi tentativi. Attendi {count} secondo.",
+    "other": "Troppi tentativi. Attendi {count} secondi."
+  },
+  "wrong": "Password errata."
+}

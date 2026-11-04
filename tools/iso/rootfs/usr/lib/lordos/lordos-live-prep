@@ -3,7 +3,7 @@
 # lordos.service). On an installed system it does nothing. See docs/ISO.md and docs/SESSIONS.md.
 #
 # Options on the kernel command line (grub menu):
-#   lordos.lang=es   interface language (en by default; es, pt and fr): /etc/default/locale and the live
+#   lordos.lang=es   interface language (en by default; es, pt, fr and it): /etc/default/locale and the live
 #                    user's settings the first time
 #   lordos.gpu=0     safe mode: everything on the CPU. lord-sessiond reads it from /proc/cmdline and
 #                    passes LORD_GPU=0 to every session (nothing is needed here).
@@ -28,6 +28,7 @@ for arg in $(cat /proc/cmdline); do
         lordos.lang=es) LANG_UI=es ;;
         lordos.lang=pt) LANG_UI=pt ;;
         lordos.lang=fr) LANG_UI=fr ;;
+        lordos.lang=it) LANG_UI=it ;;
     esac
 done
 # the keyboard follows the language (the SDK's default is latam); Settings → Keyboard changes it
@@ -35,6 +36,7 @@ case "$LANG_UI" in
     es) LOC=es_ES.UTF-8; KB=latam; DIRS="Escritorio Documentos Descargas Música Imágenes Videos" ;;
     pt) LOC=pt_BR.UTF-8; KB=br; DIRS="Área_de_trabalho Documentos Downloads Música Imagens Vídeos" ;;
     fr) LOC=fr_FR.UTF-8; KB=fr; DIRS="Bureau Documents Téléchargements Musique Images Vidéos" ;;
+    it) LOC=it_IT.UTF-8; KB=it; DIRS="Scrivania Documenti Scaricati Musica Immagini Video" ;;
     *)  LOC=en_US.UTF-8; KB=us; DIRS="Desktop Documents Downloads Music Pictures Videos" ;;
 esac
 printf 'LANG=%s\n' "$LOC" > /etc/default/locale     # also the login screen language

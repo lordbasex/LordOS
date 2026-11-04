@@ -1,7 +1,7 @@
 // emoji.jsx — emoji and symbols for the whole system.
 //
 //   ❖. (or Ctrl+❖Space) opens a small picker where the cursor is: search by words in
-//   Spanish, English, Portuguese and French (CLDR), categories, recents and skin tone. Choosing one types it
+//   Spanish, English, Portuguese, French and Italian (CLDR), categories, recents and skin tone. Choosing one types it
 //   into the focused field the same way the input method does (a key that types that
 //   text); in a Linux app it pastes it through the clipboard; if there is no field, it copies it.
 //   The "Emoji & Symbols" app (apps/characters) shows the same thing in a window, plus the Unicode
@@ -44,7 +44,7 @@ const fold = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 let index = null;              // [{ ch, text }] with all words folded
 function buildIndex() {
   if (index) return index;
-  const langs = ['es', 'en', 'pt', 'fr'];
+  const langs = ['es', 'en', 'pt', 'fr', 'it'];
   const cats = langs.map(keywords);
   index = [];
   for (const g of groups()) for (const ch of g.list) {

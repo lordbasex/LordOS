@@ -390,5 +390,8 @@
   "write.text": "Keep the drive plugged in. This takes a few minutes.",
   "write.title": "Writing to {name}",
   "write.untouchedText": "Nothing on the drive was changed.",
-  "write.why": "What happened"
+  "write.why": "What happened",
+  "general.moreLanguages": "More languages",
+  "general.langSince": "{name} needs a LordOS {v} image or newer.",
+  "err.langImage": "This image can’t start in that language: choose English, Español or Português, or a newer image."
 }

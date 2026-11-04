@@ -10,10 +10,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+An update of 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes.
+
+### Added
+
+- **Italian** as a built-in language ([#16](https://github.com/lordbasex/LordOS/issues/16)): the whole interface, every app, error messages, the login screen, remote desktop's pages, the LordOS Imager, emoji names (CLDR 45), country names (CLDR), Italian dates and numbers (`it_IT`, `it_CH`), and the home folders in Italian for new users (Scrivania, Documenti, Scaricati…). The Store shows apps' Italian names when their metadata has them.
+- Settings → Language & Region: **Preferred languages**, a list with English, Español and Português and a **+** to add Français, Italiano or an installed pack (it becomes the first, LordOS's language), **−** to remove one and arrows to reorder them. When a text isn't translated, the next language in the list is used before English. The **+** list also names languages LordOS isn't translated into yet, and says where to ask for them.
+- The login screen's language button shows a globe and the language's name; its menu lists English, Español and Português first and then the other languages LordOS ships.
+- LordOS Imager: the new system's language is chosen with chips (English, Español, Português, and "+ More languages" for the others). A language the chosen image can't start in is shown disabled with the first image version that can (Italian from the 0.8.9 images). The desktop app's own language is a globe at the bottom of its sidebar.
+
 ### Fixed
 
-- LordOS Imager for Mac didn't list a card in the Mac's built-in SD card slot: macOS reports that slot as an
-  internal disk, and the Imager only looked at external ones. It now lists physical disks with removable media
+- The desktop LordOS Imager didn't list a card in a laptop's built-in SD card slot: the system reports that slot
+  as an internal disk, and the Imager only looked at external ones. It now lists physical disks with removable media
   too; the internal SSD and other fixed internal disks are still never shown. Reported by a user with an SD
   card that showed up in other writers (`diskutil`: "internal, physical", FAT32, 15.9 GB).
 

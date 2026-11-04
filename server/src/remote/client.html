@@ -138,6 +138,26 @@ const L = {
     media: 'La connexion est établie, mais aucune image n’est arrivée.', mediaWhat: 'Ce navigateur ne peut peut-être pas lire la vidéo H.264 ou VP8 pour le moment (décodage matériel désactivé ou codec bloqué). Essayez un autre navigateur.',
     wsdown: 'L’ordinateur est injoignable : la connexion a été perdue.', wsdownWhat: 'Vérifiez que l’ordinateur est allumé et connecté au réseau. Cette page continue d’essayer toute seule.',
   },
+  it: {
+    full: 'Schermo intero', out: 'Disconnetti', conn: 'Connessione…', reconn: 'Riconnessione…', retry: 'Riprova', signout: 'Esci',
+    sndOn: 'Attiva l’audio', sndOff: 'Disattiva l’audio', video: 'Video', bye: 'La sessione è terminata.', busy: '{app} sta condividendo questa sessione. Riprova quando avrà finito.',
+    hwEnc: 'via hardware', swEnc: 'via software', pinOn: 'Mantieni visibile questa barra', pinOff: 'Lascia che questa barra si nasconda',
+    vinfoTip: (comp, enc, ms) => `Schermo composto sulla ${comp}; video codificato ${enc} (${ms} ms per fotogramma). Fotogrammi al secondo: mostrati qui / inviati dal computer.`,
+    unsupTitle: 'Questo browser non può mostrare il desktop remoto',
+    unsupText: 'Il desktop remoto arriva come video in diretta tramite WebRTC. A questo browser manca qualcosa di necessario:',
+    reqRtc: 'WebRTC (RTCPeerConnection) con canali dati', reqCodec: 'Decodifica video H.264 o VP8', reqSecure: 'Una pagina sicura (https): questa lo è',
+    unsupWhat: 'Apri questo indirizzo in un browser aggiornato, su computer o su dispositivo mobile, con WebRTC attivo. Anche le estensioni o le impostazioni per la privacy che disattivano WebRTC causano questo problema.',
+    failTitle: 'Impossibile connettersi al desktop remoto', why: 'Perché', what: 'Cosa fare', details: 'Dettagli',
+    noroute: 'La connessione video non ha mai raggiunto questo computer: nessun controllo di connessione è arrivato via UDP, né dalla porta TCP {port}. Un firewall, una VPN o la rete che vi separa li blocca entrambi.',
+    norouteWhat: 'Consenti UDP, o almeno la porta TCP {port}, tra questo browser e il computer. Per connetterti tra reti diverse, un amministratore può aggiungere un relay (TURN) in Impostazioni → Condivisione sul computer.',
+    dtls: 'La connessione è stata raggiunta, ma non è stato possibile creare il canale video cifrato (DTLS).',
+    dtlsWhat: 'Riprova. Se succede ancora, qualcosa nel mezzo (un proxy o un software di sicurezza) sta alterando la connessione.',
+    lost: 'La connessione si è interrotta e non è tornata.', lostWhat: 'Controlla la rete da entrambe le parti. Quando torna, riprova: la tua sessione resta aperta.',
+    server: 'Il computer non è riuscito ad avviare la connessione video.', serverWhat: 'Riprova. Se succede ancora, disattiva e riattiva il desktop remoto in Impostazioni → Condivisione.',
+    offer: 'Il computer ha rifiutato o non ha risposto alla proposta di connessione di questo browser.', offerWhat: 'Aggiorna il browser e riprova. Se succede ancora, un’estensione potrebbe modificare la pagina.',
+    media: 'La connessione è attiva, ma non è arrivata nessuna immagine.', mediaWhat: 'Questo browser forse non riesce a riprodurre video H.264 o VP8 al momento (decodifica hardware disattivata o un codec bloccato). Prova un altro browser.',
+    wsdown: 'Il computer non è raggiungibile: la connessione si è interrotta.', wsdownWhat: 'Controlla che il computer sia acceso e in rete. Questa pagina continua a riprovare da sola.',
+  },
 };
 const T = L[(navigator.language || 'en').slice(0, 2)] || L.en;
 const $ = (id) => document.getElementById(id);

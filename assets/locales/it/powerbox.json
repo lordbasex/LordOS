@@ -1,0 +1,10 @@
+{
+  "openTitle": "«{app}» vuole aprire un file",
+  "saveTitle": "«{app}» vuole salvare un file",
+  "open": "Apri",
+  "save": "Salva",
+  "cancel": "Annulla",
+  "up": "Su",
+  "name": "Nome",
+  "folder": "Cartella"
+}

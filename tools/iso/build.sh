@@ -128,6 +128,7 @@ es_MX.UTF-8 UTF-8
 en_US.UTF-8 UTF-8
 pt_BR.UTF-8 UTF-8
 fr_FR.UTF-8 UTF-8
+it_IT.UTF-8 UTF-8
 EOF
 in_ch locale-gen > /dev/null
 echo 'LANG=en_US.UTF-8' > "$CH/etc/default/locale"     # English by default (lordos-live-prep switches it)

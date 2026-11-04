@@ -12,7 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define IDX_MAGIC "LPKIDX3"
+#define IDX_MAGIC "LPKIDX4"
 #define PKG_DIR "/var/lib/lordos/pkg"
 #define PKG_CACHE "/var/cache/lordos/pkg"
 
@@ -33,7 +33,7 @@ typedef struct {
 typedef struct { uint32_t name, version, pkg; } IdxProv;      /* name is provided by package pkg */
 
 typedef struct {
-    uint32_t id, package, name, summary, name_es, summary_es, name_pt, summary_pt, name_fr, summary_fr, icon, categories, type;
+    uint32_t id, package, name, summary, name_es, summary_es, name_pt, summary_pt, name_fr, summary_fr, name_it, summary_it, icon, categories, type;
     uint32_t desc;                      /* in the descriptions block, 0-terminated; UINT32_MAX: none */
 } IdxApp;
 

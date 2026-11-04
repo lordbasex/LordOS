@@ -7,14 +7,18 @@ import { platform } from '../platform.js';
 import { app, set, setCfg, setSecrets } from '../state.js';
 import * as v from '../core/validate.js';
 import * as firstrun from '../core/firstrun.js';
-import { COOLERS, LANGUAGES, ACCENTS, THEMES, WALLPAPERS, profilesFor, defaultProfile, overclockAllowed, coolerHasFan, defaultConfig } from '../core/catalog.js';
+import { COOLERS, LANGUAGES, ACCENTS, THEMES, WALLPAPERS, profilesFor, defaultProfile, overclockAllowed, coolerHasFan, defaultConfig, langOnImage } from '../core/catalog.js';
 import { Field, SwitchRow, Choice, Card, Group, Notice, PickList, Press, Badge } from './kit.jsx';
 import { CoolerArt, ThemeArt } from './art.jsx';
 import countries from '../data/countries.js';
 
 export const TABS = ['general', 'user', 'wifi', 'remote', 'look', 'cooling', 'more'];
 
-export function customiseProblems(s) { return firstrun.check(s.cfg, s.secrets); }
+export function customiseProblems(s) {
+  const out = firstrun.check(s.cfg, s.secrets);
+  if (!langOnImage(LANGUAGES.find((l) => l.id === s.cfg.lang), s.image)) out.push({ field: 'lang', key: 'imager.err.langImage' });
+  return out;
+}
 const errFor = (s, field) => {
   const p = customiseProblems(s).find((x) => x.field === field);
   return p ? p.key : null;
@@ -26,6 +30,44 @@ function useErr(s) {
     const k = errFor(s, field);
     return k && (s.showErrors || (value !== undefined && value !== '' && value !== null)) ? tr(k) : null;
   };
+}
+
+// The new system's language: English, Español and Português as chips, then "+ More languages"
+// shows the others (Français, Italiano…). A language the chosen image can't start in is shown
+// disabled, with the first image version that can.
+function LanguagePick({ s }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const c = s.cfg;
+  const [more, setMore] = useState(() => !LANGUAGES.find((l) => l.id === c.lang)?.core);
+  const shown = LANGUAGES.filter((l) => l.core || more);
+  const later = LANGUAGES.filter((l) => !l.core && !langOnImage(l, s.image));
+  return (
+    <View style={{ gap: 6 }}>
+      <View {...platform.a11y({ label: tr('imager.general.language'), role: 'radiogroup' })} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {shown.map((l) => {
+          const on = c.lang === l.id, ok = langOnImage(l, s.image);
+          return (
+            <Press key={l.id} id={`lang-${l.id}`} label={l.name} role="radio" selected={on} disabled={!ok} onClick={() => setCfg({ lang: l.id })}
+              style={{ height: 28, paddingHorizontal: 14, borderRadius: 14, justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
+                border: `1px solid ${on ? t.accent : t.separator}` }}>
+              <Text style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', color: on ? '#fff' : t.text }}>{l.name}</Text>
+            </Press>
+          );
+        })}
+        {!more ? (
+          <Press id="lang-more" label={tr('imager.general.moreLanguages')} onClick={() => setMore(true)}
+            style={{ height: 28, paddingHorizontal: 14, borderRadius: 14, justifyContent: 'center', border: `1px dashed ${t.textDim}` }}>
+            <Text style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', color: t.text }}>{`+ ${tr('imager.general.moreLanguages')}`}</Text>
+          </Press>
+        ) : null}
+      </View>
+      {more && later.length ? (
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4 }}>
+          {later.map((l) => tr('imager.general.langSince', { name: l.name, v: l.since })).join(' ')}</Text>
+      ) : null}
+    </View>
+  );
 }
 
 function General({ s }) {
@@ -44,7 +86,8 @@ function General({ s }) {
         error={err('hostname', c.hostname)} hint={tr('imager.general.hostnameHint', { name: c.hostname || v.suggestHostname(c.user.fullname || c.user.name) })} suffix=".local" />
       <View style={{ gap: 6 }}>
         <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: useTheme().text }}>{tr('imager.general.language')}</Text>
-        <Choice id="lang" label={tr('imager.general.language')} value={c.lang} onChange={(lang) => setCfg({ lang })} options={LANGUAGES.map((l) => [l.id, l.name])} />
+        <LanguagePick s={s} />
+        {err('lang', c.lang) ? <Text style={{ fontSize: typeScale.caption, color: '#ff453a' }}>{err('lang', c.lang)}</Text> : null}
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.l }}>
         <View style={{ flex: 1, gap: 6 }}>

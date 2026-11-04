@@ -1,0 +1,14 @@
+{
+  "folder": "Fotocamera",
+  "photoName": "Foto {date}",
+  "videoName": "Video {date}",
+  "photo": "Foto",
+  "video": "Video",
+  "mirror": "Specchio",
+  "none": "Nessuna fotocamera trovata",
+  "denied": "Fotocamera non ha il permesso di usare la fotocamera. Modificalo in Impostazioni → Privacy.",
+  "error": "Impossibile usare la fotocamera: {error}",
+  "noneHint": "Collega una fotocamera USB: compare qui da sola, senza riavviare l’app.",
+  "deniedTitle": "Nessun accesso alla fotocamera",
+  "errorTitle": "Impossibile aprire la fotocamera"
+}

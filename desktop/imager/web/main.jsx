@@ -15,6 +15,8 @@ function Root() {
 }
 
 await init();
+// state.js read the options before init() loaded them: take the saved ones (language, theme…)
+app.set((s) => ({ ...s, options: { ...s.options, ...platform.loadOptions() } }));
 await warm();
 createRoot(document.getElementById('root')).render(h(Root));
 

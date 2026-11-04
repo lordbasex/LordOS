@@ -13,7 +13,7 @@
 //           {t:'mode', mode:'login'|'lock'|'switch', user} · {t:'ok'} · {t:'fail', wait} · {t:'error'} · {t:'busy'}
 import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/runtime';
 import {
-  View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, keyboard, settings, LordOSWordmark,
+  View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, CORE_LANGUAGES, keyboard, settings, LordOSWordmark,
   lordosWallpapers, findWallpaper, wallpaperSrc, GREETER_WALLPAPER, fs, osk, oskState, startOsk, OskPanel, OskIcon, oskLift, motionCodecs, media, MediaView,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -150,13 +150,28 @@ function Pill({ label, icon, onClick, keepFocus }) {
   );
 }
 
+// The language button: a drawn globe and the language's own name.
+function GlobeLabel({ text }) {
+  const c = 'rgba(255,255,255,0.85)';
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 13, height: 13, borderRadius: 7, border: `1.3px solid ${c}`, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', width: 5, height: 13, borderRadius: 3, border: `1.1px solid ${c}` }} />
+        <View style={{ position: 'absolute', width: 13, height: 1.1, backgroundColor: c }} />
+      </View>
+      <Text style={{ fontSize: 12, fontWeight: 600, color: c }}>{text}</Text>
+    </View>
+  );
+}
+
 function PopupList({ items, onPick, onClose, right }) {
   return (
     <View onClick={onClose} style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height }}>
       <View onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right, bottom: 58, minWidth: 170, padding: 6, borderRadius: 12,
         backgroundColor: 'rgba(30,22,40,0.92)', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 10px 30px rgba(0,0,0,0.45)' }}>
-        {items.map(([id, label, on]) => (
-          <View key={id} onClick={() => { onPick(id); onClose(); }} style={{ height: 30, paddingHorizontal: 10, borderRadius: 7, flexDirection: 'row',
+        {items.map(([id, label, on], i) => (id === '-'
+          ? <View key={`sep${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+          : <View key={id} onClick={() => { onPick(id); onClose(); }} style={{ height: 30, paddingHorizontal: 10, borderRadius: 7, flexDirection: 'row',
             alignItems: 'center', gap: 8, backgroundColor: on ? 'rgba(255,255,255,0.12)' : 'transparent' }}>
             <Text style={{ width: 12, fontSize: 12, color: '#fff' }}>{on ? '✓' : ''}</Text>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>{label}</Text>
@@ -221,9 +236,10 @@ function Greeter() {
         const kbs = layouts.map((l, i) => ({ layout: l, variant: variants[i] || '' }));
         if (JSON.stringify(settings.get().keyboards) !== JSON.stringify(kbs)) keyboard.set(kbs);
         // language: the one chosen here before or the system's (if there is no catalog, English)
-        if (!['es', 'en', 'pt', 'fr'].includes(settings.get().language)) {
+        const shipped = languages().filter((l) => !l.user).map((l) => l.id);
+        if (!shipped.includes(settings.get().language)) {
           const sys = String(m.lang || '').slice(0, 2);
-          setLanguage(['es', 'en', 'pt', 'fr'].includes(sys) ? sys : 'en');
+          setLanguage(shipped.includes(sys) ? sys : 'en');
         }
         // the selected user: the one from the locked screen, another (switch user), the last one
         // shown on the monitor, one with an open session or the first. Only when the screen is shown
@@ -279,7 +295,12 @@ function Greeter() {
   const avatarSize = Math.round(Math.max(76, Math.min(110, H * 0.12)));
   const kbs = keyboard.configured();
   const kbIdx = Math.min(s.keyboardIndex || 0, kbs.length - 1);
-  const langs = languages().filter((l) => ['es', 'en', 'pt', 'fr'].includes(l.id));
+  // the languages LordOS ships: English, Español and Português first, then the others (Français,
+  // Italiano…) after a separator; a user's packs aren't readable from the login screen
+  const shipped = languages().filter((l) => !l.user);
+  const core = CORE_LANGUAGES.map((id) => shipped.find((l) => l.id === id)).filter(Boolean);
+  const langs = [...core, ...shipped.filter((l) => !CORE_LANGUAGES.includes(l.id))];
+  const langName = shipped.find((l) => l.id === lang)?.name || lang.toUpperCase();
   const locked = info.mode === 'lock' && user && user.name === info.user;
   // the column rises so the password stays above the on-screen keyboard
   const lift = oskLift(Math.round(H * 0.6) + 104 + (locked ? 16 : 0), H);
@@ -358,7 +379,7 @@ function Greeter() {
           <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{ip || info.host}</Text>
         </View>
         <View style={{ position: 'absolute', right: 20, bottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Pill label={lang.toUpperCase()} onClick={() => setMenu(menu === 'lang' ? null : 'lang')} />
+          <Pill icon={<GlobeLabel text={langName} />} onClick={() => setMenu(menu === 'lang' ? null : 'lang')} />
           {kbs.length > 1 ? <Pill label={keyboard.label(kbs[kbIdx])} onClick={() => setMenu(menu === 'kb' ? null : 'kb')} /> : null}
           <Pill keepFocus icon={<OskIcon color="rgba(255,255,255,0.85)" size={14} />} onClick={osk.toggle} />
           <RoundButton label={t('greeter.restart')} onClick={() => power('reboot')}>
@@ -377,7 +398,7 @@ function Greeter() {
           </View>
         ) : null}
         {menu === 'lang' ? <PopupList right={20 + (kbs.length > 1 ? 160 : 100)} onClose={() => setMenu(null)} onPick={(id) => setLanguage(id)}
-          items={langs.map((l) => [l.id, l.name, l.id === lang])} /> : null}
+          items={langs.flatMap((l, i) => [...(i === core.length && i > 0 ? [['-']] : []), [l.id, l.name, l.id === lang]])} /> : null}
         {menu === 'kb' ? <PopupList right={20 + 100} onClose={() => setMenu(null)} onPick={(i) => settings.set({ keyboardIndex: Number(i) })}
           items={kbs.map((k, i) => [String(i), keyboard.list().find((x) => x.id === k.layout)?.name || k.layout, i === kbIdx])} /> : null}
         </View>

@@ -390,5 +390,8 @@
   "write.text": "Gardez le lecteur branché. Cela prend quelques minutes.",
   "write.title": "Écriture sur {name}",
   "write.untouchedText": "Rien n’a été modifié sur le lecteur.",
-  "write.why": "Ce qui s’est passé"
+  "write.why": "Ce qui s’est passé",
+  "general.moreLanguages": "Plus de langues",
+  "general.langSince": "{name} nécessite une image LordOS {v} ou plus récente.",
+  "err.langImage": "Cette image ne peut pas démarrer dans cette langue : choisissez English, Español ou Português, ou une image plus récente."
 }

@@ -5,10 +5,10 @@
 // The same files build the desktop app (desktop/imager, Tauri): only platform.js is swapped and the
 // few SDK primitives used are DOM versions there. Nothing here talks to the system directly.
 import { View, Text, ScrollView, Button, Lumo, useTheme, useLocale, useStore, typeScale, spacing } from '@lordos/sdk';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { platform } from './platform.js';
-import { app, set, STEPS, loadReleases, isBusy } from './state.js';
-import { deviceById, deviceLabel } from './core/catalog.js';
+import { app, set, setOptions, STEPS, loadReleases, isBusy } from './state.js';
+import { deviceById, deviceLabel, LANGUAGES } from './core/catalog.js';
 import { Press, Helper, useFocusKeys } from './ui/kit.jsx';
 import { ImagerIcon } from './ui/art.jsx';
 import { DeviceStep } from './ui/StepDevice.jsx';
@@ -63,6 +63,56 @@ function stepDetail(s, id, tr) {
   return '';
 }
 
+// The desktop app's own language (on LordOS the Imager follows Settings): a globe with the
+// language's name; its menu lists English, Español and Português, then the others, then "the
+// computer's language".
+function AppLanguage({ s }) {
+  const t = useTheme();
+  const { t: tr, lang } = useLocale();
+  const [open, setOpen] = useState(false);
+  const pick = (id) => { setOpen(false); setOptions({ lang: id }); platform.setLanguage?.(id); };
+  const cur = s.options.lang || '';
+  const name = LANGUAGES.find((l) => l.id === lang)?.name || lang;
+  const item = (id, label) => (
+    <Press key={id || 'auto'} id={`applang-${id || 'auto'}`} label={label} role="menuitemradio" selected={cur === id} onClick={() => pick(id)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, height: 28, borderRadius: 6,
+        backgroundColor: cur === id ? t.accent : 'transparent' }}>
+      <Text style={{ fontSize: typeScale.callout, color: cur === id ? '#fff' : t.text }}>{label}</Text>
+    </Press>
+  );
+  const sep = (k) => <View key={k} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: t.separator }} />;
+  return (
+    <View>
+      {open ? (
+        <View {...platform.a11y({ role: 'menu', label: tr('imager.options.language') })}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: 36, padding: 6, borderRadius: 10, backgroundColor: t.windowBg,
+            border: `1px solid ${t.separator}`, boxShadow: '0 12px 30px rgba(0,0,0,0.35)' }}>
+          <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, paddingHorizontal: 8, paddingVertical: 4 }}>{tr('imager.options.language')}</Text>
+          {LANGUAGES.filter((l) => l.core).map((l) => item(l.id, l.name))}
+          {sep('a')}
+          {LANGUAGES.filter((l) => !l.core).map((l) => item(l.id, l.name))}
+          {sep('b')}
+          {item('', tr('imager.options.auto'))}
+        </View>
+      ) : null}
+      <Press id="applang" label={`${tr('imager.options.language')}: ${name}`} onClick={() => setOpen(!open)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 7 }}>
+        <Globe color={t.textDim} />
+        <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{name}</Text>
+      </Press>
+    </View>
+  );
+}
+
+function Globe({ color }) {
+  return (
+    <View style={{ width: 14, height: 14, borderRadius: 7, border: `1.3px solid ${color}`, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', width: 6, height: 14, borderRadius: 3, border: `1.1px solid ${color}` }} />
+      <View style={{ position: 'absolute', width: 14, height: 1.1, backgroundColor: color }} />
+    </View>
+  );
+}
+
 function Sidebar({ s }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -109,6 +159,7 @@ function Sidebar({ s }) {
       </View>
       <View style={{ flex: 1 }} />
       {s.step !== 'done' ? <Helper pose={pose} title={tr(`imager.tip.${tip}.title`)} text={tr(`imager.tip.${tip}.text`)} /> : null}
+      {!platform.followsSystem ? <AppLanguage s={s} /> : null}
       <Press id="options" label={tr('imager.options.title')} onClick={() => set({ dialog: 'options' })}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 7 }}>
         <Text style={{ fontSize: 14, color: t.textDim }}>⚙</Text>

@@ -178,7 +178,7 @@ lord-server until they're installed.
 - **The picker** (`sdk/emoji.jsx`, mounted by `startShell` in every theme):
   - it opens with **❖.** or Ctrl+❖Space, below the cursor of the focused field, or in the middle
     of the screen;
-  - it **searches** by name and keywords in Spanish, English, Portuguese and French at once (CLDR, ignoring
+  - it **searches** by name and keywords in Spanish, English, Portuguese, French and Italian at once (CLDR, ignoring
     accents): "corazon", "heart" and "coração" find the same thing;
   - it has **categories** (Tab moves from one to the next), **recents** and **skin tone** (both
     saved in the settings);

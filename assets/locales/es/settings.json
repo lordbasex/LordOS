@@ -515,5 +515,17 @@
   "motion.loginReset": "La pantalla de inicio de sesión volvió a su video predeterminado.",
   "wallpaperFor.desktop": "Escritorio",
   "wallpaperFor.login": "Pantalla de inicio de sesión",
-  "sharing.inUseBy": "En uso por {app}. El escritorio remoto no puede entrar a esta sesión hasta que termine."
+  "sharing.inUseBy": "En uso por {app}. El escritorio remoto no puede entrar a esta sesión hasta que termine.",
+  "lang.preferred": "Idiomas preferidos",
+  "lang.primary": "Principal",
+  "lang.preferredHint": "El primer idioma es el de LordOS y sus apps (la pantalla de inicio de sesión tiene el suyo, que se elige ahí). Si un texto no está traducido, se usan los siguientes, en orden.",
+  "lang.add": "Agregar un idioma",
+  "lang.remove": "Quitar el idioma",
+  "lang.up": "Subir",
+  "lang.down": "Bajar",
+  "lang.search": "Buscar idiomas",
+  "lang.ready": "LISTOS PARA USAR",
+  "lang.notYet": "TODAVÍA SIN TRADUCIR",
+  "lang.notYetHint": "LordOS todavía no está traducido al {name}. Ya podés usar sus formatos de fecha y números con Región, más abajo, y pedir el idioma en github.com/lordbasex/LordOS/issues.",
+  "lang.none": "Ningún idioma coincide."
 }

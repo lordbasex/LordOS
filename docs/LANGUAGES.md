@@ -1,7 +1,16 @@
 # Language and region in LordOS
 
 LordOS handles language across the whole system, not just in the interface. It ships with
-**Spanish, English, Portuguese and French**, and more languages are added with packs, without touching code.
+**Spanish, English, Portuguese, French and Italian**, and more languages are added with packs, without touching code.
+
+**Settings → Language & Region → Preferred languages** lists English, Español and Português by
+default. **+** adds another one (Français, Italiano, an installed pack); it goes first and becomes
+LordOS's language. **−** removes the selected one and **↑ ↓** reorder them. The first language is the one of
+LordOS and its apps (the login screen keeps the one chosen on it); when a text isn't translated the next ones are tried in
+order, then English (`settings.languages`, `sdk/i18n.js`). The **+** list also names the languages
+LordOS isn't translated into yet (`sdk/langnames.js`): picking one says so and where to ask for it.
+The login screen's language button (a globe and the language's name) shows English, Español and
+Português first and then the other languages LordOS ships.
 
 | Layer | What it does | Where |
 |---|---|---|
@@ -51,7 +60,7 @@ formatNumber(1234.5, 2)            // "1.234,50" (es_AR) / "1,234.50" (en_US)
 - App names come from `apps.json` (`appName(app)`); if there is no translation, from
   `manifest.json` (whose `name` and `description` are English).
 - **English is the default language** and the fallback: a new user, the greeter, the live system
-  (unless GRUB's Español, Português or Français entry passes `lordos.lang`) and the installer start in English.
+  (unless GRUB's Español, Português or Français entry passes `lordos.lang`; Italian is chosen in Settings, the boot menu has no room for another entry) and the installer start in English.
   A language saved in `settings.json` is always kept.
 - Changing the language remounts the whole interface. Windows, tabs and sessions live in stores
   and are kept. That's why lists containing text can't be module-level constants: they are built
@@ -123,7 +132,7 @@ Add**. Available plural rules: `one-other`, `zero-one-other`, `none`, `east-slav
 the same format.
 
 `node tools/i18n-check.mjs` with no arguments checks every bundled language and also the keys the
-code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt and fr, and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
+code uses (`t('…')` in apps, themes and SDK) that don't exist in English. Today (0.8.5-beta): 8,002 keys, complete in es, en, pt, fr and it (0.8.8.2: 9,342 keys), and 496 error codes from the server. It also runs `tools/brand-check.mjs`, which fails when a third-party
 brand or product name (another system, its apps or features) shows up in the catalogs,
 the Help articles, the app manifests, README.md or CHANGELOG.md: LordOS uses its own names
 (Search, Apps, Night Light, Quick Preview…) and generic wording. Real exceptions go in its

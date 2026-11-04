@@ -250,7 +250,7 @@ def build_mmdb(csv_path, out):
 # ---- countries -----------------------------------------------------------------------------
 
 def countries(geojson):
-    pos, names = {}, {'es': {}, 'en': {}, 'pt': {}, 'fr': {}}
+    pos, names = {}, {'es': {}, 'en': {}, 'pt': {}, 'fr': {}, 'it': {}}
     for feat in geojson['features']:
         p = feat['properties']
         cc = iso_of(p)
@@ -260,7 +260,7 @@ def countries(geojson):
         if lon is None or lat is None:
             continue
         pos[cc] = [round(lon, 2), round(lat, 2)]
-        for lang, key in (('es', 'NAME_ES'), ('en', 'NAME_EN'), ('pt', 'NAME_PT'), ('fr', 'NAME_FR')):
+        for lang, key in (('es', 'NAME_ES'), ('en', 'NAME_EN'), ('pt', 'NAME_PT'), ('fr', 'NAME_FR'), ('it', 'NAME_IT')):
             names[lang][cc] = p.get(key) or p.get('NAME_EN') or p.get('NAME') or cc
     return pos, names
 

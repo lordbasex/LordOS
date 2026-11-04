@@ -59,7 +59,7 @@ fn platform(st: State<App>) -> Platform {
     let country = loc.split(['-', '_']).nth(1).unwrap_or("").to_uppercase();
     Platform {
         os: std::env::consts::OS, arch: std::env::consts::ARCH, version: env!("CARGO_PKG_VERSION"),
-        lang: if ["en", "es", "pt", "fr"].contains(&lang.as_str()) { lang } else { "en".into() },
+        lang: if ["en", "es", "pt", "fr", "it"].contains(&lang.as_str()) { lang } else { "en".into() },
         timezone: iana_time_zone::get_timezone().unwrap_or_default(),
         country: if country.len() == 2 && country.bytes().all(|c| c.is_ascii_uppercase()) { country } else { String::new() },
         cache: st.cache.lock().unwrap().display().to_string(),

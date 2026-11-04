@@ -1,0 +1,73 @@
+{
+  "archiveName": "Archivio",
+  "archiveSummary": {
+    "one": "{count} file, {size}",
+    "other": "{count} file, {size}"
+  },
+  "compressOne": "Comprimi «{name}»",
+  "compressMany": {
+    "one": "Comprimi {count} elemento",
+    "other": "Comprimi {count} elementi"
+  },
+  "compressing": "Compressione di «{name}»…",
+  "compressProgress": "Compressione di «{name}»: {files} file",
+  "compressed": {
+    "one": "«{name}» pronto ({count} file)",
+    "other": "«{name}» pronto ({count} file)"
+  },
+  "compressError": "Impossibile comprimere «{name}» ({error})",
+  "extractHere": "Estrai qui",
+  "extractSelected": {
+    "one": "Estrai {count} elemento",
+    "other": "Estrai {count} elementi"
+  },
+  "extracting": "Estrazione di «{name}»…",
+  "extractProgress": "Estrazione di «{name}»: {files} file ({pct}%)",
+  "extracted": {
+    "one": "Estratto in «{name}» ({count} file)",
+    "other": "Estratto in «{name}» ({count} file)"
+  },
+  "extractedSkipped": {
+    "one": "Estratto in «{name}» ({count} file); {skipped} ignorati per sicurezza",
+    "other": "Estratto in «{name}» ({count} file); {skipped} ignorati per sicurezza"
+  },
+  "extractError": "Impossibile estrarre «{name}» ({error})",
+  "opening": "Apertura di «{name}»…",
+  "loading": "Caricamento…",
+  "locked": "protetto da password",
+  "pages": {
+    "one": "{count} pagina",
+    "other": "{count} pagine"
+  },
+  "more": {
+    "one": "e {count} altro",
+    "other": "e altri {count}"
+  },
+  "err.invalid": "non è un archivio, oppure è danneggiato",
+  "err.disk-full": "il disco è pieno",
+  "err.too-big": "è troppo grande",
+  "err.too-many": "contiene troppi file",
+  "err.corrupt": "è danneggiato",
+  "err.write": "impossibile scrivere",
+  "err.unavailable": "il servizio dei documenti non è disponibile",
+  "err.cancelled": "annullato",
+  "err.crash": "il servizio dei documenti si è interrotto inaspettatamente",
+  "err.timeout": "ha richiesto troppo tempo",
+  "err.protocol": "il servizio dei documenti ha inviato una risposta non valida",
+  "err.spawn": "impossibile avviare il servizio dei documenti",
+  "err.closed": "il documento è stato chiuso",
+  "err.bad-request": "richiesta non valida",
+  "err.bad-field": "campo del modulo non valido",
+  "err.bad-page": "pagina non valida",
+  "err.busy": "il servizio dei documenti è occupato",
+  "err.memory": "memoria esaurita",
+  "err.no-fonts": "nessun carattere disponibile",
+  "err.not-open": "il documento non è aperto",
+  "err.nothing": "non c’è nulla da salvare",
+  "err.read-only": "il documento è di sola lettura",
+  "err.save": "impossibile salvare",
+  "err.unknown-op": "operazione sconosciuta",
+  "err.image": "immagine non valida",
+  "err.blob": "dati non validi",
+  "err.password": "il documento è protetto da password"
+}

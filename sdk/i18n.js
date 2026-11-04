@@ -11,7 +11,8 @@
 //   ~/.local/share/lordos/locales/<language>/<namespace>.json   (the user's language packs)
 // The namespace is the first part of the key ('terminal', 'files', 'shell'…). A new
 // language is a folder with those files and a meta.json; no code changes are needed.
-// If a key is missing English is used and, if it isn't there either, the key itself.
+// If a key is missing, the user's other preferred languages are tried in order (settings.languages),
+// then English and, if it isn't there either, the key itself.
 //
 // There is no Intl in QuickJS: plurals and date/number formats come from our own rules
 // and data (each language's format.json).
@@ -19,10 +20,13 @@ import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 
 export const FALLBACK = 'en';
+// The three languages LordOS lists first everywhere (Settings, the login screen, the Imager); the
+// others are added with + (docs/LANGUAGES.md).
+export const CORE_LANGUAGES = ['en', 'es', 'pt'];
 
 // Plural rules (CLDR, simplified to integers). A language picks its own in meta.json.
 const PLURALS = {
-  'one-other': (n) => (n === 1 ? 'one' : 'other'),                   // en, es, de, it, nl, sv…
+  'one-other': (n) => (n === 1 ? 'one' : 'other'),                   // en, es, it, de, nl, sv…
   'zero-one-other': (n) => (n === 0 || n === 1 ? 'one' : 'other'),   // pt, fr
   none: () => 'other',                                               // ja, zh, ko, th, vi, id
   'east-slavic': (n) => {                                            // ru, uk, be
@@ -132,14 +136,29 @@ function lookup(lang, key) {
 
 const fill = (str, vars) => String(str).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] != null ? String(vars[k]) : m));
 
+// The languages to look a text up in: the interface language, the other preferred ones, English.
+function chain(lang) {
+  const out = [lang];
+  const p = settings.get().languages;
+  if (Array.isArray(p)) for (const x of p) if (typeof x === 'string' && !out.includes(x)) out.push(x);
+  if (!out.includes(FALLBACK)) out.push(FALLBACK);
+  return out;
+}
+
+function find(key) {
+  for (const l of chain(locale.get().lang)) {
+    const v = lookup(l, key);
+    if (v !== undefined) return [v, l];
+  }
+  return [undefined, null];
+}
+
 export function t(key, vars) {
-  const { lang } = locale.get();
-  let v = lookup(lang, key);
-  if (v === undefined && lang !== FALLBACK) v = lookup(FALLBACK, key);
+  let [v, from] = find(key);
   if (v === undefined) return fill(key, vars);
   if (v && typeof v === 'object') {
     const n = Math.abs(Number(vars?.count ?? 0));
-    const rule = PLURALS[meta(lang).plural] || PLURALS['one-other'];
+    const rule = PLURALS[meta(from).plural] || PLURALS['one-other'];
     v = v[rule(n)] ?? v.other ?? Object.values(v)[0];
   }
   return fill(v, vars);
@@ -147,14 +166,12 @@ export function t(key, vars) {
 
 // Translation if it exists, or null (for strings with their own fallback, e.g. theme.json).
 export function tOptional(key, vars) {
-  const { lang } = locale.get();
-  const v = lookup(lang, key) ?? lookup(FALLBACK, key);
-  return v === undefined ? null : t(key, vars);
+  return find(key)[0] === undefined ? null : t(key, vars);
 }
 
 // Name of an app: apps.<id> in the catalog (the user's language, then English), else manifest.json's
 // name (English).
-export const appName = (app) => (app ? (lookup(locale.get().lang, `apps.${app.id}`) ?? lookup(FALLBACK, `apps.${app.id}`) ?? app.name) : '');
+export const appName = (app) => (app ? (find(`apps.${app.id}`)[0] ?? app.name) : '');
 
 // ---- formats (date, time, numbers) ----
 
@@ -231,7 +248,26 @@ export function useLocale() {
   return { ...l, dir: direction(), t, formatDate, formatTime, formatNumber };
 }
 
-export const setLanguage = (lang) => settings.set({ language: lang });
+// Interface language: also moves it to the front of the preferred list when there is one.
+export function setLanguage(lang) {
+  const p = settings.get().languages;
+  settings.set(Array.isArray(p) ? { language: lang, languages: [lang, ...p.filter((x) => x !== lang)] } : { language: lang });
+}
+
+// Preferred languages in order (Settings → Language & Region): the first is the interface language;
+// when a text isn't translated the next ones are used. Without a saved list: the current language
+// and then en, es, pt.
+export function preferredLanguages() {
+  const cur = locale.get().lang;
+  const p = settings.get().languages;
+  const list = Array.isArray(p) && p.length ? p.filter((x) => typeof x === 'string' && x) : CORE_LANGUAGES;
+  return [cur, ...list.filter((x) => x !== cur)];
+}
+
+export function setPreferredLanguages(list) {
+  const clean = [...new Set(list)].filter((x) => typeof x === 'string' && x);
+  if (clean.length) settings.set({ languages: clean, language: clean[0] });
+}
 
 // After installing or editing a language pack.
 export function reloadCatalogs() {

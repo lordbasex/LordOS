@@ -1,0 +1,22 @@
+{
+  "folder": "Registrazioni",
+  "name": "Registrazione {date} {time}",
+  "all": "Tutte le registrazioni",
+  "empty": "Non ci sono ancora registrazioni",
+  "hint": "Premi il pulsante rosso (o R) per registrare con il microfono",
+  "denied": "Registratore vocale non ha il permesso di usare il microfono",
+  "play": "Riproduci",
+  "pause": "Pausa",
+  "rename": "Rinomina",
+  "trim": "Taglia",
+  "cancelTrim": "Annulla taglio",
+  "saveTrim": "Salva copia tagliata",
+  "trimmed": "tagliata",
+  "export": "Esporta come",
+  "exportBtn": "Esporta",
+  "working": "Esportazione…",
+  "exported": "«{name}» salvato",
+  "exportError": "Impossibile esportare",
+  "renameError": "Impossibile rinominare (esiste già quel nome?)",
+  "emptyTitle": "Scegli o crea una registrazione"
+}
