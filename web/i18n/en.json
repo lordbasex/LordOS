@@ -179,9 +179,14 @@
       "productivity": "Productivity",
       "media": "Media",
       "system": "System",
-      "privacy": "Privacy & security"
+      "privacy": "Privacy & security",
+      "thirdparty": "Third-party suites"
     },
-    "upcoming": "Coming in {v} (in development)"
+    "upcoming": "Coming in {v} (in development)",
+    "thirdpartyNote": "Open source suites from other projects that we think are worth having. LordOS does not make them: the Store installs each one from its maker's own package, kept with a pinned checksum, and they get the same firewall and permissions as any other Linux app.",
+    "by": "By {v}",
+    "website": "Website",
+    "fromStore": "In the Store"
   },
   "debHintA": "On a server without a screen, add",
   "debHintB": "and use it from your browser.",

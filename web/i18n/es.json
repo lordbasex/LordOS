@@ -179,9 +179,14 @@
       "productivity": "Productividad",
       "media": "Multimedia",
       "system": "Sistema",
-      "privacy": "Privacidad y seguridad"
+      "privacy": "Privacidad y seguridad",
+      "thirdparty": "Suites de terceros"
     },
-    "upcoming": "Llega en {v} (en desarrollo)"
+    "upcoming": "Llega en {v} (en desarrollo)",
+    "thirdpartyNote": "Suites de código abierto de otros proyectos que creemos que vale la pena tener. No las hace LordOS: la Store instala cada una desde el paquete de su autor, guardado con un checksum fijo, y reciben el mismo firewall y los mismos permisos que cualquier otra app de Linux.",
+    "by": "De {v}",
+    "website": "Sitio web",
+    "fromStore": "En la Store"
   },
   "debHintA": "En un servidor sin pantalla, agregá",
   "debHintB": "y usalo desde el navegador.",

@@ -1184,5 +1184,41 @@
         "Sem janela de cliente, X11 ou toolkit"
       ]
     }
+  },
+  "artcraft": {
+    "category": "thirdparty",
+    "vendor": "Storytold",
+    "homepage": "https://github.com/storytold/craft-launcher",
+    "screenshot": "docs/screenshots/artcraft-launcher.png",
+    "name": {
+      "en": "ArtCraft",
+      "es": "ArtCraft",
+      "pt": "ArtCraft"
+    },
+    "tagline": {
+      "en": "An open source office and creative suite, with one launcher for all its apps",
+      "es": "Una suite de oficina y creatividad de código abierto, con un lanzador para todas sus apps",
+      "pt": "Uma suíte de escritório e criação de código aberto, com um lançador para todos os seus apps"
+    },
+    "features": {
+      "en": [
+        "New in 0.8.8.1, in Store → Third-party suites",
+        "The launcher installs, updates and opens each app of the suite",
+        "Word processing, slides, spreadsheets, PDF, photos, design, video, sound and CAD",
+        "Apache-2.0, for amd64 and arm64"
+      ],
+      "es": [
+        "Nueva en 0.8.8.1, en Store → Suites de terceros",
+        "El lanzador instala, actualiza y abre cada app de la suite",
+        "Textos, presentaciones, planillas, PDF, fotos, diseño, video, sonido y CAD",
+        "Apache-2.0, para amd64 y arm64"
+      ],
+      "pt": [
+        "Nova na 0.8.8.1, em Store → Suítes de terceiros",
+        "O lançador instala, atualiza e abre cada app da suíte",
+        "Textos, apresentações, planilhas, PDF, fotos, design, vídeo, som e CAD",
+        "Apache-2.0, para amd64 e arm64"
+      ]
+    }
   }
 }

@@ -178,7 +178,8 @@ const shotImgs = shots.map((s) => ({ thumb: webp(s.file, 720), full: webp(s.file
 log(`gallery: ${shots.length} images converted`);
 
 // ---------- apps data ----------
-const APP_CATS = ['productivity', 'media', 'system', 'privacy'];
+// thirdparty: suites from other projects that the Store offers (apt/catalog.json, section "suites"); not made by LordOS
+const APP_CATS = ['productivity', 'media', 'system', 'privacy', 'thirdparty'];
 const appsFile = path.join(WEB, 'i18n/apps.json');
 const apps = fs.existsSync(appsFile)
   ? Object.entries(JSON.parse(fs.readFileSync(appsFile, 'utf8'))).filter(([id]) => !id.startsWith('_')).map(([id, a]) => ({ id, ...a }))
@@ -189,7 +190,7 @@ for (const a of apps) {
   const iconPng = path.join(WEB, 'src/app-icons', a.id + '.png');
   const iconSrc = fs.existsSync(iconPng) ? iconPng : a.icon && /\.(svg|png)$/.test(a.icon) && fs.existsSync(r(a.icon)) ? r(a.icon) : null;
   a.iconImg = iconSrc ? icon(iconSrc, a.id) : null;
-  if (!a.iconImg) console.warn('[web] apps: no icon for', a.id, a.icon);
+  if (!a.iconImg && !a.vendor) console.warn('[web] apps: no icon for', a.id, a.icon);
   a.shot = a.screenshot && fs.existsSync(r(a.screenshot)) ? { thumb: webp(r(a.screenshot), 720), full: webp(r(a.screenshot), 1600) } : null;
 }
 if (apps.length) log(`apps: ${apps.length} apps`);
@@ -660,7 +661,8 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       const tag = a.tagline && (a.tagline[l] || a.tagline.en);
       const shot = a.shot ? `<a class="g-card" href="${a.shot.full.url}" data-w="${a.shot.full.w}" data-h="${a.shot.full.h}" data-cap="${esc(name)}" aria-label="${esc(t.apps.shotOpen + ': ' + name)}"><img src="${a.shot.thumb.url}" width="${a.shot.thumb.w}" height="${a.shot.thumb.h}" alt="${esc(name)}" loading="lazy" decoding="async"></a>` : '';
       return `<article class="app" id="app-${esc(a.id)}">
-<div class="app-head">${a.iconImg ? `<img src="${a.iconImg.url}" width="56" height="56" alt="" loading="lazy">` : ''}<div><h3>${esc(name)}</h3>${tag ? `<p class="app-tag">${esc(tag)}</p>` : ''}</div></div>
+<div class="app-head">${a.iconImg ? `<img src="${a.iconImg.url}" width="56" height="56" alt="" loading="lazy">` : `<span class="app-letter" aria-hidden="true">${esc(name.slice(0, 1))}</span>`}<div><h3>${esc(name)}</h3>${tag ? `<p class="app-tag">${esc(tag)}</p>` : ''}</div></div>
+${a.vendor ? `<p class="app-by">${esc(t.apps.by.replace('{v}', a.vendor))}${a.homepage ? ` · <a href="${esc(a.homepage)}" rel="noopener">${esc(t.apps.website)}</a>` : ''}</p>` : ''}
 ${a.upcoming ? `<span class="iso soon">${esc(t.apps.upcoming.replace('{v}', a.upcoming))}</span>` : ''}
 ${a.isolated ? `<span class="iso" title="${esc(t.apps.isolatedTitle)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>${esc(t.apps.isolated)}</span>` : ''}
 ${feats.length ? `<ul>\n${feats.map((f) => `<li>${esc(f)}</li>`).join('\n')}\n</ul>` : ''}
@@ -669,6 +671,7 @@ ${shot}
     };
     const sections = present.map((c) => `<section class="apps-sec" data-item data-cat="${c}" aria-labelledby="cat-${c}">
 <h2 id="cat-${c}">${esc(t.apps.cats[c])}</h2>
+${c === 'thirdparty' ? `<p class="apps-note">${esc(t.apps.thirdpartyNote)}</p>` : ''}
 <div class="apps-grid">
 ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompare(appName(y, l), l)).map(card).join('\n')}
 </div>
