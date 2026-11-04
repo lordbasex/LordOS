@@ -99,7 +99,7 @@ Besides the kernel and libc, only these are allowed:
 | Mesa: `libgbm`, `libEGL`, `libGLESv2` | GPU composition and dmabuf buffers from apps (games); optional: without a 3D GPU or without the `-dev` packages it builds and runs without Mesa (approved by the user on 2026-10-16, see `GPU.md`) | system |
 | QuickJS              | ES2023 JavaScript engine, ~1 MB, written in C                  | vendored|
 | `stb_truetype`, `stb_image` | fonts and images (`lord-server`, `lord-doc`, `lord-maild`, and `lord-clean` for similar images); public domain, a single header | vendored|
-| `stb_image_write`    | PNG for the remote desktop's lossless refresh of still areas and cursor images (`lord-sessiond`), and images written by the `lord-doc` and `lord-maild` helpers; public domain | vendored|
+| `stb_image_write`    | PNG for the remote desktop's lossless refresh of still areas and cursor images (`lord-sessiond`), Remote Desk's computer pictures (`rdesk/thumb.c`, in lord-server), and images written by the `lord-doc` and `lord-maild` helpers; public domain | vendored|
 | OpenSSL (`libssl`, `libcrypto`) | TLS. **Only four binaries link it directly** (`lord-rdesk` also loads it, through libfreerdp): `lord-sessiond` (remote desktop on the LAN, `REMOTE.md`), `lord-maild` (IMAP/SMTP/CalDAV/CardDAV, certificates checked against the system CA store, `MAIL.md`) and, since 0.8.5, `lord-fetch` (the blocklist downloads, sandboxed, no sockets of its own, `FIREWALL.md` "Blocklists") and `lord-tls` (the package engine's HTTPS, sandboxed, `PACKAGES.md` "HTTPS"). Never `lord-server` | system |
 | FreeRDP (`libfreerdp3`, `libfreerdp-client3`, `libwinpr3`) | RDP in the sandboxed `lord-rdesk` (0.8.7, `FILES.md`, "Remote desktop"); its client library only for shared folders | system |
 | `libcrypt`           | verifying passwords against `/etc/shadow` (`lord-sessiond`, `admin.c`) | system |
@@ -186,8 +186,9 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
 
 - **`lord-rdesk`** (0.8.7): one RDP or VNC connection for Remote Desk, in a scope of its own (firewall app
   `desktop:lordos-rdesk`). It connects, applies `sandbox_apply_helper` (no new sockets, no exec) and paints into a memfd
-  lord-server shows, with no window or toolkit: our own RFB client for VNC, libfreerdp for RDP. See `FILES.md`, "Remote
-  desktop".
+  lord-server shows, with no window or toolkit: our own RFB client for VNC, libfreerdp for RDP. Since 0.8.8.4 the
+  remote computer's sound goes into an audio ring lord-server makes and plays (`rdesk/rdesksnd.c`), and lord-server
+  keeps a picture of each computer from the shared picture (`rdesk/thumb.c`). See `FILES.md`, "Remote desktop".
 
 - **`lord-tls`** (0.8.5): the package engine's HTTPS. The Store's download child (as `nobody`, in
   `lordos-net-store.scope`) connects the TCP socket itself and execs only `<lord-server dir>/lord-tls`

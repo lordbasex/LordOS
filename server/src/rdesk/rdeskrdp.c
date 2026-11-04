@@ -20,6 +20,7 @@
 #define CH 3
 void rd_send(uint32_t type, int a, int b, int c, const char *text);
 uint32_t *rd_picture(int w, int h);
+PVIRTUALCHANNELENTRY rd_addin_provider(LPCSTR name, LPCSTR subsystem, LPCSTR type, DWORD flags);    /* rdesksnd.c */
 
 static BYTE *picture(int w, int h) { return (BYTE *)rd_picture(w, h); }
 
@@ -98,16 +99,31 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
     if (password[0]) freerdp_settings_set_string(s, FreeRDP_Password, password);
     freerdp_settings_set_uint32(s, FreeRDP_DesktopWidth, view->w ? (UINT32)view->w : 1280);
     freerdp_settings_set_uint32(s, FreeRDP_DesktopHeight, view->h ? (UINT32)view->h : 800);
-    if (view->drives) {
-        freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
+    if (view->admin) freerdp_settings_set_bool(s, FreeRDP_ConsoleSession, TRUE);
+    /* the remote desktop's own scale (its text and controls bigger), as the server's display settings would set it;
+     * the device factor takes the three values the protocol knows */
+    if (view->scale >= 100 && view->scale <= 500) {
+        freerdp_settings_set_uint32(s, FreeRDP_DesktopScaleFactor, (UINT32)view->scale);
+        freerdp_settings_set_uint32(s, FreeRDP_DeviceScaleFactor, view->scale >= 170 ? 180 : view->scale >= 130 ? 140 : 100);
+    }
+    if (view->drives || view->sound == RD_SOUND_HERE) {
+        freerdp_register_addin_provider(rd_addin_provider, 0);
         in->LoadChannels = freerdp_client_load_channels;
+    }
+    if (view->drives) {
         freerdp_settings_set_bool(s, FreeRDP_DeviceRedirection, TRUE);
         for (int i = 0; i < view->drives; i++) {
             const char *params[] = { "drive", view->drive[i][0], view->drive[i][1] };
             if (!freerdp_client_add_device_channel(s, 3, params)) return 1;
         }
     }
-    freerdp_settings_set_uint32(s, FreeRDP_ColorDepth, 32);
+    /* the sound: played here (our rdpsnd device, into lord-server's ring), left on the remote computer, or none */
+    if (view->sound == RD_SOUND_HERE) {
+        const char *params[] = { "rdpsnd", "sys:lordos" };
+        freerdp_settings_set_bool(s, FreeRDP_AudioPlayback, TRUE);
+        if (!freerdp_client_add_static_channel(s, 2, params)) return 1;
+    } else if (view->sound == RD_SOUND_THERE) freerdp_settings_set_bool(s, FreeRDP_RemoteConsoleAudio, TRUE);
+    freerdp_settings_set_uint32(s, FreeRDP_ColorDepth, view->depth == 16 || view->depth == 24 ? (UINT32)view->depth : 32);
     freerdp_settings_set_bool(s, FreeRDP_SoftwareGdi, TRUE);
     /* TLS or NLA only: RDP's own security has no certificate to check, and the password would go to whoever answered */
     freerdp_settings_set_bool(s, FreeRDP_RdpSecurity, FALSE);
@@ -123,12 +139,18 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
         return 1;
     }
     rd_send(RD_STATE, RS_CONNECTED, 0, 0, NULL);
+    int lost = 0;
     for (;;) {
         HANDLE ev[64];
         DWORD n = freerdp_get_event_handles(in->context, ev, 64);
         if (!n) break;
         DWORD w = WaitForMultipleObjects(n, ev, FALSE, 20);
-        if (w == WAIT_FAILED || !freerdp_check_event_handles(in->context) || freerdp_shall_disconnect_context(in->context)) break;
+        if (w == WAIT_FAILED || !freerdp_check_event_handles(in->context) || freerdp_shall_disconnect_context(in->context)) {
+            /* the server says why when it ends the session (sign-out, a disconnect, another connection): no reason is a
+             * lost connection, which the app may reconnect */
+            lost = !freerdp_error_info(in);
+            break;
+        }
         struct pollfd p = { CH, POLLIN, 0 };
         while (poll(&p, 1, 0) > 0) {
             RdMsg m;
@@ -136,7 +158,7 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
             input(in, &m);
         }
     }
-    rd_send(RD_STATE, RS_ENDED, 0, 0, NULL);
+    rd_send(RD_STATE, lost ? RS_DROPPED : RS_ENDED, 0, 0, NULL);
 out:
     freerdp_disconnect(in);
     gdi_free(in);

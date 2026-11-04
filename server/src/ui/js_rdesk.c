@@ -1,15 +1,18 @@
 /* js_rdesk.c — lord.rdesk: the RDP and VNC apps (docs/FILES.md, "Remote desktop"). lord-server starts lord-rdesk in a
  * scope of its own, gives it the job once and shares the picture, which the engine shows as a media node.
  *
- *   open(proto, host, port, user, domain, password) → id, or 0
+ *   open(proto, host, port, user, domain, password, w, h, folders, { admin, scale, sound: 'here'|'there'|'none', depth }) → id, or 0
  *   poll(id) → { state, w, h, cert, media }    reads what the helper said; called by the app on a timer
- *   key(id, keysym, scancode, down) · pointer(id, x, y, buttons) · cert(id, ok) · close(id) */
+ *   key(id, keysym, scancode, down) · pointer(id, x, y, buttons) · cert(id, ok) · close(id)
+ *   snapshot(id, device) → bool   the session's picture as the device's card picture (rdesk/thumb.c)
+ *   forgetSnapshot(device)         removes it (the device was removed) */
 #include "js_rdesk.h"
 #include "../media/media_int.h"
 #include "../rdesk/proto.h"
 #include "../doc/wire.h"
 #include "../sec/cgroup.h"
 #include "../lan/rconnect.h"
+#include "../rdesk/thumb.h"
 
 #include <fcntl.h>
 #include <limits.h>
@@ -27,13 +30,21 @@
 
 extern char **environ;
 #define MAX_SESS 4
-typedef struct { int used, sock, state, w, h, media; pid_t pid; char cert[160]; } Sess;
+typedef struct { int used, sock, state, w, h, media; pid_t pid; char cert[160]; MAudio *audio; } Sess;   /* audio: the sound ring until the picture's media node takes it */
 static Sess sess[MAX_SESS];
 
 static Sess *get(JSContext *c, JSValueConst v) {
     int i = 0;
     JS_ToInt32(c, &i, v);
     return i >= 1 && i <= MAX_SESS && sess[i - 1].used ? &sess[i - 1] : NULL;
+}
+
+/* a user name as RDP takes it: the lan connector's rule, plus '@' for a full sign-in name (user@example.com) */
+static int rdesk_user_ok(const char *s) {
+    size_t n = strlen(s);
+    if (n > 128 || s[0] == '-' || s[0] == '@') return 0;
+    for (size_t i = 0; i < n; i++) if (!((s[i] >= '0' && s[i] <= '9') || ((s[i] | 32) >= 'a' && (s[i] | 32) <= 'z') || strchr("._-@", s[i]))) return 0;
+    return 1;
 }
 
 static int helper_path(char *bin, size_t n) {
@@ -82,6 +93,39 @@ static void add_view(JSContext *c, JBuf *b, int argc, JSValueConst *argv) {
     jb_printf(b, ",\"drives\":%d", n);
 }
 
+/* argv[9]: { admin, scale, sound: 'here'|'there'|'none', depth } (RDP). Returns the sound wanted (RD_SOUND_*). */
+static int opt_int(JSContext *c, JSValueConst o, const char *k) { JSValue v = JS_GetPropertyStr(c, o, k); int i = 0; JS_ToInt32(c, &i, v); JS_FreeValue(c, v); return i; }
+static int add_options(JSContext *c, JBuf *b, int argc, JSValueConst *argv, int have_ring) {
+    if (argc < 10 || !JS_IsObject(argv[9])) return RD_SOUND_NONE;
+    JSValue va = JS_GetPropertyStr(c, argv[9], "admin");
+    int admin = JS_ToBool(c, va) > 0, scale = opt_int(c, argv[9], "scale"), depth = opt_int(c, argv[9], "depth");
+    JS_FreeValue(c, va);
+    jb_printf(b, ",\"admin\":%d", admin);
+    if (scale >= 100 && scale <= 500) jb_printf(b, ",\"scale\":%d", scale);
+    if (depth == 16 || depth == 24 || depth == 32) jb_printf(b, ",\"depth\":%d", depth);
+    int sound = RD_SOUND_NONE;
+    if (have_ring >= 0) {
+        JSValue vs = JS_GetPropertyStr(c, argv[9], "sound");
+        const char *so = JS_ToCString(c, vs);
+        if (so && !strcmp(so, "here") && have_ring) sound = RD_SOUND_HERE;
+        else if (so && !strcmp(so, "there")) sound = RD_SOUND_THERE;
+        if (so) JS_FreeCString(c, so);
+        JS_FreeValue(c, vs);
+    }
+    jb_printf(b, ",\"sound\":%d", sound);
+    return sound;
+}
+/* does this session want its sound played here? */
+static int wants_sound(JSContext *c, int argc, JSValueConst *argv) {
+    if (argc < 10 || !JS_IsObject(argv[9])) return 0;
+    JSValue vs = JS_GetPropertyStr(c, argv[9], "sound");
+    const char *so = JS_ToCString(c, vs);
+    int r = so && !strcmp(so, "here");
+    if (so) JS_FreeCString(c, so);
+    JS_FreeValue(c, vs);
+    return r;
+}
+
 static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 6) return JS_NewInt32(c, 0);
@@ -90,7 +134,7 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_ToInt32(c, &port, argv[2]);
     for (int i = 0; i < MAX_SESS; i++) if (!sess[i].used) { slot = i; break; }
     char bin[PATH_MAX];
-    if (slot >= 0 && proto && host && user && dom && pw && (!strcmp(proto, "rdp") || !strcmp(proto, "vnc")) && rconnect_host_ok(host) && rconnect_user_ok(user) &&
+    if (slot >= 0 && proto && host && user && dom && pw && (!strcmp(proto, "rdp") || !strcmp(proto, "vnc")) && rconnect_host_ok(host) && rdesk_user_ok(user) &&
         rconnect_user_ok(dom) && port >= 0 && port < 65536 && strlen(pw) < 256 && !helper_path(bin, sizeof bin)) {
         int sv[2];
         if (!socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) {
@@ -112,6 +156,10 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 _exit(127);
             }
             close(sv[1]);
+            /* the sound plays here: lord-server's own stream, fed from a ring the helper writes (media/maudio.c) */
+            MAudio *audio = NULL;
+            int ring = -1;
+            if (!strcmp(proto, "rdp") && wants_sound(c, argc, argv)) audio = maudio_open(0, "Remote Desk", host, "video", &ring);
             JBuf b;
             jb_init(&b);
             jb_raw(&b, "{\"proto\":"); jb_str(&b, proto);
@@ -120,11 +168,14 @@ static JSValue f_open(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             jb_raw(&b, ",\"domain\":"); jb_str(&b, dom);
             jb_raw(&b, ",\"password\":"); jb_str(&b, pw);
             add_view(c, &b, argc, argv);
+            int sound = add_options(c, &b, argc, argv, !strcmp(proto, "rdp") ? audio != NULL : -1);
             jb_raw(&b, "}");
-            if (p > 0 && !b.oom && send(sv[0], b.p, b.n, MSG_NOSIGNAL) == (ssize_t)b.n) {
-                sess[slot] = (Sess){ .used = 1, .sock = sv[0], .pid = p, .state = RS_CONNECTING };
+            if (p > 0 && !b.oom && send(sv[0], b.p, b.n, MSG_NOSIGNAL) == (ssize_t)b.n &&
+                (sound != RD_SOUND_HERE || !rd_send_fd(sv[0], RD_AUDIO_SHM, ring))) {
+                sess[slot] = (Sess){ .used = 1, .sock = sv[0], .pid = p, .state = RS_CONNECTING, .audio = sound == RD_SOUND_HERE ? audio : NULL };
+                if (sound != RD_SOUND_HERE) maudio_close(audio);
                 id = slot + 1;
-            } else { close(sv[0]); if (p > 0) { kill(p, SIGKILL); waitpid(p, NULL, 0); } }
+            } else { close(sv[0]); maudio_close(audio); if (p > 0) { kill(p, SIGKILL); waitpid(p, NULL, 0); } }
             if (b.p) explicit_bzero(b.p, b.cap);
             jb_free(&b);
         }
@@ -150,6 +201,8 @@ static void set_size(Sess *s, int w, int h) {
     free(m->cache); m->cache = NULL;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
     s->media = m->id; s->w = w; s->h = h;
+    /* the media node keeps the sound from now on: lord-server's loop serves its stream, and closing the node ends it */
+    if (s->audio && !m->audio) { m->audio = s->audio; s->audio = NULL; maudio_playing(m->audio, 1); }
     if (rd_send_picture(s->sock, fd)) s->state = RS_FAILED;
     close(fd);
 }
@@ -167,13 +220,15 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (!r) break;
         if (m.type == RD_SIZE) set_size(s, m.a, m.b);
         else if (m.type == RD_FRAME) frames++;
-        else if (m.type == RD_STATE && m.a >= 0 && m.a <= RS_UNREACHABLE) s->state = m.a;
+        else if (m.type == RD_STATE && m.a >= 0 && m.a <= RS_LAST) s->state = m.a;
         else if (m.type == RD_CERT) { m.text[sizeof m.text - 1] = 0; snprintf(s->cert, sizeof s->cert, "%s", m.text); }
     }
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     if (frames && ms) { ms->frame_seq++; media_src_damage(ms); }
+    if (ms && ms->audio) maudio_service(ms->audio);        /* what the helper wrote since, without waiting for PipeWire to ask */
     JSValue o = JS_NewObject(c);
-    static const char *const names[] = { "connecting", "connected", "denied", "failed", "ended", "unreachable" };
+    static const char *const names[] = { "connecting", "connected", "denied", "failed", "ended", "unreachable", "notfound", "dropped" };
+    _Static_assert(sizeof names / sizeof names[0] == RS_LAST + 1, "a name for each state");
     JS_SetPropertyStr(c, o, "state", JS_NewString(c, names[s->state]));
     JS_SetPropertyStr(c, o, "w", JS_NewInt32(c, s->w));
     JS_SetPropertyStr(c, o, "h", JS_NewInt32(c, s->h));
@@ -197,13 +252,34 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     waitpid(s->pid, NULL, 0);
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (m) media_src_close(m);
+    maudio_close(s->audio);
     memset(s, 0, sizeof *s);
     return JS_UNDEFINED;
+}
+
+static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc > 1 ? get(c, argv[0]) : NULL;
+    MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    if (!m || !m->px || m->w < 1 || m->h < 1 || (size_t)m->w * m->h * 4 > m->map_len) return JS_FALSE;
+    const char *dev = JS_ToCString(c, argv[1]);
+    int ok = dev && !rd_thumb_save(getenv("HOME"), dev, m->px, m->w, m->h, RD_THUMB_W);
+    if (dev) JS_FreeCString(c, dev);
+    return JS_NewBool(c, ok);
+}
+
+static JSValue f_forget_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *dev = argc > 0 ? JS_ToCString(c, argv[0]) : NULL;
+    int ok = dev && !rd_thumb_remove(getenv("HOME"), dev);
+    if (dev) JS_FreeCString(c, dev);
+    return JS_NewBool(c, ok);
 }
 
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("open", 6, f_open), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("key", 4, f_key),
     JS_CFUNC_DEF("pointer", 4, f_ptr), JS_CFUNC_DEF("cert", 2, f_cert), JS_CFUNC_DEF("close", 1, f_close),
+    JS_CFUNC_DEF("snapshot", 2, f_snapshot), JS_CFUNC_DEF("forgetSnapshot", 1, f_forget_snapshot),
 };
 
 void js_rdesk_register(JSContext *c, JSValue lord) {

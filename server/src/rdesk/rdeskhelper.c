@@ -5,6 +5,7 @@
 #include "rfb.h"
 #include "../sec/json.h"
 #include "../sec/sandbox.h"
+#include "../media/aring.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -19,10 +20,35 @@
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
 #define CH 3
+
+extern ARingHdr *rd_audio_ring;     /* rdesksnd.c */
+
+/* the audio ring lord-server sends after the job, mapped before the sandbox; NULL if it isn't one */
+static ARingHdr *take_audio_ring(void) {
+    RdMsg m;
+    int fd = -1;
+    struct iovec io = { &m, sizeof m };
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+    if (recvmsg(CH, &mh, 0) != (ssize_t)sizeof m) return NULL;
+    for (struct cmsghdr *c = CMSG_FIRSTHDR(&mh); c; c = CMSG_NXTHDR(&mh, c)) if (c->cmsg_type == SCM_RIGHTS) memcpy(&fd, CMSG_DATA(c), sizeof fd);
+    if (fd < 0) return NULL;
+    ARingHdr *h = NULL;
+    struct stat st;
+    if (m.type == RD_AUDIO_SHM && !fstat(fd, &st) && st.st_size > AR_HDR && st.st_size <= AR_HDR + (1 << 22)) {
+        void *p = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        h = p == MAP_FAILED ? NULL : p;
+        /* a ring of the size lord-server says, inside the mapping, a power of two */
+        if (h && (h->magic != AR_MAGIC || h->size == 0 || (h->size & (h->size - 1)) || ar_bytes(h->size) > (size_t)st.st_size)) { munmap(p, (size_t)st.st_size); h = NULL; }
+    }
+    close(fd);
+    return h;
+}
 
 int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, const char *password, const RdView *view);   /* rdeskrdp.c */
 
@@ -90,11 +116,13 @@ static int run_vnc(int sock, char *password) {
     return 0;
 }
 
+/* the connected socket, -1 nothing answered at that address, -2 the name doesn't resolve */
 static int dial(const char *host, int port) {
     char ps[8];
     snprintf(ps, sizeof ps, "%d", port);
     struct addrinfo hints = { .ai_socktype = SOCK_STREAM }, *res = NULL;
-    if (getaddrinfo(host, ps, &hints, &res)) return -1;
+    int g = getaddrinfo(host, ps, &hints, &res);
+    if (g) return g == EAI_MEMORY || g == EAI_SYSTEM ? -1 : -2;
     int fd = -1;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
         fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC, 0);
@@ -122,10 +150,13 @@ int main(void) {
     int port = (int)json_num(d.root, "port", 0);
     if (!proto || !host || !user || !dom || !pw) return 2;
     int rdp = !strcmp(proto, "rdp");
+    int sound = rdp ? (int)json_num(d.root, "sound", 0) : RD_SOUND_NONE;
+    if (sound == RD_SOUND_HERE && !(rd_audio_ring = take_audio_ring())) sound = RD_SOUND_NONE;
     int sock = dial(host, port ? port : rdp ? 3389 : 5900);
-    if (sock < 0) { rd_send(RD_STATE, RS_UNREACHABLE, 0, 0, NULL); return 1; }
+    if (sock < 0) { rd_send(RD_STATE, sock == -2 ? RS_NOTFOUND : RS_UNREACHABLE, 0, 0, NULL); return 1; }
     /* it stays in the scope lord-server placed it in, with that scope's memory limits. connected: no new sockets and no files from here on. RDP's library keeps /etc/ssl and its own crypto config */
-    RdView view = { .w = (int)json_num(d.root, "w", 0), .h = (int)json_num(d.root, "h", 0) };
+    RdView view = { .w = (int)json_num(d.root, "w", 0), .h = (int)json_num(d.root, "h", 0), .admin = json_num(d.root, "admin", 0) > 0,
+                    .scale = (int)json_num(d.root, "scale", 0), .sound = sound, .depth = (int)json_num(d.root, "depth", 32) };
     int rofds[9], rwfds[9], nro = 0, nrw = 0;
     int drives = rdp ? (int)json_num(d.root, "drives", 0) : 0;
     for (int i = 0; i < drives && i < 8; i++) {
