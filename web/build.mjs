@@ -745,7 +745,7 @@ ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompar
     const card = (title, ver, list, extra = '') => `<article class="pi-card"><div class="pi-card-h"><h3>${esc(title)}</h3><span class="pi-ver">LordOS ${ver}</span></div>${rows(list)}${extra}</article>`;
     const cards = card(P.pi5Title, '0.8.8.1', P.pi5Rows) + '\n' + card(P.pi500Title, '0.8.8', P.pi500Rows,
       `<p class="pi-thanks">${esc(P.thanks).replace('{name}', '<strong>Steve Sande</strong>')}</p>`);
-    const shotList = ['desktop', 'login', 'power', 'cooling', 'about', 'network', 'cleaner']
+    const shotList = Object.keys(P.shots)
       .map((k) => shotFig(`docs/screenshots/pi/${k}.png`, P.shots[k], 'shot-fig pi-shot')).filter(Boolean);
     const shotsSection = shotList.length ? `<section class="wrap pi-sec" aria-labelledby="pi-shots">
 <h2 id="pi-shots" class="pi-h2">${esc(P.shotsTitle)}</h2>
