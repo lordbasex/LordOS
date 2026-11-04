@@ -2222,7 +2222,22 @@ static void blit_surface(Canvas *c, const Surf *s, float x, float y, float sxk, 
     else canvas_blit_scaled(c, s->px, s->w, s->w, s->h, sx, sy, sw, sh, dx, dy, dw, dh, op, s->opaque);
 }
 
+/* A screenshot while the GPU composes: a window whose content is only a dmabuf texture (a GPU app,
+ * for example a browser) has no pixels on the CPU, so it is read back for the capture. Without this
+ * the capture showed the theme's frame and shadow with nothing inside. malloc'd, or NULL. */
+static uint32_t *capture_readback(const Surf *s) {
+    if (!paint_capture_mode || s->px || !s->dmabuf || !s->content) return NULL;
+    const GpuTex *t = s->dmabuf->tex;
+    int w = s->dmabuf->d.width, h = s->dmabuf->d.height;
+    if (!gpu_tex_current(t) || w <= 0 || h <= 0 || w > 8192 || h > 8192) return NULL;
+    uint32_t *px = malloc((size_t)w * (size_t)h * 4);
+    if (px && gpu_tex_read(t, px, w, h) == 0) return px;
+    free(px);
+    return NULL;
+}
+
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
+    uint32_t *tmp;
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
         if (tfv.on) {
             if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
@@ -2252,6 +2267,12 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
         }
         s->hole_sig = hole_sig(s);
     } else if (s->px) blit_surface(c, s, x, y, 1, 1, op);
+    else if ((tmp = capture_readback(s))) {
+        s->px = tmp;
+        blit_surface(c, s, x, y, 1, 1, op);
+        s->px = NULL;
+        free(tmp);
+    }
     for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op, clip);
 }
 
@@ -2407,17 +2428,21 @@ void wl_paint_fullscreen(Canvas *out) {
         canvas_clear(out, 0x000000);                /* protected fullscreen: black in the capture */
         return;
     }
-    if (!fs_surf || !fs_surf->content || !fs_surf->px) return;
+    if (!fs_surf || !fs_surf->content) return;
     float x, y, sx, sy, fx, fy, fw, fh;
     fs_box(&x, &y, &sx, &sy);
     fs_rect(&fx, &fy, &fw, &fh);
     /* only on the display it covers (a mirror shows the same rect) */
     double vx1 = paint_view.x + (out->w - paint_view.dx) / paint_view.k, vy1 = paint_view.y + (out->h - paint_view.dy) / paint_view.k;
     if (fx >= vx1 || fy >= vy1 || fx + fw <= paint_view.x || fy + fh <= paint_view.y) return;
+    uint32_t *tmp = fs_surf->px ? NULL : capture_readback(fs_surf);     /* a GPU app in a screenshot */
+    if (!fs_surf->px && !tmp) return;
+    if (tmp) fs_surf->px = tmp;
     Rect oc = out->clip;
     canvas_set_clip(out, rect_and(oc, (Rect){ (int)floorf(PVX(fx)), (int)floorf(PVY(fy)), (int)ceilf(PVX(fx + fw)), (int)ceilf(PVY(fy + fh)) }));
     blit_surface(out, fs_surf, x, y, sx, sy, 1);
     canvas_set_clip(out, oc);
+    if (tmp) { fs_surf->px = NULL; free(tmp); }
     for (int i = 0; i < npopups; i++) {
         float px, py;
         if (origin(popups[i], &px, &py)) paint_tree(out, popups[i], px, py, 1, (Rect){ -65536, -65536, 65536, 65536 });

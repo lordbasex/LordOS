@@ -60,7 +60,10 @@ wm.beginResize(id, edges)     // edges as in xdg_toplevel.resize: 1 top, 2 botto
   their own frame ask with `_NET_WM_MOVERESIZE`, which the window manager for X (`wl/xwm.c`) turns
   into the same request.
 - If the theme didn't mark the window's node (`wm.frameRef`), or the window is maximized,
-  `beginMove` returns `false` and the theme can fall back to its old JS dragging.
+  `beginMove` returns `false` and the theme can fall back to its old JS dragging. A maximized
+  window only leaves its place once the pointer moved 6 px with the button held (both themes and
+  `sdk/wayland.js`): a click on its bar to bring it forward (a trackpad jitters a pixel or two) keeps
+  it maximized. Dragged out, it takes its own size under the pointer where it was grabbed.
 
 ### The moving window is a layer (`ui/paint.c`)
 

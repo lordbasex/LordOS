@@ -23,6 +23,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - An **on-screen level indicator** for the volume, mute, screen brightness and keyboard-light keys: a rounded translucent panel near the bottom of the screen with an icon and a segmented bar, shown for 1.5 s after each press (a held key keeps it up), in Lord Flow and Lord Classic, light and dark. With Reduce motion it appears and goes without a fade ([#24](https://github.com/lordbasex/LordOS/issues/24)).
+- Screenshots: a window picked with ❖⇧4 then Space, or an area, came out cropped at a display scale above 100 % (the selection was in logical pixels and the capture is at the display's full resolution). The whole window is captured now, at any scale ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+- A maximized window clicked to bring it forward shrank to its own size: the slightest pointer movement during the click counted as dragging it out. It now has to move a few pixels with the button held first, in both themes and for apps that draw their own title bar ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+- A full-screen screenshot showed a GPU-drawn app's window (a third-party browser, for example) as an empty frame with its shadow: its content is now read back from the GPU for the capture ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 
 ## [0.8.8.2-beta] - 2026-11-04
 

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
 const TITLE_H = 40;
+const DRAG_START = 6;      // px the pointer moves before a maximized window is dragged out
 const LIGHTS = [
   { key: 'close', color: '#ff5f57', glyph: '×', act: (id) => wm.close(id) },
   { key: 'min', color: '#febc2e', glyph: '−', act: (id) => wm.minimize(id) },
@@ -27,13 +28,25 @@ export function Window({ win, app, t, focused, fx }) {
   const geo = wm.frame(win);
   const fxs = fxStyle(fx, geo);
 
+  // A maximized window is dragged out of its place by JS, but only once the pointer really moved: a
+  // click on its bar (to bring it forward) jitters a pixel or two on a trackpad, or half a pixel at
+  // 200 %, and that must not restore it to its own size.
   useEffect(() => {
     const offMove = addListener('pointermove', (e) => {
-      if (drag.current) wm.move(win.id, e.x - drag.current.dx, e.y - drag.current.dy);
+      const d = drag.current;
+      if (!d) return;
+      if (!d.moving) {
+        if (Math.abs(e.x - d.x0) + Math.abs(e.y - d.y0) < DRAG_START) return;
+        d.moving = true;
+        // back to its own size, under the pointer where it was grabbed
+        d.dx = Math.round(d.rel * win.w);
+        d.dy = Math.min(TITLE_H / 2, d.y0 - geo.y);
+      }
+      wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
     const offUp = addListener('pointerup', () => { drag.current = null; });
     return () => { offMove(); offUp(); };
-  }, [win.id]);
+  }, [win.id, win.w, geo.y]);
 
   // Linux app that draws its own frame (GTK, Chromium and Firefox with their own bar): only the
   // content, with the theme's shadow. A right click on its bar asks for the window menu
@@ -65,7 +78,7 @@ export function Window({ win, app, t, focused, fx }) {
       boxShadow: focused ? '0 24px 56px rgba(0,0,0,0.55)' : '0 10px 28px rgba(0,0,0,0.32)',
       ...fxs,
     }}>
-      <View onMouseDown={(e) => { if (!wm.beginMove(win.id)) drag.current = { dx: e.x - geo.x, dy: e.y - geo.y }; }}
+      <View onMouseDown={(e) => { if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false }; }}
         onDoubleClick={() => wm.toggleMaximize(win.id)}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 14, backgroundColor: t.titleBg }}>
         <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: TITLE_H, textAlign: 'center',
