@@ -6,6 +6,10 @@
  *   net-test ovpn-inline <path>      the .ovpn with its files embedded (lord.net.prepareOvpn)
  *   net-test errors                  config errors are code lines (errcode.h), never prose
  *   net-test ifwatch                 an interface gets its saved state once, whenever it appears
+ *   net-test wake                    Wi-Fi after waking from sleep: checked, re-associated, turned off and on
+ *   sudo net-test health <if>        the after-sleep check of one Wi-Fi interface (needs its wpa_supplicant)
+ *   sudo net-test arp <if> <src> <ip> does ip answer an ARP request from src (the after-sleep gateway check)
+ *   sudo net-test dhcp <if>          the DHCP client in the foreground (SIGUSR2: confirm the lease, as after sleep)
  *   sudo net-test act <action> <arg> runs a "net-*" action the way the helper would;
  *                                    "\n" in arg is a newline, "@file" reads it
  *   sudo net-test daemons            the tests' resident processes
@@ -18,6 +22,7 @@
 #include "net/netpriv.h"
 #include "net/vpn.h"
 #include "net/ifwatch.h"
+#include "net/wake.h"
 #include "errcode.h"
 
 #include <dirent.h>
@@ -161,6 +166,15 @@ int admin_daemon_stop(const char *name) {
     for (int i = 0; i < 60 && kill(pid, 0) == 0; i++) usleep(100000);
     unlink(pp);
     return 0;
+}
+
+int admin_daemon_signal(const char *name, int sig) {
+    char pp[128], lp[128];
+    paths(name, pp, lp);
+    FILE *f = fopen(pp, "r");
+    int pid = 0;
+    if (f) { if (fscanf(f, "%d", &pid) != 1) pid = 0; fclose(f); }
+    return pid > 0 && kill(pid, sig) == 0 ? 0 : -1;
 }
 
 /* ---- tabla ---- */
@@ -317,11 +331,104 @@ static int test_ifwatch(void) {
     return bad;
 }
 
+/* ---- wake: fakes for what actions.c supplies ---- */
+
+static int wk_on = 1, wk_state = WK_OK, wk_busy_n, wk_renews, wk_reassocs, wk_stops, wk_starts, wk_fix_on;
+static char wk_last[32];
+static int wkf_active(const char *n) { (void)n; return wk_on; }
+static int wkf_health(const char *n) { (void)n; return wk_state; }
+static void wkf_renew(const char *n) { (void)n; wk_renews++; }
+static void wkf_reassoc(const char *n) { (void)n; wk_reassocs++; if (wk_fix_on == 1) wk_state = WK_OK; }
+static void wkf_stop(const char *n) { (void)n; wk_stops++; wk_busy_n = 2; }
+static int wkf_busy(const char *n) { (void)n; return wk_busy_n > 0 ? wk_busy_n-- : 0; }
+static void wkf_start(const char *n) { (void)n; wk_starts++; if (wk_fix_on == 2) wk_state = WK_OK; }
+static void wkf_log(const char *n, const char *what, int why) { (void)n; (void)why; snprintf(wk_last, sizeof wk_last, "%s", what); }
+
+/* Runs the steps it asks for until it's done or ms reaches until; returns the ms it finished at (-1: not done). */
+static long wk_run(WakeTable *t, const WakeOps *o, long from, long until) {
+    long at = from + WAKE_SETTLE_MS;
+    while (at >= 0 && at <= until) {
+        long next = wake_step(t, o, at);
+        if (next < 0) return at;
+        at = next;
+    }
+    return -1;
+}
+
+static int test_wake(void) {
+    static const WakeOps o = { wkf_active, wkf_health, wkf_renew, wkf_reassoc, wkf_stop, wkf_busy, wkf_start, wkf_log };
+    const char *one[] = { "wlan0" };
+    WakeTable t = {0};
+    int bad = 0;
+#define WK(x) do { if (!(x)) { printf("FAIL wake:%d: %s\n", __LINE__, #x); bad++; } } while (0)
+    /* it works after waking: nothing touched but the lease, which gets confirmed */
+    wake_begin(&t, one, 1, 0);
+    WK(wake_step(&t, &o, 1000) == WAKE_SETTLE_MS);                 /* not before it settles */
+    WK(wk_run(&t, &o, 0, 60000) == WAKE_SETTLE_MS && wk_renews == 1 && !wk_reassocs && !wk_stops && !strcmp(wk_last, "ok"));
+    /* it associates late but on its own (within the first seconds): no re-association */
+    wk_state = WK_NOT_ASSOCIATED;
+    wake_begin(&t, one, 1, 100000);
+    WK(wake_step(&t, &o, 100000 + WAKE_SETTLE_MS) == 100000 + WAKE_SETTLE_MS + WAKE_CHECK_MS);
+    wk_state = WK_OK;
+    WK(wake_step(&t, &o, 100000 + WAKE_SETTLE_MS + WAKE_CHECK_MS) == -1 && wk_renews == 2 && !wk_reassocs);
+    /* the case of issue #14: associated, "up", but the gateway never answers; re-associating fixes it */
+    wk_state = WK_NO_GATEWAY;
+    wk_fix_on = 1;
+    wake_begin(&t, one, 1, 200000);
+    long done = wk_run(&t, &o, 200000, 300000);
+    WK(done >= 200000 + WAKE_REASSOC_MS && done < 200000 + WAKE_REASSOC_MS + WAKE_SETTLE_MS + WAKE_CHECK_MS + 1);
+    WK(wk_reassocs == 1 && !wk_stops && !strcmp(wk_last, "recovered-reassociate"));
+    /* re-associating isn't enough: the card off and on, as by hand, once its daemons have exited */
+    wk_state = WK_NO_GATEWAY;
+    wk_fix_on = 2;
+    wake_begin(&t, one, 1, 400000);
+    done = wk_run(&t, &o, 400000, 500000);
+    WK(done > 400000 + WAKE_REASSOC_MS + WAKE_RESET_MS && wk_reassocs == 2 && wk_stops == 1 && wk_starts == 1 && !wk_busy_n);
+    WK(!strcmp(wk_last, "recovered-reset"));
+    /* nothing helps: it gives up, says so, and doesn't loop */
+    wk_state = WK_NO_CARRIER;
+    wk_fix_on = 0;
+    wake_begin(&t, one, 1, 600000);
+    done = wk_run(&t, &o, 600000, 700000);
+    WK(done >= 600000 + WAKE_REASSOC_MS + WAKE_RESET_MS + WAKE_GIVEUP_MS && wk_reassocs == 3 && wk_stops == 2 && wk_starts == 2);
+    WK(!strcmp(wk_last, "failed") && t.n == 0);
+    /* turned off (net-down) while being looked at: left alone */
+    wake_begin(&t, one, 1, 800000);
+    wk_on = 0;
+    WK(wk_run(&t, &o, 800000, 900000) == 800000 + WAKE_SETTLE_MS && wk_reassocs == 3 && !strcmp(wk_last, "skipped"));
+    wk_on = 1;
+    /* a new wake replaces a round still going; no interfaces: nothing to do */
+    wake_begin(&t, one, 1, 1000000);
+    wake_begin(&t, one, 0, 1000500);
+    WK(t.n == 0 && wake_step(&t, &o, 1010000) == -1);
+#undef WK
+    printf("wake: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: net-test crypto | errors | state | monitor <s> | act <action> <arg> | daemons\n"); return 2; }
     if (!strcmp(argv[1], "crypto")) return test_crypto() ? 1 : 0;
     if (!strcmp(argv[1], "errors")) return test_errors() ? 1 : 0;
     if (!strcmp(argv[1], "ifwatch")) return test_ifwatch() ? 1 : 0;
+    if (!strcmp(argv[1], "wake")) return test_wake() ? 1 : 0;
+    if (!strcmp(argv[1], "dhcp") && argc > 2) { dhcp_run(argv[2], 0); return 0; }
+    if (!strcmp(argv[1], "arp") && argc > 4) {
+        int fam;
+        uint8_t src[16], dst[16];
+        if (parse_ip(argv[3], &fam, src) || fam != AF_INET || parse_ip(argv[4], &fam, dst) || fam != AF_INET) return 2;
+        uint32_t s4, d4;
+        memcpy(&s4, src, 4);
+        memcpy(&d4, dst, 4);
+        int r = arp_probe(argv[2], s4, d4, 3, 300);
+        printf("%s %s\n", argv[4], r ? "no answer" : "answers");
+        return r ? 1 : 0;
+    }
+    if (!strcmp(argv[1], "health") && argc > 2) {
+        int h = net_wake_health(argv[2]);
+        printf("%s: %s\n", argv[2], wake_why(h));
+        return h ? 1 : 0;
+    }
     if (!strcmp(argv[1], "state")) {
         print_json("interfaces", net_interfaces_json());
         print_json("routes", net_routes_json());

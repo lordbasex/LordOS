@@ -1,6 +1,6 @@
 # Network and VPN in LordOS
 
-LordOS's networking is its own and runs directly on top of the kernel. It doesn't use NetworkManager, D-Bus, libnl, wg-quick or wireguard-tools. The code is in `server/src/net/` and has two sides:
+LordOS's networking is its own and runs directly on top of the kernel. It doesn't use NetworkManager, libnl, wg-quick or wireguard-tools, and it uses D-Bus for one thing only: `lord-netd` listens for logind's sleep and wake signal (see "After waking from sleep"). The code is in `server/src/net/` and has two sides:
 
 | Side | What it does | Files |
 |---|---|---|
@@ -87,6 +87,50 @@ lord-server --user ana  ── lord-admin ──┘  net-* actions are forwarded
 - **Resident processes no longer inherit the helper's descriptors** (`admin_daemon_fork` and
   `A_FORK` actions keep only their pipe): a DHCP client that outlives `lord-netd` doesn't hold its
   lock or socket.
+
+### After waking from sleep (issue #14)
+
+Some Wi-Fi radios lose their association while the computer sleeps and come back with the link
+"up": the kernel and wpa_supplicant never notice, there is no carrier change, and nothing reconnects
+until the card is turned off and on by hand (reported with the built-in card of a 2015 laptop).
+`lord-netd` now does what the person had to do:
+
+- **How it hears the wake.** logind's `PrepareForSleep(b)` signal on the system bus (`true` before
+  sleeping, `false` after waking), with LordOS's own D-Bus client (`server/src/vault/dbus.c`, libc
+  only) in `net/sleepbus.c`. It is subscribed to that one signal and believes it only from the
+  connection that owns `org.freedesktop.login1` (the bus sets the sender). It owns no name, exports
+  nothing and calls nothing else. Without a system bus it tries again (5 s, 10 s… up to 80 s), and a
+  wake nobody announced is still caught: `CLOCK_BOOTTIME` keeps counting while asleep and
+  `CLOCK_MONOTONIC` doesn't, so a jump of more than 3 s between them is a wake (`net_watch_run`).
+  Both sources together count as one wake.
+- **Wired interfaces.** Each DHCP client (`if:<if>`) gets `SIGUSR2` right away and confirms its lease
+  (INIT-REBOOT). The network may be another one now, and the lease's timers, on `CLOCK_MONOTONIC`,
+  stood still while asleep: without this a lease that expired during a long sleep was still
+  believed valid.
+- **Wi-Fi interfaces** (`net/wake.c`, a state machine without system calls, tested with
+  `net-test wake`). Those that were connected when the computer went to sleep (or, if that wasn't
+  seen in time, those with saved networks) are looked at 3 s after waking, then once per second:
+  1. Is it working? wpa_supplicant says `COMPLETED`, there is carrier, an IPv4 address, and the
+     gateway (the DHCP lease's or the static config's) answers an ARP request (3 tries, 300 ms each).
+     Yes: its DHCP client confirms the lease, and that's all.
+  2. Not working 8 s after waking: wpa_supplicant re-associates (`DISCONNECT`, `RECONNECT`) and
+     DHCP renews.
+  3. Not working 12 s after that: the card off and on, as by hand. Its daemons stop, the link goes
+     down, and once they have exited its saved config is applied as at boot (link up,
+     wpa_supplicant with the saved networks, DHCP).
+  4. Not working 20 s after that: it is logged as `failed` and left alone (no loop).
+  An interface turned off meanwhile (`net-down`) is left alone.
+- **The log.** Each step goes to `lord-netd`'s log (`journalctl -u lordos`, lines starting with
+  `lord-netd: after sleep:` and `lord-netd: woke from sleep`) and as a `net wake …` notification
+  (below).
+- **Tested (build VM, November 4):** `net-test wake` (the state machine: working, late association,
+  fixed by re-associating, fixed by the card off and on, nothing helps, turned off meanwhile);
+  `sudo net-test arp <if> <src> <gateway>` against a veth peer in a netns (answers; an absent
+  address and a downed peer don't); `sudo net-test dhcp <if>` with `SIGUSR2`: `renew`, a REQUEST
+  for the same address, ACK, `bound`.
+- **Not confirmed on the reported hardware yet:** the logind signal, the checks on a real radio,
+  re-association and the card off and on need a computer whose radio loses its association while
+  asleep.
 
 ### Test (VM 119, October 17)
 
@@ -252,9 +296,11 @@ All three use protocol 76 (`RTPROT_LORDOS`): they're deleted on disconnect, and 
 ### Notifications (`admin.onEvent`, text)
 
 ```
-net dhcp <if> started | stopped | bound <ip>/<n> <gw|-> <seconds> | no-carrier | nak | expired | reboot-timeout | error <reason>
+net dhcp <if> started | stopped | bound <ip>/<n> <gw|-> <seconds> | renew | no-carrier | nak | expired | reboot-timeout | error <reason>
 net wifi <if> connected <ssid> | disconnected | wrong-key | no-sae | scan-results
 net link restored <count>      (interfaces that appeared after boot and were brought up)
+net wake <if> renew | ok | skipped | reassociate <why> | reset <why> | recovered-reassociate <why> | recovered-reset <why> | failed <why>
+                               (after waking from sleep; why: not-associated | no-carrier | no-address | gateway-unreachable)
 net vpn <name> connecting | connected [ip] | reconnecting | disconnected | need-auth | auth-failed | state <state> | error [reason] | log <openvpn error line>
 daemon <process> <line>        (wpa_supplicant output: "wpa:<if>")
 daemon <process> exit <code>   (end of "if:<if>", "wpa:<if>", "vpn:<name>")
@@ -308,7 +354,7 @@ They are children of `lord-netd` (or, without it, of the session's helper), whic
 
 | Process | What it is |
 |---|---|
-| `if:<if>` | DHCP client. On Wi-Fi it also translates wpa_supplicant's notifications. |
+| `if:<if>` | DHCP client. On Wi-Fi it also translates wpa_supplicant's notifications. `SIGUSR2`: confirm the lease now (after waking from sleep). |
 | `wpa:<if>` | wpa_supplicant. Leaves a pidfile in `/run/lordos/wpa/<if>.pid` to kill one left over from a previous session. |
 | `vpn:<name>` | Drives openvpn, charon, pppd, openconnect or openfortivpn. The program dies with it (`PDEATHSIG`). |
 
@@ -441,5 +487,6 @@ Already there: `openssl` (test PKI), systemd-networkd, systemd-resolved and the 
 - **Wi-Fi:** test WPA3/SAE with an SAE hostapd; WPA-Enterprise (802.1X); hidden networks from the UI; choosing among several BSSIDs.
 - **IPv6:** DHCPv6 (today the kernel does SLAAC on its own) and DNS via RA (RDNSS).
 - **VPN at boot:** a per-VPN "connect automatically" option. Today interfaces, Wi-Fi and the VPNs that were up before a `lord-netd` restart are restored, but not those from before a shutdown.
+- **After waking from sleep:** confirm on a radio that loses its association while asleep (issue #14) that the check notices it and that re-associating, or turning the card off and on, brings it back.
 - **Test `lord-netd` with a real physical NIC and Wi-Fi** on a system installed from the ISO (on VM 119 it was tested with a veth and `lord-sessiond` installed like the `.deb`).
 - **ifupdown:** interfaces in `/etc/network/interfaces` show up as system ones, but `net-manage` doesn't yet know how to take them out of there.

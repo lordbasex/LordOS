@@ -139,6 +139,7 @@ EOF
     run "net-test crypto" build/net-test crypto
     run "net-test errors" build/net-test errors
     run "net-test ifwatch" build/net-test ifwatch
+    run "net-test wake" build/net-test wake
     run "pkg-test" build/pkg-test
     run "fsops-test" build/fsops-test
     run "sign-test" build/sign-test

@@ -70,5 +70,6 @@ int  admin_daemon_exec(const char *name, const char *const argv[], const char *c
 int  admin_daemon_fork(const char *name, void (*fn)(void *), void *arg);
 int  admin_daemon_stop(const char *name);             /* SIGTERM; 0 if it was running */
 int  admin_daemon_running(const char *name);
+int  admin_daemon_signal(const char *name, int sig);  /* 0 if it was running */
 
 #endif

@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- Wi-Fi that showed as connected after the computer woke from sleep but carried nothing until the card was turned off and on. LordOS's network service now hears the computer wake: wired connections confirm their address right away, and each Wi-Fi connection is checked a few seconds later (associated, link, address, and the router answering). If it isn't working, it re-associates and renews its address, and if that isn't enough it turns the card off and on by itself, as you had to. Every step is in the log. Needs confirming on the reported hardware ([#14](https://github.com/lordbasex/LordOS/issues/14))
+
 ## [0.8.8.2-beta] - 2026-11-04
 
 An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.
