@@ -157,6 +157,8 @@
   "picker.chooseFolder": "Escolher esta pasta",
   "picker.fileName": "Nome do arquivo",
   "picker.exists": "Já existe um arquivo com este nome.",
+  "picker.viewList": "Lista",
+  "picker.viewThumbs": "Miniaturas",
   "power.apps": "Apps abertos: {list}. Eles serão fechados: salve seu trabalho antes.",
   "power.cancel": "Cancelar",
   "power.needAdminRestart": "Só um administrador pode reiniciar o computador enquanto outros usuários têm sessão aberta.",

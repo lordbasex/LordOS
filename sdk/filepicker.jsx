@@ -3,22 +3,31 @@
 // importing .ics/.vcf) and for Linux apps through the portal below. Isolated .lpk apps use the
 // powerbox (fs.openFile) instead. It shows the home folder and the local disks mounted for the user
 // (lord.fs enforces that anyway); what it decides, it decides in filepickermodel.js.
+// A List / Thumbnails switch in the toolbar (remembered in settings.pickerView; thumbnails when the
+// dialog takes only pictures): the thumbnails are lord-media's (useThumb, the cache Files and Photos
+// use), asked for only for the tiles in sight, and a file shows its type icon until its own arrives.
 //
 //   <FilePicker onPick={(path) => …} onClose={() => …} filter={/\.(png|jpe?g)$/i} title={t('…')} multiple />
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, addListener } from '@lordos/runtime';
+import { View, Text, Image, addListener } from '@lordos/runtime';
 import { useTheme, ThemeContext, DEFAULT_TOKENS, shellTokens } from './theme.js';
 import { t, direction } from './i18n.js';
 import { Button, ScrollView, TextInput, takeTextFocus, releaseTextFocus, hasTextFocus } from './components.jsx';
 import { Toolbar, ToolbarButton, ToolbarGroup, Hairline, EmptyState, spacing, typeScale } from './controls.jsx';
 import { createStore, useStore } from './store.js';
 import * as fs from './fs.js';
+import { settings } from './settings.js';
+import { useThumb } from './media.js';
+import { kindOf } from './filekinds.js';
 import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs } from './fileparts.jsx';
-import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction } from './filepickermodel.js';
+import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
+  imagesOnly, viewFor, saveView, liveRange, gridStep } from './filepickermodel.js';
 
 const ROW_H = 24;
+const TILE_W = 104, TILE_H = 118, THUMB = 72, GRID_PAD = 8;
+const THUMB_KINDS = ['image', 'video', 'audio'];
 const SIDE_W = 176, DATE_W = 150, SIZE_W = 84;
 const COL_TITLE = { name: 'files.col.name', date: 'files.col.date', size: 'files.col.size' };
 
@@ -31,6 +40,34 @@ function SortTitle({ k, width, sort, onSort, t: th }) {
       justifyContent: k === 'size' ? 'flex-end' : 'flex-start' }}>
       <Text style={listHeaderCell(th, on)}>{t(COL_TITLE[k])}</Text>
       {on && <Text style={{ fontSize: 8, color: th.textDim }}>{sort.desc ? '▼' : '▲'}</Text>}
+    </View>
+  );
+}
+
+// A tile's picture: its thumbnail once lord-media has made it, its type icon until then (and for good
+// when it has none). Mounted only for the tiles in sight, so a big folder asks for a screenful.
+function Thumb({ e, dark }) {
+  const src = useThumb(e.path, 256);
+  if (!src) return <EntryIcon e={e} size={THUMB} dark={dark} thumb={false} />;
+  return (
+    <View style={{ width: THUMB, height: THUMB, alignItems: 'center', justifyContent: 'center' }}>
+      <Image src={src} style={{ width: THUMB, height: THUMB, objectFit: 'contain' }} />
+    </View>
+  );
+}
+
+function Tile({ e, on, live, th, onDown, onOpen }) {
+  const dark = th.mode === 'dark';
+  const pictured = live && !e.dir && THUMB_KINDS.includes(kindOf(e)) && !/\.svg$/i.test(e.name);
+  return (
+    <View onMouseDown={onDown} onDoubleClick={onOpen} style={{ width: TILE_W, height: TILE_H, paddingTop: 6, alignItems: 'center', gap: 4 }}>
+      <View style={{ padding: 4, borderRadius: 7, backgroundColor: on ? (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
+        {pictured ? <Thumb e={e} dark={dark} /> : <EntryIcon e={e} size={THUMB} dark={dark} thumb={false} />}
+      </View>
+      <View style={{ maxWidth: TILE_W - 8, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: on ? th.accent : 'transparent', alignItems: 'center' }}>
+        <Text style={{ fontSize: 12, lineHeight: 16, maxHeight: 32, color: on ? '#fff' : th.text, textAlign: 'center', whiteSpace: 'normal', overflow: 'hidden',
+          textOverflow: 'ellipsis', numberOfLines: 2 }}>{e.name}</Text>
+      </View>
     </View>
   );
 }
@@ -55,6 +92,19 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   const [replacing, setReplacing] = useState(false);
   const root = useRef(null), listBox = useRef(null), scroll = useRef(null), typed = useRef({ text: '', at: 0 });
   const width = useWidth(root, 800);
+  const listW = useWidth(listBox, 600);
+  // List or Thumbnails: a dialog for pictures and one for anything else each remember their own
+  const images = useMemo(() => imagesOnly(filter), []);
+  const [view, setViewNow] = useState(() => viewFor(settings.get().pickerView, images));
+  const setView = (v) => {
+    if (v === view) return;
+    setViewNow(v);
+    settings.set((s) => ({ ...s, pickerView: saveView(s.pickerView, images, v) }));
+    scroll.current?.scrollTo(0);
+  };
+  const thumbs = view === 'thumbs';
+  const cols = Math.max(1, Math.floor((listW - 2 * GRID_PAD) / TILE_W));
+  const [sight, setSight] = useState({ y: 0, h: 0 });
 
   const rows = useMemo(() => {
     let list = [];
@@ -69,9 +119,9 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     const i = rows.findIndex((r) => r.path === path);
     const s = scroll.current;
     if (i < 0 || !s) return;
-    const top = i * ROW_H, view = lord.getLayout(listBox.current.id)[3];
+    const rowH = thumbs ? TILE_H : ROW_H, top = (thumbs ? Math.floor(i / cols) : i) * rowH, box = lord.getLayout(listBox.current.id)[3];
     if (top < s.offset()) s.scrollTo(top);
-    else if (top + 2 * ROW_H > s.offset() + view) s.scrollTo(top + 2 * ROW_H - view);
+    else if (top + 2 * rowH > s.offset() + box) s.scrollTo(top + 2 * rowH - box);
   };
   const go = (path, how = 'push') => {
     if (path === dir) return;
@@ -129,6 +179,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     if (e.key === 'Enter') { act(enterAction(state)); return; }
     if (e.alt && e.key === 'ArrowLeft') { goBack(); return; }
     if (e.alt && e.key === 'ArrowRight') { goForward(); return; }
+    const by = thumbs ? gridStep(e.key, cols, direction() === 'rtl') : 0;
+    if (by) { moveTo(stepRow(rows, cursor, by)); return; }
     if (e.key === 'ArrowDown') { moveTo(stepRow(rows, cursor, 1)); return; }
     if (e.key === 'ArrowUp') { moveTo(stepRow(rows, cursor, -1)); return; }
     if (e.key === 'Home') { moveTo(rows[0]); return; }
@@ -195,14 +247,32 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, overflow: 'hidden' }}>
             <PathCrumbs t={th} crumbs={shown} onGo={(i) => go(shown[i].path)} />
           </View>
+          <ToolbarGroup>
+            <ToolbarButton icon="≡" iconSize={14} small title={t('shell.picker.viewList')} active={!thumbs} onClick={() => setView('list')} />
+            <ToolbarButton icon="▦" iconSize={14} small title={t('shell.picker.viewThumbs')} active={thumbs} onClick={() => setView('thumbs')} />
+          </ToolbarGroup>
         </Toolbar>
-        <View style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: th.separator }}>
-          <SortTitle k="name" sort={sort} onSort={onSort} t={th} />
-          {showDate && <SortTitle k="date" width={DATE_W} sort={sort} onSort={onSort} t={th} />}
-          <SortTitle k="size" width={SIZE_W} sort={sort} onSort={onSort} t={th} />
-        </View>
+        {thumbs ? <View style={{ height: 1, backgroundColor: th.separator }} /> : (
+          <View style={{ flexDirection: 'row', height: 27, alignItems: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: th.separator }}>
+            <SortTitle k="name" sort={sort} onSort={onSort} t={th} />
+            {showDate && <SortTitle k="date" width={DATE_W} sort={sort} onSort={onSort} t={th} />}
+            <SortTitle k="size" width={SIZE_W} sort={sort} onSort={onSort} t={th} />
+          </View>
+        )}
         <View ref={listBox} style={{ flex: 1, minHeight: 0 }} onMouseDown={() => { setCursor(null); setReplacing(false); }}>
-          <ScrollView scrollRef={scroll} style={{ flex: 1 }}>
+          <ScrollView scrollRef={scroll} style={{ flex: 1 }} onScroll={(y, h) => setSight((v) => (v.y === y && v.h === h ? v : { y, h }))}>
+            {thumbs ? (
+              <View style={{ paddingHorizontal: GRID_PAD, paddingBottom: 12, flexDirection: 'row', flexWrap: 'wrap' }}>
+                {(() => {
+                  const [from, to] = liveRange(sight.y, sight.h, TILE_H, cols, rows.length);
+                  return rows.map((e, i) => (
+                    <Tile key={e.path} e={e} th={th} on={e.path === cursor || chosen.includes(e.path)} live={i >= from && i < to}
+                      onDown={(ev) => { ev.stopPropagation(); hold(); select(e, ev); }} onOpen={(ev) => { ev.stopPropagation(); openRow(e); }} />
+                  ));
+                })()}
+                {!rows.length && <EmptyState title={t('shell.picker.empty')} style={{ minHeight: 180, flex: 1 }} />}
+              </View>
+            ) : (
             <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 12 }}>
               {rows.map((e, i) => {
                 const on = e.path === cursor || chosen.includes(e.path);
@@ -219,6 +289,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
               })}
               {!rows.length && <EmptyState title={t('shell.picker.empty')} style={{ minHeight: 180 }} />}
             </View>
+            )}
           </ScrollView>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, backgroundColor: th.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.025)' }}>

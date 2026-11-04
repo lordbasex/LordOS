@@ -81,3 +81,44 @@ export function enterAction(a) {
   if (a.mode === 'open' && a.multiple && a.row && !a.chosen?.length) return { pickMany: [a.row.path] };
   return primaryAction(a);
 }
+
+// ---- the List / Thumbnails switch ----
+
+// Does the dialog take only pictures (the wallpaper, a Notes image, a portal's image/* filter)?
+// filter: a RegExp, { test } or a function of the name; null takes everything.
+const IMAGE_NAMES = ['a.png', 'a.jpg', 'a.jpeg', 'a.webp', 'a.gif'];
+const OTHER_NAMES = ['a.txt', 'a.pdf', 'a.mp3', 'a.mp4', 'a.zip', 'a.csv', 'a.pub', 'a.ics', 'a.odt', 'a'];
+export function imagesOnly(filter) {
+  if (!filter) return false;
+  const test = typeof filter === 'function' ? filter : (n) => filter.test(n);
+  const ok = (n) => { try { if (filter.lastIndex) filter.lastIndex = 0; return !!test(n); } catch (e) { return false; } };
+  return IMAGE_NAMES.some(ok) && !OTHER_NAMES.some(ok);
+}
+
+// The view the dialog opens in. saved: settings.pickerView, { files, images }, each 'list' | 'thumbs',
+// written when the person flips the switch; a dialog for pictures and one for anything else keep
+// their own. Without a choice, pictures show as thumbnails and the rest as a list.
+export const VIEWS = ['list', 'thumbs'];
+export function viewFor(saved, images) {
+  const v = saved?.[images ? 'images' : 'files'];
+  return VIEWS.includes(v) ? v : images ? 'thumbs' : 'list';
+}
+export const saveView = (saved, images, view) => ({ ...(saved || {}), [images ? 'images' : 'files']: view });
+
+// Thumbnails load only for the tiles in sight and a row either side: [from, to) of rows' indexes.
+// offset and view in pixels, tileH the height of a row of tiles, cols the tiles in one.
+export function liveRange(offset, view, tileH, cols, count, spare = 1) {
+  if (!count || cols < 1 || tileH <= 0) return [0, 0];
+  const first = Math.max(0, Math.floor(Math.max(0, offset) / tileH) - spare);
+  const last = Math.floor((Math.max(0, offset) + Math.max(0, view)) / tileH) + spare;
+  return [Math.min(count, first * cols), Math.min(count, (last + 1) * cols)];
+}
+
+// Keys in the thumbnails: ← → one tile (reversed right to left), ↑ ↓ one row.
+export function gridStep(key, cols, rtl = false) {
+  if (key === 'ArrowLeft') return rtl ? 1 : -1;
+  if (key === 'ArrowRight') return rtl ? -1 : 1;
+  if (key === 'ArrowUp') return -Math.max(1, cols);
+  if (key === 'ArrowDown') return Math.max(1, cols);
+  return 0;
+}
