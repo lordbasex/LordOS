@@ -14,16 +14,21 @@
  *   net-vpn-import <type>\n<name>\n<config>   type wireguard | openvpn
  *   net-vpn-credentials <name>\n<user>\n<password>
  *   net-vpn-up / net-vpn-down / net-vpn-delete <name>
- *   net-vpn-status [name]       LOG per VPN (JSON) and OK */
+ *   net-vpn-status [name]       LOG per VPN (JSON) and OK
+ *
+ * lord-netd also hears the computer wake from sleep (net_wake_event, below; wake.c). */
 #include "net.h"
 #include "netpriv.h"
 #include "vpn.h"
 #include "ifwatch.h"
+#include "wake.h"
 #include "../pkg/pkg.h"
 
 #include <net/if.h>                 /* before the linux/ ones */
 
+#include <arpa/inet.h>
 #include <dirent.h>
+#include <ifaddrs.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -218,19 +223,183 @@ static int if_scan(int booting, int *applied) {
     return ifwatch_step(&if_seen, now, n, &if_ops, mono_ms(), booting, applied);
 }
 
+/* ---- after the computer wakes from sleep (issue #14; wake.c) ---- */
+
+static WakeTable wake_t;
+static long wake_next = -1, wake_last_ms = -100000, wake_gap;
+/* what each radio was doing when the computer went to sleep */
+typedef struct { char name[16]; int connected; } WakeSnap;
+static WakeSnap wake_snap[WAKE_MAX];
+static int wake_nsnap, wake_snap_set;
+static long wake_snap_gap;
+
+/* Time spent asleep since boot: CLOCK_BOOTTIME keeps counting while suspended, CLOCK_MONOTONIC doesn't. */
+static long sleep_gap_ms(void) {
+    struct timespec b, m;
+    clock_gettime(CLOCK_BOOTTIME, &b);
+    clock_gettime(CLOCK_MONOTONIC, &m);
+    return (long)(b.tv_sec - m.tv_sec) * 1000 + (b.tv_nsec - m.tv_nsec) / 1000000;
+}
+
+static int wpa_running(const char *name) {
+    char d[40];
+    snprintf(d, sizeof d, "wpa:%s", name);
+    return admin_daemon_running(d);
+}
+
+static int wpa_completed(const char *name) {
+    char st[2048];
+    return wifi_ctrl(name, "STATUS", st, sizeof st) > 0 && (!strncmp(st, "wpa_state=COMPLETED", 19) || strstr(st, "\nwpa_state=COMPLETED"));
+}
+
+static int wpa_has_networks(const char *name) {
+    char r[4096];
+    if (wifi_ctrl(name, "LIST_NETWORKS", r, sizeof r) <= 0) return 0;
+    char *nl = strchr(r, '\n');                    /* the first line is the header */
+    return nl && nl[1] != 0;
+}
+
+static void wake_logf(const char *name, const char *what, int why) {
+    if (why != WK_OK) {
+        fprintf(stderr, "lord-netd: after sleep: %s: %s (%s)\n", name, what, wake_why(why));
+        admin_event("net wake %s %s %s", name, what, wake_why(why));
+    } else {
+        fprintf(stderr, "lord-netd: after sleep: %s: %s\n", name, what);
+        admin_event("net wake %s %s", name, what);
+    }
+}
+
+static int wk_active(const char *name) { return rt_ifindex(name) && wpa_running(name) && !managed_by_system(name); }
+
+static int if_ipv4(const char *name, uint32_t *addr) {
+    struct ifaddrs *ifa = NULL;
+    int found = 0;
+    if (getifaddrs(&ifa)) return 0;
+    for (struct ifaddrs *i = ifa; i && !found; i = i->ifa_next)
+        if (i->ifa_addr && i->ifa_addr->sa_family == AF_INET && !strcmp(i->ifa_name, name)) {
+            *addr = ((struct sockaddr_in *)i->ifa_addr)->sin_addr.s_addr;
+            found = 1;
+        }
+    freeifaddrs(ifa);
+    return found;
+}
+
+/* Its gateway: the DHCP lease's, or the static config's (IPv4). 0 if it has none. */
+static uint32_t if_gateway(const char *name) {
+    uint32_t gw = 0;
+    if (!dhcp_lease_router(name, &gw) && gw) return gw;
+    char *t = load_if_conf(name), v[64];
+    int fam;
+    uint8_t a[16];
+    if (t && kv_get(t, "gateway", 0, v, sizeof v) && !parse_ip(v, &fam, a) && fam == AF_INET) memcpy(&gw, a, 4);
+    free(t);
+    return gw;
+}
+
+int net_wake_health(const char *name) {
+    if (!wpa_completed(name)) return WK_NOT_ASSOCIATED;
+    char p[96], c[8] = "";
+    snprintf(p, sizeof p, "/sys/class/net/%s/carrier", name);
+    FILE *f = fopen(p, "r");
+    if (f) { if (!fgets(c, sizeof c, f)) c[0] = 0; fclose(f); }
+    if (c[0] != '1') return WK_NO_CARRIER;
+    uint32_t addr = 0, gw;
+    if (!if_ipv4(name, &addr)) return WK_NO_ADDRESS;
+    if (!(gw = if_gateway(name))) return WK_OK;          /* nothing to ask: associated with an address will do */
+    return arp_probe(name, addr, gw, 3, 300) ? WK_NO_GATEWAY : WK_OK;
+}
+
+static void dhcp_renew(const char *name) {
+    char d[40];
+    snprintf(d, sizeof d, "if:%s", name);
+    admin_daemon_signal(d, SIGUSR2);
+}
+
+static void wk_reassociate(const char *name) {
+    char r[64];
+    wifi_ctrl(name, "DISCONNECT", r, sizeof r);
+    wifi_ctrl(name, "RECONNECT", r, sizeof r);
+    dhcp_renew(name);
+}
+
+static void wk_reset_stop(const char *name) {
+    stop_if_daemons(name);
+    int fd = nl_open(NETLINK_ROUTE, 0);
+    if (fd >= 0) { rt_link_set(fd, rt_ifindex(name), 0); close(fd); }
+}
+
+static void wk_reset_start(const char *name) { op_apply(name); }
+
+static const WakeOps wake_ops = { wk_active, net_wake_health, dhcp_renew, wk_reassociate, wk_reset_stop, op_busy, wk_reset_start, wake_logf };
+
+void net_wake_event(int sleeping, const char *source) {
+    long gap = sleep_gap_ms();
+    struct if_nameindex *ifs = if_nameindex();
+    if (sleeping) {
+        wake_nsnap = 0;
+        for (struct if_nameindex *i = ifs; i && i->if_index && wake_nsnap < WAKE_MAX; i++)
+            if (is_wifi(i->if_name) && wpa_running(i->if_name)) {
+                snprintf(wake_snap[wake_nsnap].name, sizeof wake_snap[0].name, "%s", i->if_name);
+                wake_snap[wake_nsnap++].connected = wpa_completed(i->if_name);
+            }
+        wake_snap_set = 1;
+        wake_snap_gap = gap;
+        if (ifs) if_freenameindex(ifs);
+        fprintf(stderr, "lord-netd: going to sleep (%s)\n", source);
+        return;
+    }
+    long now = mono_ms();
+    wake_gap = gap;
+    if (now - wake_last_ms < 5000) { if (ifs) if_freenameindex(ifs); return; }     /* both sources heard the same wake */
+    wake_last_ms = now;
+    /* the snapshot is trustworthy only if it was taken before the sleep (time asleep grew since) */
+    int snap_ok = wake_snap_set && gap - wake_snap_gap > 1000;
+    const char *names[WAKE_MAX];
+    int n = 0, wired = 0;
+    for (struct if_nameindex *i = ifs; i && i->if_index; i++) {
+        const char *name = i->if_name;
+        if (managed_by_system(name)) continue;
+        if (!is_wifi(name)) {
+            char d[40];
+            snprintf(d, sizeof d, "if:%s", name);
+            if (admin_daemon_running(d)) { dhcp_renew(name); wake_logf(name, "renew", WK_OK); wired++; }
+            continue;
+        }
+        if (!wpa_running(name) || n == WAKE_MAX) continue;
+        int want = 0;
+        if (snap_ok) { for (int k = 0; k < wake_nsnap; k++) if (!strcmp(wake_snap[k].name, name)) want = wake_snap[k].connected; }
+        else want = wpa_has_networks(name);                 /* not known: a radio with saved networks */
+        if (want) names[n++] = name;
+    }
+    fprintf(stderr, "lord-netd: woke from sleep (%s, %ld s asleep): renewing %d wired, checking %d Wi-Fi\n",
+            source, snap_ok ? (gap - wake_snap_gap) / 1000 : -1L, wired, n);
+    wake_begin(&wake_t, names, n, now);
+    wake_snap_set = 0;
+    if (ifs) if_freenameindex(ifs);
+    wake_next = n ? now + WAKE_SETTLE_MS : -1;
+}
+
 int net_watch_open(void) {
+    wake_gap = sleep_gap_ms();
     if_watch_fd = nl_open(NETLINK_ROUTE, RTMGRP_LINK);
     if (if_watch_fd >= 0) fcntl(if_watch_fd, F_SETFL, fcntl(if_watch_fd, F_GETFL) | O_NONBLOCK);
     return if_watch_fd;
 }
 
 int net_watch_timeout(void) {
-    if (!if_pending) return -1;
-    long left = if_next_ms - mono_ms();
+    long at = if_pending ? if_next_ms : -1;
+    if (wake_next >= 0 && (at < 0 || wake_next < at)) at = wake_next;
+    if (at < 0) return -1;
+    long left = at - mono_ms();
     return left < 0 ? 0 : (int)left;
 }
 
 void net_watch_run(int readable) {
+    /* a wake nobody announced (no system bus): the time asleep jumped */
+    long gap = sleep_gap_ms();
+    if (gap - wake_gap > 3000) net_wake_event(0, "clock");
+    wake_gap = gap;
+    if (wake_next >= 0 && mono_ms() >= wake_next) wake_next = wake_step(&wake_t, &wake_ops, mono_ms());
     if (readable) { char junk[8192]; while (recv(if_watch_fd, junk, sizeof junk, MSG_DONTWAIT) > 0) {} }
     if (!readable && (!if_pending || mono_ms() < if_next_ms)) return;
     int applied = 0;

@@ -58,6 +58,16 @@ void net_act_vpn_enable(const AdminReq *r, const char *arg, size_t len);
 int  net_watch_open(void);
 int  net_watch_timeout(void);
 void net_watch_run(int readable);
+/* lord-netd: the computer is going to sleep (1) or woke (0); source for the log ("logind", "clock").
+ * On waking, wired DHCP clients renew and each Wi-Fi interface is checked and, if it carries nothing,
+ * re-associated or turned off and on (wake.c). net_watch_run also notices a wake nobody announced. */
+void net_wake_event(int sleeping, const char *source);
+/* lord-netd: logind's PrepareForSleep over the system bus (sleepbus.c). net_sleep_poll gives the fd
+ * (-1: not connected) and its poll events; net_sleep_timeout when to try connecting again (-1: never);
+ * net_sleep_run goes after each poll and calls net_wake_event. */
+int  net_sleep_poll(short *events);
+int  net_sleep_timeout(void);
+void net_sleep_run(int revents);
 
 /* Privileged helper (admin.c) actions this module adds. A_ANYONE: also a user who isn't
  * an administrator (connecting to a network or to an already configured VPN). */

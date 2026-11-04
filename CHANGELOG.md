@@ -35,6 +35,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - With "Require password after the display turns off", the login screen turned the display back on and kept it on, and the computer never went to sleep. Now the screen stays off when it locks, the password is asked for when you wake it, the lock screen turns the display off again after the same time, and the computer still sleeps at the chosen time. A sleep time shorter than the lock time also locks first ([#23](https://github.com/lordbasex/LordOS/issues/23)).
 - The battery percentage in the menu bar and in Settings → Energy didn't follow the battery on laptops whose battery reports no change events while it discharges, so the low-battery notices at 20 %, 10 % and 5 % never came. It is now read again every 30 seconds ([#25](https://github.com/lordbasex/LordOS/issues/25)).
+- Wi-Fi that showed as connected after the computer woke from sleep but carried nothing until the card was turned off and on. LordOS's network service now hears the computer wake: wired connections confirm their address right away, and each Wi-Fi connection is checked a few seconds later (associated, link, address, and the router answering). If it isn't working, it re-associates and renews its address, and if that isn't enough it turns the card off and on by itself, as you had to. Every step is in the log. Needs confirming on the reported hardware ([#14](https://github.com/lordbasex/LordOS/issues/14))
 
 ## [0.8.8.2-beta] - 2026-11-04
 

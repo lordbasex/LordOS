@@ -108,6 +108,11 @@ void dns_revert(const char *ifname);
 /* ---- pieces of the actions ---- */
 
 void dhcp_run(const char *ifname, int wifi);    /* DHCP client (doesn't return); wifi: waits for association */
+int  dhcp_lease_router(const char *ifname, uint32_t *router);  /* gateway of its saved lease; 0 ok */
+/* Does dst answer an ARP request from src on ifname (addresses in network order)? 0 yes. */
+int  arp_probe(const char *ifname, uint32_t src, uint32_t dst, int tries, int wait_ms);
+/* After waking from sleep: is this Wi-Fi interface carrying traffic? WK_OK or what fails (wake.h). */
+int  net_wake_health(const char *ifname);
 int  wg_up(const char *name, char *err, size_t errn);
 int  wg_down(const char *name);
 int  wg_status_json(const char *name, Buf *out);

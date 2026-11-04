@@ -6,7 +6,9 @@
  * wpa_supplicant's notices (connected/disconnected) into EVENTs. SIGTERM: DHCPRELEASE and cleanup. If the process that
  * started it dies (lord-netd, which lord-sessiond restarts right away) it gets SIGUSR1: it keeps
  * the address and leaves the lease in /run/lordos/dhcp/<if>.lease, and the new client confirms it
- * (INIT-REBOOT) without dropping connections.
+ * (INIT-REBOOT) without dropping connections. SIGUSR2 (lord-netd, after the computer wakes from sleep):
+ * confirm the lease now (INIT-REBOOT), since the network may have changed and the timers, on
+ * CLOCK_MONOTONIC, stood still while asleep.
  *
  * It sends and receives over an AF_PACKET socket (no IP needed yet); a UDP socket on
  * port 68 bound to the interface keeps the kernel from answering "port unreachable" and serves
@@ -60,8 +62,9 @@ typedef struct {
     char domain[128];
 } Lease;
 
-static volatile sig_atomic_t stop_flag, keep_flag;
+static volatile sig_atomic_t stop_flag, keep_flag, renew_flag;
 static void on_term(int s) { (void)s; stop_flag = 1; }
+static void on_renew(int s) { (void)s; renew_flag = 1; }
 static void on_parent_gone(int s) { (void)s; keep_flag = 1; stop_flag = 1; }
 
 static double now_s(void) {
@@ -309,6 +312,19 @@ static void lease_save(const Dhcp *d) {
 
 static void lease_forget(const Dhcp *d) { char p[96]; lease_path(d, p, sizeof p); unlink(p); }
 
+int dhcp_lease_router(const char *ifname, uint32_t *router) {
+    char p[96];
+    snprintf(p, sizeof p, LEASE_DIR "/%s.lease", ifname);
+    LeaseFile f;
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t r = read(fd, &f, sizeof f);
+    close(fd);
+    if (r != (ssize_t)sizeof f || f.magic != LEASE_MAGIC || strncmp(f.ifname, ifname, sizeof f.ifname)) return -1;
+    *router = f.lease.router;
+    return 0;
+}
+
 /* The lease of an earlier client on this same interface, if still valid. */
 static void lease_load(Dhcp *d) {
     char p[96];
@@ -354,6 +370,49 @@ static void drop_lease(Dhcp *d, const char *why) {
     admin_event("net dhcp %s %s", d->ifname, why);
 }
 
+/* ---- does the gateway answer? (lord-netd, after waking from sleep) ---- */
+
+struct arp_pkt {
+    uint16_t htype, ptype;
+    uint8_t hlen, plen;
+    uint16_t op;
+    uint8_t sha[6];
+    uint32_t spa;
+    uint8_t tha[6];
+    uint32_t tpa;
+} __attribute__((packed));
+
+int arp_probe(const char *ifname, uint32_t src, uint32_t dst, int tries, int wait_ms) {
+    int ifindex = rt_ifindex(ifname);
+    if (!ifindex) return -1;
+    int s = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    struct ifreq ifr = {0};
+    snprintf(ifr.ifr_name, sizeof ifr.ifr_name, "%s", ifname);
+    if (s < 0 || ioctl(s, SIOCGIFHWADDR, &ifr)) { if (s >= 0) close(s); return -1; }
+    close(s);
+    int fd = socket(AF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC, htons(ETH_P_ARP));
+    struct sockaddr_ll ll = { .sll_family = AF_PACKET, .sll_protocol = htons(ETH_P_ARP), .sll_ifindex = ifindex };
+    if (fd < 0 || bind(fd, (struct sockaddr *)&ll, sizeof ll)) { if (fd >= 0) close(fd); return -1; }
+    struct arp_pkt q = { .htype = htons(1), .ptype = htons(ETH_P_IP), .hlen = 6, .plen = 4, .op = htons(1), .spa = src, .tpa = dst };
+    memcpy(q.sha, ifr.ifr_hwaddr.sa_data, 6);
+    struct sockaddr_ll to = ll;
+    to.sll_halen = 6;
+    memset(to.sll_addr, 0xff, 6);
+    int ok = 0;
+    for (int i = 0; i < tries && !ok; i++) {
+        if (sendto(fd, &q, sizeof q, 0, (struct sockaddr *)&to, sizeof to) != (ssize_t)sizeof q) break;
+        double end = now_s() + wait_ms / 1000.0;
+        for (double t = now_s(); !ok && t < end; t = now_s()) {
+            struct pollfd pf = { fd, POLLIN, 0 };
+            if (poll(&pf, 1, (int)((end - t) * 1000) + 1) <= 0) break;
+            struct arp_pkt r;
+            if (recv(fd, &r, sizeof r, 0) == (ssize_t)sizeof r && r.op == htons(2) && r.spa == dst) ok = 1;
+        }
+    }
+    close(fd);
+    return ok ? 0 : -1;
+}
+
 /* ---- Wi-Fi: wpa_supplicant notices ---- */
 
 static int wpa_attach(Dhcp *d) {
@@ -394,6 +453,8 @@ void dhcp_run(const char *ifname, int wifi) {
     sigaction(SIGINT, &sa, NULL);
     struct sigaction sk = { .sa_handler = on_parent_gone };
     sigaction(SIGUSR1, &sk, NULL);
+    struct sigaction sr = { .sa_handler = on_renew };
+    sigaction(SIGUSR2, &sr, NULL);
     prctl(PR_SET_PDEATHSIG, SIGUSR1);           /* lord-netd dies: exit without releasing the address */
     d.ifindex = rt_ifindex(ifname);
     gethostname(d.host, sizeof d.host - 1);
@@ -427,6 +488,11 @@ void dhcp_run(const char *ifname, int wifi) {
     admin_event("net dhcp %s started", ifname);
 
     while (!stop_flag) {
+        if (renew_flag) {
+            renew_flag = 0;
+            admin_event("net dhcp %s renew", ifname);
+            if (d.state != S_WAIT_LINK) enter(&d, d.lease.addr ? S_REBOOTING : S_SELECTING);
+        }
         double t = now_s();
         if (wifi && d.wpa < 0 && t >= wpa_retry) { d.wpa = wpa_attach(&d); wpa_retry = t + 2; }
         if (d.state == S_WAIT_LINK && link_carrier(d.ifindex)) enter(&d, d.lease.addr ? S_REBOOTING : S_SELECTING);
