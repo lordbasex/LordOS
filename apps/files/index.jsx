@@ -672,6 +672,7 @@ export default function Files() {
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   const viewCtx = {
+    scrollKey: `${active}|${loc.type}|${loc.path || ''}|${loc.inner || ''}|${loc.color || ''}|${loc.root || ''}|${loc.query || ''}`,   // a new place opens at the top
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
     onItemDown, onOpen: open, onContext, statOf,

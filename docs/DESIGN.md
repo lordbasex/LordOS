@@ -257,10 +257,16 @@ Every scrolling area uses the SDK's `ScrollView`, which draws an **overlay scrol
   `scrollRadius` and `scrollThumbBorder` (a pill in Lord Flow; the Lord Classic theme's is squarer and
   solid with a hairline). `ThemeProvider` passes the setting (`scrollBars`) and `reduceMotion` with
   the tokens, so isolated apps follow them too.
+- **New content starts at the top (0.8.8.3):** a view that shows one page out of several (a Store
+  category, a Settings section, a folder, search results) passes `resetKey` (the page's id); when it
+  changes, the view goes back to the top instead of keeping the last page's position, which could
+  leave a short page scrolled past its end. Views whose content just updates (a log, a refreshing
+  list) leave it out and keep their position. The Store also returns to where a list was when you
+  go back from an app's page.
 - The Terminal's history bar (drawn in C, `term_paint.c`) uses the same size and inset and shows
   only while you look at the history.
 
-Tests: `tests/scrollbar_model_test.mjs` (geometry, thumb hit-test and drag, show/hide per mode,
+Tests: `tests/scrollview_reset_test.mjs` (`resetKey`), `tests/scrollbar_model_test.mjs` (geometry, thumb hit-test and drag, show/hide per mode,
 fade timing, reduce motion) and `test_overlay_scrollbar` in `build/engine-test` (painted over the
 content, no strip reserved, never over the text, the strip takes the pointer only while shown,
 the faded opacity, RTL). Screenshots: `scrollbars-network-{light,dark}-{hidden,scrolling}.png`,

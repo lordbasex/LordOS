@@ -368,7 +368,7 @@ function Charts({ tab, rate }) {
   const last = samples[samples.length - 1];
   if (!last) return null;
   return (
-    <ScrollView style={{ flex: 1 }}>
+    <ScrollView resetKey={tab} style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}>
         {tab === 'overview' && <Overview s={s} last={last} />}
         {tab === 'cpu' && <CpuTab s={s} last={last} />}
@@ -439,15 +439,15 @@ export default function Monitor() {
       ) : view === 'network' ? (
         <Network prefs={prefs} />
       ) : view === 'voltage' ? (
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey="voltage" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
         </ScrollView>
       ) : view === 'cooling' ? (
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey="cooling" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
       ) : view === 'processes' ? (
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey="processes" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (

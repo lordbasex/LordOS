@@ -89,7 +89,7 @@ export default function Characters() {
       </Toolbar>
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ width: 180, backgroundColor: th.sidebarBg }}>
-          <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 10 }}>
+          <ScrollView resetKey={tab} style={{ flex: 1, paddingHorizontal: 10, paddingTop: 10 }}>
             {side.map(([id, label]) => {
               const on = tab === 'emoji' ? (!q.trim() && group === id) : block === id;
               return <SidebarItem key={id} label={label} selected={on} onClick={() => { if (tab === 'emoji') { setQ(''); setGroup(id); } else setBlock(id); }} />;
@@ -101,12 +101,12 @@ export default function Characters() {
         <View style={{ flex: 1, minWidth: 0, direction: 'ltr' }}>
           {tab === 'emoji' ? (
             list.length ? (
-              <ScrollView style={{ flex: 1, padding: 12 }}>
+              <ScrollView resetKey={`${group}|${q}`} style={{ flex: 1, padding: 12 }}>
                 <EmojiGrid list={list} sel={-1} picked={pick} onPick={choose} tone={tone} size={44} th={th} wrap />
               </ScrollView>
             ) : <EmptyState title={group === 'recent' && !q.trim() ? tr('emoji.noRecent') : tr('emoji.none')} />
           ) : (
-            <ScrollView style={{ flex: 1, padding: 12 }}>
+            <ScrollView resetKey={block} style={{ flex: 1, padding: 12 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                 {chars.map((ch) => (
                   <View key={ch} onClick={() => choose(ch)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8,

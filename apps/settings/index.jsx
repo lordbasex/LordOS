@@ -945,7 +945,7 @@ export default function Settings() {
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.title, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
             {tr(`settings.section.${section}`)}</Text>
         </View>
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey={section} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: spacing.xxl, paddingTop: spacing.xl, alignItems: 'center' }}>
             <View style={{ width: '100%', maxWidth: 680 }}>
               <Body page={section === 'network' ? args?.page : undefined} />

@@ -5,7 +5,7 @@ import {
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
   suggestions, unseenSuggestions, refreshSuggestions,
 } from '@lordos/sdk';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, catalogApp, catalogApps } from './ai.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
@@ -319,6 +319,16 @@ export default function Store() {
   const deb = useDebian();
   const launcher = useLauncherApps();
   const go = (p) => { setApp(null); setPage(p); };
+  // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
+  const scroll = useRef(null);
+  const listAt = useRef(null);
+  const listKey = `${page}|${query}`;
+  useEffect(() => {
+    const at = listAt.current;
+    if (app || !at) return;
+    listAt.current = null;
+    if (at.key === listKey) scroll.current?.scrollTo(at.y);
+  }, [app]);
   useEffect(() => {
     if (args?.install) setFile(args.install);
     if (args?.page) go(args.page);
@@ -330,8 +340,9 @@ export default function Store() {
   const unseen = page === 'suggested' ? 0 : unseenSuggestions(sug.list).length;    // new suggestions (the page's badge)
   const counts = debian.categoryCounts();
   const cat = page.startsWith('cat:') ? page.slice(4) : null;
-  const openDeb = (name) => setApp({ name, ai: false });
-  const openAi = (name) => setApp({ name, ai: true });
+  const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
+  const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
+  const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const pageTitle = cat ? tr(`store.cat.${cat}`) : tr(`store.page.${page}`);
   const appTitle = app && (app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
   const searchable = !app && page !== 'updates' && page !== 'suggested';
@@ -381,7 +392,7 @@ export default function Store() {
           </View>
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={200} /> : null}
         </Toolbar>
-        <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
+        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />

@@ -108,7 +108,7 @@ function Article({ id, onOpen }) {
   const col = Math.max(280, Math.min(680, width - 2 * spacing.xxxl));
   return (
     <View ref={box} style={{ flex: 1 }}>
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView resetKey={id} style={{ flex: 1 }}>
         <View style={{ alignItems: 'center', paddingTop: spacing.xxl, paddingBottom: spacing.xxxl }}>
           <View style={{ width: col, direction: textDirection(a.body) }}>
             {app && (

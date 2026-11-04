@@ -56,7 +56,7 @@ function GroupTitle({ g, t }) {
 export function IconView({ groups, ctx }) {
   const t = useTheme();
   return (
-    <ScrollView style={{ flex: 1 }}>
+    <ScrollView resetKey={ctx.scrollKey} style={{ flex: 1 }}>
       <View style={{ padding: 12, paddingBottom: 32 }}>
         {groups.map((g) => (
           <View key={g.key}>
@@ -218,7 +218,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
     <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
       <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
         <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey={ctx.scrollKey} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
             {groups.map((g) => (
               <View key={g.key}>

@@ -104,18 +104,25 @@ export function SectionTitle({ children }) {
 //   press); a jump that moves the view shows the bar like any other scroll.
 // contentStyle (optional): style of the scrolled content box (its padding).
 // gutter (0.8.1, optional): with "Always" only, keep a strip at the end for the bar.
+// resetKey (0.8.8.3, optional): what the view is showing (a page, a section, a folder, a search).
+//   When it changes the view goes back to the top, so the next page doesn't open where the last
+//   one was scrolled to (or past its end). Leave it out where the same content just updates
+//   (a growing log, a list that refreshes) and the position should stay.
 export const SCROLL_GUTTER = 11;
 // A TextInput asks the ScrollView it is in to show its caret: on focus, on typing, and when the view
 // changes height, as a window does when it shrinks for the on-screen keyboard. A wheel scroll with a
 // field focused doesn't ask.
 const ScrollReveal = createContext(null);
-export function ScrollView({ style, contentStyle, children, scrollRef, gutter }) {
+export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey }) {
   const t = useTheme();
   const mode = scrollbarMode(t.scrollBars);
   const reduce = !!t.reduceMotion;
   const rtl = direction() === 'rtl';
   const outer = useRef(null), inner = useRef(null), thumb = useRef(null);
   const [offset, setOffset] = useState(0);
+  // new content (resetKey changed): start at the top; React renders again before committing
+  const [shownKey, setShownKey] = useState(resetKey);
+  if (shownKey !== resetKey) { setShownKey(resetKey); if (offset) setOffset(0); }
   const [metrics, setMetrics] = useState({ view: 0, content: 0 });
   const [ui, setUi] = useState({ near: false, hover: false, dragging: false, shown: mode === 'always' });
   const st = useRef(null);

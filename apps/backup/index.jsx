@@ -390,7 +390,7 @@ function Browser({ st }) {
           {!narrow ? <Text style={[caption, { width: 150, textAlign: 'end' }]}>{tr('backup.col.modified')}</Text> : null}
           <Hairline edge="bottom" />
         </View>
-        <ScrollView style={{ flex: 1 }}>
+        <ScrollView resetKey={`${sel}|${rel}`} style={{ flex: 1 }}>
           <View style={{ paddingVertical: spacing.xs, paddingHorizontal: spacing.s }}>
             {items.map((it, i) => {
               const on = pick === it.name;

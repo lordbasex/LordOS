@@ -434,7 +434,7 @@ function Hardware({ r }) {
         </ScrollView>
         <Hairline edge="end" />
       </View>
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView resetKey={cur} style={{ flex: 1 }}>
         <View style={{ padding: spacing.xl, gap: spacing.l }}>
           <Text style={{ fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.section.${cur}`)}</Text>
           <Section id={cur} r={r} />
