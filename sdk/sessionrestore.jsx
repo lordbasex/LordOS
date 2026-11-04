@@ -19,7 +19,7 @@ import { t } from './i18n.js';
 import { useTheme } from './theme.js';
 import { spacing, typeScale, controlSize } from './controls.jsx';
 import { settings, saveSettingsNow } from './settings.js';
-import { windows, wm, getApp, isLiveSystem, workAreaOf, setLinuxPlacement, SNAP_ZONES, activeDesktop, setActiveDesktop } from './windows.js';
+import { windows, wm, getApp, isLiveSystem, workAreaOf, setLinuxPlacement, SNAP_ZONES, activeDesktop, desktopList, setActiveDesktop } from './windows.js';
 import { desktopAt, indexOfDesktop, activeIndex } from './desktops.js';
 import { cleanIndex } from './desktopmodel.js';
 import { dockIdOfWindow, launchDockItem } from './dock.js';
@@ -291,6 +291,7 @@ export function startSessionRestore() {
   armed = true;
   windows.subscribe(schedule);
   activeDesktop.subscribe(schedule);
+  desktopList.subscribe(schedule);                      // desktops reordered: each window's position changed
   if (mode === 'off') { if (saved) settings.set({ sessionSaved: null }); hold = false; return; }
   const switched = saved?.clean === 'theme';           // the same session in a new theme (themeReopen)
   const list = cleanList(saved?.windows, SNAP_ZONES);

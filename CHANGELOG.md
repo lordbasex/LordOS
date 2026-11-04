@@ -17,6 +17,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - The system file dialog has a **List / Thumbnails** switch in its toolbar, so pictures can be chosen by how they look (Settings → Wallpaper, Notes' images and every other app that uses the dialog). A dialog that takes only pictures opens in Thumbnails; the choice is remembered. Thumbnails load in the background for the files in sight, and other files show their type icon ([#22](https://github.com/lordbasex/LordOS/issues/22))
+### Added
+
+- Desktops: **rename** a desktop by double-clicking its name in the Overview, from its right-click menu (**Rename…**) or in Settings → Desktop & Dock → Names; the name shows in the indicator, the Overview, Move to Desktop and the window lists, and an empty name goes back to "Desktop N". **Reorder** desktops by dragging them along the Overview's strip (or **Move Left** / **Move Right** in the same menu); their windows move with them. Names and order are kept across sessions ([#15](https://github.com/lordbasex/LordOS/issues/15))
 
 ## [0.8.8.2-beta] - 2026-11-04
 

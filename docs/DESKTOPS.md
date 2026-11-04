@@ -7,8 +7,8 @@ window is *parked*.
 | Code | Role |
 |---|---|
 | `sdk/desktopmodel.js` | The rules as plain data, no runtime: what shows, what is in front, who has the keyboard, the Overview's layout. `server/tests/desktop_model_test.mjs` |
-| `sdk/windows.js` | `w.desktop`, the stores `activeDesktop` and `desktopList`, `wm.moveToDesktop`, `wm.raise`, `useWindows`, `useWindowHidden` |
-| `sdk/desktops.js` | Switching, the keys, the saved count, the indicator, the animation |
+| `sdk/windows.js` | `w.desktop`, the stores `activeDesktop`, `desktopList` and `desktopNames`, `desktopName`, `renameDesktop`, `moveDesktop`, `wm.moveToDesktop`, `wm.raise`, `useWindows`, `useWindowHidden` |
+| `sdk/desktops.js` | Switching, the keys, the saved count and names, the indicator, the animation |
 | `sdk/overview.jsx` | The Overview, the same in both themes (it replaced Lord Classic's task view) |
 | `sdk/windowshell.jsx` | `display: none` on a hidden desktop, the window's place in the Overview |
 | `sdk/wayland.js`, `server/src/wl/wl.c` | The keyboard and the parked state of Linux windows |
@@ -67,6 +67,20 @@ over the wallpaper, since the other desktops' windows aren't drawn. There is no 
 - Click a desktop to show it there; click the one in view to leave. The button at the end adds one; × on a
   hovered desktop closes it.
 - Drag a window to a desktop, or to the add button, to move it.
+- Drag a desktop along the strip to change the order: the others make room, and its windows go with it.
+- Double-click a desktop's name to rename it (Enter or a click elsewhere keeps it, Esc cancels). Right-click a
+  desktop for **Rename…**, **Move Left**, **Move Right** and **Close Desktop**.
+
+## Names and order
+
+A desktop is called "Desktop 2" by its position until it is given a name: in the Overview, or in
+**Settings → Desktop & Dock → Names**. An empty name goes back to the default. The name is used everywhere a
+desktop is named: the indicator, the Overview, **Move to Desktop**, and the " · Work" after a window of another
+desktop in the Dock menu, the Window menu and the app switcher. A name is one line of at most 32 characters.
+
+The order is `desktopList`; windows carry the desktop's id, so moving a desktop moves its windows, and a desktop
+with no name of its own takes the default name of its new position. The rules are `cleanName`, `withName`,
+`namesByPosition`, `moveDesktopTo` and `stripSlot` in `desktopmodel.js`.
 
 Ctrl+Down shows the windows of the app in front on this desktop, with no strip. A fullscreen Linux app is presented
 above every layer, so the Overview doesn't open over it.
@@ -113,6 +127,9 @@ alone, `lord-server` used 0 CPU ticks in 10 s with three desktops and windows op
 ## What is kept
 
 - `settings.desktopCount`: the number of desktops, across sessions.
+- `settings.desktopNames`: their names by position (`''` for the default, unnamed ones at the end left out, `null`
+  for none). Desktops are numbered again at each start, so the order is kept by everything naming a position:
+  these names and each window's `desk` below. Reordering schedules a session save.
 - Session restore ([SESSIONS.md](SESSIONS.md)): each entry has `desk`, its position in the list, left out for the
   first, and `sessionSaved.active` is the desktop in view. A window that comes back opens directly on its desktop,
   so it takes neither the front nor the keyboard of the desktop in view. Only a sane position is read back.

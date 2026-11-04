@@ -465,6 +465,8 @@
   "dock.desktops.arrows": "Usa Ctrl + tasti freccia per le Scrivanie",
   "dock.desktops.arrowsHint": "Ctrl+Su apre la Panoramica, Ctrl+Sinistra e Destra cambiano scrivania, Ctrl+Giù mostra le finestre dell’app in primo piano.",
   "dock.desktops.swipe": "Lo scorrimento con quattro dita cambia scrivania",
+  "dock.desktops.names": "Nomi",
+  "dock.desktops.namesHint": "Lascia un nome vuoto per usare quello predefinito. Nella Panoramica, fai doppio clic sul nome di una scrivania per rinominarla, oppure trascinala lungo la striscia per cambiarne l’ordine.",
   "kb.desktopArrows.title": "Scrivanie",
   "kb.desktopArrows.label": "Usa Ctrl + tasti freccia per le Scrivanie",
   "kb.desktopArrows.hint": "Ctrl+Su apre la Panoramica, Ctrl+Sinistra e Destra cambiano scrivania, Ctrl+Giù mostra le finestre dell’app. Disattivalo per tenere questi tasti per spostarti di parola in parola nelle app; Super+Ctrl+Sinistra e Destra cambiano comunque scrivania.",

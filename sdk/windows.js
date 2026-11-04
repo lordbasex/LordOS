@@ -7,9 +7,9 @@
 // that the theme shows in its menu bar.
 import { screen, onScreenChange, addListener, mainDisplay, displayAt, displayFor } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
-import { appName } from './i18n.js';
+import { appName, t } from './i18n.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext } from './snap.js';
-import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop } from './desktopmodel.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -74,6 +74,8 @@ export const windows = createStore([]);
 // together. desktopList is the order on screen; sdk/desktops.js switches, persists and animates.
 export const activeDesktop = createStore(FIRST_DESKTOP);
 export const desktopList = createStore([FIRST_DESKTOP]);
+// The names given to desktops: id → name, none for a desktop with its default name ("Desktop 2", by position).
+export const desktopNames = createStore({});
 export const onActiveDesktop = (w) => onDesktop(w, activeDesktop.get());
 const desktopState = () => ({ list: desktopList.get(), active: activeDesktop.get() });
 // The overview shows this desktop's minimized windows too (sdk/overview.jsx sets it).
@@ -91,14 +93,26 @@ export function closeDesktop(id) {
   const { state, target } = removeDesktop(desktopState(), id);
   if (target == null) return false;
   windows.set((ws) => ws.map((w) => ((w.desktop ?? FIRST_DESKTOP) === id ? { ...w, desktop: target } : w)));
+  if (desktopNames.get()[id]) desktopNames.set(withName(desktopNames.get(), id, ''));
   desktopList.set(state.list);
   activeDesktop.set(state.active);
   return true;
 }
 // Exactly `list`, in that order (a new session, sdk/desktops.js): no window is on any other desktop yet.
-export function setDesktops(list, active) {
+export function setDesktops(list, active, names = {}) {
+  desktopNames.set(names);
   desktopList.set(list);
   activeDesktop.set(active);
+}
+// Its own name, or the default by position. An empty name goes back to the default.
+export const desktopName = (id) => desktopNames.get()[id] || t('shell.desktops.name', { n: desktopList.get().indexOf(id) + 1 });
+export function renameDesktop(id, name) {
+  if (desktopList.get().includes(id)) desktopNames.set(withName(desktopNames.get(), id, name));
+}
+// To another position in the list; its windows go with it (they name the desktop, not a position).
+export function moveDesktop(id, index) {
+  const list = desktopList.get(), next = moveDesktopTo(list, id, index);
+  if (next !== list) desktopList.set(next);
 }
 
 // The screen size changed: the work area keeps the theme's margins (menu

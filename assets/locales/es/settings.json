@@ -465,6 +465,8 @@
   "dock.desktops.arrows": "Usar Ctrl + flechas para los escritorios",
   "dock.desktops.arrowsHint": "Ctrl+arriba abre la Vista general, Ctrl+izquierda y derecha cambian de escritorio, Ctrl+abajo muestra las ventanas de la app en primer plano.",
   "dock.desktops.swipe": "Deslizar con cuatro dedos cambia de escritorio",
+  "dock.desktops.names": "Nombres",
+  "dock.desktops.namesHint": "Dejá un nombre vacío para usar el predeterminado. En la Vista general, hacé doble clic en el nombre de un escritorio para renombrarlo, o arrastralo por la tira para cambiar el orden.",
   "kb.desktopArrows.title": "Escritorios",
   "kb.desktopArrows.label": "Usar Ctrl + flechas para los escritorios",
   "kb.desktopArrows.hint": "Ctrl+Arriba abre la vista general, Ctrl+Izquierda y Derecha cambian de escritorio, Ctrl+Abajo muestra las ventanas de la app. Apagalo para dejar estas teclas al movimiento por palabras en las apps; Super+Ctrl+Izquierda y Derecha siguen cambiando de escritorio.",
