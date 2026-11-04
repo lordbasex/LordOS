@@ -327,6 +327,17 @@ powerbox) the dialog looks and works like Files, built from Files' own pieces
 - **Keys and mouse:** a click selects, a double click opens a folder or picks a file; Enter does the same for the row
   under the cursor (with none, it is the primary button); Esc cancels; the arrows move. Saving asks before replacing
   a file.
+- **List or Thumbnails (0.8.8.3):** two buttons at the end of the toolbar switch the files between the list and
+  tiles with small pictures ([#13](https://github.com/lordbasex/LordOS/issues/13),
+  [#22](https://github.com/lordbasex/LordOS/issues/22)). A dialog that takes only pictures (Settings → Wallpaper,
+  Notes' images, a contact's photo, a Linux app's `image/*` filter) opens in Thumbnails, any other in the list; the
+  person's choice is remembered in `settings.json` (`pickerView`, `{ files, images }`, one for each kind of dialog).
+  The pictures are lord-media's thumbnails, the same `~/.cache/lordos/thumbs` cache Files and Photos use
+  (`useThumb`), asked for only for the tiles in sight and a row either side, so a big folder asks for a screenful and
+  the dialog never waits for one: a file shows its type icon until its thumbnail arrives, and for good when it has
+  none (folders, documents, SVG). Videos and music show a frame or the cover. In Thumbnails the arrows move by tile
+  and by row (reversed right to left) and sorting keeps the list's last choice. In an isolated app's own process
+  (Mail, Contacts, Passwords) the switch works but is not remembered: that process has no settings file.
 
 Local disks are new here: an app that asks through the dialog can now be given a file on one, when the person picks
 it. The same dialog answers `org.freedesktop.portal.FileChooser` for Linux apps with no file dialog of their own,

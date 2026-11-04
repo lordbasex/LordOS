@@ -113,7 +113,7 @@ export const SCROLL_GUTTER = 11;
 // changes height, as a window does when it shrinks for the on-screen keyboard. A wheel scroll with a
 // field focused doesn't ask.
 const ScrollReveal = createContext(null);
-export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey }) {
+export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey, onScroll }) {
   const t = useTheme();
   const mode = scrollbarMode(t.scrollBars);
   const reduce = !!t.reduceMotion;
@@ -205,6 +205,10 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
     setOffset(Math.max(0, v));
   };
   if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner };
+  // onScroll(y, view): the offset after it changed (what is in sight, for lazy contents)
+  const scrolledTo = useRef(onScroll);
+  scrolledTo.current = onScroll;
+  useEffect(() => { scrolledTo.current?.(y, metrics.view); }, [y, metrics.view]);
   const latestReveal = useRef(null);
   latestReveal.current = (c, always) => {
     if (!outer.current) return;

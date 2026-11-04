@@ -1,5 +1,5 @@
 // The system file dialog without a screen. node server/tests/filepicker_model_test.mjs
-import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction } from '../../sdk/filepickermodel.js';
+import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep } from '../../sdk/filepickermodel.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -71,5 +71,35 @@ eq('enter in save, on a folder', enterAction({ ...base, mode: 'save', name: 'a',
 eq('enter in save', enterAction({ ...base, mode: 'save', name: 'a', row: file }), { save: true });
 eq('enter, multiple, one row', enterAction({ ...base, multiple: true, row: file }), { pickMany: ['/h/f'] });
 eq('enter, multiple, chosen', enterAction({ ...base, multiple: true, row: file, chosen: ['/a'] }), { pickMany: ['/a'] });
+
+// the List / Thumbnails switch
+eq('wallpaper filter is images', imagesOnly(/\.(png|jpe?g)$/i), true);
+eq('contact photo filter', imagesOnly(/\.(png|jpe?g|gif|bmp|webp)$/i), true);
+eq('notes test object', imagesOnly({ test: (n) => /\.(png|jpe?g|gif|webp)$/i.test(n) }), true);
+eq('a function', imagesOnly((n) => n.endsWith('.png')), true);
+eq('portal image globs', imagesOnly(/^(.*\.png|.*\.jpg|.*\.jpeg)$/i), true);
+eq('no filter', imagesOnly(null), false);
+eq('keys', imagesOnly(/\.pub$/), false);
+eq('images and pdf', imagesOnly(/\.(png|pdf)$/i), false);
+eq('everything', imagesOnly(/.*/), false);
+eq('a throwing test', imagesOnly({ test: () => { throw new Error('x'); } }), false);
+eq('default files', viewFor(null, false), 'list');
+eq('default images', viewFor(null, true), 'thumbs');
+eq('remembered files', viewFor({ files: 'thumbs' }, false), 'thumbs');
+eq('remembered images', viewFor({ images: 'list' }, true), 'list');
+eq('each its own', viewFor({ files: 'thumbs' }, true), 'thumbs');
+eq('junk', viewFor({ files: 'huge' }, false), 'list');
+eq('save view', saveView({ images: 'list' }, false, 'thumbs'), { images: 'list', files: 'thumbs' });
+eq('save view, nothing yet', saveView(null, true, 'list'), { images: 'list' });
+eq('live, top', liveRange(0, 300, 100, 4, 100), [0, 20]);
+eq('live, scrolled', liveRange(1000, 300, 100, 4, 100), [36, 60]);
+eq('live, end', liveRange(2400, 300, 100, 4, 100), [92, 100]);
+eq('live, empty', liveRange(0, 300, 100, 4, 0), [0, 0]);
+eq('live, no columns', liveRange(0, 300, 100, 0, 9), [0, 0]);
+eq('grid right', gridStep('ArrowRight', 5), 1);
+eq('grid left rtl', gridStep('ArrowLeft', 5, true), 1);
+eq('grid down', gridStep('ArrowDown', 5), 5);
+eq('grid up', gridStep('ArrowUp', 5), -5);
+eq('grid other', gridStep('Home', 5), 0);
 
 console.log(process.exitCode ? 'FAILED' : `ok ${ok}`);

@@ -157,6 +157,8 @@
   "picker.chooseFolder": "Elegir esta carpeta",
   "picker.fileName": "Nombre del archivo",
   "picker.exists": "Ya existe un archivo con este nombre.",
+  "picker.viewList": "Lista",
+  "picker.viewThumbs": "Miniaturas",
   "power.apps": "Apps abiertas: {list}. Se van a cerrar: guardá tu trabajo antes.",
   "power.cancel": "Cancelar",
   "power.needAdminRestart": "Solo un administrador puede reiniciar la computadora mientras otros usuarios tienen la sesión abierta.",
