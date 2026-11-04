@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="raspberry-pi" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main">
+<section class="dl pi-hero" aria-labelledby="pi-h">
+<div class="pi-sky" aria-hidden="true">
+<svg class="pi-crown" viewBox="0 0 512 512"><path d="M256 446C200 446 166 442 148 436Q124 430 122 404L72 222Q66 186 96 206C126 232 156 256 178 264Q192 268 199 254C219 228 234 188 243 154Q256 116 269 154C278 188 293 228 313 254Q320 268 334 264C356 256 386 232 416 206Q446 186 440 222L390 404Q388 430 364 436C346 442 312 446 256 446Z"/><rect class="pi-band" x="128" y="372" width="256" height="22" rx="11"/><circle class="pi-gem" cx="84" cy="196" r="14"/><circle class="pi-gem g2" cx="256" cy="122" r="17"/><circle class="pi-gem g3" cx="428" cy="196" r="14"/></svg>
+<i style="left:43%;top:23%;animation-delay:-1.6s"></i><i style="left:8%;top:13%;animation-delay:-3.3s"></i><i style="left:14%;top:50%;animation-delay:-2.3s"></i><i style="left:66%;top:31%;animation-delay:-0.1s"></i><i style="left:57%;top:57%;animation-delay:-0.3s"></i><i style="left:13%;top:74%;animation-delay:-1.7s"></i><i style="left:74%;top:19%;animation-delay:-3.8s"></i><i style="left:82%;top:84%;animation-delay:-2.3s"></i><i style="left:9%;top:77%;animation-delay:-2.3s"></i><i style="left:8%;top:32%;animation-delay:-0.2s"></i><i style="left:19%;top:41%;animation-delay:-1.7s"></i><i style="left:71%;top:19%;animation-delay:-2.3s"></i><i style="left:73%;top:91%;animation-delay:-0.7s"></i><i style="left:76%;top:77%;animation-delay:-2.6s"></i><i style="left:49%;top:16%;animation-delay:-2.2s"></i><i style="left:10%;top:76%;animation-delay:-0.2s"></i><i style="left:28%;top:67%;animation-delay:-2.7s"></i><i style="left:56%;top:44%;animation-delay:-1.9s"></i>
+</div>
+<div class="wrap">
+<div class="pi-hero-txt">
+<p class="pi-eyebrow">{{t.pi.kicker}}</p>
+<h1 id="pi-h">{{t.pi.title}}</h1>
+<p class="sub">{{t.pi.lead}}</p>
+<div class="pi-cta">
+<a class="btn btn-violet" href="https://github.com/lordbasex/LordOS/releases">{{t.pi.download}}</a>
+<a class="btn pi-btn-line" href="{{{imagerUrl}}}">{{t.pi.guide}}</a>
+</div>
+</div>
+<div class="pi-art">
+<figure><div class="pi-art-box">{{{artArgon}}}</div><figcaption>{{t.pi.capArgon}}</figcaption></figure>
+<figure><div class="pi-art-box">{{{art500}}}</div><figcaption>{{t.pi.cap500}}</figcaption></figure>
+</div>
+</div>
+</section>
+
+<section class="wrap pi-sec" aria-labelledby="pi-tested">
+<h2 id="pi-tested" class="pi-h2">{{t.pi.testedTitle}}</h2>
+<p class="pi-lead">{{{testedLead}}}</p>
+<div class="pi-cards">
+{{{cards}}}
+</div>
+</section>
+
+<section class="pi-band" aria-labelledby="pi-argon">
+<div class="wrap pi-argon">
+<div class="pi-argon-art">{{{artPi5}}}</div>
+<div class="pi-argon-txt">
+<h2 id="pi-argon" class="pi-h2">{{t.pi.argonTitle}}</h2>
+<p>{{t.pi.argonText}}</p>
+<ul>
+{{{argonPoints}}}
+</ul>
+<p class="pi-more"><a href="{{{fansUrl}}}">{{t.pi.argonMore}}</a></p>
+</div>
+</div>
+</section>
+
+{{{shotsSection}}}
+
+<section class="wrap pi-sec" aria-labelledby="pi-bench">
+<h2 id="pi-bench" class="pi-h2">{{t.pi.benchTitle}}</h2>
+<p class="pi-lead">{{t.pi.benchLead}}</p>
+<ol class="pi-steps">
+{{{benchSteps}}}
+</ol>
+</section>
+
+<section class="wrap pi-sec" aria-labelledby="pi-tools">
+<h2 id="pi-tools" class="pi-h2">{{t.pi.toolsTitle}}</h2>
+<p class="pi-lead">{{t.pi.toolsLead}}</p>
+<div class="pi-tools">
+{{{tools}}}
+</div>
+</section>
+
+<section class="dl pi-share" aria-labelledby="pi-share">
+<div class="wrap pi-share-in">
+<img class="pi-lumo" src="{{{lumo}}}" width="140" height="140" alt="{{t.pi.lumoAlt}}" loading="lazy">
+<div class="pi-share-txt">
+<h2 id="pi-share" class="pi-h2">{{t.pi.shareTitle}}</h2>
+<p class="sub">{{t.pi.shareText}}</p>
+<div class="cmd">
+<div class="cmd-bar"><span class="cmd-t" aria-hidden="true"><i></i><i></i><i></i>shell</span><button type="button" class="copy" data-copy="pi-issue-cmd" data-done="{{t.copied}}" aria-label="{{t.copyCmdLabel}}" hidden>{{t.copy}}</button></div>
+<pre id="pi-issue-cmd" tabindex="0">lordos-issue --print</pre>
+</div>
+<p class="pi-note">{{t.pi.shareAlt}}</p>
+</div>
+<div class="pi-share-btns">
+<a class="btn btn-violet" href="https://www.reddit.com/r/LordOS/" rel="noopener">{{t.pi.shareReddit}}</a>
+<a class="btn pi-btn-line" href="https://github.com/lordbasex/LordOS/issues/new?template=hardware-report.yml" rel="noopener">{{t.pi.shareGithub}}</a>
+{{{browseLink}}}
+</div>
+</div>
+</section>
+</main>
+
+{{{lightbox}}}
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>

@@ -30,12 +30,16 @@ const DIST = path.join(WEB, 'dist');
 const CACHE = path.join(WEB, '.cache');
 const SITE = 'https://lordos.org';
 const LANGS = ['en', 'es', 'pt'];
-const PAGES = ['home', 'apps', 'gallery'];
+const PAGES = ['home', 'explore', 'raspberry-pi'];   // apps and gallery are one page since 0.8.8.1 (Explore); their old addresses redirect
 const CONTENT = process.env.CONTENT_DIR ? path.resolve(process.env.CONTENT_DIR) : path.join(path.dirname(fileURLToPath(import.meta.url)), 'content');
 // headless Chromium for the paper PDFs: a folder whose node_modules has playwright
 const TOOLS = process.env.WEB_TOOLS || process.env.ICON_DEPS || '';
 const FINGERPRINT = 'c7155b8e6bbbb180f907381994d06af76d333016cd6f3facf67cadd053ea108e';
 const GITHUB = 'https://github.com/lordbasex/LordOS';
+// the community forum (r/LordOS): questions, feedback and every release announced
+const COMMUNITY = 'https://www.reddit.com/r/LordOS/';
+// the GitHub mark for the header's repository link (the menu has no "GitHub" text link since 0.8.8.1)
+const GH_MARK = '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
 // the LordOS Imager downloads of the current release (package.json's version and channel)
 const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 // a package-only update (0.8.4.1) leaves the live ISO and the Imager on an earlier release: lordos.media
@@ -125,6 +129,7 @@ const homeCss = minCss(src('home.css').replace('__FONT_MEDIUM__', fontMedium));
 const homeCssUrl = hashed(Buffer.from(homeCss), 'home', 'css');
 const imagerCss = minCss(src('imager.css'));
 const imagerCssUrl = hashed(Buffer.from(imagerCss), 'imager', 'css');
+const searchJsUrl = hashed(Buffer.from(src('search.js')), 'search', 'js');
 // [[PLACEHOLDER]] markers left by the content agents: highlighted when --allow-placeholders, else the build fails
 const ALLOW_PH = process.argv.includes('--allow-placeholders');
 const placeholders = new Map();
@@ -313,8 +318,8 @@ function render(tpl, vars, t) {
 function head(t, page, over, doc) {
   const meta = over || {
     home: [t.meta.title, t.meta.description],
-    gallery: [t.meta.galleryTitle, t.meta.galleryDescription],
-    apps: [t.apps.metaTitle, t.apps.metaDescription],
+    explore: [t.explore.metaTitle, t.explore.metaDescription],
+    'raspberry-pi': [t.pi.metaTitle, t.pi.metaDescription],
   }[page];
   const [title, desc] = meta;
   const ogImage = SITE + '/social-card.png';
@@ -355,6 +360,21 @@ ${LANGS.filter((l) => l !== t.lang).map((l) => `<meta property="og:locale:altern
 }
 
 
+// the search dialog (search.js fills it): one field, suggested topics, results
+function searchDialog(t) {
+  const S = t.search;
+  const topics = S.topics.map(([label, href]) => `<a class="g-chip" href="${esc(sitePath(href, t.lang))}"${/^https?:/.test(href) ? ' rel="noopener"' : ''}>${esc(label)}</a>`).join('');
+  return `<dialog id="search" class="search" aria-label="${esc(S.label)}" data-kinds="${esc(JSON.stringify(S.kinds))}">
+<div class="search-field"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg><input id="search-q" type="search" autocomplete="off" spellcheck="false" placeholder="${esc(S.placeholder)}" aria-label="${esc(S.label)}" role="combobox" aria-expanded="true" aria-controls="search-list"><kbd>Esc</kbd></div>
+<div class="search-body">
+<div id="search-sugg"><p class="search-h">${esc(S.suggested)}</p><div class="search-topics">${topics}</div></div>
+<ul id="search-list" role="listbox" aria-label="${esc(S.results)}"></ul>
+<p id="search-none" class="search-none" hidden>${esc(S.none)} <q></q></p>
+</div>
+<p class="search-foot">${esc(S.hint)}</p>
+</dialog>`;
+}
+
 function header(t, page) {
   const l = t.lang;
   const home = prefix(l);
@@ -362,14 +382,14 @@ function header(t, page) {
   const cur = (p) => (page === p ? ' aria-current="page"' : '');
   const links = [
     `<a href="${h('#features')}">${esc(t.navFeatures)}</a>`,
-    HAS_APPS ? `<a href="${pageUrl(l, 'apps')}"${cur('apps')}>${esc(t.navApps)}</a>` : '',
-    `<a href="${pageUrl(l, 'gallery')}"${cur('gallery')}>${esc(t.navGallery)}</a>`,
+    `<a href="${pageUrl(l, 'explore')}"${cur('explore')}>${esc(t.navExplore)}</a>`,
+    `<a href="${pageUrl(l, 'raspberry-pi')}"${cur('raspberry-pi')}>${esc(t.navRaspberry)}</a>`,
     HAS_PAPER ? `<a href="${pageUrl(l, 'paper')}"${cur('paper')}>${esc(t.pages.navPaper)}</a>` : '',
     HAS_FAQ ? `<a href="${pageUrl(l, 'faq')}"${cur('faq')}>${esc(t.pages.navFaq)}</a>` : '',
     `<a href="${h('#download')}">${esc(t.navDownload)}</a>`,
     `<a href="${h('#support')}">${esc(t.navSupport)}</a>`,
     `<a href="${pageUrl(l, 'about')}"${cur('about')}>${esc(t.navAbout)}</a>`,
-    `<a href="${GITHUB}">GitHub</a>`,
+    `<a href="${COMMUNITY}" rel="noopener">${esc(t.navCommunity)}</a>`,
   ].filter(Boolean).join('\n');
 
   // mobile drawer: a CSS-only toggle (hidden checkbox + labels) that site.js upgrades to a real dialog
@@ -380,8 +400,8 @@ function header(t, page) {
     featureList.length
       ? group(t.navFeatures, [row(h('#features'), t.pages.allFeatures), ...featureList.map((m) => row(pageUrl(l, 'features/' + m.slug), loc(m.title, l), cur('features/' + m.slug)))], page.startsWith('features/'))
       : row(h('#features'), t.navFeatures),
-    HAS_APPS ? row(pageUrl(l, 'apps'), t.navApps, cur('apps')) : '',
-    row(pageUrl(l, 'gallery'), t.navGallery, cur('gallery')),
+    row(pageUrl(l, 'explore'), t.navExplore, cur('explore')),
+    row(pageUrl(l, 'raspberry-pi'), t.navRaspberry, cur('raspberry-pi')),
     HAS_PAPER ? row(pageUrl(l, 'paper'), t.pages.navPaper, cur('paper')) : '',
     HAS_FAQ ? row(pageUrl(l, 'faq'), t.pages.navFaq, cur('faq')) : '',
     row(h('#download'), t.navDownload),
@@ -390,7 +410,7 @@ function header(t, page) {
     legalPages.length
       ? group(t.pages.legal.nav, [row(pageUrl(l, 'legal'), t.pages.legal.all, cur('legal')), ...legalLinks.map((x) => row(pageUrl(l, 'legal/' + x.slug), loc(x.title, l), cur('legal/' + x.slug)))], page.startsWith('legal'))
       : '',
-    row(GITHUB, 'GitHub', ' rel="noopener"'),
+    row(COMMUNITY, t.navCommunity, ' rel="noopener"'),
   ].filter(Boolean).join('\n');
   const X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   return `<input type="checkbox" id="nav-cb" class="nav-cb" aria-label="${esc(t.pages.menu)}">
@@ -401,12 +421,15 @@ function header(t, page) {
 ${links}
 </div>
 <div class="tools">
+<button type="button" class="gh-link search-btn" aria-label="${esc(t.search.label)}" title="${esc(t.search.label)} (Ctrl K)" data-src="${searchJsUrl}" data-index="/search-${t.lang}.json"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></button>
+<a class="gh-link" href="${GITHUB}" rel="noopener" aria-label="${esc(t.ghLabel)}" title="GitHub">${GH_MARK}</a>
 ${themeSwitch(t)}
 ${langMenu(t, page, false)}
 <label for="nav-cb" class="burger" aria-hidden="true" data-label="${esc(t.pages.menu)}"><span></span><span></span><span></span></label>
 </div>
 </nav>
 </header>
+${searchDialog(t)}
 <div class="drawer" id="drawer" aria-label="${esc(t.pages.menu)}">
 <label for="nav-cb" class="scrim" aria-hidden="true"></label>
 <div class="dpanel">
@@ -440,7 +463,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -522,7 +545,7 @@ function teaser(t) {
 <p class="kicker">${esc(t.apps.teaserKicker)}</p>
 <h2 id="teaser-h" class="h2s">${esc(t.apps.teaserTitle)}</h2>
 <p>${esc(t.apps.teaserText)}</p>
-<a class="btn btn-primary" href="${pageUrl(t.lang, 'apps')}">${esc(t.apps.seeAll)}</a>
+<a class="btn btn-primary" href="${pageUrl(t.lang, 'explore')}#apps">${esc(t.apps.seeAll)}</a>
 </div>
 <ul class="teaser-icons">
 ${icons}
@@ -531,7 +554,8 @@ ${icons}
 </section>`;
 }
 
-const tpl = { imager: src('imager.html'), home: src('home.html'), gallery: src('gallery.html'), apps: src('apps.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
+const PI_ART = JSON.parse(src('pi-art.json'));   // the three drawings (our own, isometric): argon, pi500, pi5
+const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), hardware: src('hardware.html'), guide: src('guide.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -647,9 +671,10 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
 <figcaption><span class="g-cap">${esc(cap)}</span><span class="g-tag">${esc(catLabel(s.category))}</span></figcaption>
 </figure>`;
   }).join('\n');
-  write(path.join(pageUrl(l, 'gallery'), 'index.html'), render(tpl.gallery, { ...common('gallery'), catButtons, shots: shotsHtml }, t));
+  const shotButtons = catButtons;
 
-  // apps
+  // apps (shown on Explore)
+  let appsHtml = { appButtons: '', sections: '', count: 0 };
   if (HAS_APPS) {
     const present = APP_CATS.filter((c) => apps.some((a) => a.category === c));
     const appCount = (n) => `<span class="n" aria-label="${n} apps">${n}</span>`;
@@ -676,7 +701,32 @@ ${c === 'thirdparty' ? `<p class="apps-note">${esc(t.apps.thirdpartyNote)}</p>` 
 ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompare(appName(y, l), l)).map(card).join('\n')}
 </div>
 </section>`).join('\n');
-    write(path.join(pageUrl(l, 'apps'), 'index.html'), render(tpl.apps, { ...common('apps', null, true), catButtons, sections }, t));
+    appsHtml = { appButtons: catButtons, sections, count: apps.length };
+  }
+  // Explore: the apps and the screenshots in one page, each with its own filters (site.js [data-filters])
+  const nPill = (n) => `<span class="n">${n}</span>`;
+  write(path.join(pageUrl(l, 'explore'), 'index.html'), render(tpl.explore, { ...common('explore', null, true),
+    appButtons: appsHtml.appButtons, sections: appsHtml.sections, shotButtons, shots: shotsHtml,
+    appsCount: nPill(appsHtml.count), shotsCount: nPill(shots.length) }, t));
+  // the old addresses of the two pages it replaces
+  for (const [old, frag] of [['apps', 'apps'], ['gallery', 'screenshots']]) {
+    const dest = SITE + pageUrl(l, 'explore') + '#' + frag;
+    write(path.join(pageUrl(l, old), 'index.html'), `<!doctype html>
+<html lang="${l}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(t.explore.title)} · LordOS</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="${SITE + pageUrl(l, 'explore')}">
+<meta http-equiv="refresh" content="0; url=${dest}">
+<link rel="stylesheet" href="${cssUrl}">
+</head>
+<body>
+<p class="moved"><a href="${dest}">${esc(t.explore.title)}</a></p>
+</body>
+</html>
+`);
   }
 
   // feature pages and paper share these helpers
@@ -687,6 +737,37 @@ ${apps.filter((a) => a.category === c).sort((x, y) => appName(x, l).localeCompar
     const thumb = webp(f, 720), full = webp(f, 1600);
     return `<figure class="${cls}"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(cap)}" aria-label="${esc(t.gallery.open + ': ' + cap)}"><img src="${thumb.url}" width="${thumb.w}" height="${thumb.h}" alt="${esc(cap)}" loading="lazy" decoding="async"></a>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
   };
+  // Raspberry Pi: the boards, the Argon ONE V5 case, screenshots, LordBench and the terminal tools
+  {
+    const P = t.pi;
+    const aria = (svg, label) => svg.replace(/role="img" aria-label="[^"]*"/, `role="img" aria-label="${esc(label)}"`);
+    const rows = (list) => `<dl>${list.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
+    const card = (title, ver, list, extra = '') => `<article class="pi-card"><div class="pi-card-h"><h3>${esc(title)}</h3><span class="pi-ver">LordOS ${ver}</span></div>${rows(list)}${extra}</article>`;
+    const cards = card(P.pi5Title, '0.8.8.1', P.pi5Rows) + '\n' + card(P.pi500Title, '0.8.8', P.pi500Rows,
+      `<p class="pi-thanks">${esc(P.thanks).replace('{name}', '<strong>Steve Sande</strong>')}</p>`);
+    const shotList = Object.keys(P.shots)
+      .map((k) => shotFig(`docs/screenshots/pi/${k}.png`, P.shots[k], 'shot-fig pi-shot')).filter(Boolean);
+    const shotsSection = shotList.length ? `<section class="wrap pi-sec" aria-labelledby="pi-shots">
+<h2 id="pi-shots" class="pi-h2">${esc(P.shotsTitle)}</h2>
+<div class="pi-shots">
+${shotList.join('\n')}
+</div>
+</section>` : '';
+    const code = (s) => esc(s).replace(/(--share|\breport\b|bench --quick|--full)/g, '<code>$1</code>');
+    write(path.join(pageUrl(l, 'raspberry-pi'), 'index.html'), render(tpl.raspberry, { ...common('raspberry-pi', null, 'home'),
+      imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
+      fansUrl: GITHUB + '/blob/main/docs/FANS.md#argon-one-v5-case',
+      artArgon: aria(PI_ART.argon, P.artArgon), art500: aria(PI_ART.pi500, P.art500), artPi5: aria(PI_ART.pi5, P.artPi5),
+      testedLead: esc(P.testedLead).replace('{cmd}', '<code>lordos-issue</code>'),
+      cards, argonPoints: P.argonPoints.map(([b, x]) => `<li><strong>${esc(b)}</strong> ${esc(x)}</li>`).join('\n'),
+      shotsSection,
+      benchSteps: P.benchSteps.map(([h, x], i) => `<li><h3>${esc(h)}</h3><p>${esc(x)}</p>${i === 1 ? '<pre class="pi-pre">lordos-sysreport bench --quick\nlordos-sysreport bench --full --json</pre>' : ''}</li>`).join('\n'),
+      tools: P.tools.map(([c, x]) => `<article class="pi-tool"><h3><code>${esc(c)}</code></h3><p>${c === 'lordos-issue' || c === 'lordos-testbench' ? esc(x) : code(x)}</p></article>`).join('\n'),
+      lumo: LUMO.wave || img.lumoWave,
+      browseLink: HAS_HW ? `<a class="pi-browse" href="${pageUrl(l, 'hardware')}">${esc(P.shareBrowse)}</a>` : '',
+    }, t));
+  }
+
   const diaStrings = { tones: t.pages.tones, legend: t.pages.legend, then: t.pages.then, connections: t.pages.connections };
   const renderMd = (srcText, diagrams, screenshots, usedShots, where = 'content') => { const res = markdown(phIn(srcText, where), {
     anchorLabel: t.pages.anchorLabel,
@@ -915,6 +996,32 @@ ${(c.items || []).map((it) => {
     }, t));
   }
 
+  // search index (search.js): [kind, title, url, text] for every page a visitor may look for
+  {
+    const plain = (md) => String(md || '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_>#|]/g, '').replace(/\s+/g, ' ').trim();
+    const cut = (x, n = 220) => (x.length > n ? x.slice(0, n).replace(/\s\S*$/, '') + '…' : x);
+    const idx = [];
+    const add = (kind, title, url, text = '') => idx.push([kind, title, url, cut(plain(text))]);
+    add('page', t.navExplore, pageUrl(l, 'explore'), t.explore.lead);
+    add('page', t.pi.title, pageUrl(l, 'raspberry-pi'), `Raspberry Pi 5 Raspberry Pi 500 ${t.pi.lead}`);
+    add('page', t.pi.argonTitle, pageUrl(l, 'raspberry-pi') + '#pi-argon', t.pi.argonText);
+    add('page', t.pi.benchTitle, pageUrl(l, 'raspberry-pi') + '#pi-bench', `LordBench benchmark ${t.pi.benchLead}`);
+    add('page', t.pi.toolsTitle, pageUrl(l, 'raspberry-pi') + '#pi-tools', t.pi.tools.map((x) => x[0]).join(' '));
+    add('page', t.navDownload, pageUrl(l, 'home') + '#download', t.dlLead || '');
+    add('page', t.navSupport, pageUrl(l, 'home') + '#support', '');
+    add('page', t.navAbout, pageUrl(l, 'about'), '');
+    if (HAS_PAPER) add('page', t.pages.navPaper, pageUrl(l, 'paper'), '');
+    if (HAS_FAQ) add('page', t.pages.faq.title, pageUrl(l, 'faq'), t.pages.faq.lead);
+    if (HAS_HW) add('page', t.pages.hardware.title, pageUrl(l, 'hardware'), t.pages.hardware.lead);
+    if (HAS_GUIDE) add('guide', 'LordOS Imager', pageUrl(l, 'imager'), '');
+    for (const m of featureList) add('feature', loc(m.title, l), pageUrl(l, 'features/' + m.slug), loc(m.tagline, l));
+    for (const g of guidePages) add('guide', loc(g.title, l), pageUrl(l, g.slug), loc(g.description || g.lead, l));
+    if (HAS_FAQ) for (const c of faqJson.categories) for (const it of c.items || []) add('faq', loc(it.q, l), pageUrl(l, 'faq') + '#' + it.id, loc(it.a, l));
+    for (const a of apps) add('app', appName(a, l), pageUrl(l, 'explore') + '#app-' + a.id, (a.tagline && (a.tagline[l] || a.tagline.en)) || '');
+    for (const x of legalPages) add('legal', loc(x.title, l) || x.slug, pageUrl(l, 'legal/' + x.slug), '');
+    write(`search-${l}.json`, JSON.stringify(idx));
+  }
+
   // tested hardware (0.8.7)
   if (HAS_HW) {
     const H = t.pages.hardware;
@@ -995,7 +1102,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES.filter((p) => p !== 'apps' || HAS_APPS), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>
@@ -1027,7 +1134,7 @@ for (const f of html) {
   }
   // CHANGELOG.md quoted verbatim on the paper (between <!--chlog--> marks) keeps its own history,
   // which names other boards in two notes; every other check still covers it
-  { const m = s.replace(/<!--chlog-->[\s\S]*?<!--\/chlog-->/g, ' ').replace(/<[^>]+>/g, ' ').match(/.{0,70}(\bPi (4|400|500)\b|\bCM[45]\b).{0,50}/i); if (m) throw new Error(`only the Raspberry Pi 5 is supported; other models are not mentioned in website copy (${path.relative(DIST, f)}): …${m[0].trim()}…`); }
+  { const m = s.replace(/<!--chlog-->[\s\S]*?<!--\/chlog-->/g, ' ').replace(/<[^>]+>/g, ' ').match(/.{0,70}(\bPi (4|400)\b|\bCM[45]\b).{0,50}/i); if (m) throw new Error(`only the Raspberry Pi 5 and the Pi 500 (tested) are supported; other models are not mentioned in website copy (${path.relative(DIST, f)}): …${m[0].trim()}…`); }
 }
 const jsSize = Buffer.byteLength(jsSrc) + Buffer.byteLength(themeSrc), cssSize = Buffer.byteLength(css);
 if (jsSize > 15 * 1024) throw new Error(`JS is ${jsSize} bytes (limit 15 KB)`);

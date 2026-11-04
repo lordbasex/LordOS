@@ -16,6 +16,8 @@
   "navGallery": "Galeria",
   "navDownload": "Baixar",
   "navSupport": "Apoiar",
+  "ghLabel": "LordOS no GitHub",
+  "navCommunity": "Comunidade",
   "navAbout": "Sobre",
   "badge": "Versão 0.8.8 · Beta",
   "heroTitle": "O desktop Linux livre, rápido e seguro.",
@@ -200,5 +202,233 @@
     "latest": "Versão mais recente",
     "compare": "Alterações no GitHub",
     "released": "Publicada"
+  },
+  "navExplore": "Explorar",
+  "navRaspberry": "Raspberry Pi",
+  "explore": {
+    "kicker": "Apps e capturas",
+    "title": "Explore o LordOS",
+    "lead": "Todos os apps que vêm com o LordOS e a galeria de todo o desktop, num só lugar.",
+    "jumpLabel": "Ir para",
+    "apps": "Apps",
+    "shots": "Capturas",
+    "metaTitle": "Explore o LordOS: apps e capturas",
+    "metaDescription": "Cada app do LordOS com suas capturas, e uma galeria do desktop no claro e no escuro."
+  },
+  "pi": {
+    "metaTitle": "LordOS no Raspberry Pi 5 e no Raspberry Pi 500",
+    "metaDescription": "Um desktop completo no Raspberry Pi 5 e no Pi 500: composto na GPU, vídeo por hardware, controle da ventoinha e o case Argon ONE V5, com números de placas reais.",
+    "kicker": "Raspberry Pi 5 · Raspberry Pi 500",
+    "title": "Um desktop completo no seu Raspberry Pi",
+    "lead": "O LordOS desenha o desktop na GPU do Pi, decodifica vídeo HEVC por hardware, controla a ventoinha e reconhece o case Argon ONE V5 pelo nome. Uma só imagem para as duas placas, gravada com o LordOS Imager.",
+    "download": "Baixar a imagem para o Pi",
+    "guide": "Guia do LordOS Imager",
+    "capArgon": "Raspberry Pi 5 no case Argon ONE V5",
+    "cap500": "Raspberry Pi 500: um Pi 5 dentro de um teclado",
+    "artArgon": "Desenho de um Raspberry Pi 5 dentro do case de alumínio Argon ONE V5",
+    "art500": "Desenho do computador-teclado Raspberry Pi 500",
+    "artPi5": "Desenho da placa Raspberry Pi 5",
+    "testedTitle": "Testado em placas reais",
+    "testedLead": "Números dos relatórios que o próprio LordOS faz ({cmd} e Sobre o LordOS), não de uma ficha técnica.",
+    "pi5Title": "Raspberry Pi 5 · 16 GB",
+    "pi500Title": "Raspberry Pi 500 · 8 GB",
+    "pi5Rows": [
+      [
+        "Boot até o desktop",
+        "8,6 s"
+      ],
+      [
+        "Memória em uso",
+        "0,6 GB de 16 GB, com o desktop aberto"
+      ],
+      [
+        "Servidor gráfico",
+        "56 MB de RAM, um quadro em 5,8 ms"
+      ],
+      [
+        "Arrastar uma janela",
+        "58,8 FPS em 1920 × 1080, na GPU"
+      ],
+      [
+        "Vídeo",
+        "HEVC decodificado por hardware"
+      ],
+      [
+        "Case",
+        "Argon ONE V5, detectado"
+      ],
+      [
+        "Também funciona",
+        "Teclado e mouse Bluetooth, áudio USB, Wi-Fi, Ethernet"
+      ]
+    ],
+    "pi500Rows": [
+      [
+        "Tela",
+        "4K, 3840 × 2160 a 150 %, composta na GPU"
+      ],
+      [
+        "Memória em uso",
+        "1,8 GB de 7,9 GB, com o navegador e o E-mail abertos"
+      ],
+      [
+        "Teclado",
+        "O teclado próprio, reconhecido como está"
+      ],
+      [
+        "Câmera",
+        "Webcam USB com o seu microfone"
+      ],
+      [
+        "Código assinado",
+        "Verificado, 10 componentes"
+      ],
+      [
+        "Ainda melhorando",
+        "Arrastar janelas em 4K (de 9 a 37 FPS)"
+      ]
+    ],
+    "thanks": "Testado por {name}. Obrigado, Steve!",
+    "argonTitle": "O case Argon ONE V5, suportado",
+    "argonText": "O LordOS encontra o case no primeiro boot e pergunta uma única vez. Depois, Ajustes → Refrigeração controla a ventoinha com o serviço próprio do LordOS, e as portas USB e o áudio da frente funcionam. Sem scripts do fabricante.",
+    "argonPoints": [
+      [
+        "Silencioso por projeto:",
+        "o corpo de alumínio é um grande dissipador. No Equilibrado, a ventoinha ficou desligada a 50–53 °C com os quatro núcleos no máximo."
+      ],
+      [
+        "Quando precisa:",
+        "2.700 RPM a 30 %, 4.500 a 55 % e até 7.400 na velocidade máxima."
+      ],
+      [
+        "Portas da frente:",
+        "duas USB 2.0, microfone e fones, ativas depois de escolher o case em Ajustes e reiniciar."
+      ],
+      [
+        "Seguro:",
+        "o LordOS nunca muda a configuração de energia do bootloader."
+      ]
+    ],
+    "argonMore": "Como o LordOS controla a ventoinha",
+    "shotsTitle": "Veja num Pi",
+    "shots": {
+      "desktop": "O desktop, 1920 × 1080",
+      "about": "Sobre o LordOS: placa, case e código assinado",
+      "monitor-overview": "Monitor: todo o sistema num relance",
+      "monitor-cpu": "Monitor: cada núcleo do Cortex-A76",
+      "monitor-memory": "Monitor: a memória em uso",
+      "monitor-network": "Monitor: a atividade de rede e cada conexão",
+      "monitor-disks": "Monitor: a atividade do cartão SD",
+      "monitor-processes": "Monitor: os processos",
+      "monitor-cooling": "Monitor: temperatura e a ventoinha do Argon",
+      "monitor-voltage": "Monitor: tensões e consumo da placa",
+      "cleaner": "Limpeza: o que enche o cartão SD",
+      "cleaner-review": "Limpeza: você revisa antes de remover qualquer coisa"
+    },
+    "toolsTitle": "Quatro ferramentas no terminal",
+    "toolsLead": "Vêm com o LordOS, funcionam também por SSH e nunca enviam nada por conta própria.",
+    "tools": [
+      [
+        "lordos-fetch",
+        "A coroa e um resumo numa tela: versão, placa, kernel, tela, CPU, GPU, memória, disco e isolamento. --share esconde o seu usuário e o nome do computador para uma captura."
+      ],
+      [
+        "lordos-issue",
+        "Um relatório completo para um bug ou um teste de hardware: dispositivos, drivers, telas, código assinado, serviços que falharam e os erros deste boot. Troca nomes e endereços; só lê, e salva um arquivo que você confere antes de publicar."
+      ],
+      [
+        "lordos-sysreport",
+        "Informações do sistema pelo terminal: report para o hardware, e bench --quick ou --full para o LordBench, as mesmas medições do app, também em JSON."
+      ],
+      [
+        "lordos-testbench",
+        "Um padrão de teste numa janela: quadros por segundo e tempos de quadro, cada tecla acesa ao apertar, o mouse e a roda, e o que o servidor gráfico informa. Útil para testar um teclado, um mouse ou uma tela novos."
+      ]
+    ],
+    "shareTitle": "Testou o LordOS no seu Pi? Conte pra gente",
+    "shareText": "Cada relatório ajuda o próximo: qual placa, qual case, qual tela, o que funcionou. O LordOS monta o relatório para você, sem nomes nem endereços, e não muda nada.",
+    "shareAlt": "Ou abra Informações do sistema → Compatibilidade e compartilhe por lá.",
+    "shareReddit": "Publique no r/LordOS",
+    "shareGithub": "Envie um relatório de hardware no GitHub",
+    "shareBrowse": "Ver os relatórios da comunidade",
+    "benchTitle": "Meça o seu Pi com o LordBench",
+    "benchLead": "O LordOS traz o seu próprio benchmark. Ele espera o sistema ficar tranquilo, mede CPU, memória, GPU, o compositor e o vídeo, e compara a sua placa com o nosso Raspberry Pi 5 de referência.",
+    "benchSteps": [
+      [
+        "No app",
+        "Abra Informações do sistema → Desempenho e toque em Teste rápido (menos de um minuto). O Teste completo inclui o disco, todos os codecs de vídeo e alguns minutos de carga em todos os núcleos: de 4 a 6 minutos, com algum desgaste num cartão SD."
+      ],
+      [
+        "No terminal",
+        "Rode os mesmos testes por SSH, também em JSON:"
+      ],
+      [
+        "Compartilhe",
+        "Publique uma captura da aba Desempenho no r/LordOS, ou cole o JSON num relatório de hardware, com a sua placa, o seu case e a sua fonte. Assim vemos onde o LordOS é rápido e onde ainda não é."
+      ]
+    ],
+    "lumoAlt": "Lumo, o mascote do LordOS, acenando"
+  },
+  "search": {
+    "label": "Buscar",
+    "placeholder": "Busque páginas, perguntas, apps…",
+    "suggested": "Temas sugeridos",
+    "results": "Resultados",
+    "none": "Nada encontrado para",
+    "hint": "↑ ↓ para mover · Enter para abrir · Esc para fechar · Ctrl K para buscar de qualquer página",
+    "kinds": {
+      "page": "Página",
+      "feature": "Recurso",
+      "guide": "Guia",
+      "faq": "Pergunta",
+      "app": "App",
+      "legal": "Legal"
+    },
+    "topics": [
+      [
+        "Raspberry Pi 5 e Pi 500",
+        "/raspberry-pi/"
+      ],
+      [
+        "Baixar o LordOS",
+        "/#download"
+      ],
+      [
+        "Guia do LordOS Imager",
+        "/imager/"
+      ],
+      [
+        "Requisitos do sistema",
+        "/requirements/"
+      ],
+      [
+        "Máquina virtual (OVA)",
+        "/virtual-machine/"
+      ],
+      [
+        "Instalar no Debian 13",
+        "/faq/#debian-one-liner"
+      ],
+      [
+        "Case Argon ONE V5",
+        "/raspberry-pi/#pi-argon"
+      ],
+      [
+        "LordBench",
+        "/raspberry-pi/#pi-bench"
+      ],
+      [
+        "Apps",
+        "/explore/#apps"
+      ],
+      [
+        "Segurança",
+        "/legal/security/"
+      ],
+      [
+        "Comunidade no Reddit",
+        "https://www.reddit.com/r/LordOS/"
+      ]
+    ]
   }
 }

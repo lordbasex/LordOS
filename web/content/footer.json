@@ -21,7 +21,7 @@
             "es": "Apps",
             "pt": "Apps"
           },
-          "href": "/apps/"
+          "href": "/explore/#apps"
         },
         {
           "label": {
@@ -29,7 +29,15 @@
             "es": "Galería",
             "pt": "Galeria"
           },
-          "href": "/gallery/"
+          "href": "/explore/#screenshots"
+        },
+        {
+          "label": {
+            "en": "Raspberry Pi",
+            "es": "Raspberry Pi",
+            "pt": "Raspberry Pi"
+          },
+          "href": "/raspberry-pi/"
         },
         {
           "label": {
@@ -119,6 +127,14 @@
             "pt": "Kit de marca"
           },
           "href": "https://github.com/lordbasex/LordOS/blob/main/docs/LORDOS-BRAND.md"
+        },
+        {
+          "label": {
+            "en": "Community (Reddit)",
+            "es": "Comunidad (Reddit)",
+            "pt": "Comunidade (Reddit)"
+          },
+          "href": "https://www.reddit.com/r/LordOS/"
         },
         {
           "label": {

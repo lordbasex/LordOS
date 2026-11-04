@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="explore" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main" class="wrap wide g-main">
+<p class="kicker">{{t.explore.kicker}}</p>
+<h1>{{t.explore.title}}</h1>
+<p class="g-lead">{{t.explore.lead}}</p>
+<nav class="x-jump" aria-label="{{t.explore.jumpLabel}}">
+<a href="#apps">{{t.explore.apps}} {{{appsCount}}}</a>
+<a href="#screenshots">{{t.explore.shots}} {{{shotsCount}}}</a>
+</nav>
+
+<section id="apps" class="x-part" data-filters aria-labelledby="x-apps">
+<h2 id="x-apps" class="x-h">{{t.explore.apps}}</h2>
+<p class="x-sub">{{t.apps.lead}}</p>
+<div class="g-bar">
+<div class="g-cats" role="group" aria-label="{{t.apps.filterLabel}}">
+{{{appButtons}}}
+</div>
+</div>
+{{{sections}}}
+</section>
+
+<section id="screenshots" class="x-part" data-filters aria-labelledby="x-shots">
+<h2 id="x-shots" class="x-h">{{t.explore.shots}}</h2>
+<p class="x-sub">{{t.gallery.lead}}</p>
+<div class="g-bar">
+<div class="g-cats" role="group" aria-label="{{t.gallery.filterLabel}}">
+{{{shotButtons}}}
+</div>
+<div class="g-themes" role="group" aria-label="{{t.gallery.themeLabel}}">
+<button type="button" class="g-chip" data-theme="all" aria-pressed="true">{{t.gallery.all}}</button>
+<button type="button" class="g-chip" data-theme="light" aria-pressed="false">{{t.gallery.light}}</button>
+<button type="button" class="g-chip" data-theme="dark" aria-pressed="false">{{t.gallery.dark}}</button>
+</div>
+</div>
+<div class="g-grid">
+{{{shots}}}
+</div>
+<p class="g-more" hidden><button type="button" class="btn btn-ghost">{{t.gallery.more}}</button></p>
+<p class="g-empty" hidden>{{t.gallery.empty}}</p>
+<p class="g-note">{{t.gallery.note}}</p>
+</section>
+</main>
+
+{{{lightbox}}}
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+</body>
+</html>
