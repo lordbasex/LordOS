@@ -11,6 +11,7 @@ const S = await import(path.join(here, '../../sdk/sessionmodel.js'));
 const {
   onDesktop, windowHidden, visibleOn, mountedOn, focusedOn, keyboardSurface, acceptsAppRequest, surfaceState, pickWindow, addDesktop, removeDesktop,
   nextDesktop, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, gridLayout, stripLayout, hitRect, overviewPlaceholder, MAX_DESKTOPS,
+  cleanName, cleanNames, namesByPosition, withName, moveDesktopTo, stripSlot, MAX_NAME,
 } = M;
 
 let n = 0, bad = 0;
@@ -120,6 +121,60 @@ eq('swipes rtl', [swipeStep('left', true), swipeStep('right', true)], [-1, 1]);
 // saved values come from a file
 eq('count', [cleanCount(4), cleanCount(0), cleanCount(99), cleanCount('3'), cleanCount(undefined), cleanCount(2.5)], [4, 1, 1, 1, 1, 1]);
 eq('index', [cleanIndex(3), cleanIndex(-1), cleanIndex(99), cleanIndex('1'), cleanIndex(undefined)], [3, 0, 0, 0, 0]);
+
+// names: typed, or read from the settings file
+eq('name kept', cleanName('Work'), 'Work');
+eq('name trimmed and one line', cleanName('  Mail \n and\tchat  '), 'Mail and chat');
+eq('control characters go', cleanName('a\u0000b\u001bc'), 'a b c');
+eq('not a string', [cleanName(null), cleanName(3), cleanName(undefined), cleanName({})], ['', '', '', '']);
+eq('blank is the default', cleanName('   '), '');
+eq('at most MAX_NAME characters', [...cleanName('x'.repeat(100))].length, MAX_NAME);
+eq('cut by characters, not bytes', cleanName('ñ'.repeat(40)), 'ñ'.repeat(MAX_NAME));
+eq('saved names fit the count', cleanNames(['A', ' B ', 7], 4), ['A', 'B', '', '']);
+eq('saved names, too many', cleanNames(['A', 'B', 'C'], 2), ['A', 'B']);
+eq('saved names, not an array', cleanNames('A', 2), ['', '']);
+eq('by position', namesByPosition([3, 1, 2], { 1: 'Mail', 3: 'Code' }), ['Code', 'Mail']);
+eq('by position keeps gaps', namesByPosition([1, 2, 3], { 3: 'Music' }), ['', '', 'Music']);
+eq('none named saves nothing', namesByPosition([1, 2], {}), null);
+eq('rename', withName({}, 2, ' Work '), { 2: 'Work' });
+eq('empty name: back to the default', withName({ 2: 'Work', 1: 'Home' }, 2, ''), { 1: 'Home' });
+{
+  const before = { 1: 'A' };
+  withName(before, 1, 'B');
+  eq('renaming does not change the old names', before, { 1: 'A' });
+}
+
+// reordering: a desktop moves, its id (so its windows and its name) with it
+eq('move to the end', moveDesktopTo([1, 2, 3], 1, 2), [2, 3, 1]);
+eq('move to the start', moveDesktopTo([1, 2, 3], 3, 0), [3, 1, 2]);
+eq('move one step', moveDesktopTo([1, 2, 3, 4], 2, 2), [1, 3, 2, 4]);
+eq('index clamped', [moveDesktopTo([1, 2, 3], 1, 99), moveDesktopTo([1, 2, 3], 3, -5)], [[2, 3, 1], [3, 1, 2]]);
+{
+  const l = [1, 2, 3];
+  eq('same place: the same list', moveDesktopTo(l, 2, 1) === l, true);
+  eq('unknown desktop: the same list', moveDesktopTo(l, 9, 0) === l, true);
+  eq('not a position: the same list', moveDesktopTo(l, 1, '2') === l, true);
+}
+{
+  // windows name their desktop, so after a reorder each one is still on the same desktop, now at another position
+  const ws = [win('a', 1), win('b', 3)];
+  const order = moveDesktopTo([1, 2, 3], 3, 0);
+  eq('windows go with their desktop', ws.map((w) => order.indexOf(w.desktop)), [1, 0]);
+  eq('and their names', namesByPosition(order, { 3: 'Code' }), ['Code']);
+  // what a new session reads back: names by position onto fresh ids 1..n
+  const back = cleanNames(namesByPosition(order, { 3: 'Code', 1: 'Mail' }), 3);
+  eq('names come back in the new order', back, ['Code', 'Mail', '']);
+}
+{
+  const a = { x: 0, y: 28, w: 1280, h: 700 };
+  const st = stripLayout([1, 2, 3], a, { canAdd: true });
+  const mid = (c) => c.x + c.w / 2;
+  eq('slot under each card', st.cards.map((c) => stripSlot(st.cards, mid(c))), [0, 1, 2]);
+  eq('slot before the first and after the last', [stripSlot(st.cards, -500), stripSlot(st.cards, 5000)], [0, 2]);
+  const rt = stripLayout([1, 2, 3], a, { canAdd: true, rtl: true });
+  eq('slot in a mirrored strip', [stripSlot(rt.cards, 5000), stripSlot(rt.cards, -500)], [0, 2]);
+  eq('no cards', stripSlot([], 10), -1);
+}
 
 // session restore keeps each window's desktop, and only a sane number
 {

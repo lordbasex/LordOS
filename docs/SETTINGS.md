@@ -19,7 +19,7 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 | Notifications | with Sound | `apps/settings/Notifications.jsx`, `sdk/notify.js`, `hw/notifyd.c` |
 | Date & Time | with Language & Region | `apps/settings/DateTime.jsx`, `hw/hw.c` (timedated) |
 | Wallpaper → Your pictures (0.8.8) | with Appearance, Desktop & Dock | `apps/settings/index.jsx` (`Wallpapers`; a PNG or JPEG of your own for the desktop or the login screen, picked with the system file dialog), `sdk/settings.js` (`addWallpaperImage`, `removeWallpaperImage`); see `WALLPAPERS.md` |
-| Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Lord Flow only) and the four finger swipe; see `DESKTOPS.md` |
+| Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Lord Flow only), the four finger swipe and each desktop's name (0.8.8.3); see `DESKTOPS.md` |
 | Keyboard → App switcher (0.8.8) | with Language & Region, Date & Time | `apps/settings/Switcher.jsx`: the keys, which apps show, size and look; see `SHORTCUTS.md` |
 | Mouse & Trackpad (0.8.8: always shown) | with Keyboard | `apps/settings/Trackpad.jsx`: a mouse's speed and natural scrolling (wheel direction), then the touchpad's rows when there is one; see `TRACKPAD.md` |
 | Default Apps | with Keyboard and Mouse & Trackpad | `apps/settings/DefaultApps.jsx`, `sdk/defaults.js`, `hw/defaults.c`, `hw/mimeapps.c` |

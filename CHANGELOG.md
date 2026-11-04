@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- Desktops: **rename** a desktop by double-clicking its name in the Overview, from its right-click menu (**Rename…**) or in Settings → Desktop & Dock → Names; the name shows in the indicator, the Overview, Move to Desktop and the window lists, and an empty name goes back to "Desktop N". **Reorder** desktops by dragging them along the Overview's strip (or **Move Left** / **Move Right** in the same menu); their windows move with them. Names and order are kept across sessions ([#15](https://github.com/lordbasex/LordOS/issues/15))
+
 ## [0.8.8.2-beta] - 2026-11-04
 
 An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.

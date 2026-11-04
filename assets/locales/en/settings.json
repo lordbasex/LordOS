@@ -465,6 +465,8 @@
   "dock.desktops.arrows": "Use Ctrl + arrow keys for Desktops",
   "dock.desktops.arrowsHint": "Ctrl+Up opens the Overview, Ctrl+Left and Right switch desktops, Ctrl+Down shows the windows of the app in front.",
   "dock.desktops.swipe": "Four finger swipe switches desktops",
+  "dock.desktops.names": "Names",
+  "dock.desktops.namesHint": "Leave a name empty to use the default. In the Overview, double-click a desktop's name to rename it, or drag it along the strip to change the order.",
   "kb.desktopArrows.title": "Desktops",
   "kb.desktopArrows.label": "Use Ctrl + arrow keys for Desktops",
   "kb.desktopArrows.hint": "Ctrl+Up opens the Overview, Ctrl+Left and Right switch desktops, Ctrl+Down shows the windows of the app. Turn this off to keep these keys for moving by word in apps; Super+Ctrl+Left and Right still switch desktops.",

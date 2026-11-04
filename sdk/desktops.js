@@ -2,7 +2,7 @@
 // and the stores in windows.js; this module switches, keeps the count, draws the brief indicator and
 // runs the switch animation.
 //
-//   nextDesktopBy(step), addDesktopAndShow(), closeActiveDesktop(), desktopName(id)
+//   nextDesktopBy(step), addDesktopAndShow(), closeActiveDesktop(), desktopName(id) (windows.js)
 //   flowDesktopKeys, classicDesktopKeys     the theme tables' entries (sdk/shortcuts.js)
 //   desktopSwipe(dir)                       a registerGestureActions action
 //
@@ -16,8 +16,8 @@ import { t, direction } from './i18n.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { Layer } from './layers.js';
-import { windows, wm, activeDesktop, desktopList, setActiveDesktop, setDesktops, createDesktop, closeDesktop, fxNodes, overviewShowing } from './windows.js';
-import { MAX_DESKTOPS, visibleOn, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex } from './desktopmodel.js';
+import { windows, wm, activeDesktop, desktopList, desktopNames, desktopName, setActiveDesktop, setDesktops, createDesktop, closeDesktop, fxNodes, overviewShowing } from './windows.js';
+import { MAX_DESKTOPS, visibleOn, neighbor, arrowStep, swipeStep, cleanCount, cleanIndex, cleanNames, namesByPosition } from './desktopmodel.js';
 import { cycleWindows } from './trackpad.js';
 import { toggleOverview, toggleAppWindows } from './overview.jsx';
 
@@ -26,7 +26,7 @@ const FX_MS = 170, FX_SLIDE = 56, HUD_MS = 800;
 // ---- names and positions ----
 
 const positionOf = (id) => desktopList.get().indexOf(id);
-export const desktopName = (id) => t('shell.desktops.name', { n: positionOf(id) + 1 });
+export { desktopName };
 // " · Desktop 2" for a window on another desktop, in lists that show every desktop.
 export function desktopSuffix(w) {
   const list = desktopList.get();
@@ -99,7 +99,10 @@ export const desktopSwipe = (dir) => () => {
   else cycleWindows(dir);
 };
 
-// ---- the count, across sessions and theme switches ----
+// ---- the count, the names and the order, across sessions and theme switches ----
+//
+// The order needs nothing of its own: desktops are numbered 1..n again at each start, and everything
+// that is kept names a position (the names here, each window's place in session restore).
 
 let surfaceDesktops = null;       // theme switch: Linux surface id → position in the list
 
@@ -132,13 +135,23 @@ export function startDesktops() {
   const list = Array.from({ length: cleanCount(s.desktopCount) }, (_, i) => i + 1);
   const was = s.themeDesktops;
   if (was) { surfaceDesktops = was.surfaces || null; settings.set({ themeDesktops: null }); }
-  setDesktops(list, list[Math.min(cleanIndex(was?.active), list.length - 1)]);
+  const names = {};
+  cleanNames(s.desktopNames, list.length).forEach((n, i) => { if (n) names[list[i]] = n; });
+  setDesktops(list, list[Math.min(cleanIndex(was?.active), list.length - 1)], names);
   started = true;
   shown = activeDesktop.get();
 }
-desktopList.subscribe(() => {
-  if (started && settings.get().desktopCount !== desktopList.get().length) settings.set({ desktopCount: desktopList.get().length });
-});
+function saveDesktops() {
+  if (!started) return;
+  const list = desktopList.get(), s = settings.get();
+  const names = namesByPosition(list, desktopNames.get());
+  const patch = {};
+  if (s.desktopCount !== list.length) patch.desktopCount = list.length;
+  if (JSON.stringify(s.desktopNames ?? null) !== JSON.stringify(names)) patch.desktopNames = names;
+  if (Object.keys(patch).length) settings.set(patch);
+}
+desktopList.subscribe(saveDesktops);
+desktopNames.subscribe(saveDesktops);
 
 // ---- the brief indicator and the animation ----
 
@@ -197,6 +210,7 @@ export function DesktopHud() {
   const on = useStore(hudState);
   const active = useStore(activeDesktop);
   const list = useStore(desktopList);
+  useStore(desktopNames);
   const th = useTheme();
   if (!on) return null;
   const d = mainDisplay();

@@ -109,6 +109,57 @@ export const cleanCount = (n) => (Number.isInteger(n) && n >= 1 && n <= MAX_DESK
 // A saved position in the list (0 is the first desktop).
 export const cleanIndex = (i) => (Number.isInteger(i) && i >= 0 && i < MAX_DESKTOPS ? i : 0);
 
+// ---- names and order ----
+
+// A desktop's own name, as typed (rename in the Overview or Settings) or read from the settings file:
+// one line, no control characters, at most MAX_NAME characters. '' means the default ("Desktop 2").
+export const MAX_NAME = 32;
+export function cleanName(s) {
+  if (typeof s !== 'string') return '';
+  const one = s.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
+  return [...one].slice(0, MAX_NAME).join('').trim();
+}
+// The saved names, by position in the list (settings.desktopNames): exactly `count` clean strings.
+export function cleanNames(saved, count) {
+  const a = Array.isArray(saved) ? saved : [];
+  return Array.from({ length: Math.max(0, count) }, (_, i) => cleanName(a[i]));
+}
+// What is saved: the names in the list's order, with the unnamed ones at the end left out (null for none).
+export function namesByPosition(list, names) {
+  const out = list.map((id) => cleanName(names?.[id]));
+  while (out.length && !out[out.length - 1]) out.pop();
+  return out.length ? out : null;
+}
+// Renaming: id → name, with no entry for a desktop back on its default.
+export function withName(names, id, name) {
+  const next = { ...names };
+  const n = cleanName(name);
+  if (n) next[id] = n; else delete next[id];
+  return next;
+}
+
+// The list with desktop `id` taken out and put back at `index` (dragging it in the Overview's strip).
+// Its windows go with it: they name the desktop, not a position.
+export function moveDesktopTo(list, id, index) {
+  const from = list.indexOf(id);
+  if (from < 0 || !Number.isInteger(index)) return list;
+  const to = Math.max(0, Math.min(list.length - 1, index));
+  if (to === from) return list;
+  const rest = list.filter((d) => d !== id);
+  return [...rest.slice(0, to), id, ...rest.slice(to)];
+}
+
+// While a card of the strip is dragged: the position whose card's center is nearest to x (the cards are
+// already mirrored in right-to-left languages, so this needs no direction).
+export function stripSlot(cards, x) {
+  let best = -1, dist = Infinity;
+  cards.forEach((c, i) => {
+    const d = Math.abs(c.x + c.w / 2 - x);
+    if (d < dist) { dist = d; best = i; }
+  });
+  return best;
+}
+
 // ---- the overview's layout ----
 
 const PAD = 48, GAP = 28, LABEL = 30;
