@@ -10,29 +10,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-### Fixed
+## [0.8.8.3-beta] - 2026-11-05
 
-- Store: switching category, page or search kept the previous list's scroll position, so a short category could look empty. Each page and each app's page now opens at the top, and back from an app returns to where the list was. The same fix (a `resetKey` on the SDK's `ScrollView`) applies to Settings sections, System Information, Help articles, Monitor tabs, Characters, Backup folders and Files folders ([#20](https://github.com/lordbasex/LordOS/issues/20))
+An update of 0.8.8 to 0.8.8.2 through Store → Updates and `apt`: only the `lordos` package changes, with the fixes and ideas reported on GitHub since 0.8.8. Thanks to everyone who opened an issue.
 
 ### Added
 
 - The system file dialog has a **List / Thumbnails** switch in its toolbar, so pictures can be chosen by how they look (Settings → Wallpaper, Notes' images and every other app that uses the dialog). A dialog that takes only pictures opens in Thumbnails; the choice is remembered. Thumbnails load in the background for the files in sight, and other files show their type icon ([#22](https://github.com/lordbasex/LordOS/issues/22))
-### Added
-
 - Desktops: **rename** a desktop by double-clicking its name in the Overview, from its right-click menu (**Rename…**) or in Settings → Desktop & Dock → Names; the name shows in the indicator, the Overview, Move to Desktop and the window lists, and an empty name goes back to "Desktop N". **Reorder** desktops by dragging them along the Overview's strip (or **Move Left** / **Move Right** in the same menu); their windows move with them. Names and order are kept across sessions ([#15](https://github.com/lordbasex/LordOS/issues/15))
-### Added
-
 - An **on-screen level indicator** for the volume, mute, screen brightness and keyboard-light keys: a rounded translucent panel near the bottom of the screen with an icon and a segmented bar, shown for 1.5 s after each press (a held key keeps it up), in Lord Flow and Lord Classic, light and dark. With Reduce motion it appears and goes without a fade ([#24](https://github.com/lordbasex/LordOS/issues/24)).
 - Screenshots: a window picked with ❖⇧4 then Space, or an area, came out cropped at a display scale above 100 % (the selection was in logical pixels and the capture is at the display's full resolution). The whole window is captured now, at any scale ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - A maximized window clicked to bring it forward shrank to its own size: the slightest pointer movement during the click counted as dragging it out. It now has to move a few pixels with the button held first, in both themes and for apps that draw their own title bar ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - A full-screen screenshot showed a GPU-drawn app's window (a third-party browser, for example) as an empty frame with its shadow: its content is now read back from the GPU for the capture ([#19](https://github.com/lordbasex/LordOS/issues/19)).
 - Mail: some messages, mostly newsletters, didn't open and showed **bad-json**. Their HTML layout nests tables several levels deep, and the check that lord-server makes on every reply of the mail helper stopped at 32 levels. It now accepts the depth the HTML view can produce. Also: a NUL byte can no longer cut a message's text short, a reply too large to show says so ("This message is too large to show here") instead of breaking the event queue, and a message that still can't be shown says so in your language ([#18](https://github.com/lordbasex/LordOS/issues/18)).
-### Added
-
 - Settings → Energy: shorter sleep times, 10 and 20 min on the power adapter and 5 and 10 min on battery ([#17](https://github.com/lordbasex/LordOS/issues/17)).
 
 ### Fixed
 
+- Store: switching category, page or search kept the previous list's scroll position, so a short category could look empty. Each page and each app's page now opens at the top, and back from an app returns to where the list was. The same fix (a `resetKey` on the SDK's `ScrollView`) applies to Settings sections, System Information, Help articles, Monitor tabs, Characters, Backup folders and Files folders ([#20](https://github.com/lordbasex/LordOS/issues/20))
 - With "Require password after the display turns off", the login screen turned the display back on and kept it on, and the computer never went to sleep. Now the screen stays off when it locks, the password is asked for when you wake it, the lock screen turns the display off again after the same time, and the computer still sleeps at the chosen time. A sleep time shorter than the lock time also locks first ([#23](https://github.com/lordbasex/LordOS/issues/23)).
 - The battery percentage in the menu bar and in Settings → Energy didn't follow the battery on laptops whose battery reports no change events while it discharges, so the low-battery notices at 20 %, 10 % and 5 % never came. It is now read again every 30 seconds ([#25](https://github.com/lordbasex/LordOS/issues/25)).
 - Wi-Fi that showed as connected after the computer woke from sleep but carried nothing until the card was turned off and on. LordOS's network service now hears the computer wake: wired connections confirm their address right away, and each Wi-Fi connection is checked a few seconds later (associated, link, address, and the router answering). If it isn't working, it re-associates and renews its address, and if that isn't enough it turns the card off and on by itself, as you had to. Every step is in the log. Needs confirming on the reported hardware ([#14](https://github.com/lordbasex/LordOS/issues/14))
@@ -3410,7 +3405,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...HEAD
+[0.8.8.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...v0.8.8.3-beta
 [0.8.8.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...v0.8.8.2-beta
 [0.8.8.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...v0.8.8.1-beta
 [0.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.7-beta...v0.8.8-beta
