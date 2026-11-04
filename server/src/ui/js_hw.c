@@ -195,15 +195,21 @@ static JSValue f_display_sun(JSContext *c, JSValueConst t, int argc, JSValueCons
 
 static JSValue f_display_idle(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    int v[3] = { 0, 0, 0 };
-    for (int i = 0; i < 3 && i < argc; i++) { v[i] = arg_int(c, argv[i], 0); if (v[i] < 0 || v[i] > 86400) v[i] = 0; }
-    display_set_idle(v[0], v[1], v[2]);
+    int v[4] = { 0, 0, 0, 0 };
+    for (int i = 0; i < 4 && i < argc; i++) { v[i] = arg_int(c, argv[i], 0); if (v[i] < 0 || v[i] > 86400) v[i] = 0; }
+    display_set_idle(v[0], v[1], v[2], v[3]);
     return JS_UNDEFINED;
 }
 
 static JSValue f_display_wake(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)c; (void)t; (void)argc; (void)argv;
     display_wake();
+    return JS_UNDEFINED;
+}
+
+static JSValue f_display_blank(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    display_blank();
     return JS_UNDEFINED;
 }
 
@@ -218,8 +224,9 @@ static const JSCFunctionListEntry display_funcs[] = {
     JS_CFUNC_DEF("setTemperature", 1, f_display_set_temp),
     JS_CFUNC_DEF("temperature", 0, f_display_temp),
     JS_CFUNC_DEF("sun", 4, f_display_sun),
-    JS_CFUNC_DEF("setIdle", 3, f_display_idle),
+    JS_CFUNC_DEF("setIdle", 4, f_display_idle),
     JS_CFUNC_DEF("wake", 0, f_display_wake),
+    JS_CFUNC_DEF("blank", 0, f_display_blank),
 };
 
 /* ---- lord.power ---- */

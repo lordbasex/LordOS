@@ -12,6 +12,7 @@
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
  * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
  * lord.themes only accepts simple names. */
+#include "../hw/display.h"
 #include "../hw/hw_admin.h"
 #include "js_sys.h"
 #include "js_err.h"
@@ -2064,9 +2065,17 @@ static JSValue f_session_managed(JSContext *c, JSValueConst this_val, int argc, 
     return JS_NewBool(c, getenv("LORDOS_SESSIOND") != NULL);
 }
 
+/* The lock carries this session's idle state for the login screen (docs/SETTINGS.md): "dark" when the
+ * screen is already off after idle (the login screen then stays off until a key or the mouse), its
+ * display-off and sleep timeouts and the seconds left until sleep, so the computer still sleeps while locked. */
 static JSValue f_session_lock(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
-    mirror_session("{\"a\":\"lock\"}");
+    int dark, off, sleep, sleep_left;
+    display_idle_state(&dark, &off, &sleep, &sleep_left);
+    char j[128];
+    snprintf(j, sizeof j, "{\"a\":\"lock\",\"dark\":%s,\"off\":%d,\"sleep\":%d,\"sleepLeft\":%d}", dark ? "true" : "false", off,
+             sleep, sleep_left);
+    mirror_session(j);
     return JS_NewBool(c, mirror_clients() > 0);
 }
 

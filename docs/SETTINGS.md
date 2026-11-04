@@ -206,7 +206,8 @@ with real hardware** (no controller in the VMs).
   `charge_*`/`current_now`/`voltage_now`): percentage, time to empty or to full (the kernel's
   `time_to_*_now` when present), health (`full / full_design`), cycles, watts, model and
   technology. Device batteries (mice, keyboards: `scope = Device`) are listed but not counted.
-  Refreshed on `power_supply` uevents. Unit-tested over a fake sysfs tree; **untested on a real
+  Refreshed on `power_supply` uevents and, since many batteries send none while they discharge, read again
+  every 30 s while there is a battery (`hw_timeout` in the poll timeout; sent only when it changed). Unit-tested over a fake sysfs tree; **untested on a real
   laptop** (the VMs have no battery and the Debian kernel has no `test_power` module).
 - **Low battery.** A notification at 20 %, 10 % and 5 % (sticky at 5 %) while discharging.
 - **Menu bar.** A battery item with the percentage (optional) through `registerStatusItem`, so
@@ -221,7 +222,15 @@ with real hardware** (no controller in the VMs).
   different on battery and on power. lord-server keeps the deadlines (`display_timeout` in the
   poll timeout): screen off is the connector's DPMS (`kms_dpms`; nothing is drawn while it is off),
   "require password" locks the session through `lord-sessiond` N seconds after the screen goes off,
-  and sleep runs the closed action `power-suspend` (`systemctl suspend`). The VM is never put to
+  and sleep runs the closed action `power-suspend` (`systemctl suspend`). A locked session no longer
+  has the monitor, so its lock message (`{"a":"lock","dark","off","sleep","sleepLeft"}`, from
+  `display_idle_state`) hands the deadlines to the login screen: when the screen was already off
+  (`dark`) the login screen keeps it off (`lord.display.blank()`) until a key, the mouse or the
+  trackpad; it turns the screen off again after the same `off` time, and when the sleep time is up
+  (`sleepLeft` after the lock, then `sleep` after the last input) it asks `lord-sessiond` to suspend
+  (`{t:'power', a:'suspend'}`, the login screen having no admin helper). If sleep comes before the lock
+  deadline, the session locks first. Sleep choices: 10, 15, 20, 30 min, 1, 2 and 3 h on the power
+  adapter; 5, 10, 15, 30 min, 1, 2 and 3 h on battery. The VM is never put to
   sleep in the tests. Since 0.8.5 a Linux app that holds a Wayland idle inhibitor
   (`zwp_idle_inhibit_manager_v1`, `wl.c`) on a shown surface, such as a video player, counts as
   activity (`wl_idle_inhibited` in `main.c`), so the screen stays on.

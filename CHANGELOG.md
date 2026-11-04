@@ -10,6 +10,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Energy: shorter sleep times, 10 and 20 min on the power adapter and 5 and 10 min on battery ([#17](https://github.com/lordbasex/LordOS/issues/17)).
+
+### Fixed
+
+- With "Require password after the display turns off", the login screen turned the display back on and kept it on, and the computer never went to sleep. Now the screen stays off when it locks, the password is asked for when you wake it, the lock screen turns the display off again after the same time, and the computer still sleeps at the chosen time. A sleep time shorter than the lock time also locks first ([#23](https://github.com/lordbasex/LordOS/issues/23)).
+- The battery percentage in the menu bar and in Settings → Energy didn't follow the battery on laptops whose battery reports no change events while it discharges, so the low-battery notices at 20 %, 10 % and 5 % never came. It is now read again every 30 seconds ([#25](https://github.com/lordbasex/LordOS/issues/25)).
+
 ## [0.8.8.2-beta] - 2026-11-04
 
 An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.

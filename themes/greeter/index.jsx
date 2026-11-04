@@ -6,11 +6,12 @@
 // password, opening the session, rebooting, powering off) is requested with lord.greeter.send() and the answer
 // arrives through __lordGreeter: this JS never sees /etc/shadow.
 //
-// Requests: {t:'hello'} · {t:'login', user, pass} · {t:'power', a:'reboot'|'poweroff'} · {t:'bootTestCancel'}
+// Requests: {t:'hello'} · {t:'login', user, pass} · {t:'power', a:'reboot'|'poweroff'|'suspend'} · {t:'bootTestCancel'}
 // Notices:  {t:'hello', mode, user, last, host, layouts, variants, lang, users:[{name, full, color, image, admin, open}],
 //            bootTest?:{k, n, in}} (a boot time test restarts in `in` seconds; a login cancels it)
 //           (last: the user whose session was last shown on the monitor)
-//           {t:'mode', mode:'login'|'lock'|'switch', user} · {t:'ok'} · {t:'fail', wait} · {t:'error'} · {t:'busy'}
+//           {t:'mode', mode:'login'|'lock'|'switch', user, dark, off, sleep, sleepLeft} · {t:'ok'} · {t:'fail', wait} · {t:'error'}
+//           · {t:'busy'} (dark, off, sleep, sleepLeft: a locked session's idle state, see idleOnLock)
 import { render, screen, mainBox, onScreenChange, addListener } from '@lordos/runtime';
 import {
   View, Text, Image, TextInput, ThemeProvider, useStore, locale, t, formatDate, formatTime, setLanguage, languages, CORE_LANGUAGES, keyboard, settings, LordOSWordmark,
@@ -20,6 +21,19 @@ import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
 
 const send = (msg) => { try { return lord.greeter.send(JSON.stringify(msg)); } catch (e) { return false; } };
+
+// A locked session no longer has the monitor, so its idle deadlines move here (docs/SETTINGS.md): the
+// screen goes off after `off` seconds without input, and the computer sleeps when the session's time is up
+// (`sleepLeft` seconds after the lock, then `sleep` after the last input; lord-sessiond suspends,
+// sdk/hardware.jsx onIdle). Locked because the screen had turned off (`dark`): this screen stays off
+// until a key, the mouse or the trackpad. Any other showing has none.
+function idleOnLock(m) {
+  try {
+    const lock = m.mode === 'lock';
+    lord.display.setIdle(lock ? m.off || 0 : 0, 0, lock ? m.sleep || 0 : 0, lock ? m.sleepLeft || 0 : 0);
+    if (lock && m.dark) lord.display.blank();
+  } catch (e) { /* an older lord-server */ }
+}
 
 const listeners = new Set();
 globalThis.__lordGreeter = (json) => {
@@ -255,6 +269,7 @@ function Greeter() {
           return (m.users.find((u) => u.open) || m.users[0] || {}).name || '';
         });
       } else if (m.t === 'mode') {
+        idleOnLock(m);
         setPass(''); setMsg(''); setBusy(false); setMenu(null); setConfirm(null); setFocusRev((v) => v + 1);
         setInfo((old) => ({ ...old, mode: m.mode, user: m.user }));
         reselect.current = true;

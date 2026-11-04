@@ -44,6 +44,8 @@ static struct {
     int off_s, lock_s, sleep_s;
     double last;
     int done_off, done_lock, done_sleep, off;
+    int blank_pending;                  /* display_blank: turn off as soon as there is a card */
+    int sleep_first_s;                  /* the first sleep deadline when it differs (until the next input) */
 } D = { .kelvin = NIGHT_K_MAX };
 
 static void apply_tint_all(void);
@@ -686,10 +688,11 @@ void display_hotplug(void) {
 
 /* ---- idle ---- */
 
-void display_set_idle(int off_s, int lock_s, int sleep_s) {
+void display_set_idle(int off_s, int lock_s, int sleep_s, int sleep_first_s) {
     D.off_s = off_s > 0 ? off_s : 0;
     D.lock_s = lock_s > 0 ? lock_s : 0;
     D.sleep_s = sleep_s > 0 ? sleep_s : 0;
+    D.sleep_first_s = D.sleep_s && sleep_first_s > 0 ? sleep_first_s : 0;
     D.last = now_ms();
     D.done_off = D.done_lock = D.done_sleep = 0;
 }
@@ -714,14 +717,29 @@ void display_wake(void) {
 void display_activity(double now) {
     D.last = now;
     D.done_off = D.done_lock = D.done_sleep = 0;
+    D.blank_pending = 0;
+    D.sleep_first_s = 0;
     if (D.off) display_wake();
 }
 
 static double deadline(int secs, int done) { return secs && !done ? D.last + secs * 1000.0 : -1; }
+static double sleep_deadline(void) { return deadline(D.sleep_first_s ? D.sleep_first_s : D.sleep_s, D.done_sleep); }
+
+void display_blank(void) { D.blank_pending = 1; }
+
+void display_idle_state(int *dark, int *off_s, int *sleep_s, int *sleep_left_s) {
+    double now = now_ms(), slp = sleep_deadline();
+    *dark = D.off;
+    *off_s = D.off_s;
+    *sleep_s = D.sleep_s;
+    /* due now: this process sleeps right after this lock (display_tick), it is not handed on */
+    *sleep_left_s = slp < 0 || slp <= now ? 0 : (int)((slp - now) / 1000.0 + 0.999);
+}
 
 double display_timeout(double now) {
     if (!kms()) return -1;
-    double best = -1, ds[3] = { deadline(D.off_s, D.done_off), deadline(D.lock_s, D.done_lock), deadline(D.sleep_s, D.done_sleep) };
+    if (D.blank_pending) return 0;
+    double best = -1, ds[3] = { deadline(D.off_s, D.done_off), deadline(D.lock_s, D.done_lock), sleep_deadline() };
     for (int i = 0; i < 3; i++) {
         if (ds[i] < 0) continue;
         double left = ds[i] - now;
@@ -734,7 +752,14 @@ double display_timeout(double now) {
 void display_tick(double now) {
     Kms *k = kms();
     if (!k) return;
-    double off = deadline(D.off_s, D.done_off), lock = deadline(D.lock_s, D.done_lock), slp = deadline(D.sleep_s, D.done_sleep);
+    double off = deadline(D.off_s, D.done_off), lock = deadline(D.lock_s, D.done_lock), slp = sleep_deadline();
+    if (D.blank_pending) {              /* the login screen of an idle lock: it stays dark (display_blank) */
+        D.blank_pending = 0;
+        D.done_off = 1;
+        if (!D.off && dpms_all(0)) D.off = 1;
+        event("idle", "{\"stage\":\"off\"}");
+        off = -1;
+    }
     if (off >= 0 && now >= off) {
         D.done_off = 1;
         if (dpms_all(0)) D.off = 1;

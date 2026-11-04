@@ -99,12 +99,19 @@ void display_tint(Canvas *c, Rect r);   /* apply the software LUT in place */
 /* Sunrise/sunset for a date at the time zone's coordinates (zone1970.tab), minutes UTC. */
 int  display_sun(const char *zone, int y, int m, int d, double *rise, double *set);
 
-/* Idle (seconds; 0 = never): screen off, lock notice, sleep notice. */
-void display_set_idle(int off_s, int lock_s, int sleep_s);
+/* Idle (seconds; 0 = never): screen off, lock notice, sleep notice. sleep_first_s (0 = sleep_s) is the
+ * first sleep deadline, until the next input: a locked session's time left, kept by the login screen. */
+void display_set_idle(int off_s, int lock_s, int sleep_s, int sleep_first_s);
 void display_activity(double now_ms);   /* any input */
 double display_timeout(double now_ms);  /* ms to the next idle deadline, or -1 */
 void display_tick(double now_ms);
 int  display_is_off(void);              /* DPMS off: main.c does not render */
 void display_wake(void);                /* turn the screen back on now */
+/* Turn the screen off as soon as this process has the card (now, or when it is lent), until the next
+ * input: the login screen shown by an idle lock stays dark (docs/SETTINGS.md). */
+void display_blank(void);
+/* For a lock: is the screen off after idle, the display-off and sleep timeouts (s, 0 = never) and the
+ * seconds left until the sleep deadline (0 = none, or due now). */
+void display_idle_state(int *dark, int *off_s, int *sleep_s, int *sleep_left_s);
 
 #endif
