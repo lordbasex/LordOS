@@ -10,6 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- Screenshots: a window picked with ❖⇧4 then Space, or an area, came out cropped at a display scale above 100 % (the selection was in logical pixels and the capture is at the display's full resolution). The whole window is captured now, at any scale ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+- A maximized window clicked to bring it forward shrank to its own size: the slightest pointer movement during the click counted as dragging it out. It now has to move a few pixels with the button held first, in both themes and for apps that draw their own title bar ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+- A full-screen screenshot showed a GPU-drawn app's window (a third-party browser, for example) as an empty frame with its shadow: its content is now read back from the GPU for the capture ([#19](https://github.com/lordbasex/LordOS/issues/19)).
+
 ## [0.8.8.2-beta] - 2026-11-04
 
 An update of 0.8.8 and 0.8.8.1 through Store → Updates and `apt`: only the `lordos` package changes. There are no new images: the 0.8.8 ISO, OVA and Raspberry Pi image update to this from the Store.

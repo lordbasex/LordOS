@@ -13,6 +13,7 @@ import {
   t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
+import { captureRect } from './geometry.js';
 
 const APP = 'screenshots';
 const recording = createStore(null);   // { id, path, start }
@@ -164,7 +165,11 @@ function Overlay({ handle, mode: initial }) {
   const done = async (r) => {
     wm.close(win.id, true);
     if (!r || r.w < 3 || r.h < 3) { media.close(handle); return; }
-    const c = media.crop(handle, r.x, r.y, r.w, r.h);
+    // r is in logical pixels; the capture is at the display's physical resolution (2× at 200 %)
+    const info = media.info(handle);
+    const p = info && captureRect(r, info.width, info.height, lord.screen);
+    if (!p) { media.close(handle); return; }
+    const c = media.crop(handle, p.x, p.y, p.w, p.h);
     media.close(handle);
     await finish(c);
   };
@@ -176,7 +181,7 @@ function Overlay({ handle, mode: initial }) {
     const offMove = addListener('pointermove', (e) => {
       if (drag.current) { const d = drag.current; setRect({ x: Math.min(d.x, e.x), y: Math.min(d.y, e.y), w: Math.abs(e.x - d.x), h: Math.abs(e.y - d.y) }); return; }
       // window under the pointer (the topmost one)
-      const vis = list.filter((w) => !w.minimized && w.app !== APP);
+      const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
       let found = null;
       for (const w of vis) { const f = wm.frame(w); if (e.x >= f.x && e.y >= f.y && e.x < f.x + f.w && e.y < f.y + f.h) found = { ...f, title: windowTitle(w) }; }
       setHover(found);

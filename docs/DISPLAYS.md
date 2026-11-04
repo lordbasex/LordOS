@@ -199,6 +199,12 @@ Settings → Displays → "Screenshots and sharing": **main display** (default) 
   coordinates are mapped back through its view.
 - All displays: a capture view of the whole logical space at 100 % is painted only while someone
   watches or records (`Out cap` in `main.c`).
+- A window or area picked in Screenshots is in logical pixels; `apps/screenshots/geometry.js`
+  turns it into the capture's pixels (× the main display's scale, from its origin), so at 200 % a
+  window comes out whole (tests: `server/tests/screenshots_model_test.mjs`).
+- On the GPU path a window whose content is only a GPU buffer (dmabuf: a browser, a game) is read
+  back from its texture for a screenshot (`capture_readback` in `wl/wl.c`); before, the capture
+  showed its frame and shadow with nothing inside.
 
 ## Measurements (VM 118, CPU path, 4 vCPU)
 

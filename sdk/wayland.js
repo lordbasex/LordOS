@@ -46,6 +46,15 @@ addListener('pointermove', (e) => {
   if (!w) { drag = null; return; }
   if (!drag.start || drag.start.x == null) { drag.start = { x: e.x, y: e.y, f: wm.frame(w) }; return; }
   const dx = e.x - drag.start.x, dy = e.y - drag.start.y, f = drag.start.f;
+  if (drag.edges == null && w.maximized) {
+    // out of the maximized place only once the pointer really moved (a click's jitter keeps it), at
+    // its own size and under the pointer where it was grabbed
+    if (Math.abs(dx) + Math.abs(dy) < 6) return;
+    const rel = f.w ? Math.min(1, Math.max(0, (drag.start.x - f.x) / f.w)) : 0.5;
+    drag.start = { x: e.x, y: e.y, f: { ...f, x: Math.round(e.x - rel * w.w), y: f.y + dy, w: w.w, h: w.h } };
+    wm.move(drag.id, drag.start.f.x, drag.start.f.y);
+    return;
+  }
   if (drag.edges == null) { wm.move(drag.id, f.x + dx, f.y + dy); return; }
   const E = drag.edges;      // 1 arriba, 2 abajo, 4 izquierda, 8 derecha
   let { x, y, w: ww, h: hh } = f;
