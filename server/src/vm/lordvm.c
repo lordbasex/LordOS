@@ -2862,10 +2862,22 @@ static int recover(void) {
         if (fd < 0) continue;
         ssize_t n = read(fd, buf, sizeof buf - 1);
         close(fd);
-        if (n <= 0) continue;
+        if (n < 0) continue;
+        buf[n > 0 ? n : 0] = 0;
         int match = 0;
         for (ssize_t k = 0; k + 36 <= n; k++) if (!memcmp(buf + k, S.m.id, 36)) { match = 1; break; }
         if (i == 1 && !match && strstr(buf, "passt")) match = 1;
+        if (!n) {
+            /* exiting: its main thread is gone (no command line any more) but other threads still hold its descriptors,
+             * and with them the disks' locks. Its name says whether it's ours to wait for */
+            char comm[64] = "";
+            snprintf(path, sizeof path, "/proc/%ld/comm", pids[i]);
+            fd = open(path, O_RDONLY | O_CLOEXEC);
+            ssize_t c = fd >= 0 ? read(fd, comm, sizeof comm - 1) : -1;
+            if (fd >= 0) close(fd);
+            if (c > 0) comm[c] = 0;
+            match = !strncmp(comm, i == 0 ? "qemu-system" : "passt", i == 0 ? 11 : 5);
+        }
         if (match) {
             vlog("recovery: process %ld of the old run is still there: killing it", pids[i]);
             kill((pid_t)pids[i], SIGKILL);
