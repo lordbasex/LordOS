@@ -771,6 +771,7 @@ static void set_state(int st, int why, int code, const char *detail) {
     for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
     if (st == VS_RUNNING || st == VS_PAUSED) notify_parent(1);
     else if (st == VS_STOPPED || st == VS_CRASHED) notify_parent(0);
+    awake_update();
 }
 
 static int pq_push(int kind, int client, uint32_t seq, int fd) {
