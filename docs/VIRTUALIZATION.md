@@ -1307,6 +1307,23 @@ secret file in no new disk. Merges byte for byte: a split VMDK with two snapshot
 | `config.pvs` (`SystemUuid {feedface-1111-4222-8333-444455556666}`) | `feedface-1111-4222-8333-444455556666` | `00:1c:42:ab:cd:ef/e1000e` | UEFI |
 | a loose VHDX | a new one | a new one | booted from SATA |
 
+**On screen** (VM 125, LordOS 0.8.8.3 amd64 with this branch, 2026-11-05; `machines-shots5`): the assistant's *Migrate from another
+app* tile, the file dialog into a `.vmwarevm` bundle (Debian's nocloud image as a split VMDK, a data disk with a snapshot, two cards,
+UEFI, a vTPM, Secure Boot, a disc image, a shared folder), the plan sheet (`01-plan-sheet.png`, `02-plan-sheet-lost.png`: name, system,
+CPU and memory, two disks, both MACs, firmware, the UUID kept, the devices; the TPM warning; what won't come along; the license line; space),
+the progress (`03-import-progress.png`), the done sheet (`04-import-done.png`), the card in the library (`05-library-card.png`), and the machine
+running in its window (`06-imported-running.png`, `07-imported-running-console.png`: the guest's kernel brings up `e1000e` as `enp0s2` and
+`vmxnet3` as `enp0s24`, and its first-boot questions on the serial console). The guest's own reading of its UUID and MACs on screen wasn't
+finished: VM 125 was taken back by another test session mid-way (the same readings are measured above by `vm_import_identity.sh`), and
+Configure's *Switch to Fast Devices* wasn't driven on screen (`lord-vm --set --devices` is). Seen there and fixed: the sheet's name field
+didn't show, "1 snapshots", the tile's hint was cut.
+
+An independent review (path traversal, XXE, memory safety) found and the branch fixed: XML text split by many comments cost the square of
+its length (a library `strstr` measures the whole rest of the input; the reader now scans only to the match and keeps each element's text
+length), a VMDK descriptor's place inside an `.ova` member was checked after an unchecked multiplication, extent offsets weren't validated,
+over-long descriptor lines were cut instead of refused, and a disk with more pieces than the jail lists failed obscurely. The review read the
+parsers, `imp_resolve`, the specs and the jail and found the traversal and XXE guarantees held.
+
 VirtualBox couldn't run its machine on VM116 (no `vboxdrv`), so what its own guest read wasn't seen: the derivation is from its source code,
 and the measurement is that our guest reads what that derivation gives. No VMware or Parallels app was available: those fixtures are made
 by `qemu-img` and written by hand from their file formats.
