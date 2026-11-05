@@ -625,12 +625,120 @@ GB*, *21.4 GB* free), Pause and Resume from the right-click menu (the card said 
 Devices and resolution menus, Screenshot (a PNG of 1022 × 598 in `~/Pictures/Screenshots`), the floating full-screen bar, BootFailed
 with the ISO moved away (*the attached image is missing*), FirstRun with an empty library and Requirements.
 
-**Not done or not verified:** Esc pressed while one of the window's menus is open closes it and also reaches the guest; BIOS machines were built for but not run from the app; the package engine's download of
-`vm-enable` waited with no time limit while the network didn't answer (the sheet said *Installing…* until it was closed); ejecting an ISO from a running machine
-(QMP `blockdev-open-tray`/`blockdev-remove-medium`) and attaching another one; one slice for all machines and nested
+**Not done or not verified:** ~~Esc pressed while one of the window's menus is open closes it and also reaches the guest~~ (fixed in the
+beta, below); BIOS machines were built for but not run from the app; ~~the package engine's download of `vm-enable` waited with no time
+limit while the network didn't answer~~ (beta); ~~ejecting an ISO from a running machine and attaching another one~~ (beta); one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
 cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
 checks, letterbox and pointer scaling, guest size, refresh rate, wheel steps).
+
+**Phase 2, the beta.** Built on branch `machines-beta` (2026-11-05), from `machines-alpha`, in the order of the beta's list; each part is its own commit. The
+messages of 3.9 grew (`vmproto.h` is the contract: `VM_CDROM`, `VM_SUSPEND`, `VM_KEEP`, `VM_SNAPSHOT`, `VM_CONSOLE`, `VM_AGENT`, `VM_CLIP`
+to lord-vm; `VM_NOTICE`, `VM_JOB`, `VM_CONSOLE_FD`, `VM_AGENT_STATE`, `VM_CLIP_DATA` from it; reasons `suspended` and `resume-failed`); the
+version number is unchanged, since both ends ship together and an older peer drops what it doesn't know. `machine.json` is schema 2 (`base`,
+`agent`, `clipboard`): a schema 1 file is read as is and written as 2 with `machine.json.schema1` kept, as 3.6 says. Measured on the amd64
+build VM (**nested**, Debian 13 nocloud guest, 512 MB to 1 GB) and on screen on VM 125 (LordOS amd64, nested) unless said otherwise.
+
+*Phase 1's open items.*
+
+- *Esc in a menu*: a key pressed while one of the window's menus (or the agent's popover, or the disc picker) is open stays with it, down
+  and up. Seen on VM 125: with Devices open, `x` didn't reach the guest's login prompt and Esc closed the menu; with no menu, `x` did.
+- *CD/DVD while running*: the drive is always there (`virtio-scsi-pci` at slot 8, after the slots a machine always had, so no interface
+  moves). `VM_CDROM` carries a descriptor lord-server opened for the person; lord-vm hands it to QEMU with QMP `add-fd` and inserts a raw
+  node on `/dev/fdset/N` (`blockdev-open-tray`, `-remove-medium`, `-del`, `-insert-medium`, `-close-tray`), so QEMU never opens a path and
+  its Landlock rules don't change; `machine.json` follows. Devices → Choose Disc Image / Eject Disc; `lord-vm --cdrom DIR IMAGE|none`. Seen
+  on VM 125 with Debian 13.7's netinst ISO; the guest's state carried across a suspend and resume with the disc in.
+- *Install timeout*: the package engine's HTTP client tries all of a host's addresses for 20 s together, and a host that didn't connect or
+  answer isn't tried again in the same batch (`pkg/http.c`), so `vm-enable` on a network that drops packets ends in about a minute; the
+  Requirements page also says the network isn't answering after 90 s without a word from the engine. Not reproduced against a dead network
+  on screen.
+- *passt crashing*: QEMU's `-netdev stream` on a descriptor can't reconnect, and the card sits on the root bus, so it can't be hot-unplugged
+  without moving it (which renames the guest's interface). So lord-vm reports it: `VM_NOTICE network-lost` with the signal, in the log and
+  as a line in the window (*the network stopped until the next start*). Relaying the stream through lord-vm, so a new passt could be
+  attached, would cost a copy of every packet; not done. The crash itself wasn't reproduced.
+
+*Suspend and resume (6.1).* `VM_SUSPEND` stops the vCPUs and migrates to `file:/dev/fdset/90`, a descriptor lord-vm opened on
+`.suspend.state.tmp` (QEMU 10 deprecates `fd:` for files; the 128 MiB/s default limit is lifted), with progress from `query-migrate` as
+`VM_JOB`; `suspend.json` records QEMU's version, the machine type, this CPU (a hash of its model and features), vCPUs and memory; both are
+renamed into place under `operation.json` "suspend" and QEMU quits: *stopped, suspended*. The next start passes `-incoming defer`, loads the
+state through `migrate-incoming` under "resume" and removes it before the first `cont`. A state from another QEMU, CPU, machine type, vCPU
+count or memory size isn't loaded (*resume-failed*, the state kept): Try Anyway (`--resume-anyway`) or Discard (`--discard-state`).
+Measured: a 512 MB guest saved 288 MB in 0.9 s and resumed in 0.4 s (build VM); a 1 GB guest saved 326 MB in 2.6 s and resumed in 0.3 s
+(VM 125, from the window; text typed at its login prompt was still there). **Keep Running** (`VM_KEEP`) leaves a machine on when its
+window closes; **Start Without Window** runs `lord-vm --detach --keep-running`; the card says *No window*. Closing a window asks Suspend,
+Shut Down or Keep Running unless Configure says which. **Keep awake**: the session's idle sleep asks `lord.vm.awake()` and skips while a
+running machine keeps the computer awake (app.json `keepAwake`, on by default); the guest is kept awake through the agent (below). Whether
+the idle sleep was really held off wasn't watched on screen.
+
+*Snapshots (6.2).* qcow2 internal snapshots, the doc's decision. Running: QMP `snapshot-save`, `snapshot-load` and `snapshot-delete` jobs
+over every writable node (system disk and UEFI variables), the memory into the system disk, followed through `JOB_STATUS_CHANGE` and
+`query-jobs`, the memory's size from `query-block`. Off: `qemu-img snapshot -c/-a/-d` per disk, jailed like an import. A snapshot with
+memory on a machine that's off is gone back to by starting from it: a `snapshot-load` before the first `cont` (`--loadvm`; QEMU's own
+`-loadvm` picks the UEFI variables for the memory and refuses). `snapshots.json` (names, times, whether memory, its size) is written last;
+pictures are `snapshots/<tag>.png` (the live picture from the window, else the card's). A delete removes the entry first. At every start a
+tag the list doesn't name is removed. Measured (build VM): take 1.0 s, go back 0.55 s; on VM 125, Go Back to This with *a snapshot of now
+first* took both and went back in 3 s, and the text typed after the snapshot was gone. At most 64; a warning from 20 (6.2).
+
+*Clones (6.3) and storage (6.16).* `lord-vm --clone DIR NEWDIR [--duplicate] [--linked] [--from-snapshot TAG]`, with the source off: a
+reflink copy first (btrfs, XFS); with `--linked` on ext4 the source's disk moves to `<library>/.shared/` as a read-only base and both machines
+get an overlay (`qemu-img create -u -b`, the base never opened) under "link" in the source; otherwise a Clone is converted (flattened,
+without snapshots) and a Duplicate copied with its holes, snapshots and saved session. A linked clone's base is named in `machine.json`;
+QEMU gets it as a read-only node and never follows the overlay's header; it is QEMU's only extra Landlock read; qemu-img's jail takes a
+second read file to flatten one. A Duplicate keeps the id and won't start while its original runs. Measured: a linked clone of a 1.2 GB disk
+in 0.14 s, both then running together; a full clone in about 5 s. **Compaction** (`--compact [--estimate]`, Reclaim Space) rewrites the disk
+into a new file, checks it and renames it over, under "compact"; refused with snapshots, a saved session or a base. The **Storage** window
+(mock *Storage*) is per 6.16: the volume's bar (machines, disc images in use, the Trash, other files), each machine with its clones under it,
+what deleting it frees (its files less what it shares by reflink, `FIEMAP_EXTENT_SHARED`, plus its base when it's the last user, the Trash
+counted), the split (disks, saved session, snapshots as *about* their memory's size, other), Reclaim Space with an estimate first, and shared
+bases nobody uses. Shared extents weren't seen: VM 125 and the build VM are ext4.
+
+*Profiles, resolution, recording.* Profiles per 5.6 (Productivity, Software Development, Testing, Design, Light desktop) scaled to the
+host; Testing is Isolated; Design says 3D comes later. The resolution menu lists the sizes that fit the display. **Record** feeds the guest's
+picture (not the screen) into lord-media's screen recorder (`media_framerec_*`), into `~/Pictures/Screenshots`; no sound yet. Seen on VM
+125: a 26 s recording, a 1022 × 598 H.264 MP4 of 25 KB, and the notification with Open and Show in Files.
+
+*Logs and the Shell (6.18, 6.19).* `VM_CONSOLE` hands out one stream to the serial console (output also to `serial.log`; the last 8 KB
+replayed without terminal queries), shown with `term_create_fd` in a pane under the picture, marked GUEST with the machine's name. This is the
+serial console, not the agent's shell of 6.18, so it works with no agent and no network but logs in like a console. Logs opens on an
+**Overview** (unified diagnostics from run.json, the machine log and the library: state, last start, QEMU's version, sandbox, limits, network
+notices, storage, an operation waiting, recoveries, problems; Copy Report), then the machine log, the serial console and the guest's journal.
+
+*The guest agent (6.17, 7).* Opt-in per machine (`agent`; off for Testing). virtio-serial at slot 7 with two ports, sockets lord-vm holds:
+`org.qemu.guest_agent.0` for **qemu-guest-agent** (the guest's package) and `org.lordos.agent` for our own channel. The doc leaves the
+clipboard path open (6.8: QEMU's D-Bus clipboard needs a vdagent in the guest), so the clipboard goes through our channel and **lordos-guest**
+(`tools/guest`, a small static program packaged per architecture), which reads and writes the clipboard with the guest's `wl-paste`/`wl-copy`
+or `xclip`, as the desktop user, and never runs anything the host names; frames per 6.17 with a 1 MiB limit, parsed in lord-vm. Install
+Clipboard Helper copies it in through `guest-file-write` and one fixed script (udev rule, user unit). The agent's light is on the card and
+first on the bar, with a popover of what works now. Seen on VM 125: *Debian GNU/Linux 13 (trixie), agent 10.0.13*, journal in Logs, guest
+kept awake, the helper installed in 60 ms (build VM) and from the popover, and the clipboard both ways (a guest with Xvfb and xclip: text
+copied in the guest was in LordOS's clipboard history; a report copied in LordOS was in the guest's clipboard after the window came to the
+front). Not tried: a guest desktop session starting the helper by itself (the unit waits for `graphical-session.target`), Wayland guests.
+
+*Release gates (12).* Scripts in `server/tests/`, each `sh tests/<gate>.sh BUILD_DIR …`, run on the amd64 build VM (**nested**, ext4):
+
+| Gate | Script | What it does | Result |
+|---|---|---|---|
+| Disk integrity | `vm_integrity.sh` | SIGKILL of QEMU or lord-vm while the guest writes, in a snapshot, a revert, a suspend, three full clones, four linked clones (15 to 60 ms in) and two compactions; `qemu-img check` after each and after the next open | **46 passed**, 0 failed (leaked clusters only after some kills, repaired at the next start) |
+| Failure recovery | `vm_recovery.sh` | kills lord-vm in the middle of each operation with an intent file (suspend, resume, snapshot take, delete and revert, compaction, linked clone) and checks the next open finishes it or rolls it back, says so, and leaves clean disks | **22 passed**, 0 failed |
+| Leaks | `vm_leak.sh` | 100 start/stop cycles, then no process, zombie, socket, cgroup, lock or operation left, logs rotated, disks clean | **10 passed**; 100 cycles in 145 s, 1456 ms each on average, the slowest 5244 ms |
+
+The first runs failed on things the gates were written to find: `qemu-img check` right after a kill raced the dying QEMU for
+the disk locks (recovery now waits for it to be gone), a killed compaction left a `qemu-img convert` running (tools are now
+started with `PR_SET_PDEATHSIG`), and the build VM's 2 GB `/tmp` ran out of space under full clones (the gates now work in
+`/var/tmp`). Some kills land after the operation finished; the gate then says so and skips the "interrupted" checks rather than
+pass them.
+
+*On the Pi 5 (arm64, LordOS kernel, KVM).* The arm64 package of this branch, merged with 0.8.8.4's work so Remote Desk, the
+single sign-on VPN and the Sound balance stayed (checked after the install), was installed and the Pi rebooted once. With the
+Debian guest made in Phase 1: suspend 6.6 s for 393 MB of state, start from it 0.43 s (state loaded in 216 ms), a snapshot with
+memory 6.5 s, going back to it 1.4 s, and delete. The gates weren't run on the Pi, and its windows weren't driven (it's the
+user's desktop).
+
+*Not done or not verified in the beta:* passt is reported, not restarted; host shutdown doesn't yet suspend running machines; a clone gets
+a new MAC but not yet a new machine-id or hostname (the agent could, 6.3); snapshot sizes count only the memory, not the disk clusters a
+snapshot keeps; shared extents and the reflink path weren't seen (no btrfs or XFS here); the gates ran nested amd64, not on the Pi or bare
+metal; a power cut isn't simulated; the clipboard carries text only; the agent's own shell (6.18) is the serial console for now; Record has
+no sound; the idle-sleep hold wasn't observed; the arm64 build was installed on the Pi (above), where only what's listed there was tried.
 
 ## 4. Guest systems
 
@@ -1431,7 +1539,7 @@ Machines (React + LordOS SDK)
 |---|---|---|
 | **0, Technical proof** | No app. KVM, QEMU, QMP and D-Bus display: a Debian 13 guest with picture and input on amd64 and Pi 5, over direct QMP. Answers 2.2's open items: 4K guest on 16K host, Pi GICv2, GICV trapping by kernel, TCG numbers, `ui-dbus` on arm64, nested checks, `device=/dev/fdset`, formats and modifiers per GPU, desktop under load. No agent, no 3D, no USB, no snapshots | Done 2026-11-04: numbers in section 13, open items in 13.8 |
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
-| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass |
+| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta): the gates pass on nested amd64; the Linux download cards, the gates on the Pi and on bare metal are still open |
 | **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import, backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
 | **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
