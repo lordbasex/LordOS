@@ -8,7 +8,7 @@
 set -u
 BIN=$(cd "$1" && pwd) || exit 2
 IMG=$2
-W=${3:-/tmp/lvg-int.$$}
+W=${3:-${TMPDIR:-/var/tmp}/lvg-int.$$}   # /var/tmp: /tmp is often a small tmpfs, and full clones need room
 . "$(dirname "$0")/vm_gate_lib.sh"
 gate_begin
 gate_creds

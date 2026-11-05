@@ -8,7 +8,7 @@
 set -u
 BIN=$(cd "$1" && pwd) || exit 2
 IMG=$2
-W=${3:-/tmp/lvg-rec.$$}
+W=${3:-${TMPDIR:-/var/tmp}/lvg-rec.$$}   # /var/tmp: /tmp is often a small tmpfs, and full clones need room
 . "$(dirname "$0")/vm_gate_lib.sh"
 gate_begin
 gate_creds
@@ -76,11 +76,11 @@ check_disks "$D" "snapshot revert: disks clean"
 
 echo "-- compaction"
 for s in $(jtags); do "$VM" --snapshot "$D" delete "$s" >/dev/null 2>&1; done
-"$VM" --compact "$D" >/dev/null 2>&1 &
+"$VM" --compact "$D" > "$W/compact.out" 2>&1 &
 cp=$!
 end=$(( $(ms) + 20000 ))
 while [ "$(ms)" -lt "$end" ] && [ ! -f "$D/operation.json" ]; do sleep 0.01; done
-t "compaction: started (operation.json in place)" '[ -f "$D/operation.json" ]'
+t "compaction: started (operation.json in place)" '[ -f "$D/operation.json" ]' "$(tail -2 "$W/compact.out")"
 sleep 0.3; kill -9 $cp 2>/dev/null; pkill -9 -f "qemu-img convert.*$D" 2>/dev/null; wait $cp 2>/dev/null
 "$VM" --start "$D" --detach --keep-running >/dev/null 2>&1; wait_state "$D" running 60; "$VM" --poweroff "$D" >/dev/null 2>&1; wait_state "$D" stopped 30
 t "compaction: rolled back, and said so" 'said "compaction"'

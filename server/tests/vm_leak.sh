@@ -8,7 +8,7 @@
 set -u
 BIN=$(cd "$1" && pwd) || exit 2
 N=${2:-100}
-W=${3:-/tmp/lvg-leak.$$}
+W=${3:-${TMPDIR:-/var/tmp}/lvg-leak.$$}   # /var/tmp: /tmp is often a small tmpfs, and full clones need room
 IMG=
 . "$(dirname "$0")/vm_gate_lib.sh"
 gate_begin
