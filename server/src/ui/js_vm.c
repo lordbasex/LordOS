@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -945,12 +946,34 @@ static JSValue f_log(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     return JS_NewString(c, s);
 }
 
+/* takes the ISO out of a machine that is off (after an install): machine.json without "iso". Refused while lord-vm
+ * holds the machine's lock. true when done */
+static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX], p[PATH_MAX + 16], err[256];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_FALSE;
+    snprintf(p, sizeof p, "%s/lock", dir);
+    int fd = open(p, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return JS_FALSE;
+    if (flock(fd, LOCK_EX | LOCK_NB)) { close(fd); return JS_FALSE; }        /* running */
+    VmMachine m;
+    int ok = !vm_machine_load(dir, &m, err, sizeof err);
+    if (ok && m.iso[0]) {
+        m.iso[0] = 0;
+        vm_now_iso(m.updated);
+        ok = !vm_machine_save(dir, &m);
+    }
+    flock(fd, LOCK_UN);
+    close(fd);
+    return JS_NewBool(c, ok);
+}
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
-    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 1, f_log),
+    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 1, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

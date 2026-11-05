@@ -493,7 +493,7 @@ The Machines app (`apps/machines/`, marked **Alpha**) has a library window and o
 
 - Library: name, architecture (and *Emulated*), vCPUs, memory, disk, state with a dot and words, the reason after a failure with
   *Show log*; Start or Open, Stop (Shut Down, Force Off, through the runtime socket), Delete (only when off, after a question, to the
-  Trash). A banner lists what is missing and installs it with the closed admin action `vm-enable` (QEMU for this architecture, its
+  Trash), Eject ISO (only when off, for a machine that still has one). A banner lists what is missing and installs it with the closed admin action `vm-enable` (QEMU for this architecture, its
   UEFI firmware, `qemu-system-modules-opengl` for the D-Bus display, `qemu-utils`, `passt`, through LordOS's package engine, as
   Settings does for optional VPN programs; a stale index is read again once), and offers `vm-kvm` (3.4) when `/dev/kvm` exists but
   this account can't open it.
@@ -535,7 +535,29 @@ Debian 13 guest (below) running X with an xterm showed X's I-beam over the xterm
 at the host's pointer, the host's arrow over the bar and outside the window, the cursor drawn larger in full screen (the picture scaled up),
 and the host's arrow again on the text console after X quit.
 
-**Not done or not verified:** an ISO install, TCG (emulated) and BIOS machines were built for but not run from the app; one slice for all machines and nested
+**Installing from an ISO** (2026-11-05, VM 125). Debian 13.7.0's official amd64 netinst ISO (its SHA512 matched the official
+`SHA512SUMS`) went into a new machine through *Boot from an ISO* (2 vCPU, 1 GB, an empty 20 GB disk): the firmware started the ISO's UEFI
+menu, the graphical installer ran with the host's mouse and keyboard (language, location, keyboard, network by DHCP from passt, users,
+guided partitioning of the whole disk: ESP, ext4, swap, base system, mirror, software selection) and finished in about 15 minutes. Its
+*Continue* rebooted into the installed system with the ISO still attached: the system disk has `bootindex=0`, so the firmware started the
+installed GRUB (the installer's boot entry in the NVRAM qcow2 and the disk's ESP), and the root login worked. Found and fixed:
+
+- **The network card moved when the ISO was taken out.** QEMU numbered the PCI slots in the order of the devices, so the ISO's SCSI
+  controller pushed the network card from slot 2 to slot 3: the installer configured `enp0s3`, and after the ISO was gone the card was
+  `enp0s2` with nothing configured for it. Every device now has a fixed slot (`lordvm.c`): the system disk 1, the network card 2, the
+  random-number device 3, the display 4, then the keyboard and tablet, and the ISO's controller 8; slots 1 to 6 are the ones a machine
+  without an ISO always had, so existing machines keep theirs (an *Isolated* machine's devices after the disk move up once).
+- **Taking the ISO out.** A machine that is off and has an ISO shows *ISO attached* and an **Eject ISO** button in the library;
+  `lord.vm.eject(dir)` takes the machine's lock (refused while lord-vm holds it) and rewrites `machine.json` without `iso`. After it, the
+  installed system started with its network up on `enp0s2` (slot 2) and `apt-get` installed packages.
+
+Seen once, not fixed: passt (Debian 13's `0.0~git20250503.587980c-2+deb13u1`) crashed with SIGSEGV during a large `apt-get` download in
+the installed guest, after logging `Flow 26 (FREE): Failed to set SO_PEEK_OFF … Socket operation on non-socket`; lord-vm logged *the
+machine's network stopped* and the guest had no network until its next start. QEMU's `-netdev stream` on a descriptor can't reconnect,
+so a restarted passt would need the network card to be detached and attached again (to do: a newer passt, or that reattach).
+
+**Not done or not verified:** TCG (emulated) and BIOS machines were built for but not run from the app; ejecting an ISO from a running machine
+(QMP `blockdev-open-tray`/`blockdev-remove-medium`) and attaching another one; one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
 cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
 the app. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's

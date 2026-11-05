@@ -76,13 +76,13 @@ function Requirements({ host, onChanged }) {
   );
 }
 
-function Row({ m, selected, onSelect, onDelete, onLog }) {
+function Row({ m, selected, onSelect, onDelete, onLog, onEject }) {
   const t = useTheme();
   const v = stateView(m.state, m.reason);
   const a = actionsFor(m.state);
   const emulated = m.accel === 'tcg';
   const stop = (how) => { lord.vm.stop(m.dir, how); };
-  const facts = m.error ? tr(`machines.bad.${m.error}`) : [m.arch, emulated ? tr('machines.emulated') : null, tr('machines.vcpus', { n: m.vcpus }), gb(m.memoryMb), tr('machines.disk', { n: m.diskGb })].filter(Boolean).join(' · ');
+  const facts = m.error ? tr(`machines.bad.${m.error}`) : [m.arch, emulated ? tr('machines.emulated') : null, tr('machines.vcpus', { n: m.vcpus }), gb(m.memoryMb), tr('machines.disk', { n: m.diskGb }), m.iso ? tr('machines.isoAttached') : null].filter(Boolean).join(' · ');
   return (
     <View onClick={onSelect} style={{ minHeight: 56, paddingHorizontal: spacing.m, paddingVertical: spacing.s, flexDirection: 'row', alignItems: 'center', gap: spacing.m,
       borderRadius: 8, backgroundColor: selected ? t.hover : 'transparent' }}>
@@ -103,6 +103,7 @@ function Row({ m, selected, onSelect, onDelete, onLog }) {
       {a.poweroff ? <MenuButton small icon={null} label={tr('machines.stop')} title={tr('machines.stop')} items={[
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => stop('shutdown') },
         { label: tr('machines.cmd.poweroff'), destructive: true, onClick: () => stop('poweroff') }]} /> : null}
+      {a.remove && m.iso ? <Button small plain label={tr('machines.eject')} title={m.iso} onClick={onEject} /> : null}
       {a.remove ? <Button small plain label={tr('machines.delete')} onClick={onDelete} /> : null}
     </View>
   );
@@ -147,7 +148,8 @@ export function Library() {
         <ScrollView style={{ flex: 1 }} contentStyle={{ padding: spacing.s, gap: 2 }}>
           {sorted.map((m) => (
             <Row key={m.dir} m={m} selected={sel === m.dir} onSelect={() => setSel(m.dir)} onDelete={() => setDel(m)}
-              onLog={() => setLog({ name: m.name, text: lord.vm.log(m.dir) })} />
+              onLog={() => setLog({ name: m.name, text: lord.vm.log(m.dir) })}
+              onEject={() => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); }} />
           ))}
         </ScrollView>
       )}

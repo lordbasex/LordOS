@@ -756,23 +756,26 @@ static void build_qemu_args(void) {
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
     arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
     arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
-    arg("-device"); arg("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0");
+    /* Every PCI device has a fixed slot: with the slots QEMU picks, taking an ISO out after an install moved the
+     * network card (enp0s3 became enp0s2) and the installed system's network didn't come up. Slots 1 to 6 are the
+     * ones a machine without an ISO always had; the ISO's controller goes after them. */
+    arg("-device"); arg("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0,addr=0x1");
     if (m->iso[0]) {
-        arg("-device"); arg("virtio-scsi-pci,id=scsi0");
+        arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
         arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
         arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
         arg("-device"); arg("scsi-cd,bus=scsi0.0,drive=cd,bootindex=1");
     }
     if (m->network == VM_NET_SHARED) {
         arg("-netdev"); arg("stream,id=net0,addr.type=fd,addr.str=6");
-        arg("-device"); argf("virtio-net-pci,netdev=net0,mac=%s", m->mac);
+        arg("-device"); argf("virtio-net-pci,netdev=net0,mac=%s,addr=0x2", m->mac);
     }
-    arg("-device"); arg("virtio-rng-pci");
+    arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
-    if (!arm) { arg("-device"); arg("virtio-vga,id=video0"); }
+    if (!arm) { arg("-device"); arg("virtio-vga,id=video0,addr=0x4"); }
     if (m->display == VM_DISPLAY_WINDOW) {
-        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0"); arg("-device"); arg("virtio-keyboard-pci"); }
-        arg("-device"); arg("virtio-tablet-pci");
+        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
+        arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
         arg("-display"); arg("dbus,p2p=yes");
     } else { arg("-display"); arg("none"); }
     arg("-chardev"); arg("socket,id=qmp,fd=4"); arg("-mon"); arg("chardev=qmp,mode=control");
