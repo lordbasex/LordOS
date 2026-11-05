@@ -199,7 +199,14 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     // a network that doesn't answer: the engine gives up on its own, but the page never waits more than STALL_MS
     // without a word from it
     let last = Date.now(), stalled = false;
-    const said = (line) => { last = Date.now(); setMsg({ ok: true, text: statusText(line) }); };
+    // the engine's progress lines ("progress lists 1 5", "progress download 1048576 2097152") said in words
+    const said = (line) => {
+      last = Date.now();
+      const m = /^progress (\w+) (\d+) (\d+)/.exec(String(line || ''));
+      const mb = (x) => Math.round(Number(x) / 1048576 * 10) / 10;
+      setMsg({ ok: true, text: !m ? statusText(line) : m[1] === 'download' ? tr('machines.req.progress.download', { a: mb(m[2]), b: mb(m[3]) })
+        : m[1] === 'lists' ? tr('machines.req.progress.lists', { a: m[2], b: m[3] }) : tr('machines.req.installing') });
+    };
     const watch = setInterval(() => {
       if (Date.now() - last < STALL_MS || stalled) return;
       stalled = true; setMsg({ ok: false, text: tr('machines.req.stalled') }); setBusy(false);
@@ -208,7 +215,10 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     try {
       try { await go(); } catch (e) { if (e.code === 'pkg.busy') throw e; last = Date.now(); await admin.run('pkg-update', '', said); await go(); }
       if (!stalled) setMsg({ ok: true, text: tr('machines.req.installed') });
-    } catch (e) { if (!stalled) setMsg({ ok: false, text: e.message }); }
+    } catch (e) {
+      // no package source answered (the network is down or blocks them): said as that, not as a verification problem
+      if (!stalled) setMsg({ ok: false, text: e.code === 'pkg.noVerifiedSource' ? tr('machines.req.offline') : e.message });
+    }
     clearInterval(watch);
     setBusy(false); onChanged();
   };
@@ -226,9 +236,10 @@ export function Requirements({ host, onBack, onChanged, archs }) {
         </View>
       ))}
       <View style={{ flex: 1 }} />
-      {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
+      {/* how it's going, in the place of the note under the rows, so the page keeps its height */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start' }}>{admin.available() && info.admin ? tr('machines.req.fromStore') : tr('machines.req.notAdmin')}</Text>
+        {msg ? <Text style={{ flex: 1, fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text>
+          : <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start' }}>{admin.available() && info.admin ? tr('machines.req.fromStore') : tr('machines.req.notAdmin')}</Text>}
         {onBack ? <Btn label={tr('machines.back')} onClick={onBack} /> : null}
         <Btn primary label={busy ? tr('machines.req.installing') : tr('machines.req.installMissing')} disabled={busy || !missing.length || !admin.available() || !info.admin} onClick={install} />
       </View>
