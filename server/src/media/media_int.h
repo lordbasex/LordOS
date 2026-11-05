@@ -43,6 +43,7 @@ typedef struct {
     int ring_gen, ring_w, ring_h, ring_slots, cur_slot;
     uint32_t *px;               /* capture or image: premultiplied ARGB */
     int w, h, opaque;
+    int xrgb;                   /* the 4th byte means nothing (QEMU's x8r8g8b8): drawn with alpha 255 */
     unsigned frame_seq;         /* changes with each new frame */
     unsigned painted_seq;       /* the frame_seq the last paint read (Machines acknowledges frames with it) */
     /* drawing */

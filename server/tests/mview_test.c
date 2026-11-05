@@ -74,6 +74,18 @@ int main(void) {
     media_paint(&c, 7, 1, 0, 0, W, H, 0, 1);
     CHECK(lit(&c, 0x123456) > 0, "a new frame in the same picture: drawn again");
 
+    /* 5. an x8r8g8b8 picture (alpha byte 0) is drawn opaque, copied as is and scaled */
+    picture(W, H, 0x00336699u);
+    src.xrgb = 1;
+    canvas_clear(&c, 0);
+    media_paint(&c, 7, 1, 0, 0, W, H, 0, 1);
+    CHECK((buf[(size_t)H / 2 * W + W / 2] >> 24) == 0xff, "xrgb copied as is: alpha 255");
+    picture(100, 50, 0x00336699u);
+    canvas_clear(&c, 0);
+    media_paint(&c, 7, 1, 0, 0, W, H, 0, 1);
+    CHECK(buf[(size_t)H / 2 * W + W / 2] == 0xff336699u, "xrgb scaled: alpha 255");
+    src.xrgb = 0;
+
     printf("mview_test: %d checks, %d failed\n", checks, fails);
     free(src.px);
     free(src.cache);
