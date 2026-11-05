@@ -3,6 +3,9 @@
 # (suspend, resume, snapshot take, revert and delete, compaction, linked clone) is interrupted by killing lord-vm, and
 # the next open (lord-vm, as the app starts it: no terminal) finishes it or rolls it back, says which in the log, and
 # leaves nothing half-made: no operation.json, no temporary file, snapshots.json and the disks' tags agreeing.
+# Then the network (6.5): passt is killed while the guest fetches over HTTP twice a second, and the guest's network
+# must come back by itself (measured), again after more kills, until lord-vm gives up after 5 in a minute and says so;
+# and SIGTERM to the whole machine at once (a host shutdown) saves it to disk. Needs the network (deb.debian.org).
 #
 #   sh tests/vm_recovery.sh BUILD_DIR GUEST_IMAGE [WORK_DIR]
 set -u
@@ -102,4 +105,42 @@ t "linked clone: finished or rolled back: a disk to start from, no half-made clo
 if grep -q '"base"' "$D/machine.json"; then t "linked clone: the source runs on its base" '[ -f "$(sed -n "s/.*\"base\": \"\(.*\)\",*/\1/p" "$D/machine.json")" ]'
 else t "linked clone: the disk is back in its folder, no base left" '! ls "$W"/.shared/*.qcow2 >/dev/null 2>&1'; fi
 check_disks "$D" "linked clone: disks clean"
+
+echo "-- network: passt killed while the guest fetches"
+PROBE=$(printf '%s\n' '[Unit]' 'After=network-online.target' '[Service]' "ExecStart=/bin/bash -c 'while :; do if timeout 2 bash -c \"exec 3<>/dev/tcp/deb.debian.org/80; printf \\\\\"HEAD / HTTP/1.0\\\\\\\\r\\\\\\\\nHost: deb.debian.org\\\\\\\\r\\\\\\\\n\\\\\\\\r\\\\\\\\n\\\\\" >&3; head -1 <&3\" >/dev/null 2>&1; then echo \"<3>NETOK\" >/dev/kmsg; else echo \"<3>NETFAIL\" >/dev/kmsg; fi; sleep 0.5; done'")
+umask 077
+{ grep -v 'systemd\.' "$W/creds"; echo "binary:systemd.extra-unit.lordvm-net.service=$(printf '%s\n' "$PROBE" | base64 -w0)"
+  echo "binary:systemd.unit-dropin.multi-user.target=$(printf '[Unit]\nWants=lordvm-net.service\n' | base64 -w0)"; } >"$W/netcreds"
+umask 022
+N=$W/n.lordvm
+"$VM" --create "$N" --name network --import "$IMG" --vcpus 1 --memory 768 --display none >/dev/null 2>&1
+"$VM" --start "$N" --detach --keep-running --credentials-file "$W/netcreds" >/dev/null 2>&1
+wait_state "$N" running 60; wait_serial "$N" NETOK 180
+oks() { grep -ac NETOK "$N/log/serial.log"; }
+t "network: the guest fetches before" '[ "$(oks)" -gt 0 ]'
+back_after_kill() {    # kills passt, prints the milliseconds until the guest's next successful fetch (host clock), or -1
+    pp=$(sed -n 's/.*"passt_pid":\([0-9]*\).*/\1/p' "$N/run.json")
+    n0=$(oks); t0=$(ms); kill -9 "$pp" 2>/dev/null
+    while [ $(( $(ms) - t0 )) -lt 30000 ]; do [ "$(oks)" -gt "$n0" ] && { echo $(( $(ms) - t0 )); return; }; sleep 0.05; done
+    echo -1
+}
+b1=$(back_after_kill)
+t "network: back by itself after passt was killed ($b1 ms to the guest's next fetch)" '[ "$b1" -ge 0 ] && [ "$b1" -lt 10000 ]'
+t "network: lord-vm said it reconnected" 'grep -q "network: the network is back" "$N/log/lord-vm.log"'
+sleep 2; b2=$(back_after_kill); sleep 2; b3=$(back_after_kill)
+t "network: back again after two more kills ($b2 ms, $b3 ms)" '[ "$b2" -ge 0 ] && [ "$b3" -ge 0 ]'
+t "network: the new passt runs" 'kill -0 "$(sed -n "s/.*\"passt_pid\":\([0-9]*\).*/\1/p" "$N/run.json")"'
+for k in 1 2 3; do pp=$(sed -n 's/.*"passt_pid":\([0-9]*\).*/\1/p' "$N/run.json"); kill -9 "$pp" 2>/dev/null; sleep 9; done
+t "network: after 5 restarts in a minute it gives up, and says so" 'grep -q "again and again: the machine has no network" "$N/log/lord-vm.log"'
+t "network: the machine itself keeps running" '[ "$(field "$N" state)" = running ]'
+
+echo "-- the computer stops: SIGTERM to lord-vm, QEMU and passt at once"
+lv=$(runpid "$N"); qp=$(qemupid "$N")
+kill -TERM "$lv" "$qp" 2>/dev/null; wait_gone "$lv" 60
+t "host stop: the machine was saved to disk, not shut down" '[ -f "$N/suspend.state" ] && grep -q "state stopped (suspended)" "$N/log/lord-vm.log"'
+"$VM" --start "$N" --detach --keep-running >/dev/null 2>&1; wait_state "$N" running 60
+t "host stop: the next start resumes it" 'grep -q "resume: loaded" "$N/log/lord-vm.log" && [ ! -f "$N/suspend.state" ]'
+pl=$(sed -n 's/.*"passt_pid":\([0-9]*\).*/\1/p' "$N/run.json")
+"$VM" --poweroff "$N" >/dev/null 2>&1; wait_state "$N" stopped 30
+t "network: its passt is gone with it" 'sleep 1; ! kill -0 "$pl" 2>/dev/null'
 gate_end "vm-recovery"

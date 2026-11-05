@@ -5,10 +5,17 @@
 VM_COMMON := src/vm/machine.c src/vm/vmops.c src/vm/vmagent.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
 LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+# lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
+# there; without it, a host shutdown still saves machines through SIGTERM
+LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
+ifeq ($(LORDVM_LOGIND),1)
+LORDVM_FLAGS := -DVM_LOGIND $(shell pkg-config --cflags libsystemd)
+LORDVM_LIBS := $(shell pkg-config --libs libsystemd)
+endif
 all: build/lord-vm build/lordos-guest
 build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORDVM_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
 
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
