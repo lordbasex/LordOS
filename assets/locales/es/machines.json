@@ -600,7 +600,7 @@
   "cfg.agentOffSum": "Apagado",
   "as.shareClip": "Compartir el portapapeles con esta máquina",
   "as.shareClipHint": "Texto, en los dos sentidos, por el agente. Apagado salvo que lo actives; se cambia después en Configurar.",
-  "as.migrateHint": "Una máquina de otra app de virtualización (.vmx, .vbox, .pvm, .ova)",
+  "as.migrateHint": ".vmx, .vbox, .pvm, .ova, .vmdk, .vdi",
   "mig.pick": "Elegí la máquina: su archivo de configuración (.vmx, .vbox, config.pvs, .ovf), un .ova o una imagen de disco",
   "mig.unreadable": "No se puede leer esta máquina.",
   "mig.failed": "La importación falló.",
@@ -634,7 +634,7 @@
   "mig.idKept": "Se conserva: el UUID del sistema que lee el invitado",
   "mig.idNew": "Una nueva (el origen no guarda una)",
   "mig.r.devices": "Dispositivos",
-  "mig.devicesCompat": "Discos SATA y una placa {nic}: arranca sin drivers nuevos",
+  "mig.devicesCompat": "Discos SATA, una placa de red {nic}: arranca sin drivers nuevos",
   "mig.lost": "Lo que no viene",
   "mig.note.snapshots-flattened": "{n} instantáneas: se conserva el estado actual, unificado",
   "mig.note.tpm": "El TPM virtual: sus claves no se pueden traer",
@@ -679,5 +679,7 @@
   "cfg.devCompatNote": "Dispositivos para los que todo sistema tiene drivers, como se los daba la otra app. Los rápidos necesitan los drivers virtio del invitado: instalalos primero (un invitado sin ellos los obtiene del disco de drivers virtio) y después cambiá. El invitado verá controladores de disco y de red nuevos; la dirección MAC se mantiene.",
   "cfg.devFastNote": "Discos y placa de red virtio: lo más rápido. Un invitado sin drivers virtio no encontrará su disco: volvé atrás si no arranca.",
   "cfg.devToFast": "Pasar a dispositivos rápidos",
-  "cfg.devToCompat": "Volver a dispositivos compatibles"
+  "cfg.devToCompat": "Volver a dispositivos compatibles",
+  "mig.layer": "1 instantánea",
+  "mig.note.snapshot-flattened": "Una instantánea: se conserva el estado actual, unificado"
 }

@@ -600,7 +600,7 @@
   "cfg.agentOffSum": "Off",
   "as.shareClip": "Share the clipboard with this machine",
   "as.shareClipHint": "Text, both ways, through the guest agent. Off unless you turn it on; change it later in Configure.",
-  "as.migrateHint": "A machine of another virtualization app (.vmx, .vbox, .pvm, .ova)",
+  "as.migrateHint": ".vmx, .vbox, .pvm, .ova, .vmdk, .vdi",
   "mig.pick": "Choose the machine: its settings file (.vmx, .vbox, config.pvs, .ovf), an .ova, or a disk image",
   "mig.unreadable": "This machine can’t be read.",
   "mig.failed": "The import failed.",
@@ -634,7 +634,7 @@
   "mig.idKept": "Kept: the system UUID the guest reads",
   "mig.idNew": "A new one (the source doesn’t keep one)",
   "mig.r.devices": "Devices",
-  "mig.devicesCompat": "SATA disks and a {nic} card: it starts without new drivers",
+  "mig.devicesCompat": "SATA disks, a {nic} network card: it starts without new drivers",
   "mig.lost": "What won’t come along",
   "mig.note.snapshots-flattened": "{n} snapshots: the current state is kept, flattened",
   "mig.note.tpm": "The virtual TPM: its keys can’t be carried over",
@@ -679,5 +679,7 @@
   "cfg.devCompatNote": "Devices every system has drivers for, as the other app gave it. The fast ones need the guest’s virtio drivers: install them first (a guest without them gets them from the virtio drivers’ disc), then switch. The guest then sees new disk and network controllers; the MAC address stays.",
   "cfg.devFastNote": "virtio disks and network card: the fastest. A guest without virtio drivers won’t find its disk: switch back if it doesn’t start.",
   "cfg.devToFast": "Switch to Fast Devices",
-  "cfg.devToCompat": "Switch Back to Compatible Devices"
+  "cfg.devToCompat": "Switch Back to Compatible Devices",
+  "mig.layer": "1 snapshot",
+  "mig.note.snapshot-flattened": "A snapshot: the current state is kept, flattened"
 }

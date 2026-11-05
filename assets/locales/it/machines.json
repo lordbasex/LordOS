@@ -600,7 +600,7 @@
   "cfg.agentOffSum": "Spento",
   "as.shareClip": "Condividi gli appunti con questa macchina",
   "as.shareClipHint": "Testo, in entrambi i versi, tramite l’agente. Spento a meno che tu non lo attivi; si cambia poi in Configura.",
-  "as.migrateHint": "Una macchina di un’altra app di virtualizzazione (.vmx, .vbox, .pvm, .ova)",
+  "as.migrateHint": ".vmx, .vbox, .pvm, .ova, .vmdk, .vdi",
   "mig.pick": "Scegli la macchina: il suo file di impostazioni (.vmx, .vbox, config.pvs, .ovf), un .ova o un’immagine disco",
   "mig.unreadable": "Questa macchina non può essere letta.",
   "mig.failed": "L’importazione non è riuscita.",
@@ -634,7 +634,7 @@
   "mig.idKept": "Mantenuta: l’UUID di sistema che legge l’ospite",
   "mig.idNew": "Una nuova (l’origine non ne tiene una)",
   "mig.r.devices": "Dispositivi",
-  "mig.devicesCompat": "Dischi SATA e una scheda {nic}: si avvia senza nuovi driver",
+  "mig.devicesCompat": "Dischi SATA, scheda di rete {nic}: si avvia senza nuovi driver",
   "mig.lost": "Cosa non viene con sé",
   "mig.note.snapshots-flattened": "{n} istantanee: si tiene lo stato attuale, unificato",
   "mig.note.tpm": "Il TPM virtuale: le sue chiavi non si possono portare",
@@ -679,5 +679,7 @@
   "cfg.devCompatNote": "Dispositivi per cui ogni sistema ha i driver, come quelli dell’altra app. Quelli veloci richiedono i driver virtio dell’ospite: installali prima (un ospite che non li ha li prende dal disco dei driver virtio), poi passa. L’ospite vedrà nuovi controller di disco e di rete; l’indirizzo MAC resta.",
   "cfg.devFastNote": "Dischi e scheda di rete virtio: i più veloci. Un ospite senza driver virtio non troverà il disco: torna indietro se non parte.",
   "cfg.devToFast": "Passa ai dispositivi veloci",
-  "cfg.devToCompat": "Torna ai dispositivi compatibili"
+  "cfg.devToCompat": "Torna ai dispositivi compatibili",
+  "mig.layer": "1 istantanea",
+  "mig.note.snapshot-flattened": "Un’istantanea: si tiene lo stato attuale, unificato"
 }

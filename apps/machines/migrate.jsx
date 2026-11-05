@@ -18,7 +18,8 @@ function Line({ what, from, to, last }) {
     <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: last ? 0 : 1, borderColor: p.line }}>
       <Text style={{ width: 130, fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{what}</Text>
       <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: p.dim, textAlign: 'start', direction: 'ltr' }}>{from}</Text>
-      <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: p.text, textAlign: 'start' }}>{to}</Text>
+      {typeof to === 'string' ? <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: p.text, textAlign: 'start' }}>{to}</Text>
+        : <View style={{ flex: 1, minWidth: 0 }}>{to}</View>}
     </View>
   );
 }
@@ -128,7 +129,7 @@ export function Migrate({ host, path, names, onClose, onDone, onStart }) {
   // the plan sheet
   const blockers = planBlockers(plan), notes = planNotes(plan);
   const codes = (plan.notes || []).map((n) => n.code);
-  const fmt = (d) => `${(d.format || '?').toUpperCase()}, ${bytes(d.vsize)}${d.layers > 1 ? `, ${tr('machines.mig.layers', { n: d.layers - 1 })}` : ''}`;
+  const fmt = (d) => `${(d.format || '?').toUpperCase()}, ${bytes(d.vsize)}${d.layers > 1 ? `, ${tr(d.layers === 2 ? 'machines.mig.layer' : 'machines.mig.layers', { n: d.layers - 1 })}` : ''}`;
   const here = (d) => tr('machines.mig.diskHere', { size: bytes(d.vsize), used: bytes(d.used) }) + (d.serial_kept ? `, ${tr('machines.mig.serialKept')}` : '');
   const macs = (plan.nics || []).map((n) => n.mac || tr('machines.mig.noMac')).join(', ');
   const cpuFrom = plan.sockets ? tr('machines.mig.cpuTopo', { n: plan.vcpus, s: plan.sockets, c: plan.cores, mem: gb(plan.memory_mb) }) : tr('machines.mig.cpu', { n: plan.vcpus, mem: gb(plan.memory_mb) });
@@ -158,7 +159,7 @@ export function Migrate({ host, path, names, onClose, onDone, onStart }) {
       {plan.emulated ? <Banner tone="warn">{tr('machines.mig.emulated', { arch: plan.arch, host: host?.arch || '' })}</Banner> : null}
       {notes.length ? <>
         <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.mig.lost')}</Text>
-        {notes.map((c) => <Text key={c} style={{ fontSize: 13, lineHeight: 1.6, color: p.dim, textAlign: 'start' }}>{`•  ${tr(`machines.mig.note.${c}`, { n: plan.snapshots || 0 })}`}</Text>)}
+        {notes.map((c) => <Text key={c} style={{ fontSize: 13, lineHeight: 1.6, color: p.dim, textAlign: 'start' }}>{`•  ${tr(c === 'snapshots-flattened' && plan.snapshots === 1 ? 'machines.mig.note.snapshot-flattened' : `machines.mig.note.${c}`, { n: plan.snapshots || 0 })}`}</Text>)}
       </> : null}
       <Text style={{ fontSize: 13, lineHeight: 1.6, color: p.dim, textAlign: 'start' }}>{`•  ${tr('machines.mig.note.devices')}`}</Text>
       {codes.includes('license') ? <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.mig.license')}</Text> : null}

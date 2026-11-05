@@ -600,7 +600,7 @@
   "cfg.agentOffSum": "Desligado",
   "as.shareClip": "Compartilhar a área de transferência com esta máquina",
   "as.shareClipHint": "Texto, nos dois sentidos, pelo agente. Desligado a menos que você ative; mude depois em Configurar.",
-  "as.migrateHint": "Uma máquina de outro app de virtualização (.vmx, .vbox, .pvm, .ova)",
+  "as.migrateHint": ".vmx, .vbox, .pvm, .ova, .vmdk, .vdi",
   "mig.pick": "Escolha a máquina: o arquivo de configurações (.vmx, .vbox, config.pvs, .ovf), um .ova ou uma imagem de disco",
   "mig.unreadable": "Esta máquina não pode ser lida.",
   "mig.failed": "A importação falhou.",
@@ -634,7 +634,7 @@
   "mig.idKept": "Mantida: o UUID do sistema que o convidado lê",
   "mig.idNew": "Uma nova (a origem não guarda uma)",
   "mig.r.devices": "Dispositivos",
-  "mig.devicesCompat": "Discos SATA e uma placa {nic}: inicia sem drivers novos",
+  "mig.devicesCompat": "Discos SATA, placa de rede {nic}: inicia sem drivers novos",
   "mig.lost": "O que não vem junto",
   "mig.note.snapshots-flattened": "{n} instantâneos: o estado atual é mantido, unificado",
   "mig.note.tpm": "O TPM virtual: as chaves não podem ser trazidas",
@@ -679,5 +679,7 @@
   "cfg.devCompatNote": "Dispositivos para os quais todo sistema tem drivers, como os do outro app. Os rápidos precisam dos drivers virtio do convidado: instale-os primeiro (um convidado sem eles os obtém do disco de drivers virtio) e depois troque. O convidado verá controladores de disco e rede novos; o endereço MAC continua.",
   "cfg.devFastNote": "Discos e placa de rede virtio: o mais rápido. Um convidado sem drivers virtio não encontra o disco: volte se não iniciar.",
   "cfg.devToFast": "Passar para dispositivos rápidos",
-  "cfg.devToCompat": "Voltar aos dispositivos compatíveis"
+  "cfg.devToCompat": "Voltar aos dispositivos compatíveis",
+  "mig.layer": "1 instantâneo",
+  "mig.note.snapshot-flattened": "Um instantâneo: o estado atual é mantido, unificado"
 }

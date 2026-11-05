@@ -600,7 +600,7 @@
   "cfg.agentOffSum": "Désactivé",
   "as.shareClip": "Partager le presse-papiers avec cette machine",
   "as.shareClipHint": "Du texte, dans les deux sens, par l’agent. Désactivé sauf si vous l’activez ; à changer ensuite dans Configurer.",
-  "as.migrateHint": "Une machine d’une autre app de virtualisation (.vmx, .vbox, .pvm, .ova)",
+  "as.migrateHint": ".vmx, .vbox, .pvm, .ova, .vmdk, .vdi",
   "mig.pick": "Choisissez la machine : son fichier de réglages (.vmx, .vbox, config.pvs, .ovf), un .ova ou une image disque",
   "mig.unreadable": "Cette machine ne peut pas être lue.",
   "mig.failed": "L’importation a échoué.",
@@ -634,7 +634,7 @@
   "mig.idKept": "Gardée : l’UUID système que lit l’invité",
   "mig.idNew": "Une nouvelle (la source n’en garde pas)",
   "mig.r.devices": "Périphériques",
-  "mig.devicesCompat": "Disques SATA et une carte {nic} : démarre sans nouveaux pilotes",
+  "mig.devicesCompat": "Disques SATA, carte réseau {nic} : démarre sans nouveaux pilotes",
   "mig.lost": "Ce qui ne suit pas",
   "mig.note.snapshots-flattened": "{n} instantanés : l’état actuel est gardé, aplati",
   "mig.note.tpm": "Le TPM virtuel : ses clés ne peuvent pas être reprises",
@@ -679,5 +679,7 @@
   "cfg.devCompatNote": "Des périphériques que tout système sait piloter, comme ceux de l’autre app. Les rapides demandent les pilotes virtio de l’invité : installez-les d’abord (un invité qui ne les a pas les prend sur le disque des pilotes virtio), puis basculez. L’invité verra de nouveaux contrôleurs disque et réseau ; l’adresse MAC reste.",
   "cfg.devFastNote": "Disques et carte réseau virtio : le plus rapide. Un invité sans pilotes virtio ne trouvera pas son disque : revenez en arrière s’il ne démarre pas.",
   "cfg.devToFast": "Passer aux périphériques rapides",
-  "cfg.devToCompat": "Revenir aux périphériques compatibles"
+  "cfg.devToCompat": "Revenir aux périphériques compatibles",
+  "mig.layer": "1 instantané",
+  "mig.note.snapshot-flattened": "Un instantané : l’état actuel est gardé, aplati"
 }
