@@ -21,6 +21,7 @@
 #include "../vm/machine.h"
 #include "../vm/vm_admin.h"
 #include "../vm/vmthumb.h"
+#include "../vm/logclean.h"
 #include "../sec/json.h"
 #include "ui.h"
 
@@ -1115,7 +1116,10 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = slot >= 1 && slot <= MAX_SESS && sess[slot - 1].used ? &sess[slot - 1] : NULL;
     if (!s) return JS_FALSE;
     const char *w = JS_ToCString(c, argv[1]);
-    int ok = w && (!strcmp(w, "poweroff") ? ask(s, VM_POWEROFF, 0) : ask(s, VM_SHUTDOWN, 0)) > 0;
+    /* shutdown, poweroff, pause, resume, reset (the library's menu) */
+    int type = !w ? -1 : !strcmp(w, "poweroff") ? VM_POWEROFF : !strcmp(w, "shutdown") ? VM_SHUTDOWN : !strcmp(w, "pause") ? VM_PAUSE
+             : !strcmp(w, "resume") ? VM_RESUME : !strcmp(w, "reset") ? VM_RESET : -1;
+    int ok = type >= 0 && ask(s, (uint16_t)type, 0) > 0;
     if (w) JS_FreeCString(c, w);
     close(s->vm);
     memset(s, 0, sizeof *s);
@@ -1149,13 +1153,7 @@ static JSValue f_log(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     char *s = buf;
     if (from) { char *nl = strchr(s, '\n'); if (nl) s = nl + 1; }
     /* the serial console's color codes and control characters go */
-    char *w = s;
-    for (char *q = s; *q; q++) {
-        if (*q == 0x1b) { q++; if (*q == '[') { while (q[1] && !((q[1] >= '@' && q[1] <= '~'))) q++; if (q[1]) q++; } continue; }
-        if (*q == '\r') continue;
-        *w++ = (unsigned char)*q < 0x20 && *q != '\n' ? ' ' : *q;
-    }
-    *w = 0;
+    vm_log_clean(s);
     JSValue r = JS_NewString(c, s);
     free(buf);
     return r;
