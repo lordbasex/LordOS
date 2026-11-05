@@ -78,6 +78,19 @@ export function validateDraft(d, host, names = []) {
   return { ok: Object.keys(errors).length === 0, errors, warnings, emulated };
 }
 
+// QEMU's own memory beside the guest's (machine.h, VM_OVERHEAD_*): what a machine's cgroup limit adds
+export const OVERHEAD_MB = { kvm: 384, tcg: 640 };
+export const memLimit = (m) => (m?.memoryMb || 0) + (m?.accel === 'tcg' ? OVERHEAD_MB.tcg : OVERHEAD_MB.kvm);
+
+// At start (3.7, vm_budget_fits): the machines already running plus this one, each with QEMU's overhead, within what
+// this computer lets machines use (host.memMaxMb: RAM minus the desktop's floor). One machine alone always may start
+// (the sheet already kept its memory within memMaxMb).
+export function budgetCheck(list, m, host) {
+  const running = (list || []).filter((x) => x.dir !== m.dir && stateView(x.state).active).reduce((a, x) => a + memLimit(x), 0);
+  const need = memLimit(m), total = host?.memMaxMb || 0;
+  return { ok: running === 0 || running + need <= total, need, free: Math.max(0, total - running) };
+}
+
 // what lord.vm.create takes
 export function createRequest(d) {
   const r = { name: d.name.trim(), arch: d.arch, vcpus: d.vcpus, memoryMb: d.memoryMb, diskGb: d.diskGb };

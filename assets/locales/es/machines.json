@@ -60,6 +60,7 @@
   "cmd.poweroff": "Forzar apagado",
   "win.gone": "Esta máquina ya no está en la carpeta Máquinas.",
   "win.cantStart": "No se pudo iniciar la máquina.",
+  "win.noMemory": "No alcanza la memoria al lado de las máquinas que ya están encendidas: esta necesita {need} MB con lo que usa QEMU, y quedan {free} MB para máquinas. Apagá alguna o dale menos memoria a esta.",
   "win.cantAttach": "La máquina está en marcha, pero esta ventana no se pudo conectar.",
   "win.problem": "Algo salió mal",
   "win.tryAgain": "Probar de nuevo",

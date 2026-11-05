@@ -60,6 +60,7 @@
   "cmd.poweroff": "Forcer l’arrêt",
   "win.gone": "Cette machine n’est plus dans le dossier Machines.",
   "win.cantStart": "La machine n’a pas pu démarrer.",
+  "win.noMemory": "Pas assez de mémoire à côté des machines déjà allumées : celle-ci a besoin de {need} Mo avec la part de QEMU, et il reste {free} Mo pour les machines. Éteignez-en une ou donnez moins de mémoire à celle-ci.",
   "win.cantAttach": "La machine tourne, mais cette fenêtre n’a pas pu s’y connecter.",
   "win.problem": "Quelque chose s’est mal passé",
   "win.tryAgain": "Réessayer",

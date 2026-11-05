@@ -6,6 +6,7 @@
   "size": [760, 500],
   "minSize": [620, 420],
   "dock": false,
+  "singleWindow": true,
   "permissions": ["fs:home"],
   "category": "System"
 }

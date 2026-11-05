@@ -60,6 +60,7 @@
   "cmd.poweroff": "Force Off",
   "win.gone": "This machine isn't in the Machines folder any more.",
   "win.cantStart": "The machine couldn't be started.",
+  "win.noMemory": "Not enough memory beside the machines already running: this one needs {need} MB with QEMU's own share, and {free} MB are left for machines. Shut one down, or give this one less memory.",
   "win.cantAttach": "The machine is running, but this window couldn't connect to it.",
   "win.problem": "Something went wrong",
   "win.tryAgain": "Try Again",

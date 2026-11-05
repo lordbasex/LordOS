@@ -1,6 +1,6 @@
 // The New machine sheet (alpha): name, architecture, vCPUs, memory, disk and where the system comes from (a disk
 // image to import or an ISO to boot). lord-vm --create checks it all again; the folder is ~/Machines/<name>.lordvm.
-import { View, Text, Button, TextInput, Segmented, Stepper, FilePicker, useTheme, spacing, typeScale, t as tr } from '@lordos/sdk';
+import { View, Text, Button, TextInput, Segmented, Stepper, FilePicker, useTheme, useSystemInfo, admin, statusText, spacing, typeScale, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { defaultsFor, validateDraft, createRequest, missingFor } from './model.js';
 
@@ -16,7 +16,7 @@ function Field({ label, children, hint, warn }) {
   );
 }
 
-export function NewMachine({ host, names: names0, onClose, onCreated }) {
+export function NewMachine({ host, names: names0, onClose, onCreated, onHostChanged }) {
   const t = useTheme();
   const [names] = useState(names0);              // the list goes on refreshing behind the sheet, with this machine in it
   const [d, setD] = useState(() => defaultsFor(host));
@@ -24,7 +24,23 @@ export function NewMachine({ host, names: names0, onClose, onCreated }) {
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState(null);
   const [tried, setTried] = useState(false);
+  const [inst, setInst] = useState(null);       // installing the other architecture's QEMU: { busy, ok, text }
+  const info = useSystemInfo(60000);
   const set = (p) => setD((x) => ({ ...x, ...p }));
+  // what an emulated machine needs (the library's banner covers this computer's architecture only)
+  const install = async () => {
+    setInst({ busy: true, ok: true, text: '' });
+    const go = () => admin.run('vm-enable', d.arch, (line) => setInst({ busy: true, ok: true, text: statusText(line) }));
+    try {
+      try { await go(); } catch (e) {
+        if (e.code === 'pkg.busy') throw e;
+        await admin.run('pkg-update', '');
+        await go();
+      }
+      setInst({ busy: false, ok: true, text: tr('machines.req.installed') });
+    } catch (e) { setInst({ busy: false, ok: false, text: e.message }); }
+    if (onHostChanged) onHostChanged();
+  };
   const other = host.arch === 'amd64' ? 'arm64' : 'amd64';
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [d.arch]);
@@ -91,7 +107,13 @@ export function NewMachine({ host, names: names0, onClose, onCreated }) {
             <TextInput secure value={d.rootPassword} onChange={(x) => set({ rootPassword: x })} />
           </Field>
         ) : null}
-        {missing.length ? <Text style={{ fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.needs', { list: missing.join(', ') })}</Text> : null}
+        {missing.length ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+            <Text style={{ flex: 1, fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start', lineHeight: 1.35 }}>{tr('machines.new.needs', { list: missing.join(', ') })}</Text>
+            <Button small label={inst?.busy ? tr('machines.req.installing') : tr('machines.req.install')} disabled={!!inst?.busy || !admin.available() || !info.admin} onClick={install} />
+          </View>
+        ) : null}
+        {inst?.text ? <Text style={{ fontSize: typeScale.caption, color: inst.ok ? t.textDim : '#ff453a', textAlign: 'start' }}>{inst.text}</Text> : null}
         {fail ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start', lineHeight: 1.35 }}>{tr('machines.new.failed', { why: fail })}</Text> : null}
         <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end', alignItems: 'center' }}>
           {job ? <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{iso ? tr('machines.new.creating') : tr('machines.new.importing')}</Text> : null}

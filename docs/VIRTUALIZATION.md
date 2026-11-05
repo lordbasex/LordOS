@@ -556,7 +556,28 @@ the installed guest, after logging `Flow 26 (FREE): Failed to set SO_PEEK_OFF �
 machine's network stopped* and the guest had no network until its next start. QEMU's `-netdev stream` on a descriptor can't reconnect,
 so a restarted passt would need the network card to be detached and attached again (to do: a newer passt, or that reattach).
 
-**Not done or not verified:** TCG (emulated) and BIOS machines were built for but not run from the app; ejecting an ISO from a running machine
+**An emulated machine** (2026-11-05, VM 125, amd64 host). The New sheet's *arm64 · Emulated, much slower* lists what this computer
+lacks for it (`qemu-system-arm`, `qemu-efi-aarch64`) and now has its own **Install** button (`vm-enable arm64`; the library's banner only
+covers this computer's architecture). That download stalled on VM 125, whose own internet stopped answering at the time (the gateway
+answered, the build VM on the same network downloaded the same two packages at once), so they were put in place with `dpkg -i` and the
+sheet's Install then said *Installed* and enabled Create. Debian 13's official nocloud arm64 qcow2 (SHA512 checked) was imported as an
+arm64 machine (2 vCPU, 1 GB): `machine.json` says `accel: tcg`, `virt-10.0`, AAVMF; the library shows *arm64 · Emulated*; the window
+showed the guest's console and login in about 2 minutes (QEMU at about one CPU), `uname -m` said `aarch64`, 2 CPUs, 961 MB, the Shared
+network's address; Shut Down from the library stopped it (`host-shutdown`). Its scope's `memory.max` was 1,879,048,192 (1024 + 640 + 128
+MB) and `cpu.max` 250000/100000.
+
+**The memory budget at start** (3.7). `vm_budget_fits` had no caller. The window now checks, before it starts a machine, the machines
+already running plus this one, each with QEMU's overhead (384 MB with KVM, 640 MB emulated: `memLimit` and `budgetCheck` in `model.js`),
+against what this computer lets machines use (RAM minus the desktop's floor); one machine alone may always start, since the sheet keeps
+its memory within that. On VM 125 (2,897 MB for machines) with the emulated machine running (1,664 MB), starting the 1 GB KVM machine
+(1,408 MB) was refused with *this one needs 1408 MB with QEMU's own share, and 1233 MB are left for machines*.
+
+**Session restore** brought every open machine window back as one more library window (they're `machines#vm-…` windows whose
+machine isn't part of the saved state): VM 125 had collected twelve. Machines is now a single-window app (manifest `singleWindow`):
+only its library is saved, and a saved list that names it more than once opens it once.
+
+**Not done or not verified:** BIOS machines were built for but not run from the app; the package engine's download of
+`vm-enable` waited with no time limit while the network didn't answer (the sheet said *Installing…* until it was closed); ejecting an ISO from a running machine
 (QMP `blockdev-open-tray`/`blockdev-remove-medium`) and attaching another one; one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
 cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with

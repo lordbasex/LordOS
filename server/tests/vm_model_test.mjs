@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -94,6 +94,17 @@ eq('wheel precise step', wheelSteps(30, -30, true), [1, 20]);
 eq('wheel precise clamp', wheelSteps(0, 100000, true)[0], -32);
 eq('title', windowTitle('Debian', 'Running'), 'Debian — Running');
 eq('folder', folderOf('/home/a/Machines/Debian 13.lordvm'), 'Debian 13');
+// the memory budget at start: QEMU's overhead (384 MB with KVM, 640 MB emulated) counts for every machine
+const pi8 = { memMaxMb: 6144 };
+eq('limit kvm', memLimit({ memoryMb: 1024, accel: 'kvm' }), 1408);
+eq('limit tcg', memLimit({ memoryMb: 1024, accel: 'tcg' }), 1664);
+const run = (dir, memoryMb, accel) => ({ dir, memoryMb, accel, state: 'running' });
+eq('alone always', budgetCheck([], { dir: 'a', memoryMb: 6144, accel: 'tcg' }, pi8).ok, true);
+eq('beside one fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 2048, accel: 'tcg' }, pi8), { ok: true, need: 2688, free: 3712 });
+eq('beside one, too big emulated', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'tcg' }, pi8).ok, false);
+eq('same with kvm fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'kvm' }, pi8).ok, true);
+eq('stopped ones do not count', budgetCheck([{ dir: 'b', memoryMb: 4096, accel: 'kvm', state: 'stopped' }], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

@@ -60,6 +60,7 @@
   "cmd.poweroff": "Forçar desligamento",
   "win.gone": "Esta máquina não está mais na pasta Máquinas.",
   "win.cantStart": "Não foi possível iniciar a máquina.",
+  "win.noMemory": "Não há memória suficiente ao lado das máquinas já ligadas: esta precisa de {need} MB com a parte do QEMU, e restam {free} MB para máquinas. Desligue alguma ou dê menos memória a esta.",
   "win.cantAttach": "A máquina está em execução, mas esta janela não conseguiu se conectar a ela.",
   "win.problem": "Algo deu errado",
   "win.tryAgain": "Tentar de novo",

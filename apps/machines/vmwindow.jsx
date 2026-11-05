@@ -9,7 +9,7 @@ import {
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, CTRL_ALT_DEL, windowTitle } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle } from './model.js';
 import { AlphaBadge, StateDot, has } from './ui.jsx';
 
 const BAR = 36;
@@ -94,6 +94,10 @@ export function MachineWindow({ dir, name: name0 }) {
     setName(m.name);
     setLog('');
     const active = stateView(m.state, m.reason).active;
+    if (!active) {
+      const b = budgetCheck(lord.vm.list(), m, lord.vm.host());
+      if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
+    }
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir);
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : tr('machines.win.cantStart')); return; }
     sized.current = { last: null, want: null, at: 0, rate: false };

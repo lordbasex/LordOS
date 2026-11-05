@@ -158,7 +158,7 @@ export function Library() {
           {tr('machines.status', { running: list.filter((m) => stateView(m.state).active).length, total: list.length, cpus: host.cpus, ram: gb(host.ramMb) })}
         </Text>
       </View>
-      {sheet ? <NewMachine host={host} names={list.map((m) => m.name)} onClose={() => setSheet(false)}
+      {sheet ? <NewMachine host={host} names={list.map((m) => m.name)} onClose={() => setSheet(false)} onHostChanged={refresh}
         onCreated={(m) => { setSheet(false); refresh(); if (m) openMachine(m); }} /> : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.deleteDetail')} okLabel={tr('machines.deleteOk')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => remove(del)} onCancel={() => setDel(null)} /> : null}

@@ -60,6 +60,7 @@
   "cmd.poweroff": "Forza lo spegnimento",
   "win.gone": "Questa macchina non è più nella cartella Macchine.",
   "win.cantStart": "Non è stato possibile avviare la macchina.",
+  "win.noMemory": "Memoria insufficiente accanto alle macchine già accese: questa ha bisogno di {need} MB con la parte di QEMU, e restano {free} MB per le macchine. Spegnine una o dai meno memoria a questa.",
   "win.cantAttach": "La macchina è in esecuzione, ma questa finestra non è riuscita a collegarsi.",
   "win.problem": "Qualcosa è andato storto",
   "win.tryAgain": "Riprova",
