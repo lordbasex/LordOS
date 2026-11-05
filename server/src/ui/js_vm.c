@@ -676,7 +676,8 @@ typedef struct {
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
     double rec_fed;
-    int notice;                         /* VM_NOTICE: VMN_*, and its words */
+    int rec_sound;                      /* lord-vmdisplay writes the guest's sound into the recording's ring */
+    int notice, notice_code, notice_seq; /* VM_NOTICE: VMN_*, its number, a counter of them, and its words */
     char notice_text[VM_TEXT_MAX];
 } Sess;
 static Sess sess[MAX_SESS];
@@ -977,6 +978,8 @@ static void from_vm(Sess *s) {
             break;
         case VM_NOTICE:
             s->notice = m.a;
+            s->notice_code = m.b;
+            s->notice_seq++;
             snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
             break;
         case VM_REPLY:
@@ -1173,7 +1176,10 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     }
     set_int(c, o, "clipIn", s->clip_seq);
     set_str(c, o, "cdMessage", s->cd_msg);
-    set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : "");
+    set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : s->notice == VMN_NET_BACK ? "network-back"
+                          : s->notice == VMN_IDENTITY ? "identity" : "");
+    set_int(c, o, "noticeCode", s->notice_code);
+    set_int(c, o, "noticeSeq", s->notice_seq);
     if (s->job_kind) {
         static const char *const JK[VJ_COUNT] = { "", "suspend", "resume", "snapshot", "revert", "delete" };
         JSValue j = JS_NewObject(c);

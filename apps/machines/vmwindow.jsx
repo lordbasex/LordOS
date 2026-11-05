@@ -19,7 +19,7 @@ const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'console', 'clipIn'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -313,6 +313,20 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     return false;
   }), [winId]);
 
+  // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3); the good news
+  // goes away by itself
+  const [noticeGone, setNoticeGone] = useState(0);
+  useEffect(() => {
+    if (!st?.noticeSeq || !['network-back', 'identity'].includes(st.notice)) return undefined;
+    const seq = st.noticeSeq;
+    const timer = setTimeout(() => setNoticeGone(seq), 8000);
+    return () => clearTimeout(timer);
+  }, [st?.noticeSeq]);
+  const noticeOn = !!st?.notice && st.noticeSeq !== noticeGone;
+  const noticeText = !st?.notice ? '' : st.notice === 'recovered' ? tr('machines.win.recovered')
+    : st.notice === 'network-back' ? tr('machines.win.netBack', { s: (Math.max(0, st.noticeCode || 0) / 1000).toFixed(1) })
+    : st.notice === 'identity' ? tr('machines.win.identityDone')
+    : /reconnecting/.test(st.noticeText || '') ? tr('machines.win.netReconnecting') : tr('machines.win.netLost');
   const v = stateView(st?.state, st?.reason);
   const a = actionsFor(sid ? st?.state : 'stopped');
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
@@ -527,11 +541,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       ) : null}
       {card}
       {failed}
-      {!card && !failed && (st?.notice === 'network-lost' || st?.notice === 'recovered' || cdErr) ? (
+      {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : st.notice === 'recovered' ? tr('machines.win.recovered') : tr('machines.win.netLost')}</Text>
-            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} /> : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : noticeText}</Text>
+            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} />
+              : ['network-back', 'identity'].includes(st.notice) ? <Btn label={tr('machines.ok')} onClick={() => setNoticeGone(st.noticeSeq)} style={{ height: 28 }} />
+              : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
           </View>
         </View>
       ) : null}

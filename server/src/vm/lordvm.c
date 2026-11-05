@@ -638,7 +638,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 static struct {
@@ -712,8 +712,25 @@ static struct {
     int snap_kind, snap_client;
     uint32_t snap_seq;
     char snap_tag[33], snap_name[VM_NAME_MAX + 1], snap_err[160], loadvm[33];
+    /* the network's self-healing (6.5): passt's keeper (started before lord-vm's own Landlock, which leaves lord-vm no
+     * way to start a program), the passt it started last (followed by pidfd: not our child), QEMU's backend number
+     * (pst<gen> on hub port hp<gen>), when the network went and when to try again, restarts in the last minute */
+    int keeper_fd, passt_pidfd, net_gen, net_busy, net_restarts, net_gave_up;
+    pid_t keeper, passt_ext;
+    long long net_lost_at, net_retry_at, net_window_at;
+    char net_err[160];
+    /* the computer stops or the session ends (6.1): the machine is saved to disk, else shut down, else turned off */
+    int host_stopping;
+    long long host_stop_deadline;
+    char host_stop_why[96];
+    /* a Clone's first start (6.3): the guest gets its own hostname and machine-id through the agent (identity.json) */
+    char id_hostname[64];
+    int id_state;                           /* 0 none, 1 pending, 2 running in the guest, 3 done */
+    long id_pid;
+    long long id_poll_at;
 } S;
 
+static void awake_update(void);
 static void send_to(int ci, const VmMsg *m, int fd) {
     if (ci < 0 || ci >= MAX_CLIENTS || S.cl[ci].fd < 0) return;
     if (vm_send(S.cl[ci].fd, m, fd)) vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(errno));
@@ -742,7 +759,7 @@ static void set_state(int st, int why, int code, const char *detail) {
     S.code = code;
     if (detail) snprintf(S.detail, sizeof S.detail, "%s", detail);
     vm_now_iso(S.since);
-    RunInfo r = { st, why, code, S.qemu, S.passt, getpid(), "", "", st == VS_RUNNING || st == VS_PAUSED ? S.ag_state : VAS_OFF };
+    RunInfo r = { st, why, code, S.qemu, S.passt > 0 ? S.passt : S.passt_ext, getpid(), "", "", st == VS_RUNNING || st == VS_PAUSED ? S.ag_state : VAS_OFF };
     memcpy(r.since, S.since, sizeof r.since);
     memcpy(r.detail, S.detail, sizeof r.detail);
     runinfo_write(S.dir, &r);
@@ -898,6 +915,71 @@ static pid_t spawn_passt(int net_fd, int err_fd) {
     _exit(127);
 }
 
+/* passt's keeper (6.5): a child forked before lord-vm applies its own Landlock, which leaves lord-vm unable to start a
+ * program. For each byte lord-vm writes it starts one passt (its child, which dies with it) and sends back, on one
+ * SOCK_SEQPACKET message, passt's pid and three descriptors: the network socket for QEMU, passt's stderr and a pidfd.
+ * It does nothing else and reads nothing else. */
+static void keeper_main(int sock) {
+    signal(SIGCHLD, SIG_IGN);           /* its passts are reaped by the kernel; lord-vm follows them by pidfd */
+    for (;;) {
+        char c;
+        ssize_t r = read(sock, &c, 1);
+        if (r == 0 || (r < 0 && errno != EINTR)) _exit(0);
+        if (r < 0) continue;
+        int net[2] = { -1, -1 }, perr[2] = { -1, -1 }, fds[3] = { -1, -1, -1 };
+        int32_t pid = -1;
+        if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, net) && !pipe2(perr, O_CLOEXEC)) {
+            pid_t p = spawn_passt(net[1], perr[1]);
+            int pfd = p > 0 ? (int)syscall(SYS_pidfd_open, p, 0) : -1;
+            if (pfd >= 0) { pid = p; fds[0] = net[0]; fds[1] = perr[0]; fds[2] = pfd; }
+            else if (p > 0) kill(p, SIGKILL);
+        }
+        if (net[1] >= 0) close(net[1]);
+        if (perr[1] >= 0) close(perr[1]);
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof fds)]; } cm;
+        struct iovec io = { &pid, sizeof pid };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
+        if (pid > 0) {
+            memset(&cm, 0, sizeof cm);
+            mh.msg_control = cm.b;
+            mh.msg_controllen = sizeof cm.b;
+            struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
+            ch->cmsg_level = SOL_SOCKET;
+            ch->cmsg_type = SCM_RIGHTS;
+            ch->cmsg_len = CMSG_LEN(sizeof fds);
+            memcpy(CMSG_DATA(ch), fds, sizeof fds);
+        }
+        if (sendmsg(sock, &mh, MSG_NOSIGNAL) < 0 && pid > 0) kill(pid, SIGKILL);
+        for (int i = 0; i < 3; i++) if (fds[i] >= 0) close(fds[i]);
+        if (pid < 0) { if (net[0] >= 0) close(net[0]); if (perr[0] >= 0) close(perr[0]); }
+    }
+}
+
+/* forks the keeper: it keeps fd 0-2, its socket and the passt leaf of the machine's cgroup, nothing else */
+static pid_t start_keeper(int *out) {
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return -1;
+    pid_t pid = fork();
+    if (pid < 0) { close(sv[0]); close(sv[1]); return -1; }
+    if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        sigset_t none;
+        sigemptyset(&none);
+        sigprocmask(SIG_SETMASK, &none, NULL);
+        signal(SIGTERM, SIG_DFL); signal(SIGINT, SIG_DFL); signal(SIGHUP, SIG_DFL);
+        int s = fcntl(sv[1], F_DUPFD_CLOEXEC, 64), pf = passt_procs_fd >= 0 ? fcntl(passt_procs_fd, F_DUPFD_CLOEXEC, 65) : -1;
+        if (s < 0) _exit(1);
+        int k3 = dup3(s, 3, O_CLOEXEC), k4 = pf >= 0 ? dup3(pf, 4, O_CLOEXEC) : -1;
+        syscall(SYS_close_range, pf >= 0 ? 5 : 4, ~0u, 0);
+        passt_procs_fd = k4;
+        keeper_main(k3);
+        _exit(0);
+    }
+    close(sv[1]);
+    *out = sv[0];
+    return pid;
+}
+
 /* QEMU's option values: a comma is written twice */
 static void opt_escape(char *out, size_t n, const char *s) {
     size_t o = 0;
@@ -993,8 +1075,13 @@ static void build_qemu_args(void) {
         snprintf(S.cd_node, sizeof S.cd_node, "cd");
     } else { arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,bootindex=1"); S.cd_node[0] = 0; }
     if (m->network == VM_NET_SHARED) {
-        arg("-netdev"); arg("stream,id=net0,addr.type=fd,addr.str=6");
-        arg("-device"); argf("virtio-net-pci,netdev=net0,mac=%s,addr=0x2", m->mac);
+        /* The card sits on a hub, and passt on another port of it: when passt ends, a new one is put on a new port
+         * (QMP netdev_del, getfd, netdev_add socket + hubport) while the card stays as it was, so the guest keeps its
+         * network without a restart (6.5). A card attached straight to its backend can't be given another one. */
+        arg("-netdev"); arg("hubport,id=nic0,hubid=0");
+        arg("-netdev"); arg("stream,id=pst0,addr.type=fd,addr.str=6");
+        arg("-netdev"); arg("hubport,id=hp0,hubid=0,netdev=pst0");
+        arg("-device"); argf("virtio-net-pci,netdev=nic0,mac=%s,addr=0x2", m->mac);
     }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
@@ -1453,6 +1540,105 @@ static void resume_done(void) {
     send_job(VJ_RESUME, VJS_DONE, 100, "");
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "resumed");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
+}
+
+/* ---- the network heals itself (6.5) ----
+ * passt ended (a crash, a kill, out of memory) while the machine runs: the keeper starts a new one, the old backend
+ * comes off QEMU's hub (netdev_del hp<n>, pst<n>) and the new one goes on (getfd, netdev_add socket pst<n+1>, hubport
+ * hp<n+1>). The card and the guest's interface don't change: its connections broke, the network is back. QEMU's
+ * "stream" backend can't take a descriptor by name once QEMU runs (it connects from a thread); "socket" can, and passt
+ * speaks the same framing. At most 5 restarts a minute; after that the machine has no network until it starts again. */
+#define NET_MAX_RESTARTS 5
+
+static void runinfo_now(void) { set_state(S.state, S.reason, S.code, NULL); }
+
+static void net_lost(int sig, int code) {
+    if (S.passt_pidfd >= 0) { close(S.passt_pidfd); S.passt_pidfd = -1; }
+    S.passt_ext = 0;
+    if (S.qemu_done || S.state == VS_STOPPING || S.host_stopping || !S.qmp_up) { vlog("network: passt ended (%s %d) while the machine stops", sig ? "signal" : "status", code); return; }
+    long long now = now_ms();
+    if (!S.net_window_at || now - S.net_window_at > 60000) { S.net_window_at = now; S.net_restarts = 0; }
+    char t[160];
+    if (S.keeper_fd < 0 || S.net_restarts >= NET_MAX_RESTARTS) {
+        S.net_gave_up = 1;
+        snprintf(t, sizeof t, "passt ended (%s %d)%s: the machine has no network until it starts again", sig ? "signal" : "status", code,
+                 S.keeper_fd < 0 ? "" : ", again and again");
+        vlog("network: %s", t);
+        notice_all(VMN_NET_LOST, code, t);
+        return;
+    }
+    snprintf(t, sizeof t, "passt ended (%s %d): reconnecting", sig ? "signal" : "status", code);
+    vlog("network: %s", t);
+    if (!S.net_lost_at) S.net_lost_at = now;
+    notice_all(VMN_NET_LOST, code, t);
+    /* right away the first time, then a little later each time */
+    S.net_retry_at = now + (S.net_restarts == 0 ? 0 : 1000LL << (S.net_restarts - 1));
+}
+
+static void net_restart(void) {
+    S.net_retry_at = 0;
+    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
+    char c = 'p';
+    if (write(S.keeper_fd, &c, 1) != 1) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
+    struct pollfd pf = { S.keeper_fd, POLLIN, 0 };
+    int32_t pid = -1;
+    int fds[3] = { -1, -1, -1 };
+    if (poll(&pf, 1, 3000) == 1) {
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof fds)]; } cm;
+        struct iovec io = { &pid, sizeof pid };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+        ssize_t n = recvmsg(S.keeper_fd, &mh, MSG_CMSG_CLOEXEC);
+        struct cmsghdr *ch = n == sizeof pid ? CMSG_FIRSTHDR(&mh) : NULL;
+        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof fds)) memcpy(fds, CMSG_DATA(ch), sizeof fds);
+        else pid = -1;
+    }
+    S.net_restarts++;
+    if (pid <= 0 || fds[0] < 0) {
+        for (int i = 0; i < 3; i++) if (fds[i] >= 0) close(fds[i]);
+        vlog("network: a new passt couldn't be started");
+        net_lost(0, 0);
+        return;
+    }
+    S.passt_ext = pid;
+    S.passt_pidfd = fds[2];
+    if (S.passt_err >= 0) close(S.passt_err);
+    S.passt_err = fds[1];
+    fcntl(S.passt_err, F_SETFL, O_NONBLOCK);
+    int old = S.net_gen, gen = ++S.net_gen;
+    char a[160];
+    S.net_err[0] = 0;
+    snprintf(a, sizeof a, "{\"id\":\"hp%d\"}", old);
+    qmp_do("netdev_del", a, P_NET, -1, 0, -1, -1);
+    snprintf(a, sizeof a, "{\"id\":\"pst%d\"}", old);
+    qmp_do("netdev_del", a, P_NET, -1, 0, -1, -1);
+    snprintf(a, sizeof a, "{\"fdname\":\"pst%d\"}", gen);
+    int bad = qmp_do("getfd", a, P_NET_ADD, -1, 0, fds[0], -1);
+    close(fds[0]);
+    snprintf(a, sizeof a, "{\"type\":\"socket\",\"id\":\"pst%d\",\"fd\":\"pst%d\"}", gen, gen);
+    bad |= qmp_do("netdev_add", a, P_NET_ADD, -1, 0, -1, -1);
+    snprintf(a, sizeof a, "{\"type\":\"hubport\",\"id\":\"hp%d\",\"hubid\":0,\"netdev\":\"pst%d\"}", gen, gen);
+    bad |= qmp_do("netdev_add", a, P_NET_LAST, -1, 0, -1, -1);
+    S.net_busy = !bad;
+    vlog("network: passt %d started (backend pst%d)", (int)pid, gen);
+    runinfo_now();
+    if (bad) { kill(pid, SIGKILL); }
+}
+
+/* the last netdev_add answered */
+static void net_attached(int ok, const char *desc) {
+    S.net_busy = 0;
+    if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc);
+    if (S.net_err[0]) {
+        vlog("network: QEMU didn't take the new passt: %s", S.net_err);
+        if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGKILL, NULL, 0);   /* its end comes back as net_lost */
+        return;
+    }
+    long long ms = S.net_lost_at ? now_ms() - S.net_lost_at : 0;
+    S.net_lost_at = 0;
+    char t[160];
+    snprintf(t, sizeof t, "the network is back (passt restarted, %lld ms after it ended)", ms);
+    vlog("network: %s", t);
+    notice_all(VMN_NET_BACK, (int)ms, t);
 }
 
 /* ---- snapshots while the machine runs (6.2): QMP jobs over every writable node, memory into the system disk ---- */
@@ -2077,6 +2263,9 @@ static void on_qmp_reply(const JVal *root, int ok) {
         }
         break;
     case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
+    case P_NET: break;                                  /* the old backend may already be gone */
+    case P_NET_ADD: if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc); break;
+    case P_NET_LAST: net_attached(ok, desc); break;
     case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
     case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
     case P_MIGQ: {
@@ -2155,6 +2344,7 @@ static void qemu_exited(int status) {
     }
     if (S.suspending) { if (S.susp_fd >= 0) close(S.susp_fd); S.susp_fd = -1; suspend_cleanup_tmp(); vm_op_end(S.dir); S.suspending = 0; reply(S.susp_client, S.susp_seq, VME_QMP, "QEMU stopped while saving"); }
     if (S.passt > 0) kill(S.passt, SIGTERM);
+    if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGTERM, NULL, 0);
     set_state(st, why, code, d);
 }
 
@@ -2166,16 +2356,8 @@ static void reap(void) {
         else if (p == S.passt) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             S.passt = 0;
-            if (!S.qemu_done) {
-                /* QEMU's -netdev stream on a descriptor can't reconnect, and the network card sits on the root bus
-                 * (no hot-unplug without moving it, which renames the guest's interface): the person is told */
-                int sig = WIFSIGNALED(status), code = sig ? WTERMSIG(status) : WEXITSTATUS(status);
-                char t[160];
-                snprintf(t, sizeof t, "passt ended (%s %d): the machine has no network until it starts again", sig ? "signal" : "status", code);
-                vlog("note: the machine's network stopped: %s", t);
-                notice_all(VMN_NET_LOST, code, t);
-            }
-        }
+            if (!S.qemu_done) { int sig = WIFSIGNALED(status); net_lost(sig, sig ? WTERMSIG(status) : WEXITSTATUS(status)); }
+        } else if (p == S.keeper) { vlog("network: passt's keeper ended"); S.keeper = 0; if (S.keeper_fd >= 0) close(S.keeper_fd); S.keeper_fd = -1; }
     }
 }
 
@@ -2563,6 +2745,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = -1;
+    S.keeper_fd = S.passt_pidfd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
