@@ -1283,12 +1283,12 @@ guest: the virtio-win ISO, 4.3) is **Phase 3 work, not done**: today the person 
 **Interrupted imports** (3.6): the machine is made in `<library>/.<name>.part-<pid>` with `operation.json` "import" (source and target), and
 renamed into place after `machine.json`; `operation.json` goes last. A killed import leaves its hidden folder, which the next import or
 clone in the library removes (the pid is gone), and says so; `qemu-img` and the merge die with lord-vm (`PR_SET_PDEATHSIG`). An intent left
-after the rename is closed at the machine's next start (*the import had finished*). `vm_recovery.sh`'s import case kills it mid-conversion.
+after the rename is closed at the machine's next start (*the import had finished*). `vm_recovery.sh`'s import case kills it mid-conversion: no `qemu-img` left, nothing in the library, the next import removes the folder and says so, the new disks clean, the source unchanged, an intent left after the rename closed at the next start (9 checks; the gate 31 passed, 0 failed, VM116, 2026-11-05).
 
-**Tests.** `tests/vmimport_test.c` (run by `make test` under ASan and UBSan, 138 checks): one invented fixture per format in
+**Tests.** `tests/vmimport_test.c` (run by `make test` under ASan and UBSan, 141 checks): one invented fixture per format in
 `tests/vmimport/` (two `.vmx`, three `.vbox`, a `config.pvs`, a `DiskDescriptor.xml`, an `.ovf`, a split VMDK descriptor) with every mapping
 above, the UUID rules for each SMBIOS version and guest type, VirtualBox's default serial, tar members, XML refusals (XXE, entity
-expansion, unknown entities, NUL, surrogates, mismatched tags, depth, size, element count), and every fixture truncated at every length and
+expansion, unknown entities, NUL, surrogates, mismatched tags, depth, size, element count, 200,000 comment-split text pieces in linear time), and every fixture truncated at every length and
 mutated at random, 37,841 parser runs with no fault. `tests/vm_import_test.sh` (no guest boots; 44 checks, VM116, 2026-11-05): a disk named
 with `..`, by an absolute path, through a symlink out; an extent with `..`, a device path, a symlink out; a snapshot whose parent is outside;
 a qcow2 with a backing file under a `.vmdk` name; an encrypted, a suspended and an open machine; XXE and entity expansion in a `.vbox`; a
@@ -1297,7 +1297,7 @@ secret file in no new disk. Merges byte for byte: a split VMDK with two snapshot
 `.hds` snapshot layer; the sources unchanged (checksums before and after); an `.hds` block table entry past the file's end refused at merge.
 `tests/vm_import_identity.sh` (boots each import with KVM; the guest reports on its serial line): below.
 
-**Identity, measured** (VM116, Debian 13, nested KVM, the official Debian 13 nocloud image as the guest, 2026-11-05):
+**Identity, measured** (`vm_import_identity.sh`, 33 passed, 0 failed; VM116, Debian 13, nested KVM, the official Debian 13 nocloud image as the guest, 2026-11-05):
 
 | Source | Guest's `product_uuid` | Guest's MACs and drivers | Other |
 |---|---|---|---|
