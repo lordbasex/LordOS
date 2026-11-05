@@ -122,6 +122,10 @@ int rdesk_rdp(int sock, const char *host, const char *user, const char *domain, 
         const char *params[] = { "rdpsnd", "sys:lordos" };
         freerdp_settings_set_bool(s, FreeRDP_AudioPlayback, TRUE);
         if (!freerdp_client_add_static_channel(s, 2, params)) return 1;
+        /* servers that offer it send the sound over the dynamic channel (AUDIO_PLAYBACK_DVC): without our device there
+         * too, the library adds its own with its default subsystems, which can't play inside this sandbox */
+        if (!freerdp_client_add_dynamic_channel(s, 2, params)) return 1;
+        freerdp_settings_set_bool(s, FreeRDP_SupportDynamicChannels, TRUE);
     } else if (view->sound == RD_SOUND_THERE) freerdp_settings_set_bool(s, FreeRDP_RemoteConsoleAudio, TRUE);
     freerdp_settings_set_uint32(s, FreeRDP_ColorDepth, view->depth == 16 || view->depth == 24 ? (UINT32)view->depth : 32);
     freerdp_settings_set_bool(s, FreeRDP_SoftwareGdi, TRUE);
