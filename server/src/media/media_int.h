@@ -43,6 +43,7 @@ typedef struct {
     uint32_t *px;               /* capture or image: premultiplied ARGB */
     int w, h, opaque;
     unsigned frame_seq;         /* changes with each new frame */
+    unsigned painted_seq;       /* the frame_seq the last paint read (Machines acknowledges frames with it) */
     /* drawing */
     MediaView view;
     int node, box_w, box_h, sent_w, sent_h;

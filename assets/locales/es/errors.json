@@ -698,5 +698,8 @@
   "install.free.tableDamaged": "la tabla de particiones tiene problemas, o no se pudo leer con certeza",
   "install.free.tableFull": "la tabla de particiones está llena",
   "install.free.verifyFailed": "La tabla de particiones no quedó como se esperaba, así que se restauró",
-  "install.noFirstAccount": "Este sistema ya tiene su primera cuenta"
+  "install.noFirstAccount": "Este sistema ya tiene su primera cuenta",
+  "vm.noKvm": "Esta computadora no ofrece virtualización por hardware",
+  "vm.noKvmGroup": "Este sistema no tiene el grupo kvm para la virtualización por hardware",
+  "vm.groupFailed": "No se pudo agregar tu cuenta al grupo kvm"
 }

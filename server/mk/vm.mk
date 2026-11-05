@@ -31,3 +31,10 @@ build/vm-test: tests/vm_test.c src/vm/qmp.c $(VM_COMMON) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c $(VM_COMMON)
 	./$@ || { rm -f $@; exit 1; }
+
+# lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vm_admin.c
+VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
+$(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
+build/lord-server: $(VM_SRV_OBJ)
+build/obj/ui/js.o: src/ui/js_vm.h

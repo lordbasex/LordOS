@@ -22,6 +22,7 @@
 #include "js_clean.h"
 #include "js_lan.h"
 #include "js_rdesk.h"
+#include "js_vm.h"
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "js_net.h"
@@ -426,6 +427,7 @@ static void session_context(void) {
     js_imager_register(ctx, lord);     /* lord.imager: LordOS Imager (docs/IMAGER.md) */
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
     js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
+    js_vm_register(ctx, lord);         /* lord.vm: Machines (vm/, docs/VIRTUALIZATION.md) */
     js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
     js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */

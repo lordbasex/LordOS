@@ -266,6 +266,12 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
 `vm-enable`, asked once, new login needed) or let the seat rule grant it. Our sessions come from `lord-sessiond`, so seat rules must be
 checked. Decision: `vm-enable`, asked the first time, one question with one sentence of explanation.
 
+**Built in the alpha** (3.9, The app): the closed admin action is `vm-kvm` (`vm-enable` installs the packages). It adds the session
+user to `kvm` for the next sessions *and* gives them `rw` on `/dev/kvm` now with a POSIX access-list entry written by the helper
+(`system.posix_acl_access`, no `setfacl` needed), so no new login is needed. udev drops the entry when it makes the device again; the
+group membership keeps working from then on. Only an administrator can run it; the app shows the question when `/dev/kvm` exists but
+can't be opened.
+
 ### 3.5 Files on disk
 
 ```
@@ -314,7 +320,7 @@ It stays only as a fallback, if the technical proof finds a blocker in direct QM
 
 ### 3.9 Phase 1 implementation
 
-Built on branch `machines-alpha` (2026-11-04/05): the internals of the alpha, with no window and no app yet. Sources in
+Built on branch `machines-alpha` (2026-11-04/05) in two parts: the internals, then the window and the app (The app, below). Sources in
 `server/src/vm/`, rules in `server/mk/vm.mk`, both binaries installed in `/usr/lib/lordos/bin` by `tools/iso/mkdeb.sh`
 (QEMU and passt are not package dependencies).
 
@@ -395,7 +401,7 @@ struct per packet, at most one descriptor per message; anything of another lengt
 | `VD_CURSOR`, `VD_POINTER` | from lord-vmdisplay | Cursor image in a memfd sealed against writing (`vm_cursor_check`), hotspot; pointer position |
 | `VD_KEY`, `VD_MOTION`, `VD_BUTTON`, `VD_WHEEL`, `VD_RELEASE_ALL`, `VD_RESIZE`, `VD_RATE`, `VD_CLOSE` | to lord-vmdisplay | Input and window changes |
 
-**Command line, for development and tests** (the app comes in part 2):
+**Command line, for development and tests:**
 
 ```
 lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]
@@ -449,12 +455,72 @@ scratch vCPU to read the CPU's features), so KVM machines have `/dev/kvm` in QEM
 amd64 guest finished booting is ignored and ends as `forced` after the timeout, which is the designed fallback. Without a delegated
 cgroup (a plain SSH session), the same checks pass and QEMU runs with no limits, which `VM_INFO` reports.
 
-The `machine.json` schema, the message checks, QMP line reading and the key map have unit tests (`server/tests/vm_test.c`, 147 checks,
+The `machine.json` schema, the message checks, QMP line reading, the key map and the image checks have unit tests (`server/tests/vm_test.c`, 167 checks,
 run by `make test`). lord-vmdisplay and lordvm-dev build only where `libsystemd-dev` is installed (`VMDISPLAY ?=` in `mk/vm.mk`).
 
-**Not done or not verified in this part:** the lord-server window and the app (part 2); TCG machines, an ISO install and a BIOS
-amd64 machine were built for but not run; one slice for all machines and nested leaves under lord-sessiond; our seccomp allowlist for
-QEMU; the cursor of a graphical guest (`CursorDefine` never came from a text console); render node and 3D; latency to the screen.
+**Import never follows another file.** A qcow2 can name a backing file or an external data file, and an import that followed it
+would copy that file (anything the person can read: keys, other people's shared files) into the new disk, where the guest reads it;
+a raw file can also hold a qcow2 header. So lord-vm decides the format itself from the first bytes and the name (`vm_image_kind`,
+`machine.c`): the qcow2 magic with version 2 or 3, no backing file, no external data file and not marked corrupt, or a `.img`/`.raw`
+name without the magic; anything else is refused. `qemu-img` then sees the image only as a `json:` filename that names the driver
+(never probed) with `"backing": null`, and runs in a jail like QEMU's (`vm_jail_tool`: `no_new_privs`, the same seccomp filter, no TCP,
+Landlock with read access to that one file and write access to the machine's `disks/` only); its `info` answer is refused if it
+mentions a backing file or a data file anyway. At every start the system disk's and the NVRAM's headers are checked the same way
+(`vm_qcow2_plain`), and every qcow2 `-blockdev` carries `"backing": null`. `server/tests/vm_import_test.sh` (run by `make test` where
+`qemu-img` is installed) makes a backing file, an external data file, a raw file named `.qcow2`, a backing file under a `.img` name, a
+header patched by hand and a system disk swapped after creation: all refused, and good qcow2 and raw imports still work (10 checks,
+amd64 build VM, 2026-11-05). Each layer was also checked alone: `backing: null` keeps the backing file's bytes out of a convert, and the
+jail alone makes `qemu-img` fail to open the backing file.
+
+**The app** (part 2, 2026-11-05). `lord.vm` (`server/src/ui/js_vm.c`) plays the part `vm_dev.c` plays in the tests, inside
+lord-server: it lists `~/Machines/*.lordvm` (machine.json and run.json; a run.json that says active with no `lord-vm` behind its pid
+shows as *Off (recovered)*, and lord-vm recovers it at the next start), runs `lord-vm --create` in the background, starts a machine
+on a control socketpair (`--control-fd 3 --paused`, no cgroup step in the child), attaches to a running one through its runtime socket,
+asks for the display once it has VM_INFO and a running or paused state, starts lord-vmdisplay with fd 3 and fd 4, resumes, maps each
+VD_SIZE picture read-only into an image media node, acknowledges a frame only when the engine painted it (`MediaSrc.painted_seq`, set
+by `media_paint`; a hidden window never paints and the helper goes on after 250 ms), checks cursor memfds and doesn't draw them (the
+host pointer over the guest's absolute tablet), forwards evdev keys, picture-coordinate motion, buttons, wheel steps, release-all on
+blur, resize after the window kept a size for 400 ms, and the display's refresh rate. At most 256 messages per channel per poll; no
+call blocks. lord-vm's stderr goes to a non-blocking pipe, so a window that stops polling can't stall the supervisor; when lord-vm
+ends without a last state the reason is *start-failed* (it never ran) or *supervisor-lost*.
+
+First start of cloud images: Debian's `nocloud` image stops at systemd's first-boot questions on its serial line, where nobody sees
+them. lord-server passes, at every start, this computer's language, keyboard layout and time zone as systemd credentials (5.2, "copied
+from the host"; a 0600 file in the runtime folder, removed at lord-vm's first message), and, when the New sheet was given a root
+password, its SHA-512 crypt hash, which lives in the machine's `firstboot.creds` (0600) until the machine's first clean shutdown. The
+password itself is never written anywhere.
+
+The Machines app (`apps/machines/`, marked **Alpha**) has a library window and one window per running machine:
+
+- Library: name, architecture (and *Emulated*), vCPUs, memory, disk, state with a dot and words, the reason after a failure with
+  *Show log*; Start or Open, Stop (Shut Down, Force Off, through the runtime socket), Delete (only when off, after a question, to the
+  Trash). A banner lists what is missing and installs it with the closed admin action `vm-enable` (QEMU for this architecture, its
+  UEFI firmware, `qemu-system-modules-opengl` for the D-Bus display, `qemu-utils`, `passt`, through LordOS's package engine, as
+  Settings does for optional VPN programs; a stale index is read again once), and offers `vm-kvm` (3.4) when `/dev/kvm` exists but
+  this account can't open it.
+- New Machine sheet: name, architecture (this computer's by default; the other marked *Emulated, much slower*), vCPUs (the
+  recommended number by default, a warning above it), memory (up to RAM minus the desktop's floor), disk, and the system: *Import a
+  disk image (.qcow2)* or *Boot from an ISO*, chosen in the system file dialog; an optional root password for the first start.
+- Machine window: the picture scaled to fit and kept in shape, input while in front, a bar with the state, Pause/Resume, Restart,
+  Ctrl+Alt+Delete, Full screen and Power (Shut Down, Force Off). Closing the window shuts the machine down first (a *Shutting down*
+  card with Force Off); a failure shows the reason, a likely fix and the end of the log, with Start.
+
+**On screen** (VM 125: LordOS 0.8.8.3 amd64, nested VT-x, 4 cores, 3.8 GB, no QEMU at the start), 2026-11-05: the banner installed
+the packages in about 15 s and *Allow* gave `alex` the kvm group and an access-list entry on `/dev/kvm` with no new login; Debian 13's
+official nocloud qcow2 (SHA512 checked) was imported (2 vCPU, 1 GB, 20 GB) and started with KVM; firmware, kernel and login appeared in
+the window, the guest followed the window's size, the root login and a shell worked from the host keyboard (`nproc` 2, 961 MB,
+the Shared network's address); Pause, Resume, Ctrl+Alt+Delete (the guest rebooted), Shut Down from the library (`host-shutdown`),
+Force Off, close-to-shut-down, QEMU killed with SIGSEGV (*Stopped with an error*, Start again), lord-vm killed with SIGKILL (the
+window and the library say so, the next start logs the recovery) and Delete to the Trash all worked. Screenshots are kept with the
+branch's test notes.
+
+**Not done or not verified:** the picture in **full screen** stays black (input, the bar and the state work; painting runs and the
+frame counter advances; window mode is fine): an engine issue with an image media node inside the full-screen layer, not found yet;
+an ISO install, TCG (emulated) and BIOS machines were built for but not run from the app; one slice for all machines and nested
+leaves under lord-sessiond; our seccomp allowlist for QEMU; the cursor of a graphical guest (`CursorDefine` never came from a text
+console); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
+the app. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
+checks, letterbox and pointer scaling, guest size, refresh rate, wheel steps).
 
 ## 4. Guest systems
 
@@ -528,6 +594,9 @@ Not feasible: promising this keeps working across future releases of a system we
 Guests whose license restricts them to their maker's hardware. Guests needing a real GPU for their desktop on hardware without passthrough.
 
 ## 5. The app
+
+**Alpha (Phase 1):** a minimal library, the New Machine sheet and the machine window, described in 3.9 (The app); everything below
+is Phase 2 and later.
 
 Name and icon: a generic name, ours (open decision 1). The icon is a screen holding a smaller rounded tile, on the LordOS shape (radius
 0.225). Mocks: https://claude.ai/artifact/WNiELGEazSqnr68SFWuyPz (private until shared).

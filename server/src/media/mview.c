@@ -102,6 +102,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     Rect old = canvas_push_clip(c, x, y, w, h);
     int sw, sh;
     const uint32_t *px = pixels_of(s, &sw, &sh);
+    if (px) s->painted_seq = s->frame_seq;
     if (!px) {
         if (s->view.bg >> 24) canvas_rrect(c, x, y, w, h, radius, with_opacity(s->view.bg, op));
         canvas_set_clip(c, old);

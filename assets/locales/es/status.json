@@ -148,5 +148,8 @@
   "install.free.rolledBack": "La tabla de particiones quedó como estaba",
   "install.free.rollbackFailed": "No se pudo restaurar la tabla de particiones: hay una copia en {path}. No reinicies: guardala primero",
   "install.creatingAccount": "Creando la cuenta {user}",
-  "install.accountDone": "La cuenta está lista"
+  "install.accountDone": "La cuenta está lista",
+  "vm.alreadyInstalled": "Ya estaba instalado",
+  "vm.kvmReady": "Listo: las máquinas ya pueden usar la virtualización por hardware",
+  "vm.kvmNextLogin": "Listo a partir de tu próximo inicio de sesión"
 }

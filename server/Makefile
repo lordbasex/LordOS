@@ -745,7 +745,7 @@ build/doc-test: tests/doc_test.c src/doc/wire.c src/sec/json.c $(wildcard src/do
 include $(sort $(wildcard mk/*.mk))
 # after the includes: everything build/lord-server links
 PKGTEST_OBJ := $(filter-out build/obj/sec/sign.o build/obj/sec/pkgapp.o,$(sort $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ) build/obj/vault/monocypher.o \
-               $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(LAN_SRV_OBJ) $(HW_OBJ) $(VC_OBJ) $(MAILC_OBJ) build/obj/outputs.o))
+               $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(LAN_SRV_OBJ) $(VM_SRV_OBJ) $(HW_OBJ) $(VC_OBJ) $(MAILC_OBJ) build/obj/outputs.o))
 build/lord-server-pkgtest: $(PKGTEST_OBJ) build/obj-pkgtest/sign.o build/obj-pkgtest/pkgapp.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
