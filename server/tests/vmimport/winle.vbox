@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<VirtualBox xmlns="http://www.virtualbox.org/" version="1.20-linux">
+  <Machine uuid="{11111111-2222-3333-4444-555566667777}" name="New Windows" OSType="Windows11_64">
+    <Hardware uuid="{01234567-89ab-cdef-0123-456789abcdef}">
+      <Platform architecture="x86"/>
+      <Firmware type="EFI"><SmbiosUuidLittleEndian enabled="true"/><AutoSerialNumGen enabled="true"/></Firmware>
+      <CPU count="2"/>
+      <Memory RAMSize="4096"/>
+    </Hardware>
+  </Machine>
+</VirtualBox>

