@@ -117,6 +117,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     /* video: the frame already comes at the right size; if it differs by one pixel from rounding, it's copied anyway */
     int ring = s->map && s->ring_slots;
     if (ring && !rot && s->view.zoom <= 0 && !s->view.fit && (abs(sw - bw) <= 2 || abs(sh - bh) <= 2) && sw <= bw + 2 && sh <= bh + 2) sc = 1;
+    if (s->shown_scale != sc) { s->shown_scale = sc; if (s->cur_mode == 1) media_cursor_touch(); }
     float dw = rw * sc, dh = rh * sc, dx, dy;
     if (s->view.zoom > 0) { dx = x + w / 2 - s->view.cx * dw; dy = y + h / 2 - s->view.cy * dh; }
     else { dx = x + (w - dw) / 2; dy = y + (h - dh) / 2; }

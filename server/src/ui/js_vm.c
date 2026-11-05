@@ -405,6 +405,8 @@ typedef struct {
     char last_error[VM_TEXT_MAX];
     char errtail[400];
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
+    uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
+    int cur_w, cur_h, cur_hx, cur_hy;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -616,6 +618,9 @@ static void drop_display(Sess *s, int close_helper) {
     }
     s->vd_up = 0;
     s->ack_pending = 0;
+    /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
+    free(s->cur); s->cur = NULL;
+    if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
 }
 
 static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[0] = 0; } }
@@ -677,11 +682,27 @@ static void set_picture(Sess *s, int w, int h) {
     if (m->map) munmap(m->map, m->map_len);
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
+    if (!s->media && s->cur) media_src_cursor(m->id, s->cur, s->cur_w, s->cur_h, s->cur_hx, s->cur_hy);
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;
     VdMsg r = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
     vd_send(s->vd, &r, fd);
     close(fd);
+}
+
+/* VD_CURSOR's memfd (checked: sealed, w × h × 4 bytes): kept for the picture, or given to it */
+static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
+    size_t len = (size_t)w * h * 4;
+    uint8_t *p = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) return;
+    uint8_t *copy = malloc(len);
+    if (copy) memcpy(copy, p, len);
+    munmap(p, len);
+    if (!copy) return;
+    if (hx < 0 || hy < 0 || hx >= w || hy >= h) { free(copy); return; }
+    free(s->cur);
+    s->cur = copy; s->cur_w = w; s->cur_h = h; s->cur_hx = hx; s->cur_hy = hy;
+    if (s->media) media_src_cursor(s->media, copy, w, h, hx, hy);
 }
 
 static void from_vd(Sess *s) {
@@ -701,8 +722,12 @@ static void from_vd(Sess *s) {
             frames++; last = m.e;
             break;
         case VD_CURSOR:
-            /* checked as the contract asks; the alpha shows the host's pointer over an absolute tablet */
-            if (fd >= 0 && !vm_cursor_check(fd, m.a, m.b)) { /* accepted, not drawn */ }
+            /* the guest's pointer: shown instead of the host's over the picture (main.c, media_node_cursor) */
+            if (fd >= 0 && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
+            break;
+        case VD_POINTER:
+            /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does */
+            if (s->media) media_src_cursor_visible(s->media, m.c != 0);
             break;
         case VD_STATE: s->vd_state = m.a; break;
         default: break;
@@ -878,6 +903,7 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (s->vm_pid > 0 && waitpid(s->vm_pid, NULL, WNOHANG) == 0) later(s->vm_pid);
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (m) media_src_close(m);
+    free(s->cur);
     memset(s, 0, sizeof *s);
     return JS_UNDEFINED;
 }

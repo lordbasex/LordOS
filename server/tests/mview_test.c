@@ -16,6 +16,8 @@ int mp_sendv(int sock, uint32_t type, uint32_t id, int64_t a, int64_t b, int64_t
     return -1;
 }
 
+void media_cursor_touch(void) {}
+
 static int fails, checks;
 #define CHECK(cond, what) do { checks++; if (!(cond)) { fails++; fprintf(stderr, "FAIL: %s\n", what); } } while (0)
 

@@ -478,8 +478,7 @@ shows as *Off (recovered)*, and lord-vm recovers it at the next start), runs `lo
 on a control socketpair (`--control-fd 3 --paused`, no cgroup step in the child), attaches to a running one through its runtime socket,
 asks for the display once it has VM_INFO and a running or paused state, starts lord-vmdisplay with fd 3 and fd 4, resumes, maps each
 VD_SIZE picture read-only into an image media node, acknowledges a frame only when the engine painted it (`MediaSrc.painted_seq`, set
-by `media_paint`; a hidden window never paints and the helper goes on after 250 ms), checks cursor memfds and doesn't draw them (the
-host pointer over the guest's absolute tablet), forwards evdev keys, picture-coordinate motion, buttons, wheel steps, release-all on
+by `media_paint`; a hidden window never paints and the helper goes on after 250 ms), gives the guest's pointer (below) to that media node, forwards evdev keys, picture-coordinate motion, buttons, wheel steps, release-all on
 blur, resize after the window kept a size for 400 ms, and the display's refresh rate. At most 256 messages per channel per poll; no
 call blocks. lord-vm's stderr goes to a non-blocking pipe, so a window that stops polling can't stall the supervisor; when lord-vm
 ends without a last state the reason is *start-failed* (it never ran) or *supervisor-lost*.
@@ -523,9 +522,22 @@ whoever frees it clears its size (`media.c`, `js_vm.c`, `js_rdesk.c`); `tests/mv
 before. Remote Desk had the same bug for a remote screen that changes size while shown scaled. Seen on VM 125 (CPU composition): the
 guest's console in full screen, scaled to 1067 × 800 with black bands.
 
+**The guest's pointer** (2026-11-05). VD_CURSOR's memfd (checked by `vm_cursor_check`) is copied and handed to the picture's media
+source (`media_src_cursor`); `mcursor.c` premultiplies it, cuts it to what isn't fully transparent (keeping the hotspot inside) and scales
+it to the size the picture is shown at (the factor `media_paint` used, at most 64 × 64 for the cursor plane, drawn as is within 5 %).
+main.c remembers which media node the pointer is over (`over_media`, from the same hit test that picks the CSS cursor) and `cursor_now`
+shows the guest's image there instead of the host's arrow, in the CPU composition, the GPU's texture and the cursor plane alike. Where
+the guest puts its pointer (VD_POINTER's position) isn't used: the host's pointer drives the absolute tablet, so the image is drawn at
+the host's pointer. VD_POINTER's *hidden* (the guest turned its cursor plane off: a text console, or X just quit) brings the host's arrow
+back, so there's always a pointer to aim with; a fully transparent image (an app hiding it on purpose) hides it. A new display helper
+starts with the host's arrow until QEMU defines the cursor again. `tests/mcursor_test.c` (21 checks). Seen on VM 125: the installed
+Debian 13 guest (below) running X with an xterm showed X's I-beam over the xterm and its X-shaped root cursor elsewhere, with the hotspot
+at the host's pointer, the host's arrow over the bar and outside the window, the cursor drawn larger in full screen (the picture scaled up),
+and the host's arrow again on the text console after X quit.
+
 **Not done or not verified:** an ISO install, TCG (emulated) and BIOS machines were built for but not run from the app; one slice for all machines and nested
-leaves under lord-sessiond; our seccomp allowlist for QEMU; the cursor of a graphical guest (`CursorDefine` never came from a text
-console); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
+leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
+cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
 the app. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
 checks, letterbox and pointer scaling, guest size, refresh rate, wheel steps).
 
