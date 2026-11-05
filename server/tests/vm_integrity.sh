@@ -58,7 +58,8 @@ for i in 1 2 3; do
     check_disks "$D" "full clone $i: the source's disks"
     [ -d "$W/full$i.lordvm" ] && check_disks "$W/full$i.lordvm" "full clone $i: the clone's disks (it finished)"
 done
-"$VM" --clone "$D" "$W/after.lordvm" --name after >/dev/null 2>&1
+"$VM" --clone "$D" "$W/after.lordvm" --name after >"$W/after.out" 2>&1
+t "full clone: a clone after the killed ones is made" '[ -f "$W/after.lordvm/machine.json" ]' "$(tail -2 "$W/after.out")"
 t "full clone: a killed clone's hidden folder is swept by the next one" '! ls -d "$W"/.*.part-* >/dev/null 2>&1'
 for i in 1 2 3 4; do
     echo "-- linked clone $i, killed after $((i * 15)) ms"
@@ -70,6 +71,7 @@ for i in 1 2 3 4; do
 done
 # compaction (a machine without a base or snapshots: the full clone made above)
 C=$W/after.lordvm
+[ -f "$C/machine.json" ] || { bad "compaction" "no machine to compact"; gate_end "vm-integrity"; exit; }
 for i in 1 2; do
     echo "-- compaction $i, killed"
     "$VM" --compact "$C" >/dev/null 2>&1 &

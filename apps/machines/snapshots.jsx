@@ -98,7 +98,7 @@ export function Snapshots({ dir, name: name0 }) {
         <Btn primary label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
           onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
       </View>
-      <ScrollView horizontal style={{ height: 262 }} contentStyle={{ flexDirection: 'row', gap: 12, paddingBottom: 6 }}>
+      <ScrollView style={{ maxHeight: 520 }} contentStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 6 }}>
         {list.map((s) => (
           <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196, height: 250 }}>
             <Pic src={s.picture} colors={colors} on={sel === s.tag} />

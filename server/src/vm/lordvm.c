@@ -166,6 +166,7 @@ static int run_tool_in(char *const argv[], char *out, size_t outcap, const char 
     pid_t pid = fork();
     if (pid < 0) { close(p[0]); close(p[1]); return -1; }
     if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);        /* a qemu-img never outlives the lord-vm that runs it (a killed clone) */
         dup2(p[1], 1);
         dup2(p[1], 2);
         int null = open("/dev/null", O_RDONLY);

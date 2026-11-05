@@ -49,6 +49,7 @@ start_busy() {   # DIR: started, and writing (the unit said so on the console)
 # qemu-img check of every disk of a machine (and its base): 0 clean, 3 leaked clusters only, anything else corrupt
 check_disks() {  # DIR LABEL [leaks-ok]
     rc_all=0
+    [ -f "$1/disks/system.qcow2" ] || { bad "$2" "no system disk in $1"; return; }
     for f in "$1"/disks/*.qcow2 $(sed -n 's/.*"base": "\(.*\)",*/\1/p' "$1/machine.json"); do
         [ -f "$f" ] || continue
         out=$(qemu-img check -U "$f" 2>&1); rc=$?
