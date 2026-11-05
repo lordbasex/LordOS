@@ -24,11 +24,13 @@
 #include "vmsandbox.h"
 #include "vmops.h"
 #include "vmagent.h"
+#include "vmimport.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
 #include "../pkg/crypto.h"
 
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -48,6 +50,8 @@
 #include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <strings.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -160,6 +164,9 @@ static int sha256_file(const char *path, char out[65]) {
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw);
 static int run_tool(char *const argv[], char *out, size_t outcap) { return run_tool_in(argv, out, outcap, NULL, NULL); }
 static const char *jail_read2;          /* a second file the next jailed tool may read (a linked clone's base) */
+static const char *const *jail_list;    /* or a list of them (an import: a descriptor, its extents, its snapshot layers) */
+static int jail_n;
+static void (*tool_progress)(double pct); /* qemu-img convert -p's "(12.34/100%)", as it comes */
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
@@ -173,7 +180,7 @@ static int run_tool_in(char *const argv[], char *out, size_t outcap, const char 
         if (null >= 0) dup2(null, 0);
         syscall(SYS_close_range, 3, ~0u, 0);
         if (jail_read) {
-            int mask = vm_jail_tool2(jail_read, jail_read2, jail_rw);
+            int mask = jail_n > 0 ? vm_jail_tool_n(jail_list, jail_n, jail_rw) : vm_jail_tool2(jail_read, jail_read2, jail_rw);
             if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
                 static const char e[] = "lord-vm: the image tool's sandbox couldn't be set up\n";
                 write_all(2, e, sizeof e - 1);
@@ -191,6 +198,27 @@ static int run_tool_in(char *const argv[], char *out, size_t outcap, const char 
         ssize_t r = read(p[0], tmp, sizeof tmp);
         if (r < 0 && errno == EINTR) continue;
         if (r <= 0) break;
+        if (tool_progress) {
+            /* "    (45.00/100%)\r": the last complete one in this read */
+            double last = -1;
+            for (ssize_t i = 0; i < r; i++) if (tmp[i] == '(') {
+                char *e;
+                double v = strtod(tmp + i + 1, &e);
+                if (e > tmp + i + 1 && e < tmp + r && *e == '/' && v >= 0 && v <= 100) last = v;
+            }
+            if (last >= 0) tool_progress(last);
+            /* what isn't progress (an error) is kept */
+            ssize_t o = 0;
+            for (ssize_t i = 0; i < r; i++) {
+                if (tmp[i] == '(') {
+                    ssize_t k = i + 1;
+                    while (k < r && k < i + 16 && tmp[k] != ')') k++;
+                    if (k < r && tmp[k] == ')' && memchr(tmp + i, '%', (size_t)(k - i))) { i = k; continue; }
+                }
+                if (tmp[i] != '\r') tmp[o++] = tmp[i];
+            }
+            r = o;
+        }
         if (out && n + 1 < outcap) { size_t k = (size_t)r < outcap - 1 - n ? (size_t)r : outcap - 1 - n; memcpy(out + n, tmp, k); n += k; }
     }
     if (out && outcap) out[n] = 0;
@@ -381,11 +409,13 @@ static int disk_plain(const char *path, char *err, size_t errlen) {
 
 /* ---- snapshots, offline (6.2): qemu-img snapshot on every writable disk, jailed like an import ---- */
 
-/* the machine's writable disks, in snapshot order: the system disk, then the UEFI variables */
-static int disk_files(const char *dir, const VmMachine *m, char out[2][PATH_MAX + 64]) {
+/* the machine's writable disks, in snapshot order: the system disk, the UEFI variables, then the data disks (6.22) */
+#define VM_NDISKS (2 + VM_DATA_DISKS)
+static int disk_files(const char *dir, const VmMachine *m, char out[VM_NDISKS][PATH_MAX + 64]) {
     int n = 0;
     snprintf(out[n++], PATH_MAX + 64, "%s/disks/system.qcow2", dir);
     if (m->firmware == VM_FW_UEFI) snprintf(out[n++], PATH_MAX + 64, "%s/disks/nvram.qcow2", dir);
+    for (int i = 0; i < m->n_data; i++) snprintf(out[n++], PATH_MAX + 64, "%s/disks/data-%d.qcow2", dir, i + 1);
     return n;
 }
 
@@ -457,7 +487,7 @@ static void snap_picture_rm(const char *dir, const char *tag) {
 /* a tag on the disks that snapshots.json doesn't list is what's left of a snapshot that didn't finish: removed at the
  * next open (6.2, "Failure midway"). Only tags of our own form are touched. */
 static void snaps_sweep(const char *dir, const VmMachine *m) {
-    char disks[2][PATH_MAX + 64];
+    char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
@@ -478,7 +508,7 @@ static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, c
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
     if (n >= VM_SNAPS_MAX) { snprintf(err, errlen, "a machine keeps at most %d snapshots", VM_SNAPS_MAX); return -1; }
     if (vm_snaps_find(list, n, tag) >= 0) { snprintf(err, errlen, "there is a snapshot %s already", tag); return -1; }
-    char disks[2][PATH_MAX + 64];
+    char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-take", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) {
@@ -507,7 +537,7 @@ static int snap_delete_off(const char *dir, const VmMachine *m, const char *tag,
     if (vm_op_begin(dir, "snapshot-delete", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     memmove(&list[i], &list[i + 1], sizeof list[0] * (size_t)(n - i - 1));
     if (vm_snaps_save(dir, list, n - 1)) { vm_op_end(dir); snprintf(err, errlen, "can't write snapshots.json"); return -1; }
-    char disks[2][PATH_MAX + 64], e2[256];
+    char disks[VM_NDISKS][PATH_MAX + 64], e2[256];
     int nd = disk_files(dir, m, disks);
     for (int k = 0; k < nd; k++) if (qimg_snap(dir, disks[k], "-d", tag, e2, sizeof e2)) vlog("snapshots: deleting %s on %s: %s", tag, disks[k], e2);
     snap_picture_rm(dir, tag);
@@ -521,7 +551,7 @@ static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag,
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
     if (vm_snaps_find(list, n, tag) < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
-    char disks[2][PATH_MAX + 64];
+    char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
@@ -930,7 +960,7 @@ static char *blockdev_overlay(const char *node, const char *file, const char *ba
     return b.oom ? NULL : b.p;
 }
 
-#define MAXARGS 128
+#define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
 static void arg(const char *s) { if (qargc < MAXARGS - 1) qargv[qargc++] = strdup(s); qargv[qargc] = NULL; }
@@ -960,8 +990,23 @@ static void build_qemu_args(void) {
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     arg("-cpu"); arg(kvm ? "host" : "max");
-    arg("-smp"); argf("%d", m->vcpus);
+    if (m->cpu_sockets) { arg("-smp"); argf("%d,sockets=%d,cores=%d,threads=%d", m->vcpus, m->cpu_sockets, m->cpu_cores, m->cpu_threads); }
+    else { arg("-smp"); argf("%d", m->vcpus); }
     arg("-m"); argf("%d", m->memory_mb);
+    {
+        /* what an imported machine's guest read in its SMBIOS system table (6.22); the UUID is -uuid */
+        const char *k[] = { "manufacturer", "product", "version", "serial", "sku", "family" };
+        const char *v[] = { m->sm_manufacturer, m->sm_product, m->sm_version, m->sm_serial, m->sm_sku, m->sm_family };
+        char t1[1024] = "type=1", e[2 * VM_SMBIOS_MAX + 4];
+        int any = 0;
+        for (int i = 0; i < 6; i++) if (v[i][0]) {
+            opt_escape(e, sizeof e, v[i]);
+            snprintf(t1 + strlen(t1), sizeof t1 - strlen(t1), ",%s=%s", k[i], e);
+            any = 1;
+        }
+        if (any) { arg("-smbios"); arg(t1); }
+    }
+    if (m->rtc == VM_RTC_LOCAL) { arg("-rtc"); arg("base=localtime"); }
     if (uefi) {
         arg("-blockdev"); argj(blockdev_file("fw-code-file", m->firmware_code, 1));
         arg("-blockdev"); argj(blockdev_fmt("raw", "fw-code", "fw-code-file", 1));
@@ -979,27 +1024,68 @@ static void build_qemu_args(void) {
         arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
     }
+    for (int i = 0; i < m->n_data; i++) {
+        char fn[24], nn[16];
+        snprintf(p, sizeof p, "%s/data-%d.qcow2", S.disks, i + 1);
+        snprintf(fn, sizeof fn, "data%d-file", i + 1);
+        snprintf(nn, sizeof nn, "data%d", i + 1);
+        arg("-blockdev"); argj(blockdev_file(fn, p, 0));
+        arg("-blockdev"); argj(blockdev_fmt("qcow2", nn, fn, 0));
+    }
     /* Every PCI device has a fixed slot: with the slots QEMU picks, taking an ISO out after an install moved the
      * network card (enp0s3 became enp0s2) and the installed system's network didn't come up. Slots 1 to 6 are the
-     * ones a machine without an ISO always had; the ISO's controller goes after them. */
-    arg("-device"); arg("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0,addr=0x1");
-    /* the CD/DVD drive is always there (slot 8, after the ones a machine always had), so a disc can go in and out while
-     * the machine runs (VM_CDROM); the ISO of machine.json is in it at start */
-    arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
-    if (m->iso[0]) {
-        arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
-        arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-        arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=1");
-        snprintf(S.cd_node, sizeof S.cd_node, "cd");
-    } else { arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,bootindex=1"); S.cd_node[0] = 0; }
+     * ones a machine without an ISO always had; the ISO's controller goes after them; data disks at 0x10, extra
+     * network cards at 0x18 (q35 keeps 0x1f for its own controllers). Serials are letters, digits and "-_." only. */
+    char ser[VM_SERIAL_MAX + 16];
+    snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
+    if (m->devices == VM_DEV_COMPAT) {
+        /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
+         * to ide.5), arm64's virt gets one in the system disk's slot */
+        const char *bus = arm ? "ahci" : "ide";
+        if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
+        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0,bootindex=0%s", bus, ser);
+        for (int i = 0; i < m->n_data; i++) {
+            arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
+        }
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=1", bus);
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=1", bus); S.cd_node[0] = 0; }
+    } else {
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0,addr=0x1%s", ser);
+        for (int i = 0; i < m->n_data; i++) {
+            arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
+        }
+        /* the CD/DVD drive is always there (slot 8, after the ones a machine always had), so a disc can go in and out while
+         * the machine runs (VM_CDROM); the ISO of machine.json is in it at start */
+        arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=1");
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,bootindex=1"); S.cd_node[0] = 0; }
+    }
+    static const char *const NICDEV[VM_NIC_COUNT] = { "virtio-net-pci", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet" };
     if (m->network == VM_NET_SHARED) {
         arg("-netdev"); arg("stream,id=net0,addr.type=fd,addr.str=6");
-        arg("-device"); argf("virtio-net-pci,netdev=net0,mac=%s,addr=0x2", m->mac);
+        arg("-device"); argf("%s,netdev=net0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
     }
+    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
+    for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     if (!arm) { arg("-device"); arg("virtio-vga,id=video0,addr=0x4"); }
-    if (m->display == VM_DISPLAY_WINDOW) {
+    if (m->display == VM_DISPLAY_WINDOW && m->devices == VM_DEV_COMPAT) {
+        /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
+        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
+        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
+        arg("-device"); arg("usb-tablet,bus=xhci.0");
+        arg("-display"); arg("dbus,p2p=yes");
+    } else if (m->display == VM_DISPLAY_WINDOW) {
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
         arg("-display"); arg("dbus,p2p=yes");
@@ -1064,6 +1150,11 @@ static int start_machine(void) {
         char sum[65];
         if (!sha256_file(S.m.firmware_code, sum) && strcmp(sum, S.m.firmware_sha256))
             vlog("note: the UEFI firmware changed since this machine was made (%.12s, was %.12s); its variables are kept", sum, S.m.firmware_sha256);
+    }
+    for (int i = 0; i < S.m.n_data; i++) {
+        snprintf(p, sizeof p, "%s/data-%d.qcow2", S.disks, i + 1);
+        if (!file_exists(p)) { fail_start("data disk %d is missing: %s", i + 1, p); return -1; }
+        if (disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
     }
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
     if (!file_exists(QEMU_BIN[S.m.arch])) { fail_start("%s isn't installed", QEMU_BIN[S.m.arch]); return -1; }
@@ -1457,7 +1548,13 @@ static void resume_done(void) {
 
 /* ---- snapshots while the machine runs (6.2): QMP jobs over every writable node, memory into the system disk ---- */
 
-static const char *snap_devices(void) { return S.m.firmware == VM_FW_UEFI ? "[\"sys\",\"fw-vars\"]" : "[\"sys\"]"; }
+static const char *snap_devices(void) {
+    static char b[160];
+    snprintf(b, sizeof b, "[\"sys\"%s", S.m.firmware == VM_FW_UEFI ? ",\"fw-vars\"" : "");
+    for (int i = 0; i < S.m.n_data; i++) snprintf(b + strlen(b), sizeof b - strlen(b), ",\"data%d\"", i + 1);
+    snprintf(b + strlen(b), sizeof b - strlen(b), "]");
+    return b;
+}
 
 static void snap_end(int ok, const char *why) {
     int kind = S.snap_kind == VSN_TAKE ? VJ_SNAPSHOT : S.snap_kind == VSN_REVERT ? VJ_REVERT : VJ_DELETE;
@@ -2514,9 +2611,15 @@ static int ops_recover(const char *dir, int at_start) {
             chmod(sys, 0600);
             snprintf(what, sizeof what, "an interrupted linked clone was rolled back: the disk is back in its folder");
         } else snprintf(what, sizeof what, "an interrupted linked clone left nothing to undo");
+    } else if (!strcmp(o.op, "import")) {
+        /* the folder is in place only after machine.json was written: the import had finished (a .part folder that
+         * didn't is removed whole by clone_sweep) */
+        VmMachine m;
+        char err[256];
+        snprintf(what, sizeof what, vm_machine_load(dir, &m, err, sizeof err) ? "an import left an unreadable machine.json" : "the import had finished");
     } else if (!strncmp(o.op, "snapshot-", 9) && vm_snap_tag_valid(o.tag)) {
         VmMachine m;
-        char err[256], disks[2][PATH_MAX + 64];
+        char err[256], disks[VM_NDISKS][PATH_MAX + 64];
         if (vm_machine_load(dir, &m, err, sizeof err)) { vlog("recovery: %s: %s", o.op, err); return 0; }
         int nd = disk_files(dir, &m, disks);
         VmSnap list[VM_SNAPS_MAX];
@@ -2636,7 +2739,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     ops_recover(S.dir, 1);
     if (lost || crashed) {
         /* QEMU died in the middle (killed, or with lord-vm): what it had allocated and not yet referenced is given back */
-        char disks[2][PATH_MAX + 64];
+        char disks[VM_NDISKS][PATH_MAX + 64];
         int nd = disk_files(S.dir, &S.m, disks);
         for (int k = 0; k < nd; k++) qimg_repair_leaks(S.dir, disks[k]);
     }
@@ -2848,11 +2951,17 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
+        if (!strcmp(a, "--nic-model")) {
+            for (int k = 0; VM_NIC_MODELS[k]; k++) if (!strcmp(v, VM_NIC_MODELS[k])) nicm = k;
+            if (nicm < 0) { fprintf(stderr, "lord-vm: --nic-model virtio|e1000e|e1000|e1000-82545em|e1000-82544gc|vmxnet3|rtl8139|pcnet\n"); return 2; }
+            continue;
+        }
         if (!strcmp(a, "--name")) name = v;
         else if (!strcmp(a, "--vcpus")) vcpus = atoi(v);
         else if (!strcmp(a, "--memory")) mem = atoi(v);
@@ -2883,8 +2992,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
-    if (vcpus) m.vcpus = vcpus;
+    if (vcpus && vcpus != m.vcpus) {
+        m.vcpus = vcpus;
+        /* an imported topology follows: the same sockets and threads when the new count divides, else QEMU's default */
+        if (m.cpu_sockets && vcpus % (m.cpu_sockets * m.cpu_threads) == 0) m.cpu_cores = vcpus / (m.cpu_sockets * m.cpu_threads);
+        else m.cpu_sockets = m.cpu_cores = m.cpu_threads = 0;
+    }
     if (mem) m.memory_mb = mem;
+    if (devs >= 0) m.devices = devs;
+    if (nicm >= 0) { m.nic_model = nicm; for (int k = 0; k < m.n_extra_macs; k++) m.extra_models[k] = nicm; }
+    if (devs >= 0 || nicm >= 0) m.schema = VM_SCHEMA;
     if (disp >= 0) m.display = disp;
     if (net >= 0) m.network = net;
     if (agent >= 0) m.agent = agent;
@@ -2918,8 +3035,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false");
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
+           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", m.devices ? "compat" : "virtio", VM_NIC_MODELS[m.nic_model]);
     rc = 0;
 out:
     close(lock);
@@ -3105,8 +3222,10 @@ static void clone_sweep(const char *lib) {
         if (pid > 0 && (kill((pid_t)pid, 0) == 0 || errno != ESRCH)) continue;
         char p[PATH_MAX + 260];
         snprintf(p, sizeof p, "%s/%s", lib, e->d_name);
+        VmOp o;
+        int imp = vm_op_read_peek(p, &o) == 1 && !strcmp(o.op, "import");
         rm_tree(p);
-        vlog("recovery: a clone that didn't finish was removed (%s)", e->d_name);
+        vlog("recovery: %s that didn't finish was removed (%s)", imp ? "an import" : "a clone", e->d_name);
     }
     if (d) closedir(d);
 }
@@ -3175,7 +3294,7 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     if (!from_snap && !copy_reflink(sdisk, ddisk)) {
         method = "reflink";
         if ((m.firmware == VM_FW_UEFI && copy_reflink(snv, dnv) && copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the UEFI variables failed\n"); goto out; }
-    } else if (linked && !duplicate && !from_snap && !nsnaps && !suspended && !m.base[0]) {
+    } else if (linked && !duplicate && !from_snap && !nsnaps && !suspended && !m.base[0] && !m.n_data) {
         /* 2. linked over a frozen base: the source's disk moves to .shared/ (operation.json "link" in the source) */
         char shared[PATH_MAX + 32], base[PATH_MAX + 128], ov[PATH_MAX + 64];
         snprintf(shared, sizeof shared, "%s/.shared", lib);
@@ -3215,6 +3334,15 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         if (m.firmware == VM_FW_UEFI && (from_snap ? qimg_convert(snv, NULL, from_snap, dnv, ddir, err, sizeof err) : copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the UEFI variables failed: %s\n", err); goto out; }
         n.base[0] = 0;
     }
+    for (int i = 0; i < m.n_data; i++) {
+        /* data disks (6.22) the way the system disk went: reflinked, copied with their holes, or converted */
+        char sdd[PATH_MAX + 64], ddd[PATH_MAX + 128];
+        snprintf(sdd, sizeof sdd, "%s/disks/data-%d.qcow2", real, i + 1);
+        snprintf(ddd, sizeof ddd, "%s/disks/data-%d.qcow2", tmp, i + 1);
+        int bad = !strcmp(method, "reflink") ? (copy_reflink(sdd, ddd) && copy_sparse(sdd, ddd))
+                : duplicate ? copy_sparse(sdd, ddd) : qimg_convert(sdd, NULL, from_snap, ddd, ddir, err, sizeof err);
+        if (bad) { fprintf(stderr, "lord-vm: copying data disk %d failed\n", i + 1); goto out; }
+    }
     if (duplicate) {
         /* the snapshots' list and pictures, the saved session */
         snprintf(p1, sizeof p1, "%s/snapshots.json", real); snprintf(p2, sizeof p2, "%s/snapshots.json", tmp);
@@ -3243,6 +3371,7 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         /* a Clone runs beside the original: its own identity (the agent can give the guest a new machine-id later) */
         vm_new_id(n.id);
         vm_new_mac(n.mac);
+        for (int i = 0; i < n.n_extra_macs; i++) vm_new_mac(n.extra_macs[i]);
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
     snprintf(p1, sizeof p1, "%s/thumb.png", real); snprintf(p2, sizeof p2, "%s/thumb.png", tmp); copy_small(p1, p2);
@@ -3369,6 +3498,992 @@ static int cmd_check(const char *dir) {
     return r ? 1 : 0;
 }
 
+/* ---- importing a machine from another virtualization app (docs/VIRTUALIZATION.md 6.22) ----
+ *
+ * lord-vm --import-plan SRC [--arch arm64|amd64]
+ *   SRC: a bundle folder (.vmwarevm, .pvm, a folder with a .vbox), a settings file (.vmx, .vbox, config.pvs, .ovf), an
+ *   .ova, or one disk image (VMDK, VDI, VHDX, VHD, qcow2, raw). Prints the plan as JSON: what is kept, what changes,
+ *   what can't come along, and what stops the import. Reads only.
+ * lord-vm --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated]
+ *                                  [--firmware uefi|bios] (a loose disk's) [--vcpus N] [--memory MB] (a loose disk's)
+ *   Makes the machine in <library>/.<DIR's name>.part-<pid> under operation.json "import" and renames it into place;
+ *   the source is only read. Progress lines on stdout: {"progress":12.5,"disk":1,"disks":2}; the last line is
+ *   {"imported":true,...}. A killed import leaves its .part folder, which the next import or clone in the library
+ *   removes (clone_sweep), and nothing else.
+ *
+ * Every file of the source is hostile. Its settings are read through bounded parsers (vmimport.c, vmxml.c); every name it
+ * gives is resolved inside the bundle (no "..", no absolute path: an absolute one is looked for by its last part only,
+ * no symlink that leads out); each disk's format comes from its first bytes, never from QEMU's probing; qemu-img sees each
+ * disk only as a json: spec naming every driver, with each layer's backing named by us (the base's is null) and runs in
+ * the tool jail with read access to exactly the files we resolved. Chains qemu-img can't stack (VDI and .hds snapshots)
+ * are merged by lord-vm itself in a jailed child that reads those files and writes one sparse raw file in disks/. */
+
+#define IMP_SETTINGS_MAX (4u << 20)
+
+typedef struct {
+    char bundle[PATH_MAX];              /* the folder every file must be in */
+    char settings[PATH_MAX];            /* the settings file, "" for a loose disk or an .ova */
+    char ova[PATH_MAX];                 /* an .ova package, read in place */
+    VmiTarEntry tar[VMI_OVA_MAX];
+    int ntar;
+    VmiMachine m;
+    /* per disk, as resolved */
+    struct {
+        char file[VMI_MAX_CHAIN][PATH_MAX];  /* each layer's real path (in an .ova: the package) */
+        long long off[VMI_MAX_CHAIN], len[VMI_MAX_CHAIN];  /* an .ova member's place, else 0 */
+        int fmt[VMI_MAX_CHAIN];
+        char *extents[VMI_MAX_CHAIN];    /* a VMDK descriptor's extent files, real paths, '\n'-separated (malloc'd) */
+        int n;
+        int flatten;                     /* VDI or .hds snapshots: lord-vm merges them */
+        long long vsize, used;
+        char serial[41];
+    } d[VMI_MAX_DISKS];
+    char blocker[512];                  /* JSON array items of what stops the import */
+    char notes[1024];                   /* JSON array items of what changes or can't come along */
+} Imp;
+
+static void imp_add(char *list, size_t cap, const char *code, const char *text) {
+    size_t l = strlen(list);
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "%s{\"code\":\"%s\"", l ? "," : "", code);
+    if (text && text[0]) { jb_raw(&b, ",\"text\":"); jb_str(&b, text); }
+    jb_raw(&b, "}");
+    if (!b.oom && l + strlen(b.p) + 1 < cap) memcpy(list + l, b.p, strlen(b.p) + 1);
+    jb_free(&b);
+}
+#define BLOCK(I, code, text) imp_add((I)->blocker, sizeof (I)->blocker, code, text)
+#define NOTE(I, code, text) imp_add((I)->notes, sizeof (I)->notes, code, text)
+
+static int ends_ci(const char *s, const char *suf) {
+    size_t a = strlen(s), b = strlen(suf);
+    return a >= b && !strcasecmp(s + a - b, suf);
+}
+
+/* reads a small regular file that isn't a symlink, at most max bytes; malloc'd, NUL-terminated */
+static char *read_capped(const char *path, size_t max, size_t *len) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); return NULL; }
+    char *b = malloc((size_t)st.st_size + 1);
+    size_t o = 0;
+    while (b && o < (size_t)st.st_size) {
+        ssize_t r = read(fd, b + o, (size_t)st.st_size - o);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        o += (size_t)r;
+    }
+    close(fd);
+    if (b) b[o] = 0;
+    *len = o;
+    return b;
+}
+
+/* A name from the source, as a real path inside the bundle. rel_to: the folder the name is relative to (itself inside
+ * the bundle). An absolute name is looked for by its last part in rel_to (machines move between computers with their
+ * folders); a relative one must be plain (vmi_rel_ok). The result must be a regular file whose real path is inside the
+ * bundle: a symlink is fine only when it stays in. 0 ok, -1 with why. */
+static int imp_resolve(const Imp *I, const char *rel_to, const char *name, char out[PATH_MAX], char *why, size_t wn) {
+    const char *use = name;
+    if (name[0] == '/') { const char *sl = strrchr(name, '/'); use = sl + 1; }
+    if (!vmi_rel_ok(use)) { snprintf(why, wn, "the source names a file outside its folder (%.120s)", name); return -1; }
+    char j[PATH_MAX * 2];
+    snprintf(j, sizeof j, "%s/%s", rel_to, use);
+    char r[PATH_MAX];
+    if (!realpath(j, r)) { snprintf(why, wn, "a file the source needs is missing: %.120s", use); return -1; }
+    size_t bl = strlen(I->bundle);
+    if (strncmp(r, I->bundle, bl) || r[bl] != '/') { snprintf(why, wn, "the source names a file outside its folder (%.120s)", name); return -1; }
+    struct stat st;
+    if (lstat(r, &st) || !S_ISREG(st.st_mode)) { snprintf(why, wn, "%.120s isn't a file", use); return -1; }
+    if (!dir_ok(r)) { snprintf(why, wn, "a file's path has ',' or control characters: %.120s", use); return -1; }
+    memcpy(out, r, strlen(r) + 1);
+    return 0;
+}
+
+static long ova_read(void *ctx, void *buf, size_t n, long long off) { return (long)pread(*(int *)ctx, buf, n, off); }
+
+static int head_of(const char *path, long long off, uint8_t *h, size_t n) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t r = pread(fd, h, n, off);
+    close(fd);
+    return r < 0 ? -1 : (int)r;
+}
+
+/* a VMDK's descriptor: the text of a descriptor file, or the one inside a sparse (KDMV) file */
+static int vmdk_desc(const char *path, long long off, long long len, VmiVmdk *d, char *why, size_t wn) {
+    uint8_t h[512];
+    int n = head_of(path, off, h, sizeof h);
+    if (n < 4) { snprintf(why, wn, "a disk can't be read"); return -1; }
+    char *text = NULL;
+    size_t tl = 0;
+    if (!memcmp(h, "KDMV", 4)) {
+        if (n < 44) { snprintf(why, wn, "a VMDK header is cut short"); return -1; }
+        uint64_t doff = 0, dsz = 0;
+        for (int i = 7; i >= 0; i--) { doff = doff << 8 | h[28 + i]; dsz = dsz << 8 | h[36 + i]; }
+        memset(d, 0, sizeof *d);
+        snprintf(d->create_type, sizeof d->create_type, "monolithicSparse");
+        if (!doff || !dsz) { d->nextents = 1; return 0; }        /* a stream-optimized piece without one */
+        if (dsz > 2048 || (len && (long long)(doff + dsz) * 512 > len)) { snprintf(why, wn, "a VMDK's descriptor is too large"); return -1; }
+        tl = (size_t)dsz * 512;
+        text = malloc(tl + 1);
+        int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t r = fd >= 0 && text ? pread(fd, text, tl, off + (long long)doff * 512) : -1;
+        if (fd >= 0) close(fd);
+        if (r <= 0) { free(text); snprintf(why, wn, "a VMDK's descriptor can't be read"); return -1; }
+        tl = (size_t)r;
+        text[tl] = 0;
+        tl = strlen(text);                                    /* it ends at the first NUL */
+    } else if (!memcmp(h, "COWD", 4)) {
+        snprintf(why, wn, "a disk is in an old server format (COWD), which isn't supported");
+        return -1;
+    } else {
+        if (len) { snprintf(why, wn, "a disk in the package isn't a VMDK"); return -1; }
+        text = read_capped(path, 1u << 20, &tl);
+        if (!text) { snprintf(why, wn, "a disk's descriptor can't be read (or is larger than 1 MB)"); return -1; }
+    }
+    int r = vmi_parse_vmdk(text, tl, d, why, wn);
+    free(text);
+    return r;
+}
+
+static const char *fmt_name(int f) {
+    static const char *const N[] = { "?", "vmdk", "vdi", "vhdx", "vpc", "qcow2", "raw", "parallels" };
+    return f >= 0 && f <= VMF_PARALLELS ? N[f] : "?";
+}
+
+/* resolves disk i: every layer's file and format, a VMDK's extents and parents; decides whether qemu-img can read the
+ * chain or lord-vm merges it. dir0: the folder its first name is relative to. */
+static int imp_disk(Imp *I, int i, const char *dir0, char *why, size_t wn) {
+    VmiDisk *src = &I->m.disk[i];
+    typeof(I->d[0]) *D = &I->d[i];
+    D->n = 0;
+    if (I->ova[0]) {
+        /* an .ova's disk: one member, read in place */
+        int k = -1;
+        for (int t = 0; t < I->ntar; t++) if (!strcmp(I->tar[t].name, src->chain[0].path)) k = t;
+        if (k < 0) { snprintf(why, wn, "a disk named by the package isn't in it: %.80s", src->chain[0].path); return -1; }
+        uint8_t h[512];
+        if (head_of(I->ova, I->tar[k].offset, h, sizeof h) < 64) { snprintf(why, wn, "a disk in the package can't be read"); return -1; }
+        int f = vmi_disk_format(h, 512, src->chain[0].path);
+        if (f != VMF_VMDK && f != VMF_VPC && f != VMF_VHDX && f != VMF_VDI && f != VMF_QCOW2) { snprintf(why, wn, "a disk in the package has a format that isn't supported"); return -1; }
+        if (f == VMF_QCOW2 && vm_qcow2_plain(h, 512, why, wn)) return -1;
+        if (f == VMF_VMDK) {
+            VmiVmdk vd;
+            if (vmdk_desc(I->ova, I->tar[k].offset, I->tar[k].size, &vd, why, wn)) return -1;
+            if (vd.parent[0]) { snprintf(why, wn, "a disk in the package depends on another file"); return -1; }
+            if (strcmp(vd.create_type, "streamOptimized") && strcmp(vd.create_type, "monolithicSparse")) { snprintf(why, wn, "a disk in the package isn't self-contained (%.30s)", vd.create_type); return -1; }
+        }
+        snprintf(D->file[0], PATH_MAX, "%s", I->ova);
+        D->off[0] = I->tar[k].offset; D->len[0] = I->tar[k].size; D->fmt[0] = f; D->n = 1;
+        D->used = I->tar[k].size;
+        return 0;
+    }
+    char rel_dir[PATH_MAX];
+    snprintf(rel_dir, sizeof rel_dir, "%s", dir0);
+    if (src->chain[0].fmt == VMF_PARALLELS) {
+        /* a .hdd folder: its DiskDescriptor.xml names the data files, base first */
+        char hdd[PATH_MAX * 2], dreal[PATH_MAX];
+        const char *nm = src->chain[0].path;
+        if (!vmi_rel_ok(nm)) { snprintf(why, wn, "the source names a disk outside its folder"); return -1; }
+        snprintf(hdd, sizeof hdd, "%s/%s", dir0, nm);
+        if (imp_resolve(I, hdd, "DiskDescriptor.xml", dreal, why, wn)) return -1;
+        size_t tl;
+        char *t = read_capped(dreal, 1u << 20, &tl);
+        if (!t) { snprintf(why, wn, "a disk's descriptor can't be read"); return -1; }
+        VmiHdd hd;
+        int r = vmi_parse_hdd(t, tl, &hd, why, wn);
+        free(t);
+        if (r) return -1;
+        if (hd.encrypted) { I->m.encrypted = 1; return 0; }
+        I->m.snapshots += hd.snapshots;
+        char hreal[PATH_MAX];
+        if (!realpath(hdd, hreal)) { snprintf(why, wn, "a disk folder is missing"); return -1; }
+        for (int k = 0; k < hd.nlayers; k++) {
+            if (imp_resolve(I, hreal, hd.file[k], D->file[k], why, wn)) return -1;
+            uint8_t h[64];
+            if (head_of(D->file[k], 0, h, sizeof h) < 64 || vmi_disk_format(h, 64, D->file[k]) != VMF_PARALLELS) { snprintf(why, wn, "a disk's data file isn't in the expected format"); return -1; }
+            D->fmt[k] = VMF_PARALLELS;
+        }
+        D->n = hd.nlayers;
+        D->flatten = D->n > 1;
+        D->vsize = hd.sectors * 512;
+        return 0;
+    }
+    if (src->nchain > 1) {
+        /* a .vbox chain: each layer from the media registry, base first */
+        for (int k = 0; k < src->nchain; k++) {
+            if (imp_resolve(I, rel_dir, src->chain[k].path, D->file[k], why, wn)) return -1;
+            uint8_t h[512];
+            int hn = head_of(D->file[k], 0, h, sizeof h);
+            int f = vmi_disk_format(h, hn > 0 ? (size_t)hn : 0, D->file[k]);
+            if (f != src->chain[k].fmt) { snprintf(why, wn, "a disk's file isn't the format its settings say"); return -1; }
+            D->fmt[k] = f;
+            if (f == VMF_VDI) {
+                VmiVdi v;
+                if (vmi_vdi_header(h, (size_t)hn, &v)) { snprintf(why, wn, "a VDI header is broken"); return -1; }
+                if ((k == 0) != (v.type != 4)) { snprintf(why, wn, "a VDI snapshot layer isn't where the settings put it"); return -1; }
+                if (k && strcasecmp(v.parent, src->chain[k - 1].uuid)) { snprintf(why, wn, "a VDI snapshot layer doesn't belong to its parent"); return -1; }
+            }
+        }
+        D->n = src->nchain;
+        for (int k = 1; k < D->n; k++) if (D->fmt[k] != D->fmt[0]) { snprintf(why, wn, "a disk's snapshots are in another format than its base"); return -1; }
+        if (D->fmt[0] == VMF_VDI) D->flatten = 1;
+        else if (D->fmt[0] != VMF_VMDK) { snprintf(why, wn, "snapshots of %s disks aren't supported", fmt_name(D->fmt[0])); return -1; }
+    } else {
+        /* one name: a VMDK may lead to its parents (a .vmx's snapshot), each named by the one above it */
+        char cur[PATH_MAX];
+        if (imp_resolve(I, rel_dir, src->chain[0].path, cur, why, wn)) return -1;
+        char chain[VMI_MAX_CHAIN][PATH_MAX];
+        int nc = 0;
+        for (;;) {
+            for (int k = 0; k < nc; k++) if (!strcmp(chain[k], cur)) { snprintf(why, wn, "a disk's snapshots loop"); return -1; }
+            if (nc >= VMI_MAX_CHAIN) { snprintf(why, wn, "a disk has more than %d snapshot layers", VMI_MAX_CHAIN); return -1; }
+            memcpy(chain[nc++], cur, sizeof cur);
+            uint8_t h[512];
+            int hn = head_of(cur, 0, h, sizeof h);
+            int f = vmi_disk_format(h, hn > 0 ? (size_t)hn : 0, cur);
+            if (f != VMF_VMDK) break;
+            VmiVmdk vd;
+            if (vmdk_desc(cur, 0, 0, &vd, why, wn)) return -1;
+            if (vd.encrypted) { I->m.encrypted = 1; return 0; }
+            if (!vd.parent[0]) break;
+            char pd[PATH_MAX];
+            snprintf(pd, sizeof pd, "%s", cur);
+            *strrchr(pd, '/') = 0;
+            if (imp_resolve(I, pd, vd.parent, cur, why, wn)) return -1;
+        }
+        for (int k = 0; k < nc; k++) memcpy(D->file[k], chain[nc - 1 - k], PATH_MAX);
+        D->n = nc;
+        if (nc > 1) I->m.snapshots = I->m.snapshots > nc - 1 ? I->m.snapshots : nc - 1;
+        for (int k = 0; k < nc; k++) {
+            uint8_t h[512];
+            int hn = head_of(D->file[k], 0, h, sizeof h);
+            D->fmt[k] = vmi_disk_format(h, hn > 0 ? (size_t)hn : 0, D->file[k]);
+            if (D->fmt[k] == VMF_UNKNOWN) { snprintf(why, wn, "a disk's format isn't one that can be imported (VMDK, VDI, VHDX, VHD, qcow2, raw)"); return -1; }
+            if (k && D->fmt[k] != VMF_VMDK) { snprintf(why, wn, "a disk's snapshots aren't VMDK"); return -1; }
+            if (D->fmt[k] == VMF_QCOW2 && vm_qcow2_plain(h, (size_t)hn, why, wn)) return -1;
+            if (D->fmt[k] == VMF_VDI) {
+                VmiVdi v;
+                if (vmi_vdi_header(h, (size_t)hn, &v)) { snprintf(why, wn, "a VDI header is broken"); return -1; }
+                if (v.type == 4) { snprintf(why, wn, "the disk is a VDI snapshot layer: import the machine's .vbox instead"); return -1; }
+            }
+        }
+    }
+    /* every VMDK layer's extents, inside the bundle, next to their descriptor */
+    for (int k = 0; k < D->n; k++) {
+        if (D->fmt[k] != VMF_VMDK) continue;
+        VmiVmdk vd;
+        if (vmdk_desc(D->file[k], 0, 0, &vd, why, wn)) return -1;
+        if (vd.encrypted) { I->m.encrypted = 1; return 0; }
+        if (!strcmp(vd.create_type, "monolithicSparse") || !strcmp(vd.create_type, "streamOptimized")) continue;
+        if (!strcmp(vd.create_type, "vmfsRaw") || !strcmp(vd.create_type, "vmfsRawDeviceMap") || !strcmp(vd.create_type, "fullDevice") ||
+            !strcmp(vd.create_type, "partitionedDevice") || !strcmp(vd.create_type, "vmfsPassthroughRawDeviceMap")) {
+            snprintf(why, wn, "a disk is a host device (%.30s), which isn't imported", vd.create_type); return -1;
+        }
+        char pd[PATH_MAX];
+        snprintf(pd, sizeof pd, "%s", D->file[k]);
+        *strrchr(pd, '/') = 0;
+        JBuf b;
+        jb_init(&b);
+        for (int e = 0; e < vd.nextents; e++) {
+            if (!vd.ext[e].file[0]) continue;                   /* ZERO */
+            if (strchr(vd.ext[e].file, '/')) { jb_free(&b); snprintf(why, wn, "a disk's piece is in another folder: %.80s", vd.ext[e].file); return -1; }
+            char er[PATH_MAX];
+            if (imp_resolve(I, pd, vd.ext[e].file, er, why, wn)) { jb_free(&b); return -1; }
+            jb_raw(&b, er); jb_raw(&b, "\n");
+            struct stat st;
+            if (!stat(er, &st)) D->used += (long long)st.st_blocks * 512;
+        }
+        if (b.oom) { jb_free(&b); snprintf(why, wn, "out of memory"); return -1; }
+        D->extents[k] = b.p;
+    }
+    for (int k = 0; k < D->n; k++) { struct stat st; if (!stat(D->file[k], &st)) D->used += (long long)st.st_blocks * 512; }
+    return 0;
+}
+
+/* the json: spec of one layer, and of the chain over it (each layer's backing named, the base's null) */
+static void spec_layer(JBuf *b, const Imp *I, int i, int k, int alone) {
+    const typeof(I->d[0]) *D = &I->d[i];
+    jb_printf(b, "{\"driver\":\"%s\",\"read-only\":true,\"file\":", fmt_name(D->fmt[k]));
+    if (D->len[k]) {
+        jb_printf(b, "{\"driver\":\"raw\",\"offset\":%lld,\"size\":%lld,\"file\":{\"driver\":\"file\",\"filename\":", D->off[k], D->len[k]);
+        jb_str(b, D->file[k]);
+        jb_raw(b, "}}");
+    } else {
+        jb_raw(b, "{\"driver\":\"file\",\"filename\":");
+        jb_str(b, D->file[k]);
+        jb_raw(b, "}");
+    }
+    if (D->fmt[k] == VMF_VMDK && D->extents[k]) {
+        /* a descriptor's pieces: opened by the file protocol only, never probed (their names are checked plain) */
+        int ne = 0;
+        for (const char *c = D->extents[k]; *c; c++) if (*c == '\n') ne++;
+        jb_raw(b, ",\"extents\":[");
+        for (int e = 0; e < ne; e++) jb_printf(b, "%s{\"driver\":\"file\"}", e ? "," : "");
+        jb_raw(b, "]");
+    }
+    if (D->fmt[k] == VMF_VMDK || D->fmt[k] == VMF_QCOW2) {
+        if (k == 0 || alone) jb_raw(b, ",\"backing\":null");
+        else { jb_raw(b, ",\"backing\":"); spec_layer(b, I, i, k - 1, 0); }
+    }
+    jb_raw(b, "}");
+}
+/* alone: the top layer only, with no backing (qemu-img info opens without backing files, so it refuses one named) */
+static char *spec_chain(const Imp *I, int i, int alone) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "json:");
+    spec_layer(&b, I, i, I->d[i].n - 1, alone);
+    return b.oom ? (jb_free(&b), NULL) : b.p;
+}
+
+/* the files qemu-img may read for disk i: every layer and every extent */
+static int jail_files(const Imp *I, int i, const char **out, int max) {
+    int n = 0;
+    for (int k = 0; k < I->d[i].n && n < max; k++) {
+        int dup = 0;
+        for (int q = 0; q < n; q++) if (!strcmp(out[q], I->d[i].file[k])) dup = 1;
+        if (!dup) out[n++] = I->d[i].file[k];
+    }
+    static char ext[256][PATH_MAX];
+    int ne = 0;
+    for (int k = 0; k < I->d[i].n; k++) {
+        for (const char *c = I->d[i].extents[k]; c && *c && n < max && ne < 256; ) {
+            const char *nl = strchr(c, '\n');
+            size_t l = nl ? (size_t)(nl - c) : strlen(c);
+            if (l && l < PATH_MAX) {
+                memcpy(ext[ne], c, l); ext[ne][l] = 0;
+                int dup = 0;
+                for (int q = 0; q < n; q++) if (!strcmp(out[q], ext[ne])) dup = 1;
+                if (!dup) out[n++] = ext[ne++];
+            }
+            c = nl ? nl + 1 : c + l;
+        }
+    }
+    return n;
+}
+
+/* qemu-img info of disk i's chain (jailed): its virtual size */
+static int imp_info(Imp *I, int i, char *why, size_t wn) {
+    if (I->d[i].flatten) {
+        /* merged by lord-vm: the size is the base's header's */
+        uint8_t h[512];
+        int hn = head_of(I->d[i].file[0], 0, h, sizeof h);
+        if (I->d[i].fmt[0] == VMF_VDI) {
+            VmiVdi v;
+            if (hn < 456 || vmi_vdi_header(h, (size_t)hn, &v)) { snprintf(why, wn, "a VDI header is broken"); return -1; }
+            I->d[i].vsize = v.size;
+        }
+        return I->d[i].vsize > 0 ? 0 : -1;
+    }
+    char *spec = spec_chain(I, i, 1);
+    if (!spec) { snprintf(why, wn, "out of memory"); return -1; }
+    const char *files[VMI_MAX_CHAIN * VMI_MAX_EXTENTS + VMI_MAX_CHAIN];
+    jail_list = files;
+    jail_n = jail_files(I, i, files, (int)(sizeof files / sizeof files[0]));
+    char *argv[] = { QEMU_IMG, "info", "--output=json", spec, NULL };
+    static char buf[65536];
+    int r = run_tool_in(argv, buf, sizeof buf, files[0], NULL);
+    jail_list = NULL; jail_n = 0;
+    free(spec);
+    if (r) { snprintf(why, wn, "QEMU can't read a disk: %.200s", buf); return -1; }
+    JDoc d;
+    if (json_parse(buf, strlen(buf), &d, NULL, 0)) { snprintf(why, wn, "qemu-img's answer isn't JSON"); return -1; }
+    double vs = json_num(d.root, "virtual-size", 0);
+    const JVal *fs = json_get(json_get(d.root, "format-specific"), "data");
+    int bad = fs && json_get(fs, "data-file");
+    json_free(&d);
+    if (bad) { snprintf(why, wn, "a disk depends on another file: refused"); return -1; }
+    if (vs <= 0) { snprintf(why, wn, "a disk has no size"); return -1; }
+    I->d[i].vsize = (long long)vs;
+    return 0;
+}
+
+/* detects SRC and resolves everything; blockers and notes say what the plan sheet shows. -1 only when SRC isn't
+ * something that can be imported at all (why says) */
+static int imp_detect(const char *src, Imp *I, int want_arch, char *why, size_t wn) {
+    memset(I, 0, sizeof *I);
+    char real[PATH_MAX];
+    if (!realpath(src, real) || !dir_ok(real)) { snprintf(why, wn, "%s: can't be read, or its path has ',' or control characters", src); return -1; }
+    struct stat st;
+    if (stat(real, &st)) { snprintf(why, wn, "%s: %s", src, strerror(errno)); return -1; }
+    char settings[PATH_MAX] = "";
+    int kind = VMI_NONE, loose = 0;
+    if (S_ISDIR(st.st_mode)) {
+        /* a bundle: one settings file in it */
+        snprintf(I->bundle, sizeof I->bundle, "%s", real);
+        DIR *d = opendir(real);
+        struct dirent *e;
+        int found = 0, entries = 0;
+        while (d && (e = readdir(d)) && entries++ < 4096) {
+            int k = ends_ci(e->d_name, ".vmx") ? VMI_VMX : ends_ci(e->d_name, ".vbox") ? VMI_VBOX : !strcmp(e->d_name, "config.pvs") ? VMI_PVS : ends_ci(e->d_name, ".ovf") ? VMI_OVF : VMI_NONE;
+            if (!k) continue;
+            if (found++) { kind = -1; break; }
+            kind = k;
+            if ((size_t)snprintf(settings, sizeof settings, "%s/%.255s", real, e->d_name) >= sizeof settings) { kind = -1; break; }
+        }
+        if (d) closedir(d);
+        if (kind < 0) { snprintf(why, wn, "the folder holds more than one machine's settings: choose the settings file itself"); return -1; }
+        if (!kind) { snprintf(why, wn, "the folder holds no machine settings (.vmx, .vbox, config.pvs, .ovf)"); return -1; }
+    } else if (S_ISREG(st.st_mode)) {
+        snprintf(I->bundle, sizeof I->bundle, "%s", real);
+        *strrchr(I->bundle, '/') = 0;
+        if (!I->bundle[0]) snprintf(I->bundle, sizeof I->bundle, "/");
+        if (ends_ci(real, ".vmx")) kind = VMI_VMX;
+        else if (ends_ci(real, ".vbox")) kind = VMI_VBOX;
+        else if (ends_ci(real, "/config.pvs")) kind = VMI_PVS;
+        else if (ends_ci(real, ".ovf")) kind = VMI_OVF;
+        else if (ends_ci(real, ".ova")) { kind = VMI_OVF; snprintf(I->ova, sizeof I->ova, "%s", real); }
+        else { kind = VMI_DISK; loose = 1; }
+        if (kind != VMI_DISK && !I->ova[0]) snprintf(settings, sizeof settings, "%s", real);
+    } else { snprintf(why, wn, "%s isn't a file or a folder", src); return -1; }
+    if (!strcmp(I->bundle, "/") || !strcmp(I->bundle, "/home") || !strncmp(I->bundle, "/proc", 5) || !strncmp(I->bundle, "/sys", 4) || !strncmp(I->bundle, "/dev", 4)) {
+        snprintf(why, wn, "the source must be in a folder of its own"); return -1;
+    }
+    if (settings[0]) {
+        char r2[PATH_MAX];
+        if (!realpath(settings, r2) || lstat(r2, &st) || !S_ISREG(st.st_mode)) { snprintf(why, wn, "the settings file can't be read"); return -1; }
+        snprintf(I->settings, sizeof I->settings, "%s", r2);
+    }
+    char *text = NULL;
+    size_t tl = 0;
+    if (I->ova[0]) {
+        int fd = open(I->ova, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        struct stat os;
+        if (fd < 0 || fstat(fd, &os)) { if (fd >= 0) close(fd); snprintf(why, wn, "the package can't be read"); return -1; }
+        I->ntar = vmi_tar_list(ova_read, &fd, os.st_size, I->tar, VMI_OVA_MAX, why, wn);
+        if (I->ntar < 0) { close(fd); return -1; }
+        int k = -1;
+        for (int t = 0; t < I->ntar; t++) if (ends_ci(I->tar[t].name, ".ovf")) { if (k >= 0) { close(fd); snprintf(why, wn, "the package holds two descriptors"); return -1; } k = t; }
+        if (k < 0 || I->tar[k].size > IMP_SETTINGS_MAX) { close(fd); snprintf(why, wn, "the package holds no descriptor (.ovf), or it's too large"); return -1; }
+        tl = (size_t)I->tar[k].size;
+        text = malloc(tl + 1);
+        if (!text || pread(fd, text, tl, I->tar[k].offset) != (ssize_t)tl) { free(text); close(fd); snprintf(why, wn, "the package's descriptor can't be read"); return -1; }
+        text[tl] = 0;
+        close(fd);
+    } else if (settings[0]) {
+        text = read_capped(I->settings, IMP_SETTINGS_MAX, &tl);
+        if (!text) { snprintf(why, wn, "the settings file can't be read (or is larger than 4 MB)"); return -1; }
+    }
+    VmiMachine *m = &I->m;
+    int r = 0;
+    char perr[200] = "";
+    switch (kind) {
+    case VMI_VMX: r = vmi_parse_vmx(text, tl, m, perr, sizeof perr); break;
+    case VMI_VBOX: r = vmi_parse_vbox(text, tl, m, perr, sizeof perr); break;
+    case VMI_PVS: r = vmi_parse_pvs(text, tl, m, perr, sizeof perr); break;
+    case VMI_OVF: r = vmi_parse_ovf(text, tl, m, perr, sizeof perr); break;
+    default: {
+        /* a loose disk: a machine around it with this computer's defaults */
+        memset(m, 0, sizeof *m);
+        m->kind = VMI_DISK;
+        m->arch = -1;
+        m->firmware = VM_FW_UEFI;
+        const char *b = strrchr(real, '/') + 1;
+        snprintf(m->name, sizeof m->name, "%.*s", (int)(strrchr(b, '.') && strrchr(b, '.') != b ? strrchr(b, '.') - b : (long)strlen(b)), b);
+        m->ndisk = 1;
+        snprintf(m->disk[0].chain[0].path, VMI_PATH, "%s", b);
+        m->disk[0].nchain = 1;
+        m->disk[0].boot = 1;
+        uint8_t h[512];
+        int hn = head_of(real, 0, h, sizeof h);
+        m->disk[0].chain[0].fmt = vmi_disk_format(h, hn > 0 ? (size_t)hn : 0, real);
+        if (m->disk[0].chain[0].fmt == VMF_UNKNOWN) { snprintf(why, wn, "this file isn't a machine or a disk image that can be imported"); return -1; }
+    } }
+    free(text);
+    (void)loose;
+    if (r) { snprintf(why, wn, "%s", perr); return -1; }
+    if (want_arch >= 0) m->arch = want_arch;
+    if (m->arch < 0) m->arch = VM_ARCH_AMD64;
+    if (m->arch == VM_ARCH_ARM64) m->firmware = VM_FW_UEFI;
+    /* what's beside the settings: a suspended session, the other app still running it */
+    if (kind != VMI_DISK && !I->ova[0]) {
+        DIR *d = opendir(I->bundle);
+        struct dirent *e;
+        int entries = 0;
+        while (d && (e = readdir(d)) && entries++ < 4096) {
+            if (ends_ci(e->d_name, ".vmss") || (kind == VMI_PVS && (ends_ci(e->d_name, ".sav") || ends_ci(e->d_name, ".mem")))) m->saved_state = 1;
+            if (ends_ci(e->d_name, ".lck") || (kind == VMI_PVS && !strcmp(e->d_name, "config.pvs.lock"))) BLOCK(I, "in-use", NULL);
+            if (kind == VMI_VMX && ends_ci(e->d_name, ".vmsn")) m->snapshots = m->snapshots ? m->snapshots : 1;
+        }
+        if (d) closedir(d);
+    }
+    if (m->problem[0]) BLOCK(I, "error", m->problem);
+    if (m->saved_state) BLOCK(I, "saved-state", NULL);
+    if (m->encrypted) BLOCK(I, "encrypted", NULL);
+    if (m->more_disks) BLOCK(I, "too-many-disks", NULL);
+    if (!m->ndisk && !m->problem[0]) BLOCK(I, "no-disk", NULL);
+    char rel0[PATH_MAX];
+    snprintf(rel0, sizeof rel0, "%s", I->settings[0] ? I->settings : real);
+    *strrchr(rel0, '/') = 0;
+    if (!rel0[0]) snprintf(rel0, sizeof rel0, "/");
+    for (int i = 0; i < m->ndisk && !I->blocker[0]; i++) {
+        char w[300];
+        if (imp_disk(I, i, rel0, w, sizeof w) || (!m->encrypted && imp_info(I, i, w, sizeof w))) { BLOCK(I, "error", w); break; }
+        if (m->encrypted) { BLOCK(I, "encrypted", NULL); break; }
+        /* the serial the guest read: a VMDK's ddb.uuid with disk.EnableUUID, or the source's own */
+        if (!strcmp(m->disk[i].serial, "ddb.uuid")) {
+            VmiVmdk vd;
+            char w2[200];
+            m->disk[i].serial[0] = 0;
+            if (I->d[i].fmt[0] == VMF_VMDK && !vmdk_desc(I->d[i].file[0], I->d[i].off[0], I->d[i].len[0], &vd, w2, sizeof w2)) {
+                size_t o = 0;
+                for (const char *c = vd.uuid; *c && o + 1 < sizeof m->disk[i].serial; c++) if (isxdigit((unsigned char)*c)) m->disk[i].serial[o++] = (char)tolower((unsigned char)*c);
+                m->disk[i].serial[o] = 0;
+            }
+        }
+        snprintf(I->d[i].serial, sizeof I->d[i].serial, "%s", m->disk[i].serial);
+    }
+    if (m->snapshots) NOTE(I, "snapshots-flattened", NULL);
+    if (m->tpm) NOTE(I, "tpm", NULL);
+    if (m->secure_boot) NOTE(I, "secure-boot-off", NULL);
+    if (m->firmware == VM_FW_UEFI && kind != VMI_DISK) NOTE(I, "boot-entries", NULL);
+    if (m->cdrom_files) NOTE(I, "cdrom", NULL);
+    if (m->shared_folders) NOTE(I, "shared-folders", NULL);
+    if (m->usb_filters) NOTE(I, "usb", NULL);
+    if (m->more_nics) NOTE(I, "too-many-nics", NULL);
+    for (int i = 0; i < m->nnic; i++) if (!m->nic[i].mac[0]) { NOTE(I, "new-mac", NULL); break; }
+    if (!m->uuid[0] && kind != VMI_DISK) NOTE(I, "new-uuid", NULL);
+    for (int i = 0; i < m->ndisk; i++) if (strlen(m->disk[i].serial) > VM_SERIAL_MAX || !vm_serial_valid(m->disk[i].serial)) { NOTE(I, "serial-dropped", m->disk[i].serial); break; }
+    if (kind != VMI_DISK) NOTE(I, "license", NULL);
+    return 0;
+}
+
+/* the VmMachine the import makes (host limits applied; what was cut is in the notes) */
+static int imp_machine(Imp *I, VmMachine *n, const VmHost *h, int devices, int network, int fw_over, int vcpus, int mem, char *why, size_t wn) {
+    VmiMachine *m = &I->m;
+    vm_machine_defaults(n, h, m->arch);
+    if (m->uuid[0]) snprintf(n->id, sizeof n->id, "%s", m->uuid);
+    for (char *c = n->id; *c; c++) *c = (char)tolower((unsigned char)*c);
+    if (!vm_uuid_valid(n->id)) vm_new_id(n->id);
+    char nm[VM_NAME_MAX + 1];
+    snprintf(nm, sizeof nm, "%s", m->name[0] ? m->name : "Imported machine");
+    if (!vm_name_valid(nm)) snprintf(nm, sizeof nm, "Imported machine");
+    snprintf(n->name, sizeof n->name, "%s", nm);
+    if (m->kind != VMI_DISK) { n->vcpus = m->vcpus; n->memory_mb = m->memory_mb; n->firmware = m->firmware; }
+    if (fw_over >= 0) n->firmware = fw_over;
+    if (vcpus > 0) n->vcpus = vcpus;
+    if (mem > 0) n->memory_mb = mem;
+    if (m->arch == VM_ARCH_ARM64) n->firmware = VM_FW_UEFI;
+    if (m->sockets && !vcpus) { n->cpu_sockets = m->sockets; n->cpu_cores = m->cores; n->cpu_threads = m->threads; }
+    if (n->vcpus > h->cpus) { NOTE(I, "vcpus-cut", NULL); n->vcpus = h->cpus; n->cpu_sockets = n->cpu_cores = n->cpu_threads = 0; }
+    if (n->memory_mb > vm_mem_max_mb(h)) { NOTE(I, "memory-cut", NULL); n->memory_mb = (int)vm_mem_max_mb(h); }
+    if (n->memory_mb < VM_MEM_MIN_MB) n->memory_mb = VM_MEM_MIN_MB;
+    n->network = network;
+    n->devices = devices;
+    n->rtc = m->rtc_local ? VM_RTC_LOCAL : VM_RTC_UTC;
+    /* the cards: the first is connected, the others keep their addresses */
+    int nic = -1;
+    for (int i = 0; i < m->nnic; i++) {
+        char mac[18];
+        if (m->nic[i].mac[0]) memcpy(mac, m->nic[i].mac, 18); else vm_new_mac(mac);
+        if (nic < 0) { memcpy(n->mac, mac, 18); nic = i; continue; }
+        if (n->n_extra_macs < VM_EXTRA_NICS && strcmp(mac, n->mac)) {
+            int k = n->n_extra_macs++, model = devices == VM_DEV_COMPAT ? VM_NIC_E1000E : VM_NIC_VIRTIO;
+            memcpy(n->extra_macs[k], mac, 18);
+            for (int q = 0; m->nic[i].model[0] && VM_NIC_MODELS[q]; q++) if (!strcmp(m->nic[i].model, VM_NIC_MODELS[q])) model = q;
+            n->extra_models[k] = model;
+        }
+    }
+    n->nic_model = devices == VM_DEV_COMPAT ? VM_NIC_E1000E : VM_NIC_VIRTIO;
+    if (nic >= 0 && m->nic[nic].model[0])
+        for (int k = 0; VM_NIC_MODELS[k]; k++) if (!strcmp(m->nic[nic].model, VM_NIC_MODELS[k])) n->nic_model = k;
+    snprintf(n->sm_manufacturer, sizeof n->sm_manufacturer, "%s", m->sm_manufacturer);
+    snprintf(n->sm_product, sizeof n->sm_product, "%s", m->sm_product);
+    snprintf(n->sm_version, sizeof n->sm_version, "%s", m->sm_version);
+    snprintf(n->sm_serial, sizeof n->sm_serial, "%s", m->sm_serial);
+    snprintf(n->sm_sku, sizeof n->sm_sku, "%s", m->sm_sku);
+    snprintf(n->sm_family, sizeof n->sm_family, "%s", m->sm_family);
+    n->disk_gb = (int)((I->d[0].vsize + (1LL << 30) - 1) >> 30);
+    if (n->disk_gb < VM_DISK_MIN_GB) n->disk_gb = VM_DISK_MIN_GB;
+    if (vm_serial_valid(I->d[0].serial)) memcpy(n->disk_serial, I->d[0].serial, strlen(I->d[0].serial) + 1);
+    n->n_data = m->ndisk - 1;
+    for (int i = 1; i < m->ndisk; i++) {
+        n->data_gb[i - 1] = (int)((I->d[i].vsize + (1LL << 30) - 1) >> 30);
+        if (n->data_gb[i - 1] < VM_DISK_MIN_GB) n->data_gb[i - 1] = VM_DISK_MIN_GB;
+        if (vm_serial_valid(I->d[i].serial)) memcpy(n->data_serial[i - 1], I->d[i].serial, strlen(I->d[i].serial) + 1);
+    }
+    n->accel = h->arch == m->arch && h->kvm ? VM_ACCEL_KVM : VM_ACCEL_TCG;
+    const char *code = NULL, *vars = NULL;
+    if (n->firmware == VM_FW_UEFI) {
+        if (firmware_for(m->arch, &code, &vars)) { snprintf(why, wn, "no UEFI firmware for %s is installed (%s)", vm_arch_name(m->arch), m->arch == VM_ARCH_ARM64 ? "qemu-efi-aarch64" : "ovmf"); return -1; }
+        snprintf(n->firmware_code, sizeof n->firmware_code, "%s", code);
+        if (sha256_file(code, n->firmware_sha256)) { snprintf(why, wn, "can't read %s", code); return -1; }
+    } else { n->firmware_code[0] = 0; n->firmware_sha256[0] = 0; }
+    if (!file_exists(QEMU_BIN[m->arch])) { snprintf(why, wn, "%s isn't installed", QEMU_BIN[m->arch]); return -1; }
+    if (machine_type_for(m->arch, n->machine_type, sizeof n->machine_type)) { snprintf(why, wn, "can't read QEMU's machine types"); return -1; }
+    char err[256];
+    if (vm_machine_check(n, err, sizeof err)) { snprintf(why, wn, "%s", err); return -1; }
+    return 0;
+}
+
+static void print_plan(const Imp *I, const VmMachine *n, const VmHost *h, int ok, const char *why) {
+    const VmiMachine *m = &I->m;
+    const char *const KIND[] = { "", "vmx", "vbox", "pvs", I->ova[0] ? "ova" : "ovf", "disk" };
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"kind\":\"%s\",\"name\":", I->ova[0] && m->kind == VMI_OVF ? "ova" : KIND[m->kind]);
+    jb_str(&b, ok ? n->name : m->name);
+    jb_raw(&b, ",\"source\":"); jb_str(&b, I->settings[0] ? I->settings : I->ova[0] ? I->ova : I->bundle);
+    jb_raw(&b, ",\"guest_os\":"); jb_str(&b, m->guest_os);
+    jb_printf(&b, ",\"windows\":%s,\"arch\":\"%s\",\"emulated\":%s,\"firmware\":\"%s\",\"secure_boot\":%s",
+              m->windows ? "true" : "false", vm_arch_name(m->arch), h->arch != m->arch || !h->kvm ? "true" : "false",
+              (ok ? n->firmware : m->firmware) == VM_FW_UEFI ? "uefi" : "bios", m->secure_boot ? "true" : "false");
+    jb_printf(&b, ",\"vcpus\":%d,\"sockets\":%d,\"cores\":%d,\"threads\":%d,\"memory_mb\":%d", m->vcpus, m->sockets, m->cores, m->threads, m->memory_mb);
+    if (ok) jb_printf(&b, ",\"vcpus_here\":%d,\"memory_mb_here\":%d,\"devices\":\"%s\",\"nic_model\":\"%s\",\"rtc\":\"%s\",\"uuid_here\":\"%s\"",
+                      n->vcpus, n->memory_mb, n->devices ? "compat" : "virtio", VM_NIC_MODELS[n->nic_model], n->rtc ? "local" : "utc", n->id);
+    jb_raw(&b, ",\"uuid\":"); jb_str(&b, m->uuid);
+    jb_raw(&b, ",\"uuid_how\":"); jb_str(&b, m->uuid_how);
+    jb_raw(&b, ",\"smbios\":{\"manufacturer\":"); jb_str(&b, m->sm_manufacturer);
+    jb_raw(&b, ",\"product\":"); jb_str(&b, m->sm_product);
+    jb_raw(&b, ",\"version\":"); jb_str(&b, m->sm_version);
+    jb_raw(&b, ",\"serial\":"); jb_str(&b, m->sm_serial);
+    jb_raw(&b, ",\"sku\":"); jb_str(&b, m->sm_sku);
+    jb_raw(&b, ",\"family\":"); jb_str(&b, m->sm_family);
+    jb_raw(&b, "},\"nics\":[");
+    for (int i = 0; i < m->nnic; i++) {
+        jb_printf(&b, "%s{\"mac\":\"%s\",\"model\":\"%s\",\"src_model\":", i ? "," : "", m->nic[i].mac, m->nic[i].model);
+        jb_str(&b, m->nic[i].src_model);
+        jb_printf(&b, ",\"connected\":%s,\"first\":%s}", m->nic[i].connected ? "true" : "false", i == 0 ? "true" : "false");
+    }
+    jb_raw(&b, "],\"disks\":[");
+    long long need = 0;
+    for (int i = 0; i < m->ndisk; i++) {
+        const char *f = I->d[i].n ? strrchr(I->d[i].file[I->d[i].n - 1], '/') : NULL;
+        jb_printf(&b, "%s{\"file\":", i ? "," : "");
+        jb_str(&b, I->ova[0] ? m->disk[i].chain[0].path : f ? f + 1 : m->disk[i].chain[0].path);
+        jb_printf(&b, ",\"format\":\"%s\",\"layers\":%d,\"vsize\":%lld,\"used\":%lld,\"bus\":\"%s\",\"serial\":", fmt_name(I->d[i].n ? I->d[i].fmt[0] : m->disk[i].chain[0].fmt),
+                  I->d[i].n, I->d[i].vsize, I->d[i].used, m->disk[i].bus);
+        jb_str(&b, I->d[i].serial);
+        jb_printf(&b, ",\"serial_kept\":%s}", I->d[i].serial[0] && vm_serial_valid(I->d[i].serial) ? "true" : "false");
+        need += I->d[i].used * (I->d[i].flatten ? 2 : 1);     /* a merge writes a temporary raw file first */
+    }
+    jb_printf(&b, "],\"snapshots\":%d,\"saved_state\":%s,\"tpm\":%s,\"encrypted\":%s,\"needs_bytes\":%lld", m->snapshots, m->saved_state ? "true" : "false",
+              m->tpm ? "true" : "false", m->encrypted ? "true" : "false", need);
+    jb_printf(&b, ",\"blockers\":[%s", I->blocker);
+    if (!ok && why && why[0]) { jb_printf(&b, "%s{\"code\":\"error\",\"text\":", I->blocker[0] ? "," : ""); jb_str(&b, why); jb_raw(&b, "}"); }
+    jb_printf(&b, "],\"notes\":[%s]}\n", I->notes);
+    if (!b.oom) fputs(b.p, stdout);
+    jb_free(&b);
+}
+
+static int arg_arch(const char *v) { return !strcmp(v, "arm64") ? VM_ARCH_ARM64 : !strcmp(v, "amd64") ? VM_ARCH_AMD64 : -2; }
+
+static int cmd_import_plan(const char *src, int argc, char **argv) {
+    int arch = -1;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--arch") && i + 1 < argc) { arch = arg_arch(argv[++i]); if (arch == -2) return 2; }
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
+    }
+    static Imp I;
+    char why[400] = "";
+    if (imp_detect(src, &I, arch, why, sizeof why)) { printf("{\"kind\":\"\",\"blockers\":[{\"code\":\"error\",\"text\":"); print_json_str(why); printf("}],\"notes\":[]}\n"); return 1; }
+    VmHost h;
+    vm_host_probe(&h);
+    VmMachine n;
+    int ok = !I.blocker[0] && !imp_machine(&I, &n, &h, VM_DEV_COMPAT, VM_NET_SHARED, -1, 0, 0, why, sizeof why);
+    print_plan(&I, &n, &h, ok, why);
+    return ok ? 0 : 1;
+}
+
+/* ---- merging VDI and .hds snapshot layers (in a jailed child of lord-vm) ---- */
+
+typedef struct { int fd; long long size; uint32_t *map; uint32_t nmap; uint64_t data_off, block, mult; int vdi; } Layer;
+
+static int layer_open(Layer *L, const char *path, int fmt, char *why, size_t wn) {
+    memset(L, 0, sizeof *L);
+    L->fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    if (L->fd < 0 || fstat(L->fd, &st)) { snprintf(why, wn, "can't open a layer"); return -1; }
+    L->size = st.st_size;
+    uint8_t h[512];
+    if (pread(L->fd, h, sizeof h, 0) < 64) { snprintf(why, wn, "a layer is cut short"); return -1; }
+    #define LE32(p) ((uint32_t)(p)[0] | (uint32_t)(p)[1] << 8 | (uint32_t)(p)[2] << 16 | (uint32_t)(p)[3] << 24)
+    uint64_t mapoff;
+    if (fmt == VMF_VDI) {
+        L->vdi = 1;
+        uint32_t bmap = LE32(h + 340), boff = LE32(h + 344), bsize = LE32(h + 376), extra = LE32(h + 380), blocks = LE32(h + 384);
+        if (LE32(h + 360) != 512 || extra || bsize < 512 || bsize > (64u << 20) || (bsize & 511) || !blocks || blocks > (16u << 20)) { snprintf(why, wn, "a VDI layer has a layout that isn't supported"); return -1; }
+        L->nmap = blocks; L->block = bsize; L->data_off = boff; mapoff = bmap;
+    } else {
+        int ext = !memcmp(h, "WithouFreSpacExt", 16);
+        uint32_t tracks = LE32(h + 28), bat = LE32(h + 32);
+        if (LE32(h + 16) != 2 || !tracks || tracks > (1u << 16) || !bat || bat > (16u << 20)) { snprintf(why, wn, "an .hds layer has a layout that isn't supported"); return -1; }
+        L->nmap = bat; L->block = (uint64_t)tracks * 512; L->mult = ext ? tracks : 1; mapoff = 64;
+    }
+    if (mapoff + (uint64_t)L->nmap * 4 > (uint64_t)L->size) { snprintf(why, wn, "a layer's block map is cut short"); return -1; }
+    L->map = malloc((size_t)L->nmap * 4);
+    if (!L->map || pread(L->fd, L->map, (size_t)L->nmap * 4, (off_t)mapoff) != (ssize_t)L->nmap * 4) { snprintf(why, wn, "a layer's block map can't be read"); return -1; }
+    for (uint32_t i = 0; i < L->nmap; i++) { uint8_t *p = (uint8_t *)&L->map[i]; L->map[i] = LE32(p); }
+    return 0;
+}
+
+/* where block b of layer L is: >0 its offset in the file, 0 not in this layer (look below), -1 zeros, -2 broken */
+static long long layer_where(const Layer *L, uint32_t b) {
+    uint32_t e = L->map[b];
+    long long off;
+    if (L->vdi) {
+        if (e == 0xffffffffu) return 0;
+        if (e == 0xfffffffeu) return -1;
+        off = (long long)L->data_off + (long long)e * (long long)L->block;
+    } else {
+        if (!e) return 0;
+        off = (long long)e * (long long)L->mult * 512;
+    }
+    return off > 0 && off + (long long)L->block <= L->size ? off : -2;
+}
+
+static int flatten(const Imp *I, int di, const char *out, long long vsize, char *why, size_t wn) {
+    const typeof(I->d[0]) *D = &I->d[di];
+    Layer L[VMI_MAX_CHAIN];
+    int n = D->n;
+    for (int k = 0; k < n; k++) if (layer_open(&L[k], D->file[k], D->fmt[k], why, wn)) return -1;
+    for (int k = 1; k < n; k++) if (L[k].block != L[0].block || L[k].nmap != L[0].nmap) { snprintf(why, wn, "a disk's snapshot layers don't line up"); return -1; }
+    if ((long long)L[0].nmap * (long long)L[0].block < vsize) { snprintf(why, wn, "a disk's block map is smaller than the disk"); return -1; }
+    int o = open(out, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (o < 0 || ftruncate(o, vsize)) { snprintf(why, wn, "can't make the merged disk"); return -1; }
+    char *buf = malloc((size_t)L[0].block);
+    if (!buf) return -1;
+    uint32_t blocks = (uint32_t)((vsize + (long long)L[0].block - 1) / (long long)L[0].block);
+    double last = -1;
+    for (uint32_t b = 0; b < blocks; b++) {
+        long long where = 0;
+        int k = n - 1;
+        for (; k >= 0; k--) { where = layer_where(&L[k], b); if (where) break; }
+        if (where == -2) { snprintf(why, wn, "a disk's block map points outside its file"); free(buf); close(o); return -1; }
+        if (where > 0) {
+            long long len = (long long)L[0].block;
+            if ((long long)b * len + len > vsize) len = vsize - (long long)b * len;
+            if (pread(L[k].fd, buf, (size_t)len, where) != len) { snprintf(why, wn, "a disk can't be read"); free(buf); close(o); return -1; }
+            int zero = 1;
+            for (long long q = 0; q < len; q++) if (buf[q]) { zero = 0; break; }
+            if (!zero && pwrite(o, buf, (size_t)len, (long long)b * (long long)L[0].block) != len) { snprintf(why, wn, "can't write the merged disk"); free(buf); close(o); return -1; }
+        }
+        double pct = 100.0 * (b + 1) / blocks;
+        if (pct - last >= 1 && tool_progress) { tool_progress(pct); last = pct; }
+    }
+    free(buf);
+    if (fsync(o)) { close(o); return -1; }
+    close(o);
+    for (int k = 0; k < n; k++) { close(L[k].fd); free(L[k].map); }
+    return 0;
+}
+
+/* runs flatten() in a child jailed like qemu-img: it may read the layers and write only in disks/ */
+static int flatten_jailed(const Imp *I, int di, const char *out, const char *dd, long long vsize, char *why, size_t wn) {
+    int p[2];
+    if (pipe2(p, O_CLOEXEC)) return -1;
+    pid_t pid = fork();
+    if (pid < 0) { close(p[0]); close(p[1]); return -1; }
+    if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        close(p[0]);
+        const char *files[VMI_MAX_CHAIN];
+        for (int k = 0; k < I->d[di].n; k++) files[k] = I->d[di].file[k];
+        int mask = vm_jail_tool_n(files, I->d[di].n, dd);
+        if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
+            dprintf(p[1], "the merge's sandbox couldn't be set up\n"); _exit(126);
+        }
+        char w[200] = "";
+        int r = flatten(I, di, out, vsize, w, sizeof w);
+        if (r) dprintf(p[1], "%s\n", w);
+        _exit(r ? 1 : 0);
+    }
+    close(p[1]);
+    char b[256];
+    ssize_t r = read(p[0], b, sizeof b - 1);
+    close(p[0]);
+    int st;
+    while (waitpid(pid, &st, 0) < 0 && errno == EINTR) ;
+    if (WIFEXITED(st) && !WEXITSTATUS(st)) return 0;
+    if (r > 0) { b[r] = 0; char *nl = strchr(b, '\n'); if (nl) *nl = 0; snprintf(why, wn, "%s", b); }
+    else snprintf(why, wn, "merging the snapshots failed");
+    return -1;
+}
+
+static int imp_disk_i, imp_disks;
+static double imp_weight[VMI_MAX_DISKS], imp_base[VMI_MAX_DISKS], imp_stage_w, imp_stage_base;
+static void imp_progress(double pct) {
+    double total = imp_base[imp_disk_i] + imp_weight[imp_disk_i] * (imp_stage_base + imp_stage_w * pct / 100.0);
+    printf("{\"progress\":%.1f,\"disk\":%d,\"disks\":%d}\n", total, imp_disk_i + 1, imp_disks);
+    fflush(stdout);
+}
+
+/* a loose disk with the same identity as a machine in the library is fine (a Duplicate's rule applies at start) */
+static int cmd_import_machine(const char *src, int argc, char **argv) {
+    if (argc < 1) { fprintf(stderr, "lord-vm: --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"); return 2; }
+    const char *dst = argv[0], *name = NULL;
+    int arch = -1, devices = VM_DEV_COMPAT, network = VM_NET_SHARED, fw = -1, vcpus = 0, mem = 0;
+    for (int i = 1; i < argc; i++) {
+        const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
+        if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
+        i++;
+        if (!strcmp(a, "--name")) name = v;
+        else if (!strcmp(a, "--arch")) { arch = arg_arch(v); if (arch == -2) return 2; }
+        else if (!strcmp(a, "--devices")) { devices = parse_enum(v, "virtio", "compat"); if (devices < 0) return 2; }
+        else if (!strcmp(a, "--network")) { network = parse_enum(v, "shared", "isolated"); if (network < 0) return 2; }
+        else if (!strcmp(a, "--firmware")) { fw = parse_enum(v, "uefi", "bios"); if (fw < 0) return 2; }
+        else if (!strcmp(a, "--vcpus")) vcpus = atoi(v);
+        else if (!strcmp(a, "--memory")) mem = atoi(v);
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
+    }
+    static Imp I;
+    char why[400] = "";
+    if (imp_detect(src, &I, arch, why, sizeof why)) { fprintf(stderr, "lord-vm: %s\n", why); return 1; }
+    if (I.blocker[0]) {
+        /* the first one, in words */
+        const char *t = strstr(I.blocker, "\"text\":\"");
+        if (strstr(I.blocker, "\"saved-state\"")) fprintf(stderr, "lord-vm: the machine is suspended in the other app: start it there and shut it down first\n");
+        else if (strstr(I.blocker, "\"encrypted\"")) fprintf(stderr, "lord-vm: the machine or one of its disks is encrypted: remove the encryption in the other app first\n");
+        else if (strstr(I.blocker, "\"in-use\"")) fprintf(stderr, "lord-vm: the other app has the machine open: quit it first\n");
+        else if (strstr(I.blocker, "\"too-many-disks\"")) fprintf(stderr, "lord-vm: the machine has more than %d disks\n", VMI_MAX_DISKS);
+        else if (strstr(I.blocker, "\"no-disk\"")) fprintf(stderr, "lord-vm: the machine has no disk\n");
+        else if (t) { char e[300]; size_t k = 0; for (t += 8; *t && *t != '"' && k + 1 < sizeof e; t++) e[k++] = *t; e[k] = 0; fprintf(stderr, "lord-vm: %s\n", e); }
+        else fprintf(stderr, "lord-vm: the machine can't be imported\n");
+        return 1;
+    }
+    VmHost h;
+    vm_host_probe(&h);
+    VmMachine n;
+    if (imp_machine(&I, &n, &h, devices, network, fw, vcpus, mem, why, sizeof why)) { fprintf(stderr, "lord-vm: %s\n", why); return 1; }
+    if (name) {
+        if (!vm_name_valid(name)) { fprintf(stderr, "lord-vm: the name isn't valid\n"); return 1; }
+        snprintf(n.name, sizeof n.name, "%s", name);
+    }
+    char err[256], warn[256];
+    if (vm_machine_check_host(&n, &h, err, sizeof err, warn, sizeof warn)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    /* the new folder: hidden beside where it goes, renamed into place at the end */
+    if (!dir_ok(dst) || dst[0] != '/' || !strchr(dst + 1, '/')) { fprintf(stderr, "lord-vm: %s: an absolute folder without ',' or control characters\n", dst); return 2; }
+    if (!access(dst, F_OK)) { fprintf(stderr, "lord-vm: %s exists\n", dst); return 3; }
+    char lib[PATH_MAX], parent[PATH_MAX], tmp[PATH_MAX + 64] = "";
+    snprintf(parent, sizeof parent, "%s", dst);
+    char *ds = strrchr(parent, '/');
+    *ds = 0;
+    if (!realpath(parent[0] ? parent : "/", lib)) { fprintf(stderr, "lord-vm: %s: %s\n", parent, strerror(errno)); return 1; }
+    size_t bl = strlen(I.bundle);
+    if (I.settings[0] && !strncmp(lib, I.bundle, bl) && (lib[bl] == '/' || !lib[bl])) { fprintf(stderr, "lord-vm: the new machine can't go inside the source's folder\n"); return 1; }
+    snprintf(S.dir, sizeof S.dir, "%s", lib);
+    clone_sweep(lib);
+    char final[PATH_MAX + 64];
+    snprintf(final, sizeof final, "%s/%s", lib, ds + 1);
+    snprintf(tmp, sizeof tmp, "%s/.%s.part-%d", lib, ds + 1, (int)getpid());
+    int rc = 1, lock = -1;
+    char p1[PATH_MAX + 128], dd[PATH_MAX + 80];
+    if (mkdir(tmp, 0700)) { fprintf(stderr, "lord-vm: can't make %s: %s\n", tmp, strerror(errno)); return 1; }
+    snprintf(dd, sizeof dd, "%s/disks", tmp); mkdir(dd, 0700);
+    snprintf(p1, sizeof p1, "%s/log", tmp); mkdir(p1, 0700);
+    /* what the import did stays with the machine: log/import.log */
+    snprintf(p1, sizeof p1, "%s/log/import.log", tmp);
+    log_fd = open(p1, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
+    vlog("import: from %s (%s), %d disk(s), UUID %s (%s)", I.settings[0] ? I.settings : I.ova[0] ? I.ova : I.bundle, I.m.guest_os, I.m.ndisk,
+         n.id, I.m.uuid_how[0] ? I.m.uuid_how : "new");
+    lock = open_lock(tmp);
+    if (vm_op_begin(tmp, "import", NULL, I.settings[0] ? I.settings : I.ova[0] ? I.ova : I.bundle, final)) { fprintf(stderr, "lord-vm: can't write operation.json\n"); goto out; }
+    {
+        /* free space: what the source's files use, at most; qemu-img writes only what the guest wrote */
+        long long need = 0;
+        for (int i = 0; i < I.m.ndisk; i++) need += I.d[i].used;
+        struct statvfs sv;
+        if (!statvfs(lib, &sv) && (long long)sv.f_bavail * (long long)sv.f_frsize < need + (256LL << 20))
+            fprintf(stderr, "lord-vm: note: %lld MB free here, the source's disks use up to %lld MB\n", (long long)sv.f_bavail * (long long)sv.f_frsize >> 20, need >> 20);
+    }
+    long long total = 0;
+    imp_disks = I.m.ndisk;
+    for (int i = 0; i < I.m.ndisk; i++) total += I.d[i].vsize > 0 ? I.d[i].vsize : 1;
+    double acc = 0;
+    for (int i = 0; i < I.m.ndisk; i++) { imp_weight[i] = 100.0 * (double)(I.d[i].vsize > 0 ? I.d[i].vsize : 1) / (double)total; imp_base[i] = acc; acc += imp_weight[i]; }
+    tool_progress = imp_progress;
+    for (int i = 0; i < I.m.ndisk; i++) {
+        imp_disk_i = i;
+        char out[PATH_MAX + 128], fin[PATH_MAX + 128];
+        snprintf(fin, sizeof fin, i ? "%s/disks/data-%d.qcow2" : "%s/disks/system.qcow2", tmp, i);
+        snprintf(out, sizeof out, "%s/disks/.import-%d.qcow2", tmp, i);
+        vlog("import: disk %d of %d, %s, %d layer(s), %lld bytes", i + 1, I.m.ndisk, fmt_name(I.d[i].fmt[0]), I.d[i].n, I.d[i].vsize);
+        if (I.d[i].flatten) {
+            char raw[PATH_MAX + 128];
+            snprintf(raw, sizeof raw, "%s/disks/.import-%d.raw", tmp, i);
+            imp_stage_base = 0; imp_stage_w = 0.6;
+            if (flatten_jailed(&I, i, raw, dd, I.d[i].vsize, why, sizeof why)) { fprintf(stderr, "lord-vm: merging a disk's snapshots failed: %s\n", why); unlink(raw); goto out; }
+            imp_stage_base = 0.6; imp_stage_w = 0.4;
+            char spec[PATH_MAX + 128];
+            JBuf b;
+            jb_init(&b);
+            jb_raw(&b, "json:{\"driver\":\"raw\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, raw); jb_raw(&b, "}}");
+            snprintf(spec, sizeof spec, "%s", b.oom ? "" : b.p);
+            jb_free(&b);
+            char *cv[] = { QEMU_IMG, "convert", "-p", "-O", "qcow2", spec, out, NULL };
+            int r = run_tool_in(cv, err, sizeof err, raw, dd);
+            unlink(raw);
+            if (r) { fprintf(stderr, "lord-vm: converting a disk failed: %s\n", err); goto out; }
+        } else {
+            imp_stage_base = 0; imp_stage_w = 1;
+            char *spec = spec_chain(&I, i, 0);
+            const char *files[VMI_MAX_CHAIN * VMI_MAX_EXTENTS + VMI_MAX_CHAIN];
+            jail_list = files;
+            jail_n = jail_files(&I, i, files, (int)(sizeof files / sizeof files[0]));
+            char *cv[] = { QEMU_IMG, "convert", "-p", "-O", "qcow2", spec ? spec : "", out, NULL };
+            int r = !spec || run_tool_in(cv, err, sizeof err, files[0], dd);
+            jail_list = NULL; jail_n = 0;
+            free(spec);
+            if (r) { fprintf(stderr, "lord-vm: converting a disk failed: %s\n", err); goto out; }
+        }
+        char w2[256];
+        if (disk_plain(out, w2, sizeof w2)) { fprintf(stderr, "lord-vm: the converted disk isn't plain: %s\n", w2); goto out; }
+        if (rename(out, fin)) { fprintf(stderr, "lord-vm: can't put a disk in place\n"); goto out; }
+        chmod(fin, 0600);
+    }
+    tool_progress = NULL;
+    if (n.firmware == VM_FW_UEFI) {
+        const char *code = NULL, *vars = NULL;
+        firmware_for(n.arch, &code, &vars);
+        char nv[PATH_MAX + 64];
+        snprintf(nv, sizeof nv, "%s/disks/nvram.qcow2", tmp);
+        char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "raw", "-O", "qcow2", (char *)vars, nv, NULL };
+        if (run_tool(cv, err, sizeof err)) { fprintf(stderr, "lord-vm: making the UEFI variables failed: %s\n", err); goto out; }
+        chmod(nv, 0600);
+    }
+    printf("{\"progress\":100.0,\"disk\":%d,\"disks\":%d}\n", imp_disks, imp_disks);
+    fflush(stdout);
+    if (vm_machine_save(tmp, &n)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
+    {
+        /* where it came from, for Configure's General and the log; the plan's notes, for the app's "what changed" */
+        char ip[PATH_MAX + 64];
+        snprintf(ip, sizeof ip, "%s/imported.json", tmp);
+        int ifd = open(ip, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        FILE *f = ifd >= 0 ? fdopen(ifd, "w") : NULL;
+        if (f) {
+            static const char *const KIND[] = { "", "vmx", "vbox", "pvs", "ovf", "disk" };
+            fprintf(f, "{\"from\":\"%s\",\"source\":", I.ova[0] ? "ova" : KIND[I.m.kind]);
+            JBuf b; jb_init(&b); jb_str(&b, I.settings[0] ? I.settings : I.ova[0] ? I.ova : I.bundle);
+            fputs(b.oom ? "\"\"" : b.p, f); jb_free(&b);
+            char now[21]; vm_now_iso(now);
+            fprintf(f, ",\"at\":\"%s\",\"uuid_how\":", now);
+            jb_init(&b); jb_str(&b, I.m.uuid_how); fputs(b.oom ? "\"\"" : b.p, f); jb_free(&b);
+            fprintf(f, ",\"guest_os\":");
+            jb_init(&b); jb_str(&b, I.m.guest_os); fputs(b.oom ? "\"\"" : b.p, f); jb_free(&b);
+            fprintf(f, ",\"windows\":%s,\"notes\":[%s]}\n", I.m.windows ? "true" : "false", I.notes);
+            fclose(f);
+        }
+    }
+    if (rename(tmp, final)) { fprintf(stderr, "lord-vm: can't put the machine in place: %s\n", strerror(errno)); goto out; }
+    tmp[0] = 0;
+    vm_sync_dir(lib);
+    vm_op_end(final);
+    vlog("import: %s made from %s", final, I.settings[0] ? I.settings : I.bundle);
+    printf("{\"imported\":true,\"dir\":");
+    print_json_str(final);
+    printf(",\"id\":\"%s\",\"devices\":\"%s\",\"nic_model\":\"%s\",\"mac\":\"%s\"}\n", n.id, n.devices ? "compat" : "virtio", VM_NIC_MODELS[n.nic_model], n.mac);
+    rc = 0;
+out:
+    tool_progress = NULL;
+    if (tmp[0]) rm_tree(tmp);
+    if (lock >= 0) close(lock);
+    for (int i = 0; i < VMI_MAX_DISKS; i++) for (int k = 0; k < VMI_MAX_CHAIN; k++) { free(I.d[i].extents[k]); I.d[i].extents[k] = NULL; }
+    return rc;
+}
+
 static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
@@ -3381,6 +4496,9 @@ static int usage(void) {
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"
             "       lord-vm --compact DIR [--estimate]\n"
+            "       lord-vm --import-plan SRC [--arch arm64|amd64]   (a machine of another virtualization app: what comes along)\n"
+            "       lord-vm --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated]\n"
+            "                                        [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
@@ -3400,6 +4518,8 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--snapshot")) return cmd_snapshot(dir, rest, rv);
     if (!strcmp(cmd, "--clone")) return cmd_clone(dir, rest, rv);
     if (!strcmp(cmd, "--compact")) return cmd_compact(dir, rest, rv);
+    if (!strcmp(cmd, "--import-plan")) return cmd_import_plan(dir, rest, rv);
+    if (!strcmp(cmd, "--import-machine")) return cmd_import_machine(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
         { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND }, { "--agent", VM_AGENT },

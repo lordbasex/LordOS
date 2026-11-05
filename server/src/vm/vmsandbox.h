@@ -34,6 +34,9 @@ int vm_jail_qemu(const VmQemuJail *j);
 int vm_jail_tool(const char *read_file, const char *rw_dir);
 /* the same with a second file it may read (a linked clone's base, to flatten or measure it) */
 int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_dir);
+/* the same with any number of files it may read (an import: a VMDK descriptor and its extents, a chain of snapshot
+ * layers); every one must exist, or nothing is allowed */
+int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir);
 /* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied */
 int vm_jail_self(const char *machine_dir, const char *runtime_dir);
 /* the kernel's Landlock ABI (0 none) */

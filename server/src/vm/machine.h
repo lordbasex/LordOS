@@ -19,9 +19,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* 1: Phase 1. 2 (Beta): base, agent, clipboard. An older file is read as is and written as the current schema, with a
- * copy of the old one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 2
+/* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
+ * smbios, disk_serial, data_disks, rtc. An older file is read as is and written as the current schema, with a copy of the old
+ * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
+#define VM_SCHEMA 3
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -30,6 +31,17 @@ enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
 enum { VM_NET_SHARED = 0, VM_NET_ISOLATED };
 /* the shared clipboard's direction (6.8): off unless chosen */
 enum { VM_CLIP_OFF = 0, VM_CLIP_TO_GUEST, VM_CLIP_FROM_GUEST, VM_CLIP_BOTH };
+/* the disks' and the pointer's devices (6.22): virtio (fast, needs the guest's drivers) or compat, the ones every system has
+ * drivers for: SATA (AHCI) disks and CD/DVD, a USB tablet. The network card has its own model (nic_model). */
+enum { VM_DEV_VIRTIO = 0, VM_DEV_COMPAT };
+/* network card models: virtio-net-pci and the emulated cards an imported machine may have had */
+enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
+extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
+enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
+#define VM_EXTRA_NICS  7            /* cards beyond the first, carried from an import: present with their MAC, not connected */
+#define VM_DATA_DISKS  4            /* disks/data-1.qcow2 ... data-4.qcow2 */
+#define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
+#define VM_SERIAL_MAX  20           /* a disk's serial: ATA's 20 characters */
 
 /* Limits that hold on every computer */
 #define VM_NAME_MAX       64            /* bytes of UTF-8 */
@@ -67,6 +79,20 @@ typedef struct {
     int agent;                          /* the guest agent channels (6.17): qemu-guest-agent and org.lordos.agent; off
                                          * unless turned on (schema 2) */
     int clipboard;                      /* VM_CLIP_*, through org.lordos.agent (schema 2) */
+    /* schema 3: what an imported machine keeps of its source's hardware (6.22) */
+    int devices;                        /* VM_DEV_* */
+    int nic_model;                      /* VM_NIC_* */
+    char extra_macs[VM_EXTRA_NICS][18];       /* extra_nics: each card's MAC and model */
+    int extra_models[VM_EXTRA_NICS];          /* VM_NIC_* */
+    int n_extra_macs;
+    int cpu_sockets, cpu_cores, cpu_threads;  /* 0: QEMU's default topology; else their product is vcpus */
+    char sm_manufacturer[VM_SMBIOS_MAX + 1], sm_product[VM_SMBIOS_MAX + 1], sm_version[VM_SMBIOS_MAX + 1],
+         sm_serial[VM_SMBIOS_MAX + 1], sm_sku[VM_SMBIOS_MAX + 1], sm_family[VM_SMBIOS_MAX + 1];
+    char disk_serial[VM_SERIAL_MAX + 1];
+    int n_data;                         /* data disks: disks/data-<i+1>.qcow2 */
+    int data_gb[VM_DATA_DISKS];
+    char data_serial[VM_DATA_DISKS][VM_SERIAL_MAX + 1];
+    int rtc;                            /* VM_RTC_* */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -138,7 +164,9 @@ int vm_base_valid(const char *s);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);
-int vm_mac_valid(const char *s);
+int vm_mac_valid(const char *s);      /* lowercase aa:bb:cc:dd:ee:ff, unicast, not all zero */
+int vm_smbios_valid(const char *s);   /* printable ASCII, at most VM_SMBIOS_MAX bytes */
+int vm_serial_valid(const char *s);   /* letters, digits, '-', '_', '.', at most VM_SERIAL_MAX */
 int vm_name_valid(const char *s);
 void vm_now_iso(char out[21]);
 /* new random id and MAC */

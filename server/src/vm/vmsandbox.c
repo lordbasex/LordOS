@@ -203,6 +203,10 @@ static int apply_seccomp(void) {
 
 int vm_jail_tool(const char *read_file, const char *rw_dir) { return vm_jail_tool2(read_file, NULL, rw_dir); }
 int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_dir) {
+    const char *r[2] = { read_file, read_file2 };
+    return vm_jail_tool_n(r, read_file2 ? 2 : 1, rw_dir);
+}
+int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir) {
     int mask = 0;
     struct rlimit no = { 0, 0 };
     setrlimit(RLIMIT_CORE, &no);
@@ -221,9 +225,9 @@ int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_
         if (rs >= 0) {
             uint64_t ro = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
             uint64_t rw = ro | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_REMOVE_FILE;
-            int ok = !rule(rs, "/usr", ro | LANDLOCK_ACCESS_FS_EXECUTE, h) && read_file && !rule(rs, read_file, LANDLOCK_ACCESS_FS_READ_FILE, h);
+            int ok = !rule(rs, "/usr", ro | LANDLOCK_ACCESS_FS_EXECUTE, h) && nreads > 0 && reads[0];
+            for (int i = 0; ok && i < nreads; i++) if (!reads[i] || rule(rs, reads[i], LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (rw_dir && rule(rs, rw_dir, rw, h)) ok = 0;
-            if (read_file2 && rule(rs, read_file2, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
             rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
             rule(rs, "/proc/self", ro, h);

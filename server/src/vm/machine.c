@@ -50,15 +50,35 @@ static int hex2(const char *p) {
     return v;
 }
 
-/* QEMU's own prefix, locally administered and unicast by construction */
+/* new machines get QEMU's prefix (vm_new_mac); an imported one keeps its source's address, so any unicast one that
+ * isn't all zero is accepted, lowercase */
 int vm_mac_valid(const char *s) {
-    if (!s || strlen(s) != 17 || strncmp(s, "52:54:00:", 9)) return 0;
-    for (int i = 9; i < 17; i += 3) {
-        if (hex2(s + i) < 0) return 0;
+    if (!s || strlen(s) != 17) return 0;
+    int any = 0;
+    for (int i = 0; i < 17; i += 3) {
+        int v = hex2(s + i);
+        if (v < 0) return 0;
         if (i + 2 < 17 && s[i + 2] != ':') return 0;
+        if (!i && (v & 1)) return 0;
+        any |= v;
     }
+    return any != 0;
+}
+
+int vm_smbios_valid(const char *s) {
+    if (!s || strlen(s) > VM_SMBIOS_MAX) return 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) if (*p < 0x20 || *p >= 0x7f) return 0;
     return 1;
 }
+
+int vm_serial_valid(const char *s) {
+    if (!s || strlen(s) > VM_SERIAL_MAX) return 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++)
+        if (!((*p >= '0' && *p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == '-' || *p == '_' || *p == '.')) return 0;
+    return 1;
+}
+
+const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1] = { "virtio", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet", NULL };
 
 /* 1..64 bytes of valid UTF-8, no control characters, no '/' or '\\', not only spaces */
 int vm_name_valid(const char *s) {
@@ -148,6 +168,32 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->agent != 0 && m->agent != 1) return fail(err, n, VM_E_RANGE, "agent");
     if (m->clipboard < VM_CLIP_OFF || m->clipboard > VM_CLIP_BOTH) return fail(err, n, VM_E_RANGE, "clipboard");
     if (m->schema < 2 && (m->base[0] || m->agent || m->clipboard)) return fail(err, n, VM_E_FIELD, "base, agent and clipboard need schema 2");
+    if (m->devices != VM_DEV_VIRTIO && m->devices != VM_DEV_COMPAT) return fail(err, n, VM_E_RANGE, "devices");
+    if (m->nic_model < 0 || m->nic_model >= VM_NIC_COUNT) return fail(err, n, VM_E_RANGE, "nic_model");
+    if (m->n_extra_macs < 0 || m->n_extra_macs > VM_EXTRA_NICS) return fail(err, n, VM_E_RANGE, "at most %d extra_nics", VM_EXTRA_NICS);
+    for (int i = 0; i < m->n_extra_macs; i++) {
+        if (!vm_mac_valid(m->extra_macs[i])) return fail(err, n, VM_E_RANGE, "extra_nics: a lowercase unicast MAC address");
+        if (m->extra_models[i] < 0 || m->extra_models[i] >= VM_NIC_COUNT) return fail(err, n, VM_E_RANGE, "extra_nics: model");
+        if (!strcmp(m->extra_macs[i], m->mac)) return fail(err, n, VM_E_RANGE, "extra_nics: the same address twice");
+        for (int k = 0; k < i; k++) if (!strcmp(m->extra_macs[i], m->extra_macs[k])) return fail(err, n, VM_E_RANGE, "extra_nics: the same address twice");
+    }
+    if (m->cpu_sockets || m->cpu_cores || m->cpu_threads) {
+        if (m->cpu_sockets < 1 || m->cpu_cores < 1 || m->cpu_threads < 1 || (long)m->cpu_sockets * m->cpu_cores * m->cpu_threads != m->vcpus)
+            return fail(err, n, VM_E_RANGE, "cpu_sockets × cpu_cores × cpu_threads must be vcpus");
+    }
+    const char *sm[] = { m->sm_manufacturer, m->sm_product, m->sm_version, m->sm_serial, m->sm_sku, m->sm_family };
+    for (int i = 0; i < 6; i++) if (!vm_smbios_valid(sm[i])) return fail(err, n, VM_E_RANGE, "smbios: printable ASCII, at most %d bytes", VM_SMBIOS_MAX);
+    if (!vm_serial_valid(m->disk_serial)) return fail(err, n, VM_E_RANGE, "disk_serial: letters, digits, '-', '_', '.', at most %d", VM_SERIAL_MAX);
+    if (m->n_data < 0 || m->n_data > VM_DATA_DISKS) return fail(err, n, VM_E_RANGE, "at most %d data_disks", VM_DATA_DISKS);
+    for (int i = 0; i < m->n_data; i++) {
+        if (m->data_gb[i] < VM_DISK_MIN_GB || m->data_gb[i] > VM_DISK_MAX_GB) return fail(err, n, VM_E_RANGE, "data_disks: gb");
+        if (!vm_serial_valid(m->data_serial[i])) return fail(err, n, VM_E_RANGE, "data_disks: serial");
+    }
+    if (m->n_data && m->base[0]) return fail(err, n, VM_E_RANGE, "a linked clone has no data disks");
+    if (m->rtc != VM_RTC_UTC && m->rtc != VM_RTC_LOCAL) return fail(err, n, VM_E_RANGE, "rtc");
+    if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
+                          m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
+        return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
     return VM_OK;
 }
 
@@ -180,7 +226,8 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
 
 static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
-    "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard", NULL,
+    "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
+    "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -215,6 +262,57 @@ static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
 static const char *const NETS[] = { "shared", "isolated", NULL };
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
+static const char *const DEVS[] = { "virtio", "compat", NULL };
+static const char *const RTCS[] = { "utc", "local", NULL };
+static const char *const SMB_KEYS[] = { "manufacturer", "product", "version", "serial", "sku", "family", NULL };
+
+static int get_opt_int(const JVal *o, const char *k, int *out, char *err, size_t n) { return json_get(o, k) ? get_int(o, k, out, err, n) : VM_OK; }
+
+/* schema 3's keys */
+static int parse3(const JVal *o, VmMachine *m, char *err, size_t n) {
+    int r;
+    if (json_get(o, "devices") && (r = get_enum(o, "devices", DEVS, &m->devices, err, n))) return r;
+    if (json_get(o, "nic_model") && (r = get_enum(o, "nic_model", VM_NIC_MODELS, &m->nic_model, err, n))) return r;
+    if (json_get(o, "rtc") && (r = get_enum(o, "rtc", RTCS, &m->rtc, err, n))) return r;
+    if ((r = get_opt_int(o, "cpu_sockets", &m->cpu_sockets, err, n)) || (r = get_opt_int(o, "cpu_cores", &m->cpu_cores, err, n)) ||
+        (r = get_opt_int(o, "cpu_threads", &m->cpu_threads, err, n)) || (r = get_str(o, "disk_serial", m->disk_serial, sizeof m->disk_serial, 0, err, n)))
+        return r;
+    const JVal *x = json_get(o, "extra_nics");
+    if (x) {
+        if (x->type != J_ARR) return fail(err, n, VM_E_FIELD, "extra_nics must be a list");
+        if (x->len > VM_EXTRA_NICS) return fail(err, n, VM_E_RANGE, "at most %d extra_nics", VM_EXTRA_NICS);
+        for (const JVal *e = x->kid; e; e = e->next) {
+            if (e->type != J_OBJ) return fail(err, n, VM_E_FIELD, "extra_nics: objects");
+            for (const JVal *k = e->kid; k; k = k->next) if (strcmp(k->key, "mac") && strcmp(k->key, "model")) return fail(err, n, VM_E_FIELD, "extra_nics: unknown key");
+            int i = m->n_extra_macs++;
+            if ((r = get_str(e, "mac", m->extra_macs[i], sizeof m->extra_macs[i], 1, err, n)) || (r = get_enum(e, "model", VM_NIC_MODELS, &m->extra_models[i], err, n))) return r;
+        }
+    }
+    const JVal *s = json_get(o, "smbios");
+    if (s) {
+        if (s->type != J_OBJ) return fail(err, n, VM_E_FIELD, "smbios must be an object");
+        char *dst[] = { m->sm_manufacturer, m->sm_product, m->sm_version, m->sm_serial, m->sm_sku, m->sm_family };
+        for (const JVal *e = s->kid; e; e = e->next) {
+            int k = -1;
+            for (int i = 0; SMB_KEYS[i]; i++) if (!strcmp(e->key, SMB_KEYS[i])) k = i;
+            if (k < 0) return fail(err, n, VM_E_FIELD, "smbios: unknown key \"%.20s\"", e->key);
+            if (e->type != J_STR || e->len > VM_SMBIOS_MAX || strlen(e->str) != e->len) return fail(err, n, VM_E_RANGE, "smbios: text of at most %d bytes", VM_SMBIOS_MAX);
+            memcpy(dst[k], e->str, e->len + 1);
+        }
+    }
+    const JVal *d = json_get(o, "data_disks");
+    if (d) {
+        if (d->type != J_ARR) return fail(err, n, VM_E_FIELD, "data_disks must be a list");
+        if (d->len > VM_DATA_DISKS) return fail(err, n, VM_E_RANGE, "at most %d data_disks", VM_DATA_DISKS);
+        for (const JVal *e = d->kid; e; e = e->next) {
+            if (e->type != J_OBJ) return fail(err, n, VM_E_FIELD, "data_disks: objects");
+            for (const JVal *k = e->kid; k; k = k->next) if (strcmp(k->key, "gb") && strcmp(k->key, "serial")) return fail(err, n, VM_E_FIELD, "data_disks: unknown key");
+            int i = m->n_data++;
+            if ((r = get_int(e, "gb", &m->data_gb[i], err, n)) || (r = get_str(e, "serial", m->data_serial[i], sizeof m->data_serial[i], 0, err, n))) return r;
+        }
+    }
+    return VM_OK;
+}
 
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t n) {
     memset(m, 0, sizeof *m);
@@ -252,6 +350,7 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->agent = a ? json_bool(o, "agent", 0) : 0;
         if (json_get(o, "clipboard") && (r = get_enum(o, "clipboard", CLIPS, &m->clipboard, err, n))) goto out;
     }
+    if ((r = parse3(o, m, err, n))) goto out;
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -276,6 +375,36 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 2) {
         if (m->base[0]) { jb_raw(&b, ",\n  \"base\": "); jb_str(&b, m->base); }
         jb_printf(&b, ",\n  \"agent\": %s,\n  \"clipboard\": \"%s\"", m->agent ? "true" : "false", CLIPS[m->clipboard]);
+    }
+    if (m->schema >= 3) {
+        /* only what differs from a machine made here, so a new machine's file stays as it was */
+        if (m->devices) jb_printf(&b, ",\n  \"devices\": \"%s\"", DEVS[m->devices]);
+        if (m->nic_model) jb_printf(&b, ",\n  \"nic_model\": \"%s\"", VM_NIC_MODELS[m->nic_model]);
+        if (m->n_extra_macs) {
+            jb_raw(&b, ",\n  \"extra_nics\": [");
+            for (int i = 0; i < m->n_extra_macs; i++) { jb_raw(&b, i ? ", {\"mac\": " : "{\"mac\": "); jb_str(&b, m->extra_macs[i]); jb_printf(&b, ", \"model\": \"%s\"}", VM_NIC_MODELS[m->extra_models[i]]); }
+            jb_raw(&b, "]");
+        }
+        if (m->cpu_sockets) jb_printf(&b, ",\n  \"cpu_sockets\": %d,\n  \"cpu_cores\": %d,\n  \"cpu_threads\": %d", m->cpu_sockets, m->cpu_cores, m->cpu_threads);
+        const char *sm[] = { m->sm_manufacturer, m->sm_product, m->sm_version, m->sm_serial, m->sm_sku, m->sm_family };
+        int any = 0;
+        for (int i = 0; i < 6; i++) if (sm[i][0]) {
+            jb_raw(&b, any ? ", " : ",\n  \"smbios\": {");
+            jb_str(&b, SMB_KEYS[i]); jb_raw(&b, ": "); jb_str(&b, sm[i]);
+            any = 1;
+        }
+        if (any) jb_raw(&b, "}");
+        if (m->disk_serial[0]) { jb_raw(&b, ",\n  \"disk_serial\": "); jb_str(&b, m->disk_serial); }
+        if (m->n_data) {
+            jb_raw(&b, ",\n  \"data_disks\": [");
+            for (int i = 0; i < m->n_data; i++) {
+                jb_printf(&b, "%s{\"gb\": %d", i ? ", " : "", m->data_gb[i]);
+                if (m->data_serial[i][0]) { jb_raw(&b, ", \"serial\": "); jb_str(&b, m->data_serial[i]); }
+                jb_raw(&b, "}");
+            }
+            jb_raw(&b, "]");
+        }
+        if (m->rtc) jb_printf(&b, ",\n  \"rtc\": \"%s\"", RTCS[m->rtc]);
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
