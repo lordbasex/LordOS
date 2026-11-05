@@ -29,6 +29,10 @@
  *                   Refused (VM_REPLY VME_NO_DISPLAY) for a machine whose display is "none".
  *     VM_QMP        development only (lord-vm --dev-qmp): text is one QMP command; the reply's text is the
  *                   start of QEMU's answer. Used by the isolation test; refused otherwise.
+ *     VM_CDROM      the CD/DVD drive while the machine runs. With a descriptor (an image lord-server opened read-only
+ *                   for the person): that disc goes in, through QMP add-fd and /dev/fdset (QEMU never opens a path,
+ *                   so its Landlock rules don't change); text = the image's path, kept in machine.json when it fits.
+ *                   Without one: the disc comes out. → VM_REPLY once the tray is closed again
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -37,6 +41,9 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
+ *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (the network stopped: passt
+ *                   ended while the machine runs), b = detail number (a signal or exit status), text = detail.
+ *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
  * ---- lord-vmdisplay ----
  * Started by lord-server as `lord-vmdisplay <machine id>` with fd 3 = this channel and fd 4 = the D-Bus
@@ -85,8 +92,12 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD,                                             /* from lord-vm */
+    VM_CDROM,
+    VM_REQ_LAST = VM_CDROM,
+    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE,                                  /* from lord-vm */
 };
+/* VM_NOTICE a */
+enum { VMN_NONE = 0, VMN_NET_LOST, VMN_COUNT };
 
 /* machine state */
 enum { VS_STOPPED = 0, VS_STARTING, VS_RUNNING, VS_PAUSED, VS_STOPPING, VS_CRASHED, VS_COUNT };
@@ -231,12 +242,13 @@ static inline VdMsg vd_msg(uint16_t type, int a, int b, int c, int d, int e, int
  * checks an event. Ranges only; the meaning is checked where it's used. */
 static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
-    if (to_vm) return m->type >= VM_STATUS && m->type <= VM_QMP && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600));
+    if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
     case VM_INFO: return m->a > 0 && m->b > 0;
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
+    case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     default: return 0;
     }
 }

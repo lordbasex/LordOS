@@ -14,6 +14,8 @@ import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, markCol
 import { readMeta } from './meta.js';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
+// how long the Requirements page waits for a word from the package engine before it says the network isn't answering
+const STALL_MS = 90000;
 // opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen
 export function openMachine(m) {
   const instance = `vm-${m.id || m.folder}`;
@@ -180,11 +182,20 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   ];
   const install = async () => {
     setBusy(true); setMsg(null);
-    const go = () => admin.run('vm-enable', list.join(' '), (line) => setMsg({ ok: true, text: statusText(line) }));
+    // a network that doesn't answer: the engine gives up on its own, but the page never waits more than STALL_MS
+    // without a word from it
+    let last = Date.now(), stalled = false;
+    const said = (line) => { last = Date.now(); setMsg({ ok: true, text: statusText(line) }); };
+    const watch = setInterval(() => {
+      if (Date.now() - last < STALL_MS || stalled) return;
+      stalled = true; setMsg({ ok: false, text: tr('machines.req.stalled') }); setBusy(false);
+    }, 2000);
+    const go = () => admin.run('vm-enable', list.join(' '), said);
     try {
-      try { await go(); } catch (e) { if (e.code === 'pkg.busy') throw e; await admin.run('pkg-update', ''); await go(); }
-      setMsg({ ok: true, text: tr('machines.req.installed') });
-    } catch (e) { setMsg({ ok: false, text: e.message }); }
+      try { await go(); } catch (e) { if (e.code === 'pkg.busy') throw e; last = Date.now(); await admin.run('pkg-update', '', said); await go(); }
+      if (!stalled) setMsg({ ok: true, text: tr('machines.req.installed') });
+    } catch (e) { if (!stalled) setMsg({ ok: false, text: e.message }); }
+    clearInterval(watch);
     setBusy(false); onChanged();
   };
   return (

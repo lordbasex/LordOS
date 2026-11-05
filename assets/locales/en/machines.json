@@ -353,8 +353,6 @@
   "tb.shotFailed": "The screenshot couldn't be saved",
   "tb.cdIn": "CD/DVD: {name}",
   "tb.cdNone": "CD/DVD: empty",
-  "tb.cdChange": "Change the disc…",
-  "tb.whenOff": "when off",
   "tb.folders": "Shared folders",
   "tb.sound": "Sound",
   "fs.hint": "The bar hides by itself. Move to the top edge to see it.",
@@ -375,5 +373,12 @@
   "logs.paused": "Paused",
   "logs.following": "Following the log",
   "logs.count": "{a} of {b} lines",
-  "logs.savedAs": "Saved as {name}"
+  "logs.savedAs": "Saved as {name}",
+  "ok": "OK",
+  "req.stalled": "The network isn't answering, so nothing was installed. Check the connection and try again.",
+  "tb.cdChoose": "Choose Disc Image…",
+  "tb.cdEject": "Eject Disc",
+  "tb.cdRefused": "The drive can't take a disc now.",
+  "tb.cdFailed": "The disc couldn't be changed: {why}",
+  "win.netLost": "This machine's network stopped. It comes back when the machine starts again; the machine log says why."
 }

@@ -353,8 +353,6 @@
   "tb.shotFailed": "No se pudo guardar la captura",
   "tb.cdIn": "CD/DVD: {name}",
   "tb.cdNone": "CD/DVD: vacío",
-  "tb.cdChange": "Cambiar el disco…",
-  "tb.whenOff": "apagada",
   "tb.folders": "Carpetas compartidas",
   "tb.sound": "Sonido",
   "fs.hint": "La barra se esconde sola. Llevá el puntero al borde de arriba para verla.",
@@ -375,5 +373,12 @@
   "logs.paused": "En pausa",
   "logs.following": "Siguiendo el registro",
   "logs.count": "{a} de {b} líneas",
-  "logs.savedAs": "Guardado como {name}"
+  "logs.savedAs": "Guardado como {name}",
+  "ok": "Aceptar",
+  "req.stalled": "La red no responde, así que no se instaló nada. Revisá la conexión y probá de nuevo.",
+  "tb.cdChoose": "Elegir imagen de disco…",
+  "tb.cdEject": "Expulsar disco",
+  "tb.cdRefused": "La unidad no puede tomar un disco ahora.",
+  "tb.cdFailed": "No se pudo cambiar el disco: {why}",
+  "win.netLost": "La red de esta máquina se detuvo. Vuelve cuando la máquina arranque de nuevo; el registro de la máquina dice por qué."
 }

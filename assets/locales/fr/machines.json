@@ -353,8 +353,6 @@
   "tb.shotFailed": "La capture n’a pas pu être enregistrée",
   "tb.cdIn": "CD/DVD : {name}",
   "tb.cdNone": "CD/DVD : vide",
-  "tb.cdChange": "Changer de disque…",
-  "tb.whenOff": "éteinte",
   "tb.folders": "Dossiers partagés",
   "tb.sound": "Son",
   "fs.hint": "La barre se cache toute seule. Allez au bord supérieur pour la voir.",
@@ -375,5 +373,12 @@
   "logs.paused": "En pause",
   "logs.following": "Suivi du journal",
   "logs.count": "{a} lignes sur {b}",
-  "logs.savedAs": "Enregistré sous {name}"
+  "logs.savedAs": "Enregistré sous {name}",
+  "ok": "OK",
+  "req.stalled": "Le réseau ne répond pas, rien n'a donc été installé. Vérifiez la connexion et réessayez.",
+  "tb.cdChoose": "Choisir une image disque…",
+  "tb.cdEject": "Éjecter le disque",
+  "tb.cdRefused": "Le lecteur ne peut pas prendre de disque maintenant.",
+  "tb.cdFailed": "Le disque n'a pas pu être changé : {why}",
+  "win.netLost": "Le réseau de cette machine s'est arrêté. Il revient au prochain démarrage ; le journal de la machine dit pourquoi."
 }

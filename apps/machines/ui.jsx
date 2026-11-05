@@ -85,9 +85,13 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
 }
 
 // A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's
+// How many menus are open: while one is, a machine's window keeps the keyboard for the menu (Esc closes it and never
+// reaches the guest).
+export const menus = { open: 0 };
 export function PopMenu({ x, y, items, onClose, width = 220 }) {
   const p = usePal();
   const ref = useRef(null);
+  useEffect(() => { menus.open++; return () => { menus.open--; }; }, []);
   useEffect(() => {
     const a = addListener('pointerdown', (e) => {
       const n = ref.current;

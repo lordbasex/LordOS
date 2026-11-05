@@ -35,6 +35,11 @@
 #include <unistd.h>
 
 #define TIMEOUT_MS 30000
+/* Connecting to one host tries each of its addresses, but all of them together for at most this long; and a host that
+ * didn't answer (no connection, or no reply in TIMEOUT_MS) isn't tried again in the same batch, so a batch of 60
+ * packages on a network that drops packets fails in about a minute instead of 60 × (addresses × 15 s + 30 s). */
+#define CONNECT_TOTAL_MS 20000
+#define DEAD_MAX 8
 
 /* ---- dates ---- */
 
@@ -73,7 +78,26 @@ typedef struct {
     char buf[16384];
     size_t pos, len;
     int out;                            /* pipe to the parent */
+    char dead[DEAD_MAX][264];           /* "host:port" that didn't answer in this batch */
+    int ndead;
 } Conn;
+
+static long long mono_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static int host_dead(const Conn *c, const char *host, const char *port) {
+    char k[264];
+    snprintf(k, sizeof k, "%s:%s", host, port);
+    for (int i = 0; i < c->ndead; i++) if (!strcmp(c->dead[i], k)) return 1;
+    return 0;
+}
+static void mark_dead(Conn *c, const char *host, const char *port) {
+    if (host_dead(c, host, port) || c->ndead >= DEAD_MAX) return;
+    snprintf(c->dead[c->ndead++], sizeof c->dead[0], "%s:%s", host, port);
+}
 
 static int send_msg(int out, char type, uint32_t item, const void *data, uint32_t len) {
     uint8_t h[9] = { (uint8_t)type, (uint8_t)item, (uint8_t)(item >> 8), (uint8_t)(item >> 16), (uint8_t)(item >> 24),
@@ -152,24 +176,28 @@ static int tls_start(Conn *c, int tcp, const char *host, char *err, size_t errle
 static int conn_open(Conn *c, const char *host, const char *port, int tls, char *err, size_t errlen) {
     if (c->fd >= 0 && c->tls == tls && !strcmp(c->host, host) && !strcmp(c->port, port)) return 0;
     conn_close(c);
+    if (host_dead(c, host, port)) { lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
     int r = getaddrinfo(host, port, &hints, &res);
-    if (r) { lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
+    if (r) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
+    long long end = mono_ms() + CONNECT_TOTAL_MS;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
+        long long left = end - mono_ms();
+        if (left <= 0) break;
         int fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, a->ai_protocol);
         if (fd < 0) continue;
         if (connect(fd, a->ai_addr, a->ai_addrlen) && errno != EINPROGRESS) { close(fd); continue; }
         struct pollfd p = { fd, POLLOUT, 0 };
         int e = 0;
         socklen_t el = sizeof e;
-        if (poll(&p, 1, 15000) != 1 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &e, &el) || e) { close(fd); continue; }
+        if (poll(&p, 1, left < 15000 ? (int)left : 15000) != 1 || getsockopt(fd, SOL_SOCKET, SO_ERROR, &e, &el) || e) { close(fd); continue; }
         c->fd = fd;
         break;
     }
     freeaddrinfo(res);
-    if (c->fd < 0) { lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
+    if (c->fd < 0) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     c->tls = tls;
     if (tls && (c->fd = tls_start(c, c->fd, host, err, errlen)) < 0) return -1;
     snprintf(c->host, sizeof c->host, "%s", host);
@@ -321,6 +349,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx) {
         if (rl >= (int)sizeof req || conn_write(c, req, (size_t)rl) || conn_line(c, line, sizeof line)) {
             conn_close(c);
             if (retry) { retry = 0; goto again; }
+            mark_dead(c, host, port);
             lerr_set(err, sizeof err, "pkg.http.noResponse", "host", host, NULL);
             break;
         }
@@ -457,7 +486,8 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
          * firewall and Monitor → Network (lordos:store); outside a LordOS session, where it is */
         if (getenv("LORDOS_SESSIOND")) cgroup_enter_root("lordos-net-store.scope");
         if (drop_to_nobody()) _exit(2);
-        Conn c = { .fd = -1, .out = 3, .tls = 0, .helper = 0 };
+        static Conn c;
+        c.fd = -1; c.out = 3; c.tls = 0; c.helper = 0; c.ndead = 0;
         for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i);
         conn_close(&c);
         _exit(0);

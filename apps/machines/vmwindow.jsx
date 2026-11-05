@@ -4,12 +4,12 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, MediaView, ScrollView, FilePicker, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle } from './model.js';
-import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot } from './ui.jsx';
+import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs } from './library.jsx';
 
 const BAR = 48;
@@ -17,7 +17,7 @@ const RESOLUTIONS = [[1280, 800], [1600, 900], [1920, 1080], [2560, 1440]];
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr'].every((k) => a[k] === b[k]);
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice'].every((k) => a[k] === b[k]);
 
 function Tools({ ctl, floating }) {
   const p = usePal();
@@ -137,6 +137,9 @@ export function MachineWindow({ dir, name: name0 }) {
   const [log, setLog] = useState('');
   const [name, setName] = useState(name0);
   const [iso, setIso] = useState('');
+  const [pickCd, setPickCd] = useState(false);
+  const [cdWant, setCdWant] = useState(null);       // the disc asked for while lord-vm changes it
+  const [cdErr, setCdErr] = useState('');
   const box = useRef(null);
   const root = useRef(null);
   const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0 });
@@ -176,6 +179,7 @@ export function MachineWindow({ dir, name: name0 }) {
       const q = lord.vm.poll(sid);
       if (!q) return;
       setSt((prev) => (same(prev, q) ? prev : q));
+      if (q.cd === 2 || q.cd === 3) setCdWant((w) => { if (w !== null) { if (q.cd === 2) setIso(w); else setCdErr(q.cdMessage || '?'); } return null; });
       const z = sized.current;
       if (q.display === 'up' && !z.rate) { z.rate = true; try { lord.vm.rate(sid, refreshRate(lord.display.list())); } catch (e) { lord.vm.rate(sid, 60); } }
       // the window's size, to the guest after it stayed the same for 400 ms (unless a fixed resolution was chosen)
@@ -217,8 +221,18 @@ export function MachineWindow({ dir, name: name0 }) {
   const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing;
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
-    const ka = addListener('keydown', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 1); });
-    const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
+    // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
+    const kept = new Set();
+    const ka = addListener('keydown', (e) => {
+      if (!(e.code > 0)) return;
+      if (menus.open > 0 || kept.has(e.code)) { kept.add(e.code); return; }
+      lord.vm.key(sid, e.code, 1);
+    });
+    const kb = addListener('keyup', (e) => {
+      if (!(e.code > 0)) return;
+      if (kept.delete(e.code)) return;
+      lord.vm.key(sid, e.code, 0);
+    });
     const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [live, focused, sid]);
@@ -246,6 +260,9 @@ export function MachineWindow({ dir, name: name0 }) {
     notify({ app: 'machines', label: tr('machines.title'), title: path ? tr('machines.tb.shotSaved') : tr('machines.tb.shotFailed'), body: path ? path.split('/').pop() : '', sound: false,
       actions: path ? [{ id: 'show', label: tr('machines.cmd.showInFiles'), run: () => revealPath(path) }] : [] });
   };
+  // the CD/DVD drive while the machine runs (lord-vm changes the disc through QMP; machine.json follows)
+  const cdOk = !!sid && (st?.state === 'running' || st?.state === 'paused') && cdWant === null;
+  const cdTo = (path) => { setCdErr(''); if (lord.vm.cdrom(sid, path || null)) setCdWant(path); else setCdErr(tr('machines.tb.cdRefused')); };
   const ctl = {
     st, a, full, follow, cmd,
     setFull: (on) => wm.setFullscreen(winId, on),
@@ -263,7 +280,8 @@ export function MachineWindow({ dir, name: name0 }) {
     ],
     devices: [
       { label: iso ? tr('machines.tb.cdIn', { name: iso.split('/').pop() }) : tr('machines.tb.cdNone'), disabled: true },
-      { label: tr('machines.tb.cdChange'), disabled: true, hint: tr('machines.tb.whenOff') },
+      { label: tr('machines.tb.cdChoose'), disabled: !cdOk, onClick: () => setPickCd(true) },
+      { label: tr('machines.tb.cdEject'), disabled: !cdOk || !iso, onClick: () => cdTo('') },
       '-',
       { label: tr('machines.tb.folders'), disabled: true, hint: tr('machines.later') },
       { label: tr('machines.tb.sound'), disabled: true, hint: tr('machines.later') },
@@ -286,7 +304,7 @@ export function MachineWindow({ dir, name: name0 }) {
       ] },
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
     ]);
-  }, [st?.state, full, iso, sid]);
+  }, [st?.state, full, iso, sid, cdWant]);
 
   let card = null;
   let failed = null;
@@ -316,6 +334,16 @@ export function MachineWindow({ dir, name: name0 }) {
       ) : null}
       {card}
       {failed}
+      {!card && !failed && (st?.notice === 'network-lost' || cdErr) ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : tr('machines.win.netLost')}</Text>
+            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} /> : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
+          </View>
+        </View>
+      ) : null}
+      {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
+        onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
       {full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
     </View>
   );

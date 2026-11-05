@@ -353,8 +353,6 @@
   "tb.shotFailed": "Impossibile salvare l’istantanea",
   "tb.cdIn": "CD/DVD: {name}",
   "tb.cdNone": "CD/DVD: vuoto",
-  "tb.cdChange": "Cambia disco…",
-  "tb.whenOff": "da spenta",
   "tb.folders": "Cartelle condivise",
   "tb.sound": "Audio",
   "fs.hint": "La barra si nasconde da sola. Porta il puntatore al bordo superiore per vederla.",
@@ -375,5 +373,12 @@
   "logs.paused": "In pausa",
   "logs.following": "Segue il registro",
   "logs.count": "{a} di {b} righe",
-  "logs.savedAs": "Salvato come {name}"
+  "logs.savedAs": "Salvato come {name}",
+  "ok": "OK",
+  "req.stalled": "La rete non risponde, quindi non è stato installato nulla. Controlla la connessione e riprova.",
+  "tb.cdChoose": "Scegli immagine disco…",
+  "tb.cdEject": "Espelli disco",
+  "tb.cdRefused": "L'unità non può ricevere un disco ora.",
+  "tb.cdFailed": "Impossibile cambiare il disco: {why}",
+  "win.netLost": "La rete di questa macchina si è fermata. Torna al prossimo avvio; il registro della macchina dice perché."
 }

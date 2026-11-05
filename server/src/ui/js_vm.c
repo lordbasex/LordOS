@@ -14,7 +14,8 @@
  *   cmd(id, 'shutdown'|'poweroff'|'pause'|'resume'|'reset'|'display') · stop(dir, how) for a machine with no session
  *   key(id, evdev, down) · motion(id, x, y) · button(id, b, down) · wheel(id, dy, dx) · release(id)
  *   resize(id, w, h) · rate(id, hz) · close(id)
- *   log(dir) → the end of the machine's lord-vm.log (what failed) */
+ *   log(dir) → the end of the machine's lord-vm.log (what failed)
+ *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went */
 #include "js_vm.h"
 #include "../media/media_int.h"
 #include "../vm/vmproto.h"
@@ -607,6 +608,11 @@ typedef struct {
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
     int cur_w, cur_h, cur_hx, cur_hy;
+    uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    int cd_state;
+    char cd_msg[VM_TEXT_MAX];
+    int notice;                         /* VM_NOTICE: VMN_*, and its words */
+    char notice_text[VM_TEXT_MAX];
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -852,7 +858,12 @@ static void from_vm(Sess *s) {
             maybe_display(s);
             if (s->display_failed) resume_once(s);
             break;
+        case VM_NOTICE:
+            s->notice = m.a;
+            snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
+            break;
         case VM_REPLY:
+            if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
                 if (m.seq == s->display_seq) { s->display_failed = 1; resume_once(s); }
@@ -1017,7 +1028,31 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_str(c, o, "lastError", s->last_error);
     set_str(c, o, "stderr", s->errtail);
     set_int(c, o, "frames", s->frames);
+    set_int(c, o, "cd", s->cd_state);
+    set_str(c, o, "cdMessage", s->cd_msg);
+    set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : "");
+    set_str(c, o, "noticeText", s->notice_text);
     return o;
+}
+
+/* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
+ * handed to lord-vm), or out with null. poll's cd says how it went (1 waiting, 2 done, 3 failed: cdMessage). */
+static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 1 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || s->cd_state == 1) return JS_FALSE;
+    char path[PATH_MAX] = "";
+    int fd = -1;
+    if (argc >= 2 && JS_IsString(argv[1])) {
+        if (user_file(c, argv[1], path, sizeof path)) return JS_FALSE;
+        fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY);
+        if (fd < 0) return JS_FALSE;
+    }
+    VmMsg m = vm_msg(VM_CDROM, ++s->seq, 0, 0, 0, 0, strlen(path) < VM_TEXT_MAX ? path : "");
+    int ok = !vm_send(s->vm, &m, fd);
+    if (fd >= 0) close(fd);
+    if (ok) { s->cd_seq = s->seq; s->cd_state = 1; s->cd_msg[0] = 0; }
+    return JS_NewBool(c, ok);
 }
 
 static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -1239,7 +1274,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

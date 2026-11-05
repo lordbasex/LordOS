@@ -188,6 +188,11 @@ static void test_messages(void) {
     q = vm_msg(VM_REPLY, 3, 99, 0, 0, 0, NULL); CHECK(!vm_msg_valid(&q, 0));
     q = vm_msg(200, 0, 0, 0, 0, 0, NULL); CHECK(!vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
     q = vm_msg(VM_STATUS, 0, 0, 0, 0, 0, NULL); q.version = 2; CHECK(!vm_msg_valid(&q, 1));
+    /* Beta: the CD/DVD drive while running is a request; a notice comes only from lord-vm, with a known kind */
+    q = vm_msg(VM_CDROM, 4, 0, 0, 0, 0, "/x.iso"); CHECK(vm_msg_valid(&q, 1) && !vm_msg_valid(&q, 0));
+    q = vm_msg(VM_NOTICE, 0, VMN_NET_LOST, 11, 0, 0, "passt"); CHECK(vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
+    q.a = VMN_COUNT; CHECK(!vm_msg_valid(&q, 0));
+    q.a = VMN_NONE; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];
     memset(longtext, 'a', sizeof longtext - 1); longtext[sizeof longtext - 1] = 0;
     q = vm_msg(VM_QMP, 0, 0, 0, 0, 0, longtext);

@@ -472,7 +472,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 /* ---- the supervisor ---- */
 
 typedef struct { int fd, control; } Client;
-enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START };
+enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 static struct {
@@ -504,6 +504,14 @@ static struct {
     int cred_fd[MAX_CREDS];
     char cred_name[MAX_CREDS][130];
     int ncreds;
+    /* the CD/DVD drive (scsi-cd "cd0"): the disc's block node ("" empty), its fdset (0: none, the start's ISO is a path) */
+    char cd_node[16], cd_new_node[16];
+    int cd_fdset, cd_new_fdset, cd_busy, cd_client;
+    uint32_t cd_seq;
+    char cd_err[160], cd_path[VM_PATH_MAX];
+    /* the last VM_NOTICE, sent again to clients that connect later */
+    int notice, notice_code;
+    char notice_text[160];
 } S;
 
 static void send_to(int ci, const VmMsg *m, int fd) {
@@ -760,12 +768,15 @@ static void build_qemu_args(void) {
      * network card (enp0s3 became enp0s2) and the installed system's network didn't come up. Slots 1 to 6 are the
      * ones a machine without an ISO always had; the ISO's controller goes after them. */
     arg("-device"); arg("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=0,addr=0x1");
+    /* the CD/DVD drive is always there (slot 8, after the ones a machine always had), so a disc can go in and out while
+     * the machine runs (VM_CDROM); the ISO of machine.json is in it at start */
+    arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
     if (m->iso[0]) {
-        arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
         arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
         arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-        arg("-device"); arg("scsi-cd,bus=scsi0.0,drive=cd,bootindex=1");
-    }
+        arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=1");
+        snprintf(S.cd_node, sizeof S.cd_node, "cd");
+    } else { arg("-device"); arg("scsi-cd,id=cd0,bus=scsi0.0,bootindex=1"); S.cd_node[0] = 0; }
     if (m->network == VM_NET_SHARED) {
         arg("-netdev"); arg("stream,id=net0,addr.type=fd,addr.str=6");
         arg("-device"); argf("virtio-net-pci,netdev=net0,mac=%s,addr=0x2", m->mac);
@@ -925,8 +936,53 @@ static void begin_poweroff(void) {
     set_state(VS_STOPPING, VR_POWEROFF, 0, "turning off");
 }
 
-static void handle_request(int ci, const VmMsg *m) {
-    if (!vm_msg_valid(m, 1)) { reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
+/* VM_CDROM: the disc out (open the tray, take the medium, delete its nodes), then the new one in (its descriptor into an
+ * fdset, a raw node on /dev/fdset/N, insert, close the tray). QMP runs them in order; the last one answers. */
+static void cd_change(int ci, uint32_t seq, int fd, const char *path) {
+    S.cd_busy = 1; S.cd_client = ci; S.cd_seq = seq; S.cd_err[0] = 0; S.cd_new_node[0] = 0; S.cd_new_fdset = 0;
+    snprintf(S.cd_path, sizeof S.cd_path, "%s", fd >= 0 ? path : "");
+    int bad = qmp_do("blockdev-open-tray", "{\"id\":\"cd0\",\"force\":true}", P_CD, -1, 0, -1, -1);
+    char a[256];
+    if (!bad && S.cd_node[0]) {
+        bad |= qmp_do("blockdev-remove-medium", "{\"id\":\"cd0\"}", P_CD, -1, 1, -1, -1);     /* step 1: the old disc is out */
+        snprintf(a, sizeof a, "{\"node-name\":\"%s\"}", S.cd_node);
+        bad |= qmp_do("blockdev-del", a, P_CD, -1, 0, -1, -1);
+        if (!strcmp(S.cd_node, "cd")) bad |= qmp_do("blockdev-del", "{\"node-name\":\"cd-file\"}", P_CD, -1, 0, -1, -1);
+        if (S.cd_fdset) { snprintf(a, sizeof a, "{\"fdset-id\":%d}", S.cd_fdset); bad |= qmp_do("remove-fd", a, P_CD, -1, 0, -1, -1); }
+    }
+    if (!bad && fd >= 0) {
+        static int next = 20;
+        int set = next++;
+        snprintf(S.cd_new_node, sizeof S.cd_new_node, "cd%d", set);
+        S.cd_new_fdset = set;
+        snprintf(a, sizeof a, "{\"fdset-id\":%d,\"opaque\":\"cd\"}", set);
+        bad |= qmp_do("add-fd", a, P_CD, -1, 0, fd, -1);
+        snprintf(a, sizeof a, "{\"driver\":\"raw\",\"node-name\":\"%s\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":\"/dev/fdset/%d\",\"read-only\":true}}", S.cd_new_node, set);
+        bad |= qmp_do("blockdev-add", a, P_CD, -1, 0, -1, -1);
+        snprintf(a, sizeof a, "{\"id\":\"cd0\",\"node-name\":\"%s\"}", S.cd_new_node);
+        bad |= qmp_do("blockdev-insert-medium", a, P_CD, -1, 2, -1, -1);                        /* step 2: the new one is in */
+    }
+    bad |= qmp_do("blockdev-close-tray", "{\"id\":\"cd0\"}", P_CD_LAST, -1, 0, -1, -1);
+    if (bad) { S.cd_busy = 0; reply(ci, seq, VME_BUSY, "busy"); }
+    vlog("cd: %s%s", fd >= 0 ? "inserting " : "ejecting", fd >= 0 ? path : "");
+}
+
+static void cd_done(void) {
+    S.cd_busy = 0;
+    if (S.cd_err[0]) vlog("cd: failed: %s", S.cd_err);
+    /* machine.json says what's in the drive for the next start (lord-vm holds the lock; nothing else writes it now) */
+    VmMachine m = S.m;
+    snprintf(m.iso, sizeof m.iso, "%s", !S.cd_node[0] ? "" : S.cd_fdset ? S.cd_path : S.m.iso);
+    vm_now_iso(m.updated);
+    if (vm_machine_check(&m, NULL, 0) || vm_machine_save(S.dir, &m)) vlog("cd: note: machine.json keeps its ISO (the path can't be kept)");
+    else S.m = m;
+    if (S.cd_err[0]) reply(S.cd_client, S.cd_seq, VME_QMP, S.cd_err);
+    else reply(S.cd_client, S.cd_seq, VME_OK, S.cd_node[0] ? "inserted" : "ejected");
+}
+
+static void handle_request(int ci, const VmMsg *m, int fd) {
+    if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
+    if (fd >= 0 && m->type != VM_CDROM) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
     case VM_STATUS: {
@@ -934,6 +990,7 @@ static void handle_request(int ci, const VmMsg *m) {
         i.seq = s.seq = m->seq;
         send_to(ci, &i, -1);
         send_to(ci, &s, -1);
+        if (S.notice) { VmMsg n = vm_msg(VM_NOTICE, m->seq, S.notice, S.notice_code, 0, 0, S.notice_text); send_to(ci, &n, -1); }
         return;
     }
     case VM_PAUSE:
@@ -971,6 +1028,16 @@ static void handle_request(int ci, const VmMsg *m) {
         close(sv[1]);
         snprintf(args, sizeof args, "{\"protocol\":\"@dbus-display\",\"fdname\":\"vmdisplay%d\"}", k);
         if (qmp_do("add_client", args, P_ADDCLIENT, ci, m->seq, -1, sv[0])) { close(sv[0]); reply(ci, m->seq, VME_BUSY, "busy"); }
+        return;
+    }
+    case VM_CDROM: {
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (S.cd_busy) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BUSY, "the drive is busy"); return; }
+        struct stat st;
+        if (fd >= 0 && (fstat(fd, &st) || !S_ISREG(st.st_mode) || (fcntl(fd, F_GETFL) & O_ACCMODE) != O_RDONLY)) { close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "not a file opened for reading"); return; }
+        if (fd < 0 && !S.cd_node[0]) { reply(ci, m->seq, VME_OK, "ejected"); return; }
+        cd_change(ci, m->seq, fd, m->text);
+        if (fd >= 0) close(fd);
         return;
     }
     case VM_QMP:
@@ -1017,6 +1084,12 @@ static void on_qmp_reply(const JVal *root, int ok) {
         else if (S.state != VS_RUNNING) set_state(VS_RUNNING, VR_NONE, 0, "");
         break;
     case P_GETFD: if (!ok) vlog("qmp: getfd: %s", desc); break;
+    case P_CD: case P_CD_LAST:
+        if (!ok && !S.cd_err[0]) snprintf(S.cd_err, sizeof S.cd_err, "%s", desc);
+        if (ok && p.seq == 1) { S.cd_node[0] = 0; S.cd_fdset = 0; }
+        if (ok && p.seq == 2) { snprintf(S.cd_node, sizeof S.cd_node, "%s", S.cd_new_node); S.cd_fdset = S.cd_new_fdset; }
+        if (p.kind == P_CD_LAST) cd_done();
+        break;
     case P_ADDCLIENT:
         if (ok) { VmMsg r = vm_msg(VM_DISPLAY_FD, p.seq, 0, 0, 0, 0, ""); send_to(p.client, &r, p.fd); vlog("display: connection %d handed to client %d", S.display_n, p.client); }
         else reply(p.client, p.seq, VME_QMP, desc);
@@ -1084,7 +1157,16 @@ static void reap(void) {
         else if (p == S.passt) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             S.passt = 0;
-            if (!S.qemu_done) vlog("note: the machine's network stopped");
+            if (!S.qemu_done) {
+                /* QEMU's -netdev stream on a descriptor can't reconnect, and the network card sits on the root bus
+                 * (no hot-unplug without moving it, which renames the guest's interface): the person is told */
+                int sig = WIFSIGNALED(status), code = sig ? WTERMSIG(status) : WEXITSTATUS(status);
+                S.notice = VMN_NET_LOST; S.notice_code = code;
+                snprintf(S.notice_text, sizeof S.notice_text, "passt ended (%s %d): the machine has no network until it starts again", sig ? "signal" : "status", code);
+                vlog("note: the machine's network stopped: %s", S.notice_text);
+                VmMsg n = vm_msg(VM_NOTICE, 0, S.notice, code, 0, 0, S.notice_text);
+                for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &n, -1);
+            }
         }
     }
 }
@@ -1215,10 +1297,11 @@ static void loop(void) {
                 if (p[i].revents & (POLLHUP | POLLERR) && !(p[i].revents & POLLIN)) { drop_client(k); break; }
                 for (int budget = 0; budget < 32 && S.cl[k].fd >= 0; budget++) {
                     VmMsg m;
-                    int r = vm_recv(S.cl[k].fd, &m, NULL);
+                    int mfd = -1;
+                    int r = vm_recv(S.cl[k].fd, &m, &mfd);
                     if (r < 0) { drop_client(k); break; }
                     if (!r) break;
-                    handle_request(k, &m);
+                    handle_request(k, &m, mfd);
                 }
             }
             }
@@ -1487,7 +1570,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "--json")) json = 1;
         else if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout = atoi(argv[++i]);
-        else if (type == VM_QMP && !qmptext) qmptext = argv[i];
+        else if ((type == VM_QMP || type == VM_CDROM) && !qmptext) qmptext = argv[i];
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
     char real[PATH_MAX], err[256];
@@ -1509,8 +1592,19 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
         return 0;
     }
     if (type == VM_QMP && (!qmptext || strlen(qmptext) >= VM_TEXT_MAX)) { fprintf(stderr, "lord-vm: --qmp takes one command of at most %d bytes\n", VM_TEXT_MAX - 1); return 2; }
+    int pass = -1;
+    char cdreal[PATH_MAX] = "";
+    if (type == VM_CDROM) {
+        if (!qmptext) { fprintf(stderr, "lord-vm: --cdrom DIR IMAGE|none\n"); return 2; }
+        if (strcmp(qmptext, "none")) {
+            if (!realpath(qmptext, cdreal) || (pass = open(cdreal, O_RDONLY | O_CLOEXEC | O_NOCTTY)) < 0) { fprintf(stderr, "lord-vm: %s: %s\n", qmptext, strerror(errno)); return 1; }
+        }
+        qmptext = strlen(cdreal) < VM_TEXT_MAX ? cdreal : "";
+    }
     VmMsg q = vm_msg((uint16_t)type, 7, type == VM_SHUTDOWN ? timeout : 0, 0, 0, 0, qmptext);
-    if (vm_send(fd, &q, -1)) { fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
+    int sent = vm_send(fd, &q, pass);
+    if (pass >= 0) close(pass);
+    if (sent) { fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
     int info_sb = 0, info_cg = 0, rc = 1;
     long long end = now_ms() + (type == VM_SHUTDOWN ? (timeout ? timeout : 60) * 1000 + 15000 : type == VM_POWEROFF ? 15000 : 10000);
     int replied = 0;
@@ -1635,6 +1729,7 @@ static int usage(void) {
             "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
+            "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
     return 2;
 }
@@ -1650,7 +1745,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
-        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP },
+        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM },
     };
     for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) if (!strcmp(cmd, C[i].name)) return cmd_client(dir, C[i].type, rest, rv);
     return usage();
