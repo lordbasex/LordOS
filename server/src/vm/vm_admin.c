@@ -116,6 +116,25 @@ static int in_group(const char *user, gid_t gid) {
     return 0;
 }
 
+/* /dev/kvm carries the "uaccess" tag: systemd-logind rewrites its access list on every session change (an SSH login is
+ * enough) and keeps only the user of the active seat session, which a LordOS session isn't. Without the tag the entry
+ * granted below stays until the next boot, and from the next login the kvm group covers it. */
+#define VM_KVM_RULES "/etc/udev/rules.d/71-lordos-kvm.rules"
+static void keep_kvm_acl(void) {
+    static const char rule[] =
+        "# LordOS Machines (vm-kvm): /dev/kvm is the kvm group's, and keeps the access list Machines gives it.\n"
+        "SUBSYSTEM==\"misc\", KERNEL==\"kvm\", TAG-=\"uaccess\"\n";
+    int fd = open(VM_KVM_RULES ".tmp", O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+    if (fd < 0) return;
+    int ok = write(fd, rule, sizeof rule - 1) == (ssize_t)(sizeof rule - 1) && !fsync(fd);
+    close(fd);
+    if (!ok || rename(VM_KVM_RULES ".tmp", VM_KVM_RULES)) { unlink(VM_KVM_RULES ".tmp"); return; }
+    const char *const reload[] = { "/usr/bin/udevadm", "control", "--reload", NULL };
+    const char *const change[] = { "/usr/bin/udevadm", "trigger", "--action=change", "--subsystem-match=misc", "--sysname-match=kvm", NULL };
+    const char *const settle[] = { "/usr/bin/udevadm", "settle", "--timeout=5", NULL };
+    if (!admin_run(reload) && !admin_run(change)) admin_run(settle);
+}
+
 void vm_act_kvm(const AdminReq *r, const char *arg, size_t len) {
     (void)arg;
     if (len) { admin_err("admin.invalidArgument", NULL); return; }
@@ -129,6 +148,7 @@ void vm_act_kvm(const AdminReq *r, const char *arg, size_t len) {
         const char *const a[] = { "/usr/sbin/usermod", "--append", "--groups", "kvm", r->user, NULL };
         if (admin_run(a)) { admin_err("vm.groupFailed", NULL); return; }
     }
+    keep_kvm_acl();
     if (acl_grant("/dev/kvm", r->uid)) admin_ok("vm.kvmNextLogin", NULL);   /* the group works from the next login */
     else admin_ok("vm.kvmReady", NULL);
 }

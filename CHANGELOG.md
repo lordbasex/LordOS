@@ -20,6 +20,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- Machines on the Raspberry Pi 5: the machine's picture was see-through (the window below showed through the guest's black), because the GPU composition reads the picture's unused fourth byte as transparency. It is drawn opaque now.
+- Machines: hardware virtualization allowed with **Allow** was taken away again at the next login of any kind (an SSH login is enough), because the system rewrites `/dev/kvm`'s access list for the screen's session only. LordOS now keeps it.
 - Machines: a window of each running machine came back at the next login as one more empty Machines window. Only the library is restored now.
 - Machines: after an installation from an ISO, taking the ISO out moved the network card to another PCI slot and the installed system came up without network. Every device of a machine now has a fixed slot.
 - A picture shown scaled stayed black after it was replaced by one of another size: the scaled copy was freed but its old size kept, so it was never made again. It turned the Machines window black in full screen and could do the same to a Remote Desk session whose remote screen changed size.

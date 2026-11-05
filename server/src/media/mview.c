@@ -68,6 +68,18 @@ static void build_mips(MediaSrc *s, const uint32_t *px, int w, int h) {
     }
 }
 
+/* An x8r8g8b8 picture (a Machines guest's) has 0 where alpha would be. The CPU composition never looks at it, but
+ * the GPU's takes the UI's alpha 0 for a hole where an app window shows through (gpu.c): the picture was see-through
+ * on the Raspberry Pi 5 (2026-11-05). What was copied as is gets alpha 255 here, inside the clip. */
+static void force_alpha(Canvas *c, int x, int y, int w, int h) {
+    int x0 = x > c->clip.x0 ? x : c->clip.x0, y0 = y > c->clip.y0 ? y : c->clip.y0;
+    int x1 = x + w < c->clip.x1 ? x + w : c->clip.x1, y1 = y + h < c->clip.y1 ? y + h : c->clip.y1;
+    for (int j = y0; j < y1; j++) {
+        uint32_t *row = c->px + (size_t)j * c->stride;
+        for (int i = x0; i < x1; i++) row[i] |= 0xff000000u;
+    }
+}
+
 static inline uint32_t bilinear(const uint32_t *px, int w, int h, float u, float v) {
     if (u < 0) u = 0;
     if (v < 0) v = 0;
@@ -140,6 +152,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     }
     if (!rot && !s->view.mirror && fabsf(sc - 1) < 0.001f && !s->view.bright && !s->view.contrast) {
         canvas_blit(c, px, sw, sh, (int)lroundf(dx), (int)lroundf(dy), 0, op, opaque);
+        if (s->xrgb) force_alpha(c, (int)lroundf(dx), (int)lroundf(dy), sw, sh);
         canvas_set_clip(c, old);
         return;
     }
@@ -183,7 +196,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
                 case 270: u = sw - vp; v = up; break;
                 default: u = up; v = vp;
                 }
-                o[i] = bilinear(lp, lw, lh, u / lf - 0.5f, v / lf - 0.5f);
+                o[i] = bilinear(lp, lw, lh, u / lf - 0.5f, v / lf - 0.5f) | (s->xrgb ? 0xff000000u : 0);
             }
         }
         if (s->view.bright || s->view.contrast) {
