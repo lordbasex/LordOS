@@ -25,6 +25,8 @@ int vm_op_begin(const char *dir, const char *op, const char *tag, const char *a,
 /* reads it: 1 there is one (o filled), 0 none, -1 unreadable (it's removed: an intent that can't be read was never
  * acted on, since the work starts only after the rename) */
 int vm_op_read(const char *dir, VmOp *o);
+/* reads it without touching it (an unreadable one stays for lord-vm): 1 there is one */
+int vm_op_read_peek(const char *dir, VmOp *o);
 /* removes it (and syncs the folder) */
 void vm_op_end(const char *dir);
 

@@ -676,6 +676,10 @@ static struct {
     /* resuming from suspend.state at this start */
     int resuming, resume_anyway, resumed;
     char resume_err[160];
+    /* the Shell (VM_CONSOLE): one stream to the serial console, and the last bytes the guest wrote, for a new one */
+    int console_fd;
+    char ring[8192];
+    size_t ring_n, ring_at;
     /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
     int snap_kind, snap_client;
     uint32_t snap_seq;
@@ -1515,6 +1519,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
     vlog("snapshot: %s %s \"%s\"", cmd, tag, name);
 }
 
+static void console_out(const char *b, size_t n);
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
     if (fd >= 0 && m->type != VM_CDROM) { close(fd); fd = -1; }
@@ -1585,6 +1590,26 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         begin_snapshot(ci, m->seq, m->a, m->text);
         return;
+    case VM_CONSOLE: {
+        if (!alive || S.serial_fd < 0) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        int sv[2];
+        if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { reply(ci, m->seq, VME_INTERNAL, strerror(errno)); return; }
+        if (S.console_fd >= 0) close(S.console_fd);
+        S.console_fd = sv[0];
+        fcntl(S.console_fd, F_SETFL, O_NONBLOCK);
+        VmMsg r = vm_msg(VM_CONSOLE_FD, m->seq, 0, 0, 0, 0, "");
+        send_to(ci, &r, sv[1]);
+        close(sv[1]);
+        /* the last of what the guest wrote, so the shell opens on its prompt */
+        size_t start = (S.ring_at + sizeof S.ring - S.ring_n) % sizeof S.ring;
+        for (size_t k = 0; k < S.ring_n;) {
+            size_t i = (start + k) % sizeof S.ring, run = sizeof S.ring - i < S.ring_n - k ? sizeof S.ring - i : S.ring_n - k;
+            console_out(S.ring + i, run);
+            k += run;
+        }
+        vlog("shell: opened for client %d", ci);
+        return;
+    }
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
@@ -1652,6 +1677,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         const JVal *q = json_get(json_get(root, "return"), "qemu");
         if (ok && q) snprintf(S.qemu_version, sizeof S.qemu_version, "%d.%d.%d %.40s", (int)json_num(q, "major", 0), (int)json_num(q, "minor", 0),
                               (int)json_num(q, "micro", 0), json_str(json_get(root, "return"), "package") ? json_str(json_get(root, "return"), "package") : "");
+        if (ok && q) vlog("qemu: version %s", S.qemu_version);
         if (S.resuming && !S.resumed && !S.resume_err[0]) {
             SuspendMeta sm;
             if (!suspend_meta_read(S.dir, &sm) && strcmp(sm.qemu, S.qemu_version) && !S.resume_anyway) {
@@ -1826,10 +1852,36 @@ static void pump_fd(int *fd, const char *who) {
     else if (n == 0 || (errno != EAGAIN && errno != EINTR)) { close(*fd); *fd = -1; }
 }
 
+static void ring_add(const char *b, size_t n) {
+    for (size_t i = 0; i < n; i++) { S.ring[S.ring_at] = b[i]; S.ring_at = (S.ring_at + 1) % sizeof S.ring; if (S.ring_n < sizeof S.ring) S.ring_n++; }
+}
+
+static void console_out(const char *b, size_t n) {
+    if (S.console_fd < 0) return;
+    ssize_t w = write(S.console_fd, b, n);           /* non-blocking: a console that doesn't read loses output, never stalls the guest */
+    if (w < 0 && errno != EAGAIN && errno != EINTR) { close(S.console_fd); S.console_fd = -1; }
+}
+
+/* what the Shell typed, to the guest's serial port */
+static void pump_console(void) {
+    char buf[4096];
+    ssize_t n = read(S.console_fd, buf, sizeof buf);
+    if (n <= 0) { if (n == 0 || (errno != EAGAIN && errno != EINTR)) { close(S.console_fd); S.console_fd = -1; vlog("shell: closed"); } return; }
+    if (S.serial_fd >= 0) {
+        for (ssize_t off = 0; off < n;) {
+            ssize_t w = write(S.serial_fd, buf + off, (size_t)(n - off));
+            if (w < 0) { if (errno == EINTR) continue; if (errno == EAGAIN) { struct pollfd pf = { S.serial_fd, POLLOUT, 0 }; if (poll(&pf, 1, 100) > 0) continue; } break; }
+            off += w;
+        }
+    }
+}
+
 static void pump_serial(void) {
     char buf[8192];
     ssize_t n = read(S.serial_fd, buf, sizeof buf);
     if (n <= 0) { if (n == 0 || (errno != EAGAIN && errno != EINTR)) { close(S.serial_fd); S.serial_fd = -1; } return; }
+    ring_add(buf, (size_t)n);
+    console_out(buf, (size_t)n);
     if (S.serial_log >= 0 && S.serial_bytes < SERIAL_CAP) {
         size_t k = (size_t)n;
         if (S.serial_bytes + (off_t)k > SERIAL_CAP) k = (size_t)(SERIAL_CAP - S.serial_bytes);
@@ -1851,6 +1903,7 @@ static void loop(void) {
         WATCH(S.qemu_err, -4);
         WATCH(S.passt_err, -5);
         WATCH(S.listen_fd, -6);
+        WATCH(S.console_fd, -7);
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;
@@ -1896,6 +1949,7 @@ static void loop(void) {
             case -4: pump_fd(&S.qemu_err, "qemu"); break;
             case -5: pump_fd(&S.passt_err, "passt"); break;
             case -6: accept_client(); break;
+            case -7: pump_console(); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -2112,7 +2166,7 @@ static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {

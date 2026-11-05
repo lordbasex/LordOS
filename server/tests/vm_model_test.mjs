@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
+const D = await import(path.join(here, '../../apps/machines/diag.js'));
 const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions } = M;
 
 let n = 0, bad = 0;
@@ -176,6 +177,22 @@ eq('storage rows order', storageRows(st).map((r) => [r.name || 'base', r.level])
 eq('storage row base users', storageRows(st)[1].baseUsers, 2);
 eq('storage bar', storageBar(st).map((b) => [b.key, b.bytes]), [['machines', 630], ['isos', 50], ['trash', 20], ['other', 0]]);
 eq('storage bar no total', storageBar({}), []);
+
+// ---- unified diagnostics (diag.js) ----
+const LOG = ['2026-11-05T06:00:00.000Z lord-vm 1: machine old', '2026-11-05T06:00:01.000Z qemu: SIGSEGV failed',
+  '2026-11-05T06:11:31.745Z lord-vm 9: machine 3bf "x" (amd64, kvm, 1 vCPU, 512 MB, pc-q35-10.0)',
+  '2026-11-05T06:11:31.811Z recovery: an interrupted suspend was rolled back',
+  '2026-11-05T06:11:32.000Z cgroup: in app-lordos-lordos-vm-3bf.scope (memory.max 1024 MB, cpu 150%)',
+  '2026-11-05T06:11:32.100Z qemu: pid 5; sandbox: landlock-fs=1 landlock-net=1',
+  '2026-11-05T06:11:32.200Z qemu: version 10.0.13 Debian',
+  '2026-11-05T06:11:40.000Z note: the machine\'s network stopped: passt ended (signal 11)',
+  '2026-11-05T06:12:00.000Z qemu: event VSERPORT_CHANGE'].join('\n');
+const lg = D.readLog(LOG);
+eq('diag last run only', lg.problems.length, 0);
+eq('diag recovery', lg.recovery.map((r) => r.text), ['an interrupted suspend was rolled back']);
+eq('diag fields', [lg.version, lg.sandbox, lg.cgroup.slice(0, 6), lg.started], ['10.0.13 Debian', 'landlock-fs=1 landlock-net=1', 'in app', '2026-11-05 06:11:31']);
+eq('diag network', lg.network.length, 1);
+eq('diag report', D.reportText({ name: 'X', id: 'i', arch: 'amd64', accel: 'kvm', vcpus: 1, memoryMb: 512, diskGb: 20, firmware: 'uefi', network: 'shared', state: 'running', reason: 'none', suspended: false }, lg, { snapshots: 2 }).split('\n').length, 10);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

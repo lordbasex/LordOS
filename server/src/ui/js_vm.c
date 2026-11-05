@@ -26,6 +26,7 @@
 #include "../vm/logclean.h"
 #include "../sec/json.h"
 #include "ui.h"
+#include "../term/term.h"
 
 #include <crypt.h>
 #include <dirent.h>
@@ -258,6 +259,8 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
             set_str(c, o, "iso", m.iso);
             set_str(c, o, "base", m.base);
+            JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
+            set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
             set_str(c, o, "created", m.created);
             set_str(c, o, "error", "");
@@ -266,6 +269,11 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
         }
         run_state(dir, c, o);
+        /* an operation that was interrupted and waits for the next start (3.6) */
+        {
+            VmOp op;
+            set_str(c, o, "operation", vm_op_read_peek(dir, &op) ? op.op : "");
+        }
         /* a saved session (6.1): the next start resumes from it */
         char sp[PATH_MAX + 300];
         snprintf(sp, sizeof sp, "%s/suspend.state", dir);
@@ -636,6 +644,8 @@ typedef struct {
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
+    int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
+    uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
     double rec_fed;
     int notice;                         /* VM_NOTICE: VMN_*, and its words */
@@ -909,6 +919,13 @@ static void from_vm(Sess *s) {
             maybe_display(s);
             if (s->display_failed) resume_once(s);
             break;
+        case VM_CONSOLE_FD:
+            if (fd >= 0 && m.seq == s->console_seq) {
+                if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
+                Session *ts = term_create_fd(fd, 5000);
+                if (ts) { s->console_term = ts->id; fd = -1; }
+            }
+            break;
         case VM_JOB:
             s->job_kind = m.a; s->job_status = m.b; s->job_pct = m.c;
             snprintf(s->job_text, sizeof s->job_text, "%s", m.text);
@@ -1093,6 +1110,8 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_str(c, o, "stderr", s->errtail);
     set_int(c, o, "frames", s->frames);
     set_int(c, o, "cd", s->cd_state);
+    if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
+    set_int(c, o, "console", s->console_term);
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : "");
     if (s->job_kind) {
@@ -1207,6 +1226,7 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     Sess *s = get(c, argv[0]);
     if (!s) return JS_UNDEFINED;
     if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
+    if (s->console_term) { Session *ts = term_get(s->console_term); if (ts) term_close(ts); s->console_term = 0; }
     drop_display(s, 1);
     drop_creds(s);
     if (s->vm >= 0) close(s->vm);
@@ -1262,10 +1282,10 @@ static JSValue f_log(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     if (max < 1024) max = 1024;
     if (max > 262144) max = 262144;
     const char *which = argc > 1 && JS_IsString(argv[1]) ? JS_ToCString(c, argv[1]) : NULL;
-    int serial = which && !strcmp(which, "serial");
+    int serial = which && !strcmp(which, "serial"), journal = which && !strcmp(which, "journal");
     if (which) JS_FreeCString(c, which);
     char p[PATH_MAX + 32];
-    snprintf(p, sizeof p, "%s/log/%s", dir, serial ? "serial.log" : "lord-vm.log");
+    snprintf(p, sizeof p, "%s/log/%s", dir, serial ? "serial.log" : journal ? "journal.log" : "lord-vm.log");
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) return JS_NewString(c, "");
     char *buf = malloc((size_t)max + 1);
@@ -1320,6 +1340,18 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (vm_png_save(dir, name, m->px, m->w, m->h, 8192)) return JS_NewString(c, "");
     snprintf(path, sizeof path, "%s/%s", dir, name);
     return JS_NewString(c, path);
+}
+
+/* console(session) → bool: asks lord-vm for the serial console's stream; poll's console is then the terminal session to
+ * show in a <Terminal> (lord.term.key writes to it). Asking again replaces it. */
+static JSValue f_console(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    if (!s || s->vm < 0) return JS_FALSE;
+    int q = ask(s, VM_CONSOLE, 0);
+    if (q < 0) return JS_FALSE;
+    s->console_seq = (uint32_t)q;
+    return JS_TRUE;
 }
 
 /* record(session) → a media id (0: couldn't): the guest's picture at its size into ~/Pictures/Screenshots as
@@ -1858,7 +1890,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
-    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

@@ -4,7 +4,7 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, FilePicker, Toggle, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, MediaView, ScrollView, FilePicker, Toggle, Terminal, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -18,7 +18,7 @@ const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.n
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'console'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job);
 
 function Tools({ ctl, floating }) {
@@ -35,6 +35,7 @@ function Tools({ ctl, floating }) {
     {ctl.rec ? <Btn danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
     <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
     <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
+    {!floating ? <Btn label={tr('machines.tb.shell')} primary={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} style={{ height: 30 }} /> : null}
     <Btn label={tr('machines.cmd.logs')} onClick={ctl.logs} style={{ height: 30 }} />
     <Btn label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} style={{ height: 30 }} />
     {!ctl.rec ? <Btn label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} style={{ height: 30 }} /> : null}
@@ -153,6 +154,11 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [cdWant, setCdWant] = useState(null);       // the disc asked for while lord-vm changes it
   const [cdErr, setCdErr] = useState('');
   const snapJobs = useRef([]);
+  // the Shell (6.18): the guest's serial console in a terminal pane under the picture; the keyboard goes to whichever
+  // of the two was clicked last
+  const [shell, setShell] = useWindowState('vm.shell', false);
+  const [shellKeys, setShellKeys] = useState(false);
+  const shellRef = useRef(null);
   const [rec, setRec] = useWindowState('vm.rec', null);       // { id, at } while the picture is recorded
   const [, tick] = useState(0);
   useEffect(() => { if (!rec) return undefined; const t2 = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t2); }, [rec]);
@@ -249,7 +255,20 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
-  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose;
+  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd;
+  // the console's stream, asked for once the pane is open on a running machine
+  useEffect(() => { if (shell && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, sid, st?.state, !!st?.console]);
+  useEffect(() => {
+    if (!shell || !shellKeys || !focused || !st?.console) return undefined;
+    const id = st.console;
+    return addListener('keydown', (e) => {
+      if (menus.open > 0) return;
+      const key = e.key && e.key.length > 1 ? e.key : '';
+      const base = e.ctrl || e.alt ? e.base || '' : '';
+      if (!key && !e.char && !base) return;
+      term.key(id, key, e.char || '', base, e.mods & 7);
+    });
+  }, [shell, shellKeys, focused, st?.console]);
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
@@ -322,6 +341,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   };
   const recSecs = rec ? Math.floor((now() - rec.at) / 1000) : 0;
   const ctl = {
+    shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,
     setFull: (on) => wm.setFullscreen(winId, on),
@@ -397,9 +417,23 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
 
   return (
     <View ref={root} style={{ flex: 1, backgroundColor: '#000' }}>
-      <View ref={box} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
+      <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
         {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
       </View>
+      {shell && !full ? (
+        <View onMouseDown={() => setShellKeys(true)} style={{ height: 260, borderTopWidth: 2, borderColor: shellKeys ? '#0a84ff' : p.line, backgroundColor: '#101114' }}>
+          <View style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: '#1b1c20' }}>
+            <View style={{ paddingHorizontal: 6, height: 18, borderRadius: 4, justifyContent: 'center', backgroundColor: '#3a2a5c' }}>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#d9c9ff' }}>{tr('machines.shell.badge')}</Text>
+            </View>
+            <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr('machines.shell.title', { name })}</Text>
+            <Text style={{ fontSize: 11, color: '#8a8a94' }}>{shellKeys ? tr('machines.shell.keysHere') : tr('machines.shell.clickHere')}</Text>
+            <Btn label="×" onClick={() => { setShell(false); setShellKeys(false); }} style={{ height: 20, paddingHorizontal: 8 }} />
+          </View>
+          {st?.console ? <Terminal ref={shellRef} session={st.console} style={{ flex: 1 }} />
+            : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: '#8a8a94' }}>{a.reset ? tr('machines.shell.connecting') : tr('machines.shell.off')}</Text></View>}
+        </View>
+      ) : null}
       {st?.state === 'paused' && !card ? (
         <View style={{ position: 'absolute', top: BAR + 12, left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ paddingHorizontal: 12, height: 26, borderRadius: 13, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }}>

@@ -72,6 +72,23 @@ int vm_op_read(const char *dir, VmOp *o) {
     return 1;
 }
 
+int vm_op_read_peek(const char *dir, VmOp *o) {
+    memset(o, 0, sizeof *o);
+    char path[VM_PATH_MAX + 64];
+    snprintf(path, sizeof path, "%s/operation.json", dir);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return 0;
+    char buf[8192];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    JDoc d;
+    if (n <= 0 || json_parse(buf, (size_t)n, &d, NULL, 0)) return 0;
+    const char *op = json_str(d.root, "op");
+    if (op) snprintf(o->op, sizeof o->op, "%s", op);
+    json_free(&d);
+    return op != NULL;
+}
+
 void vm_op_end(const char *dir) {
     char path[VM_PATH_MAX + 64];
     snprintf(path, sizeof path, "%s/operation.json", dir);

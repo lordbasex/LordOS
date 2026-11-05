@@ -38,6 +38,9 @@
  *                   → VM_REPLY when the state is on disk (QEMU then quits: VM_STATE stopped, suspended)
  *     VM_KEEP       a = 1: the machine keeps running when the control channel closes (Keep Running); 0: it shuts
  *                   down then, as by default
+ *     VM_CONSOLE    → VM_CONSOLE_FD: a stream to the guest's serial console (6.18, the Shell): what the guest writes
+ *                   comes out of it (the last 8 KB first), what's written to it goes to the guest. One at a time; a
+ *                   new one replaces the old. The serial log goes on as before.
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
@@ -104,9 +107,9 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT,
-    VM_REQ_LAST = VM_SNAPSHOT,
-    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB,                          /* from lord-vm */
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE,
+    VM_REQ_LAST = VM_CONSOLE,
+    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
 };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_COUNT };
@@ -269,6 +272,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_INFO: return m->a > 0 && m->b > 0;
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
+    case VM_CONSOLE_FD: return 1;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
