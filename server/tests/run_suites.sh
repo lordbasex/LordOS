@@ -194,6 +194,9 @@ EOF
     # (0.8.5) Monitor → Network's model (sdk/netmodel.js): search tokens, filters, the tree, sorting
     if have node; then run "netmodel-test (sdk/netmodel.js)" node tests/netmodel_test.mjs
     else skip "netmodel-test" "node"; fi
+    # Settings → Network → VPN's form data (apps/settings/vpnform.js): PEM blocks, edit form, import lines
+    if have node; then run "vpnform-test (apps/settings/vpnform.js)" node tests/vpnform_test.mjs
+    else skip "vpnform-test" "node"; fi
     # (0.8.7) Monitor → Voltage's model (apps/monitor/voltmodel.js): the rpi-pmic line, states, sources, the trace
     if have node; then run "voltage-model-test (apps/monitor/voltmodel.js)" node tests/voltage_model_test.mjs
     else skip "voltage-model-test" "node"; fi

@@ -239,9 +239,9 @@ replies carry only data (a count, a public key).
 | `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK vpn.imported`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR vpn.missingProgram type=<type> package=<package>` |
 | `net-vpn-enable` | `openconnect\|fortinet` | admin | Installs `openconnect` or `openfortivpn` with LordOS's package engine (the same as `pkg-install`): `LOG progress …` and the package engine's `OK`. If it was already there: `OK vpn.alreadyInstalled`. |
 | `net-vpn-credentials` | `name\nuser\npassword` | admin | OpenVPN only. Stored with mode 0600. |
-| `net-vpn-trust` | `name\nsha256` | admin | Fortinet: the certificate the person accepted (64 hex digits, `:` allowed) becomes the connection's `trusted-cert`, replacing an earlier one. `OK vpn.trusted`. Settings then calls `net-vpn-up` again. |
-| `net-vpn-config` | `name` | admin | IPsec, PPTP, OpenConnect, Fortinet: `LOG {name, type, values: {key: value}, secrets: ["password"…]}` — the saved settings without passwords or keys (to fill Settings' **Edit…** form), then `OK 1`. WireGuard / OpenVPN: `ERR vpn.editFromFile`. |
-| `net-vpn-edit` | `type\nname\nconfig` | admin | The same as `net-vpn-import` over an existing VPN of that type, while it's off (`ERR vpn.editWhileOn`). A `password`, `psk` or PEM left out keeps the saved one. |
+| `net-vpn-trust` | `name\nsha256[\nhost]` | admin | Fortinet: the certificate the person accepted (64 hex digits, `:` allowed) becomes that server's trusted certificate (`trusted-cert=host@hex`), replacing an earlier one for the same server; without `host`, the untagged ones. `OK vpn.trusted`. Settings then calls `net-vpn-up` again. |
+| `net-vpn-config` | `name` | admin | IPsec, PPTP, OpenConnect, Fortinet: `LOG {name, type, values: {key: value}, secrets: ["password"…], files: ["cert", "key"…], trustedServers: [host…]}` — the saved settings without passwords, keys or PEM contents (to fill Settings' **Edit…** form), then `OK 1`. WireGuard / OpenVPN: `ERR vpn.editFromFile`. |
+| `net-vpn-edit` | `type\nname\nconfig` | admin | The same as `net-vpn-import` over an existing VPN of that type, while it's off (`ERR vpn.editWhileOn`). A `password`, `psk`, `key-password` or PEM left out keeps the saved one (a new `key` drops the old `key-password`); the certificates trusted from the prompt are kept. Two extra lines: `forget-certs=1` drops those, `remove-client-cert=1` drops the client certificate and its key password. |
 | `net-vpn-up` / `net-vpn-down` | `name` | anyone | WireGuard: `OK vpn.connected`. The others: `OK vpn.connecting` and then an EVENT. |
 | `net-vpn-delete` | `name` | admin | |
 | `net-vpn-status` | `name` or empty | anyone | One `LOG` per VPN and then `OK <n>`:<br>`{ name, type:'wireguard', ifname, active, peers: [{ publicKey, endpoint, lastHandshake (unix), rxBytes, txBytes }] }`<br>`{ name, type:'openvpn', ifname, running, active }`<br>`{ name, type:'ipsec'\|'pptp'\|'openconnect'\|'fortinet', ifname, running, active, address }` |
@@ -288,7 +288,23 @@ It always requests a virtual IP (`vips`).
 
 Routes and DNS are sent by the server. If it sends no routes, all traffic goes through it.
 
-**`fortinet`**: `host`, `port` (443 by default), `auth` (`password`, the default, or `sso`), `user` and `password` (only with `auth=password`), `trusted-cert` (sha256 fingerprint, 64 hex digits, with or without `:`; there can be several separated by commas; saved in lowercase, which is what openfortivpn compares), `sso-port` (only with `auth=sso`, 8020 by default) and `routes` (optional; if missing, all traffic goes through it).
+**`fortinet`**: `host`, `port` (443 by default), `alt-hosts` (more servers, `host[:port]` separated by commas, up to 4), `auth` (`password`, the default, or `sso`), `user` and `password` (only with `auth=password`), `trusted-cert` (sha256 fingerprints, 64 hex digits, with or without `:`, separated by commas, each one either for any server or `host@hex` for one server; there can be several `trusted-cert` lines; saved in lowercase, which is what openfortivpn compares), `sso-port` (only with `auth=sso`, 8020 by default), `cert` and `key` (a client certificate and its private key, PEM; both or neither), `key-password` (the key's pass phrase), `description` (free text shown under the name) and `routes` (optional; if missing, all traffic goes through it).
+
+### Fortinet: more servers, client certificate, description
+
+Settings' Fortinet form follows what the vendor's own client offers, as far as openfortivpn
+1.23.1 (Debian 13) can do it:
+
+| Option | In LordOS |
+|---|---|
+| Connection name, description | **Name** and **Description** (`description`, shown under the name in the VPN row). |
+| Several remote gateways | **More servers** (`+ Add server`, one `host` or `host:port` per row, up to 4 after the main one). `forti_run` tries them in order: an unreachable server, a name that doesn't resolve or a failed TLS handshake moves on to the next; a certificate to trust, a refused sign-in or a tunnel that came up stops there. `net vpn <name> gateway <host:port>` says which one answered, and the row shows "via …" while connected. A certificate trusted from the prompt is saved for that server only (`trusted-cert=host@hex`; `net-vpn-trust name\nsha256\nhost`). Edit… lists the servers with a trusted certificate and can **Forget** them. |
+| Custom port | **Port** (and `host:port` for the other servers). |
+| Single sign-on | **Authentication → Single sign-on** (see below). |
+| "Use external browser as user agent" | The only way LordOS can do it: the SDK has no web view, so the page always opens in the default browser. The form shows it as a fixed line ("Sign-in page opens in: Default browser"), not as a choice. |
+| Auto-login with the identity provider from the OS account | Not applicable: LordOS accounts aren't directory accounts. The browser keeps the identity provider's session, so after the first sign-in the page usually goes straight through (or only asks for the authenticator approval), which is the same effect. |
+| Client certificate | **Client certificate → Choose…**: the system file dialog; one PEM file with both, or the certificate and the key separately (`.pem`, `.crt`, `.cer`, `.key`). Settings takes the first `CERTIFICATE` block and the first private-key block (RSA, EC, PKCS#8, encrypted or not) and sends them to lord-netd, which keeps root-only copies (`/etc/lordos/net/vpn/<n>.cert.pem` and `.key.pem`, 0600) and passes them to openfortivpn as `user-cert` / `user-key` in its 0600 config. The key's pass phrase (**Key password**) goes into that same 0600 config as `pem-passphrase`, never on the command line. **PKCS#12 (`.p12`, `.pfx`) is not supported**: lord-netd has no PKCS#12 decoder (it needs ASN.1 plus RC2/3DES/AES and PBKDF), and adding one means a crypto library in the root network service; Settings says to export the certificate and key as PEM. A smartcard (`pkcs11:`) isn't offered either. A key that can't be loaded (wrong pass phrase, key of another certificate) is `vpn.fortiClientCert`. |
+| Dual-stack IPv4/IPv6 | **Not offered**: openfortivpn 1.23.1 only brings up IPv4 inside the tunnel (it has no IPv6 address or route handling), so a switch would do nothing. |
 
 ### Fortinet with single sign-on
 
@@ -364,7 +380,7 @@ net link restored <count>      (interfaces that appeared after boot and were bro
 net wake <if> renew | ok | skipped | reassociate <why> | reset <why> | recovered-reassociate <why> | recovered-reset <why> | failed <why>
                                (after waking from sleep; why: not-associated | no-carrier | no-address | gateway-unreachable)
 net vpn <name> connecting | connected [ip] | reconnecting | disconnected | need-auth | auth-failed | state <state> | error [reason] | log <openvpn error line>
-               | sso <sign-in page URL> | untrusted-cert {"sha256","subject","issuer","changed"}     (Fortinet)
+               | sso <sign-in page URL> | untrusted-cert {"sha256","subject","issuer","changed","gateway"} | gateway <host:port>     (Fortinet)
 daemon <process> <line>        (wpa_supplicant output: "wpa:<if>")
 daemon <process> exit <code>   (end of "if:<if>", "wpa:<if>", "vpn:<name>")
 ```

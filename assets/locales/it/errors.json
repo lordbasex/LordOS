@@ -709,5 +709,7 @@
   "vpn.fortiEnded": "Il programma VPN si è fermato prima di connettersi.",
   "vpn.editFromFile": "Questa VPN proviene da un file: eliminala e importa il nuovo file.",
   "vpn.editWhileOn": "Disattiva la VPN prima di modificarla.",
-  "vpn.fortiSsoRefused": "Il server VPN non ha accettato l'accesso. Connetti di nuovo e accedi dalla pagina dell'organizzazione."
+  "vpn.fortiSsoRefused": "Il server VPN non ha accettato l'accesso. Connetti di nuovo e accedi dalla pagina dell'organizzazione.",
+  "vpn.clientCertPair": "Un certificato client richiede il certificato e la sua chiave privata.",
+  "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato."
 }

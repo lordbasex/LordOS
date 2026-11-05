@@ -87,7 +87,7 @@ int vpn_kv_parse(const char *text, const char *const *keys, const char *const *p
                 lineno++;
                 size_t pn = strlen(pl);
                 if (pn && pl[pn - 1] == '\r') pl[--pn] = 0;
-                for (char *c = pl; *c; c++) if (!isalnum((unsigned char)*c) && !strchr("+/=- :", *c)) { lerr_set(err, errn, "vpn.badChar", "line", lerr_int(lineno), "key", k, NULL); rc = -1; break; }
+                for (char *c = pl; *c; c++) if (!isalnum((unsigned char)*c) && !strchr("+/=- :,", *c)) { lerr_set(err, errn, "vpn.badChar", "line", lerr_int(lineno), "key", k, NULL); rc = -1; break; }
                 if (rc) break;
                 buf_printf(&b, "%s\n", pl);
                 if (!strncmp(pl, "-----END ", 9)) closed = 1;

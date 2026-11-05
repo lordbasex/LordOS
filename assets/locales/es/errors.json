@@ -709,5 +709,7 @@
   "vpn.fortiEnded": "El programa de la VPN se detuvo antes de conectar.",
   "vpn.editFromFile": "Esta VPN vino de un archivo: borrala e importá el archivo nuevo.",
   "vpn.editWhileOn": "Apagá la VPN antes de editarla.",
-  "vpn.fortiSsoRefused": "El servidor VPN no aceptó el inicio de sesión. Volvé a conectar e iniciá sesión en la página de la organización."
+  "vpn.fortiSsoRefused": "El servidor VPN no aceptó el inicio de sesión. Volvé a conectar e iniciá sesión en la página de la organización.",
+  "vpn.clientCertPair": "Un certificado de cliente necesita el certificado y su clave privada.",
+  "vpn.fortiClientCert": "No se pudo usar el certificado de cliente o su clave. Revisá la contraseña de la clave y que la clave sea de ese certificado."
 }

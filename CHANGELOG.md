@@ -13,6 +13,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - Fortinet VPN with **single sign-on**: Settings → Network → VPN → Fortinet has an **Authentication** choice, **Username and password** or **Single sign-on** (the organization's sign-in page, often with an authenticator-app approval). Connecting opens that page in the default browser and Settings shows "Waiting for you to sign in on the organization's page…" with the time left (5 minutes), **Open sign-in page** and **Cancel**; the VPN connects when the sign-in finishes. LordOS waits for the page's return on 127.0.0.1 only, and checks the server's certificate before the page opens, so a certificate question comes first.
+- Fortinet VPN: **more servers** (`+ Add server`, tried in order when one doesn't answer; the row says which one is in use, and a trusted certificate belongs to its server), a **client certificate** chosen with the file dialog (PEM certificate and private key, with an optional key password; kept root-only), a **Description** shown under the name, and with single sign-on a line saying the sign-in page opens in the default browser. PKCS#12 files and IPv6 inside the tunnel aren't available with the Linux client LordOS uses.
 - A saved IPsec, PPTP, OpenConnect or Fortinet VPN can be changed: **⋯ → Edit…** in its row while it's off (passwords left empty stay as they were). **Delete** is now a trash can button with a tooltip.
 
 ### Fixed
