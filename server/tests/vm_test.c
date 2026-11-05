@@ -460,7 +460,65 @@ static void test_agent(void) {
     CHECK(ag_b64_decode("a$==", 4, d, sizeof d) == -1 && ag_b64_decode("aGVsbG8=", 8, d, 2) == -1 && ag_b64_encode(d, 7, e, 8) == -1);
 }
 
+/* the guest's clipboard beyond text (6.8): AGK_CLIPX, PNG headers, HTML made harmless, Clone hostnames (6.3) */
+static int san(const char *in, char *out, size_t cap) { return (int)ag_html_sanitize(in, strlen(in), out, cap); }
+static void test_clipx(void) {
+    uint8_t buf[256];
+    AgClip c = { (const uint8_t *)"hi", (const uint8_t *)"<b>hi</b>", NULL, 2, 9, 0 }, r;
+    size_t n = ag_clipx_size(&c);
+    CHECK(n == 5 + 2 + 5 + 9);
+    ag_clipx_write(&c, buf);
+    CHECK(!ag_clipx_parse(buf, n, &r) && r.text_n == 2 && !memcmp(r.text, "hi", 2) && r.html_n == 9 && !r.png);
+    CHECK(ag_clipx_parse(buf, n - 1, &r) == -1);                                     /* cut short */
+    CHECK(ag_clipx_parse(buf, 0, &r) == -1);                                         /* nothing */
+    uint8_t twice[14] = { AGF_TEXT, 2, 0, 0, 0, 'a', 'b', AGF_TEXT, 2, 0, 0, 0, 'c', 'd' };
+    CHECK(ag_clipx_parse(twice, sizeof twice, &r) == -1);                            /* a form twice */
+    uint8_t odd[7] = { 9, 2, 0, 0, 0, 'a', 'b' };
+    CHECK(ag_clipx_parse(odd, sizeof odd, &r) == -1);                                /* unknown form */
+    uint8_t huge[5] = { AGF_HTML, 0xff, 0xff, 0xff, 0x7f };
+    CHECK(ag_clipx_parse(huge, sizeof huge, &r) == -1);
+    /* PNG header */
+    uint8_t png[40] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R', 0, 0, 1, 0, 0, 0, 0, 200, 8, 6, 0, 0, 0 };
+    uint32_t w = 0, h = 0;
+    CHECK(!ag_png_check(png, sizeof png, &w, &h) && w == 256 && h == 200);
+    png[16] = 0x7f;                                                                  /* 2 billion wide */
+    CHECK(ag_png_check(png, sizeof png, &w, &h) == -1);
+    png[16] = 0; png[24] = 7;                                                        /* bit depth 7 */
+    CHECK(ag_png_check(png, sizeof png, &w, &h) == -1);
+    png[24] = 8; png[1] = 'X';
+    CHECK(ag_png_check(png, sizeof png, &w, &h) == -1);
+    /* HTML */
+    char o[512];
+    CHECK(san("<p>Hello <b>world</b></p>", o, sizeof o) > 0 && !strcmp(o, "<p>Hello <b>world</b></p>"));
+    CHECK(san("a<script>alert(1)</script>b", o, sizeof o) > 0 && !strcmp(o, "ab"));
+    CHECK(san("a<SCRIPT type=x>alert(1)</ScRiPt >b", o, sizeof o) > 0 && !strcmp(o, "ab"));
+    CHECK(san("<style>body{}</style><i>x</i>", o, sizeof o) > 0 && !strcmp(o, "<i>x</i>"));
+    CHECK(san("<img src=x onerror=alert(1)>t", o, sizeof o) > 0 && !strcmp(o, "t"));
+    CHECK(san("<a href=\"javascript:alert(1)\" onclick=\"x()\">l</a>", o, sizeof o) > 0 && !strcmp(o, "<a>l</a>"));
+    CHECK(san("<a href='https://example.test/?a=1&b=\"2'>l</a>", o, sizeof o) > 0 && !strcmp(o, "<a href=\"https://example.test/?a=1&b=&quot;2\">l</a>"));
+    CHECK(san("<a href=\" javascript:x\">l</a>", o, sizeof o) > 0 && !strcmp(o, "<a>l</a>"));
+    CHECK(san("<span style=\"color: red; background: url(http://x); font-weight:bold\">s</span>", o, sizeof o) > 0 &&
+          !strcmp(o, "<span style=\"color: red; font-weight: bold\">s</span>"));
+    CHECK(san("<span style=\"color: expression(alert(1))\">s</span>", o, sizeof o) > 0 && !strcmp(o, "<span>s</span>"));
+    CHECK(san("<!-- c --><html><body><!--StartFragment--><u>u</u><!--EndFragment--></body></html>", o, sizeof o) > 0 && !strcmp(o, "<u>u</u>"));
+    CHECK(san("1 < 2 > 0 <3", o, sizeof o) > 0 && !strcmp(o, "1 &lt; 2 &gt; 0 &lt;3"));
+    CHECK(san("<iframe src=x>inner<b>no</b></iframe>after", o, sizeof o) > 0 && !strcmp(o, "after"));
+    CHECK(san("<td colspan=2 rowspan=\"x\">c</td>", o, sizeof o) > 0 && !strcmp(o, "<td colspan=\"2\">c</td>"));
+    CHECK(san("<svg><script>x</script></svg>ok", o, sizeof o) > 0 && !strcmp(o, "ok"));
+    CHECK(san("<b title=\"a\"<script>\">x</b>", o, sizeof o) > 0 && !strstr(o, "<script"));
+    CHECK(san("<div>unclosed <i", o, sizeof o) > 0 && !strcmp(o, "<div>unclosed &lt;i"));
+    CHECK(san("<p>abcdefgh</p>", o, 8) == -1);                                       /* doesn't fit */
+    /* hostnames */
+    char hn[64];
+    CHECK(vm_hostname_valid("debian-13-clone") && !vm_hostname_valid("-a") && !vm_hostname_valid("a-") && !vm_hostname_valid("A") &&
+          !vm_hostname_valid("a.b") && !vm_hostname_valid("") && !vm_hostname_valid("a;rm -rf"));
+    vm_hostname_from_name("Debian 13 (test) ", hn, sizeof hn); CHECK(!strcmp(hn, "debian-13-test"));
+    vm_hostname_from_name("Ñandú", hn, sizeof hn); CHECK(!strcmp(hn, "and"));
+    vm_hostname_from_name("--", hn, sizeof hn); CHECK(!strcmp(hn, "machine"));
+}
+
 int main(void) {
+    test_clipx();
     test_log_clean();
     test_images();
     test_schema();

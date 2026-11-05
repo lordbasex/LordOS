@@ -170,3 +170,63 @@ int vm_snaps_find(const VmSnap *s, int n, const char *tag) {
     for (int i = 0; i < n; i++) if (!strcmp(s[i].tag, tag)) return i;
     return -1;
 }
+
+/* ---- identity.json (6.3) ---- */
+
+int vm_hostname_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (!n || n > VM_HOSTNAME_MAX || s[0] == '-' || s[n - 1] == '-') return 0;
+    for (size_t i = 0; i < n; i++) if (!((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= '0' && s[i] <= '9') || s[i] == '-')) return 0;
+    return 1;
+}
+
+void vm_hostname_from_name(const char *name, char *out, size_t n) {
+    size_t o = 0;
+    int dash = 0;
+    for (const unsigned char *p = (const unsigned char *)(name ? name : ""); *p && o + 1 < n && o < VM_HOSTNAME_MAX; p++) {
+        char c = (char)*p;
+        if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) { out[o++] = c; dash = 0; }
+        else if (o && !dash) { out[o++] = '-'; dash = 1; }
+    }
+    while (o && out[o - 1] == '-') o--;
+    out[o] = 0;
+    if (!o) snprintf(out, n, "machine");
+}
+
+int vm_identity_write(const char *dir, const char *hostname) {
+    if (!vm_hostname_valid(hostname)) return -1;
+    char tmp[VM_PATH_MAX + 64], path[VM_PATH_MAX + 64], buf[128];
+    snprintf(tmp, sizeof tmp, "%s/.identity.json.tmp", dir);
+    snprintf(path, sizeof path, "%s/identity.json", dir);
+    int len = snprintf(buf, sizeof buf, "{\"hostname\":\"%s\"}\n", hostname);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0 && write(fd, buf, (size_t)len) == len && !fsync(fd);
+    if (fd >= 0) close(fd);
+    if (!ok || rename(tmp, path)) { unlink(tmp); return -1; }
+    vm_sync_dir(dir);
+    return 0;
+}
+
+int vm_identity_read(const char *dir, char *hostname, size_t n) {
+    char path[VM_PATH_MAX + 64], buf[512];
+    snprintf(path, sizeof path, "%s/identity.json", dir);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t r = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    JDoc d;
+    if (r <= 0 || json_parse(buf, (size_t)r, &d, NULL, 0)) return -1;
+    const char *h = json_str(d.root, "hostname");
+    int ok = h && vm_hostname_valid(h) && strlen(h) < n;
+    if (ok) snprintf(hostname, n, "%s", h);
+    json_free(&d);
+    return ok ? 0 : -1;
+}
+
+void vm_identity_done(const char *dir) {
+    char path[VM_PATH_MAX + 64];
+    snprintf(path, sizeof path, "%s/identity.json", dir);
+    unlink(path);
+    vm_sync_dir(dir);
+}

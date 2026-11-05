@@ -2,10 +2,10 @@
 // or Duplicate, an exact copy with the same identity (6.3). The sheet says how the disk is copied on this computer's
 // file system before anything happens: shared by reflink (btrfs, XFS), a frozen shared base with an overlay for each
 // machine (ext4), or a full copy. lord-vm does it with the machine off.
-import { View, Text, TextInput, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Toggle, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Btn, Sheet } from './ui.jsx';
-import { cloneMethod } from './model.js';
+import { cloneMethod, cloneHostname, hostnameValid } from './model.js';
 import { writeMeta } from './meta.js';
 
 function Kind({ on, title, text, foot, onClick }) {
@@ -29,6 +29,11 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
   const [info] = useState(() => lord.vm.cloneInfo(m.dir) || {});
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState('');
+  // the Clone's own identity inside the guest (6.3): a hostname, a new machine-id and SSH keys at its first start
+  const [keepId, setKeepId] = useState(false);
+  const [host, setHost] = useState(() => cloneHostname(m.name));
+  const isClone = fromSnapshot || kind === 'clone';
+  const hostBad = isClone && !keepId && !hostnameValid(host);
   const how = cloneMethod(info, fromSnapshot ? 'clone' : kind, !!fromSnapshot);
   useEffect(() => {
     if (!job) return undefined;
@@ -46,7 +51,8 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
   }, [job]);
   const go = () => {
     setFail('');
-    const id = lord.vm.clone(m.dir, { name: name.trim(), duplicate: kind === 'duplicate' && !fromSnapshot, linked: how === 'linked', fromSnapshot: fromSnapshot?.tag });
+    const id = lord.vm.clone(m.dir, { name: name.trim(), duplicate: kind === 'duplicate' && !fromSnapshot, linked: how === 'linked', fromSnapshot: fromSnapshot?.tag,
+      keepIdentity: isClone && keepId, hostname: isClone && !keepId ? host : undefined });
     if (!id) setFail(tr('machines.cfg.refused')); else setJob(id);
   };
   const blocked = running ? tr('machines.clone.running', { name: m.name }) : how === 'blocked' ? tr('machines.clone.suspended', { name: m.name }) : '';
@@ -54,7 +60,7 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
     <Sheet width={640} title={fromSnapshot ? tr('machines.clone.fromTitle', { name: fromSnapshot.name }) : tr('machines.clone.title', { name: m.name })} onCancel={onClose} actions={[
       <Btn key="c" label={tr('machines.cancel')} onClick={onClose} />,
       <Btn key="o" primary label={job ? tr('machines.clone.copying') : tr(kind === 'duplicate' && !fromSnapshot ? 'machines.clone.duplicate' : 'machines.clone.clone')}
-        disabled={!!job || !!blocked || !name.trim()} onClick={go} />,
+        disabled={!!job || !!blocked || !name.trim() || hostBad} onClick={go} />,
     ]}>
       {!fromSnapshot ? (
         <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -68,6 +74,23 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
         <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.new.name')}</Text>
         <TextInput value={name} onChange={setName} />
       </View>
+      {isClone ? (
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ flex: 1, fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.clone.keepIdentity')}</Text>
+            <Toggle on={keepId} onChange={setKeepId} />
+          </View>
+          {!keepId ? (
+            <View style={{ gap: 4 }}>
+              <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.clone.hostname')}</Text>
+              <TextInput value={host} onChange={(x) => setHost(x.trim().toLowerCase())} />
+            </View>
+          ) : null}
+          <Text style={{ fontSize: 12, lineHeight: 1.45, color: hostBad ? '#ff453a' : p.dim, textAlign: 'start' }}>
+            {hostBad ? tr('machines.clone.hostnameBad') : keepId ? tr('machines.clone.keepIdentityNote') : m.agent ? tr('machines.clone.identityAgent') : tr('machines.clone.identityNoAgent')}
+          </Text>
+        </View>
+      ) : null}
       <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: blocked ? p.warnBg : p.card }}>
         <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>
           {blocked || tr(`machines.clone.how.${how}`, { fs: info.fs || '', name: m.name })}

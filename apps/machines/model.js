@@ -315,6 +315,14 @@ export const snapSize = (s) => (s?.memory && s.vmstate > 0 ? s.vmstate : 0);
 // How lord-vm will copy the disk, from lord.vm.cloneInfo: 'reflink' (shared until changed), 'linked' (ext4: a frozen
 // base and an overlay for each), 'copy' (a full copy), or 'blocked' (a Clone of a machine with a saved session, which
 // holds its identity). fromSnapshot: a Clone of one snapshot is always converted.
+// a Clone's name inside the guest (6.3): one DNS label, as lord-vm's vm_hostname_valid and vm_hostname_from_name
+export const hostnameValid = (h) => typeof h === 'string' && h.length >= 1 && h.length <= 63 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(h);
+export function hostnameFrom(name) {
+  const base = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/, '');
+  return base || 'machine';
+}
+export const cloneHostname = (name) => `${hostnameFrom(name).slice(0, 57).replace(/-+$/, '')}-clone`;
+
 export function cloneMethod(info, kind, fromSnapshot = false) {
   if (kind === 'clone' && info?.suspended) return 'blocked';
   if (fromSnapshot) return 'copy';

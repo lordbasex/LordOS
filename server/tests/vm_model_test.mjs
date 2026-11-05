@@ -201,5 +201,17 @@ eq('diag fields', [lg.version, lg.sandbox, lg.cgroup.slice(0, 6), lg.started], [
 eq('diag network', lg.network.length, 1);
 eq('diag report', D.reportText({ name: 'X', id: 'i', arch: 'amd64', accel: 'kvm', vcpus: 1, memoryMb: 512, diskGb: 20, firmware: 'uefi', network: 'shared', state: 'running', reason: 'none', suspended: false }, lg, { snapshots: 2 }).split('\n').length, 10);
 
+// ---- a Clone's name inside the guest (6.3), as lord-vm checks it ----
+eq('hostname ok', [M.hostnameValid('debian-13-clone'), M.hostnameValid('a'), M.hostnameValid('-a'), M.hostnameValid('a-'), M.hostnameValid('A'), M.hostnameValid('a.b'), M.hostnameValid('x'.repeat(64))],
+  [true, true, false, false, false, false, false]);
+eq('hostname from name', [M.hostnameFrom('Debian 13 (test) '), M.hostnameFrom('Ñandú'), M.hostnameFrom('--')], ['debian-13-test', 'and', 'machine']);
+eq('clone hostname', [M.cloneHostname('Agent Test'), M.cloneHostname('x'.repeat(80)).length, M.hostnameValid(M.cloneHostname('x'.repeat(80)))], ['agent-test-clone', 63, true]);
+// ---- the network healing itself, in the Overview (6.5) ----
+const NET = ['2026-11-05T06:11:31.745Z lord-vm 9: machine 3bf "x" (amd64, kvm, 1 vCPU, 512 MB, pc-q35-10.0)',
+  '2026-11-05T06:12:00.000Z network: passt ended (signal 9): reconnecting',
+  '2026-11-05T06:12:00.100Z network: passt 77 started (backend pst1)',
+  '2026-11-05T06:12:00.200Z network: the network is back (passt restarted, 412 ms after it ended)'].join('\n');
+eq('diag network healed', D.readLog(NET).network.map((x) => x.text.slice(0, 20)), ['network: passt ended', 'network: the network']);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

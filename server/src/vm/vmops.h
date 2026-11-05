@@ -54,4 +54,14 @@ int vm_snaps_load(const char *dir, VmSnap *s, int max);           /* how many (0
 int vm_snaps_save(const char *dir, const VmSnap *s, int n);       /* atomically; 0 ok */
 int vm_snaps_find(const VmSnap *s, int n, const char *tag);       /* index or -1 */
 
+/* A Clone's own identity inside the guest (6.3): <machine>/identity.json, {"hostname":"debian-clone"}, written by
+ * lord-vm --clone (unless the identity is kept) and removed once the guest agent gave the guest that hostname, a new
+ * machine-id and new SSH host keys at the clone's first start. */
+#define VM_HOSTNAME_MAX 63
+int vm_hostname_valid(const char *s);                               /* one DNS label: a-z 0-9 '-', not at the ends */
+void vm_hostname_from_name(const char *name, char *out, size_t n); /* "Debian 13" → "debian-13" ("machine" if empty) */
+int vm_identity_write(const char *dir, const char *hostname);       /* 0 ok */
+int vm_identity_read(const char *dir, char *hostname, size_t n);    /* 0 there is one, -1 none or unreadable */
+void vm_identity_done(const char *dir);
+
 #endif

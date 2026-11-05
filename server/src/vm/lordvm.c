@@ -1900,7 +1900,38 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * (journalctl through guest-exec every 5 s, into log/journal.log), shuts the guest down when ACPI didn't, and pings it
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
-enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT };
+enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
+       AQ_IDEXEC, AQ_IDSTATUS };
+
+/* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
+ * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
+ * D-Bus copy goes first, or it would be copied back); the hostname is set and named in /etc/hosts; SSH host keys, when
+ * there are some, are made new. It prints the new values for the log. */
+static const char IDENTITY_SH[] =
+    "set -e; h=\"$1\"; "
+    "rm -f /etc/machine-id; if [ ! -L /var/lib/dbus/machine-id ]; then rm -f /var/lib/dbus/machine-id; fi; "
+    "systemd-machine-id-setup >/dev/null 2>&1 || dbus-uuidgen --ensure=/etc/machine-id; "
+    "if [ -d /var/lib/dbus ] && [ ! -e /var/lib/dbus/machine-id ]; then ln -s /etc/machine-id /var/lib/dbus/machine-id; fi; "
+    "hostnamectl set-hostname \"$h\" 2>/dev/null || { echo \"$h\" > /etc/hostname; hostname \"$h\"; }; "
+    "if grep -q '^127\\.0\\.1\\.1' /etc/hosts; then sed -i \"s/^127\\.0\\.1\\.1.*/127.0.1.1\\t$h/\" /etc/hosts; "
+    "else printf '127.0.1.1\\t%s\\n' \"$h\" >> /etc/hosts; fi; "
+    "if ls /etc/ssh/ssh_host_*_key >/dev/null 2>&1; then rm -f /etc/ssh/ssh_host_*; ssh-keygen -A >/dev/null 2>&1; "
+    "systemctl try-restart ssh.service >/dev/null 2>&1 || true; echo ssh-keys new; fi; "
+    "echo \"hostname $(hostname) machine-id $(cat /etc/machine-id)\"";
+
+static int qga_do(const char *cmd, const char *args, int kind);
+static void id_begin(void) {
+    if (S.id_state != 1 || !(S.ag_caps & VAC_EXEC)) return;
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
+    jb_str(&b, IDENTITY_SH);
+    jb_raw(&b, ",\"lordos-identity\",");
+    jb_str(&b, S.id_hostname);
+    jb_raw(&b, "],\"capture-output\":true}");
+    if (!b.oom && !qga_do("guest-exec", b.p, AQ_IDEXEC)) { S.id_state = 2; vlog("identity: giving the guest its own hostname (%s) and machine-id", S.id_hostname); }
+    jb_free(&b);
+}
 
 static void ag_broadcast(void) {
     char t[160];
@@ -1944,6 +1975,7 @@ static void ag_timesync(void) {
 static void ag_lost(const char *why) {
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
+    if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
     S.ag_caps &= VAC_CLIPBOARD;
     ag_set(VAS_WAITING);
 }
@@ -2018,6 +2050,7 @@ static void on_qga_reply(const JVal *root, int ok) {
             qga_do("guest-exec", "{\"path\":\"systemd-inhibit\",\"arg\":[\"--what=sleep:idle\",\"--who=LordOS Machines\","
                    "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);
         }
+        id_begin();
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
@@ -2038,6 +2071,35 @@ static void on_qga_reply(const JVal *root, int ok) {
         }
         break;
     case AQ_INHIBIT: if (ok) vlog("agent: the guest is kept awake while the machine runs"); break;
+    case AQ_IDEXEC:
+        if (!ok) { S.id_state = 1; vlog("identity: qemu-guest-agent couldn't run the script: %s", qmp_error_desc(root)); break; }
+        S.id_pid = (long)json_num(r, "pid", 0);
+        S.id_poll_at = now_ms() + 300;
+        break;
+    case AQ_IDSTATUS: {
+        if (!ok) { S.id_state = 1; S.id_poll_at = 0; break; }
+        if (!json_bool(r, "exited", 0)) { S.id_poll_at = now_ms() + 300; break; }
+        S.id_poll_at = 0;
+        int code = (int)json_num(r, "exitcode", -1);
+        char said[200] = "";
+        const char *b = json_str(r, code == 0 ? "out-data" : "err-data");
+        if (b) {
+            uint8_t out[600];
+            long n = ag_b64_decode(b, strnlen(b, 800), out, sizeof out - 1);
+            size_t k = 0;
+            for (long i = 0; i < n && k + 1 < sizeof said; i++) said[k++] = out[i] >= 0x20 && out[i] < 0x7f ? (char)out[i] : ' ';
+            said[k] = 0;
+        }
+        if (code == 0) {
+            S.id_state = 3;
+            vm_identity_done(S.dir);
+            vlog("identity: done: %s", said);
+            char t[160];
+            snprintf(t, sizeof t, "this copy now has its own identity: hostname %s, a new machine-id", S.id_hostname);
+            notice_all(VMN_IDENTITY, 0, t);
+        } else { S.id_state = 1; vlog("identity: the script failed (%d): %s", code, said); }
+        break;
+    }
     case AQ_FOPEN:
         if (!ok) { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; break; }
         S.helper_handle = (long)(r && r->type == J_NUM ? r->num : 0);
@@ -2689,6 +2751,9 @@ static void loop(void) {
 #undef WATCH
         long long now = now_ms(), next = -1;
         if (S.shut_deadline) next = S.shut_deadline;
+        if (S.net_retry_at && (next < 0 || S.net_retry_at < next)) next = S.net_retry_at;
+        if (S.host_stopping && (next < 0 || now + 500 < next)) next = now + 500;
+        if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
@@ -2697,6 +2762,9 @@ static void loop(void) {
         now = now_ms();
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
+        if (S.net_retry_at && now >= S.net_retry_at) net_restart();
+        if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
+        host_stop_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
             vlog("the guest didn't shut down in time: turning it off");
@@ -2853,8 +2921,28 @@ static int cred_ok(const char *s, int binary) {
     return 1;
 }
 
-/* systemd credentials for the guest (see the top of this file): each into a sealed memfd holding
- * "io.systemd.credential[.binary]:NAME=VALUE", the form QEMU's -smbios type=11,path= reads */
+/* one credential line (NAME=VALUE or binary:NAME=BASE64) into a sealed memfd holding
+ * "io.systemd.credential[.binary]:NAME=VALUE", the form QEMU's -smbios type=11,path= reads. 0 ok */
+static int add_credential(const char *line) {
+    int bin = !strncmp(line, "binary:", 7);
+    const char *c = bin ? line + 7 : line;
+    if (S.ncreds >= MAX_CREDS || !cred_ok(c, bin)) return -1;
+    char text[2100];
+    int len = snprintf(text, sizeof text, "io.systemd.credential%s:%s", bin ? ".binary" : "", c);
+    int fd = memfd_create("lordos-vm-credential", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0 || write_all(fd, text, (size_t)len) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+        if (fd >= 0) close(fd);
+        explicit_bzero(text, sizeof text);
+        return -1;
+    }
+    explicit_bzero(text, sizeof text);
+    const char *eq = strchr(c, '=');
+    snprintf(S.cred_name[S.ncreds], sizeof S.cred_name[0], "%.*s", (int)(eq - c), c);
+    S.cred_fd[S.ncreds++] = fd;
+    return 0;
+}
+
+/* systemd credentials for the guest (see the top of this file), from a file */
 static int read_credentials(const char *path) {
     FILE *f = fopen(path, "re");
     if (!f) { fprintf(stderr, "lord-vm: can't read %s: %s\n", path, strerror(errno)); return -1; }
@@ -2866,21 +2954,7 @@ static int read_credentials(const char *path) {
         size_t n = strlen(line);
         while (n && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = 0;
         if (!n || line[0] == '#') continue;
-        int bin = !strncmp(line, "binary:", 7);
-        const char *c = bin ? line + 7 : line;
-        if (S.ncreds >= MAX_CREDS || !cred_ok(c, bin)) { fprintf(stderr, "lord-vm: a credential line in %s isn't NAME=VALUE (or binary:NAME=BASE64)\n", path); rc = -1; break; }
-        char text[2100];
-        int len = snprintf(text, sizeof text, "io.systemd.credential%s:%s", bin ? ".binary" : "", c);
-        int fd = memfd_create("lordos-vm-credential", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-        if (fd < 0 || write_all(fd, text, (size_t)len) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
-            if (fd >= 0) close(fd);
-            rc = -1;
-            break;
-        }
-        explicit_bzero(text, sizeof text);
-        const char *eq = strchr(c, '=');
-        snprintf(S.cred_name[S.ncreds], sizeof S.cred_name[0], "%.*s", (int)(eq - c), c);
-        S.cred_fd[S.ncreds++] = fd;
+        if (add_credential(line)) { fprintf(stderr, "lord-vm: a credential line in %s isn't NAME=VALUE (or binary:NAME=BASE64)\n", path); rc = -1; break; }
     }
     explicit_bzero(line, sizeof line);
     fclose(f);
@@ -3070,9 +3144,9 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         vlog("snapshot: starting from %s \"%s\"", S.loadvm, list[i].name);
     }
     host_cpu_id(S.cpu_id);
-    if (S.m.agent) {
-        /* app.json's keepAwake (on unless turned off), and lordos-guest for Install Agent: read now, before lord-vm's
-         * own Landlock keeps it in the machine's folder */
+    {
+        /* app.json's keepAwake (on unless turned off): the guest kept awake through the agent, and this computer kept
+         * from idle sleep (logind) while the machine runs */
         char ap[PATH_MAX + 32], buf[4096];
         snprintf(ap, sizeof ap, "%s/app.json", S.dir);
         int afd = open(ap, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
@@ -3081,6 +3155,18 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         S.keep_awake = 1;
         JDoc jd;
         if (an > 0 && !json_parse(buf, (size_t)an, &jd, NULL, 0)) { S.keep_awake = json_bool(jd.root, "keepAwake", 1); json_free(&jd); }
+    }
+    if (!vm_identity_read(S.dir, S.id_hostname, sizeof S.id_hostname)) {
+        /* a Clone's first start (6.3): the new hostname as a systemd credential (used by a guest without
+         * /etc/hostname), and through the agent once it answers: hostname, machine-id, SSH host keys */
+        char line[128];
+        snprintf(line, sizeof line, "system.hostname=%s", S.id_hostname);
+        if (!add_credential(line)) vlog("identity: this copy is to be named %s (credential system.hostname%s)", S.id_hostname,
+                                        S.m.agent ? ", then the guest agent" : "; no guest agent to change its machine-id");
+        S.id_state = 1;
+    }
+    if (S.m.agent) {
+        /* lordos-guest for Install Agent: read now, before lord-vm's own Landlock keeps it in the machine's folder */
         static const char *const HELPER[2] = { "/usr/lib/lordos/guest/lordos-guest-arm64", "/usr/lib/lordos/guest/lordos-guest-amd64" };
         int hfd = open(HELPER[S.m.arch], O_RDONLY | O_CLOEXEC);
         struct stat hs;
@@ -3420,8 +3506,10 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
 
 /* ---- clones (6.3), compaction (6.4, 6.16) ----
  *
- * lord-vm --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG]
- *   Clone: a new machine that runs beside the original (new id and MAC). Duplicate: the same identity, the only kind
+ * lord-vm --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]
+ *   Clone: a new machine that runs beside the original (new SMBIOS UUID and MAC; at its first start the guest agent
+ *   gives the guest the hostname --hostname names, "<name>-clone" by default, a new machine-id and new SSH host keys,
+ *   unless --keep-identity). Duplicate: the same identity, the only kind
  *   that carries a saved session and the snapshots. The disks are, first choice to last: a reflink copy (btrfs, XFS:
  *   instant, shared until either changes); with --linked on a file system without reflink (ext4), the source's disk
  *   becomes a frozen base in <library>/.shared/ and both machines get a thin overlay on it; or a full copy (a Clone is
@@ -3535,12 +3623,14 @@ static void clone_sweep(const char *lib) {
 }
 
 static int cmd_clone(const char *src, int argc, char **argv) {
-    if (argc < 1) { fprintf(stderr, "lord-vm: --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"); return 2; }
-    const char *dst = argv[0], *name = NULL, *from_snap = NULL;
-    int duplicate = 0, linked = 0;
+    if (argc < 1) { fprintf(stderr, "lord-vm: --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"); return 2; }
+    const char *dst = argv[0], *name = NULL, *from_snap = NULL, *hostname = NULL;
+    int duplicate = 0, linked = 0, keep_identity = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--duplicate")) duplicate = 1;
         else if (!strcmp(argv[i], "--linked")) linked = 1;
+        else if (!strcmp(argv[i], "--keep-identity")) keep_identity = 1;
+        else if (!strcmp(argv[i], "--hostname") && i + 1 < argc) { hostname = argv[++i]; if (!vm_hostname_valid(hostname)) { fprintf(stderr, "lord-vm: --hostname: one name of a-z, 0-9 and '-', at most 63\n"); return 2; } }
         else if (!strcmp(argv[i], "--name") && i + 1 < argc) name = argv[++i];
         else if (!strcmp(argv[i], "--from-snapshot") && i + 1 < argc) from_snap = argv[++i];
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
@@ -3663,9 +3753,20 @@ static int cmd_clone(const char *src, int argc, char **argv) {
             if (copy_small(p1, p2)) goto out;
         }
     } else {
-        /* a Clone runs beside the original: its own identity (the agent can give the guest a new machine-id later) */
+        /* a Clone runs beside the original: a new SMBIOS UUID (-uuid) and MAC now; inside the guest, a new hostname and
+         * machine-id at its first start, through the agent (identity.json), unless the identity is kept */
         vm_new_id(n.id);
         vm_new_mac(n.mac);
+        if (!keep_identity) {
+            char hn[VM_HOSTNAME_MAX + 1];
+            if (hostname) snprintf(hn, sizeof hn, "%s", hostname);
+            else {
+                char base[VM_HOSTNAME_MAX + 1];
+                vm_hostname_from_name(m.name, base, sizeof base);
+                snprintf(hn, sizeof hn, "%.*s-clone", VM_HOSTNAME_MAX - 6, base);
+            }
+            if (vm_identity_write(tmp, hn)) { fprintf(stderr, "lord-vm: can't write identity.json\n"); goto out; }
+        }
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
     snprintf(p1, sizeof p1, "%s/thumb.png", real); snprintf(p2, sizeof p2, "%s/thumb.png", tmp); copy_small(p1, p2);
@@ -3682,7 +3783,9 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     if (!strcmp(method, "linked")) vm_op_end(real);
     printf("{\"cloned\":true,\"dir\":");
     print_json_str(dreal);
-    printf(",\"id\":\"%s\",\"method\":\"%s\"}\n", n.id, method);
+    char idh[VM_HOSTNAME_MAX + 1] = "";
+    int has_id = !vm_identity_read(dreal, idh, sizeof idh);
+    printf(",\"id\":\"%s\",\"method\":\"%s\",\"hostname\":\"%s\"}\n", n.id, method, has_id ? idh : "");
     rc = 0;
 out:
     if (tmp[0]) rm_tree(tmp);
@@ -3802,7 +3905,7 @@ static int usage(void) {
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
-            "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"
+            "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"
             "       lord-vm --compact DIR [--estimate]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"

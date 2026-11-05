@@ -269,6 +269,11 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
+            {
+                /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
+                char idh[VM_HOSTNAME_MAX + 1] = "";
+                set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
+            }
             set_str(c, o, "created", m.created);
             set_str(c, o, "error", "");
         } else {
@@ -1894,27 +1899,38 @@ static JSValue f_clone_info(JSContext *c, JSValueConst t, int argc, JSValueConst
     return o;
 }
 
-/* clone(dir, { name, duplicate, linked, fromSnapshot }) → job id (lord-vm --clone; its out is the new machine's JSON) */
+/* clone(dir, { name, duplicate, linked, fromSnapshot, hostname, keepIdentity }) → job id (lord-vm --clone; its out is the new
+ * machine's JSON). A Clone's guest gets `hostname` (else "<name>-clone"), a new machine-id and SSH host keys at its first
+ * start, through the agent, unless keepIdentity */
 static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX], lib[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir) || library(lib, sizeof lib, 0)) return JS_NewInt32(c, 0);
     JSValue vn = JS_GetPropertyStr(c, argv[1], "name"), vs = JS_GetPropertyStr(c, argv[1], "fromSnapshot");
     const char *name = JS_ToCString(c, vn), *snap = JS_IsString(vs) ? JS_ToCString(c, vs) : NULL;
-    int dup = opt_bool(c, argc, argv, "duplicate"), linked = opt_bool(c, argc, argv, "linked");
+    int dup = opt_bool(c, argc, argv, "duplicate"), linked = opt_bool(c, argc, argv, "linked"), keep = opt_bool(c, argc, argv, "keepIdentity");
+    JSValue vh = JS_GetPropertyStr(c, argv[1], "hostname");
+    const char *hn = JS_IsString(vh) ? JS_ToCString(c, vh) : NULL;
+    char host[VM_HOSTNAME_MAX + 1] = "";
+    int host_ok = !hn || !hn[0] || vm_hostname_valid(hn);
+    if (hn && hn[0] && host_ok) snprintf(host, sizeof host, "%s", hn);
+    if (hn) JS_FreeCString(c, hn);
+    JS_FreeValue(c, vh);
     int id = 0;
     char nm[VM_NAME_MAX + 1] = "", tg[40] = "", folder[64], dst[PATH_MAX + 80];
-    if (name && vm_name_valid(name) && (!snap || vm_snap_tag_valid(snap))) {
+    if (name && vm_name_valid(name) && (!snap || vm_snap_tag_valid(snap)) && host_ok) {
         snprintf(nm, sizeof nm, "%s", name);
         if (snap) snprintf(tg, sizeof tg, "%s", snap);
         folder_name(nm, folder, sizeof folder);
         snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
         for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
-        char *args[12];
+        char *args[14];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--clone"; args[k++] = dir; args[k++] = dst; args[k++] = "--name"; args[k++] = nm;
         if (dup) args[k++] = "--duplicate";
         if (linked) args[k++] = "--linked";
+        if (!dup && keep) args[k++] = "--keep-identity";
+        else if (!dup && host[0]) { args[k++] = "--hostname"; args[k++] = host; }
         if (tg[0]) { args[k++] = "--from-snapshot"; args[k++] = tg; }
         args[k] = NULL;
         if (access(dst, F_OK)) id = spawn_job(args, dst);
