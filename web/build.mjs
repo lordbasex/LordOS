@@ -419,7 +419,7 @@ function header(t, page) {
   const X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   return `<input type="checkbox" id="nav-cb" class="nav-cb" aria-label="${esc(t.pages.menu)}">
 <header class="top">
-<nav class="wrap${page === 'home' ? '' : ' wide'} nav" aria-label="${esc(t.navLabel)}">
+<nav class="wrap wide nav" aria-label="${esc(t.navLabel)}">
 <a class="nav-home" href="${home}" aria-label="${esc(t.homeLabel)}"><img class="logo-l" src="${img.logoLight}" alt="LordOS" width="122" height="36"><img class="logo-d" src="${img.logoDark}" alt="LordOS" width="122" height="36"></a>
 <div class="nav-links">
 ${links}
