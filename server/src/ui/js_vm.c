@@ -18,6 +18,7 @@
  *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went */
 #include "js_vm.h"
 #include "../media/media_int.h"
+#include "../media/aring.h"
 #include "../vm/vmproto.h"
 #include "../vm/machine.h"
 #include "../vm/vm_admin.h"
@@ -1097,14 +1098,15 @@ static void from_vd(Sess *s) {
         s->frames += frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
-    /* the recording takes the picture as it changes, and at least once a second while it doesn't */
+    /* the recording takes the picture as it changes, and at least once a second while it doesn't; with sound, every
+     * frame's time (30 a second), so the picture's timeline runs as long as the sound's */
     if (s->rec && ms && ms->px) {
         MediaSrc *r = media_src_get(s->rec);
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
         double now = ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-        if (!r || r->kind != SK_SCREENREC) s->rec = 0;
-        else if ((frames || now - s->rec_fed > 1000) && media_framerec_feed(r, ms->px, ms->w, ms->h)) s->rec_fed = now;
+        if (!r || r->kind != SK_SCREENREC) { s->rec = 0; if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; } }
+        else if ((frames || now - s->rec_fed > (s->rec_sound ? 1000.0 / 30 : 1000)) && media_framerec_feed(r, ms->px, ms->w, ms->h)) s->rec_fed = now;
     }
 }
 
@@ -1313,8 +1315,10 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     Sess *s = get(c, argv[0]);
     if (!s) return JS_UNDEFINED;
     if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
+    if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; }
     if (s->console_term) { Session *ts = term_get(s->console_term); if (ts) term_close(ts); s->console_term = 0; }
     free(s->clip_in); s->clip_in = NULL;
+    free(s->clip_html); s->clip_html = NULL; free(s->clip_png); s->clip_png = NULL;
     drop_display(s, 1);
     drop_creds(s);
     if (s->vm >= 0) close(s->vm);
@@ -1596,6 +1600,23 @@ static JSValue f_console(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return JS_TRUE;
 }
 
+/* the recording's sound ring (aring.h): a sealed memfd, 48 kHz, 16-bit, one channel, about 5 s */
+static int sound_ring(void) {
+    uint32_t size = 1u << 19;
+    int fd = memfd_create("lordos-vm-sound", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0) return -1;
+    if (ftruncate(fd, (off_t)ar_bytes(size)) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL)) { close(fd); return -1; }
+    ARingHdr *h = mmap(NULL, AR_HDR, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (h == MAP_FAILED) { close(fd); return -1; }
+    memset(h, 0, AR_HDR);
+    h->rate = AR_RATE;
+    h->channels = 1;
+    h->size = size;
+    h->magic = AR_MAGIC;
+    munmap(h, AR_HDR);
+    return fd;
+}
+
 /* record(session) → a media id (0: couldn't): the guest's picture at its size into ~/Pictures/Screenshots as
  * "<machine> <date> <time>.mp4", the way the Screenshots app records (lord-media, hardware encoding where there is
  * some). No screen-capture permission: it's the machine's own picture, never the screen, so protected windows can't be
@@ -1629,13 +1650,22 @@ static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     int render = media_render_fd(), W = m->w & ~1, H = m->h & ~1;
     char params[160];
     snprintf(params, sizeof params, "width=%d\nheight=%d\nfps=30\nhw=%d\nhwaccel=%s\n", W, H, render >= 0, media_hwaccel());
-    int fds[3] = { fd, -1, render };
+    /* the guest's sound (6.9): a ring lord-vmdisplay writes and lord-media reads, where a screen recording takes the
+     * microphone (48 kHz, one channel); muxed as the recording's audio track */
+    int ring = s->vd >= 0 ? sound_ring() : -1;
+    int fds[3] = { fd, ring, render };
     r->sock = media_spawn(MK_SCREENREC, params, fds, 3, &r->pid);
     close(fd);
     if (render >= 0) close(render);
-    if (r->sock < 0 || media_framerec_start(r, W, H, 30)) { media_src_close(r); return JS_NewInt32(c, 0); }
+    if (r->sock < 0 || media_framerec_start(r, W, H, 30)) { if (ring >= 0) close(ring); media_src_close(r); return JS_NewInt32(c, 0); }
     s->rec = r->id;
     s->rec_fed = 0;
+    s->rec_sound = 0;
+    if (ring >= 0) {
+        VdMsg am = vd_msg(VD_AUDIO_REC, 1, 0, 0, 0, 0, 0);
+        s->rec_sound = !vd_send(s->vd, &am, ring);
+        close(ring);
+    }
     media_framerec_feed(r, m->px, m->w, m->h);
     return JS_NewInt32(c, r->id);
 }

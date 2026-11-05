@@ -101,6 +101,12 @@
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
  *   default). VD_CLOSE: the helper exits.
+ *
+ *   Sound (6.9, 6.20): QEMU's audio goes to the helper as org.qemu.Display1.AudioOutListener calls on a second peer
+ *   connection. VD_AUDIO_REC a = 1 with one descriptor: a recording started; the descriptor is a ring of aring.h
+ *   (sealed memfd, 48 kHz, 16-bit, one channel) that lord-media reads; the helper writes the guest's sound into it,
+ *   mixed to one channel, and silence for the time the guest plays nothing, so the sound keeps time with the picture.
+ *   a = 0: the recording ended.
  */
 #ifndef LORD_VM_PROTO_H
 #define LORD_VM_PROTO_H
@@ -193,7 +199,7 @@ typedef struct {
 enum {
     VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS,               /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC,
 };
 enum { VDS_CONNECTED = 0, VDS_NO_PICTURE, VDS_LOST };
 enum { VDR_NONE = 0, VDR_DISABLED, VDR_REFUSED, VDR_QEMU_GONE, VDR_SERVER_GONE, VDR_SETUP };
@@ -317,6 +323,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
+    case VD_AUDIO_REC: return m->a == 0 || m->a == 1;
     default: return 0;
     }
     switch (m->type) {

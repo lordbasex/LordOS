@@ -1089,8 +1089,16 @@ static void build_qemu_args(void) {
     if (m->display == VM_DISPLAY_WINDOW) {
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
-        arg("-display"); arg("dbus,p2p=yes");
-    } else { arg("-display"); arg("none"); }
+        /* the guest's sound goes out through the same peer-to-peer D-Bus as the picture (lord-vmdisplay listens): 48 kHz,
+         * 16-bit stereo, what lord-server's recordings and speakers take without converting */
+        arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
+        arg("-display"); arg("dbus,p2p=yes,audiodev=snd0");
+    } else { arg("-audiodev"); arg("none,id=snd0"); arg("-display"); arg("none"); }
+    /* a sound card (HDA, which every Linux and Windows guest has a driver for), on its own slot after the CD/DVD
+     * drive's: a machine made before it had none, and a state saved without it still loads (a device the saved
+     * stream doesn't name keeps its reset state) */
+    arg("-device"); arg("intel-hda,id=sound0,addr=0x9");
+    arg("-device"); arg("hda-output,id=sound0-codec0,bus=sound0.0,cad=0,audiodev=snd0");
     arg("-chardev"); arg("socket,id=qmp,fd=4"); arg("-mon"); arg("chardev=qmp,mode=control");
     arg("-chardev"); arg("socket,id=ser0,fd=5"); arg("-serial"); arg("chardev:ser0");
     if (m->agent) {
