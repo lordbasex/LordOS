@@ -84,6 +84,20 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
   );
 }
 
+// A toolbar button with a glyph and its name as the tooltip (the mock "Session": agent, shell, logs, screenshot,
+// record, pause, power)
+export function IconBtn({ glyph, label, onClick, disabled, on, danger }) {
+  const p = usePal();
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={disabled ? undefined : onClick} title={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ width: 32, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
+        backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.btn : 'transparent' }}>
+      <Text style={{ fontSize: 14, fontWeight: 700, color: on || danger ? '#fff' : p.text }}>{glyph}</Text>
+    </View>
+  );
+}
+
 // A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's
 // How many menus are open: while one is, a machine's window keeps the keyboard for the menu (Esc closes it and never
 // reaches the guest).

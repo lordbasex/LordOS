@@ -98,7 +98,7 @@ export function Logs({ dir, name }) {
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: p.line }}>
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.logs.title', { name })}</Text>
+        <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('machines.logs.title', { name })}</Text>
         <Segmented small value={which} onChange={(x) => { setWhich(x); setPaused(false); }} options={sources} />
         {which !== 'overview' ? <>
           <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.logs.filter')}</Text>

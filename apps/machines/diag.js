@@ -13,10 +13,10 @@ export function readLog(text) {
     const at = m ? m[1].replace('T', ' ') : '';
     const l = m ? m[2] : raw;
     if (!l.trim()) continue;
-    if (/^lord-vm \d+: machine /.test(l)) { out.started = at; out.recovery = []; out.problems = []; out.network = []; out.notes = []; }
+    if (/^lord-vm \d+: machine /.test(l)) { out.started = at; out.recovery = []; out.problems = []; out.network = []; out.notes = []; out.cgroup = ''; }
     else if (l.startsWith('qemu: version ')) out.version = l.slice(14);
     else if (/^qemu: pid \d+; sandbox: /.test(l)) out.sandbox = l.replace(/^qemu: pid \d+; sandbox: /, '');
-    else if (l.startsWith('cgroup: ')) out.cgroup = l.slice(8);
+    else if (l.startsWith('cgroup: ')) { if (!out.cgroup || /^in |nested leaves/.test(l.slice(8))) out.cgroup = l.slice(8); }
     else if (/passt|network/i.test(l) && /note|stopped|ended/i.test(l)) out.network.push({ at, text: l });
     else if (l.startsWith('recovery: ')) out.recovery.push({ at, text: l.slice(10) });
     else if (l.startsWith('note: ')) out.notes.push({ at, text: l.slice(6) });

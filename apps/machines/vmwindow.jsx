@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
+import { usePal, has, Btn, MenuBtn, IconBtn, StateDot, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
 
 const BAR = 48;
@@ -95,18 +95,18 @@ function Tools({ ctl, floating }) {
   ];
   return <>
     {!floating ? <AgentButton ctl={ctl} /> : null}
-    {ctl.rec ? <Btn danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
+    {ctl.rec ? <Btn primary label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
     <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
     <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
-    {!floating ? <Btn label={tr('machines.tb.shell')} primary={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} style={{ height: 30 }} /> : null}
-    <Btn label={tr('machines.cmd.logs')} onClick={ctl.logs} style={{ height: 30 }} />
-    <Btn label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} style={{ height: 30 }} />
-    {!ctl.rec ? <Btn label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} style={{ height: 30 }} /> : null}
-    <Btn label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} style={{ height: 30 }} />
+    {!floating ? <IconBtn glyph=">_" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
+    <IconBtn glyph="≡" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
+    <IconBtn glyph="◉" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
+    {!ctl.rec ? <IconBtn glyph="●" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} /> : null}
+    <IconBtn glyph={a.resume ? '▶' : '❚❚'} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />
     <MenuBtn label={tr('machines.cmd.power')} items={ctl.power} />
-    {!floating ? <Btn label={tr('machines.cmd.configure')} onClick={ctl.configure} style={{ height: 30 }} /> : null}
+    {!floating ? <IconBtn glyph="⚙" label={tr('machines.cmd.configure')} onClick={ctl.configure} /> : null}
     {floating ? <Btn primary label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} style={{ height: 30 }} />
-      : <Btn label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} style={{ height: 30 }} />}
+      : <IconBtn glyph="⤢" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
   </>;
 }
 
