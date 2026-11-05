@@ -581,7 +581,7 @@
   "agent.cap.shutdown": "A clean shutdown when the power button isn't heard",
   "agent.cap.time": "The clock, set after a pause or a resume",
   "agent.cap.awake": "Kept awake while it runs",
-  "agent.cap.clipboard": "Clipboard (text), the ways Configure allows",
+  "agent.cap.clipboard": "Clipboard (text, rich text, pictures), the ways Configure allows",
   "agent.cap.resolution": "Resolution follows the window",
   "agent.cap.folders": "Shared folders",
   "agent.cap.apps": "Apps mode",

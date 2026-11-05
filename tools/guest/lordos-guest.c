@@ -173,7 +173,9 @@ int main(int argc, char **argv) {
                 } else if (has_type(types, "text/html")) {
                     long n = clip_read_type("text/html", html, sizeof html);
                     if (n > 0 && (size_t)n < sizeof html && ag_utf8_ok(html, (size_t)n)) { c.html = html; c.html_n = (uint32_t)n; }
-                    long t = clip_read(clip, sizeof clip);
+                    /* its plain text, only when the clipboard offers one (xclip would hand the HTML itself as text) */
+                    long t = has_type(types, "UTF8_STRING") || has_type(types, "text/plain") || has_type(types, "text/plain;charset=utf-8")
+                             ? clip_read(clip, sizeof clip) : -1;
                     if (t > 0 && (size_t)t < sizeof clip && ag_utf8_ok(clip, (size_t)t)) { c.text = clip; c.text_n = (uint32_t)t; }
                     sent = c.html != NULL;
                 }

@@ -1226,7 +1226,7 @@ static void html_adopt(char *h, size_t n) {
 }
 
 /* reading an app's selection into LordOS */
-typedef struct { int fd, image, sensitive, primary, html; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
+typedef struct { int fd, image, sensitive, primary, html, html_only; unsigned offer; struct wl_event_source *ev; char *buf; size_t len, cap; char origin[128]; } Reader;
 static void prim_store(const char *t, size_t n);
 
 static int reader_ready(int fd, uint32_t mask, void *data) {
@@ -1252,7 +1252,31 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
         /* the text/html beside an app's text: kept with that text (whichever of the two arrives last) */
         char *h = rd->len && rd->offer == clip_offer_gen ? malloc(rd->len) : NULL;
         if (h) memcpy(h, rd->buf, rd->len);
-        if (h && clip_text_offer == rd->offer) html_adopt(h, rd->len);
+        if (h && rd->html_only) {
+            /* an app that offers rich text only: its text is the HTML without tags (a few entities back) */
+            char *t = malloc(rd->len + 1);
+            size_t k = 0;
+            int tag = 0;
+            for (size_t i = 0; t && i < rd->len; i++) {
+                char c = rd->buf[i];
+                if (tag) { if (c == '>') tag = 0; continue; }
+                if (c == '<') { tag = 1; continue; }
+                if (c == '&' && i + 3 < rd->len && !strncmp(rd->buf + i, "&lt;", 4)) { t[k++] = '<'; i += 3; continue; }
+                if (c == '&' && i + 3 < rd->len && !strncmp(rd->buf + i, "&gt;", 4)) { t[k++] = '>'; i += 3; continue; }
+                if (c == '&' && i + 4 < rd->len && !strncmp(rd->buf + i, "&amp;", 5)) { t[k++] = '&'; i += 4; continue; }
+                t[k++] = c;
+            }
+            if (t && k) {
+                term_set_clipboard(t, k);
+                term_clipboard_mark(rd->origin, rd->sensitive);
+                clip_seen = term_clipboard_gen();
+                clip_is_image = 0;
+                clip_text_offer = rd->offer;
+                if (!rd->sensitive) { html_adopt(h, rd->len); h = NULL; }
+            }
+            free(t);
+            free(h);
+        } else if (h && clip_text_offer == rd->offer) html_adopt(h, rd->len);
         else if (h) { free(clip_html_pend); clip_html_pend = h; clip_html_pend_len = rd->len; clip_html_pend_offer = rd->offer; }
     } else if (rd->len && rd->image) {
         if (rd->len > 8 && !memcmp(rd->buf, "\x89PNG\r\n\x1a\n", 8)) {
@@ -1283,6 +1307,8 @@ static void read_selection(Source *s) {
     for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "text/plain;charset=utf-8")) mime = s->mimes[i];
     for (int i = 0; i < s->nmimes && !mime; i++) if (text_mime(s->mimes[i])) mime = s->mimes[i];
     for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "image/png")) { mime = s->mimes[i]; image = 1; }
+    int html_only = 0;
+    for (int i = 0; i < s->nmimes && !mime; i++) if (!strcmp(s->mimes[i], "text/html")) { mime = s->mimes[i]; html_only = 1; }
     if (!mime) return;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;
@@ -1292,6 +1318,7 @@ static void read_selection(Source *s) {
     if (!rd) { close(p[0]); return; }
     rd->fd = p[0];
     rd->image = image;
+    rd->html = rd->html_only = html_only;
     /* origin: the app_id of a window of that app; sensitive if it is a password manager
      * (KDE/GNOME convention: offers x-kde-passwordManagerHint = secret) */
     struct wl_client *cl = wl_resource_get_client(s->res);
@@ -1303,7 +1330,7 @@ static void read_selection(Source *s) {
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); return; }
     /* rich text: its text/html too, beside the text (not for an image, nor a secret) */
-    if (image || rd->sensitive) return;
+    if (image || html_only || rd->sensitive) return;
     int has_html = 0;
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "text/html")) has_html = 1;
     if (!has_html || pipe2(p, O_CLOEXEC | O_NONBLOCK)) return;

@@ -581,7 +581,7 @@
   "agent.cap.shutdown": "Uno spegnimento pulito quando il pulsante non viene sentito",
   "agent.cap.time": "L’ora, rimessa dopo una pausa o una ripresa",
   "agent.cap.awake": "Tenuta sveglia mentre funziona",
-  "agent.cap.clipboard": "Appunti (testo), nel verso consentito da Configura",
+  "agent.cap.clipboard": "Appunti (testo, testo formattato, immagini), nelle direzioni consentite da Configura",
   "agent.cap.resolution": "La risoluzione segue la finestra",
   "agent.cap.folders": "Cartelle condivise",
   "agent.cap.apps": "Modalità app",

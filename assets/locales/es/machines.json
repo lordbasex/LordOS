@@ -581,7 +581,7 @@
   "agent.cap.shutdown": "Un apagado limpio cuando no escucha el botón",
   "agent.cap.time": "La hora, corregida tras una pausa o al reanudar",
   "agent.cap.awake": "Despierta mientras funciona",
-  "agent.cap.clipboard": "Portapapeles (texto), en el sentido que permite Configurar",
+  "agent.cap.clipboard": "Portapapeles (texto, texto con formato, imágenes), en los sentidos que permite Configurar",
   "agent.cap.resolution": "La resolución sigue a la ventana",
   "agent.cap.folders": "Carpetas compartidas",
   "agent.cap.apps": "Modo apps",

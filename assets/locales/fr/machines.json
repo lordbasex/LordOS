@@ -581,7 +581,7 @@
   "agent.cap.shutdown": "Un arrêt propre quand le bouton n’est pas entendu",
   "agent.cap.time": "L’heure, remise après une pause ou une reprise",
   "agent.cap.awake": "Gardée éveillée pendant qu’elle tourne",
-  "agent.cap.clipboard": "Presse-papiers (texte), dans le sens que Configurer permet",
+  "agent.cap.clipboard": "Presse-papiers (texte, texte enrichi, images), dans les sens que Configurer permet",
   "agent.cap.resolution": "La résolution suit la fenêtre",
   "agent.cap.folders": "Dossiers partagés",
   "agent.cap.apps": "Mode apps",

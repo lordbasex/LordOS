@@ -581,7 +581,7 @@
   "agent.cap.shutdown": "Um desligamento limpo quando o botão não é ouvido",
   "agent.cap.time": "O relógio, ajustado após uma pausa ou retomada",
   "agent.cap.awake": "Acordada enquanto funciona",
-  "agent.cap.clipboard": "Área de transferência (texto), no sentido que Configurar permite",
+  "agent.cap.clipboard": "Área de transferência (texto, texto formatado, imagens), nos sentidos que Configurar permite",
   "agent.cap.resolution": "A resolução acompanha a janela",
   "agent.cap.folders": "Pastas compartilhadas",
   "agent.cap.apps": "Modo apps",
