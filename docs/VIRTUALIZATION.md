@@ -603,6 +603,20 @@ its memory within that. On VM 125 (2,897 MB for machines) with the emulated mach
 machine isn't part of the saved state): VM 125 had collected twelve. Machines is now a single-window app (manifest `singleWindow`):
 only its library is saved, and a saved list that names it more than once opens it once.
 
+**The Raspberry Pi 5 with the app** (2026-11-05, the user's board, 16 GB, LordOS built from `pi-machines` = `next-0884` with this
+branch). *Allow* gave the account the kvm group and an access-list entry on `/dev/kvm`, but the first start failed with QEMU's *Failed to
+retrieve host CPU features*: `/dev/kvm` carries udev's `uaccess` tag, and systemd-logind rewrote its access list at the next login of any
+kind (an SSH login was enough), keeping only the active seat session's user, which a LordOS session isn't. `vm-kvm` now writes
+`/etc/udev/rules.d/71-lordos-kvm.rules` (`TAG-="uaccess"` for kvm) so the entry stays until the next boot, and from the next login the
+kvm group covers it; after a reboot the session had group 992 (kvm) and machines started with KVM. Under GPU composition the machine's
+picture was see-through: QEMU's x8r8g8b8 leaves the fourth byte 0, which the CPU composition never reads but the GPU's takes as the UI's
+hole for app windows; `MediaSrc.xrgb` now draws it with alpha 255 (`force_alpha` in `mview.c`, two checks in `mview_test.c`). Then: Debian
+13's nocloud arm64 qcow2 imported as an arm64 KVM machine from the app (2 vCPU, 1 GB), started in its window, root login, `uname -a`
+(aarch64), `nproc` 2, 963 MB, the Shared network's address, Shut Down (`host-shutdown`); the amd64 nocloud qcow2 as an emulated machine
+(the sheet's Install added `ovmf`; `accel: tcg`, `pc-q35-10.0`, UEFI), its console and login in about 2½ minutes, `uname -m` x86_64,
+`nproc` 2, Shut Down. With the new UI, the Control Center showed both cards, the running machine's live picture, and *This Computer*
+(Raspberry Pi 5 Model B Rev 1.1, 15.8 GB) with the emulated-machine and microSD warnings.
+
 **The new UI on screen** (VM 125, 2026-11-05; screenshots in the branch's test notes, `machines-shots3`): the Control Center with three
 machines (one running X with an xterm and a clock: its live picture, CPU 1 %, memory 1 GB, power light on, the summary *1 of 3*, *1 of 3.8
 GB*, *21.4 GB* free), Pause and Resume from the right-click menu (the card said *Paused*), Configure saving 1280 MB on a machine that was off
@@ -615,8 +629,7 @@ with the ISO moved away (*the attached image is missing*), FirstRun with an empt
 `vm-enable` waited with no time limit while the network didn't answer (the sheet said *Installing…* until it was closed); ejecting an ISO from a running machine
 (QMP `blockdev-open-tray`/`blockdev-remove-medium`) and attaching another one; one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
-cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
-the app. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
+cursor plane's size); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's
 checks, letterbox and pointer scaling, guest size, refresh rate, wheel steps).
 
 ## 4. Guest systems
