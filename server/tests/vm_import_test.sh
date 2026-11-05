@@ -64,6 +64,22 @@ D2="$W/m-raw.lordvm"
 if "$VM" --create "$D2" --name raw --import "$W/good.img" --network isolated --vcpus 1 --memory 512 >"$W/raw.out" 2>&1; then ok "good raw .img: imported"
 else bad "good raw .img: imported" "$(cat "$W/raw.out")"; fi
 
+# --set (Configure) on the raw machine, which is off: CPU, memory and network change, the disk grows and never
+# shrinks, an ISO is attached and taken out, a held lock (a running machine) refuses every change
+if [ -f "$D2/machine.json" ]; then
+    if "$VM" --set "$D2" --vcpus 1 --memory 768 --network shared >"$W/set.out" 2>&1 && grep -q '"memory_mb": 768' "$D2/machine.json" && grep -q '"network": "shared"' "$D2/machine.json"
+    then ok "set: memory and network changed"; else bad "set: memory and network changed" "$(cat "$W/set.out")"; fi
+    if "$VM" --set "$D2" --disk 21 >"$W/grow.out" 2>&1 && qemu-img info "$D2/disks/system.qcow2" | grep -q "virtual size: 21 GiB"
+    then ok "set: disk grown to 21 GB"; else bad "set: disk grown to 21 GB" "$(cat "$W/grow.out") $(qemu-img info "$D2/disks/system.qcow2" | grep virtual)"; fi
+    if "$VM" --set "$D2" --disk 19 >"$W/shrink.out" 2>&1; then bad "set: disk never shrinks"; else ok "set: disk never shrinks ($(tail -1 "$W/shrink.out" | cut -c1-60))"; fi
+    head -c 65536 /dev/zero >"$W/cd.iso"
+    if "$VM" --set "$D2" --iso "$W/cd.iso" >/dev/null 2>&1 && grep -q '"iso"' "$D2/machine.json" && "$VM" --set "$D2" --iso none >/dev/null 2>&1 && ! grep -q '"iso"' "$D2/machine.json"
+    then ok "set: ISO attached and taken out"; else bad "set: ISO attached and taken out"; fi
+    if "$VM" --set "$D2" --memory 999999 >/dev/null 2>&1; then bad "set: memory out of range refused"; else ok "set: memory out of range refused"; fi
+    ( flock -x 9; "$VM" --set "$D2" --vcpus 1 >"$W/locked.out" 2>&1; echo $? >"$W/locked.rc" ) 9>"$D2/lock"
+    if [ "$(cat "$W/locked.rc")" = 3 ]; then ok "set: refused while the machine runs (lock held)"; else bad "set: refused while running" "$(cat "$W/locked.out")"; fi
+fi
+
 # the system disk swapped afterwards for one with a backing file: lord-vm refuses to start it
 if [ -f "$D/disks/system.qcow2" ]; then
     cp "$W/backing.qcow2" "$D/disks/system.qcow2"

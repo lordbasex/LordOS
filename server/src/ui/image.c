@@ -16,27 +16,62 @@ struct Image {
     int sw, sh, sfit;
     uint32_t *scaled2;              /* the previous one: an icon at two sizes (Dock and bar) is not rescaled every frame */
     int sw2, sh2, sfit2;
+    long ver;                       /* the "#<version>" it was loaded for (image_get) */
     struct Image *next;
 };
 
 static struct Image *images;
 
-Image *image_get(const char *path) {
-    for (Image *i = images; i; i = i->next)
-        if (!strcmp(i->path, path)) return i;
-    int w, h, ch;
-    unsigned char *rgba = stbi_load(path, &w, &h, &ch, 4);
+/* the file's pixels, premultiplied; NULL if it doesn't load */
+static uint32_t *load_file(const char *path, int *w, int *h, int *opaque) {
+    int ch;
+    unsigned char *rgba = stbi_load(path, w, h, &ch, 4);
     if (!rgba) { fprintf(stderr, "image: could not load %s\n", path); return NULL; }
-    Image *img = calloc(1, sizeof *img);
-    img->path = strdup(path);
-    img->w = w; img->h = h; img->opaque = 1;
-    img->px = malloc((size_t)w * h * 4);
-    for (size_t i = 0; i < (size_t)w * h; i++) {
+    uint32_t *px = malloc((size_t)*w * *h * 4);
+    *opaque = 1;
+    for (size_t i = 0; px && i < (size_t)*w * *h; i++) {
         uint32_t r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = rgba[i * 4 + 3];
-        if (a < 255) img->opaque = 0;
-        img->px[i] = a << 24 | ((r * a + 127) / 255) << 16 | ((g * a + 127) / 255) << 8 | ((b * a + 127) / 255);
+        if (a < 255) *opaque = 0;
+        px[i] = a << 24 | ((r * a + 127) / 255) << 16 | ((g * a + 127) / 255) << 8 | ((b * a + 127) / 255);
     }
     stbi_image_free(rgba);
+    return px;
+}
+
+/* A path may end in "#<digits>": a version of a file that is rewritten in place (Remote Desk's card pictures). The
+ * cache keeps one entry for the file and loads it again, into the same Image, when the version changes. */
+Image *image_get(const char *spec) {
+    char path[4096];
+    const char *hash = strrchr(spec, '#');
+    long ver = 0;
+    size_t dl = hash ? strspn(hash + 1, "0123456789") : 0;
+    if (hash && dl && dl <= 18 && !hash[1 + dl] && (size_t)(hash - spec) < sizeof path) {
+        memcpy(path, spec, (size_t)(hash - spec));
+        path[hash - spec] = 0;
+        ver = strtol(hash + 1, NULL, 10);
+    } else {
+        snprintf(path, sizeof path, "%s", spec);
+        hash = NULL;
+    }
+    for (Image *i = images; i; i = i->next) {
+        if (strcmp(i->path, path)) continue;
+        if (!hash || i->ver == ver) return i;
+        int w, h, opaque;
+        uint32_t *px = load_file(path, &w, &h, &opaque);
+        if (!px) return i;                     /* the last one it had */
+        free(i->px); free(i->scaled); free(i->scaled2);
+        i->scaled = i->scaled2 = NULL;
+        i->sw = i->sh = i->sw2 = i->sh2 = 0;
+        i->px = px; i->w = w; i->h = h; i->opaque = opaque; i->ver = ver;
+        return i;
+    }
+    int w, h, opaque;
+    uint32_t *px = load_file(path, &w, &h, &opaque);
+    if (!px) return NULL;
+    Image *img = calloc(1, sizeof *img);
+    if (!img) { free(px); return NULL; }
+    img->path = strdup(path);
+    img->w = w; img->h = h; img->opaque = opaque; img->px = px; img->ver = ver;
     img->next = images;
     images = img;
     return img;

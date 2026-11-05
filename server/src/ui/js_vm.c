@@ -20,6 +20,7 @@
 #include "../vm/vmproto.h"
 #include "../vm/machine.h"
 #include "../vm/vm_admin.h"
+#include "../vm/vmthumb.h"
 #include "../sec/json.h"
 #include "ui.h"
 
@@ -36,6 +37,9 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <sys/sysmacros.h>
+#include <time.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
@@ -135,6 +139,29 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_SetPropertyStr(c, o, "display", JS_NewBool(c, !bin_path("lord-vmdisplay", bin, sizeof bin)));
     char lib[PATH_MAX];
     set_str(c, o, "library", library(lib, sizeof lib, 0) ? "" : lib);
+    /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
+    char where[PATH_MAX];
+    const char *home = getenv("HOME");
+    snprintf(where, sizeof where, "%s", lib[0] && !library(lib, sizeof lib, 0) ? lib : home ? home : "/");
+    struct statvfs vf;
+    if (!statvfs(where, &vf)) {
+        JS_SetPropertyStr(c, o, "libFreeBytes", JS_NewFloat64(c, (double)vf.f_bavail * vf.f_frsize));
+        JS_SetPropertyStr(c, o, "libTotalBytes", JS_NewFloat64(c, (double)vf.f_blocks * vf.f_frsize));
+    }
+    struct stat ls;
+    char sys[96], link[PATH_MAX];
+    const char *kind = "";
+    if (!stat(where, &ls)) {
+        snprintf(sys, sizeof sys, "/sys/dev/block/%u:%u", major(ls.st_dev), minor(ls.st_dev));
+        ssize_t k = readlink(sys, link, sizeof link - 1);
+        if (k > 0) { link[k] = 0; kind = strstr(link, "/mmcblk") ? "sd" : strstr(link, "/nvme") ? "nvme" : strstr(link, "/usb") ? "usb" : "disk"; }
+    }
+    set_str(c, o, "libDevice", kind);
+    char model[128] = "";
+    int mf = open("/proc/device-tree/model", O_RDONLY | O_CLOEXEC);
+    if (mf >= 0) { ssize_t k = read(mf, model, sizeof model - 1); close(mf); if (k > 0) model[k] = 0; }
+    for (char *q = model; *q; q++) if ((unsigned char)*q < 0x20) *q = 0;
+    set_str(c, o, "board", model);
     return o;
 }
 
@@ -347,6 +374,175 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (arch) JS_FreeCString(c, arch);
     JS_FreeValue(c, vn); JS_FreeValue(c, va); JS_FreeValue(c, vi); JS_FreeValue(c, vs);
     return JS_NewInt32(c, id);
+}
+
+/* lord-vm with args in the background, as a job (f_job reads it); 0 when it couldn't start */
+static int spawn_job(char *const args[], const char *dir) {
+    int slot = -1;
+    for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
+    char bin[PATH_MAX];
+    if (slot < 0 || bin_path("lord-vm", bin, sizeof bin)) return 0;
+    int p[2];
+    if (pipe2(p, O_CLOEXEC)) return 0;
+    pid_t pid = fork();
+    if (!pid) {
+        int null = open("/dev/null", O_RDONLY);
+        if (null >= 0) dup2(null, 0);
+        dup2(p[1], 1);
+        dup2(p[1], 2);
+        syscall(SYS_close_range, 3, ~0u, 0);
+        sigset_t none;
+        sigemptyset(&none);
+        sigprocmask(SIG_SETMASK, &none, NULL);
+        execve(bin, args, environ);
+        _exit(127);
+    }
+    close(p[1]);
+    if (pid < 0) { close(p[0]); return 0; }
+    fcntl(p[0], F_SETFL, O_NONBLOCK);
+    jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
+    snprintf(jobs[slot].dir, sizeof jobs[slot].dir, "%s", dir);
+    return slot + 1;
+}
+
+/* set(dir, { name, vcpus, memoryMb, diskGb, network, iso }) → job id: lord-vm --set on a machine that is off (Configure) */
+static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    char *args[24], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    int n = 0, ok = 1;
+    args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
+    JSValue v = JS_GetPropertyStr(c, argv[1], "name");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && vm_name_valid(s)) { snprintf(name, sizeof name, "%s", s); args[n++] = "--name"; args[n++] = name; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    int vc = prop_int(c, argv[1], "vcpus"), mem = prop_int(c, argv[1], "memoryMb"), disk = prop_int(c, argv[1], "diskGb");
+    if (vc) { if (vc < 1 || vc > VM_VCPUS_MAX) ok = 0; snprintf(sv, sizeof sv, "%d", vc); args[n++] = "--vcpus"; args[n++] = sv; }
+    if (mem) { if (mem < VM_MEM_MIN_MB || mem > VM_MEM_MAX_MB) ok = 0; snprintf(sm, sizeof sm, "%d", mem); args[n++] = "--memory"; args[n++] = sm; }
+    if (disk) { if (disk < VM_DISK_MIN_GB || disk > VM_DISK_MAX_GB) ok = 0; snprintf(sd, sizeof sd, "%d", disk); args[n++] = "--disk"; args[n++] = sd; }
+    v = JS_GetPropertyStr(c, argv[1], "network");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "shared") || !strcmp(s, "isolated"))) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "iso");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && !strcmp(s, "none")) snprintf(iso, sizeof iso, "none");
+        else if (user_file(c, v, iso, sizeof iso)) ok = 0;
+        if (s) JS_FreeCString(c, s);
+        args[n++] = "--iso"; args[n++] = iso;
+    }
+    JS_FreeValue(c, v);
+    args[n] = NULL;
+    return JS_NewInt32(c, ok && n > 3 ? spawn_job(args, dir) : 0);
+}
+
+/* stats(dir) → { cpuUsec, memBytes, ioBytes, at } from the running QEMU's cgroup (counters: the app takes the
+ * differences), diskBytes (what the machine's disks use on this computer), or only diskBytes when it's off */
+static long long cg_num(const char *cg, const char *file, const char *key) {
+    char p[PATH_MAX + 64], buf[4096];
+    snprintf(p, sizeof p, "/sys/fs/cgroup%s/%s", cg, file);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    ssize_t k = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (k <= 0) return -1;
+    buf[k] = 0;
+    if (!key) return atoll(buf);
+    long long sum = 0;
+    int found = 0;
+    for (char *line = strtok(buf, "\n"); line; line = strtok(NULL, "\n")) {
+        if (!strcmp(key, "io")) {                      /* io.stat: "maj:min rbytes=N wbytes=N …" per device */
+            char *r = strstr(line, "rbytes="), *w = strstr(line, "wbytes=");
+            if (r) sum += atoll(r + 7);
+            if (w) sum += atoll(w + 7);
+            found = 1;
+        } else if (!strncmp(line, key, strlen(key)) && line[strlen(key)] == ' ') { sum = atoll(line + strlen(key) + 1); found = 1; break; }
+    }
+    return found ? sum : -1;
+}
+static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    double disk = 0;
+    char p[PATH_MAX + 64];
+    const char *files[] = { "system.qcow2", "nvram.qcow2" };
+    for (int i = 0; i < 2; i++) {
+        struct stat st;
+        snprintf(p, sizeof p, "%s/disks/%s", dir, files[i]);
+        if (!stat(p, &st)) disk += (double)st.st_blocks * 512;
+    }
+    JS_SetPropertyStr(c, o, "diskBytes", JS_NewFloat64(c, disk));
+    snprintf(p, sizeof p, "%s/run.json", dir);
+    char buf[2048];
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    long qpid = 0;
+    if (n > 0) {
+        JDoc d;
+        if (!json_parse(buf, (size_t)n, &d, NULL, 0)) {
+            const char *s = json_str(d.root, "state");
+            if (s && (!strcmp(s, "running") || !strcmp(s, "paused"))) qpid = (long)json_num(d.root, "qemu_pid", 0);
+            json_free(&d);
+        }
+    }
+    char cg[PATH_MAX] = "";
+    if (qpid > 0) {
+        snprintf(p, sizeof p, "/proc/%ld/cgroup", qpid);
+        int cf = open(p, O_RDONLY | O_CLOEXEC);
+        ssize_t k = cf >= 0 ? read(cf, buf, sizeof buf - 1) : -1;
+        if (cf >= 0) close(cf);
+        if (k > 3 && !strncmp(buf, "0::", 3)) {
+            buf[k] = 0;
+            char *nl = strchr(buf, '\n');
+            if (nl) *nl = 0;
+            /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
+            if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
+        }
+    }
+    if (cg[0]) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        JS_SetPropertyStr(c, o, "at", JS_NewFloat64(c, ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6));
+        JS_SetPropertyStr(c, o, "cpuUsec", JS_NewFloat64(c, (double)cg_num(cg, "cpu.stat", "usage_usec")));
+        JS_SetPropertyStr(c, o, "memBytes", JS_NewFloat64(c, (double)cg_num(cg, "memory.current", NULL)));
+        JS_SetPropertyStr(c, o, "ioBytes", JS_NewFloat64(c, (double)cg_num(cg, "io.stat", "io")));
+    }
+    return o;
+}
+
+/* snapshot(session) → bool: the machine's picture now as its card picture (<machine>/thumb.png) */
+static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv);
+
+/* isoInfo(path) → { label } : the ISO 9660 volume label (32 bytes at 0x8028), to recognize the system in it */
+static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char path[PATH_MAX];
+    if (user_file(c, argv[0], path, sizeof path)) return JS_NULL;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return JS_NULL;
+    unsigned char pvd[72];
+    ssize_t k = pread(fd, pvd, sizeof pvd, 0x8000);
+    close(fd);
+    JSValue o = JS_NewObject(c);
+    char label[33] = "";
+    if (k == (ssize_t)sizeof pvd && pvd[0] == 1 && !memcmp(pvd + 1, "CD001", 5)) {
+        memcpy(label, pvd + 40, 32);
+        for (int i = 31; i >= 0 && (label[i] == ' ' || !label[i]); i--) label[i] = 0;
+        for (int i = 0; label[i]; i++) if ((unsigned char)label[i] < 0x20 || (unsigned char)label[i] > 0x7e) label[i] = '?';
+    }
+    set_str(c, o, "label", label);
+    return o;
 }
 
 static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -930,20 +1126,47 @@ static JSValue f_log(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t; (void)argc;
     char dir[PATH_MAX];
     if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewString(c, "");
-    char p[PATH_MAX + 32], buf[4097];
-    snprintf(p, sizeof p, "%s/log/lord-vm.log", dir);
+    /* log(dir[, which, bytes]): the end of lord-vm.log ("vm", the default) or of the guest's serial console ("serial"),
+     * 4 KB by default and 256 KB at most */
+    int max = argc > 2 ? ival(c, argv[2]) : 4096;
+    if (max < 1024) max = 1024;
+    if (max > 262144) max = 262144;
+    const char *which = argc > 1 && JS_IsString(argv[1]) ? JS_ToCString(c, argv[1]) : NULL;
+    int serial = which && !strcmp(which, "serial");
+    if (which) JS_FreeCString(c, which);
+    char p[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/log/%s", dir, serial ? "serial.log" : "lord-vm.log");
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) return JS_NewString(c, "");
+    char *buf = malloc((size_t)max + 1);
+    if (!buf) { close(fd); return JS_NewString(c, ""); }
     off_t end = lseek(fd, 0, SEEK_END);
-    off_t from = end > 4096 ? end - 4096 : 0;
-    ssize_t n = pread(fd, buf, 4096, from);
+    off_t from = end > max ? end - max : 0;
+    ssize_t n = pread(fd, buf, (size_t)max, from);
     close(fd);
-    if (n <= 0) return JS_NewString(c, "");
+    if (n <= 0) { free(buf); return JS_NewString(c, ""); }
     buf[n] = 0;
     char *s = buf;
     if (from) { char *nl = strchr(s, '\n'); if (nl) s = nl + 1; }
-    for (char *q = s; *q; q++) if ((unsigned char)*q < 0x20 && *q != '\n') *q = ' ';
-    return JS_NewString(c, s);
+    /* the serial console's color codes and control characters go */
+    char *w = s;
+    for (char *q = s; *q; q++) {
+        if (*q == 0x1b) { q++; if (*q == '[') { while (q[1] && !((q[1] >= '@' && q[1] <= '~'))) q++; if (q[1]) q++; } continue; }
+        if (*q == '\r') continue;
+        *w++ = (unsigned char)*q < 0x20 && *q != '\n' ? ' ' : *q;
+    }
+    *w = 0;
+    JSValue r = JS_NewString(c, s);
+    free(buf);
+    return r;
+}
+
+static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
+    return JS_NewBool(c, !vm_thumb_save(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
 /* takes the ISO out of a machine that is off (after an install): machine.json without "iso". Refused while lord-vm
@@ -973,7 +1196,9 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
-    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 1, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
+    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
+    JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {
