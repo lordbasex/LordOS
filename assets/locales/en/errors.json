@@ -709,5 +709,7 @@
   "vpn.fortiEnded": "The VPN program stopped before connecting.",
   "vpn.editFromFile": "This VPN came from a file: delete it and import the new file.",
   "vpn.editWhileOn": "Turn the VPN off before editing it.",
-  "vpn.fortiSsoRefused": "The VPN server didn't accept the sign-in. Connect again and sign in on the organization's page."
+  "vpn.fortiSsoRefused": "The VPN server didn't accept the sign-in. Connect again and sign in on the organization's page.",
+  "vpn.clientCertPair": "A client certificate needs both the certificate and its private key.",
+  "vpn.fortiClientCert": "The client certificate or its key couldn't be used. Check the key password, and that the key belongs to the certificate."
 }

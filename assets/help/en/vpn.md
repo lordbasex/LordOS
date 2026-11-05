@@ -37,3 +37,14 @@ for that VPN and connects. If the server later shows a different certificate, Lo
 and asks again.
 
 To change a saved VPN, turn it off and choose **⋯ → Edit…** in its row. The trash can button deletes it.
+
+## Fortinet: more servers, client certificate
+
+- **More servers:** add the organization's other servers with **+ Add server** (`server` or
+  `server:port`). LordOS tries them in order and uses the first one that answers; the VPN row
+  says which one while connected.
+- **Client certificate:** if your organization gave you a certificate, choose **Client
+  certificate → Choose…** and pick the certificate and its private key (PEM files; one file with
+  both works too). Type the key's password if it has one. PKCS#12 files (`.p12`, `.pfx`) aren't
+  supported yet: export them as PEM first.
+- **Description:** a note shown under the VPN's name.

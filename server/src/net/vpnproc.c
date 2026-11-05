@@ -58,7 +58,8 @@
 #define OC_RUN NET_RUN_DIR "/oc"
 #define FORTI_DIR NET_DIR "/fortinet"
 
-static void meta(const char *name, const char *type, const char *server, const char *user, int full, int insecure, int sso) {
+/* extra: more ",\"key\":value" pairs for the metadata, or NULL */
+static void meta(const char *name, const char *type, const char *server, const char *user, int full, int insecure, const char *extra) {
     char ifn[IFNAMSIZ];
     vpn_ifname(type, name, ifn, sizeof ifn);
     Buf m = {0};
@@ -68,7 +69,7 @@ static void meta(const char *name, const char *type, const char *server, const c
     buf_json_str(&m, server);
     buf_printf(&m, ",\"user\":");
     buf_json_str(&m, user ? user : "");
-    buf_printf(&m, ",\"fullTunnel\":%s,\"insecure\":%s%s}\n", full ? "true" : "false", insecure ? "true" : "false", sso ? ",\"sso\":true" : "");
+    buf_printf(&m, ",\"fullTunnel\":%s,\"insecure\":%s%s}\n", full ? "true" : "false", insecure ? "true" : "false", extra ? extra : "");
     if (m.p) vpn_meta_save(name, m.p);
     buf_free(&m);
 }
@@ -105,7 +106,8 @@ typedef struct {
     int reported;                       /* already told the UI why (a certificate to trust): no error at the end */
     /* Fortinet */
     FortiOut fo;
-    int probing, gateway_ok, saml_port, sso;
+    int probing, gateway_ok, saml_port, sso, failover, announced;
+    char gw[270];                       /* the server being tried, "host:port" */
     char trusted[256];                  /* the trusted-cert list of the config ("" = none) */
     char *saml_id;                      /* single sign-on: the id to hand to openfortivpn */
 } Run;
@@ -162,7 +164,7 @@ int pptp_import(const char *name, const char *text, char *err, size_t errn) {
     else if (mppe && strcmp(mppe, "required") && strcmp(mppe, "optional") && strcmp(mppe, "off")) { lerr_set(err, errn, "vpn.invalidValue", "key", "mppe", NULL); rc = -1; }
     else if (vpn_kv(&kv, "routes") && !vpn_routes_valid(vpn_kv(&kv, "routes"))) { lerr_set(err, errn, "vpn.invalidValue", "key", "routes", NULL); rc = -1; }
     if (!rc && vpn_kv_save(name, "pptp", &kv)) { lerr_set(err, errn, "net.saveFailed", NULL); rc = -1; }
-    if (!rc) meta(name, "pptp", server, user, !vpn_kv(&kv, "routes"), 1, 0);
+    if (!rc) meta(name, "pptp", server, user, !vpn_kv(&kv, "routes"), 1, NULL);
     vpn_kv_free(&kv);
     return rc;
 }
@@ -271,7 +273,7 @@ int oc_import(const char *name, const char *text, char *err, size_t errn) {
     else if (!user || !*user || !vpn_kv(&kv, "password")) { lerr_set(err, errn, "vpn.missingCredentials", NULL); rc = -1; }
     else if (vpn_kv(&kv, "servercert") && !pin_ok(vpn_kv(&kv, "servercert"))) { lerr_set(err, errn, "vpn.invalidValue", "key", "servercert", NULL); rc = -1; }
     if (!rc && vpn_kv_save(name, "openconnect", &kv)) { lerr_set(err, errn, "net.saveFailed", NULL); rc = -1; }
-    if (!rc) meta(name, "openconnect", server, user, 1, 0, 0);
+    if (!rc) meta(name, "openconnect", server, user, 1, 0, NULL);
     vpn_kv_free(&kv);
     return rc;
 }
@@ -405,7 +407,9 @@ void oc_run(const char *name) {
 
 /* ======================= Fortinet (openfortivpn) ======================= */
 
-static const char *const forti_keys[] = { "host", "port", "auth", "user", "password", "trusted-cert", "sso-port", "routes", NULL };
+static const char *const forti_keys[] = { "host", "port", "alt-hosts", "auth", "user", "password", "trusted-cert", "sso-port", "routes",
+                                          "description", "key-password", NULL };
+static const char *const forti_pems[] = { "cert", "key", NULL };
 
 #define FORTI_SSO_WAIT 300              /* seconds the sign-in page may take (an authenticator app included) */
 #define FORTI_SSO_PORT 8020             /* the gateways' default SAML redirect port */
@@ -413,59 +417,89 @@ static const char *const forti_keys[] = { "host", "port", "auth", "user", "passw
 
 static int port_ok(const char *p) { return p && *p && strlen(p) <= 5 && strspn(p, "0123456789") == strlen(p) && atoi(p) >= 1 && atoi(p) <= 65535; }
 
-/* trusted-cert: each fingerprint as 64 lowercase hex digits (what openfortivpn compares), so one
- * copied with ':' or in capitals works too. 0 ok, -1 invalid. */
-static int forti_norm_certs(const char *in, char *out, size_t n) {
-    char copy[256];
-    snprintf(copy, sizeof copy, "%s", in);
-    out[0] = 0;
-    int k = 0;
-    for (char *t = strtok(copy, ", "); t; t = strtok(NULL, ", ")) {
-        char h[65];
-        if (forti_hex_norm(t, h) || strlen(out) + 66 > n) return -1;
-        snprintf(out + strlen(out), n - strlen(out), "%s%s", k++ ? "," : "", h);
-    }
-    return k ? 0 : -1;
-}
-
-static void kv_put(VpnKv *kv, const char *key, const char *val) {
-    for (int i = 0; i < kv->n; i++) if (!strcmp(kv->key[i], key)) { snprintf(kv->val[i], sizeof kv->val[0], "%s", val); return; }
+static void kv_add(VpnKv *kv, const char *key, const char *val) {
     if (kv->n >= VPN_MAX_KV) return;
     snprintf(kv->key[kv->n], sizeof kv->key[0], "%s", key);
-    snprintf(kv->val[kv->n], sizeof kv->val[0], "%s", val);
+    snprintf(kv->val[kv->n], sizeof kv->val[0], "%.255s", val);
     kv->n++;
+}
+
+static void kv_del(VpnKv *kv, int i) {
+    memmove(&kv->key[i], &kv->key[i + 1], (size_t)(kv->n - i - 1) * sizeof kv->key[0]);
+    memmove(&kv->val[i], &kv->val[i + 1], (size_t)(kv->n - i - 1) * sizeof kv->val[0]);
+    kv->n--;
+}
+
+/* Every trusted-cert line (there can be several: one typed in the form, one per server trusted from the prompt). */
+static int kv_certs(const VpnKv *kv, const char **out, int max) {
+    int n = 0;
+    for (int i = 0; i < kv->n && n < max; i++) if (!strcmp(kv->key[i], "trusted-cert")) out[n++] = kv->val[i];
+    return n;
 }
 
 int forti_import(const char *name, const char *text, char *err, size_t errn) {
     VpnKv kv;
-    if (vpn_kv_parse(text, forti_keys, NULL, &kv, err, errn)) return -1;
-    const char *host = vpn_kv(&kv, "host"), *port = vpn_kv(&kv, "port"), *user = vpn_kv(&kv, "user"), *tc = vpn_kv(&kv, "trusted-cert");
-    const char *auth = vpn_kv(&kv, "auth"), *sport = vpn_kv(&kv, "sso-port");
+    if (vpn_kv_parse(text, forti_keys, forti_pems, &kv, err, errn)) return -1;
+    const char *host = vpn_kv(&kv, "host"), *port = vpn_kv(&kv, "port"), *user = vpn_kv(&kv, "user");
+    const char *auth = vpn_kv(&kv, "auth"), *sport = vpn_kv(&kv, "sso-port"), *alt = vpn_kv(&kv, "alt-hosts");
+    const char *cert = vpn_kv_pem(&kv, "cert"), *key = vpn_kv_pem(&kv, "key");
     int sso = auth && !strcmp(auth, "sso");
-    char certs[256];
-    int rc = 0;
+    FortiGw gw[FORTI_MAX_GW];
+    int ngw = 0, rc = 0;
     if (!host || !vpn_host_ok(host) || strchr(host, ':')) { lerr_set(err, errn, "vpn.missingKey", "key", "host", NULL); rc = -1; }
     else if (port && !port_ok(port)) { lerr_set(err, errn, "vpn.invalidValue", "key", "port", NULL); rc = -1; }
+    else if ((ngw = forti_gw_list(host, port, alt, gw, FORTI_MAX_GW)) < 1) { lerr_set(err, errn, "vpn.invalidValue", "key", "alt-hosts", NULL); rc = -1; }
     else if (auth && strcmp(auth, "password") && strcmp(auth, "sso")) { lerr_set(err, errn, "vpn.invalidValue", "key", "auth", NULL); rc = -1; }
     else if (!sso && (!user || !*user || !vpn_kv(&kv, "password"))) { lerr_set(err, errn, "vpn.missingCredentials", NULL); rc = -1; }
     else if (sport && !port_ok(sport)) { lerr_set(err, errn, "vpn.invalidValue", "key", "sso-port", NULL); rc = -1; }
-    else if (tc && forti_norm_certs(tc, certs, sizeof certs)) { lerr_set(err, errn, "vpn.invalidValue", "key", "trusted-cert", NULL); rc = -1; }
-    if (!rc && tc) kv_put(&kv, "trusted-cert", certs);
+    else if (!cert != !key) { lerr_set(err, errn, "vpn.clientCertPair", NULL); rc = -1; }
+    else if (cert && strncmp(cert, "-----BEGIN CERTIFICATE-----", 27)) { lerr_set(err, errn, "vpn.invalidValue", "key", "cert", NULL); rc = -1; }
+    else if (key && (strncmp(key, "-----BEGIN ", 11) || !strstr(key, "PRIVATE KEY-----"))) { lerr_set(err, errn, "vpn.invalidValue", "key", "key", NULL); rc = -1; }
+    else if (vpn_kv(&kv, "key-password") && !key) { lerr_set(err, errn, "vpn.clientCertPair", NULL); rc = -1; }
+    /* every fingerprint as 64 lowercase hex digits (what openfortivpn compares) */
+    for (int i = 0; !rc && i < kv.n; i++) {
+        if (strcmp(kv.key[i], "trusted-cert")) continue;
+        char norm[256];
+        if (forti_certs_norm(kv.val[i], norm, sizeof norm)) { lerr_set(err, errn, "vpn.invalidValue", "key", "trusted-cert", NULL); rc = -1; }
+        else snprintf(kv.val[i], sizeof kv.val[0], "%s", norm);
+    }
     if (!rc && vpn_kv(&kv, "routes") && !vpn_routes_valid(vpn_kv(&kv, "routes"))) { lerr_set(err, errn, "vpn.invalidValue", "key", "routes", NULL); rc = -1; }
     if (!rc && vpn_kv_save(name, "fortinet", &kv)) { lerr_set(err, errn, "net.saveFailed", NULL); rc = -1; }
-    if (!rc) meta(name, "fortinet", host, user, 1, 0, sso);
+    if (!rc) {
+        Buf x = {0};
+        if (sso) buf_printf(&x, ",\"sso\":true");
+        if (cert) buf_printf(&x, ",\"clientCert\":true");
+        if (vpn_kv(&kv, "description")) { buf_printf(&x, ",\"description\":"); buf_json_str(&x, vpn_kv(&kv, "description")); }
+        buf_printf(&x, ",\"gateways\":[");
+        for (int i = 0; i < ngw; i++) buf_printf(&x, "%s\"%s:%d\"", i ? "," : "", gw[i].host, gw[i].port);
+        buf_printf(&x, "]");
+        meta(name, "fortinet", host, user, 1, 0, x.oom ? NULL : x.p);
+        buf_free(&x);
+    }
     vpn_kv_free(&kv);
     return rc;
 }
 
-/* net-vpn-trust: the certificate the person accepted becomes the connection's trusted
- * certificate (it replaces an earlier one: the server changed it). */
-int forti_trust(const char *name, const char *sha256, char *err, size_t errn) {
+/* net-vpn-trust: the certificate the person accepted becomes that server's trusted certificate
+ * ("host@hex"; it replaces an earlier one for the same server: the server changed it). Without a
+ * host (an older Settings), it replaces the untagged ones. */
+int forti_trust(const char *name, const char *sha256, const char *host, char *err, size_t errn) {
     char h[65];
+    FortiGw g;
     if (forti_hex_norm(sha256, h)) { lerr_set(err, errn, "vpn.invalidValue", "key", "trusted-cert", NULL); return -1; }
+    if (host && *host && forti_gw_parse(host, 443, &g)) { lerr_set(err, errn, "vpn.invalidValue", "key", "host", NULL); return -1; }
     VpnKv kv;
     if (vpn_kv_load(name, "fortinet", &kv)) { lerr_set(err, errn, "vpn.noConfig", NULL); return -1; }
-    kv_put(&kv, "trusted-cert", h);
+    char prefix[260] = "";
+    if (host && *host) snprintf(prefix, sizeof prefix, "%s@", g.host);
+    for (int i = kv.n - 1; i >= 0; i--) {
+        if (strcmp(kv.key[i], "trusted-cert")) continue;
+        int tagged = strchr(kv.val[i], '@') != NULL;
+        if (prefix[0] ? tagged && !strncasecmp(kv.val[i], prefix, strlen(prefix)) : !tagged) kv_del(&kv, i);
+    }
+    char v[330];
+    snprintf(v, sizeof v, "%s%s", prefix, h);
+    kv_add(&kv, "trusted-cert", v);
     int rc = vpn_kv_save(name, "fortinet", &kv) ? -1 : 0;
     if (rc) lerr_set(err, errn, "net.saveFailed", NULL);
     vpn_kv_free(&kv);
@@ -479,7 +513,9 @@ static void forti_report_cert(Run *r) {
     buf_json_str(&b, r->fo.subject);
     buf_printf(&b, ",\"issuer\":");
     buf_json_str(&b, r->fo.issuer);
-    buf_printf(&b, ",\"changed\":%s}", r->trusted[0] ? "true" : "false");
+    buf_printf(&b, ",\"changed\":%s,\"gateway\":", r->trusted[0] ? "true" : "false");
+    buf_json_str(&b, r->gw);
+    buf_printf(&b, "}");
     if (b.p && !b.oom) admin_event("net vpn %s untrusted-cert %s", r->name, b.p);
     buf_free(&b);
     r->reported = 1;
@@ -526,7 +562,12 @@ static void forti_line(const char *l, void *ud) {
     const char *code = forti_out_code(kind);
     switch (kind) {
     case FO_NONE: break;
-    case FO_GATEWAY_OK: r->gateway_ok = 1; break;
+    case FO_GATEWAY_OK:
+        r->gateway_ok = 1;
+        /* which server answered (there can be several) */
+        if (!r->announced && r->gw[0]) admin_event("net vpn %s gateway %s", r->name, r->gw);
+        r->announced = 1;
+        break;
     case FO_TUNNEL_UP: r->full = !(r->routes && *r->routes); up(r); break;
     case FO_CERT: if (!r->reported) forti_report_cert(r); break;
     case FO_SAML_LISTEN: if (r->saml_id) forti_saml_relay(r); break;
@@ -540,6 +581,8 @@ static void forti_line(const char *l, void *ud) {
         if (!r->last[0]) lerr_set(r->last, sizeof r->last, "vpn.fortiFailed", "detail", r->fo.error, NULL);
         break;
     default:
+        /* the next server may answer where this one didn't */
+        if (kind == FO_UNREACHABLE || kind == FO_RESOLVE_FAILED || kind == FO_TLS_FAILED) r->failover = 1;
         if (kind == FO_PORT_BUSY) lerr_set(r->last, sizeof r->last, code, "port", lerr_int(r->saml_port), NULL);
         else if (code) lerr_set(r->last, sizeof r->last, code, NULL);
     }
@@ -565,7 +608,7 @@ static int forti_probe(Run *r, const char *conf) {
     close(out);
     r->probing = 0;
     if (r->gateway_ok) { r->last[0] = 0; memset(&r->fo, 0, sizeof r->fo); return 0; }
-    if (!r->last[0] && !r->reported && !vpn_stop) lerr_set(r->last, sizeof r->last, "vpn.fortiUnreachable", NULL);
+    if (!r->last[0] && !r->reported && !vpn_stop) { lerr_set(r->last, sizeof r->last, "vpn.fortiUnreachable", NULL); r->failover = 1; }
     return -1;
 }
 
@@ -629,12 +672,14 @@ static int forti_saml_wait(Run *r, const char *url, char *id, size_t idn) {
 
 void forti_run(const char *name) {
     vpn_signals();
-    VpnKv kv;
+    static VpnKv kv;
     if (vpn_kv_load(name, "fortinet", &kv)) { admin_event("net vpn %s error vpn.noConfig", name); admin_event("net vpn %s disconnected", name); return; }
     Run r = { .name = name, .type = "fortinet" };
     vpn_ifname("fortinet", name, r.ifn, sizeof r.ifn);
     admin_event("net vpn %s connecting", name);
-    if (vpn_resolve(vpn_kv(&kv, "host"), &r.sfam, r.sip)) { admin_event("net vpn %s error vpn.serverUnresolved", name); admin_event("net vpn %s disconnected", name); vpn_kv_free(&kv); return; }
+    FortiGw gw[FORTI_MAX_GW];
+    int ngw = forti_gw_list(vpn_kv(&kv, "host"), vpn_kv(&kv, "port"), vpn_kv(&kv, "alt-hosts"), gw, FORTI_MAX_GW);
+    if (ngw < 1) { admin_event("net vpn %s error vpn.noConfig", name); admin_event("net vpn %s disconnected", name); vpn_kv_free(&kv); return; }
     int sso = vpn_kv(&kv, "auth") && !strcmp(vpn_kv(&kv, "auth"), "sso");
     r.sso = sso;
     r.saml_port = vpn_kv(&kv, "sso-port") ? atoi(vpn_kv(&kv, "sso-port")) : FORTI_SSO_PORT;
@@ -642,50 +687,59 @@ void forti_run(const char *name) {
     routes[0] = 0;
     if (vpn_kv(&kv, "routes")) snprintf(routes, sizeof routes, "%s", vpn_kv(&kv, "routes"));
     r.routes = routes[0] ? routes : NULL;
-    char host[256], port[8], url[400];
-    snprintf(host, sizeof host, "%s", vpn_kv(&kv, "host"));
-    snprintf(port, sizeof port, "%s", vpn_kv(&kv, "port") ? vpn_kv(&kv, "port") : "443");
-    snprintf(url, sizeof url, "https://%s:%s/remote/saml/start?redirect=1", host, port);
-    /* openfortivpn config (0600): "key = value" up to the end of the line */
-    Buf c = {0};
-    buf_printf(&c, "# Generated by LordOS (do not edit)\nhost = %s\nport = %s\n", host, port);
-    if (!sso) buf_printf(&c, "username = %s\npassword = %s\n", vpn_kv(&kv, "user"), vpn_kv(&kv, "password"));
-    if (vpn_kv(&kv, "trusted-cert")) {
-        char copy[256];
-        snprintf(copy, sizeof copy, "%s", vpn_kv(&kv, "trusted-cert"));
-        for (char *t = strtok(copy, ", "); t; t = strtok(NULL, ", ")) {
-            char h[65];
-            if (forti_hex_norm(t, h)) continue;       /* saved by an older LordOS: normalize (openfortivpn wants lowercase) */
-            buf_printf(&c, "trusted-cert = %s\n", h);
-            snprintf(r.trusted + strlen(r.trusted), sizeof r.trusted - strlen(r.trusted), "%s%s", r.trusted[0] ? "," : "", h);
-        }
+    const char *certv[VPN_MAX_KV];
+    int ncert = kv_certs(&kv, certv, VPN_MAX_KV);
+    /* client certificate: the copies net-vpn-import saved (root, 0600) */
+    char ucert[200] = "", ukey[200] = "";
+    if (vpn_kv_pem(&kv, "cert") && vpn_kv_pem(&kv, "key")) {
+        snprintf(ucert, sizeof ucert, NET_VPN_DIR "/%s.cert.pem", name);
+        snprintf(ukey, sizeof ukey, NET_VPN_DIR "/%s.key.pem", name);
     }
-    /* routes and DNS are applied by LordOS (openfortivpn with set-routes would change the system's
-     * default route): full tunnel like "def1" or the import's routes */
-    buf_printf(&c, "set-routes = 0\nset-dns = 0\npppd-use-peerdns = 0\n");
-    vpn_kv_free(&kv);
     char path[200];
     mkdir(NET_DIR, 0755);
     mkdir(FORTI_DIR, 0700);
     snprintf(path, sizeof path, FORTI_DIR "/%s.conf", name);
-    int ok = !c.oom && write_file_atomic(path, c.p, c.len, 0600) == 0;
-    if (c.p) memset(c.p, 0, c.len);
-    buf_free(&c);
-    if (!ok) { admin_event("net vpn %s error vpn.writeFailed", name); admin_event("net vpn %s disconnected", name); return; }
     static char saml_id[901];
-    if (sso && (forti_probe(&r, path) || forti_saml_wait(&r, url, saml_id, sizeof saml_id))) { down(&r); return; }
-    if (sso) r.saml_id = saml_id;
-    char ifarg[48], samlarg[32];
-    snprintf(ifarg, sizeof ifarg, "--pppd-ifname=%s", r.ifn);
-    snprintf(samlarg, sizeof samlarg, "--saml-login=%d", r.saml_port);
-    const char *argv[] = { OPENFORTIVPN, "-c", path, ifarg, "--pppd-no-peerdns", sso ? samlarg : NULL, NULL };
-    vpn_mark(r.ifn, name, 1);
-    int out;
-    pid_t pid = vpn_spawn(argv, &out, NULL, NULL);
-    if (pid < 0) { admin_event("net vpn %s error vpn.startFailed", name); admin_event("net vpn %s disconnected", name); vpn_mark(r.ifn, name, 0); return; }
-    supervise(&r, pid, out, forti_line, NULL);
-    close(out);
-    if (r.saml_id) { memset(saml_id, 0, sizeof saml_id); r.saml_id = NULL; }
+    /* the servers in order: the first that answers is used; an unreachable one (or a failed TLS
+     * handshake) moves on to the next. A certificate to trust, a refused sign-in or a tunnel that
+     * came up and went down stop there. */
+    for (int i = 0; i < ngw && !vpn_stop; i++) {
+        r.last[0] = 0;
+        r.gateway_ok = r.failover = r.announced = 0;
+        r.trusted[0] = 0;
+        memset(&r.fo, 0, sizeof r.fo);
+        snprintf(r.gw, sizeof r.gw, "%.253s:%d", gw[i].host, gw[i].port);
+        if (vpn_resolve(gw[i].host, &r.sfam, r.sip)) { lerr_set(r.last, sizeof r.last, "vpn.serverUnresolved", NULL); continue; }
+        forti_certs_for(certv, ncert, gw[i].host, r.trusted, sizeof r.trusted);
+        FortiConf fc = { .host = gw[i].host, .port = gw[i].port, .user = sso ? NULL : vpn_kv(&kv, "user"), .password = sso ? NULL : vpn_kv(&kv, "password"),
+                         .certs = r.trusted, .user_cert = ucert, .user_key = ukey, .pem_pass = vpn_kv(&kv, "key-password") };
+        char conf[4096];
+        int len = forti_conf_text(&fc, conf, sizeof conf);
+        int ok = len > 0 && write_file_atomic(path, conf, (size_t)len, 0600) == 0;
+        memset(conf, 0, sizeof conf);
+        if (!ok) { lerr_set(r.last, sizeof r.last, "vpn.writeFailed", NULL); break; }
+        if (sso) {
+            char url[400];
+            snprintf(url, sizeof url, "https://%.253s:%d/remote/saml/start?redirect=1", gw[i].host, gw[i].port);
+            if (forti_probe(&r, path)) { if (r.failover) continue; break; }
+            if (forti_saml_wait(&r, url, saml_id, sizeof saml_id)) break;
+            r.saml_id = saml_id;
+            r.announced = 1;                    /* the check already said which server */
+        }
+        char ifarg[48], samlarg[32];
+        snprintf(ifarg, sizeof ifarg, "--pppd-ifname=%s", r.ifn);
+        snprintf(samlarg, sizeof samlarg, "--saml-login=%d", r.saml_port);
+        const char *argv[] = { OPENFORTIVPN, "-c", path, ifarg, "--pppd-no-peerdns", sso ? samlarg : NULL, NULL };
+        vpn_mark(r.ifn, name, 1);
+        int out;
+        pid_t pid = vpn_spawn(argv, &out, NULL, NULL);
+        if (pid < 0) { lerr_set(r.last, sizeof r.last, "vpn.startFailed", NULL); break; }
+        supervise(&r, pid, out, forti_line, NULL);
+        close(out);
+        if (r.saml_id) { memset(saml_id, 0, sizeof saml_id); r.saml_id = NULL; }
+        if (r.connected || !r.failover || r.reported || r.auth_failed) break;
+    }
+    vpn_kv_free(&kv);
     if (!r.connected && !r.auth_failed && !r.reported && !r.last[0] && !vpn_stop) lerr_set(r.last, sizeof r.last, "vpn.fortiEnded", NULL);
     down(&r);
 }

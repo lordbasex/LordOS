@@ -37,3 +37,14 @@ VPN y conecta. Si después el servidor muestra otro certificado, LordOS avisa qu
 preguntar.
 
 Para cambiar una VPN guardada, apagala y elegí **⋯ → Editar…** en su fila. El botón del tacho la borra.
+
+## Fortinet: más servidores, certificado de cliente
+
+- **Más servidores:** agregá los otros servidores de la organización con **+ Agregar servidor**
+  (`servidor` o `servidor:puerto`). LordOS los prueba en orden y usa el primero que responde; la
+  fila de la VPN dice cuál mientras está conectada.
+- **Certificado de cliente:** si tu organización te dio un certificado, elegí **Certificado de
+  cliente → Elegir…** y seleccioná el certificado y su clave privada (archivos PEM; también sirve un
+  solo archivo con los dos). Escribí la contraseña de la clave si tiene. Los archivos PKCS#12
+  (`.p12`, `.pfx`) todavía no se admiten: exportalos antes como PEM.
+- **Descripción:** una nota que se ve debajo del nombre de la VPN.

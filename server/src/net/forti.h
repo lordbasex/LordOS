@@ -19,6 +19,7 @@ enum {
     FO_RESOLVE_FAILED,  /* the gateway's name didn't resolve */
     FO_TLS_FAILED,      /* the TLS handshake failed */
     FO_ALLOC_FAILED,    /* signed in, but the gateway gave no tunnel (no VPN for this account) */
+    FO_CLIENT_CERT,     /* the client certificate or its key couldn't be loaded (a wrong pass phrase…) */
     FO_ERROR,           /* another "ERROR:" line: o->error has its text */
 };
 
@@ -42,5 +43,40 @@ int forti_hex_norm(const char *in, char out[65]);
  * 0 = id copied (letters, digits and '-', like openfortivpn accepts), 1 = another request
  * (favicon…), -1 = malformed or an invalid id. */
 int forti_saml_id(const char *req, char *id, size_t n);
+
+/* ---- the connection's settings (forti_import / forti_run) ---- */
+
+#define FORTI_MAX_GW 5                  /* the main server and up to 4 more */
+
+typedef struct { char host[254]; int port; } FortiGw;
+
+/* "host" or "host:port" (a name or IPv4 address; port 1..65535, defport if absent). 0 ok, -1 invalid. */
+int forti_gw_parse(const char *s, int defport, FortiGw *g);
+
+/* The servers to try, in order: host/port (port NULL = 443), then the comma-separated alt list
+ * (NULL = none; spaces around each entry are ignored). Number of servers, or -1 if one is invalid or there are more than max. */
+int forti_gw_list(const char *host, const char *port, const char *alt, FortiGw *g, int max);
+
+/* One trusted-cert value: fingerprints separated by ',' or ' ', each "hex" (any server) or
+ * "host@hex" (only that server; what LordOS saves when the person trusts a certificate).
+ * Valid: 0; -1 otherwise. */
+int forti_certs_valid(const char *val);
+
+/* The same value with every fingerprint as 64 lowercase hex digits. 0 ok, -1 invalid or too long. */
+int forti_certs_norm(const char *val, char *out, size_t n);
+
+/* The fingerprints that apply to host from the n trusted-cert values (untagged ones, and those
+ * tagged with that host, ignoring case), as a comma-separated list in out. Returns how many. */
+int forti_certs_for(const char *const *vals, int n, const char *host, char *out, size_t on);
+
+/* openfortivpn's config file. NULL/empty fields are left out; a value with a line break makes it
+ * fail (-1). Returns the length written, or -1 if it doesn't fit. */
+typedef struct {
+    const char *host; int port;
+    const char *user, *password;        /* NULL with single sign-on */
+    const char *certs;                  /* comma-separated fingerprints (forti_certs_for) */
+    const char *user_cert, *user_key, *pem_pass;    /* client certificate: file paths and the key's pass phrase */
+} FortiConf;
+int forti_conf_text(const FortiConf *c, char *out, size_t n);
 
 #endif
