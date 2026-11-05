@@ -1,97 +1,160 @@
-// A machine's window (alpha, docs/VIRTUALIZATION.md 5.3): the guest's picture scaled to fit (kept in shape, black
-// bands), keyboard and pointer while the window is in front (let go of on blur), a bar with Pause or Resume,
-// Restart, Ctrl+Alt+Delete, Full screen and Power (Shut Down, Force Off). Resizing the window asks the guest for that
-// size after a short pause. Closing the window shuts the machine down; when lord-vm or the guest fails, the reason
-// and the log are here, with Start again.
+// A machine's window (the approved mocks "Toolbar", "FullScreen" and "BootFailed"): the guest's picture scaled to fit,
+// keyboard and pointer while the window is in front, and a toolbar with the machine's name and power light, the
+// resolution, Devices, Logs, Screenshot, Pause, Power, Configure and Full Screen; the same actions in the menu bar
+// (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
+// error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, Button, MediaView, ScrollView, addListener, useTheme, useAppWindow, useWindowState, useStore, wm, windows,
-  ToolbarButton, MenuButton, spacing, typeScale,
+  View, Text, MediaView, ScrollView, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle } from './model.js';
-import { AlphaBadge, StateDot, has } from './ui.jsx';
+import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot } from './ui.jsx';
+import { openConfigure, openLogs } from './library.jsx';
 
-const BAR = 36;
+const BAR = 48;
+const RESOLUTIONS = [[1280, 800], [1600, 900], [1920, 1080], [2560, 1440]];
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
+const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr'].every((k) => a[k] === b[k]);
 
-function Bar({ sid, st, name, winId, onPower }) {
-  const t = useTheme();
-  const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
-  const [near, setNear] = useState(false);
-  const v = stateView(st?.state, st?.reason);
-  const a = actionsFor(st?.state);
-  const cmd = (c) => sid && lord.vm.cmd(sid, c);
-  const cad = () => {
-    if (!sid) return;
-    CTRL_ALT_DEL.forEach((k) => lord.vm.key(sid, k, 1));
-    [...CTRL_ALT_DEL].reverse().forEach((k) => lord.vm.key(sid, k, 0));
-  };
-  const bar = (
-    <View onMouseLeave={() => setNear(false)} style={{ height: BAR, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, backgroundColor: t.windowBg }}>
-      <Text style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start', maxWidth: 260 }}>{name}</Text>
-      <StateDot tone={v.tone} />
-      <Text style={{ fontSize: 12, color: t.textDim }}>{tr(`machines.state.${v.key}`)}</Text>
-      <AlphaBadge />
-      <View style={{ flex: 1 }} />
-      <ToolbarButton icon={a.resume ? '▶' : '⏸'} title={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => cmd(a.resume ? 'resume' : 'pause')} />
-      <ToolbarButton icon="↻" title={tr('machines.cmd.reset')} disabled={!a.reset} onClick={() => cmd('reset')} />
-      <ToolbarButton label="⌃⌥⌦" title={tr('machines.cmd.cad')} disabled={!a.keys} onClick={cad} />
-      <ToolbarButton icon="⛶" title={full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen')} active={full} onClick={() => wm.setFullscreen(winId, !full)} />
-      <MenuButton icon={null} label={tr('machines.cmd.power')} title={tr('machines.cmd.power')} items={[
-        { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => onPower('shutdown') },
-        { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => onPower('poweroff') }]} />
-    </View>
-  );
-  if (!full) return <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}>{bar}</View>;
-  // full screen: the bar comes back at the top edge, as in Remote Desk
-  return <View onMouseEnter={() => setNear(true)} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: near ? BAR : 3 }}>{near ? bar : null}</View>;
+function Tools({ ctl, floating }) {
+  const p = usePal();
+  const { st, a, full, follow } = ctl;
+  const res = [
+    { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
+    '-',
+    ...RESOLUTIONS.map(([w, h]) => ({ label: `${w} × ${h}`, checked: !follow && st?.w === w && st?.h === h, disabled: !a.keys, onClick: () => ctl.fixed(w, h) })),
+  ];
+  return <>
+    <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
+    <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
+    <Btn label={tr('machines.cmd.logs')} onClick={ctl.logs} style={{ height: 30 }} />
+    <Btn label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} style={{ height: 30 }} />
+    <Btn label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} style={{ height: 30 }} />
+    <MenuBtn label={tr('machines.cmd.power')} items={ctl.power} />
+    {!floating ? <Btn label={tr('machines.cmd.configure')} onClick={ctl.configure} style={{ height: 30 }} /> : null}
+    {floating ? <Btn primary label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} style={{ height: 30 }} />
+      : <Btn label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} style={{ height: 30 }} />}
+  </>;
 }
 
-// the card over the black area when there's no picture: starting, stopped, failed, lost display
-function Card({ title, text, detail, actions }) {
-  const t = useTheme();
+function Header({ ctl, name }) {
+  const p = usePal();
+  const v = stateView(ctl.st?.state, ctl.st?.reason);
+  return (
+    <View style={{ height: BAR, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, backgroundColor: p.raised }}>
+      <StateDot tone={v.tone} size={9} />
+      <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 260 }}>{name}</Text>
+      <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{tr(`machines.state.${v.key}`)}</Text>
+      <View style={{ flex: 1 }} />
+      <Tools ctl={ctl} />
+    </View>
+  );
+}
+
+// full screen: a floating bar at the top edge, shown near it; a hint at the bottom for a few seconds
+function FloatingBar({ ctl, name }) {
+  const p = usePal();
+  const [near, setNear] = useState(true);
+  const [hint, setHint] = useState(true);
+  useEffect(() => { const a = setTimeout(() => setNear(false), 2500), b = setTimeout(() => setHint(false), 5000); return () => { clearTimeout(a); clearTimeout(b); }; }, []);
+  const v = stateView(ctl.st?.state, ctl.st?.reason);
+  return <>
+    <View onMouseEnter={() => setNear(true)} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: near ? 70 : 4, alignItems: 'center' }}>
+      {near ? (
+        <View onMouseLeave={() => setNear(false)} style={{ marginTop: 10, height: 46, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 8,
+          borderRadius: 14, backgroundColor: 'rgba(28,28,33,0.94)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
+          <StateDot tone={v.tone} size={9} />
+          <Text style={{ marginLeft: 6, marginRight: 10, fontSize: 13, fontWeight: 700, color: '#f2f2f5' }}>{name}</Text>
+          <Tools ctl={ctl} floating />
+        </View>
+      ) : null}
+    </View>
+    {hint ? (
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 20, alignItems: 'center', pointerEvents: 'none' }}>
+        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.68)' }}>
+          <Text style={{ fontSize: 13, color: '#f2f2f5' }}>{tr('machines.fs.hint')}</Text>
+        </View>
+      </View>
+    ) : null}
+  </>;
+}
+
+// the card over the black area: starting, shutting down, no picture, lost display
+function Card({ title, text, actions }) {
+  const p = usePal();
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 460, maxHeight: '90%', padding: spacing.xl, gap: spacing.s, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}` }}>
-        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
-        {text ? <Text style={{ fontSize: typeScale.body, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{text}</Text> : null}
-        {detail ? (
-          <ScrollView style={{ maxHeight: 220 }} contentStyle={{ padding: spacing.xs }}>
-            <Text style={{ fontFamily: 'monospace', fontSize: 11, color: t.text, textAlign: 'start', direction: 'ltr', whiteSpace: 'pre-wrap' }}>{detail}</Text>
-          </ScrollView>
-        ) : null}
-        {actions?.length ? <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end', marginTop: spacing.s }}>{actions}</View> : null}
+      <View style={{ width: 460, padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
+        <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+        {text ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{text}</Text> : null}
+        {actions?.length ? <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
       </View>
     </View>
   );
 }
 
+// BootFailed: why, a likely fix, Start Again, Settings, and the machine's log
+function Failed({ name, v, st, log, onStart, onSettings }) {
+  const p = usePal();
+  const neverRan = v.why === 'start-failed';
+  const lines = (log || '').split('\n').filter(Boolean).slice(-60);
+  const bad = (l) => /fail|error|refus|crash|exited|killed|cannot|can't|panic/i.test(l);
+  return (
+    <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, padding: 22, gap: 12, backgroundColor: p.bg }}>
+      <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{neverRan ? tr('machines.fail.didntStart', { name }) : tr('machines.fail.stopped', { name })}</Text>
+      <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr(`machines.why.${v.why}`)} {neverRan ? tr('machines.fail.diskSafe') : ''}</Text>
+      <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: p.badBg }}>
+        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{`${tr('machines.fail.likely')} ${tr(`machines.fix.${v.why}`, { code: st?.code })}`}</Text>
+        {st?.detail ? <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start', direction: 'ltr' }}>{st.detail}</Text> : null}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Btn big primary label={tr('machines.fail.startAgain')} onClick={onStart} />
+        <Btn big label={tr('machines.cmd.configure')} onClick={onSettings} />
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ flex: 1, fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.fail.log')}</Text>
+        <Btn label={tr('machines.logs.copy')} onClick={() => clipboard.set(log || '')} />
+      </View>
+      <ScrollView style={{ flex: 1, borderRadius: 12, backgroundColor: p.dark ? '#16171b' : 'rgba(0,0,0,0.04)' }} contentStyle={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+        {lines.map((l, i) => <Text key={i} style={{ fontFamily: 'monospace', fontSize: 12, lineHeight: 1.7, color: bad(l) ? '#ff9a9a' : p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{l}</Text>)}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function MachineWindow({ dir, name: name0 }) {
+  const p = usePal();
   const { id: winId, focused } = useAppWindow();
   // full screen moves the app in the tree and remounts it: the session belongs to the window
   const [sid, setSid] = useWindowState('vm.sid', 0);
   const [st, setSt] = useWindowState('vm.state', null);
   const [err, setErr] = useWindowState('vm.err', '');
   const [closing, setClosing] = useWindowState('vm.closing', false);
+  const [follow, setFollow] = useWindowState('vm.follow', true);
   const [log, setLog] = useState('');
   const [name, setName] = useState(name0);
+  const [iso, setIso] = useState('');
   const box = useRef(null);
-  const sized = useRef({ last: null, want: null, at: 0, rate: false });
+  const root = useRef(null);
+  const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0 });
   const buttons = useRef(new Set());
   const wheel = useRef(0);
   const sidRef = useRef(sid);
   sidRef.current = sid;
   const closingRef = useRef(closing);
   closingRef.current = closing;
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  overlayRoot.current = root.current;
 
   const begin = () => {
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
-    setName(m.name);
+    setName(m.name); setIso(m.iso || '');
     setLog('');
     const active = stateView(m.state, m.reason).active;
     if (!active) {
@@ -100,7 +163,7 @@ export function MachineWindow({ dir, name: name0 }) {
     }
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir);
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : tr('machines.win.cantStart')); return; }
-    sized.current = { last: null, want: null, at: 0, rate: false };
+    sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
     setErr(''); setSt(null); setSid(id);
   };
   useEffect(() => { if (!sid && !st && !err) begin(); }, []);
@@ -110,23 +173,25 @@ export function MachineWindow({ dir, name: name0 }) {
   useEffect(() => {
     if (!sid) return undefined;
     const timer = setInterval(() => {
-      const p = lord.vm.poll(sid);
-      if (!p) return;
-      setSt((prev) => (same(prev, p) ? prev : p));
+      const q = lord.vm.poll(sid);
+      if (!q) return;
+      setSt((prev) => (same(prev, q) ? prev : q));
       const z = sized.current;
-      if (p.display === 'up' && !z.rate) { z.rate = true; try { lord.vm.rate(sid, refreshRate(lord.display.list())); } catch (e) { lord.vm.rate(sid, 60); } }
-      // the window's size, to the guest after it stayed the same for 400 ms
-      if (p.display === 'up' && box.current) {
+      if (q.display === 'up' && !z.rate) { z.rate = true; try { lord.vm.rate(sid, refreshRate(lord.display.list())); } catch (e) { lord.vm.rate(sid, 60); } }
+      // the window's size, to the guest after it stayed the same for 400 ms (unless a fixed resolution was chosen)
+      if (q.display === 'up' && box.current && followRef.current) {
         const want = guestSize(lord.getLayout(box.current.id), z.last);
         if (!want) z.want = null;
         else if (!z.want || z.want[0] !== want[0] || z.want[1] !== want[1]) { z.want = want; z.at = now(); }
         else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; }
       }
-      if (p.ended) {
+      // the card picture in the library, every few seconds while it runs
+      if (q.display === 'up' && q.state === 'running' && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
+      if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
         if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
-        if (p.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff'].includes(p.reason)) setLog(lord.vm.log(dir).split('\n').slice(-24).join('\n'));
+        if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
       }
     }, 16);
     return () => clearInterval(timer);
@@ -145,20 +210,21 @@ export function MachineWindow({ dir, name: name0 }) {
   }), [winId, st?.state]);
 
   const v = stateView(st?.state, st?.reason);
+  const a = actionsFor(sid ? st?.state : 'stopped');
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
   const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing;
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
-    const a = addListener('keydown', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 1); });
-    const b = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
-    const c = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
-    return () => { a(); b(); c(); lord.vm.release(sid); buttons.current.clear(); };
+    const ka = addListener('keydown', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 1); });
+    const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
+    const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
+    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [live, focused, sid]);
 
   const at = (e) => (box.current && st?.w ? toPicture(e.x, e.y, lord.getLayout(box.current.id), st.w, st.h) : null);
-  const move = (e) => { const p = live && at(e); if (p) lord.vm.motion(sid, p[0], p[1]); };
+  const move = (e) => { const q = live && at(e); if (q) lord.vm.motion(sid, q[0], q[1]); };
   const down = (e) => { if (!live) return; move(e); buttons.current.add(e.button); lord.vm.button(sid, e.button, 1); };
   const onWheel = (e) => {
     if (!live) return;
@@ -167,26 +233,77 @@ export function MachineWindow({ dir, name: name0 }) {
     wheel.current = rest;
     if (n) lord.vm.wheel(sid, n, 0);
   };
-  const power = (how) => { if (sid) lord.vm.cmd(sid, how); };
+  const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running') lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
+  const cad = () => {
+    if (!sid) return;
+    CTRL_ALT_DEL.forEach((k) => lord.vm.key(sid, k, 1));
+    [...CTRL_ALT_DEL].reverse().forEach((k) => lord.vm.key(sid, k, 0));
+  };
+  const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
+  const m0 = { dir, name, id: winId.split('#vm-')[1] };
+  const shot = () => {
+    const path = sid ? lord.vm.screenshot(sid) : '';
+    notify({ app: 'machines', label: tr('machines.title'), title: path ? tr('machines.tb.shotSaved') : tr('machines.tb.shotFailed'), body: path ? path.split('/').pop() : '', sound: false,
+      actions: path ? [{ id: 'show', label: tr('machines.cmd.showInFiles'), run: () => revealPath(path) }] : [] });
+  };
+  const ctl = {
+    st, a, full, follow, cmd,
+    setFull: (on) => wm.setFullscreen(winId, on),
+    setFollow: (on) => { setFollow(on); sized.current.last = null; },
+    fixed: (w, h) => { setFollow(false); if (sid) lord.vm.resize(sid, w, h); },
+    logs: () => openLogs(m0),
+    configure: () => openConfigure(m0),
+    screenshot: shot,
+    power: [
+      { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
+      { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
+      { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
+      '-',
+      { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => cmd('poweroff') },
+    ],
+    devices: [
+      { label: iso ? tr('machines.tb.cdIn', { name: iso.split('/').pop() }) : tr('machines.tb.cdNone'), disabled: true },
+      { label: tr('machines.tb.cdChange'), disabled: true, hint: tr('machines.tb.whenOff') },
+      '-',
+      { label: tr('machines.tb.folders'), disabled: true, hint: tr('machines.later') },
+      { label: tr('machines.tb.sound'), disabled: true, hint: tr('machines.later') },
+    ],
+  };
+  useEffect(() => {
+    wm.setMenus(winId, [
+      { label: tr('machines.menu.actions'), items: [
+        { label: a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause'), disabled: !a.pause && !a.resume, onClick: () => cmd(a.resume ? 'resume' : 'pause') },
+        { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
+        { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
+        '-',
+        { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
+        { label: tr('machines.cmd.poweroff'), disabled: !a.poweroff, onClick: () => cmd('poweroff') },
+        '-',
+        { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
+        { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
+        { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
+        { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m0) },
+      ] },
+      { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
+    ]);
+  }, [st?.state, full, iso, sid]);
 
   let card = null;
-  if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Button key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
-  else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Button key="f" destructive label={tr('machines.cmd.poweroff')} onClick={() => power('poweroff')} />]} />;
+  let failed = null;
+  if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
+  else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
   else if (!sid && st) {
-    const why = v.why ? tr(`machines.why.${v.why}`) : '';
-    const detail = [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n');
-    card = <Card title={tr(`machines.state.${v.key}`)} text={[why, v.why ? tr(`machines.fix.${v.why}`, { code: st.code }) : tr('machines.win.stoppedHint')].filter(Boolean).join(' ')}
-      detail={v.why ? (log || detail || '') : ''} actions={[<Button key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
+    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={begin} onSettings={() => openConfigure(m0)} />;
+    else card = <Card title={tr(`machines.state.${v.key}`)} text={tr('machines.win.stoppedHint')} actions={[<Btn key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {
-    card = <Card title={tr('machines.win.lost')} text={tr('machines.win.lostHint')} actions={[<Button key="d" primary label={tr('machines.win.reconnect')} onClick={() => lord.vm.cmd(sid, 'display')} />]} />;
+    card = <Card title={tr('machines.win.lost')} text={tr('machines.win.lostHint')} actions={[<Btn key="d" primary label={tr('machines.win.reconnect')} onClick={() => lord.vm.cmd(sid, 'display')} />]} />;
   } else if (st.display === 'none') card = <Card title={tr('machines.win.noDisplay')} text={tr('machines.win.noDisplayHint')} />;
   else if (st.state === 'stopping') card = <Card title={tr('machines.state.stopping')} text={tr('machines.win.shuttingDownHint')} />;
 
-  const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
+    <View ref={root} style={{ flex: 1, backgroundColor: '#000' }}>
       <View ref={box} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
         {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
       </View>
@@ -198,7 +315,8 @@ export function MachineWindow({ dir, name: name0 }) {
         </View>
       ) : null}
       {card}
-      <Bar sid={sid} st={st} name={name} winId={winId} onPower={power} />
+      {failed}
+      {full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
     </View>
   );
 }

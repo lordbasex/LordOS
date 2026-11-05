@@ -1545,6 +1545,76 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
     return rc;
 }
 
+/* Changes a machine that is off (Configure): the same checks as --create, under the machine's lock (exit 3 while it
+ * runs). The disk only grows (qemu-img resize, jailed: it reads and writes the machine's disks/ only); an ISO is
+ * checked like --iso, "none" takes it out. Prints the machine as JSON. */
+static int cmd_set(const char *dir, int argc, char **argv) {
+    const char *name = NULL, *iso = NULL;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1;
+    for (int i = 0; i < argc; i++) {
+        const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
+        if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
+        i++;
+        if (!strcmp(a, "--name")) name = v;
+        else if (!strcmp(a, "--vcpus")) vcpus = atoi(v);
+        else if (!strcmp(a, "--memory")) mem = atoi(v);
+        else if (!strcmp(a, "--disk")) disk = atoi(v);
+        else if (!strcmp(a, "--display")) disp = parse_enum(v, "window", "none");
+        else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
+        else if (!strcmp(a, "--iso")) iso = v;
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
+        if ((!strcmp(a, "--display") && disp < 0) || (!strcmp(a, "--network") && net < 0)) { fprintf(stderr, "lord-vm: %s %s?\n", a, v); return 2; }
+    }
+    char real[PATH_MAX];
+    if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
+    int lock = open_lock(real);
+    if (lock == -2) { fprintf(stderr, "lord-vm: the machine is running: shut it down first\n"); return 3; }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    VmMachine m;
+    char err[256], warn[256];
+    int rc = 1;
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    VmMachine was = m;
+    if (name) snprintf(m.name, sizeof m.name, "%s", name);
+    if (vcpus) m.vcpus = vcpus;
+    if (mem) m.memory_mb = mem;
+    if (disp >= 0) m.display = disp;
+    if (net >= 0) m.network = net;
+    if (disk) {
+        if (disk < m.disk_gb) { fprintf(stderr, "lord-vm: the disk can only grow (it has %d GB)\n", m.disk_gb); goto out; }
+        m.disk_gb = disk;
+    }
+    if (iso) {
+        if (!strcmp(iso, "none")) m.iso[0] = 0;
+        else {
+            char isoreal[PATH_MAX];
+            if (!realpath(iso, isoreal) || !file_exists(isoreal) || strlen(isoreal) >= sizeof m.iso) { fprintf(stderr, "lord-vm: %s isn't a file (or its path is too long)\n", iso); goto out; }
+            memcpy(m.iso, isoreal, strlen(isoreal) + 1);
+        }
+    }
+    VmHost h;
+    vm_host_probe(&h);
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_check_host(&m, &h, err, sizeof err, warn, sizeof warn)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    if (warn[0]) fprintf(stderr, "lord-vm: note: %s\n", warn);
+    if (m.disk_gb > was.disk_gb) {
+        char sys[PATH_MAX + 64], dd[PATH_MAX + 64], size[32];
+        snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
+        snprintf(dd, sizeof dd, "%s/disks", real);
+        snprintf(size, sizeof size, "%dG", m.disk_gb);
+        if (disk_plain(sys, err, sizeof err)) { fprintf(stderr, "lord-vm: system disk: %s\n", err); goto out; }
+        char *rs[] = { QEMU_IMG, "resize", "-q", "-f", "qcow2", sys, size, NULL };
+        if (run_tool_in(rs, err, sizeof err, sys, dd)) { fprintf(stderr, "lord-vm: growing the disk failed: %s\n", err); goto out; }
+    }
+    vm_now_iso(m.updated);
+    if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
+           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false");
+    rc = 0;
+out:
+    close(lock);
+    return rc;
+}
+
 static int cmd_check(const char *dir) {
     VmMachine m;
     char err[256], warn[256];
@@ -1562,6 +1632,7 @@ static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
             "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
+            "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
@@ -1576,6 +1647,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--create")) return cmd_create(dir, rest, rv);
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
+    if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
         { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP },

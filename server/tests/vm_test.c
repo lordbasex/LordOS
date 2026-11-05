@@ -9,6 +9,7 @@
 #include "vm/qmp.h"
 #include "vm/vmkeys.h"
 #include "vm/vmproto.h"
+#include "vm/logclean.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -351,7 +352,23 @@ static void test_images(void) {
     CHECK(vm_image_kind(h, 0, NULL, err, sizeof err) == -1);
 }
 
+/* the log cleaner never reads past the end: a bare ESC, "ESC [" and a CSI cut off at the end of the log (each in a
+ * buffer of exactly its size, so ASan sees one byte too far) */
+static void test_log_clean(void) {
+    static const char *const in[] = { "boot ok\x1b", "boot ok\x1b[", "boot ok\x1b[0;3", "a\x1b[32mOK\x1b[0m b\r\n", "x\x1b" "cy" };
+    static const char *const out[] = { "boot ok", "boot ok", "boot ok", "aOK b\n", "xy" };
+    for (size_t i = 0; i < sizeof in / sizeof in[0]; i++) {
+        size_t n = strlen(in[i]) + 1;
+        char *b = malloc(n);
+        memcpy(b, in[i], n);
+        vm_log_clean(b);
+        CHECK(!strcmp(b, out[i]));
+        free(b);
+    }
+}
+
 int main(void) {
+    test_log_clean();
     test_images();
     test_schema();
     test_host();
