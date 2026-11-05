@@ -3,6 +3,7 @@
 import {
   View, Text, useTheme, useLocale, Button, Toggle, Segmented, TextInput,
   admin, fs, formatBytes, keyring, AutofillButton, spacing, typeScale, errorText, statusText,
+  ToolbarButton, MenuButton, openUrl,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, FieldRow, Badge, Note, Message, Actions, StatusDot, tint } from './ui.jsx';
@@ -33,10 +34,43 @@ const events = [];
 const eventSubs = new Set();
 admin.onEvent((text) => {
   if (!text.startsWith('net ')) return;
+  vpnPromptEvent(text);
   events.push(text);
   if (events.length > 50) events.shift();
   for (const fn of eventSubs) fn(text);
 });
+
+// Fortinet: the two things lord-netd may ask the person while connecting (server/src/net/vpnproc.c).
+//   net vpn <name> sso <url>              single sign-on: open the organization's sign-in page and wait
+//   net vpn <name> untrusted-cert {json}  the server's certificate couldn't be verified: trust it?
+// Kept here (not in a page's state) so they survive switching pages. Only the session that asked to
+// connect opens the browser (events reach every session); the others show the waiting state with
+// a button to open the page.
+const SSO_MINUTES = 5;
+const SSO_URL = /^https:\/\/[A-Za-z0-9.-]+:\d{1,5}\/remote\/saml\/start\?redirect=1$/;
+const vpnPrompts = { sso: null, cert: null };        // sso: { name, url, since, opened } · cert: { name, sha256, subject, issuer, changed }
+const connectingHere = new Set();
+function vpnPromptEvent(text) {
+  const m = /^net vpn (\S+) (\S+)\s?(.*)$/.exec(text);
+  if (!m) return;
+  const [, name, what, rest] = m;
+  if (what === 'sso' && SSO_URL.test(rest)) {
+    const mine = connectingHere.has(name);
+    vpnPrompts.sso = { name, url: rest, since: Date.now(), opened: mine && openUrl(rest) };
+  } else if (what === 'untrusted-cert') {
+    try {
+      const j = JSON.parse(rest);
+      if (/^[0-9a-f]{64}$/.test(j.sha256)) vpnPrompts.cert = { name, sha256: j.sha256, subject: String(j.subject || ''), issuer: String(j.issuer || ''), changed: !!j.changed };
+    } catch (e) { /* not ours */ }
+    if (vpnPrompts.sso?.name === name) vpnPrompts.sso = null;
+  } else if (['connected', 'disconnected', 'error', 'auth-failed'].includes(what)) {
+    if (vpnPrompts.sso?.name === name) vpnPrompts.sso = null;
+    if (what !== 'disconnected') connectingHere.delete(name);
+  }
+}
+// 64 hex digits → "AB:CD:…", the way certificate fingerprints are usually shown
+const fingerprint = (hex) => String(hex).toUpperCase().match(/../g)?.join(':') || '';
+
 function useNetEvent(fn) { useEffect(() => { eventSubs.add(fn); return () => eventSubs.delete(fn); }, []); }
 
 // The OK reply is a status code line (t('status.<code>')) unless the caller has its own text.
@@ -225,27 +259,49 @@ const cleanName = (s) => s.replace(/\.(conf|ovpn)$/i, '').replace(/[^A-Za-z0-9_-
 const VPN_LABEL = { wireguard: 'WireGuard', openvpn: 'OpenVPN', ipsec: 'IPsec / IKEv2', pptp: 'PPTP', openconnect: 'Cisco AnyConnect', fortinet: 'Fortinet' };
 const FILE_TYPES = ['wireguard', 'openvpn'];
 
-// Form fields for each type (those that do not come in a file). [key, label, options]
+// Form fields for each type (those that do not come in a file).
+// [key, label, options, show(form), secret, optional]
 const FORM = {
   ipsec: [['server'], ['auth', null, ['eap', 'psk']], ['user', null, null, (f) => f.auth !== 'psk'], ['password', null, null, (f) => f.auth !== 'psk', true],
     ['psk', null, null, (f) => f.auth === 'psk', true], ['remote_id', null, null, null, false, true], ['routes', null, null, null, false, true]],
   pptp: [['server'], ['user'], ['password', null, null, null, true], ['routes', null, null, null, false, true]],
   openconnect: [['server'], ['protocol', null, ['anyconnect', 'gp', 'pulse']], ['user'], ['password', null, null, null, true],
     ['usergroup', null, null, null, false, true], ['servercert', null, null, null, false, true]],
-  fortinet: [['host'], ['port', null, null, null, false, true], ['user'], ['password', null, null, null, true], ['trusted-cert', null, null, null, false, true],
+  // Fortinet: user name and password, or single sign-on (the organization's sign-in page in the
+  // browser; docs/NETWORK.md, "Fortinet with single sign-on")
+  fortinet: [['host'], ['port', null, null, null, false, true], ['auth', null, ['password', 'sso']],
+    ['user', null, null, (f) => f.auth !== 'sso'], ['password', null, null, (f) => f.auth !== 'sso', true],
+    ['sso-port', null, null, (f) => f.auth === 'sso', false, true], ['trusted-cert', null, null, null, false, true],
     ['routes', null, null, null, false, true]],
 };
-const FORM_DEFAULTS = { ipsec: { auth: 'eap' }, openconnect: { protocol: 'anyconnect' }, fortinet: { port: '443' } };
+const FORM_DEFAULTS = { ipsec: { auth: 'eap' }, openconnect: { protocol: 'anyconnect' }, fortinet: { port: '443', auth: 'password' } };
+const PLACEHOLDER = { 'sso-port': '8020' };
 
-function VpnImport({ onDone }) {
+// The trash can of a row's Delete button, drawn (a lid and a body).
+function TrashGlyph({ color }) {
+  return (
+    <View style={{ width: 12, height: 14, alignItems: 'center' }}>
+      <View style={{ width: 4, height: 2, borderTopLeftRadius: 1, borderTopRightRadius: 1, backgroundColor: color }} />
+      <View style={{ width: 12, height: 1.5, backgroundColor: color }} />
+      <View style={{ width: 9, height: 9.5, marginTop: 1, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, border: `1.5px solid ${color}`, borderTopWidth: 0,
+        flexDirection: 'row', justifyContent: 'space-evenly', paddingTop: 1.5, paddingBottom: 1.5 }}>
+        <View style={{ width: 1, backgroundColor: color }} />
+        <View style={{ width: 1, backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
+
+// edit: { name, type, values, secrets } (net-vpn-config) to change a saved VPN instead of adding one.
+function VpnImport({ onDone, edit }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const types = has() && lord.net.vpnTypes ? lord.net.vpnTypes() : FILE_TYPES.map((type) => ({ type, available: true }));
-  const [type, setType] = useState(null);
+  const [type, setType] = useState(edit ? edit.type : null);
   const [files] = useState(findVpnFiles);
   const [file, setFile] = useState(null);
-  const [name, setName] = useState('');
-  const [form, setForm] = useState({});
+  const [name, setName] = useState(edit ? edit.name : '');
+  const [form, setForm] = useState(edit ? { ...(FORM_DEFAULTS[edit.type] || {}), ...edit.values } : {});
   const [msg, setMsg] = useState(null);
   const [enabling, setEnabling] = useState(null);
   const [, setTick] = useState(0);
@@ -256,38 +312,42 @@ function VpnImport({ onDone }) {
       () => { setMsg({ ok: true, text: tr('network.vpn.enabled', { name: VPN_LABEL[tp.type] }) }); setTick((x) => x + 1); },
       (e) => setMsg({ ok: false, text: e.message })).finally(() => setEnabling(null));
   };
+  const kept = (k) => edit && edit.secrets.includes(k);        // a saved secret the form doesn't show: kept if left empty
   const doImport = () => {
     let config;
-    const vpnName = cleanName(name || (file ? file.name : type));
+    const vpnName = edit ? edit.name : cleanName(name || (file ? file.name : type));
     if (FILE_TYPES.includes(type)) {
       try { config = type === 'openvpn' ? lord.net.prepareOvpn(`${fs.home()}/${file.rel}`) : fs.read(file.rel); } catch (e) { setMsg({ ok: false, text: e.message }); return; }
     } else {
       const fields = FORM[type].filter(([k, , , show]) => !show || show(form));
-      const missing = fields.find(([k, , , , , optional]) => !optional && !String(form[k] || '').trim());
+      const missing = fields.find(([k, , , , , optional]) => !optional && !kept(k) && !String(form[k] || '').trim());
       if (missing) { setMsg({ ok: false, text: tr('network.vpn.missing', { field: tr(`network.vpn.field.${missing[0]}`) }) }); return; }
       config = fields.filter(([k]) => String(form[k] || '').trim()).map(([k]) => `${k}=${String(form[k]).trim()}`).join('\n');
     }
-    run(setMsg, 'net-vpn-import', `${type}\n${vpnName}\n${config}`, tr('network.vpn.imported')).then((r) => r != null && onDone());
+    if (edit) run(setMsg, 'net-vpn-edit', `${type}\n${vpnName}\n${config}`, tr('network.vpn.saved')).then((r) => r != null && onDone());
+    else run(setMsg, 'net-vpn-import', `${type}\n${vpnName}\n${config}`, tr('network.vpn.imported')).then((r) => r != null && onDone());
   };
   const cur = types.find((x) => x.type === type);
   const files4 = files.filter((f) => (type === 'openvpn' ? /\.ovpn$/i : /\.conf$/i).test(f.rel));
   const field = { flex: 1 };
   return (
     <View style={{ gap: spacing.m }}>
-      <Section title={tr('network.vpn.importTitle')}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, paddingVertical: spacing.m }}>
-          {types.map((tp) => {
-            const on = type === tp.type;
-            return (
-              <View key={tp.type} onClick={() => pick(tp)} style={{ minWidth: 112, minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, gap: 2,
-                backgroundColor: on ? t.accent : t.control }}>
-                <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: on ? '#fff' : t.text, textAlign: 'start' }}>{VPN_LABEL[tp.type] || tp.type}</Text>
-                {(tp.optional || tp.insecure) && <Text style={{ fontSize: 10, color: on ? '#fff' : tp.insecure ? tint.warn : t.textDim, textAlign: 'start' }}>
-                  {tp.insecure ? tr('network.vpn.insecure') : tp.available ? tr('network.vpn.optionalOn') : tr('network.vpn.optionalOff')}</Text>}
-              </View>
-            );
-          })}
-        </View>
+      <Section title={edit ? tr('network.vpn.editTitle', { name: edit.name }) : tr('network.vpn.importTitle')}>
+        {!edit && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, paddingVertical: spacing.m }}>
+            {types.map((tp) => {
+              const on = type === tp.type;
+              return (
+                <View key={tp.type} onClick={() => pick(tp)} style={{ minWidth: 112, minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, gap: 2,
+                  backgroundColor: on ? t.accent : t.control }}>
+                  <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: on ? '#fff' : t.text, textAlign: 'start' }}>{VPN_LABEL[tp.type] || tp.type}</Text>
+                  {(tp.optional || tp.insecure) && <Text style={{ fontSize: 10, color: on ? '#fff' : tp.insecure ? tint.warn : t.textDim, textAlign: 'start' }}>
+                    {tp.insecure ? tr('network.vpn.insecure') : tp.available ? tr('network.vpn.optionalOn') : tr('network.vpn.optionalOff')}</Text>}
+                </View>
+              );
+            })}
+          </View>
+        )}
         {cur && cur.optional && !cur.available && (
           <SettingRow label={VPN_LABEL[cur.type]} hint={tr('network.vpn.enableHint', { name: VPN_LABEL[cur.type], pkg: cur.package })}>
             <Button small primary label={enabling ? tr('network.vpn.enabling') : tr('network.vpn.enable')} onClick={() => !enabling && admin.available() && enable(cur)} />
@@ -306,23 +366,80 @@ function VpnImport({ onDone }) {
           </View>
         )}
         {cur && cur.available && FORM[type] ? FORM[type].filter(([, , , show]) => !show || show(form)).map(([k, , options, , secret, optional]) => (
-          <FieldRow key={k} label={tr(`network.vpn.field.${k}`)} hint={optional ? tr('network.vpn.optional') : ''} width={options ? 300 : 260}>
+          <FieldRow key={k} label={tr(`network.vpn.field.${k}`)} hint={optional || kept(k) ? tr('network.vpn.optional') : ''} width={options ? 300 : 260}>
             {options ? <Segmented small value={form[k]} onChange={(v) => setForm({ ...form, [k]: v })} options={options.map((o) => [o, tr(`network.vpn.opt.${o}`)])} />
-              : <TextInput secure={secret} value={form[k] || ''} onChange={(v) => setForm({ ...form, [k]: v.replace(/[\r\n]/g, '') })} style={field} />}
+              : <TextInput secure={secret} value={form[k] || ''} onChange={(v) => setForm({ ...form, [k]: v.replace(/[\r\n]/g, '') })}
+                placeholder={kept(k) ? tr('network.vpn.unchanged') : PLACEHOLDER[k] || ''} style={field} />}
           </FieldRow>
         )) : null}
+        {cur && cur.available && type === 'fortinet' && form.auth === 'sso' && (
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35, paddingVertical: spacing.s, textAlign: 'start' }}>{tr('network.vpn.ssoHint')}</Text>
+        )}
         {cur && cur.available && (FORM[type] || file) && (
           <FieldRow label={tr('network.vpn.name')} width={260}>
-            <TextInput value={name} onChange={(v) => setName(v.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24))} placeholder={type} style={field} />
+            {edit ? <Text style={{ fontSize: typeScale.body, color: t.textDim, textAlign: 'end' }}>{edit.name}</Text>
+              : <TextInput value={name} onChange={(v) => setName(v.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24))} placeholder={type} style={field} />}
           </FieldRow>
         )}
       </Section>
       {cur && cur.insecure && <Note tone="warn">{tr('network.vpn.pptpWarning')}</Note>}
       <Message msg={msg} />
       <Actions>
-        <Button label={tr('network.close')} onClick={onDone} />
-        {cur && cur.available && (FORM[type] || file) && <Button primary label={tr('network.vpn.import')} onClick={doImport} />}
+        <Button label={edit ? tr('network.cancel') : tr('network.close')} onClick={onDone} />
+        {cur && cur.available && (FORM[type] || file) && <Button primary label={edit ? tr('network.vpn.save') : tr('network.vpn.import')} onClick={doImport} />}
       </Actions>
+    </View>
+  );
+}
+
+// The server's certificate couldn't be verified (or changed): trust it, or not.
+function CertPrompt({ cert, onTrust, onCancel }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const isAdmin = admin.available();
+  const mono = { fontSize: typeScale.caption, color: t.text, direction: 'ltr', textAlign: 'start', fontFamily: 'monospace', lineHeight: 1.4 };
+  return (
+    <View style={{ gap: spacing.m }}>
+      <Section title={cert.changed ? tr('network.vpn.certChangedTitle', { name: cert.name }) : tr('network.vpn.certTitle')}>
+        <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, paddingVertical: spacing.s, textAlign: 'start' }}>
+          {cert.changed ? tr('network.vpn.certChangedBody', { name: cert.name }) : tr('network.vpn.certBody', { name: cert.name })}</Text>
+        <View style={{ gap: 2, paddingVertical: spacing.xs }}>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('network.vpn.certFingerprint')}</Text>
+          <Text style={mono}>{fingerprint(cert.sha256)}</Text>
+        </View>
+        {cert.subject ? <ValueRow label={tr('network.vpn.certSubject')} value={cert.subject} /> : null}
+        {cert.issuer ? <ValueRow label={tr('network.vpn.certIssuer')} value={cert.issuer} /> : null}
+      </Section>
+      {!isAdmin && <Note>{tr('network.vpn.certNeedAdmin')}</Note>}
+      <Actions>
+        <Button label={tr('network.cancel')} onClick={onCancel} />
+        {isAdmin && <Button primary label={tr('network.vpn.certTrust')} onClick={onTrust} />}
+      </Actions>
+    </View>
+  );
+}
+
+// Single sign-on: the sign-in page is open in the browser; lord-netd waits for it (SSO_MINUTES).
+function SsoWait({ sso, onCancel }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [, setNow] = useState(0);
+  useEffect(() => { const id = setInterval(() => setNow((x) => x + 1), 1000); return () => clearInterval(id); }, []);
+  const left = Math.max(0, SSO_MINUTES * 60 - Math.round((Date.now() - sso.since) / 1000));
+  return (
+    <View style={{ gap: spacing.m }}>
+      <Section title={tr('network.vpn.ssoWaitTitle')}>
+        <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.4, paddingVertical: spacing.s, textAlign: 'start' }}>
+          {sso.opened ? tr('network.vpn.ssoWaitBody', { name: sso.name }) : tr('network.vpn.ssoOpenBody', { name: sso.name })}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, direction: 'ltr', textAlign: 'start', paddingBottom: spacing.s }}>{sso.url}</Text>
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', paddingBottom: spacing.s }}>
+          {tr('network.vpn.ssoTimeLeft', { time: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` })}</Text>
+      </Section>
+      <Actions>
+        <Button label={tr('network.cancel')} onClick={onCancel} />
+        <Button primary={!sso.opened} label={tr('network.vpn.ssoOpen')} onClick={() => { if (openUrl(sso.url)) sso.opened = true; else sso.noBrowser = true; setNow((x) => x + 1); }} />
+      </Actions>
+      {sso.noBrowser && !sso.opened && <Note tone="warn">{tr('network.vpn.ssoNoBrowser')}</Note>}
     </View>
   );
 }
@@ -331,6 +448,7 @@ function VpnPage({ net }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [importing, setImporting] = useState(false);
+  const [editing, setEditing] = useState(null);   // net-vpn-config of the VPN being edited
   const [msg, setMsg] = useState(null);
   const [status, setStatus] = useState({});
   const [auth, setAuth] = useState(null);         // { name, user, pass }
@@ -348,6 +466,7 @@ function VpnPage({ net }) {
     if (m[2] === 'connected') setMsg({ ok: true, text: tr('network.vpn.connectedMsg', { name: m[1] }) });
     else if (m[2] === 'need-auth') setAuth({ name: m[1], user: '', pass: '' });
     else if (m[2] === 'auth-failed') setMsg({ ok: false, text: tr('network.vpn.authFailed', { name: m[1] }) });
+    else if (m[2] === 'untrusted-cert' || m[2] === 'sso') setMsg(null);
     else if (m[2] === 'error' || m[2] === 'log') {
       const why = m[3] ? errorText(m[3]) : tr('network.vpn.error');
       setMsg({ ok: false, text: m[1] === '-' ? why : `${m[1]}: ${why}` });
@@ -356,12 +475,28 @@ function VpnPage({ net }) {
     setTick((x) => x + 1);
   });
   const isAdmin = admin.available();
-  const up = (v) => run(setMsg, 'net-vpn-up', v.name).then(refresh);
-  const down = (v) => run(setMsg, 'net-vpn-down', v.name).then(refresh);
+  const up = (v) => { connectingHere.add(v.name); return run(setMsg, 'net-vpn-up', v.name).then(refresh); };
+  const down = (v) => { connectingHere.delete(v.name); return run(setMsg, 'net-vpn-down', v.name).then(refresh); };
+  const startEdit = (v) => {
+    let cfg = null;
+    admin.run('net-vpn-config', v.name, (line) => { try { cfg = JSON.parse(line); } catch (e) { /* text */ } }, { quiet: true })
+      .then(() => { if (cfg) { setImporting(false); setEditing({ ...cfg, secrets: cfg.secrets || [] }); } }, (e) => setMsg({ ok: false, text: e.message }));
+  };
   const field = { flex: 1 };
+  const cert = vpnPrompts.cert, sso = vpnPrompts.sso;
   return (
     <Stack>
       {importing && <VpnImport onDone={() => { setImporting(false); setTick((x) => x + 1); }} />}
+      {editing && <VpnImport key={editing.name} edit={editing} onDone={() => { setEditing(null); setTick((x) => x + 1); }} />}
+      {cert && (
+        <CertPrompt cert={cert} onCancel={() => { vpnPrompts.cert = null; setTick((x) => x + 1); }}
+          onTrust={() => {
+            vpnPrompts.cert = null;
+            setTick((x) => x + 1);
+            run(setMsg, 'net-vpn-trust', `${cert.name}\n${cert.sha256}`, tr('network.vpn.trustedMsg', { name: cert.name })).then((r) => r != null && up({ name: cert.name }));
+          }} />
+      )}
+      {sso && !cert && <SsoWait sso={sso} onCancel={() => { vpnPrompts.sso = null; down({ name: sso.name }); setTick((x) => x + 1); }} />}
       {auth && (
         <View style={{ gap: spacing.m }}>
           <Section title={tr('network.vpn.authTitle', { name: auth.name })}>
@@ -384,25 +519,35 @@ function VpnPage({ net }) {
           </Actions>
         </View>
       )}
-      <Section title="VPN" accessory={isAdmin && !importing ? <Button small label={tr('network.vpn.add')} onClick={() => setImporting(true)} /> : null}>
+      <Section title="VPN" accessory={isAdmin && !importing && !editing ? <Button small label={tr('network.vpn.add')} onClick={() => setImporting(true)} /> : null}>
         {list.length === 0 ? <SettingRow label={tr('network.vpn.none')} labelStyle={{ color: t.textDim }} /> : null}
         {list.map((v) => {
           const st = status[v.name] || {};
           const on = !!st.active;
+          const busy = on || !!st.running;
           const peer = st.peers?.[0];
           const iface = net.ifs.find((i) => i.name === v.ifname);
+          const who = v.sso ? ` · ${tr('network.vpn.sso')}` : v.user ? ` · ${v.user}` : '';
           const lines = [
-            `${VPN_LABEL[v.type] || v.type} · ${v.server || ''}${v.user ? ` · ${v.user}` : ''}${v.fullTunnel && v.type !== 'openconnect' ? ` · ${tr('network.vpn.fullTunnel')}` : ''}${v.insecure ? ` · ⚠ ${tr('network.vpn.insecure')}` : ''}`,
+            `${VPN_LABEL[v.type] || v.type} · ${v.server || ''}${who}${v.fullTunnel && v.type !== 'openconnect' ? ` · ${tr('network.vpn.fullTunnel')}` : ''}${v.insecure ? ` · ⚠ ${tr('network.vpn.insecure')}` : ''}`,
             on && peer?.lastHandshake ? tr('network.vpn.handshake', { s: Math.max(0, Math.round(Date.now() / 1000 - peer.lastHandshake)), rx: formatBytes(peer.rxBytes), tx: formatBytes(peer.txBytes) }) : null,
             on && v.type !== 'wireguard' && iface ? `${iface.addresses.find((a) => a.family === 4)?.address || ''} · ${tr('network.trafficValue', { rx: formatBytes(iface.rxBytes), tx: formatBytes(iface.txBytes) })}` : null,
             v.type === 'wireguard' && v.publicKey ? tr('network.vpn.publicKey', { key: v.publicKey }) : null,
           ].filter(Boolean);
+          const editable = isAdmin && FORM[v.type];
           return (
             <SettingRow key={v.name} minHeight={52} icon={<StatusDot color={on ? tint.ok : st.running ? tint.warn : tint.off} />}
               label={v.name} labelStyle={{ fontWeight: 600 }} hint={lines.join('\n')}>
               {isAdmin && v.type === 'openvpn' && v.needsAuth && <Button small label={tr('network.vpn.credentials')} onClick={() => setAuth({ name: v.name, user: '', pass: '' })} />}
-              {isAdmin && <Button small plain destructive label={tr('network.vpn.delete')} onClick={() => run(setMsg, 'net-vpn-delete', v.name).then(() => setTick((x) => x + 1))} />}
-              <Toggle small on={on || !!st.running} onChange={(x) => (x ? up(v) : down(v))} />
+              {editable && (
+                <MenuButton small title={tr('network.vpn.more')}
+                  items={[{ label: tr('network.vpn.edit'), disabled: busy, onClick: () => startEdit(v) }]} />
+              )}
+              {isAdmin && (
+                <ToolbarButton small title={tr('network.vpn.delete')} icon={<TrashGlyph color={tint.error} />}
+                  onClick={() => run(setMsg, 'net-vpn-delete', v.name).then(() => setTick((x) => x + 1))} />
+              )}
+              <Toggle small on={busy} onChange={(x) => (x ? up(v) : down(v))} />
             </SettingRow>
           );
         })}

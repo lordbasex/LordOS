@@ -18,3 +18,22 @@ En [Ajustes → Red](settings:network), la fila **VPN**:
 Importar o borrar una VPN necesita ser administrador; conectar y desconectar, no. Las claves y
 contraseñas quedan guardadas solo para root. **PPTP es inseguro**: está para redes viejas y se
 marca como tal.
+
+## Fortinet con inicio de sesión único
+
+Si tu organización te hace iniciar sesión en su propia página (inicio de sesión único, muchas veces
+con una app de autenticación), elegí **Autenticación → Inicio de sesión único** al agregar la VPN
+Fortinet: sin usuario ni contraseña. Al conectar, LordOS abre la página de inicio de sesión de la
+organización en tu navegador y muestra "Esperando que inicies sesión en la página de la
+organización…". Iniciá sesión ahí; la VPN se conecta cuando terminás. Tenés 5 minutos; **Cancelar**
+lo detiene y **Abrir página de inicio de sesión** la vuelve a abrir.
+
+## "No se pudo verificar el certificado de este servidor"
+
+LordOS muestra la huella del certificado, para quién y quién lo emitió. Muchas veces el servidor
+manda una cadena de certificados incompleta, que otros sistemas completan solos. Compará la huella
+con la que te da tu organización y elegí **Confiar** (un administrador): LordOS la recuerda para esa
+VPN y conecta. Si después el servidor muestra otro certificado, LordOS avisa que cambió y vuelve a
+preguntar.
+
+Para cambiar una VPN guardada, apagala y elegí **⋯ → Editar…** en su fila. El botón del tacho la borra.

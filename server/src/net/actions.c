@@ -13,6 +13,10 @@
  *   net-wifi-disconnect <if> / net-wifi-forget <ssid>
  *   net-vpn-import <type>\n<name>\n<config>   type wireguard | openvpn
  *   net-vpn-credentials <name>\n<user>\n<password>
+ *   net-vpn-trust <name>\n<sha256>   Fortinet: trust the certificate the person accepted, and replace an older one
+ *   net-vpn-config <name>       LOG the saved settings as JSON, without passwords or keys (to edit them)
+ *   net-vpn-edit <type>\n<name>\n<config>   like net-vpn-import over an existing VPN of that type; a
+ *                               password, pre-shared key or PEM left out keeps the saved one
  *   net-vpn-up / net-vpn-down / net-vpn-delete <name>
  *   net-vpn-status [name]       LOG per VPN (JSON) and OK
  *
@@ -659,6 +663,100 @@ void net_act_vpn_credentials(const AdminReq *r, const char *arg, size_t len) {
         if (strcmp(type, "openvpn")) admin_err("vpn.credentialsOnlyOpenvpn", NULL);
         else if (ovpn_set_credentials(l[0], l[1], l[2])) admin_err("vpn.invalidCredentials", NULL);
         else admin_ok("vpn.saved", NULL);
+    }
+    memset(copy, 0, len);
+    free(copy);
+}
+
+void net_act_vpn_trust(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char *copy = strdup(arg), *l[2] = { NULL, NULL }, type[24], err[200] = "";
+    if (!copy) { admin_err("sys.outOfMemory", NULL); return; }
+    int k = split_lines(copy, l, 2);
+    if (k < 2) admin_err("admin.invalidArgument", NULL);
+    else if (!check_vpn(l[0], type, sizeof type)) {
+        if (strcmp(type, "fortinet")) admin_err("admin.invalidArgument", NULL);
+        else if (forti_trust(l[0], l[1], err, sizeof err)) admin_say("ERR", "%s", err); /* i18n-ok: err is a code line */
+        else admin_ok("vpn.trusted", NULL);
+    }
+    memset(copy, 0, len);
+    free(copy);
+}
+
+/* Keys whose values never leave the root side (net-vpn-config) and that net-vpn-edit keeps when left out. */
+static int secret_key(const char *k) { return !strcmp(k, "password") || !strcmp(k, "psk"); }
+
+/* The types whose settings come from Settings' form (WireGuard and OpenVPN come from a file). */
+static int form_type(const char *t) { return !strcmp(t, "ipsec") || !strcmp(t, "pptp") || !strcmp(t, "openconnect") || !strcmp(t, "fortinet"); }
+
+void net_act_vpn_config(const AdminReq *r, const char *arg, size_t len) {
+    (void)r; (void)len;
+    char type[24];
+    if (check_vpn(arg, type, sizeof type)) return;
+    if (!form_type(type)) { admin_err("vpn.editFromFile", NULL); return; }
+    VpnKv kv;
+    if (vpn_kv_load(arg, type, &kv)) { admin_err("vpn.noConfig", NULL); return; }
+    Buf b = {0};
+    buf_printf(&b, "{\"name\":");
+    buf_json_str(&b, arg);
+    buf_printf(&b, ",\"type\":\"%s\",\"values\":{", type);
+    int n = 0;
+    for (int i = 0; i < kv.n; i++) {
+        if (secret_key(kv.key[i])) continue;
+        buf_printf(&b, "%s", n++ ? "," : "");
+        buf_json_str(&b, kv.key[i]);
+        buf_printf(&b, ":");
+        buf_json_str(&b, kv.val[i]);
+    }
+    buf_printf(&b, "},\"secrets\":[");
+    n = 0;
+    for (int i = 0; i < kv.n; i++) if (secret_key(kv.key[i]) && kv.val[i][0]) { buf_printf(&b, "%s\"%s\"", n++ ? "," : "", kv.key[i]); }
+    buf_printf(&b, "]}");
+    vpn_kv_free(&kv);
+    if (b.p && !b.oom) { admin_say("LOG", "%s", b.p); admin_say("OK", "1"); } /* i18n-ok: JSON data and a count */
+    else admin_err("sys.outOfMemory", NULL);
+    buf_free(&b);
+}
+
+void net_act_vpn_edit(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char *copy = strdup(arg), *l[3] = { NULL, NULL, NULL }, type[24], err[200] = "";
+    if (!copy) { admin_err("sys.outOfMemory", NULL); return; }
+    int k = split_lines(copy, l, 3);
+    if (k < 3) admin_err("admin.invalidArgument", NULL);
+    else if (!check_vpn(l[1], type, sizeof type)) {
+        VpnKv old;
+        char d[40];
+        snprintf(d, sizeof d, "vpn:%s", l[1]);
+        if (strcmp(type, l[0]) || !form_type(type)) admin_err("vpn.editFromFile", NULL);
+        else if (admin_daemon_running(d)) admin_err("vpn.editWhileOn", NULL);
+        else if (!vpn_type_available(type)) admin_err("vpn.missingProgram", "type", type, "package", vpn_type_package(type), NULL);
+        else if (vpn_kv_load(l[1], type, &old)) admin_err("vpn.noConfig", NULL);
+        else {
+            /* the saved secrets the form left out (it never shows them) */
+            Buf t = {0};
+            buf_printf(&t, "%s", l[2]);
+            for (int i = 0; i < old.n; i++) {
+                char probe[40];
+                snprintf(probe, sizeof probe, "\n%s=", old.key[i]);
+                int given = !strncmp(l[2], probe + 1, strlen(probe + 1)) || strstr(l[2], probe);
+                if (secret_key(old.key[i]) && !given) buf_printf(&t, "\n%s=%s", old.key[i], old.val[i]);
+            }
+            for (int i = 0; i < old.npem; i++) {
+                char probe[40];
+                snprintf(probe, sizeof probe, "\n%s=", old.pem_key[i]);
+                int given = !strncmp(l[2], probe + 1, strlen(probe + 1)) || strstr(l[2], probe);
+                if (!given) buf_printf(&t, "\n%s=%s", old.pem_key[i], old.pem[i]);
+            }
+            vpn_kv_free(&old);
+            int (*imp)(const char *, const char *, char *, size_t) = !strcmp(type, "ipsec") ? ipsec_import : !strcmp(type, "pptp") ? pptp_import
+                                                                   : !strcmp(type, "openconnect") ? oc_import : forti_import;
+            if (t.oom || !t.p) admin_err("sys.outOfMemory", NULL);
+            else if (imp(l[1], t.p, err, sizeof err)) admin_say("ERR", "%s", err); /* i18n-ok: err is a code line */
+            else admin_ok("vpn.saved", NULL);
+            if (t.p) memset(t.p, 0, t.len);
+            buf_free(&t);
+        }
     }
     memset(copy, 0, len);
     free(copy);

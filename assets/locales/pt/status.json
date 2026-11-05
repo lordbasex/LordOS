@@ -148,5 +148,6 @@
   "install.free.rolledBack": "A tabela de partições ficou como estava",
   "install.free.rollbackFailed": "Não foi possível restaurar a tabela de partições: há uma cópia em {path}. Não reinicie: salve-a primeiro",
   "install.creatingAccount": "Criando a conta {user}",
-  "install.accountDone": "A conta está pronta"
+  "install.accountDone": "A conta está pronta",
+  "vpn.trusted": "Certificado confiável"
 }

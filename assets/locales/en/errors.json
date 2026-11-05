@@ -698,5 +698,16 @@
   "install.free.tableDamaged": "the partition table has problems, or could not be read with certainty",
   "install.free.tableFull": "the partition table is full",
   "install.free.verifyFailed": "The partition table did not end up as expected, so it was put back",
-  "install.noFirstAccount": "This system already has its first account"
+  "install.noFirstAccount": "This system already has its first account",
+  "vpn.fortiUnreachable": "Couldn't reach the VPN server. Check the server and port, and that this network allows the connection.",
+  "vpn.fortiTlsFailed": "The secure connection with the VPN server failed.",
+  "vpn.fortiNoTunnel": "The server accepted the sign-in but didn't give this account a VPN connection.",
+  "vpn.fortiSsoTimeout": "The sign-in wasn't completed within {min} minutes. Connect again to retry.",
+  "vpn.fortiSsoFailed": "The organization's sign-in page didn't return to LordOS. Connect again to retry.",
+  "vpn.fortiSsoPortBusy": "Port {port} on this computer is in use by another program, so the sign-in page can't return to LordOS.",
+  "vpn.fortiFailed": "The VPN connection failed: {detail}",
+  "vpn.fortiEnded": "The VPN program stopped before connecting.",
+  "vpn.editFromFile": "This VPN came from a file: delete it and import the new file.",
+  "vpn.editWhileOn": "Turn the VPN off before editing it.",
+  "vpn.fortiSsoRefused": "The VPN server didn't accept the sign-in. Connect again and sign in on the organization's page."
 }

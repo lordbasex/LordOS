@@ -54,5 +54,6 @@ int  oc_import(const char *name, const char *text, char *err, size_t errn);
 void oc_run(const char *name);
 int  forti_import(const char *name, const char *text, char *err, size_t errn);
 void forti_run(const char *name);
+int  forti_trust(const char *name, const char *sha256, char *err, size_t errn);
 
 #endif
