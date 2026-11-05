@@ -370,6 +370,157 @@ static int disk_plain(const char *path, char *err, size_t errlen) {
     return vm_qcow2_plain(head, n > 0 ? (size_t)n : 0, err, errlen);
 }
 
+/* ---- snapshots, offline (6.2): qemu-img snapshot on every writable disk, jailed like an import ---- */
+
+/* the machine's writable disks, in snapshot order: the system disk, then the UEFI variables */
+static int disk_files(const char *dir, const VmMachine *m, char out[2][PATH_MAX + 64]) {
+    int n = 0;
+    snprintf(out[n++], PATH_MAX + 64, "%s/disks/system.qcow2", dir);
+    if (m->firmware == VM_FW_UEFI) snprintf(out[n++], PATH_MAX + 64, "%s/disks/nvram.qcow2", dir);
+    return n;
+}
+
+/* qemu-img snapshot -c|-a|-d TAG on one disk, as json: with no backing file (a linked clone's base isn't read) */
+static int qimg_snap(const char *dir, const char *disk, const char *flag, const char *tag, char *err, size_t errlen) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
+    jb_str(&b, disk);
+    jb_raw(&b, "}}");
+    if (b.oom) { jb_free(&b); snprintf(err, errlen, "out of memory"); return -1; }
+    char dd[PATH_MAX + 64];
+    snprintf(dd, sizeof dd, "%s/disks", dir);
+    char *argv[] = { QEMU_IMG, "snapshot", (char *)flag, (char *)tag, b.p, NULL };
+    int r = run_tool_in(argv, err, errlen, disk, dd);
+    jb_free(&b);
+    return r;
+}
+
+/* the tags a disk holds (qemu-img info, jailed, read only): how many, into tags */
+static int qimg_tags(const char *disk, char tags[][33], int max) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":");
+    jb_str(&b, disk);
+    jb_raw(&b, "}}");
+    if (b.oom) { jb_free(&b); return -1; }
+    char *argv[] = { QEMU_IMG, "info", "--output=json", "-U", b.p, NULL };
+    static char out[262144];
+    int r = run_tool_in(argv, out, sizeof out, disk, NULL);
+    jb_free(&b);
+    if (r) return -1;
+    JDoc d;
+    if (json_parse(out, strlen(out), &d, NULL, 0)) return -1;
+    int n = 0;
+    const JVal *arr = json_get(d.root, "snapshots");
+    for (const JVal *e = arr && arr->type == J_ARR ? arr->kid : NULL; e && n < max; e = e->next) {
+        const char *t = json_str(e, "name");
+        if (t && strlen(t) < 33) snprintf(tags[n++], 33, "%s", t);
+    }
+    json_free(&d);
+    return n;
+}
+
+/* after an operation that stopped in the middle: clusters a killed QEMU or qemu-img allocated but never referenced
+ * are given back (qemu-img check -r leaks: only leaks, never a guess at corruption). 0 clean or repaired. */
+static int qimg_repair_leaks(const char *dir, const char *disk) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
+    jb_str(&b, disk);
+    jb_raw(&b, "}}");
+    if (b.oom) { jb_free(&b); return -1; }
+    char dd[PATH_MAX + 64], out[2048];
+    snprintf(dd, sizeof dd, "%s/disks", dir);
+    char *argv[] = { QEMU_IMG, "check", "-q", "-r", "leaks", b.p, NULL };
+    int r = run_tool_in(argv, out, sizeof out, disk, dd);
+    jb_free(&b);
+    if (r) vlog("recovery: qemu-img check on %s: %.200s", strrchr(disk, '/') + 1, out);
+    return r;
+}
+
+static void snap_picture_rm(const char *dir, const char *tag) {
+    char p[PATH_MAX + 64];
+    snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, tag);
+    unlink(p);
+}
+
+/* a tag on the disks that snapshots.json doesn't list is what's left of a snapshot that didn't finish: removed at the
+ * next open (6.2, "Failure midway"). Only tags of our own form are touched. */
+static void snaps_sweep(const char *dir, const VmMachine *m) {
+    char disks[2][PATH_MAX + 64];
+    int nd = disk_files(dir, m, disks);
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
+    for (int i = 0; i < nd; i++) {
+        char tags[VM_SNAPS_MAX + 8][33];
+        int k = qimg_tags(disks[i], tags, VM_SNAPS_MAX + 8);
+        for (int t = 0; t < k; t++) {
+            if (!vm_snap_tag_valid(tags[t]) || vm_snaps_find(list, n, tags[t]) >= 0) continue;
+            char err[256];
+            int r = qimg_snap(dir, disks[i], "-d", tags[t], err, sizeof err);
+            vlog("snapshots: a leftover tag %s on %s %s", tags[t], strrchr(disks[i], '/') + 1, r ? "couldn't be removed" : "was removed");
+        }
+    }
+}
+
+static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, const char *name, char *err, size_t errlen) {
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
+    if (n >= VM_SNAPS_MAX) { snprintf(err, errlen, "a machine keeps at most %d snapshots", VM_SNAPS_MAX); return -1; }
+    if (vm_snaps_find(list, n, tag) >= 0) { snprintf(err, errlen, "there is a snapshot %s already", tag); return -1; }
+    char disks[2][PATH_MAX + 64];
+    int nd = disk_files(dir, m, disks);
+    if (vm_op_begin(dir, "snapshot-take", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
+    for (int i = 0; i < nd; i++) {
+        if (qimg_snap(dir, disks[i], "-c", tag, err, errlen)) {
+            char e2[256];
+            for (int k = 0; k < i; k++) qimg_snap(dir, disks[k], "-d", tag, e2, sizeof e2);
+            vm_op_end(dir);
+            return -1;
+        }
+    }
+    VmSnap sn;
+    memset(&sn, 0, sizeof sn);
+    snprintf(sn.tag, sizeof sn.tag, "%s", tag);
+    snprintf(sn.name, sizeof sn.name, "%s", name);
+    vm_now_iso(sn.created);
+    list[n++] = sn;
+    if (vm_snaps_save(dir, list, n)) { snprintf(err, errlen, "can't write snapshots.json"); return -1; }   /* the sweep removes the tags */
+    vm_op_end(dir);
+    return 0;
+}
+
+static int snap_delete_off(const char *dir, const VmMachine *m, const char *tag, char *err, size_t errlen) {
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(dir, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
+    if (i < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
+    if (vm_op_begin(dir, "snapshot-delete", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
+    memmove(&list[i], &list[i + 1], sizeof list[0] * (size_t)(n - i - 1));
+    if (vm_snaps_save(dir, list, n - 1)) { vm_op_end(dir); snprintf(err, errlen, "can't write snapshots.json"); return -1; }
+    char disks[2][PATH_MAX + 64], e2[256];
+    int nd = disk_files(dir, m, disks);
+    for (int k = 0; k < nd; k++) if (qimg_snap(dir, disks[k], "-d", tag, e2, sizeof e2)) vlog("snapshots: deleting %s on %s: %s", tag, disks[k], e2);
+    snap_picture_rm(dir, tag);
+    vm_op_end(dir);
+    return 0;
+}
+
+static void discard_state(const char *dir);
+/* back to a snapshot with the machine off: every disk goes back; a saved session no longer fits the disks and goes */
+static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag, char *err, size_t errlen) {
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
+    if (vm_snaps_find(list, n, tag) < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
+    char disks[2][PATH_MAX + 64];
+    int nd = disk_files(dir, m, disks);
+    if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
+    for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
+    discard_state(dir);
+    vm_op_end(dir);
+    return 0;
+}
+
 static int cmd_create(const char *dir, int argc, char **argv) {
     VmHost h;
     vm_host_probe(&h);
@@ -473,7 +624,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 /* ---- the supervisor ---- */
 
 typedef struct { int fd, control; } Client;
-enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME };
+enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 static struct {
@@ -521,6 +673,10 @@ static struct {
     /* resuming from suspend.state at this start */
     int resuming, resume_anyway, resumed;
     char resume_err[160];
+    /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
+    int snap_kind, snap_client;
+    uint32_t snap_seq;
+    char snap_tag[33], snap_name[VM_NAME_MAX + 1], snap_err[160], loadvm[33];
 } S;
 
 static void send_to(int ci, const VmMsg *m, int fd) {
@@ -819,6 +975,8 @@ static void fail_start(const char *fmt, ...) {
 }
 
 static int suspend_usable(char *err, size_t n);
+static const char *snap_devices(void);
+static void send_job(int kind, int status, int pct, const char *text);
 static int start_machine(void) {
     VmHost h;
     vm_host_probe(&h);
@@ -933,7 +1091,18 @@ static int start_machine(void) {
     S.qmp_up = 1;
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
-    if (S.resuming) return 0;                   /* the state goes in first (P_VERSION → begin_resume), then cont */
+    if (S.resuming) return 0;
+    if (S.loadvm[0]) {
+        /* -loadvm would take the first snapshot-capable disk for the memory (the UEFI variables, which hold none): the
+         * job names the system disk, before a vCPU runs; cont follows when it's done (snap_concluded) */
+        char a[256];
+        snprintf(a, sizeof a, "{\"job-id\":\"snap\",\"tag\":\"%s\",\"vmstate\":\"sys\",\"devices\":%s}", S.loadvm, snap_devices());
+        S.snap_kind = VSN_REVERT; S.snap_client = -1; S.snap_seq = 0;
+        snprintf(S.snap_tag, sizeof S.snap_tag, "%s", S.loadvm);
+        qmp_do("snapshot-load", a, P_SNAPJOB, -1, 0, -1, -1);
+        send_job(VJ_REVERT, VJS_RUNNING, -1, S.loadvm);
+        return 0;
+    }                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
     return 0;
@@ -1161,8 +1330,9 @@ static void begin_suspend(int ci, uint32_t seq) {
     bad |= qmp_do("migrate-set-capabilities", "{\"capabilities\":[{\"capability\":\"events\",\"state\":true}]}", P_IGNORE, -1, 0, -1, -1);
     /* QEMU limits a migration to 128 MiB/s by default: a file on this computer takes what the disk gives */
     bad |= qmp_do("migrate-set-parameters", "{\"max-bandwidth\":107374182400}", P_IGNORE, -1, 0, -1, -1);
-    bad |= qmp_do("getfd", "{\"fdname\":\"suspend\"}", P_GETFD, -1, 0, S.susp_fd, -1);
-    bad |= qmp_do("migrate", "{\"uri\":\"fd:suspend\"}", P_SUSPEND, -1, 0, -1, -1);
+    /* the file goes to QEMU as an fdset (QEMU 10 deprecates fd: for files): it opens /dev/fdset/90, never a path */
+    bad |= qmp_do("add-fd", "{\"fdset-id\":90,\"opaque\":\"suspend\"}", P_GETFD, -1, 0, S.susp_fd, -1);
+    bad |= qmp_do("migrate", "{\"uri\":\"file:/dev/fdset/90\"}", P_SUSPEND, -1, 0, -1, -1);
     if (bad) { suspend_failed("QEMU is busy"); return; }
     set_state(VS_STOPPING, VR_SUSPENDED, 0, "saving the machine's memory");
     send_job(VJ_SUSPEND, VJS_RUNNING, 0, "");
@@ -1182,8 +1352,8 @@ static void begin_resume(void) {
         return;
     }
     int bad = qmp_do("migrate-set-capabilities", "{\"capabilities\":[{\"capability\":\"events\",\"state\":true}]}", P_IGNORE, -1, 0, -1, -1);
-    bad |= qmp_do("getfd", "{\"fdname\":\"resume\"}", P_GETFD, -1, 0, fd, -1);
-    bad |= qmp_do("migrate-incoming", "{\"uri\":\"fd:resume\"}", P_RESUME, -1, 0, -1, -1);
+    bad |= qmp_do("add-fd", "{\"fdset-id\":91,\"opaque\":\"resume\"}", P_GETFD, -1, 0, fd, -1);
+    bad |= qmp_do("migrate-incoming", "{\"uri\":\"file:/dev/fdset/91\"}", P_RESUME, -1, 0, -1, -1);
     close(fd);
     if (bad) { snprintf(S.resume_err, sizeof S.resume_err, "QEMU didn't take the saved state"); kill(S.qemu, SIGKILL); S.killed = 1; return; }
     send_job(VJ_RESUME, VJS_RUNNING, -1, "");
@@ -1203,6 +1373,118 @@ static void resume_done(void) {
     send_job(VJ_RESUME, VJS_DONE, 100, "");
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "resumed");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
+}
+
+/* ---- snapshots while the machine runs (6.2): QMP jobs over every writable node, memory into the system disk ---- */
+
+static const char *snap_devices(void) { return S.m.firmware == VM_FW_UEFI ? "[\"sys\",\"fw-vars\"]" : "[\"sys\"]"; }
+
+static void snap_end(int ok, const char *why) {
+    int kind = S.snap_kind == VSN_TAKE ? VJ_SNAPSHOT : S.snap_kind == VSN_REVERT ? VJ_REVERT : VJ_DELETE;
+    if (ok) vlog("snapshot: %s %s done", S.snap_kind == VSN_TAKE ? "take" : S.snap_kind == VSN_REVERT ? "revert" : "delete", S.snap_tag);
+    else vlog("snapshot: %s failed: %s", S.snap_tag, why);
+    send_job(kind, ok ? VJS_DONE : VJS_FAILED, ok ? 100 : -1, ok ? S.snap_tag : why);
+    reply(S.snap_client, S.snap_seq, ok ? VME_OK : VME_QMP, ok ? S.snap_tag : why);
+    S.snap_kind = 0;
+}
+
+/* the job ended: what QEMU says about it (query-jobs), then it's dismissed */
+static void snap_concluded(const JVal *root, int ok) {
+    const char *err = NULL;
+    const JVal *arr = json_get(root, "return");
+    for (const JVal *e = ok && arr && arr->type == J_ARR ? arr->kid : NULL; e; e = e->next) {
+        const char *id = json_str(e, "id");
+        if (id && !strcmp(id, "snap")) err = json_str(e, "error");
+    }
+    snprintf(S.snap_err, sizeof S.snap_err, "%s", err ? err : "");
+    qmp_do("job-dismiss", "{\"id\":\"snap\"}", P_IGNORE, -1, 0, -1, -1);
+    if (S.snap_kind == VSN_TAKE) {
+        if (err) { vm_op_end(S.dir); snap_end(0, err); return; }     /* a tag left on a disk: the next start's sweep */
+        qmp_do("query-block", NULL, P_SNAPSIZE, -1, 0, -1, -1);
+    } else if (S.snap_kind == VSN_REVERT) {
+        if (S.loadvm[0]) {
+            /* a start from a snapshot: then the machine goes on as any start does */
+            S.loadvm[0] = 0;
+            if (err) { snap_end(0, err); fail_start("the snapshot couldn't be loaded: %.100s", err); kill(S.qemu, SIGKILL); S.killed = 1; return; }
+            vm_op_end(S.dir);
+            snap_end(1, "");
+            if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started from a snapshot");
+            else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
+            return;
+        }
+        if (err) {
+            /* the disks may be half-way: the machine stops, operation.json stays, and the next start finishes going back */
+            snap_end(0, err);
+            begin_poweroff();
+            return;
+        }
+        vm_op_end(S.dir);
+        snap_end(1, "");
+    } else {
+        snap_picture_rm(S.dir, S.snap_tag);
+        vm_op_end(S.dir);
+        snap_end(!err, err ? err : "");
+    }
+}
+
+/* after a take: the size of its memory (query-block, the system disk's snapshot list), then the entry, last */
+static void snap_taken(const JVal *root) {
+    double vmstate = 0;
+    const JVal *arr = json_get(root, "return");
+    for (const JVal *e = arr && arr->type == J_ARR ? arr->kid : NULL; e; e = e->next) {
+        const JVal *ins = json_get(e, "inserted");
+        const char *nn = ins ? json_str(ins, "node-name") : NULL;
+        if (!nn || strcmp(nn, "sys")) continue;
+        const JVal *sn = json_get(json_get(ins, "image"), "snapshots");
+        for (const JVal *x = sn && sn->type == J_ARR ? sn->kid : NULL; x; x = x->next) {
+            const char *name = json_str(x, "name");
+            if (name && !strcmp(name, S.snap_tag)) vmstate = json_num(x, "vm-state-size", 0);
+        }
+    }
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(S.dir, list, VM_SNAPS_MAX);
+    if (n >= VM_SNAPS_MAX) { vm_op_end(S.dir); snap_end(0, "too many snapshots"); return; }
+    VmSnap sn;
+    memset(&sn, 0, sizeof sn);
+    snprintf(sn.tag, sizeof sn.tag, "%s", S.snap_tag);
+    snprintf(sn.name, sizeof sn.name, "%s", S.snap_name);
+    vm_now_iso(sn.created);
+    sn.memory = 1;
+    sn.vmstate = vmstate;
+    list[n++] = sn;
+    if (vm_snaps_save(S.dir, list, n)) { vm_op_end(S.dir); snap_end(0, "can't write snapshots.json"); return; }
+    vm_op_end(S.dir);
+    snap_end(1, "");
+}
+
+static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
+    char tag[64] = "", name[VM_NAME_MAX + 1] = "";
+    const char *tab = strchr(text, '\t');
+    snprintf(tag, sizeof tag, "%.*s", tab ? (int)(tab - text) : (int)strlen(text), text);
+    if (tab) snprintf(name, sizeof name, "%s", tab + 1);
+    if (!vm_snap_tag_valid(tag) || (kind == VSN_TAKE && !vm_name_valid(name))) { reply(ci, seq, VME_BAD_REQUEST, "a snapshot needs a tag and a name"); return; }
+    VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(S.dir, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
+    if (kind == VSN_TAKE && (i >= 0 || n >= VM_SNAPS_MAX)) { reply(ci, seq, VME_BAD_REQUEST, i >= 0 ? "that tag exists" : "too many snapshots"); return; }
+    if (kind != VSN_TAKE && i < 0) { reply(ci, seq, VME_BAD_REQUEST, "there's no such snapshot"); return; }
+    if (kind == VSN_REVERT && !list[i].memory) { reply(ci, seq, VME_WRONG_STATE, "it was taken with the machine off: shut it down to go back to it"); return; }
+    const char *op = kind == VSN_TAKE ? "snapshot-take" : kind == VSN_REVERT ? "snapshot-revert" : "snapshot-delete";
+    if (vm_op_begin(S.dir, op, tag, NULL, NULL)) { reply(ci, seq, VME_INTERNAL, "can't write operation.json"); return; }
+    if (kind == VSN_DELETE) {
+        /* the entry goes first: a tag that snapshots.json doesn't list is never shown, and the sweep removes it */
+        memmove(&list[i], &list[i + 1], sizeof list[0] * (size_t)(n - i - 1));
+        if (vm_snaps_save(S.dir, list, n - 1)) { vm_op_end(S.dir); reply(ci, seq, VME_INTERNAL, "can't write snapshots.json"); return; }
+    }
+    S.snap_kind = kind; S.snap_client = ci; S.snap_seq = seq;
+    snprintf(S.snap_tag, sizeof S.snap_tag, "%s", tag);
+    snprintf(S.snap_name, sizeof S.snap_name, "%s", name);
+    char a[512];
+    const char *cmd = kind == VSN_TAKE ? "snapshot-save" : kind == VSN_REVERT ? "snapshot-load" : "snapshot-delete";
+    if (kind == VSN_DELETE) snprintf(a, sizeof a, "{\"job-id\":\"snap\",\"tag\":\"%s\",\"devices\":%s}", tag, snap_devices());
+    else snprintf(a, sizeof a, "{\"job-id\":\"snap\",\"tag\":\"%s\",\"vmstate\":\"sys\",\"devices\":%s}", tag, snap_devices());
+    if (qmp_do(cmd, a, P_SNAPJOB, -1, 0, -1, -1)) { vm_op_end(S.dir); S.snap_kind = 0; reply(ci, seq, VME_BUSY, "busy"); return; }
+    send_job(kind == VSN_TAKE ? VJ_SNAPSHOT : kind == VSN_REVERT ? VJ_REVERT : VJ_DELETE, VJS_RUNNING, -1, tag);
+    vlog("snapshot: %s %s \"%s\"", cmd, tag, name);
 }
 
 static void handle_request(int ci, const VmMsg *m, int fd) {
@@ -1267,8 +1549,13 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     }
     case VM_SUSPEND:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
-        if (S.suspending || S.cd_busy) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        if (S.suspending || S.cd_busy || S.snap_kind) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         begin_suspend(ci, m->seq);
+        return;
+    case VM_SNAPSHOT:
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        begin_snapshot(ci, m->seq, m->a, m->text);
         return;
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
@@ -1303,7 +1590,10 @@ static void on_qmp_event(const JVal *root) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
-    else if (!strcmp(ev, "MIGRATION")) {
+    else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
+        const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
+        if (id && st && !strcmp(id, "snap") && !strcmp(st, "concluded") && S.snap_kind) qmp_do("query-jobs", NULL, P_JOBQ, -1, 0, -1, -1);
+    } else if (!strcmp(ev, "MIGRATION")) {
         const char *st = data ? json_str(data, "status") : NULL;
         if (!st) return;
         if (S.suspending) {
@@ -1345,6 +1635,16 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     }
     case P_SUSPEND: if (!ok && S.suspending) suspend_failed(desc); break;
+    case P_SNAPJOB:
+        if (!ok && S.snap_kind) {
+            if (S.loadvm[0]) { S.loadvm[0] = 0; snap_end(0, desc); fail_start("the snapshot couldn't be loaded: %.100s", desc); kill(S.qemu, SIGKILL); S.killed = 1; break; }
+            if (S.snap_kind == VSN_DELETE) snap_picture_rm(S.dir, S.snap_tag);
+            vm_op_end(S.dir);
+            snap_end(0, desc);
+        }
+        break;
+    case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
+    case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
     case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
     case P_MIGQ: {
         const JVal *ram = json_get(json_get(root, "return"), "ram");
@@ -1594,9 +1894,9 @@ static void loop(void) {
 }
 
 /* a previous lord-vm left this machine marked running: its children die with it (PDEATHSIG), but check */
-static void recover(void) {
+static int recover(void) {
     RunInfo r;
-    if (runinfo_read(S.dir, &r) || !state_active(r.state)) return;
+    if (runinfo_read(S.dir, &r) || !state_active(r.state)) return 0;
     vlog("recovery: the previous lord-vm (pid %ld) ended without a final state (%s): marking it lost", r.pid, STATE_NAME[r.state]);
     long pids[2] = { r.qemu_pid, r.passt_pid };
     for (int i = 0; i < 2; i++) {
@@ -1621,6 +1921,7 @@ static void recover(void) {
     runinfo_write(S.dir, &lost);
     char sp[PATH_MAX];
     if (!socket_path(&S.m, sp, sizeof sp, NULL, 0)) unlink(sp);
+    return 1;
 }
 
 static void rotate_logs(void) {
@@ -1714,6 +2015,33 @@ static int ops_recover(const char *dir, int at_start) {
         snprintf(p1, sizeof p1, "%s/suspend.state", dir);
         if (file_exists(p1)) snprintf(what, sizeof what, "an interrupted resume was rolled back: the saved state is kept");
         else snprintf(what, sizeof what, "the resume had finished");
+    } else if (!strncmp(o.op, "snapshot-", 9) && vm_snap_tag_valid(o.tag)) {
+        VmMachine m;
+        char err[256], disks[2][PATH_MAX + 64];
+        if (vm_machine_load(dir, &m, err, sizeof err)) { vlog("recovery: %s: %s", o.op, err); return 0; }
+        int nd = disk_files(dir, &m, disks);
+        VmSnap list[VM_SNAPS_MAX];
+        int n = vm_snaps_load(dir, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, o.tag);
+        if (!strcmp(o.op, "snapshot-take")) {
+            if (i >= 0) snprintf(what, sizeof what, "the snapshot %s had finished", o.tag);
+            else {
+                for (int k = 0; k < nd; k++) qimg_snap(dir, disks[k], "-d", o.tag, err, sizeof err);
+                snap_picture_rm(dir, o.tag);
+                snprintf(what, sizeof what, "an interrupted snapshot was rolled back: nothing of it is left");
+            }
+        } else if (!strcmp(o.op, "snapshot-delete")) {
+            if (i >= 0) { memmove(&list[i], &list[i + 1], sizeof list[0] * (size_t)(n - i - 1)); vm_snaps_save(dir, list, n - 1); }
+            for (int k = 0; k < nd; k++) qimg_snap(dir, disks[k], "-d", o.tag, err, sizeof err);
+            snap_picture_rm(dir, o.tag);
+            snprintf(what, sizeof what, "an interrupted snapshot deletion was finished");
+        } else if (!strcmp(o.op, "snapshot-revert")) {
+            int bad = i < 0;
+            for (int k = 0; !bad && k < nd; k++) bad = qimg_snap(dir, disks[k], "-a", o.tag, err, sizeof err);
+            if (bad) { vlog("recovery: going back to %s couldn't be finished: %s", o.tag, err); return 0; }   /* kept for the next try */
+            discard_state(dir);
+            snprintf(what, sizeof what, "going back to a snapshot was finished on the disks; the machine starts as after a power cut");
+        } else snprintf(what, sizeof what, "an unknown operation \"%.40s\" was dropped", o.op);
+        for (int k = 0; k < nd; k++) qimg_repair_leaks(dir, disks[k]);
     } else snprintf(what, sizeof what, "an unknown operation \"%.40s\" was dropped", o.op);
     vm_op_end(dir);
     vlog("recovery: %s (%s, started %s)", what, o.op, o.started);
@@ -1743,6 +2071,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--keep-running")) S.keep_running = 1;
         else if (!strcmp(argv[i], "--dev-qmp")) S.dev_qmp = 1;
         else if (!strcmp(argv[i], "--resume-anyway")) S.resume_anyway = 1;
+        else if (!strcmp(argv[i], "--loadvm") && i + 1 < argc) { if (!vm_snap_tag_valid(argv[++i])) { fprintf(stderr, "lord-vm: --loadvm TAG\n"); return 2; } snprintf(S.loadvm, sizeof S.loadvm, "%s", argv[i]); }
         else if (!strcmp(argv[i], "--discard-state")) discard = 1;
         else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) control = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credentials-file") && i + 1 < argc) { if (read_credentials(argv[++i])) return 2; }
@@ -1795,9 +2124,26 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),
          S.m.accel ? "tcg" : "kvm", S.m.vcpus, S.m.memory_mb, S.m.machine_type);
-    recover();
+    int lost = recover();
     ops_recover(S.dir, 1);
+    if (lost) {
+        /* QEMU died with lord-vm: what it had allocated and not yet referenced is given back */
+        char disks[2][PATH_MAX + 64];
+        int nd = disk_files(S.dir, &S.m, disks);
+        for (int k = 0; k < nd; k++) qimg_repair_leaks(S.dir, disks[k]);
+    }
+    snaps_sweep(S.dir, &S.m);
     if (discard) { discard_state(S.dir); vlog("the saved state was discarded: the machine starts from its disks"); }
+    if (S.loadvm[0]) {
+        /* back to a snapshot with its memory: QEMU loads it at start (-loadvm), under operation.json; a saved session
+         * no longer fits the disks */
+        VmSnap list[VM_SNAPS_MAX];
+        int n = vm_snaps_load(S.dir, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, S.loadvm);
+        if (i < 0 || !list[i].memory) { fprintf(stderr, "lord-vm: no snapshot %s with memory\n", S.loadvm); vlog("snapshot: no %s with memory", S.loadvm); return 1; }
+        discard_state(S.dir);
+        if (vm_op_begin(S.dir, "snapshot-revert", S.loadvm, NULL, NULL)) return 1;
+        vlog("snapshot: starting from %s \"%s\"", S.loadvm, list[i].name);
+    }
     host_cpu_id(S.cpu_id);
     S.state = VS_STOPPED;
     set_state(VS_STARTING, VR_NONE, 0, "");
@@ -2040,6 +2386,75 @@ out:
     return rc;
 }
 
+/* --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list: under the lock when the machine is off (qemu-img,
+ * jailed), through its socket when it runs (VM_SNAPSHOT, waiting for the job). Prints JSON. Exit 4: going back to a
+ * snapshot with memory needs a start (lord-vm --start DIR --loadvm TAG). */
+static int cmd_snapshot(const char *dir, int argc, char **argv) {
+    if (argc < 1) { fprintf(stderr, "lord-vm: --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list\n"); return 2; }
+    const char *what = argv[0];
+    int kind = !strcmp(what, "take") ? VSN_TAKE : !strcmp(what, "revert") ? VSN_REVERT : !strcmp(what, "delete") ? VSN_DELETE : !strcmp(what, "list") ? 0 : -1;
+    if (kind < 0 || (kind == VSN_TAKE && argc < 2) || ((kind == VSN_REVERT || kind == VSN_DELETE) && argc < 2)) { fprintf(stderr, "lord-vm: --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list\n"); return 2; }
+    char real[PATH_MAX], err[256], tag[33] = "", name[VM_NAME_MAX + 1] = "";
+    if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
+    VmMachine m;
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    snprintf(S.dir, sizeof S.dir, "%s", real);
+    if (kind == VSN_TAKE) {
+        if (!vm_name_valid(argv[1])) { fprintf(stderr, "lord-vm: a snapshot's name is 1 to %d bytes of text\n", VM_NAME_MAX); return 2; }
+        snprintf(name, sizeof name, "%s", argv[1]);
+        if (argc > 2) snprintf(tag, sizeof tag, "%s", argv[2]); else vm_snap_tag(tag);
+    } else if (kind) snprintf(tag, sizeof tag, "%s", argv[1]);
+    if (kind && !vm_snap_tag_valid(tag)) { fprintf(stderr, "lord-vm: %s isn't a snapshot tag\n", tag); return 2; }
+    if (!kind) {
+        VmSnap list[VM_SNAPS_MAX];
+        int n = vm_snaps_load(real, list, VM_SNAPS_MAX);
+        printf("{\"snapshots\":[");
+        for (int i = 0; i < n; i++) { printf("%s{\"tag\":\"%s\",\"name\":", i ? "," : "", list[i].tag); print_json_str(list[i].name); printf(",\"created\":\"%s\",\"memory\":%s,\"vmstate\":%.0f}", list[i].created, list[i].memory ? "true" : "false", list[i].vmstate); }
+        printf("]}\n");
+        return 0;
+    }
+    int lock = open_lock(real);
+    if (lock == -2) {
+        /* running: the machine's own lord-vm does it */
+        int fd = connect_machine(&m);
+        if (fd < 0) { fprintf(stderr, "lord-vm: the machine runs but its socket can't be reached\n"); return 1; }
+        char text[VM_TEXT_MAX];
+        snprintf(text, sizeof text, "%s%s%s", tag, kind == VSN_TAKE ? "\t" : "", kind == VSN_TAKE ? name : "");
+        VmMsg q = vm_msg(VM_SNAPSHOT, 9, kind, 0, 0, 0, text);
+        if (vm_send(fd, &q, -1)) { close(fd); fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
+        long long end = now_ms() + 30 * 60 * 1000;
+        int rc = 1;
+        for (;;) {
+            VmMsg r;
+            long long left = end - now_ms();
+            int g = left > 0 ? wait_msg(fd, &r, (int)left) : 0;
+            if (g <= 0) { fprintf(stderr, "lord-vm: no answer from the machine\n"); break; }
+            if (r.type == VM_REPLY && r.seq == 9) {
+                if (r.a == VME_OK) { printf("{\"ok\":true,\"tag\":\"%s\",\"running\":true}\n", tag); rc = 0; }
+                else { fprintf(stderr, "lord-vm: %s\n", r.text); rc = r.a == VME_WRONG_STATE ? 4 : 1; }
+                break;
+            }
+        }
+        close(fd);
+        return rc;
+    }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    ops_recover(real, 0);
+    int rc = 1;
+    if (kind == VSN_TAKE) rc = snap_take_off(real, &m, tag, name, err, sizeof err);
+    else if (kind == VSN_DELETE) rc = snap_delete_off(real, &m, tag, err, sizeof err);
+    else {
+        VmSnap list[VM_SNAPS_MAX];
+        int n = vm_snaps_load(real, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
+        if (i >= 0 && list[i].memory) { close(lock); fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag); return 4; }
+        rc = snap_revert_off(real, &m, tag, err, sizeof err);
+    }
+    close(lock);
+    if (rc) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    printf("{\"ok\":true,\"tag\":\"%s\",\"running\":false}\n", tag);
+    return 0;
+}
+
 /* --discard-state DIR: the saved state goes (under the lock), and the next start boots from the disks */
 static int cmd_discard(const char *dir) {
     char real[PATH_MAX];
@@ -2083,6 +2498,7 @@ static int usage(void) {
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR\n"
+            "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
@@ -2099,6 +2515,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
     if (!strcmp(cmd, "--discard-state")) return cmd_discard(dir);
+    if (!strcmp(cmd, "--snapshot")) return cmd_snapshot(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
         { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND },

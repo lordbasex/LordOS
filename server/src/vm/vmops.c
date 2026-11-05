@@ -92,3 +92,64 @@ int vm_snap_tag_valid(const char *s) {
     for (size_t i = 0; i < n; i++) if (!((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= '0' && s[i] <= '9') || s[i] == '-')) return 0;
     return 1;
 }
+
+int vm_snaps_load(const char *dir, VmSnap *s, int max) {
+    char path[VM_PATH_MAX + 64];
+    snprintf(path, sizeof path, "%s/snapshots.json", dir);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return 0;
+    static char buf[128 * 1024];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    JDoc d;
+    if (n <= 0 || json_parse(buf, (size_t)n, &d, NULL, 0)) return 0;
+    int k = 0;
+    const JVal *arr = json_get(d.root, "snapshots");
+    for (const JVal *e = arr && arr->type == J_ARR ? arr->kid : NULL; e && k < max; e = e->next) {
+        const char *tag = json_str(e, "tag"), *name = json_str(e, "name"), *cr = json_str(e, "created");
+        if (!vm_snap_tag_valid(tag) || !name || !vm_name_valid(name)) continue;
+        memset(&s[k], 0, sizeof s[k]);
+        snprintf(s[k].tag, sizeof s[k].tag, "%s", tag);
+        snprintf(s[k].name, sizeof s[k].name, "%s", name);
+        if (cr) snprintf(s[k].created, sizeof s[k].created, "%.20s", cr);
+        s[k].memory = json_bool(e, "memory", 0);
+        s[k].vmstate = json_num(e, "vmstate", 0);
+        k++;
+    }
+    json_free(&d);
+    return k;
+}
+
+int vm_snaps_save(const char *dir, const VmSnap *s, int n) {
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{\"snapshots\":[");
+    for (int i = 0; i < n; i++) {
+        jb_raw(&j, i ? ",\n  {\"tag\":" : "\n  {\"tag\":"); jb_str(&j, s[i].tag);
+        jb_raw(&j, ",\"name\":"); jb_str(&j, s[i].name);
+        jb_raw(&j, ",\"created\":"); jb_str(&j, s[i].created);
+        jb_printf(&j, ",\"memory\":%s,\"vmstate\":%.0f}", s[i].memory ? "true" : "false", s[i].vmstate);
+    }
+    jb_raw(&j, "\n]}\n");
+    if (j.oom) { jb_free(&j); return -1; }
+    char tmp[VM_PATH_MAX + 64], path[VM_PATH_MAX + 64];
+    snprintf(tmp, sizeof tmp, "%s/.snapshots.json.tmp", dir);
+    snprintf(path, sizeof path, "%s/snapshots.json", dir);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0;
+    for (size_t off = 0; ok && off < j.n;) {
+        ssize_t w = write(fd, j.p + off, j.n - off);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) ok = 0; else off += (size_t)w;
+    }
+    if (fd >= 0) { if (ok && fsync(fd)) ok = 0; close(fd); }
+    jb_free(&j);
+    if (!ok || rename(tmp, path)) { unlink(tmp); return -1; }
+    vm_sync_dir(dir);
+    return 0;
+}
+
+int vm_snaps_find(const VmSnap *s, int n, const char *tag) {
+    for (int i = 0; i < n; i++) if (!strcmp(s[i].tag, tag)) return i;
+    return -1;
+}

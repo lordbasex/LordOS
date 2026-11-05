@@ -22,6 +22,7 @@
 #include "../vm/machine.h"
 #include "../vm/vm_admin.h"
 #include "../vm/vmthumb.h"
+#include "../vm/vmops.h"
 #include "../vm/logclean.h"
 #include "../sec/json.h"
 #include "ui.h"
@@ -275,7 +276,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 /* ---- creating (lord-vm --create, in the background) ---- */
 
 #define MAX_JOBS 4
-typedef struct { int used, fd, done, ok; pid_t pid; char out[2048]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
+typedef struct { int used, fd, done, ok, exit; pid_t pid; char out[2048]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
@@ -573,6 +574,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (r == 0 && waitpid(j->pid, &st, WNOHANG) == j->pid) {
             j->done = 1;
             j->ok = WIFEXITED(st) && WEXITSTATUS(st) == 0;
+            j->exit = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
             close(j->fd);
             if (j->ok && j->hash[0]) {
                 char p[PATH_MAX + 120];
@@ -587,6 +589,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JSValue o = JS_NewObject(c);
     JS_SetPropertyStr(c, o, "done", JS_NewBool(c, j->done));
     JS_SetPropertyStr(c, o, "ok", JS_NewBool(c, j->ok));
+    set_int(c, o, "exit", j->exit);
     set_str(c, o, "out", j->out);
     set_str(c, o, "dir", j->dir);
     if (j->done) memset(j, 0, sizeof *j);
@@ -732,6 +735,14 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t;
     char dir[PATH_MAX], bin[PATH_MAX];
     int anyway = opt_bool(c, argc, argv, "resumeAnyway"), discard = opt_bool(c, argc, argv, "discardState");
+    char loadvm[40] = "";
+    if (argc >= 2 && JS_IsObject(argv[1])) {
+        JSValue v = JS_GetPropertyStr(c, argv[1], "loadvm");
+        const char *t2 = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+        if (t2 && vm_snap_tag_valid(t2)) snprintf(loadvm, sizeof loadvm, "%s", t2);
+        if (t2) JS_FreeCString(c, t2);
+        JS_FreeValue(c, v);
+    }
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
@@ -759,6 +770,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
         if (anyway) args[k++] = "--resume-anyway";
         if (discard) args[k++] = "--discard-state";
+        if (loadvm[0]) { args[k++] = "--loadvm"; args[k++] = loadvm; }
         if (have_creds) { args[k++] = "--credentials-file"; args[k++] = creds; }
         args[k] = NULL;
         execve(bin, args, environ);
@@ -1371,6 +1383,92 @@ static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_NewInt32(c, n);
 }
 
+/* ---- snapshots (6.2): lord-vm --snapshot as a job (through the running lord-vm when the machine is on) ---- */
+
+/* snaps(dir) → { list: [{ tag, name, created, memory, vmstate, picture }], max, warn } */
+static JSValue f_snaps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NULL;
+    static VmSnap list[VM_SNAPS_MAX];
+    int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
+    JSValue o = JS_NewObject(c), arr = JS_NewArray(c);
+    for (int i = 0; i < n; i++) {
+        JSValue e = JS_NewObject(c);
+        set_str(c, e, "tag", list[i].tag);
+        set_str(c, e, "name", list[i].name);
+        set_str(c, e, "created", list[i].created);
+        JS_SetPropertyStr(c, e, "memory", JS_NewBool(c, list[i].memory));
+        JS_SetPropertyStr(c, e, "vmstate", JS_NewFloat64(c, list[i].vmstate));
+        char p[PATH_MAX + 64];
+        struct stat st;
+        snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, list[i].tag);
+        set_str(c, e, "picture", !stat(p, &st) ? p : "");
+        JS_SetPropertyUint32(c, arr, (uint32_t)i, e);
+    }
+    JS_SetPropertyStr(c, o, "list", arr);
+    set_int(c, o, "max", VM_SNAPS_MAX);
+    set_int(c, o, "warn", VM_SNAPS_WARN);
+    return o;
+}
+
+/* snapTake(dir, name[, session]) → { job, tag }: the picture first (the session's live one, or the card's), then
+ * lord-vm --snapshot DIR take NAME TAG */
+static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (argc < 2 || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NULL;
+    const char *name = JS_ToCString(c, argv[1]);
+    if (!name) return JS_NULL;
+    char nm[VM_NAME_MAX + 1];
+    int ok = vm_name_valid(name);
+    snprintf(nm, sizeof nm, "%s", name);
+    JS_FreeCString(c, name);
+    if (!ok) return JS_NULL;
+    char tag[33], sd[PATH_MAX + 32], file[64];
+    vm_snap_tag(tag);
+    snprintf(sd, sizeof sd, "%s/snapshots", dir);
+    mkdir(sd, 0700);
+    snprintf(file, sizeof file, "%s.png", tag);
+    Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
+    MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
+    else {
+        char from[PATH_MAX + 32], to[PATH_MAX + 96];
+        snprintf(from, sizeof from, "%s/thumb.png", dir);
+        snprintf(to, sizeof to, "%s/%s", sd, file);
+        int a = open(from, O_RDONLY | O_CLOEXEC | O_NOFOLLOW), b = a >= 0 ? open(to, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600) : -1;
+        char buf[65536];
+        ssize_t r;
+        while (b >= 0 && (r = read(a, buf, sizeof buf)) > 0) if (write(b, buf, (size_t)r) != r) break;
+        if (a >= 0) close(a);
+        if (b >= 0) close(b);
+    }
+    char *args[] = { "lord-vm", "--snapshot", dir, "take", nm, tag, NULL };
+    int id = spawn_job(args, dir);
+    if (!id) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    set_int(c, o, "job", id);
+    set_str(c, o, "tag", tag);
+    return o;
+}
+
+/* snapRevert(dir, tag) / snapDelete(dir, tag) → job id. A revert of a snapshot with memory on a machine that's off
+ * ends with exit 4: the app starts the machine with { loadvm: tag } instead. */
+static JSValue snap_job(JSContext *c, int argc, JSValueConst *argv, const char *what) {
+    char dir[PATH_MAX];
+    if (argc < 2 || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    const char *tag = JS_ToCString(c, argv[1]);
+    char tg[40] = "";
+    if (tag && vm_snap_tag_valid(tag)) snprintf(tg, sizeof tg, "%s", tag);
+    if (tag) JS_FreeCString(c, tag);
+    if (!tg[0]) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--snapshot", dir, (char *)what, tg, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+static JSValue f_snap_revert(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return snap_job(c, argc, argv, "revert"); }
+static JSValue f_snap_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return snap_job(c, argc, argv, "delete"); }
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
@@ -1379,6 +1477,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
+    JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

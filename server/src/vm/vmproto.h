@@ -38,6 +38,10 @@
  *                   → VM_REPLY when the state is on disk (QEMU then quits: VM_STATE stopped, suspended)
  *     VM_KEEP       a = 1: the machine keeps running when the control channel closes (Keep Running); 0: it shuts
  *                   down then, as by default
+ *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
+ *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
+ *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
+ *                   in snapshots.json is written last (6.2). VM_JOB reports it; → VM_REPLY when it's done
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -100,8 +104,8 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP,
-    VM_REQ_LAST = VM_KEEP,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT,
+    VM_REQ_LAST = VM_SNAPSHOT,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB,                          /* from lord-vm */
 };
 /* VM_NOTICE a */
@@ -109,6 +113,8 @@ enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
+/* VM_SNAPSHOT a */
+enum { VSN_TAKE = 1, VSN_REVERT, VSN_DELETE };
 
 /* machine state */
 enum { VS_STOPPED = 0, VS_STARTING, VS_RUNNING, VS_PAUSED, VS_STOPPING, VS_CRASHED, VS_COUNT };
@@ -255,7 +261,8 @@ static inline VdMsg vd_msg(uint16_t type, int a, int b, int c, int d, int e, int
  * checks an event. Ranges only; the meaning is checked where it's used. */
 static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
-    if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600));
+    if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
+                      (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;

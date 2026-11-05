@@ -10,6 +10,7 @@
 #include "vm/vmkeys.h"
 #include "vm/vmproto.h"
 #include "vm/logclean.h"
+#include "vm/vmops.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -372,10 +373,46 @@ static void test_log_clean(void) {
     }
 }
 
+/* Beta: operation.json (3.6) and snapshots.json (6.2) */
+static void test_ops(void) {
+    char tpl[] = "/tmp/vm-test-ops-XXXXXX";
+    char *dir = mkdtemp(tpl);
+    CHECK(dir != NULL);
+    if (!dir) return;
+    VmOp o;
+    CHECK(vm_op_read(dir, &o) == 0);
+    CHECK(!vm_op_begin(dir, "snapshot-take", "s20261105-120000", "/a", NULL));
+    CHECK(vm_op_read(dir, &o) == 1 && !strcmp(o.op, "snapshot-take") && !strcmp(o.tag, "s20261105-120000") && !strcmp(o.a, "/a") && o.started[0]);
+    vm_op_end(dir);
+    CHECK(vm_op_read(dir, &o) == 0);
+    char p[256];
+    snprintf(p, sizeof p, "%s/operation.json", dir);
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd >= 0) { (void)!write(fd, "{not json", 9); close(fd); }
+    CHECK(vm_op_read(dir, &o) == -1 && access(p, F_OK) != 0);       /* unreadable: dropped */
+    char tag[24];
+    vm_snap_tag(tag);
+    CHECK(vm_snap_tag_valid(tag));
+    CHECK(!vm_snap_tag_valid("x2026") && !vm_snap_tag_valid("s;rm") && !vm_snap_tag_valid("S1") && !vm_snap_tag_valid("s") && !vm_snap_tag_valid(NULL));
+    VmSnap a[3], b[VM_SNAPS_MAX];
+    memset(a, 0, sizeof a);
+    snprintf(a[0].tag, sizeof a[0].tag, "s1"); snprintf(a[0].name, sizeof a[0].name, "Fresh install"); snprintf(a[0].created, sizeof a[0].created, "2026-11-05T12:00:00Z");
+    snprintf(a[1].tag, sizeof a[1].tag, "s2"); snprintf(a[1].name, sizeof a[1].name, "Antes \"del\" cambio \xc3\xa9"); a[1].memory = 1; a[1].vmstate = 301989888;
+    snprintf(a[2].tag, sizeof a[2].tag, "bad tag"); snprintf(a[2].name, sizeof a[2].name, "x");
+    CHECK(!vm_snaps_save(dir, a, 3));
+    int n = vm_snaps_load(dir, b, VM_SNAPS_MAX);
+    CHECK(n == 2);                                                   /* a bad tag is never loaded */
+    CHECK(n == 2 && !strcmp(b[1].name, a[1].name) && b[1].memory && b[1].vmstate == 301989888 && !b[0].memory);
+    CHECK(vm_snaps_find(b, n, "s2") == 1 && vm_snaps_find(b, n, "s9") == -1);
+    snprintf(p, sizeof p, "rm -rf %s", dir);
+    (void)!system(p);
+}
+
 int main(void) {
     test_log_clean();
     test_images();
     test_schema();
+    test_ops();
     test_host();
     test_messages();
     test_qmp();

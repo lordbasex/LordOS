@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -142,6 +142,12 @@ eq('doing windowed', doingOf({ state: 'running' }, true), 'running');
 eq('close default', closeChoice({}), 'ask');
 eq('close keep', closeChoice({ onClose: 'keep' }), 'keep');
 eq('close bad', closeChoice({ onClose: 'reboot' }), 'ask');
+
+eq('snap name first', snapName([], 'Snapshot'), 'Snapshot 1');
+eq('snap name next free', snapName([{ name: 'Snapshot 2' }], 'Snapshot'), 'Snapshot 3');
+eq('snap name taken', snapName([{ name: 'snapshot 2' }, { name: 'x' }], 'Snapshot'), 'Snapshot 3');
+eq('snap size memory', snapSize({ memory: true, vmstate: 5 }), 5);
+eq('snap size disk', snapSize({ memory: false, vmstate: 0 }), 0);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

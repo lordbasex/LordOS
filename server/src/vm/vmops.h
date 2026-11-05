@@ -35,4 +35,21 @@ int vm_snap_tag_valid(const char *s);
 /* fsync of a folder, after a rename in it */
 void vm_sync_dir(const char *dir);
 
+/* <machine>/snapshots.json (6.2): the snapshots that are complete, with their names. Written by lord-vm only, last in
+ * each operation, so an entry is proof that every disk has the tag. Pictures: <machine>/snapshots/<tag>.png (lord-server).
+ *   {"snapshots":[{"tag":"s20261105-120000","name":"Before the upgrade","created":"2026-11-05T12:00:00Z",
+ *                  "memory":true,"vmstate":301989888}]} */
+#define VM_SNAPS_MAX  64           /* refused beyond */
+#define VM_SNAPS_WARN 20           /* internal snapshots slow down with many: the app warns from here (6.2) */
+typedef struct {
+    char tag[33];
+    char name[VM_NAME_MAX + 1];
+    char created[21];
+    int memory;                    /* taken while running: memory and devices too, it resumes where it was */
+    double vmstate;                /* bytes of that memory */
+} VmSnap;
+int vm_snaps_load(const char *dir, VmSnap *s, int max);           /* how many (0 none or unreadable) */
+int vm_snaps_save(const char *dir, const VmSnap *s, int n);       /* atomically; 0 ok */
+int vm_snaps_find(const VmSnap *s, int n, const char *tag);       /* index or -1 */
+
 #endif

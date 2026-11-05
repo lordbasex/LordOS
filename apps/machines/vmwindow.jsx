@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
-import { openConfigure, openLogs } from './library.jsx';
+import { openConfigure, openLogs, openSnapshots } from './library.jsx';
 
 const BAR = 48;
 const RESOLUTIONS = [[1280, 800], [1600, 900], [1920, 1080], [2560, 1440]];
@@ -86,13 +86,14 @@ function FloatingBar({ ctl, name }) {
 }
 
 // the card over the black area: starting, shutting down, no picture, lost display
-function Card({ title, text, actions, width = 460 }) {
+function Card({ title, text, actions, width = 460, extra }) {
   const p = usePal();
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width, padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
         <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         {text ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{text}</Text> : null}
+        {extra}
         {actions?.length ? <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
       </View>
     </View>
@@ -131,7 +132,7 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
   );
 }
 
-export function MachineWindow({ dir, name: name0 }) {
+export function MachineWindow({ dir, name: name0, loadvm }) {
   const p = usePal();
   const { id: winId, focused } = useAppWindow();
   // full screen moves the app in the tree and remounts it: the session belongs to the window
@@ -148,6 +149,7 @@ export function MachineWindow({ dir, name: name0 }) {
   const [pickCd, setPickCd] = useState(false);
   const [cdWant, setCdWant] = useState(null);       // the disc asked for while lord-vm changes it
   const [cdErr, setCdErr] = useState('');
+  const snapJobs = useRef([]);
   const box = useRef(null);
   const root = useRef(null);
   const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0 });
@@ -177,7 +179,8 @@ export function MachineWindow({ dir, name: name0 }) {
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
     setErr(''); setSt(null); setSid(id);
   };
-  useEffect(() => { if (!sid && !st && !err) begin(); }, []);
+  // a window opened to go back to a snapshot (with memory, the machine off) starts from it
+  useEffect(() => { if (!sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
   const stRef = useRef(st);
   stRef.current = st;
   // the window went away (not a remount): let go of the machine; one this window started is shut down by lord-vm
@@ -189,6 +192,7 @@ export function MachineWindow({ dir, name: name0 }) {
       const q = lord.vm.poll(sid);
       if (!q) return;
       setSt((prev) => (same(prev, q) ? prev : q));
+      snapJobs.current = snapJobs.current.filter((j) => { const r = lord.vm.job(j); if (r?.done && !r.ok) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.snap.failed'), body: r.out.trim().split('\n').pop() || '', sound: false }); return r && !r.done; });
       if (q.cd === 2 || q.cd === 3) setCdWant((w) => { if (w !== null) { if (q.cd === 2) setIso(w); else setCdErr(q.cdMessage || '?'); } return null; });
       const z = sized.current;
       if (q.display === 'up' && !z.rate) { z.rate = true; try { lord.vm.rate(sid, refreshRate(lord.display.list())); } catch (e) { lord.vm.rate(sid, 60); } }
@@ -287,6 +291,13 @@ export function MachineWindow({ dir, name: name0 }) {
   // the CD/DVD drive while the machine runs (lord-vm changes the disc through QMP; machine.json follows)
   const cdOk = !!sid && (st?.state === 'running' || st?.state === 'paused') && cdWant === null;
   const cdTo = (path) => { setCdErr(''); if (lord.vm.cdrom(sid, path || null)) setCdWant(path); else setCdErr(tr('machines.tb.cdRefused')); };
+  // Take Snapshot from the window: named by time, with the live picture; lord-vm reports it as a VM_JOB
+  const snapNow = () => {
+    const d = new Date();
+    const r = lord.vm.snapTake(dir, tr('machines.snap.atTime', { time: `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }), sid);
+    if (!r) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.snap.failed'), body: '', sound: false });
+    else snapJobs.current.push(r.job);
+  };
   const ctl = {
     st, a, full, follow, cmd,
     setFull: (on) => wm.setFullscreen(winId, on),
@@ -323,6 +334,9 @@ export function MachineWindow({ dir, name: name0 }) {
         { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy, onClick: () => cmd('suspend') },
         { label: tr('machines.cmd.poweroff'), disabled: !a.poweroff, onClick: () => cmd('poweroff') },
         '-',
+        { label: tr('machines.snap.takeNow'), disabled: !sid || busy || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
+        { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
+        '-',
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
@@ -335,8 +349,8 @@ export function MachineWindow({ dir, name: name0 }) {
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
-  else if (askClose) card = <Card width={620} title={tr('machines.close.title', { name })} text={tr('machines.close.text')} actions={[
-    <View key="t" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.close.always')}</Text></View>,
+  else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text')}
+    extra={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 13, color: p.text }}>{tr('machines.close.always')}</Text></View>} actions={[
     <Btn key="c" label={tr('machines.cancel')} onClick={() => setAskClose(false)} />,
     <Btn key="k" label={tr('machines.close.keep')} onClick={() => { if (always) writeMeta(dir, { onClose: 'keep' }); finish('keep'); }} />,
     <Btn key="s" label={tr('machines.cmd.shutdown')} onClick={() => { if (always) writeMeta(dir, { onClose: 'shutdown' }); finish('shutdown'); }} />,
@@ -348,7 +362,8 @@ export function MachineWindow({ dir, name: name0 }) {
   else if (!sid && st) {
     if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => openConfigure(m0)}
       onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
-    else card = <Card title={tr(`machines.state.${v.key}`)} text={tr('machines.win.stoppedHint')} actions={[<Btn key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
+    else if (v.key === 'suspended') card = <Card title={tr('machines.state.suspended')} text={tr('machines.win.suspendedHint')} actions={[<Btn key="s" primary label={tr('machines.cmd.resume')} onClick={() => begin()} />]} />;
+    else card = <Card title={tr(`machines.state.${v.key}`)} text={tr('machines.win.stoppedHint')} actions={[<Btn key="s" primary label={tr('machines.start')} onClick={() => begin()} />]} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {

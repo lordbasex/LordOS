@@ -151,3 +151,18 @@ export function MenuBtn({ label, items, primary, disabled }) {
 
 // the window's content root, for a menu at a pointer position (PopMenu takes coordinates inside it)
 export const overlayRoot = { current: null };
+
+// A dialog over the window (the mocks' Clone and the snapshot sheets): title, body, actions on the right. Esc cancels.
+export function Sheet({ title, children, actions, width = 560, onCancel }) {
+  const p = usePal();
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onCancel?.(); }), [onCancel]);
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <View style={{ width, padding: 22, gap: 14, borderRadius: 18, backgroundColor: p.dark ? '#1f1f23' : '#ffffff', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+        <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+        {children}
+        {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>{actions}</View> : null}
+      </View>
+    </View>
+  );
+}

@@ -17,11 +17,11 @@ const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
 const STALL_MS = 90000;
 // opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen
-export function openMachine(m) {
+export function openMachine(m, opts) {
   const instance = `vm-${m.id || m.folder}`;
   const id = `machines#${instance}`;
   const fresh = !windows.get().some((w) => w.id === id);
-  wm.open('machines', { instance, args: { machine: m.dir, name: m.name } });
+  wm.open('machines', { instance, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
   return id;
 }
@@ -31,6 +31,13 @@ export function openConfigure(m, section) {
   const fresh = !windows.get().some((w) => w.id === id);
   wm.open('machines', { instance, args: { configure: m.dir, name: m.name, section: section || 'general' } });
   if (fresh) { wm.resize(id, 980, 640); wm.center(id); }
+}
+export function openSnapshots(m) {
+  const instance = `snap-${m.id || m.folder}`;
+  const id = `machines#${instance}`;
+  const fresh = !windows.get().some((w) => w.id === id);
+  wm.open('machines', { instance, args: { snapshots: m.dir, name: m.name } });
+  if (fresh) { wm.resize(id, 1100, 560); wm.center(id); }
 }
 export function openLogs(m) {
   const instance = `log-${m.id || m.folder}`;
@@ -347,9 +354,10 @@ export function Library() {
       { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => stop('poweroff') },
       '-',
       { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m) },
+      { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
-      m.iso && a.remove ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
+      m.iso && a.remove && !m.suspended ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
       m.suspended && a.start ? { label: tr('machines.fail.discardState'), destructive: true, onClick: () => setDiscard(m) } : null,
       '-',
       { label: tr('machines.cmd.remove'), destructive: true, disabled: !a.remove, onClick: () => setDel(m) },

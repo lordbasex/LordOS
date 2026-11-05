@@ -12,7 +12,7 @@ export function stateView(state, reason) {
     case 'running': return { key: 'running', tone: 'run', active: true, why: null };
     case 'paused': return { key: 'paused', tone: 'pause', active: true, why: null };
     case 'starting': return { key: 'starting', tone: 'busy', active: true, why: null };
-    case 'stopping': return { key: 'stopping', tone: 'busy', active: true, why: null };
+    case 'stopping': return { key: r === 'suspended' ? 'suspending' : 'stopping', tone: 'busy', active: true, why: null };
     case 'crashed': return { key: 'crashed', tone: 'bad', active: false, why: r === 'none' ? 'qemu-failed' : r };
     default:
       // a machine whose supervisor died is shown as off, with the reason: lord-vm recovers it at the next start
@@ -254,3 +254,14 @@ export const closeChoice = (meta) => (CLOSE_CHOICES.includes(meta?.onClose) ? me
 
 // the card picture's path, versioned by its time so the engine loads it again when it changes ('' when none)
 export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math.floor(mtime)}` : '');
+
+// ---- snapshots (6.2) ----
+
+// a new snapshot's suggested name: "Snapshot 3", the first number not in use
+export function snapName(list, base) {
+  const names = new Set((list || []).map((s) => s.name.toLowerCase()));
+  for (let i = (list || []).length + 1; i < 1000; i++) { const n = `${base} ${i}`; if (!names.has(n.toLowerCase())) return n; }
+  return base;
+}
+// does the snapshot hold the machine's memory (and how much)
+export const snapSize = (s) => (s?.memory && s.vmstate > 0 ? s.vmstate : 0);
