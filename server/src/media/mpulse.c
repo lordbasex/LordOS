@@ -230,11 +230,14 @@ static int send_playback(LmPulse *p) {
     ts_bool(&t, 0);                                  /* variable_rate */
     ts_bool(&t, 0);                                  /* muted */
     ts_bool(&t, 1);                                  /* adjust_latency */
-    const char *kv[] = { "media.name", media_name, "media.role", role };
-    ts_proplist(&t, kv, 2);
+    /* state.restore-props=false: the session manager keeps volume and mute per media.role, so one video muted in
+     * Settings → Sound once muted every later stream of that role (players, Remote Desk, the remote camera) for
+     * good. LordOS sets each stream's volume itself; nothing is restored or saved for ours. */
+    const char *kv[] = { "media.name", media_name, "media.role", role, "state.restore-props", "false" };
+    ts_proplist(&t, kv, 3);
     ts_bool(&t, 0);                                  /* volume_set */
     ts_bool(&t, 0);                                  /* early_requests */
-    ts_bool(&t, 0);                                  /* muted_set */
+    ts_bool(&t, 1);                                  /* muted_set: starts unmuted (muted above is 0) */
     ts_bool(&t, 0);                                  /* dont_inhibit_auto_suspend */
     ts_bool(&t, 0);                                  /* fail_on_suspend */
     ts_bool(&t, 0);                                  /* relative_volume */
@@ -272,8 +275,8 @@ static int send_record(LmPulse *p) {
     ts_bool(&t, 0);                                  /* variable_rate */
     ts_bool(&t, 0);                                  /* peak_detect */
     ts_bool(&t, 1);                                  /* adjust_latency */
-    const char *kv[] = { "media.name", media_name, "media.role", "production" };
-    ts_proplist(&t, kv, 2);
+    const char *kv[] = { "media.name", media_name, "media.role", "production", "state.restore-props", "false" };
+    ts_proplist(&t, kv, 3);
     ts_u32(&t, PA_INVALID_INDEX);                    /* direct_on_input */
     ts_bool(&t, 0); ts_bool(&t, 0); ts_bool(&t, 0);  /* early_requests, dont_inhibit, fail_on_suspend */
     ts_u8(&t, 1);
