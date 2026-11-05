@@ -888,7 +888,7 @@ static void spawn_vmdisplay(Sess *s, int dbus_fd) {
     if (!p) {
         int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21);
         int null = open("/dev/null", O_RDWR);
-        if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
+        if (null >= 0) { dup2(null, 0); dup2(null, 1); }          /* its notes go to the session's log (stderr) */
         dup2(a, 3);
         dup2(b, 4);
         syscall(SYS_close_range, 5, ~0u, 0);

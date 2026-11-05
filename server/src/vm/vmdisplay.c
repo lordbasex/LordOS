@@ -249,8 +249,14 @@ static int on_au_write(sd_bus_message *m, void *u, sd_bus_error *e) {
     A.writes++;
     return sd_bus_reply_method_return(m, "");
 }
+/* QEMU reads the listener's Interfaces (no extra ones here: PCM goes as Write calls) while it registers it */
+static int au_interfaces(sd_bus *b, const char *path, const char *iface, const char *prop, sd_bus_message *reply, void *u, sd_bus_error *e) {
+    (void)b; (void)path; (void)iface; (void)prop; (void)u; (void)e;
+    return sd_bus_message_append_strv(reply, NULL);
+}
 static const sd_bus_vtable audio_vt[] = {
     SD_BUS_VTABLE_START(0),
+    SD_BUS_PROPERTY("Interfaces", "as", au_interfaces, 0, SD_BUS_VTABLE_PROPERTY_CONST),
     SD_BUS_METHOD("Init", "tybbuyuub", "", on_au_init, 0),
     SD_BUS_METHOD("Fini", "t", "", on_au_fini, 0),
     SD_BUS_METHOD("SetEnabled", "tb", "", on_au_enabled, 0),
@@ -258,6 +264,14 @@ static const sd_bus_vtable audio_vt[] = {
     SD_BUS_METHOD("Write", "tay", "", on_au_write, 0),
     SD_BUS_VTABLE_END
 };
+
+/* RegisterOutListener's answer: 1 taken, 2 refused */
+static int au_registered(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)e;
+    *(int *)u = sd_bus_message_is_method_error(m, NULL) ? 2 : 1;
+    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: RegisterOutListener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
+    return 0;
+}
 
 /* VD_AUDIO_REC: the recording's ring (checked: sealed against shrinking, the size it says, 48 kHz, one channel) */
 static void au_rec(int fd) {
@@ -769,16 +783,36 @@ int main(int argc, char **argv) {
     if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, av)) {
         abus = p2p(av[0]);
         rep = NULL;
+        /* QEMU asks the new listener for its properties before it answers RegisterOutListener: the call is made
+         * without waiting, and both connections are served until the answer comes (5 s at most) */
+        static int au_done, au_ok;
+        au_done = au_ok = 0;
+        sd_bus_slot *slot = NULL;
         if (abus && sd_bus_add_object_vtable(abus, NULL, "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt, NULL) >= 0 &&
-            sd_bus_call_method(bus, NULL, "/org/qemu/Display1/Audio", "org.qemu.Display1.Audio", "RegisterOutListener", &e, &rep, "h", av[1]) >= 0)
-            fprintf(stderr, "lord-vmdisplay %s: sound listener registered\n", argv[1]);
+            sd_bus_call_method_async(bus, &slot, NULL, "/org/qemu/Display1/Audio", "org.qemu.Display1.Audio", "RegisterOutListener", au_registered, &au_done, "h", av[1]) >= 0) {
+            close(av[1]);
+            av[1] = -1;
+            long long until = now_ms() + 5000;
+            /* the console's listener too: QEMU asks it for its properties right after RegisterListener, and answers
+             * nothing else until it has them */
+            while (!au_done && now_ms() < until) {
+                while (sd_bus_process(lbus, NULL) > 0) ;
+                while (sd_bus_process(abus, NULL) > 0) ;
+                while (sd_bus_process(bus, NULL) > 0) ;
+                if (au_done) break;
+                struct pollfd pf[3] = { { sd_bus_get_fd(abus), (short)sd_bus_get_events(abus), 0 }, { sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 },
+                                        { sd_bus_get_fd(lbus), (short)sd_bus_get_events(lbus), 0 } };
+                poll(pf, 3, 100);
+            }
+            au_ok = au_done == 1;
+        }
+        sd_bus_slot_unref(slot);
+        if (au_ok) fprintf(stderr, "lord-vmdisplay %s: sound listener registered\n", argv[1]);
         else {
-            fprintf(stderr, "lord-vmdisplay %s: no sound (%s)\n", argv[1], e.message ? e.message : "no listener");
+            fprintf(stderr, "lord-vmdisplay %s: no sound (%s)\n", argv[1], au_done == 2 ? "QEMU refused the listener" : abus ? "no answer" : "no connection");
             if (abus) { sd_bus_flush_close_unref(abus); abus = NULL; }
         }
-        sd_bus_error_free(&e);
-        sd_bus_message_unref(rep);
-        close(av[1]);
+        if (av[1] >= 0) close(av[1]);
     }
     fprintf(stderr, "lord-vmdisplay %s: console \"%s\" %ux%u, mouse %s\n", argv[1], label ? label : "", cw, ch, absm ? "absolute" : "relative");
     free(label);
