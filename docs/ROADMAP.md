@@ -707,6 +707,9 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
   optional 720p stream. The asynchronous capture is on the branch `v089-capture-work` (drops went from 36 % to 23 %).
 - [ ] **Unattended install, the rest:** the boot entry on the new ISOs, and tests of the free space mode, UEFI, a USB
   stick, `ssh_key`, `after = poweroff` and the arm64 ISO.
+- [ ] **Command-line tools on the new images** (requested 2026-11-05): `dnsutils` (dig, nslookup), `screen`, `mc`,
+  `tcpdump`, `net-tools` (ifconfig, netstat, route) and `vim`, on the PC ISO and the Raspberry Pi image. Systems
+  already installed get them from the Store or `apt`; decide whether the `lordos` package should also recommend them.
 - [ ] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO.
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
   and notarized by the maintainer, Windows and Linux built too, then `"lordos": {"imager"}` in `package.json` moves so
