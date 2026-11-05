@@ -1932,13 +1932,26 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         VmMsg r = vm_msg(VM_CONSOLE_FD, m->seq, 0, 0, 0, 0, "");
         send_to(ci, &r, sv[1]);
         close(sv[1]);
-        /* the last of what the guest wrote, so the shell opens on its prompt */
-        size_t start = (S.ring_at + sizeof S.ring - S.ring_n) % sizeof S.ring;
-        for (size_t k = 0; k < S.ring_n;) {
-            size_t i = (start + k) % sizeof S.ring, run = sizeof S.ring - i < S.ring_n - k ? sizeof S.ring - i : S.ring_n - k;
-            console_out(S.ring + i, run);
-            k += run;
+        /* the last of what the guest wrote, so the shell opens on its prompt; without the terminal queries in it
+         * (CSI … n, c, t: cursor position, attributes, size), which a new terminal would answer into the guest's
+         * login prompt long after anyone asked */
+        static char replay[sizeof S.ring];
+        size_t start = (S.ring_at + sizeof S.ring - S.ring_n) % sizeof S.ring, o = 0;
+        for (size_t k = 0; k < S.ring_n; k++) {
+            char ch = S.ring[(start + k) % sizeof S.ring];
+            if (ch == 0x1b && k + 1 < S.ring_n && S.ring[(start + k + 1) % sizeof S.ring] == '[') {
+                size_t e = k + 2;
+                while (e < S.ring_n && e < k + 24) {
+                    char x = S.ring[(start + e) % sizeof S.ring];
+                    if ((x >= '0' && x <= '9') || x == ';' || x == '?' || x == '>' || x == '=') { e++; continue; }
+                    break;
+                }
+                char fin = e < S.ring_n ? S.ring[(start + e) % sizeof S.ring] : 0;
+                if (fin == 'n' || fin == 'c' || fin == 't') { k = e; continue; }
+            }
+            replay[o++] = ch;
         }
+        console_out(replay, o);
         vlog("shell: opened for client %d", ci);
         return;
     }
@@ -2604,10 +2617,13 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),
          S.m.accel ? "tcg" : "kvm", S.m.vcpus, S.m.memory_mb, S.m.machine_type);
+    RunInfo prev;
+    int crashed = !runinfo_read(S.dir, &prev) && prev.state == VS_CRASHED &&
+                  (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_OUT_OF_MEMORY || prev.reason == VR_SUPERVISOR_LOST);
     int lost = recover();
     ops_recover(S.dir, 1);
-    if (lost) {
-        /* QEMU died with lord-vm: what it had allocated and not yet referenced is given back */
+    if (lost || crashed) {
+        /* QEMU died in the middle (killed, or with lord-vm): what it had allocated and not yet referenced is given back */
         char disks[2][PATH_MAX + 64];
         int nd = disk_files(S.dir, &S.m, disks);
         for (int k = 0; k < nd; k++) qimg_repair_leaks(S.dir, disks[k]);
@@ -3066,6 +3082,23 @@ static void rm_tree(const char *dir) {
 
 static int copy_small(const char *from, const char *to) { return file_exists(from) ? copy_sparse(from, to) : 0; }
 
+/* a clone that lord-vm didn't finish (killed) leaves <library>/.<name>.part-<pid>: removed once that lord-vm is gone */
+static void clone_sweep(const char *lib) {
+    DIR *d = opendir(lib);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        const char *part = e->d_name[0] == '.' ? strstr(e->d_name, ".part-") : NULL;
+        if (!part) continue;
+        long pid = atol(part + 6);
+        if (pid > 0 && (kill((pid_t)pid, 0) == 0 || errno != ESRCH)) continue;
+        char p[PATH_MAX + 260];
+        snprintf(p, sizeof p, "%s/%s", lib, e->d_name);
+        rm_tree(p);
+        vlog("recovery: a clone that didn't finish was removed (%s)", e->d_name);
+    }
+    if (d) closedir(d);
+}
+
 static int cmd_clone(const char *src, int argc, char **argv) {
     if (argc < 1) { fprintf(stderr, "lord-vm: --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"); return 2; }
     const char *dst = argv[0], *name = NULL, *from_snap = NULL;
@@ -3101,6 +3134,7 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     char *sl = strrchr(lib, '/');
     if (!sl || sl == lib) goto out;
     *sl = 0;
+    clone_sweep(lib);
     if (!dir_ok(dst) || strchr(dst, '/') == NULL) { fprintf(stderr, "lord-vm: %s: an absolute folder without ',' or control characters\n", dst); goto out; }
     snprintf(dreal, sizeof dreal, "%s", dst);
     if (!access(dreal, F_OK)) { fprintf(stderr, "lord-vm: %s exists\n", dreal); goto out; }
