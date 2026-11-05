@@ -776,7 +776,9 @@ int vmi_parse_vmdk(const char *text, size_t len, VmiVmdk *d, char *err, size_t e
         size_t e = i;
         while (e < len && text[e] != '\n' && text[e]) e++;
         char line[VMI_PATH + 128];
-        size_t l = e - i < sizeof line - 1 ? e - i : sizeof line - 1;
+        /* a line longer than any we accept is refused, never cut: QEMU reads the descriptor too, and must read the same */
+        if (e - i >= sizeof line - 1) return fail(err, errlen, "a line of the disk's descriptor is too long");
+        size_t l = e - i;
         memcpy(line, text + i, l);
         line[l] = 0;
         int nul = e < len && !text[e];
@@ -811,7 +813,12 @@ int vmi_parse_vmdk(const char *text, size_t len, VmiVmdk *d, char *err, size_t e
                 x->file[q - p - 1] = 0;
                 p = q + 1;
                 while (*p == ' ') p++;
-                if (*p) x->offset = strtoll(p, NULL, 10);
+                if (*p) {
+                    char *oe;
+                    x->offset = strtoll(p, &oe, 10);
+                    while (*oe == ' ') oe++;
+                    if (oe == p || x->offset < 0 || *oe) return fail(err, errlen, "a bad extent offset");
+                }
             } else if (strcmp(kind, "ZERO")) return fail(err, errlen, "an extent without a file");
             continue;
         }

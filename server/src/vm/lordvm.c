@@ -3625,7 +3625,10 @@ static int vmdk_desc(const char *path, long long off, long long len, VmiVmdk *d,
         memset(d, 0, sizeof *d);
         snprintf(d->create_type, sizeof d->create_type, "monolithicSparse");
         if (!doff || !dsz) { d->nextents = 1; return 0; }        /* a stream-optimized piece without one */
-        if (dsz > 2048 || (len && (long long)(doff + dsz) * 512 > len)) { snprintf(why, wn, "a VMDK's descriptor is too large"); return -1; }
+        /* inside its member (an .ova's) or its file: checked before any multiplication */
+        long long lim = len ? len / 512 : 0;
+        if (!len) { struct stat fs; if (stat(path, &fs) || fs.st_size < 0) return -1; lim = (long long)(fs.st_size / 512); }
+        if (dsz > 2048 || doff > (uint64_t)lim || dsz > (uint64_t)lim - doff) { snprintf(why, wn, "a VMDK's descriptor is outside its file"); return -1; }
         tl = (size_t)dsz * 512;
         text = malloc(tl + 1);
         int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
@@ -3839,6 +3842,7 @@ static char *spec_chain(const Imp *I, int i, int alone) {
     return b.oom ? (jb_free(&b), NULL) : b.p;
 }
 
+static int jail_overflow;            /* jail_files had more files than it can list: the import says so instead of failing in qemu-img */
 /* the files qemu-img may read for disk i: every layer and every extent */
 static int jail_files(const Imp *I, int i, const char **out, int max) {
     int n = 0;
@@ -3849,6 +3853,7 @@ static int jail_files(const Imp *I, int i, const char **out, int max) {
     }
     static char ext[256][PATH_MAX];
     int ne = 0;
+    jail_overflow = 0;
     for (int k = 0; k < I->d[i].n; k++) {
         for (const char *c = I->d[i].extents[k]; c && *c && n < max && ne < 256; ) {
             const char *nl = strchr(c, '\n');
@@ -3861,6 +3866,7 @@ static int jail_files(const Imp *I, int i, const char **out, int max) {
             }
             c = nl ? nl + 1 : c + l;
         }
+        if (I->d[i].extents[k] && *I->d[i].extents[k] && (ne >= 256 || n >= max)) jail_overflow = 1;
     }
     return n;
 }
@@ -3883,6 +3889,7 @@ static int imp_info(Imp *I, int i, char *why, size_t wn) {
     const char *files[VMI_MAX_CHAIN * VMI_MAX_EXTENTS + VMI_MAX_CHAIN];
     jail_list = files;
     jail_n = jail_files(I, i, files, (int)(sizeof files / sizeof files[0]));
+    if (jail_overflow) { jail_list = NULL; jail_n = 0; free(spec); snprintf(why, wn, "a disk has more pieces than can be imported"); return -1; }
     char *argv[] = { QEMU_IMG, "info", "--output=json", spec, NULL };
     static char buf[65536];
     int r = run_tool_in(argv, buf, sizeof buf, files[0], NULL);
@@ -4239,7 +4246,14 @@ static int flatten(const Imp *I, int di, const char *out, long long vsize, char 
     const typeof(I->d[0]) *D = &I->d[di];
     Layer L[VMI_MAX_CHAIN];
     int n = D->n;
-    for (int k = 0; k < n; k++) if (layer_open(&L[k], D->file[k], D->fmt[k], why, wn)) return -1;
+    if (vsize <= 0 || vsize > ((long long)VM_DISK_MAX_GB << 30)) { snprintf(why, wn, "a disk's size is out of range"); return -1; }
+    long long entries = 0;
+    for (int k = 0; k < n; k++) {
+        if (layer_open(&L[k], D->file[k], D->fmt[k], why, wn)) return -1;
+        entries += L[k].nmap;
+        /* every layer's block table is held at once: 64 M entries (256 MB) at most */
+        if (entries > (64LL << 20)) { snprintf(why, wn, "a disk's snapshot layers are too many or too large to merge"); return -1; }
+    }
     for (int k = 1; k < n; k++) if (L[k].block != L[0].block || L[k].nmap != L[0].nmap) { snprintf(why, wn, "a disk's snapshot layers don't line up"); return -1; }
     if ((long long)L[0].nmap * (long long)L[0].block < vsize) { snprintf(why, wn, "a disk's block map is smaller than the disk"); return -1; }
     int o = open(out, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);

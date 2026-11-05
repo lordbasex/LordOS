@@ -82,11 +82,20 @@ static long decode(const char *s, size_t n, char *out) {
     return (long)o;
 }
 
+/* the first `pat` at or after s[from], or NULL: scans only as far as the match (a library strstr may measure the whole
+ * rest of the input first, which made a file of many small comments cost the square of its size) */
+static char *find(char *s, size_t from, size_t len, const char *pat) {
+    size_t pl = strlen(pat);
+    for (size_t i = from; i + pl <= len; i++) if (s[i] == pat[0] && !memcmp(s + i, pat, pl)) return s + i;
+    return NULL;
+}
+
 static const char *local(const char *q) { const char *c = strrchr(q, ':'); return c ? c + 1 : q; }
 
-static int add_text(Doc *d, VxNode *n, const char *s, size_t len, size_t *cap) {
+/* have: the text's length so far, kept by the caller (a strlen here made many small pieces cost the square of the text) */
+static int add_text(Doc *d, VxNode *n, const char *s, size_t len, size_t *cap, size_t *havep) {
     if (!len) return 0;
-    size_t have = n->text ? strlen(n->text) : 0;
+    size_t have = *havep;
     if (have + len > (1u << 20)) return -1;
     if (!n->text || have + len + 1 > *cap) {
         size_t c = *cap ? *cap * 2 : 64;
@@ -99,6 +108,7 @@ static int add_text(Doc *d, VxNode *n, const char *s, size_t len, size_t *cap) {
     }
     memcpy(n->text + have, s, len);
     n->text[have + len] = 0;
+    *havep = have + len;
     return 0;
 }
 
@@ -142,7 +152,7 @@ VxNode *vx_parse(const char *src, size_t len, const char **err) {
     if (len >= 3 && (unsigned char)s[0] == 0xef && (unsigned char)s[1] == 0xbb && (unsigned char)s[2] == 0xbf) i = 3;
     VxNode *stack[VX_MAX_DEPTH];
     const char *qn[VX_MAX_DEPTH];
-    size_t tcap[VX_MAX_DEPTH];
+    size_t tcap[VX_MAX_DEPTH], tlen[VX_MAX_DEPTH];
     int depth = 0, nodes = 0, have_root = 0;
     VxAttr at[VX_MAX_ATTRS];
     while (i < len) {
@@ -157,7 +167,7 @@ VxNode *vx_parse(const char *src, size_t len, const char **err) {
                 if (!blank) {
                     long o = decode(s + i, j - i, s + i);
                     if (o < 0) FAIL("bad entity");
-                    if (add_text(d, stack[depth - 1], s + i, (size_t)o, &tcap[depth - 1])) FAIL("text too long");
+                    if (add_text(d, stack[depth - 1], s + i, (size_t)o, &tcap[depth - 1], &tlen[depth - 1])) FAIL("text too long");
                 }
             }
             i = j;
@@ -166,23 +176,23 @@ VxNode *vx_parse(const char *src, size_t len, const char **err) {
         /* s[i] == '<' */
         if (i + 1 >= len) FAIL("truncated");
         if (s[i + 1] == '?') {
-            char *e = strstr(s + i + 2, "?>");
+            char *e = find(s, i + 2, len, "?>");
             if (!e) FAIL("unclosed processing instruction");
             i = (size_t)(e - s) + 2;
             continue;
         }
         if (s[i + 1] == '!') {
             if (len - i >= 4 && !memcmp(s + i, "<!--", 4)) {
-                char *e = strstr(s + i + 4, "-->");
+                char *e = find(s, i + 4, len, "-->");
                 if (!e) FAIL("unclosed comment");
                 i = (size_t)(e - s) + 3;
                 continue;
             }
             if (len - i >= 9 && !memcmp(s + i, "<![CDATA[", 9)) {
                 if (!depth) FAIL("CDATA outside the root");
-                char *e = strstr(s + i + 9, "]]>");
+                char *e = find(s, i + 9, len, "]]>");
                 if (!e) FAIL("unclosed CDATA");
-                if (add_text(d, stack[depth - 1], s + i + 9, (size_t)(e - (s + i + 9)), &tcap[depth - 1])) FAIL("text too long");
+                if (add_text(d, stack[depth - 1], s + i + 9, (size_t)(e - (s + i + 9)), &tcap[depth - 1], &tlen[depth - 1])) FAIL("text too long");
                 i = (size_t)(e - s) + 3;
                 continue;
             }
@@ -262,7 +272,7 @@ VxNode *vx_parse(const char *src, size_t len, const char **err) {
             p->last = n;
         } else have_root = 1;
         i = j;
-        if (!empty) { stack[depth] = n; qn[depth] = qname; tcap[depth] = 0; depth++; }
+        if (!empty) { stack[depth] = n; qn[depth] = qname; tcap[depth] = 0; tlen[depth] = 0; depth++; }
     }
     if (depth || !have_root) FAIL(have_root ? "unclosed element" : "no root element");
     trim_all(&d->root);

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static int fails, checks;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; fprintf(stderr, "%s:%d: CHECK(%s) failed\n", __FILE__, __LINE__, #c); } } while (0)
@@ -159,6 +160,12 @@ static void test_vmdk(void) {
     CHECK(!strncmp(d.uuid, "60 00 C2 9a", 11));
     free(t);
     CHECK(vmi_parse_vmdk("just text\n", 10, &d, err, sizeof err) < 0);
+    const char *neg = "# Disk DescriptorFile\ncreateType=\"monolithicFlat\"\nRW 2048 FLAT \"a-flat.vmdk\" -512\n";
+    CHECK(vmi_parse_vmdk(neg, strlen(neg), &d, err, sizeof err) < 0);
+    char *lng = malloc(4000);
+    snprintf(lng, 4000, "# Disk DescriptorFile\ncreateType=\"monolithicFlat\"\nRW 2048 FLAT \"%01500d.vmdk\" 0\n", 7);
+    CHECK(vmi_parse_vmdk(lng, strlen(lng), &d, err, sizeof err) < 0);
+    free(lng);
 }
 
 static void test_helpers(void) {
@@ -246,6 +253,21 @@ static void test_xml(void) {
     CHECK(vx_parse(many, o, NULL) == NULL);
     free(many);
     CHECK(vx_parse("<a>\0</a>", 8, NULL) == NULL);
+    /* text in many small pieces (between comments) costs linear time, not its square */
+    {
+        size_t np = 200000, o2 = 0;
+        char *pc = malloc(np * 8 + 16);
+        memcpy(pc, "<a>", 3); o2 = 3;
+        for (size_t i = 0; i < np; i++) { memcpy(pc + o2, "x<!---->", 8); o2 += 8; }
+        memcpy(pc + o2, "</a>", 4); o2 += 4;
+        clock_t t0 = clock();
+        VxNode *rr = vx_parse(pc, o2, NULL);
+        double secs = (double)(clock() - t0) / CLOCKS_PER_SEC;
+        CHECK(rr && strlen(vx_text(rr)) == np && secs < 1.0);
+        if (secs >= 1.0) fprintf(stderr, "  %zu pieces took %.2f s\n", np, secs);
+        vx_free(rr);
+        free(pc);
+    }
 }
 
 /* ---- tar ---- */
