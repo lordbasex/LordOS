@@ -417,8 +417,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     });
   };
   const recSecs = rec ? Math.floor((now() - rec.at) / 1000) : 0;
-  // the shared clipboard (6.8), through the agent's channel and only the ways the machine allows: the host's text goes
-  // in when the window comes to the front, the guest's comes out as it changes
+  // the shared clipboard (6.8), through the agent's channel and only the ways the machine allows: the host's clipboard
+  // (text, rich text, a picture) goes in when the window comes to the front, the guest's comes out as it changes; a
+  // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
   useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard }); } }, [sid, st?.state]);
@@ -426,6 +427,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => {
     if (!focused || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined) return;
     if (!(st?.agent?.caps & 32)) return;
+    if (lord.vm.clipboardSendHost) { lord.vm.clipboardSendHost(sid); return; }
     const text = clipboard.get();
     if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) clipSent.current = text;
   }, [focused, sid, cfg.clipboard, st?.agent?.caps]);
@@ -434,6 +436,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!sid || !st?.clipIn || st.clipIn === clipSeen.current) return;
     clipSeen.current = st.clipIn;
     if (!clipFrom(cfg.clipboard)) return;
+    const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid) : 'text';
+    if (kind !== 'text') return;
     const text = lord.vm.clipboardTake(sid);
     if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
   }, [st?.clipIn]);

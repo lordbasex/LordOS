@@ -701,7 +701,7 @@ static struct {
     int keep_awake, inhibit_done;
     uint8_t *lag_buf;
     size_t lag_n;
-    int lag_hello;
+    int lag_hello, lag_clipx;               /* lordos-guest said hello; it takes AGK_CLIPX (pictures, rich text) */
     char lag_version[48];
     uint8_t *helper;                        /* lordos-guest for VAG_INSTALL, read before lord-vm's own Landlock */
     size_t helper_n, helper_off;
@@ -1958,17 +1958,61 @@ static void drain_qga(void) {
 }
 
 /* org.lordos.agent: frames from lordos-guest */
+/* frames to the guest go through a queue: a picture is more than the port takes at once, and lord-vm never waits */
+static uint8_t *lag_out;
+static size_t lag_out_n, lag_out_off;
+static void lag_flush(void) {
+    while (S.lag_fd >= 0 && lag_out_off < lag_out_n) {
+        ssize_t w = write(S.lag_fd, lag_out + lag_out_off, lag_out_n - lag_out_off);
+        if (w > 0) { lag_out_off += (size_t)w; continue; }
+        if (w < 0 && (errno == EAGAIN || errno == EINTR)) return;
+        break;
+    }
+    lag_out_n = lag_out_off = 0;
+}
 static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n) {
     if (S.lag_fd < 0) return;
-    uint8_t h[AG_HEAD];
-    ag_frame_head(h, kind, 0, n);
-    struct iovec io[2] = { { h, AG_HEAD }, { (void *)data, n } };
-    ssize_t w = writev(S.lag_fd, io, n ? 2 : 1);
-    if (w != (ssize_t)(AG_HEAD + n)) vlog("agent: a frame to the guest was cut short (%zd of %u)", w, AG_HEAD + n);
+    size_t need = lag_out_n + AG_HEAD + n;
+    if (need > 2 * (size_t)AG_FRAME_MAX + 2 * AG_HEAD) { vlog("agent: the queue to the guest is full: a frame dropped"); return; }
+    uint8_t *nb = realloc(lag_out, need);
+    if (!nb) return;
+    lag_out = nb;
+    ag_frame_head(lag_out + lag_out_n, kind, 0, n);
+    if (n) memcpy(lag_out + lag_out_n + AG_HEAD, data, n);
+    lag_out_n = need;
+    lag_flush();
 }
 
 static int clip_allows(int to_guest) {
     return S.m.clipboard == VM_CLIP_BOTH || S.m.clipboard == (to_guest ? VM_CLIP_TO_GUEST : VM_CLIP_FROM_GUEST);
+}
+
+/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
+ * UTF-8), a PNG whose header is sane (lord-server re-encodes it in lord-media's sandbox before anything decodes it for
+ * real). The kept parts again in that layout, in *out (malloc); 0 something is left, -1 nothing usable. */
+static int clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn) {
+    AgClip c, k;
+    memset(&k, 0, sizeof k);
+    if (ag_clipx_parse(in, n, &c)) { snprintf(what, wn, "malformed"); return -1; }
+    static char html[AG_TEXT_MAX + 1];
+    uint32_t w = 0, h = 0;
+    if (c.text && ag_utf8_ok(c.text, c.text_n)) { k.text = c.text; k.text_n = c.text_n; }
+    if (c.html && ag_utf8_ok(c.html, c.html_n)) {
+        long hn = ag_html_sanitize((const char *)c.html, c.html_n, html, sizeof html);
+        if (hn > 0) { k.html = (const uint8_t *)html; k.html_n = (uint32_t)hn; }
+    }
+    if (c.png && !ag_png_check(c.png, c.png_n, &w, &h)) { k.png = c.png; k.png_n = c.png_n; }
+    snprintf(what, wn, "%s%s%s", k.text ? "text " : "", k.html ? "html " : "", k.png ? "png " : "");
+    if (k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "%ux%u ", w, h); }
+    if (c.html && !k.html) { size_t l = strlen(what); snprintf(what + l, wn - l, "(html dropped) "); }
+    if (c.png && !k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "(picture refused) "); }
+    size_t sz = ag_clipx_size(&k);
+    if (!sz) { snprintf(what, wn, "nothing usable"); return -1; }
+    *out = malloc(sz);
+    if (!*out) return -1;
+    ag_clipx_write(&k, *out);
+    *on = sz;
+    return 0;
 }
 
 static void drain_lag(void) {
@@ -1990,10 +2034,11 @@ static void drain_lag(void) {
                 snprintf(S.lag_version, sizeof S.lag_version, "%.40s", t + 13);
                 char *sp = strchr(S.lag_version, ' ');
                 if (sp) *sp = 0;
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello", S.lag_version);
+                S.lag_clipx = strstr(t + 13, " clipx") != NULL;
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "");
                 S.lag_hello = 1;
                 S.ag_caps |= VAC_CLIPBOARD;
-                static const char me[] = "lord-vm 1 clipboard";
+                static const char me[] = "lord-vm 2 clipboard clipx";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 ag_broadcast();
             }
@@ -2004,6 +2049,21 @@ static void drain_lag(void) {
                 for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
             }
             if (fd >= 0) close(fd);
+        } else if (f.kind == AGK_CLIPX && S.lag_hello && clip_allows(0) && f.len) {
+            uint8_t *clean = NULL;
+            size_t cn = 0;
+            char what[64];
+            if (clip_clean(f.data, f.len, &clean, &cn, what, sizeof what)) vlog("agent: the guest's clipboard was refused (%s)", what);
+            else {
+                int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+                if (fd >= 0 && !write_all(fd, clean, cn) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+                    VmMsg m = vm_msg(VM_CLIP_DATA, 0, (int)cn, VCF_CLIPX, 0, 0, "");
+                    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
+                    vlog("agent: the guest's clipboard: %s", what);
+                }
+                if (fd >= 0) close(fd);
+            }
+            free(clean);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -2159,9 +2219,25 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         struct stat st;
         ssize_t n = !fstat(fd, &st) && st.st_size == m->a ? pread(fd, buf, (size_t)m->a, 0) : -1;
         close(fd);
-        if (n != m->a || !ag_utf8_ok(buf, (size_t)n)) { reply(ci, m->seq, VME_BAD_REQUEST, "not text"); return; }
-        lag_send(AGK_CLIP, buf, (uint32_t)n);
-        reply(ci, m->seq, VME_OK, "");
+        if (n != m->a) { reply(ci, m->seq, VME_BAD_REQUEST, "unreadable"); return; }
+        if (m->b == VCF_TEXT) {
+            if (n > (ssize_t)AG_TEXT_MAX || !ag_utf8_ok(buf, (size_t)n)) { reply(ci, m->seq, VME_BAD_REQUEST, "not text"); return; }
+            lag_send(AGK_CLIP, buf, (uint32_t)n);
+            reply(ci, m->seq, VME_OK, "");
+            return;
+        }
+        uint8_t *clean = NULL;
+        size_t cn = 0;
+        char what[64];
+        if (clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what)) { reply(ci, m->seq, VME_BAD_REQUEST, what); return; }
+        if (S.lag_clipx) lag_send(AGK_CLIPX, clean, (uint32_t)cn);
+        else {
+            AgClip c;
+            if (!ag_clipx_parse(clean, cn, &c) && c.text) lag_send(AGK_CLIP, c.text, c.text_n);
+            else { free(clean); reply(ci, m->seq, VME_DENIED, "the guest's clipboard helper takes text only"); return; }
+        }
+        free(clean);
+        reply(ci, m->seq, VME_OK, what);
         return;
     }
     case VM_KEEP:
@@ -2206,7 +2282,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;

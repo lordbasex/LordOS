@@ -24,6 +24,8 @@
 #include "../vm/vmthumb.h"
 #include "../vm/vmops.h"
 #include "../vm/logclean.h"
+#include "../vm/vmagent.h"
+#include "../wl/wl.h"
 #include "../sec/json.h"
 #include "ui.h"
 #include "../term/term.h"
@@ -672,6 +674,12 @@ typedef struct {
     char ag_msg[VM_TEXT_MAX];
     char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
     int clip_seq;
+    char *clip_html;                    /* its rich text (sanitized by lord-vm) and picture (header checked by lord-vm,
+                                         * re-encoded by lord-media before it's used), when it came as VCF_CLIPX */
+    uint8_t *clip_png;
+    size_t clip_html_n, clip_png_n;
+    uint64_t clip_last;                 /* what went either way last (its main form's hash): not sent back */
+    unsigned clip_skip_img;             /* the clipboard picture made from the guest's (wl_clip_image_gen): not sent back */
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
@@ -960,8 +968,21 @@ static void from_vm(Sess *s) {
                 if (seals >= 0 && (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) == (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) &&
                     !fstat(fd, &cst) && cst.st_size == m.a) {
                     char *t = malloc((size_t)m.a + 1);
-                    if (t && pread(fd, t, (size_t)m.a, 0) == m.a) { t[m.a] = 0; free(s->clip_in); s->clip_in = t; s->clip_seq++; }
-                    else free(t);
+                    if (t && pread(fd, t, (size_t)m.a, 0) == m.a) {
+                        t[m.a] = 0;
+                        free(s->clip_in); free(s->clip_html); free(s->clip_png);
+                        s->clip_in = s->clip_html = NULL; s->clip_png = NULL; s->clip_html_n = s->clip_png_n = 0;
+                        AgClip cx;
+                        if (m.b == VCF_TEXT) { s->clip_in = t; t = NULL; s->clip_seq++; }
+                        else if (!ag_clipx_parse((const uint8_t *)t, (size_t)m.a, &cx)) {
+                            /* lord-vm checked every part; kept as parts, the picture still to be re-encoded */
+                            if (cx.text && (s->clip_in = malloc(cx.text_n + 1))) { memcpy(s->clip_in, cx.text, cx.text_n); s->clip_in[cx.text_n] = 0; }
+                            if (cx.html && (s->clip_html = malloc(cx.html_n + 1))) { memcpy(s->clip_html, cx.html, cx.html_n); s->clip_html[cx.html_n] = 0; s->clip_html_n = cx.html_n; }
+                            if (cx.png && (s->clip_png = malloc(cx.png_n))) { memcpy(s->clip_png, cx.png, cx.png_n); s->clip_png_n = cx.png_n; }
+                            s->clip_seq++;
+                        }
+                    }
+                    free(t);
                 }
             }
             break;
@@ -1447,6 +1468,120 @@ static JSValue f_clip_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     return s && s->clip_in ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
+}
+
+static uint64_t clip_hash(const void *p, size_t n) {
+    uint64_t h = 1469598103934665603ULL;
+    for (size_t i = 0; i < n; i++) { h ^= ((const uint8_t *)p)[i]; h *= 1099511628211ULL; }
+    return h ^ n;
+}
+
+/* the text of some HTML, for a guest that offered rich text without its plain text: tags out, a few entities back */
+static char *html_text(const char *h, size_t n) {
+    char *o = malloc(n + 1);
+    size_t k = 0;
+    int in_tag = 0;
+    for (size_t i = 0; o && i < n; i++) {
+        char ch = h[i];
+        if (in_tag) { if (ch == '>') in_tag = 0; continue; }
+        if (ch == '<') { in_tag = 1; if (i + 3 < n && (!strncmp(h + i, "<br", 3) || !strncmp(h + i, "<p", 2) || !strncmp(h + i, "</p", 3) || !strncmp(h + i, "</li", 4)) && k && o[k - 1] != '\n') o[k++] = '\n'; continue; }
+        if (ch == '&') {
+            static const struct { const char *e; char c; } E[] = { { "&amp;", '&' }, { "&lt;", '<' }, { "&gt;", '>' }, { "&quot;", '"' }, { "&#39;", '\'' }, { "&nbsp;", ' ' } };
+            int done = 0;
+            for (size_t e = 0; e < sizeof E / sizeof E[0] && !done; e++) { size_t l = strlen(E[e].e); if (i + l <= n && !strncmp(h + i, E[e].e, l)) { o[k++] = E[e].c; i += l - 1; done = 1; } }
+            if (done) continue;
+        }
+        o[k++] = ch;
+    }
+    if (o) o[k] = 0;
+    return o;
+}
+
+/* clipboardApply(session) → "image" | "html" | "text" | "": the guest's last clipboard on this computer's. A picture is
+ * re-encoded in lord-media's sandbox first (decoded and written again as a PNG: nothing the guest crafted reaches an
+ * app) and arrives a moment later; rich text goes with its text (wl_clip_set_html); plain text is left to the app
+ * (clipboard.set, which keeps the history's ways). */
+static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    if (!s) return JS_NewString(c, "");
+    if (s->clip_png) {
+        const char *rt = getenv("XDG_RUNTIME_DIR");
+        char dir[PATH_MAX], dst[PATH_MAX + 64], tmp[PATH_MAX + 64];
+        static unsigned seq;
+        int in = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING), o = -1;
+        if (rt && in >= 0 && write(in, s->clip_png, s->clip_png_n) == (ssize_t)s->clip_png_n && !fcntl(in, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            snprintf(dir, sizeof dir, "%s/lordos", rt);
+            mkdir(dir, 0700);
+            snprintf(dst, sizeof dst, "%s/clip-vm%d-%u.png", dir, (int)getpid(), ++seq);
+            snprintf(tmp, sizeof tmp, "%s/.vm%d-%u.part", dir, (int)getpid(), seq);
+            o = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        }
+        int fds[2] = { in, o }, id = 0;
+        if (in >= 0 && o >= 0) { lseek(in, 0, SEEK_SET); id = media_job(0, MW_EDIT, JP_CLIP, fds, 2, 0, 0, "format=png\n", tmp, dst, 0); }
+        else { if (in >= 0) close(in); if (o >= 0) close(o); }
+        s->clip_last = clip_hash(s->clip_png, s->clip_png_n);
+        s->clip_skip_img = wl_clip_image_gen() + 1;
+        free(s->clip_png); s->clip_png = NULL; s->clip_png_n = 0;
+        return JS_NewString(c, id > 0 ? "image" : "");
+    }
+    if (s->clip_html) {
+        char *txt = s->clip_in ? strdup(s->clip_in) : html_text(s->clip_html, s->clip_html_n);
+        if (!txt) return JS_NewString(c, "");
+        term_set_clipboard(txt, strlen(txt));
+        term_clipboard_mark("machines", 0);
+        wl_clip_set_html(s->clip_html, s->clip_html_n);
+        s->clip_last = clip_hash(s->clip_html, s->clip_html_n);
+        free(txt);
+        free(s->clip_html); s->clip_html = NULL; s->clip_html_n = 0;
+        return JS_NewString(c, "html");
+    }
+    if (s->clip_in) { s->clip_last = clip_hash(s->clip_in, strlen(s->clip_in)); return JS_NewString(c, "text"); }
+    return JS_NewString(c, "");
+}
+
+/* clipboardSendHost(session) → bool: this computer's clipboard for the guest, as it is now: a picture, or text with its
+ * rich text when an app gave some; never a secret (Passwords, password fields). Not sent again if it's what went
+ * either way last. lord-vm checks it all again and sends it on only the ways machine.json allows. */
+static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    if (!s || s->vm < 0) return JS_FALSE;
+    AgClip cx;
+    memset(&cx, 0, sizeof cx);
+    uint64_t h;
+    if (wl_clip_is_image()) {
+        size_t n = 0;
+        const unsigned char *png = wl_clip_png(&n);
+        if (!png || !n || n > AG_PNG_MAX || wl_clip_image_sensitive()) return JS_FALSE;
+        if (wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = clip_hash(png, n); return JS_FALSE; }
+        cx.png = png; cx.png_n = (uint32_t)n;
+        h = clip_hash(png, n);
+    } else {
+        const char *txt = term_clipboard();
+        size_t tn = strlen(txt), hn = 0;
+        if (!tn || tn > AG_TEXT_MAX || term_clipboard_sensitive()) return JS_FALSE;
+        const char *html = wl_clip_html(&hn);
+        cx.text = (const uint8_t *)txt; cx.text_n = (uint32_t)tn;
+        if (html && hn <= AG_TEXT_MAX) { cx.html = (const uint8_t *)html; cx.html_n = (uint32_t)hn; }
+        h = cx.html ? clip_hash(html, hn) : clip_hash(txt, tn);
+    }
+    if (h == s->clip_last) return JS_FALSE;
+    size_t n = ag_clipx_size(&cx);
+    uint8_t *buf = malloc(n);
+    int ok = 0;
+    if (buf) {
+        ag_clipx_write(&cx, buf);
+        int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (fd >= 0 && write(fd, buf, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            VmMsg m = vm_msg(VM_CLIP, ++s->seq, (int)n, VCF_CLIPX, 0, 0, NULL);
+            ok = !vm_send(s->vm, &m, fd);
+        }
+        if (fd >= 0) close(fd);
+        free(buf);
+    }
+    if (ok) s->clip_last = h;
+    return JS_NewBool(c, ok);
 }
 
 /* console(session) → bool: asks lord-vm for the serial console's stream; poll's console is then the terminal session to
@@ -1998,7 +2133,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
+    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

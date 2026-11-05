@@ -44,8 +44,10 @@
  *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
  *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
  *                   into the guest through qemu-guest-agent and enables it) → VM_REPLY
- *     VM_CLIP       the host's clipboard text for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX) of
- *                   UTF-8; sent on only when machine.json's clipboard allows to-guest and lordos-guest said hello
+ *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
+ *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
+ *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
+ *                   lordos-guest said hello (as text only to a helper without "clipx")
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
@@ -60,12 +62,17 @@
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
  *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* (what works now), text = "version\tsystem" as
  *                   the guest reported them (untrusted, shown as text only). Sent on each change and after VM_STATUS
- *     VM_CLIP_DATA  the guest's clipboard text (machine.json allows from-guest): a sealed memfd of a bytes of UTF-8
+ *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
+ *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
+ *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
- *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (the network stopped: passt
- *                   ended while the machine runs; an interrupted operation was finished or rolled back at this
- *                   start), b = detail number (a signal or exit status), text = detail.
+ *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
+ *                   the machine runs, a new one is being attached, or, after 5 in a minute, the machine has no network
+ *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
+ *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
+ *                   Clone's guest got its own hostname and machine-id), b = detail number (a signal or exit status),
+ *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
  * ---- lord-vmdisplay ----
@@ -129,7 +136,9 @@ enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64 };
-#define VM_CLIP_MAX (1u << 20)
+#define VM_CLIP_MAX (11u << 20)
+/* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
+enum { VCF_TEXT = 0, VCF_CLIPX = 1 };
 /* VM_SNAPSHOT a */
 enum { VSN_TAKE = 1, VSN_REVERT, VSN_DELETE };
 
@@ -281,7 +290,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
-                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX));
+                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX)));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -290,7 +299,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
     case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 128;
-    case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX;
+    case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
