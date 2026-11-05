@@ -329,7 +329,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 
 | File | What |
 |---|---|
-| `machine.json` | The description, schema 1 (`machine.h`): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
+| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
 | `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
@@ -740,6 +740,12 @@ snapshot keeps; shared extents and the reflink path weren't seen (no btrfs or XF
 metal; a power cut isn't simulated; the clipboard carries text only; the agent's own shell (6.18) is the serial console for now; Record has
 no sound; the idle-sleep hold wasn't observed; the arm64 build was installed on the Pi (above), where only what's listed there was tried.
 
+**Phase 3, import of other apps' machines.** Built on branch `machines-import` (2026-11-05), from `machines-beta`: *Migrate from another
+app* in the assistant, `lord-vm --import-plan` and `--import-machine`, `lord.vm.importPlan`, `importMachine` and `importInfo`, Configure's
+*Switch to Fast Devices*, `machine.json` schema 3, the tool jail for any number of files (`vm_jail_tool_n`), an import case in
+`vm_recovery.sh`, and `vm_import_identity.sh`. What it reads, keeps, refuses and why, how the SMBIOS UUID is derived, and what was
+measured: 6.22.
+
 ## 4. Guest systems
 
 ### 4.1 Linux
@@ -859,8 +865,9 @@ Steps, each one screen, with Back always available:
 1. **Choose:** cards.
    - Download: Ubuntu, Debian, Fedora, LordOS; Android (later).
    - "Install from an ISO file" (drag a file on it).
-   - "Migrate from another PC" (6.11).
-   - "Import a machine": see 6.22.
+   - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
+     "Migrate from another PC" (6.11), which comes later.
+   - "Import a machine": a qcow2 or raw disk image, see 6.22.
    - "Other architecture…" (behind it, Emulated).
 2. **Detect:** reads the ISO's volume label and boot files to name the system and architecture. Wrong architecture: says so, before anything starts.
 3. **Profile:** see 5.6.
@@ -1185,12 +1192,131 @@ An importer has three steps: **detect** a file or folder, show a **plan** of wha
 
 | Source | Reads | Result |
 |---|---|---|
-| Disk images: qcow2, VMDK, VDI, VHDX, raw | The image | New machine, settings from a profile |
-| OVA, OVF | Descriptor: CPU, memory, disks, networks | Machine with those settings |
+| Disk images: qcow2, raw | The image | New machine, settings from a profile (the assistant's *Import a machine*, `lord-vm --create --import`, 3.9) |
+| Disk images: VMDK, VDI, VHDX, VHD | The image | New machine around it (*Migrate from another app*, below) |
+| OVA, OVF | Descriptor: CPU, memory, disks, networks; a VirtualBox machine section when the package has one | Machine with those settings |
 | Virtual machine bundles of other desktop tools | Their settings file and disks | Settings mapped where they mean the same; disks converted |
-| libvirt domain XML | Domain | Machine with those settings |
+| libvirt domain XML | Domain | Machine with those settings (not built) |
 
 The plan states what's lost. **Snapshots in foreign formats are flattened to the current state.** Saved sessions can't move between engines, so a machine must be shut down first. Encrypted foreign disks need decrypting first. A guest that lacks virtio drivers starts on emulated SATA and an ordinary NIC; the assistant then installs the drivers and switches. A machine of another architecture imports fine and is marked Emulated: moving an arm64 machine to a Pi works natively, moving an amd64 one doesn't. Conversions run in the sandbox, because disk images are hostile input.
+
+**Built** (Phase 3, branch `machines-import`, 2026-11-05): *Migrate from another app* in the assistant, `lord-vm --import-plan SRC` and
+`lord-vm --import-machine SRC DIR`. The goal is an exact clone, so that a licensed guest that is already activated sees as little
+hardware change as possible. User-facing text says "other virtualization apps" and the file extensions; the tools are named only in
+this table of formats, in code identifiers and where a name is a file-format fact.
+
+| Format (the tool that writes it) | Settings | Disks, as read | Snapshots |
+|---|---|---|---|
+| `.vmx` and a `.vmwarevm` folder (VMware Workstation, Fusion) | `key = "value"` lines, `\|XX` escapes; 1 MB at most | VMDK: one sparse file (`KDMV`, its own descriptor), or a descriptor and its extents (`twoGbMaxExtentSparse`, `monolithicFlat`, split flat); stream-optimized | Delta VMDKs naming their parent (`parentFileNameHint`), followed from the current one, each parent named by us |
+| `.vbox` (VirtualBox) | XML | VDI, VMDK, VHD; the media registry's tree | Differencing VDIs: **merged by lord-vm** (QEMU's `vdi` driver can't read a differencing image) |
+| `.pvm` folder with `config.pvs` (Parallels Desktop) | XML | `.hdd` folders: `DiskDescriptor.xml` and `.hds` data files, read with QEMU's `parallels` driver | `.hds` layers of the snapshot tree: **merged by lord-vm** (the driver has no backing) |
+| `.ova`, `.ovf` (OVF, any tool) | XML; an `.ova` is a ustar archive read in place | Stream-optimized VMDK inside the package, read through a `raw` node with `offset` and `size`: nothing is extracted | Flattened at export by the tool |
+| One disk: `.vmdk`, `.vdi`, `.vhdx`, `.vhd`, `.qcow2`, `.img`/`.raw` | none: a machine with this computer's defaults; BIOS or UEFI chosen on the sheet | Format from the first bytes | A VDI layer alone is refused (import its `.vbox`) |
+
+**What is carried over as is**, into `machine.json` schema 3 (`devices`, `nic_model`, `extra_nics`, `cpu_sockets`/`cpu_cores`/`cpu_threads`,
+`smbios`, `disk_serial`, `data_disks`, `rtc`; a schema 2 file is read as is and written as 3 with `machine.json.schema2` kept, 3.6):
+
+| What the guest saw | `.vmx` | `.vbox` | `config.pvs` | OVF | Here |
+|---|---|---|---|---|---|
+| SMBIOS system UUID | `uuid.bios` | `<Hardware uuid>`, else `<Machine uuid>`; `DmiSystemUuid` extra data first | `SystemUuid`, else `VmUuid` | `uuid.bios` extra config, or the VirtualBox section | `-uuid` (the machine's id) |
+| Manufacturer, product, version, serial, SKU, family | `serialNumber`, `hw.model` | `DmiSystemVendor`, `…Product`, `…Version`, `…Serial`, `…SKU`, `…Family`; `AutoSerialNumGen` gives `VirtualBox-<uuid>` | — | the VirtualBox section | `-smbios type=1,…` |
+| Every card's MAC and model | `ethernetN.generatedAddress` / `.address` (static), `virtualDev` | `<Adapter MACAddress type>` | `<NetworkAdapter><MAC>` | `rasd:Address`, `ResourceSubType` | first card on the network, the others present with their MAC, not connected (`extra_nics`, slots 0x18…) |
+| Card model | e1000e, e1000, vmxnet3, vlance → pcnet | 82540EM → e1000, 82545EM → e1000-82545em, 82543GC → e1000-82544gc, Am79C97x → pcnet, virtio | not mapped: e1000e | E1000, VmxNet3, PCNet32 | the same QEMU device where it has one, else e1000e |
+| BIOS or UEFI | `firmware = "efi"` | `<Firmware type="EFI…">` | `EfiEnabled` | `firmware` extra config, the VirtualBox section | SeaBIOS or OVMF (AAVMF on arm64) |
+| vCPUs and topology | `numvcpus`, `cpuid.coresPerSocket` | `<CPU count>` as one socket of that many cores (**Reported**) | `<Cpu><Number>`, one socket | `VirtualQuantity`, `vmw:CoresPerSocket` | `-smp N,sockets=S,cores=C,threads=T` |
+| Memory | `memsize` | `RAMSize` | `<RAM>` | `AllocationUnits` × `VirtualQuantity` | the same, cut to this computer's limit with a note |
+| Disks, order, size | the boot disk (`bios.hddOrder`) first, then scsi, sata, nvme, ide | controllers in order, then port and device | `<Hdd>` in order | `ResourceType` 17 items in order | `system.qcow2` and `data-1…4.qcow2`, same virtual size (not rounded), boot order kept |
+| Disk serial | with `disk.EnableUUID`: the descriptor's `ddb.uuid` (32 characters: too long for SATA, said on the sheet) | the port's `SerialNumber` extra data, else `VB%08x-%08x` of the base image's UUID (DevAHCI.cpp, DevATA.cpp) | `<Serial>` | — | `serial=` on the disk, 20 characters at most |
+| RTC base | local for Windows guest types | `<RTC localOrUTC>`, local by default | local for the Windows type | the VirtualBox section | `-rtc base=localtime` |
+
+**How the UUID is derived.** An app writes 16 bytes into its SMBIOS type 1 table with an SMBIOS version; the guest decodes them. Linux
+(dmidecode, `/sys/class/dmi/id/product_uuid`) swaps the first three fields from SMBIOS 2.6 on and not before; Windows reads them
+little-endian whatever the version. QEMU writes the UUID it gets little-endian in a newer table, so every guest reads back exactly the
+`-uuid` string. So `-uuid` is the string the guest read on the source:
+
+- `.vmx`: the bytes are `uuid.bios` as written. The table is 2.7 with `acpi.smbiosVersion2.7 = "TRUE"`, or for `virtualHW.version` 13 and
+  later when the key is absent, and 2.4 before (**Reported**: the vendor's knowledge base says 13, Red Hat's article on virt-who says 12).
+  Windows guests, and Linux guests on 2.7, read it swapped. **Measured** for a Linux guest on hardware version 19 (below).
+- `.vbox`: the bytes are the hardware UUID in network order unless `<SmbiosUuidLittleEndian enabled="true"/>` (VirtualBox 7 writes it
+  for new machines); a `DmiSystemUuid` value is always in network order; the table is 2.5 (DevPcBios.cpp, DevFwCommon.cpp, Settings.cpp).
+  Linux reads the bytes as stored, Windows little-endian. **Measured** for Linux with a real `.vbox` of VirtualBox 7.2 (below).
+- `config.pvs`: assumed written as the spec says, so read as written (**To test**: no such app or guest here).
+
+A guest whose two readings differ (a Windows guest on VirtualBox's old order, a Linux guest on VMware 2.7) gets its own reading: the
+guest type decides. **The license:** the identifiers are copied, the hardware is still new to the guest, so its system may ask to activate
+again; the sheet says that and nothing more. There is no activation tooling of any kind.
+
+**What the plan sheet states before importing** (`--import-plan`'s `blockers` and `notes`, the mock *Import*): a suspended source
+(`checkpoint.vmState`, a `.vmss`, `stateFile`, a `.sav` or `.mem`) is refused until it's shut down there; the other app holding the
+machine (a `.lck`) is refused; an encrypted machine or disk (`encryption.keySafe`, `CRYPT/` properties, `MachineEncrypted`, an `.hdd`
+encryption engine, a VMDK descriptor's `encryption.`) is refused; more than five disks are refused. Notes: snapshots flattened (how many),
+the virtual TPM can't be carried (with a warning to have the disk's recovery key at hand if the guest encrypts its disk with the TPM),
+Secure Boot off here, UEFI boot entries made again (the guest's fallback loader starts it), attached disc images, shared folders and USB
+rules left out, cards beyond the eighth, a card or a UUID the source didn't keep made new, a disk serial too long for SATA, vCPUs or memory
+cut to this computer. The other architecture is marked Emulated, with *Other architecture…* to read the plan again for the other one.
+
+**Guests without virtio drivers.** Every import starts on `devices: compat`: the system disk and data disks as `ide-hd` on SATA (q35's own
+AHCI, `ide.0`…`ide.4`; on arm64 an `ich9-ahci` in the system disk's slot), the CD/DVD as `ide-cd` on port 5 (so a drivers' disc can go in
+while it runs), a USB tablet (and keyboard on arm64) on `qemu-xhci`, and the card's own model (e1000e when the source's has no QEMU
+twin), MAC kept. Configure → Disks → *Switch to Fast Devices* (`lord-vm --set --devices virtio --nic-model virtio`, the machine off) moves
+it to virtio once the guest has the drivers, and *Switch Back* undoes it. Installing those drivers into a guest that has none (a Windows
+guest: the virtio-win ISO, 4.3) is **Phase 3 work, not done**: today the person inserts the drivers' disc and installs them in the guest.
+
+**Security: every file of the source is hostile.**
+
+- XML (`vmxml.c`): no `<!DOCTYPE`/`<!ENTITY` (no external entities, no entity expansion), the five predefined entities and numeric
+  references only (no NUL, no surrogates), 4 MB, 64 levels, 50,000 elements, 64 attributes each, no recursion, every read bounded; prefixes
+  dropped, no URL resolved. `.vmx` and VMDK descriptors: 1 MB, 20,000 lines. Tar: checksums checked, plain names only, regular files only
+  (a link, a device, a long-name or extended header is refused), sizes inside the file.
+- Paths: a name must be plain (`vmi_rel_ok`: no `..`, `.`, empty component, `/` at the start, `\`, `:`, `~`, control characters); an
+  absolute name is looked for by its last part only, in its folder; the result's real path must be inside the bundle and a regular file (a
+  symlink that stays inside is fine, one that leads out is refused). VMDK extents must be in the descriptor's folder. The new machine can't
+  be made inside the source's folder.
+- Disks: the format comes from the first bytes (`vmi_disk_format`), checked against what the settings say; a qcow2 must have no backing
+  file or data file (`vm_qcow2_plain`); `qemu-img` sees each disk only as a `json:` spec that names every driver, `"backing": null` on the
+  base and each parent named by us (never the header's name), extents opened by the `file` driver, and runs in the tool jail
+  (`vm_jail_tool_n`: `no_new_privs`, our seccomp filter, no TCP, Landlock with read access to exactly the files we resolved and write access to
+  the new `disks/` only). VDI and `.hds` layers are merged by a jailed child of lord-vm (the same jail, no exec) that checks every block table
+  entry against its file and writes one sparse raw file, then converted by the jailed `qemu-img`; the raw file is removed.
+- The result: each disk passes `vm_qcow2_plain`; files are 0600; the source's files are only read (`O_NOFOLLOW`).
+
+**Interrupted imports** (3.6): the machine is made in `<library>/.<name>.part-<pid>` with `operation.json` "import" (source and target), and
+renamed into place after `machine.json`; `operation.json` goes last. A killed import leaves its hidden folder, which the next import or
+clone in the library removes (the pid is gone), and says so; `qemu-img` and the merge die with lord-vm (`PR_SET_PDEATHSIG`). An intent left
+after the rename is closed at the machine's next start (*the import had finished*). `vm_recovery.sh`'s import case kills it mid-conversion.
+
+**Tests.** `tests/vmimport_test.c` (run by `make test` under ASan and UBSan, 138 checks): one invented fixture per format in
+`tests/vmimport/` (two `.vmx`, three `.vbox`, a `config.pvs`, a `DiskDescriptor.xml`, an `.ovf`, a split VMDK descriptor) with every mapping
+above, the UUID rules for each SMBIOS version and guest type, VirtualBox's default serial, tar members, XML refusals (XXE, entity
+expansion, unknown entities, NUL, surrogates, mismatched tags, depth, size, element count), and every fixture truncated at every length and
+mutated at random, 37,841 parser runs with no fault. `tests/vm_import_test.sh` (no guest boots; 44 checks, VM116, 2026-11-05): a disk named
+with `..`, by an absolute path, through a symlink out; an extent with `..`, a device path, a symlink out; a snapshot whose parent is outside;
+a qcow2 with a backing file under a `.vmdk` name; an encrypted, a suspended and an open machine; XXE and entity expansion in a `.vbox`; a
+`.vbox` location and an `.hds` file with `..`; `.ova` members with `..` and a link; an `.ovf` href with `..`: all refused, nothing made, the
+secret file in no new disk. Merges byte for byte: a split VMDK with two snapshots, two differencing VDIs (a block replaced, one zeroed), an
+`.hds` snapshot layer; the sources unchanged (checksums before and after); an `.hds` block table entry past the file's end refused at merge.
+`tests/vm_import_identity.sh` (boots each import with KVM; the guest reports on its serial line): below.
+
+**Identity, measured** (VM116, Debian 13, nested KVM, the official Debian 13 nocloud image as the guest, 2026-11-05):
+
+| Source | Guest's `product_uuid` | Guest's MACs and drivers | Other |
+|---|---|---|---|
+| `.vmx`, virtualHW 19, `uuid.bios "56 4d 12 34 56 78 9a bc-de f0 11 22 33 44 55 66"` | `34124d56-7856-bc9a-def0-112233445566` (2.7: swapped), as derived | `00:0c:29:ab:cd:ef/e1000e`, `00:50:56:01:02:03/vmxnet3` | serial `EX-VMX-0001`, UEFI, 1 socket × 2 cores, the data disk's snapshot data and its exact size (64 MiB) |
+| `.vbox` made by VirtualBox 7.2.22's `VBoxManage` (hardware UUID `01234567-89ab-4def-8123-456789abcdef`, stored little-endian) | `67452301-ab89-ef4d-8123-456789abcdef`, as derived | `08:00:27:1a:2b:3c/e1000`, `08:00:27:1a:2b:3d/virtio_net` | serial `EX-VBOX-0001`, vendor `Example Systems`, SATA serial `VB…` as derived from the VDI's UUID, BIOS |
+| its `.ova` export (`VBoxManage export`) | the same | the same | serial and vendor from the package's machine section |
+| `config.pvs` (`SystemUuid {feedface-1111-4222-8333-444455556666}`) | `feedface-1111-4222-8333-444455556666` | `00:1c:42:ab:cd:ef/e1000e` | UEFI |
+| a loose VHDX | a new one | a new one | booted from SATA |
+
+VirtualBox couldn't run its machine on VM116 (no `vboxdrv`), so what its own guest read wasn't seen: the derivation is from its source code,
+and the measurement is that our guest reads what that derivation gives. No VMware or Parallels app was available: those fixtures are made
+by `qemu-img` and written by hand from their file formats.
+
+**Not done or not verified:** installing virtio drivers into a guest that has none (above); a Windows guest wasn't imported (no image or
+license here), so the little-endian reading and the RTC are from the rules above, not seen; VMware's encrypted descriptors (the whole
+descriptor encrypted) are refused only when the `.vmx` or descriptor says `encryption.`; `.vhd` fixed images are recognized by name;
+an `.ova` with compressed or chunked disks is refused; `.hdd` disks split into several storages are refused; a VMDK's `ddb.uuid` serial
+can't go on SATA; extra cards aren't connected; cancelling an import from the sheet; the manifest (`.mf`) of an `.ova` isn't checked; the
+plan's space estimate counts the source's files, not what the guest wrote; libvirt XML.
 
 ### 6.23 Reaching a machine from another computer
 
@@ -1540,7 +1666,7 @@ Machines (React + LordOS SDK)
 | **0, Technical proof** | No app. KVM, QEMU, QMP and D-Bus display: a Debian 13 guest with picture and input on amd64 and Pi 5, over direct QMP. Answers 2.2's open items: 4K guest on 16K host, Pi GICv2, GICV trapping by kernel, TCG numbers, `ui-dbus` on arm64, nested checks, `device=/dev/fdset`, formats and modifiers per GPU, desktop under load. No agent, no 3D, no USB, no snapshots | Done 2026-11-04: numbers in section 13, open items in 13.8 |
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
 | **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta): the gates pass on nested amd64; the Linux download cards, the gates on the Pi and on bare metal are still open |
-| **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import, backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
+| **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import (import of other apps' machines built, 6.22), backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
 | **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
 
@@ -1596,7 +1722,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | virtio-win guest with optional unattended install, skipping Setup | 3 | Partly | amd64 and arm64; can't be promised across releases; no activation (4.3) |
 | Drivers attached during install, tools at the end | 3 | Yes | Pinned versions |
 | Migrate from a physical PC | 4 | Work | Driver injection is delicate |
-| Import qcow2, VMDK, VDI, VHDX, OVA, other tools' bundles | 3 | Yes | Snapshots flattened, saved sessions lost (6.22) |
+| Import qcow2, VMDK, VDI, VHDX, OVA, other tools' bundles | 3 | Yes | Built (6.22): identity kept (SMBIOS UUID, MACs, serials, firmware, topology); snapshots flattened, saved sessions refused, vTPM lost |
 | Android guest | 4 | Partly | Own image needed |
 | Guests tied to one maker's hardware | never | No | Not offered: neither licensed nor possible on these hosts |
 
