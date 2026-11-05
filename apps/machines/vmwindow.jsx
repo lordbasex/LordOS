@@ -176,7 +176,7 @@ export function MachineWindow({ dir, name: name0 }) {
     const why = v.why ? tr(`machines.why.${v.why}`) : '';
     const detail = [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n');
     card = <Card title={tr(`machines.state.${v.key}`)} text={[why, v.why ? tr(`machines.fix.${v.why}`, { code: st.code }) : tr('machines.win.stoppedHint')].filter(Boolean).join(' ')}
-      detail={log || detail || ''} actions={[<Button key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
+      detail={v.why ? (log || detail || '') : ''} actions={[<Button key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {
