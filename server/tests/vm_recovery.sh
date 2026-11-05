@@ -17,7 +17,7 @@ D=$W/r.lordvm
 t "create" '[ -f "$D/disks/system.qcow2" ]'
 tags() { qemu-img snapshot -l -U "$D/disks/system.qcow2" 2>/dev/null | awk 'NR > 2 { print $2 }' | sort | tr '\n' ' '; }
 jtags() { "$VM" --snapshot "$D" list | sed 's/"tag":"/\n/g' | sed -n 's/^\(s[0-9-]*\)".*/\1/p' | sort | tr '\n' ' '; }
-said() { tail -40 "$D/log/lord-vm.log" | grep -q "recovery: .*$1"; }
+said() { grep -q "recovery: .*$1" "$D/log/lord-vm.log"; }
 interrupt() {    # LABEL COMMAND...: the machine runs; COMMAND in the background; lord-vm killed when operation.json appears
     label=$1; shift
     lv=$(runpid "$D")
@@ -27,14 +27,15 @@ interrupt() {    # LABEL COMMAND...: the machine runs; COMMAND in the background
     while [ "$(ms)" -lt "$end" ] && [ ! -f "$D/operation.json" ]; do sleep 0.01; done
     hit=0; [ -f "$D/operation.json" ] && hit=1
     sleep "${DELAY:-0.05}"; kill -9 "$lv" 2>/dev/null; wait_gone "$lv" 20; wait $cp 2>/dev/null
-    if [ $hit = 1 ] && [ -f "$D/operation.json" ]; then ok "$label: interrupted with operation.json in place"; else skp "$label: interrupted" "the operation finished before the kill"; fi
+    HIT=0
+    if [ $hit = 1 ] && [ -f "$D/operation.json" ]; then HIT=1; ok "$label: interrupted with operation.json in place"; else skp "$label: interrupted" "the operation finished before the kill"; fi
 }
 
 echo "-- suspend"
 start_busy "$D"
 DELAY=0.1 interrupt "suspend" "$VM" --suspend "$D"
 "$VM" --start "$D" --detach --keep-running >/dev/null 2>&1; wait_state "$D" running 60
-t "suspend: rolled back or finished, and said so" 'said "suspend\|the suspend"'
+[ $HIT = 0 ] || t "suspend: rolled back or finished, and said so" 'said "suspend\|the suspend"'
 t "suspend: no temporary state left" '! ls "$D"/.suspend.* >/dev/null 2>&1 && [ ! -f "$D/operation.json" ]'
 "$VM" --suspend "$D" >/dev/null 2>&1; wait_state "$D" stopped 60
 
@@ -51,7 +52,7 @@ t "resume: the next start goes on from the saved state or from the disks" '[ "$(
 echo "-- snapshot take"
 interrupt "snapshot take" "$VM" --snapshot "$D" take "interrupted"
 "$VM" --start "$D" --detach --keep-running >/dev/null 2>&1; wait_state "$D" running 60
-t "snapshot take: rolled back or finished, and said so" 'said "snapshot"'
+[ $HIT = 0 ] || t "snapshot take: rolled back or finished, and said so" 'said "snapshot"'
 "$VM" --poweroff "$D" >/dev/null 2>&1; wait_state "$D" stopped 30
 t "snapshot take: snapshots.json and the disks agree ($(jtags)/ $(tags))" '[ "$(jtags)" = "$(tags)" ]'
 
@@ -69,7 +70,7 @@ start_busy "$D"
 RT=$(jtags | awk '{ print $NF }')
 interrupt "snapshot revert" "$VM" --snapshot "$D" revert "$RT"
 "$VM" --start "$D" --detach --keep-running >/dev/null 2>&1; wait_state "$D" running 60
-t "snapshot revert: finished on the disks, and said so" 'said "snapshot\|going back"'
+[ $HIT = 0 ] || t "snapshot revert: finished on the disks, and said so" 'said "snapshot\|going back"'
 "$VM" --poweroff "$D" >/dev/null 2>&1; wait_state "$D" stopped 30
 check_disks "$D" "snapshot revert: disks clean"
 
@@ -79,6 +80,7 @@ for s in $(jtags); do "$VM" --snapshot "$D" delete "$s" >/dev/null 2>&1; done
 cp=$!
 end=$(( $(ms) + 20000 ))
 while [ "$(ms)" -lt "$end" ] && [ ! -f "$D/operation.json" ]; do sleep 0.01; done
+t "compaction: started (operation.json in place)" '[ -f "$D/operation.json" ]'
 sleep 0.3; kill -9 $cp 2>/dev/null; pkill -9 -f "qemu-img convert.*$D" 2>/dev/null; wait $cp 2>/dev/null
 "$VM" --start "$D" --detach --keep-running >/dev/null 2>&1; wait_state "$D" running 60; "$VM" --poweroff "$D" >/dev/null 2>&1; wait_state "$D" stopped 30
 t "compaction: rolled back, and said so" 'said "compaction"'

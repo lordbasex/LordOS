@@ -2378,7 +2378,18 @@ static int recover(void) {
         int match = 0;
         for (ssize_t k = 0; k + 36 <= n; k++) if (!memcmp(buf + k, S.m.id, 36)) { match = 1; break; }
         if (i == 1 && !match && strstr(buf, "passt")) match = 1;
-        if (match) { vlog("recovery: process %ld of the old run is still there: killing it", pids[i]); kill((pid_t)pids[i], SIGKILL); }
+        if (match) {
+            vlog("recovery: process %ld of the old run is still there: killing it", pids[i]);
+            kill((pid_t)pids[i], SIGKILL);
+            /* not our child: it's gone when /proc says so; until then it still holds its disks' locks */
+            for (int k = 0; k < 100; k++) {
+                char st[64];
+                snprintf(st, sizeof st, "/proc/%ld", pids[i]);
+                if (access(st, F_OK)) break;
+                struct timespec ts = { 0, 50000000 };
+                nanosleep(&ts, NULL);
+            }
+        }
     }
     RunInfo lost = r;
     lost.state = VS_CRASHED;
