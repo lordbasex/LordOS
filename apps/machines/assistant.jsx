@@ -1,12 +1,16 @@
 // The New Machine assistant (the approved mock "Assistant"), in the library window: 1 Choose what to run, 2 a profile
 // (CPU, memory, disk), 3 the name, 4 review, 5 create. The system is recognized from the ISO's volume label or the
 // file's name (name and mark), the architecture from the file's name; another architecture is emulated and says so.
-// Downloading a system and migrating from another computer are shown as coming later.
+// Downloading a system is shown as coming later; Migrate from another app opens the import plan (migrate.jsx).
 import { View, Text, TextInput, FilePicker, Toggle, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize } from './model.js';
 import { usePal, OsMark, Btn, gb } from './ui.jsx';
 import { writeMeta } from './meta.js';
+import { Migrate } from './migrate.jsx';
+
+// what Migrate from another app takes: other apps' settings files and packages, and their disk formats
+const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\.pvs)$/i;
 
 const STEPS = ['choose', 'profile', 'name', 'review', 'install'];
 
@@ -83,6 +87,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     setStep(4);
   };
 
+  if (source === 'migrate' && path && !picking) return <Migrate host={host} path={path} names={names} onClose={onClose} onDone={() => onClose()} onStart={(m) => onCreated(m)} />;
   const can = [!!source && !!path && !v.errors.path, true, !v.errors.name, v.ok && !missing.length, false][step];
   const title = tr(`machines.as.title.${STEPS[step]}`);
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
@@ -97,7 +102,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.own')}</Text>
     <View style={{ flexDirection: 'row', gap: 12 }}>
       <Tile title={tr('machines.as.iso')} hint={fileHint('iso')} selected={source === 'iso'} onClick={() => { if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
-      <Tile title={tr('machines.as.migrate')} hint={tr('machines.later')} disabled />
+      <Tile title={tr('machines.as.migrate')} hint={tr('machines.as.migrateHint')} selected={source === 'migrate'} onClick={() => { setPath(''); setSource('migrate'); setPicking(true); }} />
       <Tile title={tr('machines.as.import')} hint={fileHint('import')} selected={source === 'import'} onClick={() => { if (source !== 'import') setPath(''); setSource('import'); setPicking(true); }} />
     </View>
     {path ? (
@@ -217,8 +222,10 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         {step < 3 ? <Btn primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
         {step === 3 ? <Btn primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
       </View>
-      {picking ? <FilePicker title={source === 'iso' ? tr('machines.new.pickIso') : tr('machines.new.pickImage')} filter={source === 'iso' ? /\.iso$/i : /\.(qcow2|img|raw)$/i}
-        onPick={(x) => { chose(Array.isArray(x) ? x[0] : x); setPicking(false); }} onClose={() => setPicking(false)} /> : null}
+      {picking ? <FilePicker title={source === 'iso' ? tr('machines.new.pickIso') : source === 'migrate' ? tr('machines.mig.pick') : tr('machines.new.pickImage')}
+        filter={source === 'iso' ? /\.iso$/i : source === 'migrate' ? MIGRATE_FILES : /\.(qcow2|img|raw)$/i}
+        onPick={(x) => { const pth = Array.isArray(x) ? x[0] : x; if (source === 'migrate') setPath(pth); else chose(pth); setPicking(false); }}
+        onClose={() => { setPicking(false); if (source === 'migrate' && !path) setSource(null); }} /> : null}
     </View>
   );
 }

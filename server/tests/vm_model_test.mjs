@@ -201,5 +201,17 @@ eq('diag fields', [lg.version, lg.sandbox, lg.cgroup.slice(0, 6), lg.started], [
 eq('diag network', lg.network.length, 1);
 eq('diag report', D.reportText({ name: 'X', id: 'i', arch: 'amd64', accel: 'kvm', vcpus: 1, memoryMb: 512, diskGb: 20, firmware: 'uefi', network: 'shared', state: 'running', reason: 'none', suspended: false }, lg, { snapshots: 2 }).split('\n').length, 10);
 
+// ---- the import plan of another app's machine (6.22, migrate.jsx) ----
+const PLAN = '2026-11-05T10:00:00.000Z import: something\n{"kind":"vmx","name":"Work","blockers":[{"code":"saved-state"}],"notes":[{"code":"license"},{"code":"tpm"},{"code":"snapshots-flattened"},{"code":"zzz"}]}';
+const pl = M.parsePlan(PLAN);
+eq('plan parsed', [pl.kind, pl.name], ['vmx', 'Work']);
+eq('plan none', M.parsePlan('lord-vm: nope\n{"progress":1}'), null);
+eq('plan notes in order, unknown ones dropped', M.planNotes(pl), ['snapshots-flattened', 'tpm']);
+eq('plan blockers', M.planBlockers(pl), [{ code: 'saved-state', text: '' }]);
+const pr = M.importProgress('{"progress":12.5,"disk":1,"disks":2}\n2026 import: disk 2\n{"progress":61,"disk":2,"disks":2}\n{"progr');
+eq('import progress', [pr.pct, pr.disk, pr.disks, pr.done], [61, 2, 2, null]);
+eq('import done', M.importProgress('{"progress":100,"disk":1,"disks":1}\n{"imported":true,"dir":"/m/x.lordvm"}').done.dir, '/m/x.lordvm');
+eq('unique names', [M.uniqueName('Work', []), M.uniqueName('Work', ['Work']), M.uniqueName('Work', ['Work', 'Work 2']), M.uniqueName('  ', [])], ['Work', 'Work 2', 'Work 3', 'Imported machine']);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

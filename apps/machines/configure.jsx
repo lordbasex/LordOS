@@ -85,7 +85,7 @@ export function Configure({ dir, section: section0 }) {
     display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
     network: tr(`machines.cfg.net.${m.network}`),
     sound: tr('machines.cfg.sum.sound'),
-    disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
+    disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
     sharing: tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
     agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
     boot: m.firmware === 'uefi' ? 'UEFI' : 'BIOS',
@@ -114,6 +114,9 @@ export function Configure({ dir, section: section0 }) {
       </Row>
       <Row label={tr('machines.cfg.arch')} value={emulated ? `${m.arch}, ${tr('machines.emulatedLower')}` : m.arch} />
       <Row label={tr('machines.cfg.created')} value={(m.created || '').replace('T', ' ').replace('Z', ' UTC')} />
+      {m.imported ? <Row label={tr('machines.cfg.importedFrom')} note={tr('machines.cfg.importedNote')}>
+        <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{meta.importedFrom || '—'}</Text>
+      </Row> : null}
       <Row label={tr('machines.cfg.folder')} last>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{dir}</Text>
@@ -183,6 +186,15 @@ export function Configure({ dir, section: section0 }) {
         <Off off={running}><Stepper value={cur.diskGb} min={m.diskGb} max={2048} width={72} format={(x) => `${x} GB`} onChange={(x) => set({ diskGb: x })} /></Off>
       </Row>
     </Group>
+    {m.dataDisks ? <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks)} last /></Group> : null}
+    {m.imported || m.devices === 'compat' ? <Group>
+      {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
+      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
+        note={(m.devices === 'compat' ? tr('machines.cfg.devCompatNote') : tr('machines.cfg.devFastNote')) + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={m.devices === 'compat' ? tr('machines.cfg.devToFast') : tr('machines.cfg.devToCompat')} disabled={running || !!job}
+          onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>
+      </Row>
+    </Group> : null}
     <Group>
       <Row label={tr('machines.cfg.cd')} value={m.iso ? m.iso.split('/').pop() : tr('machines.cfg.cdEmpty')} last note={running ? tr('machines.cfg.cdRunning') : null}>
         <View style={{ flexDirection: 'row', gap: 8 }}>

@@ -376,3 +376,40 @@ export function resolutions(screenW, screenH, cur) {
   if (cur && cur[0] > 0 && !list.some(([w, h]) => w === cur[0] && h === cur[1])) list.push([cur[0], cur[1]]);
   return list.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
 }
+
+// ---- importing a machine of another virtualization app (6.22) ----
+// The plan is lord-vm --import-plan's JSON (the last line that is an object); null when there's none yet.
+export function parsePlan(out) {
+  const lines = String(out || '').split('\n').filter((l) => l.startsWith('{'));
+  for (let i = lines.length - 1; i >= 0; i--) { try { const p = JSON.parse(lines[i]); if (p && 'blockers' in p) return p; } catch (e) { /* not this one */ } }
+  return null;
+}
+// an import's progress: the last {"progress":…} line, and the result once it's there
+export function importProgress(out) {
+  let pct = 0, disk = 0, disks = 0, done = null;
+  for (const l of String(out || '').split('\n')) {
+    if (!l.startsWith('{')) continue;
+    try {
+      const o = JSON.parse(l);
+      if (typeof o.progress === 'number') { pct = o.progress; disk = o.disk; disks = o.disks; }
+      if (o.imported) done = o;
+    } catch (e) { /* a cut line */ }
+  }
+  return { pct: Math.max(0, Math.min(100, pct)), disk, disks, done };
+}
+// a name the library doesn't have yet: "Name", "Name 2", …
+export function uniqueName(name, names = []) {
+  const base = String(name || '').trim().slice(0, 60) || 'Imported machine';
+  if (!names.includes(base)) return base;
+  for (let k = 2; k < 100; k++) if (!names.includes(`${base} ${k}`)) return `${base} ${k}`;
+  return base;
+}
+// what the plan sheet lists as not coming along, in its order; each is a machines.mig.note.<code> text
+export const PLAN_NOTE_ORDER = ['snapshots-flattened', 'tpm', 'secure-boot-off', 'boot-entries', 'cdrom', 'shared-folders', 'usb', 'too-many-nics',
+  'new-mac', 'new-uuid', 'serial-dropped', 'vcpus-cut', 'memory-cut'];
+export function planNotes(plan) {
+  const codes = (plan?.notes || []).map((n) => n.code);
+  return PLAN_NOTE_ORDER.filter((c) => codes.includes(c));
+}
+// what stops the import: { code, text } in the order lord-vm found them
+export const planBlockers = (plan) => (plan?.blockers || []).map((b) => ({ code: b.code, text: b.text || '' }));
