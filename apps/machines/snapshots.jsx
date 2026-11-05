@@ -33,6 +33,8 @@ function Pic({ src, colors, on }) {
   );
 }
 
+const rowsOf = (items, n) => { const out = []; for (let i = 0; i < items.length; i += n) out.push(items.slice(i, i + n)); return out; };
+
 export function Snapshots({ dir, name: name0 }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
@@ -75,6 +77,19 @@ export function Snapshots({ dir, name: name0 }) {
     return () => clearInterval(timer);
   }, [busy]);
 
+  // how many cards a row takes: the grid's width, looked at twice a second (the window can be resized)
+  const gridRef = useRef(null);
+  const [cols, setCols] = useState(5);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const n = gridRef.current;
+      if (!n) return;
+      const w = lord.getLayout(n.id)[2];
+      const c = Math.max(1, Math.floor((w + 12) / 208));
+      if (w > 0) setCols((x) => (x === c ? x : c));
+    }, 500);
+    return () => clearInterval(timer);
+  }, []);
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
   const v = stateView(m.state, m.reason);
   const meta = readMeta(dir);
@@ -98,22 +113,26 @@ export function Snapshots({ dir, name: name0 }) {
         <Btn primary label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
           onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
       </View>
-      <ScrollView style={{ maxHeight: 520 }} contentStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 6 }}>
-        {list.map((s) => (
-          <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196, height: 250 }}>
-            <Pic src={s.picture} colors={colors} on={sel === s.tag} />
-            <Node on={sel === s.tag} />
-            <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{s.name}</Text>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{when(s.created)}</Text>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{snapSize(s) ? tr('machines.snap.withMemory', { size: bytes(s.vmstate) }) : tr('machines.snap.diskOnly')}</Text>
-          </View>
-        ))}
-        <View style={{ width: 196, height: 250 }}>
-          <Pic src={thumbSrc(dir, thumb.current)} colors={colors} on={false} />
-          <Node on={false} last />
-          <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.snap.now')}</Text>
-          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.state.${v.key}`)}</Text>
-          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.current')}</Text>
+      {/* the timeline in rows of as many cards as the window's width takes, in the window's free height (no spacer beside
+          it: it got half of that), scrolling when there are more rows than fit */}
+      <ScrollView style={{ flex: 1, minHeight: 262 }}>
+        <View ref={gridRef} style={{ gap: 12, paddingBottom: 6 }}>
+          {rowsOf([...list.map((s) => (
+            <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196, height: 250 }}>
+              <Pic src={s.picture} colors={colors} on={sel === s.tag} />
+              <Node on={sel === s.tag} />
+              <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{s.name}</Text>
+              <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{when(s.created)}</Text>
+              <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{snapSize(s) ? tr('machines.snap.withMemory', { size: bytes(s.vmstate) }) : tr('machines.snap.diskOnly')}</Text>
+            </View>
+          )),
+          <View key="now" style={{ width: 196, height: 250 }}>
+            <Pic src={thumbSrc(dir, thumb.current)} colors={colors} on={false} />
+            <Node on={false} last />
+            <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.snap.now')}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.state.${v.key}`)}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.current')}</Text>
+          </View>], cols).map((row, i) => <View key={i} style={{ flexDirection: 'row', gap: 12, height: 250 }}>{row}</View>)}
         </View>
       </ScrollView>
       {!list.length ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.none')}</Text> : null}
@@ -129,7 +148,6 @@ export function Snapshots({ dir, name: name0 }) {
         </View>
       ) : null}
       {cur && !cur.memory && v.active ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.offOnly')}</Text> : null}
-      <View style={{ flex: 1 }} />
       {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
       {busy ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr(`machines.snap.busy.${busy.what}`)}</Text> : null}
       <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{list.length >= lim.warn ? tr('machines.snap.many', { n: lim.warn }) : tr('machines.snap.notBackup')}</Text>
