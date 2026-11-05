@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -105,6 +105,30 @@ eq('beside one, too big emulated', budgetCheck([run('b', 2048, 'kvm')], { dir: '
 eq('same with kvm fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'kvm' }, pi8).ok, true);
 eq('stopped ones do not count', budgetCheck([{ dir: 'b', memoryMb: 4096, accel: 'kvm', state: 'stopped' }], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
 eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+
+// the Control Center and the assistant
+eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');
+eq('system from file', systemOf('', 'ubuntu-24.04-desktop-arm64.iso'), { id: 'ubuntu', name: 'Ubuntu' });
+eq('system unknown', systemOf('MYDISK').id, 'other');
+eq('version', versionOf('debian-13.1.0-amd64-netinst.iso'), '13.1');
+eq('version none', versionOf('netinst.iso'), '');
+eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');
+eq('arch x86', archOf('Fedora-Server-dvd-x86_64-41.iso'), 'amd64');
+eq('arch unknown', archOf('mysystem.iso'), '');
+eq('name', suggestName({ name: 'Debian' }, '13', ['Debian 13']), 'Debian 13 2');
+eq('profile light', profileSize('light', { vcpusRecommended: 3, memMaxMb: 14160 }), { vcpus: 1, memoryMb: 1024, diskGb: 16 });
+eq('profile dev small host', profileSize('development', { vcpusRecommended: 3, memMaxMb: 2897 }), { vcpus: 3, memoryMb: 2816, diskGb: 64 });
+eq('usage first sample', usage(null, { at: 1000, cpuUsec: 5, memBytes: 9, ioBytes: 1 }, 2), { memBytes: 9, cpu: null, disk: false });
+eq('usage 50 %', usage({ at: 1000, cpuUsec: 0, ioBytes: 5 }, { at: 2000, cpuUsec: 1000000, memBytes: 1, ioBytes: 9 }, 2), { memBytes: 1, cpu: 50, disk: true });
+eq('usage off', usage(null, { diskBytes: 5 }, 2), null);
+const sl = [{ dir: 'a', state: 'running' }, { dir: 'b', state: 'stopped' }];
+eq('summary', summaryOf(sl, { a: { memBytes: 1073741824 } }, { ramMb: 4096, libFreeBytes: 50, libTotalBytes: 100 }),
+  { running: { a: 1, b: 2, frac: 0.5 }, memory: { a: 1073741824, b: 4294967296, frac: 0.25 }, free: { a: 50, b: 100, frac: 0.5 } });
+eq('summary without numbers', summaryOf([], {}, {}).memory, null);
+eq('doing shut down', doingOf({ state: 'stopped', reason: 'guest-shutdown' }), 'shutDown');
+eq('doing failed', doingOf({ state: 'crashed', reason: 'start-failed' }), 'crashed');
+eq('thumb', thumbSrc('/h/M/a.lordvm', 1700000000.5), '/h/M/a.lordvm/thumb.png#1700000000');
+eq('no thumb', thumbSrc('/h/M/a.lordvm', 0), '');
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

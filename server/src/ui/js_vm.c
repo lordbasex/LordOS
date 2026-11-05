@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -250,6 +251,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "network", m.network == VM_NET_SHARED ? "shared" : "isolated");
             set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
             set_str(c, o, "iso", m.iso);
+            set_str(c, o, "mac", m.mac);
             set_str(c, o, "created", m.created);
             set_str(c, o, "error", "");
         } else {
@@ -1119,8 +1121,20 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     /* shutdown, poweroff, pause, resume, reset (the library's menu) */
     int type = !w ? -1 : !strcmp(w, "poweroff") ? VM_POWEROFF : !strcmp(w, "shutdown") ? VM_SHUTDOWN : !strcmp(w, "pause") ? VM_PAUSE
              : !strcmp(w, "resume") ? VM_RESUME : !strcmp(w, "reset") ? VM_RESET : -1;
-    int ok = type >= 0 && ask(s, (uint16_t)type, 0) > 0;
+    int seq = type >= 0 ? ask(s, (uint16_t)type, 0) : -1;
+    int ok = seq > 0;
     if (w) JS_FreeCString(c, w);
+    /* lord-vm answers each request: wait for that answer (half a second at most), so it isn't sent to a closed socket */
+    for (int k = 0; ok && k < 8; k++) {
+        struct pollfd pf = { s->vm, POLLIN, 0 };
+        if (poll(&pf, 1, 60) <= 0) continue;
+        VmMsg r;
+        int fd = -1;
+        int got = vm_recv(s->vm, &r, &fd);
+        if (fd >= 0) close(fd);
+        if (got <= 0) break;
+        if (r.type == VM_REPLY && r.seq == (uint32_t)seq) break;
+    }
     close(s->vm);
     memset(s, 0, sizeof *s);
     return JS_NewBool(c, ok);
@@ -1167,6 +1181,35 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     return JS_NewBool(c, !vm_thumb_save(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
+/* screenshot(session) → the file's path, or "": the guest's picture at its size, in ~/Pictures/Screenshots as
+ * "<machine> <date> <time>.png" */
+static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    const char *home = getenv("HOME");
+    if (!m || !m->px || !home || home[0] != '/') return JS_NewString(c, "");
+    char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
+    snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
+    snprintf(dir, sizeof dir, "%s/Pictures/Screenshots", home); mkdir(dir, 0755);
+    VmMachine vm;
+    char err[128];
+    const char *base = !vm_machine_load(s->dir, &vm, err, sizeof err) ? vm.name : "Machine";
+    char clean[VM_NAME_MAX + 1];
+    size_t k = 0;
+    for (const char *q = base; *q && k + 1 < sizeof clean; q++) clean[k++] = (*q == '/' || (unsigned char)*q < 0x20) ? '-' : *q;
+    clean[k] = 0;
+    time_t now = time(NULL);
+    struct tm tmv;
+    localtime_r(&now, &tmv);
+    char when[40];
+    strftime(when, sizeof when, "%Y-%m-%d %H.%M.%S", &tmv);
+    snprintf(name, sizeof name, "%s %s.png", clean, when);
+    if (vm_png_save(dir, name, m->px, m->w, m->h, 8192)) return JS_NewString(c, "");
+    snprintf(path, sizeof path, "%s/%s", dir, name);
+    return JS_NewString(c, path);
+}
+
 /* takes the ISO out of a machine that is off (after an install): machine.json without "iso". Refused while lord-vm
  * holds the machine's lock. true when done */
 static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -1196,7 +1239,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

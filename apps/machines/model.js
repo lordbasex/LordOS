@@ -161,3 +161,86 @@ export const windowTitle = (name, stateText) => (stateText ? `${name} — ${stat
 
 // a folder name for display, from the machine's dir (".../Machines/Debian.lordvm" → "Debian")
 export const folderOf = (dir) => (dir || '').split('/').pop().replace(/\.lordvm$/, '');
+
+// ---- the Control Center (Main) ----
+
+// Systems recognized from an ISO's volume label or a file's name: an id for the card's mark, the name shown. Our own
+// marks (ui.jsx OsMark), never a project's logo.
+const SYSTEMS = [
+  ['lordos', /lordos/i, 'LordOS'], ['debian', /debian|\bd-i\b/i, 'Debian'], ['ubuntu', /ubuntu|kubuntu|xubuntu|lubuntu/i, 'Ubuntu'],
+  ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
+  ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
+  ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
+];
+export function systemOf(...texts) {
+  const s = texts.filter(Boolean).join(' ');
+  for (const [id, re, name] of SYSTEMS) if (re.test(s)) return { id, name };
+  return { id: 'other', name: '' };
+}
+// a version in a file name or label: "debian-13.1.0-amd64" → "13.1"
+export function versionOf(text) {
+  const m = String(text || '').match(/(?:^|[^0-9.])(\d{1,2}(?:\.\d{1,2})?)(?:\.\d+)?(?=[^0-9.]|$)/);
+  return m ? m[1] : '';
+}
+// the architecture a file is built for, from its name (the assistant picks it; '' when the name doesn't say)
+export function archOf(name) {
+  const s = String(name || '').toLowerCase();
+  if (/aarch64|arm64/.test(s)) return 'arm64';
+  if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
+  return '';
+}
+// a machine name from a system and version, unique among names
+export function suggestName(sys, version, names = []) {
+  const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');
+  if (!names.some((n) => n.toLowerCase() === base.toLowerCase())) return base;
+  for (let i = 2; i < 100; i++) { const c = `${base} ${i}`; if (!names.some((n) => n.toLowerCase() === c.toLowerCase())) return c; }
+  return base;
+}
+
+// Profiles in the assistant: what a machine gets, kept within this computer (all but one core, memMaxMb).
+export const PROFILES = ['light', 'standard', 'development'];
+export function profileSize(p, host) {
+  const want = { light: [1, 1024, 16], standard: [2, 2048, 32], development: [4, 4096, 64] }[p] || [2, 2048, 32];
+  const cpus = Math.max(1, Math.min(want[0], host?.vcpusRecommended || 1));
+  const memMax = host?.memMaxMb || want[1];
+  const mem = Math.max(LIMITS.memMin, Math.min(want[1], Math.floor(memMax / 256) * 256 || memMax));
+  return { vcpus: cpus, memoryMb: mem, diskGb: want[2] };
+}
+
+// Card numbers from two samples of lord.vm.stats(dir) (cgroup counters): CPU % of the machine's vCPUs, memory in
+// bytes, disk activity since the last sample. null when the machine isn't running or there's only one sample.
+export function usage(prev, cur, vcpus) {
+  if (!cur || !(cur.at > 0) || !(cur.cpuUsec >= 0)) return null;
+  const out = { memBytes: cur.memBytes >= 0 ? cur.memBytes : null, cpu: null, disk: false };
+  if (prev && prev.at > 0 && cur.at > prev.at && prev.cpuUsec >= 0) {
+    const ms = cur.at - prev.at;
+    out.cpu = Math.max(0, Math.min(100, ((cur.cpuUsec - prev.cpuUsec) / (ms * 1000 * Math.max(1, vcpus || 1))) * 100));
+    out.disk = cur.ioBytes > prev.ioBytes;
+  }
+  return out;
+}
+
+// The three bars at the top: machines running, the memory they use against this computer's, and free disk space
+// where machines live. Each { value: [a, b], frac } or null where there's no real number.
+export function summaryOf(list, usages, host) {
+  const n = (list || []).length;
+  const running = (list || []).filter((m) => stateView(m.state).active);
+  const mem = running.reduce((a, m) => a + (usages?.[m.dir]?.memBytes || 0), 0);
+  const ram = (host?.ramMb || 0) * 1048576;
+  const free = host?.libFreeBytes, total = host?.libTotalBytes;
+  return {
+    running: { a: running.length, b: n, frac: n ? running.length / n : 0 },
+    memory: ram ? { a: mem, b: ram, frac: Math.min(1, mem / ram) } : null,
+    free: free >= 0 && total > 0 ? { a: free, b: total, frac: Math.min(1, free / total) } : null,
+  };
+}
+
+// What a card says it's doing (no guest agent yet: lord-vm's state only)
+export function doingOf(m) {
+  const v = stateView(m?.state, m?.reason);
+  if (v.key === 'stopped' && !v.why) return 'shutDown';
+  return v.key;
+}
+
+// the card picture's path, versioned by its time so the engine loads it again when it changes ('' when none)
+export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math.floor(mtime)}` : '');

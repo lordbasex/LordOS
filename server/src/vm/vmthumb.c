@@ -61,7 +61,7 @@ static void put(void *ud, void *data, int n) {
     }
 }
 
-int vm_thumb_save(const char *dir, const uint32_t *px, int w, int h, int maxw) {
+int vm_png_save(const char *dir, const char *name, const uint32_t *px, int w, int h, int maxw) {
     int ow = 0, oh = 0;
     unsigned char *rgb = vm_thumb_scale(px, w, h, maxw, &ow, &oh);
     if (!rgb) return -1;
@@ -76,7 +76,7 @@ int vm_thumb_save(const char *dir, const uint32_t *px, int w, int h, int maxw) {
         stbi_write_png_compression_level = 3;          /* a quick write: it runs on the UI thread */
         int ok = stbi_write_png_to_func(put, &o, ow, oh, 3, rgb, ow * 3);
         if (close(fd)) o.failed = 1;
-        if (ok && !o.failed && !renameat(dfd, tmp, dfd, "thumb.png")) rc = 0;
+        if (ok && !o.failed && !renameat(dfd, tmp, dfd, name)) rc = 0;
         else unlinkat(dfd, tmp, 0);
     }
     close(dfd);
