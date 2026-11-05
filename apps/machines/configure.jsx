@@ -3,8 +3,8 @@
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES } from './model.js';
-import { usePal, has, gb, bytes, Bar, Btn, OsMark } from './ui.jsx';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf } from './model.js';
+import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'boot', 'security'];
@@ -77,8 +77,9 @@ export function Configure({ dir, section: section0 }) {
     if (!id) setMsg({ ok: false, text: tr('machines.cfg.refused') }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
   };
   const emulated = m.accel === 'tcg';
+  const prof = profileOf({ ...m, ...draft }, host, meta.profile);
   const summary = {
-    general: [meta.osName || systemOf(m.name).name, m.arch].filter(Boolean).join(', '),
+    general: [meta.osName || systemOf(m.name).name, m.arch, prof ? tr(`machines.as.profile.${prof}`) : null].filter(Boolean).join(', '),
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
@@ -103,6 +104,12 @@ export function Configure({ dir, section: section0 }) {
           <View style={{ flex: 1 }}><TextInput value={meta.osName || ''} placeholder={tr('machines.cfg.systemPlaceholder')}
             onChange={(x) => { writeMeta(dir, { osName: x }); setMeta(readMeta(dir)); }} /></View>
         </View>
+      </Row>
+      <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
+          items={PROFILES.map((k) => { const s = profileSize(k, host); return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
+            hint: tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) }),
+            onClick: () => { set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
       </Row>
       <Row label={tr('machines.cfg.arch')} value={emulated ? `${m.arch}, ${tr('machines.emulatedLower')}` : m.arch} />
       <Row label={tr('machines.cfg.created')} value={(m.created || '').replace('T', ' ').replace('Z', ' UTC')} />

@@ -4,17 +4,16 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, FilePicker, Toggle, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, MediaView, ScrollView, FilePicker, Toggle, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
 
 const BAR = 48;
-const RESOLUTIONS = [[1280, 800], [1600, 900], [1920, 1080], [2560, 1440]];
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
@@ -25,16 +24,20 @@ const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'disp
 function Tools({ ctl, floating }) {
   const p = usePal();
   const { st, a, full, follow } = ctl;
+  // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
-    { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
+    ...resolutions(screen.width, screen.height, st?.w ? [st.w, st.h] : null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: !follow && st?.w === w && st?.h === h, disabled: !a.keys, onClick: () => ctl.fixed(w, h) })),
     '-',
-    ...RESOLUTIONS.map(([w, h]) => ({ label: `${w} × ${h}`, checked: !follow && st?.w === w && st?.h === h, disabled: !a.keys, onClick: () => ctl.fixed(w, h) })),
+    { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
+    { label: tr('machines.tb.sizesNote'), disabled: true },
   ];
   return <>
+    {ctl.rec ? <Btn danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
     <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
     <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
     <Btn label={tr('machines.cmd.logs')} onClick={ctl.logs} style={{ height: 30 }} />
     <Btn label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} style={{ height: 30 }} />
+    {!ctl.rec ? <Btn label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} style={{ height: 30 }} /> : null}
     <Btn label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} style={{ height: 30 }} />
     <MenuBtn label={tr('machines.cmd.power')} items={ctl.power} />
     {!floating ? <Btn label={tr('machines.cmd.configure')} onClick={ctl.configure} style={{ height: 30 }} /> : null}
@@ -150,6 +153,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [cdWant, setCdWant] = useState(null);       // the disc asked for while lord-vm changes it
   const [cdErr, setCdErr] = useState('');
   const snapJobs = useRef([]);
+  const [rec, setRec] = useWindowState('vm.rec', null);       // { id, at } while the picture is recorded
+  const [, tick] = useState(0);
+  useEffect(() => { if (!rec) return undefined; const t2 = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t2); }, [rec]);
   const box = useRef(null);
   const root = useRef(null);
   const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0 });
@@ -298,7 +304,25 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!r) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.snap.failed'), body: '', sound: false });
     else snapJobs.current.push(r.job);
   };
+  // Record (6.20): the machine's own picture into ~/Pictures/Screenshots, no screen permission; a second click stops it
+  const record = () => {
+    if (rec) { media.stop(rec.id); return; }
+    const id = sid ? lord.vm.record(sid) : 0;
+    if (!id) { notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.tb.recordFailed'), body: '', sound: false }); return; }
+    setRec({ id, at: now() });
+    const off = media.on(id, (type, d) => {
+      if (type !== 'done') return;
+      off();
+      setRec(null);
+      const secs = Math.round((d.duration || 0) / 1000);
+      notify({ app: 'machines', label: tr('machines.title'), title: d.ok ? tr('machines.tb.recSaved') : tr('machines.tb.recordFailed'),
+        body: d.ok ? tr('machines.tb.recSavedBody', { file: (d.path || '').split('/').pop(), m: Math.floor(secs / 60), s: secs % 60 }) : '', sound: false,
+        actions: d.ok && d.path ? [{ id: 'open', label: tr('machines.tb.open'), run: () => openFileWithApps(d.path, (d.path || "").split("/").pop()) }, { id: 'show', label: tr('machines.cmd.showInFiles'), run: () => revealPath(d.path) }] : [] });
+    });
+  };
+  const recSecs = rec ? Math.floor((now() - rec.at) / 1000) : 0;
   const ctl = {
+    rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,
     setFull: (on) => wm.setFullscreen(winId, on),
     setFollow: (on) => { setFollow(on); sized.current.last = null; },

@@ -135,6 +135,12 @@ MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h);
 void media_capture_size(int *w, int *h);     /* recording / remote desktop frame size (docs/DISPLAYS.md) */
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
 int  media_screenrec_start(MediaSrc *s, int fps);
+/* A recording of one picture instead of the screen (a Machines guest, 6.20): the same input ring and encoder, w × h
+ * fixed at start; the caller feeds it (a picture of another size is drawn into its top left, the rest black). It never
+ * becomes the screen recording, so the screen keeps its own. 0 ok. */
+int  media_framerec_start(MediaSrc *s, int w, int h, int fps);
+/* one frame, at most at the recording's rate (sooner ones are skipped); 1 sent, 0 skipped */
+int  media_framerec_feed(MediaSrc *s, const uint32_t *px, int w, int h);
 void media_capture_src_closed(MediaSrc *s);
 int  media_memfd_from_pixels(const uint32_t *px, int w, int h);
 

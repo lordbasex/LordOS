@@ -28,7 +28,7 @@ export function Storage() {
     const ms = lord.vm.list();
     for (const m of s.machines) {
       const x = ms.find((y) => y.dir === m.dir);
-      m.state = x?.state; m.reason = x?.reason;
+      m.runState = x?.state; m.runReason = x?.reason;
       m.meta = readMeta(m.dir);
     }
     setSt(s); setList(ms);
@@ -62,7 +62,7 @@ export function Storage() {
   const bar = storageBar(st);
   const cur = rows.find((r) => r.key === sel) || null;
   const m = cur?.machine;
-  const on = m && stateView(m.state, m.reason).active;
+  const on = m && stateView(m.runState, m.runReason).active;
   const colors = { machines: '#0a84ff', isos: '#ffb340', trash: '#ff6b6b', other: '#8a8a94' };
   const trash = (x) => {
     setDel(null);

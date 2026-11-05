@@ -19,6 +19,8 @@ export function readMeta(dir) {
       if (typeof j.notes === 'string') meta.notes = j.notes.slice(0, 4000);
       if (['ask', 'suspend', 'shutdown', 'keep'].includes(j.onClose)) meta.onClose = j.onClose;
       if (typeof j.keepAwake === 'boolean') meta.keepAwake = j.keepAwake;
+      if (typeof j.profile === 'string' && /^[a-z]{1,16}$/.test(j.profile)) meta.profile = j.profile;
+      if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });

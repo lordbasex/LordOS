@@ -36,7 +36,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [sys, setSys] = useState({ id: 'other', name: '' });
   const [ver, setVer] = useState('');
   const [arch, setArch] = useState(host.arch);
-  const [profile, setProfile] = useState('standard');
+  const [profile, setProfile] = useState('productivity');
   const [name, setName] = useState('');
   const [rootPassword, setRootPassword] = useState('');
   const [customize, setCustomize] = useState(false);
@@ -44,7 +44,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [fail, setFail] = useState(null);
   const other = host.arch === 'amd64' ? 'arm64' : 'amd64';
   const size = profileSize(profile, host);
-  const d = { name, arch, ...size, source: source === 'iso' ? 'iso' : 'import', path, rootPassword };
+  const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' ? 'iso' : 'import', path, rootPassword };
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [arch]);
   const emulated = arch !== host.arch;
@@ -67,7 +67,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       if (!r || !r.done) return;
       setJob(0);
       if (r.ok) {
-        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' ') });
+        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
         if (customize) onConfigure(m || null); else onCreated(m || null);
       } else setFail(r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() || '?');
@@ -110,17 +110,28 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     ) : null}
     {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr('machines.as.emulated', { arch, host: host.arch })}</Text></View> : null}
   </>;
-  else if (step === 1) body = <>
-    <View style={{ flexDirection: 'row', gap: 12 }}>
-      {PROFILES.map((k) => { const s = profileSize(k, host); return (
-        <Tile key={k} height={130} selected={profile === k} onClick={() => setProfile(k)} title={tr(`machines.as.profile.${k}`)}
-          hint={tr(`machines.as.profileHint.${k}`)}>
-          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.size', { cpus: s.vcpus, mem: gb(s.memoryMb), disk: s.diskGb })}</Text>
-        </Tile>); })}
-    </View>
-    <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.as.profileNote', { mem: gb(host.memMaxMb) })}</Text>
+  else if (step === 1) {
+    // the mock "Profiles": two columns of cards, each with what it's for and what it gives on this computer
+    const rows = [];
+    for (let i = 0; i < PROFILES.length; i += 2) rows.push(PROFILES.slice(i, i + 2));
+    body = <>
+    <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.as.profileFits', { cpus: host.cpus, mem: gb(host.ramMb) })}</Text>
+    {rows.map((r, i) => (
+      <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
+        {r.map((k) => { const s = profileSize(k, host); return (
+          <View key={k} onClick={() => setProfile(k)} style={{ flex: 1, minHeight: 92, paddingHorizontal: 14, paddingVertical: 10, gap: 4, borderRadius: 10,
+            backgroundColor: p.card, border: `2px solid ${profile === k ? p.accent : p.line}` }}>
+            <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr(`machines.as.profile.${k}`)}</Text>
+            <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr(`machines.as.profileHint.${k}`)}</Text>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) })}</Text>
+          </View>); })}
+        {r.length < 2 ? <View style={{ flex: 1 }} /> : null}
+      </View>
+    ))}
+    {size.gfx === '3d' ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.no3d')}</Text> : null}
     {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.emulatedShort')}</Text></View> : null}
   </>;
+  }
   else if (step === 2) body = <>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
       <OsMark id={sys.id} size={56} />
@@ -150,7 +161,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       [tr('machines.as.r.cpu'), tr('machines.vcpus', { n: size.vcpus })],
       [tr('machines.as.r.memory'), gb(size.memoryMb)],
       [tr('machines.as.r.disk'), source === 'iso' ? tr('machines.as.r.diskNew', { n: size.diskGb }) : tr('machines.as.r.diskCopy', { n: size.diskGb })],
-      [tr('machines.as.r.network'), tr('machines.as.r.shared')],
+      [tr('machines.as.r.profile'), tr(`machines.as.profile.${profile}`)],
+      [tr('machines.as.r.network'), tr(`machines.cfg.net.${size.network}`)],
       [tr('machines.as.r.where'), `~/Machines/${name}.lordvm`],
     ];
     body = <>

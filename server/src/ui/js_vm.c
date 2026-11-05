@@ -326,6 +326,14 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     const char *name = JS_ToCString(c, vn), *arch = JS_ToCString(c, va);
     int vcpus = prop_int(c, argv[0], "vcpus"), mem = prop_int(c, argv[0], "memoryMb"), disk = prop_int(c, argv[0], "diskGb");
     char imp[PATH_MAX] = "", iso[PATH_MAX] = "";
+    int isolated = 0;
+    {
+        JSValue vnet = JS_GetPropertyStr(c, argv[0], "network");
+        const char *ns = JS_IsString(vnet) ? JS_ToCString(c, vnet) : NULL;
+        isolated = ns && !strcmp(ns, "isolated");
+        if (ns) JS_FreeCString(c, ns);
+        JS_FreeValue(c, vnet);
+    }
     int has_imp = JS_IsString(vi), has_iso = JS_IsString(vs);
     int ok = name && arch && vm_name_valid(name) && (!strcmp(arch, "amd64") || !strcmp(arch, "arm64")) &&
              vcpus >= 1 && vcpus <= VM_VCPUS_MAX && mem >= VM_MEM_MIN_MB && mem <= VM_MEM_MAX_MB &&
@@ -358,7 +366,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
         char *args[] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
-                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
+                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
         int p[2];
         if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
         else {
@@ -628,6 +636,8 @@ typedef struct {
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
+    int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
+    double rec_fed;
     int notice;                         /* VM_NOTICE: VMN_*, and its words */
     char notice_text[VM_TEXT_MAX];
 } Sess;
@@ -1000,6 +1010,15 @@ static void from_vd(Sess *s) {
         s->frames += frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
+    /* the recording takes the picture as it changes, and at least once a second while it doesn't */
+    if (s->rec && ms && ms->px) {
+        MediaSrc *r = media_src_get(s->rec);
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        double now = ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+        if (!r || r->kind != SK_SCREENREC) s->rec = 0;
+        else if ((frames || now - s->rec_fed > 1000) && media_framerec_feed(r, ms->px, ms->w, ms->h)) s->rec_fed = now;
+    }
 }
 
 /* VD_FRAME_DONE once the engine read the picture (the media node painted that frame); a hidden window never
@@ -1187,6 +1206,7 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s) return JS_UNDEFINED;
+    if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
     drop_display(s, 1);
     drop_creds(s);
     if (s->vm >= 0) close(s->vm);
@@ -1300,6 +1320,50 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (vm_png_save(dir, name, m->px, m->w, m->h, 8192)) return JS_NewString(c, "");
     snprintf(path, sizeof path, "%s/%s", dir, name);
     return JS_NewString(c, path);
+}
+
+/* record(session) → a media id (0: couldn't): the guest's picture at its size into ~/Pictures/Screenshots as
+ * "<machine> <date> <time>.mp4", the way the Screenshots app records (lord-media, hardware encoding where there is
+ * some). No screen-capture permission: it's the machine's own picture, never the screen, so protected windows can't be
+ * in it. Stopped with lord.media.stop(id) (its "done" event names the file), or when the window closes. */
+static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    const char *home = getenv("HOME");
+    if (!m || !m->px || m->w < 16 || m->h < 16 || !home || home[0] != '/' || s->rec) return JS_NewInt32(c, 0);
+    char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
+    snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
+    snprintf(dir, sizeof dir, "%s/Pictures/Screenshots", home); mkdir(dir, 0755);
+    VmMachine vm;
+    const char *base = !vm_machine_load(s->dir, &vm, NULL, 0) ? vm.name : "Machine";
+    char clean[VM_NAME_MAX + 1];
+    size_t k = 0;
+    for (const char *q = base; *q && k + 1 < sizeof clean; q++) clean[k++] = (*q == '/' || (unsigned char)*q < 0x20) ? '-' : *q;
+    clean[k] = 0;
+    time_t now = time(NULL);
+    struct tm tmv;
+    localtime_r(&now, &tmv);
+    char when[40];
+    strftime(when, sizeof when, "%Y-%m-%d %H.%M.%S", &tmv);
+    snprintf(name, sizeof name, "%s %s.mp4", clean, when);
+    snprintf(path, sizeof path, "%s/%s", dir, name);
+    MediaSrc *r = media_src_new(SK_SCREENREC, "machines");
+    if (!r) return JS_NewInt32(c, 0);
+    int fd = media_open_output(path, r->tmp, sizeof r->tmp, r->dst, sizeof r->dst);
+    if (fd < 0) { media_src_close(r); return JS_NewInt32(c, 0); }
+    int render = media_render_fd(), W = m->w & ~1, H = m->h & ~1;
+    char params[160];
+    snprintf(params, sizeof params, "width=%d\nheight=%d\nfps=30\nhw=%d\nhwaccel=%s\n", W, H, render >= 0, media_hwaccel());
+    int fds[3] = { fd, -1, render };
+    r->sock = media_spawn(MK_SCREENREC, params, fds, 3, &r->pid);
+    close(fd);
+    if (render >= 0) close(render);
+    if (r->sock < 0 || media_framerec_start(r, W, H, 30)) { media_src_close(r); return JS_NewInt32(c, 0); }
+    s->rec = r->id;
+    s->rec_fed = 0;
+    media_framerec_feed(r, m->px, m->w, m->h);
+    return JS_NewInt32(c, r->id);
 }
 
 /* takes the ISO out of a machine that is off (after an install): machine.json without "iso". Refused while lord-vm
@@ -1794,7 +1858,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
-    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

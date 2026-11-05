@@ -96,7 +96,7 @@ export function budgetCheck(list, m, host) {
 
 // what lord.vm.create takes
 export function createRequest(d) {
-  const r = { name: d.name.trim(), arch: d.arch, vcpus: d.vcpus, memoryMb: d.memoryMb, diskGb: d.diskGb };
+  const r = { name: d.name.trim(), arch: d.arch, vcpus: d.vcpus, memoryMb: d.memoryMb, diskGb: d.diskGb, network: d.network === 'isolated' ? 'isolated' : 'shared' };
   if (d.source === 'iso') r.iso = d.path; else r.import = d.path;
   if (d.source !== 'iso' && d.rootPassword) r.rootPassword = d.rootPassword;
   return r;
@@ -200,14 +200,33 @@ export function suggestName(sys, version, names = []) {
   return base;
 }
 
-// Profiles in the assistant: what a machine gets, kept within this computer (all but one core, memMaxMb).
-export const PROFILES = ['light', 'standard', 'development'];
+// Profiles (5.6): only values shown in Configure, scaled to this computer (all but one core at most, memMaxMb), and
+// nothing shared by any of them. Design wants 3D, which comes later: it runs 2D and says so.
+export const PROFILES = ['productivity', 'development', 'testing', 'design', 'light'];
+const PROFILE = {
+  //            cores (share of host), memory (MB cap, share of RAM), disk GB, network, graphics
+  productivity: { cpu: 1 / 2, mem: [8192, 1 / 3], disk: 32, network: 'shared', gfx: '2d' },
+  development: { cpu: 3 / 4, mem: [16384, 1 / 2], disk: 64, network: 'shared', gfx: '2d' },
+  testing: { cpu: 1 / 2, mem: [4096, 1], disk: 32, network: 'isolated', gfx: '2d' },
+  design: { cpu: 3 / 4, mem: [16384, 1 / 2], disk: 64, network: 'shared', gfx: '3d' },
+  light: { cpu: 0, mem: [3072, 1 / 2], disk: 24, network: 'shared', gfx: '2d' },
+};
 export function profileSize(p, host) {
-  const want = { light: [1, 1024, 16], standard: [2, 2048, 32], development: [4, 4096, 64] }[p] || [2, 2048, 32];
-  const cpus = Math.max(1, Math.min(want[0], host?.vcpusRecommended || 1));
-  const memMax = host?.memMaxMb || want[1];
-  const mem = Math.max(LIMITS.memMin, Math.min(want[1], Math.floor(memMax / 256) * 256 || memMax));
-  return { vcpus: cpus, memoryMb: mem, diskGb: want[2] };
+  const d = PROFILE[p] || PROFILE.productivity;
+  const rec = Math.max(1, host?.vcpusRecommended || 1), cpus = host?.cpus || rec + 1;
+  const vcpus = p === 'light' ? Math.min(2, rec) : Math.max(1, Math.min(rec, Math.floor(cpus * d.cpu) || 1));
+  const ram = host?.ramMb || 4096, memMax = host?.memMaxMb || 2048;
+  const want = Math.min(d.mem[0], Math.floor(ram * d.mem[1]));
+  const memoryMb = Math.max(LIMITS.memMin, Math.floor(Math.min(want, memMax) / 256) * 256 || LIMITS.memMin);
+  return { vcpus, memoryMb, diskGb: d.disk, network: d.network, gfx: d.gfx };
+}
+// a profile's values a machine has now ('' when it matches none: changed by hand since)
+export function profileOf(m, host, saved) {
+  if (saved && PROFILES.includes(saved)) {
+    const s = profileSize(saved, host);
+    if (s.vcpus === m.vcpus && s.memoryMb === m.memoryMb && s.network === m.network) return saved;
+  }
+  return '';
 }
 
 // Card numbers from two samples of lord.vm.stats(dir) (cgroup counters): CPU % of the machine's vCPUs, memory in
@@ -319,4 +338,16 @@ export function storageBar(st) {
   const parts = [['machines', machines], ['isos', st.isos || 0], ['trash', st.trash || 0]];
   const other = Math.max(0, used - parts.reduce((a, x) => a + x[1], 0));
   return [...parts, ['other', other]].map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
+}
+
+// ---- the resolution menu (5.3) ----
+
+// sizes a guest can be asked for, those that fit this display (the window's picture never needs to be larger), and the
+// guest's current one when it isn't in the list
+const SIZES = [[1024, 768], [1280, 720], [1280, 800], [1366, 768], [1440, 900], [1600, 900], [1680, 1050], [1920, 1080], [1920, 1200], [2560, 1440], [3840, 2160]];
+export function resolutions(screenW, screenH, cur) {
+  const fit = SIZES.filter(([w, h]) => w <= (screenW || 1920) && h <= (screenH || 1080));
+  const list = fit.length ? fit : [SIZES[0]];
+  if (cur && cur[0] > 0 && !list.some(([w, h]) => w === cur[0] && h === cur[1])) list.push([cur[0], cur[1]]);
+  return list.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
 }
