@@ -54,7 +54,7 @@ extern char **environ;
 static const char *const STATES[VS_COUNT] = { "stopped", "starting", "running", "paused", "stopping", "crashed" };
 static const char *const REASONS[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
-    "start-failed", "guest-panic", "supervisor-lost", "reset", "user",
+    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed",
 };
 
 static void reap_orphans(void);
@@ -260,6 +260,12 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
         }
         run_state(dir, c, o);
+        /* a saved session (6.1): the next start resumes from it */
+        char sp[PATH_MAX + 300];
+        snprintf(sp, sizeof sp, "%s/suspend.state", dir);
+        struct stat ss;
+        JS_SetPropertyStr(c, o, "suspended", JS_NewBool(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode)));
+        JS_SetPropertyStr(c, o, "stateBytes", JS_NewFloat64(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode) ? (double)ss.st_blocks * 512 : 0));
         JS_SetPropertyUint32(c, arr, n++, o);
     }
     closedir(d);
@@ -269,7 +275,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 /* ---- creating (lord-vm --create, in the background) ---- */
 
 #define MAX_JOBS 4
-typedef struct { int used, fd, done, ok; pid_t pid; char out[2048]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; } Job;
+typedef struct { int used, fd, done, ok; pid_t pid; char out[2048]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
@@ -575,6 +581,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
                 if (fd >= 0) { dprintf(fd, "passwd.hashed-password.root=%s\n", j->hash); close(fd); }
             }
             explicit_bzero(j->hash, sizeof j->hash);
+            if (j->creds[0]) unlink(j->creds);
         }
     }
     JSValue o = JS_NewObject(c);
@@ -608,6 +615,8 @@ typedef struct {
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
     int cur_w, cur_h, cur_hx, cur_hy;
+    int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
+    char job_text[VM_TEXT_MAX];
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
@@ -711,9 +720,18 @@ static int write_creds(char *path, size_t n, const char *dir) {
     return 0;
 }
 
+/* start(dir[, { resumeAnyway, discardState, loadvm }]) → session id */
+static int opt_bool(JSContext *c, int argc, JSValueConst *argv, const char *k) {
+    if (argc < 2 || !JS_IsObject(argv[1])) return 0;
+    JSValue v = JS_GetPropertyStr(c, argv[1], k);
+    int b = JS_ToBool(c, v) > 0;
+    JS_FreeValue(c, v);
+    return b;
+}
 static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     char dir[PATH_MAX], bin[PATH_MAX];
+    int anyway = opt_bool(c, argc, argv, "resumeAnyway"), discard = opt_bool(c, argc, argv, "discardState");
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
@@ -736,7 +754,13 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         /* no cgroup_enter here: lord-vm places itself in the machine's scope through lord-sessiond */
-        char *args[] = { "lord-vm", "--start", dir, "--control-fd", "3", "--paused", have_creds ? "--credentials-file" : NULL, creds, NULL };
+        char *args[16];
+        int k = 0;
+        args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
+        if (anyway) args[k++] = "--resume-anyway";
+        if (discard) args[k++] = "--discard-state";
+        if (have_creds) { args[k++] = "--credentials-file"; args[k++] = creds; }
+        args[k] = NULL;
         execve(bin, args, environ);
         _exit(127);
     }
@@ -857,6 +881,10 @@ static void from_vm(Sess *s) {
             snprintf(s->detail, sizeof s->detail, "%s", m.text);
             maybe_display(s);
             if (s->display_failed) resume_once(s);
+            break;
+        case VM_JOB:
+            s->job_kind = m.a; s->job_status = m.b; s->job_pct = m.c;
+            snprintf(s->job_text, sizeof s->job_text, "%s", m.text);
             break;
         case VM_NOTICE:
             s->notice = m.a;
@@ -1030,7 +1058,16 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "frames", s->frames);
     set_int(c, o, "cd", s->cd_state);
     set_str(c, o, "cdMessage", s->cd_msg);
-    set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : "");
+    set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : "");
+    if (s->job_kind) {
+        static const char *const JK[VJ_COUNT] = { "", "suspend", "resume", "snapshot", "revert", "delete" };
+        JSValue j = JS_NewObject(c);
+        set_str(c, j, "kind", JK[s->job_kind]);
+        set_str(c, j, "status", s->job_status == VJS_RUNNING ? "running" : s->job_status == VJS_DONE ? "done" : "failed");
+        set_int(c, j, "pct", s->job_pct);
+        set_str(c, j, "text", s->job_text);
+        JS_SetPropertyStr(c, o, "job", j);
+    }
     set_str(c, o, "noticeText", s->notice_text);
     return o;
 }
@@ -1066,6 +1103,9 @@ static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         else if (!strcmp(w, "pause")) ok = ask(s, VM_PAUSE, 0) > 0;
         else if (!strcmp(w, "resume")) ok = ask(s, VM_RESUME, 0) > 0;
         else if (!strcmp(w, "reset")) ok = ask(s, VM_RESET, 0) > 0;
+        else if (!strcmp(w, "suspend")) ok = ask(s, VM_SUSPEND, 0) > 0;
+        else if (!strcmp(w, "keep")) ok = ask(s, VM_KEEP, 1) > 0;
+        else if (!strcmp(w, "nokeep")) ok = ask(s, VM_KEEP, 0) > 0;
         else if (!strcmp(w, "display")) {
             /* the picture again after lord-vmdisplay went away */
             if (s->vd < 0 && (s->state == VS_RUNNING || s->state == VS_PAUSED)) { s->display_asked = 0; s->display_failed = 0; s->vd_state = -1; maybe_display(s); ok = 1; }
@@ -1155,7 +1195,7 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     const char *w = JS_ToCString(c, argv[1]);
     /* shutdown, poweroff, pause, resume, reset (the library's menu) */
     int type = !w ? -1 : !strcmp(w, "poweroff") ? VM_POWEROFF : !strcmp(w, "shutdown") ? VM_SHUTDOWN : !strcmp(w, "pause") ? VM_PAUSE
-             : !strcmp(w, "resume") ? VM_RESUME : !strcmp(w, "reset") ? VM_RESET : -1;
+             : !strcmp(w, "resume") ? VM_RESUME : !strcmp(w, "reset") ? VM_RESET : !strcmp(w, "suspend") ? VM_SUSPEND : -1;
     int seq = type >= 0 ? ask(s, (uint16_t)type, 0) : -1;
     int ok = seq > 0;
     if (w) JS_FreeCString(c, w);
@@ -1267,6 +1307,70 @@ static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_NewBool(c, ok);
 }
 
+/* startDetached(dir) → job id: the machine starts with no window (lord-vm --detach --keep-running); a window can
+ * attach to it later, and it keeps running when that window closes */
+static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX], creds[PATH_MAX];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    int have = !write_creds(creds, sizeof creds, dir);
+    char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
+    int id = spawn_job(args, dir);
+    if (!id) { if (have) unlink(creds); return JS_NewInt32(c, 0); }
+    if (have) snprintf(jobs[id - 1].creds, sizeof jobs[id - 1].creds, "%s", creds);
+    return JS_NewInt32(c, id);
+}
+
+/* discardState(dir) → job id: the saved session goes; the next start boots from the disks */
+static JSValue f_discard(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--discard-state", dir, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+
+/* awake() → how many running machines keep this computer from sleeping (5.3, "Keep this computer awake"; app.json
+ * keepAwake, on unless turned off). The session's idle sleep asks before it suspends. */
+static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char lib[PATH_MAX];
+    if (library(lib, sizeof lib, 0)) return JS_NewInt32(c, 0);
+    DIR *d = opendir(lib);
+    if (!d) return JS_NewInt32(c, 0);
+    int n = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
+        char p[PATH_MAX + 300], buf[2048];
+        snprintf(p, sizeof p, "%s/%s/run.json", lib, e->d_name);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+        if (fd >= 0) close(fd);
+        if (k <= 0) continue;
+        JDoc j;
+        if (json_parse(buf, (size_t)k, &j, NULL, 0)) continue;
+        const char *st = json_str(j.root, "state");
+        long pid = (long)json_num(j.root, "pid", 0);
+        int on = st && (!strcmp(st, "running") || !strcmp(st, "starting") || !strcmp(st, "stopping")) && pid > 0 && !kill((pid_t)pid, 0);
+        json_free(&j);
+        if (!on) continue;
+        snprintf(p, sizeof p, "%s/%s/app.json", lib, e->d_name);
+        fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+        if (fd >= 0) close(fd);
+        int keep = 1;
+        if (k > 0 && !json_parse(buf, (size_t)k, &j, NULL, 0)) {
+            keep = json_bool(j.root, "keepAwake", 1);
+            json_free(&j);
+        }
+        n += keep;
+    }
+    closedir(d);
+    return JS_NewInt32(c, n);
+}
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
@@ -1275,6 +1379,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

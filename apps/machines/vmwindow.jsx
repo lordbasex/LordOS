@@ -4,11 +4,12 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, FilePicker, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, MediaView, ScrollView, FilePicker, Toggle, addListener, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice } from './model.js';
+import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs } from './library.jsx';
 
@@ -17,7 +18,9 @@ const RESOLUTIONS = [[1280, 800], [1600, 900], [1920, 1080], [2560, 1440]];
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice'].every((k) => a[k] === b[k]);
+const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice'].every((k) => a[k] === b[k])
+  && jobKey(a.job) === jobKey(b.job);
 
 function Tools({ ctl, floating }) {
   const p = usePal();
@@ -83,11 +86,11 @@ function FloatingBar({ ctl, name }) {
 }
 
 // the card over the black area: starting, shutting down, no picture, lost display
-function Card({ title, text, actions }) {
+function Card({ title, text, actions, width = 460 }) {
   const p = usePal();
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 460, padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
+      <View style={{ width, padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
         <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         {text ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{text}</Text> : null}
         {actions?.length ? <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
@@ -97,7 +100,7 @@ function Card({ title, text, actions }) {
 }
 
 // BootFailed: why, a likely fix, Start Again, Settings, and the machine's log
-function Failed({ name, v, st, log, onStart, onSettings }) {
+function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) {
   const p = usePal();
   const neverRan = v.why === 'start-failed';
   const lines = (log || '').split('\n').filter(Boolean).slice(-60);
@@ -112,7 +115,10 @@ function Failed({ name, v, st, log, onStart, onSettings }) {
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Btn big primary label={tr('machines.fail.startAgain')} onClick={onStart} />
-        <Btn big label={tr('machines.cmd.configure')} onClick={onSettings} />
+        {v.why === 'resume-failed' ? <>
+          <Btn big label={tr('machines.fail.resumeAnyway')} onClick={onAnyway} />
+          <Btn big danger label={tr('machines.fail.discardState')} onClick={onDiscard} />
+        </> : <Btn big label={tr('machines.cmd.configure')} onClick={onSettings} />}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ flex: 1, fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.fail.log')}</Text>
@@ -132,7 +138,9 @@ export function MachineWindow({ dir, name: name0 }) {
   const [sid, setSid] = useWindowState('vm.sid', 0);
   const [st, setSt] = useWindowState('vm.state', null);
   const [err, setErr] = useWindowState('vm.err', '');
-  const [closing, setClosing] = useWindowState('vm.closing', false);
+  const [closing, setClosing] = useWindowState('vm.closing', false);   // false, 'shutdown' or 'suspend'
+  const [askClose, setAskClose] = useWindowState('vm.ask', false);
+  const [always, setAlways] = useState(false);
   const [follow, setFollow] = useWindowState('vm.follow', true);
   const [log, setLog] = useState('');
   const [name, setName] = useState(name0);
@@ -153,7 +161,7 @@ export function MachineWindow({ dir, name: name0 }) {
   followRef.current = follow;
   overlayRoot.current = root.current;
 
-  const begin = () => {
+  const begin = (opts) => {
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
@@ -164,12 +172,14 @@ export function MachineWindow({ dir, name: name0 }) {
       const b = budgetCheck(lord.vm.list(), m, lord.vm.host());
       if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
     }
-    const id = active ? lord.vm.attach(dir) : lord.vm.start(dir);
+    const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : tr('machines.win.cantStart')); return; }
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
     setErr(''); setSt(null); setSid(id);
   };
   useEffect(() => { if (!sid && !st && !err) begin(); }, []);
+  const stRef = useRef(st);
+  stRef.current = st;
   // the window went away (not a remount): let go of the machine; one this window started is shut down by lord-vm
   useEffect(() => () => { if (sid && !windows.get().some((w) => w.id === winId)) lord.vm.close(sid); }, [sid]);
 
@@ -201,24 +211,35 @@ export function MachineWindow({ dir, name: name0 }) {
     return () => clearInterval(timer);
   }, [sid]);
 
-  // closing the window shuts the machine down first (a paused one is resumed so it can hear the power button)
+  // Closing the window (5.3): Suspend, Shut Down or Keep Running, asked unless the machine's Configure says which. A
+  // shutdown resumes a paused machine first, so it can hear the power button; Keep Running tells lord-vm to stay when
+  // this window lets go of it.
+  const finish = (how) => {
+    const s = sidRef.current;
+    setAskClose(false);
+    if (!s) { wm.close(winId, true); return; }
+    if (how === 'keep') { lord.vm.cmd(s, 'keep'); lord.vm.close(s); setSid(0); wm.close(winId, true); return; }
+    setClosing(how);
+    if (how === 'suspend') { lord.vm.cmd(s, 'suspend'); return; }
+    if (stRef.current?.state === 'paused') lord.vm.cmd(s, 'resume');
+    lord.vm.cmd(s, 'shutdown');
+  };
   useEffect(() => wm.setCloseGuard(winId, () => {
     const s = sidRef.current;
-    if (!s) return true;
-    if (!closingRef.current) {
-      setClosing(true);
-      if (st?.state === 'paused') lord.vm.cmd(s, 'resume');
-      lord.vm.cmd(s, 'shutdown');
-    }
+    const q = stRef.current;
+    if (!s || !q || !['running', 'paused', 'starting', 'stopping'].includes(q.state)) return true;
+    if (closingRef.current) return false;
+    const how = closeChoice(readMeta(dir));
+    if (how === 'ask' || q.state === 'starting') setAskClose(true); else finish(how);
     return false;
-  }), [winId, st?.state]);
+  }), [winId]);
 
   const v = stateView(st?.state, st?.reason);
   const a = actionsFor(sid ? st?.state : 'stopped');
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
-  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing;
+  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose;
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
@@ -260,6 +281,9 @@ export function MachineWindow({ dir, name: name0 }) {
     notify({ app: 'machines', label: tr('machines.title'), title: path ? tr('machines.tb.shotSaved') : tr('machines.tb.shotFailed'), body: path ? path.split('/').pop() : '', sound: false,
       actions: path ? [{ id: 'show', label: tr('machines.cmd.showInFiles'), run: () => revealPath(path) }] : [] });
   };
+  // a long request of lord-vm's in progress (suspend, resume, a snapshot): its card, and no second one
+  const job = st?.job?.status === 'running' ? st.job : null;
+  const busy = !!job;
   // the CD/DVD drive while the machine runs (lord-vm changes the disc through QMP; machine.json follows)
   const cdOk = !!sid && (st?.state === 'running' || st?.state === 'paused') && cdWant === null;
   const cdTo = (path) => { setCdErr(''); if (lord.vm.cdrom(sid, path || null)) setCdWant(path); else setCdErr(tr('machines.tb.cdRefused')); };
@@ -273,6 +297,7 @@ export function MachineWindow({ dir, name: name0 }) {
     screenshot: shot,
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy, onClick: () => cmd('suspend') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
       { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
       '-',
@@ -295,6 +320,7 @@ export function MachineWindow({ dir, name: name0 }) {
         { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
         '-',
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
+        { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy, onClick: () => cmd('suspend') },
         { label: tr('machines.cmd.poweroff'), disabled: !a.poweroff, onClick: () => cmd('poweroff') },
         '-',
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
@@ -309,9 +335,19 @@ export function MachineWindow({ dir, name: name0 }) {
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
+  else if (askClose) card = <Card width={620} title={tr('machines.close.title', { name })} text={tr('machines.close.text')} actions={[
+    <View key="t" style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.close.always')}</Text></View>,
+    <Btn key="c" label={tr('machines.cancel')} onClick={() => setAskClose(false)} />,
+    <Btn key="k" label={tr('machines.close.keep')} onClick={() => { if (always) writeMeta(dir, { onClose: 'keep' }); finish('keep'); }} />,
+    <Btn key="s" label={tr('machines.cmd.shutdown')} onClick={() => { if (always) writeMeta(dir, { onClose: 'shutdown' }); finish('shutdown'); }} />,
+    <Btn key="u" primary label={tr('machines.cmd.suspend')} disabled={st?.state === 'starting'} onClick={() => { if (always) writeMeta(dir, { onClose: 'suspend' }); finish('suspend'); }} />,
+  ]} />;
+  else if (job) card = <Card title={tr(`machines.job.${job.kind}`, { name })} text={job.pct >= 0 ? tr('machines.job.pct', { pct: job.pct }) : tr('machines.job.wait')} />;
+  else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;
   else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
   else if (!sid && st) {
-    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={begin} onSettings={() => openConfigure(m0)} />;
+    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => openConfigure(m0)}
+      onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
     else card = <Card title={tr(`machines.state.${v.key}`)} text={tr('machines.win.stoppedHint')} actions={[<Btn key="s" primary label={tr('machines.start')} onClick={begin} />]} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
@@ -334,10 +370,10 @@ export function MachineWindow({ dir, name: name0 }) {
       ) : null}
       {card}
       {failed}
-      {!card && !failed && (st?.notice === 'network-lost' || cdErr) ? (
+      {!card && !failed && (st?.notice === 'network-lost' || st?.notice === 'recovered' || cdErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : tr('machines.win.netLost')}</Text>
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : st.notice === 'recovered' ? tr('machines.win.recovered') : tr('machines.win.netLost')}</Text>
             {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} /> : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
           </View>
         </View>

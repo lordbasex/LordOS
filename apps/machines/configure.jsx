@@ -1,9 +1,9 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
-import { View, Text, TextInput, Stepper, Segmented, FilePicker, ScrollView, useAppWindow, wm, revealPath, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf } from './model.js';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, OsMark } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 
@@ -79,7 +79,7 @@ export function Configure({ dir, section: section0 }) {
   const emulated = m.accel === 'tcg';
   const summary = {
     general: [meta.osName || systemOf(m.name).name, m.arch].filter(Boolean).join(', '),
-    startup: tr('machines.cfg.sum.startup'),
+    startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
     network: tr(`machines.cfg.net.${m.network}`),
@@ -118,8 +118,16 @@ export function Configure({ dir, section: section0 }) {
     </Row></Group>
   </>;
   else if (sec === 'startup') pane = <>
-    <Group><Row label={tr('machines.cfg.onClose')} value={tr('machines.cfg.onCloseValue')} last note={tr('machines.cfg.onCloseNote')} /></Group>
-    <Later text={tr('machines.cfg.laterSuspend')} />
+    <Group>
+      <Row label={tr('machines.cfg.onClose')} note={tr('machines.cfg.onCloseNote')}>
+        <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
+          options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
+      </Row>
+      <Row label={tr('machines.cfg.keepAwake')} last note={tr('machines.cfg.keepAwakeNote')}>
+        <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
+      </Row>
+    </Group>
+    {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
   else if (sec === 'cpu') {
     const cpus = host?.cpus || m.vcpus, memMax = host?.memMaxMb || m.memoryMb;

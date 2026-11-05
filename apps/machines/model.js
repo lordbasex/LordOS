@@ -5,7 +5,7 @@
 // lord-vm's states and reasons (server/src/vm/vmproto.h, VS_* and VR_*) → what the app shows. `tone`: 'run' (green),
 // 'pause' (amber), 'off' (gray), 'busy' (accent), 'bad' (red). The text key is under `machines.state.*`, and the
 // reason, when it's worth saying, under `machines.why.*`.
-const BAD_REASONS = ['qemu-failed', 'qemu-signal', 'out-of-memory', 'start-failed', 'guest-panic', 'supervisor-lost', 'forced'];
+const BAD_REASONS = ['qemu-failed', 'qemu-signal', 'out-of-memory', 'start-failed', 'guest-panic', 'supervisor-lost', 'forced', 'resume-failed'];
 export function stateView(state, reason) {
   const r = reason || 'none';
   switch (state) {
@@ -17,6 +17,8 @@ export function stateView(state, reason) {
     default:
       // a machine whose supervisor died is shown as off, with the reason: lord-vm recovers it at the next start
       if (r === 'supervisor-lost') return { key: 'recovered', tone: 'bad', active: false, why: r };
+      // its memory is in suspend.state: the next start resumes where it was (6.1)
+      if (r === 'suspended') return { key: 'suspended', tone: 'pause', active: false, why: null };
       return { key: 'stopped', tone: 'off', active: false, why: BAD_REASONS.includes(r) ? r : null };
   }
 }
@@ -32,6 +34,7 @@ export function actionsFor(state) {
     pause: state === 'running',
     resume: state === 'paused',
     reset: on,
+    suspend: on,
     keys: state === 'running',
     remove: state === 'stopped' || state === 'crashed' || !state,
   };
@@ -235,12 +238,19 @@ export function summaryOf(list, usages, host) {
   };
 }
 
-// What a card says it's doing (no guest agent yet: lord-vm's state only)
-export function doingOf(m) {
+// What a card says it's doing: lord-vm's state, a saved session, or running with no window of this app (Keep Running,
+// Start Without Window). `windowed`: a window of this app shows it.
+export function doingOf(m, windowed = true) {
   const v = stateView(m?.state, m?.reason);
+  if (m?.suspended && !v.active) return 'suspended';
   if (v.key === 'stopped' && !v.why) return 'shutDown';
+  if (v.key === 'running' && !windowed) return 'noWindow';
   return v.key;
 }
+
+// What closing a machine's window does (app.json onClose): ask (the default), suspend, shutdown or keep (Keep Running)
+export const CLOSE_CHOICES = ['ask', 'suspend', 'shutdown', 'keep'];
+export const closeChoice = (meta) => (CLOSE_CHOICES.includes(meta?.onClose) ? meta.onClose : 'ask');
 
 // the card picture's path, versioned by its time so the engine loads it again when it changes ('' when none)
 export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math.floor(mtime)}` : '');

@@ -4,7 +4,7 @@
 // disk. Double-click opens or starts; right-click has the machine's menu. FirstRun, Requirements and the Pi page are
 // the other screens of this window.
 import {
-  View, Text, Image, ScrollView, useAppWindow, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText,
+  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -53,7 +53,7 @@ function Summary({ label, value, frac, color }) {
   );
 }
 
-function Card({ m, u, sel, onSelect, onMenu }) {
+function Card({ m, u, sel, onSelect, onMenu, windowed }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const v = stateView(m.state, m.reason);
@@ -65,7 +65,7 @@ function Card({ m, u, sel, onSelect, onMenu }) {
   const on = v.active;
   const emulated = m.accel === 'tcg';
   const system = [sys.name || tr('machines.card.system'), m.arch, emulated ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ');
-  const doing = tr(`machines.doing.${doingOf(m)}`);
+  const doing = tr(`machines.doing.${doingOf(m, windowed)}`);
   const go = () => (a.open || a.start ? openMachine(m) : null);
   return (
     <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -276,13 +276,25 @@ export function Library() {
   const [del, setDel] = useState(null);
   const [error, setError] = useState('');
   const [usages, setUsages] = useState({});
+  const [discard, setDiscard] = useState(null);
+  const wins = useStore(windows, (ws) => ws.map((w) => w.id).join(' '));
   const prev = useRef({});
+  // lord-vm jobs started from here (start with no window, discard a saved state): followed until they end, so the
+  // engine frees them, and a failure is shown
+  const jobs = useRef([]);
+  const follow = (id, name) => { if (!id) { setError(tr('machines.cfg.refused')); return; } jobs.current.push({ id, name }); };
   const root = useRef(null);
   overlayRoot.current = root.current;
 
   // the list with each machine's disk use, card picture time, app notes, and CPU/memory/disk activity while it runs
   const read = () => {
     if (!has()) return;
+    jobs.current = jobs.current.filter((j) => {
+      const r = lord.vm.job(j.id);
+      if (!r || !r.done) return !!r;
+      if (!r.ok) setError(`${j.name}: ${r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim()}`);
+      return false;
+    });
     const ms = lord.vm.list();
     const next = {};
     for (const m of ms) {
@@ -326,8 +338,10 @@ export function Library() {
     const stop = (how) => lord.vm.stop(m.dir, how);
     return [
       a.start ? { label: tr('machines.start'), onClick: () => openMachine(m) } : { label: tr('machines.open'), disabled: !a.open, onClick: () => openMachine(m) },
+      a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => follow(lord.vm.startDetached(m.dir), m.name) } : null,
       { label: tr('machines.cmd.pause'), disabled: !a.pause, onClick: () => stop('pause') },
       { label: tr('machines.cmd.resume'), disabled: !a.resume, onClick: () => stop('resume') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend, onClick: () => stop('suspend') },
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => stop('shutdown') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => stop('reset') },
       { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => stop('poweroff') },
@@ -336,6 +350,7 @@ export function Library() {
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
       m.iso && a.remove ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
+      m.suspended && a.start ? { label: tr('machines.fail.discardState'), destructive: true, onClick: () => setDiscard(m) } : null,
       '-',
       { label: tr('machines.cmd.remove'), destructive: true, disabled: !a.remove, onClick: () => setDel(m) },
     ];
@@ -358,7 +373,7 @@ export function Library() {
     <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 12 }}>
       {rows.map((r, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 12, height: rowH }}>
-          {r.map((m) => <Card key={m.dir} m={m} u={usages[m.dir]} sel={sel === m.dir} onSelect={() => setSel(m.dir)}
+          {r.map((m) => <Card key={m.dir} m={m} u={usages[m.dir]} sel={sel === m.dir} onSelect={() => setSel(m.dir)} windowed={wins.split(' ').includes(winIdOf(m))}
             onMenu={(e) => setMenu({ x: e.x, y: e.y, m })} />)}
           {Array.from({ length: cols - r.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
         </View>
@@ -387,6 +402,8 @@ export function Library() {
       {body}
       {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
         items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive
+        onOk={() => { const d = discard; setDiscard(null); follow(lord.vm.discardState(d.dir), d.name); }} onCancel={() => setDiscard(null)} /> : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.deleteDetail')} okLabel={tr('machines.deleteOk')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => remove(del)} onCancel={() => setDel(null)} /> : null}
     </View>

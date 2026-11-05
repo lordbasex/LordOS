@@ -33,6 +33,11 @@
  *                   for the person): that disc goes in, through QMP add-fd and /dev/fdset (QEMU never opens a path,
  *                   so its Landlock rules don't change); text = the image's path, kept in machine.json when it fits.
  *                   Without one: the disc comes out. → VM_REPLY once the tray is closed again
+ *     VM_SUSPEND    saves the machine's memory and devices to <machine>/suspend.state (QMP migrate to a descriptor
+ *                   lord-vm opened) and stops QEMU; the next start resumes from it (6.1). VM_JOB reports progress;
+ *                   → VM_REPLY when the state is on disk (QEMU then quits: VM_STATE stopped, suspended)
+ *     VM_KEEP       a = 1: the machine keeps running when the control channel closes (Keep Running); 0: it shuts
+ *                   down then, as by default
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -41,8 +46,11 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
+ *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
+ *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (the network stopped: passt
- *                   ended while the machine runs), b = detail number (a signal or exit status), text = detail.
+ *                   ended while the machine runs; an interrupted operation was finished or rolled back at this
+ *                   start), b = detail number (a signal or exit status), text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
  * ---- lord-vmdisplay ----
@@ -92,12 +100,15 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM,
-    VM_REQ_LAST = VM_CDROM,
-    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE,                                  /* from lord-vm */
+    VM_CDROM, VM_SUSPEND, VM_KEEP,
+    VM_REQ_LAST = VM_KEEP,
+    VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB,                          /* from lord-vm */
 };
 /* VM_NOTICE a */
-enum { VMN_NONE = 0, VMN_NET_LOST, VMN_COUNT };
+enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_COUNT };
+/* VM_JOB a, b */
+enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
+enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 
 /* machine state */
 enum { VS_STOPPED = 0, VS_STARTING, VS_RUNNING, VS_PAUSED, VS_STOPPING, VS_CRASHED, VS_COUNT };
@@ -116,6 +127,8 @@ enum {
     VR_SUPERVISOR_LOST,     /* the previous lord-vm died; found at the next start or status */
     VR_GUEST_RESET,         /* the guest or VM_RESET restarted it (state stays running) */
     VR_USER,                /* VM_PAUSE / VM_RESUME */
+    VR_SUSPENDED,           /* VM_SUSPEND: the memory is in suspend.state, the next start resumes from it */
+    VR_RESUME_FAILED,       /* the saved state couldn't be loaded (text says why); it's kept: try again or discard */
     VR_COUNT
 };
 /* VM_REPLY codes */
@@ -249,6 +262,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_INFO: return m->a > 0 && m->b > 0;
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
+    case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
 }

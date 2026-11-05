@@ -264,6 +264,8 @@ const managed = () => typeof lord.session !== 'undefined' && lord.session.manage
 function onIdle(stage) {
   if (stage === 'lock' && managed()) lord.session.lock();
   if (stage !== 'sleep') return;
+  // a machine that runs keeps this computer awake (Machines, "Keep this computer awake", on unless turned off there)
+  try { if (typeof lord.vm !== 'undefined' && lord.vm.awake() > 0) return; } catch (e) { /* no Machines here */ }
   // the login screen of a locked session has no admin helper: lord-sessiond suspends (docs/SESSIONS.md)
   if (typeof lord.greeter !== 'undefined') { lord.greeter.send(JSON.stringify({ t: 'power', a: 'suspend' })); return; }
   // sleep came before the lock deadline (a short sleep time): lock first, so waking up asks for the password

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -129,6 +129,19 @@ eq('doing shut down', doingOf({ state: 'stopped', reason: 'guest-shutdown' }), '
 eq('doing failed', doingOf({ state: 'crashed', reason: 'start-failed' }), 'crashed');
 eq('thumb', thumbSrc('/h/M/a.lordvm', 1700000000.5), '/h/M/a.lordvm/thumb.png#1700000000');
 eq('no thumb', thumbSrc('/h/M/a.lordvm', 0), '');
+
+// ---- Beta: suspend, Keep Running, closing ----
+eq('suspended state', stateView('stopped', 'suspended'), { key: 'suspended', tone: 'pause', active: false, why: null });
+eq('resume failed', stateView('crashed', 'resume-failed').why, 'resume-failed');
+eq('suspend allowed running', actionsFor('running').suspend, true);
+eq('suspend allowed paused', actionsFor('paused').suspend, true);
+eq('suspend not off', actionsFor('stopped').suspend, false);
+eq('doing suspended', doingOf({ state: 'stopped', reason: 'poweroff', suspended: true }), 'suspended');
+eq('doing no window', doingOf({ state: 'running' }, false), 'noWindow');
+eq('doing windowed', doingOf({ state: 'running' }, true), 'running');
+eq('close default', closeChoice({}), 'ask');
+eq('close keep', closeChoice({ onClose: 'keep' }), 'keep');
+eq('close bad', closeChoice({ onClose: 'reboot' }), 'ask');
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

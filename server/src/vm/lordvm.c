@@ -22,6 +22,7 @@
 #include "qmp.h"
 #include "vmproto.h"
 #include "vmsandbox.h"
+#include "vmops.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -73,7 +74,7 @@ static const char *const FW_AMD64[][2] = {
 static const char *const STATE_NAME[VS_COUNT] = { "stopped", "starting", "running", "paused", "stopping", "crashed" };
 static const char *const REASON_NAME[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
-    "start-failed", "guest-panic", "supervisor-lost", "reset", "user",
+    "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed",
 };
 
 /* ---- log ---- */
@@ -472,7 +473,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 /* ---- the supervisor ---- */
 
 typedef struct { int fd, control; } Client;
-enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST };
+enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 static struct {
@@ -512,6 +513,14 @@ static struct {
     /* the last VM_NOTICE, sent again to clients that connect later */
     int notice, notice_code;
     char notice_text[160];
+    /* suspend to disk (6.1): the state file lord-vm opened, who asked, whether the vCPUs ran before */
+    char qemu_version[64], cpu_id[17];
+    int susp_fd, susp_client, susp_was_running, suspending, suspended;
+    uint32_t susp_seq;
+    long long susp_t0, migq_next;
+    /* resuming from suspend.state at this start */
+    int resuming, resume_anyway, resumed;
+    char resume_err[160];
 } S;
 
 static void send_to(int ci, const VmMsg *m, int fd) {
@@ -794,6 +803,7 @@ static void build_qemu_args(void) {
     arg("-sandbox"); arg("on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
     arg("-msg"); arg("timestamp=on");
     arg("-S");
+    if (S.resuming) { arg("-incoming"); arg("defer"); }
     /* credentials: memfds at fd 7, 8, ... (never their values on the command line) */
     for (int i = 0; i < S.ncreds; i++) { arg("-smbios"); argf("type=11,path=/proc/self/fd/%d", 7 + i); }
 }
@@ -808,6 +818,7 @@ static void fail_start(const char *fmt, ...) {
     set_state(VS_CRASHED, VR_START_FAILED, 0, d);
 }
 
+static int suspend_usable(char *err, size_t n);
 static int start_machine(void) {
     VmHost h;
     vm_host_probe(&h);
@@ -830,6 +841,13 @@ static int start_machine(void) {
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
     if (!file_exists(QEMU_BIN[S.m.arch])) { fail_start("%s isn't installed", QEMU_BIN[S.m.arch]); return -1; }
     if (S.m.network == VM_NET_SHARED && !file_exists(PASST)) { fail_start("passt isn't installed (Shared network)"); return -1; }
+    {
+        char why[160];
+        int u = suspend_usable(why, sizeof why);
+        if (u < 0) { vlog("resume: %s", why); set_state(VS_CRASHED, VR_RESUME_FAILED, 0, why); return -1; }
+        S.resuming = u == 1;
+        if (S.resuming) vlog("resume: this start continues from the saved state");
+    }
 
     int kvm = -1;
     if (S.m.accel == VM_ACCEL_KVM) {
@@ -914,6 +932,8 @@ static int start_machine(void) {
     }
     S.qmp_up = 1;
     S.oom0 = read_oom_kills();
+    qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
+    if (S.resuming) return 0;                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
     return 0;
@@ -980,6 +1000,211 @@ static void cd_done(void) {
     else reply(S.cd_client, S.cd_seq, VME_OK, S.cd_node[0] ? "inserted" : "ejected");
 }
 
+/* ---- suspend to disk and resume (6.1, 3.6) ----
+ *
+ * <dir>/suspend.state  QEMU's migration stream: memory and devices, written through a descriptor lord-vm opened
+ * <dir>/suspend.json   what made it: QEMU's version, the machine type, this computer's CPU, vCPUs and memory
+ * Both are written as .tmp and renamed (the state last), under operation.json "suspend". The next start resumes from
+ * them (-incoming defer, migrate-incoming on a descriptor) under operation.json "resume", and removes them before the
+ * vCPUs run, since the disks then move on. A state made by another QEMU build, machine type or CPU isn't loaded
+ * unless asked (--resume-anyway); --discard-state removes it and the machine boots from its disks. */
+
+static void send_job(int kind, int status, int pct, const char *text) {
+    VmMsg j = vm_msg(VM_JOB, 0, kind, status, pct, 0, text);
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &j, -1);
+}
+
+static void notice_all(int kind, int code, const char *text) {
+    S.notice = kind; S.notice_code = code;
+    snprintf(S.notice_text, sizeof S.notice_text, "%s", text);
+    VmMsg n = vm_msg(VM_NOTICE, 0, kind, code, 0, 0, S.notice_text);
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &n, -1);
+}
+
+/* this computer's CPU, as a saved state cares about it: model and feature flags (amd64), implementer, part and
+ * features (arm64) of the first CPU; 16 hex digits of their SHA-256 */
+static void host_cpu_id(char out[17]) {
+    snprintf(out, 17, "unknown");
+    int fd = open("/proc/cpuinfo", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return;
+    static char buf[65536];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    Sha256 h;
+    sha256_init(&h);
+    static const char *const keys[] = { "model name", "flags", "CPU implementer", "CPU architecture", "CPU variant", "CPU part", "Features", NULL };
+    for (char *line = buf; line && *line; ) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = 0;
+        if (!*line) break;                          /* the first processor only */
+        for (int k = 0; keys[k]; k++) if (!strncmp(line, keys[k], strlen(keys[k]))) { sha256_update(&h, (const uint8_t *)line, strlen(line)); sha256_update(&h, (const uint8_t *)"\n", 1); }
+        line = nl ? nl + 1 : NULL;
+    }
+    uint8_t d[32];
+    sha256_final(&h, d);
+    for (int i = 0; i < 8; i++) snprintf(out + i * 2, 3, "%02x", d[i]);
+}
+
+static void state_paths(char *st, char *meta, char *tmp, char *mtmp, size_t n) {
+    snprintf(st, n, "%s/suspend.state", S.dir);
+    snprintf(meta, n, "%s/suspend.json", S.dir);
+    if (tmp) snprintf(tmp, n, "%s/.suspend.state.tmp", S.dir);
+    if (mtmp) snprintf(mtmp, n, "%s/.suspend.json.tmp", S.dir);
+}
+
+typedef struct { char qemu[64], machine_type[32], cpu[17], saved[21]; int vcpus, memory_mb; double bytes; } SuspendMeta;
+
+static int suspend_meta_read(const char *dir, SuspendMeta *sm) {
+    memset(sm, 0, sizeof *sm);
+    char p[PATH_MAX + 32], buf[4096];
+    snprintf(p, sizeof p, "%s/suspend.json", dir);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    JDoc d;
+    if (n <= 0 || json_parse(buf, (size_t)n, &d, NULL, 0)) return -1;
+    const char *q = json_str(d.root, "qemu"), *mt = json_str(d.root, "machine_type"), *cpu = json_str(d.root, "cpu"), *sv = json_str(d.root, "saved");
+    if (q) snprintf(sm->qemu, sizeof sm->qemu, "%s", q);
+    if (mt) snprintf(sm->machine_type, sizeof sm->machine_type, "%s", mt);
+    if (cpu) snprintf(sm->cpu, sizeof sm->cpu, "%s", cpu);
+    if (sv) snprintf(sm->saved, sizeof sm->saved, "%.20s", sv);
+    sm->vcpus = (int)json_num(d.root, "vcpus", 0);
+    sm->memory_mb = (int)json_num(d.root, "memory_mb", 0);
+    sm->bytes = json_num(d.root, "bytes", 0);
+    json_free(&d);
+    return q && mt && cpu ? 0 : -1;
+}
+
+/* does this start take the saved state? 1 yes; 0 there's none; -1 there is one this computer can't load (why in err) */
+static int suspend_usable(char *err, size_t n) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32];
+    state_paths(st, meta, NULL, NULL, sizeof st);
+    if (!file_exists(st)) return 0;
+    SuspendMeta sm;
+    if (suspend_meta_read(S.dir, &sm)) { snprintf(err, n, "the saved state's description is missing or damaged"); return -1; }
+    if (strcmp(sm.machine_type, S.m.machine_type) || sm.vcpus != S.m.vcpus || sm.memory_mb != S.m.memory_mb) {
+        snprintf(err, n, "the machine changed since it was suspended (%s, %d vCPU, %d MB)", sm.machine_type, sm.vcpus, sm.memory_mb);
+        return -1;
+    }
+    if (strcmp(sm.cpu, S.cpu_id) && !S.resume_anyway) { snprintf(err, n, "it was saved on another processor"); return -1; }
+    return 1;
+}
+
+static void suspend_cleanup_tmp(void) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32], tmp[PATH_MAX + 32], mtmp[PATH_MAX + 32];
+    state_paths(st, meta, tmp, mtmp, sizeof st);
+    unlink(tmp); unlink(mtmp);
+}
+
+static void suspend_failed(const char *why) {
+    vlog("suspend: failed: %s", why);
+    if (S.susp_fd >= 0) { close(S.susp_fd); S.susp_fd = -1; }
+    suspend_cleanup_tmp();
+    vm_op_end(S.dir);
+    S.suspending = 0;
+    S.migq_next = 0;
+    if (S.qmp_up && !S.qemu_done) {
+        if (S.susp_was_running) qmp_do("cont", NULL, P_IGNORE, -1, 0, -1, -1);
+        set_state(S.susp_was_running ? VS_RUNNING : VS_PAUSED, VR_USER, 0, "");
+    }
+    send_job(VJ_SUSPEND, VJS_FAILED, -1, why);
+    reply(S.susp_client, S.susp_seq, VME_QMP, why);
+}
+
+static void suspend_done(void) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32], tmp[PATH_MAX + 32], mtmp[PATH_MAX + 32];
+    state_paths(st, meta, tmp, mtmp, sizeof st);
+    struct stat sb;
+    if (S.susp_fd < 0 || fsync(S.susp_fd) || fstat(S.susp_fd, &sb) || sb.st_size <= 0) { suspend_failed("the saved state couldn't be written to disk"); return; }
+    close(S.susp_fd);
+    S.susp_fd = -1;
+    char now[21];
+    vm_now_iso(now);
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{\"qemu\":"); jb_str(&j, S.qemu_version);
+    jb_raw(&j, ",\"machine_type\":"); jb_str(&j, S.m.machine_type);
+    jb_raw(&j, ",\"cpu\":"); jb_str(&j, S.cpu_id);
+    jb_printf(&j, ",\"vcpus\":%d,\"memory_mb\":%d,\"bytes\":%lld,\"saved\":", S.m.vcpus, S.m.memory_mb, (long long)sb.st_size);
+    jb_str(&j, now);
+    jb_raw(&j, "}\n");
+    int fd = j.oom ? -1 : open(mtmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0 && !write_all(fd, j.p, j.n) && !fsync(fd);
+    if (fd >= 0) close(fd);
+    jb_free(&j);
+    /* the description first, then the state: a state without its description is never loaded */
+    if (!ok || rename(mtmp, meta) || rename(tmp, st)) { unlink(meta); suspend_failed("the saved state couldn't be kept"); return; }
+    vm_sync_dir(S.dir);
+    vm_op_end(S.dir);
+    S.suspending = 0;
+    S.suspended = 1;
+    S.migq_next = 0;
+    vlog("suspend: %lld MB saved in %lld ms", (long long)sb.st_size >> 20, now_ms() - S.susp_t0);
+    send_job(VJ_SUSPEND, VJS_DONE, 100, "");
+    reply(S.susp_client, S.susp_seq, VME_OK, "suspended");
+    if (qmp_do("quit", NULL, P_IGNORE, -1, 0, -1, -1)) { kill(S.qemu, SIGKILL); S.killed = 1; }
+    S.kill_deadline = now_ms() + 5000;
+}
+
+static void begin_suspend(int ci, uint32_t seq) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32], tmp[PATH_MAX + 32], mtmp[PATH_MAX + 32];
+    state_paths(st, meta, tmp, mtmp, sizeof st);
+    if (vm_op_begin(S.dir, "suspend", NULL, tmp, NULL)) { reply(ci, seq, VME_INTERNAL, "can't write operation.json"); return; }
+    S.susp_fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (S.susp_fd < 0) { vm_op_end(S.dir); reply(ci, seq, VME_INTERNAL, "can't make the state file"); return; }
+    S.susp_client = ci; S.susp_seq = seq; S.suspending = 1; S.susp_was_running = S.state == VS_RUNNING; S.susp_t0 = now_ms();
+    int bad = 0;
+    if (S.susp_was_running) bad |= qmp_do("stop", NULL, P_IGNORE, -1, 0, -1, -1);
+    bad |= qmp_do("migrate-set-capabilities", "{\"capabilities\":[{\"capability\":\"events\",\"state\":true}]}", P_IGNORE, -1, 0, -1, -1);
+    /* QEMU limits a migration to 128 MiB/s by default: a file on this computer takes what the disk gives */
+    bad |= qmp_do("migrate-set-parameters", "{\"max-bandwidth\":107374182400}", P_IGNORE, -1, 0, -1, -1);
+    bad |= qmp_do("getfd", "{\"fdname\":\"suspend\"}", P_GETFD, -1, 0, S.susp_fd, -1);
+    bad |= qmp_do("migrate", "{\"uri\":\"fd:suspend\"}", P_SUSPEND, -1, 0, -1, -1);
+    if (bad) { suspend_failed("QEMU is busy"); return; }
+    set_state(VS_STOPPING, VR_SUSPENDED, 0, "saving the machine's memory");
+    send_job(VJ_SUSPEND, VJS_RUNNING, 0, "");
+    S.migq_next = now_ms() + 500;
+    vlog("suspend: saving to %s", tmp);
+}
+
+/* after the QMP handshake of a start that resumes: the saved stream goes in through a descriptor */
+static void begin_resume(void) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32];
+    state_paths(st, meta, NULL, NULL, sizeof st);
+    int fd = open(st, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0 || vm_op_begin(S.dir, "resume", NULL, st, NULL)) {
+        if (fd >= 0) close(fd);
+        snprintf(S.resume_err, sizeof S.resume_err, "can't read the saved state");
+        kill(S.qemu, SIGKILL); S.killed = 1;
+        return;
+    }
+    int bad = qmp_do("migrate-set-capabilities", "{\"capabilities\":[{\"capability\":\"events\",\"state\":true}]}", P_IGNORE, -1, 0, -1, -1);
+    bad |= qmp_do("getfd", "{\"fdname\":\"resume\"}", P_GETFD, -1, 0, fd, -1);
+    bad |= qmp_do("migrate-incoming", "{\"uri\":\"fd:resume\"}", P_RESUME, -1, 0, -1, -1);
+    close(fd);
+    if (bad) { snprintf(S.resume_err, sizeof S.resume_err, "QEMU didn't take the saved state"); kill(S.qemu, SIGKILL); S.killed = 1; return; }
+    send_job(VJ_RESUME, VJS_RUNNING, -1, "");
+    S.susp_t0 = now_ms();
+    vlog("resume: loading %s", st);
+}
+
+static void resume_done(void) {
+    char st[PATH_MAX + 32], meta[PATH_MAX + 32];
+    state_paths(st, meta, NULL, NULL, sizeof st);
+    /* from here the disks move on: the state is no longer valid, and goes before a single vCPU runs */
+    unlink(st); unlink(meta);
+    vm_sync_dir(S.dir);
+    vm_op_end(S.dir);
+    S.resumed = 1;
+    vlog("resume: loaded in %lld ms", now_ms() - S.susp_t0);
+    send_job(VJ_RESUME, VJS_DONE, 100, "");
+    if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "resumed");
+    else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
+}
+
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
     if (fd >= 0 && m->type != VM_CDROM) { close(fd); fd = -1; }
@@ -1040,6 +1265,16 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd >= 0) close(fd);
         return;
     }
+    case VM_SUSPEND:
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (S.suspending || S.cd_busy) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        begin_suspend(ci, m->seq);
+        return;
+    case VM_KEEP:
+        S.keep_running = m->a ? 1 : 0;
+        vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
+        reply(ci, m->seq, VME_OK, "");
+        return;
     case VM_QMP:
         if (!S.dev_qmp) { reply(ci, m->seq, VME_DENIED, "lord-vm wasn't started with --dev-qmp"); return; }
         if (!S.qmp_up) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
@@ -1068,6 +1303,17 @@ static void on_qmp_event(const JVal *root) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
+    else if (!strcmp(ev, "MIGRATION")) {
+        const char *st = data ? json_str(data, "status") : NULL;
+        if (!st) return;
+        if (S.suspending) {
+            if (!strcmp(st, "completed")) suspend_done();
+            else if (!strcmp(st, "failed") || !strcmp(st, "cancelled")) suspend_failed("QEMU couldn't save the machine's memory: see the log");
+        } else if (S.resuming && !S.resumed) {
+            if (!strcmp(st, "completed")) resume_done();
+            else if (!strcmp(st, "failed")) { snprintf(S.resume_err, sizeof S.resume_err, "QEMU couldn't load the saved state"); }
+        }
+    }
     else vlog("qemu: event %.60s", ev);
 }
 
@@ -1084,6 +1330,28 @@ static void on_qmp_reply(const JVal *root, int ok) {
         else if (S.state != VS_RUNNING) set_state(VS_RUNNING, VR_NONE, 0, "");
         break;
     case P_GETFD: if (!ok) vlog("qmp: getfd: %s", desc); break;
+    case P_VERSION: {
+        const JVal *q = json_get(json_get(root, "return"), "qemu");
+        if (ok && q) snprintf(S.qemu_version, sizeof S.qemu_version, "%d.%d.%d %.40s", (int)json_num(q, "major", 0), (int)json_num(q, "minor", 0),
+                              (int)json_num(q, "micro", 0), json_str(json_get(root, "return"), "package") ? json_str(json_get(root, "return"), "package") : "");
+        if (S.resuming && !S.resumed && !S.resume_err[0]) {
+            SuspendMeta sm;
+            if (!suspend_meta_read(S.dir, &sm) && strcmp(sm.qemu, S.qemu_version) && !S.resume_anyway) {
+                snprintf(S.resume_err, sizeof S.resume_err, "it was saved by QEMU %.60s, this is %.60s", sm.qemu, S.qemu_version);
+                vlog("resume: refused: %s", S.resume_err);
+                if (qmp_do("quit", NULL, P_IGNORE, -1, 0, -1, -1)) { kill(S.qemu, SIGKILL); S.killed = 1; }
+            } else begin_resume();
+        }
+        break;
+    }
+    case P_SUSPEND: if (!ok && S.suspending) suspend_failed(desc); break;
+    case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
+    case P_MIGQ: {
+        const JVal *ram = json_get(json_get(root, "return"), "ram");
+        double tot = ram ? json_num(ram, "total", 0) : 0, done = ram ? json_num(ram, "transferred", 0) : 0;
+        if (S.suspending && tot > 0) send_job(VJ_SUSPEND, VJS_RUNNING, done >= tot ? 99 : (int)(done * 100 / tot), "");
+        break;
+    }
     case P_CD: case P_CD_LAST:
         if (!ok && !S.cd_err[0]) snprintf(S.cd_err, sizeof S.cd_err, "%s", desc);
         if (ok && p.seq == 1) { S.cd_node[0] = 0; S.cd_fdset = 0; }
@@ -1131,6 +1399,13 @@ static void qemu_exited(int status) {
     char d[160] = "";
     long oom = read_oom_kills();
     if (S.reason == VR_START_FAILED) { st = VS_CRASHED; why = VR_START_FAILED; code = WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status); snprintf(d, sizeof d, "%s", S.detail); }
+    else if (S.suspended) why = VR_SUSPENDED;
+    else if (S.resuming && !S.resumed) {
+        /* the saved state is still there (removed only once loaded): try again, or discard it */
+        st = VS_CRASHED; why = VR_RESUME_FAILED; code = WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status);
+        snprintf(d, sizeof d, "%s", S.resume_err[0] ? S.resume_err : "QEMU stopped while loading the saved state: see the log");
+        vm_op_end(S.dir);
+    }
     else if (WIFEXITED(status)) {
         code = WEXITSTATUS(status);
         if (code != 0) { st = VS_CRASHED; why = VR_QEMU_FAILED; snprintf(d, sizeof d, "QEMU exited with %d: see the log", code); }
@@ -1145,6 +1420,7 @@ static void qemu_exited(int status) {
         else if (oom > S.oom0) { st = VS_CRASHED; why = VR_OUT_OF_MEMORY; snprintf(d, sizeof d, "the machine went over its memory limit (%ld MB)", vm_mem_limit_mb(&S.m)); }
         else { st = VS_CRASHED; why = VR_QEMU_SIGNAL; snprintf(d, sizeof d, "QEMU died from signal %d (%s)", code, strsignal(code)); }
     }
+    if (S.suspending) { if (S.susp_fd >= 0) close(S.susp_fd); S.susp_fd = -1; suspend_cleanup_tmp(); vm_op_end(S.dir); S.suspending = 0; reply(S.susp_client, S.susp_seq, VME_QMP, "QEMU stopped while saving"); }
     if (S.passt > 0) kill(S.passt, SIGTERM);
     set_state(st, why, code, d);
 }
@@ -1161,11 +1437,10 @@ static void reap(void) {
                 /* QEMU's -netdev stream on a descriptor can't reconnect, and the network card sits on the root bus
                  * (no hot-unplug without moving it, which renames the guest's interface): the person is told */
                 int sig = WIFSIGNALED(status), code = sig ? WTERMSIG(status) : WEXITSTATUS(status);
-                S.notice = VMN_NET_LOST; S.notice_code = code;
-                snprintf(S.notice_text, sizeof S.notice_text, "passt ended (%s %d): the machine has no network until it starts again", sig ? "signal" : "status", code);
-                vlog("note: the machine's network stopped: %s", S.notice_text);
-                VmMsg n = vm_msg(VM_NOTICE, 0, S.notice, code, 0, 0, S.notice_text);
-                for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &n, -1);
+                char t[160];
+                snprintf(t, sizeof t, "passt ended (%s %d): the machine has no network until it starts again", sig ? "signal" : "status", code);
+                vlog("note: the machine's network stopped: %s", t);
+                notice_all(VMN_NET_LOST, code, t);
             }
         }
     }
@@ -1252,10 +1527,12 @@ static void loop(void) {
 #undef WATCH
         long long now = now_ms(), next = -1;
         if (S.shut_deadline) next = S.shut_deadline;
+        if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
+        if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
             vlog("the guest didn't shut down in time: turning it off");
@@ -1415,10 +1692,49 @@ static int read_credentials(const char *path) {
     return rc;
 }
 
+/* An operation.json left by a lord-vm that stopped in the middle (3.6): finish the work or roll it back, and say which.
+ * Runs under the machine's lock, before anything else touches the machine. 1 when there was something to do. */
+static int ops_recover(const char *dir, int at_start) {
+    VmOp o;
+    int r = vm_op_read(dir, &o);
+    if (r < 0) { vlog("recovery: operation.json was unreadable and is removed (no step had started)"); return 0; }
+    if (!r) return 0;
+    char what[200] = "", p1[PATH_MAX + 32], p2[PATH_MAX + 32];
+    if (!strcmp(o.op, "suspend")) {
+        snprintf(p1, sizeof p1, "%s/suspend.state", dir);
+        snprintf(p2, sizeof p2, "%s/suspend.json", dir);
+        if (file_exists(p1) && file_exists(p2)) snprintf(what, sizeof what, "the suspend had finished: the machine resumes from it");
+        else {
+            unlink(p1); unlink(p2);
+            snprintf(p1, sizeof p1, "%s/.suspend.state.tmp", dir); unlink(p1);
+            snprintf(p1, sizeof p1, "%s/.suspend.json.tmp", dir); unlink(p1);
+            snprintf(what, sizeof what, "an interrupted suspend was rolled back: the machine starts from its disks, as after a power cut");
+        }
+    } else if (!strcmp(o.op, "resume")) {
+        snprintf(p1, sizeof p1, "%s/suspend.state", dir);
+        if (file_exists(p1)) snprintf(what, sizeof what, "an interrupted resume was rolled back: the saved state is kept");
+        else snprintf(what, sizeof what, "the resume had finished");
+    } else snprintf(what, sizeof what, "an unknown operation \"%.40s\" was dropped", o.op);
+    vm_op_end(dir);
+    vlog("recovery: %s (%s, started %s)", what, o.op, o.started);
+    if (at_start) { S.notice = VMN_RECOVERED; S.notice_code = 0; snprintf(S.notice_text, sizeof S.notice_text, "%s", what); }
+    else fprintf(stderr, "lord-vm: recovery: %s\n", what);
+    return 1;
+}
+
+static void discard_state(const char *dir) {
+    char p[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/suspend.state", dir); unlink(p);
+    snprintf(p, sizeof p, "%s/suspend.json", dir); unlink(p);
+    snprintf(p, sizeof p, "%s/.suspend.state.tmp", dir); unlink(p);
+    snprintf(p, sizeof p, "%s/.suspend.json.tmp", dir); unlink(p);
+    vm_sync_dir(dir);
+}
+
 static int cmd_start(const char *dir, int argc, char **argv) {
-    int detach = 0, control = -1;
+    int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -1426,6 +1742,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--detach")) detach = 1;
         else if (!strcmp(argv[i], "--keep-running")) S.keep_running = 1;
         else if (!strcmp(argv[i], "--dev-qmp")) S.dev_qmp = 1;
+        else if (!strcmp(argv[i], "--resume-anyway")) S.resume_anyway = 1;
+        else if (!strcmp(argv[i], "--discard-state")) discard = 1;
         else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) control = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credentials-file") && i + 1 < argc) { if (read_credentials(argv[++i])) return 2; }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
@@ -1478,6 +1796,9 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),
          S.m.accel ? "tcg" : "kvm", S.m.vcpus, S.m.memory_mb, S.m.machine_type);
     recover();
+    ops_recover(S.dir, 1);
+    if (discard) { discard_state(S.dir); vlog("the saved state was discarded: the machine starts from its disks"); }
+    host_cpu_id(S.cpu_id);
     S.state = VS_STOPPED;
     set_state(VS_STARTING, VR_NONE, 0, "");
 
@@ -1487,7 +1808,10 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     sigprocmask(SIG_BLOCK, &ss, NULL);
     S.sig_fd = signalfd(-1, &ss, SFD_CLOEXEC | SFD_NONBLOCK);
     signal(SIGHUP, SIG_IGN);
-    if (control >= 0) add_client(control, 1);
+    if (control >= 0) {
+        add_client(control, 1);
+        if (S.notice) { VmMsg n = vm_msg(VM_NOTICE, 0, S.notice, S.notice_code, 0, 0, S.notice_text); send_to(0, &n, -1); }
+    }
     S.listen_fd = open_listener();
     setup_cgroups();
     if (start_machine()) {
@@ -1606,18 +1930,18 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
     if (pass >= 0) close(pass);
     if (sent) { fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
     int info_sb = 0, info_cg = 0, rc = 1;
-    long long end = now_ms() + (type == VM_SHUTDOWN ? (timeout ? timeout : 60) * 1000 + 15000 : type == VM_POWEROFF ? 15000 : 10000);
+    long long end = now_ms() + (type == VM_SHUTDOWN ? (timeout ? timeout : 60) * 1000 + 15000 : type == VM_POWEROFF ? 15000 : type == VM_SUSPEND ? 600000 : 10000);
     int replied = 0;
     for (;;) {
         VmMsg r;
         long long left = end - now_ms();
         int g = left > 0 ? wait_msg(fd, &r, (int)left) : 0;
-        if (g < 0) { if (type == VM_SHUTDOWN || type == VM_POWEROFF) { if (!json) printf("%s: stopped\n", m.name); rc = 0; } break; }
+        if (g < 0) { if (type == VM_SHUTDOWN || type == VM_POWEROFF || (type == VM_SUSPEND && replied)) { if (!json) printf("%s: stopped\n", m.name); rc = 0; } break; }
         if (!g) { fprintf(stderr, "lord-vm: no answer in time\n"); break; }
         if (r.type == VM_INFO) { info_sb = r.c; info_cg = r.d; continue; }
         if (r.type == VM_STATE) {
             if (type == VM_STATUS) { print_state(&m, r.a, r.b, r.c, r.text, r.d, info_sb, info_cg, json, 1); rc = 0; break; }
-            if ((type == VM_SHUTDOWN || type == VM_POWEROFF) && (r.a == VS_STOPPED || r.a == VS_CRASHED)) { print_state(&m, r.a, r.b, r.c, r.text, r.d, 0, 0, json, 0); rc = r.a == VS_STOPPED ? 0 : 1; break; }
+            if ((type == VM_SHUTDOWN || type == VM_POWEROFF || type == VM_SUSPEND) && (r.a == VS_STOPPED || r.a == VS_CRASHED)) { print_state(&m, r.a, r.b, r.c, r.text, r.d, 0, 0, json, 0); rc = r.a == VS_STOPPED ? 0 : 1; break; }
             continue;
         }
         if (r.type == VM_REPLY && r.seq == 7) {
@@ -1628,7 +1952,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
                 rc = 1;
                 break;
             }
-            if (type == VM_SHUTDOWN || type == VM_POWEROFF) continue;
+            if (type == VM_SHUTDOWN || type == VM_POWEROFF || type == VM_SUSPEND) continue;
             if (json || type == VM_QMP) { printf("{\"ok\":true,\"text\":"); print_json_str(r.text); printf("}\n"); }
             rc = 0;
             break;
@@ -1668,7 +1992,14 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     char err[256], warn[256];
     int rc = 1;
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    snprintf(S.dir, sizeof S.dir, "%s", real);
+    ops_recover(real, 0);
     VmMachine was = m;
+    {
+        char st[PATH_MAX + 32];
+        snprintf(st, sizeof st, "%s/suspend.state", real);
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+    }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus) m.vcpus = vcpus;
     if (mem) m.memory_mb = mem;
@@ -1709,6 +2040,28 @@ out:
     return rc;
 }
 
+/* --discard-state DIR: the saved state goes (under the lock), and the next start boots from the disks */
+static int cmd_discard(const char *dir) {
+    char real[PATH_MAX];
+    if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
+    int lock = open_lock(real);
+    if (lock == -2) { fprintf(stderr, "lord-vm: the machine is running\n"); return 3; }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    snprintf(S.dir, sizeof S.dir, "%s", real);
+    ops_recover(real, 0);
+    discard_state(real);
+    RunInfo r;
+    if (!runinfo_read(real, &r) && (r.reason == VR_SUSPENDED || r.reason == VR_RESUME_FAILED)) {
+        r.state = VS_STOPPED; r.reason = VR_POWEROFF; r.code = 0;
+        snprintf(r.detail, sizeof r.detail, "the saved state was discarded");
+        vm_now_iso(r.since);
+        runinfo_write(real, &r);
+    }
+    close(lock);
+    printf("{\"discarded\":true}\n");
+    return 0;
+}
+
 static int cmd_check(const char *dir) {
     VmMachine m;
     char err[256], warn[256];
@@ -1728,6 +2081,8 @@ static int usage(void) {
             "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
             "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
+            "                           [--resume-anyway] [--discard-state]\n"
+            "       lord-vm --suspend DIR | --discard-state DIR\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
@@ -1743,9 +2098,10 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
+    if (!strcmp(cmd, "--discard-state")) return cmd_discard(dir);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
-        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM },
+        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND },
     };
     for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) if (!strcmp(cmd, C[i].name)) return cmd_client(dir, C[i].type, rest, rv);
     return usage();
