@@ -12,6 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- Settings → Sound: a **Balance** control for stereo outputs (left ↔ right, with Center), for a weak channel on a headset adapter or one-sided hearing; it is kept with the output's volume and survives restarts.
 - **Remote Desk, redesigned**: a sidebar with Favorites and Devices, cards with a picture of each computer's last session (taken a few seconds after every connection, kept only on this computer) or a list, sections by group, sort, a filter, search, and a ⋯ menu and a star on each card. Each connection opens its own window.
 - Remote Desk: **saved credentials** (user name, optional domain and display name; the password only in the keyring) chosen per computer, or "Ask When Required"; a password typed at sign-in is saved only once the computer accepts it. Remote Desk Settings (❖,) with General, Resolutions, Credentials and Groups.
 - Remote Desk: **sound from the remote computer** over RDP, played on this computer (or left on the remote one, or none), through LordOS's own audio path; the helper stays sandboxed.

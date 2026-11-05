@@ -5,6 +5,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect } from 'react';
 import { Stack, Section, SettingRow, Note, tint } from './ui.jsx';
+import { balanceOf, volumesFor, snapBalance } from './balance.js';
 
 function Volume({ kind, item, width = 170 }) {
   const t = useTheme();
@@ -16,6 +17,24 @@ function Volume({ kind, item, width = 170 }) {
       <Slider value={Math.min(1, item.level)} max={1} width={width} onChange={(v) => sound.setVolume(kind, item.index, v)} />
       <Text style={{ width: 40, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end' }}>{`${pct} %`}</Text>
       <Toggle small on={!item.mute} onChange={(on) => sound.setMute(kind, item.index, !on)} />
+    </View>
+  );
+}
+
+// Left/right balance of a stereo output: for a weak channel or one-sided hearing.
+function Balance({ item, tr, width = 170 }) {
+  const t = useTheme();
+  const b = balanceOf(item.volume);
+  const pct = Math.round(Math.abs(b) * 100);
+  const text = pct === 0 ? tr('settings.sound.balanceCenter') : tr(b < 0 ? 'settings.sound.balanceLeft' : 'settings.sound.balanceRight', { pct });
+  const set = (v) => sound.setVolume('sink', item.index, volumesFor(item.level, snapBalance(v)));
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, direction: 'ltr' }}>
+      <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('settings.sound.left')}</Text>
+      <Slider value={b} min={-1} max={1} width={width - 36} onChange={set} />
+      <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('settings.sound.right')}</Text>
+      <Text style={{ width: 92, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end' }}>{text}</Text>
+      <Button small label={tr('settings.sound.balanceReset')} disabled={pct === 0} onClick={() => set(0)} />
     </View>
   );
 }
@@ -76,6 +95,7 @@ export function SoundSettings() {
       {out && (
         <Section>
           <SettingRow label={tr('settings.sound.volume')}><Volume kind="sink" item={out} /></SettingRow>
+          {out.volume && out.volume.length === 2 && <SettingRow label={tr('settings.sound.balance')}><Balance item={out} tr={tr} /></SettingRow>}
           {out.ports.length > 1 && <SettingRow label={tr('settings.sound.port')}><Ports kind="sink" dev={out} /></SettingRow>}
           <SettingRow label={tr('settings.sound.test')}><Button small label={tr('settings.sound.play')} onClick={() => sound.play('notify')} /></SettingRow>
         </Section>
