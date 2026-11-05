@@ -1920,6 +1920,7 @@ static const char IDENTITY_SH[] =
     "echo \"hostname $(hostname) machine-id $(cat /etc/machine-id)\"";
 
 static int qga_do(const char *cmd, const char *args, int kind);
+static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n);
 static void id_begin(void) {
     if (S.id_state != 1 || !(S.ag_caps & VAC_EXEC)) return;
     JBuf b;
@@ -2051,6 +2052,9 @@ static void on_qga_reply(const JVal *root, int ok) {
                    "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);
         }
         id_begin();
+        /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
+         * is asked to say it again (once; its answer gets the plain hello) */
+        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;

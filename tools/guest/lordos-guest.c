@@ -210,7 +210,14 @@ int main(int argc, char **argv) {
             int used = ag_frame_next(buf, have, &f);
             if (used < 0 || (!used && have == sizeof buf)) { have = 0; break; }
             if (!used) break;
-            if (f.kind == AGK_HELLO) host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
+            if (f.kind == AGK_HELLO) {
+                host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
+                /* a new lord-vm (after a resume) asks once: the hello again */
+                if (f.len < 200 && memmem(f.data, f.len, " ask", 4)) {
+                    static const char again[] = "lordos-guest " VERSION " clipboard clipx";
+                    send_frame(fd, AGK_HELLO, (const uint8_t *)again, sizeof again - 1);
+                }
+            }
             if (f.kind == AGK_CLIP && f.len && ag_utf8_ok(f.data, f.len)) {
                 uint64_t h = hash(f.data, f.len);
                 if (h != last && !clip_write(f.data, f.len)) last = h;
