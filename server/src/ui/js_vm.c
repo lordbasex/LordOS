@@ -195,6 +195,10 @@ static void run_state(const char *dir, JSContext *c, JSValue o) {
             for (int i = 0; r && i < VR_COUNT; i++) if (!strcmp(r, REASONS[i])) snprintf(rs, sizeof rs, "%s", r);
             if (si) snprintf(since, sizeof since, "%s", si);
             if (de) snprintf(detail, sizeof detail, "%s", de);
+            {
+                const char *ag = json_str(d.root, "agent");
+                set_str(c, o, "agentState", ag && (!strcmp(ag, "connected") || !strcmp(ag, "waiting")) ? ag : "off");
+            }
             code = (int)json_num(d.root, "code", 0);
             long pid = (long)json_num(d.root, "pid", 0);
             int active = !strcmp(st, "starting") || !strcmp(st, "running") || !strcmp(st, "paused") || !strcmp(st, "stopping");
@@ -334,7 +338,12 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     const char *name = JS_ToCString(c, vn), *arch = JS_ToCString(c, va);
     int vcpus = prop_int(c, argv[0], "vcpus"), mem = prop_int(c, argv[0], "memoryMb"), disk = prop_int(c, argv[0], "diskGb");
     char imp[PATH_MAX] = "", iso[PATH_MAX] = "";
-    int isolated = 0;
+    int isolated = 0, share = 0;
+    {
+        JSValue vsh = JS_GetPropertyStr(c, argv[0], "shareClipboard");
+        share = JS_ToBool(c, vsh) > 0;
+        JS_FreeValue(c, vsh);
+    }
     {
         JSValue vnet = JS_GetPropertyStr(c, argv[0], "network");
         const char *ns = JS_IsString(vnet) ? JS_ToCString(c, vnet) : NULL;
@@ -374,7 +383,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
         char *args[] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
-                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
+                         "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso,
+                         share ? "--agent" : NULL, "on", "--clipboard", "both", NULL };
         int p[2];
         if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
         else {
@@ -461,6 +471,17 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         const char *s = JS_ToCString(c, v);
         if (s && (!strcmp(s, "shared") || !strcmp(s, "isolated"))) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
         if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    char clip[16] = "";
+    v = JS_GetPropertyStr(c, argv[1], "agent");
+    if (JS_IsBool(v)) { args[n++] = "--agent"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "clipboard");
+    if (JS_IsString(v)) {
+        const char *cs = JS_ToCString(c, v);
+        if (cs && (!strcmp(cs, "off") || !strcmp(cs, "to-guest") || !strcmp(cs, "from-guest") || !strcmp(cs, "both"))) { snprintf(clip, sizeof clip, "%s", cs); args[n++] = "--clipboard"; args[n++] = clip; } else ok = 0;
+        if (cs) JS_FreeCString(c, cs);
     }
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
@@ -644,6 +665,13 @@ typedef struct {
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
+    int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
+    char ag_text[VM_TEXT_MAX];
+    uint32_t ag_seq;                    /* an Install Agent request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    int ag_result;
+    char ag_msg[VM_TEXT_MAX];
+    char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
+    int clip_seq;
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
@@ -919,6 +947,23 @@ static void from_vm(Sess *s) {
             maybe_display(s);
             if (s->display_failed) resume_once(s);
             break;
+        case VM_AGENT_STATE:
+            s->ag_state = m.a; s->ag_caps = m.b;
+            snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
+            break;
+        case VM_CLIP_DATA:
+            /* the guest's text: checked sealed and of the size it says, then kept for the app to take */
+            if (fd >= 0) {
+                int seals = fcntl(fd, F_GET_SEALS);
+                struct stat cst;
+                if (seals >= 0 && (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) == (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) &&
+                    !fstat(fd, &cst) && cst.st_size == m.a) {
+                    char *t = malloc((size_t)m.a + 1);
+                    if (t && pread(fd, t, (size_t)m.a, 0) == m.a) { t[m.a] = 0; free(s->clip_in); s->clip_in = t; s->clip_seq++; }
+                    else free(t);
+                }
+            }
+            break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
                 if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
@@ -935,6 +980,7 @@ static void from_vm(Sess *s) {
             snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
             break;
         case VM_REPLY:
+            if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -1112,6 +1158,20 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "cd", s->cd_state);
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
+    {
+        JSValue ag = JS_NewObject(c);
+        set_str(c, ag, "state", s->ag_state == VAS_CONNECTED ? "connected" : s->ag_state == VAS_WAITING ? "waiting" : "off");
+        set_int(c, ag, "caps", s->ag_caps);
+        const char *tab = strchr(s->ag_text, '\t');
+        char ver[64] = "";
+        snprintf(ver, sizeof ver, "%.*s", tab ? (int)(tab - s->ag_text) : 0, s->ag_text);
+        set_str(c, ag, "version", ver);
+        set_str(c, ag, "system", tab ? tab + 1 : "");
+        set_int(c, ag, "install", s->ag_result);
+        set_str(c, ag, "message", s->ag_msg);
+        JS_SetPropertyStr(c, o, "agent", ag);
+    }
+    set_int(c, o, "clipIn", s->clip_seq);
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : "");
     if (s->job_kind) {
@@ -1227,6 +1287,7 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (!s) return JS_UNDEFINED;
     if (s->rec) { MediaSrc *r = media_src_get(s->rec); if (r) media_src_close(r); s->rec = 0; }     /* finished properly, "done" follows */
     if (s->console_term) { Session *ts = term_get(s->console_term); if (ts) term_close(ts); s->console_term = 0; }
+    free(s->clip_in); s->clip_in = NULL;
     drop_display(s, 1);
     drop_creds(s);
     if (s->vm >= 0) close(s->vm);
@@ -1340,6 +1401,46 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (vm_png_save(dir, name, m->px, m->w, m->h, 8192)) return JS_NewString(c, "");
     snprintf(path, sizeof path, "%s/%s", dir, name);
     return JS_NewString(c, path);
+}
+
+/* agent(session, 'install'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
+ * Install went) */
+static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
+    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN : 0;
+    if (w) JS_FreeCString(c, w);
+    if (!s || !a || s->vm < 0) return JS_FALSE;
+    int q = ask(s, VM_AGENT, a);
+    if (q < 0) return JS_FALSE;
+    if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
+    return JS_TRUE;
+}
+
+/* clipboardSend(session, text) → bool: the host's clipboard text for the guest, in a sealed memfd (lord-vm passes it
+ * on only in the directions machine.json allows). clipboardTake(session) → the guest's last text (poll's clipIn counts) */
+static JSValue f_clip_send(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    size_t n = 0;
+    const char *txt = s ? JS_ToCStringLen(c, &n, argv[1]) : NULL;
+    int ok = 0;
+    if (txt && n > 0 && n <= VM_CLIP_MAX && s->vm >= 0) {
+        int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (fd >= 0 && write(fd, txt, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            VmMsg m = vm_msg(VM_CLIP, ++s->seq, (int)n, 0, 0, 0, NULL);
+            ok = !vm_send(s->vm, &m, fd);
+        }
+        if (fd >= 0) close(fd);
+    }
+    if (txt) JS_FreeCString(c, txt);
+    return JS_NewBool(c, ok);
+}
+static JSValue f_clip_take(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    return s && s->clip_in ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
 }
 
 /* console(session) → bool: asks lord-vm for the serial console's stream; poll's console is then the terminal session to
@@ -1890,7 +1991,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
-    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
+    JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

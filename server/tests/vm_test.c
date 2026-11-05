@@ -11,6 +11,7 @@
 #include "vm/vmproto.h"
 #include "vm/logclean.h"
 #include "vm/vmops.h"
+#include "vm/vmagent.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -437,11 +438,34 @@ static void test_ops(void) {
     (void)!system(p);
 }
 
+/* Beta: org.lordos.agent frames, UTF-8, base64 (the guest is untrusted) */
+static void test_agent(void) {
+    uint8_t b[64];
+    ag_frame_head(b, AGK_CLIP, 0, 3);
+    memcpy(b + AG_HEAD, "abc", 3);
+    AgFrame f;
+    CHECK(ag_frame_next(b, AG_HEAD + 2, &f) == 0);                       /* not complete */
+    CHECK(ag_frame_next(b, AG_HEAD + 3, &f) == AG_HEAD + 3 && f.kind == AGK_CLIP && f.len == 3 && !memcmp(f.data, "abc", 3));
+    ag_frame_head(b, AGK_CLIP, 0, AG_FRAME_MAX + 1);
+    CHECK(ag_frame_next(b, AG_HEAD, &f) == -1);                          /* too long: dropped */
+    ag_frame_head(b, 999, 7, 0);
+    CHECK(ag_frame_next(b, AG_HEAD, &f) == AG_HEAD && f.kind == 999 && f.chan == 7 && !f.len);   /* unknown kinds pass, to be skipped */
+    CHECK(ag_utf8_ok((const uint8_t *)"h\xc3\xa9llo \xe2\x82\xac \xf0\x9f\x98\x80", 15));
+    CHECK(!ag_utf8_ok((const uint8_t *)"a\0b", 3) && !ag_utf8_ok((const uint8_t *)"\xc3", 1) && !ag_utf8_ok((const uint8_t *)"\xc0\x80", 2));
+    CHECK(!ag_utf8_ok((const uint8_t *)"\xed\xa0\x80", 3) && !ag_utf8_ok((const uint8_t *)"\xf5\x80\x80\x80", 4) && !ag_utf8_ok((const uint8_t *)"\xe2\x82", 2));
+    char e[32];
+    uint8_t d[32];
+    CHECK(ag_b64_encode((const uint8_t *)"hello!!", 7, e, sizeof e) == 12 && !strcmp(e, "aGVsbG8hIQ=="));
+    CHECK(ag_b64_decode(e, strlen(e), d, sizeof d) == 7 && !memcmp(d, "hello!!", 7));
+    CHECK(ag_b64_decode("a$==", 4, d, sizeof d) == -1 && ag_b64_decode("aGVsbG8=", 8, d, 2) == -1 && ag_b64_encode(d, 7, e, 8) == -1);
+}
+
 int main(void) {
     test_log_clean();
     test_images();
     test_schema();
     test_ops();
+    test_agent();
     test_host();
     test_messages();
     test_qmp();

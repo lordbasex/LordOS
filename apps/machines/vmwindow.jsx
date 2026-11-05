@@ -4,11 +4,11 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, MediaView, ScrollView, FilePicker, Toggle, Terminal, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, MediaView, ScrollView, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, MenuBtn, StateDot, overlayRoot, menus } from './ui.jsx';
 import { openConfigure, openLogs, openSnapshots } from './library.jsx';
@@ -18,8 +18,70 @@ const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.n
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'console'].every((k) => a[k] === b[k])
-  && jobKey(a.job) === jobKey(b.job);
+const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'console', 'clipIn'].every((k) => a[k] === b[k])
+  && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent);
+
+// the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
+function AgentButton({ ctl }) {
+  const p = usePal();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const g = ctl.st?.agent, cfg = ctl.cfg || {};
+  const tone = agentTone(g, cfg.agent);
+  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : tr('machines.agent.waiting');
+  return (
+    <View ref={ref}>
+      <View onClick={() => setOpen(!open)} title={label} style={{ height: 30, paddingHorizontal: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: tone === 'run' ? '#1d4d33' : p.btn }}>
+        <StateDot tone={tone} size={9} />
+        <Text style={{ fontSize: 12, fontWeight: 600, color: tone === 'run' ? '#7be3a4' : p.text }}>{tr('machines.agent.short')}</Text>
+      </View>
+      {open ? (
+        <Overlay anchor={ref}>
+          <View style={{ position: 'absolute', top: 34, left: 0, width: 300 }}>
+            <AgentPop ctl={ctl} onClose={() => setOpen(false)} />
+          </View>
+        </Overlay>
+      ) : null}
+    </View>
+  );
+}
+function AgentPop({ ctl, onClose }) {
+  const p = usePal();
+  const ref = useRef(null);
+  const g = ctl.st?.agent, cfg = ctl.cfg || {};
+  useEffect(() => {
+    menus.open++;
+    const a = addListener('pointerdown', (e) => { const n = ref.current; if (!n) return; const [lx, ly, w, h] = lord.getLayout(n.id); if (e.x < lx || e.x > lx + w || e.y < ly || e.y > ly + h) onClose(); });
+    const b = addListener('keydown', (e) => { if (e.key === 'Escape') onClose(); });
+    return () => { menus.open--; a(); b(); };
+  }, []);
+  const on = g?.state === 'connected';
+  const lines = agentLines(g, cfg);
+  return (
+    <View ref={ref} style={{ padding: 12, gap: 6, borderRadius: 10, backgroundColor: p.dark ? '#2b2b31' : '#fff', border: `1px solid ${p.line}`, boxShadow: '0 12px 34px rgba(0,0,0,0.5)' }}>
+      <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
+      {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(', ')}</Text>
+        : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+      <View style={{ height: 4 }} />
+      {lines.map(([k, st]) => (
+        <View key={k} style={{ flexDirection: 'row', gap: 8 }}>
+          <Text style={{ width: 86, fontSize: 12, fontWeight: 600, color: st === 'works' ? '#7be3a4' : p.text, textAlign: 'start' }}>{tr(`machines.agent.st.${st}`)}</Text>
+          <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.agent.cap.${k}`)}</Text>
+        </View>
+      ))}
+      {on ? (
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+          <Btn label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} style={{ height: 28 }} />
+          <Btn label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} style={{ height: 28 }} />
+        </View>
+      ) : null}
+      {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.installed')}</Text> : null}
+      {g?.install === 3 ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{g.message}</Text> : null}
+    </View>
+  );
+}
 
 function Tools({ ctl, floating }) {
   const p = usePal();
@@ -32,6 +94,7 @@ function Tools({ ctl, floating }) {
     { label: tr('machines.tb.sizesNote'), disabled: true },
   ];
   return <>
+    {!floating ? <AgentButton ctl={ctl} /> : null}
     {ctl.rec ? <Btn danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} style={{ height: 30, backgroundColor: '#8f1f2c' }} /> : null}
     <MenuBtn label={st?.w ? `${st.w} × ${st.h}` : tr('machines.tb.resolution')} items={res} primary={!follow} disabled={!a.keys} />
     <MenuBtn label={tr('machines.tb.devices')} items={ctl.devices} />
@@ -340,7 +403,28 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     });
   };
   const recSecs = rec ? Math.floor((now() - rec.at) / 1000) : 0;
+  // the shared clipboard (6.8), through the agent's channel and only the ways the machine allows: the host's text goes
+  // in when the window comes to the front, the guest's comes out as it changes
+  const cfgRef = useRef({});
+  const [cfg, setCfg] = useState({});
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard }); } }, [sid, st?.state]);
+  const clipSent = useRef('');
+  useEffect(() => {
+    if (!focused || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined) return;
+    if (!(st?.agent?.caps & 32)) return;
+    const text = clipboard.get();
+    if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) clipSent.current = text;
+  }, [focused, sid, cfg.clipboard, st?.agent?.caps]);
+  const clipSeen = useRef(0);
+  useEffect(() => {
+    if (!sid || !st?.clipIn || st.clipIn === clipSeen.current) return;
+    clipSeen.current = st.clipIn;
+    if (!clipFrom(cfg.clipboard)) return;
+    const text = lord.vm.clipboardTake(sid);
+    if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
+  }, [st?.clipIn]);
   const ctl = {
+    sid, cfg,
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,

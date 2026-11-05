@@ -7,7 +7,7 @@ import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, pr
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 
-const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'boot', 'security'];
+const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 
 function Group({ children }) {
   const p = usePal();
@@ -67,7 +67,7 @@ export function Configure({ dir, section: section0 }) {
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
-  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, ...draft };
+  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   const dirty = Object.keys(draft).some((k) => draft[k] !== m[k]);
   const save = (patch) => {
@@ -86,7 +86,8 @@ export function Configure({ dir, section: section0 }) {
     network: tr(`machines.cfg.net.${m.network}`),
     sound: tr('machines.cfg.sum.sound'),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
-    sharing: tr('machines.cfg.sum.sharing'),
+    sharing: tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
+    agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
     boot: m.firmware === 'uefi' ? 'UEFI' : 'BIOS',
     security: tr('machines.cfg.sum.security'),
   };
@@ -191,7 +192,23 @@ export function Configure({ dir, section: section0 }) {
       </Row>
     </Group>
   </>;
-  else if (sec === 'sharing') pane = <Later text={tr('machines.cfg.laterSharing')} />;
+  else if (sec === 'sharing') pane = <>
+    <Group>
+      <Row label={tr('machines.cfg.clipboard')} note={tr('machines.cfg.clipboardNote') + (offNote ? ` ${offNote}` : '')} last>
+        <Off off={running}><Segmented small value={cur.clipboard} onChange={(x) => set({ clipboard: x, ...(x !== 'off' ? { agent: true } : {}) })}
+          options={['off', 'to-guest', 'from-guest', 'both'].map((k) => [k, tr(`machines.cfg.clip.${k}`)])} /></Off>
+      </Row>
+    </Group>
+    <Later text={tr('machines.cfg.laterFolders')} />
+  </>;
+  else if (sec === 'agent') pane = <>
+    <Group>
+      <Row label={tr('machines.cfg.agent')} note={tr('machines.cfg.agentNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={!!cur.agent} onChange={(x) => set({ agent: x, ...(!x ? { clipboard: 'off' } : {}) })} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.agentInstall')} last note={tr('machines.cfg.agentInstallNote')} />
+    </Group>
+  </>;
   else if (sec === 'boot') pane = <>
     <Group>
       <Row label={tr('machines.cfg.firmware')} value={m.firmware === 'uefi' ? 'UEFI' : 'BIOS'} />
@@ -205,7 +222,7 @@ export function Configure({ dir, section: section0 }) {
     ))}
   </Group>;
 
-  const savable = ['general', 'cpu', 'network', 'disks'].includes(sec);
+  const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent'].includes(sec);
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: p.bg }}>
       <View style={{ width: 260, paddingHorizontal: 10, paddingVertical: 14, gap: 1, backgroundColor: p.raised }}>

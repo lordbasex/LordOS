@@ -99,6 +99,7 @@ export function createRequest(d) {
   const r = { name: d.name.trim(), arch: d.arch, vcpus: d.vcpus, memoryMb: d.memoryMb, diskGb: d.diskGb, network: d.network === 'isolated' ? 'isolated' : 'shared' };
   if (d.source === 'iso') r.iso = d.path; else r.import = d.path;
   if (d.source !== 'iso' && d.rootPassword) r.rootPassword = d.rootPassword;
+  if (d.shareClipboard) r.shareClipboard = true;
   return r;
 }
 
@@ -273,6 +274,30 @@ export const closeChoice = (meta) => (CLOSE_CHOICES.includes(meta?.onClose) ? me
 
 // the card picture's path, versioned by its time so the engine loads it again when it changes ('' when none)
 export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math.floor(mtime)}` : '');
+
+// ---- the guest agent (6.17) ----
+
+// lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64 };
+export function agentLines(agent, cfg) {
+  const caps = agent?.caps || 0, on = agent?.state === 'connected';
+  const clip = cfg?.clipboard || 'off';
+  return [
+    ['shell', 'works'],                                       // the serial console needs no agent
+    ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
+    ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
+    ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
+    ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
+    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : 'needsHelper'],
+    ['resolution', 'works'],
+    ['folders', 'later'], ['apps', 'later'],
+  ];
+}
+// the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
+export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
+// which way the clipboard may go
+export const clipTo = (c) => c === 'both' || c === 'to-guest';
+export const clipFrom = (c) => c === 'both' || c === 'from-guest';
 
 // ---- snapshots (6.2) ----
 

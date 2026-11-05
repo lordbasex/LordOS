@@ -23,6 +23,7 @@
 #include "vmproto.h"
 #include "vmsandbox.h"
 #include "vmops.h"
+#include "vmagent.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -228,7 +229,7 @@ static int socket_path(const VmMachine *m, char *out, size_t n, char *rundir, si
 
 /* ---- run.json ---- */
 
-typedef struct { int state, reason, code; long qemu_pid, passt_pid, pid; char since[21], detail[160]; } RunInfo;
+typedef struct { int state, reason, code; long qemu_pid, passt_pid, pid; char since[21], detail[160]; int agent; } RunInfo;
 
 static void runinfo_write(const char *dir, const RunInfo *r) {
     JBuf b;
@@ -237,6 +238,7 @@ static void runinfo_write(const char *dir, const RunInfo *r) {
               STATE_NAME[r->state], REASON_NAME[r->reason], r->code, r->pid, r->qemu_pid, r->passt_pid);
     jb_str(&b, r->since);
     jb_raw(&b, ",\"detail\":"); jb_str(&b, r->detail);
+    jb_printf(&b, ",\"agent\":\"%s\"", r->agent == VAS_CONNECTED ? "connected" : r->agent == VAS_WAITING ? "waiting" : "off");
     jb_raw(&b, "}\n");
     if (b.oom) { jb_free(&b); return; }
     char tmp[PATH_MAX + 32], path[PATH_MAX + 32];
@@ -319,6 +321,9 @@ static int firmware_for(int arch, const char **code, const char **vars) {
 }
 
 static int parse_enum(const char *s, const char *a, const char *b) { return !strcmp(s, a) ? 0 : !strcmp(s, b) ? 1 : -1; }
+static int parse_clip(const char *s) {
+    return !strcmp(s, "off") ? VM_CLIP_OFF : !strcmp(s, "to-guest") ? VM_CLIP_TO_GUEST : !strcmp(s, "from-guest") ? VM_CLIP_FROM_GUEST : !strcmp(s, "both") ? VM_CLIP_BOTH : -1;
+}
 
 /* The image to import, as QEMU must read it: a json: filename that names the format (never probed) and, for qcow2,
  * no backing file. QEMU's option parser isn't involved, so no character of the path needs escaping. */
@@ -529,7 +534,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -545,10 +550,14 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
         else if (!strcmp(a, "--import")) import = v;
         else if (!strcmp(a, "--iso")) iso = v;
+        else if (!strcmp(a, "--agent")) { agent = parse_enum(v, "off", "on"); if (agent < 0) { fprintf(stderr, "lord-vm: --agent on|off\n"); return 2; } }
+        else if (!strcmp(a, "--clipboard")) { clip = parse_clip(v); if (clip < 0) { fprintf(stderr, "lord-vm: --clipboard off|to-guest|from-guest|both\n"); return 2; } }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
     VmMachine m;
     vm_machine_defaults(&m, &h, arch);
+    if (agent >= 0) m.agent = agent;
+    if (clip >= 0) m.clipboard = clip;
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (accel >= 0) m.accel = accel;
     if (vcpus) m.vcpus = vcpus;
@@ -680,6 +689,24 @@ static struct {
     int console_fd;
     char ring[8192];
     size_t ring_n, ring_at;
+    /* the guest agent (6.17): qemu-guest-agent on one port (JSON lines, Qmp's reader), org.lordos.agent on another */
+    int qga_fd, lag_fd, ag_state, ag_caps, qga_up, qga_open;
+    Qmp qga;
+    int agq[32], agq_head, agq_n;           /* what each qemu-guest-agent reply answers (AQ_*) */
+    long long ag_next, sync_at, ping_at, journal_at, shutdown_at;
+    long sync_id;
+    char ag_version[48], ag_os[96], jcursor[256];
+    long jpid;                              /* a journalctl running in the guest (guest-exec), 0 none */
+    int keep_awake, inhibit_done;
+    uint8_t *lag_buf;
+    size_t lag_n;
+    int lag_hello;
+    char lag_version[48];
+    uint8_t *helper;                        /* lordos-guest for VAG_INSTALL, read before lord-vm's own Landlock */
+    size_t helper_n, helper_off;
+    long helper_handle;
+    int install_client;
+    uint32_t install_seq;
     /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
     int snap_kind, snap_client;
     uint32_t snap_seq;
@@ -714,7 +741,7 @@ static void set_state(int st, int why, int code, const char *detail) {
     S.code = code;
     if (detail) snprintf(S.detail, sizeof S.detail, "%s", detail);
     vm_now_iso(S.since);
-    RunInfo r = { st, why, code, S.qemu, S.passt, getpid(), "", "" };
+    RunInfo r = { st, why, code, S.qemu, S.passt, getpid(), "", "", st == VS_RUNNING || st == VS_PAUSED ? S.ag_state : VAS_OFF };
     memcpy(r.since, S.since, sizeof r.since);
     memcpy(r.detail, S.detail, sizeof r.detail);
     runinfo_write(S.dir, &r);
@@ -978,12 +1005,21 @@ static void build_qemu_args(void) {
     } else { arg("-display"); arg("none"); }
     arg("-chardev"); arg("socket,id=qmp,fd=4"); arg("-mon"); arg("chardev=qmp,mode=control");
     arg("-chardev"); arg("socket,id=ser0,fd=5"); arg("-serial"); arg("chardev:ser0");
+    if (m->agent) {
+        /* the guest agent (6.17): virtio-serial at slot 7, after every slot a machine had; qemu-guest-agent's port and
+         * ours, each a socket lord-vm holds the other end of (fds 7 and 8) */
+        arg("-device"); arg("virtio-serial-pci,id=vser0,addr=0x7");
+        arg("-chardev"); arg("socket,id=qga0,fd=7");
+        arg("-device"); arg("virtserialport,bus=vser0.0,nr=1,chardev=qga0,id=qga-port,name=org.qemu.guest_agent.0");
+        arg("-chardev"); arg("socket,id=lag0,fd=8");
+        arg("-device"); arg("virtserialport,bus=vser0.0,nr=2,chardev=lag0,id=lag-port,name=org.lordos.agent");
+    }
     arg("-sandbox"); arg("on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
     arg("-msg"); arg("timestamp=on");
     arg("-S");
     if (S.resuming) { arg("-incoming"); arg("defer"); }
     /* credentials: memfds at fd 7, 8, ... (never their values on the command line) */
-    for (int i = 0; i < S.ncreds; i++) { arg("-smbios"); argf("type=11,path=/proc/self/fd/%d", 7 + i); }
+    for (int i = 0; i < S.ncreds; i++) { arg("-smbios"); argf("type=11,path=/proc/self/fd/%d", (m->agent ? 9 : 7) + i); }
 }
 
 static void fail_start(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -1045,7 +1081,8 @@ static int start_machine(void) {
         if (kvm < 0) { fail_start("can't open /dev/kvm: %s", strerror(errno)); return -1; }
         S.sandbox |= VMS_KVM_FD;
     } else kvm = open("/dev/null", O_RDWR | O_CLOEXEC);
-    int qmp[2], ser[2], net[2] = { -1, -1 }, qerr[2], perr[2] = { -1, -1 }, st[2];
+    int qmp[2], ser[2], net[2] = { -1, -1 }, qerr[2], perr[2] = { -1, -1 }, st[2], qga[2] = { -1, -1 }, lag[2] = { -1, -1 };
+    if (S.m.agent && (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qga) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, lag))) { fail_start("out of descriptors"); return -1; }
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qmp) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ser) ||
         pipe2(qerr, O_CLOEXEC) || pipe2(st, O_CLOEXEC)) { fail_start("out of descriptors"); return -1; }
     if (S.m.network == VM_NET_SHARED) {
@@ -1064,7 +1101,7 @@ static int start_machine(void) {
         size_t o = 0;
         for (int i = 0; qargv[i] && o + 2 < sizeof line; i++) o += (size_t)snprintf(line + o, sizeof line - o, "%s%s", i ? " " : "", qargv[i]);
         vlog("qemu: %s", line);
-        for (int i = 0; i < S.ncreds; i++) vlog("qemu: credential %s on fd %d (value not logged)", S.cred_name[i], 7 + i);
+        for (int i = 0; i < S.ncreds; i++) vlog("qemu: credential %s on fd %d (value not logged)", S.cred_name[i], (S.m.agent ? 9 : 7) + i);
     }
     pid_t pid = fork();
     if (pid < 0) { fail_start("fork: %s", strerror(errno)); return -1; }
@@ -1075,8 +1112,9 @@ static int start_machine(void) {
         dup2(qerr[1], 1);
         dup2(qerr[1], 2);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[4 + MAX_CREDS + 1], nf = 0;
+        int fds[6 + MAX_CREDS + 1], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
+        if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
         fds[nf++] = st[1];
         place_fds(fds, nf);
@@ -1096,6 +1134,14 @@ static int start_machine(void) {
     }
     S.qemu = pid;
     close(kvm); close(qmp[1]); close(ser[1]); close(qerr[1]); close(st[1]);
+    if (S.m.agent) {
+        close(qga[1]); close(lag[1]);
+        S.qga_fd = qga[0]; S.lag_fd = lag[0];
+        fcntl(S.qga_fd, F_SETFL, O_NONBLOCK); fcntl(S.lag_fd, F_SETFL, O_NONBLOCK);
+        qmp_open(&S.qga, S.qga_fd);
+        S.ag_state = VAS_WAITING;
+        S.ag_next = now_ms() + 1000;
+    }
     for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
@@ -1147,6 +1193,7 @@ static void begin_shutdown(int secs) {
     qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1);
     S.host_shutdown = 1;
     S.shut_deadline = now_ms() + (long long)(secs ? secs : 60) * 1000;
+    if (S.qga_up) S.shutdown_at = now_ms() + 15000;     /* ACPI first, then the agent (6.1) */
     set_state(VS_STOPPING, VR_HOST_SHUTDOWN, 0, "asked the guest to shut down");
 }
 
@@ -1519,10 +1566,294 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
     vlog("snapshot: %s %s \"%s\"", cmd, tag, name);
 }
 
+/* ---- the guest agent (6.17, 7) ----
+ *
+ * qemu-guest-agent (Debian's qemu-guest-agent package, in the guest) answers on org.qemu.guest_agent.0: lord-vm syncs
+ * with it when the guest opens the port (VSERPORT_CHANGE) or every 10 s until it answers, then reads its version and
+ * the system's name, sets the guest's clock (also after a resume, an unpause or going back to a snapshot), keeps the
+ * guest from sleeping while the machine runs (systemd-inhibit, unless Configure says otherwise), follows the journal
+ * (journalctl through guest-exec every 5 s, into log/journal.log), shuts the guest down when ACPI didn't, and pings it
+ * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
+ * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
+enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT };
+
+static void ag_broadcast(void) {
+    char t[160];
+    snprintf(t, sizeof t, "%s\t%s", S.ag_version, S.ag_os);
+    VmMsg m = vm_msg(VM_AGENT_STATE, 0, S.ag_state, S.ag_caps, 0, 0, t);
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+}
+
+static void ag_set(int state) {
+    if (state == S.ag_state) return;
+    S.ag_state = state;
+    set_state(S.state, S.reason, S.code, NULL);         /* run.json says it too: the library's agent light */
+    vlog("agent: %s%s%s", state == VAS_CONNECTED ? "connected" : state == VAS_WAITING ? "waiting" : "off", state == VAS_CONNECTED ? ", " : "", state == VAS_CONNECTED ? S.ag_version : "");
+    ag_broadcast();
+}
+
+static int qga_do(const char *cmd, const char *args, int kind) {
+    if (S.qga_fd < 0 || S.agq_n >= 32) return -1;
+    if (qmp_command(&S.qga, cmd, args, -1)) return -1;
+    if (kind >= 0) { S.agq[(S.agq_head + S.agq_n) % 32] = kind; S.agq_n++; }
+    return 0;
+}
+
+static void qga_sync(void) {
+    char a[64];
+    S.agq_n = 0;                        /* nothing sent before is waited for any more */
+    snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
+    qga_do("guest-sync", a, AQ_SYNC);
+    S.sync_at = now_ms();
+}
+
+static void ag_timesync(void) {
+    if (!S.qga_up) return;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    char a[64];
+    snprintf(a, sizeof a, "{\"time\":%lld}", (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec);
+    qga_do("guest-set-time", a, AQ_IGNORE);
+}
+
+static void ag_lost(const char *why) {
+    if (S.qga_up) vlog("agent: %s", why);
+    S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
+    S.ag_caps &= VAC_CLIPBOARD;
+    ag_set(VAS_WAITING);
+}
+
+static void journal_append(const uint8_t *data, size_t n) {
+    char p[PATH_MAX + 32], p1[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/log/journal.log", S.dir);
+    struct stat st;
+    if (!stat(p, &st) && st.st_size > (4 << 20)) { snprintf(p1, sizeof p1, "%s/log/journal.1.log", S.dir); rename(p, p1); }
+    int fd = open(p, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return;
+    /* the cursor line ("-- cursor: s=…") is ours to keep, the rest goes to the file */
+    const uint8_t *line = data, *end = data + n;
+    while (line < end) {
+        const uint8_t *nl = memchr(line, '\n', (size_t)(end - line));
+        size_t l = nl ? (size_t)(nl - line) : (size_t)(end - line);
+        if (l > 11 && !memcmp(line, "-- cursor: ", 11)) { if (l - 11 < sizeof S.jcursor) { memcpy(S.jcursor, line + 11, l - 11); S.jcursor[l - 11] = 0; } }
+        else if (l && !(l > 3 && !memcmp(line, "-- ", 3))) { write_all(fd, line, l); write_all(fd, "\n", 1); }
+        line = nl ? nl + 1 : end;
+    }
+    close(fd);
+}
+
+static void ag_install_step(void);
+
+static void on_qga_reply(const JVal *root, int ok) {
+    if (!S.agq_n) return;
+    int kind = S.agq[S.agq_head];
+    S.agq_head = (S.agq_head + 1) % 32;
+    S.agq_n--;
+    const JVal *r = json_get(root, "return");
+    switch (kind) {
+    case AQ_SYNC:
+        if (ok && r && r->type == J_NUM && (long)r->num == S.sync_id) {
+            S.qga_up = 1;
+            S.ping_at = now_ms();
+            qga_do("guest-info", NULL, AQ_INFO);
+            qga_do("guest-get-osinfo", NULL, AQ_OSINFO);
+            ag_timesync();
+        }
+        break;
+    case AQ_INFO: {
+        const char *v = ok ? json_str(r, "version") : NULL;
+        snprintf(S.ag_version, sizeof S.ag_version, "%.40s", v ? v : "");
+        int caps = S.ag_caps & VAC_CLIPBOARD;
+        const JVal *cmds = json_get(r, "supported_commands");
+        for (const JVal *e = cmds && cmds->type == J_ARR ? cmds->kid : NULL; e; e = e->next) {
+            const char *n = json_str(e, "name");
+            if (!n || !json_bool(e, "enabled", 0)) continue;
+            if (!strcmp(n, "guest-shutdown")) caps |= VAC_SHUTDOWN;
+            else if (!strcmp(n, "guest-set-time")) caps |= VAC_TIME;
+            else if (!strcmp(n, "guest-exec")) caps |= VAC_EXEC | VAC_JOURNAL | (S.keep_awake ? VAC_AWAKE : 0);
+            else if (!strcmp(n, "guest-file-write")) caps |= VAC_FILES;
+        }
+        S.ag_caps = caps;
+        break;
+    }
+    case AQ_OSINFO: {
+        const char *n = ok ? json_str(r, "pretty-name") : NULL;
+        if (!n && ok) n = json_str(r, "name");
+        /* the guest's words, shown as text: printable ASCII and UTF-8 only, short */
+        char clean[96] = "";
+        size_t k = 0;
+        for (const unsigned char *q = (const unsigned char *)(n ? n : ""); *q && k + 1 < sizeof clean; q++) if (*q >= 0x20 && *q != 0x7f) clean[k++] = (char)*q;
+        clean[k] = 0;
+        if (!ag_utf8_ok((const uint8_t *)clean, k)) clean[0] = 0;
+        snprintf(S.ag_os, sizeof S.ag_os, "%s", clean);
+        S.ag_state = -1;
+        ag_set(VAS_CONNECTED);
+        if (S.keep_awake && (S.ag_caps & VAC_EXEC) && !S.inhibit_done) {
+            S.inhibit_done = 1;
+            qga_do("guest-exec", "{\"path\":\"systemd-inhibit\",\"arg\":[\"--what=sleep:idle\",\"--who=LordOS Machines\","
+                   "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);
+        }
+        break;
+    }
+    case AQ_PING: if (ok) S.ping_at = now_ms(); break;
+    case AQ_JEXEC: S.jpid = ok ? (long)json_num(r, "pid", 0) : 0; if (!ok) S.ag_caps &= ~VAC_JOURNAL; break;
+    case AQ_JSTATUS:
+        if (!ok) { S.jpid = 0; break; }
+        if (!json_bool(r, "exited", 0)) break;                /* asked again at the next turn */
+        {
+            const char *b = json_str(r, "out-data");
+            if (b) {
+                size_t bl = strlen(b);
+                uint8_t *out = malloc(bl * 3 / 4 + 4);
+                long n = out ? ag_b64_decode(b, bl, out, bl * 3 / 4 + 4) : -1;
+                if (n > 0) journal_append(out, (size_t)n);
+                free(out);
+            }
+            S.jpid = 0;
+        }
+        break;
+    case AQ_INHIBIT: if (ok) vlog("agent: the guest is kept awake while the machine runs"); break;
+    case AQ_FOPEN:
+        if (!ok) { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; break; }
+        S.helper_handle = (long)(r && r->type == J_NUM ? r->num : 0);
+        S.helper_off = 0;
+        ag_install_step();
+        break;
+    case AQ_FWRITE: if (!ok) { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; } else ag_install_step(); break;
+    case AQ_FCLOSE: if (ok) ag_install_step(); else { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; } break;
+    case AQ_INSTALL: reply(S.install_client, S.install_seq, ok ? VME_OK : VME_QMP, ok ? "installed" : qmp_error_desc(root)); S.helper_handle = 0; vlog("agent: lordos-guest %s", ok ? "installed" : "couldn't be installed"); break;
+    default: break;
+    }
+}
+
+/* the steps of VAG_INSTALL: lordos-guest written in 32 KB pieces through guest-file-write, then one fixed script */
+static const char INSTALL_SH[] =
+    "set -e; mv -f /usr/local/bin/.lordos-guest.new /usr/local/bin/lordos-guest; chmod 755 /usr/local/bin/lordos-guest; "
+    "printf '%s\\n' 'SUBSYSTEM==\"virtio-ports\", ATTR{name}==\"org.lordos.agent\", TAG+=\"uaccess\"' > /etc/udev/rules.d/71-lordos-guest.rules; "
+    "mkdir -p /etc/systemd/user; printf '%s\\n' '[Unit]' 'Description=LordOS Machines clipboard' 'After=graphical-session.target' "
+    "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' 'WantedBy=graphical-session.target' "
+    "> /etc/systemd/user/lordos-guest.service; udevadm control --reload || true; udevadm trigger --subsystem-match=virtio-ports || true; "
+    "systemctl --global enable lordos-guest.service || true";
+static void ag_install_step(void) {
+    if (S.helper_off < S.helper_n) {
+        size_t n = S.helper_n - S.helper_off < 32768 ? S.helper_n - S.helper_off : 32768;
+        static char b64[32768 / 3 * 4 + 64], args[32768 / 3 * 4 + 128];
+        if (ag_b64_encode(S.helper + S.helper_off, n, b64, sizeof b64) < 0) return;
+        snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.helper_handle, b64);
+        S.helper_off += n;
+        qga_do("guest-file-write", args, AQ_FWRITE);
+        return;
+    }
+    if (S.helper_handle) {
+        char a[64];
+        snprintf(a, sizeof a, "{\"handle\":%ld}", S.helper_handle);
+        S.helper_handle = 0;
+        qga_do("guest-file-close", a, AQ_FCLOSE);
+        return;
+    }
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
+    jb_str(&b, INSTALL_SH);
+    jb_raw(&b, "]}");
+    if (!b.oom) qga_do("guest-exec", b.p, AQ_INSTALL);
+    jb_free(&b);
+}
+
+static void drain_qga(void) {
+    if (qmp_fill(&S.qga) < 0) { close(S.qga_fd); S.qga_fd = -1; ag_set(VAS_OFF); return; }
+    JDoc d;
+    while (qmp_next(&S.qga, &d) > 0) {
+        int k = qmp_kind(d.root);
+        if (k == QMP_MSG_RETURN || k == QMP_MSG_ERROR) on_qga_reply(d.root, k == QMP_MSG_RETURN);
+        json_free(&d);
+    }
+}
+
+/* org.lordos.agent: frames from lordos-guest */
+static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n) {
+    if (S.lag_fd < 0) return;
+    uint8_t h[AG_HEAD];
+    ag_frame_head(h, kind, 0, n);
+    struct iovec io[2] = { { h, AG_HEAD }, { (void *)data, n } };
+    ssize_t w = writev(S.lag_fd, io, n ? 2 : 1);
+    if (w != (ssize_t)(AG_HEAD + n)) vlog("agent: a frame to the guest was cut short (%zd of %u)", w, AG_HEAD + n);
+}
+
+static int clip_allows(int to_guest) {
+    return S.m.clipboard == VM_CLIP_BOTH || S.m.clipboard == (to_guest ? VM_CLIP_TO_GUEST : VM_CLIP_FROM_GUEST);
+}
+
+static void drain_lag(void) {
+    if (!S.lag_buf) { S.lag_buf = malloc(AG_FRAME_MAX + AG_HEAD); S.lag_n = 0; if (!S.lag_buf) return; }
+    ssize_t r = read(S.lag_fd, S.lag_buf + S.lag_n, AG_FRAME_MAX + AG_HEAD - S.lag_n);
+    if (r <= 0) { if (r == 0 || (errno != EAGAIN && errno != EINTR)) { close(S.lag_fd); S.lag_fd = -1; } return; }
+    S.lag_n += (size_t)r;
+    for (;;) {
+        AgFrame f;
+        int k = ag_frame_next(S.lag_buf, S.lag_n, &f);
+        if (k < 0) { vlog("agent: org.lordos.agent sent a frame over %u bytes: dropped", AG_FRAME_MAX); S.lag_n = 0; S.lag_hello = 0; return; }
+        if (!k) { if (S.lag_n == AG_FRAME_MAX + AG_HEAD) S.lag_n = 0; return; }
+        if (f.kind == AGK_HELLO) {
+            char t[64];
+            size_t l = f.len < sizeof t - 1 ? f.len : sizeof t - 1;
+            memcpy(t, f.data, l); t[l] = 0;
+            int good = !strncmp(t, "lordos-guest ", 13) && ag_utf8_ok((const uint8_t *)t, l);
+            if (good) {
+                snprintf(S.lag_version, sizeof S.lag_version, "%.40s", t + 13);
+                char *sp = strchr(S.lag_version, ' ');
+                if (sp) *sp = 0;
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello", S.lag_version);
+                S.lag_hello = 1;
+                S.ag_caps |= VAC_CLIPBOARD;
+                static const char me[] = "lord-vm 1 clipboard";
+                lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+                ag_broadcast();
+            }
+        } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
+            int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+            if (fd >= 0 && !write_all(fd, f.data, f.len) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+                VmMsg m = vm_msg(VM_CLIP_DATA, 0, (int)f.len, 0, 0, 0, "");
+                for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
+            }
+            if (fd >= 0) close(fd);
+        }
+        /* other kinds: skipped, so either side can grow */
+        memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
+        S.lag_n -= (size_t)k;
+    }
+}
+
+/* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
+static void ag_tick(long long now) {
+    S.ag_next = now + 1000;
+    if (S.qga_fd < 0) return;
+    if (!S.qga_up) { if (now - S.sync_at > (S.qga_open ? 3000 : 10000)) qga_sync(); return; }
+    if (now - S.ping_at > 25000) { ag_lost("qemu-guest-agent stopped answering"); return; }
+    if (now - S.ping_at > 10000 && !S.agq_n) qga_do("guest-ping", NULL, AQ_PING);
+    if (S.shutdown_at && now >= S.shutdown_at) {
+        S.shutdown_at = 0;
+        if (S.state == VS_STOPPING && (S.ag_caps & VAC_SHUTDOWN)) { vlog("agent: the guest didn't answer the power button: asking qemu-guest-agent"); qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); }
+    }
+    if ((S.ag_caps & VAC_JOURNAL) && now >= S.journal_at && !S.helper_handle && S.state == VS_RUNNING) {
+        S.journal_at = now + 5000;
+        if (S.jpid) { char a[48]; snprintf(a, sizeof a, "{\"pid\":%ld}", S.jpid); qga_do("guest-exec-status", a, AQ_JSTATUS); }
+        else {
+            JBuf b;
+            jb_init(&b);
+            jb_raw(&b, "{\"path\":\"journalctl\",\"arg\":[\"-o\",\"short-iso\",\"--no-pager\",\"-n\",\"300\",\"--show-cursor\"");
+            if (S.jcursor[0]) { jb_raw(&b, ",\"--after-cursor\","); jb_str(&b, S.jcursor); }
+            jb_raw(&b, "],\"capture-output\":true}");
+            if (!b.oom) qga_do("guest-exec", b.p, AQ_JEXEC);
+            jb_free(&b);
+        }
+    }
+}
+
 static void console_out(const char *b, size_t n);
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM) { close(fd); fd = -1; }
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
     case VM_STATUS: {
@@ -1531,6 +1862,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         send_to(ci, &i, -1);
         send_to(ci, &s, -1);
         if (S.notice) { VmMsg n = vm_msg(VM_NOTICE, m->seq, S.notice, S.notice_code, 0, 0, S.notice_text); send_to(ci, &n, -1); }
+        if (S.m.agent) { char t[160]; snprintf(t, sizeof t, "%s\t%s", S.ag_version, S.ag_os); VmMsg a = vm_msg(VM_AGENT_STATE, m->seq, S.ag_state, S.ag_caps, 0, 0, t); send_to(ci, &a, -1); }
         return;
     }
     case VM_PAUSE:
@@ -1610,6 +1942,28 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         vlog("shell: opened for client %d", ci);
         return;
     }
+    case VM_AGENT:
+        if (!S.m.agent) { reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
+        if (!S.qga_up) { reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+        if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
+        if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
+        if (!S.helper || S.helper_handle || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
+        S.install_client = ci; S.install_seq = m->seq;
+        S.helper_handle = -1;
+        if (qga_do("guest-file-open", "{\"path\":\"/usr/local/bin/.lordos-guest.new\",\"mode\":\"w\"}", AQ_FOPEN)) { S.helper_handle = 0; reply(ci, m->seq, VME_BUSY, "busy"); }
+        return;
+    case VM_CLIP: {
+        if (fd < 0) { reply(ci, m->seq, VME_BAD_REQUEST, "no text"); return; }
+        if (!clip_allows(1) || !S.lag_hello) { close(fd); reply(ci, m->seq, VME_DENIED, "the clipboard isn't shared toward this machine"); return; }
+        static uint8_t buf[VM_CLIP_MAX];
+        struct stat st;
+        ssize_t n = !fstat(fd, &st) && st.st_size == m->a ? pread(fd, buf, (size_t)m->a, 0) : -1;
+        close(fd);
+        if (n != m->a || !ag_utf8_ok(buf, (size_t)n)) { reply(ci, m->seq, VME_BAD_REQUEST, "not text"); return; }
+        lag_send(AGK_CLIP, buf, (uint32_t)n);
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
@@ -1632,7 +1986,10 @@ static void on_qmp_event(const JVal *root) {
     const char *ev = json_str(root, "event");
     const JVal *data = json_get(root, "data");
     if (!strcmp(ev, "STOP")) { if (S.state == VS_RUNNING) set_state(VS_PAUSED, VR_USER, 0, ""); }
-    else if (!strcmp(ev, "RESUME")) { if (S.state == VS_PAUSED || S.state == VS_STARTING) set_state(VS_RUNNING, S.state == VS_STARTING ? VR_NONE : VR_USER, 0, ""); }
+    else if (!strcmp(ev, "RESUME")) {
+        if (S.state == VS_PAUSED || S.state == VS_STARTING) set_state(VS_RUNNING, S.state == VS_STARTING ? VR_NONE : VR_USER, 0, "");
+        ag_timesync();                  /* the guest's clock stood still while it was paused or saved */
+    }
     else if (!strcmp(ev, "SHUTDOWN")) {
         int guest = data ? json_bool(data, "guest", 0) : 0;
         const char *why = data ? json_str(data, "reason") : NULL;
@@ -1643,7 +2000,15 @@ static void on_qmp_event(const JVal *root) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
-    else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
+    else if (!strcmp(ev, "VSERPORT_CHANGE")) {
+        const char *id = data ? json_str(data, "id") : NULL;
+        int open = data ? json_bool(data, "open", 0) : 0;
+        if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
+        else if (id && !strcmp(id, "lag-port")) {
+            vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
+            if (!open) { S.lag_hello = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; ag_broadcast(); }
+        }
+    } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
         if (id && st && !strcmp(id, "snap") && !strcmp(st, "concluded") && S.snap_kind) qmp_do("query-jobs", NULL, P_JOBQ, -1, 0, -1, -1);
     } else if (!strcmp(ev, "MIGRATION")) {
@@ -1904,16 +2269,20 @@ static void loop(void) {
         WATCH(S.passt_err, -5);
         WATCH(S.listen_fd, -6);
         WATCH(S.console_fd, -7);
+        WATCH(S.qga_fd, -8);
+        WATCH(S.lag_fd, -9);
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;
         if (S.shut_deadline) next = S.shut_deadline;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
+        if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
+        if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
             vlog("the guest didn't shut down in time: turning it off");
@@ -1950,6 +2319,8 @@ static void loop(void) {
             case -5: pump_fd(&S.passt_err, "passt"); break;
             case -6: accept_client(); break;
             case -7: pump_console(); break;
+            case -8: drain_qga(); break;
+            case -9: drain_lag(); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -2166,7 +2537,7 @@ static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -2254,6 +2625,26 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         vlog("snapshot: starting from %s \"%s\"", S.loadvm, list[i].name);
     }
     host_cpu_id(S.cpu_id);
+    if (S.m.agent) {
+        /* app.json's keepAwake (on unless turned off), and lordos-guest for Install Agent: read now, before lord-vm's
+         * own Landlock keeps it in the machine's folder */
+        char ap[PATH_MAX + 32], buf[4096];
+        snprintf(ap, sizeof ap, "%s/app.json", S.dir);
+        int afd = open(ap, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t an = afd >= 0 ? read(afd, buf, sizeof buf - 1) : -1;
+        if (afd >= 0) close(afd);
+        S.keep_awake = 1;
+        JDoc jd;
+        if (an > 0 && !json_parse(buf, (size_t)an, &jd, NULL, 0)) { S.keep_awake = json_bool(jd.root, "keepAwake", 1); json_free(&jd); }
+        static const char *const HELPER[2] = { "/usr/lib/lordos/guest/lordos-guest-arm64", "/usr/lib/lordos/guest/lordos-guest-amd64" };
+        int hfd = open(HELPER[S.m.arch], O_RDONLY | O_CLOEXEC);
+        struct stat hs;
+        if (hfd >= 0 && !fstat(hfd, &hs) && hs.st_size > 0 && hs.st_size < (8 << 20) && (S.helper = malloc((size_t)hs.st_size))) {
+            S.helper_n = (size_t)hs.st_size;
+            if (pread(hfd, S.helper, S.helper_n, 0) != (ssize_t)S.helper_n) { free(S.helper); S.helper = NULL; S.helper_n = 0; }
+        }
+        if (hfd >= 0) close(hfd);
+    }
     S.state = VS_STOPPED;
     set_state(VS_STARTING, VR_NONE, 0, "");
 
@@ -2349,7 +2740,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "--json")) json = 1;
         else if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout = atoi(argv[++i]);
-        else if ((type == VM_QMP || type == VM_CDROM) && !qmptext) qmptext = argv[i];
+        else if ((type == VM_QMP || type == VM_CDROM || type == VM_AGENT) && !qmptext) qmptext = argv[i];
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
     char real[PATH_MAX], err[256];
@@ -2380,12 +2771,18 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
         }
         qmptext = strlen(cdreal) < VM_TEXT_MAX ? cdreal : "";
     }
-    VmMsg q = vm_msg((uint16_t)type, 7, type == VM_SHUTDOWN ? timeout : 0, 0, 0, 0, qmptext);
+    int a = type == VM_SHUTDOWN ? timeout : 0;
+    if (type == VM_AGENT) {
+        a = !qmptext ? 0 : !strcmp(qmptext, "shutdown") ? VAG_SHUTDOWN : !strcmp(qmptext, "timesync") ? VAG_TIMESYNC : !strcmp(qmptext, "install") ? VAG_INSTALL : 0;
+        if (!a) { fprintf(stderr, "lord-vm: --agent DIR shutdown|timesync|install\n"); return 2; }
+        qmptext = "";
+    }
+    VmMsg q = vm_msg((uint16_t)type, 7, a, 0, 0, 0, qmptext);
     int sent = vm_send(fd, &q, pass);
     if (pass >= 0) close(pass);
     if (sent) { fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
     int info_sb = 0, info_cg = 0, rc = 1;
-    long long end = now_ms() + (type == VM_SHUTDOWN ? (timeout ? timeout : 60) * 1000 + 15000 : type == VM_POWEROFF ? 15000 : type == VM_SUSPEND ? 600000 : 10000);
+    long long end = now_ms() + (type == VM_SHUTDOWN ? (timeout ? timeout : 60) * 1000 + 15000 : type == VM_POWEROFF ? 15000 : type == VM_SUSPEND ? 600000 : type == VM_AGENT ? 120000 : 10000);
     int replied = 0;
     for (;;) {
         VmMsg r;
@@ -2423,7 +2820,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -2435,8 +2832,10 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--display")) disp = parse_enum(v, "window", "none");
         else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
         else if (!strcmp(a, "--iso")) iso = v;
+        else if (!strcmp(a, "--agent")) agent = parse_enum(v, "off", "on");
+        else if (!strcmp(a, "--clipboard")) clip = parse_clip(v);
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
-        if ((!strcmp(a, "--display") && disp < 0) || (!strcmp(a, "--network") && net < 0)) { fprintf(stderr, "lord-vm: %s %s?\n", a, v); return 2; }
+        if ((!strcmp(a, "--display") && disp < 0) || (!strcmp(a, "--network") && net < 0) || (!strcmp(a, "--agent") && agent < 0) || (!strcmp(a, "--clipboard") && clip < 0)) { fprintf(stderr, "lord-vm: %s %s?\n", a, v); return 2; }
     }
     char real[PATH_MAX];
     if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
@@ -2453,13 +2852,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus) m.vcpus = vcpus;
     if (mem) m.memory_mb = mem;
     if (disp >= 0) m.display = disp;
     if (net >= 0) m.network = net;
+    if (agent >= 0) m.agent = agent;
+    if (clip >= 0) m.clipboard = clip;
+    if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
     if (disk) {
         if (disk < m.disk_gb) { fprintf(stderr, "lord-vm: the disk can only grow (it has %d GB)\n", m.disk_gb); goto out; }
         m.disk_gb = disk;
@@ -2488,8 +2890,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false");
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
+           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false");
     rc = 0;
 out:
     close(lock);
@@ -2926,9 +3328,10 @@ static int usage(void) {
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
             "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
             "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
+            "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both]   (also on --create)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--resume-anyway] [--discard-state]\n"
-            "       lord-vm --suspend DIR | --discard-state DIR\n"
+            "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"
             "       lord-vm --compact DIR [--estimate]\n"
@@ -2953,7 +3356,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--compact")) return cmd_compact(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
-        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND },
+        { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND }, { "--agent", VM_AGENT },
     };
     for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) if (!strcmp(cmd, C[i].name)) return cmd_client(dir, C[i].type, rest, rv);
     return usage();

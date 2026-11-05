@@ -93,7 +93,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
         <View style={{ position: 'absolute', left: 10, top: 10, paddingHorizontal: 9, height: 20, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)' }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: v.why ? '#ff9a9a' : '#f2f2f5' }}>{doing}</Text>
         </View>
-        <View style={{ position: 'absolute', right: 10, top: 10 }}><Lights power={on} agent={false} disk={!!u?.disk} /></View>
+        <View style={{ position: 'absolute', right: 10, top: 10 }}><Lights power={on} agent={on && m.agentState === 'connected'} disk={!!u?.disk} /></View>
         {hover && (a.start || a.open) ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
             <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={a.open ? tr('machines.open') : tr('machines.start')}

@@ -47,13 +47,13 @@ export function OsMark({ id, size = 40 }) {
 // the card picture's colors when there's no picture yet
 export const markColors = (id) => (MARKS[id] || MARKS.other).slice(0, 2);
 
-// power, agent, disk activity (the agent is always off: there's no guest agent yet)
+// power, agent, disk activity
 export function Lights({ power, agent, disk }) {
   const dot = (on, color, label) => <View key={label} title={label} style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: on ? color : '#5a5a63' }} />;
   return (
     <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 8, height: 20, alignItems: 'center', borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.62)' }}>
       {dot(power, '#30d158', tr(power ? 'machines.light.powerOn' : 'machines.light.powerOff'))}
-      {dot(agent, '#6cb6ff', tr('machines.light.agentOff'))}
+      {dot(agent, '#6cb6ff', tr(agent ? 'machines.light.agentOn' : 'machines.light.agentOff'))}
       {dot(disk, '#ffb340', tr(disk ? 'machines.light.diskActive' : 'machines.light.diskIdle'))}
     </View>
   );

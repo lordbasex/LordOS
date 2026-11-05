@@ -40,11 +40,12 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [name, setName] = useState('');
   const [rootPassword, setRootPassword] = useState('');
   const [customize, setCustomize] = useState(false);
+  const [shareClip, setShareClip] = useState(false);
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState(null);
   const other = host.arch === 'amd64' ? 'arm64' : 'amd64';
   const size = profileSize(profile, host);
-  const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' ? 'iso' : 'import', path, rootPassword };
+  const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' ? 'iso' : 'import', path, rootPassword, shareClipboard: shareClip };
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [arch]);
   const emulated = arch !== host.arch;
@@ -174,6 +175,15 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
           </View>
         ))}
       </View>
+      {profile === 'productivity' ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+          <Toggle on={shareClip} onChange={setShareClip} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.shareClip')}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.shareClipHint')}</Text>
+          </View>
+        </View>
+      ) : null}
       {missing.length ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}>
           <Text style={{ flex: 1, fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.new.needs', { list: missing.join(', ') })}</Text>

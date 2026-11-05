@@ -2,14 +2,20 @@
 # QMP, limits, state), and lord-vmdisplay, its picture and input over QEMU's peer-to-peer D-Bus display. libc and the
 # shared sandbox, cgroup and JSON code; lord-vmdisplay also links the system's D-Bus library (libsystemd), built only
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
-VM_COMMON := src/vm/machine.c src/vm/vmops.c src/sec/json.c src/doc/wire.c
+VM_COMMON := src/vm/machine.c src/vm/vmops.c src/vm/vmagent.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
 LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
-all: build/lord-vm
+all: build/lord-vm build/lordos-guest
 build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORDVM_SRC)
 	chmod g-w $@
+
+# lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
+# runs on whatever the guest has)
+build/lordos-guest: ../tools/guest/lordos-guest.c src/vm/vmagent.c src/vm/vmagent.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c src/vm/vmagent.c
 
 VMDISPLAY ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
 ifeq ($(VMDISPLAY),1)

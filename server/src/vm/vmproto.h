@@ -41,6 +41,11 @@
  *     VM_CONSOLE    → VM_CONSOLE_FD: a stream to the guest's serial console (6.18, the Shell): what the guest writes
  *                   comes out of it (the last 8 KB first), what's written to it goes to the guest. One at a time; a
  *                   new one replaces the old. The serial log goes on as before.
+ *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
+ *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
+ *                   into the guest through qemu-guest-agent and enables it) → VM_REPLY
+ *     VM_CLIP       the host's clipboard text for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX) of
+ *                   UTF-8; sent on only when machine.json's clipboard allows to-guest and lordos-guest said hello
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
@@ -53,6 +58,9 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
+ *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* (what works now), text = "version\tsystem" as
+ *                   the guest reported them (untrusted, shown as text only). Sent on each change and after VM_STATUS
+ *     VM_CLIP_DATA  the guest's clipboard text (machine.json allows from-guest): a sealed memfd of a bytes of UTF-8
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (the network stopped: passt
@@ -107,15 +115,21 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE,
-    VM_REQ_LAST = VM_CONSOLE,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP,
+    VM_REQ_LAST = VM_CLIP,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
+    VM_AGENT_STATE, VM_CLIP_DATA,
 };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
+/* VM_AGENT a, VM_AGENT_STATE a and b */
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL };
+enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
+enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64 };
+#define VM_CLIP_MAX (1u << 20)
 /* VM_SNAPSHOT a */
 enum { VSN_TAKE = 1, VSN_REVERT, VSN_DELETE };
 
@@ -265,7 +279,9 @@ static inline VdMsg vd_msg(uint16_t type, int a, int b, int c, int d, int e, int
 static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
-                      (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE));
+                      (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
+                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -273,6 +289,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 128;
+    case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

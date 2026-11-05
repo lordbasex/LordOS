@@ -129,6 +129,12 @@ for b in lord-vm lord-vmdisplay; do
     [ -x "server/build/$b" ] && install -m 755 "server/build/$b" "$L/bin/$b"
     [ -x "$L/bin/$b" ] && { "$STRIP" --strip-unneeded "$L/bin/$b" 2>/dev/null || true; }
 done
+# lordos-guest (0.8.9 beta): the clipboard helper Machines copies into a guest of this architecture (Install Agent)
+if [ -x server/build/lordos-guest ]; then
+    install -d "$L/guest"
+    install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
+    "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
+fi
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }
