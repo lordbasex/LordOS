@@ -70,7 +70,7 @@ function Card({ m, u, sel, onSelect, onMenu }) {
       onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
       style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', backgroundColor: p.card,
         border: `2px solid ${sel ? p.accent : 'transparent'}` }}>
-      <View style={{ flex: 1, minHeight: 0, background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
+      <View style={{ flex: 1, minHeight: 0, ...(src ? { backgroundColor: '#000' } : { background: `linear-gradient(135deg, ${c1}, ${c2})` }) }}>
         {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} size={56} /></View>
         )}
