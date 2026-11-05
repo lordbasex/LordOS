@@ -210,8 +210,10 @@ eq('clone hostname', [M.cloneHostname('Agent Test'), M.cloneHostname('x'.repeat(
 const NET = ['2026-11-05T06:11:31.745Z lord-vm 9: machine 3bf "x" (amd64, kvm, 1 vCPU, 512 MB, pc-q35-10.0)',
   '2026-11-05T06:12:00.000Z network: passt ended (signal 9): reconnecting',
   '2026-11-05T06:12:00.100Z network: passt 77 started (backend pst1)',
-  '2026-11-05T06:12:00.200Z network: the network is back (passt restarted, 412 ms after it ended)'].join('\n');
+  '2026-11-05T06:12:00.200Z network: the network is back (passt restarted, 412 ms after it ended)',
+  '2026-11-05T06:13:00.000Z network: passt ended (status 0) while the machine stops'].join('\n');
 eq('diag network healed', D.readLog(NET).network.map((x) => x.text.slice(0, 20)), ['network: passt ended', 'network: the network']);
+eq('diag network not on stop', D.readLog(NET).problems.length, 0);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);
