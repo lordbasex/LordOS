@@ -26,6 +26,11 @@ typedef struct {
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without
  * VMS_SECCOMP_OURS and VMS_NO_NEW_PRIVS. */
 int vm_jail_qemu(const VmQemuJail *j);
+/* qemu-img on an image the person chose (import): no_new_privs, the same seccomp as QEMU (no sockets), Landlock
+ * with read and execute /usr, read `read_file` only, read and write (and make files) only in `rw_dir` (NULL: none),
+ * no TCP. In the child, before execve; returns VMS_* bits, and the caller refuses to exec without
+ * VMS_NO_NEW_PRIVS and VMS_SECCOMP_OURS, and without VMS_LANDLOCK_FS where the kernel has Landlock. */
+int vm_jail_tool(const char *read_file, const char *rw_dir);
 /* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied */
 int vm_jail_self(const char *machine_dir, const char *runtime_dir);
 /* the kernel's Landlock ABI (0 none) */

@@ -110,6 +110,18 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
 
+/* An image to import: its format from its first bytes and its name, never QEMU's probing (a crafted qcow2 can name
+ * a backing file or an external data file, and the import would copy that file into the new disk; a raw file can
+ * hold a qcow2 header and pretend). head: the file's first bytes (VM_IMG_HEAD, fewer for a short file).
+ * VM_IMG_QCOW2: the qcow2 magic, version 2 or 3, no backing file, no external data file, not marked corrupt.
+ * VM_IMG_RAW: a .img or .raw name and no qcow2 magic. Anything else: -1, err says why. The same check guards the
+ * system disk at every start (vm_qcow2_plain). */
+enum { VM_IMG_QCOW2 = 0, VM_IMG_RAW = 1 };
+#define VM_IMG_HEAD 512
+int vm_image_kind(const uint8_t *head, size_t n, const char *name, char *err, size_t errlen);
+/* a qcow2 header lord-vm may hand QEMU: 0 yes (no backing file, no external data file, not corrupt) */
+int vm_qcow2_plain(const uint8_t *head, size_t n, char *err, size_t errlen);
+
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);
 int vm_mac_valid(const char *s);

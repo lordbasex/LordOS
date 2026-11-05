@@ -387,3 +387,43 @@ void vm_host_probe(VmHost *h) {
     h->kvm = fd >= 0;
     if (fd >= 0) close(fd);
 }
+
+/* ---- images (vm_image_kind) ---- */
+
+static uint64_t be64(const uint8_t *p) { uint64_t v = 0; for (int i = 0; i < 8; i++) v = v << 8 | p[i]; return v; }
+static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
+
+int vm_qcow2_plain(const uint8_t *h, size_t n, char *err, size_t errlen) {
+    if (n < 72 || memcmp(h, "QFI\xfb", 4)) { fail(err, errlen, -1, "not a qcow2 image"); return -1; }
+    uint32_t ver = be32(h + 4);
+    if (ver != 2 && ver != 3) { fail(err, errlen, -1, "qcow2 version %u isn't supported", ver); return -1; }
+    if (be64(h + 8) || be32(h + 16)) { fail(err, errlen, -1, "the image depends on a backing file: refused"); return -1; }
+    if (ver == 3) {
+        if (n < 104) { fail(err, errlen, -1, "the qcow2 header is cut short"); return -1; }
+        uint64_t incompat = be64(h + 72);
+        uint32_t hlen = be32(h + 100);
+        if (hlen < 104 || hlen > 4096) { fail(err, errlen, -1, "the qcow2 header length is wrong"); return -1; }
+        if (incompat & 4) { fail(err, errlen, -1, "the image keeps its data in another file: refused"); return -1; }
+        if (incompat & 2) { fail(err, errlen, -1, "the image is marked corrupt"); return -1; }
+        /* bits QEMU doesn't know (0 dirty, 3 compression type, 4 extended L2 are fine) */
+        if (incompat & ~(uint64_t)0x1f) { fail(err, errlen, -1, "the image needs qcow2 features this computer doesn't have"); return -1; }
+    }
+    return 0;
+}
+
+static int ends_with(const char *s, const char *suf) {
+    size_t a = strlen(s), b = strlen(suf);
+    if (a < b) return 0;
+    for (size_t i = 0; i < b; i++) if ((s[a - b + i] | 32) != suf[i]) return 0;
+    return 1;
+}
+
+int vm_image_kind(const uint8_t *head, size_t n, const char *name, char *err, size_t errlen) {
+    if (n >= 4 && !memcmp(head, "QFI\xfb", 4)) return vm_qcow2_plain(head, n, err, errlen) ? -1 : VM_IMG_QCOW2;
+    if (name && (ends_with(name, ".img") || ends_with(name, ".raw"))) {
+        if (n < 512) { fail(err, errlen, -1, "the image is too small to be a disk"); return -1; }
+        return VM_IMG_RAW;
+    }
+    fail(err, errlen, -1, ends_with(name ? name : "", ".qcow2") ? "not a qcow2 image" : "only qcow2 images (or raw .img) can be imported");
+    return -1;
+}

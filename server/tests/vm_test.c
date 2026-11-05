@@ -317,7 +317,42 @@ static void test_keys(void) {
     CHECK(dup == 0);
 }
 
+/* import: the format comes from our check of the first bytes, never QEMU's probing */
+static void put_be(uint8_t *p, uint64_t v, int n) { for (int i = n - 1; i >= 0; i--) { p[i] = (uint8_t)v; v >>= 8; } }
+static void test_images(void) {
+    uint8_t h[VM_IMG_HEAD];
+    char err[128];
+    memset(h, 0, sizeof h);
+    memcpy(h, "QFI\xfb", 4); put_be(h + 4, 3, 4); put_be(h + 100, 112, 4);
+    CHECK(vm_image_kind(h, sizeof h, "/x/debian.qcow2", err, sizeof err) == VM_IMG_QCOW2);
+    CHECK(vm_image_kind(h, sizeof h, "/x/debian.img", err, sizeof err) == VM_IMG_QCOW2);      /* the magic wins */
+    CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == 0);
+    put_be(h + 8, 0x200, 8); put_be(h + 16, 11, 4);                                              /* backing file */
+    CHECK(vm_image_kind(h, sizeof h, "/x/a.qcow2", err, sizeof err) == -1 && strstr(err, "backing"));
+    CHECK(vm_image_kind(h, sizeof h, "/x/a.img", err, sizeof err) == -1);
+    put_be(h + 8, 0, 8); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == -1);              /* size alone */
+    put_be(h + 16, 0, 4);
+    put_be(h + 72, 4, 8); CHECK(vm_image_kind(h, sizeof h, "/x/a.qcow2", err, sizeof err) == -1 && strstr(err, "another file"));
+    put_be(h + 72, 2, 8); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == -1);              /* corrupt */
+    put_be(h + 72, 1 << 6, 8); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == -1);         /* unknown feature */
+    put_be(h + 72, 1 | 8 | 16, 8); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == 0);      /* dirty, zstd, extended L2 */
+    put_be(h + 72, 0, 8);
+    put_be(h + 100, 50, 4); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == -1);
+    put_be(h + 100, 104, 4);
+    CHECK(vm_qcow2_plain(h, 80, err, sizeof err) == -1);                                          /* v3 cut short */
+    put_be(h + 4, 2, 4); CHECK(vm_qcow2_plain(h, 80, err, sizeof err) == 0);                      /* v2 has no more */
+    put_be(h + 4, 4, 4); CHECK(vm_qcow2_plain(h, sizeof h, err, sizeof err) == -1);
+    memset(h, 0, sizeof h);
+    CHECK(vm_image_kind(h, sizeof h, "/x/disk.img", err, sizeof err) == VM_IMG_RAW);
+    CHECK(vm_image_kind(h, sizeof h, "/x/DISK.RAW", err, sizeof err) == VM_IMG_RAW);
+    CHECK(vm_image_kind(h, sizeof h, "/x/disk.qcow2", err, sizeof err) == -1);                    /* raw pretending */
+    CHECK(vm_image_kind(h, sizeof h, "/x/disk.vmdk", err, sizeof err) == -1);
+    CHECK(vm_image_kind(h, 100, "/x/disk.img", err, sizeof err) == -1);
+    CHECK(vm_image_kind(h, 0, NULL, err, sizeof err) == -1);
+}
+
 int main(void) {
+    test_images();
     test_schema();
     test_host();
     test_messages();

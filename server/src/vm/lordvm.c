@@ -151,8 +151,11 @@ static int sha256_file(const char *path, char out[65]) {
     return 0;
 }
 
-/* runs a program (no shell) and waits; its output goes to the log. 0 when it exited with 0 */
-static int run_tool(char *const argv[], char *out, size_t outcap) {
+/* runs a program (no shell) and waits; its output goes to the log. 0 when it exited with 0. With `jail_read`, the
+ * program runs inside vm_jail_tool (it may read only that file and write only in `jail_rw`) or not at all. */
+static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw);
+static int run_tool(char *const argv[], char *out, size_t outcap) { return run_tool_in(argv, out, outcap, NULL, NULL); }
+static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
     pid_t pid = fork();
@@ -163,6 +166,14 @@ static int run_tool(char *const argv[], char *out, size_t outcap) {
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
         syscall(SYS_close_range, 3, ~0u, 0);
+        if (jail_read) {
+            int mask = vm_jail_tool(jail_read, jail_rw);
+            if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
+                static const char e[] = "lord-vm: the image tool's sandbox couldn't be set up\n";
+                write_all(2, e, sizeof e - 1);
+                _exit(126);
+            }
+        }
         char *env[] = { "LC_ALL=C", NULL };
         execve(argv[0], argv, env);
         _exit(127);
@@ -305,15 +316,57 @@ static int firmware_for(int arch, const char **code, const char **vars) {
 
 static int parse_enum(const char *s, const char *a, const char *b) { return !strcmp(s, a) ? 0 : !strcmp(s, b) ? 1 : -1; }
 
-static int image_virtual_gb(const char *img) {
-    char *argv[] = { QEMU_IMG, "info", "--output=json", (char *)img, NULL };
+/* The image to import, as QEMU must read it: a json: filename that names the format (never probed) and, for qcow2,
+ * no backing file. QEMU's option parser isn't involved, so no character of the path needs escaping. */
+static char *image_spec(const char *real, int kind) {
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "json:{\"driver\":\"%s\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":", kind == VM_IMG_QCOW2 ? "qcow2" : "raw");
+    jb_str(&b, real);
+    jb_raw(&b, kind == VM_IMG_QCOW2 ? "},\"backing\":null}" : "}}");
+    return b.oom ? NULL : b.p;
+}
+
+/* Reads the first bytes of the image and decides its format (vm_image_kind), then asks qemu-img, jailed, for its
+ * size with that format; refuses an image QEMU says has a backing file or an external data file anyway. */
+static int image_check(const char *real, int *kind, int *gb, char *err, size_t errlen) {
+    uint8_t head[VM_IMG_HEAD];
+    int fd = open(real, O_RDONLY | O_CLOEXEC | O_NOCTTY);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode)) { if (fd >= 0) close(fd); snprintf(err, errlen, "isn't a file"); return -1; }
+    ssize_t n = read(fd, head, sizeof head);
+    close(fd);
+    *kind = vm_image_kind(head, n > 0 ? (size_t)n : 0, real, err, errlen);
+    if (*kind < 0) return -1;
+    char *spec = image_spec(real, *kind);
+    if (!spec) { snprintf(err, errlen, "out of memory"); return -1; }
+    char *argv[] = { QEMU_IMG, "info", "--output=json", spec, NULL };
     static char buf[65536];
-    if (run_tool(argv, buf, sizeof buf)) return -1;
+    int r = run_tool_in(argv, buf, sizeof buf, real, NULL);
+    free(spec);
+    if (r) { snprintf(err, errlen, "QEMU can't read it: %.180s", buf); return -1; }
     JDoc d;
-    if (json_parse(buf, strlen(buf), &d, NULL, 0)) return -1;
+    if (json_parse(buf, strlen(buf), &d, NULL, 0)) { snprintf(err, errlen, "qemu-img's answer isn't JSON"); return -1; }
+    const char *fmt = json_str(d.root, "format");
+    const JVal *fs = json_get(json_get(d.root, "format-specific"), "data");
     double vs = json_num(d.root, "virtual-size", 0);
+    int bad = !fmt || strcmp(fmt, *kind == VM_IMG_QCOW2 ? "qcow2" : "raw") || json_get(d.root, "backing-filename") ||
+              json_get(d.root, "full-backing-filename") || json_get(d.root, "backing-filename-format") || (fs && json_get(fs, "data-file"));
     json_free(&d);
-    return vs > 0 ? (int)((vs + (1 << 30) - 1) / (1 << 30)) : -1;
+    if (bad) { snprintf(err, errlen, "the image depends on another file: refused"); return -1; }
+    if (vs <= 0) { snprintf(err, errlen, "the image has no size"); return -1; }
+    *gb = (int)((vs + (1 << 30) - 1) / (1 << 30));
+    return 0;
+}
+
+/* the system disk at each start: a qcow2 with no backing file and no external data file (vm_qcow2_plain) */
+static int disk_plain(const char *path, char *err, size_t errlen) {
+    uint8_t head[VM_IMG_HEAD];
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) { snprintf(err, errlen, "can't open it: %s", strerror(errno)); return -1; }
+    ssize_t n = read(fd, head, sizeof head);
+    close(fd);
+    return vm_qcow2_plain(head, n > 0 ? (size_t)n : 0, err, errlen);
 }
 
 static int cmd_create(const char *dir, int argc, char **argv) {
@@ -363,9 +416,13 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         if (!realpath(iso, isoreal) || !file_exists(isoreal) || strlen(isoreal) >= sizeof m.iso) { fprintf(stderr, "lord-vm: %s isn't a file (or its path is too long)\n", iso); return 1; }
         memcpy(m.iso, isoreal, strlen(isoreal) + 1);
     }
+    char impreal[PATH_MAX];
+    int impkind = -1;
     if (import) {
-        int g = image_virtual_gb(import);
-        if (g < 0) { fprintf(stderr, "lord-vm: %s isn't a disk image QEMU can read\n", import); return 1; }
+        int g = 0;
+        char why[256];
+        if (!realpath(import, impreal)) { fprintf(stderr, "lord-vm: %s: %s\n", import, strerror(errno)); return 1; }
+        if (image_check(impreal, &impkind, &g, why, sizeof why)) { fprintf(stderr, "lord-vm: %s: %s\n", import, why); return 1; }
         if (m.disk_gb < g) m.disk_gb = g;
     }
     char err[256], warn[256];
@@ -385,9 +442,16 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
     snprintf(size, sizeof size, "%dG", m.disk_gb);
     if (import) {
-        char *cv[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", (char *)import, sys, NULL };
-        char *rs[] = { QEMU_IMG, "resize", "-q", sys, size, NULL };
-        if (run_tool(cv, err, sizeof err) || run_tool(rs, err, sizeof err)) { fprintf(stderr, "lord-vm: importing %s failed: %s\n", import, err); unlink(sys); return 1; }
+        /* jailed: reads the image only, writes only in disks/; the format is named, backing is off */
+        char *spec = image_spec(impreal, impkind), dd[PATH_MAX + 64];
+        snprintf(dd, sizeof dd, "%s/disks", real);
+        char *cv[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", spec, sys, NULL };
+        char *rs[] = { QEMU_IMG, "resize", "-q", "-f", "qcow2", sys, size, NULL };
+        int bad = !spec || run_tool_in(cv, err, sizeof err, impreal, dd) || run_tool_in(rs, err, sizeof err, sys, dd);
+        free(spec);
+        char why[256];
+        if (!bad && disk_plain(sys, why, sizeof why)) { snprintf(err, sizeof err, "%s", why); bad = 1; }
+        if (bad) { fprintf(stderr, "lord-vm: importing %s failed: %s\n", import, err); unlink(sys); return 1; }
     } else {
         char *cr[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", sys, size, NULL };
         if (run_tool(cr, err, sizeof err)) { fprintf(stderr, "lord-vm: qemu-img create failed: %s\n", err); return 1; }
@@ -644,7 +708,9 @@ static char *blockdev_file(const char *node, const char *path, int ro) {
 static char *blockdev_fmt(const char *drv, const char *node, const char *file, int ro) {
     JBuf b;
     jb_init(&b);
-    jb_printf(&b, "{\"driver\":\"%s\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":%s%s}", drv, node, file, ro ? "true" : "false", ro ? "" : ",\"discard\":\"unmap\"");
+    /* a qcow2 never follows a backing file, whatever its header says (start checks the header too) */
+    jb_printf(&b, "{\"driver\":\"%s\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":%s%s%s}", drv, node, file, ro ? "true" : "false",
+              ro ? "" : ",\"discard\":\"unmap\"", !strcmp(drv, "qcow2") ? ",\"backing\":null" : "");
     return b.oom ? NULL : b.p;
 }
 
@@ -737,9 +803,11 @@ static int start_machine(void) {
     char p[PATH_MAX + 64];
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
     if (!file_exists(p)) { fail_start("the system disk is missing: %s", p); return -1; }
+    if (disk_plain(p, err, sizeof err)) { fail_start("the system disk can't be used: %s", err); return -1; }
     if (S.m.firmware == VM_FW_UEFI) {
         snprintf(p, sizeof p, "%s/nvram.qcow2", S.disks);
         if (!file_exists(p)) { fail_start("the UEFI variables are missing: %s", p); return -1; }
+        if (disk_plain(p, err, sizeof err)) { fail_start("the UEFI variables can't be used: %s", err); return -1; }
         if (!file_exists(S.m.firmware_code)) { fail_start("the UEFI firmware is missing: %s", S.m.firmware_code); return -1; }
         char sum[65];
         if (!sha256_file(S.m.firmware_code, sum) && strcmp(sum, S.m.firmware_sha256))

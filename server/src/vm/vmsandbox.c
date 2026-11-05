@@ -191,6 +191,48 @@ int vm_jail_qemu(const VmQemuJail *j) {
     return mask;
 }
 
+static int apply_seccomp(void) {
+    if (!VM_AUDIT_ARCH) return 0;
+    static struct sock_filter filt[256];
+    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]));
+    if (n > (int)(sizeof filt / sizeof filt[0])) return 0;
+    struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
+    return !syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) ? VMS_SECCOMP_OURS : 0;
+}
+
+int vm_jail_tool(const char *read_file, const char *rw_dir) {
+    int mask = 0;
+    struct rlimit no = { 0, 0 };
+    setrlimit(RLIMIT_CORE, &no);
+    if (!prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) mask |= VMS_NO_NEW_PRIVS;
+    int abi = vm_landlock_abi();
+    if (abi >= 1) {
+        struct landlock_ruleset_attr attr;
+        memset(&attr, 0, sizeof attr);
+        uint64_t h = fs_handled(abi);
+        attr.handled_access_fs = h;
+        if (abi >= 4) attr.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP | LANDLOCK_ACCESS_NET_CONNECT_TCP;
+#ifdef LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET
+        if (abi >= 6) attr.scoped = LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET | LANDLOCK_SCOPE_SIGNAL;
+#endif
+        int rs = (int)syscall(SYS_landlock_create_ruleset, &attr, sizeof attr, 0U);
+        if (rs >= 0) {
+            uint64_t ro = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+            uint64_t rw = ro | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_REMOVE_FILE;
+            int ok = !rule(rs, "/usr", ro | LANDLOCK_ACCESS_FS_EXECUTE, h) && read_file && !rule(rs, read_file, LANDLOCK_ACCESS_FS_READ_FILE, h);
+            if (rw_dir && rule(rs, rw_dir, rw, h)) ok = 0;
+            rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
+            rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
+            rule(rs, "/proc/self", ro, h);
+            rule(rs, "/sys/devices/system/cpu", ro, h);
+            if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) mask |= VMS_LANDLOCK_FS | (abi >= 4 ? VMS_LANDLOCK_NET : 0);
+            close(rs);
+        }
+    }
+    mask |= apply_seccomp();
+    return mask;
+}
+
 int vm_jail_self(const char *machine_dir, const char *runtime_dir) {
     int abi = vm_landlock_abi();
     if (abi < 1) return 0;
