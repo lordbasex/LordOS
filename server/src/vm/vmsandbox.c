@@ -171,6 +171,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
                 rule(rs, "/dev/kvm", dev, h);
             }
             if (j->iso && j->iso[0] && rule(rs, j->iso, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
+            if (j->base && j->base[0] && rule(rs, j->base, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {
                 mask |= VMS_LANDLOCK_FS;
                 if (abi >= 4) mask |= VMS_LANDLOCK_NET;
@@ -200,7 +201,8 @@ static int apply_seccomp(void) {
     return !syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) ? VMS_SECCOMP_OURS : 0;
 }
 
-int vm_jail_tool(const char *read_file, const char *rw_dir) {
+int vm_jail_tool(const char *read_file, const char *rw_dir) { return vm_jail_tool2(read_file, NULL, rw_dir); }
+int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_dir) {
     int mask = 0;
     struct rlimit no = { 0, 0 };
     setrlimit(RLIMIT_CORE, &no);
@@ -221,6 +223,7 @@ int vm_jail_tool(const char *read_file, const char *rw_dir) {
             uint64_t rw = ro | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_REMOVE_FILE;
             int ok = !rule(rs, "/usr", ro | LANDLOCK_ACCESS_FS_EXECUTE, h) && read_file && !rule(rs, read_file, LANDLOCK_ACCESS_FS_READ_FILE, h);
             if (rw_dir && rule(rs, rw_dir, rw, h)) ok = 0;
+            if (read_file2 && rule(rs, read_file2, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
             rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
             rule(rs, "/proc/self", ro, h);

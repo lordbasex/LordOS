@@ -265,3 +265,58 @@ export function snapName(list, base) {
 }
 // does the snapshot hold the machine's memory (and how much)
 export const snapSize = (s) => (s?.memory && s.vmstate > 0 ? s.vmstate : 0);
+
+// ---- clones (6.3) ----
+
+// How lord-vm will copy the disk, from lord.vm.cloneInfo: 'reflink' (shared until changed), 'linked' (ext4: a frozen
+// base and an overlay for each), 'copy' (a full copy), or 'blocked' (a Clone of a machine with a saved session, which
+// holds its identity). fromSnapshot: a Clone of one snapshot is always converted.
+export function cloneMethod(info, kind, fromSnapshot = false) {
+  if (kind === 'clone' && info?.suspended) return 'blocked';
+  if (fromSnapshot) return 'copy';
+  if (info?.reflink) return 'reflink';
+  if (kind === 'clone' && !info?.snapshots && !info?.suspended && !info?.linked) return 'linked';
+  return kind === 'duplicate' ? 'duplicate' : 'copy';
+}
+
+// ---- the Storage window (6.16) ----
+
+// lord.vm.storage() → the list's rows: each machine, its clones under it (app.json cloneOf), then the shared bases.
+// { key, name, level, size, frees, machine } or { key, base: true, path, size, users, trash, names }
+export function storageRows(st) {
+  const ms = [...(st?.machines || [])].map((m) => ({ ...m, savedBytes: m.state }));
+  const byId = new Map(ms.map((m) => [m.id, m]));
+  const kids = new Map();
+  const tops = [];
+  for (const m of ms) {
+    const parent = m.meta?.cloneOf && byId.has(m.meta.cloneOf) && m.meta.cloneOf !== m.id ? m.meta.cloneOf : null;
+    if (parent) { if (!kids.has(parent)) kids.set(parent, []); kids.get(parent).push(m); } else tops.push(m);
+  }
+  const rows = [];
+  const bases = st?.bases || [];
+  const add = (m, level, seen) => {
+    if (seen.has(m.id) || level > 6) return;
+    seen.add(m.id);
+    const b = m.base ? bases.find((x) => x.path === m.base) : null;
+    rows.push({ key: m.dir, name: m.name, level, size: m.total, frees: m.frees, machine: { ...m, savedBytes: m.state }, baseBytes: b?.bytes || 0, baseUsers: b ? b.users + b.trash : 0 });
+    for (const k of (kids.get(m.id) || []).sort((a, z) => a.name.localeCompare(z.name))) add(k, level + 1, seen);
+  };
+  const seen = new Set();
+  for (const m of tops.sort((a, z) => a.name.localeCompare(z.name))) add(m, 0, seen);
+  for (const b of bases) {
+    const names = ms.filter((m) => m.base === b.path).map((m) => m.name);
+    rows.push({ key: b.path, base: true, path: b.path, size: b.bytes, users: b.users, trash: b.trash, names, level: 0 });
+  }
+  return rows;
+}
+
+// the volume's bar: machines (their folders and shared bases), disc images in use, machines in the Trash, other files
+export function storageBar(st) {
+  const total = st?.total || 0;
+  if (!(total > 0)) return [];
+  const machines = (st.machines || []).reduce((a, m) => a + (m.total || 0), 0) + (st.bases || []).reduce((a, b) => a + (b.bytes || 0), 0);
+  const used = Math.max(0, total - (st.free || 0));
+  const parts = [['machines', machines], ['isos', st.isos || 0], ['trash', st.trash || 0]];
+  const other = Math.max(0, used - parts.reduce((a, x) => a + x[1], 0));
+  return [...parts, ['other', other]].map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
+}

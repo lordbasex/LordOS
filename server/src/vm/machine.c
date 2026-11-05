@@ -117,8 +117,13 @@ static int path_valid(const char *s) {
     return 1;
 }
 
+int vm_base_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    return n > 15 && path_valid(s) && strstr(s, "/.shared/") && !strchr(strstr(s, "/.shared/") + 9, '/') && !strcmp(s + n - 6, ".qcow2");
+}
+
 int vm_machine_check(const VmMachine *m, char *err, size_t n) {
-    if (m->schema != VM_SCHEMA) return fail(err, n, m->schema > VM_SCHEMA ? VM_E_NEWER : VM_E_SCHEMA, "schema %d", m->schema);
+    if (m->schema < 1 || m->schema > VM_SCHEMA) return fail(err, n, m->schema > VM_SCHEMA ? VM_E_NEWER : VM_E_SCHEMA, "schema %d", m->schema);
     if (!vm_uuid_valid(m->id)) return fail(err, n, VM_E_RANGE, "id is not a lowercase UUID");
     if (!vm_name_valid(m->name)) return fail(err, n, VM_E_RANGE, "name must be 1 to %d bytes of text, without '/' or control characters", VM_NAME_MAX);
     if (m->arch != VM_ARCH_ARM64 && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "arch");
@@ -139,6 +144,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (!vm_mac_valid(m->mac)) return fail(err, n, VM_E_RANGE, "mac must be 52:54:00:xx:xx:xx, lowercase");
     if (m->iso[0] && !path_valid(m->iso)) return fail(err, n, VM_E_RANGE, "iso must be an absolute path without '..', ',' or control characters");
     if (!iso_time_valid(m->created) || !iso_time_valid(m->updated)) return fail(err, n, VM_E_RANGE, "created and updated are UTC times like 2026-11-04T20:00:00Z");
+    if (m->base[0] && !vm_base_valid(m->base)) return fail(err, n, VM_E_RANGE, "base must be a .qcow2 in a .shared folder");
+    if (m->agent != 0 && m->agent != 1) return fail(err, n, VM_E_RANGE, "agent");
+    if (m->clipboard < VM_CLIP_OFF || m->clipboard > VM_CLIP_BOTH) return fail(err, n, VM_E_RANGE, "clipboard");
+    if (m->schema < 2 && (m->base[0] || m->agent || m->clipboard)) return fail(err, n, VM_E_FIELD, "base, agent and clipboard need schema 2");
     return VM_OK;
 }
 
@@ -171,7 +180,7 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
 
 static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
-    "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", NULL,
+    "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -205,6 +214,7 @@ static const char *const ACCELS[] = { "kvm", "tcg", NULL };
 static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
 static const char *const NETS[] = { "shared", "isolated", NULL };
+static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t n) {
     memset(m, 0, sizeof *m);
@@ -233,8 +243,15 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         (r = get_str(o, "firmware_sha256", m->firmware_sha256, sizeof m->firmware_sha256, 0, err, n)) ||
         (r = get_enum(o, "display", DISPLAYS, &m->display, err, n)) || (r = get_enum(o, "network", NETS, &m->network, err, n)) ||
         (r = get_str(o, "mac", m->mac, sizeof m->mac, 1, err, n)) || (r = get_str(o, "iso", m->iso, sizeof m->iso, 0, err, n)) ||
-        (r = get_str(o, "created", m->created, sizeof m->created, 1, err, n)) || (r = get_str(o, "updated", m->updated, sizeof m->updated, 1, err, n)))
+        (r = get_str(o, "created", m->created, sizeof m->created, 1, err, n)) || (r = get_str(o, "updated", m->updated, sizeof m->updated, 1, err, n)) ||
+        (r = get_str(o, "base", m->base, sizeof m->base, 0, err, n)))
         goto out;
+    {
+        const JVal *a = json_get(o, "agent");
+        if (a && a->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "agent must be true or false"); goto out; }
+        m->agent = a ? json_bool(o, "agent", 0) : 0;
+        if (json_get(o, "clipboard") && (r = get_enum(o, "clipboard", CLIPS, &m->clipboard, err, n))) goto out;
+    }
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -256,6 +273,10 @@ char *vm_machine_json(const VmMachine *m) {
     jb_printf(&b, ",\n  \"display\": \"%s\",\n  \"network\": \"%s\",\n  \"mac\": ", DISPLAYS[m->display], NETS[m->network]);
     jb_str(&b, m->mac);
     if (m->iso[0]) { jb_raw(&b, ",\n  \"iso\": "); jb_str(&b, m->iso); }
+    if (m->schema >= 2) {
+        if (m->base[0]) { jb_raw(&b, ",\n  \"base\": "); jb_str(&b, m->base); }
+        jb_printf(&b, ",\n  \"agent\": %s,\n  \"clipboard\": \"%s\"", m->agent ? "true" : "false", CLIPS[m->clipboard]);
+    }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
     jb_raw(&b, "\n}\n");
@@ -293,8 +314,30 @@ int vm_machine_load(const char *dir, VmMachine *m, char *err, size_t n) {
     return r;
 }
 
-int vm_machine_save(const char *dir, const VmMachine *m) {
-    if (m->schema != VM_SCHEMA || vm_machine_check(m, NULL, 0)) return VM_E_RANGE;
+int vm_machine_save(const char *dir, const VmMachine *m0) {
+    if (m0->schema > VM_SCHEMA) return VM_E_RANGE;
+    VmMachine up = *m0;
+    if (up.schema < 1) return VM_E_RANGE;
+    {
+        VmMachine c = up;
+        c.schema = VM_SCHEMA;               /* checked as what is written */
+        if (vm_machine_check(&c, NULL, 0)) return VM_E_RANGE;
+    }
+    const VmMachine *m = &up;
+    if (up.schema < VM_SCHEMA) {
+        /* migrated forward, with the old file kept (3.6) */
+        char from[VM_PATH_MAX + 32], keep[VM_PATH_MAX + 48];
+        snprintf(from, sizeof from, "%s/machine.json", dir);
+        snprintf(keep, sizeof keep, "%s/machine.json.schema%d", dir, up.schema);
+        size_t len = 0;
+        char *old = access(keep, F_OK) ? read_small(from, 64 * 1024, &len) : NULL;
+        if (old) {
+            int fd = open(keep, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+            if (fd >= 0) { if (write(fd, old, len) != (ssize_t)len) {} fsync(fd); close(fd); }
+            free(old);
+        }
+        up.schema = VM_SCHEMA;
+    }
     char *j = vm_machine_json(m);
     if (!j) return VM_E_IO;
     char tmp[VM_PATH_MAX + 32], path[VM_PATH_MAX + 32];
@@ -393,11 +436,11 @@ void vm_host_probe(VmHost *h) {
 static uint64_t be64(const uint8_t *p) { uint64_t v = 0; for (int i = 0; i < 8; i++) v = v << 8 | p[i]; return v; }
 static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
 
-int vm_qcow2_plain(const uint8_t *h, size_t n, char *err, size_t errlen) {
+static int qcow2_check(const uint8_t *h, size_t n, int backing_ok, char *err, size_t errlen) {
     if (n < 72 || memcmp(h, "QFI\xfb", 4)) { fail(err, errlen, -1, "not a qcow2 image"); return -1; }
     uint32_t ver = be32(h + 4);
     if (ver != 2 && ver != 3) { fail(err, errlen, -1, "qcow2 version %u isn't supported", ver); return -1; }
-    if (be64(h + 8) || be32(h + 16)) { fail(err, errlen, -1, "the image depends on a backing file: refused"); return -1; }
+    if (!backing_ok && (be64(h + 8) || be32(h + 16))) { fail(err, errlen, -1, "the image depends on a backing file: refused"); return -1; }
     if (ver == 3) {
         if (n < 104) { fail(err, errlen, -1, "the qcow2 header is cut short"); return -1; }
         uint64_t incompat = be64(h + 72);
@@ -410,6 +453,8 @@ int vm_qcow2_plain(const uint8_t *h, size_t n, char *err, size_t errlen) {
     }
     return 0;
 }
+int vm_qcow2_plain(const uint8_t *h, size_t n, char *err, size_t errlen) { return qcow2_check(h, n, 0, err, errlen); }
+int vm_qcow2_overlay(const uint8_t *h, size_t n, char *err, size_t errlen) { return qcow2_check(h, n, 1, err, errlen); }
 
 static int ends_with(const char *s, const char *suf) {
     size_t a = strlen(s), b = strlen(suf);

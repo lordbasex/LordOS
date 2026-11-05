@@ -19,13 +19,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define VM_SCHEMA 1
+/* 1: Phase 1. 2 (Beta): base, agent, clipboard. An older file is read as is and written as the current schema, with a
+ * copy of the old one kept beside it (machine.json.schema1); a newer one is never rewritten. */
+#define VM_SCHEMA 2
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
 enum { VM_FW_UEFI = 0, VM_FW_BIOS };
 enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
 enum { VM_NET_SHARED = 0, VM_NET_ISOLATED };
+/* the shared clipboard's direction (6.8): off unless chosen */
+enum { VM_CLIP_OFF = 0, VM_CLIP_TO_GUEST, VM_CLIP_FROM_GUEST, VM_CLIP_BOTH };
 
 /* Limits that hold on every computer */
 #define VM_NAME_MAX       64            /* bytes of UTF-8 */
@@ -58,6 +62,11 @@ typedef struct {
     int network;
     char mac[18];                       /* 52:54:00:xx:xx:xx */
     char iso[VM_PATH_MAX];              /* attached installer image, read-only; "" none */
+    char base[VM_PATH_MAX];             /* a linked clone's frozen shared disk (6.3): <library>/.shared/<x>.qcow2, read
+                                         * only, the system disk's backing; "" none (schema 2) */
+    int agent;                          /* the guest agent channels (6.17): qemu-guest-agent and org.lordos.agent; off
+                                         * unless turned on (schema 2) */
+    int clipboard;                      /* VM_CLIP_*, through org.lordos.agent (schema 2) */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -121,6 +130,11 @@ enum { VM_IMG_QCOW2 = 0, VM_IMG_RAW = 1 };
 int vm_image_kind(const uint8_t *head, size_t n, const char *name, char *err, size_t errlen);
 /* a qcow2 header lord-vm may hand QEMU: 0 yes (no backing file, no external data file, not corrupt) */
 int vm_qcow2_plain(const uint8_t *head, size_t n, char *err, size_t errlen);
+/* the same for a linked clone's system disk, which has a backing file: its name in the header is never followed (lord-vm
+ * names machine.json's base itself), the other checks stay */
+int vm_qcow2_overlay(const uint8_t *head, size_t n, char *err, size_t errlen);
+/* a base path machine.json may name: absolute, plain, in a ".shared" folder, a .qcow2 */
+int vm_base_valid(const char *s);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);

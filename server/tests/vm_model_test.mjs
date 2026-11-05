@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -148,6 +148,23 @@ eq('snap name next free', snapName([{ name: 'Snapshot 2' }], 'Snapshot'), 'Snaps
 eq('snap name taken', snapName([{ name: 'snapshot 2' }, { name: 'x' }], 'Snapshot'), 'Snapshot 3');
 eq('snap size memory', snapSize({ memory: true, vmstate: 5 }), 5);
 eq('snap size disk', snapSize({ memory: false, vmstate: 0 }), 0);
+
+eq('clone reflink', cloneMethod({ reflink: true }, 'clone'), 'reflink');
+eq('clone linked on ext4', cloneMethod({ reflink: false }, 'clone'), 'linked');
+eq('clone with snapshots copies', cloneMethod({ snapshots: 2 }, 'clone'), 'copy');
+eq('clone of a linked clone copies', cloneMethod({ linked: true }, 'clone'), 'copy');
+eq('clone suspended blocked', cloneMethod({ suspended: true }, 'clone'), 'blocked');
+eq('duplicate suspended ok', cloneMethod({ suspended: true }, 'duplicate'), 'duplicate');
+eq('from snapshot copies', cloneMethod({ reflink: true }, 'clone', true), 'copy');
+const st = { total: 1000, free: 400, isos: 50, trash: 20, machines: [
+  { dir: '/a', id: 'A', name: 'Debian Dev', total: 100, frees: 10, base: '/l/.shared/b.qcow2' },
+  { dir: '/b', id: 'B', name: 'Debian Dev clone', total: 30, frees: 30, base: '/l/.shared/b.qcow2', meta: { cloneOf: 'A' } },
+  { dir: '/c', id: 'C', name: 'Alpha', total: 200, frees: 200, base: '' },
+], bases: [{ path: '/l/.shared/b.qcow2', bytes: 300, users: 2, trash: 0 }] };
+eq('storage rows order', storageRows(st).map((r) => [r.name || 'base', r.level]), [['Alpha', 0], ['Debian Dev', 0], ['Debian Dev clone', 1], ['base', 0]]);
+eq('storage row base users', storageRows(st)[1].baseUsers, 2);
+eq('storage bar', storageBar(st).map((b) => [b.key, b.bytes]), [['machines', 630], ['isos', 50], ['trash', 20], ['other', 0]]);
+eq('storage bar no total', storageBar({}), []);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

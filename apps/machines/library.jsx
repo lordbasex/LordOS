@@ -12,6 +12,7 @@ import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc,
 import { Assistant } from './assistant.jsx';
 import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, markColors, overlayRoot } from './ui.jsx';
 import { readMeta } from './meta.js';
+import { CloneSheet } from './clone.jsx';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
@@ -38,6 +39,12 @@ export function openSnapshots(m) {
   const fresh = !windows.get().some((w) => w.id === id);
   wm.open('machines', { instance, args: { snapshots: m.dir, name: m.name } });
   if (fresh) { wm.resize(id, 1100, 560); wm.center(id); }
+}
+export function openStorage() {
+  const id = 'machines#storage';
+  const fresh = !windows.get().some((w) => w.id === id);
+  wm.open('machines', { instance: 'storage', args: { storage: true } });
+  if (fresh) { wm.resize(id, 1040, 620); wm.center(id); }
 }
 export function openLogs(m) {
   const instance = `log-${m.id || m.folder}`;
@@ -284,6 +291,7 @@ export function Library() {
   const [error, setError] = useState('');
   const [usages, setUsages] = useState({});
   const [discard, setDiscard] = useState(null);
+  const [copying, setCopying] = useState(null);
   const wins = useStore(windows, (ws) => ws.map((w) => w.id).join(' '));
   const prev = useRef({});
   // lord-vm jobs started from here (start with no window, discard a saved state): followed until they end, so the
@@ -327,6 +335,7 @@ export function Library() {
     wm.setMenus(winId, [{ label: tr('machines.menu.machine'), items: [
       { label: tr('machines.newMachine'), onClick: () => setPage('new') },
       { label: tr('machines.req.menu'), onClick: () => setPage('requirements') },
+      { label: tr('machines.storage.menu'), onClick: openStorage },
       ...(host?.arch === 'arm64' ? [{ label: tr('machines.pi.menu'), onClick: () => setPage('pi') }] : []),
     ] }]);
   }, [host?.arch]);
@@ -355,6 +364,7 @@ export function Library() {
       '-',
       { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
+      { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
       m.iso && a.remove && !m.suspended ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
@@ -399,7 +409,8 @@ export function Library() {
           {sorted.length ? <>
             <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} frac={sum.running.frac} color={p.ok} />
             {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} frac={sum.memory.frac} color={p.mem} /> : null}
-            {sum.free ? <Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} /> : null}
+            {sum.free ? <View onClick={openStorage} title={tr('machines.storage.menu')}><Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} /></View> : null}
+            <Btn label={tr('machines.storage.disk')} onClick={openStorage} />
           </> : null}
           {host.arch === 'arm64' && host.board ? <Btn label={tr('machines.pi.button')} onClick={() => setPage('pi')} /> : null}
           {missing.length || (host.kvmDevice && !host.kvm) ? <Btn label={tr('machines.req.button')} onClick={() => setPage('requirements')} style={{ backgroundColor: p.warnBg }} /> : null}
@@ -410,6 +421,8 @@ export function Library() {
       {body}
       {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
         items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
+        onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => { const d = discard; setDiscard(null); follow(lord.vm.discardState(d.dir), d.name); }} onCancel={() => setDiscard(null)} /> : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.deleteDetail')} okLabel={tr('machines.deleteOk')} cancelLabel={tr('machines.cancel')} destructive

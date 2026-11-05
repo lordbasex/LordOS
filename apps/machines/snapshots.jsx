@@ -9,12 +9,19 @@ import { stateView, snapName, snapSize, thumbSrc } from './model.js';
 import { usePal, has, bytes, Btn, Sheet, markColors } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { openMachine } from './library.jsx';
+import { CloneSheet } from './clone.jsx';
 
 const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${formatDate(d)}, ${formatTime(d)}`; };
 const errOf = (out) => (out || '').trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || (out || '').trim();
 
-function Node({ on }) {
-  return <View style={{ width: 13, height: 13, marginTop: 12, marginLeft: 14, borderRadius: 7, backgroundColor: on ? '#0a84ff' : '#8a8a94' }} />;
+// the node on the timeline, over the line that joins one snapshot to the next
+function Node({ on, last }) {
+  return (
+    <View style={{ height: 25, marginTop: 6 }}>
+      <View style={{ position: 'absolute', left: 14, right: last ? undefined : -12, width: last ? 0 : undefined, top: 11, height: 3, backgroundColor: '#44444c' }} />
+      <View style={{ position: 'absolute', left: 14, top: 6, width: 13, height: 13, borderRadius: 7, backgroundColor: on ? '#0a84ff' : '#8a8a94' }} />
+    </View>
+  );
 }
 
 function Pic({ src, colors, on }) {
@@ -39,6 +46,7 @@ export function Snapshots({ dir, name: name0 }) {
   const [del, setDel] = useState(null);
   const [busy, setBusy] = useState(null);           // { job, what, then }
   const [msg, setMsg] = useState(null);
+  const [cloning, setCloning] = useState(null);
   const thumb = useRef(0);
   const load = () => {
     if (!has()) return;
@@ -90,20 +98,20 @@ export function Snapshots({ dir, name: name0 }) {
         <Btn primary label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
           onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
       </View>
-      <ScrollView horizontal style={{ height: 230 }} contentStyle={{ flexDirection: 'row', gap: 12, paddingBottom: 6 }}>
+      <ScrollView horizontal style={{ height: 262 }} contentStyle={{ flexDirection: 'row', gap: 12, paddingBottom: 6 }}>
         {list.map((s) => (
-          <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196 }}>
+          <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196, height: 250 }}>
             <Pic src={s.picture} colors={colors} on={sel === s.tag} />
             <Node on={sel === s.tag} />
-            <Text style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{s.name}</Text>
+            <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{s.name}</Text>
             <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{when(s.created)}</Text>
             <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{snapSize(s) ? tr('machines.snap.withMemory', { size: bytes(s.vmstate) }) : tr('machines.snap.diskOnly')}</Text>
           </View>
         ))}
-        <View style={{ width: 196 }}>
+        <View style={{ width: 196, height: 250 }}>
           <Pic src={thumbSrc(dir, thumb.current)} colors={colors} on={false} />
-          <Node on={false} />
-          <Text style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.snap.now')}</Text>
+          <Node on={false} last />
+          <Text style={{ marginTop: 4, fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.snap.now')}</Text>
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.state.${v.key}`)}</Text>
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.current')}</Text>
         </View>
@@ -115,6 +123,7 @@ export function Snapshots({ dir, name: name0 }) {
             <Text style={{ fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{cur.name}</Text>
             <Text style={{ marginTop: 2, fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(cur.memory ? 'machines.snap.aboutMemory' : 'machines.snap.aboutDisk')}</Text>
           </View>
+          <Btn label={tr('machines.snap.cloneHere')} disabled={!!busy || v.active} onClick={() => setCloning(cur)} />
           <Btn label={tr('machines.snap.delete')} disabled={!!busy} onClick={() => setDel(cur)} />
           <Btn primary label={tr('machines.snap.goBack')} disabled={!!busy || (!cur.memory && v.active)} onClick={() => { setFirst(!full); setGoBack(cur); }} />
         </View>
@@ -150,6 +159,8 @@ export function Snapshots({ dir, name: name0 }) {
           </View>
         </Sheet>
       ) : null}
+      {cloning ? <CloneSheet m={m} fromSnapshot={cloning} running={v.active} onClose={() => setCloning(null)}
+        onDone={() => { setCloning(null); setMsg({ ok: true, text: tr('machines.clone.done') }); }} /> : null}
       {del ? (
         <Sheet title={tr('machines.snap.deleteTitle', { name: del.name })} onCancel={() => setDel(null)} actions={[
           <Btn key="c" label={tr('machines.cancel')} onClick={() => setDel(null)} />,

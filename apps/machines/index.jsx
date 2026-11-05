@@ -8,12 +8,14 @@ import { MachineWindow } from './vmwindow.jsx';
 import { Configure } from './configure.jsx';
 import { Logs } from './logs.jsx';
 import { Snapshots } from './snapshots.jsx';
+import { Storage } from './storage.jsx';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
 export default function App() {
   const { args } = useAppWindow();
   if (args?.machine) return <MachineWindow dir={args.machine} name={args.name || ''} loadvm={args.loadvm || ''} />;
+  if (args?.storage) return <Storage />;
   if (args?.snapshots) return <Snapshots dir={args.snapshots} name={args.name || ''} />;
   if (args?.configure) return <Configure dir={args.configure} section={args.section} />;
   if (args?.logs) return <Logs dir={args.logs} name={args.name || ''} />;

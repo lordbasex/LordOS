@@ -19,6 +19,7 @@ typedef struct {
     const char *disks_dir;      /* <machine>/disks, read and write */
     const char *iso;            /* attached ISO or NULL, read */
     const char *fw_code;        /* UEFI code file or NULL (already under /usr) */
+    const char *base;           /* a linked clone's shared base (6.3), read only, or NULL */
     int kvm;                    /* KVM machine: /dev/kvm may be opened again (arm64's -cpu host makes a scratch vCPU
                                  * by path to read the host's features); QEMU holds a KVM descriptor already */
 } VmQemuJail;
@@ -31,6 +32,8 @@ int vm_jail_qemu(const VmQemuJail *j);
  * no TCP. In the child, before execve; returns VMS_* bits, and the caller refuses to exec without
  * VMS_NO_NEW_PRIVS and VMS_SECCOMP_OURS, and without VMS_LANDLOCK_FS where the kernel has Landlock. */
 int vm_jail_tool(const char *read_file, const char *rw_dir);
+/* the same with a second file it may read (a linked clone's base, to flatten or measure it) */
+int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_dir);
 /* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied */
 int vm_jail_self(const char *machine_dir, const char *runtime_dir);
 /* the kernel's Landlock ABI (0 none) */

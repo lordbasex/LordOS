@@ -39,6 +39,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
@@ -156,6 +158,7 @@ static int sha256_file(const char *path, char out[65]) {
  * program runs inside vm_jail_tool (it may read only that file and write only in `jail_rw`) or not at all. */
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw);
 static int run_tool(char *const argv[], char *out, size_t outcap) { return run_tool_in(argv, out, outcap, NULL, NULL); }
+static const char *jail_read2;          /* a second file the next jailed tool may read (a linked clone's base) */
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
@@ -168,7 +171,7 @@ static int run_tool_in(char *const argv[], char *out, size_t outcap, const char 
         if (null >= 0) dup2(null, 0);
         syscall(SYS_close_range, 3, ~0u, 0);
         if (jail_read) {
-            int mask = vm_jail_tool(jail_read, jail_rw);
+            int mask = vm_jail_tool2(jail_read, jail_read2, jail_rw);
             if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
                 static const char e[] = "lord-vm: the image tool's sandbox couldn't be set up\n";
                 write_all(2, e, sizeof e - 1);
@@ -887,6 +890,14 @@ static char *blockdev_fmt(const char *drv, const char *node, const char *file, i
     return b.oom ? NULL : b.p;
 }
 
+/* a linked clone's system disk: its backing is the shared base node, named here, never the header's file name */
+static char *blockdev_overlay(const char *node, const char *file, const char *backing) {
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"driver\":\"qcow2\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":false,\"discard\":\"unmap\",\"backing\":\"%s\"}", node, file, backing);
+    return b.oom ? NULL : b.p;
+}
+
 #define MAXARGS 128
 static char *qargv[MAXARGS];
 static int qargc;
@@ -927,8 +938,15 @@ static void build_qemu_args(void) {
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "fw-vars", "fw-vars-file", 0));
     }
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
-    arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
-    arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
+    if (m->base[0]) {
+        arg("-blockdev"); argj(blockdev_file("base-file", m->base, 1));
+        arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
+        arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
+        arg("-blockdev"); argj(blockdev_overlay("sys", "sys-file", "base"));
+    } else {
+        arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
+        arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
+    }
     /* Every PCI device has a fixed slot: with the slots QEMU picks, taking an ISO out after an install moved the
      * network card (enp0s3 became enp0s2) and the installed system's network didn't come up. Slots 1 to 6 are the
      * ones a machine without an ISO always had; the ISO's controller goes after them. */
@@ -986,7 +1004,17 @@ static int start_machine(void) {
     char p[PATH_MAX + 64];
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
     if (!file_exists(p)) { fail_start("the system disk is missing: %s", p); return -1; }
-    if (disk_plain(p, err, sizeof err)) { fail_start("the system disk can't be used: %s", err); return -1; }
+    if (S.m.base[0]) {
+        /* a linked clone (6.3): its base is checked like a system disk, and the disk itself may name a backing file,
+         * which is never followed: QEMU gets the base by node */
+        if (!file_exists(S.m.base)) { fail_start("the shared disk this machine was cloned from is missing: %s", S.m.base); return -1; }
+        if (disk_plain(S.m.base, err, sizeof err)) { fail_start("the shared disk can't be used: %s", err); return -1; }
+        uint8_t head[VM_IMG_HEAD];
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t n = fd >= 0 ? read(fd, head, sizeof head) : -1;
+        if (fd >= 0) close(fd);
+        if (vm_qcow2_overlay(head, n > 0 ? (size_t)n : 0, err, sizeof err)) { fail_start("the system disk can't be used: %s", err); return -1; }
+    } else if (disk_plain(p, err, sizeof err)) { fail_start("the system disk can't be used: %s", err); return -1; }
     if (S.m.firmware == VM_FW_UEFI) {
         snprintf(p, sizeof p, "%s/nvram.qcow2", S.disks);
         if (!file_exists(p)) { fail_start("the UEFI variables are missing: %s", p); return -1; }
@@ -1050,7 +1078,7 @@ static int start_machine(void) {
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
         fcntl(stf, F_SETFD, FD_CLOEXEC);
-        VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.accel == VM_ACCEL_KVM };
+        VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL, S.m.accel == VM_ACCEL_KVM };
         int mask = vm_jail_qemu(&j);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -1993,6 +2021,7 @@ static int read_credentials(const char *path) {
     return rc;
 }
 
+static void rm_tree(const char *dir);
 /* An operation.json left by a lord-vm that stopped in the middle (3.6): finish the work or roll it back, and say which.
  * Runs under the machine's lock, before anything else touches the machine. 1 when there was something to do. */
 static int ops_recover(const char *dir, int at_start) {
@@ -2015,6 +2044,26 @@ static int ops_recover(const char *dir, int at_start) {
         snprintf(p1, sizeof p1, "%s/suspend.state", dir);
         if (file_exists(p1)) snprintf(what, sizeof what, "an interrupted resume was rolled back: the saved state is kept");
         else snprintf(what, sizeof what, "the resume had finished");
+    } else if (!strcmp(o.op, "compact")) {
+        if (o.a[0] && strstr(o.a, "/disks/.system.qcow2.compact")) unlink(o.a);
+        snprintf(what, sizeof what, "an interrupted compaction was rolled back: the disk is as it was");
+    } else if (!strcmp(o.op, "link")) {
+        /* a linked clone that didn't finish: if machine.json names the base, the source runs on it (forward); if not, the
+         * base goes back to being the source's disk. The half-made clone goes either way. */
+        VmMachine m;
+        char err[256], sys[PATH_MAX + 32], ov[PATH_MAX + 64];
+        snprintf(sys, sizeof sys, "%s/disks/system.qcow2", dir);
+        snprintf(ov, sizeof ov, "%s/disks/.system.qcow2.new", dir);
+        unlink(ov);
+        if (o.b[0] && strstr(o.b, ".part-")) rm_tree(o.b);
+        if (!vm_machine_load(dir, &m, err, sizeof err) && m.base[0] && !strcmp(m.base, o.a) && file_exists(sys))
+            snprintf(what, sizeof what, "an interrupted linked clone: this machine now runs on a shared base; the clone wasn't made");
+        else if (vm_base_valid(o.a) && file_exists(o.a)) {
+            if (file_exists(sys)) unlink(sys);              /* an empty overlay: QEMU never ran on it */
+            if (rename(o.a, sys)) { vlog("recovery: can't move %s back: %s", o.a, strerror(errno)); return 0; }
+            chmod(sys, 0600);
+            snprintf(what, sizeof what, "an interrupted linked clone was rolled back: the disk is back in its folder");
+        } else snprintf(what, sizeof what, "an interrupted linked clone left nothing to undo");
     } else if (!strncmp(o.op, "snapshot-", 9) && vm_snap_tag_valid(o.tag)) {
         VmMachine m;
         char err[256], disks[2][PATH_MAX + 64];
@@ -2059,6 +2108,7 @@ static void discard_state(const char *dir) {
     vm_sync_dir(dir);
 }
 
+static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
@@ -2093,6 +2143,11 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.lock_fd = open_lock(S.dir);
     if (S.lock_fd == -2) { fprintf(stderr, "lord-vm: %s is already running\n", S.m.name); return 3; }
     if (S.lock_fd < 0) { fprintf(stderr, "lord-vm: can't write in %s\n", S.dir); return 1; }
+    {
+        /* a Duplicate has the original's identity (6.3): the two never run at once (one socket, one -uuid) */
+        int f = connect_machine(&S.m);
+        if (f >= 0) { close(f); fprintf(stderr, "lord-vm: a machine with the same identity is running (a Duplicate and its original don't run together)\n"); return 3; }
+    }
 
     if (detach) {
         int np[2];
@@ -2367,6 +2422,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     if (vm_machine_check(&m, err, sizeof err) || vm_machine_check_host(&m, &h, err, sizeof err, warn, sizeof warn)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
     if (warn[0]) fprintf(stderr, "lord-vm: note: %s\n", warn);
+    if (m.disk_gb > was.disk_gb && m.base[0]) { fprintf(stderr, "lord-vm: a linked clone's disk can't grow: make a full clone of it first\n"); goto out; }
     if (m.disk_gb > was.disk_gb) {
         char sys[PATH_MAX + 64], dd[PATH_MAX + 64], size[32];
         snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
@@ -2455,6 +2511,327 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
     return 0;
 }
 
+/* ---- clones (6.3), compaction (6.4, 6.16) ----
+ *
+ * lord-vm --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG]
+ *   Clone: a new machine that runs beside the original (new id and MAC). Duplicate: the same identity, the only kind
+ *   that carries a saved session and the snapshots. The disks are, first choice to last: a reflink copy (btrfs, XFS:
+ *   instant, shared until either changes); with --linked on a file system without reflink (ext4), the source's disk
+ *   becomes a frozen base in <library>/.shared/ and both machines get a thin overlay on it; or a full copy (a Clone is
+ *   converted, which flattens and compacts; a Duplicate is copied with its holes). The new machine is made in a hidden
+ *   folder and renamed into place; the source must be off. Prints {"cloned":true,"dir":...,"method":...}. */
+
+static int copy_sparse(const char *from, const char *to) {
+    int a = open(from, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (a < 0) return -1;
+    struct stat st;
+    if (fstat(a, &st) || !S_ISREG(st.st_mode)) { close(a); return -1; }
+    int b = open(to, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (b < 0) { close(a); return -1; }
+    int bad = ftruncate(b, st.st_size);
+    static char buf[1 << 20];
+    for (off_t off = 0; !bad && off < st.st_size;) {
+        off_t d = lseek(a, off, SEEK_DATA);
+        if (d < 0) break;                               /* the rest is a hole */
+        off_t h = lseek(a, d, SEEK_HOLE);
+        if (h < 0) h = st.st_size;
+        for (off_t p = d; !bad && p < h;) {
+            size_t want = (size_t)(h - p) < sizeof buf ? (size_t)(h - p) : sizeof buf;
+            ssize_t r = pread(a, buf, want, p);
+            if (r <= 0) { bad = 1; break; }
+            if (pwrite(b, buf, (size_t)r, p) != r) bad = 1;
+            p += r;
+        }
+        off = h;
+    }
+    if (!bad && fsync(b)) bad = 1;
+    close(a); close(b);
+    if (bad) unlink(to);
+    return bad ? -1 : 0;
+}
+
+/* a reflink copy (FICLONE): 0 done, -1 this file system can't (or failed) */
+static int copy_reflink(const char *from, const char *to) {
+    int a = open(from, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (a < 0) return -1;
+    int b = open(to, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (b < 0) { close(a); return -1; }
+    int r = ioctl(b, FICLONE, a);
+    if (!r) r = fsync(b);
+    close(a); close(b);
+    if (r) unlink(to);
+    return r ? -1 : 0;
+}
+
+/* qemu-img convert of a qcow2 (with its base when it has one), jailed: it reads the disk (and the base) and writes
+ * only in out_dir. snap: a snapshot's tag to copy instead of the current state, or NULL */
+static int qimg_convert(const char *disk, const char *base, const char *snap, const char *out, const char *out_dir, char *err, size_t errlen) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":");
+    jb_str(&b, disk);
+    if (base && base[0]) { jb_raw(&b, "},\"backing\":{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, base); jb_raw(&b, "}}}"); }
+    else jb_raw(&b, "},\"backing\":null}");
+    if (b.oom) { jb_free(&b); snprintf(err, errlen, "out of memory"); return -1; }
+    char sn[64];
+    snprintf(sn, sizeof sn, "snapshot.name=%s", snap ? snap : "");
+    char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", b.p, (char *)out, NULL };
+    char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", b.p, (char *)out, NULL };
+    jail_read2 = base && base[0] ? base : NULL;
+    int r = run_tool_in(snap ? with : without, err, errlen, disk, out_dir);
+    jail_read2 = NULL;
+    jb_free(&b);
+    return r;
+}
+
+/* qemu-img create of an overlay on base, without opening the base (-u, the size given) */
+static int qimg_overlay(const char *base, const char *out, const char *out_dir, int gb, char *err, size_t errlen) {
+    char size[32];
+    snprintf(size, sizeof size, "%dG", gb);
+    char *argv[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", "-u", "-b", (char *)base, "-F", "qcow2", (char *)out, size, NULL };
+    return run_tool_in(argv, err, errlen, out_dir, out_dir);      /* the overlay doesn't exist yet: its folder */
+}
+
+static void rm_tree(const char *dir) {
+    DIR *d = opendir(dir);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            char p[PATH_MAX + 260];
+            snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+            struct stat st;
+            if (!lstat(p, &st) && S_ISDIR(st.st_mode)) rm_tree(p); else unlink(p);
+        }
+        closedir(d);
+    }
+    rmdir(dir);
+}
+
+static int copy_small(const char *from, const char *to) { return file_exists(from) ? copy_sparse(from, to) : 0; }
+
+static int cmd_clone(const char *src, int argc, char **argv) {
+    if (argc < 1) { fprintf(stderr, "lord-vm: --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"); return 2; }
+    const char *dst = argv[0], *name = NULL, *from_snap = NULL;
+    int duplicate = 0, linked = 0;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--duplicate")) duplicate = 1;
+        else if (!strcmp(argv[i], "--linked")) linked = 1;
+        else if (!strcmp(argv[i], "--name") && i + 1 < argc) name = argv[++i];
+        else if (!strcmp(argv[i], "--from-snapshot") && i + 1 < argc) from_snap = argv[++i];
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
+    }
+    char real[PATH_MAX], err[256];
+    if (!realpath(src, real)) { fprintf(stderr, "lord-vm: %s: %s\n", src, strerror(errno)); return 1; }
+    snprintf(S.dir, sizeof S.dir, "%s", real);
+    int lock = open_lock(real);
+    if (lock == -2) { fprintf(stderr, "lord-vm: the machine is running: shut it down first\n"); return 3; }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    ops_recover(real, 0);
+    VmMachine m;
+    int rc = 1;
+    char tmp[PATH_MAX + 64] = "", lib[PATH_MAX], dreal[PATH_MAX + 64];
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    char st[PATH_MAX + 32];
+    snprintf(st, sizeof st, "%s/suspend.state", real);
+    int suspended = file_exists(st);
+    if (suspended && !duplicate) { fprintf(stderr, "lord-vm: the machine has a saved session, which holds its identity: resume it and shut it down first, or make a Duplicate\n"); goto out; }
+    if (from_snap && (duplicate || !vm_snap_tag_valid(from_snap))) { fprintf(stderr, "lord-vm: --from-snapshot makes a Clone from one snapshot\n"); goto out; }
+    VmSnap snaps[VM_SNAPS_MAX];
+    int nsnaps = vm_snaps_load(real, snaps, VM_SNAPS_MAX);
+    if (from_snap && vm_snaps_find(snaps, nsnaps, from_snap) < 0) { fprintf(stderr, "lord-vm: there's no snapshot %s\n", from_snap); goto out; }
+    /* the new folder: beside the source, made hidden and renamed into place */
+    snprintf(lib, sizeof lib, "%s", real);
+    char *sl = strrchr(lib, '/');
+    if (!sl || sl == lib) goto out;
+    *sl = 0;
+    if (!dir_ok(dst) || strchr(dst, '/') == NULL) { fprintf(stderr, "lord-vm: %s: an absolute folder without ',' or control characters\n", dst); goto out; }
+    snprintf(dreal, sizeof dreal, "%s", dst);
+    if (!access(dreal, F_OK)) { fprintf(stderr, "lord-vm: %s exists\n", dreal); goto out; }
+    {
+        char dparent[PATH_MAX + 64];
+        snprintf(dparent, sizeof dparent, "%s", dreal);
+        char *ds = strrchr(dparent, '/');
+        *ds = 0;
+        char rp[PATH_MAX];
+        if (!realpath(dparent, rp) || strcmp(rp, lib)) { fprintf(stderr, "lord-vm: the clone goes beside the machine, in %s\n", lib); goto out; }
+        snprintf(tmp, sizeof tmp, "%s/.%s.part-%d", lib, ds + 1, (int)getpid());
+    }
+    char p1[PATH_MAX + 128], p2[PATH_MAX + 128];
+    if (mkdir(tmp, 0700)) { fprintf(stderr, "lord-vm: can't make %s: %s\n", tmp, strerror(errno)); tmp[0] = 0; goto out; }
+    snprintf(p1, sizeof p1, "%s/disks", tmp); mkdir(p1, 0700);
+    snprintf(p1, sizeof p1, "%s/log", tmp); mkdir(p1, 0700);
+    char sdisk[PATH_MAX + 64], ddisk[PATH_MAX + 128], snv[PATH_MAX + 64], dnv[PATH_MAX + 128], ddir[PATH_MAX + 64];
+    snprintf(sdisk, sizeof sdisk, "%s/disks/system.qcow2", real);
+    snprintf(ddisk, sizeof ddisk, "%s/disks/system.qcow2", tmp);
+    snprintf(snv, sizeof snv, "%s/disks/nvram.qcow2", real);
+    snprintf(dnv, sizeof dnv, "%s/disks/nvram.qcow2", tmp);
+    snprintf(ddir, sizeof ddir, "%s/disks", tmp);
+    const char *method = "copy";
+    VmMachine n = m;
+    /* 1. reflink, whatever the kind (a snapshot to start from needs a convert) */
+    if (!from_snap && !copy_reflink(sdisk, ddisk)) {
+        method = "reflink";
+        if ((m.firmware == VM_FW_UEFI && copy_reflink(snv, dnv) && copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the UEFI variables failed\n"); goto out; }
+    } else if (linked && !duplicate && !from_snap && !nsnaps && !suspended && !m.base[0]) {
+        /* 2. linked over a frozen base: the source's disk moves to .shared/ (operation.json "link" in the source) */
+        char shared[PATH_MAX + 32], base[PATH_MAX + 128], ov[PATH_MAX + 64];
+        snprintf(shared, sizeof shared, "%s/.shared", lib);
+        mkdir(shared, 0700);
+        char when[24];
+        vm_snap_tag(when);
+        snprintf(base, sizeof base, "%s/%.8s-%s.qcow2", shared, m.id, when + 1);
+        if (!vm_base_valid(base)) { fprintf(stderr, "lord-vm: the library's path can't hold a shared disk\n"); goto out; }
+        if (vm_op_begin(real, "link", NULL, base, tmp)) { fprintf(stderr, "lord-vm: can't write operation.json\n"); goto out; }
+        if (rename(sdisk, base)) { vm_op_end(real); fprintf(stderr, "lord-vm: can't move the disk to %s: %s\n", shared, strerror(errno)); goto out; }
+        chmod(base, 0400);
+        vm_sync_dir(shared);
+        snprintf(ov, sizeof ov, "%s/disks/.system.qcow2.new", real);
+        char sd[PATH_MAX + 32];
+        snprintf(sd, sizeof sd, "%s/disks", real);
+        if (qimg_overlay(base, ov, sd, m.disk_gb, err, sizeof err) || rename(ov, sdisk)) {
+            unlink(ov); rename(base, sdisk); chmod(sdisk, 0600); vm_op_end(real);
+            fprintf(stderr, "lord-vm: making the overlay failed: %s\n", err); goto out;
+        }
+        VmMachine sm = m;
+        snprintf(sm.base, sizeof sm.base, "%.1023s", base);
+        vm_now_iso(sm.updated);
+        if (vm_machine_save(real, &sm)) {
+            unlink(sdisk); rename(base, sdisk); chmod(sdisk, 0600); vm_op_end(real);
+            fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out;
+        }
+        if (qimg_overlay(base, ddisk, ddir, m.disk_gb, err, sizeof err)) { fprintf(stderr, "lord-vm: making the clone's overlay failed: %s\n", err); vm_op_end(real); goto out; }
+        if (m.firmware == VM_FW_UEFI && copy_sparse(snv, dnv)) { fprintf(stderr, "lord-vm: copying the UEFI variables failed\n"); vm_op_end(real); goto out; }
+        snprintf(n.base, sizeof n.base, "%.1023s", base);
+        method = "linked";
+    } else if (duplicate) {
+        /* 3a. a Duplicate is the same disks, snapshots and all, holes kept */
+        if (copy_sparse(sdisk, ddisk) || (m.firmware == VM_FW_UEFI && copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the disks failed: %s\n", strerror(errno)); goto out; }
+    } else {
+        /* 3b. a Clone is converted: flattened (a linked clone's base folded in), compacted, without snapshots */
+        if (qimg_convert(sdisk, m.base, from_snap, ddisk, ddir, err, sizeof err)) { fprintf(stderr, "lord-vm: copying the disk failed: %s\n", err); goto out; }
+        if (m.firmware == VM_FW_UEFI && (from_snap ? qimg_convert(snv, NULL, from_snap, dnv, ddir, err, sizeof err) : copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the UEFI variables failed: %s\n", err); goto out; }
+        n.base[0] = 0;
+    }
+    if (duplicate) {
+        /* the snapshots' list and pictures, the saved session */
+        snprintf(p1, sizeof p1, "%s/snapshots.json", real); snprintf(p2, sizeof p2, "%s/snapshots.json", tmp);
+        if (copy_small(p1, p2)) goto out;
+        snprintf(p1, sizeof p1, "%s/snapshots", real);
+        DIR *sd = opendir(p1);
+        if (sd) {
+            snprintf(p2, sizeof p2, "%s/snapshots", tmp);
+            mkdir(p2, 0700);
+            struct dirent *e;
+            while ((e = readdir(sd))) {
+                if (e->d_name[0] == '.' || strlen(e->d_name) > 60) continue;
+                char a[PATH_MAX + 200], b[PATH_MAX + 200];
+                snprintf(a, sizeof a, "%s/%s", p1, e->d_name); snprintf(b, sizeof b, "%s/snapshots/%s", tmp, e->d_name);
+                copy_small(a, b);
+            }
+            closedir(sd);
+        }
+        if (suspended) {
+            snprintf(p1, sizeof p1, "%s/suspend.state", real); snprintf(p2, sizeof p2, "%s/suspend.state", tmp);
+            if (copy_reflink(p1, p2) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying the saved session failed\n"); goto out; }
+            snprintf(p1, sizeof p1, "%s/suspend.json", real); snprintf(p2, sizeof p2, "%s/suspend.json", tmp);
+            if (copy_small(p1, p2)) goto out;
+        }
+    } else {
+        /* a Clone runs beside the original: its own identity (the agent can give the guest a new machine-id later) */
+        vm_new_id(n.id);
+        vm_new_mac(n.mac);
+    }
+    snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
+    snprintf(p1, sizeof p1, "%s/thumb.png", real); snprintf(p2, sizeof p2, "%s/thumb.png", tmp); copy_small(p1, p2);
+    if (name) {
+        if (!vm_name_valid(name)) { fprintf(stderr, "lord-vm: the name isn't valid\n"); goto out; }
+        snprintf(n.name, sizeof n.name, "%s", name);
+    }
+    vm_now_iso(n.created);
+    memcpy(n.updated, n.created, sizeof n.updated);
+    if (vm_machine_save(tmp, &n)) { fprintf(stderr, "lord-vm: can't write the clone's machine.json\n"); goto out; }
+    if (rename(tmp, dreal)) { fprintf(stderr, "lord-vm: can't put the clone in place: %s\n", strerror(errno)); goto out; }
+    tmp[0] = 0;
+    vm_sync_dir(lib);
+    if (!strcmp(method, "linked")) vm_op_end(real);
+    printf("{\"cloned\":true,\"dir\":");
+    print_json_str(dreal);
+    printf(",\"id\":\"%s\",\"method\":\"%s\"}\n", n.id, method);
+    rc = 0;
+out:
+    if (tmp[0]) rm_tree(tmp);
+    close(lock);
+    return rc;
+}
+
+/* lord-vm --compact DIR [--estimate]: the system disk rewritten without the space it no longer uses (6.4). The machine
+ * must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json "compact": the new
+ * file is made beside the old one, checked, and renamed over it. --estimate prints what it would take. */
+static int cmd_compact(const char *dir, int argc, char **argv) {
+    int estimate = argc > 0 && !strcmp(argv[0], "--estimate");
+    char real[PATH_MAX], err[256];
+    if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
+    snprintf(S.dir, sizeof S.dir, "%s", real);
+    VmMachine m;
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    char sys[PATH_MAX + 64], dd[PATH_MAX + 64], tmp[PATH_MAX + 64];
+    snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
+    snprintf(dd, sizeof dd, "%s/disks", real);
+    snprintf(tmp, sizeof tmp, "%s/disks/.system.qcow2.compact", real);
+    struct stat sb;
+    if (stat(sys, &sb)) { fprintf(stderr, "lord-vm: the system disk is missing\n"); return 1; }
+    long long before = (long long)sb.st_blocks * 512;
+    VmSnap snaps[VM_SNAPS_MAX];
+    int nsnaps = vm_snaps_load(real, snaps, VM_SNAPS_MAX);
+    char st[PATH_MAX + 32];
+    snprintf(st, sizeof st, "%s/suspend.state", real);
+    const char *why = nsnaps ? "it has snapshots, which compaction would drop: delete them first" : file_exists(st) ? "it has a saved session" : m.base[0] ? "it's a linked clone" : NULL;
+    if (estimate) {
+        JBuf b;
+        jb_init(&b);
+        jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
+        jb_str(&b, sys);
+        jb_raw(&b, "}}");
+        static char out[8192];
+        char *argv2[] = { QEMU_IMG, "measure", "--output=json", "-U", "-O", "qcow2", b.p, NULL };
+        int r = b.oom ? -1 : run_tool_in(argv2, out, sizeof out, sys, NULL);
+        jb_free(&b);
+        JDoc d;
+        double req = -1;
+        if (!r && !json_parse(out, strlen(out), &d, NULL, 0)) { req = json_num(d.root, "required", -1); json_free(&d); }
+        printf("{\"allocated\":%lld,\"required\":%.0f,\"possible\":%s,\"why\":", before, req, why ? "false" : "true");
+        print_json_str(why ? why : "");
+        printf("}\n");
+        return req < 0 ? 1 : 0;
+    }
+    if (why) { fprintf(stderr, "lord-vm: can't compact: %s\n", why); return 1; }
+    int lock = open_lock(real);
+    if (lock == -2) { fprintf(stderr, "lord-vm: the machine is running: shut it down first\n"); return 3; }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    ops_recover(real, 0);
+    int rc = 1;
+    unlink(tmp);
+    if (vm_op_begin(real, "compact", NULL, tmp, NULL)) { fprintf(stderr, "lord-vm: can't write operation.json\n"); goto out; }
+    if (qimg_convert(sys, NULL, NULL, tmp, dd, err, sizeof err)) { fprintf(stderr, "lord-vm: compacting failed: %s\n", err); unlink(tmp); vm_op_end(real); goto out; }
+    {
+        /* the new file is checked before it replaces the old one */
+        char *ck[] = { QEMU_IMG, "check", "-q", "-f", "qcow2", tmp, NULL };
+        int fd = open(tmp, O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) { fsync(fd); close(fd); }
+        if (run_tool_in(ck, err, sizeof err, tmp, NULL)) { fprintf(stderr, "lord-vm: the compacted disk didn't pass its check: %s\n", err); unlink(tmp); vm_op_end(real); goto out; }
+    }
+    if (rename(tmp, sys)) { fprintf(stderr, "lord-vm: can't replace the disk: %s\n", strerror(errno)); unlink(tmp); vm_op_end(real); goto out; }
+    vm_sync_dir(dd);
+    vm_op_end(real);
+    stat(sys, &sb);
+    printf("{\"compacted\":true,\"before\":%lld,\"after\":%lld}\n", before, (long long)sb.st_blocks * 512);
+    rc = 0;
+out:
+    close(lock);
+    return rc;
+}
+
 /* --discard-state DIR: the saved state goes (under the lock), and the next start boots from the disks */
 static int cmd_discard(const char *dir) {
     char real[PATH_MAX];
@@ -2499,6 +2876,8 @@ static int usage(void) {
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
+            "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG]\n"
+            "       lord-vm --compact DIR [--estimate]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
@@ -2516,6 +2895,8 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
     if (!strcmp(cmd, "--discard-state")) return cmd_discard(dir);
     if (!strcmp(cmd, "--snapshot")) return cmd_snapshot(dir, rest, rv);
+    if (!strcmp(cmd, "--clone")) return cmd_clone(dir, rest, rv);
+    if (!strcmp(cmd, "--compact")) return cmd_compact(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
         { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND },

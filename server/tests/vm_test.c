@@ -61,7 +61,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "2", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "3", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -108,8 +108,25 @@ static void test_schema(void) {
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
-    n9.schema = 2;
+    n9.schema = 3;
     CHECK(vm_machine_save("/nonexistent-dir", &n9) != VM_OK);
+    /* schema 2: base (a .qcow2 in a .shared folder), agent, clipboard; not in a schema 1 file */
+    struct { const char *add; int want; } s2[] = {
+        { "\"base\":\"/home/u/Machines/.shared/a.qcow2\"", VM_OK }, { "\"base\":\"/home/u/Machines/a.qcow2\"", VM_E_RANGE },
+        { "\"base\":\"/home/u/.shared/x/a.qcow2\"", VM_E_RANGE }, { "\"base\":\"/home/u/.shared/a.img\"", VM_E_RANGE },
+        { "\"base\":\"/home/u/.shared/../a.qcow2\"", VM_E_RANGE },
+        { "\"agent\":true", VM_OK }, { "\"agent\":1", VM_E_FIELD }, { "\"clipboard\":\"both\"", VM_OK }, { "\"clipboard\":\"all\"", VM_E_RANGE },
+    };
+    for (size_t i = 0; i < sizeof s2 / sizeof s2[0]; i++) {
+        char t[4096];
+        const char *at = strstr(GOOD, "\"schema\":1");
+        snprintf(t, sizeof t, "%.*s\"schema\":2%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s2[i].add);
+        int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+        if (r != s2[i].want) fprintf(stderr, "  schema 2 %s: got %d (%s)\n", s2[i].add, r, err);
+        CHECK(r == s2[i].want);
+        snprintf(t, sizeof t, "%.*s,%s}", (int)strlen(GOOD) - 1, GOOD, s2[i].add);
+        CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s2[i].want != VM_OK);    /* never in schema 1 */
+    }
     /* amd64 with bios: no firmware_code */
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
     m.arch = VM_ARCH_AMD64;
@@ -124,11 +141,23 @@ static void test_schema(void) {
     /* save and load */
     char tmpl[] = "/tmp/vm-test.XXXXXX";
     if (mkdtemp(tmpl)) {
-        CHECK(vm_machine_save(tmpl, &m) == VM_OK);
-        char *j1 = vm_machine_json(&m), *j2 = NULL;
-        CHECK(vm_machine_load(tmpl, &m2, err, sizeof err) == VM_OK && (j2 = vm_machine_json(&m2)) && !strcmp(j1, j2));   /* m kept old bytes after its NULs */
+        /* a schema 1 machine: written as schema 2, its old file kept beside it once */
+        char p0[256];
+        snprintf(p0, sizeof p0, "%s/machine.json", tmpl);
+        char *old = vm_machine_json(&m);
+        int fd0 = open(p0, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd0 >= 0 && old) { (void)!write(fd0, old, strlen(old)); close(fd0); }
+        free(old);
+        CHECK(m.schema == 1 && vm_machine_save(tmpl, &m) == VM_OK);
+        VmMachine m3 = m;
+        m3.schema = VM_SCHEMA;
+        char *j1 = vm_machine_json(&m3), *j2 = NULL;
+        CHECK(vm_machine_load(tmpl, &m2, err, sizeof err) == VM_OK && m2.schema == VM_SCHEMA && (j2 = vm_machine_json(&m2)) && !strcmp(j1, j2));
         free(j1); free(j2);
         char p[256];
+        snprintf(p, sizeof p, "%s/machine.json.schema1", tmpl);
+        CHECK(!access(p, F_OK));
+        unlink(p);
         snprintf(p, sizeof p, "%s/machine.json", tmpl); unlink(p);
         rmdir(tmpl);
     }

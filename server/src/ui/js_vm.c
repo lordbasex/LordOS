@@ -38,6 +38,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/ioctl.h>
+#include <sys/vfs.h>
+#include <linux/fs.h>
+#include <linux/fiemap.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -253,6 +257,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "network", m.network == VM_NET_SHARED ? "shared" : "isolated");
             set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
             set_str(c, o, "iso", m.iso);
+            set_str(c, o, "base", m.base);
             set_str(c, o, "mac", m.mac);
             set_str(c, o, "created", m.created);
             set_str(c, o, "error", "");
@@ -1469,6 +1474,315 @@ static JSValue snap_job(JSContext *c, int argc, JSValueConst *argv, const char *
 static JSValue f_snap_revert(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return snap_job(c, argc, argv, "revert"); }
 static JSValue f_snap_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return snap_job(c, argc, argv, "delete"); }
 
+/* ---- clones, compaction, storage (6.3, 6.4, 6.16) ---- */
+
+/* the file system's name, and whether it can share file data (reflink) */
+static const char *fs_name(long t) {
+    switch ((unsigned long)t) {
+    case 0xEF53: return "ext4";
+    case 0x9123683E: return "btrfs";
+    case 0x58465342: return "xfs";
+    case 0x01021994: return "tmpfs";
+    case 0x2FC12FC1: return "zfs";
+    case 0xF2F52010: return "f2fs";
+    default: return "other";
+    }
+}
+/* can this folder's file system make reflink copies? (a real FICLONE of a small file, removed after) */
+static int reflink_ok(const char *dir) {
+    char a[PATH_MAX + 64], b[PATH_MAX + 64];
+    snprintf(a, sizeof a, "%s/.reflink-test-%d-a", dir, (int)getpid());
+    snprintf(b, sizeof b, "%s/.reflink-test-%d-b", dir, (int)getpid());
+    int fa = open(a, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600), ok = 0;
+    if (fa >= 0) {
+        char buf[4096];
+        memset(buf, 7, sizeof buf);
+        if (write(fa, buf, sizeof buf) == (ssize_t)sizeof buf) {
+            int fb = open(b, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+            if (fb >= 0) { ok = !ioctl(fb, FICLONE, fa); close(fb); }
+        }
+        close(fa);
+    }
+    unlink(a); unlink(b);
+    return ok;
+}
+
+/* cloneInfo(dir) → { fs, reflink, snapshots, suspended, linked, running }: what the Clone sheet says it will do */
+static JSValue f_clone_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX], lib[PATH_MAX];
+    VmMachine m;
+    if (machine_dir(c, argv[0], dir, sizeof dir) || library(lib, sizeof lib, 0) || vm_machine_load(dir, &m, NULL, 0)) return JS_NULL;
+    struct statfs sf;
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "fs", !statfs(lib, &sf) ? fs_name((long)sf.f_type) : "other");
+    JS_SetPropertyStr(c, o, "reflink", JS_NewBool(c, reflink_ok(lib)));
+    static VmSnap sn[VM_SNAPS_MAX];
+    set_int(c, o, "snapshots", vm_snaps_load(dir, sn, VM_SNAPS_MAX));
+    char p[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/suspend.state", dir);
+    JS_SetPropertyStr(c, o, "suspended", JS_NewBool(c, !access(p, F_OK)));
+    JS_SetPropertyStr(c, o, "linked", JS_NewBool(c, m.base[0] != 0));
+    return o;
+}
+
+/* clone(dir, { name, duplicate, linked, fromSnapshot }) → job id (lord-vm --clone; its out is the new machine's JSON) */
+static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], lib[PATH_MAX];
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir) || library(lib, sizeof lib, 0)) return JS_NewInt32(c, 0);
+    JSValue vn = JS_GetPropertyStr(c, argv[1], "name"), vs = JS_GetPropertyStr(c, argv[1], "fromSnapshot");
+    const char *name = JS_ToCString(c, vn), *snap = JS_IsString(vs) ? JS_ToCString(c, vs) : NULL;
+    int dup = opt_bool(c, argc, argv, "duplicate"), linked = opt_bool(c, argc, argv, "linked");
+    int id = 0;
+    char nm[VM_NAME_MAX + 1] = "", tg[40] = "", folder[64], dst[PATH_MAX + 80];
+    if (name && vm_name_valid(name) && (!snap || vm_snap_tag_valid(snap))) {
+        snprintf(nm, sizeof nm, "%s", name);
+        if (snap) snprintf(tg, sizeof tg, "%s", snap);
+        folder_name(nm, folder, sizeof folder);
+        snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
+        for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
+        char *args[12];
+        int k = 0;
+        args[k++] = "lord-vm"; args[k++] = "--clone"; args[k++] = dir; args[k++] = dst; args[k++] = "--name"; args[k++] = nm;
+        if (dup) args[k++] = "--duplicate";
+        if (linked) args[k++] = "--linked";
+        if (tg[0]) { args[k++] = "--from-snapshot"; args[k++] = tg; }
+        args[k] = NULL;
+        if (access(dst, F_OK)) id = spawn_job(args, dst);
+    }
+    if (name) JS_FreeCString(c, name);
+    if (snap) JS_FreeCString(c, snap);
+    JS_FreeValue(c, vn); JS_FreeValue(c, vs);
+    return JS_NewInt32(c, id);
+}
+
+/* compact(dir, estimate) → job id: lord-vm --compact [--estimate] (the estimate's out is JSON) */
+static JSValue f_compact(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    int est = argc > 1 && JS_ToBool(c, argv[1]) > 0;
+    char *args[] = { "lord-vm", "--compact", dir, est ? "--estimate" : NULL, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+
+/* what a file takes on disk, and how much of it is shared with another file (reflink: FIEMAP_EXTENT_SHARED) */
+static double blocks_of(const char *p) { struct stat st; return !lstat(p, &st) && S_ISREG(st.st_mode) ? (double)st.st_blocks * 512 : 0; }
+static double shared_of(const char *p) {
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return 0;
+    union { struct fiemap f; char b[sizeof(struct fiemap) + 256 * sizeof(struct fiemap_extent)]; } u;
+    double shared = 0;
+    unsigned long long start = 0;
+    for (int rounds = 0; rounds < 4096; rounds++) {
+        memset(&u, 0, sizeof u);
+        u.f.fm_start = start;
+        u.f.fm_length = ~0ULL;
+        u.f.fm_extent_count = 256;
+        if (ioctl(fd, FS_IOC_FIEMAP, &u.f) || !u.f.fm_mapped_extents) break;
+        int last = 0;
+        for (unsigned i = 0; i < u.f.fm_mapped_extents; i++) {
+            struct fiemap_extent *e = &u.f.fm_extents[i];
+            if (e->fe_flags & FIEMAP_EXTENT_SHARED) shared += (double)e->fe_length;
+            if (e->fe_flags & FIEMAP_EXTENT_LAST) last = 1;
+            start = e->fe_logical + e->fe_length;
+        }
+        if (last) break;
+    }
+    close(fd);
+    return shared;
+}
+static double tree_bytes(const char *dir, int depth) {
+    double n = 0;
+    DIR *d = depth < 4 ? opendir(dir) : NULL;
+    if (!d) return 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        char p[PATH_MAX + 260];
+        snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+        struct stat st;
+        if (lstat(p, &st)) continue;
+        if (S_ISDIR(st.st_mode)) n += tree_bytes(p, depth + 1); else if (S_ISREG(st.st_mode)) n += (double)st.st_blocks * 512;
+    }
+    closedir(d);
+    return n;
+}
+
+/* the bases machines name, in the library and in the Trash (a machine there still holds its base) */
+typedef struct { char path[VM_PATH_MAX]; int users, trash; } BaseUse;
+static int base_note(BaseUse *b, int n, int max, const char *path, int trash) {
+    for (int i = 0; i < n; i++) if (!strcmp(b[i].path, path)) { if (trash) b[i].trash++; else b[i].users++; return n; }
+    if (n >= max) return n;
+    snprintf(b[n].path, sizeof b[n].path, "%s", path);
+    b[n].users = !trash; b[n].trash = !!trash;
+    return n + 1;
+}
+static int trash_dir(char *out, size_t n) {
+    const char *home = getenv("HOME");
+    if (!home || home[0] != '/') return -1;
+    snprintf(out, n, "%s/.local/share/Trash/files", home);
+    return 0;
+}
+
+/* storage() → the Storage window's figures (6.16): { total, free, machines: [{ dir, name, id, base, disks, snapshots,
+ * state, other, shared, total, frees }], bases: [{ path, bytes, users, trash }], trash, isos } in bytes. "frees" is what
+ * deleting the machine would really give back: its own files less what it shares by reflink, plus its base when it's
+ * the last machine on it (the Trash counted). */
+static JSValue f_storage(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char lib[PATH_MAX], tr[PATH_MAX];
+    JSValue o = JS_NewObject(c), arr = JS_NewArray(c), barr = JS_NewArray(c);
+    if (library(lib, sizeof lib, 0)) { JS_SetPropertyStr(c, o, "machines", arr); JS_SetPropertyStr(c, o, "bases", barr); return o; }
+    struct statvfs vf;
+    if (!statvfs(lib, &vf)) {
+        JS_SetPropertyStr(c, o, "total", JS_NewFloat64(c, (double)vf.f_blocks * vf.f_frsize));
+        JS_SetPropertyStr(c, o, "free", JS_NewFloat64(c, (double)vf.f_bavail * vf.f_frsize));
+    }
+    static BaseUse bases[64];
+    int nb = 0;
+    double trash = 0, isos = 0;
+    static char seen_iso[16][VM_PATH_MAX];
+    int nis = 0;
+    if (!trash_dir(tr, sizeof tr)) {
+        DIR *d = opendir(tr);
+        struct dirent *e;
+        while (d && (e = readdir(d))) {
+            size_t l = strlen(e->d_name);
+            if (l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
+            char p[PATH_MAX + 260];
+            snprintf(p, sizeof p, "%s/%s", tr, e->d_name);
+            trash += tree_bytes(p, 0);
+            VmMachine m;
+            if (!vm_machine_load(p, &m, NULL, 0) && m.base[0]) nb = base_note(bases, nb, 64, m.base, 1);
+        }
+        if (d) closedir(d);
+    }
+    /* the machines: a first pass for the bases' users */
+    DIR *d = opendir(lib);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
+        char p[PATH_MAX + 260];
+        snprintf(p, sizeof p, "%s/%s", lib, e->d_name);
+        VmMachine m;
+        if (!vm_machine_load(p, &m, NULL, 0) && m.base[0]) nb = base_note(bases, nb, 64, m.base, 0);
+    }
+    if (d) rewinddir(d);
+    uint32_t k = 0;
+    while (d && (e = readdir(d)) && k < 256) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
+        char p[PATH_MAX + 260], f[PATH_MAX + 300];
+        snprintf(p, sizeof p, "%s/%s", lib, e->d_name);
+        VmMachine m;
+        if (vm_machine_load(p, &m, NULL, 0)) continue;
+        double disks = 0, shared = 0;
+        const char *files[] = { "system.qcow2", "nvram.qcow2" };
+        for (int i = 0; i < 2; i++) { snprintf(f, sizeof f, "%s/disks/%s", p, files[i]); disks += blocks_of(f); shared += shared_of(f); }
+        snprintf(f, sizeof f, "%s/suspend.state", p);
+        double state = blocks_of(f);
+        shared += shared_of(f);
+        static VmSnap sn[VM_SNAPS_MAX];
+        int ns = vm_snaps_load(p, sn, VM_SNAPS_MAX);
+        double snaps = 0;
+        for (int i = 0; i < ns; i++) snaps += sn[i].vmstate;
+        if (snaps > disks) snaps = disks;
+        double all = tree_bytes(p, 0), other = all - disks - state;
+        if (other < 0) other = 0;
+        double frees = all - shared;
+        if (m.base[0]) {
+            for (int i = 0; i < nb; i++) if (!strcmp(bases[i].path, m.base) && bases[i].users + bases[i].trash == 1) frees += blocks_of(m.base);
+        }
+        if (m.iso[0]) {
+            int dupi = 0;
+            for (int i = 0; i < nis; i++) if (!strcmp(seen_iso[i], m.iso)) dupi = 1;
+            if (!dupi && nis < 16) { snprintf(seen_iso[nis++], VM_PATH_MAX, "%s", m.iso); isos += blocks_of(m.iso); }
+        }
+        JSValue x = JS_NewObject(c);
+        set_str(c, x, "dir", p);
+        set_str(c, x, "name", m.name);
+        set_str(c, x, "id", m.id);
+        set_str(c, x, "base", m.base);
+        JS_SetPropertyStr(c, x, "disks", JS_NewFloat64(c, disks - snaps));
+        JS_SetPropertyStr(c, x, "snapshots", JS_NewFloat64(c, snaps));
+        set_int(c, x, "snapshotCount", ns);
+        JS_SetPropertyStr(c, x, "state", JS_NewFloat64(c, state));
+        JS_SetPropertyStr(c, x, "other", JS_NewFloat64(c, other));
+        JS_SetPropertyStr(c, x, "shared", JS_NewFloat64(c, shared));
+        JS_SetPropertyStr(c, x, "total", JS_NewFloat64(c, all));
+        JS_SetPropertyStr(c, x, "frees", JS_NewFloat64(c, frees < 0 ? 0 : frees));
+        JS_SetPropertyUint32(c, arr, k++, x);
+    }
+    if (d) closedir(d);
+    for (int i = 0; i < nb; i++) {
+        JSValue x = JS_NewObject(c);
+        set_str(c, x, "path", bases[i].path);
+        JS_SetPropertyStr(c, x, "bytes", JS_NewFloat64(c, blocks_of(bases[i].path)));
+        set_int(c, x, "users", bases[i].users);
+        set_int(c, x, "trash", bases[i].trash);
+        JS_SetPropertyUint32(c, barr, (uint32_t)i, x);
+    }
+    /* bases nobody names any more (all their machines deleted for good) */
+    char sh[PATH_MAX + 16];
+    snprintf(sh, sizeof sh, "%s/.shared", lib);
+    DIR *sd = opendir(sh);
+    uint32_t bi = (uint32_t)nb;
+    while (sd && (e = readdir(sd))) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l < 7 || strcmp(e->d_name + l - 6, ".qcow2")) continue;
+        char p[PATH_MAX + 300];
+        snprintf(p, sizeof p, "%s/%s", sh, e->d_name);
+        int known = 0;
+        for (int i = 0; i < nb; i++) if (!strcmp(bases[i].path, p)) known = 1;
+        if (known) continue;
+        JSValue x = JS_NewObject(c);
+        set_str(c, x, "path", p);
+        JS_SetPropertyStr(c, x, "bytes", JS_NewFloat64(c, blocks_of(p)));
+        set_int(c, x, "users", 0);
+        set_int(c, x, "trash", 0);
+        JS_SetPropertyUint32(c, barr, bi++, x);
+    }
+    if (sd) closedir(sd);
+    JS_SetPropertyStr(c, o, "machines", arr);
+    JS_SetPropertyStr(c, o, "bases", barr);
+    JS_SetPropertyStr(c, o, "trash", JS_NewFloat64(c, trash));
+    JS_SetPropertyStr(c, o, "isos", JS_NewFloat64(c, isos));
+    return o;
+}
+
+/* removeBase(path) → bool: a shared base that no machine names, in the library or the Trash, goes */
+static JSValue f_remove_base(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char lib[PATH_MAX], want[PATH_MAX + 16];
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_FALSE;
+    int ok = !library(lib, sizeof lib, 0) && vm_base_valid(p);
+    snprintf(want, sizeof want, "%s/.shared/", lib);
+    ok = ok && !strncmp(p, want, strlen(want));
+    char path[VM_PATH_MAX];
+    snprintf(path, sizeof path, "%s", p);
+    JS_FreeCString(c, p);
+    if (!ok) return JS_FALSE;
+    JSValue s = f_storage(c, JS_UNDEFINED, 0, NULL), b = JS_GetPropertyStr(c, s, "bases");
+    int used = 1;
+    uint32_t n = 0;
+    JSValue len = JS_GetPropertyStr(c, b, "length");
+    JS_ToUint32(c, &n, len);
+    JS_FreeValue(c, len);
+    for (uint32_t i = 0; i < n; i++) {
+        JSValue x = JS_GetPropertyUint32(c, b, i), vp = JS_GetPropertyStr(c, x, "path");
+        const char *xp = JS_ToCString(c, vp);
+        if (xp && !strcmp(xp, path)) used = prop_int(c, x, "users") + prop_int(c, x, "trash");
+        if (xp) JS_FreeCString(c, xp);
+        JS_FreeValue(c, vp); JS_FreeValue(c, x);
+    }
+    JS_FreeValue(c, b); JS_FreeValue(c, s);
+    return JS_NewBool(c, !used && !unlink(path));
+}
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
@@ -1479,6 +1793,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
+    JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
+    JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 
