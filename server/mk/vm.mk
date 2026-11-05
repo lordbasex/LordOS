@@ -1,0 +1,33 @@
+# Machines (docs/VIRTUALIZATION.md, "Phase 1 implementation"): lord-vm, the supervisor of one machine (QEMU, passt,
+# QMP, limits, state), and lord-vmdisplay, its picture and input over QEMU's peer-to-peer D-Bus display. libc and the
+# shared sandbox, cgroup and JSON code; lord-vmdisplay also links the system's D-Bus library (libsystemd), built only
+# when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
+VM_COMMON := src/vm/machine.c src/sec/json.c src/doc/wire.c
+VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
+LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+all: build/lord-vm
+build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORDVM_SRC)
+	chmod g-w $@
+
+VMDISPLAY ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
+ifeq ($(VMDISPLAY),1)
+VMDISPLAY_SRC := src/vm/vmdisplay.c src/sec/sandbox.c src/sec/cgroup.c
+all: build/lord-vmdisplay build/lordvm-dev
+build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ $(VMDISPLAY_SRC) $(shell pkg-config --libs libsystemd) -lpthread
+	chmod g-w $@
+build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c -lm
+endif
+
+# schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
+# The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
+test: build/vm-test
+build/vm-test: tests/vm_test.c src/vm/qmp.c $(VM_COMMON) $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c $(VM_COMMON)
+	./$@ || { rm -f $@; exit 1; }

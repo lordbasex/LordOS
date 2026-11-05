@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- Machines (virtualization), alpha internals with no app yet: `lord-vm`, the sandboxed supervisor of one machine (QEMU over QMP, passt networking, cgroup limits, crash recovery), and `lord-vmdisplay`, its sandboxed picture and input helper over QEMU's D-Bus display, with a versioned `machine.json` and an isolation test that passes on the Raspberry Pi 5 and on amd64 (docs/VIRTUALIZATION.md 3.9).
+
 ## [0.8.8.3-beta] - 2026-11-05
 
 An update for 0.8.8, 0.8.8.1 and 0.8.8.2 through Store → Updates and `apt`: only the `lordos` package changes, with the fixes and ideas reported on GitHub since 0.8.8. Thanks to everyone who opened an issue. It also brings everything in 0.8.8.2 (Italian, preferred languages, the Raspberry Pi 500 in the Imager), which was not published on its own.

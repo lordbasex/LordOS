@@ -2,7 +2,8 @@
 
 The design of **Machines** (working name), LordOS's desktop virtualization app: run other operating systems in windows of the
 LordOS desktop, on the machine you have, at native speed where the hardware allows it, for free and with open source parts.
-Nothing here is built yet. This is the design, and it follows the Virtual machines item in [ROADMAP.md](ROADMAP.md).
+This is the design, and it follows the Virtual machines item in [ROADMAP.md](ROADMAP.md). Phase 0 (section 13) and the internals
+of Phase 1 (3.9) are built; the app isn't.
 
 How to read it:
 
@@ -279,6 +280,7 @@ checked. Decision: `vm-enable`, asked the first time, one question with one sent
   log/               last three runs
 ```
 
+Phase 1 keeps the NVRAM as `disks/nvram.qcow2` and adds `lock` and `run.json` (3.9), because QEMU may write only in `disks/`.
 Files shows the folder as one item. It moves to another LordOS computer only under the conditions of 3.6. `machine.json` never holds passwords.
 Keys go to the keyring.
 
@@ -309,6 +311,150 @@ Decided on 2026-11-01: `lord-vm` drives QEMU directly through QMP.
 libvirt was considered seriously: its session mode runs as the user, Debian 13 has 11.3.0 (**Measured**), it supports `<graphics type='dbus' p2p='yes'>` through `virDomainOpenGraphics` (**Reported**, its documentation), and it brings machine-type and firmware handling, plus snapshots with years of edge cases. Against it: a second daemon in the session, XML as the contract, and its own process setup between us and QEMU, right where our sandbox has to be.
 
 It stays only as a fallback, if the technical proof finds a blocker in direct QMP. Its internal snapshot code is worth reading in any case.
+
+### 3.9 Phase 1 implementation
+
+Built on branch `machines-alpha` (2026-11-04/05): the internals of the alpha, with no window and no app yet. Sources in
+`server/src/vm/`, rules in `server/mk/vm.mk`, both binaries installed in `/usr/lib/lordos/bin` by `tools/iso/mkdeb.sh`
+(QEMU and passt are not package dependencies).
+
+**Files of one machine** (any folder; the app will use `~/Machines/<name>.lordvm`, 3.5). QEMU may write only in `disks/`, so a
+compromised QEMU can't change `machine.json` (and through it, what the next start lets it read), the logs or the state:
+
+| File | What |
+|---|---|
+| `machine.json` | The description, schema 1 (`machine.h`): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
+| `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
+| `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
+| `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
+| `log/serial.log` | The guest's serial console, 1 MB at most per run (`serial.1.log`, the run before) |
+| `lock` | `flock`ed by the running lord-vm: a second one on the same machine is refused |
+| `run.json` | The last state lord-vm wrote: state, reason, code, pids, time, detail. Status and recovery read it |
+
+**Limits** (3.7): vCPUs at most the host's CPUs, with a warning above all-but-one (3 on a Pi 5, 13.7); memory 256 MB up to the
+host's RAM minus 2 GB (1 GB on a 4 GB board). The machine's memory limit is its memory plus QEMU's overhead (384 MB with KVM, 640
+MB with TCG, whose translation cache is capped with `tb-size=256`); `vm_budget_fits` checks a new machine against the ones
+running. Enforcing the sum needs one slice for all machines, which lord-sessiond can't make yet (below).
+
+**Processes** of a running machine:
+
+```
+lord-server ──fd 3, VmMsg──▶ lord-vm (app-lordos-lordos-vm-<id>.scope)      ← lord-vm --control-fd 3 [--paused] DIR
+                               ├─ passt   -f -q -1 --fd 3 --no-map-gw -t none -u none --dns-forward 169.254.0.53
+                               └─ qemu-system-<arch>   fds: 3 /dev/kvm, 4 QMP, 5 serial, 6 network, 7… credentials
+lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id>.scope) ──fd 4, D-Bus p2p──▶ QEMU
+```
+
+- **lord-vm** loads and checks `machine.json` and this computer, takes the lock, recovers a previous run that ended without a
+  final state (kills what is left of it, marks it `supervisor-lost`, removes its socket), rotates the logs, enters the machine's
+  scope, opens `/dev/kvm`, starts passt and QEMU paused (`-S`), completes the QMP handshake, applies its own Landlock (read and
+  write in the machine's folder only) and continues QEMU unless asked to stay paused. It listens on
+  `$XDG_RUNTIME_DIR/lordos-vm/<id>.sock` (folder 0700, peer uid checked) with the same messages as fd 3, so the CLI and a restarted
+  lord-server can reach it. When lord-server closes fd 3, the machine is shut down (ACPI, 60 s, then off), unless lord-vm was
+  started with `--keep-running`. lord-vm exits when QEMU has, after the last state.
+- **QEMU** gets `-nodefaults -no-user-config`, `-uuid`, the pinned machine type with `dump-guest-core=off`, `-accel kvm,device=/dev/fdset/1`
+  with `-add-fd` (or `tcg,thread=multi,tb-size=256`), `-cpu host` (`max` with TCG), every disk as `-blockdev` JSON with
+  `bootindex=0` on the system disk, an ISO as `scsi-cd` with `bootindex=1`, `virtio-net-pci` on `-netdev stream,addr.type=fd`, `virtio-rng-pci`,
+  `virtio-vga` on amd64 always (3.3) and `virtio-gpu-pci` + `virtio-keyboard-pci` on arm64, `virtio-tablet-pci` with a window,
+  `-display dbus,p2p=yes` (or `none`), QMP and the serial port as `-chardev socket,fd=N`, and
+  `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny`. Its environment is `LC_ALL=C.UTF-8` only.
+  `PR_SET_PDEATHSIG` (SIGKILL) and its own process group are set before exec, and core dumps are off.
+- **Guest credentials** (systemd's first-boot settings, a root password for tests) come from `--credentials-file` (mode 0600),
+  never from a command line: lord-vm puts each in a sealed memfd and QEMU reads it as `-smbios type=11,path=/proc/self/fd/N`. The
+  log names them only; the isolation test checks that the password isn't on QEMU's command line or in any log.
+- **lord-vmdisplay** reads the console, registers its listener (with `Listener.Unix.Map`), then applies the helper sandbox of
+  `sec/sandbox.c` (no files, no new sockets, no exec, threads only, its own scope with 512 MB) before it handles anything about the
+  picture. Decisions on 13.8 item 4: QEMU's memfd is sealed only against new seals (`seal_shrink: no`, again on both hosts), so
+  refusing unsealed buffers would mean no picture: every read of QEMU's buffer runs under a `SIGBUS` guard instead, and a fault drops
+  that buffer until the next `ScanoutMap`. The damaged area is copied into lord-server's picture (sealed by lord-server against
+  shrinking and growing), at most `VD_RATE` times a second (60 by default; lord-server sends the display's real rate), and not again
+  until lord-server acknowledges the frame or 250 ms pass, so lord-server never reads a picture while it's written and never sees
+  QEMU's memory. Plain `Scanout`/`Update` arrays are still copied (QEMU uses them for surfaces it can't share); `ScanoutDMABUF` is
+  refused in the alpha (no 3D). Input goes out as D-Bus calls that expect no reply: evdev key codes mapped to QEMU's numbers
+  (`vmkeys.h`), absolute pointer (relative while the guest's tablet driver isn't up; `IsAbsolute` is asked again while the pointer
+  moves), buttons, wheel steps, release-all on focus loss, and `SetUIInfo` at most every 100 ms for the window's size. The cursor
+  (`CursorDefine`) goes to lord-server in its own sealed memfd.
+
+**Messages** (`server/src/vm/vmproto.h`, the full contract is its header comment). Both channels are `SOCK_SEQPACKET`, one fixed
+struct per packet, at most one descriptor per message; anything of another length or version drops the peer.
+
+| `VmMsg` (224 bytes) | Direction | Meaning |
+|---|---|---|
+| `VM_STATUS`, `VM_PAUSE`, `VM_RESUME`, `VM_SHUTDOWN` (a = seconds, 0: 60), `VM_POWEROFF`, `VM_RESET` | to lord-vm | Lifecycle (6.1); each answered by `VM_REPLY` with the request's `seq` |
+| `VM_DISPLAY` | to lord-vm | QMP `getfd` + `add_client @dbus-display`; answered by `VM_DISPLAY_FD` carrying the connection for lord-vmdisplay |
+| `VM_QMP` | to lord-vm | One raw QMP command, only with `lord-vm --dev-qmp` (tests) |
+| `VM_REPLY` | from lord-vm | a = `VME_*`, text = reason |
+| `VM_STATE` | from lord-vm | a = `stopped`, `starting`, `running`, `paused`, `stopping`, `crashed`; b = why (`guest-shutdown`, `host-shutdown`, `forced`, `poweroff`, `qemu-failed`, `qemu-signal`, `out-of-memory`, `start-failed`, `guest-panic`, `supervisor-lost`, `reset`, `user`); c = exit status or signal; d = QEMU's pid; text = detail for the log and the likely-cause line of 6.1 |
+| `VM_INFO` | from lord-vm | vCPUs, memory, `VMS_*` (what the sandbox applied), `VMC_*` (cgroups), the id |
+
+| `VdMsg` (32 bytes) | Direction | Meaning |
+|---|---|---|
+| `VD_READY`, `VD_STATE`, `VD_STATS` | from lord-vmdisplay | Console size; connected / no picture / lost; counts every 5 s |
+| `VD_SIZE` → `VD_SHM` | both | The helper asks for a picture of w × h; lord-server answers with a memfd of w × h × 4 sealed against shrinking and growing (`vm_picture_memfd`) |
+| `VD_FRAME` → `VD_FRAME_DONE` | both | Damage x, y, w, h and a frame number; lord-server answers after it read the picture |
+| `VD_CURSOR`, `VD_POINTER` | from lord-vmdisplay | Cursor image in a memfd sealed against writing (`vm_cursor_check`), hotspot; pointer position |
+| `VD_KEY`, `VD_MOTION`, `VD_BUTTON`, `VD_WHEEL`, `VD_RELEASE_ALL`, `VD_RESIZE`, `VD_RATE`, `VD_CLOSE` | to lord-vmdisplay | Input and window changes |
+
+**Command line, for development and tests** (the app comes in part 2):
+
+```
+lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]
+                     [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]
+lord-vm --start DIR [--paused] [--detach] [--keep-running] [--credentials-file FILE] [--dev-qmp]
+lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR
+lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, typing, pointer, resize (server/tests/vm_dev.c)
+```
+
+**What is enforced, and where it stops.**
+
+- QEMU: Landlock (read and execute `/usr`; read `/etc/ld.so.cache` and its own `/proc/<pid>`; read and write `disks/`; read the ISO;
+  `/dev/null`; TCP bind and connect refused; abstract unix sockets and signals scoped), `no_new_privs`, our seccomp filter (no
+  `socket`, `connect`, `bind`, `listen`, `accept`, namespaces, mount, `ptrace`, `process_vm_*`, `bpf`, `perf_event_open`, `keyctl`,
+  `io_uring`, `userfaultfd`, modules, kexec, `TIOCSTI`), then QEMU's own filter. Ours is a denylist: an allowlist for QEMU is still
+  **To test** (3.3).
+- passt sandboxes itself (namespaces and its own seccomp); lord-vm doesn't put Landlock on it, because Landlock would forbid the
+  mounts passt's own isolation makes.
+- cgroups: lord-vm enters `app-lordos-lordos-vm-<id>.scope` through lord-sessiond (memory.max = the machine's limit + 128 MB, cpu.max
+  = vCPUs × 100 % + 50 %). With lord-sessiond, scopes belong to root, so lord-vm can't divide its scope: QEMU and passt share it.
+  When lord-vm runs in a cgroup it may divide (a delegated scope), it makes leaves `supervisor`, `qemu` (the machine's memory limit,
+  swap 0, its CPU limit) and `passt` (128 MB, 200 %); the test below runs that way. One slice for all machines, the sum of 3.7,
+  needs lord-sessiond to create nested scopes: not done.
+- lord-vm's own Landlock covers files only; it keeps the right to signal QEMU and passt.
+
+**Isolation test** (`server/tests/vm_isolation.sh BUILD_DIR IMAGE`, Phase 1's "done when"). It makes a machine from a Debian 13
+image, starts it through `lordvm-dev` (lord-server's part), and has QEMU itself try what it must not do, through
+`lord-vm --dev-qmp`: `blockdev-add` of files and devices, `screendump`, file, TCP, UDP and unix `chardev-add`, a user network with a
+forwarded port. The guest reports its own network on the kernel log through a unit passed as a systemd credential. Then pause,
+resume, a second lord-vm on the same machine, QEMU killed with `SIGSEGV`, lord-vm killed with `SIGKILL`, recovery, and an ACPI
+shutdown. With `LORDVM_SCOPE=1` each lord-vm runs alone in a delegated scope (`systemd-run --user --scope -p Delegate=yes`), so the
+nested leaves are tested. **Measured** on 2026-11-05, final runs:
+
+| | Pi 5 (arm64 guest, KVM) | amd64, **nested** (amd64 guest, KVM, OVMF) |
+|---|---|---|
+| Result | **61 passed, 0 failed, 0 skipped** | **59 passed, 0 failed, 0 skipped** |
+| QEMU's sandbox | Landlock (files, TCP, scope), our seccomp, QEMU's seccomp (`Seccomp_filters` ≥ 2), `NoNewPrivs` 1, `CapEff` 0 | same |
+| QEMU's descriptors | only sockets, pipes, anonymous files, `/dev/kvm`, `/dev/null`, its disks, the firmware | same |
+| Refused to QEMU | `/etc/hostname`, a file in the home folder, its own `machine.json` and logs, `/proc/<lord-vm>/environ`, a screenshot or file chardev in `/tmp`, `/dev/mem`, `/dev/mmcblk0`, `/dev/dri/renderD128`, `/dev/dri/card0`, `/dev/net/tun`, `/dev/vhost-net`, `/dev/tty`, `/dev/ptmx`; TCP connect and listen, UDP, a unix socket, the session bus, a user network with a forwarded port; nothing reached the host's listeners | same, with `/dev/nvme0n1` |
+| Allowed (control) | a file in `disks/` | same |
+| Guest network (passt) | address and gateway copied from the host, DNS answered, `http://1.1.1.1/` 301, `http://deb.debian.org/` 200, the host's loopback through the gateway unreachable | same |
+| cgroups | QEMU in its `qemu` leaf, `memory.max` 1,476,395,008 (1024 + 384 MB); passt beside it, listening on nothing | same, in the scope lord-vm made for itself |
+| Display | first picture, not black, typed login and command ran (`echo` reached the serial line), `SetUIInfo` 1024 × 768 taken by the guest, nothing refused on either side | same |
+| lord-vmdisplay | seccomp, `NoNewPrivs`, no file held; its sandbox refuses `/etc`, home, `/dev/kvm`, files in `/tmp`, AF_INET, AF_UNIX, `socketpair`, `fork`; `/dev/null` and `memfd` stay | same |
+| Secrets | the root password from `--credentials-file` was on no command line and in no log | same |
+| Lifecycle | pause, resume, second start refused (exit 3), QEMU `SIGSEGV` → `crashed`/`qemu-signal` 11 with passt and the socket gone, lord-vm `SIGKILL` → QEMU and passt gone, status `supervisor-lost`, the next start recovers, ACPI shutdown in 4 s | same, ACPI shutdown in 4 s |
+
+Earlier runs on the same day found, and the code now handles: on arm64, QEMU opens `/dev/kvm` again by path for `-cpu host` (a
+scratch vCPU to read the CPU's features), so KVM machines have `/dev/kvm` in QEMU's Landlock rules (it holds a KVM descriptor anyway);
+`--dns` together with `--dns-forward` made passt advertise an address it didn't answer on; an ACPI request sent before a nested
+amd64 guest finished booting is ignored and ends as `forced` after the timeout, which is the designed fallback. Without a delegated
+cgroup (a plain SSH session), the same checks pass and QEMU runs with no limits, which `VM_INFO` reports.
+
+The `machine.json` schema, the message checks, QMP line reading and the key map have unit tests (`server/tests/vm_test.c`, 147 checks,
+run by `make test`). lord-vmdisplay and lordvm-dev build only where `libsystemd-dev` is installed (`VMDISPLAY ?=` in `mk/vm.mk`).
+
+**Not done or not verified in this part:** the lord-server window and the app (part 2); TCG machines, an ISO install and a BIOS
+amd64 machine were built for but not run; one slice for all machines and nested leaves under lord-sessiond; our seccomp allowlist for
+QEMU; the cursor of a graphical guest (`CursorDefine` never came from a text console); render node and 3D; latency to the screen.
 
 ## 4. Guest systems
 
@@ -1076,14 +1222,15 @@ networking, virtiofs on both architectures, the desktop under a 3-vCPU load. Sti
 2. **The arm64 3D abort:** a fix in Debian's QEMU, a patch of ours (open decision 5), or 3D stays off on arm64 (6.10).
 3. **dmabuf import in the compositor:** the tiled V3D modifier, direct scanout or composite, fences with a timeout, and checking that the
    picture is right.
-4. **`lord-vmdisplay` for real:** `SIGBUS`-safe copy or refusal of unsealed memfds, copy before forward, the 60 Hz cap tied to the
-   display's real refresh rate, latency all the way to the screen.
+4. **`lord-vmdisplay` for real:** done in 3.9 (`SIGBUS`-guarded copy, copy before forward with an acknowledged frame, a rate lord-server
+   sets). Still open: latency all the way to the screen, which needs the window (Phase 1, part 2).
 5. **The Pi desktop:** repeat the 4-vCPU drag on an untouched board, measure a memory-heavy guest at 3 vCPUs, and find the cause of the
    1000 ms stalls when all four cores are busy, which happens with no VM at all.
 6. **GICV trapping:** the cost of interrupt-heavy work on the 16K kernel, and whether a 4K kernel removes it (open decision 4).
-7. **Not touched in Phase 0:** our own seccomp filter on top of QEMU's, the render node passed by descriptor, Landlock on QEMU, nested
-   cgroup scopes (3.7), D-Bus audio, clipboard and Chardev, cursor and mouse, disk speed of qcow2, pause, suspend and resume, UEFI vars as
-   qcow2 (6.2).
+7. **Not touched in Phase 0:** our own seccomp filter on top of QEMU's, Landlock on QEMU, nested cgroup leaves, mouse, pause and
+   resume, and UEFI vars as qcow2 are done in 3.9 (the filter is a denylist; nested leaves only where lord-vm's cgroup is delegated, not
+   yet under lord-sessiond). Still open: the render node passed by descriptor, one slice for all machines (3.7), D-Bus audio, clipboard
+   and Chardev, the cursor of a graphical guest, disk speed of qcow2, suspend.
 8. **`passt` on the Pi:** why its speed ranges from 96 to 379 MB/s from run to run, and whether that matters for real traffic.
 9. **Boot time:** UEFI firmware is 12.3 s of the Pi's 18.6 s. Whether a lighter firmware setup or direct kernel boot for Linux guests is
    worth offering.
