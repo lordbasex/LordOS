@@ -307,6 +307,8 @@ if (HAS_PAPER && TOOLS) { try { createRequire(path.join(TOOLS, 'package.json')).
 if (HAS_PAPER && !HAS_PDF) console.warn('[web] paper: set WEB_TOOLS to a folder with playwright to build the PDFs; the PDF link is left out');
 const prefix = (l) => (l === 'en' ? '/' : `/${l}/`);
 const pageUrl = (l, page) => prefix(l) + (page === 'home' ? '' : page + '/');
+// the blog lives on its own host: one home per language
+const blogUrl = (l) => 'https://blog.lordos.org' + (l === 'en' ? '/' : `/${l}/`);
 const get = (obj, key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 
 function render(tpl, vars, t) {
@@ -390,6 +392,7 @@ function header(t, page) {
     `<a href="${h('#support')}">${esc(t.navSupport)}</a>`,
     `<a href="${pageUrl(l, 'about')}"${cur('about')}>${esc(t.navAbout)}</a>`,
     `<a href="${COMMUNITY}" rel="noopener">${esc(t.navCommunity)}</a>`,
+    `<a href="${blogUrl(l)}">${esc(t.navBlog)}</a>`,
   ].filter(Boolean).join('\n');
 
   // mobile drawer: a CSS-only toggle (hidden checkbox + labels) that site.js upgrades to a real dialog
@@ -411,6 +414,7 @@ function header(t, page) {
       ? group(t.pages.legal.nav, [row(pageUrl(l, 'legal'), t.pages.legal.all, cur('legal')), ...legalLinks.map((x) => row(pageUrl(l, 'legal/' + x.slug), loc(x.title, l), cur('legal/' + x.slug)))], page.startsWith('legal'))
       : '',
     row(COMMUNITY, t.navCommunity, ' rel="noopener"'),
+    row(blogUrl(l), t.navBlog),
   ].filter(Boolean).join('\n');
   const X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   return `<input type="checkbox" id="nav-cb" class="nav-cb" aria-label="${esc(t.pages.menu)}">
@@ -653,7 +657,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       return `<div class="laptop" id="hero-show" role="region" aria-roledescription="carousel" aria-label="${esc(H.carousel)}"><div class="lp-screen"><span class="lp-cam" aria-hidden="true"></span><div class="lp-display">${slides}</div></div><div class="lp-base" aria-hidden="true"><span class="lp-notch"></span></div>${ctl}</div><ul class="stats">${pills}</ul>`;
     })(),
     fingerprint: FINGERPRINT, banner: l === 'en' ? banner() : '',
-    writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: PKG.version, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
+    writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: MEDIA_VERSION, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
     imagerMac: `${IMAGER_DL}_universal.dmg`, imagerWin: `${IMAGER_DL}_x64_setup.exe`, imagerLinux: `${IMAGER_DL}_amd64.deb`,
     faqServer: HAS_FAQ ? pageUrl(l, 'faq') + '#server-vps' : `${GITHUB}/blob/main/docs/INSTALL-DEBIAN.md#servers-and-vps`,
   }, t));
