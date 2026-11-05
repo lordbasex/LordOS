@@ -10,6 +10,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- Fortinet VPN with **single sign-on**: Settings → Network → VPN → Fortinet has an **Authentication** choice, **Username and password** or **Single sign-on** (the organization's sign-in page, often with an authenticator-app approval). Connecting opens that page in the default browser and Settings shows "Waiting for you to sign in on the organization's page…" with the time left (5 minutes), **Open sign-in page** and **Cancel**; the VPN connects when the sign-in finishes. LordOS waits for the page's return on 127.0.0.1 only, and checks the server's certificate before the page opens, so a certificate question comes first.
+- A saved IPsec, PPTP, OpenConnect or Fortinet VPN can be changed: **⋯ → Edit…** in its row while it's off (passwords left empty stay as they were). **Delete** is now a trash can button with a tooltip.
+
+### Fixed
+
+- Fortinet: a server whose certificate couldn't be verified (often one that sends an incomplete certificate chain, which other systems complete on their own) showed only `fortinet: ERROR: <long hex number>`. Settings now says "This server's certificate couldn't be verified", with the fingerprint (`AB:CD:…`), who it was issued to and by, and **Trust** / **Cancel**; Trust saves it as the connection's trusted certificate and connects again. If the server later shows another certificate, it says the certificate changed. A trusted certificate typed in capitals or with `:` now works too (openfortivpn compares lowercase only).
+- Fortinet: openfortivpn's common failures are readable messages instead of its raw output: wrong username or password, server unreachable, secure connection failed, signed in but no VPN for the account, sign-in not completed in time.
+
 ## [0.8.8.3-beta] - 2026-11-05
 
 An update for 0.8.8, 0.8.8.1 and 0.8.8.2 through Store → Updates and `apt`: only the `lordos` package changes, with the fixes and ideas reported on GitHub since 0.8.8. Thanks to everyone who opened an issue. It also brings everything in 0.8.8.2 (Italian, preferred languages, the Raspberry Pi 500 in the Imager), which was not published on its own.

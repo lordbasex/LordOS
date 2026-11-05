@@ -698,5 +698,16 @@
   "install.free.tableDamaged": "la table des partitions présente des problèmes, ou n’a pas pu être lue avec certitude",
   "install.free.tableFull": "la table des partitions est pleine",
   "install.free.verifyFailed": "La table des partitions n’a pas le résultat attendu ; elle a donc été rétablie",
-  "install.noFirstAccount": "Ce système a déjà son premier compte"
+  "install.noFirstAccount": "Ce système a déjà son premier compte",
+  "vpn.fortiUnreachable": "Impossible de joindre le serveur VPN. Vérifiez le serveur et le port, et que ce réseau autorise la connexion.",
+  "vpn.fortiTlsFailed": "La connexion sécurisée avec le serveur VPN a échoué.",
+  "vpn.fortiNoTunnel": "Le serveur a accepté la connexion mais n'a pas attribué de connexion VPN à ce compte.",
+  "vpn.fortiSsoTimeout": "La connexion n'a pas été terminée en {min} minutes. Reconnectez-vous pour réessayer.",
+  "vpn.fortiSsoFailed": "La page de connexion de l'organisation n'est pas revenue vers LordOS. Reconnectez-vous pour réessayer.",
+  "vpn.fortiSsoPortBusy": "Le port {port} de cet ordinateur est utilisé par un autre programme : la page de connexion ne peut pas revenir vers LordOS.",
+  "vpn.fortiFailed": "La connexion VPN a échoué : {detail}",
+  "vpn.fortiEnded": "Le programme VPN s'est arrêté avant de se connecter.",
+  "vpn.editFromFile": "Ce VPN provient d'un fichier : supprimez-le et importez le nouveau fichier.",
+  "vpn.editWhileOn": "Désactivez le VPN avant de le modifier.",
+  "vpn.fortiSsoRefused": "Le serveur VPN n'a pas accepté la connexion. Reconnectez-vous et connectez-vous sur la page de l'organisation."
 }

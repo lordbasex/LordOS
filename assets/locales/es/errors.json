@@ -698,5 +698,16 @@
   "install.free.tableDamaged": "la tabla de particiones tiene problemas, o no se pudo leer con certeza",
   "install.free.tableFull": "la tabla de particiones está llena",
   "install.free.verifyFailed": "La tabla de particiones no quedó como se esperaba, así que se restauró",
-  "install.noFirstAccount": "Este sistema ya tiene su primera cuenta"
+  "install.noFirstAccount": "Este sistema ya tiene su primera cuenta",
+  "vpn.fortiUnreachable": "No se pudo llegar al servidor VPN. Revisá el servidor y el puerto, y que esta red permita la conexión.",
+  "vpn.fortiTlsFailed": "Falló la conexión segura con el servidor VPN.",
+  "vpn.fortiNoTunnel": "El servidor aceptó el inicio de sesión pero no le dio a esta cuenta una conexión VPN.",
+  "vpn.fortiSsoTimeout": "El inicio de sesión no se completó en {min} minutos. Volvé a conectar para reintentar.",
+  "vpn.fortiSsoFailed": "La página de inicio de sesión de la organización no volvió a LordOS. Volvé a conectar para reintentar.",
+  "vpn.fortiSsoPortBusy": "Otro programa usa el puerto {port} de esta computadora, así que la página de inicio de sesión no puede volver a LordOS.",
+  "vpn.fortiFailed": "Falló la conexión VPN: {detail}",
+  "vpn.fortiEnded": "El programa de la VPN se detuvo antes de conectar.",
+  "vpn.editFromFile": "Esta VPN vino de un archivo: borrala e importá el archivo nuevo.",
+  "vpn.editWhileOn": "Apagá la VPN antes de editarla.",
+  "vpn.fortiSsoRefused": "El servidor VPN no aceptó el inicio de sesión. Volvé a conectar e iniciá sesión en la página de la organización."
 }

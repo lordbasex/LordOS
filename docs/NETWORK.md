@@ -181,7 +181,7 @@ enabled. `lordos.service` now has `DelegateSubgroup=supervisor`.
 | IPsec with client certificate (`auth=cert`) | the same, with `load-key` | ⚠️ implemented, untested |
 | PPTP (included, **insecure**) | Debian's `pppd` + `pptp` with the pppd config LordOS writes | ✅ against `pptpd` in a netns: MS-CHAPv2, mandatory MPPE 128 negotiated, routes, DNS, wrong password |
 | OpenConnect (optional: `net-vpn-enable openconnect`) | Debian's `openconnect` with our own fixed-content script | ✅ AnyConnect against `ocserv` 1.3 in a netns: certificate pin, split routes and DNS/domain sent by the server, wrong password, unknown certificate without pin (fails correctly). Installation with LordOS's package engine was tested too. GlobalProtect and Pulse: ⚠️ no test server |
-| Fortinet (optional: `net-vpn-enable fortinet`) | Debian's `openfortivpn` | ⚠️ **not tested against a FortiGate** (no free server available). Tested: installation, generated config, startup, "Connection refused" error against a closed port, name that doesn't resolve |
+| Fortinet (optional: `net-vpn-enable fortinet`) | Debian's `openfortivpn` | User name and password, or **single sign-on** (the organization's sign-in page, see "Fortinet with single sign-on"). An untrusted certificate is a prompt (fingerprint, subject, issuer, **Trust**). Tested: installation, generated config, startup, the readable errors, and against a real gateway up to the organization's sign-in page and the certificate prompt. ⚠️ A complete sign-in and the tunnel coming up with single sign-on: not yet (it needs the organization's account) |
 | DHCPv6, 802.1X/WPA-Enterprise | — | pending |
 
 ## The UI: Settings → Network
@@ -239,6 +239,9 @@ replies carry only data (a count, a public key).
 | `net-vpn-import` | `type\nname\nconfig`, type `wireguard\|openvpn\|ipsec\|pptp\|openconnect\|fortinet` | admin | WireGuard: `OK <public key>`; with `PrivateKey = generate` it creates it. The others: `OK vpn.imported`. For OpenVPN, first `lord.net.prepareOvpn`. The formats are below. If the program is missing: `ERR vpn.missingProgram type=<type> package=<package>` |
 | `net-vpn-enable` | `openconnect\|fortinet` | admin | Installs `openconnect` or `openfortivpn` with LordOS's package engine (the same as `pkg-install`): `LOG progress …` and the package engine's `OK`. If it was already there: `OK vpn.alreadyInstalled`. |
 | `net-vpn-credentials` | `name\nuser\npassword` | admin | OpenVPN only. Stored with mode 0600. |
+| `net-vpn-trust` | `name\nsha256` | admin | Fortinet: the certificate the person accepted (64 hex digits, `:` allowed) becomes the connection's `trusted-cert`, replacing an earlier one. `OK vpn.trusted`. Settings then calls `net-vpn-up` again. |
+| `net-vpn-config` | `name` | admin | IPsec, PPTP, OpenConnect, Fortinet: `LOG {name, type, values: {key: value}, secrets: ["password"…]}` — the saved settings without passwords or keys (to fill Settings' **Edit…** form), then `OK 1`. WireGuard / OpenVPN: `ERR vpn.editFromFile`. |
+| `net-vpn-edit` | `type\nname\nconfig` | admin | The same as `net-vpn-import` over an existing VPN of that type, while it's off (`ERR vpn.editWhileOn`). A `password`, `psk` or PEM left out keeps the saved one. |
 | `net-vpn-up` / `net-vpn-down` | `name` | anyone | WireGuard: `OK vpn.connected`. The others: `OK vpn.connecting` and then an EVENT. |
 | `net-vpn-delete` | `name` | admin | |
 | `net-vpn-status` | `name` or empty | anyone | One `LOG` per VPN and then `OK <n>`:<br>`{ name, type:'wireguard', ifname, active, peers: [{ publicKey, endpoint, lastHandshake (unix), rxBytes, txBytes }] }`<br>`{ name, type:'openvpn', ifname, running, active }`<br>`{ name, type:'ipsec'\|'pptp'\|'openconnect'\|'fortinet', ifname, running, active, address }` |
@@ -285,7 +288,66 @@ It always requests a virtual IP (`vips`).
 
 Routes and DNS are sent by the server. If it sends no routes, all traffic goes through it.
 
-**`fortinet`**: `host`, `port` (443 by default), `user`, `password`, `trusted-cert` (64-character hex sha256 fingerprint; there can be several separated by commas) and `routes` (optional; if missing, all traffic goes through it).
+**`fortinet`**: `host`, `port` (443 by default), `auth` (`password`, the default, or `sso`), `user` and `password` (only with `auth=password`), `trusted-cert` (sha256 fingerprint, 64 hex digits, with or without `:`; there can be several separated by commas; saved in lowercase, which is what openfortivpn compares), `sso-port` (only with `auth=sso`, 8020 by default) and `routes` (optional; if missing, all traffic goes through it).
+
+### Fortinet with single sign-on
+
+Some gateways don't take a user name and password: they send the person to the organization's
+sign-in page (an identity provider over SAML, often with an authenticator-app approval). With
+`auth=sso`, `forti_run` (`vpnproc.c`) does this:
+
+1. **Certificate check first.** A short `openfortivpn --cookie-on-stdin` run with a placeholder
+   cookie (never a user name or password) that is stopped as soon as it prints "Connected to
+   gateway." — TLS is up and the certificate was accepted. If the certificate can't be verified,
+   the person is asked now (see below), not after signing in. An unreachable gateway is reported
+   here too.
+2. **The sign-in page.** lord-netd listens on `127.0.0.1:<sso-port>` (loopback only) and sends
+   `net vpn <name> sso https://<host>:<port>/remote/saml/start?redirect=1`. The Settings that asked
+   to connect opens that address in the default browser (`openUrl`, the `x-scheme-handler/https`
+   app) and shows "Waiting for you to sign in on the organization's page…" with the time left,
+   **Open sign-in page** and **Cancel** (`net-vpn-down`). Other sessions show the same state
+   without opening the browser. The wait lasts 5 minutes (`vpn.fortiSsoTimeout`).
+3. **The return.** After the sign-in, the gateway redirects the browser to
+   `http://127.0.0.1:<sso-port>/?id=<id>`. The port is set on the gateway (its "SAML redirect port",
+   8020 unless the organization changed it), which is why it isn't a random free port. LordOS
+   answers with a short "Signed in" page, checks the id (letters, digits and `-`, like
+   openfortivpn), closes its listener, starts `openfortivpn --saml-login=<sso-port>` and, as soon as
+   it says "Listening for SAML login", hands it the same request. openfortivpn exchanges the id for
+   the session cookie and brings the tunnel up as usual ("Tunnel is up and running" → `connected`).
+
+Why LordOS listens itself instead of leaving it to `--saml-login`: openfortivpn 1.23 waits only
+5 × 10 s for the browser, too little for a person typing a password and approving on a phone.
+
+The per-app firewall doesn't get in the way: lord-netd is a system service, not an app, and the
+browser's connection to `127.0.0.1` is loopback, which the firewall never filters — except for an
+app given the "no LAN" rule, which also covers `127.0.0.1` (docs/FIREWALL.md); a browser with that
+rule can't complete the sign-in.
+
+### Fortinet: certificates and errors
+
+openfortivpn accepts a gateway whose certificate chains to a known authority and matches the host
+name, or whose sha256 fingerprint is in `trusted-cert`. A gateway that sends its certificate without
+the intermediate one fails that check on Linux even when other systems accept it (they fetch the
+missing intermediate from the address in the certificate). openfortivpn then prints the certificate's
+subject, issuer and fingerprint; `forti.c` reads that block and lord-netd sends
+`net vpn <name> untrusted-cert {"sha256", "subject", "issuer", "changed"}`. Settings shows "This
+server's certificate couldn't be verified", the fingerprint as `AB:CD:…`, who it was issued to and by,
+and that the server may be sending an incomplete certificate chain. **Trust** (administrators) is
+`net-vpn-trust` and connects again. If a trusted fingerprint was already saved and the server now
+shows another one, `changed` is true and Settings says the certificate changed (like Remote Desk).
+A renewed certificate means trusting it again.
+
+Completing the chain automatically (downloading the intermediate from the certificate's address and
+passing it as `--ca-file`) was left out: lord-netd is libc-only, with no TLS or X.509 code of its own,
+and doing it would mean linking a TLS library into the root network service or running another tool
+to read the server's certificate. The fingerprint is openfortivpn's own mechanism.
+
+openfortivpn's other common failures become readable messages (`forti.c`, tested by
+`tests/forti_test.c`): wrong user name or password (`auth-failed`; with single sign-on, `vpn.fortiSsoRefused`: the gateway didn't accept the sign-in), gateway unreachable
+(`vpn.fortiUnreachable`), name that doesn't resolve (`vpn.serverUnresolved`), TLS failure
+(`vpn.fortiTlsFailed`), signed in but no tunnel for this account (`vpn.fortiNoTunnel`), sign-in page
+that didn't return (`vpn.fortiSsoFailed`), sign-in port in use (`vpn.fortiSsoPortBusy`), and any other
+line as `vpn.fortiFailed detail=<text>`.
 
 **Full tunnel.** The system's default route is never touched. It's done like OpenVPN's `redirect-gateway def1`:
 - `0.0.0.0/1` and `128.0.0.0/1` through the tunnel;
@@ -302,6 +364,7 @@ net link restored <count>      (interfaces that appeared after boot and were bro
 net wake <if> renew | ok | skipped | reassociate <why> | reset <why> | recovered-reassociate <why> | recovered-reset <why> | failed <why>
                                (after waking from sleep; why: not-associated | no-carrier | no-address | gateway-unreachable)
 net vpn <name> connecting | connected [ip] | reconnecting | disconnected | need-auth | auth-failed | state <state> | error [reason] | log <openvpn error line>
+               | sso <sign-in page URL> | untrusted-cert {"sha256","subject","issuer","changed"}     (Fortinet)
 daemon <process> <line>        (wpa_supplicant output: "wpa:<if>")
 daemon <process> exit <code>   (end of "if:<if>", "wpa:<if>", "vpn:<name>")
 ```
@@ -457,7 +520,11 @@ Then `net-vpn-import` and `net-vpn-up`. Result: `connected 10.20.0.1`, ping to 1
 **Fortinet**
 
 1. `net-vpn-enable fortinet`.
-2. `net-vpn-up` against `10.88.0.2:10443`, a closed port. Result: `error ERROR:  connect: Connection refused` and then `disconnected`.
+2. `net-vpn-up` against `10.88.0.2:10443`, a closed port. Result: `error vpn.fortiUnreachable` ("Couldn't reach the VPN server…") and then `disconnected`.
+3. Single sign-on against a real gateway (November 2026, VM 125): the certificate prompt with the
+   gateway's fingerprint, subject and issuer; after **Trust**, the browser opened the organization's
+   sign-in page and Settings waited with the time left; **Cancel** stopped it. The sign-in itself and
+   the tunnel need the organization's account.
 
 **To clean up:** `ip netns del …`, `rmmod mac80211_hwsim` and delete `/etc/lordos/net/if`.
 
@@ -479,7 +546,7 @@ Already there: `openssl` (test PKI), systemd-networkd, systemd-resolved and the 
 ## Pending
 
 - **Untested VPNs:**
-  - Fortinet against a real FortiGate.
+  - Fortinet: a complete single sign-on and tunnel against a real gateway (it needs an account there).
   - GlobalProtect and Pulse/Ivanti with OpenConnect.
   - IPsec with a client certificate.
   - L2TP/IPsec, which isn't there.

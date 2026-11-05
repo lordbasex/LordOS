@@ -148,5 +148,6 @@
   "install.free.rolledBack": "The partition table is as it was",
   "install.free.rollbackFailed": "The partition table could not be put back: a copy is at {path}. Do not restart: save it first",
   "install.creatingAccount": "Creating the account {user}",
-  "install.accountDone": "The account is ready"
+  "install.accountDone": "The account is ready",
+  "vpn.trusted": "Certificate trusted"
 }

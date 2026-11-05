@@ -46,6 +46,9 @@ void net_act_wifi_disconnect(const AdminReq *r, const char *arg, size_t len);
 void net_act_wifi_forget(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_import(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_credentials(const AdminReq *r, const char *arg, size_t len);
+void net_act_vpn_trust(const AdminReq *r, const char *arg, size_t len);
+void net_act_vpn_config(const AdminReq *r, const char *arg, size_t len);
+void net_act_vpn_edit(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_up(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_down(const AdminReq *r, const char *arg, size_t len);
 void net_act_vpn_delete(const AdminReq *r, const char *arg, size_t len);
@@ -84,6 +87,9 @@ void net_sleep_run(int revents);
     { "net-wifi-forget", net_act_wifi_forget, 0 }, \
     { "net-vpn-import", net_act_vpn_import, 0 }, \
     { "net-vpn-credentials", net_act_vpn_credentials, 0 }, \
+    { "net-vpn-trust", net_act_vpn_trust, 0 }, \
+    { "net-vpn-config", net_act_vpn_config, 0 }, \
+    { "net-vpn-edit", net_act_vpn_edit, 0 }, \
     { "net-vpn-up", net_act_vpn_up, A_ANYONE }, \
     { "net-vpn-down", net_act_vpn_down, A_ANYONE }, \
     { "net-vpn-delete", net_act_vpn_delete, 0 }, \
