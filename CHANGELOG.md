@@ -27,10 +27,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Machines: an opt-in **guest agent** (qemu-guest-agent in the guest, plus Machines' own private channel): its light on the card and the window's bar with what works now, a clean shutdown when the power button isn't heard, the guest's clock set after a pause or resume, the guest kept awake, its journal in Logs, and a **shared clipboard** (text, the directions you choose) through a small helper Machines installs in the guest.
 - Machines: the CD/DVD can be changed while a machine runs (Devices → Choose Disc Image, Eject Disc).
 - Machines: an interrupted suspend, resume, snapshot, compaction or linked clone is finished or undone the next time the machine opens, and the machine's log says which; disks a killed machine left with leaked space are repaired. Release gates for disk integrity, failure recovery and leaks (100 start/stop cycles) are scripts in `server/tests/`.
+- Machines: the network heals itself: when its helper (passt) ends, a new one is attached while the machine runs, the guest keeps its network card and address, and the window says it's back (measured: 4 to 7 ms to attach, the guest's next request 0.2 s after).
+- Machines: the shared clipboard carries pictures and rich text both ways, beside text; a machine's pictures are re-encoded on this side and its rich text cleaned of scripts, event handlers and links that aren't web or mail, before any app sees them.
+- Machines: **Record** has the machine's sound (its new sound card), in time with the picture.
+- Machines: a **Clone** gets its own name and machine-id inside the machine and new SSH keys at its first start, through the guest agent (the name is editable in the Clone sheet; **Keep identity (exact copy)** skips it).
+- Machines: shutting down, restarting or logging out saves running machines to disk (falling back to a clean shutdown, then off), and they resume where they were; a running machine keeps this computer from going to sleep when idle (visible to the system as an idle inhibitor), and the computer sleeps once none runs.
 
 ### Fixed
 
-- Machines: Esc pressed while one of a machine window's menus is open closes the menu without reaching the guest; downloads of the packages Machines needs give up in about a minute when the network doesn't answer, and the page says so instead of waiting forever; when the machine's network helper ends, the window says the network stopped until the next start.
+- Machines: the Snapshots window shows every snapshot, in rows that scroll, instead of one row cut off.
+- Machines: the install page says how the download goes in words, and when the network doesn't answer says so (about a minute) instead of "No package source could be verified".
+- Machines: finishing an interrupted revert at the next start no longer fails while the killed engine is still exiting.
+- Machines: Esc pressed while one of a machine window's menus is open closes the menu without reaching the guest; downloads of the packages Machines needs give up in about a minute when the network doesn't answer, and the page says so instead of waiting forever; when the machine's network helper ends, it's replaced and the window says so.
 
 - Machines on the Raspberry Pi 5: the machine's picture was see-through (the window below showed through the guest's black), because the GPU composition reads the picture's unused fourth byte as transparency. It is drawn opaque now.
 - Machines: hardware virtualization allowed with **Allow** was taken away again at the next login of any kind (an SSH login is enough), because the system rewrites `/dev/kvm`'s access list for the screen's session only. LordOS now keeps it.

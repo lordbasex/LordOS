@@ -650,12 +650,12 @@ build VM (**nested**, Debian 13 nocloud guest, 512 MB to 1 GB) and on screen on 
   on VM 125 with Debian 13.7's netinst ISO; the guest's state carried across a suspend and resume with the disc in.
 - *Install timeout*: the package engine's HTTP client tries all of a host's addresses for 20 s together, and a host that didn't connect or
   answer isn't tried again in the same batch (`pkg/http.c`), so `vm-enable` on a network that drops packets ends in about a minute; the
-  Requirements page also says the network isn't answering after 90 s without a word from the engine. Not reproduced against a dead network
-  on screen.
-- *passt crashing*: QEMU's `-netdev stream` on a descriptor can't reconnect, and the card sits on the root bus, so it can't be hot-unplugged
-  without moving it (which renames the guest's interface). So lord-vm reports it: `VM_NOTICE network-lost` with the signal, in the log and
-  as a line in the window (*the network stopped until the next start*). Relaying the stream through lord-vm, so a new passt could be
-  attached, would cost a copy of every packet; not done. The crash itself wasn't reproduced.
+  Requirements page also says the network isn't answering after 90 s without a word from the engine. Reproduced on VM 125 with passt
+  removed and TCP 80 and 443 dropped by nftables: *Downloading: 0 of 0.3 MB*, then *Reading the package sources (0 of 5)* after the
+  download gave up, and *The package sources didn't answer: check this computer's network, then try again* 61 to 74 s after Install;
+  the page stayed usable (Back, the library), and Install worked once the rule was gone. The page now says the engine's progress in
+  words and keeps its message in place of the note under the rows, so its buttons stay in the window.
+- *passt crashing*: the network heals itself (below, *The network heals itself*).
 
 *Suspend and resume (6.1).* `VM_SUSPEND` stops the vCPUs and migrates to `file:/dev/fdset/90`, a descriptor lord-vm opened on
 `.suspend.state.tmp` (QEMU 10 deprecates `fd:` for files; the 128 MiB/s default limit is lifted), with progress from `query-migrate` as
@@ -734,11 +734,93 @@ Debian guest made in Phase 1: suspend 6.6 s for 393 MB of state, start from it 0
 memory 6.5 s, going back to it 1.4 s, and delete. The gates weren't run on the Pi, and its windows weren't driven (it's the
 user's desktop).
 
-*Not done or not verified in the beta:* passt is reported, not restarted; host shutdown doesn't yet suspend running machines; a clone gets
-a new MAC but not yet a new machine-id or hostname (the agent could, 6.3); snapshot sizes count only the memory, not the disk clusters a
-snapshot keeps; shared extents and the reflink path weren't seen (no btrfs or XFS here); the gates ran nested amd64, not on the Pi or bare
-metal; a power cut isn't simulated; the clipboard carries text only; the agent's own shell (6.18) is the serial console for now; Record has
-no sound; the idle-sleep hold wasn't observed; the arm64 build was installed on the Pi (above), where only what's listed there was tried.
+*The beta's open items, closed (2026-11-05).* Each its own commit on `machines-beta`; seen on VM 125 (LordOS amd64, nested) from the
+app, measured on the build VM, and on the Pi 5 below.
+
+- *The network heals itself (6.5).* The card sits on a QEMU hub (`-netdev hubport,id=nic0`) and passt on another port of it (`pst0` on
+  `hp0`). A child forked before lord-vm's own Landlock (the *keeper*) starts a new passt on request and hands back its socket, its stderr
+  and a pidfd; lord-vm takes the old backend off (`netdev_del hp<n>`, `pst<n>`) and puts the new one on (`getfd`, `netdev_add` `socket`
+  with the descriptor's name, `hubport` `hp<n+1>`). The card, its MAC and the guest's interface don't change. QEMU's `stream` backend
+  can't take a named descriptor once QEMU runs (it connects from a thread: *Unable to parse FD number*), `socket` can, and passt speaks
+  the same framing. Right away the first time, then after 1, 2, 4, 8 s; after 5 in a minute the machine keeps no network and says so.
+  `VM_NOTICE network-lost` (*reconnecting*) and `network-back` (milliseconds without network) show as a short line in the window.
+  Measured: lord-vm attaches the new passt 4 to 7 ms after the old one ended; the guest's next HTTP fetch 0.22 s (build VM) and 239 ms
+  (recovery gate) after the kill, then 1.1 s and 2.6 s after two more kills in the same minute. On VM 125, passt killed during a 12.7 MB
+  download at 300 KB/s in the guest: the transfer didn't stop while the guest drained what it had received, its TCP connection was reset
+  18.8 s later (passt's sockets went with it), curl resumed in 0.1 s and the file arrived intact (`gzip -t`). The recovery gate kills
+  passt three times while the guest fetches twice a second, then until lord-vm gives up, and checks the machine keeps running.
+- *Clipboard beyond text (6.8).* `AGK_CLIPX` on `org.lordos.agent`, when both hellos say `clipx`: text, `text/html` and `image/png` in
+  one frame (8 MB for a picture, 1 MB for text, 8192 px a side). lord-vm checks what either side sends: UTF-8 text; HTML sanitized
+  (formatting tags and their text; `script`, `style`, `iframe`, `svg` and the like go with their content; no event attributes; `href`
+  only `http`, `https`, `mailto` or `#`; `style` only for colors, weights, sizes and alignment, never `url`, `expression` or `import`);
+  a PNG header that is believable. lord-server re-encodes a guest's picture in lord-media's sandbox (decode and write a new PNG,
+  `MW_EDIT`) before it goes on the clipboard, and puts rich text on the clipboard with its text (`wl_clip_set_html`): offered as
+  `text/html` to Wayland and X11 apps, and read from apps that offer it, also from one that offers only HTML. `lordos-guest` 2 reads the
+  guest's `TARGETS` (`xclip`, or `wl-paste -l`) and writes one form back (the tools hold one type each). After a resume, lord-vm asks the
+  helper to say hello again. Seen on VM 125 with an X guest (Xorg on its screen, `xclip`, `feh`): a picture copied in the guest was in
+  LordOS's clipboard history, re-encoded (573 bytes in, 784 out); a picture copied with `wl-copy` on the host arrived in the guest with
+  the same MD5 and was shown by `feh`; rich text with a `<script>`, an `onerror`, a `javascript:` link and a `url()` background went both
+  ways without them. 33 unit checks (`vm_test.c`) cover the layout, the PNG header and the sanitizer. Files by copy and paste or drag
+  aren't in the beta: 6.21, below.
+- *Recordings with sound (6.9, 6.20).* Every machine has an HDA card (slot 9; a state saved without it still loads, checked: suspended by
+  the previous build, resumed by this one). With a window, QEMU's audio goes out on the peer-to-peer D-Bus display (`-audiodev dbus`,
+  48 kHz, 16-bit stereo) and lord-vmdisplay registers an `AudioOutListener` (with its `Interfaces` property, while serving the console's
+  listener too: QEMU asks both for their properties before it answers). While Record runs, lord-vmdisplay writes the sound, mixed to one
+  channel, into a ring (aring.h) lord-media reads as the recording's AAC track, with silence for the time the guest plays nothing and
+  nothing more than 200 ms ahead of the clock; the picture is fed at 30 frames a second. Measured on VM 125, the guest playing three
+  1.5 s bursts of 1 kHz (`speaker-test`) and turning its screen red during each: video 23.634 s, audio 23.616 s (18 ms apart); tone
+  starts and red frames 10 to 34 ms apart, ends 38 to 70 ms apart.
+- *A Clone's identity (6.3).* A Clone gets a new SMBIOS UUID (`-uuid`) and MAC as before, and `identity.json` with the name inside the
+  machine (`<name>-clone` by default, editable in the sheet; `--hostname`). At its first start lord-vm passes it as the credential
+  `system.hostname`, and once qemu-guest-agent answers runs one fixed script as root: `/etc/machine-id` (and the D-Bus copy) removed and
+  made again by `systemd-machine-id-setup`, which takes the new UUID; the hostname in `/etc/hostname` and `/etc/hosts`; new SSH host keys
+  when there were some. Then `identity.json` goes and the window says so. **Keep identity (exact copy)**, off by default, skips it. Without
+  an agent the sheet says the copy keeps the machine-id, and its name changes only on systems that take it from the credential (a
+  credential can't replace an existing `/etc/hostname` or machine-id). Seen on VM 125: original `testbox`, machine-id
+  `6393cf9c…8da0` = product_uuid `6393cf9c-…-8da0`, MAC `…:86:37:84`; its clone `test-box-clone`, `516e4286…1df8` = `516e4286-…-1df8`, MAC
+  `…:aa:58:a9`, SSH key fingerprint changed; both running side by side. The script ran 0.9 s after the agent answered.
+- *Host shutdown, restart and logout (6.1).* lord-vm holds a logind *delay* inhibitor (`shutdown`) while it runs. PrepareForShutdown, a
+  SIGTERM (the session's units stopping) or lord-server going away without Keep Running starts a suspend to disk; if it isn't done in
+  30 s, or can't be, the machine is shut down (ACPI, 30 s), then turned off. QEMU is started with SIGTERM, SIGINT and SIGHUP blocked, so
+  stopping the machine's scope doesn't kill it first. The package has `/usr/lib/systemd/logind.conf.d/lordos-machines.conf`
+  (`InhibitDelayMaxSec=30`). Seen on VM 125: a machine with text on its screen, the host restarted (`systemctl reboot`):
+  *the computer is shutting down: saving the machine to disk*, the SIGTERM 1.1 s later absorbed, 496 MB saved in 2.3 s; after the
+  restart the card said Suspended, and Start resumed it in 1.2 s with the text on its screen. The recovery gate sends SIGTERM to lord-vm
+  and QEMU at once and checks the machine is saved, then resumed.
+- *Idle sleep held off (6.14).* While a machine runs and *Keep this computer awake* is on, lord-vm holds a logind *idle block*
+  inhibitor, let go when the machine pauses or stops. The session's idle sleep asks `lord.vm.awake()`, says so in the session log, and
+  tries again every 30 s, sleeping once no machine runs; the login screen's sleep deadline (lord-sessiond) reads logind's
+  `BlockInhibited`. `systemd-inhibit --list` on VM 125 with two machines: two *LordOS Machines* idle blocks and two shutdown delays;
+  none once they stopped. Seen on VM 125 with *Sleep when inactive* at 10 minutes and a machine running: at the deadline the session
+  log said *idle: sleep held off: 1 running machine(s) keep this computer awake* and the computer stayed up (12:53 to 13:04, uptime
+  rising); 19 s after the machine was shut down: *no running machine holds sleep off any more: going to sleep*, and the journal has
+  `PM: suspend entry (s2idle)` at 13:04:47.
+- *Install timeout.* Above, *Phase 1's open items*: seen against a dead network on VM 125.
+- *Snapshot timeline.* With 24 snapshots it showed one row (the wrap of 7a340336 inside a scroll view was measured as one row, and a
+  spacer took half the height): rows are made from the grid's width now and the timeline takes the window's height; seen with 24
+  snapshots in rows of five, scrolled to *Now*.
+- *Found on the way:* recovery took a QEMU that was still exiting (a zombie whose threads still held the disks' locks, with an empty
+  command line) for gone, and finishing an interrupted revert failed; it is recognized by its name now (the recovery gate's revert case
+  failed three times in a row before, passes now).
+
+*Release gates after these changes* (build VM, nested amd64): integrity **46 passed**; recovery **32 passed** (22 before, plus the
+network and host-stop cases); leaks **10 passed**, 100 cycles in 146 s, 1464 ms each on average, the slowest 5251 ms. On the Pi 5 (arm64, LordOS kernel 6.18.57, KVM, the Debian 13 arm64 nocloud image copied from VM 125
+over the LAN): integrity **45 passed** (the one fewer is a linked clone that finished before its kill on amd64, a conditional check),
+recovery **32 passed** (passt killed: the guest's next fetch 110 ms after, then 1.1 s and 2.5 s; SIGTERM saved the machine and the next
+start resumed it), leaks **10 passed**, 100 cycles in 147 s, 1476 ms each, the slowest 5441 ms.
+
+*On the Pi 5, the final arm64 build.* Built from `beta-deploy` (`pi-machines` with `machines-beta` merged, `next-0884` included: Remote
+Desk's `lord-rdesk`, the Fortinet single sign-on and the Sound balance strings checked in the installed package), installed with one
+reboot. Driven on the owner's desktop with a virtual pointer and keyboard, its windows left as they were: the library, Start of *Pi
+Debian* from its card, the Shell pane on the serial console, Logs (Overview and the machine log, with the logind lines), Suspend (367
+MB in 5.9 s) and Resume (state loaded in 217 ms), the Snapshots window and Take Snapshot (with memory, 385 MB, 9 s), Shut Down, the
+Clone sheet with the name inside the machine and *Keep identity*, and a Clone (`pi-debian-clone`, a new id and MAC; removed again).
+`systemd-inhibit --list` showed the machine's idle block and shutdown delay while it ran.
+
+*Not done or not verified:* snapshot sizes count only the memory, not the disk clusters a snapshot keeps; shared extents and the
+reflink path weren't seen (no btrfs or XFS here); a power cut isn't simulated; the agent's own shell (6.18) is the serial console for
+now; files by copy and paste or drag (6.21) aren't built; a sound card's playback on this computer's speakers isn't built (only
+recordings take the guest's sound).
 
 ## 4. Guest systems
 
@@ -1166,6 +1248,9 @@ A window following the guest's logs as they arrive: the systemd journal in Linux
 The camera icon saves the guest's display at its real resolution, directly from the frame, with no window around it. The record icon records display and sound to a video, with hardware encoding where available, a visible red state on the bar and the Clock bar's recording indicator. Files go to the same folder as the system's Screenshots app. No screen-capture permission is needed, since it's the VM's own frame, and protected host windows are never included.
 
 ### 6.21 File copy with progress
+
+**Status (beta, 2026-11-05):** not built. The agent's channel carries the clipboard (text, rich text, pictures: 3.9), not files: copy and
+paste of files and drag in or out need the flow control, resume and panel below, and are Phase 3 work.
 
 Drag files and folders onto a running machine's window to copy them to the desktop of the user signed in at its display, or onto a shared folder window to choose the place. It goes through the agent, so it needs neither network nor shared folders.
 
