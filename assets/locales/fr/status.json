@@ -149,5 +149,8 @@
   "install.free.rollbackFailed": "La table des partitions n’a pas pu être rétablie : une copie se trouve dans {path}. Ne redémarrez pas : enregistrez-la d’abord",
   "install.creatingAccount": "Création du compte {user}",
   "install.accountDone": "Le compte est prêt",
-  "vpn.trusted": "Certificat approuvé"
+  "vpn.trusted": "Certificat approuvé",
+  "vm.alreadyInstalled": "Déjà installé",
+  "vm.kvmReady": "C’est fait : les machines peuvent utiliser la virtualisation matérielle",
+  "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion"
 }

@@ -149,5 +149,8 @@
   "install.free.rollbackFailed": "Impossibile ripristinare la tabella delle partizioni: una copia si trova in {path}. Non riavviare: prima salvala",
   "install.creatingAccount": "Creazione dell’account {user}",
   "install.accountDone": "L’account è pronto",
-  "vpn.trusted": "Certificato accettato"
+  "vpn.trusted": "Certificato accettato",
+  "vm.alreadyInstalled": "Già installato",
+  "vm.kvmReady": "Fatto: le macchine possono già usare la virtualizzazione hardware",
+  "vm.kvmNextLogin": "Possibile dal tuo prossimo accesso"
 }

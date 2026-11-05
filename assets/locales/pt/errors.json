@@ -711,5 +711,8 @@
   "vpn.editWhileOn": "Desligue a VPN antes de editá-la.",
   "vpn.fortiSsoRefused": "O servidor VPN não aceitou o login. Conecte de novo e faça login na página da organização.",
   "vpn.clientCertPair": "Um certificado do cliente precisa do certificado e da chave privada.",
-  "vpn.fortiClientCert": "Não foi possível usar o certificado do cliente ou a chave. Verifique a senha da chave e se a chave é desse certificado."
+  "vpn.fortiClientCert": "Não foi possível usar o certificado do cliente ou a chave. Verifique a senha da chave e se a chave é desse certificado.",
+  "vm.noKvm": "Este computador não oferece virtualização por hardware",
+  "vm.noKvmGroup": "Este sistema não tem o grupo kvm para a virtualização por hardware",
+  "vm.groupFailed": "Não foi possível adicionar a sua conta ao grupo kvm"
 }

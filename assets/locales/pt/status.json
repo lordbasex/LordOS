@@ -149,5 +149,8 @@
   "install.free.rollbackFailed": "Não foi possível restaurar a tabela de partições: há uma cópia em {path}. Não reinicie: salve-a primeiro",
   "install.creatingAccount": "Criando a conta {user}",
   "install.accountDone": "A conta está pronta",
-  "vpn.trusted": "Certificado confiável"
+  "vpn.trusted": "Certificado confiável",
+  "vm.alreadyInstalled": "Já estava instalado",
+  "vm.kvmReady": "Pronto: as máquinas já podem usar a virtualização por hardware",
+  "vm.kvmNextLogin": "Pronto a partir do seu próximo login"
 }

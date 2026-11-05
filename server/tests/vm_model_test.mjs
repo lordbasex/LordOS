@@ -1,0 +1,110 @@
+// vm_model_test.mjs — Machines' pure logic (apps/machines/model.js): state mapping, allowed actions, the New machine
+// sheet's checks, letterbox and pointer scaling, the guest size on resize, the refresh rate and wheel steps.
+//
+//   node tests/vm_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const M = await import(path.join(here, '../../apps/machines/model.js'));
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck } = M;
+
+let n = 0, bad = 0;
+const eq = (name, got, want) => {
+  n++;
+  const g = JSON.stringify(got), w = JSON.stringify(want);
+  if (g !== w) { bad++; console.log(`✗ ${name}: want ${w}, got ${g}`); }
+};
+
+// ---- states ----
+eq('running', stateView('running', 'none'), { key: 'running', tone: 'run', active: true, why: null });
+eq('paused', stateView('paused', 'user').key, 'paused');
+eq('crashed keeps why', stateView('crashed', 'out-of-memory'), { key: 'crashed', tone: 'bad', active: false, why: 'out-of-memory' });
+eq('crashed no why', stateView('crashed', 'none').why, 'qemu-failed');
+eq('stopped clean', stateView('stopped', 'guest-shutdown'), { key: 'stopped', tone: 'off', active: false, why: null });
+eq('stopped after forced', stateView('stopped', 'forced').why, 'forced');
+eq('start failed', stateView('stopped', 'start-failed').why, 'start-failed');
+eq('supervisor lost → recovered', stateView('stopped', 'supervisor-lost'), { key: 'recovered', tone: 'bad', active: false, why: 'supervisor-lost' });
+eq('unknown → stopped', stateView(undefined).key, 'stopped');
+eq('stopping busy', stateView('stopping').tone, 'busy');
+
+// ---- actions ----
+eq('stopped: start, delete', [actionsFor('stopped').start, actionsFor('stopped').remove, actionsFor('stopped').shutdown], [true, true, false]);
+eq('running: no start, no delete', [actionsFor('running').start, actionsFor('running').remove, actionsFor('running').shutdown, actionsFor('running').pause], [false, false, true, true]);
+eq('paused: resume, not pause', [actionsFor('paused').resume, actionsFor('paused').pause, actionsFor('paused').shutdown, actionsFor('paused').poweroff], [true, false, false, true]);
+eq('crashed: start again', actionsFor('crashed').start, true);
+eq('starting: force off only', [actionsFor('starting').poweroff, actionsFor('starting').shutdown, actionsFor('starting').remove], [true, false, false]);
+
+// ---- defaults and validation ----
+const pi = { arch: 'arm64', cpus: 4, vcpusRecommended: 3, memMaxMb: 14336, kvm: true };
+const pc = { arch: 'amd64', cpus: 4, vcpusRecommended: 3, memMaxMb: 1024, kvm: true };
+eq('Pi defaults', defaultsFor(pi), { name: '', arch: 'arm64', vcpus: 3, memoryMb: 2048, diskGb: 20, source: 'import', path: '', rootPassword: '' });
+eq('small host memory', defaultsFor(pc).memoryMb, 1024);
+eq('tiny host memory', defaultsFor({ arch: 'amd64', memMaxMb: 700 }).memoryMb, 700);
+const good = { name: 'Debian 13', arch: 'amd64', vcpus: 2, memoryMb: 1024, diskGb: 20, source: 'import', path: '/home/a/debian.qcow2' };
+eq('good draft', validateDraft(good, pc), { ok: true, errors: {}, warnings: [], emulated: false });
+eq('empty name', validateDraft({ ...good, name: '  ' }, pc).errors.name, 'nameEmpty');
+eq('long name (bytes)', validateDraft({ ...good, name: 'é'.repeat(33) }, pc).errors.name, 'nameBad');
+eq('control char', validateDraft({ ...good, name: 'a\tb' }, pc).errors.name, 'nameBad');
+eq('taken name', validateDraft(good, pc, ['debian 13']).errors.name, 'nameTaken');
+eq('too many vCPUs', validateDraft({ ...good, vcpus: 5 }, pc).errors.vcpus, 'vcpus');
+eq('above recommended warns', validateDraft({ ...good, vcpus: 4 }, pc).warnings, ['vcpus']);
+eq('zero vCPUs', validateDraft({ ...good, vcpus: 0 }, pc).errors.vcpus, 'vcpus');
+eq('memory over host', validateDraft({ ...good, memoryMb: 2048 }, pc).errors.memoryMb, 'memory');
+eq('memory under min', validateDraft({ ...good, memoryMb: 128 }, pc).errors.memoryMb, 'memory');
+eq('disk 0', validateDraft({ ...good, diskGb: 0 }, pc).errors.diskGb, 'disk');
+eq('no image', validateDraft({ ...good, path: '' }, pc).errors.path, 'imageMissing');
+eq('iso missing', validateDraft({ ...good, source: 'iso', path: '' }, pc).errors.path, 'isoMissing');
+eq('wrong image kind', validateDraft({ ...good, path: '/a/b.vmdk' }, pc).errors.path, 'imageKind');
+eq('iso kind', validateDraft({ ...good, source: 'iso', path: '/a/b.qcow2' }, pc).errors.path, 'isoKind');
+eq('iso ok', validateDraft({ ...good, source: 'iso', path: '/a/debian.ISO' }, pc).ok, true);
+eq('emulated warns', validateDraft({ ...good, arch: 'arm64' }, pc), { ok: true, errors: {}, warnings: ['emulated'], emulated: true });
+eq('no kvm warns', validateDraft(good, { ...pc, kvm: false }).warnings, ['noKvm']);
+eq('bad arch', validateDraft({ ...good, arch: 'riscv64' }, pc).errors.arch, 'arch');
+eq('request import', createRequest(good), { name: 'Debian 13', arch: 'amd64', vcpus: 2, memoryMb: 1024, diskGb: 20, import: '/home/a/debian.qcow2' });
+eq('request root password', createRequest({ ...good, rootPassword: 'x' }).rootPassword, 'x');
+eq('no root password for an ISO', createRequest({ ...good, source: 'iso', path: '/a.iso', rootPassword: 'x' }).rootPassword, undefined);
+eq('request iso', createRequest({ ...good, name: ' X ', source: 'iso', path: '/a.iso' }).iso, '/a.iso');
+eq('missing packages', missingFor({ missing: { amd64: 'qemu-system-x86 ovmf qemu-utils', arm64: 'qemu-system-arm qemu-utils' } }, ['amd64', 'arm64']),
+  ['qemu-system-x86', 'ovmf', 'qemu-utils', 'qemu-system-arm']);
+eq('nothing missing', missingFor({ missing: { amd64: '' } }, ['amd64']), []);
+
+// ---- picture ----
+const r2 = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+eq('letterbox wide box', r2(letterbox([0, 0, 1000, 500], 800, 600)), { x: 166.67, y: 0, w: 666.67, h: 500, k: 0.83 });
+eq('letterbox tall box', letterbox([10, 20, 400, 600], 800, 600), { x: 10, y: 170, w: 400, h: 300, k: 0.5 });
+eq('letterbox exact', letterbox([0, 0, 1024, 768], 1024, 768).k, 1);
+eq('letterbox empty', letterbox([0, 0, 100, 100], 0, 0).k, 0);
+eq('point center', toPicture(210, 320, [10, 20, 400, 600], 800, 600), [800 / 2, 600 / 2]);
+eq('point in band clamps', toPicture(100, 25, [10, 20, 400, 600], 800, 600), [180, 0]);
+eq('point past end', toPicture(9999, 9999, [10, 20, 400, 600], 800, 600), [799, 599]);
+eq('point no picture', toPicture(1, 1, [0, 0, 10, 10], 0, 0), null);
+eq('guest size even', guestSize([0, 0, 1023.6, 701.2], null), [1022, 700]);
+eq('guest size min', guestSize([0, 0, 200, 100], null), [320, 200]);
+eq('guest size unchanged', guestSize([0, 0, 1024, 700], [1022, 700]), null);
+eq('guest size changed', guestSize([0, 0, 1280, 700], [1022, 700]), [1280, 700]);
+eq('rate Hz', refreshRate([{ mode: { refresh: 60 } }, { mode: { refresh: 144 } }]), 144);
+eq('rate mHz', refreshRate([{ mode: { refresh: 59950 } }]), 60);
+eq('rate none', refreshRate(null), 60);
+eq('rate absurd', refreshRate([{ mode: { refresh: 500 } }]), 60);
+eq('wheel notch up', wheelSteps(0, -120, false), [1, 0]);
+eq('wheel notch down', wheelSteps(0, 1, false), [-1, 0]);
+eq('wheel precise adds up', wheelSteps(0, -30, true), [0, 30]);
+eq('wheel precise step', wheelSteps(30, -30, true), [1, 20]);
+eq('wheel precise clamp', wheelSteps(0, 100000, true)[0], -32);
+eq('title', windowTitle('Debian', 'Running'), 'Debian — Running');
+eq('folder', folderOf('/home/a/Machines/Debian 13.lordvm'), 'Debian 13');
+// the memory budget at start: QEMU's overhead (384 MB with KVM, 640 MB emulated) counts for every machine
+const pi8 = { memMaxMb: 6144 };
+eq('limit kvm', memLimit({ memoryMb: 1024, accel: 'kvm' }), 1408);
+eq('limit tcg', memLimit({ memoryMb: 1024, accel: 'tcg' }), 1664);
+const run = (dir, memoryMb, accel) => ({ dir, memoryMb, accel, state: 'running' });
+eq('alone always', budgetCheck([], { dir: 'a', memoryMb: 6144, accel: 'tcg' }, pi8).ok, true);
+eq('beside one fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 2048, accel: 'tcg' }, pi8), { ok: true, need: 2688, free: 3712 });
+eq('beside one, too big emulated', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'tcg' }, pi8).ok, false);
+eq('same with kvm fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'kvm' }, pi8).ok, true);
+eq('stopped ones do not count', budgetCheck([{ dir: 'b', memoryMb: 4096, accel: 'kvm', state: 'stopped' }], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+
+console.log(`vm-model: ${n} checks, ${bad} failed`);
+process.exit(bad ? 1 : 0);

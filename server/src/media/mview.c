@@ -102,6 +102,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     Rect old = canvas_push_clip(c, x, y, w, h);
     int sw, sh;
     const uint32_t *px = pixels_of(s, &sw, &sh);
+    if (px) s->painted_seq = s->frame_seq;
     if (!px) {
         if (s->view.bg >> 24) canvas_rrect(c, x, y, w, h, radius, with_opacity(s->view.bg, op));
         canvas_set_clip(c, old);
@@ -116,6 +117,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     /* video: the frame already comes at the right size; if it differs by one pixel from rounding, it's copied anyway */
     int ring = s->map && s->ring_slots;
     if (ring && !rot && s->view.zoom <= 0 && !s->view.fit && (abs(sw - bw) <= 2 || abs(sh - bh) <= 2) && sw <= bw + 2 && sh <= bh + 2) sc = 1;
+    if (s->shown_scale != sc) { s->shown_scale = sc; if (s->cur_mode == 1) media_cursor_touch(); }
     float dw = rw * sc, dh = rh * sc, dx, dy;
     if (s->view.zoom > 0) { dx = x + w / 2 - s->view.cx * dw; dy = y + h / 2 - s->view.cy * dh; }
     else { dx = x + (w - dw) / 2; dy = y + (h - dh) / 2; }
@@ -149,7 +151,10 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     float key[4] = { dx - vx0, dy - vy0, sc, (float)(vw * 65536 + vh) };
     if (!s->cache || s->cache_w != vw || s->cache_h != vh || s->cache_seq != s->frame_seq || s->cache_gen != s->view.gen ||
         memcmp(key, s->cache_box, sizeof key)) {
-        if (s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
+        /* whoever drops the cache (a new picture, unmap_pixels) leaves cache_w × cache_h as they were: a
+         * size that fits isn't proof that there's a buffer. Before 2026-11-05 a Machines or Remote Desk
+         * picture replaced while scaled (full screen) left the cache NULL and the box black for good */
+        if (!s->cache || s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
         if (!s->cache) { canvas_set_clip(c, old); return; }
         s->cache_w = vw;
         s->cache_h = vh;

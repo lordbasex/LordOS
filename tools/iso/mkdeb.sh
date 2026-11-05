@@ -123,6 +123,12 @@ install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
+# Machines (0.8.9, alpha internals): lord-vm supervises one machine, lord-vmdisplay carries its picture and input
+# (docs/VIRTUALIZATION.md, "Phase 1 implementation"). QEMU and passt aren't dependencies: Machines asks for them.
+for b in lord-vm lord-vmdisplay; do
+    [ -x "server/build/$b" ] && install -m 755 "server/build/$b" "$L/bin/$b"
+    [ -x "$L/bin/$b" ] && { "$STRIP" --strip-unneeded "$L/bin/$b" 2>/dev/null || true; }
+done
 # lord-fetch (0.8.5): downloads the subscribed blocklists over HTTPS, sandboxed (docs/FIREWALL.md, "Blocklists")
 [ -x server/build/lord-fetch ] && install -m 755 server/build/lord-fetch "$L/bin/lord-fetch"
 [ -x "$L/bin/lord-fetch" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-fetch" 2>/dev/null || true; }

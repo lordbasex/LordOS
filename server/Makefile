@@ -52,7 +52,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/ui/js_media.c
+MEDIA_SRC := src/media/media.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
@@ -122,6 +122,20 @@ build/firstrun-fuzz: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
 	./$@ 300000 || { rm -f $@; exit 1; }
+# how a media node draws its picture (src/media/mview.c), the rest of media stubbed
+test: build/mview-test
+build/mview-test: tests/mview_test.c src/media/mview.c src/canvas.c src/media/media_int.h src/canvas.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/mview_test.c src/canvas.c -lm
+	./$@ || { rm -f $@; exit 1; }
+# a Machines guest's pointer made ready for the host's cursor (src/media/mcursor.c)
+test: build/mcursor-test
+build/mcursor-test: tests/mcursor_test.c src/media/mcursor.c src/media/mcursor.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/mcursor_test.c src/media/mcursor.c -lm
+	./$@ || { rm -f $@; exit 1; }
 build/imager-test: tests/imager_test.c src/imager/imgverify.c src/imager/imgverify.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
@@ -751,7 +765,7 @@ build/doc-test: tests/doc_test.c src/doc/wire.c src/sec/json.c $(wildcard src/do
 include $(sort $(wildcard mk/*.mk))
 # after the includes: everything build/lord-server links
 PKGTEST_OBJ := $(filter-out build/obj/sec/sign.o build/obj/sec/pkgapp.o,$(sort $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ) build/obj/vault/monocypher.o \
-               $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(LAN_SRV_OBJ) $(HW_OBJ) $(VC_OBJ) $(MAILC_OBJ) build/obj/outputs.o))
+               $(CLEAN_SRV_OBJ) $(LB_SRV_OBJ) $(LAN_SRV_OBJ) $(VM_SRV_OBJ) $(HW_OBJ) $(VC_OBJ) $(MAILC_OBJ) build/obj/outputs.o))
 build/lord-server-pkgtest: $(PKGTEST_OBJ) build/obj-pkgtest/sign.o build/obj-pkgtest/pkgapp.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 

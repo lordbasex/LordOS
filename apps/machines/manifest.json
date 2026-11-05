@@ -1,0 +1,12 @@
+{
+  "id": "machines",
+  "version": "0.8.9-alpha.1",
+  "name": "Machines",
+  "description": "Runs other systems in windows, each in its own sandbox (alpha)",
+  "size": [760, 500],
+  "minSize": [620, 420],
+  "dock": false,
+  "singleWindow": true,
+  "permissions": ["fs:home"],
+  "category": "System"
+}

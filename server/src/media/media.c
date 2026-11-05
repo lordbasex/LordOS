@@ -339,6 +339,54 @@ void media_src_damage(MediaSrc *s) {
     ui.dirty = 1;
 }
 
+/* ---- a source's own pointer (Machines: the guest's CursorDefine) ---- */
+
+static unsigned cursor_serial;
+void media_cursor_touch(void) { cursor_serial++; }
+unsigned media_cursor_serial(void) { return cursor_serial; }
+
+static void cursor_drop(MediaSrc *s) {
+    mcur_free(&s->cur);
+    mcur_free(&s->cur_shown);
+    s->cur_shown_f = 0;
+    s->cur_mode = 0;
+}
+
+void media_src_cursor(int id, const uint8_t *bgra, int w, int h, int hx, int hy) {
+    MediaSrc *s = media_src_get(id);
+    if (!s) return;
+    cursor_drop(s);
+    if (bgra) {
+        int r = mcur_prepare(bgra, w, h, hx, hy, &s->cur);
+        s->cur_mode = r == 0 ? 1 : r == 1 ? 2 : 0;      /* nothing visible: the guest hides its pointer */
+    }
+    cursor_serial++;
+}
+
+void media_src_cursor_visible(int id, int on) {
+    MediaSrc *s = media_src_get(id);
+    if (!s || s->cur_off == !on) return;
+    s->cur_off = !on;
+    cursor_serial++;
+}
+
+int media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen) {
+    MediaSrc *s = media_src_get(id);
+    /* the guest turned its pointer off (its cursor plane: a text console, or X just quit): the host's arrow, so
+     * there's always a pointer to aim with; a fully transparent image is an app hiding it on purpose */
+    if (!s || !s->cur_mode || s->cur_off) return 0;
+    *gen = 0xe0000000u + (cursor_serial & 0x0fffffffu);
+    if (s->cur_mode == 2) return 2;
+    float f = mcur_fit_scale(s->cur.w, s->cur.h, s->shown_scale > 0 ? s->shown_scale : 1, MCUR_MAX_OUT);
+    if (!s->cur_shown.px || s->cur_shown_f != f) {
+        mcur_free(&s->cur_shown);
+        if (mcur_scale(&s->cur, f, &s->cur_shown)) return 0;
+        s->cur_shown_f = f;
+    }
+    *px = s->cur_shown.px; *w = s->cur_shown.w; *h = s->cur_shown.h; *hx = s->cur_shown.hx; *hy = s->cur_shown.hy;
+    return 1;
+}
+
 static void unmap_pixels(MediaSrc *s) {
     if (s->map) munmap(s->map, s->map_len);
     s->map = NULL;
@@ -347,6 +395,7 @@ static void unmap_pixels(MediaSrc *s) {
     s->px = NULL;
     free(s->cache);
     s->cache = NULL;
+    s->cache_w = s->cache_h = 0;
     for (int i = 0; i < s->nmip; i++) free(s->mip[i]);
     s->nmip = 0;
 }
@@ -374,6 +423,7 @@ void media_src_close(MediaSrc *s) {
     drop_helper(s, 2000);
     if (s->tmp[0]) media_finish_output(s->tmp, s->dst, 0);
     unmap_pixels(s);
+    if (s->cur_mode) { cursor_drop(s); cursor_serial++; }
     if (s->in_map) munmap(s->in_map, s->in_len);
     if (s->in_fd >= 0) close(s->in_fd);
     maudio_close(s->audio);
