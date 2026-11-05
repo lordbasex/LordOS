@@ -675,7 +675,7 @@ static void set_picture(Sess *s, int w, int h) {
     if (!m) m = media_src_new(SK_IMAGE, "machines");
     if (!m) { munmap(map, len); close(fd); return; }
     if (m->map) munmap(m->map, m->map_len);
-    free(m->cache); m->cache = NULL;
+    free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->frame_seq++;
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;

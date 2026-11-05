@@ -150,7 +150,10 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     float key[4] = { dx - vx0, dy - vy0, sc, (float)(vw * 65536 + vh) };
     if (!s->cache || s->cache_w != vw || s->cache_h != vh || s->cache_seq != s->frame_seq || s->cache_gen != s->view.gen ||
         memcmp(key, s->cache_box, sizeof key)) {
-        if (s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
+        /* whoever drops the cache (a new picture, unmap_pixels) leaves cache_w × cache_h as they were: a
+         * size that fits isn't proof that there's a buffer. Before 2026-11-05 a Machines or Remote Desk
+         * picture replaced while scaled (full screen) left the cache NULL and the box black for good */
+        if (!s->cache || s->cache_w * s->cache_h < vw * vh) { free(s->cache); s->cache = malloc((size_t)vw * vh * 4); }
         if (!s->cache) { canvas_set_clip(c, old); return; }
         s->cache_w = vw;
         s->cache_h = vh;

@@ -347,6 +347,7 @@ static void unmap_pixels(MediaSrc *s) {
     s->px = NULL;
     free(s->cache);
     s->cache = NULL;
+    s->cache_w = s->cache_h = 0;
     for (int i = 0; i < s->nmip; i++) free(s->mip[i]);
     s->nmip = 0;
 }

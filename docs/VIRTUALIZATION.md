@@ -514,9 +514,16 @@ Force Off, close-to-shut-down, QEMU killed with SIGSEGV (*Stopped with an error*
 window and the library say so, the next start logs the recovery) and Delete to the Trash all worked. Screenshots are kept with the
 branch's test notes.
 
-**Not done or not verified:** the picture in **full screen** stays black (input, the bar and the state work; painting runs and the
-frame counter advances; window mode is fine): an engine issue with an image media node inside the full-screen layer, not found yet;
-an ISO install, TCG (emulated) and BIOS machines were built for but not run from the app; one slice for all machines and nested
+**Full screen was black** (found 2026-11-05): in a window the guest follows the window's size, so its picture is copied as is; in full
+screen it's drawn scaled (a guest text console can't grow past the framebuffer it booted with: 800 × 600 on a 1280 × 800 screen), through
+the media node's scaled copy (`mview.c`). Replacing the picture (`set_picture` in `js_vm.c`, the same in `js_rdesk.c`) freed that copy
+but left its old size, and `media_paint` took a size that fits as proof that the copy was there: no copy was made again and the node
+drew nothing, in both compositions (media nodes are painted by the CPU into the UI). Now a missing copy is always made again, and
+whoever frees it clears its size (`media.c`, `js_vm.c`, `js_rdesk.c`); `tests/mview_test.c` (run by `make test`) failed 3 of 7 checks
+before. Remote Desk had the same bug for a remote screen that changes size while shown scaled. Seen on VM 125 (CPU composition): the
+guest's console in full screen, scaled to 1067 × 800 with black bands.
+
+**Not done or not verified:** an ISO install, TCG (emulated) and BIOS machines were built for but not run from the app; one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; the cursor of a graphical guest (`CursorDefine` never came from a text
 console); HiDPI (the guest is asked for the window's logical size); render node and 3D; latency to the screen; the Pi 5 (arm64) with
 the app. Unit tests: `vm_test.c` 167 checks (with `vm_image_kind`), `vm_model_test.mjs` 66 checks (states, actions, the sheet's

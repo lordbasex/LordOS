@@ -122,6 +122,13 @@ build/firstrun-fuzz: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
 	./$@ 300000 || { rm -f $@; exit 1; }
+# how a media node draws its picture (src/media/mview.c), the rest of media stubbed
+test: build/mview-test
+build/mview-test: tests/mview_test.c src/media/mview.c src/canvas.c src/media/media_int.h src/canvas.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/mview_test.c src/canvas.c -lm
+	./$@ || { rm -f $@; exit 1; }
 build/imager-test: tests/imager_test.c src/imager/imgverify.c src/imager/imgverify.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \

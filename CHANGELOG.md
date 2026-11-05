@@ -15,6 +15,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - Machines (virtualization), alpha internals with no app yet: `lord-vm`, the sandboxed supervisor of one machine (QEMU over QMP, passt networking, cgroup limits, crash recovery), and `lord-vmdisplay`, its sandboxed picture and input helper over QEMU's D-Bus display, with a versioned `machine.json` and an isolation test that passes on the Raspberry Pi 5 and on amd64 (docs/VIRTUALIZATION.md 3.9).
 - Machines app (alpha): a library of the machines in `~/Machines` with their state, a New Machine sheet (architecture, vCPUs, memory, disk, import a `.qcow2` disk image or boot from an ISO), and a window per machine with its picture scaled to fit, keyboard and mouse, Pause/Resume, Restart, Ctrl+Alt+Delete, Full screen, Shut Down and Force Off. It installs what it needs (QEMU, firmware, the display module, passt) and lets the account use hardware virtualization with one click each, shows why a machine stopped with its log, and recovers a machine whose supervisor died. Closing a machine's window shuts it down; Delete moves it to the Trash.
 
+### Fixed
+
+- A picture shown scaled stayed black after it was replaced by one of another size: the scaled copy was freed but its old size kept, so it was never made again. It turned the Machines window black in full screen and could do the same to a Remote Desk session whose remote screen changed size.
+
 ### Security
 
 - Machines: importing a disk image never reads another file: the image's format comes from LordOS's own check of its header (no backing file, no external data file), `qemu-img` runs sandboxed with the format named and backing turned off, and the system disk is checked again at every start.
