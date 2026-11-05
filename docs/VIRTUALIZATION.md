@@ -489,20 +489,47 @@ from the host"; a 0600 file in the runtime folder, removed at lord-vm's first me
 password, its SHA-512 crypt hash, which lives in the machine's `firstboot.creds` (0600) until the machine's first clean shutdown. The
 password itself is never written anywhere.
 
-The Machines app (`apps/machines/`, marked **Alpha**) has a library window and one window per running machine:
+The Machines app (`apps/machines/`) follows the approved mocks (Main, Assistant, Configure, Toolbar, FullScreen, FirstRun,
+Requirements, BootFailed, Logs, PiView; see the mock artifact linked in 5). Controls of later phases (snapshots, clone, export, USB,
+profiles, remote, apps mode, unattended install) are hidden, or shown disabled as *Coming later* where the mock puts them in a primary
+spot; the lights and bars show only real numbers.
 
-- Library: name, architecture (and *Emulated*), vCPUs, memory, disk, state with a dot and words, the reason after a failure with
-  *Show log*; Start or Open, Stop (Shut Down, Force Off, through the runtime socket), Delete (only when off, after a question, to the
-  Trash), Eject ISO (only when off, for a machine that still has one). A banner lists what is missing and installs it with the closed admin action `vm-enable` (QEMU for this architecture, its
-  UEFI firmware, `qemu-system-modules-opengl` for the D-Bus display, `qemu-utils`, `passt`, through LordOS's package engine, as
-  Settings does for optional VPN programs; a stale index is read again once), and offers `vm-kvm` (3.4) when `/dev/kvm` exists but
-  this account can't open it.
-- New Machine sheet: name, architecture (this computer's by default; the other marked *Emulated, much slower*), vCPUs (the
-  recommended number by default, a warning above it), memory (up to RAM minus the desktop's floor), disk, and the system: *Import a
-  disk image (.qcow2)* or *Boot from an ISO*, chosen in the system file dialog; an optional root password for the first start.
-- Machine window: the picture scaled to fit and kept in shape, input while in front, a bar with the state, Pause/Resume, Restart,
-  Ctrl+Alt+Delete, Full screen and Power (Shut Down, Force Off). Closing the window shuts the machine down first (a *Shutting down*
-  card with Force Off); a failure shows the reason, a likely fix and the end of the log, with Start.
+- **Control Center** (the library window): the summary bars *Running* (machines on of all), *Memory* (what the running machines' cgroups
+  use, against this computer's RAM) and *Free* (free space where machines live); a card per machine with its picture (`thumb.png`,
+  written by the machine's window every 5 s while it runs, so a stopped machine shows its last picture, dimmed), the system's own mark
+  (a letter tile of ours, never a project's logo), name, system and architecture (*emulated*), what it's doing (lord-vm's state: no
+  agent yet), the three lights (power; agent, always off; disk activity, from the cgroup's `io.stat`), CPU % of its vCPUs and memory from
+  its cgroup (`lord.vm.stats`, two samples 1.5 s apart: `usage` in `model.js`) and what its disks use on this computer. Hover shows a
+  round Start/Open button, double-click opens or starts, right-click has Start or Open, Pause, Resume, Shut Down, Restart, Force Off,
+  Configure…, Logs, Show in Files, Eject ISO and Remove…. The app keeps what lord-vm doesn't need (the system's id and name, notes) in
+  the machine's `app.json`. **FirstRun** (an empty library) offers New Machine and Import, and beside it *One step first* (`vm-kvm`) or
+  *Virtualization is off* with *Continue Emulated*. **Requirements** (*What's Missing* in the header when something is) lists KVM, the
+  engine, the firmware, the display module, the disk tools and passt with Ready/Missing and installs what's missing (`vm-enable`).
+  On arm64 a **This Computer** page (PiView) says what the board runs natively, emulated or not at all, warns about an emulated machine
+  and about machines on a microSD card (the library's device, from `/sys/dev/block`).
+- **New Machine assistant** (full window, five steps: Choose, Profile, Name, Review, Create). Choose: *Download and install* tiles
+  (LordOS, Debian, Ubuntu, Fedora) are *Coming later*, like *Migrate from another computer*; *Install from an ISO file* and *Import a
+  machine* open the file dialog. The system is recognized from the ISO 9660 volume label (`lord.vm.isoInfo`) and the file's name
+  (`systemOf`, `versionOf`), the architecture from the name (`archOf`), with *Other architecture…* to switch; an emulated choice says
+  it's much slower. Profile: Light, Standard, Development (`profileSize`, kept within this computer). Name: prefilled
+  (`suggestName`), the root password for imported cloud images, and *Customize settings before starting*. Review lists everything and
+  what's missing to install; Create makes the machine and opens its window (it starts), or opens Configure instead.
+- **Configure** (a window per machine): a sidebar of sections with one-line summaries, General (name, system, notes, architecture,
+  created, folder), Startup and shutdown, CPU and memory (cores and memory with bars and the cgroup limit), Display, Network (Shared or
+  Isolated, MAC), Sound and input, Disks (grow the system disk, insert or eject an ISO), Sharing, Boot, Security (what the sandbox
+  does). Changes go through **`lord-vm --set`** (new: under the machine's lock, refused with exit 3 while it runs, the same checks as
+  `--create`, the disk only grows, through the jailed `qemu-img resize`), as a background job (`lord.vm.set`); while the machine runs
+  they are dimmed with a note. What later phases bring (suspend on close, 3D, forwarded ports, sound, shared folders, TPM) says so.
+- **Machine window**: a toolbar with the power light and name, the resolution (*Follow the window* or a fixed size sent to the guest),
+  Devices (the CD/DVD; changing it, shared folders and sound later), Logs, Screenshot (the guest's picture at its size into
+  `~/Pictures/Screenshots`, with a notification), Pause or Resume (QMP `stop`/`cont`, VM_PAUSE/VM_RESUME, already in lord-vm and in the
+  isolation test), Power (Shut Down, Restart, Ctrl+Alt+Delete, Force Off), Configure… and Full Screen; the menu bar has **Actions** and
+  **Devices** with the same items. In full screen the bar floats at the top edge (shown when the pointer reaches it) with *Leave Full
+  Screen*, and a hint at the bottom for five seconds. A failure shows **BootFailed**: why, the likely fix and lord-vm's detail,
+  Start Again, Configure… and the machine log with Copy. **Logs** (a window): the machine log or the guest's serial console, a filter,
+  Pause/Follow, Copy, Save (to Documents), levels guessed from the words.
+- `lord.vm.stop(dir, how)` (the library's menu, through the runtime socket) takes `shutdown`, `poweroff`, `pause`, `resume` and
+  `reset`, and waits up to half a second for lord-vm's answer before closing the socket.
 
 **On screen** (VM 125: LordOS 0.8.8.3 amd64, nested VT-x, 4 cores, 3.8 GB, no QEMU at the start), 2026-11-05: the banner installed
 the packages in about 15 s and *Allow* gave `alex` the kvm group and an access-list entry on `/dev/kvm` with no new login; Debian 13's
@@ -576,7 +603,15 @@ its memory within that. On VM 125 (2,897 MB for machines) with the emulated mach
 machine isn't part of the saved state): VM 125 had collected twelve. Machines is now a single-window app (manifest `singleWindow`):
 only its library is saved, and a saved list that names it more than once opens it once.
 
-**Not done or not verified:** BIOS machines were built for but not run from the app; the package engine's download of
+**The new UI on screen** (VM 125, 2026-11-05; screenshots in the branch's test notes, `machines-shots3`): the Control Center with three
+machines (one running X with an xterm and a clock: its live picture, CPU 1 %, memory 1 GB, power light on, the summary *1 of 3*, *1 of 3.8
+GB*, *21.4 GB* free), Pause and Resume from the right-click menu (the card said *Paused*), Configure saving 1280 MB on a machine that was off
+(`machine.json` changed) and dimming everything on a running one, the Logs window on both logs, the assistant from Debian 13.7's ISO
+(recognized as *Debian 13.7, amd64*, Light profile, *Create and Start*: the installer's menu in the new window), the window's Power,
+Devices and resolution menus, Screenshot (a PNG of 1022 × 598 in `~/Pictures/Screenshots`), the floating full-screen bar, BootFailed
+with the ISO moved away (*the attached image is missing*), FirstRun with an empty library and Requirements.
+
+**Not done or not verified:** Esc pressed while one of the window's menus is open closes it and also reaches the guest; BIOS machines were built for but not run from the app; the package engine's download of
 `vm-enable` waited with no time limit while the network didn't answer (the sheet said *Installing…* until it was closed); ejecting an ISO from a running machine
 (QMP `blockdev-open-tray`/`blockdev-remove-medium`) and attaching another one; one slice for all machines and nested
 leaves under lord-sessiond; our seccomp allowlist for QEMU; a guest cursor larger than 64 × 64 after scaling is drawn smaller (the
