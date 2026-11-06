@@ -41,6 +41,7 @@ typedef enum {
     RCM_SIZE,           /* operations/size, as an _async job: Measure (17.2) */
     RCM_JOB_STATUS,     /* job/status of those two */
     RCM_JOB_STOP,       /* job/stop: cancel a Measure */
+    RCM_LIST,           /* operations/list of an account's top folder only: a new account is checked before it counts */
     RCM_COUNT
 } RcMethod;
 
@@ -86,7 +87,13 @@ int              cloud_field_hidden(const CloudKind *k, const char *field);
 int              cloud_excluded(const char *name);      /* a backend that isn't a storage of its own (alias, union…) */
 /* oauth (rclone's token, client_id and client_secret options), object (keys, endpoint, bucket), crypt, else server */
 const char      *cloud_derive_group(const char *name, const char *const *opts, int n);
-int              cloud_internal_question(const char *opt);   /* config/create's questions LordOS answers itself */
+int              cloud_internal_question(const char *opt);
+/* an rclone option JS may never set (4.2): it runs a program, reads or writes a local file, folder or socket, reaches the
+ * environment or another program's credentials, or is one of rclone's config_ internals; and every type that isn't plain
+ * data (a list given to a shell, …) is refused unless known. type: rclone's Type ("string", "bool", …), NULL unknown. */
+int              cloud_option_refused(const char *name, const char *type);
+/* rclone's words when an account didn't work → cloud.authFailed | cloud.unreachable | cloud.badAddress | NULL (other) */
+const char      *cloud_failure_code(const char *msg);   /* config/create's questions LordOS answers itself */
 /* a question's state as JS sees it, "<account id>:<rclone's state>": 0 and both parts */
 int              cloud_answer_state(const char *s, char *id, size_t n, const char **state);
 /* the page of an account: 1 and out, 0 none. field: the value of k->webfield (NULL if none). */

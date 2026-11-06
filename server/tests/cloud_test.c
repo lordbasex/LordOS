@@ -22,9 +22,9 @@ static void t_methods(void) {
     static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
         "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
         "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
-        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", NULL };
+        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", NULL };
     static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
-        "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/list", "operations/delete",
+        "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/delete",
         "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
         "operations/copyfile", "operations/rmdirs", "operations/mkdir", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
         "sync/move", "pluginsctl/addPlugin", "debug/set-gc-percent", "core/obscure", "mount/unmountall", "job/list", "job/stopgroup", "operations/check", NULL };
@@ -179,6 +179,35 @@ static void t_rules(void) {
     CHECK(!cloud_internal_question("config_type") && !cloud_internal_question("config_2fa") && !cloud_internal_question(NULL));
     const CloudKind *nc = cloud_kind("nextcloud"), *wd = cloud_kind("webdav");
     CHECK(nc && nc->variant && wd && !wd->variant && !strcmp(cloud_kind("jottacloud")->group, "server"));
+}
+
+static void t_refused(void) {
+    /* B5: what JS may never set, whatever the backend */
+    const char *bad[] = { "ssh", "key_file", "pubkey_file", "known_hosts_file", "key_use_agent", "ssh_agent", "server_command",
+        "md5sum_command", "sha1sum_command", "bearer_token_command", "unix_socket", "service_account_file", "box_config_file",
+        "config_file", "client_certificate_path", "shared_credentials_file", "sse_customer_key_file", "service_principal_file",
+        "db_path", "chunk_path", "tmp_upload_path", "env_auth", "use_msi", "use_az", "socks_proxy", "http_proxy",
+        "config_token", "config_refresh_token", "auth_url", "token_url", "client_credentials", "local_dir", "x_cmd" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(cloud_option_refused(bad[i], "string"));
+    const char *good[] = { "host", "user", "port", "pass", "key_pem", "key_file_pass", "pubkey", "url", "vendor", "endpoint",
+        "access_key_id", "secret_access_key", "region", "provider", "remote", "password", "password2", "bucket", "account", "key",
+        "use_insecure_cipher", "disable_hashcheck", "shell_type", "root_folder_id", "description" };
+    for (size_t i = 0; i < sizeof good / sizeof good[0]; i++) CHECK(!cloud_option_refused(good[i], "string"));
+    CHECK(cloud_option_refused("ssh", "SpaceSepList") && cloud_option_refused("anything", "SpaceSepList"));
+    CHECK(cloud_option_refused("headers", "CommaSepList") == 0 && cloud_option_refused("x", "stringArray") && cloud_option_refused("x", NULL));
+    CHECK(!cloud_option_refused("port", "int") && !cloud_option_refused("chunk_size", "SizeSuffix") && !cloud_option_refused("x", "Tristate"));
+    CHECK(cloud_option_refused(NULL, "string") && cloud_option_refused("Bad-Name", "string"));
+    /* B4: rclone's words about an account that didn't work */
+    CHECK(!strcmp(cloud_failure_code("couldn't connect SSH: ssh: handshake failed: ssh: unable to authenticate, attempted methods [none password], no supported methods remain"), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("couldn't list files: 401 Unauthorized: "), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("failed to read private key: x509: decryption password incorrect"), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("AccessDenied: Access Denied status code: 403"), "cloud.authFailed"));
+    CHECK(!strcmp(cloud_failure_code("dial tcp 127.0.0.1:1: connect: connection refused"), "cloud.unreachable"));
+    CHECK(!strcmp(cloud_failure_code("dial tcp: lookup nowhere.example.test: no such host"), "cloud.unreachable"));
+    CHECK(!strcmp(cloud_failure_code("dial tcp 10.255.255.1:22: i/o timeout"), "cloud.unreachable"));
+    CHECK(!strcmp(cloud_failure_code("parse \"http://127.0.0.1:99999\": invalid port \":99999\" after host"), "cloud.badAddress"));
+    CHECK(!strcmp(cloud_failure_code("Get \"ftp://x\": unsupported protocol scheme \"ftp\""), "cloud.badAddress"));
+    CHECK(cloud_failure_code("directory not found") == NULL && cloud_failure_code("") == NULL && cloud_failure_code(NULL) == NULL);
 }
 
 static void t_signin(void) {
@@ -556,6 +585,7 @@ int main(void) {
     t_paths();
     t_kinds();
     t_rules();
+    t_refused();
     t_signin();
     t_options();
     t_meta();

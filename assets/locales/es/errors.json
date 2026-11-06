@@ -97,6 +97,8 @@
   "cloud.noQuestion": "Esa pregunta ya no espera respuesta",
   "cloud.notConnected": "Esta cuenta todavía no está conectada. Probá de nuevo en un momento",
   "cloud.notMeasuring": "No se está midiendo nada",
+  "cloud.badAddress": "Esa dirección no es válida",
+  "cloud.unreachable": "No se puede llegar al servidor. Revisá la dirección, el puerto y la red",
   "bench.bootTestFailed": "No se pudo guardar el estado de la prueba de arranque",
   "bench.bootTestLive": "La prueba de arranque no funciona en la sesión en vivo: nada de lo que registra sobrevive a un reinicio",
   "camera.busy": "La cámara está ocupada",

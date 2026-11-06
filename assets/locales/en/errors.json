@@ -97,6 +97,8 @@
   "cloud.noQuestion": "That question isn't waiting for an answer any more",
   "cloud.notConnected": "This account isn't connected yet. Try again in a moment",
   "cloud.notMeasuring": "Nothing is being measured",
+  "cloud.badAddress": "That address isn't valid",
+  "cloud.unreachable": "The server can't be reached. Check the address, the port and the network",
   "bench.bootTestFailed": "Could not save the boot time test's state",
   "bench.bootTestLive": "The boot time test can't run in the live session: nothing it records survives a restart",
   "camera.busy": "The camera is busy",

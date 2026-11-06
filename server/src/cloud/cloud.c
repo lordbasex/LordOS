@@ -840,6 +840,8 @@ static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, K
         int secret = json_bool(o, "IsPassword", 0) || json_bool(o, "Sensitive", 0);
         if (secret) { if (sa.n) jb_raw(&sa, ","); jb_raw(&sa, nm); }
         if (json_bool(o, "Advanced", 0) || json_num(o, "Hide", 0) != 0 || cloud_field_hidden(k, nm) || (oauth && is_oauth_field(nm))) continue;
+        /* 4.2: an option that runs a program or reads a local file is neither offered nor accepted (sftp's ssh, key_file…) */
+        if (cloud_option_refused(nm, json_str(o, "Type"))) continue;
         if (oauth) continue;                            /* signing in asks rclone's own questions */
         if (ki->n >= 64) continue;
         cpy(ki->name[ki->n], sizeof ki->name[0], nm);
@@ -1017,6 +1019,9 @@ static int answer_states(const char *id, JDoc *d, char *msg, size_t mn, char **q
     return -1;
 }
 
+/* options rclone itself keeps that the refusal rule would catch by name: OAuth's client id and secret, the token */
+static int keep_internal(const char *k) { return !strcmp(k, "token") || !strcmp(k, "client_id") || !strcmp(k, "client_secret"); }
+
 /* config/create with the non-secret options, the preset and the secrets (a JSON object's text, or NULL).
  * fresh 1: a new account, secrets plain, the state machine answered; 2: the same for an existing account (Sign In
  * Again, new credentials: config/update, so what isn't given stays); 0: what config/get gave (obscured), at start. */
@@ -1031,6 +1036,7 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
     if (a->k->preset) { jb_raw(&b, a->k->preset); first = 0; }
     for (int i = 0; i < a->p.n; i++) {
         if (cloud_field_hidden(a->k, a->p.kv[i].key)) continue;
+        if (cloud_option_refused(a->p.kv[i].key, "string") && !keep_internal(a->p.kv[i].key)) continue;   /* even from a file */
         if (!first) jb_raw(&b, ",");
         first = 0;
         jb_str(&b, a->p.kv[i].key);
@@ -1041,6 +1047,7 @@ static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg
     if (secret_json && !json_parse(secret_json, strlen(secret_json), &sd, NULL, 0)) {
         for (const JVal *x = sd.root->type == J_OBJ ? sd.root->kid : NULL; x; x = x->next) {
             if (x->type != J_STR || !cloud_key_ok(x->key)) continue;
+            if (cloud_option_refused(x->key, "string") && !keep_internal(x->key)) continue;
             if (!first) jb_raw(&b, ",");
             first = 0;
             jb_str(&b, x->key);
@@ -1159,7 +1166,12 @@ static int mount_acc(Acc *a) {
     jb_free(&b);
     pthread_mutex_lock(&cl_mu);
     if (st == 200) { a->mounted = 1; a->err[0] = 0; a->message[0] = 0; }
-    else { a->mounted = 0; cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : "cloud.mountFailed"); cpy(a->message, sizeof a->message, msg); }
+    else {
+        a->mounted = 0;
+        const char *fc = cloud_failure_code(msg);
+        cpy(a->err, sizeof a->err, !strcmp(code_of(msg, 0), "cloud.folderNotEmpty") ? "cloud.folderNotEmpty" : fc ? fc : "cloud.mountFailed");
+        cpy(a->message, sizeof a->message, msg);
+    }
     pthread_mutex_unlock(&cl_mu);
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
     cl_changed();
@@ -1309,7 +1321,10 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
         acc_free(a);
         pthread_mutex_unlock(&cl_mu);
     } else {
-        if (!a->mounted && cl_running) mount_acc(a);  /* as it was; the error says the new settings didn't take */
+        /* as it was: the credentials in the keyring (the new ones are only saved once they work), mounted again; the
+         * error says the new settings didn't take */
+        if (cl_running) bring_up_config(a);
+        if (!a->mounted && cl_running) mount_acc(a);
         pthread_mutex_lock(&cl_mu);
         cpy(a->err, sizeof a->err, code);
         cpy(a->message, sizeof a->message, msg);
@@ -1317,6 +1332,16 @@ static void add_failed(Acc *a, int req, const char *code, const char *msg) {
         pthread_mutex_unlock(&cl_mu);
     }
     cl_changed();
+}
+
+/* lists the account's top folder (folders only, no times): 0 it answered, -1 and rclone's words */
+static int verify_remote(Acc *a, char *msg, size_t mn) {
+    char body[160];
+    cl_pf(body, sizeof body, "{\"fs\":\"%s:\",\"remote\":\"\",\"opt\":{\"dirsOnly\":true,\"noModTime\":true,\"noMimeType\":true}}", a->id);
+    int st = rcs(RCM_LIST, body, msg, mn, 20000);
+    if (st == 200) return 0;
+    if (st < 0) cpy(msg, mn, "i/o timeout: no answer within 20 s");
+    return -1;
 }
 
 /* after config/create or an answer: done (r 0), rclone asks (r 1, q), or failed */
@@ -1333,6 +1358,13 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
     if (r < 0) {
         const char *c = cl_running ? code_of(msg, 0) : "cloud.notRunning";
         add_failed(a, req, !strcmp(c, "cloud.failed") ? "cloud.addFailed" : c, msg);
+        return;
+    }
+    /* B4: before it counts, the account must answer: its top folder listed (rclone connects and signs in there) */
+    char vmsg[256] = "";
+    if (verify_remote(a, vmsg, sizeof vmsg)) {
+        const char *c = cloud_failure_code(vmsg);
+        add_failed(a, req, c ? c : "cloud.addFailed", vmsg);
         return;
     }
     pthread_mutex_lock(&cl_mu);

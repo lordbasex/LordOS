@@ -115,6 +115,40 @@ r=$(cmd add webdav Work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"
 check "add refuses a field the provider doesn't have" has "$r" '"field":"nosuch"'
 r=$(cmd add webdav ../Work "{\"url\":\"http://127.0.0.1:$PORT\"}")
 check "add refuses a name that isn't a folder name" has "$r" 'cloud.badName'
+# B5: an option that runs a program is never accepted (4.2): sftp's `ssh` is rclone's external ssh command
+r=$(cmd add sftp Evil "{\"host\":\"127.0.0.1\",\"user\":\"x\",\"ssh\":\"sh -c \\\"id > $T/pwned\\\"\"}")
+check "add sftp with ssh= is refused (cloud.badField)" has "$r" '"error":"cloud.badField","field":"ssh"'
+r=$(cmd add sftp Evil2 "{\"host\":\"127.0.0.1\",\"user\":\"x\",\"key_file\":\"$H/.ssh/id_ed25519\"}")
+check "add sftp with key_file= is refused" has "$r" '"field":"key_file"'
+r=$(cmd add webdav Evil3 "{\"url\":\"http://127.0.0.1:$PORT\",\"bearer_token_command\":\"touch $T/pwned\"}")
+check "add webdav with bearer_token_command= is refused" has "$r" 'cloud.badField'
+sleep 2
+check "nothing was run (no file written)" test ! -e "$T/pwned"
+r=$(cmd state)
+check "and no account was made" sh -c 'case "$1" in *Evil*) exit 1;; esac; exit 0' x "$r"
+r=$(cmd providers)
+printf '%s' "$r" > "$T/providers.json"
+check "no kind offers an option that runs a program or names a local file (all kinds)" python3 - "$T/providers.json" <<'PY'
+import json, re, sys
+bad = re.compile(r'(_command|_file|_path|_socket|_dir|_cmd|_exec|_agent)$|^(ssh|server_command|key_use_agent|unix_socket|known_hosts_file|env_auth|use_msi|use_az|socks_proxy|http_proxy)$|^config_')
+l = json.load(open(sys.argv[1]))
+hits = [(p['kind'], f['name']) for p in l for f in p['fields'] if bad.search(f['name'])]
+print(len(l), 'kinds', sum(len(p['fields']) for p in l), 'fields', hits)
+sys.exit(1 if hits or len(l) < 50 else 0)
+PY
+
+# B4: a new account must answer before it counts
+r=$(cmd add webdav Wrong "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"nottheone\"}")
+check "add with a wrong password: cloud.authFailed" has "$r" 'cloud.authFailed'
+NP=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+r=$(cmd add webdav Nowhere "{\"url\":\"http://127.0.0.1:$NP\",\"user\":\"dav\",\"pass\":\"davpass\"}")
+check "add with nothing listening: cloud.unreachable" has "$r" 'cloud.unreachable'
+r=$(cmd add webdav BadUrl "{\"url\":\"http://127.0.0.1:99999\",\"user\":\"dav\",\"pass\":\"davpass\"}")
+check "add with a port that can't be: cloud.badAddress" has "$r" 'cloud.badAddress'
+r=$(cmd state)
+check "none of them left an account" sh -c 'case "$1" in *Wrong*|*Nowhere*|*BadUrl*) exit 1;; esac; exit 0' x "$r"
+check "nor a folder, a keyring item or a line in accounts.json" sh -c "[ ! -e '$H/Cloud/Wrong' ] && [ ! -e '$H/Cloud/Nowhere' ] && ! grep -q Wrong '$H/.config/lordos/cloud/accounts.json' 2>/dev/null && [ -z \"\$(ls '$H/.harness-keyring' 2>/dev/null | grep -v LOCKED)\" ]"
+
 r=$(cmd add webdav Work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"davpass\"}")
 ID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
 check "add an account: $ID" test -n "$ID"
@@ -233,6 +267,26 @@ check "delete refuses the account's own folder" has "$r" 'cloud.badPath'
 r=$(cmd delete "$M/../Work/notes.txt")
 check "delete refuses .." has "$r" 'cloud.badPath'
 check "notes.txt still there" test -e "$S/notes.txt"
+
+# B4 for an existing account: wrong new credentials are reported and the account stays as it was
+r=$(cmd addid "$ID" webdav Work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"nottheone\"}")
+check "new credentials that don't work: cloud.authFailed" has "$r" 'cloud.authFailed'
+r=$(cmd wait '"mounted":true' 30)
+check "the account is still there and mounted" has "$r" '"ok"'
+check "and still reads with its old password" test "$(cat "$M/notes.txt")" = "changed here"
+
+# B3: Recents and search never walk into a cloud mount, even one whose server doesn't answer
+kill -STOP "$DAV"
+OUT=$(cd "$B/.." && HOME="$H" timeout 20 "$B/fs-walk" recent 2>&1); rc=$?
+check "Recents come back at once with the server frozen" sh -c '[ "$1" = 0 ] && ms=$(echo "$2" | sed -n "s/^hits .* ms //p") && [ -n "$ms" ] && [ "$ms" -lt 3000 ]' x "$rc" "$OUT"
+check "and list nothing from ~/Cloud" sh -c 'case "$1" in *"/Cloud/"*) exit 1;; esac; exit 0' x "$OUT"
+OUT=$(HOME="$H" timeout 20 "$B/fs-walk" search notes 2>&1); rc=$?
+check "search comes back at once with the server frozen" sh -c '[ "$1" = 0 ] && ms=$(echo "$2" | sed -n "s/^hits .* ms //p") && [ -n "$ms" ] && [ "$ms" -lt 3000 ]' x "$rc" "$OUT"
+check "and finds nothing inside ~/Cloud" sh -c 'case "$1" in *"/Cloud/"*) exit 1;; esac; exit 0' x "$OUT"
+echo "local recent" > "$H/local-recent.txt"
+OUT=$(HOME="$H" timeout 20 "$B/fs-walk" recent 2>&1)
+check "while a file in the home folder is still found" has "$OUT" "$H/local-recent.txt"
+kill -CONT "$DAV"
 
 # Empty Trash and Measure (17.2 items 4 and 5)
 r=$(cmd state)
