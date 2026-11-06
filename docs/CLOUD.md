@@ -486,7 +486,7 @@ MenuBar, States; Backups is Phase 2), against section 17 only.
 | `apps/settings/Cloud.jsx` | Settings → Cloud, the account page and the sheets |
 | `apps/files/cloud.jsx` | Files' Cloud section, status, menu items, Share Link, Get Info, the offline message (docs/FILES.md, "Cloud") |
 | `sdk/cloudmock.js` | a development stand-in for `lord.cloud`, used only when `lord.cloud` is missing and settings.json has `"cloudDevMock": true` (or `"states"`, which a few seconds in turns on a sign-in request, a full account with changes waiting, a conflict and an offline account) |
-| `server/tests/cloud_model_test.mjs` | 137 checks, in `run_suites.sh`: the model, the glyph pixels, the file dialog's places, the mock against section 17's shape, every text in the five catalogs, and that Cloud's screens use no one-sided physical edge (right to left) |
+| `server/tests/cloud_model_test.mjs` | 169 checks (with section 19's), in `run_suites.sh`: the model, the glyph pixels, the file dialog's places, the mock against section 17's shape, every text in the five catalogs, and that Cloud's screens use no one-sided physical edge (right to left) |
 
 Decisions taken while building it:
 
@@ -518,10 +518,82 @@ Decisions taken while building it:
 What the interface needs beyond section 17 (both optional: without them the interface works and says less):
 
 - `cloud.setAccountOptions(id, { unmeteredOnly, bwUp })` and `account.options` with the same keys: the account page's
-  **Only on unmetered networks** and **Upload limit** (the Account mock). Without it those two rows are disabled with
-  "Comes with a later update".
+  **Only on unmetered networks** and **Upload limit** (the Account mock). The core doesn't have them (17.1), so those two
+  rows are hidden.
 - `State.conflicts: [{ path, kept, account, at }]`, newest first: the "Changed on another device too" notification
   (section 7.2). Without it there is no conflict notification.
-- Times (`expiresAt`, `links().expires`, `recent[].at`, `conflicts[].at`) are read as seconds or milliseconds.
+- Times (`expiresAt`, `links().expires`, `recent[].at`, `conflicts[].at`) are read as seconds or milliseconds; the
+  bandwidth menus write KiB/s (17.1), their MB/s being MiB/s.
 - Error codes the interface itself uses: `cloud.unavailable`, `cloud.badId`, `cloud.badKind`, `cloud.uploadFailed`,
   `cloud.pending` (errors.json); `link()`'s `unsupported` is section 17's bare word.
+
+## 19. Verified providers
+
+rclone offers far more providers than anyone has tried on LordOS. The Add Account sheet says which were checked here and
+asks people to check the rest. Decided 2026-11-06 with the maintainer.
+
+### 19.1 The list
+
+`assets/cloud/providers.json` names the kinds verified on LordOS, each with `since` (the release), `date` and `evidence`:
+`"maintainer test: <what>"` or `"issue #N"` (a person's Check This Account report on GitHub). A kind goes in only when it
+was really checked end to end. Today:
+
+| Kind | Evidence |
+|---|---|
+| `webdav` | `cloud_integration.sh` and `cloud_providers_check.sh` against `rclone serve webdav`, VM 116 (amd64), 13/13 |
+| `sftp` | `cloud_providers_check.sh` against the machine's own OpenSSH `sshd` on 127.0.0.1, a throwaway user and key (`key_pem`), 14/14; SFTP has no links |
+| `s3` | `cloud_providers_check.sh` against `rclone serve s3` (one bucket, access key and secret), 13/13; links not confirmed: the stand-in's links are `http://` and `lord-server` keeps only `https` ones (`cloud_url_ok`), which a real S3 service gives |
+
+`server/tests/cloud_providers_check.sh <build> <rclone> [webdav] [sftp] [s3]` runs Check This Account's steps through
+`build/cloud-harness` (the same `src/cloud`), with the files checked on the server's side too: 40/40 on VM 116 with rclone
+v1.75.2 on 2026-11-06. It needs FUSE and, for SFTP, `sudo` without a password (a throwaway user, removed at the end).
+It isn't in `run_suites.sh` for that reason. The presets `nextcloud` and `owncloud` aren't marked: no real Nextcloud or
+ownCloud server was tried.
+
+### 19.2 Add Account
+
+The verified providers come first, grouped by kind as before. Below them, **Not verified yet** (closed, with how many)
+holds every other provider rclone offers, still addable, with the line "These work through rclone, but nobody has
+confirmed them on LordOS yet. Using one? Check it and tell us, and we'll mark it verified." and **Tell Us on GitHub**.
+Search looks in both parts and opens the second when it has matches.
+
+For a browser sign-in provider not verified yet, the sheet asks before Continue: **Sign in with rclone's app** (the
+default) or **Use my own app (client ID and secret)**, with the two fields (the secret masked), the line "Your own app on
+the provider's developer site: its quota is yours alone, and the sign-in page shows your app's name. The redirect
+address must be http://127.0.0.1:53682/" and **How to make one** (rclone's page for that backend, `https://rclone.org/<kind>/`;
+`gcs` is `googlecloudstorage`, the WebDAV presets `webdav`: every page checked to answer 200). The ID and secret go to
+`beginSignIn`'s `{ clientId, clientSecret }`, which the core keeps in the keyring (`account.ownClient` says so later). The
+same choice comes with **Sign In Again** for such a provider (or any account already on its own app) and under the
+account's **Advanced** for every browser sign-in account; a verified provider keeps the plain flow.
+
+### 19.3 Check This Account
+
+On the account's page: a box of its own for a provider not verified yet, under **Advanced** for a verified one (to report
+a problem). `sdk/cloudcheck.js` runs it with `lord.fs` and `cloud.*` only, each step with its result and time:
+
+1. **Space information**: `refreshAbout`, then the state's `about` (skipped when the provider tells none).
+2. **List the account** (its root).
+3. **Make a check folder** `.lordos-check-<random>` (in object storage the root lists buckets: inside the first one, or a
+   new bucket `lordos-check-<random>` when there is none).
+4. **Write 1 MiB** of random bytes.
+5. **Send it up**: its status goes to on this computer (going up seen on the way), 2 minutes at most.
+6. **Free Up Space** on it (tried again while rclone still holds it open).
+7. **Bring it back, same contents**: read through the mount, compared by hash.
+8. **Make a link** and stop sharing it, where the account has links.
+9. **Delete the check folder**: `lord.fs` has no delete, so the folder moves out of the cloud (a move job) into a
+   scratch folder of the home, which goes to the Trash and out of it. Runs even when an earlier step failed.
+10. **Delete it in the cloud**: gone from a fresh listing and nothing of it waiting to go up, 1 minute at most.
+
+Then a **report** with nothing personal: LordOS version and architecture, rclone's version, the provider's kind and
+label, whether it is verified, **own app: yes/no** (no IDs), which `about` fields the provider gives (not their values),
+whether it has links, each step's result, time and a fixed note word (never an error's text, which can hold a path), and
+the totals. No account name, email, file names but the check's, links or tokens. **Copy Report** and **Tell Us on GitHub**.
+
+### 19.4 GitHub
+
+`.github/ISSUE_TEMPLATE/cloud-provider.yml` is an issue form (label `cloud-provider`): provider, does it work (yes, partly,
+no), the report, LordOS version, anything else. **Tell Us on GitHub** opens
+`https://github.com/lordbasex/LordOS/issues/new?template=cloud-provider.yml&title=Cloud provider: <label>&provider=<label>&version=…&report=…`
+(every value URL-encoded) in the default browser; the report is cut at a line, with "[truncated]", so the address stays
+under 7000 characters. From the Add Account sheet's line the same address goes without a report. A maintainer who
+confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"`.

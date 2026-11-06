@@ -1,0 +1,49 @@
+name: Cloud provider
+description: Tell us whether a cloud storage provider works in LordOS's Cloud, so we can mark it verified.
+title: "Cloud provider: "
+labels: ["cloud-provider"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for checking a provider. Settings → Cloud → the account → **Check This Account** makes the report below; it has no
+        account name, email, file names, links or passwords. Please don't add any of those yourself.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: The provider's name as Add Account shows it.
+      placeholder: WebDAV
+    validations:
+      required: true
+  - type: dropdown
+    id: works
+    attributes:
+      label: Does it work?
+      options:
+        - "Yes"
+        - Partly
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Check This Account report
+      description: Copy Report in Settings → Cloud → the account, or what you tried and what happened.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: LordOS version
+      description: Open the About LordOS app and copy the version (for example "0.8.8.5 · Beta").
+      placeholder: 0.8.8.5 · Beta
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: What didn't work, or how you set the account up (preset, your own app…). No personal data, please.

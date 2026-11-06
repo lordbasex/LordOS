@@ -6,10 +6,12 @@
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, tOptional, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, systemInfo, lordosVersion,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
+import { runCheck, buildReport, issueUrl, aboutFields, checkWorks, CHECK_STEPS } from '../../sdk/cloudcheck.js';
+import CLOUD_PROVIDERS from '../../assets/cloud/providers.json';
 
 const M = cloudModel;
 // the page and the open sheet survive the header's button and a remount: { page: account id | null, sheet }
@@ -18,7 +20,7 @@ const setView = (p) => cloudView.set(p);
 
 const RCLONE_SITE = 'https://rclone.org/';
 const RCLONE_LICENSE = 'https://github.com/rclone/rclone/blob/master/COPYING';
-const MB = 1e6;
+const MIB = 1024;                                       // lord.cloud's bwUp/bwDown are KiB/s (17.1)
 const LIMITS = [0, 1, 2, 5, 10, 20, 50];                // MB/s, 0 = no limit
 const FREE_BELOW = [5, 10, 20, 50, 100];                // GB (section 7.2)
 
@@ -163,10 +165,10 @@ function Overview({ st }) {
       {msg ? <Note tone={msg.ok ? 'ok' : 'error'}>{msg.text}</Note> : null}
       <Section title={tr('cloud.bandwidth')} footer={tr('cloud.bandwidthHint')}>
         <SettingRow label={tr('cloud.uploadLimit')}>
-          <PopUp width={130} value={Math.round((o.bwUp || 0) / MB)} onChange={(v) => cloud.setOptions({ bwUp: v * MB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />
+          <PopUp width={130} value={Math.round((o.bwUp || 0) / MIB)} onChange={(v) => cloud.setOptions({ bwUp: v * MIB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />
         </SettingRow>
         <SettingRow label={tr('cloud.downloadLimit')}>
-          <PopUp width={130} value={Math.round((o.bwDown || 0) / MB)} onChange={(v) => cloud.setOptions({ bwDown: v * MB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />
+          <PopUp width={130} value={Math.round((o.bwDown || 0) / MIB)} onChange={(v) => cloud.setOptions({ bwDown: v * MIB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />
         </SettingRow>
         <SettingRow label={tr('cloud.pauseOnBattery')}><Toggle small on={o.pauseOnBattery !== false} onChange={(v) => cloud.setOptions({ pauseOnBattery: v })} /></SettingRow>
         <SettingRow label={tr('cloud.pauseOnMetered')}><Toggle small on={o.pauseOnMetered !== false} onChange={(v) => cloud.setOptions({ pauseOnMetered: v })} /></SettingRow>
@@ -327,36 +329,128 @@ function Options({ a, accounts }) {
     <View aria-label={tr('cloud.options')} style={box(t)}>
       {row(tr('cloud.opt.folder'), `~/Cloud/${a.name}`, <NameField a={a} accounts={accounts} />)}
       {row(tr('cloud.opt.onDemand'), tr('cloud.opt.onDemandHint'), <Toggle small on={onDemand} onChange={(v) => (v ? cloud.unkeep([a.mount]) : cloud.keep([a.mount]))} />)}
-      {row(tr('cloud.opt.pause'), tr('cloud.opt.pauseHint'), <Toggle small on={a.state === 'paused'} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />)}
-      {row(tr('cloud.opt.unmetered'), own ? '' : tr('cloud.opt.later'),
-        <Toggle small on={!!ao.unmeteredOnly} onChange={(v) => own && cloud.setAccountOptions(a.id, { unmeteredOnly: v })} />, false, !own)}
-      {row(tr('cloud.opt.uploadLimit'), tr('cloud.opt.thisAccount'),
-        <PopUp width={110} disabled={!own} value={Math.round((ao.bwUp || 0) / MB)} onChange={(v) => cloud.setAccountOptions(a.id, { bwUp: v * MB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />, true, !own)}
+      {row(tr('cloud.opt.pause'), tr('cloud.opt.pauseHint'), <Toggle small on={a.state === 'paused' || !!a.paused} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />, !own)}
+      {/* an account's own options only where lord-server has them (not in 0.8.8.5: docs/CLOUD.md 17.1) */}
+      {own ? row(tr('cloud.opt.unmetered'), '', <Toggle small on={!!ao.unmeteredOnly} onChange={(v) => cloud.setAccountOptions(a.id, { unmeteredOnly: v })} />) : null}
+      {own ? row(tr('cloud.opt.uploadLimit'), tr('cloud.opt.thisAccount'),
+        <PopUp width={110} value={Math.round((ao.bwUp || 0) / MIB)} onChange={(v) => cloud.setAccountOptions(a.id, { bwUp: v * MIB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />, true) : null}
     </View>
   );
 }
 
-// Advanced → Use my own client ID (section 6.2): signs in again with the person's own OAuth app.
-function OwnClient({ a }) {
+// The choice for a browser sign-in (docs/CLOUD.md 19): rclone's app (the default) or the person's own app, its client ID
+// and secret (to beginSignIn's { clientId, clientSecret }, kept in the keyring), why, and rclone's page on making one.
+function OwnAppChoice({ p, value, onChange }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const v = value || { own: false, id: '', secret: '' };
+  const set = (o) => onChange({ ...v, ...o });
+  return (
+    <View style={{ gap: 6 }}>
+      <Segmented small fill value={v.own ? 'own' : 'rclone'} onChange={(x) => set({ own: x === 'own' })}
+        options={[['rclone', tr('cloud.ownApp.rclone')], ['own', tr('cloud.ownApp.own')]]} />
+      {v.own ? (
+        <View style={{ gap: 6 }}>
+          <Dim t={t}>{tr('cloud.ownApp.hint', { redirect: M.OAUTH_REDIRECT })}</Dim>
+          <TextInput value={v.id} onChange={(x) => set({ id: x.trim() })} placeholder={tr('cloud.ownClient.id')} style={{ direction: 'ltr' }} />
+          <TextInput secure value={v.secret} onChange={(x) => set({ secret: x })} placeholder={tr('cloud.ownClient.secret')} style={{ direction: 'ltr' }} />
+          <Text onClick={() => openUrl(M.rcloneDocsUrl(p && p.kind))} style={{ fontSize: typeScale.callout, color: t.accent, textAlign: 'start' }}>{tr('cloud.ownApp.howTo')}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+const ownOpts = (c) => (c && c.own && c.id ? { clientId: c.id, clientSecret: c.secret || '' } : {});
+
+// Check This Account (docs/CLOUD.md 19): its steps, then a report with nothing personal, to copy or send.
+const checks = new Map();          // account id → { running, steps, report } (survives leaving the page)
+// what the check uses of lord.fs (its own names; move is lord.fs.copy's move job)
+const checkFs = {
+  home: () => lord.fs.home(), list: (p) => lord.fs.list(p), mkdir: (p) => lord.fs.mkdir(p), write: (p, d) => lord.fs.write(p, d),
+  read: (p, m) => lord.fs.read(p, m), stat: (p) => lord.fs.stat(p), move: (a, b) => lord.fs.copy(a, b, true), jobs: () => lord.fs.jobs(),
+  forgetJob: (id) => lord.fs.jobForget(id), trash: (p) => lord.fs.trash(p), trashList: () => lord.fs.trashList(), removeFromTrash: (id) => lord.fs.removeFromTrash(id),
+};
+const checkRev = createStore(0);
+function CheckAccount({ a, st, p, verified }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  useStore(checkRev);
+  const c = checks.get(a.id) || { running: false, steps: null, report: '' };
+  const label = (p && p.label) || a.provider || a.kind;
+  const save = (o) => { checks.set(a.id, { ...(checks.get(a.id) || {}), ...o }); checkRev.set((x) => x + 1); };
+  const start = () => {
+    save({ running: true, steps: CHECK_STEPS.map((id) => ({ id, result: null, ms: 0 })), report: '' });
+    const env = { fs: checkFs, cloud, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now() };
+    runCheck(a, env, (steps) => save({ steps })).then((steps) => {
+      const acc = (cloud.state().accounts || []).find((x) => x.id === a.id) || a;
+      let info = {};
+      try { info = systemInfo() || {}; } catch (e) { /* none */ }
+      const report = buildReport({ version: lordosVersion(info).version, arch: info.arch, rclone: (cloud.state().service || {}).version, kind: a.kind, label,
+        verified, ownApp: !!acc.ownClient, aboutFields: aboutFields(acc.about), linksSupported: !!acc.linksSupported, steps });
+      save({ running: false, steps, report });
+    }, () => save({ running: false }));
+  };
+  const mark = { pass: ['✓', tint.ok], fail: ['✕', tint.error], skipped: ['–', t.textDim] };
+  return (
+    <View style={{ gap: 8 }}>
+      <Dim t={t}>{tr(verified ? 'cloud.check.hintVerified' : 'cloud.check.hint')}</Dim>
+      <Actions start><Button small primary={!verified} disabled={c.running} label={tr(c.running ? 'cloud.check.running' : c.steps ? 'cloud.check.again' : 'cloud.check.run')} onClick={start} /></Actions>
+      {c.steps ? (
+        <View style={{ gap: 2 }}>
+          {c.steps.map((s) => (
+            <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 }}>
+              <Text style={{ width: 14, fontSize: 12, fontWeight: 700, color: s.result ? mark[s.result][1] : t.textDim, textAlign: 'center' }}>{s.result ? mark[s.result][0] : '·'}</Text>
+              <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr(`cloud.check.step.${s.id}`)}</Text>
+              <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{s.result ? (s.result === 'skipped' ? tr('cloud.check.skipped') : `${Math.round(s.ms)} ms`) : ''}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {c.report ? (
+        <View style={{ gap: 6 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: checkWorks(c.steps) === 'yes' ? tint.ok : tint.warn, textAlign: 'start' }}>{tr(`cloud.check.works.${checkWorks(c.steps)}`)}</Text>
+          <View style={{ maxHeight: 160, borderRadius: 8, border: `1px solid ${t.separator}`, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#f7f7f9' }}>
+            <ScrollView style={{ padding: 8 }}>
+              <Text style={{ fontFamily: 'monospace', fontSize: 11, color: t.text, direction: 'ltr', textAlign: 'start', lineHeight: 1.35 }}>{c.report}</Text>
+            </ScrollView>
+          </View>
+          <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.check.private')}</Dim>
+          <Actions start>
+            <Button small label={tr('cloud.check.copy')} onClick={() => { clipboard.set(c.report); toast.set(tr('cloud.check.copied')); }} />
+            <Button small label={tr('cloud.tellUs')} onClick={() => openUrl(issueUrl({ label, report: c.report, version: lordosVersion().version }))} />
+          </Actions>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// Advanced: Check This Account (for a verified provider: to report a problem) and, for a browser sign-in, the person's own app.
+function Advanced({ a, st, p, verified }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [open, setOpen] = useState(false);
-  const [id, setId] = useState('');
-  const [secret, setSecret] = useState('');
+  const [own, setOwn] = useState({ own: true, id: '', secret: '' });
+  const oauth = p ? p.group === 'oauth' : a.group === 'oauth';
   return (
     <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 10, gap: 8 }]}>
       <View onClick={() => setOpen(!open)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <Text style={{ fontSize: 10, color: t.textDim }}>{open ? '▼' : direction() === 'rtl' ? '◀' : '▶'}</Text>
         <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.advanced')}</Text>
       </View>
-      {open ? (
+      {open && verified ? (
+        <View style={{ gap: 6 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.check.title')}</Text>
+          <CheckAccount a={a} st={st} p={p} verified />
+        </View>
+      ) : null}
+      {open && oauth ? (
         <View style={{ gap: 6 }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownClient.title')}</Text>
-          <Dim t={t}>{tr('cloud.ownClient.hint')}</Dim>
-          <TextInput value={id} onChange={setId} placeholder={tr('cloud.ownClient.id')} style={{ direction: 'ltr' }} />
-          <TextInput secure value={secret} onChange={setSecret} placeholder={tr('cloud.ownClient.secret')} style={{ direction: 'ltr' }} />
+          <Dim t={t}>{tr(a.ownClient ? 'cloud.ownApp.inUse' : 'cloud.ownClient.hint')}</Dim>
+          <OwnAppChoice p={p || { kind: a.kind }} value={own} onChange={setOwn} />
           <Actions>
-            <Button small label={tr('cloud.signInAgain')} disabled={!id.trim()} onClick={() => signInAgain(a, { clientId: id.trim(), clientSecret: secret })} />
+            <Button small label={tr('cloud.signInAgain')} disabled={own.own && !own.id} onClick={() => beginAgain(a, p, ownOpts(own))} />
           </Actions>
         </View>
       ) : null}
@@ -366,15 +460,43 @@ function OwnClient({ a }) {
 
 function providerOf(kind) { return cloud.providers().find((p) => p.kind === kind) || null; }
 
-// Sign In Again: the browser for an OAuth account, the credentials form for the others (the same name updates it).
-function signInAgain(a, own = {}) {
+function beginAgain(a, p, own = {}) {
+  const r = cloud.beginSignIn(a.kind, a.name, own);
+  setView({ sheet: { kind: 'signin', provider: p || { kind: a.kind, label: a.provider }, name: a.name, error: r && r.error } });
+}
+// Sign In Again: the browser for an OAuth account (with the own-app choice first for a provider not verified yet, or
+// when the account already uses its own app), the credentials form for the others (the same name updates it).
+function signInAgain(a) {
   const p = providerOf(a.kind);
-  if (!p || p.group === 'oauth') {
-    const r = cloud.beginSignIn(a.kind, a.name, own);
-    setView({ sheet: { kind: 'signin', provider: p || { kind: a.kind, label: a.provider }, name: a.name, error: r && r.error } });
+  const oauth = p ? p.group === 'oauth' : a.group === 'oauth';
+  if (oauth) {
+    if (M.ownAppOffered(p || { kind: a.kind, group: 'oauth' }, CLOUD_PROVIDERS) || a.ownClient) setView({ sheet: { kind: 'again', id: a.id } });
+    else beginAgain(a, p);
     return;
   }
-  setView({ sheet: { kind: 'cred', provider: p, name: a.name, again: true } });
+  if (p) setView({ sheet: { kind: 'cred', provider: p, name: a.name, again: true } });
+}
+
+function AgainSheet({ st, sheet }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const a = (st.accounts || []).find((x) => x.id === sheet.id);
+  const p = a ? providerOf(a.kind) : null;
+  const [own, setOwn] = useState({ own: !!(a && a.ownClient), id: '', secret: '' });
+  const close = () => setView({ sheet: null });
+  if (!a) return null;
+  return (
+    <Sheet width={440} onClose={close} label={tr('cloud.signInAgain')}>
+      <View style={{ padding: spacing.xl, gap: spacing.m }}>
+        <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.again.title', { name: a.name })}</Text>
+        <OwnAppChoice p={p || { kind: a.kind }} value={own} onChange={setOwn} />
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+          <Button label={tr('cloud.cancel')} onClick={close} />
+          <Button primary label={tr('cloud.continue')} disabled={own.own && !own.id} onClick={() => beginAgain(a, p, ownOpts(own))} />
+        </View>
+      </View>
+    </Sheet>
+  );
 }
 
 function AccountPage({ a, st }) {
@@ -386,24 +508,32 @@ function AccountPage({ a, st }) {
   const website = useMemo(() => cloud.websiteUrl(a.id), [a.id]);
   const last = (st.recent || []).find((r) => r.account === a.id || M.accountOf(r.path, [a]));
   const p = providerOf(a.kind);
+  const verified = M.isVerified(a.kind, CLOUD_PROVIDERS);
   const line = M.stateLine(a);
   const wide = (wm.frame(wm.get(win.id) || {}).w || 880) >= 860;
   const side = (
     <View aria-label={tr('cloud.options')} style={{ width: wide ? 280 : undefined, gap: 12 }}>
+      {verified ? null : (
+        <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 6, border: `1px solid ${t.accent}` }]}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.check.title')}</Text>
+          <CheckAccount a={a} st={st} p={p} verified={false} />
+        </View>
+      )}
       <Options a={a} accounts={accs} />
       <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 4 }]}>
         <Dim t={t}>{a.provider || a.kind}</Dim>
         <Dim t={t} style={{ color: toneColor(t, line.tone) }}>{tr(line.key, line.vars)}</Dim>
         <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
         <Dim t={t}>{last ? tr('cloud.lastSynced', { when: (() => { const g = M.ago(last.at); return tr(g.key, g.vars); })() }) : tr('cloud.notSyncedYet')}</Dim>
-        {a.message && a.state === 'error' ? <Dim t={t} style={{ color: tint.warn }}>{errorText(a.message)}</Dim> : null}
+        {a.error ? <Dim t={t} style={{ color: tint.warn }}>{errorText(a.error)}</Dim> : null}
+        <Dim t={t}>{verified ? tr('cloud.verified.yes') : tr('cloud.verified.no')}</Dim>
       </View>
       <Button label={tr('cloud.signInAgain')} onClick={() => signInAgain(a)} />
       <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ height: 30, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#fff' }}>{tr('cloud.remove')}</Text>
       </View>
       <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.removeHint')}</Dim>
-      {p && p.group === 'oauth' ? <OwnClient a={a} /> : null}
+      <Advanced a={a} st={st} p={p} verified={verified} />
     </View>
   );
   return (
@@ -465,31 +595,62 @@ const defaultName = (accounts, p, tr) => {
   return '';
 };
 
+function ProviderGroups({ groups, sel, onPick, onMore }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const rows = (items) => { const out = []; for (let i = 0; i < items.length; i += 3) out.push(items.slice(i, i + 3)); return out; };
+  return groups.map((g) => {
+    const items = [...g.items.map((x) => ({ p: x })), ...(g.more ? [{ more: g.more, group: g.group }] : [])];
+    return (
+      <View key={g.group}>
+        <Text style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 4, fontSize: 11, fontWeight: 600, color: t.textDim, textTransform: 'uppercase', textAlign: 'start' }}>{tr(`cloud.group.${g.group}`)}</Text>
+        <View style={{ paddingHorizontal: 22, paddingBottom: 8, gap: 8 }}>
+          {rows(items).map((r, i) => (
+            <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+              {r.map((it) => (it.more != null
+                ? <ProviderTile key="more" more={it.more} onClick={() => onMore(it.group)} />
+                : <ProviderTile key={it.p.kind} p={it.p} on={sel === it.p.kind} onClick={() => onPick(it.p)} />))}
+              {r.length < 3 ? [...Array(3 - r.length)].map((_, k) => <View key={`f${k}`} style={{ flex: 1 }} />) : null}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  });
+}
+
 function AddSheet({ st }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const providers = useMemo(() => cloud.providers(), []);
+  // rclone lists its providers once it runs (17.1: [] until then, with a state push after)
+  const [providers, setProviders] = useState(() => cloud.providers());
+  useEffect(() => { if (!providers.length) { const l = cloud.providers(); if (l.length) setProviders(l); } }, [st]);
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState([]);
+  const [showUnverified, setShowUnverified] = useState(false);
   const [sel, setSel] = useState(null);
+  const [own, setOwn] = useState({ own: false, id: '', secret: '' });
   const [name, setName] = useState(() => defaultName(st.accounts, null, tr));
   const [named, setNamed] = useState(false);          // the person typed a name: picking a provider keeps it
   const [err, setErr] = useState('');
-  const groups = M.groupProviders(providers, q, expanded);
+  const parts = M.splitProviders(providers, CLOUD_PROVIDERS, q, expanded, showUnverified);
   const p = providers.find((x) => x.kind === sel);
+  const offerOwn = M.ownAppOffered(p, CLOUD_PROVIDERS);
   const close = () => setView({ sheet: null });
+  const pick = (x) => { setSel(x.kind); setErr(''); setOwn({ own: false, id: '', secret: '' }); if (!named) setName(defaultName(st.accounts, x, tr)); };
   const go = () => {
     if (!p) return;
     const bad = M.nameProblem(name, st.accounts);
     if (bad) { setErr(tr(`cloud.name.${bad}`)); return; }
+    if (offerOwn && own.own && !own.id) { setErr(tr('cloud.ownApp.needId')); return; }
     if (p.group === 'oauth') {
-      const r = cloud.beginSignIn(p.kind, name.trim(), {});
+      const r = cloud.beginSignIn(p.kind, name.trim(), offerOwn ? ownOpts(own) : {});
       setView({ sheet: { kind: 'signin', provider: p, name: name.trim(), error: r && r.error } });
     } else setView({ sheet: { kind: 'cred', provider: p, name: name.trim() } });
   };
-  const rows = (items) => { const out = []; for (let i = 0; i < items.length; i += 3) out.push(items.slice(i, i + 3)); return out; };
+  const none = providers.length && !parts.verified.length && !parts.unverified.length;
   return (
-    <Sheet width={640} top={40} onClose={close} label={tr('cloud.add.title')}>
+    <Sheet width={640} top={30} onClose={close} label={tr('cloud.add.title')}>
       <View style={{ paddingHorizontal: 22, paddingTop: 20, paddingBottom: 10, gap: 6 }}>
         <Text style={{ fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.add.title')}</Text>
         <Dim t={t} style={{ fontSize: typeScale.body }}>{tr('cloud.add.subtitle')}</Dim>
@@ -497,30 +658,37 @@ function AddSheet({ st }) {
       <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: 10 }}>
         <SearchField value={q} onChange={setQ} placeholder={tr('cloud.add.search', { count: providers.length })} autoFocus />
       </View>
-      <ScrollView style={{ maxHeight: 380 }}>
+      <ScrollView style={{ maxHeight: offerOwn ? 260 : 380 }}>
         <View style={{ paddingBottom: 6 }}>
-          {!providers.length ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr('cloud.unavailable')}</Dim> : null}
-          {providers.length && !groups.length ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr('cloud.add.none')}</Dim> : null}
-          {groups.map((g) => {
-            const items = [...g.items.map((x) => ({ p: x })), ...(g.more ? [{ more: g.more, group: g.group }] : [])];
-            return (
-              <View key={g.group}>
-                <Text style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 4, fontSize: 11, fontWeight: 600, color: t.textDim, textTransform: 'uppercase', textAlign: 'start' }}>{tr(`cloud.group.${g.group}`)}</Text>
-                <View style={{ paddingHorizontal: 22, paddingBottom: 8, gap: 8 }}>
-                  {rows(items).map((r, i) => (
-                    <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
-                      {r.map((it) => (it.more != null
-                        ? <ProviderTile key="more" more={it.more} onClick={() => setExpanded([...expanded, it.group])} />
-                        : <ProviderTile key={it.p.kind} p={it.p} on={sel === it.p.kind} onClick={() => { setSel(it.p.kind); setErr(''); if (!named) setName(defaultName(st.accounts, it.p, tr)); }} />))}
-                      {r.length < 3 ? [...Array(3 - r.length)].map((_, k) => <View key={`f${k}`} style={{ flex: 1 }} />) : null}
-                    </View>
-                  ))}
-                </View>
+          {!providers.length ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr(cloud.available() ? 'cloud.add.loading' : 'cloud.unavailable')}</Dim> : null}
+          {none ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr('cloud.add.none')}</Dim> : null}
+          <ProviderGroups groups={parts.verified} sel={sel} onPick={pick} onMore={(g) => setExpanded([...expanded, g])} />
+          {parts.unverifiedCount ? (
+            <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: t.separator }}>
+              <View onClick={() => setShowUnverified(!parts.open)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 22, paddingTop: 10, paddingBottom: 4 }}>
+                <Text style={{ fontSize: 10, color: t.textDim }}>{parts.open ? '▼' : direction() === 'rtl' ? '◀' : '▶'}</Text>
+                <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.unverified.title')}</Text>
+                <Dim t={t}>{String(parts.unverifiedCount)}</Dim>
               </View>
-            );
-          })}
+              {parts.open ? (
+                <>
+                  <View style={{ paddingHorizontal: 22, paddingBottom: 6, gap: 6 }}>
+                    <Dim t={t}>{tr('cloud.unverified.line')}</Dim>
+                    <Actions start><Button small label={tr('cloud.tellUs')} onClick={() => openUrl(issueUrl({ label: p && !M.isVerified(p.kind, CLOUD_PROVIDERS) ? p.label : '', version: lordosVersion().version }))} /></Actions>
+                  </View>
+                  <ProviderGroups groups={parts.unverified} sel={sel} onPick={pick} onMore={() => {}} />
+                </>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
+      {offerOwn ? (
+        <View style={{ paddingHorizontal: 22, paddingTop: 10, gap: 6, borderTopWidth: 1, borderTopColor: t.separator }}>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownApp.title', { provider: p.label })}</Text>
+          <OwnAppChoice p={p} value={own} onChange={setOwn} />
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 18, borderTopWidth: 1, borderTopColor: t.separator, marginTop: 6 }}>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('cloud.accountName')}</Text>
         <View style={{ width: 180 }}><TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setNamed(true); setErr(''); }} onSubmit={go} /></View>
@@ -726,6 +894,7 @@ export function CloudSettings({ page }) {
       {sh && sh.kind === 'cred' ? <CredSheet st={st} sheet={sh} /> : null}
       {sh && sh.kind === 'signin' ? <SignInSheet st={st} sheet={sh} /> : null}
       {sh && sh.kind === 'remove' ? <RemoveSheet st={st} sheet={sh} /> : null}
+      {sh && sh.kind === 'again' ? <AgainSheet st={st} sheet={sh} /> : null}
     </View>
   );
 }
