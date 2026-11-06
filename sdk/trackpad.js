@@ -16,6 +16,10 @@ export const TRACKPAD_DEFAULTS = {
   speed: 0.5,               // pointer speed (0..1)
   mouseSpeed: 0.5,          // a mouse's speed (0..1)
   mouseNatural: false,      // a mouse's wheel the other way
+  mouseLeftHanded: false,   // a mouse's primary button is the right one
+  pointerSize: 1,           // pointer size, times the display's (0.75..2)
+  scrollSpeed: 0.5,         // two-finger scroll speed (0..1)
+  sensitivity: 'medium',    // touch sensitivity: 'low' | 'medium' | 'high'
   tap: true,                // tap to click
   tapDrag: true,            // tap and drag
   natural: true,            // natural scrolling

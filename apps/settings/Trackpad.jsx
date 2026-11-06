@@ -1,12 +1,14 @@
-// Settings → Trackpad (only if there is a touchpad): speed, tap to click, secondary click,
-// three-finger drag, natural scrolling, inertia, pinch and swipe. Each row comes with
-// a small drawing of the gesture that animates on mouse hover. Saved in settings.trackpad and applied
-// live (sdk/trackpad.js → lord.input.configure). See docs/TRACKPAD.md.
+// Settings → Mouse & Trackpad, one section per device: Pointer (size, for every device), Mouse
+// (speed, natural scrolling, primary button) and Trackpad (speed, touch sensitivity, tap to click,
+// secondary click, three-finger drag, scrolling and its speed, inertia, pinch and swipe). Each
+// trackpad row comes with a small drawing of the gesture that animates on mouse hover. Saved in
+// settings.trackpad and applied live (sdk/trackpad.js → lord.input.configure). See docs/TRACKPAD.md.
 import { View, Text, useTheme, useLocale, Toggle, Segmented, Slider, useSettings, useTrackpads, TRACKPAD_DEFAULTS, setTrackpad, spacing, typeScale } from '@lordos/sdk';
 import { Stack, Section, SettingRow, Note } from './ui.jsx';
 import { useEffect, useState } from 'react';
 
 const PAD_W = 64, PAD_H = 44;
+const POINTER_SIZES = [0.75, 1, 1.25, 1.5, 2];
 
 // Finger positions (0..1 inside the touchpad) according to the gesture phase p (0..1).
 function fingers(kind, p) {
@@ -19,6 +21,8 @@ function fingers(kind, p) {
     case 'secondary': return [[0.42, 0.5, p < 0.25], [0.58, 0.5, p < 0.25]];
     case 'threeDrag': return row(3, 0.55, 0.2, 0.3 * e);
     case 'dwt': return [[0.5, 0.5]];
+    case 'sensitivity': return [[0.5, 0.5, p < 0.5]];
+    case 'scrollSpeed': return [[0.42, 0.8 - 0.6 * e], [0.58, 0.8 - 0.6 * e]];
     case 'natural':
     case 'scroll': return [[0.42, 0.75 - 0.5 * e], [0.58, 0.75 - 0.5 * e]];
     case 'kinetic': return p < 0.35 ? [[0.42, 0.8 - p * 1.5], [0.58, 0.8 - p * 1.5]] : [];
@@ -72,30 +76,43 @@ export function TrackpadSettings() {
   const [tab, setTab] = useState('point');
   const c = { ...TRACKPAD_DEFAULTS, ...(s.trackpad || {}) };
   const toggle = (key) => <Toggle small on={!!c[key]} onChange={(v) => setTrackpad({ [key]: v })} />;
+  const slider = (key, lo = 'trackpad.slow', hi = 'trackpad.fast') => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr(lo)}</Text>
+      <Slider value={c[key]} onChange={(v) => setTrackpad({ [key]: Math.round(v * 100) / 100 })} width={120} />
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr(hi)}</Text>
+    </View>
+  );
+  // the nearest of the sizes offered (an older or hand-edited value still selects one)
+  const size = POINTER_SIZES.reduce((a, b) => (Math.abs(b - c.pointerSize) < Math.abs(a - c.pointerSize) ? b : a), 1);
   return (
     <Stack>
-      <Section title={tr('trackpad.mouse.title')}>
-        <SettingRow label={tr('trackpad.mouse.speed')} stack={false}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.slow')}</Text>
-            <Slider value={c.mouseSpeed} onChange={(v) => setTrackpad({ mouseSpeed: Math.round(v * 100) / 100 })} width={120} />
-            <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.fast')}</Text>
-          </View>
+      <Section title={tr('trackpad.pointer.title')}>
+        <SettingRow label={tr('trackpad.pointer.size')} hint={tr('trackpad.pointer.sizeHint')} stack>
+          <Segmented small value={size} onChange={(v) => setTrackpad({ pointerSize: v })}
+            options={[[0.75, tr('trackpad.pointer.small')], [1, tr('trackpad.pointer.default')], [1.25, tr('trackpad.pointer.large')],
+              [1.5, tr('trackpad.pointer.larger')], [2, tr('trackpad.pointer.largest')]]} />
         </SettingRow>
-        <SettingRow label={tr('trackpad.mouse.natural')} hint={tr('trackpad.mouse.naturalHint')}>{toggle('mouseNatural')}</SettingRow>
       </Section>
+      <Section title={tr('trackpad.mouse.title')}>
+        <SettingRow label={tr('trackpad.mouse.speed')} stack={false}>{slider('mouseSpeed')}</SettingRow>
+        <SettingRow label={tr('trackpad.mouse.natural')} hint={tr('trackpad.mouse.naturalHint')}>{toggle('mouseNatural')}</SettingRow>
+        <SettingRow label={tr('trackpad.mouse.primary')} hint={tr('trackpad.mouse.primaryHint')}>
+          <Segmented small value={c.mouseLeftHanded ? 'right' : 'left'} onChange={(v) => setTrackpad({ mouseLeftHanded: v === 'right' })}
+            options={[['left', tr('trackpad.mouse.primary.left')], ['right', tr('trackpad.mouse.primary.right')]]} />
+        </SettingRow>
+      </Section>
+      <Section title={tr('trackpad.pad.title')} />
       {devices.length === 0 && <Note>{tr('trackpad.noDevice')}</Note>}
       <View style={{ alignItems: 'center' }}>
         <Segmented appearance="neutral" value={tab} onChange={setTab} options={[['point', tr('trackpad.tab.point')], ['scroll', tr('trackpad.tab.scroll')], ['more', tr('trackpad.tab.more')]]} />
       </View>
       {tab === 'point' && (
         <Section>
-          <Row kind="speed" label={tr('trackpad.speed')} hint={tr('trackpad.speedHint')}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.slow')}</Text>
-              <Slider value={c.speed} onChange={(v) => setTrackpad({ speed: Math.round(v * 100) / 100 })} width={120} />
-              <Text style={{ fontSize: typeScale.caption, color: t.textDim }}>{tr('trackpad.fast')}</Text>
-            </View>
+          <Row kind="speed" label={tr('trackpad.speed')} hint={tr('trackpad.speedHint')}>{slider('speed')}</Row>
+          <Row kind="sensitivity" label={tr('trackpad.sensitivity')} hint={tr('trackpad.sensitivityHint')} stack>
+            <Segmented small value={c.sensitivity} onChange={(v) => setTrackpad({ sensitivity: v })}
+              options={[['low', tr('trackpad.sensitivity.low')], ['medium', tr('trackpad.sensitivity.medium')], ['high', tr('trackpad.sensitivity.high')]]} />
           </Row>
           <Row kind="tap" label={tr('trackpad.tap')} hint={tr('trackpad.tapHint')}>{toggle('tap')}</Row>
           <Row kind="tapDrag" label={tr('trackpad.tapDrag')} hint={tr('trackpad.tapDragHint')}>{toggle('tapDrag')}</Row>
@@ -111,6 +128,7 @@ export function TrackpadSettings() {
         <Section>
           <Row kind="natural" label={tr('trackpad.natural')} hint={tr('trackpad.naturalHint')}>{toggle('natural')}</Row>
           <Row kind="scroll" label={tr('trackpad.scroll')} hint={tr('trackpad.scrollHint')}>{toggle('scroll')}</Row>
+          <Row kind="scrollSpeed" label={tr('trackpad.scrollSpeed')} hint={tr('trackpad.scrollSpeedHint')}>{slider('scrollSpeed')}</Row>
           <Row kind="kinetic" label={tr('trackpad.kinetic')} hint={tr('trackpad.kineticHint')}>{toggle('kinetic')}</Row>
           <Row kind="pinch" label={tr('trackpad.pinch')} hint={tr('trackpad.pinchHint')}>{toggle('pinch')}</Row>
         </Section>
