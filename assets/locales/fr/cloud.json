@@ -265,10 +265,9 @@
   "unverified.line": "Ils fonctionnent grâce à rclone, mais personne ne les a encore confirmés sur LordOS. Vous en utilisez un ? Vérifiez-le et dites-le-nous : nous le marquerons comme vérifié.",
   "add.loading": "Récupération de la liste des fournisseurs…",
   "again.title": "Se reconnecter à « {name} »",
-  "ownApp.title": "Comment se connecter à {provider}",
+  "ownApp.title": "Comment se connecter",
   "ownApp.rclone": "Se connecter avec l’application de rclone",
-  "ownApp.own": "Utiliser ma propre application (ID et secret client)",
-  "ownApp.hint": "Votre propre application sur le site développeurs du fournisseur : son quota n’est qu’à vous, et la page de connexion affiche le nom de votre application. L’adresse de redirection doit être {redirect}",
+  "ownApp.own": "Utiliser ma propre application",
   "ownApp.howTo": "Comment en créer une",
   "ownApp.needId": "Saisissez l’ID client de votre application, ou connectez-vous avec l’application de rclone.",
   "ownApp.inUse": "Ce compte se connecte avec votre propre application. Reconnectez-vous pour la changer.",
@@ -322,5 +321,10 @@
   "delete.done": {
     "one": "Supprimé de {provider}",
     "other": "{count} éléments supprimés de {provider}"
-  }
+  },
+  "ownApp.recommended": "Recommandé",
+  "ownApp.rcloneLine": "Le plus rapide. La page de {provider} vous demandera d’autoriser rclone, le moteur open source qu’utilise Cloud.",
+  "ownApp.ownLine": "Votre propre application sur le site développeurs de {provider} : son quota n’est qu’à vous. Il vous faudra son ID client et son secret.",
+  "ownApp.redirect": "Adresse de redirection : {redirect}",
+  "ownApp.copied": "Adresse de redirection copiée"
 }

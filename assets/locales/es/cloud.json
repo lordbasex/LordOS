@@ -265,10 +265,9 @@
   "unverified.line": "Funcionan a través de rclone, pero nadie los confirmó todavía en LordOS. ¿Usás alguno? Comprobalo y contanos, y lo marcamos como verificado.",
   "add.loading": "Obteniendo la lista de proveedores…",
   "again.title": "Volvé a iniciar sesión en «{name}»",
-  "ownApp.title": "Cómo iniciar sesión en {provider}",
+  "ownApp.title": "Cómo iniciar sesión",
   "ownApp.rclone": "Iniciar sesión con la app de rclone",
-  "ownApp.own": "Usar mi propia app (ID y secreto de cliente)",
-  "ownApp.hint": "Tu propia app en el sitio para desarrolladores del proveedor: su cuota es solo tuya, y la página de inicio de sesión muestra el nombre de tu app. La dirección de redirección tiene que ser {redirect}",
+  "ownApp.own": "Usar mi propia app",
   "ownApp.howTo": "Cómo crear una",
   "ownApp.needId": "Escribí el ID de cliente de tu app, o iniciá sesión con la app de rclone.",
   "ownApp.inUse": "Esta cuenta inicia sesión con tu propia app. Volvé a iniciar sesión para cambiarla.",
@@ -322,5 +321,10 @@
   "delete.done": {
     "one": "Borrado de {provider}",
     "other": "{count} elementos borrados de {provider}"
-  }
+  },
+  "ownApp.recommended": "Recomendado",
+  "ownApp.rcloneLine": "Lo más rápido. La página de {provider} te va a pedir que permitas rclone, el motor de código abierto que usa Nube.",
+  "ownApp.ownLine": "Tu propia app en el sitio para desarrolladores de {provider}: su cuota es solo tuya. Vas a necesitar su ID y su secreto de cliente.",
+  "ownApp.redirect": "Dirección de redirección: {redirect}",
+  "ownApp.copied": "Dirección de redirección copiada"
 }

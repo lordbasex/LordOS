@@ -6,7 +6,7 @@
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, systemInfo, lordosVersion,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, systemInfo, lordosVersion,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -401,18 +401,54 @@ function OwnAppChoice({ p, value, onChange }) {
   const { t: tr } = useLocale();
   const v = value || { own: false, id: '', secret: '' };
   const set = (o) => onChange({ ...v, ...o });
+  const label = (p && p.label) || (p && p.kind) || '';
+  // radio keys: ↑ ↓ (or 1, 2) choose while no text field has the keys
+  useEffect(() => addListener('keydown', (e) => {
+    if (hasTextFocus()) return;
+    if (e.key === 'ArrowUp' || e.key === '1') set({ own: false });
+    else if (e.key === 'ArrowDown' || e.key === '2') set({ own: true });
+  }), [v.own, v.id, v.secret]);
+  // one option: a card like the provider tiles, a radio dot, its title and line; the selected one has the accent border
+  const card = (own, title, line, tag, extra) => {
+    const on = !!v.own === own;
+    return (
+      <View role="radio" aria-checked={on ? 'true' : 'false'} onClick={() => { if (!on) set({ own }); }}
+        style={{ padding: 12, gap: 10, borderRadius: 10, border: `1px solid ${on ? t.accent : t.separator}`,
+          backgroundColor: on ? (t.mode === 'dark' ? '#16335a' : '#dcebff') : t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          <View style={{ width: 16, height: 16, marginTop: 1, borderRadius: 8, border: `1.5px solid ${on ? t.accent : t.textDim}`, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {on ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accent }} /> : null}
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
+              {tag ? (
+                <View style={{ paddingHorizontal: 6, height: 17, borderRadius: 5, justifyContent: 'center', backgroundColor: t.mode === 'dark' ? 'rgba(48,209,88,0.18)' : 'rgba(36,138,61,0.12)' }}>
+                  <Text style={{ fontSize: 10, fontWeight: 600, color: t.mode === 'dark' ? '#30d158' : '#248a3d' }}>{tag}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{line}</Text>
+          </View>
+        </View>
+        {on && extra ? <View style={{ gap: 6, paddingInlineStart: 26 }}>{extra}</View> : null}
+      </View>
+    );
+  };
   return (
-    <View style={{ gap: 6 }}>
-      <Segmented small fill value={v.own ? 'own' : 'rclone'} onChange={(x) => set({ own: x === 'own' })}
-        options={[['rclone', tr('cloud.ownApp.rclone')], ['own', tr('cloud.ownApp.own')]]} />
-      {v.own ? (
-        <View style={{ gap: 6 }}>
-          <Dim t={t}>{tr('cloud.ownApp.hint', { redirect: M.OAUTH_REDIRECT })}</Dim>
+    <View role="radiogroup" aria-label={tr('cloud.ownApp.title')} style={{ gap: 8 }}>
+      {card(false, tr('cloud.ownApp.rclone'), tr('cloud.ownApp.rcloneLine', { provider: label }), tr('cloud.ownApp.recommended'))}
+      {card(true, tr('cloud.ownApp.own'), tr('cloud.ownApp.ownLine', { provider: label }), null, (
+        <>
           <TextInput value={v.id} onChange={(x) => set({ id: x.trim() })} placeholder={tr('cloud.ownClient.id')} style={{ direction: 'ltr' }} />
           <TextInput secure value={v.secret} onChange={(x) => set({ secret: x })} placeholder={tr('cloud.ownClient.secret')} style={{ direction: 'ltr' }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('cloud.ownApp.redirect', { redirect: M.OAUTH_REDIRECT })}</Text>
+            <Button small label={tr('cloud.copy')} onClick={() => { clipboard.set(M.OAUTH_REDIRECT); toast.set(tr('cloud.ownApp.copied')); }} />
+          </View>
           <Text onClick={() => openUrl(M.rcloneDocsUrl(p && p.kind))} style={{ fontSize: typeScale.callout, color: t.accent, textAlign: 'start' }}>{tr('cloud.ownApp.howTo')}</Text>
-        </View>
-      ) : null}
+        </>
+      ))}
     </View>
   );
 }
@@ -502,8 +538,8 @@ function Advanced({ a, st, p, verified }) {
       ) : null}
       {open && oauth ? (
         <View style={{ gap: 6 }}>
-          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownClient.title')}</Text>
-          <Dim t={t}>{tr(a.ownClient ? 'cloud.ownApp.inUse' : 'cloud.ownClient.hint')}</Dim>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownApp.title')}</Text>
+          {a.ownClient ? <Dim t={t}>{tr('cloud.ownApp.inUse')}</Dim> : null}
           <OwnAppChoice p={p || { kind: a.kind }} value={own} onChange={setOwn} />
           <Actions>
             <Button small label={tr('cloud.signInAgain')} disabled={own.own && !own.id} onClick={() => beginAgain(a, p, ownOpts(own))} />
@@ -740,7 +776,7 @@ function AddSheet({ st }) {
       <View style={{ paddingHorizontal: 22, paddingTop: 6, paddingBottom: 10 }}>
         <SearchField value={q} onChange={setQ} placeholder={tr('cloud.add.search', { count: providers.length })} autoFocus />
       </View>
-      <ScrollView style={{ maxHeight: offerOwn ? 260 : 380 }}>
+      <ScrollView style={{ maxHeight: offerOwn ? (own.own ? 150 : 230) : 380 }}>
         <View style={{ paddingBottom: 6 }}>
           {!providers.length ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr('cloud.add.none')}</Dim> : null}
           {none ? <Dim t={t} style={{ paddingHorizontal: 22 }}>{tr('cloud.add.none')}</Dim> : null}
@@ -773,7 +809,7 @@ function AddSheet({ st }) {
       ) : null}
       {offerOwn ? (
         <View style={{ paddingHorizontal: 22, paddingTop: 10, gap: 6, borderTopWidth: 1, borderTopColor: t.separator }}>
-          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownApp.title', { provider: p.label })}</Text>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.ownApp.title')}</Text>
           <OwnAppChoice p={p} value={own} onChange={setOwn} />
         </View>
       ) : null}

@@ -265,10 +265,9 @@
   "unverified.line": "Funcionam pelo rclone, mas ninguém os confirmou no LordOS ainda. Usa algum? Verifique e conte para nós, e marcamos como verificado.",
   "add.loading": "Obtendo a lista de provedores…",
   "again.title": "Entrar de novo em “{name}”",
-  "ownApp.title": "Como entrar no {provider}",
+  "ownApp.title": "Como entrar",
   "ownApp.rclone": "Entrar com o app do rclone",
-  "ownApp.own": "Usar meu próprio app (ID e segredo do cliente)",
-  "ownApp.hint": "Seu próprio app no site de desenvolvedores do provedor: a cota é só sua, e a página de acesso mostra o nome do seu app. O endereço de redirecionamento tem de ser {redirect}",
+  "ownApp.own": "Usar meu próprio app",
   "ownApp.howTo": "Como criar um",
   "ownApp.needId": "Digite o ID de cliente do seu app, ou entre com o app do rclone.",
   "ownApp.inUse": "Esta conta entra com o seu próprio app. Entre de novo para trocá-lo.",
@@ -322,5 +321,10 @@
   "delete.done": {
     "one": "Apagado do {provider}",
     "other": "{count} itens apagados do {provider}"
-  }
+  },
+  "ownApp.recommended": "Recomendado",
+  "ownApp.rcloneLine": "O mais rápido. A página do {provider} vai pedir para você autorizar o rclone, o motor de código aberto que a Nuvem usa.",
+  "ownApp.ownLine": "Seu próprio app no site de desenvolvedores do {provider}: a cota é só sua. Você vai precisar do ID e do segredo do cliente.",
+  "ownApp.redirect": "Endereço de redirecionamento: {redirect}",
+  "ownApp.copied": "Endereço de redirecionamento copiado"
 }

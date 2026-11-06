@@ -265,10 +265,9 @@
   "unverified.line": "Funzionano tramite rclone, ma nessuno li ha ancora confermati su LordOS. Ne usi uno? Controllalo e diccelo, e lo segneremo come verificato.",
   "add.loading": "Recupero dell’elenco dei fornitori…",
   "again.title": "Accedi di nuovo a «{name}»",
-  "ownApp.title": "Come accedere a {provider}",
+  "ownApp.title": "Come accedere",
   "ownApp.rclone": "Accedi con l’app di rclone",
-  "ownApp.own": "Usa la mia app (ID e segreto client)",
-  "ownApp.hint": "La tua app sul sito per sviluppatori del fornitore: la sua quota è solo tua, e la pagina di accesso mostra il nome della tua app. L’indirizzo di reindirizzamento deve essere {redirect}",
+  "ownApp.own": "Usa la mia app",
   "ownApp.howTo": "Come crearne una",
   "ownApp.needId": "Inserisci l’ID client della tua app, oppure accedi con l’app di rclone.",
   "ownApp.inUse": "Questo account accede con la tua app. Accedi di nuovo per cambiarla.",
@@ -322,5 +321,10 @@
   "delete.done": {
     "one": "Eliminato da {provider}",
     "other": "{count} elementi eliminati da {provider}"
-  }
+  },
+  "ownApp.recommended": "Consigliato",
+  "ownApp.rcloneLine": "Il modo più rapido. La pagina di {provider} ti chiederà di autorizzare rclone, il motore open source che usa Cloud.",
+  "ownApp.ownLine": "La tua app sul sito per sviluppatori di {provider}: la sua quota è solo tua. Ti serviranno il suo ID client e il segreto.",
+  "ownApp.redirect": "Indirizzo di reindirizzamento: {redirect}",
+  "ownApp.copied": "Indirizzo di reindirizzamento copiato"
 }
