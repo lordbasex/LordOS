@@ -215,6 +215,9 @@ EOF
     # (0.8.7) Store → Updates' names for LordOS's data packages (apps/store/syspkg.js): lordos-hwdata as a dated list
     if have node; then run "store-syspkg-test (apps/store/syspkg.js)" node tests/store_syspkg_test.mjs
     else skip "store-syspkg-test" "node"; fi
+    # (0.8.8.4, #37) the Store's search (apps/store/search.js): words in any order, joined or apart, accents, keywords
+    if have node; then run "store-search-test (apps/store/search.js)" node tests/store_search_test.mjs
+    else skip "store-search-test" "node"; fi
     # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
     if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
     else skip "livestart-test" "node"; fi

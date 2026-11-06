@@ -7,6 +7,7 @@
 #include "js_pkg.h"
 #include "../pkg/deb.h"
 #include "../pkg/idx.h"
+#include "../pkg/match.h"
 #include "../pkg/resolve.h"
 #include "../pkg/status.h"
 
@@ -155,40 +156,24 @@ static JSValue summary_obj(JSContext *c, const char *name, long rec, const StPkg
 
 /* ---- search ---- */
 
-static const char *ci_find(const char *hay, const char *needle, size_t nl) {
-    if (!nl) return hay;
-    for (const char *h = hay; *h; h++) {
-        size_t i = 0;
-        while (i < nl && h[i] && tolower((unsigned char)h[i]) == needle[i]) i++;
-        if (i == nl) return h;
-    }
-    return NULL;
-}
-
 typedef struct { long rec; int score; } Hit;
 
+/* The query's words against every package (pkg/match.c: case and accents ignored, words joined or
+ * apart, the packages with every word first and then those with some; `every` leaves those out), apps
+ * first. */
 static JSValue f_search(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     refresh();
     const char *q = argc > 0 ? JS_ToCString(c, argv[0]) : NULL;
     JSValueConst opts = argc > 1 ? argv[1] : JS_UNDEFINED;
-    int limit = opt_int(c, opts, "limit", 50, 1, 500), apps_only = opt_bool(c, opts, "apps");
+    int limit = opt_int(c, opts, "limit", 50, 1, 500), apps_only = opt_bool(c, opts, "apps"), every = opt_bool(c, opts, "every");
     char lang[16], section[64];
     opt_str(c, opts, "lang", lang, sizeof lang);
     opt_str(c, opts, "section", section, sizeof section);
     int l = lang_of(lang);
-    char terms[8][64];
-    int nt = 0;
-    if (q) {
-        char buf[256];
-        snprintf(buf, sizeof buf, "%s", q);
-        for (char *t = strtok(buf, " \t"); t && nt < 8; t = strtok(NULL, " \t")) {
-            size_t k = 0;
-            for (; t[k] && k < 63; k++) terms[nt][k] = (char)tolower((unsigned char)t[k]);
-            terms[nt++][k] = 0;
-        }
-        JS_FreeCString(c, q);
-    }
+    PkgQuery pq;
+    pkg_query_parse(&pq, q ? q : "");
+    if (q) JS_FreeCString(c, q);
     Hit *hits = calloc((size_t)limit + 1, sizeof *hits);
     int nh = 0;
     for (long i = 0; hits && X.map && i < (long)X.h->npkg; i++) {
@@ -198,25 +183,15 @@ static JSValue f_search(JSContext *c, JSValueConst this_val, int argc, JSValueCo
         if (apps_only && (!a || strcmp(idx_s(&X, a->type), "desktop-application"))) continue;
         if (section[0] && strcmp(idx_s(&X, p->section), section)) continue;
         const char *name = idx_s(&X, p->name);
-        int score = a ? 300 : 0, all = 1;            /* applications first */
-        for (int t = 0; t < nt && all; t++) {
-            size_t tl = strlen(terms[t]);
-            int s = 0;
-            const char *m = ci_find(name, terms[t], tl);
-            if (m) s = !strcasecmp(name, terms[t]) ? 1000 : m == name ? 500 : 200;
-            if (a) {
-                const char *an = app_name(a, l);
-                const char *am = ci_find(an, terms[t], tl);
-                int as = !am ? 0 : !strcasecmp(an, terms[t]) ? 900 : am == an ? 450 : 250;
-                if (as > s) s = as;
-                if (!s && ci_find(app_summary(a, l), terms[t], tl)) s = 80;
-            }
-            if (!s && ci_find(idx_s(&X, p->summary), terms[t], tl)) s = 50;
-            if (!s) all = 0;
-            score += s;
+        int score, full;
+        if (!pq.n) {
+            if (!a) continue;           /* no text: only the applications */
+            score = 300;
+        } else {
+            score = pkg_match_score(&pq, name, a ? app_name(a, l) : NULL, a ? app_summary(a, l) : NULL, idx_s(&X, p->summary), &full);
+            if (!score || (every && !full)) continue;      /* every: only the packages with every word */
+            if (a) score += full ? 300 : 75;            /* applications first */
         }
-        if (!all) continue;
-        if (!nt && !a) continue;        /* no text: only the applications */
         /* top-k by insertion */
         int pos = nh;
         while (pos > 0 && (hits[pos - 1].score < score || (hits[pos - 1].score == score && strcmp(idx_s(&X, X.pkg[hits[pos - 1].rec].name), name) > 0))) pos--;

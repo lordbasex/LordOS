@@ -202,6 +202,24 @@ computer** (below). Store → Installed shows each native LordOS app's own versi
   Store draws a skeleton of the banner (it pulses, unless Reduce motion is on); a repository without a banner shows
   a catalog app instead.
 
+**Search (0.8.8.4, #37).** The query is split into words; case and accents don't matter (`camara`
+finds «Cámara»), the words can be in any order, and they are also tried joined, so `vs code` finds the
+`vscode` packages and `vscode` finds an app called «VS Code». A result with every word comes first,
+ranked by where the words are: the whole name, the start of the name, the start of a word, inside a
+word, then the summaries (and a bonus when the words appear together in that order). With two words or
+more, packages with only some of them follow, after all of those, when one of the words starts a word
+of their name (`vs code` also lists `code-aster`); a word only in a summary isn't enough.
+`lord.pkg.search` does this in C (`server/src/pkg/match.c`, tested in `build/pkg-test`), and the
+Store's own lists in JS with the same rules (`apps/store/search.js`, tested in
+`server/tests/store_search_test.mjs`). While searching, Discover first shows **From the LordOS
+catalog**: the catalog apps that match (`apt/catalog.json`, every section), which aren't in the package
+lists until their maker's repository is added; they match by name, id, package name, the catalog's
+`keywords` (`"vscode"`, `"vs code"`, nicknames) and, with less weight, the summary in the user's
+language and in English, the vendor and the kind. The same search filters the catalog pages,
+categories, Installed and LordOS apps. Spotlight asks for `every: true`: only the packages with every
+word. On VM 116 (Debian 13, 75,016 packages) a search takes 24–33 ms, the same as before (24–31 ms with
+the old substring search, measured with the same queries).
+
 **What `lordos` depends on since 0.8.7.** `lordos-hwdata`, the signed tested-hardware snapshot
 ([UPDATES.md](UPDATES.md), "The tested-hardware snapshot"); `libfreerdp3-3`, `libfreerdp-client3-3` and `libwinpr3-3` for
 Remote Desk; `rclone`, `fuse3` and `openssh-client` for Connect to Server; `openssl`. An update brings them in.
@@ -308,7 +326,7 @@ these change. `lang` (`'es'`, `'pt'` or omitted) picks the AppStream name and de
 lord.pkg.available()            // true if there is already an index
 lord.pkg.lastUpdate()           // seconds since 1970 (0: never)
 lord.pkg.sources()              // [{ uri, suite, component, codename, label, date, validUntil, priority, packages }]
-lord.pkg.search(q, { limit = 50, apps = false, section, lang })   // [Summary], sorted by relevance
+lord.pkg.search(q, { limit = 50, apps = false, every = false, section, lang })   // [Summary], sorted by relevance
 lord.pkg.info(name, { lang })   // Summary + { description, homepage, arch, source, depends, preDepends,
                                 //   recommends, suggests, provides, conflicts, breaks, priority, suite,
                                 //   origin, appDescription, versions: [{ version, suite, size }] } | null

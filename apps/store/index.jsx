@@ -6,7 +6,8 @@ import {
   suggestions, unseenSuggestions, refreshSuggestions,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AiDetail, AiDiscover, AiPage, catalogApp, catalogApps } from './ai.js';
+import { AiDetail, AiDiscover, AiPage, CatalogResults, catalogApp, catalogApps, searchCatalog } from './ai.js';
+import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
 
@@ -205,8 +206,7 @@ function LordOSPage({ query }) {
   const [files, setFiles] = useState(() => findPackageFiles().filter((f) => /\.lpk$/i.test(f.name)));
   const [pick, setPick] = useState(null);
   const [msg, setMsg] = useState(null);
-  const q = query.trim().toLowerCase();
-  const shown = list.filter((p) => !q || `${p.name} ${p.description} ${p.id}`.toLowerCase().includes(q));
+  const shown = list.filter((p) => matches(query, [p.name, p.id], [p.description]));
   return (
     <View>
       <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' }}>{tr('store.lordos.subtitle')}</Text>
@@ -281,8 +281,7 @@ function InstalledPage({ query }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const apps = useLauncherApps();
-  const q = query.trim().toLowerCase();
-  const shown = apps.filter((a) => !q || `${a.name} ${a.comment || ''} ${a.id}`.toLowerCase().includes(q));
+  const shown = apps.filter((a) => matches(query, [a.name, a.id, a.genericName], [a.comment]));
   // the kind, and a LordOS app's or package's own version (manifest "version")
   const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
   return (
@@ -350,7 +349,14 @@ export default function Store() {
   let body;
   if (app) body = app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
   else if (cat) body = <debian.Category cat={cat} query={query} onOpen={openDeb} />;
-  else if (page === 'discover') body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={query.trim() ? null : <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />} />;
+  else if (page === 'discover') {
+    // while searching, the catalog apps that match come first (#37)
+    // (and the package results leave them out)
+    const hits = query.trim() ? searchCatalog(catalogApps(), query) : [];
+    const top = !query.trim() ? <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />
+      : hits.length ? <CatalogResults query={query} onOpen={openAi} /> : null;
+    body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={top} hide={hits.map((a) => a.package)} />;
+  }
   else if (page === 'suggested') body = <debian.SuggestedPage />;
   else if (page === 'ai') body = <AiPage query={query} onOpen={openAi} />;
   else if (page === 'commercial') body = <AiPage section="commercial" query={query} onOpen={openAi} onPage={go} />;

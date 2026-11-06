@@ -124,6 +124,10 @@ validate() {
         is_name "$(jf "$id" .package)" || die "$id: bad package name"
         for p in $(jf "$id" '(.extra_packages // [])[]'); do is_name "$p" || die "$id: bad extra package $p"; done
         is_https "$(jf "$id" .homepage)" || die "$id: homepage must be https"
+        # optional search words (the Store's search, apps/store/search.js): at most 12 short plain strings
+        jq -e --arg id "$id" '.apps[] | select(.id == $id) | (.keywords // []) | type == "array" and length <= 12 and
+            all(.[]; type == "string" and length >= 2 and length <= 40 and (explode | all(. >= 32)) and (test("[\\\\\"<>]") | not))' "$CAT" >/dev/null \
+            || die "$id: keywords must be at most 12 strings of 2 to 40 characters"
         arches=$(jf "$id" '.arches[]')
         [ -n "$arches" ] || die "$id: no arches"
         for a in $arches; do case "$a" in amd64|arm64) ;; *) die "$id: unsupported arch $a" ;; esac; done

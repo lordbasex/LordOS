@@ -12,6 +12,7 @@ import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
 import { sysPkgKey, snapshotDate } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
+import { search } from './search.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -224,9 +225,9 @@ function NoIndex() {
 }
 
 // Search results: apps as cards, other packages as rows.
-function Results({ q, onOpen }) {
+function Results({ q, onOpen, more, hide = [] }) {
   const th = useTheme();
-  const res = lord.pkg.search(q, { limit: 60, lang: lang2() });
+  const res = lord.pkg.search(q, { limit: 60, lang: lang2() }).filter((r) => !hide.includes(r.name));
   const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
@@ -240,17 +241,18 @@ function Results({ q, onOpen }) {
           h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.summary)),
         r.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null,
         h(Text, { style: { fontSize: 15, color: th.textDim } }, direction() === 'rtl' ? '‹' : '›'))))) : null,
-    res.length === 0 ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
+    res.length === 0 && !more ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
 }
 
-// Discover: what the page above it brings (`top`: the featured app and the AI shelf), the
-// suggestions for this computer, then a shelf per category with its first apps and "See all".
-function Discover({ query, onOpen, onCategory, top }) {
+// Discover: what the page above it brings (`top`: the featured app and the AI shelf; while searching,
+// the catalog apps that match), the suggestions for this computer, then a shelf per category with its
+// first apps and "See all".
+function Discover({ query, onOpen, onCategory, top, hide }) {
   const { gen } = useStore(state);
   void gen;
   const q = query.trim();
   if (!ready()) return h(View, { style: { gap: 26 } }, top, h(NoIndex));
-  if (q) return h(Results, { q, onOpen });
+  if (q) return h(View, { style: { gap: 26 } }, top, h(Results, { q, onOpen, more: !!top, hide }));
   const counts = categoryCounts();
   return h(View, { style: { gap: 26 } },
     h(Progress),
@@ -269,9 +271,9 @@ function Category({ cat, query, onOpen }) {
   const { gen } = useStore(state);
   void gen;
   if (!ready()) return h(NoIndex);
-  const q = query.trim().toLowerCase();
-  const list = lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() })
-    .filter((a) => !q || `${a.name} ${a.summary || ''} ${a.package}`.toLowerCase().includes(q));
+  const all = lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() });
+  const q = query.trim();
+  const list = q ? search(all, q, (a) => ({ names: [a.name, a.package], texts: [a.summary] })) : all;
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
     list.length ? h(Grid, { items: list.slice(0, q ? 200 : 400), onOpen })

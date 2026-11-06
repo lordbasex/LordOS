@@ -35,6 +35,9 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
     "package": "llama.cpp",            // the Debian package users install
     "extra_packages": [],              // optional: other packages a recipe may produce
     "name": "llama.cpp",
+    "keywords": ["llama", "llm"],      // optional: other words the Store's search finds it by (at most 12,
+                                       // 2 to 40 characters each: nicknames, joined or split names such as
+                                       // "vscode" and "vs code"; apps/store/search.js)
     "summary": { "en": "…", "es": "…", "pt": "…" },   // one short neutral line per language
     "license": "MIT", "vendor": "ggml.ai (ggml-org)", "homepage": "https://github.com/ggml-org/llama.cpp",
     "arches": ["amd64", "arm64"],

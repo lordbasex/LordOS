@@ -319,7 +319,7 @@ function buildResults(raw, apps) {
   // Store (AppStream apps)
   if (q.length >= 3 && typeof lord.pkg !== 'undefined' && lord.pkg.available()) {
     let res = [];
-    try { res = lord.pkg.search(query, { limit: 20, lang: locale.get().lang.split('-')[0] }).filter((r) => r.app && !r.installed).slice(0, 5); } catch (e) { res = []; }
+    try { res = lord.pkg.search(query, { limit: 20, every: true, lang: locale.get().lang.split('-')[0] }).filter((r) => r.app && !r.installed).slice(0, 5); } catch (e) { res = []; }
     add('store', res.map((r) => ({ key: `store:${r.name}`, score: 10, title: r.app.name, subtitle: r.app.summary || r.summary, image: r.app.icon,
       preview: { kind: 'pkg', pkg: r }, run: () => wm.open('store', { args: { search: query, package: r.name } }) })));
   }

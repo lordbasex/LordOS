@@ -10,6 +10,7 @@
 #include "pkg/crypto.h"
 #include "pkg/deb.h"
 #include "pkg/idx.h"
+#include "pkg/match.h"
 #include "pkg/pgp.h"
 #include "pkg/pin.h"
 #include "pkg/pkg.h"
@@ -501,6 +502,75 @@ static int cmd_plan(int argc, char **argv) {
     return 0;
 }
 
+/* The search (pkg/match.c, #37): words in any order, case and accents ignored, joined or apart,
+ * every word first, then some of them */
+static int score_of(const char *query, const char *name, const char *app, const char *app_sum, const char *sum, int *full) {
+    PkgQuery q;
+    pkg_query_parse(&q, query);
+    return pkg_match_score(&q, name, app, app_sum, sum, full);
+}
+static void test_search(void) {
+    char b[64];
+    pkg_fold("Ação Ñandú ÉCOLE Łódź", b, sizeof b);
+    CHECK(!strcmp(b, "acao nandu ecole lodz"), "fold: [%s]", b);
+    pkg_fold("Cafe\xcc\x81", b, sizeof b);
+    CHECK(!strcmp(b, "cafe"), "fold drops a combining mark: [%s]", b);
+    pkg_fold("日本 x", b, sizeof b);
+    CHECK(!strcmp(b, "日本 x"), "fold keeps other scripts: [%s]", b);
+    pkg_fold("abcdef", b, 4);
+    CHECK(!strcmp(b, "abc"), "fold stops at the buffer: [%s]", b);
+    pkg_compact("VS Code (OSS)", b, sizeof b);
+    CHECK(!strcmp(b, "vscodeoss"), "compact: [%s]", b);
+    PkgQuery q;
+    pkg_query_parse(&q, "  VS   Code ");
+    CHECK(q.n == 2 && !strcmp(q.w[0], "vs") && !strcmp(q.w[1], "code") && !strcmp(q.joined, "vscode"), "query words: %d [%s]", q.n, q.joined);
+    pkg_query_parse(&q, "brave-browser");
+    CHECK(q.n == 2 && !strcmp(q.joined, "bravebrowser"), "punctuation separates words");
+    pkg_query_parse(&q, "   ");
+    CHECK(q.n == 0, "an empty query has no words");
+    CHECK(pkg_match_level("code", NULL, "code", 4) == 4 && pkg_match_level("codium", NULL, "cod", 3) == 3 &&
+          pkg_match_level("node-vscode", NULL, "vscode", 6) == 2 && pkg_match_level("libvscode", NULL, "vscode", 6) == 1 &&
+          pkg_match_level("libvs", NULL, "vs", 2) == 0 && pkg_match_level("vs code", "vscode", "vscode", 6) == 1,
+          "match levels");
+
+    int full = 0, s;
+    s = score_of("", "code", NULL, NULL, "x", &full);
+    CHECK(s == 0, "an empty query matches nothing");
+    /* the words joined: "vs code" finds the vscode packages, ahead of a package with both words apart */
+    int a = score_of("vs code", "node-vscode-jsonrpc", NULL, NULL, "Node.js module", &full);
+    CHECK(a > 0 && full, "vs code finds node-vscode-jsonrpc (%d)", a);
+    int r = score_of("vs code", "librust-vsock-dev", NULL, NULL, "Virtio socket support for Rust - Rust source code", &full);
+    CHECK(r > 0 && full && r < a, "vsock with \"code\" in its summary ranks below (%d < %d)", r, a);
+    /* the words apart in the name: "vscode" finds "VS Code" */
+    s = score_of("vscode", "code-oss", "VS Code OSS", NULL, NULL, &full);
+    CHECK(s > 0 && full, "vscode finds the app VS Code OSS (%d)", s);
+    /* the app's whole name, words in any order, case and accents */
+    int e = score_of("Visual Studio Code", "code", "Visual Studio Code", "Editor", "Code editing.", &full);
+    CHECK(e > 0 && full, "the whole app name (%d)", e);
+    s = score_of("code studio", "code", "Visual Studio Code", NULL, NULL, &full);
+    CHECK(s > 0 && full && s < e, "words in another order, below the exact name (%d)", s);
+    s = score_of("camara", "cheese", "Cámara", NULL, NULL, &full);
+    CHECK(s > 0 && full, "accents ignored (%d)", s);
+    s = score_of("CODIUM", "codium", NULL, NULL, "Free/Libre Open Source Software Binaries of VS Code", &full);
+    int s2 = score_of("codium", "codium-insiders", NULL, NULL, "x", &full), s3 = score_of("codium", "vscodium-tools", NULL, NULL, "x", &full);
+    CHECK(s > s2 && s2 > s3 && s3 > 0, "the exact package name, then its start, then inside (%d > %d > %d)", s, s2, s3);
+    s = score_of("vs code", "cursor", "Cursor", "Code editor, based on VS Code", NULL, &full);
+    CHECK(s > r && full, "the words together in a summary rank above them apart (%d > %d)", s, r);
+    /* some words: only when one starts a word of the name, and below every full match */
+    int p = score_of("vs code", "code-aster", NULL, NULL, "finite element", &full);
+    CHECK(p > 0 && !full && p < r, "code-aster is a partial match, below the full ones (%d)", p);
+    s = score_of("vs code", "librust-foo", NULL, NULL, "Rust source code", &full);
+    CHECK(s == 0, "a word only in the summary is not enough for a partial match (%d)", s);
+    s = score_of("code", "librust-foo", NULL, NULL, "Rust source code", &full);
+    CHECK(s > 0 && full, "one word in the summary is a match (%d)", s);
+    s = score_of("x code", "codeblocks", NULL, NULL, "IDE", &full);
+    CHECK(s > 0 && !full, "partial with the other word missing (%d)", s);
+    s = score_of("zz yy", "codeblocks", NULL, NULL, "IDE", &full);
+    CHECK(s == 0, "no word at all");
+    s = score_of("a code", "a-tool", NULL, NULL, "IDE", &full);
+    CHECK(s == 0, "a one-letter word alone doesn't make a partial match (%d)", s);
+}
+
 /* ReleaseNotes (docs/UPDATES.md): the stanza of that package and version, " ." as an empty line */
 static void test_notes(void) {
     const char *t = "Package: lordos\nVersion: 0.8.1\nNotes:\n ### Added\n .\n - Updates from the Store\n\n"
@@ -557,6 +627,7 @@ int main(int argc, char **argv) {
     test_versions();
     test_deb822();
     test_notes();
+    test_search();
     test_crypto();
     test_compress();
     pin_root = dir;                     /* never the machine's own /etc/apt/preferences */

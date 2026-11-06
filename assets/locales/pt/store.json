@@ -287,5 +287,6 @@
   "formats.hfs": "Lê volumes HFS+, somente leitura.",
   "formats.apfs": "Opcional. Lê volumes APFS, somente leitura.",
   "formats.allow": "Continuar",
-  "formats.optional": "Adicionar também APFS. Compila um driver para o seu kernel e soma cerca de 500 MB de compiladores e headers."
+  "formats.optional": "Adicionar também APFS. Compila um driver para o seu kernel e soma cerca de 500 MB de compiladores e headers.",
+  "search.catalog": "Do catálogo do LordOS"
 }

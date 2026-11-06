@@ -287,5 +287,6 @@
   "formats.hfs": "Lit les volumes HFS+, en lecture seule.",
   "formats.apfs": "Lit les volumes APFS, en lecture seule. Facultatif.",
   "formats.allow": "Continuer",
-  "formats.optional": "Ajouter aussi APFS. Cela compile un pilote pour votre noyau et ajoute environ 500 Mo de compilateurs et d’en-têtes."
+  "formats.optional": "Ajouter aussi APFS. Cela compile un pilote pour votre noyau et ajoute environ 500 Mo de compilateurs et d’en-têtes.",
+  "search.catalog": "Du catalogue LordOS"
 }
