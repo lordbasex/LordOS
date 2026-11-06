@@ -1007,6 +1007,59 @@ static void test_folders(void) {
     const char *q[6];
     roles(g, 6, q);
     CHECKS(q[0], "inbox"); CHECKS(q[1], ""); CHECKS(q[2], "sent"); CHECKS(q[3], "all"); CHECKS(q[4], "trash"); CHECKS(q[5], "");
+    /* localized names, modified UTF-7 ("Envoy&AOk-s" = "Envoyés"), accents without case */
+    CHECKS(folder_name_role("Envoy&AOk-s", '/'), "sent");
+    CHECKS(folder_name_role("INBOX.&AMk-l&AOk-ments envoy&AOk-s", '.'), "sent");
+    CHECKS(folder_name_role("ÉLÉMENTS ENVOYÉS", '/'), "sent");
+    CHECKS(folder_name_role("Ind&AOk-sirables", '/'), "junk");
+    CHECKS(folder_name_role("Entw&APw-rfe", '/'), "drafts");
+    CHECKS(folder_name_role("Itens Exclu&AO0-dos", '/'), "trash");
+    CHECKS(folder_name_role("Lixo Eletr&APQ-nico", '/'), "junk");
+    CHECKS(folder_name_role("Posta inviata", '/'), "sent");
+    CHECKS(folder_name_role("Papierkorb", '/'), "trash");
+    CHECKS(folder_name_role("Elementos eliminados", '/'), "trash");
+    CHECKS(folder_name_role("Envoyes", '/'), "");                 /* no accent folding beyond case */
+    CHECKS(folder_name_role("Projets/Corbeille", '/'), "");       /* deeper: a user folder */
+
+    /* a French server with no SPECIAL-USE flags, "/" and no prefix */
+    const FolderRoleIn fr[] = {
+        { "INBOX", "\\HasNoChildren ", '/', 0 },
+        { "Brouillons", "", '/', 0 },
+        { "Envoy&AOk-s", "", '/', 0 },
+        { "Corbeille", "\\HasChildren ", '/', 0 },
+        { "Corbeille/Ancien", "", '/', 0 },
+        { "Ind&AOk-sirables", "", '/', 0 },
+        { "Spam", "", '/', 0 },
+        { "Archives", "", '/', 0 },
+        { "Clients", "", '/', 0 },
+        { "Clients/Envoy&AOk-s", "", '/', 0 },
+    };
+    const char *r[10];
+    roles(fr, 10, r);
+    CHECKS(r[0], "inbox"); CHECKS(r[1], "drafts"); CHECKS(r[2], "sent"); CHECKS(r[3], "trash"); CHECKS(r[4], "");
+    CHECKS(r[5], ""); CHECKS(r[6], "junk");                      /* the English name comes first */
+    CHECKS(r[7], "archive"); CHECKS(r[8], ""); CHECKS(r[9], "");
+    /* the same French server with the "INBOX." prefix and "." */
+    const FolderRoleIn frd[] = {
+        { "INBOX", "", '.', 0 },
+        { "INBOX.Brouillons", "", '.', 0 },
+        { "INBOX.Envoy&AOk-s", "", '.', 0 },
+        { "INBOX.Corbeille", "", '.', 0 },
+        { "INBOX.Corbeille.Ancien", "", '.', 0 },
+        { "INBOX.Ind&AOk-sirables", "", '.', 0 },
+        { "INBOX.Clients", "", '.', 0 },
+        { "INBOX.Clients.Corbeille", "", '.', 0 },
+    };
+    roles(frd, 8, r);
+    CHECKS(r[0], "inbox"); CHECKS(r[1], "drafts"); CHECKS(r[2], "sent"); CHECKS(r[3], "trash"); CHECKS(r[4], "");
+    CHECKS(r[5], "junk"); CHECKS(r[6], ""); CHECKS(r[7], "");
+    /* a flag still wins over any name */
+    const FolderRoleIn frf[] = {
+        { "INBOX", "", '/', 0 }, { "Corbeille", "", '/', 0 }, { "Deleted", "\\Trash ", '/', 0 },
+    };
+    roles(frf, 3, r);
+    CHECKS(r[1], ""); CHECKS(r[2], "trash");
+
     /* no delimiter (NIL), empty input */
     const FolderRoleIn f[] = { { "Drafts", NULL, 0, 0 } };
     roles(f, 1, q);

@@ -1,5 +1,6 @@
 /* folderrole.c — folder roles from SPECIAL-USE flags and names (see folderrole.h). */
 #include "folderrole.h"
+#include "imapp.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -37,22 +38,56 @@ static int name_level(const char *name, char delim) {
     return 0;
 }
 
+/* Names servers give their special folders when they don't flag them: English first, then the
+ * usual localized names (earlier = preferred when two folders compete for a role). */
 static const struct { const char *n, *role; } NAMES[] = {
-    { "Sent", "sent" }, { "Sent Items", "sent" }, { "Sent Messages", "sent" }, { "Sent Mail", "sent" }, { "Enviados", "sent" }, { "Elementos enviados", "sent" },
-    { "Drafts", "drafts" }, { "Borradores", "drafts" }, { "Rascunhos", "drafts" },
-    { "Trash", "trash" }, { "Deleted Items", "trash" }, { "Deleted Messages", "trash" }, { "Papelera", "trash" }, { "Lixeira", "trash" }, { "Bin", "trash" },
-    { "Junk", "junk" }, { "Spam", "junk" }, { "Junk E-mail", "junk" }, { "Correo no deseado", "junk" },
-    { "Archive", "archive" }, { "Archivo", "archive" }, { "Arquivo", "archive" }, { "All Mail", "all" }, /* i18n-ok: folder names servers use */
+    { "Sent", "sent" }, { "Sent Items", "sent" }, { "Sent Messages", "sent" }, { "Sent Mail", "sent" },
+    { "Drafts", "drafts" },
+    { "Trash", "trash" }, { "Deleted Items", "trash" }, { "Deleted Messages", "trash" }, { "Bin", "trash" },
+    { "Junk", "junk" }, { "Spam", "junk" }, { "Junk E-mail", "junk" }, { "Junk Mail", "junk" },
+    { "Archive", "archive" }, { "All Mail", "all" },
+    /* i18n-ok: folder names servers use (fr, es, pt, it, de) */
+    { "Envoyés", "sent" }, { "Éléments envoyés", "sent" }, { "Brouillons", "drafts" }, { "Corbeille", "trash" },
+    { "Indésirables", "junk" }, { "Pourriel", "junk" }, { "Archives", "archive" },
+    { "Enviados", "sent" }, { "Elementos enviados", "sent" }, { "Borradores", "drafts" }, { "Papelera", "trash" },
+    { "Elementos eliminados", "trash" }, { "Correo no deseado", "junk" }, { "Archivo", "archive" },
+    { "Itens Enviados", "sent" }, { "Rascunhos", "drafts" }, { "Lixeira", "trash" }, { "Lixo", "trash" },
+    { "Itens Excluídos", "trash" }, { "Lixo Eletrônico", "junk" }, { "Arquivo", "archive" },
+    { "Posta inviata", "sent" }, { "Inviati", "sent" }, { "Bozze", "drafts" }, { "Cestino", "trash" },
+    { "Posta indesiderata", "junk" }, { "Archivio", "archive" },
+    { "Gesendet", "sent" }, { "Gesendete Elemente", "sent" }, { "Entwürfe", "drafts" }, { "Papierkorb", "trash" },
+    { "Junk-E-Mail", "junk" }, { "Archiv", "archive" },
 };
 #define NNAMES ((int)(sizeof NAMES / sizeof NAMES[0]))
 
-/* Index in NAMES (earlier = the more usual name for its role), or -1. */
+/* Case-insensitive for ASCII and for the Latin-1 letters in UTF-8 (À–Þ ↔ à–þ, "É" = "é"). */
+static int fold(const unsigned char **p) {
+    unsigned c = **p;
+    if (c == 0xC3 && (*p)[1] >= 0x80 && (*p)[1] <= 0xBF) {
+        unsigned d = (*p)[1];
+        *p += 2;
+        if (d <= 0x9E && d != 0x97) d += 0x20;
+        return 0x100 | d;
+    }
+    (*p)++;
+    return c >= 'A' && c <= 'Z' ? (int)(c + 32) : (int)c;
+}
+
+static int name_eq(const char *a, const char *b) {
+    const unsigned char *x = (const unsigned char *)a, *y = (const unsigned char *)b;
+    while (*x && *y) if (fold(&x) != fold(&y)) return 0;
+    return !*x && !*y;
+}
+
+/* Index in NAMES, or -1. The name is matched after decoding IMAP's modified UTF-7
+ * ("Envoy&AOk-s" is "Envoyés"). */
 static int name_index(const char *name, char delim) {
     if (!name) return -1;
     int lvl = name_level(name, delim);
     if (!lvl) return -1;
-    const char *base = lvl == 2 ? name + 6 : name;
-    for (int i = 0; i < NNAMES; i++) if (!strcasecmp(base, NAMES[i].n)) return i;
+    char base[512];
+    imap_utf7_decode(lvl == 2 ? name + 6 : name, base, sizeof base);
+    for (int i = 0; i < NNAMES; i++) if (name_eq(base, NAMES[i].n)) return i;
     return -1;
 }
 
@@ -80,7 +115,7 @@ void folder_roles_resolve(const FolderRoleIn *in, int n, const char **out) {
             if (in[i].noselect || *out[i] || !in[i].name || *folder_flag_role(in[i].flags)) continue;
             int k = name_index(in[i].name, in[i].delim);
             if (k < 0 || strcmp(NAMES[k].role, role)) continue;
-            int score = name_level(in[i].name, in[i].delim) * 100 + k;
+            int score = name_level(in[i].name, in[i].delim) * 1000 + k;
             if (pick < 0 || score < best) { pick = i; best = score; }
         }
         if (pick >= 0) out[pick] = role;

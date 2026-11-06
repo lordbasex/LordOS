@@ -10,8 +10,9 @@
 
 /* The role a LIST flag list gives ("\HasNoChildren \Sent " → "sent"), or "". */
 const char *folder_flag_role(const char *flags);
-/* The role a folder name suggests with that hierarchy delimiter (0 = flat), or "".
- * "INBOX" (any case) is always "inbox". */
+/* The role a folder name suggests with that hierarchy delimiter (0 = flat), or "": English and
+ * the usual French, Spanish, Portuguese, Italian and German names, matched after decoding IMAP's
+ * modified UTF-7 and without case (ASCII and Latin-1 accented letters). "INBOX" is always "inbox". */
 const char *folder_name_role(const char *name, char delim);
 
 typedef struct {

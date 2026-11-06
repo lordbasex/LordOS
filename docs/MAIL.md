@@ -121,8 +121,10 @@ Keyboard: ❖N new, ❖R reply, ❖⇧R reply all, ❖J forward, ❖E archive, �
 Each account has **at most one** Inbox, Drafts, Sent, Archive, Junk, Trash and All Mail
 (`server/src/mail/folderrole.c`, decided over the whole `LIST` at once). A folder the server flags
 with SPECIAL-USE (`\Sent`, `\Drafts`, `\Trash`, `\Junk`, `\Archive`, `\All`) always gets that role;
-only when no folder is flagged for a role does a name count ("Sent", "Sent Items", "Junk",
-"Spam", "Papelera"…), and then only for a top-level folder or a direct child of INBOX
+only when no folder is flagged for a role does a name count: English ("Sent", "Sent Items",
+"Junk", "Spam"…) first, then the usual French, Spanish, Portuguese, Italian and German names
+("Envoyés", "Corbeille", "Papelera", "Lixeira", "Cestino", "Papierkorb"…), compared after decoding
+IMAP's modified UTF-7 ("Envoy&AOk-s") and without case, accented letters included. And then only for a top-level folder or a direct child of INBOX
 ("Trash", "INBOX.Trash", "INBOX/Trash"), top level first, then the more usual name, then the
 server's order. A user folder deeper in the tree ("Clients/Sent") is never taken for a special one,
 and look-alikes that lose ("Sent Messages" next to a flagged "Sent") stay ordinary folders under
