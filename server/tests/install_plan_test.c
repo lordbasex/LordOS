@@ -67,6 +67,25 @@ int main(void) {
     T(!install_ssh_key_ok("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7yT1pM4xK0bZ9w2vQe8Lh3sN5uR6t\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"));
     T(!install_ssh_key_ok("ssh-dss AAAAB3NzaC1kc3MAAACBAP1/U4EddRIpUt9KnC7s5Of2EbdSPO9EAMMeP4C2USZpRV1AIlH7WT2NWPq/xfW6M"));
     T(!install_ssh_key_ok("ssh-ed25519 short"));
+
+    /* mode manual: its fields reach manual.c as they were sent, and malformed ones refuse the plan */
+    static MpPlan m;
+    T(parse_plan("{\"mode\":\"manual\",\"disk\":\"sda\",\"tableTag\":\"00112233445566778899aabbccddeeff-deadbeef\",\"delete\":\"3\","
+                 "\"create\":\"root:41943040:83886079\",\"homePart\":2,\"homeFormat\":false,\"espPart\":1,\"espFormat\":true,\"swapPart\":5,\"swap\":0}", &p) == 0);
+    T(fsp_mode(p.mode) == 2 && !strcmp(p.table_tag, "00112233445566778899aabbccddeeff-deadbeef") && !strcmp(p.del, "3"));
+    T(p.home_part == 2 && !p.home_format && p.esp_part == 1 && p.esp_format && p.swap_part == 5 && p.root_part == 0);
+    T(manual_plan(&p, &m) == 0 && m.ndel == 1 && m.del[0] == 3 && m.nadd == 1 && m.add[0].role == MP_ROOT && m.part[MP_HOME] == 2 && m.esp_format);
+    T(parse_plan("{\"mode\":\"manual\",\"rootPart\":-1}", &p) == 0 && manual_plan(&p, &m) != 0);
+    T(parse_plan("{\"mode\":\"manual\",\"rootPart\":129}", &p) == 0 && manual_plan(&p, &m) != 0);
+    T(parse_plan("{\"mode\":\"manual\",\"delete\":\"3,3\"}", &p) == 0 && manual_plan(&p, &m) != 0);
+    T(parse_plan("{\"mode\":\"manual\",\"create\":\"root:1:2,root:3:4\"}", &p) == 0 && manual_plan(&p, &m) != 0);
+    T(parse_plan("{\"mode\":\"manual\",\"create\":\"boot:1:2\"}", &p) == 0 && manual_plan(&p, &m) != 0);
+    /* a list too long for its field refuses the plan instead of being cut */
+    { static char big[1300]; strcpy(big, "{\"mode\":\"manual\",\"delete\":\""); size_t l = strlen(big);
+      while (l < sizeof big - 8) { memcpy(big + l, "1,", 2); l += 2; } strcpy(big + l, "1\"}");
+      T(parse_plan(big, &p) != 0); }
+    /* it is refused like any other plan when the disk isn't listed */
+    T(parse_plan("{\"mode\":\"manual\",\"disk\":\"zzz9\",\"rootPart\":4,\"espPart\":1}", &p) == 0 && !strcmp(validate(&p), "install.diskNotListed"));
     printf("install-plan-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

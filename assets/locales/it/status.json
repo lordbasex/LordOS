@@ -147,6 +147,8 @@
   "install.free.rollingBack": "Ripristino della tabella delle partizioni",
   "install.free.rolledBack": "La tabella delle partizioni è com’era",
   "install.free.rollbackFailed": "Impossibile ripristinare la tabella delle partizioni: una copia si trova in {path}. Non riavviare: prima salvala",
+  "install.manual.installing": "Installazione di LordOS su {dev} con le partizioni scelte",
+  "install.manual.tableKept": "L’installazione si è fermata dopo aver eliminato delle partizioni: resta la nuova tabella, perché il loro spazio potrebbe essere già stato scritto. Le altre partizioni non sono state toccate",
   "install.creatingAccount": "Creazione dell’account {user}",
   "install.accountDone": "L’account è pronto",
   "vpn.trusted": "Certificato accettato"

@@ -49,6 +49,21 @@ int fp_undo(FpUndo *u);
 /* The install finished: nothing is left to undo. */
 void fp_commit(FpUndo *u);
 
+/* Shared with manual partitioning (manualpart.c). */
+extern const uint8_t fp_root_type[16];          /* the architecture's Linux root type, on disk */
+extern const char fp_root_code[];               /* the same as sgdisk's code */
+int  fp_sys_ull(const char *path, unsigned long long *out);
+/* Reads the first sector and both GPT copies; s->ok only when both are sound and agree. -1: unreadable. */
+int  fp_snapshot(const char *disk, FpSnap *s);
+int  fp_same_snapshot(const FpSnap *a, const FpSnap *b);
+/* Something on the disk is mounted, swapped or held. */
+int  fp_in_use(const char *disk);
+/* Mounts an EFI partition read-only to measure it (esp_fat, esp_read, esp_free, esp_has_ours). */
+void fp_look_at_esp(const char *esp, FspFacts *f);
+int  fp_settle(void);
+/* The kernel sees partition `part` of `disk` exactly at start..end (sectors of lsec bytes). */
+int  fp_kernel_sees(const char *disk, const char *part, unsigned lsec, uint64_t start, uint64_t end);
+
 #ifdef FP_TEST
 /* tests/freepart_cli.c only, never in lord-server. */
 extern int fp_test_uefi;        /* act as if booted through UEFI, with efibootmgr present */

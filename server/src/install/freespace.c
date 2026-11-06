@@ -22,6 +22,7 @@ uint32_t fsp_crc32(const uint8_t *p, size_t n) {
 int fsp_mode(const char *s) {
     if (!s[0] || !strcmp(s, "erase")) return 0;
     if (!strcmp(s, "free")) return 1;
+    if (!strcmp(s, "manual")) return 2;
     return -1;
 }
 

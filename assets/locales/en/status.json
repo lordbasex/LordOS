@@ -147,6 +147,8 @@
   "install.free.rollingBack": "Putting the partition table back",
   "install.free.rolledBack": "The partition table is as it was",
   "install.free.rollbackFailed": "The partition table could not be put back: a copy is at {path}. Do not restart: save it first",
+  "install.manual.installing": "Installing LordOS on {dev} with the partitions you chose",
+  "install.manual.tableKept": "The installation stopped after partitions were deleted: the new table stays, since their space may already have been written. The other partitions are untouched",
   "install.creatingAccount": "Creating the account {user}",
   "install.accountDone": "The account is ready",
   "vpn.trusted": "Certificate trusted"

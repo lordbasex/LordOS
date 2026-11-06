@@ -707,6 +707,13 @@ An update of 0.8.8 through the Store and `apt`, only the `lordos` package; no ne
   optional 720p stream. The asynchronous capture is on the branch `v089-capture-work` (drops went from 36 % to 23 %).
 - [ ] **Unattended install, the rest:** the boot entry on the new ISOs, and tests of the free space mode, UEFI, a USB
   stick, `ssh_key`, `after = poweroff` and the arm64 ISO.
+- [x] **Manual partitioning in the installer** ([#31](https://github.com/lordbasex/LordOS/issues/31), built 2026-11-05 on
+  `i31-parts`; reaches people with the new ISOs): **Choose partitions** on a GPT disk booted through UEFI, with `/`,
+  `/home` kept or formatted, the EFI partition kept or formatted on request, swap, delete and create in free space,
+  every change listed and confirmed (`ISO.md`, "Manual partitioning"). Tested on images and with a full install
+  through the wizard in a throwaway UEFI VM.
+- [ ] **Manual partitioning, the rest:** resizing, more than one disk, BIOS boot and MBR disks, LUKS and LVM, other
+  file systems for new partitions, and a run on real hardware beside another system.
 - [ ] **Command-line tools on the new images** (requested 2026-11-05): `dnsutils` (dig, nslookup), `screen`, `mc`,
   `tcpdump`, `net-tools` (ifconfig, netstat, route) and `vim`, on the PC ISO and the Raspberry Pi image. Systems
   already installed get them from the Store or `apt`; decide whether the `lordos` package should also recommend them.

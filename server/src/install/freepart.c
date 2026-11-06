@@ -31,19 +31,20 @@
 /* The architecture's Linux root type, as sgdisk's code and as it lies on disk. */
 #if defined(__x86_64__)
 #define ROOT_CODE "8304"
-static const uint8_t root_type[16] = { 0xe3, 0xbc, 0x68, 0x4f, 0xcd, 0xe8, 0xb1, 0x4d, 0x96, 0xe7, 0xfb, 0xca, 0xf9, 0x84, 0xb7, 0x09 };
+const uint8_t fp_root_type[16] = { 0xe3, 0xbc, 0x68, 0x4f, 0xcd, 0xe8, 0xb1, 0x4d, 0x96, 0xe7, 0xfb, 0xca, 0xf9, 0x84, 0xb7, 0x09 };
 #elif defined(__aarch64__)
 #define ROOT_CODE "8305"
-static const uint8_t root_type[16] = { 0x45, 0xb0, 0x21, 0xb9, 0xf0, 0x1d, 0xc3, 0x41, 0xaf, 0x44, 0x4c, 0x6f, 0x28, 0x0d, 0x3f, 0xae };
+const uint8_t fp_root_type[16] = { 0x45, 0xb0, 0x21, 0xb9, 0xf0, 0x1d, 0xc3, 0x41, 0xaf, 0x44, 0x4c, 0x6f, 0x28, 0x0d, 0x3f, 0xae };
 #else
 #error "the disk installer knows x86-64 and arm64"
 #endif
+const char fp_root_code[] = ROOT_CODE;
 
 #ifdef FP_TEST
 int fp_test_uefi, fp_test_fail;
 #endif
 
-static int sys_ull(const char *path, unsigned long long *out) {
+int fp_sys_ull(const char *path, unsigned long long *out) {
     char v[64] = "";
     FILE *f = fopen(path, "r");
     if (!f) return -1;
@@ -66,15 +67,15 @@ static int read_at(int fd, void *buf, size_t n, uint64_t off) {
 
 /* Reads the boot structures. Sets s->ok only when both GPT copies are sound and agree; the first
  * sector is always read if the disk can be read at all. Returns -1 if it can't. */
-static int fp_snapshot(const char *disk, FpSnap *s) {
+int fp_snapshot(const char *disk, FpSnap *s) {
     char p[128], dev[48];
     unsigned long long v, sectors512;
     memset(s, 0, sizeof *s);
     snprintf(p, sizeof p, "/sys/block/%s/queue/logical_block_size", disk);
-    if (sys_ull(p, &v) || (v != 512 && v != 4096)) return -1;
+    if (fp_sys_ull(p, &v) || (v != 512 && v != 4096)) return -1;
     s->lsec = (unsigned)v;
     snprintf(p, sizeof p, "/sys/block/%s/size", disk);
-    if (sys_ull(p, &sectors512) || !sectors512) return -1;
+    if (fp_sys_ull(p, &sectors512) || !sectors512) return -1;
     s->total = sectors512 / (s->lsec / 512);
     snprintf(dev, sizeof dev, "/dev/%s", disk);
     int fd = open(dev, O_RDONLY | O_CLOEXEC);
@@ -94,7 +95,7 @@ out:
     return r;
 }
 
-static int same_snapshot(const FpSnap *a, const FpSnap *b) {
+int fp_same_snapshot(const FpSnap *a, const FpSnap *b) {
     if (!a->ok || !b->ok || a->lsec != b->lsec || a->total != b->total) return 0;
     size_t bytes = (size_t)a->g1.count * FSP_ENTRY_SIZE;
     return !memcmp(a->mbr, b->mbr, sizeof a->mbr) && !memcmp(a->hdr1, b->hdr1, a->lsec) && !memcmp(a->hdr2, b->hdr2, a->lsec)
@@ -102,7 +103,7 @@ static int same_snapshot(const FpSnap *a, const FpSnap *b) {
 }
 
 /* Mounted, swapped or held by device-mapper, md or anything else that claims a partition. */
-static int in_use(const char *disk) {
+int fp_in_use(const char *disk) {
     char dev[48], line[1024], p[PATH_MAX];
     int busy = 0;
     size_t dl = (size_t)snprintf(dev, sizeof dev, "/dev/%s", disk);
@@ -135,7 +136,7 @@ static int capture(const char *const argv[], char *out, size_t cap) {
 }
 
 /* Mounts the ESP read-only, without exec, to measure it and look for our folder. */
-static void look_at_esp(const char *esp, FspFacts *f) {
+void fp_look_at_esp(const char *esp, FspFacts *f) {
     const char *const argv[] = { "/usr/sbin/blkid", "-p", "-s", "TYPE", "-o", "value", esp, NULL };
     char type[64] = "";
     if (admin_run_capture(argv, type, sizeof type)) return;
@@ -175,7 +176,7 @@ void fp_probe(const char *disk, FpProbe *p) {
 #ifdef FP_TEST
     if (fp_test_uefi) f->uefi = f->boot_tool = 1;
 #endif
-    f->busy = in_use(disk);
+    f->busy = fp_in_use(disk);
     f->table = &p->table;
     if (fp_snapshot(disk, &p->snap)) { p->why = "install.free.tableDamaged"; return; }
     f->mbr = fsp_mbr_kind(p->snap.mbr);
@@ -188,7 +189,7 @@ void fp_probe(const char *disk, FpProbe *p) {
         if (f->table_ok && p->esps == 1 && !f->busy) {
             char path[48];
             fsp_part_path(disk, esp, path, sizeof path);
-            look_at_esp(path, f);
+            fp_look_at_esp(path, f);
         }
     }
     p->why = fsp_decide(f, &p->choice);
@@ -196,13 +197,13 @@ void fp_probe(const char *disk, FpProbe *p) {
 
 /* ---- creating the partition ---- */
 
-static int settle(void) {
+int fp_settle(void) {
     const char *const a[] = { "/usr/bin/udevadm", "settle", "--timeout=10", NULL };
     return admin_run(a);
 }
 
 /* The kernel sees the new partition exactly where it was asked to be. */
-static int kernel_sees(const char *disk, const char *part, unsigned lsec, uint64_t start, uint64_t end) {
+int fp_kernel_sees(const char *disk, const char *part, unsigned lsec, uint64_t start, uint64_t end) {
     const char *base = strrchr(part, '/') + 1;
     char p[128];
     unsigned long long s, n;
@@ -213,9 +214,9 @@ static int kernel_sees(const char *disk, const char *part, unsigned lsec, uint64
     }
     if (access(part, F_OK)) return 0;
     snprintf(p, sizeof p, "/sys/block/%s/%s/start", disk, base);
-    if (sys_ull(p, &s)) return 0;
+    if (fp_sys_ull(p, &s)) return 0;
     snprintf(p, sizeof p, "/sys/block/%s/%s/size", disk, base);
-    if (sys_ull(p, &n)) return 0;
+    if (fp_sys_ull(p, &n)) return 0;
     return s == start * scale && n == (end - start + 1) * scale;
 }
 
@@ -226,7 +227,7 @@ static int proven(const FpUndo *u, const char *disk, uint64_t start, uint64_t en
     const FpSnap *b = &u->before;
     if (!fsp_mbr_same(b->mbr, now.mbr)) return 0;
     if (!fsp_header_kept(&b->g1, &now.g1) || !fsp_header_kept(&b->g2, &now.g2)) return 0;
-    return fsp_entries_changed_only(b->ent1, now.ent1, b->g1.count, u->num - 1, start, end, root_type) == 0;
+    return fsp_entries_changed_only(b->ent1, now.ent1, b->g1.count, u->num - 1, start, end, fp_root_type) == 0;
 }
 
 const char *fp_create(const char *disk, uint64_t start, uint64_t end, FpUndo *u) {
@@ -255,7 +256,7 @@ const char *fp_create(const char *disk, uint64_t start, uint64_t end, FpUndo *u)
       if (admin_run(a) || stat(u->backup, &st) || !st.st_size) { unlink(u->backup); return "install.free.backupFailed"; } }
 
     /* the region and the table one last time, against the bytes taken above */
-    if (fp_snapshot(disk, &again) || !same_snapshot(&p.snap, &again) || in_use(disk)) { unlink(u->backup); return "install.free.diskChanged"; }
+    if (fp_snapshot(disk, &again) || !fp_same_snapshot(&p.snap, &again) || fp_in_use(disk)) { unlink(u->backup); return "install.free.diskChanged"; }
 
     char n[64], t[24], c[24];
     snprintf(n, sizeof n, "%u:%llu:%llu", u->num, (unsigned long long)start, (unsigned long long)end);
@@ -270,9 +271,9 @@ const char *fp_create(const char *disk, uint64_t start, uint64_t end, FpUndo *u)
 #ifdef FP_TEST
     if (fp_test_fail == 1) { fp_undo(u); return "install.free.verifyFailed"; }
 #endif
-    settle();
+    fp_settle();
     if (!proven(u, disk, start, end)) { fp_undo(u); return "install.free.verifyFailed"; }
-    if (!kernel_sees(disk, u->root, u->before.lsec, start, end)) { fp_undo(u); return "install.noPartitions"; }
+    if (!fp_kernel_sees(disk, u->root, u->before.lsec, start, end)) { fp_undo(u); return "install.noPartitions"; }
 #ifdef FP_TEST
     if (fp_test_fail == 2) { fp_undo(u); return "install.formatRootFailed"; }
 #endif
@@ -287,15 +288,15 @@ int fp_undo(FpUndo *u) {
     u->active = 0;
     const char *disk = strrchr(u->dev, '/') + 1;
     /* sgdisk refused before saving anything: there is nothing to write back */
-    if (!fp_snapshot(disk, &now) && same_snapshot(&u->before, &now)) { unlink(u->backup); return 0; }
+    if (!fp_snapshot(disk, &now) && fp_same_snapshot(&u->before, &now)) { unlink(u->backup); return 0; }
     admin_log("install.free.rollingBack", NULL);
     char arg[140];
     snprintf(arg, sizeof arg, "--load-backup=%s", u->backup);
     const char *const a[] = { SGDISK, arg, u->dev, NULL };
     int r = admin_run(a);
     sync();
-    settle();
-    if (r || fp_snapshot(disk, &now) || !same_snapshot(&u->before, &now)) {
+    fp_settle();
+    if (r || fp_snapshot(disk, &now) || !fp_same_snapshot(&u->before, &now)) {
         admin_log("install.free.rollbackFailed", "path", u->backup, NULL);
         return -1;
     }

@@ -7,12 +7,16 @@
  *                           { name, path, size, model, vendor, transport, removable, parts: [...] }
  *                           (no loop, ram, zram, sr, dm or md, and not the disk the live system booted from)
  *                           and, read-only: ptable, esp, espPart, freeStart, freeEnd, freeBytes (the
- *                           largest free GPT region), freeOk, freeWhy (an error code when not freeOk)
+ *                           largest free GPT region), freeOk, freeWhy (an error code when not freeOk);
+ *                           for manual partitioning lsec, first, last, tableTag, manualOk, manualWhy,
+ *                           and per partition num, start, end, esp, fs and (ESPs) loaders
  *   install-run <json>      installs (in a separate process). Mode "erase": wipes the disk, GPT with
  *                           BIOS boot (1 MiB, x86-64 only), ESP (512 MiB, FAT32) and ext4 root; copies
  *                           the live system (unsquashfs), configures it and installs grub: UEFI and BIOS
  *                           on x86-64, UEFI only on arm64. Mode "free": see freepart.c: one new ext4
  *                           partition in free space of a GPT disk, grub in EFI/LordOS on its ESP.
+ *                           Mode "manual": see manualpart.c: the partitions the person chose on a
+ *                           GPT disk (delete, create, which is /, /home, swap and the ESP).
  *                           Progress: "LOG progress <phase> <done> <total>", phases partition,
  *                           copy, configure, bootloader.
  *   install-account <json>  the OVA image's first boot: same plan without disk, mode and swap. It only
@@ -27,7 +31,10 @@
  *
  * The install-run JSON: { mode ("erase", the default, or "free"), disk, user, fullname, password,
  * hostname, lang, locale, timezone, kblayout, kbvariant, swap (MiB, 0 = no swap), and in mode free
- * freeStart, freeEnd (the region install-disks reported, which has to still be it) }. Every field is validated here (root), without
+ * freeStart, freeEnd (the region install-disks reported, which has to still be it), and in mode
+ * manual tableTag (install-disks' one, which has to still be it), delete ("2,5"), create
+ * ("root:S:E,home:S:E,swap:S:E,esp:S:E", sectors), rootPart, homePart, swapPart, espPart (existing
+ * partition numbers), homeFormat, espFormat }. Every field is validated here (root), without
  * trusting the UI: the disk has to be in the install-disks list, names
  * pass strict expressions, the region has to be in SUPPORTED, the zone in zoneinfo and
  * the layout in xkb. The password never goes into an argv: it's hashed here with crypt(3)
@@ -38,6 +45,7 @@
 #endif
 #include "install.h"
 #include "freepart.h"
+#include "manualpart.h"
 #include "../users/homedirs.h"
 
 #include <crypt.h>
@@ -263,16 +271,22 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
         fprintf(f, ",\"vendor\":"); json_str(f, k->vendor);
         fprintf(f, ",\"transport\":"); json_str(f, k->transport);
         fprintf(f, ",\"removable\":%s,\"usable\":%s", k->removable ? "true" : "false", k->size >= MIN_DISK ? "true" : "false");
-        static FpProbe fp;
+        static MppProbe mp;
         char espname[48] = "";
         unsigned espnum = 0;
-        fp_probe(k->name, &fp);
-        if (fp.esps == 1) { fsp_esp_count(&fp.table, &espnum); fsp_part_path(k->name, espnum, espname, sizeof espname); }
-        fprintf(f, ",\"ptable\":"); json_str(f, fsp_mbr_name(fp.facts.mbr));
-        fprintf(f, ",\"esp\":%s,\"espPart\":", fp.esps > 0 ? "true" : "false"); json_str(f, espname);
+        mpp_probe(k->name, &mp);
+        if (mp.fp.esps == 1) { fsp_esp_count(&mp.fp.table, &espnum); fsp_part_path(k->name, espnum, espname, sizeof espname); }
+        fprintf(f, ",\"ptable\":"); json_str(f, fsp_mbr_name(mp.fp.facts.mbr));
+        fprintf(f, ",\"esp\":%s,\"espPart\":", mp.fp.esps > 0 ? "true" : "false"); json_str(f, espname);
         fprintf(f, ",\"freeStart\":%llu,\"freeEnd\":%llu,\"freeBytes\":%llu,\"freeOk\":%s,\"freeWhy\":",
-                (unsigned long long)fp.region.start, (unsigned long long)fp.region.end, (unsigned long long)fp.region.bytes, fp.why ? "false" : "true");
-        json_str(f, fp.why ? fp.why : "");
+                (unsigned long long)mp.fp.region.start, (unsigned long long)mp.fp.region.end, (unsigned long long)mp.fp.region.bytes, mp.fp.why ? "false" : "true");
+        json_str(f, mp.fp.why ? mp.fp.why : "");
+        /* manual partitioning (manualpart.c): the table in sectors, and its tag for install-run */
+        fprintf(f, ",\"lsec\":%u,\"first\":%llu,\"last\":%llu,\"tableTag\":", mp.fp.table.lsec,
+                (unsigned long long)mp.fp.table.first, (unsigned long long)mp.fp.table.last);
+        json_str(f, mp.why ? "" : mp.tag);
+        fprintf(f, ",\"manualOk\":%s,\"manualWhy\":", mp.why ? "false" : "true");
+        json_str(f, mp.why ? mp.why : "");
         fprintf(f, ",\"parts\":[");
         int first = 1;
         for (char *l = out, *next; l && *l; l = next) {
@@ -285,7 +299,25 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
             fprintf(f, "%s{\"name\":", first ? "" : ","); json_str(f, name);
             fprintf(f, ",\"fstype\":"); json_str(f, fs);
             fprintf(f, ",\"label\":"); json_str(f, label);
-            fprintf(f, ",\"size\":%llu}", strtoull(size, NULL, 10));
+            fprintf(f, ",\"size\":%llu", strtoull(size, NULL, 10));
+            /* the table's own entry for it, when the table could be believed */
+            for (int q = 0; !mp.why && q < mp.fp.table.n; q++) {
+                char pp[48];
+                fsp_part_path(k->name, mp.fp.table.p[q].num, pp, sizeof pp);
+                if (strcmp(strrchr(pp, '/') + 1, name)) continue;
+                const FspPart *tp = &mp.fp.table.p[q];
+                fprintf(f, ",\"num\":%u,\"start\":%llu,\"end\":%llu,\"esp\":%s,\"fs\":", tp->num,
+                        (unsigned long long)tp->start, (unsigned long long)tp->end, tp->esp ? "true" : "false");
+                json_str(f, mp.facts.fstype[tp->num]);
+                if (tp->esp) {
+                    char names[8][33];
+                    int nl = mpp_esp_loaders(pp, names, 8);
+                    fprintf(f, ",\"loaders\":[");
+                    for (int z = 0; z < nl; z++) { if (z) fputc(',', f); json_str(f, names[z]); }
+                    fputc(']', f);
+                }
+            }
+            fputc('}', f);
             first = 0;
         }
         fprintf(f, "]}");
@@ -300,7 +332,10 @@ void install_act_disks(const AdminReq *r, const char *arg, size_t len) {
 
 typedef struct { char mode[16], disk[32], user[33], fullname[128], password[257], hostname[64], lang[16], locale[64], timezone[64], kblayout[24], kbvariant[40]; long swap; unsigned long long free_start, free_end;
                  /* the unattended install only (install_set_unattended) */
-                 char password_hash[256], ssh_key[1024]; int autologin, has_extra; } Plan;
+                 char password_hash[256], ssh_key[1024]; int autologin, has_extra;
+                 /* mode manual (manual.c): partitions to delete and create, the roles of existing ones */
+                 char del[MP_LIST_MAX + 1], create[MP_LIST_MAX + 1], table_tag[64];
+                 long root_part, home_part, swap_part, esp_part; int home_format, esp_format; } Plan;
 
 static int unattended;
 void install_set_unattended(int on) { unattended = on; }
@@ -399,6 +434,7 @@ static int parse_plan(const char *s, Plan *pl) {
                 { "locale", pl->locale, sizeof pl->locale }, { "timezone", pl->timezone, sizeof pl->timezone },
                 { "kblayout", pl->kblayout, sizeof pl->kblayout }, { "kbvariant", pl->kbvariant, sizeof pl->kbvariant },
                 { "passwordHash", pl->password_hash, sizeof pl->password_hash }, { "sshKey", pl->ssh_key, sizeof pl->ssh_key },
+                { "delete", pl->del, sizeof pl->del }, { "create", pl->create, sizeof pl->create }, { "tableTag", pl->table_tag, sizeof pl->table_tag },
             };
             if (!strcmp(key, "passwordHash") || !strcmp(key, "sshKey")) pl->has_extra = 1;
             for (size_t i = 0; i < sizeof f / sizeof *f; i++)
@@ -407,6 +443,10 @@ static int parse_plan(const char *s, Plan *pl) {
             char *end;
             long v = strtol(p, &end, 10);
             if (!strcmp(key, "swap")) pl->swap = v;
+            if (!strcmp(key, "rootPart")) pl->root_part = v;
+            if (!strcmp(key, "homePart")) pl->home_part = v;
+            if (!strcmp(key, "swapPart")) pl->swap_part = v;
+            if (!strcmp(key, "espPart")) pl->esp_part = v;
             if (!strcmp(key, "freeStart") || !strcmp(key, "freeEnd")) {
                 char *e2;
                 errno = 0;
@@ -417,6 +457,8 @@ static int parse_plan(const char *s, Plan *pl) {
             p = end;
         } else if (!strncmp(p, "true", 4) || !strncmp(p, "null", 4)) {
             if (!strcmp(key, "autologin")) { pl->has_extra = 1; pl->autologin = p[0] == 't'; }
+            if (!strcmp(key, "homeFormat")) pl->home_format = p[0] == 't';
+            if (!strcmp(key, "espFormat")) pl->esp_format = p[0] == 't';
             p += 4;
         } else if (!strncmp(p, "false", 5)) { if (!strcmp(key, "autologin")) pl->has_extra = 1; p += 5; }
         else return -1;
@@ -485,6 +527,21 @@ static const char *validate_person(Plan *pl) {
     return NULL;
 }
 
+/* The manual fields of the plan as manual.c takes them; -1 if one is malformed. */
+static int manual_plan(const Plan *pl, MpPlan *m) {
+    memset(m, 0, sizeof *m);
+    const long parts[MP_ROLES] = { [MP_ROOT] = pl->root_part, [MP_HOME] = pl->home_part, [MP_SWAP] = pl->swap_part, [MP_ESP] = pl->esp_part };
+    for (int r = 0; r < MP_ROLES; r++) {
+        if (parts[r] < 0 || parts[r] > FSP_MAX_PARTS) return -1;
+        m->part[r] = (unsigned)parts[r];
+    }
+    if (mp_parse_delete(pl->del, m) || mp_parse_create(pl->create, m)) return -1;
+    m->home_format = pl->home_format;
+    m->esp_format = pl->esp_format;
+    m->swap_file = pl->swap;
+    return 0;
+}
+
 static const char *validate(Plan *pl) {
     if (fsp_mode(pl->mode) < 0) return "install.badMode";
     Disk disks[32];
@@ -500,6 +557,14 @@ static const char *validate(Plan *pl) {
         fp_probe(pl->disk, &fp);
         if (fp.why) return fp.why;
         if (!pl->free_start || pl->free_start != fp.choice.region.start || pl->free_end != fp.choice.region.end) return "install.free.diskChanged";
+    }
+    if (fsp_mode(pl->mode) == 2) {
+        /* every rule of manual partitioning, from the disk itself (manual.c) */
+        static MpPlan mpl;
+        static MppProbe mp;
+        if (manual_plan(pl, &mpl)) return "install.badPlan";
+        const char *why2 = mpp_check(pl->disk, pl->table_tag, &mpl, &mp);
+        if (why2) return why2;
     }
     return NULL;
 }
@@ -609,7 +674,7 @@ static int target_ids(const char *user, uid_t *uid, gid_t *gid) {
 }
 
 static void umount_target(void) {
-    static const char *const sub[] = { "/sys/firmware/efi/efivars", "/run", "/sys", "/proc", "/dev/pts", "/dev", "/boot/efi", "", NULL };
+    static const char *const sub[] = { "/sys/firmware/efi/efivars", "/run", "/sys", "/proc", "/dev/pts", "/dev", "/boot/efi", "/home", "", NULL };
     sync();
     for (int i = 0; sub[i]; i++) {
         char p[PATH_MAX];
@@ -645,15 +710,23 @@ static int disk_busy(const char *disk) {
 /* Mode free: what a failed install has to give back. Empty in mode erase. */
 static FpUndo undo;
 static int undo_boot_folder;
+/* Mode manual: the same, from manualpart.c. */
+static MppResult mres;
 
 static void free_abort(void) {
-    if (!undo.active) return;
     if (undo_boot_folder) {                     /* EFI/LordOS didn't exist before (freespace.c): it's all ours */
         const char *const a[] = { "/usr/bin/rm", "-rf", "--", TARGET "/boot/efi/EFI/" FP_BOOT_FOLDER, NULL };
         run(a);
+        undo_boot_folder = 0;
+    }
+    if (!undo.active && !mres.undo.active) {
+        /* deleted partitions were formatted over: their table entries can't honestly come back */
+        if (mres.kept_new_table) admin_log("install.manual.tableKept", NULL);
+        return;
     }
     umount_target();
     fp_undo(&undo);
+    fp_undo(&mres.undo);
 }
 
 #define FAIL(...) do { free_abort(); admin_err(__VA_ARGS__, NULL); umount_target(); explicit_bzero(&pl, sizeof pl); return; } while (0)
@@ -663,6 +736,13 @@ static void free_abort(void) {
 static const char *setup_person(Plan *pl, int *step, int steps) {
     writef(TARGET "/etc/hostname", 0644, "%s\n", pl->hostname);
     writef(TARGET "/etc/hosts", 0644, "127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n", pl->hostname);
+
+    /* a kept /home (mode manual) may already have this user's folder: it stays, with its files */
+    char home[PATH_MAX];
+    struct stat hst;
+    snprintf(home, sizeof home, TARGET "/home/%s", pl->user);
+    const int had_home = lstat(home, &hst) == 0;
+    if (had_home && !S_ISDIR(hst.st_mode)) return "install.manual.homeNotFolder";
 
     /* the user, with their password hashed here (yescrypt) */
     { const char *const a[] = { "/usr/sbin/useradd", "-m", "-s", "/bin/bash", "-c", pl->fullname, "-G", "sudo,audio,video,input,render,pipewire", pl->user, NULL };
@@ -711,14 +791,31 @@ static const char *setup_person(Plan *pl, int *step, int steps) {
     /* the user's LordOS settings: chosen language and keyboard */
     uid_t uid; gid_t gid;
     if (target_ids(pl->user, &uid, &gid)) return "install.userMissing";
+    /* the kept folder belonged to another uid (an earlier system): only that owner's files become
+     * this user's; -h never follows a link out of the folder */
+    if (had_home && hst.st_uid != uid) {
+        char from[32], to[48];
+        snprintf(from, sizeof from, "--from=%u", (unsigned)hst.st_uid);
+        snprintf(to, sizeof to, "%u:%u", (unsigned)uid, (unsigned)gid);
+        const char *const a[] = { "/usr/bin/chown", "-R", "-h", from, to, "--", home, NULL };
+        if (run(a)) admin_log("install.chownWarning", NULL);
+    }
+    /* a kept folder keeps its own settings, and nothing is made or written through a link in it */
     { char p[PATH_MAX];
-      snprintf(p, sizeof p, TARGET "/home/%s/.config", pl->user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
-      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos", pl->user); mkdir(p, 0755); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      struct stat cst;
+      snprintf(p, sizeof p, TARGET "/home/%s/.config", pl->user); mkdir(p, 0755);
+      int may = lstat(p, &cst) == 0 && S_ISDIR(cst.st_mode);
+      if (may && lchown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos", pl->user);
+      if (may) { mkdir(p, 0755); may = lstat(p, &cst) == 0 && S_ISDIR(cst.st_mode); }
+      if (may && lchown(p, uid, gid)) admin_log("install.chownWarning", NULL);
       snprintf(p, sizeof p, TARGET "/home/%s/.config/lordos/settings.json", pl->user);
-      writef(p, 0644, "{\n  \"language\": \"%s\",\n  \"keyboards\": [{ \"layout\": \"%s\", \"variant\": \"%s\" }],\n  \"keyboardIndex\": 0\n}\n", pl->lang, pl->kblayout, pl->kbvariant);
-      if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      if (may && (!had_home || access(p, F_OK))) {
+          writef(p, 0644, "{\n  \"language\": \"%s\",\n  \"keyboards\": [{ \"layout\": \"%s\", \"variant\": \"%s\" }],\n  \"keyboardIndex\": 0\n}\n", pl->lang, pl->kblayout, pl->kbvariant);
+          if (lchown(p, uid, gid)) admin_log("install.chownWarning", NULL);
+      }
       snprintf(p, sizeof p, TARGET "/home/%s/.config/locale.conf", pl->user);
-      writef(p, 0644, "LANG=%s\n", pl->locale); if (chown(p, uid, gid)) admin_log("install.chownWarning", NULL); }
+      if (may && (!had_home || access(p, F_OK))) { writef(p, 0644, "LANG=%s\n", pl->locale); if (lchown(p, uid, gid)) admin_log("install.chownWarning", NULL); } }
     /* Escritorio, Documentos, Descargas… in the chosen language and ~/.config/user-dirs.dirs (the
      * same list as Settings → Users and the live system: users/homedirs.c) */
     { char p[PATH_MAX]; snprintf(p, sizeof p, TARGET "/home/%s", pl->user);
@@ -746,18 +843,29 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     if (why) { explicit_bzero(&pl, sizeof pl); admin_err(why, NULL); return; }
     if (disk_busy(pl.disk)) { admin_err("install.diskBusy", "disk", pl.disk, NULL); explicit_bzero(&pl, sizeof pl); return; }
 
-    const int beside = fsp_mode(pl.mode) == 1;
+    const int beside = fsp_mode(pl.mode) == 1, manual = fsp_mode(pl.mode) == 2;
+    /* both share a disk with other systems: grub in EFI/LordOS with its own firmware entry */
+    const int shared = beside || manual;
     char dev[48], esp[48], root[48];
     snprintf(dev, sizeof dev, "/dev/%s", pl.disk);
-    if (!beside) {
+    if (!shared) {
     part_path(pl.disk, INSTALL_BIOS ? 2 : 1, esp, sizeof esp);
     part_path(pl.disk, INSTALL_BIOS ? 3 : 2, root, sizeof root);
     }
-    admin_log(beside ? "install.free.installing" : "install.installingTo", "dev", dev, NULL);
+    admin_log(beside ? "install.free.installing" : manual ? "install.manual.installing" : "install.installingTo", "dev", dev, NULL);
 
-    /* 1. partition. Mode free: one new partition, nothing else (freepart.c) */
+    /* 1. partition. Mode free: one new partition, nothing else (freepart.c). Mode manual: what the
+     * person chose, deleted, created and formatted in manualpart.c */
     progress("partition", 0, 4);
-    if (beside) {
+    static MpPlan mpl;
+    if (manual) {
+        if (manual_plan(&pl, &mpl)) FAIL("install.badPlan");
+        const char *why2 = mpp_apply(pl.disk, pl.table_tag, &mpl, &mres);
+        if (why2) FAIL(why2);
+        cpy(esp, sizeof esp, mres.dev[MP_ESP]);
+        cpy(root, sizeof root, mres.dev[MP_ROOT]);
+        progress("partition", 3, 4);
+    } else if (beside) {
         const char *why2 = fp_create(pl.disk, pl.free_start, pl.free_end, &undo);
         if (why2) FAIL(why2);
         cpy(esp, sizeof esp, undo.esp);
@@ -806,14 +914,28 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     progress("configure", step, steps);
     char ru[80], eu[80];
     if (uuid_of(root, ru, sizeof ru) || uuid_of(esp, eu, sizeof eu)) FAIL("install.uuidFailed");
-    char swapline[64] = "";
+    char swapline[160] = "";
     if (pl.swap > 0) snprintf(swapline, sizeof swapline, "/swapfile none swap sw 0 0\n");
-    /* a shared ESP is never checked or repaired at boot, and its absence doesn't stop this system */
+    /* mode manual: a /home and a swap partition of their own */
+    char homeline[160] = "";
+    if (manual && mres.dev[MP_HOME][0]) {
+        char hu[80];
+        if (uuid_of(mres.dev[MP_HOME], hu, sizeof hu)) FAIL("install.uuidFailed");
+        snprintf(homeline, sizeof homeline, "UUID=%s /home %s defaults 0 %d\n", hu, mres.home_fs, mp_fsck_pass(mres.home_fs));
+    }
+    if (manual && mres.dev[MP_SWAP][0]) {
+        char su[80];
+        if (uuid_of(mres.dev[MP_SWAP], su, sizeof su)) FAIL("install.uuidFailed");
+        snprintf(swapline, sizeof swapline, "UUID=%s none swap sw 0 0\n", su);
+    }
+    /* a shared ESP is never checked or repaired at boot, and its absence doesn't stop this system;
+     * one LordOS formatted is its own, as in an erase install */
+    const int esp_shared = beside || (manual && !mres.esp_formatted);
     if (writef(TARGET "/etc/fstab", 0644,
-               beside ? "# /etc/fstab — generated by the LordOS installer\n"
-                        "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077,nofail 0 0\n%s"
-                      : "# /etc/fstab — generated by the LordOS installer\n"
-                        "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n%s", ru, eu, swapline))
+               esp_shared ? "# /etc/fstab — generated by the LordOS installer\n"
+                            "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077,nofail 0 0\n%s%s"
+                          : "# /etc/fstab — generated by the LordOS installer\n"
+                            "UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n%s%s", ru, eu, homeline, swapline))
         FAIL("sys.writeFailed", "path", "/etc/fstab");
     progress("configure", ++step, steps);
 
@@ -823,6 +945,13 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     unlink(TARGET "/etc/sysctl.d/50-lordos-ping.conf.dpkg-old");
     { const char *const a[] = { "/usr/bin/dpkg", "--purge", "live-boot", "live-boot-initramfs-tools", NULL }; in_target(a); }
     { const char *const a[] = { "/usr/sbin/userdel", "-r", "lordos", NULL }; in_target(a); }
+    /* mode manual: /home goes on its partition only now, after the live user's folder is gone, so
+     * that removal can never reach a kept /home */
+    if (manual && mres.dev[MP_HOME][0]) {
+        mkdir(TARGET "/home", 0755);
+        if (mount(mres.dev[MP_HOME], TARGET "/home", mres.home_fs, MS_NOSUID | MS_NODEV, NULL))
+            FAIL("install.mountFailed", "path", mres.dev[MP_HOME], "errno", lerr_errno(errno));
+    }
     progress("configure", ++step, steps);
 
     { const char *why = setup_person(&pl, &step, steps);
@@ -845,12 +974,12 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     int theme = access(TARGET "/usr/share/grub/themes/lordos/theme.txt", R_OK) == 0;
     /* beside another system: a menu with time to choose, and that system in it when os-prober came
      * in the image */
-    int prober = beside && access(TARGET "/usr/bin/os-prober", X_OK) == 0;
+    int prober = shared && access(TARGET "/usr/bin/os-prober", X_OK) == 0;
     writef(TARGET "/etc/default/grub", 0644,
            "# generated by the LordOS installer\nGRUB_DEFAULT=0\nGRUB_TIMEOUT=%d\nGRUB_DISTRIBUTOR=LordOS\n"
            "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet %sloglevel=3\"\nGRUB_CMDLINE_LINUX=\"\"\nGRUB_DISABLE_OS_PROBER=%s\n"
            "GRUB_GFXMODE=auto\nGRUB_GFXPAYLOAD_LINUX=keep\n%s",
-           beside ? 5 : 2,
+           shared ? 5 : 2,
            splash ? "splash vt.global_cursor_default=0 " : "",
            prober ? "false" : "true",
            theme ? "GRUB_TERMINAL_OUTPUT=gfxterm\nGRUB_THEME=/usr/share/grub/themes/lordos/theme.txt\n" : "");
@@ -862,20 +991,27 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     /* 4. boot: grub for UEFI (removable path, works on any firmware) and, on x86-64, for BIOS.
      * Mode free: its own folder and its own firmware entry; never the removable path, which may be
      * another system's, and never the disk's first sectors */
-    const int boot_steps = beside ? 3 : INSTALL_BIOS ? 3 : 2;
+    const int boot_steps = shared ? 3 : INSTALL_BIOS ? 3 : 2;
     int boot_step = 0;
     progress("bootloader", 0, boot_steps);
-    if (beside) {
-        undo_boot_folder = 1;
+    if (shared) {
+        /* mode manual may reuse a folder an earlier LordOS left: then it isn't ours to remove */
+        undo_boot_folder = beside || mres.esp_formatted || access(TARGET "/boot/efi/EFI/" FP_BOOT_FOLDER, F_OK) != 0;
         const char *const a[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--bootloader-id=" FP_BOOT_FOLDER, "--no-nvram", NULL };
         if (in_target(a) || access(TARGET "/boot/efi/EFI/" FP_BOOT_FOLDER "/" GRUB_EFI_FILE, R_OK)) FAIL("install.grubEfiFailed");
+        /* an EFI partition LordOS formatted holds nobody else's loader: the removable path too, so it
+         * boots on firmware that forgets its entries */
+        if (manual && mres.esp_formatted) {
+            const char *const b[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--removable", "--no-nvram", NULL };
+            if (in_target(b)) FAIL("install.grubEfiFailed");
+        }
     } else {
     { const char *const a[] = { "/usr/sbin/grub-install", GRUB_EFI_TARGET, "--efi-directory=/boot/efi", "--removable", "--no-nvram", NULL };
       if (in_target(a)) FAIL("install.grubEfiFailed"); }
     }
     progress("bootloader", ++boot_step, boot_steps);
 #if INSTALL_BIOS
-    if (!beside) {
+    if (!shared) {          /* never the first sectors of a disk other systems use */
     { const char *const a[] = { "/usr/sbin/grub-install", "--target=i386-pc", dev, NULL };
       if (in_target(a)) FAIL("install.grubBiosFailed"); }
     progress("bootloader", ++boot_step, boot_steps);
@@ -884,16 +1020,18 @@ void install_act_run(const AdminReq *r, const char *arg, size_t len) {
     { const char *const a[] = { "/usr/sbin/grub-mkconfig", "-o", "/boot/grub/grub.cfg", NULL };
       if (in_target(a)) FAIL("install.grubConfigFailed"); }
     progress("bootloader", ++boot_step, boot_steps);
-    if (beside) {
+    if (shared) {
         /* last on purpose: after this nothing can fail, so no entry needs undoing. It only adds an
          * entry: the others stay, this one goes first in the boot order */
         char pn[16];
-        snprintf(pn, sizeof pn, "%u", undo.esp_num);
+        snprintf(pn, sizeof pn, "%u", manual ? mres.esp_num : undo.esp_num);
         const char *const a[] = { "/usr/bin/efibootmgr", "-q", "-c", "-d", dev, "-p", pn, "-L", "LordOS",
                                   "-l", "\\EFI\\" FP_BOOT_FOLDER "\\" GRUB_EFI_FILE, NULL };
         if (run(a)) FAIL("install.free.bootEntryFailed");
         progress("bootloader", ++boot_step, boot_steps);
         fp_commit(&undo);
+        fp_commit(&mres.undo);
+        mres.kept_new_table = 0;
     }
     umount_target();
     explicit_bzero(&pl, sizeof pl);
