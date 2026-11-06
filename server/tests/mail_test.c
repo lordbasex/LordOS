@@ -1066,6 +1066,7 @@ static void test_folders(void) {
     roles(f, 1, q);
     CHECKS(q[0], "drafts");
     roles(f, 0, q);
+}
 
 /* ---- CalDAV / CardDAV sync helpers (davutil.c) ---- */
 
