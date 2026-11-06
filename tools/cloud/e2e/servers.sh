@@ -73,6 +73,7 @@ PermitRootLogin no
 UsePAM yes
 Subsystem sftp internal-sftp
 LogLevel VERBOSE
+PerSourcePenalties no
 EOF
     # ---- certificates: a bench CA (trusted system-wide) and a self-signed one (trusted by nobody)
     mkdir -p $CONF/tls
