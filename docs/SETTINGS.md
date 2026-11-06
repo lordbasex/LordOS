@@ -418,7 +418,7 @@ Not a hardware page, but its native side lives here too: `hw/brframe.c`, exposed
 `lord.browserFrame.apply(on, 'all'|'chromium'|'firefox')`, `.state()`, `.tidy()` and
 `.chromiumRunning()` in `ui/js_hw.c`; the page is `apps/settings/BrowserFrame.jsx` (strings in
 `settings.json`, `browserTabs.*`) and the logic `sdk/browserframe.js`. It writes one preference in the
-user's own Chromium and Firefox profiles; see `WAYLAND.md`, "The switch in Settings".
+user's own Chromium, Brave (0.8.8.4) and Firefox profiles; see `WAYLAND.md`, "The switch in Settings".
 
 ## Other pages that changed in 0.8.5
 

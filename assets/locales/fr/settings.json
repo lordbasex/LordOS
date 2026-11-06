@@ -6,22 +6,22 @@
   "admin.timezone": "Fuseau horaire",
   "admin.unavailable": "L’assistant d’administration n’est pas lancé : lord-server doit démarrer avec sudo et l’utilisateur doit appartenir au groupe sudo.",
   "browserTabs.applyAll": "Les modifier",
-  "browserTabs.chromiumOpen": "Chromium est ouvert : ses profils seront modifiés dès que vous le quitterez.",
+  "browserTabs.chromiumOpen": "Chromium ou Brave est ouvert : ses profils seront modifiés dès que vous le quitterez.",
   "browserTabs.done": "Terminé. Les navigateurs l’appliqueront à leur prochaine ouverture.",
   "browserTabs.failed": {
     "one": "{count} profil de navigateur n’a pas pu être modifié et est resté tel quel.",
     "other": "{count} profils de navigateur n’ont pas pu être modifiés et sont restés tels quels."
   },
   "browserTabs.firefoxKept": "Un profil Firefox définit ce réglage dans son propre fichier user.js : il n’a pas été modifié.",
-  "browserTabs.hint": "Activé : Chromium et Firefox affichent une seule barre avec leurs onglets et les boutons de fenêtre de LordOS. Désactivé : ils utilisent le cadre de LordOS. Ce réglage modifie vos profils de navigateur et s’applique à la prochaine ouverture de chaque navigateur.",
+  "browserTabs.hint": "Activé : Chromium, Brave et Firefox affichent une seule barre avec leurs onglets et les boutons de fenêtre de LordOS. Désactivé : ils utilisent le cadre de LordOS. Ce réglage modifie vos profils de navigateur et s’applique à la prochaine ouverture de chaque navigateur.",
   "browserTabs.label": "Navigateurs : onglets dans la barre de titre",
   "browserTabs.othersOff": {
-    "one": "{count} profil Chromium utilise encore le cadre de LordOS",
-    "other": "{count} profils Chromium utilisent encore le cadre de LordOS"
+    "one": "{count} profil Chromium ou Brave n’affiche pas encore les boutons de fenêtre de LordOS",
+    "other": "{count} profils Chromium ou Brave n’affichent pas encore les boutons de fenêtre de LordOS"
   },
   "browserTabs.othersOn": {
-    "one": "{count} profil Chromium affiche encore sa propre barre",
-    "other": "{count} profils Chromium affichent encore leur propre barre"
+    "one": "{count} profil Chromium ou Brave affiche encore sa propre barre",
+    "other": "{count} profils Chromium ou Brave affichent encore leur propre barre"
   },
   "change": "Modifier…",
   "clipboard.add": "Ajouter",

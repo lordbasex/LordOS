@@ -2,10 +2,11 @@
  * switch in Settings"). Writes ONE preference of the preinstalled browsers in the user's own
  * profiles, and nothing else:
  *
- *   Chromium  ~/.config/chromium/{Default,Profile N}/Preferences
+ *   Chromium  ~/.config/chromium/{Default,Profile N}/Preferences, and the same in Brave's
+ *             ~/.config/BraveSoftware/Brave-Browser (0.8.8.4, #39; "chromium" below means both):
  *             browser.custom_chrome_frame = on, and with on extensions.theme.system_theme = 1
  *             (the GTK theme, for LordOS's window buttons) unless the profile uses a theme
- *             extension. Only while Chromium is not running (it rewrites the file when it quits);
+ *             extension. Only while that browser is not running (it rewrites the file when it quits);
  *             a surgical edit of those keys, the rest of the file byte for byte, validated as JSON
  *             before and after, a backup (Preferences.lordos-backup) and an atomic rename.
  *   Firefox   ~/.config/mozilla/firefox and ~/.mozilla/firefox, the relative profiles listed in
@@ -27,7 +28,7 @@ typedef struct {
     int profiles;   /* profiles looked at */
     int changed;    /* written now */
     int unchanged;  /* already as asked */
-    int running;    /* Chromium: it is open and nothing was written (try again after it quits);
+    int running;    /* Chromium/Brave: one is open and its profiles weren't written (try again after it quits);
                        Firefox: profiles that are open (the line applies when Firefox restarts) */
     int kept;       /* Firefox: the user's own user.js sets the preference; left alone */
     int failed;     /* unreadable, malformed or unwritable: left exactly as it was */
@@ -50,7 +51,7 @@ void brf_chromium_apply(const char *cfg, int on, BrfResult *r);
 void brf_firefox_apply(const char *cfg, const char *home, int on, BrfResult *r);
 int  brf_firefox_tidy(const char *cfg, const char *home);         /* marked lines removed */
 int  brf_chromium_running(const char *cfg);
-/* How many Chromium profiles say custom_chrome_frame true / false (unset ones aren't counted). */
+/* Chromium and Brave profiles that switching off (*on) or on (*off) would change; malformed ones aren't counted. */
 void brf_chromium_state(const char *cfg, int *on, int *off);
 
 /* {"chromium":{…},"firefox":{…}} for lord.browserFrame.apply (malloc, NULL on OOM). */

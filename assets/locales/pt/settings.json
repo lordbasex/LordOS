@@ -6,22 +6,22 @@
   "admin.timezone": "Fuso horário",
   "admin.unavailable": "O assistente de administração não está ativo: o lord-server deve iniciar com sudo e o usuário estar no grupo sudo.",
   "browserTabs.applyAll": "Alterá-los",
-  "browserTabs.chromiumOpen": "O Chromium está aberto: seus perfis mudam assim que você o fechar.",
+  "browserTabs.chromiumOpen": "O Chromium ou o Brave está aberto: seus perfis mudam assim que você o fechar.",
   "browserTabs.done": "Pronto. Os navegadores usam isso na próxima vez que abrirem.",
   "browserTabs.failed": {
     "one": "Não foi possível alterar {count} perfil de navegador, que ficou como estava.",
     "other": "Não foi possível alterar {count} perfis de navegador, que ficaram como estavam."
   },
   "browserTabs.firefoxKept": "Um perfil do Firefox define isso no seu próprio arquivo user.js, então não foi alterado.",
-  "browserTabs.hint": "Ativado: o Chromium e o Firefox desenham uma única barra com suas abas e os botões de janela do LordOS. Desativado: usam a moldura do LordOS. Altera seus perfis de navegador e vale na próxima vez que cada navegador abrir.",
+  "browserTabs.hint": "Ativado: o Chromium, o Brave e o Firefox desenham uma única barra com suas abas e os botões de janela do LordOS. Desativado: usam a moldura do LordOS. Altera seus perfis de navegador e vale na próxima vez que cada navegador abrir.",
   "browserTabs.label": "Navegadores: abas na barra de título",
   "browserTabs.othersOff": {
-    "one": "{count} perfil do Chromium ainda usa a moldura do LordOS",
-    "other": "{count} perfis do Chromium ainda usam a moldura do LordOS"
+    "one": "{count} perfil do Chromium ou do Brave ainda não mostra os botões de janela do LordOS",
+    "other": "{count} perfis do Chromium ou do Brave ainda não mostram os botões de janela do LordOS"
   },
   "browserTabs.othersOn": {
-    "one": "{count} perfil do Chromium ainda desenha sua própria barra",
-    "other": "{count} perfis do Chromium ainda desenham sua própria barra"
+    "one": "{count} perfil do Chromium ou do Brave ainda desenha sua própria barra",
+    "other": "{count} perfis do Chromium ou do Brave ainda desenham sua própria barra"
   },
   "change": "Alterar…",
   "clipboard.add": "Adicionar",

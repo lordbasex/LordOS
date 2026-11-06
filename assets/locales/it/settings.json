@@ -6,22 +6,22 @@
   "admin.timezone": "Fuso orario",
   "admin.unavailable": "L’assistente di amministrazione non è in esecuzione: lord-server deve avviarsi con sudo e l’utente deve far parte del gruppo sudo.",
   "browserTabs.applyAll": "Modificali",
-  "browserTabs.chromiumOpen": "Chromium è aperto: i suoi profili cambiano appena lo chiudi.",
+  "browserTabs.chromiumOpen": "Chromium o Brave è aperto: i suoi profili cambiano appena lo chiudi.",
   "browserTabs.done": "Fatto. I browser lo useranno alla prossima apertura.",
   "browserTabs.failed": {
     "one": "{count} profilo del browser non è stato modificato ed è rimasto com’era.",
     "other": "{count} profili del browser non sono stati modificati e sono rimasti com’erano."
   },
   "browserTabs.firefoxKept": "Un profilo di Firefox imposta questa opzione nel proprio file user.js, quindi è stato lasciato com’è.",
-  "browserTabs.hint": "Attivo: Chromium e Firefox disegnano un’unica barra con le loro schede e i pulsanti della finestra di LordOS. Disattivo: usano la cornice di LordOS. Modifica i profili dei tuoi browser e si applica alla prossima apertura di ciascun browser.",
+  "browserTabs.hint": "Attivo: Chromium, Brave e Firefox disegnano un’unica barra con le loro schede e i pulsanti della finestra di LordOS. Disattivo: usano la cornice di LordOS. Modifica i profili dei tuoi browser e si applica alla prossima apertura di ciascun browser.",
   "browserTabs.label": "Browser: schede nella barra del titolo",
   "browserTabs.othersOff": {
-    "one": "{count} profilo di Chromium usa ancora la cornice di LordOS",
-    "other": "{count} profili di Chromium usano ancora la cornice di LordOS"
+    "one": "{count} profilo di Chromium o Brave non mostra ancora i pulsanti della finestra di LordOS",
+    "other": "{count} profili di Chromium o Brave non mostrano ancora i pulsanti della finestra di LordOS"
   },
   "browserTabs.othersOn": {
-    "one": "{count} profilo di Chromium disegna ancora la propria barra",
-    "other": "{count} profili di Chromium disegnano ancora la propria barra"
+    "one": "{count} profilo di Chromium o Brave disegna ancora la propria barra",
+    "other": "{count} profili di Chromium o Brave disegnano ancora la propria barra"
   },
   "change": "Cambia…",
   "clipboard.add": "Aggiungi",

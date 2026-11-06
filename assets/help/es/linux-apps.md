@@ -27,6 +27,11 @@ ningún comando escrito a mano.
   pestañas propia del navegador: en Chromium, menú ⋮ → Configuración → Apariencia → desactivar «Usar
   la barra de título y los bordes del sistema»; en Firefox, menú ☰ → Más herramientas → Personalizar
   barra de herramientas → desmarcar «Barra de título».
+- **Brave** (y otros navegadores hechos sobre Chromium) dibuja su propia barra. Con su tema «Clásico»
+  los botones de ventana son los suyos, no los de LordOS. Configuración → Apariencia → «Navegadores:
+  pestañas en la barra de título» también cambia los perfiles de Brave (con Brave cerrado; si está
+  abierto, se aplica cuando se cierra); en el propio Brave: menú ☰ → Configuración → Apariencia → Tema → GTK.
+  Para usar el marco de LordOS: activar ahí «Usar la barra de título y los bordes del sistema».
 - **GTK y GNOME** siguen el modo oscuro o claro y el color de acento de LordOS en vivo, y ponen los
   botones de la ventana a la izquierda, como los semáforos (en el tema Lord Classic, a la derecha). Las
   apps GTK 3 usan el tema «LordOS»; su color de acento es fijo.
