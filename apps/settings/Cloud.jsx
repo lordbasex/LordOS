@@ -156,7 +156,7 @@ function AllAccounts({ st }) {
     <View aria-label={tr('cloud.allAccounts')} style={[box(t), { padding: 16, gap: 10 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
         <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.allAccounts')}</Text>
-        <Dim t={t}>{tr('cloud.space.usedOf', { used: formatBytes(bar.used), total: formatBytes(bar.total) })}</Dim>
+        <Dim t={t}>{bar.total != null ? tr('cloud.space.usedOf', { used: formatBytes(bar.used), total: formatBytes(bar.total) }) : tr('cloud.space.usedOnly', { used: formatBytes(bar.used) })}</Dim>
       </View>
       <SpaceBar height={14} gap={2} parts={bar.segs.map((s) => ({ frac: s.pct, color: s.color }))} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
@@ -175,7 +175,7 @@ function AccountRow({ a, accounts, last }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const u = M.usage(a.about);
-  const line = M.stateLine(a);
+  const line = M.stateLine(a, (cloudState.get() || {}).service);
   const color = M.accountColor(accounts, a.id);
   return (
     <BoxRow t={t} last={last} onClick={() => setView({ page: a.id, sheet: null })}>
@@ -224,6 +224,16 @@ function Overview({ st }) {
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr('cloud.empty.title')}</Text>
           <Dim t={t} style={{ textAlign: 'center' }}>{tr('cloud.empty.body')}</Dim>
           <Button primary label={tr('cloud.addAccount')} onClick={() => setView({ sheet: { kind: 'add' } })} />
+        </View>
+      ) : null}
+      {svc.running === false && accs.length ? (
+        <View style={[box(t), { padding: 16, gap: 8, border: `1px solid ${tint.warn}` }]}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.serviceDown.title')}</Text>
+          <Dim t={t}>{svc.error ? errorText(svc.error) : tr('cloud.serviceDown.body')}</Dim>
+          <Actions start>
+            <Button small primary label={tr('cloud.service.restart')} onClick={() => cloud.restart()} />
+            <Button small label={tr('cloud.service.log')} onClick={() => cloud.showLog()} />
+          </Actions>
         </View>
       ) : null}
       <AllAccounts st={st} />
@@ -695,7 +705,7 @@ function AccountPage({ a, st }) {
   const p = providerOf(a.kind, a);
   const verified = typeof (providerCache.get().find((x) => x.kind === a.kind) || {}).verified === 'boolean'
     ? providerCache.get().find((x) => x.kind === a.kind).verified : M.isVerified(a.kind, CLOUD_PROVIDERS);
-  const line = M.stateLine(a);
+  const line = M.stateLine(a, st.service);
   const stateText = tr(line.key, line.vars);
   const errText = a.error && !M.needsUnlock(a) ? errorText(M.explainError(a.error, st, a)) : '';
   // two balanced columns once the window is wide enough, one column otherwise

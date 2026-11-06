@@ -791,6 +791,24 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
   `cloud.notRunning` is read as the account's reason while the service runs (`explainError`).
 - **Sign In Again** passes `{ accountId }` to `beginSignIn` and `add` (17.2 item 10).
 
+
+
+### 18.4 After the end-to-end run (2026-11-06)
+
+- **Trust questions** come in the same steps as rclone's questions: `{ question: { kind: 'hostKey', host, port, fingerprint } }`
+  asks "Is this the right server?" with the SHA256 fingerprint in monospace and **Trust**; `kind: 'certificate'` asks "This
+  server's certificate isn't trusted by the system" with fingerprint, issued to, issued by and **Trust This Certificate**.
+  Both answer `cloud.answer(state, 'trust')`; Cancel goes back to the credentials with what was typed.
+- **Errors with details**: `cloud.hostKeyChanged` shows both fingerprints (`old`, `new` of the answer), `cloud.cantRevoke` the
+  date the link stops working (`expires`), and `cloud.certUntrusted`, `cloud.unreachable`, `cloud.badAddress`,
+  `cloud.notConnected`, `cloud.keyringLocked`, `cloud.noKeyring`, `cloud.notRunning`, `cloud.notFound`, `cloud.badKind` their
+  own texts (`errorVars`, `errorMessage`). An error of `add` or of a later step shows under the credentials form, the field it
+  belongs to outlined (lord-server's `field`, else by the code: an address for unreachable and bad address, the password
+  for a failed sign-in), with everything typed kept.
+- **Provider names**: an account's line uses the provider list's short label (asked once in the background when the pane
+  opens), else rclone's description cut before "including"; it is cut with an ellipsis where it doesn't fit.
+- **Measure** shows for a connected account whose provider gives no total, `about` null included (S3).
+
 **From the end-to-end tests (2026-11-06, B3–B9):**
 
 12. **Options JS may set (B5, 4.2).** Only an allow-list per kind: rclone's non-advanced, non-hidden options of that
@@ -847,3 +865,16 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
 - **Provider names**: an account's line uses the provider list's short label (asked once in the background when the pane
   opens), else rclone's description cut before "including"; it is cut with an ellipsis where it doesn't fit.
 - **Measure** shows for a connected account whose provider gives no total, `about` null included (S3).
+
+### 18.5 The e2e first pass, interface items (U3, U4, U6, U7)
+
+- **U3**: a file that was coming down keeps "coming down" (at 100 %) for up to 8 s when an answer says "in the cloud"
+  right after (`mergeStatusHeld`), so it no longer flickers back before "on this computer"; Free Up Space still turns a
+  file to "in the cloud" at once.
+- **U4**: "All accounts" says "<used> of <total>" only when every account has a quota, else "<used> used" (a measured
+  `used` is never a total). An account without a quota that nobody measured (`used` 0, no `measuredAt`) says "Space not
+  measured" in Settings and nothing in Files' status bar.
+- **U6**: WebDAV's presets list plain WebDAV ("other") first and choose it by default (`presetField`).
+- **U7**: while `service.running` is false every account says "Not connected: the cloud service isn't running" (dim with
+  "!" in Files' sidebar), and the overview starts with the service's own message, **Restart** and **Show Log**.
+- The server form no longer promises a fingerprint prompt; the trust step (18.4) shows only when lord-server asks.
