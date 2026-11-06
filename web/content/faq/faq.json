@@ -742,9 +742,9 @@
             "pt": "Os gestos do touchpad funcionam?"
           },
           "a": {
-            "en": "Yes. LordOS has its own touchpad driver with tap to click, two-finger click, natural and inertial scrolling, pinch to zoom and three-finger swipes, set up in Settings → Trackpad. Touchscreens work too.",
-            "es": "Sí. LordOS tiene su propio driver de touchpad con tocar para hacer clic, clic con dos dedos, desplazamiento natural y con inercia, pellizcar para hacer zoom y deslizar con tres dedos, que configurás en Ajustes → Trackpad. Las pantallas táctiles también funcionan.",
-            "pt": "Sim. O LordOS tem seu próprio driver de touchpad com tocar para clicar, clique com dois dedos, rolagem natural e com inércia, pinçar para zoom e deslizar com três dedos, configurados em Ajustes → Trackpad. Telas sensíveis ao toque também funcionam."
+            "en": "Yes. LordOS has its own touchpad driver with tap to click, two-finger click, natural and inertial scrolling, pinch to zoom and three-finger swipes, including touchpads that sense a finger before it touches. Settings → Mouse & Trackpad has a section for the mouse and one for the trackpad (speed, touch sensitivity, scrolling speed, gestures), and the pointer size. Touchscreens work too.",
+            "es": "Sí. LordOS tiene su propio driver de touchpad con tocar para hacer clic, clic con dos dedos, desplazamiento natural y con inercia, pellizcar para hacer zoom y deslizar con tres dedos, también en touchpads que detectan el dedo antes de que toque. Ajustes → Mouse y trackpad tiene una sección para el mouse y otra para el trackpad (velocidad, sensibilidad al tacto, velocidad de desplazamiento, gestos), y el tamaño del puntero. Las pantallas táctiles también funcionan.",
+            "pt": "Sim. O LordOS tem seu próprio driver de touchpad com tocar para clicar, clique com dois dedos, rolagem natural e com inércia, pinçar para zoom e deslizar com três dedos, inclusive em touchpads que detectam o dedo antes de ele tocar. Ajustes → Mouse e trackpad tem uma seção para o mouse e outra para o trackpad (velocidade, sensibilidade ao toque, velocidade de rolagem, gestos), e o tamanho do ponteiro. Telas sensíveis ao toque também funcionam."
           }
         },
         {

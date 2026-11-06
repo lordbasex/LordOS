@@ -343,6 +343,11 @@ static void jquote(char *out, size_t n, const char *s) {
  * display's scale (pct). mode 0 = the LordOS arrow, 1 = image, 2 = hidden (like wl_cursor). */
 typedef struct { int mode; const uint32_t *px; int w, h, hx, hy; unsigned gen; } Cur;
 
+/* An own shape's generation: changes with the shape, the scale it's drawn at and the pointer size. */
+static unsigned cursor_gen_of(int shape, int pct) {
+    return 0xf0000000u + ((cursor_size_serial() & 0xfffu) << 12) + (unsigned)shape * 16 + (unsigned)(cursor_effective_pct(pct) / 25);
+}
+
 static void cursor_now(const Server *s, Cur *c, int pct) {
     c->mode = wl_cursor(&c->px, &c->w, &c->h, &c->hx, &c->hy, &c->gen);
     int grabbing = grab_active();
@@ -351,7 +356,7 @@ static void cursor_now(const Server *s, Cur *c, int pct) {
     if (shape <= CUR_DEFAULT) { c->mode = 0; return; }
     const CursorImage *ci = cursor_image_pct(shape, pct);
     if (!ci) { c->mode = 0; return; }
-    *c = (Cur){ 1, ci->px, ci->w, ci->h, ci->hx, ci->hy, 0xf0000000u + (unsigned)shape * 8 + (unsigned)(pct / 25) };
+    *c = (Cur){ 1, ci->px, ci->w, ci->h, ci->hx, ci->hy, cursor_gen_of(shape, pct) };
 }
 
 /* To draw it here (CPU, cursor plane, texture): the arrow is also an image. */
@@ -359,7 +364,7 @@ static void cursor_local(const Server *s, Cur *c, int pct) {
     cursor_now(s, c, pct);
     if (c->mode != 0) return;
     const CursorImage *ci = cursor_image_pct(CUR_DEFAULT, pct);
-    if (ci) *c = (Cur){ 1, ci->px, ci->w, ci->h, ci->hx, ci->hy, 0xf0000000u + CUR_DEFAULT * 8 + (unsigned)(pct / 25) };
+    if (ci) *c = (Cur){ 1, ci->px, ci->w, ci->h, ci->hx, ci->hy, cursor_gen_of(CUR_DEFAULT, pct) };
 }
 
 /* The pointer in a display's physical pixels. */
@@ -1103,6 +1108,8 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
         /* Botones con la numeración del DOM: 0 izquierdo, 1 medio, 2 derecho. */
         int button = ev->code == BTN_LEFT ? 0 : ev->code == BTN_MIDDLE ? 1 : ev->code == BTN_RIGHT ? 2 : -1;
+        /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
+        if ((button == 0 || button == 2) && !d->tp && d->fd >= 0 && tp_config()->mouse_left_handed) button = 2 - button;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
             s->buttons[s->nbuttons++] = (ButtonEvent){ ev->value == 1, button };
         else if (ev->code < BTN_MISC) {
@@ -2510,6 +2517,12 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        static unsigned cursor_size_seen;   /* Settings → Mouse & Trackpad: pointer size */
+        if (cursor_size_serial() != cursor_size_seen) {
+            cursor_size_seen = cursor_size_serial();
+            s.cursor_dirty = 1;
+            if (gpu_active()) update_cursor(&s);
+        }
         if (wl_idle_inhibited()) display_activity(now_ms());   /* a video or a presentation keeps the screen on */
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());

@@ -19,10 +19,16 @@ enum { TP_BEGIN = 1, TP_UPDATE = 2, TP_END = 3, TP_CANCEL = 4, TP_MOMENTUM = 5, 
 /* secondary click (physical click on a clickpad) */
 enum { TP_CLICK_TWO_FINGERS = 0, TP_CLICK_BOTTOM_RIGHT = 1, TP_CLICK_BOTTOM_LEFT = 2 };
 
+/* touch sensitivity: how firm a touch must be to count, and how eager palm rejection is */
+enum { TP_SENS_LOW = 0, TP_SENS_MEDIUM = 1, TP_SENS_HIGH = 2 };
+
 typedef struct {
     double speed;           /* 0..1, pointer speed (0.5 = normal) */
     double mouse_speed;     /* 0..1, a mouse's speed (0.5 = as it comes) */
     int mouse_natural;      /* a mouse's wheel the other way */
+    int mouse_left_handed;  /* a mouse's primary button is the right one */
+    double scroll_speed;    /* 0..1, two-finger scroll speed (0.5 = normal) */
+    int sensitivity;        /* TP_SENS_* */
     int tap;                /* tap to click (1/2/3 fingers = left/right/middle) */
     int tap_drag;           /* tap and drag (tap, and put the finger back down right away) */
     int natural;            /* natural scrolling (the content follows the fingers) */
@@ -61,6 +67,7 @@ typedef struct {
     int max_fingers;                    /* from BTN_TOOL_*TAP (can be more than nslots) */
     struct input_absinfo x, y, pressure, major;
     int has_pressure, has_major;
+    int bus, vendor, product;           /* struct input_id (EVIOCGID) */
     char name[80];
 } TpCaps;
 

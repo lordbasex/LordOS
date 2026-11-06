@@ -181,7 +181,29 @@ static void build(int shape, Shape *s) {
 
 /* ---- rasterization ---- */
 
-static CursorImage cache[5][CUR_COUNT];       /* 100, 125, 150, 175 and 200 % */
+static CursorImage cache[6][CUR_COUNT];       /* 75, 100, 125, 150, 175 and 200 % */
+static int size_pct = 100;
+static unsigned size_serial;
+
+int cursor_set_size(int pct) {
+    if (pct < 75) pct = 75;
+    if (pct > 200) pct = 200;
+    if (pct == size_pct) return 0;
+    size_pct = pct;
+    size_serial++;
+    return 1;
+}
+int cursor_size(void) { return size_pct; }
+unsigned cursor_size_serial(void) { return size_serial; }
+
+int cursor_effective_pct(int pct) {
+    if (pct < 100) pct = 100;
+    if (pct > 200) pct = 200;
+    pct = pct * size_pct / 100;
+    if (pct < 75) pct = 75;
+    if (pct > 200) pct = 200;
+    return (pct + 12) / 25 * 25;
+}
 
 static uint32_t pack(float a, float lum) {
     if (a <= 0) return 0;
@@ -197,10 +219,8 @@ const CursorImage *cursor_image(int shape, int scale) { return cursor_image_pct(
  * 32 px × scale, so a 150 % display gets a sharp 48 px arrow. */
 const CursorImage *cursor_image_pct(int shape, int pct) {
     if (shape <= CUR_AUTO || shape >= CUR_COUNT) shape = CUR_DEFAULT;
-    if (pct < 100) pct = 100;
-    if (pct > 200) pct = 200;
-    pct = (pct + 12) / 25 * 25;
-    CursorImage *ci = &cache[(pct - 100) / 25][shape];
+    pct = cursor_effective_pct(pct);
+    CursorImage *ci = &cache[(pct - 75) / 25][shape];
     if (ci->px) return ci;
     float scale = pct / 100.0f;
     Shape s;

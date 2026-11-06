@@ -13,6 +13,10 @@
  *                                       a mouse with a high-resolution wheel (and horizontal)
  *   sudo tpsim record /dev/input/eventN SECONDS
  *                                       records a real device (for tp-test --replay)
+ *   sudo tpsim play-file [--bcm5974] [--wait S] FILE.ev
+ *                                       replays a recording or a dump ("ms type code value"); with
+ *                                       --bcm5974 the device looks like a laptop's bcm5974 (16 slots,
+ *                                       no resolution, touch size, no pressure, USB 05ac:0273)
  *
  * Build: cc -O2 -Wall -Wextra -o tpsim tpsim.c gestures.c -lm */
 #include "gestures.h"
@@ -98,6 +102,63 @@ static int create(int touchscreen) {
     char sys[64] = "";
     if (ioctl(fd, UI_GET_SYSNAME(sizeof sys), sys) >= 0) fprintf(stderr, "tpsim: %s created (/sys/devices/virtual/input/%s)\n", u.name, sys);
     return fd;
+}
+
+/* Like bcm5974 (laptops up to 2015): what matters to the driver, not the USB protocol. */
+static int create_bcm5974(void) {
+    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) { perror("tpsim: /dev/uinput (sudo?)"); return -1; }
+    ioctl(fd, UI_SET_EVBIT, EV_SYN);
+    ioctl(fd, UI_SET_EVBIT, EV_KEY);
+    ioctl(fd, UI_SET_EVBIT, EV_ABS);
+    int keys[] = { BTN_LEFT, BTN_TOUCH, BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP, BTN_TOOL_TRIPLETAP, BTN_TOOL_QUADTAP, BTN_TOOL_QUINTTAP };
+    for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++) ioctl(fd, UI_SET_KEYBIT, keys[i]);
+    abs_setup(fd, ABS_X, -4828, 5345, 0);
+    abs_setup(fd, ABS_Y, -203, 6803, 0);
+    abs_setup(fd, ABS_PRESSURE, 0, 256, 0);
+    abs_setup(fd, ABS_TOOL_WIDTH, 0, 16, 0);
+    abs_setup(fd, ABS_MT_SLOT, 0, 15, 0);
+    abs_setup(fd, ABS_MT_TRACKING_ID, 0, 65535, 0);
+    abs_setup(fd, ABS_MT_TOUCH_MAJOR, 0, 2048, 0);
+    abs_setup(fd, ABS_MT_TOUCH_MINOR, 0, 2048, 0);
+    abs_setup(fd, ABS_MT_WIDTH_MAJOR, 0, 2048, 0);
+    abs_setup(fd, ABS_MT_WIDTH_MINOR, 0, 2048, 0);
+    abs_setup(fd, ABS_MT_ORIENTATION, -16384, 16384, 0);
+    abs_setup(fd, ABS_MT_POSITION_X, -4828, 5345, 0);
+    abs_setup(fd, ABS_MT_POSITION_Y, -203, 6803, 0);
+    ioctl(fd, UI_SET_PROPBIT, INPUT_PROP_POINTER);
+    ioctl(fd, UI_SET_PROPBIT, INPUT_PROP_BUTTONPAD);
+    struct uinput_setup u;
+    memset(&u, 0, sizeof u);
+    u.id.bustype = BUS_USB;
+    u.id.vendor = 0x05ac;
+    u.id.product = 0x0273;
+    snprintf(u.name, sizeof u.name, "bcm5974");
+    if (ioctl(fd, UI_DEV_SETUP, &u) || ioctl(fd, UI_DEV_CREATE)) { perror("tpsim: create device"); close(fd); return -1; }
+    char sys[64] = "";
+    if (ioctl(fd, UI_GET_SYSNAME(sizeof sys), sys) >= 0) fprintf(stderr, "tpsim: bcm5974 (simulated) created (/sys/devices/virtual/input/%s)\n", sys);
+    return fd;
+}
+
+/* "ms type code value" lines (comments with #), with their timing */
+static int play_file(int fd, const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) { perror(path); return 1; }
+    Live l = { fd, mono() };
+    char line[256];
+    double first = -1;
+    int n = 0;
+    while (fgets(line, sizeof line, f)) {
+        double t;
+        int type, code, value;
+        if (line[0] == '#' || sscanf(line, "%lf %d %d %d", &t, &type, &code, &value) != 4) continue;
+        if (first < 0) first = t;
+        live_emit(&l, t - first, type, code, value);
+        n++;
+    }
+    fclose(f);
+    fprintf(stderr, "tpsim: %s: %d events in %.0f ms\n", path, n, mono() - l.t0);
+    return 0;
 }
 
 /* ---- mouse with a high-resolution wheel (REL_WHEEL_HI_RES, REL_HWHEEL_HI_RES) ---- */
@@ -205,10 +266,21 @@ int main(int argc, char **argv) {
         ioctl(fd, EVIOCSCLOCKID, &clk);
         char name[128] = "";
         ioctl(fd, EVIOCGNAME(sizeof name), name);
-        struct input_absinfo x, y;
+        struct input_absinfo x, y, m, p, sl;
+        memset(&m, 0, sizeof m);
+        memset(&p, 0, sizeof p);
+        memset(&sl, 0, sizeof sl);
         ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &x);
         ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &y);
-        printf("# record %s\n# caps x %d %d %d y %d %d %d\n", name, x.minimum, x.maximum, x.resolution, y.minimum, y.maximum, y.resolution);
+        struct input_id id;
+        memset(&id, 0, sizeof id);
+        ioctl(fd, EVIOCGID, &id);
+        printf("# record %s\n# caps x %d %d %d y %d %d %d\n# caps id %d %d %d\n", name, x.minimum, x.maximum, x.resolution, y.minimum,
+               y.maximum, y.resolution, id.bustype, id.vendor, id.product);
+        if (ioctl(fd, EVIOCGABS(ABS_MT_SLOT), &sl) == 0) printf("# caps slots %d\n", sl.maximum + 1);
+        if (ioctl(fd, EVIOCGABS(ABS_MT_TOUCH_MAJOR), &m) == 0 && m.maximum > m.minimum) printf("# caps major %d %d\n", m.minimum, m.maximum);
+        if (ioctl(fd, EVIOCGABS(ABS_MT_PRESSURE), &p) == 0 && p.maximum > p.minimum) printf("# caps pressure %d %d\n", p.minimum, p.maximum);
+        printf("# caps name %s\n", name);
         double end = mono() + atof(argv[3]) * 1000, t0 = -1;
         fcntl(fd, F_SETFL, O_NONBLOCK);
         while (mono() < end) {
@@ -221,12 +293,13 @@ int main(int argc, char **argv) {
         }
         return 0;
     }
-    int touchscreen = 0, mouse = 0;
+    int touchscreen = 0, mouse = 0, bcm = 0;
     double wait = 2;
     int i = 2;
     for (; i < argc && argv[i][0] == '-'; i++) {
         if (!strcmp(argv[i], "--touchscreen")) touchscreen = 1;
         else if (!strcmp(argv[i], "--mouse")) mouse = 1;
+        else if (!strcmp(argv[i], "--bcm5974")) bcm = 1;
         else if (!strcmp(argv[i], "--wait") && i + 1 < argc) wait = atof(argv[++i]);
     }
     if (!strcmp(argv[1], "play")) {
@@ -236,6 +309,15 @@ int main(int argc, char **argv) {
         if (mouse) play_mouse(fd, argv + i, argc - i);
         else play(fd, argv + i, argc - i);
         sleep_ms(300);
+        ioctl(fd, UI_DEV_DESTROY);
+        close(fd);
+        return 0;
+    }
+    if (!strcmp(argv[1], "play-file") && i < argc) {
+        int fd = bcm ? create_bcm5974() : create(0);
+        if (fd < 0) return 1;
+        sleep_ms(wait * 1000);
+        for (; i < argc; i++) { play_file(fd, argv[i]); sleep_ms(300); }
         ioctl(fd, UI_DEV_DESTROY);
         close(fd);
         return 0;

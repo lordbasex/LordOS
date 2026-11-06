@@ -3299,7 +3299,7 @@ void wl_pointer_confine(int *x, int *y) {
 void wl_set_pointer_scale(int pct) { if (pct != pointer_scale) { pointer_scale = pct; cursor_gen++; } }
 
 int wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen) {
-    *gen = cursor_gen;
+    *gen = cursor_gen + (cursor_size_serial() << 20);      /* the pointer size redraws own shapes */
     if (wl_pointer_locked()) return 2;
     if (cursor_mode == 1 && cursor_surf && cursor_surf->px) {
         *px = cursor_surf->px;

@@ -24,8 +24,16 @@ typedef struct {
 const CursorImage *cursor_image(int shape, int scale);
 /* Cursor scale for a W×H screen (2 on 4K/HiDPI). */
 int cursor_scale_for(int W, int H);
-/* The same at a display's scale in percent (100–200). */
+/* The same at a display's scale in percent (100–200), times the pointer size setting. */
 const CursorImage *cursor_image_pct(int shape, int pct);
+/* Pointer size (Settings → Mouse & Trackpad) in percent of the display's: 75–200, 100 = as the
+ * display. The result is capped at 200 % (64 px, the cursor plane). Returns 1 if it changed. */
+int cursor_set_size(int pct);
+int cursor_size(void);
+/* Changes each time the size changes (to redraw the cursor). */
+unsigned cursor_size_serial(void);
+/* The scale (percent, a multiple of 25 in 75–200) a display at pct gets with the size setting. */
+int cursor_effective_pct(int pct);
 /* xdg_toplevel.resize edges (1 top, 2 bottom, 4 left, 8 right) → shape. */
 int cursor_for_edges(int edges);
 /* cursor-shape-v1 shape (wp_cursor_shape_device_v1.shape) → own shape; 0 if none. */

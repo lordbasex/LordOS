@@ -37,6 +37,8 @@ but badly.
 | Chromium 155 (Wayland) before | Pinch: Chromium zooms the page via `zwp_pointer_gestures_v1` |
 | ![windows](trackpad-swipe-windows.png) | ![remote](trackpad-remote-pinch.png) |
 | Three fingers to the left: the window behind (Files) comes to the front | Remote desktop pinch (`RP_PINCH`, as the browser sends it): ×2.2 zoom on the map |
+| ![mouse and trackpad](trackpad-settings-point.png) | ![scroll and zoom](trackpad-settings-scroll.png) |
+| Settings → Mouse & Trackpad since 0.8.8.4: Pointer, Mouse and Trackpad sections (headless session on VM 116, no touchpad attached) | The Scroll & Zoom tab with the new scrolling speed |
 
 ## Pieces
 
@@ -61,7 +63,12 @@ but badly.
 - **Clickpad:** `INPUT_PROP_BUTTONPAD` (the whole touchpad is the button).
 - **Touchscreen:** `ABS_MT_*` with `INPUT_PROP_DIRECT`.
 - **Size in mm:** comes from `resolution` in absinfo, in units per mm. If it's missing, a touchpad
-  100 mm wide is assumed (300 mm for a screen).
+  100 mm wide is assumed (300 mm for a screen), and 104 × 75 mm for a bcm5974-class touchpad.
+- **Touchpads that report hovering fingers** (the `bcm5974` driver, laptops up to 2015, and
+  `applespi`; or vendor `05ac` on USB/SPI with a touch size and no pressure): touches by size, see
+  "Hovering fingers and pointer jumps" below. The log line ends in `, touches by size`.
+- **Slots:** up to 16 (bcm5974 declares 16). Events of a slot beyond the device's are dropped; they
+  used to land on the slot before.
 - **Clock:** `CLOCK_MONOTONIC` is requested for the events (`EVIOCSCLOCKID`), so times can be
   compared with the loop's.
 - **More fingers than contacts:** if the device reports more fingers than contacts
@@ -81,15 +88,26 @@ On every `SYN_REPORT` the driver looks at the contacts in millimeters.
 **Contacts that don't count:**
 
 - **Palms:**
-  - a contact larger than 22 mm (`ABS_MT_TOUCH_MAJOR`);
+  - a contact larger than 22 mm (`ABS_MT_TOUCH_MAJOR`), or above 1600 units on a bcm5974-class touchpad;
   - pressure above 85 % of the range during the first 150 ms;
+  - Touch sensitivity moves both limits: ×0.8 with Low (palms are caught sooner), ×1.25 with High;
   - a touch that starts at the left or right edge (7 mm, or 7 % of the width) and doesn't leave
     the edge within 300 ms.
 - **Clickpad thumb:** a contact that starts in the bottom strip (12 mm, or 15 % of the height)
   doesn't count while there are other fingers, until it moves more than 4 mm. That way, pressing with
   the thumb while the index finger is resting gives a left click.
-- **Disable while typing:** touches that start up to 500 ms after a key don't count. Modifier keys
-  don't count as typing, so Ctrl+click still works.
+- **Disable while typing:** touches that start up to 200 ms after an isolated key, or 500 ms while
+  typing (a key less than 500 ms after the one before), don't count. Modifier keys don't count as
+  typing, so Ctrl+click still works. A touch that began after the last key is **released** once
+  that time passes with no other key: it moves the pointer without lifting the finger, but it can't
+  tap. Before 0.8.8.4 it stayed ignored until the finger lifted: pressing Space in Files to close
+  the Quick Preview and touching right after left the pointer stuck ([#34](https://github.com/lordbasex/LordOS/issues/34)).
+- **Pinned fingers:** pressing (or releasing) a clickpad pushes the finger a little. The fingers
+  that are down are pinned at that moment and don't move the pointer until they move 1.5 mm on
+  purpose, so a click doesn't nudge the pointer.
+- **Jumps:** a contact that moves more than 20 mm in one frame (normalized to 12 ms), or 7 mm more
+  than in the frame before, jumped: its motion is dropped (as libinput does). The first one is
+  logged: `tp: bcm5974: a contact jumped 64 mm in 11 ms; its motion is dropped`.
 
 **Depending on how many fingers there are:**
 
@@ -113,6 +131,7 @@ stop its own inertia.
 **Scroll:**
 
 - ~5 px per mm, up to ×3 if the fingers move fast;
+- the scrolling speed setting multiplies it by ×0.5 to ×2;
 - natural by default: moving the fingers up moves down in the document;
 - if it goes almost straight, it locks to one axis.
 
@@ -140,6 +159,30 @@ drag" off it's released immediately.
 - fingers are counted: 1 left, 2 right, 3 middle (the usual convention);
 - or, depending on the setting, the bottom-right (or bottom-left) corner is the right click;
 - while it's pressed only the pointer moves (with the finger that moves the most).
+
+## Hovering fingers and pointer jumps (0.8.8.4, issue #34)
+
+Reported on a 2015 laptop with a bcm5974 touchpad: a jumpy pointer, taps that needed several tries, and sometimes a
+click that sent the pointer to the bottom-left corner. What the driver did with what `bcm5974`
+reports:
+
+| Problem | Cause | Fix (`tp.c`) |
+|---|---|---|
+| Jumpy pointer, missed taps | The sensor reports a finger that is only **hovering** (a small `ABS_MT_TOUCH_MAJOR`). The driver took it as a touch: the pointer followed the approaching finger, and a tap measured from the hover was too long or had moved too much | A touch begins above 150 units and ends below 130 (hysteresis, the values libinput uses for these devices). Touch sensitivity: ×1.5 with Low, ×0.65 with High |
+| Click → bottom-left corner | The kernel assigns slots by distance, without a limit (`input_mt_assign_slots`, `dmax` 0): when the index lifts as the thumb presses, the thumb can inherit the index's slot and tracking id, and the contact "moves" 50 mm in one frame. With the button down the driver even picked the finger that moved the most | Jump detection (above), and the fingers are pinned on the press |
+| Pointer stuck after Space | Disable while typing kept a touch that began within 500 ms of a key ignored until it lifted | 200 ms after an isolated key, and the touch is released when the keyboard is quiet |
+| (robustness) | bcm5974 declares 16 slots and the driver kept 10: events of slot 10–15 went to the slot before | 16 slots; unknown slots are dropped |
+
+Replayed in `tp-test` (hand-written sequences that follow what bcm5974 sends, not recordings of a
+real laptop) against the driver before and after: before, a hover-then-tap gave no click and
+moved the pointer, a hovering finger moved it 157 px, the click with the slot handover moved it
+−680, +592 px, and after Space it never moved; after, the tap clicks, the hover is ignored, the
+click moves it 4 px and after Space it moves once 200 ms have passed. The same sequences went
+through the kernel with a bcm5974-like uinput device (`tpsim play-file --bcm5974`) and were read back
+with `tp_open` (`tp-test --live`), with the same results.
+
+**Still to check on the real laptop:** the thresholds come from libinput's quirks for these devices; a recording
+of the real touchpad (`tpsim record`, see the checklist) would confirm them.
 
 ## The LordOS interface (SDK)
 
@@ -179,21 +222,34 @@ on):
 
 It's in the Language & Keyboard group and, since 0.8.8, always shows, with or without a touchpad (before, it was
 Trackpad and appeared only with one). It's saved in `settings.trackpad` (`~/.config/lordos/settings.json`) and applied
-live: `sdk/trackpad.js` calls `lord.input.configure`.
+live: `sdk/trackpad.js` calls `lord.input.configure`. Since 0.8.8.4 it has one section per device.
 
-At the top, **Mouse** applies to a mouse:
+**Pointer**, for every device:
+
+| Setting (key) | Default |
+|---|---|
+| Pointer size (`pointerSize`: 0.75 Small, 1 Default, 1.25 Large, 1.5 Larger, 2 Largest) | 1 |
+
+The size multiplies the display's scale (a 200 % display with Small draws the 150 % pointer, 48 px) and is capped at
+64 px, the cursor plane. It applies to LordOS's own pointers (`cursor.c`, also the shapes Linux apps ask for with
+`cursor-shape-v1`) and sets `XCURSOR_SIZE` (24 × size) for Linux apps started afterwards; apps that draw their own
+pointer image and are already open keep theirs.
+
+**Mouse**:
 
 | Setting (key) | Default |
 |---|---|
 | Speed (`mouseSpeed`, 0..1) | 0.5 |
 | Natural scrolling (`mouseNatural`: the content moves against the wheel's direction) | no |
+| Primary button (`mouseLeftHanded`: Left or Right; Right swaps a mouse's left and right buttons, not a touchpad's) | Left |
 
-Without a touchpad, a note says the touchpad rows apply when one is connected. Each touchpad row has a small drawing
+**Trackpad**: without a touchpad, a note says these rows apply when one is connected. Each row has a small drawing
 of the gesture that animates on mouse hover.
 
 | Tab | Setting (key) | Default |
 |---|---|---|
 | Point & Click | Pointer speed (`speed`, 0..1) | 0.5 |
+| | Touch sensitivity (`sensitivity`: `low`, `medium`, `high`; see "Hovering fingers". On other touchpads with pressure, Low also asks for 15 % of the pressure range) | medium |
 | | Tap to click (`tap`) | yes |
 | | Tap and drag (`tapDrag`) | yes |
 | | Secondary click (`secondary`: `two-fingers`, `bottom-right`, `bottom-left`) | two fingers |
@@ -201,6 +257,7 @@ of the gesture that animates on mouse hover.
 | | Disable while typing (`dwt`) | yes |
 | Scroll & Zoom | Natural scrolling (`natural`) | yes |
 | | Two-finger scrolling (`scroll`) | yes |
+| | Scrolling speed (`scrollSpeed`, 0..1: ×0.5 to ×2) | 0.5 |
 | | Inertia (`kinetic`) | yes |
 | | Pinch to zoom (`pinch`) | yes |
 | More Gestures | Three-finger swipe (`swipe3`) | yes |
@@ -254,7 +311,7 @@ pinch. The session treats them the same as the local touchpad's, via `tp_route_s
 ### `make -C server test` → `build/tp-test`
 
 It feeds the driver the same evdev sequences the simulated touchpad replays, with their timing, and
-checks what it recognizes. There are 51 checks:
+checks what it recognizes. There are 67 checks:
 
 - pointer and curve;
 - tap with 1, 2 and 3 fingers, double tap, tap and drag;
@@ -263,10 +320,27 @@ checks what it recognizes. There are 51 checks:
 - pinch out and in, 60° rotation;
 - three-finger swipe (4 directions) and four-finger, three-finger drag;
 - palm, edge, disable while typing (Ctrl doesn't block), hold;
-- touchscreen: tap, drag, scroll, pinch and touch to an app.
+- touchscreen: tap, drag, scroll, pinch and touch to an app;
+- bcm5974-like touchpad: hover then tap, hovering finger, click with a slot handover, click
+  that pushes the finger, Space then touch, unknown slot, touch sensitivity; scrolling speed.
 
 `build/tp-test --replay archivo.ev` replays a recording (for example, of a real touchpad with
-`tpsim record`) and shows what came out.
+`tpsim record`) and shows what came out. `tpsim record` writes the device's capabilities as
+`# caps` lines (id, slots, touch size, pressure, name) so the replay applies the same quirks.
+
+`build/tp-test --dump NAME` prints one of the bcm5974 sequences, and `build/tp-test --live DEV SECS`
+opens a device like lord-server does (`tp_open`) and prints what the driver made of it; `DEV` can
+be the name of a device about to appear, which it grabs on arrival:
+
+```sh
+./build/tp-test --dump click-jump > click-jump.ev
+sudo ./build/tp-test --live bcm5974 4 &
+sudo tpsim play-file --bcm5974 --wait 1 click-jump.ev      # a bcm5974-like uinput device
+```
+
+If a session is on the monitor, `lord-sessiond` lends it the new device too; when it grabs it
+first, the gestures reach that desktop (the reader then says `EVIOCGRAB: another reader got it
+first`). Do this with no session on the monitor.
 
 ### Simulated touchpad (`tests/touchpad-sim/tpsim`)
 
@@ -415,7 +489,11 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
 11. **Touchscreen, if there is one:**
     - tap is a click, dragging moves, two fingers scroll and pinch;
     - in a GTK app, touches arrive as `wl_touch`.
-12. **If something goes wrong:** record the gesture (`sudo tpsim record /dev/input/eventN 10 > g.ev`)
+12. **bcm5974 laptops:** the log says `touches by size`; a finger held just above the
+    touchpad doesn't move the pointer; a light tap clicks the first time; clicking with the thumb
+    while the index lifts doesn't throw the pointer; after Space in Files the pointer moves without
+    lifting the finger.
+13. **If something goes wrong:** record the gesture (`sudo tpsim record /dev/input/eventN 10 > g.ev`)
     and replay it with `build/tp-test --replay g.ev`.
 
 ## Pending
@@ -432,5 +510,5 @@ The maximum is a frame that was being drawn on the CPU at that exact moment.
   - right click by long press on the touchscreen.
 - **Palm by size:** only works on devices that report `TOUCH_MAJOR` in the same units as the
   position. The others rely on pressure and edges.
-- **Tested only in the VM**, with the simulated touchpad and screen. Real hardware is still missing
-  (the checklist above).
+- **Tested only in the VM**, with the simulated touchpad and screen, and a simulated bcm5974. Real
+  hardware is still missing (the checklist above), the 2015 laptop of issue #34 included.

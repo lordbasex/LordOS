@@ -3,8 +3,10 @@
  * touches no files (settings are saved to settings.json from the SDK, sdk/trackpad.js).
  *
  *   lord.input.devices()      → [{ name, kind: 'touchpad'|'touchscreen', clickpad, width, height, fingers }]
- *   lord.input.config()       → { speed, tap, tapDrag, natural, secondary, threeDrag, dwt, scroll,
- *                                 kinetic, pinch, swipe3, swipe4 }
+ *   lord.input.config()       → { speed, mouseSpeed, mouseNatural, mouseLeftHanded, scrollSpeed,
+ *                                 sensitivity: 'low'|'medium'|'high', pointerSize, tap, tapDrag,
+ *                                 natural, secondary, threeDrag, dwt, scroll, kinetic, pinch,
+ *                                 swipe3, swipe4 }
  *   lord.input.configure(obj) → applies the valid fields (the rest stay as they are); true
  *
  * The on-screen keyboard (docs/ON-SCREEN-KEYBOARD.md). The theme's and the login screen's context
@@ -24,10 +26,13 @@
 #include "../keyboard.h"
 #include "../osk.h"
 #include "../tp/tp.h"
+#include "../cursor.h"
 
 #include <linux/input.h>
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static JSValue f_devices(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
@@ -38,19 +43,47 @@ static JSValue f_devices(JSContext *c, JSValueConst this, int argc, JSValueConst
 }
 
 static const struct { const char *name; size_t off; } flags[] = {
-    { "mouseNatural", offsetof(TpConfig, mouse_natural) }, { "tap", offsetof(TpConfig, tap) },           { "tapDrag", offsetof(TpConfig, tap_drag) },
+    { "mouseNatural", offsetof(TpConfig, mouse_natural) }, { "mouseLeftHanded", offsetof(TpConfig, mouse_left_handed) },
+    { "tap", offsetof(TpConfig, tap) },           { "tapDrag", offsetof(TpConfig, tap_drag) },
     { "natural", offsetof(TpConfig, natural) },   { "threeDrag", offsetof(TpConfig, three_drag) },
     { "dwt", offsetof(TpConfig, dwt) },           { "scroll", offsetof(TpConfig, scroll) },
     { "kinetic", offsetof(TpConfig, kinetic) },   { "pinch", offsetof(TpConfig, pinch) },
     { "swipe3", offsetof(TpConfig, swipe3) },     { "swipe4", offsetof(TpConfig, swipe4) },
 };
 static const char *const secondary[] = { "two-fingers", "bottom-right", "bottom-left" };
+static const char *const sensitivity[] = { "low", "medium", "high" };
+
+/* a number in 0..1 (or lo..hi) from the object, if it's there and valid */
+static int num_field(JSContext *c, JSValueConst o, const char *name, double lo, double hi, double *out) {
+    JSValue v = JS_GetPropertyStr(c, o, name);
+    double d;
+    int ok = JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= lo && d <= hi;
+    JS_FreeValue(c, v);
+    if (ok) *out = d;
+    return ok;
+}
+
+static int str_field(JSContext *c, JSValueConst o, const char *name, const char *const *names, int n, int *out) {
+    JSValue v = JS_GetPropertyStr(c, o, name);
+    int found = 0;
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        for (int i = 0; s && i < n; i++) if (!strcmp(s, names[i])) { *out = i; found = 1; }
+        JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    return found;
+}
 
 static JSValue f_config(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
     (void)this; (void)argc; (void)argv;
     const TpConfig *k = tp_config();
     JSValue o = JS_NewObject(c);
     JS_SetPropertyStr(c, o, "speed", JS_NewFloat64(c, k->speed));
+    JS_SetPropertyStr(c, o, "mouseSpeed", JS_NewFloat64(c, k->mouse_speed));
+    JS_SetPropertyStr(c, o, "scrollSpeed", JS_NewFloat64(c, k->scroll_speed));
+    JS_SetPropertyStr(c, o, "sensitivity", JS_NewString(c, sensitivity[k->sensitivity]));
+    JS_SetPropertyStr(c, o, "pointerSize", JS_NewFloat64(c, cursor_size() / 100.0));
     for (size_t i = 0; i < sizeof flags / sizeof flags[0]; i++)
         JS_SetPropertyStr(c, o, flags[i].name, JS_NewBool(c, *(const int *)((const char *)k + flags[i].off)));
     JS_SetPropertyStr(c, o, "secondary", JS_NewString(c, secondary[k->secondary]));
@@ -61,26 +94,24 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     (void)this;
     if (argc < 1 || !JS_IsObject(argv[0])) return JS_FALSE;
     TpConfig k = *tp_config();
-    JSValue v = JS_GetPropertyStr(c, argv[0], "speed");
     double d;
-    if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0 && d <= 1) k.speed = d;
-    JS_FreeValue(c, v);
-    v = JS_GetPropertyStr(c, argv[0], "mouseSpeed");
-    if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0 && d <= 1) k.mouse_speed = d;
-    JS_FreeValue(c, v);
+    num_field(c, argv[0], "speed", 0, 1, &k.speed);
+    num_field(c, argv[0], "mouseSpeed", 0, 1, &k.mouse_speed);
+    num_field(c, argv[0], "scrollSpeed", 0, 1, &k.scroll_speed);
     for (size_t i = 0; i < sizeof flags / sizeof flags[0]; i++) {
-        v = JS_GetPropertyStr(c, argv[0], flags[i].name);
+        JSValue v = JS_GetPropertyStr(c, argv[0], flags[i].name);
         if (JS_IsBool(v)) *(int *)((char *)&k + flags[i].off) = JS_ToBool(c, v);
         JS_FreeValue(c, v);
     }
-    v = JS_GetPropertyStr(c, argv[0], "secondary");
-    if (JS_IsString(v)) {
-        const char *s = JS_ToCString(c, v);
-        for (int i = 0; s && i < 3; i++) if (!strcmp(s, secondary[i])) k.secondary = i;
-        JS_FreeCString(c, s);
-    }
-    JS_FreeValue(c, v);
+    str_field(c, argv[0], "secondary", secondary, 3, &k.secondary);
+    str_field(c, argv[0], "sensitivity", sensitivity, 3, &k.sensitivity);
     tp_set_config(&k);
+    /* pointer size (×0.75..×2 of the display's), also for Linux apps started from now on */
+    if (num_field(c, argv[0], "pointerSize", 0.5, 2, &d) && cursor_set_size((int)(d * 100 + 0.5))) {
+        char v[16];
+        snprintf(v, sizeof v, "%d", 24 * cursor_size() / 100);
+        setenv("XCURSOR_SIZE", v, 1);
+    }
     return JS_TRUE;
 }
 
