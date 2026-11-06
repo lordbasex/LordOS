@@ -14,6 +14,14 @@
  * leave them) as are touches that start while typing. On a clickpad, a finger that
  * rests at the bottom (the thumb that presses) doesn't count while there are others.
  *
+ * Kernel quirks handled here (docs/TRACKPAD.md, "Hovering fingers and pointer jumps"):
+ *   - some touchpads (the bcm5974 and applespi drivers) report a contact as soon as a finger
+ *     hovers over the surface: a touch only counts once its size passes a threshold (hysteresis);
+ *   - the kernel's slot assignment can hand a slot over to a different finger: a contact that
+ *     moves more than a finger can in one frame is a jump and its motion is dropped;
+ *   - pressing a clickpad pushes the finger: fingers are pinned on the press and release until
+ *     they move on purpose.
+ *
  * When released, a fast scroll keeps going on its own (inertia) with phase TP_MOMENTUM; Wayland apps do their
  * own inertia (they receive axis_stop), so the one here is for the LordOS UI.
  *
@@ -29,7 +37,7 @@
 #include <sys/ioctl.h>
 #include <time.h>
 
-#define MAX_SLOTS 10
+#define MAX_SLOTS 16      /* bcm5974 declares 16 */
 #define MAX_DEVS 16
 
 /* times (ms) and distances (mm) */
@@ -45,12 +53,28 @@
 #define KINETIC_STOP    25.0
 #define KINETIC_TAU     325.0    /* ms: deceleration constant */
 #define TS_PRESS_TIME   90.0     /* touchscreen: the button is pressed if the finger stays */
+#define DWT_KEY_TIME    200.0    /* disable while typing after an isolated key (DWT_TIME while typing) */
+#define JUMP_MM         20.0     /* one frame (normalized to 12 ms): more than this is a jump */
+#define JUMP_GROW_MM    7.0      /* ...or this much more than the frame before */
+#define PIN_MOVE        1.5      /* a pinned finger (clickpad press) moves the pointer after this */
+/* Touchpads that report hovering fingers (HOVER_PAD), in ABS_MT_TOUCH_MAJOR units: a touch begins
+ * above SIZE_TOUCH_ON and ends below SIZE_TOUCH_OFF; above SIZE_PALM it's a palm. Their size when
+ * absinfo has no resolution. The values are libinput's for these devices. */
+#define SIZE_TOUCH_ON  150
+#define SIZE_TOUCH_OFF 130
+#define SIZE_PALM      1600
+#define SIZE_W_MM      104.0
+#define SIZE_H_MM      75.0
 
 typedef struct {
     int id, x, y, major, pressure;
-    int down, was;
+    int kdown;                      /* the kernel says there is a contact (tracking id >= 0) */
+    int down, was;                  /* it counts as a touch (kdown, and firm enough) */
     double mx, my, pmx, pmy, sx, sy, t0;
     int palm, edge, thumb, dwt;
+    int notap;                      /* released from disable-while-typing: moves, but doesn't tap */
+    int pinned;                     /* clickpad press: no motion until it moves PIN_MOVE */
+    double pin_x, pin_y, jlast;     /* where it was pinned; last frame's (normalized) motion */
 } Slot;
 
 enum { G_NONE, G_POINTER, G_UND2, G_SCROLL, G_PINCH, G_UNDN, G_SWIPE, G_DRAG3 };
@@ -61,7 +85,11 @@ struct TpDevice {
     int fd;
     double rx, ry, wmm, hmm;        /* units per mm, size in mm */
     Slot s[MAX_SLOTS];
+    Slot junk;                      /* events of a slot beyond MAX_SLOTS go here */
     int cur, tool, dropped;
+    int by_size;                    /* touches count by their size (hover_pad, SIZE_*) */
+    int size_on, size_off, palm_major;  /* ABS_MT_TOUCH_MAJOR thresholds (0 = not used) */
+    int jumps;                      /* pointer jumps dropped (logged once) */
     int phys, phys_prev, phys_btn;  /* clickpad physical click and the button that was sent */
     int btn_pending[3], btn_state[3];   /* physical buttons of a touchpad with buttons */
     double now, prev_t;
@@ -92,11 +120,13 @@ struct TpDevice {
 };
 
 static TpConfig cfg = { .speed = 0.5, .mouse_speed = 0.5, .tap = 1, .tap_drag = 1, .natural = 1, .secondary = TP_CLICK_TWO_FINGERS,
-                        .three_drag = 0, .dwt = 1, .scroll = 1, .kinetic = 1, .pinch = 1, .swipe3 = 1, .swipe4 = 0 };
+                        .three_drag = 0, .dwt = 1, .scroll = 1, .kinetic = 1, .pinch = 1, .swipe3 = 1, .swipe4 = 0,
+                        .scroll_speed = 0.5, .sensitivity = TP_SENS_MEDIUM };
 static const TpSink *sink;
 static void *sink_ud;
 static int scr_w = 1920, scr_h = 1080;
 static double last_key = -1e12;
+static int typing;                  /* the last key came less than DWT_TIME after the one before */
 static TpDevice *devs[MAX_DEVS];
 static int ndevs;
 
@@ -106,6 +136,9 @@ void tp_set_config(const TpConfig *c) {
     if (cfg.speed < 0) cfg.speed = 0;
     if (cfg.speed > 1) cfg.speed = 1;
     if (cfg.secondary < 0 || cfg.secondary > 2) cfg.secondary = 0;
+    if (!(cfg.scroll_speed >= 0)) cfg.scroll_speed = 0.5;
+    if (cfg.scroll_speed > 1) cfg.scroll_speed = 1;
+    if (cfg.sensitivity < TP_SENS_LOW || cfg.sensitivity > TP_SENS_HIGH) cfg.sensitivity = TP_SENS_MEDIUM;
 }
 void tp_set_sink(const TpSink *s, void *ud) { sink = s; sink_ud = ud; }
 void tp_set_screen(int w, int h) { if (w > 0 && h > 0) { scr_w = w; scr_h = h; } }
@@ -143,11 +176,24 @@ double tp_accel(double v, double setting) {
     return factor * (lo + (hi - lo) * t);
 }
 
-/* scroll: ~5 px per mm, a bit faster if the fingers move fast (up to ×3) */
+/* scroll: ~5 px per mm, a bit faster if the fingers move fast (up to ×3); the scroll speed
+ * setting multiplies it between ×0.5 and ×2 (0.5 = ×1) */
 static double scroll_gain(TpDevice *d, double v) {
     if (d->c.kind == TP_KIND_TOUCHSCREEN) return (double)scr_h / (d->hmm > 1 ? d->hmm : 1);
     double k = 1 + v / 180.0;
-    return 5.0 * (k > 3 ? 3 : k);
+    return 5.0 * (k > 3 ? 3 : k) * 0.5 * pow(4.0, cfg.scroll_speed);
+}
+
+/* Touch sensitivity: low asks for a firmer touch and rejects palms sooner; high the opposite. */
+static double sens_touch(void) { return cfg.sensitivity == TP_SENS_LOW ? 1.5 : cfg.sensitivity == TP_SENS_HIGH ? 0.65 : 1.0; }
+static double sens_palm(void) { return cfg.sensitivity == TP_SENS_LOW ? 0.8 : cfg.sensitivity == TP_SENS_HIGH ? 1.25 : 1.0; }
+
+/* The bcm5974 (laptops up to 2015) and applespi (2016 on) drivers name their device like this; the
+ * vendor id is the same maker's (05ac). The name strings are the drivers' own identifiers. */
+static int hover_pad(const TpCaps *c) {
+    if (c->kind != TP_KIND_TOUCHPAD || !c->has_major) return 0;
+    if (!strcmp(c->name, "bcm5974") || strstr(c->name, "Apple SPI Touchpad")) return 1;
+    return c->vendor == 0x05ac && !c->has_pressure && (c->bus == BUS_USB || c->bus == BUS_SPI);
 }
 
 /* ---- devices ---- */
@@ -163,9 +209,11 @@ TpDevice *tp_new(const TpCaps *caps) {
     double w = d->c.x.maximum - d->c.x.minimum, h = d->c.y.maximum - d->c.y.minimum;
     if (w <= 0) w = 1;
     if (h <= 0) h = 1;
-    /* no resolution: a 100 mm wide touchpad is assumed (or 300 mm for a screen) */
-    d->rx = d->c.x.resolution > 0 ? d->c.x.resolution : w / (d->c.kind == TP_KIND_TOUCHSCREEN ? 300.0 : 100.0);
-    d->ry = d->c.y.resolution > 0 ? d->c.y.resolution : d->rx;
+    d->by_size = hover_pad(&d->c);
+    if (d->by_size) { d->size_on = SIZE_TOUCH_ON; d->size_off = SIZE_TOUCH_OFF; d->palm_major = SIZE_PALM; }
+    /* no resolution: a 100 mm wide touchpad is assumed (or 300 mm for a screen); those of hover_pad ~104 × 75 */
+    d->rx = d->c.x.resolution > 0 ? d->c.x.resolution : w / (d->c.kind == TP_KIND_TOUCHSCREEN ? 300.0 : d->by_size ? SIZE_W_MM : 100.0);
+    d->ry = d->c.y.resolution > 0 ? d->c.y.resolution : d->by_size ? h / SIZE_H_MM : d->rx;
     d->wmm = w / d->rx;
     d->hmm = h / d->ry;
     for (int i = 0; i < MAX_SLOTS; i++) d->s[i].id = -1;
@@ -214,14 +262,20 @@ TpDevice *tp_open(int fd, const char *name) {
     c.max_fingers = HAS(keys, BTN_TOOL_QUINTTAP) ? 5 : HAS(keys, BTN_TOOL_QUADTAP) ? 4 : HAS(keys, BTN_TOOL_TRIPLETAP) ? 3
                   : HAS(keys, BTN_TOOL_DOUBLETAP) ? 2 : 1;
     if (c.max_fingers < c.nslots) c.max_fingers = c.nslots;
+    struct input_id id;
+    memset(&id, 0, sizeof id);
+    ioctl(fd, EVIOCGID, &id);
+    c.bus = id.bustype;
+    c.vendor = id.vendor;
+    c.product = id.product;
     snprintf(c.name, sizeof c.name, "%s", name ? name : "");
     TpDevice *d = tp_new(&c);
     if (!d) return NULL;
     d->fd = fd;
     int clk = CLOCK_MONOTONIC;
     ioctl(fd, EVIOCSCLOCKID, &clk);
-    fprintf(stderr, "tp: %s: %s%s, %.0f×%.0f mm, %d contacts\n", c.name, c.kind == TP_KIND_TOUCHSCREEN ? "touchscreen" : "touchpad",
-            c.clickpad ? " (clickpad)" : "", d->wmm, d->hmm, c.nslots);
+    fprintf(stderr, "tp: %s: %s%s, %.0f×%.0f mm, %d contacts%s\n", c.name, c.kind == TP_KIND_TOUCHSCREEN ? "touchscreen" : "touchpad",
+            c.clickpad ? " (clickpad)" : "", d->wmm, d->hmm, d->c.nslots, d->by_size ? ", touches by size" : "");
     return d;
 }
 
@@ -252,8 +306,13 @@ void tp_key_activity(int code, double now) {
     case KEY_RIGHTALT: case KEY_LEFTMETA: case KEY_RIGHTMETA: case KEY_CAPSLOCK: case KEY_FN:
         return;
     }
+    typing = now - last_key < DWT_TIME;
     last_key = now;
 }
+
+/* how long after the last key the touchpad is ignored: short after one key (Space to open a
+ * preview), longer while typing */
+static double dwt_time(void) { return typing ? DWT_TIME : DWT_KEY_TIME; }
 
 /* ---- contacts ---- */
 
@@ -267,10 +326,26 @@ static double bottom_zone(TpDevice *d) { double z = d->hmm * 0.15; return z > 12
 static int in_edge(TpDevice *d, const Slot *s) { double z = edge_zone(d); return s->mx < z || s->mx > d->wmm - z; }
 
 static int is_palm_size(TpDevice *d, const Slot *s) {
-    if (d->c.has_major && s->major > 0 && s->major / d->rx > 22.0) return 1;
+    if (d->palm_major > 0) { if (s->major > d->palm_major * sens_palm()) return 1; }
+    else if (d->c.has_major && s->major > 0 && s->major / d->rx > 22.0 * sens_palm()) return 1;
+    double pk = 0.85 * sens_palm();
+    if (pk > 0.97) pk = 0.97;
     if (d->c.has_pressure && d->c.pressure.maximum > d->c.pressure.minimum && !d->phys &&
-        s->pressure > d->c.pressure.minimum + 0.85 * (d->c.pressure.maximum - d->c.pressure.minimum)) return 1;
+        s->pressure > d->c.pressure.minimum + pk * (d->c.pressure.maximum - d->c.pressure.minimum)) return 1;
     return 0;
+}
+
+/* Is the contact firm enough to be a touch? With hysteresis: it begins above the "on" threshold
+ * and ends below "off". hover_pad: by size; others with pressure: only with low sensitivity. */
+static int firm(TpDevice *d, const Slot *s) {
+    if (!s->kdown) return 0;
+    double k = sens_touch();
+    if (d->size_on > 0) return s->was ? s->major >= d->size_off * k : s->major > d->size_on * k;
+    if (cfg.sensitivity == TP_SENS_LOW && d->c.has_pressure && d->c.kind == TP_KIND_TOUCHPAD && d->c.pressure.maximum > d->c.pressure.minimum) {
+        double r = d->c.pressure.maximum - d->c.pressure.minimum, p = s->pressure - d->c.pressure.minimum;
+        return s->was ? p >= 0.10 * r : p > 0.15 * r;
+    }
+    return 1;
 }
 
 static void begin_touch(TpDevice *d, Slot *s) {
@@ -278,17 +353,54 @@ static void begin_touch(TpDevice *d, Slot *s) {
     s->pmx = s->sx = s->mx;
     s->pmy = s->sy = s->my;
     s->t0 = d->now;
-    s->palm = s->edge = s->thumb = s->dwt = 0;
+    s->palm = s->edge = s->thumb = s->dwt = s->notap = s->pinned = 0;
+    s->jlast = 0;
     if (d->c.kind != TP_KIND_TOUCHPAD) return;
     s->palm = is_palm_size(d, s);
     s->edge = in_edge(d, s);
     s->thumb = d->c.clickpad && s->my > d->hmm - bottom_zone(d);
-    s->dwt = cfg.dwt && d->now - last_key < DWT_TIME;
+    s->dwt = cfg.dwt && d->now - last_key < dwt_time();
+}
+
+/* A contact that moved more than a finger can in one frame: the kernel gave its slot to another
+ * finger (or the sensor glitched). Like libinput: > 20 mm per 12 ms, or 7 mm more than the frame
+ * before. Its motion is dropped, as if it had been there already. */
+static int jumped(TpDevice *d, Slot *s) {
+    double dt = d->now - d->prev_t;
+    if (d->prev_t <= 0 || dt <= 0 || dt > 25) { s->jlast = 0; return 0; }
+    double dist = hypot(s->mx - s->pmx, s->my - s->pmy) * 12.0 / dt;
+    double grow = dist - s->jlast;
+    s->jlast = dist;
+    if (dist <= JUMP_MM && grow <= JUMP_GROW_MM) return 0;
+    s->jlast = 0;
+    if (!d->jumps++) fprintf(stderr, "tp: %s: a contact jumped %.0f mm in %.0f ms; its motion is dropped\n", d->c.name, dist * dt / 12.0, dt);
+    return 1;
 }
 
 static void update_touch(TpDevice *d, Slot *s) {
     slot_mm(d, s);
     if (d->c.kind != TP_KIND_TOUCHPAD) return;
+    if (jumped(d, s)) {
+        /* the start moves with it, so a tap or a thumb isn't judged by the jump */
+        s->sx += s->mx - s->pmx;
+        s->sy += s->my - s->pmy;
+        s->pin_x += s->mx - s->pmx;
+        s->pin_y += s->my - s->pmy;
+        s->pmx = s->mx;
+        s->pmy = s->my;
+    }
+    if (s->pinned) {
+        if (hypot(s->mx - s->pin_x, s->my - s->pin_y) > PIN_MOVE) s->pinned = 0;
+        else { s->pmx = s->mx; s->pmy = s->my; }
+    }
+    /* disable while typing ends for a touch that began after the last key, once the keyboard is
+     * quiet: the pointer moves without lifting the finger (it can't tap, though) */
+    if (s->dwt && last_key < s->t0 && d->now - last_key >= dwt_time()) {
+        s->dwt = 0;
+        s->notap = 1;
+        s->sx = s->mx;
+        s->sy = s->my;
+    }
     if (!s->palm && is_palm_size(d, s) && d->now - s->t0 < 150) s->palm = 1;
     if (s->edge) {
         if (!in_edge(d, s) && d->now - s->t0 < EDGE_TIME) s->edge = 0;        /* left the edge right away: finger */
@@ -613,7 +725,12 @@ static void tap_frame(TpDevice *d, int nf) {
     int moved = tap_moved(d);
     switch (d->tap) {
     case T_IDLE:
-        if (cfg.tap && nf > 0 && !d->phys && !d->d3_down) { d->tap = T_TOUCH; d->tap_t = d->now; d->tap_max = nf; }
+        if (cfg.tap && nf > 0 && !d->phys && !d->d3_down) {
+            d->tap = T_TOUCH;
+            d->tap_t = d->now;
+            d->tap_max = nf;
+            for (int i = 0; i < d->c.nslots; i++) if (d->s[i].down && d->s[i].notap) d->tap = T_DEAD;
+        }
         break;
     case T_TOUCH:
         if (nf > d->tap_max) d->tap_max = nf;
@@ -673,7 +790,17 @@ static void touchpad_frame(TpDevice *d, double dt) {
     if (n > 0 && d->kin) kinetic_stop(d);
     if (n > 0 && d->d3_down && d->d3_release > 0 && n != 3) { out_button(0, 0); d->d3_down = 0; d->d3_release = 0; }
 
-    /* physical click */
+    /* physical click: pressing (and releasing) pushes the fingers; they stay put until they move on purpose */
+    if (d->phys != d->phys_prev)
+        for (int i = 0; i < d->c.nslots; i++) {
+            Slot *s = &d->s[i];
+            if (!s->down) continue;
+            s->pinned = 1;
+            s->pin_x = s->mx;
+            s->pin_y = s->my;
+            s->pmx = s->mx;
+            s->pmy = s->my;
+        }
     if (d->phys != d->phys_prev) {
         if (d->phys) {
             if (d->tap_down) tap_release(d);
@@ -763,7 +890,7 @@ static void resync(TpDevice *d) {
         req.code = (unsigned)codes[c];
         if (ioctl(d->fd, EVIOCGMTSLOTS(sizeof req), &req) < 0) return;
         for (int i = 0; i < d->c.nslots; i++) {
-            if (c == 0) { d->s[i].id = req.v[i]; d->s[i].down = req.v[i] >= 0; }
+            if (c == 0) { d->s[i].id = req.v[i]; d->s[i].kdown = req.v[i] >= 0; }
             else if (c == 1) d->s[i].x = req.v[i];
             else d->s[i].y = req.v[i];
         }
@@ -778,6 +905,7 @@ static void frame(TpDevice *d) {
     if (dt > 0.05) dt = 0.05;
     for (int i = 0; i < d->c.nslots; i++) {
         Slot *s = &d->s[i];
+        s->down = firm(d, s);
         if (s->down && !s->was) begin_touch(d, s);
         else if (s->down) update_touch(d, s);
     }
@@ -797,12 +925,13 @@ void tp_event_at(TpDevice *d, const struct input_event *ev, double now) {
         if (ev->type == EV_SYN && ev->code == SYN_REPORT) { d->dropped = 0; resync(d); d->now = now; frame(d); }
         return;
     }
-    Slot *s = &d->s[d->cur];
+    Slot *s = d->cur >= 0 ? &d->s[d->cur] : &d->junk;
     switch (ev->type) {
     case EV_ABS:
         switch (ev->code) {
-        case ABS_MT_SLOT: if (ev->value >= 0 && ev->value < d->c.nslots) d->cur = ev->value; break;
-        case ABS_MT_TRACKING_ID: s->id = ev->value; s->down = ev->value >= 0; break;
+        /* a slot we don't track: its events are dropped (they used to land on the previous slot) */
+        case ABS_MT_SLOT: d->cur = ev->value >= 0 && ev->value < d->c.nslots ? ev->value : -1; break;
+        case ABS_MT_TRACKING_ID: s->id = ev->value; s->kdown = ev->value >= 0; break;
         case ABS_MT_POSITION_X: s->x = ev->value; break;
         case ABS_MT_POSITION_Y: s->y = ev->value; break;
         case ABS_MT_TOUCH_MAJOR: s->major = ev->value; break;

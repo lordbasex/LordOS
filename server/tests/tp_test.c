@@ -5,15 +5,25 @@
  * gesture (in gesture time) and how much processing a frame costs.
  *
  *   build/tp-test                 all tests
- *   build/tp-test --replay F.ev   replays a recording (tpsim record/dump) and shows what came out */
+ *   build/tp-test --replay F.ev   replays a recording (tpsim record/dump) and shows what came out
+ *   build/tp-test --dump NAME     prints one of the bcm5974 sequences below as text (for
+ *                                 tpsim play-file --bcm5974, which replays it through uinput)
+ *   build/tp-test --live DEV SECS opens DEV as lord-server does (tp_open), grabs it, reads it for
+ *                                 SECS seconds and prints what the driver made of it; DEV can be
+ *                                 the name of a device about to appear (it's grabbed on arrival) */
 #include "../src/tp/tp.h"
 #include "../../tests/touchpad-sim/gestures.h"
 
+#include <fcntl.h>
 #include <math.h>
+#include <poll.h>
+#include <sys/inotify.h>
+#include <sys/ioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 enum { O_MOTION, O_BUTTON, O_SCROLL, O_PINCH, O_SWIPE, O_HOLD, O_TOUCH, O_WARP };
 typedef struct { int kind, phase, a, b; double t, dx, dy, scale, rot; } Out;
@@ -89,7 +99,7 @@ static TpCaps sim_caps(int kind) {
 
 static TpConfig defaults(void) {
     return (TpConfig){ .speed = 0.5, .tap = 1, .tap_drag = 1, .natural = 1, .three_drag = 0, .dwt = 1, .scroll = 1,
-                       .kinetic = 1, .pinch = 1, .swipe3 = 1, .swipe4 = 0 };
+                       .kinetic = 1, .pinch = 1, .swipe3 = 1, .swipe4 = 0, .scroll_speed = 0.5, .sensitivity = TP_SENS_MEDIUM };
 }
 
 static double base_t = 100000;      /* each test starts later (far from the last key) */
@@ -332,6 +342,321 @@ static void t_touchscreen(void) {
     touch_consume = 0;
 }
 
+/* ---- bcm5974 touchpad (a 2015 laptop): issue #34 ----
+ *
+ * What bcm5974 declares: 16 slots, x -4828..5345 and y -203..6803 without a resolution, a touch
+ * size (ABS_MT_TOUCH_MAJOR) and no pressure; a clickpad. Its sensor reports a finger that is
+ * only hovering (small touch size), and the kernel's slot assignment can hand a finger's slot to
+ * another finger in the same frame. The sequences are written by hand from that description:
+ * no real device was recorded. */
+
+#define AP_XMIN -4828
+#define AP_XMAX 5345
+#define AP_YMIN -203
+#define AP_YMAX 6803
+
+static TpCaps bcm_caps(void) {
+    TpCaps c;
+    memset(&c, 0, sizeof c);
+    c.kind = TP_KIND_TOUCHPAD;
+    c.clickpad = 1;
+    c.nslots = 16;
+    c.max_fingers = 5;
+    c.x = (struct input_absinfo){ .minimum = AP_XMIN, .maximum = AP_XMAX, .fuzz = 40 };
+    c.y = (struct input_absinfo){ .minimum = AP_YMIN, .maximum = AP_YMAX, .fuzz = 28 };
+    c.major = (struct input_absinfo){ .minimum = 0, .maximum = 2048 };
+    c.has_major = 1;
+    c.bus = BUS_USB;
+    c.vendor = 0x05ac;
+    c.product = 0x0273;
+    snprintf(c.name, sizeof c.name, "bcm5974");
+    return c;
+}
+
+typedef void (*Emit)(double t, int type, int code, int value);
+typedef struct { int slot, id; double x, y; int major; } Ct;      /* mm from the top-left corner */
+static Emit ap_emit;
+static double ap_t;
+static int ap_live[16], ap_btn, ap_tool;
+
+static int ap_ux(double mm) { return (int)lround(AP_XMIN + mm * (AP_XMAX - AP_XMIN) / 104.0); }
+static int ap_uy(double mm) { return (int)lround(AP_YMIN + mm * (AP_YMAX - AP_YMIN) / 75.0); }
+
+/* one frame (~11 ms like bcm5974): the contacts listed are down, every other slot is lifted */
+static void ap_frame(int n, const Ct *c, int button) {
+    int seen[16] = {0};
+    for (int i = 0; i < n; i++) {
+        ap_emit(ap_t, EV_ABS, ABS_MT_SLOT, c[i].slot);
+        if (ap_live[c[i].slot] != c[i].id) ap_emit(ap_t, EV_ABS, ABS_MT_TRACKING_ID, c[i].id);
+        ap_live[c[i].slot] = c[i].id;
+        ap_emit(ap_t, EV_ABS, ABS_MT_TOUCH_MAJOR, c[i].major);
+        ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_X, ap_ux(c[i].x));
+        ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_Y, ap_uy(c[i].y));
+        seen[c[i].slot] = 1;
+    }
+    for (int k = 0; k < 16; k++)
+        if (ap_live[k] > 0 && !seen[k]) { ap_emit(ap_t, EV_ABS, ABS_MT_SLOT, k); ap_emit(ap_t, EV_ABS, ABS_MT_TRACKING_ID, -1); ap_live[k] = 0; }
+    static const int tools[] = { 0, BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP, BTN_TOOL_TRIPLETAP, BTN_TOOL_QUADTAP, BTN_TOOL_QUINTTAP };
+    int tool = n > 5 ? 5 : n;
+    if (tool != ap_tool) {
+        if (ap_tool) ap_emit(ap_t, EV_KEY, tools[ap_tool], 0);
+        if (!ap_tool) ap_emit(ap_t, EV_KEY, BTN_TOUCH, 1);
+        if (tool) ap_emit(ap_t, EV_KEY, tools[tool], 1);
+        else ap_emit(ap_t, EV_KEY, BTN_TOUCH, 0);
+        ap_tool = tool;
+    }
+    if (button != ap_btn) { ap_emit(ap_t, EV_KEY, BTN_LEFT, button); ap_btn = button; }
+    ap_emit(ap_t, EV_SYN, SYN_REPORT, 0);
+    ap_t += 11;
+}
+static void ap_one(int id, double x, double y, int major, int button) { Ct c = { 0, id, x, y, major }; ap_frame(1, &c, button); }
+
+/* A light tap: the finger hovers for 130 ms while it comes down (drifting 3 mm), touches for
+ * 55 ms, and hovers 45 ms going up. The tap has to count, and the hover must not move the pointer. */
+static void seq_hover_tap(void) {
+    for (int k = 0; k < 12; k++) ap_one(1, 40 + k * 0.25, 30 + k * 0.1, 40 + k * 8, 0);
+    for (int k = 0; k < 5; k++) ap_one(1, 43, 31.2, 420, 0);
+    for (int k = 0; k < 4; k++) ap_one(1, 43 + k * 0.3, 31.2, 90 - k * 10, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 400;
+}
+
+/* A finger hovering above the touchpad, moving 25 mm, never touching. */
+static void seq_hover_move(void) {
+    for (int k = 0; k < 30; k++) ap_one(1, 30 + k * 0.85, 40, 90, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 200;
+}
+
+/* Index finger resting; it lifts as the thumb presses in the bottom-left corner to click, and the
+ * kernel keeps the index's slot (and tracking id) for the thumb: the contact "moves" 50 mm in one
+ * frame. That was the pointer going to the bottom-left corner on a click. */
+static void seq_click_jump(void) {
+    for (int k = 0; k < 10; k++) ap_one(1, 60 + k * 0.2, 25, 500, 0);
+    ap_one(1, 14, 68, 700, 1);                              /* the same slot, now the thumb */
+    for (int k = 0; k < 8; k++) ap_one(1, 14 + k * 0.05, 68, 900, 1);
+    for (int k = 0; k < 3; k++) ap_one(1, 14.4, 68, 600, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 400;
+}
+
+/* Pressing the clickpad pushes the finger 1 mm; then the finger drags 20 mm with the button held. */
+static void seq_click_push(void) {
+    for (int k = 0; k < 6; k++) ap_one(1, 50, 35, 500, 0);
+    for (int k = 0; k < 4; k++) ap_one(1, 50 + k * 0.25, 35 + k * 0.1, 900, 1);
+    for (int k = 0; k < 20; k++) ap_one(1, 51 + k * 1.0, 35.4, 900, 1);
+    ap_one(1, 71, 35.4, 600, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 400;
+}
+
+/* Space in Files (Quick Preview), Space again to close it, and the finger touches right after
+ * and moves for 0.8 s without lifting. */
+static double space_at;
+static void seq_space_move(void) {
+    space_at = ap_t;
+    ap_t += 60;
+    for (int k = 0; k < 70; k++) ap_one(1, 30 + k * 0.5, 40, 500, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 300;
+}
+
+/* A device with 2 slots that sends a third (some firmware does): its events must not land on
+ * the finger in slot 1 (that was a jump of the pointer). */
+static void seq_slot_overflow(void) {
+    for (int k = 0; k < 10; k++) {
+        ap_emit(ap_t, EV_ABS, ABS_MT_SLOT, 1);
+        if (!k) ap_emit(ap_t, EV_ABS, ABS_MT_TRACKING_ID, 7);
+        ap_emit(ap_t, EV_ABS, ABS_MT_TOUCH_MAJOR, 500);
+        ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_X, ap_ux(50 + k * 0.3));
+        ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_Y, ap_uy(30));
+        if (k == 5) {
+            ap_emit(ap_t, EV_ABS, ABS_MT_SLOT, 5);
+            ap_emit(ap_t, EV_ABS, ABS_MT_TRACKING_ID, 9);
+            ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_X, ap_ux(2));
+            ap_emit(ap_t, EV_ABS, ABS_MT_POSITION_Y, ap_uy(74));
+        }
+        if (!k) { ap_emit(ap_t, EV_KEY, BTN_TOUCH, 1); ap_emit(ap_t, EV_KEY, BTN_TOOL_FINGER, 1); }
+        ap_emit(ap_t, EV_SYN, SYN_REPORT, 0);
+        ap_t += 11;
+    }
+    ap_emit(ap_t, EV_ABS, ABS_MT_SLOT, 1);
+    ap_emit(ap_t, EV_ABS, ABS_MT_TRACKING_ID, -1);
+    ap_emit(ap_t, EV_KEY, BTN_TOOL_FINGER, 0);
+    ap_emit(ap_t, EV_KEY, BTN_TOUCH, 0);
+    ap_emit(ap_t, EV_SYN, SYN_REPORT, 0);
+    ap_t += 300;
+}
+
+/* a light touch (size 200, between the "on" thresholds of medium and low) moving 20 mm */
+static void seq_light_move(void) {
+    for (int k = 0; k < 30; k++) ap_one(1, 30 + k * 0.7, 40, 200, 0);
+    ap_frame(0, NULL, 0);
+    ap_t += 200;
+}
+
+static const struct { const char *name; void (*play)(void); } ap_seqs[] = {
+    { "hover-tap", seq_hover_tap }, { "hover-move", seq_hover_move }, { "click-jump", seq_click_jump },
+    { "click-push", seq_click_push }, { "space-move", seq_space_move }, { "slot-overflow", seq_slot_overflow },
+    { "light-move", seq_light_move },
+};
+
+static void ap_reset(double t);
+
+static void print_emit(double t, int type, int code, int value) { printf("%.1f %d %d %d\n", t, type, code, value); }
+
+static int dump(const char *name) {
+    for (size_t i = 0; i < sizeof ap_seqs / sizeof ap_seqs[0]; i++)
+        if (!strcmp(ap_seqs[i].name, name)) {
+            TpCaps c = bcm_caps();
+            printf("# tp-test %s: bcm5974-like (written by hand, not recorded)\n", name);
+            printf("# caps x %d %d %d y %d %d %d\n# caps major %d %d\n# caps id %d %d %d\n# caps name %s\n", c.x.minimum, c.x.maximum, 0,
+                   c.y.minimum, c.y.maximum, 0, c.major.minimum, c.major.maximum, c.bus, c.vendor, c.product, c.name);
+            ap_reset(0);
+            ap_emit = print_emit;
+            ap_seqs[i].play();
+            return 0;
+        }
+    fprintf(stderr, "no sequence %s\n", name);
+    return 2;
+}
+
+static void feed_emit(double t, int type, int code, int value) { feed(NULL, t, type, code, value); }
+
+static void ap_reset(double t) {
+    ap_t = t;
+    ap_btn = ap_tool = 0;
+    memset(ap_live, 0, sizeof ap_live);
+}
+
+static Sum ap_go(const char *name, void (*play)(void), const TpCaps *caps, const TpConfig *cfg) {
+    TpConfig c = cfg ? *cfg : defaults();
+    tp_set_config(&c);
+    TpCaps k = caps ? *caps : bcm_caps();
+    dev = tp_new(&k);
+    nout = 0;
+    ap_reset(base_t);
+    last_tick = base_t;
+    ap_emit = feed_emit;
+    play();
+    ticks_until(ap_t + 3000);
+    base_t = ap_t + 10000;
+    tp_free(dev);
+    dev = NULL;
+    Sum s = summary();
+    print_sum(name, &s);
+    return s;
+}
+
+static void t_bcm5974(void) {
+    Sum s = ap_go("bcm5974:hover-tap", seq_hover_tap, NULL, NULL);
+    CHECK(!strcmp(s.btns, "Ll"), "a light tap after hovering clicks (%s)", s.btns);
+    CHECK(fabs(s.mx) < 3 && fabs(s.my) < 3, "the hover does not move the pointer: %.1f,%.1f", s.mx, s.my);
+    s = ap_go("bcm5974:hover-move", seq_hover_move, NULL, NULL);
+    CHECK(!s.nmotion && !s.btns[0], "a hovering finger is not a touch: %d motions, %s", s.nmotion, s.btns);
+    s = ap_go("bcm5974:click-jump", seq_click_jump, NULL, NULL);
+    CHECK(!strcmp(s.btns, "Ll"), "the click is a left click (%s)", s.btns);
+    CHECK(s.mx > -30 && s.my < 30, "no jump to the bottom-left on the click: %.0f,%+.0f px", s.mx, s.my);
+    s = ap_go("bcm5974:click-push", seq_click_push, NULL, NULL);
+    CHECK(!strcmp(s.btns, "Ll") && s.mx > 100, "press and drag: %s, %.0f px", s.btns, s.mx);
+    /* Space (Quick Preview in Files) just before the touch, then no more keys */
+    TpConfig c = defaults();
+    tp_set_config(&c);
+    TpCaps k = bcm_caps();
+    dev = tp_new(&k);
+    nout = 0;
+    ap_reset(base_t);
+    last_tick = base_t;
+    ap_emit = feed_emit;
+    tp_key_activity(KEY_SPACE, base_t);
+    seq_space_move();
+    ticks_until(ap_t + 3000);
+    base_t = ap_t + 10000;
+    tp_free(dev);
+    dev = NULL;
+    s = summary();
+    print_sum("bcm5974:space", &s);
+    double first = -1;
+    for (int i = 0; i < nout; i++) if (outs[i].kind == O_MOTION) { first = outs[i].t; break; }
+    CHECK(s.mx > 60, "after Space the pointer moves without lifting the finger: %.0f px", s.mx);
+    CHECK(first < 0 || first - space_at >= 200, "...but not right after the key: %.0f ms", first - space_at);
+    CHECK(!s.btns[0], "and the released touch does not tap (%s)", s.btns);
+    /* while typing (keys 150 ms apart) a resting touch stays ignored */
+    c = defaults();
+    tp_set_config(&c);
+    dev = tp_new(&k);
+    nout = 0;
+    ap_reset(base_t);
+    last_tick = base_t;
+    for (int i = 0; i < 6; i++) tp_key_activity(KEY_A, base_t + i * 150);
+    ap_t = base_t + 760;
+    for (int i = 0; i < 6; i++) {          /* the palm comes down between keys */
+        for (int f = 0; f < 13; f++) ap_one(1, 20 + i * 0.1, 60, 500, 0);
+        tp_key_activity(KEY_A, ap_t);
+    }
+    ap_frame(0, NULL, 0);
+    ticks_until(ap_t + 3000);
+    base_t = ap_t + 10000;
+    tp_free(dev);
+    dev = NULL;
+    s = summary();
+    CHECK(!s.nmotion && !s.btns[0], "a touch made while typing stays ignored while the keys go on: %d motions", s.nmotion);
+    /* slots beyond the device's */
+    k = bcm_caps();
+    k.nslots = 2;
+    s = ap_go("bcm5974:slot-overflow", seq_slot_overflow, &k, NULL);
+    double travel = 0;
+    for (int i = 0; i < nout; i++) if (outs[i].kind == O_MOTION) travel += fabs(outs[i].dx) + fabs(outs[i].dy);
+    CHECK(travel < 40, "an unknown slot does not move the finger in slot 1: %.0f px of travel", travel);
+}
+
+/* the motion of the click-push sequence while the press pushes the finger: pinned */
+static void t_pin(void) {
+    TpConfig c = defaults();
+    tp_set_config(&c);
+    TpCaps k = bcm_caps();
+    dev = tp_new(&k);
+    nout = 0;
+    ap_reset(base_t);
+    last_tick = base_t;
+    ap_emit = feed_emit;
+    for (int i = 0; i < 6; i++) ap_one(1, 50, 35, 500, 0);
+    double press = ap_t;
+    for (int i = 0; i < 4; i++) ap_one(1, 50 + i * 0.25, 35 + i * 0.1, 900, 1);
+    for (int i = 0; i < 4; i++) ap_one(1, 50.75 - i * 0.25, 35.3, 900, 0);     /* release: back */
+    ap_frame(0, NULL, 0);
+    ticks_until(ap_t + 3000);
+    base_t = ap_t + 10000;
+    tp_free(dev);
+    dev = NULL;
+    double moved = 0;
+    for (int i = 0; i < nout; i++) if (outs[i].kind == O_MOTION && outs[i].t >= press) moved += fabs(outs[i].dx) + fabs(outs[i].dy);
+    Sum s = summary();
+    print_sum("bcm5974:pin", &s);
+    CHECK(moved < 1, "pressing and releasing the clickpad does not nudge the pointer: %.1f px", moved);
+    CHECK(!strcmp(s.btns, "Ll"), "click (%s)", s.btns);
+}
+
+static void t_settings(void) {
+    /* scroll speed: ×2 at the top of the slider, ×0.5 at the bottom */
+    Sum n = go("scroll", NULL);
+    TpConfig f = defaults();
+    f.scroll_speed = 1;
+    Sum fast = go("scroll", &f);
+    f.scroll_speed = 0;
+    Sum slow = go("scroll", &f);
+    CHECK(fast.sy > n.sy * 1.7 && slow.sy < n.sy * 0.6, "scroll speed: %.0f / %.0f / %.0f px", slow.sy, n.sy, fast.sy);
+    /* touch sensitivity on bcm5974: a touch of size 200 counts with medium, not with low */
+    TpConfig lo = defaults();
+    lo.sensitivity = TP_SENS_LOW;
+    Sum a = ap_go("bcm5974:light", seq_light_move, NULL, NULL);
+    Sum b = ap_go("bcm5974:light-low", seq_light_move, NULL, &lo);
+    CHECK(a.nmotion > 0 && !b.nmotion, "light touch: medium %d motions, low %d", a.nmotion, b.nmotion);
+    /* and on a pressure touchpad, low ignores a very light touch; medium keeps the old behaviour */
+    Sum p = go("move", &lo);
+    CHECK(p.mx > 150, "low sensitivity still takes a normal finger: %.0f px", p.mx);
+}
+
 static int replay(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) { perror(path); return 1; }
@@ -346,6 +671,16 @@ static int replay(const char *path) {
         if (sscanf(line, "# caps x %d %d %d y %d %d %d", &a, &b, &cc, &d, &e, &g) == 6) {
             caps.x = (struct input_absinfo){ .minimum = a, .maximum = b, .resolution = cc };
             caps.y = (struct input_absinfo){ .minimum = d, .maximum = e, .resolution = g };
+            continue;
+        }
+        if (sscanf(line, "# caps major %d %d", &a, &b) == 2) { caps.major = (struct input_absinfo){ .minimum = a, .maximum = b }; caps.has_major = 1; continue; }
+        /* newer recordings list every capability after this line: start without the simulated ones */
+        if (sscanf(line, "# caps id %d %d %d", &a, &b, &cc) == 3) { caps.bus = a; caps.vendor = b; caps.product = cc; caps.has_pressure = caps.has_major = 0; continue; }
+        if (sscanf(line, "# caps slots %d", &a) == 1) { caps.nslots = a; continue; }
+        if (sscanf(line, "# caps pressure %d %d", &a, &b) == 2) { caps.pressure = (struct input_absinfo){ .minimum = a, .maximum = b }; caps.has_pressure = 1; continue; }
+        if (!strncmp(line, "# caps name ", 12)) {
+            snprintf(caps.name, sizeof caps.name, "%.79s", line + 12);
+            caps.name[strcspn(caps.name, "\r\n")] = 0;
             continue;
         }
         if (line[0] == '#') continue;
@@ -363,10 +698,84 @@ static int replay(const char *path) {
     return 0;
 }
 
+/* Waits for a new /dev/input/eventN called name and grabs it at once, before a session on the
+ * monitor (lord-sessiond hotplug) takes it: the replayed gestures must not reach a desktop. */
+static int wait_device(const char *name, char *path, size_t size) {
+    int in = inotify_init1(IN_CLOEXEC);
+    if (in < 0 || inotify_add_watch(in, "/dev/input", IN_CREATE | IN_ATTRIB) < 0) { perror("inotify"); return -1; }
+    for (int tries = 0; tries < 200; tries++) {
+        char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+        struct pollfd p = { in, POLLIN, 0 };
+        if (poll(&p, 1, 100) <= 0) continue;
+        ssize_t n = read(in, buf, sizeof buf);
+        for (char *q = buf; n > 0 && q < buf + n;) {
+            const struct inotify_event *e = (const struct inotify_event *)q;
+            q += sizeof *e + e->len;
+            if (!e->len || strncmp(e->name, "event", 5)) continue;
+            snprintf(path, size, "/dev/input/%s", e->name);
+            int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+            if (fd < 0) continue;
+            char nm[80] = "";
+            ioctl(fd, EVIOCGNAME(sizeof nm), nm);
+            if (strcmp(nm, name)) { close(fd); continue; }
+            if (ioctl(fd, EVIOCGRAB, 1)) perror("EVIOCGRAB: another reader got it first");
+            close(in);
+            return fd;
+        }
+    }
+    close(in);
+    fprintf(stderr, "no new device called %s\n", name);
+    return -1;
+}
+
+/* A real (or uinput) device, opened like lord-server does: a path, or the name of a device that is
+ * about to appear (tpsim play-file --bcm5974: "bcm5974"). */
+static int live(const char *what, double secs) {
+    char path[64];
+    int fd;
+    if (what[0] == '/') {
+        snprintf(path, sizeof path, "%s", what);
+        fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (fd >= 0 && ioctl(fd, EVIOCGRAB, 1)) perror("EVIOCGRAB: another reader got it first");
+    } else fd = wait_device(what, path, sizeof path);
+    if (fd < 0) { perror(what); return 1; }
+    TpConfig c = defaults();
+    tp_set_config(&c);
+    char name[80] = "";
+    ioctl(fd, EVIOCGNAME(sizeof name), name);
+    dev = tp_open(fd, name);
+    if (!dev) { fprintf(stderr, "%s: not a touchpad or touchscreen\n", path); return 1; }
+    nout = 0;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    double now = ts.tv_sec * 1e3 + ts.tv_nsec / 1e6, end = now + secs * 1000;
+    last_tick = now;
+    while (now < end) {
+        double w = tp_timeout(now);
+        struct pollfd p = { fd, POLLIN, 0 };
+        poll(&p, 1, w < 0 || w > 50 ? 50 : (int)w + 1);
+        struct input_event ev;
+        while (read(fd, &ev, sizeof ev) == sizeof ev) {
+            double t = ev.input_event_sec * 1e3 + ev.input_event_usec / 1e3;
+            ticks_until(t);
+            cur_t = t;
+            tp_event(dev, &ev);
+        }
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        now = ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+        ticks_until(now);
+    }
+    Sum s = summary();
+    print_sum(name, &s);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     tp_set_sink(&sink, NULL);
     tp_set_screen(1280, 800);
     if (argc == 3 && !strcmp(argv[1], "--replay")) return replay(argv[2]);
+    if (argc == 3 && !strcmp(argv[1], "--dump")) return dump(argv[2]);
+    if (argc == 4 && !strcmp(argv[1], "--live")) return live(argv[2], atof(argv[3]));
     t_pointer();
     t_taps();
     t_clicks();
@@ -376,6 +785,9 @@ int main(int argc, char **argv) {
     t_palm();
     t_hold();
     t_touchscreen();
+    t_bcm5974();
+    t_pin();
+    t_settings();
     printf("processing a frame: %.2f µs (average over %.0f frames)\n", proc_ns / proc_frames / 1000, proc_frames);
     printf("tp-test: %d/%d passed\n", checks - fails, checks);
     return fails ? 1 : 0;
