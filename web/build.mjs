@@ -44,10 +44,22 @@ const GH_MARK = '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentCo
 const PKG = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 // a package-only update (0.8.4.1) leaves the live ISO and the Imager on an earlier release: lordos.media
 const CHANNEL = PKG.lordos && PKG.lordos.channel ? '-' + PKG.lordos.channel : '';
-const MEDIA_VERSION = (PKG.lordos && PKG.lordos.media) || PKG.version;
-// the Imager is released only when it changes: lordos.imager names the release that holds its downloads
-const IMAGER_VERSION = (PKG.lordos && PKG.lordos.imager) || MEDIA_VERSION;
+// downloads.json (tools/web/downloads.mjs): for each download, the newest release that carries the file.
+// Refreshed from GitHub on every build (DOWNLOADS_OFFLINE=1 skips that); the committed copy is the fallback.
+const DL_FILE = path.join(REPO, 'web/content/downloads.json');
+if (process.env.DOWNLOADS_OFFLINE !== '1') {
+  try {
+    execFileSync(process.execPath, [path.join(REPO, 'tools/web/downloads.mjs'), DL_FILE], { stdio: ['ignore', 'ignore', 'pipe'], timeout: 60000 });
+  } catch (e) { console.warn(`[web] downloads.json: GitHub not reachable, using the committed copy (${String(e.stderr || e.message).trim().split('\n').pop()})`); }
+}
+const DL = fs.existsSync(DL_FILE) ? JSON.parse(fs.readFileSync(DL_FILE, 'utf8')).downloads : {};
+const MEDIA_VERSION = (DL['iso-amd64'] && DL['iso-amd64'].version) || (PKG.lordos && PKG.lordos.media) || PKG.version;
+// the Imager is released only when it changes: the newest release that holds its downloads
+const IMAGER_VERSION = (DL['imager-mac'] && DL['imager-mac'].version) || (PKG.lordos && PKG.lordos.imager) || MEDIA_VERSION;
 const IMAGER_DL = `${GITHUB}/releases/download/v${IMAGER_VERSION}${CHANNEL}/lordos_imager_${IMAGER_VERSION}`;
+// a direct link to one file (from downloads.json; the release-name pattern if it isn't listed)
+const dlUrl = (kind, fallback) => (DL[kind] && DL[kind].url) || fallback;
+const dlSize = (kind) => { const b = DL[kind] && DL[kind].size; return b ? (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`) : ''; };
 
 const r = (...p) => path.join(REPO, ...p);
 const read = (f) => fs.readFileSync(f);
@@ -293,7 +305,7 @@ const HAS_GUIDE = LANGS.every((l) => fs.existsSync(path.join(imagerDir, `guide.$
 const guideText = HAS_GUIDE ? Object.fromEntries(LANGS.map((l) => [l, readJson(path.join(imagerDir, `guide.${l}.json`))])) : {};
 const IMAGER_VIDEO_DIR = process.env.IMAGER_VIDEO_DIR ? path.resolve(process.env.IMAGER_VIDEO_DIR) : path.join(imagerDir, 'video');
 const imagerLinks = (l) => ({
-  mac: `${IMAGER_DL}_universal.dmg`, win: `${IMAGER_DL}_x64_setup.exe`, linux: `${IMAGER_DL}_amd64.deb`,
+  mac: dlUrl('imager-mac', `${IMAGER_DL}_universal.dmg`), win: dlUrl('imager-win', `${IMAGER_DL}_x64_setup.exe`), linux: dlUrl('imager-linux', `${IMAGER_DL}_amd64.deb`),
   signing: builtPages().has('legal/code-signing') ? pageUrl(l, 'legal/code-signing') : `${GITHUB}/blob/main/docs/SIGNING.md`,
   switchFiles: `${GITHUB}/blob/main/docs/RASPBERRY.md#switch-files`,
 });
@@ -307,6 +319,8 @@ if (HAS_PAPER && TOOLS) { try { createRequire(path.join(TOOLS, 'package.json')).
 if (HAS_PAPER && !HAS_PDF) console.warn('[web] paper: set WEB_TOOLS to a folder with playwright to build the PDFs; the PDF link is left out');
 const prefix = (l) => (l === 'en' ? '/' : `/${l}/`);
 const pageUrl = (l, page) => prefix(l) + (page === 'home' ? '' : page + '/');
+// the blog lives on its own host: one home per language
+const blogUrl = (l) => 'https://blog.lordos.org' + (l === 'en' ? '/' : `/${l}/`);
 const get = (obj, key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 
 function render(tpl, vars, t) {
@@ -390,6 +404,7 @@ function header(t, page) {
     `<a href="${h('#support')}">${esc(t.navSupport)}</a>`,
     `<a href="${pageUrl(l, 'about')}"${cur('about')}>${esc(t.navAbout)}</a>`,
     `<a href="${COMMUNITY}" rel="noopener">${esc(t.navCommunity)}</a>`,
+    `<a href="${blogUrl(l)}">${esc(t.navBlog)}</a>`,
   ].filter(Boolean).join('\n');
 
   // mobile drawer: a CSS-only toggle (hidden checkbox + labels) that site.js upgrades to a real dialog
@@ -411,11 +426,12 @@ function header(t, page) {
       ? group(t.pages.legal.nav, [row(pageUrl(l, 'legal'), t.pages.legal.all, cur('legal')), ...legalLinks.map((x) => row(pageUrl(l, 'legal/' + x.slug), loc(x.title, l), cur('legal/' + x.slug)))], page.startsWith('legal'))
       : '',
     row(COMMUNITY, t.navCommunity, ' rel="noopener"'),
+    row(blogUrl(l), t.navBlog),
   ].filter(Boolean).join('\n');
   const X = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   return `<input type="checkbox" id="nav-cb" class="nav-cb" aria-label="${esc(t.pages.menu)}">
 <header class="top">
-<nav class="wrap${page === 'home' ? '' : ' wide'} nav" aria-label="${esc(t.navLabel)}">
+<nav class="wrap wide nav" aria-label="${esc(t.navLabel)}">
 <a class="nav-home" href="${home}" aria-label="${esc(t.homeLabel)}"><img class="logo-l" src="${img.logoLight}" alt="LordOS" width="122" height="36"><img class="logo-d" src="${img.logoDark}" alt="LordOS" width="122" height="36"></a>
 <div class="nav-links">
 ${links}
@@ -579,6 +595,12 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
   write(path.join(pageUrl(l, 'home'), 'index.html'), render(tpl.home, {
     ...common('home', null, 'home'), features, showcase, teaser: teaser(t),
     vmGuide: pageUrl(l, 'virtual-machine'), reqUrl: pageUrl(l, 'requirements'),
+    // straight to the files (downloads.json): update-only releases carry no media (#35)
+    ...(() => { const d = `${GITHUB}/releases/download/v${MEDIA_VERSION}${CHANNEL}/`;
+      return { isoAmd: dlUrl('iso-amd64', d + `lordos-live-${MEDIA_VERSION}-amd64.iso`), isoArm: dlUrl('iso-arm64', d + `lordos-live-${MEDIA_VERSION}-arm64.iso`),
+        ovaUrl: dlUrl('ova-amd64', d + `lordos-${MEDIA_VERSION}-amd64.ova`), piUrl: dlUrl('rpi5', d + `lordos-${MEDIA_VERSION}-rpi5-arm64.img.xz`),
+        isoSize: dlSize('iso-amd64'), ovaSize: dlSize('ova-amd64'), piSize: dlSize('rpi5'),
+        mediaRel: (DL['iso-amd64'] && DL['iso-amd64'].page) || `${GITHUB}/releases/tag/v${MEDIA_VERSION}${CHANNEL}`, mediaVer: MEDIA_VERSION }; })(),
     heroImg: (() => {
       // the desktop inside a laptop drawn in CSS, as a slideshow of real screenshots (site.js runs it;
       // without JS only the first slide shows). Slide 1 has light and dark variants that follow the theme.
@@ -653,7 +675,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
       return `<div class="laptop" id="hero-show" role="region" aria-roledescription="carousel" aria-label="${esc(H.carousel)}"><div class="lp-screen"><span class="lp-cam" aria-hidden="true"></span><div class="lp-display">${slides}</div></div><div class="lp-base" aria-hidden="true"><span class="lp-notch"></span></div>${ctl}</div><ul class="stats">${pills}</ul>`;
     })(),
     fingerprint: FINGERPRINT, banner: l === 'en' ? banner() : '',
-    writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: PKG.version, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
+    writeBlock: HAS_GUIDE ? writeBlock({ l, t, g: guideText[l], esc, links: imagerLinks(l), version: MEDIA_VERSION, isoVersion: MEDIA_VERSION, guideUrl: pageUrl(l, 'imager') }) : '',
     imagerMac: `${IMAGER_DL}_universal.dmg`, imagerWin: `${IMAGER_DL}_x64_setup.exe`, imagerLinux: `${IMAGER_DL}_amd64.deb`,
     faqServer: HAS_FAQ ? pageUrl(l, 'faq') + '#server-vps' : `${GITHUB}/blob/main/docs/INSTALL-DEBIAN.md#servers-and-vps`,
   }, t));
@@ -755,7 +777,7 @@ ${shotList.join('\n')}
 </section>` : '';
     const code = (s) => esc(s).replace(/(--share|\breport\b|bench --quick|--full)/g, '<code>$1</code>');
     write(path.join(pageUrl(l, 'raspberry-pi'), 'index.html'), render(tpl.raspberry, { ...common('raspberry-pi', null, 'home'),
-      imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
+      piUrl: dlUrl('rpi5', `${GITHUB}/releases/download/v${MEDIA_VERSION}${CHANNEL}/lordos-${MEDIA_VERSION}-rpi5-arm64.img.xz`), imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
       fansUrl: GITHUB + '/blob/main/docs/FANS.md#argon-one-v5-case',
       artArgon: aria(PI_ART.argon, P.artArgon), art500: aria(PI_ART.pi500, P.art500), artPi5: aria(PI_ART.pi5, P.artPi5),
       testedLead: esc(P.testedLead).replace('{cmd}', '<code>lordos-issue</code>'),
@@ -1086,6 +1108,7 @@ write('favicon-32.png', read(r('docs/brand/favicon/favicon-32.png')));
 write('favicon-512.png', read(r('docs/brand/favicon/favicon-512.png')));
 write('apple-touch-icon.png', read(r('docs/brand/favicon/apple-touch-icon-180.png')));
 write('social-card.png', read(r('docs/brand/png/social-card-1200x630.png')));
+if (fs.existsSync(DL_FILE)) write('downloads.json', fs.readFileSync(DL_FILE));
 write('lordos-release.pub.pem', read(r('tools/release/lordos-release.pub.pem')));
 // install.sh is published from the last commit, never from uncommitted edits in the working tree
 let installSh = read(r('tools/install/install.sh'));
