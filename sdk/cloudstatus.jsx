@@ -130,7 +130,7 @@ export function startCloud() {
   // development only: the stand-in for lord.cloud (cloudmock.js)
   try {
     const dev = settings.get().cloudDevMock;
-    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || dev === 'states')) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
+    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || dev === 'states' || dev === 'providersFail')) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
   } catch (e) { console.log(`cloud mock: ${e}`); }
   let prev = cloudState.get();
   cloudState.subscribe(() => {

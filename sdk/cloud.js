@@ -1,16 +1,18 @@
 // cloud.js — Cloud: the person's cloud storage accounts (lord.cloud, server/src/cloud, docs/CLOUD.md section 17).
 //
 //   const st = useCloud()              live State: { available, service, options, accounts, signin, recent }
-//   cloud.available() / cloud.state() / cloud.providers()
+//   cloud.available() / cloud.state()
+//   cloud.providers() → Promise<[{ kind, label, description, group, verified, website?, fields, questions? }]> (asked fresh, 17.2)
 //   cloud.beginSignIn(kind, name, { clientId, clientSecret }) → { id, url, expiresAt } | { error }
 //   cloud.openSignInPage(id) / cloud.cancelSignIn(id)
-//   cloud.add(kind, name, fields) → { id } | { error, field? }
+//   cloud.add(kind, name, fields) → { id } | { question } | { error, field? }   cloud.answer(state, value) → Promise, the same (17.2)
 //   cloud.remove(id, { discardPending }) → { ok } | { error: 'pending', files }
 //   cloud.rename(id, name) / refreshAbout(id) / websiteUrl(id)
 //   cloud.status(paths) → { [path]: { st, pct?, error? } }       cloud.keep(paths) / unkeep(paths)
 //   cloud.free(paths) → { freed, skipped: [{ path, reason }] }
 //   cloud.link(path, expire) → Promise<{ url } | { error }>       cloud.unlink(path) → Promise<{ ok } | { error }>
 //   cloud.links(id) → [{ path, url, expires, made }]
+//   cloud.emptyTrash(id) → Promise   cloud.measure(id) → Promise<{ bytes, count }>   cloud.delete(paths) → Promise (17.2)
 //   cloud.pause(id|null) / resume(id|null) / setOptions({ … }) / restart() / showLog()
 //
 // lord-server's cloud thread is rclone's only client; JS never reaches it. The state is pushed (__lordCloud),
@@ -37,7 +39,9 @@ globalThis.__lordCloudReply = (req, res) => {
   if (done) { waiting.delete(req); done(res); }
 };
 
-const later = (r) => (r && r.req ? new Promise((resolve) => waiting.set(r.req, resolve)) : Promise.resolve(r || { error: 'cloud.failed' }));
+const later = (r) => (r && typeof r.then === 'function' ? r : r && r.req ? new Promise((resolve) => waiting.set(r.req, resolve)) : Promise.resolve(r || { error: 'cloud.failed' }));
+// a call of 17.2 the running lord-server may not have yet
+const maybe = (name, ...args) => (has() && typeof lord.cloud[name] === 'function' ? later(lord.cloud[name](...args)) : Promise.resolve({ error: 'cloud.unavailable' }));
 const paths = (p) => (Array.isArray(p) ? p : [p]).map(String);
 
 // lord-server opens the sign-in page itself; if the default browser isn't a Linux app it can launch, the session does
@@ -51,7 +55,8 @@ function openHere(url) {
 export const cloud = {
   available: () => has() && !!lord.cloud.available(),
   state: () => cloudState.get(),
-  providers: () => (has() ? lord.cloud.providers() || [] : []),
+  // 17.2: a Promise, asked of rclone every time (an older server answered a list at once)
+  providers: () => (has() ? later(lord.cloud.providers()).then((l) => (Array.isArray(l) ? l : l && l.error ? Promise.reject(l) : [])) : Promise.reject({ error: 'cloud.unavailable' })),
   beginSignIn: (kind, name, opts = {}) => (has() ? lord.cloud.beginSignIn(String(kind), String(name), {
     clientId: opts.clientId ? String(opts.clientId) : '', clientSecret: opts.clientSecret ? String(opts.clientSecret) : '',
   }) : { error: 'cloud.unavailable' }),
@@ -63,6 +68,11 @@ export const cloud = {
   },
   cancelSignIn: (id) => has() && lord.cloud.cancelSignIn(String(id)),
   add: (kind, name, fields = {}) => (has() ? lord.cloud.add(String(kind), String(name), fields) : { error: 'cloud.unavailable' }),
+  answer: (state, value) => maybe('answer', String(state), String(value ?? '')),
+  emptyTrash: (id) => maybe('emptyTrash', String(id)),
+  measure: (id) => maybe('measure', String(id)),
+  cancelMeasure: (id) => has() && typeof lord.cloud.cancelMeasure === 'function' && lord.cloud.cancelMeasure(String(id)),
+  delete: (p) => maybe('delete', paths(p)),
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),
   refreshAbout: (id) => has() && lord.cloud.refreshAbout(String(id)),

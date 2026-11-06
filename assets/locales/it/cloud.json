@@ -294,5 +294,33 @@
   "check.step.read": "Riscaricalo, stesso contenuto",
   "check.step.link": "Crea un link",
   "check.step.delete": "Cancella la cartella di controllo",
-  "check.step.deleteUp": "Cancellala nel cloud"
+  "check.step.deleteUp": "Cancellala nel cloud",
+  "add.loadFailed": "rclone non ha risposto con i suoi fornitori.",
+  "notes.before": "Prima di aggiungere {provider}",
+  "notes.iclouddrive.adp": "La cifratura end-to-end aggiuntiva del disco deve essere disattivata nell’account: rclone non può leggere i file cifrati così.",
+  "notes.iclouddrive.web": "L’accesso al disco dal web deve essere attivo nelle impostazioni dell’account.",
+  "notes.iclouddrive.code": "Chiede ora un codice da uno dei tuoi dispositivi, e di nuovo circa ogni 30 giorni (Accedi di nuovo).",
+  "question.title": "{provider} chiede",
+  "trash.empty": "Svuota il cestino",
+  "trash.title": "Svuotare il cestino di «{name}»?",
+  "trash.detail": "Tutto ciò che è nel cestino di {provider} per questo account viene cancellato per sempre. Non si può annullare.",
+  "trash.running": "Svuotamento del cestino…",
+  "trash.done": "Il cestino di {provider} è vuoto.",
+  "trash.ok": "Svuota il cestino",
+  "measure.run": "Misura",
+  "measure.again": "Misura di nuovo",
+  "measure.running": "Misurazione di ciò che contiene questo account…",
+  "measure.hint": "Questo spazio non ha quota. La misurazione scorre ogni file una volta.",
+  "measure.done": "{used} usati, misurato {when}",
+  "delete.title": {
+    "one": "Eliminare da {provider}?",
+    "other": "Eliminare {count} elementi da {provider}?"
+  },
+  "delete.toTrash": "Va nel suo cestino su {provider}.",
+  "delete.final": "{provider} non ha un cestino: non si può annullare.",
+  "delete.ok": "Elimina",
+  "delete.done": {
+    "one": "Eliminato da {provider}",
+    "other": "{count} elementi eliminati da {provider}"
+  }
 }

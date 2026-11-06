@@ -155,7 +155,7 @@ export function groupProviders(list, query = '', expanded = []) {
   const out = [];
   for (const g of GROUPS) {
     let items = (list || []).filter((p) => groupOf(p) === g);
-    if (q) items = items.filter((p) => [p.label, p.hint, p.kind].some((x) => fold(x).includes(q)));
+    if (q) items = items.filter((p) => [p.label, p.description, p.hint, p.kind].some((x) => fold(x).includes(q)));
     if (!items.length) continue;
     // the encrypted folder always last in its group
     items = [...items.filter((p) => p.group !== 'crypt'), ...items.filter((p) => p.group === 'crypt')];
@@ -334,18 +334,20 @@ export function rateOf(samples, total) {
 // data: the file's object; → its entry for a kind ({ since, date, evidence }) or null
 export const verifiedInfo = (kind, data) => ((data && data.verified) || {})[kind] || null;
 export const isVerified = (kind, data) => !!verifiedInfo(kind, data);
+// a provider item: its own `verified` (17.2, from lord-server's overlay) or else the file's
+const verifiedItem = (p, data) => (p && typeof p.verified === 'boolean' ? p.verified : isVerified(p && p.kind, data));
 // The sheet's two parts: { verified: groups (groupProviders), unverified: groups, unverifiedCount, open }. While searching
 // both are searched and the Not verified part opens by itself when it has matches.
 export function splitProviders(list, data, query = '', expanded = [], showUnverified = false) {
-  const v = (list || []).filter((p) => isVerified(p.kind, data));
-  const u = (list || []).filter((p) => !isVerified(p.kind, data));
+  const v = (list || []).filter((p) => verifiedItem(p, data));
+  const u = (list || []).filter((p) => !verifiedItem(p, data));
   const q = String(query || '').trim();
   const unverified = groupProviders(u, q, ['oauth', 'server', 'object']);
   return { verified: groupProviders(v, q, expanded), unverified, unverifiedCount: unverified.reduce((s, g) => s + g.items.length, 0),
     open: showUnverified || (!!q && unverified.length > 0) };
 }
 // a browser sign-in provider not verified yet: the add sheet offers the person's own app right away
-export const ownAppOffered = (p, data) => !!p && p.group === 'oauth' && !isVerified(p.kind, data);
+export const ownAppOffered = (p, data) => !!p && p.group === 'oauth' && !verifiedItem(p, data);
 // rclone's page for a backend (How to make one): its kind, but a few pages have their own names
 const DOC_PAGE = { gcs: 'googlecloudstorage', 'google cloud storage': 'googlecloudstorage', nextcloud: 'webdav', owncloud: 'webdav' };
 export const rcloneDocsUrl = (kind) => {
@@ -354,3 +356,59 @@ export const rcloneDocsUrl = (kind) => {
   return page ? `https://rclone.org/${page}/` : 'https://rclone.org/overview/';
 };
 export const OAUTH_REDIRECT = 'http://127.0.0.1:53682/';
+
+// ---- 17.2: rclone's questions, notes before a provider, Measure, delete in the cloud ----
+
+// How to ask one of rclone's questions ({ state, name, help, type, examples, isPassword, required, default }):
+// { input: 'bool' | 'choice' | 'number' | 'password' | 'text', options: [[value, label]], value: the starting value }
+export function questionInput(q) {
+  const qq = q || {};
+  const type = String(qq.type || '').toLowerCase();
+  const ex = (qq.examples || []).map((e) => (e && typeof e === 'object' ? [String(e.value ?? e.Value ?? ''), String(e.help ?? e.Help ?? e.value ?? e.Value ?? '')] : [String(e), String(e)]))
+    .filter(([v]) => v !== '');
+  const def = qq.default == null ? '' : String(qq.default);
+  if (type === 'bool') return { input: 'bool', options: [], value: def === 'true' ? 'true' : 'false' };
+  if (qq.isPassword) return { input: 'password', options: [], value: '' };
+  if (ex.length >= 2 && ex.length <= 12 && !/^(int|sizesuffix|duration)/.test(type)) return { input: 'choice', options: ex, value: ex.some(([v]) => v === def) ? def : ex[0][0] };
+  if (/^(int|uint|float|sizesuffix)/.test(type)) return { input: 'number', options: [], value: def };
+  return { input: 'text', options: ex, value: def };
+}
+// the answer as rclone takes it, or null while it can't be sent (required and empty, a number that isn't one)
+export function questionAnswer(q, raw) {
+  const how = questionInput(q);
+  const v = raw == null ? '' : String(raw).trim();
+  if (how.input === 'bool') return v === 'true' ? 'true' : 'false';
+  if (how.input === 'number' && v && !/^-?\d+(\.\d+)?[a-zA-Z]?$/.test(v)) return null;
+  if (!v && q && q.required) return null;
+  return how.input === 'password' ? String(raw ?? '') : v;
+}
+
+// What some providers need said before their sign-in starts (from rclone's documentation, in our words): keys of cloud.json
+const NOTES = { iclouddrive: ['cloud.notes.iclouddrive.adp', 'cloud.notes.iclouddrive.web', 'cloud.notes.iclouddrive.code'] };
+export const notesFor = (kind) => NOTES[String(kind || '')] || [];
+
+// Measure (17.2): a provider without a quota can be measured; the line once it was
+export const canMeasure = (about) => !about || !(about.total > 0);
+export function measuredLine(about, fmt, fmtTime) {
+  if (!about || !about.measuredAt) return null;
+  return { key: 'cloud.measure.done', vars: { used: fmt(about.used || 0), when: fmtTime(new Date(toMs(about.measuredAt))) } };
+}
+
+// Move to Trash in Files (17.2): paths in a cloud account are deleted there through cloud.delete, never moved into a
+// .Trash-<uid> folder of the cloud. → { local: [paths], cloud: [{ acc, paths }] }; an account's own folder never goes.
+export function splitTrash(paths, accounts) {
+  const local = [], by = new Map();
+  for (const p of paths || []) {
+    const a = accountOf(p, accounts);
+    if (!a) { local.push(p); continue; }
+    if (p === a.mount) continue;
+    if (!by.has(a.id)) by.set(a.id, { acc: a, paths: [] });
+    by.get(a.id).paths.push(p);
+  }
+  return { local, cloud: [...by.values()] };
+}
+// the confirmation for one account's paths: { title, detail } keys and vars
+export const deletePrompt = (acc, count) => ({
+  title: { key: 'cloud.delete.title', vars: { provider: (acc && (acc.provider || acc.kind)) || '', count } },
+  detail: { key: acc && acc.trashSupported ? 'cloud.delete.toTrash' : 'cloud.delete.final', vars: { provider: (acc && (acc.provider || acc.kind)) || '' } },
+});

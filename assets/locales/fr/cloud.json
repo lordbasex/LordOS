@@ -294,5 +294,33 @@
   "check.step.read": "Le récupérer, même contenu",
   "check.step.link": "Créer un lien",
   "check.step.delete": "Supprimer le dossier de vérification",
-  "check.step.deleteUp": "Le supprimer dans le cloud"
+  "check.step.deleteUp": "Le supprimer dans le cloud",
+  "add.loadFailed": "rclone n’a pas répondu avec ses fournisseurs.",
+  "notes.before": "Avant d’ajouter {provider}",
+  "notes.iclouddrive.adp": "Le chiffrement de bout en bout supplémentaire du disque doit être désactivé dans le compte : rclone ne peut pas lire les fichiers chiffrés ainsi.",
+  "notes.iclouddrive.web": "L’accès au disque depuis le web doit être activé dans les réglages du compte.",
+  "notes.iclouddrive.code": "Un code d’un de vos appareils est demandé maintenant, puis environ tous les 30 jours (Se reconnecter).",
+  "question.title": "{provider} demande",
+  "trash.empty": "Vider la corbeille",
+  "trash.title": "Vider la corbeille de « {name} » ?",
+  "trash.detail": "Tout ce qui est dans la corbeille de {provider} pour ce compte est supprimé définitivement. C’est irréversible.",
+  "trash.running": "Vidage de la corbeille…",
+  "trash.done": "La corbeille de {provider} est vide.",
+  "trash.ok": "Vider la corbeille",
+  "measure.run": "Mesurer",
+  "measure.again": "Mesurer à nouveau",
+  "measure.running": "Mesure du contenu de ce compte…",
+  "measure.hint": "Ce stockage n’a pas de quota. La mesure parcourt chaque fichier une fois.",
+  "measure.done": "{used} utilisés, mesuré {when}",
+  "delete.title": {
+    "one": "Supprimer de {provider} ?",
+    "other": "Supprimer {count} éléments de {provider} ?"
+  },
+  "delete.toTrash": "Il va dans sa corbeille sur {provider}.",
+  "delete.final": "{provider} n’a pas de corbeille : c’est irréversible.",
+  "delete.ok": "Supprimer",
+  "delete.done": {
+    "one": "Supprimé de {provider}",
+    "other": "{count} éléments supprimés de {provider}"
+  }
 }

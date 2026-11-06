@@ -335,6 +335,10 @@ mocks (Files, FilesMenu, ShareLink, GetInfo, States); the code is `apps/files/cl
   usual card give way to these.
 - **Header and status bar**: in an account's folders the toolbar has a pill "N coming down · N going up" for that
   account, and the status bar ends with "… of … used in <account> · … on this computer" instead of the disk's free space.
+- **Move to Trash** on items of an account (the menu, ❖⌫, Delete, dragging onto the Trash) asks "Delete from
+  <provider>?" and deletes them in the cloud (`cloud.delete`): they go to the provider's own trash where it has one,
+  otherwise for good. Nothing goes to LordOS's Trash and no `.Trash-<uid>` folder is made in the cloud, so Restore isn't
+  offered for them. Local items chosen with them go to the Trash as usual (docs/CLOUD.md 17.2, 18.1).
 - **Offline**: opening a file only in the cloud while its account is offline shows "<name> isn't on this computer",
   with OK and Keep on This Computer.
 - **Crumbs**: the path bar (and the file dialog's) starts at the account: "Work › Projects", not "Home › Cloud › Work".

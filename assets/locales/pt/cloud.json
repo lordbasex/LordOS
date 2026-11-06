@@ -294,5 +294,33 @@
   "check.step.read": "Baixar de volta, mesmo conteúdo",
   "check.step.link": "Criar um link",
   "check.step.delete": "Apagar a pasta de verificação",
-  "check.step.deleteUp": "Apagá-la na nuvem"
+  "check.step.deleteUp": "Apagá-la na nuvem",
+  "add.loadFailed": "O rclone não respondeu com os seus provedores.",
+  "notes.before": "Antes de adicionar {provider}",
+  "notes.iclouddrive.adp": "A criptografia de ponta a ponta extra do disco tem de estar desativada na conta: o rclone não consegue ler arquivos criptografados assim.",
+  "notes.iclouddrive.web": "O acesso ao disco pela web tem de estar ativado nos ajustes da conta.",
+  "notes.iclouddrive.code": "Pede um código de um dos seus dispositivos agora, e de novo a cada uns 30 dias (Entrar de novo).",
+  "question.title": "{provider} pergunta",
+  "trash.empty": "Esvaziar lixeira",
+  "trash.title": "Esvaziar a lixeira de “{name}”?",
+  "trash.detail": "Tudo o que está na lixeira do {provider} para esta conta é apagado para sempre. Não dá para desfazer.",
+  "trash.running": "Esvaziando a lixeira…",
+  "trash.done": "A lixeira do {provider} está vazia.",
+  "trash.ok": "Esvaziar lixeira",
+  "measure.run": "Medir",
+  "measure.again": "Medir de novo",
+  "measure.running": "Medindo o que esta conta guarda…",
+  "measure.hint": "Este armazenamento não tem cota. Medir percorre cada arquivo uma vez.",
+  "measure.done": "{used} usados, medido {when}",
+  "delete.title": {
+    "one": "Apagar do {provider}?",
+    "other": "Apagar {count} itens do {provider}?"
+  },
+  "delete.toTrash": "Vai para a lixeira dele no {provider}.",
+  "delete.final": "O {provider} não tem lixeira: não dá para desfazer.",
+  "delete.ok": "Apagar",
+  "delete.done": {
+    "one": "Apagado do {provider}",
+    "other": "{count} itens apagados do {provider}"
+  }
 }

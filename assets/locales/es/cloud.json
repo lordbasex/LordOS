@@ -294,5 +294,33 @@
   "check.step.read": "Bajarlo de nuevo, mismo contenido",
   "check.step.link": "Crear un enlace",
   "check.step.delete": "Borrar la carpeta de comprobación",
-  "check.step.deleteUp": "Borrarla en la nube"
+  "check.step.deleteUp": "Borrarla en la nube",
+  "add.loadFailed": "rclone no respondió con sus proveedores.",
+  "notes.before": "Antes de agregar {provider}",
+  "notes.iclouddrive.adp": "El cifrado de extremo a extremo adicional del disco tiene que estar desactivado en la cuenta: rclone no puede leer archivos cifrados así.",
+  "notes.iclouddrive.web": "El acceso al disco desde la web tiene que estar activado en los ajustes de la cuenta.",
+  "notes.iclouddrive.code": "Te pide un código de uno de tus dispositivos ahora, y de nuevo cada unos 30 días (Iniciar sesión de nuevo).",
+  "question.title": "{provider} pregunta",
+  "trash.empty": "Vaciar papelera",
+  "trash.title": "¿Vaciar la papelera de «{name}»?",
+  "trash.detail": "Todo lo que está en la papelera de {provider} para esta cuenta se borra para siempre. No se puede deshacer.",
+  "trash.running": "Vaciando la papelera…",
+  "trash.done": "La papelera de {provider} está vacía.",
+  "trash.ok": "Vaciar papelera",
+  "measure.run": "Medir",
+  "measure.again": "Medir de nuevo",
+  "measure.running": "Midiendo lo que tiene esta cuenta…",
+  "measure.hint": "Este almacenamiento no tiene cuota. Medir recorre cada archivo una vez.",
+  "measure.done": "{used} usados, medido {when}",
+  "delete.title": {
+    "one": "¿Borrar de {provider}?",
+    "other": "¿Borrar {count} elementos de {provider}?"
+  },
+  "delete.toTrash": "Va a su papelera en {provider}.",
+  "delete.final": "{provider} no tiene papelera: no se puede deshacer.",
+  "delete.ok": "Borrar",
+  "delete.done": {
+    "one": "Borrado de {provider}",
+    "other": "{count} elementos borrados de {provider}"
+  }
 }

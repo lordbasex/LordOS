@@ -633,3 +633,35 @@ confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"
    `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`, pinned in the script, key file in `packaging/keys/`), checks the hash, and puts
    the unmodified binary in `/usr/lib/lordos/rclone/rclone`. It is published in LordOS's own apt repository with each release
    (rclone has no apt repository of its own), so Store → Updates and `apt` keep it current. No Go on the build host.
+
+### 18.1 The interface of 17.2 (items 1 to 6)
+
+- **Providers from rclone, every time.** Add Account asks `cloud.providers()` (a Promise) each time it opens: until it
+  answers the sheet shows only a spinner, "Getting the list of providers…" and **Cancel**; a failure says so with
+  **Try Again**. Groups follow each item's `group`; verified first (the item's `verified`, else
+  `assets/cloud/providers.json`), the rest under **Not verified yet**; search looks at the label, the description, the
+  hint and the kind. An account's page keeps the last list of the session (`providerCache`) for its provider's group and
+  fields; Sign In Again for a server account asks rclone for the list when this session hasn't yet.
+- **rclone's names.** The label shows exactly as rclone gives it, in the tiles, the credentials form and an account's
+  provider line; the interface renames nothing. The names come at runtime: none is in a catalog, so brand-check still
+  passes.
+- **rclone's questions.** `cloud.add` (or `cloud.answer`) answering `{ question }` opens a step in the same sheet: rclone's
+  help text, then an input by `questionInput()`: a switch for `bool`, a masked field for `isPassword`, a list of choices
+  for 2 to 12 examples, a number field, else text. **Continue** sends `cloud.answer(state, value)` and the next answer is
+  handled the same way, until `{ id }` (the account's page opens) or `{ error }` (shown in the step). Before the phone
+  maker's drive (`iclouddrive`) the sheet and the form say, in our words from rclone's page, that the drive's extra
+  end-to-end encryption must be off, web access to the drive on, and that it asks for a code now and about every 30 days.
+- **Empty Trash** on the account's page when `account.trashSupported`: a confirmation ("can't be undone"), then
+  `cloud.emptyTrash(id)` with a spinner and the result. Without it, a provider with trashed bytes keeps the website link.
+- **Measure** where the provider gives no total: a button with "Measuring lists every file once"; while it runs a
+  spinner and **Cancel** (`cloud.cancelMeasure(id)` when lord-server has it; otherwise the answer is just ignored),
+  then "<used> used, measured <date time>" from `about.measuredAt`, also in the overview's account row.
+- **Delete in the cloud.** Move to Trash in Files (the menu, ❖⌫ and Delete, dragging onto the Trash) splits what is
+  chosen (`splitTrash`): local items go to the Trash as before; each account's items are asked about ("Delete from
+  <provider>?" with "It goes to its trash on <provider>." or "<provider> has no trash: it can't be undone.") and go to
+  `cloud.delete(paths)`, never `lord.fs.trash`, so no `.Trash-<uid>` folder is made in the cloud and Restore isn't
+  offered. An account's own folder is never deleted this way. Check This Account (19.3) still moves its own folder out
+  through `lord.fs`; with `cloud.delete` in every server it can use that instead.
+- The dev mock (`sdk/cloudmock.js`) answers all of it: providers after 0.9 s (`"cloudDevMock": "providersFail"` to see
+  the failure), a 6-digit code asked when adding the phone maker's drive, Empty Trash, a 4 s Measure that can be
+  stopped, delete.

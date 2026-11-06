@@ -227,7 +227,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   installCloudMock(H);
   const c = globalThis.lord.cloud;
   const API = ['available', 'state', 'providers', 'beginSignIn', 'openSignInPage', 'cancelSignIn', 'add', 'remove', 'rename', 'refreshAbout', 'websiteUrl',
-    'status', 'keep', 'unkeep', 'free', 'link', 'unlink', 'links', 'pause', 'resume', 'setOptions', 'restart', 'showLog'];
+    'status', 'keep', 'unkeep', 'free', 'link', 'unlink', 'links', 'pause', 'resume', 'setOptions', 'restart', 'showLog', 'answer', 'emptyTrash', 'measure', 'delete'];
   eq('every call of section 17', API.filter((k) => typeof c[k] !== 'function'), []);
   const st = c.state();
   eq('state keys', Object.keys(st).filter((k) => k !== 'conflicts').sort(), ['accounts', 'options', 'recent', 'service', 'signin']);
@@ -237,7 +237,11 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('account keys', st.accounts.every((a) => AK.every((k) => k in a)), true);
   eq('account states are known', st.accounts.every((a) => ['ok', 'syncing', 'paused', 'signin', 'offline', 'error', 'locked'].includes(a.state)), true);
   eq('recent shape', st.recent.every((r) => r.path && r.account && ['up', 'down'].includes(r.dir) && r.at), true);
-  const prov = c.providers();
+  const provP = c.providers();
+  eq('providers: a Promise (17.2)', typeof provP.then, 'function');
+  for (const f of timers.splice(0)) f();
+  const prov = await provP;
+  eq('providers: description and verified', prov.every((p) => typeof p.description === 'string' && typeof p.verified === 'boolean'), true);
   eq('providers shape', prov.every((p) => p.kind && p.label && ['oauth', 'server', 'object', 'crypt'].includes(p.group) && Array.isArray(p.fields)), true);
   eq('fields shape', prov.flatMap((p) => p.fields).every((f) => 'name' in f && 'label' in f && 'secret' in f && 'required' in f && 'default' in f && Array.isArray(f.examples)), true);
   const work = st.accounts.find((a) => a.name === 'Work');
@@ -253,6 +257,16 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('sign-in shape', [!!si.id, !!si.url, si.expiresAt > 0, pushed.signin.phase], [true, true, true, 'waiting']);
   for (const f of timers.splice(0)) f();
   eq('sign-in finishes', [pushed.signin.phase, pushed.accounts.some((a) => a.name === 'Mine')], ['done', true]);
+  const q1 = c.add('iclouddrive', 'Phone', {});
+  eq('a question from add (17.2)', [!!q1.question, q1.question.state], [true, 'mock-2fa']);
+  const q2 = await c.answer('mock-2fa', '12');
+  eq('a wrong answer asks again', !!q2.question, true);
+  const doneP = c.answer('mock-2fa', '123456');
+  for (const f of timers.splice(0)) f();
+  const done = await doneP;
+  eq('the right answer makes the account', [!!done.id, pushed.accounts.some((a) => a.name === 'Phone')], [true, true]);
+  const ms = c.measure(done.id); for (const f of timers.splice(0)) f();
+  eq('measure answers bytes and count, about.measuredAt set', [(await ms).count > 0, !!pushed.accounts.find((a) => a.id === done.id).about.measuredAt], [true, true]);
 }
 
 // ---- every text the model and the screens name is in each catalog ----
@@ -379,6 +393,38 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   w.env.fs.mkdir = () => { throw Object.assign(new Error('EACCES /home/ana/Cloud/Ana Secret'), { code: 'sys.errno' }); };
   out = await runCheck(w.acc, w.env);
   eq('an error\'s text never becomes a note (it can hold a path)', [out.find((x) => x.id === 'folder').note, out.some((x) => /Ana|home/.test(x.note))], ['sys.errno', false]);
+}
+
+
+// ---- 17.2: providers from rclone, questions, notes, Measure, delete in the cloud ----
+{
+  const P = (kind, label, group, description, verified) => ({ kind, label, group, description, verified, fields: [] });
+  const list = [P('drive', 'Drive Thing', 'oauth', 'Files of a large drive', false), P('webdav', 'WebDAV', 'server', 'Any WebDAV server', true),
+    P('koofr', 'Koofr', 'server', 'European storage', false), P('s3', 'S3', 'object', 'Amazon S3 compliant', true)];
+  const sp = M.splitProviders(list, { verified: {} });
+  eq('the item\'s own verified wins over the file', [sp.verified.flatMap((g) => g.items.map((p) => p.kind)), sp.unverified.flatMap((g) => g.items.map((p) => p.kind))], [['webdav', 's3'], ['drive', 'koofr']]);
+  eq('search by description', M.splitProviders(list, {}, 'european').unverified.flatMap((g) => g.items.map((p) => p.kind)), ['koofr']);
+  eq('labels untouched (rclone\'s names)', M.groupProviders(list).flatMap((g) => g.items.map((p) => p.label)), ['Drive Thing', 'WebDAV', 'Koofr', 'S3']);
+  eq('own app from the item', [M.ownAppOffered(list[0], {}), M.ownAppOffered({ ...list[0], verified: true }, {})], [true, false]);
+  const q = (o) => ({ state: 's', name: 'n', help: 'h', type: 'string', examples: [], isPassword: false, required: true, default: '', ...o });
+  eq('question inputs', [M.questionInput(q({})).input, M.questionInput(q({ isPassword: true })).input, M.questionInput(q({ type: 'bool', default: true })), M.questionInput(q({ type: 'int' })).input,
+    M.questionInput(q({ examples: [{ value: 'a', help: 'Choice A' }, { value: 'b', help: 'Choice B' }], default: 'b' }))],
+    ['text', 'password', { input: 'bool', options: [], value: 'true' }, 'number', { input: 'choice', options: [['a', 'Choice A'], ['b', 'Choice B']], value: 'b' }]);
+  eq('answers', [M.questionAnswer(q({}), ' 123456 '), M.questionAnswer(q({}), ''), M.questionAnswer(q({ required: false }), ''), M.questionAnswer(q({ type: 'bool' }), 'true'),
+    M.questionAnswer(q({ type: 'int' }), 'x'), M.questionAnswer(q({ type: 'int' }), '42'), M.questionAnswer(q({ isPassword: true }), ' p w ')], ['123456', null, '', 'true', null, '42', ' p w ']);
+  eq('notes before a provider', [M.notesFor('iclouddrive').length, M.notesFor('webdav')], [3, []]);
+  const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
+  eq('the notes are in the catalog', M.notesFor('iclouddrive').every((k) => k.slice(6) in cat), true);
+  eq('measure', [M.canMeasure({ used: 5 }), M.canMeasure({ used: 5, total: 9 }), M.canMeasure(null)], [true, false, true]);
+  eq('measured line', [M.measuredLine({ used: 7 }, String, () => 'x'), M.measuredLine({ used: 7e9, measuredAt: 1.7e12 }, (n) => `${n / 1e9} GB`, () => 'today')],
+    [null, { key: 'cloud.measure.done', vars: { used: '7 GB', when: 'today' } }]);
+  const accs = [acc('1', 'Work', { provider: 'pCloud', trashSupported: true }), acc('2', 'NAS', { provider: 'WebDAV' })];
+  const t = M.splitTrash([`${H}/Documents/a`, `${H}/Cloud/Work/x`, `${H}/Cloud/Work/y`, `${H}/Cloud/NAS/z`, `${H}/Cloud/Work`], accs);
+  eq('Move to Trash: local, then each account; an account\'s own folder never', [t.local, t.cloud.map((g) => [g.acc.id, g.paths.length])], [[`${H}/Documents/a`], [['1', 2], ['2', 1]]]);
+  eq('the question: its trash, or no undo', [M.deletePrompt(accs[0], 2), M.deletePrompt(accs[1], 1).detail.key],
+    [{ title: { key: 'cloud.delete.title', vars: { provider: 'pCloud', count: 2 } }, detail: { key: 'cloud.delete.toTrash', vars: { provider: 'pCloud' } } }, 'cloud.delete.final']);
+  const src = fs.readFileSync(path.join(root, 'apps/files/index.jsx'), 'utf8');
+  eq('Files: Move to Trash and dragging to the Trash go through the cloud split', [/splitTrash\(paths, cf\.accounts\)/.test(src), /target === 'trash:'\) \{ trashRef\.current/.test(src)], [true, true]);
 }
 
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----

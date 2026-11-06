@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel,
+  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel, cloud, errorText,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -380,10 +380,25 @@ export default function Files() {
   const toTrash = (paths = selPaths) => {
     if (!paths.length || readOnly) return;
     if (loc.type === 'trash') { askDelete(paths); return; }
+    // Cloud (docs/CLOUD.md 17.2): what is in a cloud account is deleted there, after asking, and never moved into a
+    // .Trash folder inside the cloud; it goes to the provider's own trash where it has one, so Restore isn't offered
+    const split = cloudModel.splitTrash(paths, cf.accounts);
     let n = 0;
-    for (const p of paths) { try { fs.trash(p); n++; } catch (e) { report(e); } }
+    for (const p of split.local) { try { fs.trash(p); n++; } catch (e) { report(e); } }
     if (n) { setMsg(tr('files.trashed', { count: n })); bump(); }
+    const ask = (i) => {
+      const g = split.cloud[i];
+      if (!g) return;
+      const pr = cloudModel.deletePrompt(g.acc, g.paths.length);
+      setConfirm({ text: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars), ok: tr('cloud.delete.ok'), run: () => {
+        cloud.delete(g.paths).then((r) => { setMsg(r && r.error ? errorText(r.error) : tr('cloud.delete.done', { count: g.paths.length, provider: g.acc.provider || g.acc.kind })); bump(); });
+        setTimeout(() => ask(i + 1), 0);
+      } });
+    };
+    ask(0);
   };
+  const trashRef = useRef(toTrash);
+  trashRef.current = toTrash;
   const restore = (paths = selPaths) => { let n = 0; for (const p of paths) { try { fs.restore(p); n++; } catch (err) { report(err); } } if (n) { setMsg(tr('files.restored', { count: n })); bump(); } };
   // disks: the same closed actions as the Disks app (an internal disk asks for an administrator)
   const mount = (p) => {
@@ -508,7 +523,7 @@ export default function Files() {
       setDrag(null); setDropTarget(null);
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
       if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
-      if (target === 'trash:') { let n = 0; for (const x of p.paths) { try { fs.trash(x); n++; } catch (err) { setMsg(err.message); } } if (n) bump(); return; }
+      if (target === 'trash:') { trashRef.current(p.paths); return; }       // (cloud paths are asked about and deleted there)
       transfer(p.paths, target, !e.alt);
     });
     return () => { mv(); up(); };

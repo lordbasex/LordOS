@@ -15,7 +15,7 @@ const PROVIDERS = [
   ['premiumizeme', 'premiumize.me', 'oauth', 'Personal'], ['putio', 'put.io', 'oauth', 'Personal'],
   ['webdav', 'WebDAV', 'server', 'Nextcloud, ownCloud…'], ['sftp', 'SFTP', 'server', 'Any SSH server'], ['smb', 'SMB', 'server', 'A network share'],
   ['ftp', 'FTP', 'server', 'An FTP server'], ['mega', 'Mega', 'server', 'User and password'], ['koofr', 'Koofr', 'server', 'User and password'],
-  ['seafile', 'Seafile', 'server', 'A Seafile server'],
+  ['seafile', 'Seafile', 'server', 'A Seafile server'], ['iclouddrive', 'iCloud Drive', 'server', 'Apple ID and a code'],
   ['s3', 'S3', 'object', 'And compatible services'], ['b2', 'Backblaze B2', 'object', 'Buckets'],
   ['swift', 'Swift', 'object', 'OpenStack object storage'],
   ['crypt', 'Encrypted folder', 'crypt', 'On top of an account'],
@@ -35,6 +35,7 @@ const FIELDS = {
     F('access_key_id', 'Access key', { required: true }), F('secret_access_key', 'Secret key', { secret: true, required: true }), F('region', 'Region')],
   b2: [F('account', 'Key ID', { required: true }), F('key', 'Application key', { secret: true, required: true })],
   swift: [F('auth', 'Authentication URL', { required: true }), F('user', 'User', { required: true }), F('key', 'Key', { secret: true, required: true })],
+  iclouddrive: [F('apple_id', 'Apple ID', { required: true }), F('password', 'Password', { secret: true, required: true })],
   crypt: [F('remote', 'Folder to encrypt', { required: true, examples: ['Work:Private'] }), F('password', 'Password', { secret: true, required: true })],
 };
 
@@ -78,12 +79,15 @@ export function installCloudMock(home, scenario = '') {
     ],
     conflicts: [],
   };
+  st.accounts[0].trashSupported = true;
+  st.accounts[1].trashSupported = true;
   st.accounts[1].kept = [`${mount('Work')}/Projects/2026`, `${mount('Work')}/Contracts`, `${mount('Work')}/Templates`];
   st.accounts[0].kept = [`${mount('Personal')}/Pictures/Family`];
   const status = {};
   const links = { m2: [{ path: `${mount('Work')}/Quarterly report.pdf`, url: 'https://share.example.test/s/XZk4p9QwT2', expires: (now + 7 * 864e5) / 1000, made: now / 1000 },
     { path: `${mount('Work')}/Templates`, url: 'https://share.example.test/s/Brand8kQ', expires: 0, made: now / 1000 }] };
   let seq = 5;
+  let pendingAdd = null, measureTimer = 0;
 
   // sample folders and files (small: only their names matter here)
   const mk = (p) => { try { lord.fs.mkdir(p); } catch (e) { /* there */ } };
@@ -132,7 +136,10 @@ export function installCloudMock(home, scenario = '') {
   lord.cloud = {
     available: () => true,
     state: () => JSON.parse(JSON.stringify(st)),
-    providers: () => PROVIDERS.map(([kind, label, group, hint]) => ({ kind, label, group, hint, fields: group === 'oauth' ? [] : FIELDS[kind] || [] })),
+    // 17.2: a Promise, a little later (and a failure with settings "cloudDevMock": "providersFail")
+    providers: () => new Promise((resolve, reject) => setTimeout(() => (scenario === 'providersFail' ? reject({ error: 'cloud.notRunning' })
+      : resolve(PROVIDERS.map(([kind, label, group, hint]) => ({ kind, label, description: hint, group, verified: ['webdav', 'sftp', 's3'].includes(kind),
+        fields: group === 'oauth' ? [] : FIELDS[kind] || [] })))), 900)),
     beginSignIn(kind, name) {
       const id = `m${seq++}`;
       const p = PROVIDERS.find((x) => x[0] === kind);
@@ -152,11 +159,37 @@ export function installCloudMock(home, scenario = '') {
     add(kind, name) {
       const p = PROVIDERS.find((x) => x[0] === kind);
       if (!p) return { error: 'cloud.badKind' };
+      // rclone's questions (17.2): the phone maker's drive asks for a code sent to a trusted device
+      if (kind === 'iclouddrive') {
+        pendingAdd = { kind, name, label: p[1] };
+        return { question: { state: 'mock-2fa', name: 'config_2fa', help: 'Two-factor authentication: enter the 6-digit code sent to your trusted device.', type: 'string', examples: [], isPassword: false, required: true, default: '' } };
+      }
       const id = `m${seq++}`;
       st.accounts.push(acc(id, name, kind, p[1], kind === 's3' || kind === 'b2' ? { used: 0 } : null, { linksSupported: false }));
       mk(mount(name));
       push();
       return { id };
+    },
+    answer(state, value) {
+      if (state !== 'mock-2fa' || !pendingAdd) return Promise.resolve({ error: 'cloud.badState' });
+      if (!/^\d{6}$/.test(value)) return Promise.resolve({ question: { state: 'mock-2fa', name: 'config_2fa', help: 'That code is not right. Enter the 6-digit code again.', type: 'string', required: true } });
+      const id = `m${seq++}`;
+      st.accounts.push(acc(id, pendingAdd.name, pendingAdd.kind, pendingAdd.label, { total: 50 * GB, used: 12 * GB, free: 38 * GB }));
+      mk(mount(pendingAdd.name));
+      pendingAdd = null;
+      push();
+      return new Promise((r) => setTimeout(() => r({ id }), 600));
+    },
+    emptyTrash(id) { const a = find(id); return new Promise((r) => setTimeout(() => { if (a && a.about) { a.about.used -= a.about.trashed || 0; a.about.trashed = 0; push(); } r(a ? { ok: true } : { error: 'cloud.notFound' }); }, 1500)); },
+    measure(id) {
+      const a = find(id);
+      return new Promise((r) => { measureTimer = setTimeout(() => { if (a) { a.about = { ...(a.about || {}), used: 163.4 * GB, measuredAt: Date.now() }; push(); } r({ bytes: 163.4 * GB, count: 41213 }); }, 4000); });
+    },
+    cancelMeasure() { clearTimeout(measureTimer); },
+    delete(paths) {
+      for (const p of paths) { try { lord.fs.copy(p, `${home}/.cache/lordos-cloudmock-deleted-${seq++}`, true); } catch (e) { /* gone */ } delete status[p]; }
+      push();
+      return new Promise((r) => setTimeout(() => r({ ok: true }), 300));
     },
     remove(id, o) {
       const a = find(id);
