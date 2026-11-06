@@ -471,6 +471,8 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('unlock', [M.needsUnlock(locked), M.needsUnlock({ state: 'ok' }), M.needsUnlock({ state: 'locked' })], [true, false, true]);
   const src = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
   eq('Unlock Keyring… uses the system prompt; the menu bar panel too', [/askKeyringUnlock\(\)/.test(src), /askKeyringUnlock\(\)/.test(fs.readFileSync(path.join(root, 'sdk/cloudstatus.jsx'), 'utf8'))], [true, true]);
+  eq('after unlocking: cloud.retry, no restart', [/askKeyringUnlock\(\)\.then\(\(ok\) => \{ if \(ok\) cloud\.retry\(null\)/.test(src), /cloud\.restart\(\);\n/.test(src.split('function unlockKeyring')[1].split('}')[0])], [true, false]);
+  eq('Sign In Again names the account by its id (17.2 item 10)', [/accountId: a\.id \}, p \|\|/.test(src), /again: true, accountId: a\.id/.test(src), /sheet\.accountId \? \{ accountId: sheet\.accountId \}/.test(src)], [true, true, true]);
   eq('the form\'s body scrolls between its fixed title and buttons', /<ScrollView style=\{\{ maxHeight: Math\.max\(180, frameH - 220\) \}\}>/.test(src), true);
 }
 

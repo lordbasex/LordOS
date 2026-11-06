@@ -269,6 +269,7 @@ export function installCloudMock(home, scenario = '') {
     resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; push(); },
     setOptions(o) { Object.assign(st.options, o); push(); },
     setAccountOptions(id, o) { const a = find(id); if (a) { a.options = { ...(a.options || {}), ...o }; push(); } },
+    retry(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'locked') { a.state = 'ok'; delete a.error; a.about = { used: 1 }; } push(); },
     restart() { st.service.uptimeS = 0; st.service.restarts++; push(); },
     showLog: () => {},
   };

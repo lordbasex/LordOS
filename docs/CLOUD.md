@@ -767,3 +767,26 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
     mounts at the new name. **Measured:** renamed with a file open in it: mounted at the new name, the old folder unmounted
     and gone; in a new session the account comes back mounted under its new name, `add` with the same kind and the name in
     another case updates it, and `add` with its id updates it under any name.
+
+### 18.3 After the Pi test (2026-11-06)
+
+- **The credentials form** shows the fields a kind needs (`formLayout`): SFTP Server, Port, User, then **Sign in with**
+  Password or SSH key (a key file chosen with the file dialog, read once and sent as `key_pem`, so rclone never needs the
+  file, plus its passphrase); WebDAV Address, preset, User, Password; S3 Provider, Endpoint, Region, Access key, Secret key;
+  FTP and SMB alike; any other kind its required options and those without a default. The rest is under **Advanced
+  options** (closed): a short label (the first clause of rclone's help), the control, rclone's whole help dimmed and the
+  option's name. Only a password is masked (`isPassword`, which lord-server now gives per field with its `type`; rclone's
+  `Sensitive` host and user stay plain text), yes/no options are switches, rclone's choices menus. The form's body scrolls
+  inside the Settings window between its title and Back / Connect.
+- **The account page** uses the width: Settings gives Cloud a 980-pixel column; two balanced columns from 900 pixels
+  (space, kept folders, shared links and Check This Account / options, status, Sign In Again and Remove), one below that,
+  and **Advanced** full width at the bottom with the two sign-in cards side by side. The folder name is a field on click:
+  Enter, Save or a click elsewhere renames (`cloud.rename`), Escape leaves it, a problem shows under it.
+- **A locked keyring** (`cloud.keyringLocked`, after an automatic login) is said once, in the status box, with
+  **Unlock Keyring…** (the system's keyring prompt, `askKeyringUnlock` in `sdk/vault.js`) and "Your sign-ins are kept in the
+  keyring, which locks when you log in without a password."; the same button is on the overview's row and in the menu bar
+  panel. After unlocking, `cloud.retry(null)` connects the accounts at once.
+- **Errors**: an account's space without an answer says "The space shows once the account is connected" (no Measure: that
+  is only for a provider that answered without a total); Measure and Empty Trash show their own error's text, and
+  `cloud.notRunning` is read as the account's reason while the service runs (`explainError`).
+- **Sign In Again** passes `{ accountId }` to `beginSignIn` and `add` (17.2 item 10).

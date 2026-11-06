@@ -118,13 +118,9 @@ function MeasureRow({ a }) {
 }
 
 // Unlock Keyring… (an account's error cloud.keyringLocked): the system's keyring prompt; once it is unlocked lord-server
-// connects the accounts on its next try (within half a minute), or at once when every account was waiting for it
+// connects the waiting accounts at once (lord-server hears the vault's unlock too; cloud.retry asks it now, 17.2 item 8)
 export function unlockKeyring() {
-  return askKeyringUnlock().then((ok) => {
-    const accs = (cloudState.get().accounts || []);
-    if (ok && accs.length && accs.every(M.needsUnlock)) cloud.restart();
-    return ok;
-  });
+  return askKeyringUnlock().then((ok) => { if (ok) cloud.retry(null); return ok; });
 }
 function UnlockRow({ a, small }) {
   const t = useTheme();
@@ -620,16 +616,17 @@ export function startSignIn(kind, name, own, provider) {
   if (signinStarting) return;
   const cur = cloudState.get().signin;
   const same = cur && cur.phase === 'waiting' && cur.kind === kind && String(cur.name || '').toLowerCase() === String(name).toLowerCase() && M.toMs(cur.expiresAt) > Date.now();
-  if (same) { setView({ sheet: null, signin: { provider, name, kind } }); return; }
+  if (same) { setView({ sheet: null, signin: { provider, name, kind, own } }); return; }
   if (cur && cur.phase === 'waiting') cloud.cancelSignIn(cur.id);
   signinStarting = true;
-  setView({ sheet: null, signin: { provider, name, kind, starting: true } });
+  setView({ sheet: null, signin: { provider, name, kind, own, starting: true } });
   let r;
   try { r = cloud.beginSignIn(kind, name, own || {}); } finally { signinStarting = false; }
-  setView({ sheet: null, signin: { provider, name, kind, id: r && r.id, error: r && r.error } });
+  setView({ sheet: null, signin: { provider, name, kind, own, id: r && r.id, error: r && r.error } });
 }
 function beginAgain(a, p, own = {}) {
-  startSignIn(a.kind, a.name, own, p || { kind: a.kind, label: a.provider });
+  // { accountId }: exactly this account, whatever its name now (17.2 item 10)
+  startSignIn(a.kind, a.name, { ...own, accountId: a.id }, p || { kind: a.kind, label: a.provider });
 }
 // Sign In Again: the browser for an OAuth account (with the own-app choice first for a provider not verified yet, or
 // when the account already uses its own app), the credentials form for the others (the same name updates it).
@@ -642,7 +639,7 @@ function signInAgain(a) {
     return;
   }
   // the form needs the provider's fields: from rclone's list (asked now if this session hasn't yet)
-  const open = (q) => { if (q && (q.fields || []).length) setView({ sheet: { kind: 'cred', provider: q, name: a.name, again: true } }); };
+  const open = (q) => { if (q && (q.fields || []).length) setView({ sheet: { kind: 'cred', provider: q, name: a.name, again: true, accountId: a.id } }); };
   if (p && (p.fields || []).length) open(p);
   else loadProviders().then(() => open(providerOf(a.kind)), () => {});
 }
@@ -958,7 +955,7 @@ function CredSheet({ st, sheet }) {
     const bad = sheet.again ? null : M.nameProblem(name, st.accounts);
     if (bad) { setErr({ text: tr(`cloud.name.${bad}`), field: '__name' }); return; }
     setBusy(true);
-    Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v))).then((r) => {
+    Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v), sheet.accountId ? { accountId: sheet.accountId } : {})).then((r) => {
       setBusy(false);
       if (r && r.error) { setErr({ text: errorText(r.error), field: r.field || null }); if (r.field && layout.advanced.some((f) => f.name === r.field)) setAdv(true); return; }
       afterAdd(r, p, name.trim());
@@ -1209,7 +1206,7 @@ function SignInCard({ st, info }) {
       <Actions>
         <Button label={tr(failed ? 'cloud.close' : 'cloud.cancel')} onClick={cancel} />
         {failed
-          ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => startSignIn(info.kind || p.kind, info.name, {}, p)} />
+          ? <Button primary label={tr('cloud.signin.tryAgain')} onClick={() => startSignIn(info.kind || p.kind, info.name, info.own || {}, p)} />
           : <Button primary label={tr('cloud.signin.again')} disabled={!si || info.starting} onClick={() => si && cloud.openSignInPage(si.id)} />}
       </Actions>
       <Dim t={t} style={{ fontSize: typeScale.caption, lineHeight: 1.5 }}>{tr('cloud.signin.rclone')}</Dim>

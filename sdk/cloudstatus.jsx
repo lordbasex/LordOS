@@ -60,7 +60,7 @@ function Panel({ st, onClose }) {
           h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, a.name),
           h(Text, { style: { fontSize: 12, color: ToneColor(th, line.tone), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, text)),
         // a locked keyring: unlock it from here (the system's keyring prompt)
-        a.error === 'cloud.keyringLocked' || a.state === 'locked' ? h(View, { onClick: (e) => { e.stopPropagation?.(); onClose(); askKeyringUnlock(); },
+        a.error === 'cloud.keyringLocked' || a.state === 'locked' ? h(View, { onClick: (e) => { e.stopPropagation?.(); onClose(); askKeyringUnlock().then((ok) => { if (ok) cloud.retry(null); }); },
           style: { height: 24, paddingHorizontal: 10, borderRadius: th.controlRadiusSmall, justifyContent: 'center', backgroundColor: th.accent } },
         h(Text, { style: { fontSize: 12, fontWeight: 600, color: '#fff' } }, t('cloud.unlock'))) : null);
       })),
