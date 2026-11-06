@@ -295,5 +295,9 @@
   "fav.gone": "{name} isn't there any more",
   "pin.add": "Pin to Locations",
   "pin.remove": "Remove from Locations",
-  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name."
+  "net.offLink": "This server is outside your local network, so LordOS doesn’t list its folders. Type the folder’s name.",
+  "zoom.in": "Zoom In",
+  "zoom.out": "Zoom Out",
+  "zoom.reset": "Actual Size",
+  "zoom.label": "Icon and text size"
 }

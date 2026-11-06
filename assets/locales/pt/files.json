@@ -295,5 +295,9 @@
   "fav.gone": "{name} não está mais lá",
   "pin.add": "Fixar em Locais",
   "pin.remove": "Remover de Locais",
-  "net.offLink": "Este servidor está fora da sua rede local, então o LordOS não lista as pastas dele. Digite o nome da pasta."
+  "net.offLink": "Este servidor está fora da sua rede local, então o LordOS não lista as pastas dele. Digite o nome da pasta.",
+  "zoom.in": "Ampliar",
+  "zoom.out": "Reduzir",
+  "zoom.reset": "Tamanho real",
+  "zoom.label": "Tamanho dos ícones e do texto"
 }

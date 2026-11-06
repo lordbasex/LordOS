@@ -211,7 +211,8 @@ export function Taskbar({ t, pos, align, start, onStart, onSearch, taskView, onT
   const tray = (
     <View style={{ flexDirection: vert ? 'column' : 'row', alignItems: 'center', gap: 2 }}>
       <PrivacyIndicators />
-      {vert ? null : <StatusItems color={t.text} />}
+      {/* as tall as the bar's buttons, so a status item's panel opens clear of the bar (sdk/statusplace.js) */}
+      {vert ? null : <StatusItems color={t.text} height={40} />}
       {!vert && keyboard.configured().length > 1 ? (
         <BarButton t={t} width={36} onClick={() => keyboard.next()}>
           <Text style={{ fontSize: 11, fontWeight: 600, color: t.text }}>{keyboard.label(keyboard.active())}</Text>

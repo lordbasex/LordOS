@@ -295,5 +295,9 @@
   "fav.gone": "{name} n’est plus là",
   "pin.add": "Épingler dans Emplacements",
   "pin.remove": "Retirer d’Emplacements",
-  "net.offLink": "Ce serveur est en dehors de votre réseau local : LordOS ne liste donc pas ses dossiers. Saisissez le nom du dossier."
+  "net.offLink": "Ce serveur est en dehors de votre réseau local : LordOS ne liste donc pas ses dossiers. Saisissez le nom du dossier.",
+  "zoom.in": "Agrandir",
+  "zoom.out": "Réduire",
+  "zoom.reset": "Taille réelle",
+  "zoom.label": "Taille des icônes et du texte"
 }

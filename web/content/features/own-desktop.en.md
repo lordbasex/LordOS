@@ -82,7 +82,7 @@ All in 0.8.7.
 - **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place; you sign in with a user and password or as a guest, which passed against one real shared folder and one test server. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
 - **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit. Both protocols were tried against a throwaway test machine; RDP to a real desktop session and RDP's shared folders are not verified yet.
 - **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost.
-- **Your way of working.** Choose, reorder and resize list columns, set Files' own Settings, and open Terminal in the folder you're in.
+- **Your way of working.** Choose, reorder and resize list columns, zoom the icons and the list (the slider in the status bar, Ctrl and + or −, or Ctrl and the wheel) with each folder remembering its own size, set Files' own Settings, and open Terminal in the folder you're in.
 
 ## Keys, the on-screen keyboard and coming back
 

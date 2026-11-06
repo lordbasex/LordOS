@@ -183,6 +183,12 @@ cards and USB devices are not available yet. VNC has no sound.
 
 Each folder keeps its view and sort in `settings.files.folderViews` (400 at most, oldest out first), so they survive closing and a restart; Network, Recents and the other places keep theirs too. A folder with none takes Settings → General's default view. The sidebar's width is dragged from its edge, between 150 and 360 px, and kept (`apps/files/viewprefs.js`).
 
+### Zoom (0.8.8.4)
+
+The icon and list views have a **zoom** ([#33](https://github.com/lordbasex/LordOS/issues/33)): the icon (or thumbnail) and the name grow or shrink together, in seven steps from −2 to +4, with 0 the usual size. Icons go from 32 to 160 px, with cards from 76 to 196 px wide and names from 10 to 16 px; list rows go from 20 to 48 px, with icons from 12 to 40 px (thumbnails from 32 px up, as in the icon view) and names from 11 to 19 px, the other columns one size smaller. Ways to change it: the slider between a small and a large square at the end of the status bar (the squares step; a double click on the slider goes back to 0; narrow windows keep only the squares), View → Zoom In / Zoom Out / Actual Size, Ctrl and + (or =), Ctrl and −, Ctrl and 0, and Ctrl with the mouse wheel or a two-finger touchpad scroll over the files. The columns and gallery views don't zoom, and the control isn't shown there.
+
+The step is kept **per place and per view** with the place's view and sort (`folderViews[path].zoom`, e.g. `{ "icons": 2, "list": -1 }`), so a picture folder can keep big icons and a small list while every other folder stays at the usual size; a step of 0 isn't stored. It lives in `settings.json`, like the rest of the view settings: nothing is written into the folder itself (no hidden file), so read-only folders, disks of other systems and servers keep it too and their contents don't change. The sizes and the stored value are checked by `server/tests/files_model_test.mjs` (`iconMetrics`, `listMetrics`, `zoomWith`).
+
 ## Disks' file systems (0.8.7)
 
 NTFS, exFAT, FAT, HFS+ and APFS come as one Store item, **Disk Formats** (`lordos-disk-formats`, Commercial group, label "Commercial format"), installed and removed as one after a page lists each driver with its license and source. All of them are free software at no cost. The package adds a marker, `/usr/lib/lordos/disk-formats.enabled`, that `disk-mount` checks, and depends on ntfs-3g, exfatprogs and dosfstools, plus apfs-dkms and kernel headers on amd64 (323 MB, not on the Pi, whose kernel is LordOS's own).
@@ -305,6 +311,7 @@ isn't built, so treat signing in to a real SMB server as untested.
 | ❖N / ❖T / ❖W | New window / new tab / close tab |
 | Ctrl+Tab, ⇧Ctrl+Tab | Next / previous tab |
 | ❖1 ❖2 ❖3 ❖4 | Icons / list / columns / gallery |
+| Ctrl + / Ctrl − / Ctrl 0, Ctrl + wheel | Zoom in / out / actual size (icons and list) |
 | ❖[ / ❖] / ❖↑ | Back / forward / enclosing folder |
 | ❖↓ or double click | Open |
 | Enter | Rename |

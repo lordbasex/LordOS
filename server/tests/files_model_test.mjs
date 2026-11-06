@@ -1,5 +1,5 @@
 // Files without a screen: what an address means and how columns move. node server/tests/files_model_test.mjs
-import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith } from '../../apps/files/viewprefs.js';
+import { clampSide, SIDE_MIN, SIDE_MAX, viewFor, viewKey, folderViewsWith, clampZoom, zoomWith, zoomOf, iconMetrics, listMetrics, iconColumns, ZOOM_MIN, ZOOM_MAX } from '../../apps/files/viewprefs.js';
 import { parseAddress, sshLine, remoteUri, hostAddress } from '../../apps/files/connect.js';
 import { normalColumns, visible, toggleColumn, moveColumn, resize, dropBefore, totalWidth, MIN_W, MAX_W } from '../../apps/files/columns.js';
 
@@ -40,7 +40,7 @@ eq('total', totalWidth(d), 350);
   const eq = (a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
   const l = { view: 'list', sort: { by: 'date', desc: true } };
   const p = { folderViews: folderViewsWith({}, '/a', l), defaultView: { view: 'columns', sort: { by: 'name', desc: false } } };
-  eq(viewFor(p, { type: 'dir', path: '/a' }), l);
+  eq(viewFor(p, { type: 'dir', path: '/a' }), { ...l, zoom: {} });
   eq(viewFor(p, { type: 'dir', path: '/b' }).view, 'columns');
   eq(viewFor({ folderViews: {}, defaultView: null }, { type: 'dir', path: '/b' }).view, 'icons');
   eq(viewFor({ folderViews: { '/a': { view: 'evil', sort: {} } }, defaultView: null }, { type: 'dir', path: '/a' }).view, 'icons');
@@ -49,5 +49,26 @@ eq('total', totalWidth(d), 350);
   for (let i = 0; i < 405; i++) m = folderViewsWith(m, `/f${i}`, l);
   eq(Object.keys(m).length, 400); eq(!!m['/f0'], false);
   eq([clampSide(10), clampSide(9999), clampSide(220), clampSide('x')], [SIDE_MIN, SIDE_MAX, 220, 200]);
+}
+// zoom (issue #33): steps per place and per view, kept with the view and the sort; odd values don't count
+{
+  eq('clamp', [clampZoom(-9), clampZoom(9), clampZoom(1), clampZoom(1.5), clampZoom('2'), clampZoom(undefined)], [ZOOM_MIN, ZOOM_MAX, 1, 0, 0, 0]);
+  eq('usual sizes', [iconMetrics(0).icon, iconMetrics(0).cell, listMetrics(0).icon, listMetrics(0).row, listMetrics(0).font], [64, 100, 16, 24, 13]);
+  const grows = (f, k) => { for (let z = ZOOM_MIN; z < ZOOM_MAX; z++) if (!(f(z + 1)[k] > f(z)[k])) return false; return true; };
+  eq('icons grow', [grows(iconMetrics, 'icon'), grows(iconMetrics, 'cell'), grows(iconMetrics, 'font')], [true, true, true]);
+  eq('list grows', [grows(listMetrics, 'icon'), grows(listMetrics, 'row'), grows(listMetrics, 'font')], [true, true, true]);
+  eq('row fits the icon', [...Array(ZOOM_MAX - ZOOM_MIN + 1)].every((_, i) => listMetrics(ZOOM_MIN + i).row >= listMetrics(ZOOM_MIN + i).icon + 6), true);
+  eq('columns', [iconColumns(724, 0), iconColumns(724, 4), iconColumns(724, ZOOM_MIN), iconColumns(50, 4)], [6, 3, 8, 1]);
+  let z = zoomWith({}, 'icons', 2);
+  z = zoomWith(z, 'list', -1);
+  eq('per view', [zoomOf(z, 'icons'), zoomOf(z, 'list'), zoomOf(z, 'gallery'), zoomOf(null, 'icons')], [2, -1, 0, 0]);
+  eq('back to 0 drops it', zoomWith(z, 'icons', 0), { list: -1 });
+  eq('clamped on the way in', zoomWith({}, 'icons', 99), { icons: ZOOM_MAX });
+  const pz = { folderViews: folderViewsWith({}, '/p', { view: 'icons', sort: { by: 'name' }, zoom: z }), defaultView: null };
+  eq('kept with the folder', viewFor(pz, { type: 'dir', path: '/p' }).zoom, { icons: 2, list: -1 });
+  eq('other folders usual', viewFor(pz, { type: 'dir', path: '/q' }).zoom, {});
+  const junk = { folderViews: { '/j': { view: 'list', sort: { by: 'name' }, zoom: { icons: 40, list: 'x', evil: 3 } } }, defaultView: null };
+  eq('junk zoom', viewFor(junk, { type: 'dir', path: '/j' }).zoom, {});
+  eq('no zoom stored when usual', 'zoom' in folderViewsWith({}, '/u', { view: 'list', sort: { by: 'name' }, zoom: {} })['/u'], false);
 }
 console.log(`files-model-test: ${ok} ok`);

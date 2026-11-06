@@ -108,12 +108,14 @@ export function SectionTitle({ children }) {
 //   When it changes the view goes back to the top, so the next page doesn't open where the last
 //   one was scrolled to (or past its end). Leave it out where the same content just updates
 //   (a growing log, a list that refreshes) and the position should stay.
+// onWheel (0.8.8.4, optional): sees each wheel event first; if it calls e.stopPropagation() the view
+//   doesn't scroll (Files zooms with Ctrl + wheel).
 export const SCROLL_GUTTER = 11;
 // A TextInput asks the ScrollView it is in to show its caret: on focus, on typing, and when the view
 // changes height, as a window does when it shrinks for the on-screen keyboard. A wheel scroll with a
 // field focused doesn't ask.
 const ScrollReveal = createContext(null);
-export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey, onScroll }) {
+export function ScrollView({ style, contentStyle, children, scrollRef, gutter, resetKey, onScroll, onWheel }) {
   const t = useTheme();
   const mode = scrollbarMode(t.scrollBars);
   const reduce = !!t.reduceMotion;
@@ -240,6 +242,7 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
   const pad = gutter && mode === 'always' ? { paddingInlineEnd: SCROLL_GUTTER } : null;
   return (
     <View ref={outer} onWheel={(e) => {
+      if (onWheel) { onWheel(e); if (e.stopped) return; }
       const m = measure() || metrics;
       const mx = Math.max(0, m.content - m.view);
       if (mx > 0 && e.deltaY) scrolled();
