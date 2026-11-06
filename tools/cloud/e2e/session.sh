@@ -54,13 +54,25 @@ J
     i=0; while [ ! -S "$R/lordos/remote.sock" ] && [ $i -lt 60 ]; do sleep 0.5; i=$((i + 1)); done
     [ -S "$R/lordos/remote.sock" ] || { echo "no remote.sock for $U"; tail -20 /var/log/e2e-client-$U.log; exit 1; }
     sleep 2
+    if [ -n "${NOKEYRING:-}" ]; then echo "session $U up (keyring left locked)"; else
     python3 -I "$HERE/ui.py" "$R/lordos/remote.sock" "keyring:$(pw "$U")" >/dev/null
-    echo "session $U up (keyring password sent)" ;;
+    echo "session $U up (keyring password sent)"; fi ;;
+  unlock)   # the keyring password, later (as the login screen would after a lock)
+    U=${2:?user}
+    python3 -I "$HERE/ui.py" "$(rt "$U")/lordos/remote.sock" "keyring:$(pw "$U")" >/dev/null; echo "keyring password sent" ;;
 stop)
     U=${2:?user}
+    # as a logout does: lord-server gets SIGTERM and rclone its PDEATHSIG (SIGTERM), and both get time to unmount
+    # (stopping the unit at once would SIGKILL rclone with the rest of the unit and leave dead mounts)
+    pkill -TERM -u "$U" -x lord-server 2>/dev/null || true
+    i=0; while pgrep -u "$U" -x rclone >/dev/null && [ $i -lt 40 ]; do sleep 0.5; i=$((i + 1)); done
+    pgrep -u "$U" -x rclone >/dev/null && echo "rclone still running 20 s after logout"
     systemctl stop "e2e-client-$U" 2>/dev/null || true
-    sleep 1
-    for m in /home/"$U"/Cloud/*; do [ -d "$m" ] && mountpoint -q "$m" && echo "still mounted after logout: $m"; done; true ;;
+    grep " /home/$U/" /proc/mounts | grep -q fuse && { echo "still mounted after logout:"; grep " /home/$U/" /proc/mounts | cut -d' ' -f1-3; }
+    true ;;
+  unmount)   # clean up dead mounts a killed session left (as the user, like Files' eject)
+    U=${2:?user}
+    grep " /home/$U/" /proc/mounts | grep fuse | cut -d' ' -f2 | sed 's/\\040/ /g' | while IFS= read -r m; do runuser -u "$U" -- fusermount3 -u -z "$m"; done ;;
 status)
     U=${2:?user}
     systemctl is-active "e2e-client-$U" || true

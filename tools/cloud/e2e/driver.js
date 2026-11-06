@@ -5,6 +5,10 @@
 // { cloud, cloudState, wm, lord, sleep, log } and writes ~/.e2e/out-<n>.json: { ok, value } or { ok: false, error }.
 import { cloud, cloudState } from '../../../sdk/cloud.js';
 import { wm } from '../../../sdk/windows.js';
+import * as cloudcheck from '../../../sdk/cloudcheck.js';
+
+// Check This Account exactly as Settings runs it (apps/settings/Cloud.jsx: checkFs and env)
+globalThis.__e2eCheck = cloudcheck;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
