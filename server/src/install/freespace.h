@@ -55,7 +55,7 @@ typedef struct { unsigned num, esp_num; FspRegion region; } FspChoice;
 
 uint32_t fsp_crc32(const uint8_t *p, size_t n);
 
-/* 0 erase, 1 free, -1 anything else. "" is erase: what the action always did. */
+/* 0 erase, 1 free, 2 manual (manual.c), -1 anything else. "" is erase: what the action always did. */
 int fsp_mode(const char *s);
 
 /* What the first sector says; `s` is 512 bytes. */

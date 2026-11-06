@@ -5,10 +5,11 @@
 // On the OVA image's first boot the same wizard, without the disk, makes the person's account on the
 // running system (install-account): lord.system.info().firstAccount.
 import {
-  View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, useTheme, useLocale, useStore, createStore,
+  View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, MenuButton, useTheme, useLocale, useStore, createStore,
   admin, keyboard, languages, setLanguage, formatBytes, locale, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
+import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
 
 export function Icon({ size: s }) {
   return (
@@ -30,6 +31,7 @@ export function Icon({ size: s }) {
 // Wizard state: it survives the UI remounting when the language changes.
 const wiz = createStore({
   step: 0, lang: '', region: '', zone: '', kb: null, disk: null, mode: 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, swap: 2048,
+  manual: emptyManual(), confirmManual: false,
   fullname: '', user: '', userEdited: false, host: '', hostEdited: false, pass: '', pass2: '',
   progress: null, log: [], error: null, done: false,
 });
@@ -172,7 +174,7 @@ function DiskStep() {
         setDisks(found);
         // a new look at the disk asks for a new confirmation: what was confirmed may have changed
         const now = wiz.get().disk && found.find((d) => d.name === wiz.get().disk.name);
-        if (wiz.get().disk) set({ disk: now && now.usable ? now : null, mode: now?.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false });
+        if (wiz.get().disk) set({ disk: now && now.usable ? now : null, mode: now?.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, manual: emptyManual(), confirmManual: false });
       }, (e) => { setErr(e.message); setDisks([]); });
   };
   useEffect(load, []);
@@ -184,7 +186,7 @@ function DiskStep() {
       {disks === null && <Text style={{ fontSize: 12, color: t.textDim }}>{tr('installer.disk.loading')}</Text>}
       {disks && disks.length === 0 && !err && <Text style={{ fontSize: 13, color: t.text }}>{tr('installer.disk.none')}</Text>}
       {(disks || []).map((d) => (
-        <View key={d.name} onClick={() => d.usable && set({ disk: d, mode: d.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false })}
+        <View key={d.name} onClick={() => d.usable && s.disk?.name !== d.name && set({ disk: d, mode: d.freeOk ? 'free' : 'erase', confirmDisk: '', confirmBox: false, confirmFree: false, manual: emptyManual(), confirmManual: false })}
           style={{ padding: 14, borderRadius: 10, gap: 4, opacity: d.usable ? 1 : 0.5,
             border: `2px solid ${s.disk?.name === d.name ? t.accent : t.separator}`, backgroundColor: t.hover }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -199,12 +201,17 @@ function DiskStep() {
       {s.disk && !s.disk.freeOk && s.disk.freeWhy && s.disk.ptable !== 'none' && (
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35 }}>{tr('installer.disk.freeNo', { why: errorText(s.disk.freeWhy) })}</Text>
       )}
-      {s.disk?.freeOk && (
+      {s.disk && !s.disk.manualOk && s.disk.manualWhy && s.disk.ptable !== 'none' && (
+        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.35 }}>{tr('installer.manual.none', { why: errorText(s.disk.manualWhy) })}</Text>
+      )}
+      {s.disk && (s.disk.freeOk || s.disk.manualOk) && (
         <Field label={tr('installer.disk.modeLabel')}>
-          <Segmented value={s.mode} onChange={(mode) => set({ mode, confirmDisk: '', confirmBox: false, confirmFree: false })}
-            options={[['free', tr('installer.disk.modeFree')], ['erase', tr('installer.disk.modeErase')]]} />
+          <Segmented value={s.mode} onChange={(mode) => set({ mode, confirmDisk: '', confirmBox: false, confirmFree: false, confirmManual: false })}
+            options={[...(s.disk.freeOk ? [['free', tr('installer.disk.modeFree')]] : []), ...(s.disk.manualOk ? [['manual', tr('installer.disk.modeManual')]] : []),
+              ['erase', tr('installer.disk.modeErase')]]} />
         </Field>
       )}
+      {s.disk && s.mode === 'manual' && <ManualPanel />}
       {s.disk && s.mode === 'free' && (
         <Card style={{ borderColor: t.accent }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text }}>{tr('installer.disk.freeTitle', { disk: s.disk.path })}</Text>
@@ -221,7 +228,7 @@ function DiskStep() {
           </Field>
         </Card>
       )}
-      {s.disk && s.mode !== 'free' && (
+      {s.disk && s.mode === 'erase' && (
         <Card style={{ borderColor: '#ff453a' }}>
           <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#ff453a' }}>{tr('installer.disk.eraseTitle', { disk: s.disk.path })}</Text>
           <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.disk.eraseText')}</Text>
@@ -240,6 +247,142 @@ function DiskStep() {
       )}
       <Button label={tr('installer.disk.reload')} onClick={load} style={{ alignSelf: 'flex-start' }} />
     </View>
+  );
+}
+
+// ---- manual partitioning (docs/ISO.md, "Manual partitioning"; the model is manualmodel.js) ----
+
+const partText = (d, p) => [p.name, formatBytes((p.end - p.start + 1) * d.lsec), p.fs || p.fstype, p.label].filter(Boolean).join(' · ');
+const FS_OF = { root: 'ext4', home: 'ext4', swap: 'swap', esp: 'FAT32' };
+
+// Every change of a manual plan, as the person reads it (the disk step and the summary).
+export function manualChanges(d, m, tr) {
+  const r = manualReview(d, m, 0);
+  return r.changes.map((c) => {
+    if (c.kind === 'delete') return tr('installer.manual.ch.delete', { part: partText(d, c.part) });
+    if (c.kind === 'create') return tr('installer.manual.ch.create', { size: formatBytes(c.bytes), role: tr(`installer.manual.role.${c.role}`), fs: FS_OF[c.role] });
+    return tr(`installer.manual.ch.${c.act}`, { part: partText(d, c.part) });
+  });
+}
+
+function ManualRow({ d, row, m }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [adding, setAdding] = useState(false);
+  const [role, setRole] = useState('root');
+  const [size, setSize] = useState('');
+  const line = { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 12 };
+  if (row.kind === 'part') {
+    const p = row.p, gone = row.act === 'delete';
+    const trigger = () => (
+      <View style={{ height: 24, paddingHorizontal: 10, borderRadius: 6, justifyContent: 'center', backgroundColor: row.act === 'keep' ? t.control : gone ? '#ff453a' : t.accent }}>
+        <Text style={{ fontSize: 12, color: row.act === 'keep' ? t.text : '#fff', whiteSpace: 'nowrap' }}>{`${tr(`installer.manual.act.${row.act}`)} ▾`}</Text>
+      </View>
+    );
+    return (
+      <View style={line}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: gone ? 0.5 : 1 }}>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{partText(d, p)}</Text>
+          <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            {[p.esp ? tr('installer.manual.espBadge') : null, p.loaders?.length ? tr('installer.manual.loaders', { list: p.loaders.join(', ') }) : null].filter(Boolean).join(' · ') || ' '}</Text>
+        </View>
+        <MenuButton trigger={trigger} minWidth={260} items={actionsFor(p).map((a) => ({
+          label: tr(`installer.manual.act.${a}`), checked: a === row.act, destructive: a === 'delete',
+          onClick: () => set({ manual: setAction(wiz.get().manual, p.num, a), confirmManual: false }),
+        }))} />
+      </View>
+    );
+  }
+  if (row.kind === 'new') {
+    return (
+      <View style={[line, { backgroundColor: t.mode === 'dark' ? 'rgba(48,209,88,0.10)' : 'rgba(48,209,88,0.08)' }]}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text }}>
+            {`${tr('installer.manual.new')} · ${formatBytes(row.bytes)} · ${tr(`installer.manual.role.${row.a.role}`)} · ${FS_OF[row.a.role]}`}</Text>
+        </View>
+        <Button small label={tr('installer.manual.remove')} onClick={() => set({ manual: removeAdded(wiz.get().manual, row.index), confirmManual: false })} />
+      </View>
+    );
+  }
+  // free space: create a partition in it
+  const used = new Set([...Object.values(m.acts).map((a) => ({ root: 'root', home: 'home', homeFormat: 'home', swap: 'swap', esp: 'esp', espFormat: 'esp' }[a])), ...m.adds.map((a) => a.role)]);
+  const create = () => {
+    const mib = Number(String(size).replace(',', '.')) * 1024;
+    if (!Number.isFinite(mib) || mib < 0) return;
+    const at = placeIn(d, row.gap, mib);
+    set({ manual: addPartition(wiz.get().manual, role, at.start, at.end), confirmManual: false });
+    setAdding(false); setSize('');
+  };
+  return (
+    <View style={{ gap: 8, paddingVertical: 8, paddingHorizontal: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim }}>{`${tr('installer.manual.free')} · ${formatBytes(row.bytes)}`}</Text>
+        {!adding && row.bytes >= 32 * 1024 * 1024 && <Button small label={tr('installer.manual.add')} onClick={() => {
+          setRole(['root', 'esp', 'home', 'swap'].find((r) => !used.has(r)) || 'root');
+          setAdding(true);
+        }} />}
+      </View>
+      {adding && (
+        <View style={{ gap: 8 }}>
+          <Segmented small value={role} onChange={setRole} options={['root', 'home', 'swap', 'esp'].map((r) => [r, tr(`installer.manual.role.${r}`)])} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 12, color: t.text }}>{tr('installer.manual.size')}</Text>
+            <TextInput value={size} onChange={setSize} placeholder={formatBytes(row.bytes)} style={{ width: 110 }} />
+            <Button small primary label={tr('installer.manual.create')} onClick={create} />
+            <Button small label={tr('installer.manual.cancel')} onClick={() => setAdding(false)} />
+          </View>
+          <Text style={{ fontSize: 11, color: t.textDim }}>{tr('installer.manual.sizeHint', { max: formatBytes(row.bytes) })}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ManualPanel() {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const s = useStore(wiz);
+  const d = s.disk, m = s.manual;
+  const r = manualReview(d, m, 0);        // a swap partition drops the swap file (startInstall)
+  const list = manualRows(d, m);
+  const changes = manualChanges(d, m, tr);
+  return (
+    <Card style={{ borderColor: t.accent, gap: 10 }}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text }}>{tr('installer.manual.title', { disk: d.path })}</Text>
+      <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.manual.intro')}</Text>
+      <View style={{ borderRadius: 8, border: `1px solid ${t.separator}` }}>
+        {list.map((row, i) => (
+          <View key={`${row.kind}-${row.start}-${i}`}>
+            {i > 0 && <View style={{ height: 1, backgroundColor: t.separator }} />}
+            <ManualRow d={d} row={row} m={m} />
+          </View>
+        ))}
+      </View>
+      {r.where.swap ? <Text style={{ fontSize: 12, color: t.textDim }}>{tr('installer.manual.swapByPart')}</Text> : (
+        <Field label={tr('installer.disk.swap')} hint={tr('installer.disk.swapHint')}>
+          <Segmented value={String(s.swap)} onChange={(v) => set({ swap: Number(v) })}
+            options={[['0', tr('installer.disk.swapNone')], ['2048', '2 GB'], ['4096', '4 GB'], ['8192', '8 GB']]} />
+        </Field>
+      )}
+      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text }}>{tr('installer.manual.changes')}</Text>
+      {changes.length ? changes.map((c, i) => <Text key={i} style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{`• ${c}`}</Text>)
+        : <Text style={{ fontSize: 12, color: t.textDim }}>{tr('installer.manual.noChanges')}</Text>}
+      <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.4 }}>{tr('installer.manual.rest')}</Text>
+      {r.errors.map((e) => <Text key={e} style={{ fontSize: 12, color: '#ff9f0a', lineHeight: 1.4 }}>{errorText(e)}</Text>)}
+      {!r.errors.length && (
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Toggle on={s.confirmManual} onChange={(confirmManual) => set({ confirmManual })} />
+            <Text style={{ fontSize: 12, color: t.text }}>{tr('installer.manual.understand')}</Text>
+          </View>
+          {r.destructive && (
+            <Field label={tr('installer.disk.typeName', { name: d.name })}>
+              <TextInput value={s.confirmDisk} onChange={(confirmDisk) => set({ confirmDisk: confirmDisk.trim() })} placeholder={d.name} />
+            </Field>
+          )}
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -309,12 +452,14 @@ function Summary() {
   const s = useStore(wiz);
   const p = plan(s);
   const arm64 = useSystemInfo(60000).arch === 'aarch64';     // UEFI only: no BIOS boot partition (install.c)
-  const beside = s.mode === 'free';
+  const beside = s.mode === 'free', manual = s.mode === 'manual';
+  const mr = manual && s.disk ? manualReview(s.disk, s.manual, 0) : null;
   const rows = [
     ...(FIRST_ACCOUNT ? [] : [
-      [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr(beside ? 'installer.summary.kept' : 'installer.summary.erased')}`],
-      [tr('installer.summary.layout'), beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
-      [tr('installer.summary.swap'), s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
+      [tr('installer.summary.disk'), `${s.disk?.path} (${formatBytes(s.disk?.size || 0)}) — ${tr(beside ? 'installer.summary.kept' : manual ? 'installer.summary.manual' : 'installer.summary.erased')}`],
+      [tr('installer.summary.layout'), manual ? [...manualChanges(s.disk, s.manual, tr), tr('installer.manual.rest')]
+        : beside ? tr('installer.summary.layoutFree', { size: formatBytes(s.disk?.freeBytes || 0) }) : tr(arm64 ? 'installer.summary.layoutValueEfi' : 'installer.summary.layoutValue')],
+      [tr('installer.summary.swap'), mr?.where.swap ? tr('installer.summary.swapPart') : s.swap ? `${s.swap / 1024} GB` : tr('installer.disk.swapNone')],
     ]),
     [tr('installer.summary.lang'), `${p.lang} · ${p.region}.UTF-8 · ${p.zone}`],
     [tr('installer.summary.keyboard'), kbName(p.kb)],
@@ -326,7 +471,8 @@ function Summary() {
       <GroupBox>
         {rows.map(([k, v]) => (
           <FormRow key={k} label={k} labelWidth={140} minHeight={34}>
-            <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.35 }}>{v}</Text>
+            {Array.isArray(v) ? <View style={{ flex: 1, gap: 3, paddingVertical: 6 }}>{v.map((x, i) => <Text key={i} style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.35 }}>{x}</Text>)}</View>
+              : <Text style={{ fontSize: typeScale.callout, color: t.text, lineHeight: 1.35 }}>{v}</Text>}
           </FormRow>
         ))}
       </GroupBox>
@@ -383,8 +529,10 @@ function startInstall() {
     lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
   } : {
     mode: s.mode, ...(s.mode === 'free' ? { freeStart: s.disk.freeStart, freeEnd: s.disk.freeEnd } : {}),
+    ...(s.mode === 'manual' ? manualReview(s.disk, s.manual, 0).fields : {}),
     disk: s.disk.name, user: s.user, fullname: s.fullname.trim(), password: s.pass, hostname: s.host,
-    lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '', swap: s.swap,
+    lang: p.lang, locale: `${p.region}.UTF-8`, timezone: p.zone, kblayout: p.kb.layout, kbvariant: p.kb.variant || '',
+    swap: s.mode === 'manual' && manualReview(s.disk, s.manual, 0).where.swap ? 0 : s.swap,
   };
   set({ pass: '', pass2: '' });            // the password doesn't stay in the UI
   admin.run(FIRST_ACCOUNT ? 'install-account' : 'install-run', JSON.stringify(job), (line) => {
@@ -393,6 +541,12 @@ function startInstall() {
     else wiz.set((st) => ({ ...st, log: [...st.log, line].slice(-30) }));
   }).then(() => set({ done: true }), (e) => set({ error: e.message }));
 }
+
+// The manual plan has no problems left, was confirmed, and a plan that loses data also has the disk's name typed.
+const manualReady = (s) => {
+  const r = manualReview(s.disk, s.manual, 0);
+  return !r.errors.length && s.confirmManual && (!r.destructive || s.confirmDisk === s.disk.name);
+};
 
 export default function Installer() {
   const t = useTheme();
@@ -406,7 +560,9 @@ export default function Installer() {
   const e = userErrors(s, tr);
   const canNext = {
     welcome: admin.available(), language: true, keyboard: true,
-    disk: s.mode === 'free' ? !!s.disk?.freeOk && s.confirmFree : !!s.disk && s.confirmBox && s.confirmDisk === s.disk.name,
+    disk: s.mode === 'free' ? !!s.disk?.freeOk && s.confirmFree
+      : s.mode === 'manual' ? !!s.disk?.manualOk && manualReady(s)
+        : !!s.disk && s.confirmBox && s.confirmDisk === s.disk.name,
     user: !Object.values(e).some(Boolean), summary: true,
   }[name];
   const Body = { welcome: Welcome, language: Language, keyboard: Keyboard, disk: DiskStep, user: UserStep, summary: Summary, install: Install }[name];

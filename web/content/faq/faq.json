@@ -227,6 +227,19 @@
           }
         },
         {
+          "id": "manual-partitioning",
+          "q": {
+            "en": "Can I choose the partitions myself when installing?",
+            "es": "¿Puedo elegir yo las particiones al instalar?",
+            "pt": "Posso escolher as partições eu mesmo ao instalar?"
+          },
+          "a": {
+            "en": "In development (after 0.8.8.3), arriving with the next ISO: the installer's Disk step gets **Choose partitions** ([#31](https://github.com/lordbasex/LordOS/issues/31)). On a GPT disk of a computer started through UEFI you pick which partition is / (formatted, at least 8 GB), an optional separate /home that keeps its files or is formatted, the EFI partition (kept, with LordOS adding its own folder, or formatted only if you ask), and an optional swap partition; you can also delete partitions and create new ones in free space with a size. Before anything is written you see the list of every change and confirm it. It was tested on disk images and with a full install in a virtual machine that kept the old /home's files. Not yet: resizing partitions, using more than one disk, BIOS boot or MBR disks in this mode, and encryption. The released 0.8.8.x ISOs only install beside another system in free space or erase the disk.",
+            "es": "En desarrollo (después de la 0.8.8.3), llega con la próxima ISO: el paso Disco del instalador suma **Elegir particiones** ([#31](https://github.com/lordbasex/LordOS/issues/31)). En un disco GPT de una computadora arrancada por UEFI elegís qué partición es / (formateada, al menos 8 GB), una /home aparte opcional que conserva sus archivos o se formatea, la partición EFI (conservada, con LordOS agregando su propia carpeta, o formateada solo si lo pedís) y una partición swap opcional; también podés borrar particiones y crear nuevas en el espacio libre con un tamaño. Antes de escribir nada ves la lista de cada cambio y la confirmás. Se probó con imágenes de disco y con una instalación completa en una máquina virtual que conservó los archivos de la /home anterior. Todavía no: achicar o agrandar particiones, usar más de un disco, arranque BIOS o discos MBR en este modo, ni cifrado. Las ISO 0.8.8.x publicadas solo instalan al lado de otro sistema en el espacio libre o borran el disco.",
+            "pt": "Em desenvolvimento (depois da 0.8.8.3), chega com a próxima ISO: o passo Disco do instalador ganha **Escolher partições** ([#31](https://github.com/lordbasex/LordOS/issues/31)). Num disco GPT de um computador iniciado por UEFI você escolhe qual partição é / (formatada, pelo menos 8 GB), uma /home separada opcional que mantém os arquivos ou é formatada, a partição EFI (mantida, com o LordOS adicionando a própria pasta, ou formatada só se você pedir) e uma partição swap opcional; também pode apagar partições e criar novas no espaço livre com um tamanho. Antes de gravar qualquer coisa você vê a lista de cada mudança e confirma. Foi testado com imagens de disco e com uma instalação completa numa máquina virtual que manteve os arquivos da /home anterior. Ainda não: redimensionar partições, usar mais de um disco, inicialização BIOS ou discos MBR neste modo, nem criptografia. As ISOs 0.8.8.x publicadas só instalam ao lado de outro sistema no espaço livre ou apagam o disco."
+          }
+        },
+        {
           "id": "debian-one-liner",
           "q": {
             "en": "How do I install LordOS on Debian 13?",

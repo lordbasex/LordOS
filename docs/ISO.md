@@ -272,11 +272,14 @@ Assistant steps:
 2. **Language, region and time zone.** The language changes the interface live.
 3. **Keyboard.** The layout is applied live and there's a field to try it.
 4. **Disk.** Lists the disks (model, size, connection and what's on them), excluding the disk the
-   live system booted from. When the disk qualifies (see "Installing in free space") a choice
-   appears between installing beside what's there and erasing the disk; otherwise the reason is
-   shown and erasing is the only way. To erase you have to tick "I understand the whole disk will be
-   erased" and type the disk's name (`sda`). To install beside, you read what stays untouched and tick
-   a confirmation of its own. Optional: swap as a file, of 2, 4 or 8 GB.
+   live system booted from. Up to three ways to install appear: **Beside what is there** when the disk
+   qualifies (see "Installing in free space"), **Choose partitions** when it qualifies (see "Manual
+   partitioning") and **Erase the disk**, always; for a way that isn't offered the reason is shown. To
+   erase you have to tick "I understand the whole disk will be erased" and type the disk's name
+   (`sda`). To install beside, you read what stays untouched and tick a confirmation of its own. To
+   choose the partitions, you review the list of every change, tick "I have checked every change
+   above" and, when a change loses data already on the disk, type the disk's name too. Optional: swap
+   as a file, of 2, 4 or 8 GB (or, choosing the partitions, a swap partition).
 5. **User.**
    - The user name is suggested from the full name.
    - The password is typed twice.
@@ -390,6 +393,121 @@ EFI partition cached, so shut it down fully first. Secure Boot has to be off, as
 `build/freepart-cli` (`make -C server build/freepart-cli`, root, loop devices only, never installed) and
 `server/tests/freepart_loop.sh` run the real partitioning step on an image, with failures injected.
 
+### Manual partitioning
+
+The third mode (`"mode": "manual"` in `install-run`, **Choose partitions** in the wizard, 0.8.8.4,
+[#31](https://github.com/lordbasex/LordOS/issues/31)) lets the person decide where LordOS goes on a
+disk: which partition is `/`, an optional separate `/home` (keeping its files or formatted), the EFI
+partition to boot from (kept, or formatted only when asked) and an optional swap partition. Partitions
+can be deleted, and new ones created in free space, with a size. Nothing is written until **Install**.
+
+| Disk step | ![list](installer-manual-list.png) |
+|---|---|
+| A partition's menu | ![menu](installer-manual-menu.png) |
+| A new partition in free space | ![add](installer-manual-add.png) |
+| Every change, confirmed before going on | ![changes](installer-manual-changes.png) |
+| The summary | ![summary](installer-manual-summary.png) |
+
+What the disk needs (the root side checks each, `mp_disk_why` in `server/src/install/manual.c`):
+
+| Needs | Refused with |
+|---|---|
+| The live system booted through UEFI, and `efibootmgr` is in the image | `install.manual.needUefi`, `install.manual.noBootTool` |
+| A GPT with a plain protective MBR: not MBR, not a hybrid MBR, not a blank disk (use **Erase the disk** for those) | `install.manual.mbr`, `hybridMbr`, `noTable` |
+| A sound table, read exactly as in "Installing in free space" | `install.manual.tableDamaged` |
+| Nothing mounted, swapped or held on the disk | `install.manual.busy` |
+
+What each partition can become (the menu on each row):
+
+| Choice | What happens to it |
+|---|---|
+| Leave as it is | nothing: byte for byte as it was |
+| / (system): format (ext4) | formatted; at least 8 GB |
+| /home: keep its files | mounted as `/home`, nothing formatted; only ext4, ext3, ext2, XFS or Btrfs |
+| /home: format (ext4) | formatted |
+| Swap: format | `mkswap`; 256 MB to 64 GB |
+| EFI partition: keep it, add LordOS | grub goes in `EFI/LordOS`; the other folders stay. FAT, readable, 32 MB free. Only for a partition of the EFI type |
+| EFI partition: format it | FAT32, every boot loader on it is erased; only when chosen. At least 64 MB |
+| Delete | its table entry is removed |
+
+A new partition goes at the start of a free region (counting the space of partitions marked for
+deletion), aligned to 1 MiB, with a role: `/` (8 GB at least), `/home` (1 GB), swap or an EFI
+partition (100 MB). One partition per role, and one role per partition; `/` and an EFI partition are
+required. A swap partition replaces the swap file.
+
+The plan the wizard sends: `tableTag` (the disk's GUID and its entries' CRC from `install-disks`),
+`delete` (`"3,5"`), `create` (`"root:S:E,swap:S:E"`, sectors), `rootPart`, `homePart`, `swapPart`,
+`espPart` (existing partition numbers) and `homeFormat`, `espFormat`. The root side reads the disk
+again and refuses a plan that doesn't fit it, before anything is written: the table changed since it
+was listed (`install.manual.diskChanged`), a partition that isn't there or is also deleted, a role
+twice, a non-EFI partition as the EFI one or the EFI one as anything else, a new partition off the
+1 MiB alignment, outside the usable area or over a partition that stays, sizes, a full table, a kept
+`/home` with another file system, a kept EFI partition that isn't FAT or has no room, and a swap
+partition together with a swap file. `tests/manual_test.c` (in `make test`) feeds these rules hostile
+plans; `tests/installer_manual_test.mjs` checks the wizard's model.
+
+What it does, in `server/src/install/manualpart.c`:
+
+1. Reads everything again and checks the plan against the disk as it is now.
+2. When the table changes: `sgdisk --backup` to `/run/lordos-install`, a byte copy of the first
+   sector, both headers and both entry arrays, compared again right before writing; then **one**
+   `sgdisk -d N … -n N:start:end -t N:code -c N:name …` call. New partitions take the lowest numbers
+   the table doesn't use; a deleted number stays empty, existing partitions are not renumbered. Types:
+   8304 (8305 on arm64) for `/`, 8302 for `/home`, 8200 for swap, EF00 for an EFI partition.
+3. Proves the result on the raw disk: the first sector's boot code, the headers, every entry that
+   stays byte for byte, every deleted entry empty, every new entry with its sectors and type. Then
+   that the kernel dropped the deleted partitions and sees every partition the plan uses where the
+   table says. If not, the table is put back from the backup and compared again.
+4. `wipefs` and the file system on each partition that gets one, and nothing else.
+
+Then the system is copied and configured as in "Installing in free space" (grub in `EFI/LordOS`, its own
+firmware entry first in the boot order, a 5 second menu, `os-prober`, nothing written to the disk's
+first sectors), plus:
+
+- `/etc/fstab` gets `/home` (`UUID=… /home <type> defaults 0 2`, pass 0 for XFS and Btrfs) and the swap
+  partition (`UUID=… none swap sw 0 0`). An EFI partition LordOS formatted is its own, as in an erase
+  install (`0 1`, and grub also at the removable path `EFI/BOOT`); one it kept is shared (`nofail`, `0 0`).
+- `/home` is mounted only after the live user's folder was removed, so that removal can never reach
+  a kept `/home`.
+- A kept `/home` that already has a folder with the new user's name keeps it and its files. If its
+  files belonged to another user id (an earlier system), `chown -R -h --from=<old uid>` gives that
+  owner's files to the new user and nothing else, never following a link. The user's
+  `~/.config/lordos/settings.json` and `~/.config/locale.conf` are written only when missing, and
+  nothing is written through a link in that folder.
+- A kept EFI partition that already has `EFI/LordOS` (an earlier LordOS) is reused; that folder is
+  then not removed if the install fails.
+
+If a step fails: a plan that deletes nothing puts the table back as in "Installing in free space". A
+plan that deletes a partition keeps the new table once the first partition is formatted, because the
+deleted space may already be written and the old entries would point at data that is gone; the
+installer says so (`install.manual.tableKept`). The other partitions are untouched either way.
+
+Not done yet (0.8.8.4): resizing a partition, choosing partitions on more than one disk, BIOS (non-UEFI)
+boot and MBR disks in this mode, encryption (LUKS) and LVM, and file systems other than ext4 for new
+partitions.
+
+`build/manualpart-cli` (`make -C server build/manualpart-cli`, root, loop devices only, never installed)
+and `server/tests/manualpart_loop.sh` run the real steps on a sparse image: 54 checks, including
+refusals that must not write, failures that put the table back byte for byte, a plan that deletes,
+creates, keeps `/home` and the EFI partition (their bytes unchanged by checksum), a reinstall over an
+old system without touching the table, and 4 KiB sectors. `build/install-run-cli` runs the whole
+`install-run` as a command on a throwaway machine booted from the ISO.
+
+Tested on 2026-11-05 in a throwaway UEFI virtual machine (Proxmox, OVMF) booted from the 0.8.8 ISO with
+this branch's `lord-server` and wizard copied over the live system: a 24 GB disk with an EFI partition
+holding another system's loader, an old `/home` with files of another user id, a partition to delete and
+another system's partition. Through the wizard: delete it, a 1 GB swap partition in its place, `/` in
+the free space, keep `/home` and the EFI partition. The install finished in about a minute and a half. Afterwards: the
+table had exactly the planned entries (5 swap, 6 `/` of type 8304, 3 gone, 1, 2 and 4 as they were,
+`sgdisk -v` clean); the other system's partition was byte-identical by checksum and every file on the EFI
+partition outside `EFI/LordOS` unchanged; the firmware had a `LordOS` entry first in the boot order;
+`fstab` had `/`, the EFI partition (`nofail`), `/home` and the swap partition by UUID; the installed
+system booted to its login screen, `/home` was the old partition with `keep.txt` and the other files
+intact, the user's old folder now owned by the new user, another user's folder left as it was, and the
+swap partition active.
+
+![installed](installer-manual-installed.png)
+
 ### Installer security
 
 It adds three actions to the privileged helper (`server/src/install/install.c`, macro
@@ -397,7 +515,7 @@ It adds three actions to the privileged helper (`server/src/install/install.c`, 
 
 | Action | Who | What it does |
 |---|---|---|
-| `install-disks` | administrator | lists the installable disks (JSON via `LOG`), with each one's table type, EFI partition, largest free GPT region and whether it qualifies for free space. It only reads, mounting the EFI partition read-only to measure it |
+| `install-disks` | administrator | lists the installable disks (JSON via `LOG`), with each one's table type, EFI partition, largest free GPT region and whether it qualifies for free space, and for manual partitioning the table's sectors, its tag, each partition's number, sectors, file system and (EFI partitions) the folders under `EFI/`. It only reads, mounting EFI partitions read-only to measure and list them |
 | `install-run <json>` | administrator, in a separate process | installs |
 | `install-account <json>` | administrator, in a separate process; only while `/etc/lordos/first-account` exists | the OVA's first boot: makes the person's account (see "OVA image") |
 | `install-reboot` | administrator | `systemctl reboot` |
@@ -424,7 +542,7 @@ What `install-run` validates on the root side, without trusting the interface:
   `[A-Za-z0-9_-]`.
 - **Swap:** from 0 to 16384 MiB.
 - **Mode:** `erase`, or absent as before, or `free`, which adds every rule of "Installing in free
-  space". Anything else is refused, and a `mode` that isn't a string, or comes twice, makes the plan
+  space", or `manual`, which adds every rule of "Manual partitioning". Anything else is refused, and a `mode` that isn't a string, or comes twice, makes the plan
   invalid: it can't fall through to an erase.
 - **The password:**
   - never goes into an argv: it arrives through the helper's socketpair;
@@ -433,7 +551,7 @@ What `install-run` validates on the root side, without trusting the interface:
   - afterwards it is wiped from memory (`explicit_bzero`), and the interface also forgets it when
     starting.
 - **Fixed-path programs:** `wipefs`, `sgdisk`, `udevadm`, `mkfs.vfat`, `mkfs.ext4`, `unsquashfs`,
-  `blkid`, `fallocate`, `mkswap`, `efibootmgr`, `rm`, `chroot` (with `dpkg`, `userdel`, `useradd`, `locale-gen`,
+  `blkid`, `fallocate`, `mkswap`, `efibootmgr`, `rm`, `chown` (manual mode, a kept `/home`), `chroot` (with `dpkg`, `userdel`, `useradd`, `locale-gen`,
   `systemd-machine-id-setup`, `update-initramfs`, `grub-install` and `grub-mkconfig` inside) and
   `systemctl`. `install.c` builds the arguments from the already validated values.
 

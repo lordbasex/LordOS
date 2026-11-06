@@ -147,6 +147,8 @@
   "install.free.rollingBack": "Restaurando la tabla de particiones",
   "install.free.rolledBack": "La tabla de particiones quedó como estaba",
   "install.free.rollbackFailed": "No se pudo restaurar la tabla de particiones: hay una copia en {path}. No reinicies: guardala primero",
+  "install.manual.installing": "Instalando LordOS en {dev} con las particiones que elegiste",
+  "install.manual.tableKept": "La instalación se detuvo después de borrar particiones: queda la tabla nueva, porque su espacio ya puede estar escrito. Las demás particiones no se tocaron",
   "install.creatingAccount": "Creando la cuenta {user}",
   "install.accountDone": "La cuenta está lista",
   "vpn.trusted": "Certificado aceptado"

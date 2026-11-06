@@ -14,7 +14,7 @@ O que cada imagem do LordOS precisa. Se um número desta página não bater com 
 
 - **Processador:** qualquer Intel ou AMD de 64 bits. Não há versão de 32 bits.
 - **Memória:** 4 GB mínimo; 8 GB recomendado, 16 GB com muitos apps abertos.
-- **Armazenamento:** instalar precisa de um disco de pelo menos 8 GB (o limite do instalador é 8 GiB); 32 GB ou mais é o recomendado. Instalar ao lado de outro sistema precisa de um disco GPT com partição EFI, o computador iniciado em modo UEFI e pelo menos 8 GB livres. Essa opção ainda nunca foi executada até o fim, então faça um backup antes.
+- **Armazenamento:** instalar precisa de um disco de pelo menos 8 GB (o limite do instalador é 8 GiB); 32 GB ou mais é o recomendado. Instalar ao lado de outro sistema precisa de um disco GPT com partição EFI, o computador iniciado em modo UEFI e pelo menos 8 GB livres. Essa opção ainda nunca foi executada até o fim, então faça um backup antes. Em desenvolvimento para a próxima ISO: escolher você mesmo as partições (/, /home, a partição EFI, swap), o que precisa do mesmo disco GPT e início UEFI; / precisa de pelo menos 8 GB.
 - **Firmware:** UEFI ou BIOS. Desative a inicialização segura (Secure Boot).
 - **Gráficos:** qualquer um. Com uma placa de vídeo compatível (via Mesa: AMD, Intel e outras) a área de trabalho é composta na GPU; sem ela, o caminho pela CPU sempre funciona.
 - **Para iniciar:** um pendrive de 2 GB ou mais; a ISO tem cerca de 1,1 GB. O sistema ao vivo também pode ser copiado para a memória ao iniciar (há uma opção no menu de inicialização); para isso, dê ao computador 4 GB ou mais.
