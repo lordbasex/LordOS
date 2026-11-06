@@ -753,5 +753,8 @@
   "vm.hashMismatch": "El SHA-256 de la descarga no es el que da la lista de quien la hace: se descartó",
   "vm.downloadFailed": "No se pudo descargar la imagen: {reason}",
   "vm.nothingRunning": "No hay ninguna descarga en curso",
-  "vm.removeFailed": "No se pudo borrar la imagen"
+  "vm.removeFailed": "No se pudo borrar la imagen",
+  "vm.listUnsigned": "{name} no está firmada por quien la hace, así que sus hashes no son confiables: rechazada",
+  "vm.listBadSignature": "La firma de {name} no se verifica con la clave fijada de quien la hace ({reason}): rechazada",
+  "vm.imageInUse": "Una máquina encendida tiene esa imagen en su lectora de CD: apagala primero"
 }

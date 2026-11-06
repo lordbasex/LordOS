@@ -362,13 +362,17 @@ export function storageRows(st) {
   return rows;
 }
 
-// the volume's bar: machines (their folders and shared bases), disc images in use, machines in the Trash, other files
-export function storageBar(st) {
+// the volume's bar: machines (their folders and shared bases), disc images in use, the systems downloaded by the
+// assistant (images: catalog.js downloadedImages; one in use is counted there, not twice), machines in the Trash, other
+// files. The downloads only show when there are some.
+export function storageBar(st, images = []) {
   const total = st?.total || 0;
   if (!(total > 0)) return [];
   const machines = (st.machines || []).reduce((a, m) => a + (m.total || 0), 0) + (st.bases || []).reduce((a, b) => a + (b.bytes || 0), 0);
   const used = Math.max(0, total - (st.free || 0));
-  const parts = [['machines', machines], ['isos', st.isos || 0], ['trash', st.trash || 0]];
+  const dl = images.reduce((a, x) => a + (x.size || 0), 0);
+  const inUse = images.reduce((a, x) => a + (x.users?.length ? x.size || 0 : 0), 0);
+  const parts = [['machines', machines], ['isos', Math.max(0, (st.isos || 0) - inUse)], ...(images.length ? [['downloads', dl]] : []), ['trash', st.trash || 0]];
   const other = Math.max(0, used - parts.reduce((a, x) => a + x[1], 0));
   return [...parts, ['other', other]].map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
 }

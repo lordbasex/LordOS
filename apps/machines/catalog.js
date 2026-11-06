@@ -88,5 +88,43 @@ export function progressOf(line) {
   return m ? { done: Number(m[1]), total: Number(m[2]) } : null;
 }
 
+// "vm.downloadResumed from=<bytes>" from vm-image-get (a stopped download continued): the bytes kept, or 0
+export function resumedOf(line) {
+  const m = /^vm\.downloadResumed from=(\d+)/.exec(String(line || ''));
+  return m ? Number(m[1]) : 0;
+}
+
 // the size on a card: the list's when it says, else the catalog's estimate
 export const sizeMb = (approxMb, bytes) => Math.round(bytes > 0 ? bytes / 1048576 : approxMb);
+
+// ---- downloaded images (the Storage window, 6.16) ----
+// /var/lib/lordos/machines/images: <sha256>.iso (checked), <sha256>.iso.part (a stopped download, continued on the next
+// try) and <sha256>.json (what it is: { id, arch, file, size, at }, written by the admin helper). entries: fs.list of
+// that folder; infoOf(sha): the parsed .json or null; machines: lord.vm.list() (this account's: { name, iso, state }).
+// → [{ sha, path, partial, size, id, arch, file, version, label, users: [names], dirs, running: [names] }], biggest first
+export const IMAGES_DIR = '/var/lib/lordos/machines/images';
+export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m) => m.state === 'running' || m.state === 'paused') {
+  const out = new Map();
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const m = /^([0-9a-f]{64})\.iso(\.part)?$/.exec(String(e?.name || ''));
+    if (!m || e.dir || e.link) continue;
+    const partial = !!m[2];
+    const prev = out.get(m[1]);
+    if (prev && !prev.partial) continue;                  // the checked image wins over a leftover part
+    const path = `${IMAGES_DIR}/${m[1]}.iso`;
+    let info = null;
+    try { info = infoOf(m[1]); } catch (x) { info = null; }
+    const sys = (cat?.systems || []).find((s) => s?.id === info?.id);
+    const file = typeof info?.file === 'string' && NAME.test(info.file) ? info.file : '';
+    const version = sys && file ? versionIn(file, sys.release) : '';
+    const users = [], dirs = [], running = [];
+    if (!partial) for (const x of Array.isArray(machines) ? machines : []) {
+      if (x?.iso !== path) continue;
+      users.push(x.name); dirs.push(x.dir);
+      if (runningOf(x)) running.push(x.name);
+    }
+    out.set(m[1], { sha: m[1], path, partial, size: Number(e.size) || 0, id: sys ? sys.id : 'other', arch: info?.arch === 'arm64' || info?.arch === 'amd64' ? info.arch : '',
+      file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : '', users, dirs, running });
+  }
+  return [...out.values()].sort((a, b) => b.size - a.size || a.sha.localeCompare(b.sha));
+}

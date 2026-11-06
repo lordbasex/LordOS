@@ -155,6 +155,7 @@
   "vm.alreadyInstalled": "Già installato",
   "vm.downloadCancelled": "Download interrotto",
   "vm.imageRemoved": "Immagine eliminata",
+  "vm.downloadResumed": "Ripresa di un download interrotto ({from} byte tenuti)",
   "vm.kvmReady": "Fatto: le macchine possono già usare la virtualizzazione hardware",
   "vm.kvmNextLogin": "Possibile dal tuo prossimo accesso"
 }

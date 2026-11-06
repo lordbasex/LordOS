@@ -155,6 +155,7 @@
   "vm.alreadyInstalled": "Already installed",
   "vm.downloadCancelled": "Download stopped",
   "vm.imageRemoved": "Image deleted",
+  "vm.downloadResumed": "Continuing a stopped download ({from} bytes kept)",
   "vm.kvmReady": "Allowed: machines can use hardware virtualization now",
   "vm.kvmNextLogin": "Allowed from your next login"
 }

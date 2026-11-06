@@ -753,5 +753,8 @@
   "vm.hashMismatch": "Lo SHA-256 del download non è quello dell’elenco di chi la produce: è stato scartato",
   "vm.downloadFailed": "Non è stato possibile scaricare l’immagine: {reason}",
   "vm.nothingRunning": "Nessun download in corso",
-  "vm.removeFailed": "Non è stato possibile eliminare l’immagine"
+  "vm.removeFailed": "Non è stato possibile eliminare l’immagine",
+  "vm.listUnsigned": "{name} non è firmato da chi lo produce, quindi i suoi hash non sono affidabili: rifiutato",
+  "vm.listBadSignature": "La firma di {name} non si verifica con la chiave fissata di chi lo produce ({reason}): rifiutato",
+  "vm.imageInUse": "Una macchina accesa ha quell’immagine nel lettore CD: spegnila prima"
 }

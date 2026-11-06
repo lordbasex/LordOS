@@ -753,5 +753,8 @@
   "vm.hashMismatch": "O SHA-256 do download não é o da lista de quem a faz: ele foi descartado",
   "vm.downloadFailed": "Não foi possível baixar a imagem: {reason}",
   "vm.nothingRunning": "Nenhum download em andamento",
-  "vm.removeFailed": "Não foi possível apagar a imagem"
+  "vm.removeFailed": "Não foi possível apagar a imagem",
+  "vm.listUnsigned": "{name} não é assinada por quem a faz, então seus hashes não são confiáveis: recusada",
+  "vm.listBadSignature": "A assinatura de {name} não confere com a chave fixada de quem a faz ({reason}): recusada",
+  "vm.imageInUse": "Uma máquina ligada tem essa imagem no drive de CD: desligue-a primeiro"
 }

@@ -753,5 +753,8 @@
   "vm.hashMismatch": "The download's SHA-256 isn't the one its maker lists: it was thrown away",
   "vm.downloadFailed": "The image couldn't be downloaded: {reason}",
   "vm.nothingRunning": "No download is running",
-  "vm.removeFailed": "The image couldn't be deleted"
+  "vm.removeFailed": "The image couldn't be deleted",
+  "vm.listUnsigned": "{name} isn't signed by its maker, so its hashes can't be trusted: refused",
+  "vm.listBadSignature": "The signature on {name} doesn't verify with its maker's pinned key ({reason}): refused",
+  "vm.imageInUse": "A running machine has that image in its CD drive: shut it down first"
 }

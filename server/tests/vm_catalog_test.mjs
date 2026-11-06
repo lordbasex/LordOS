@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const C = await import(path.join(here, '../../apps/machines/catalog.js'));
 const CAT = JSON.parse(fs.readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
-const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, compareNames, sizeMb } = C;
+const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR } = C;
+const M = await import(path.join(here, '../../apps/machines/model.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -62,6 +63,37 @@ eq('versions', [versionIn('debian-13.7.0-amd64-netinst.iso', '13'), versionIn('u
 // ---- progress and sizes ----
 eq('progress', [progressOf('progress download 1048576 2097152'), progressOf('progress lists 1 5'), progressOf('')], [{ done: 1048576, total: 2097152 }, null, null]);
 eq('sizes', [sizeMb(760, 0), sizeMb(760, 2925092864)], [760, 2790]);
+
+eq('resumed', [resumedOf('vm.downloadResumed from=412000000'), resumedOf('progress download 1 2'), resumedOf(null)], [412000000, 0, 0]);
+
+// ---- the makers' signed lists: every card names its signature, key file and fingerprints ----
+for (const s of CAT.systems) {
+  eq(`${s.id}: signed`, [['detached', 'clearsigned'].includes(s.signature?.type), /^[a-z0-9-]+\.asc$/.test(s.keys), (s.fingerprints || []).every((f) => /^[0-9A-F]{40}$/.test(f)) && s.fingerprints.length > 0,
+    typeof s.keySource === 'string' && typeof s.fingerprintChecked === 'string' && s.fingerprintChecked.includes('https://')], [true, true, true, true]);
+  eq(`${s.id}: key file pinned in the package`, fs.existsSync(path.join(here, '../../packaging/keys/machines', s.keys)), true);
+}
+// the Fedora list as the helper keeps it: only the signed text, which still gives the image, its hash and size
+const fed = fs.readFileSync(path.join(here, 'vmimage/fedora-amd64.checksum'), 'utf8');
+const signed = fed.slice(fed.indexOf('\n\n') + 2, fed.indexOf('-----BEGIN PGP SIGNATURE-----'));
+eq('fedora signed text', pickImage(entryOf(CAT, 'fedora', 'amd64'), signed)?.name, 'Fedora-Workstation-Live-45-1.4.x86_64.iso');
+eq('debian published list', pickImage(entryOf(CAT, 'debian', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/debian-amd64.sums'), 'utf8'))?.name, 'debian-13.7.0-amd64-netinst.iso');
+
+// ---- downloaded images (Storage) ----
+const A = H('a'), B = H('b'), D = H('d');
+const infos = { [A]: { id: 'debian', arch: 'amd64', file: 'debian-13.7.0-amd64-netinst.iso', size: 790626304 }, [B]: { id: 'kali', arch: 'amd64', file: 'kali-linux-2026.3-installer-amd64.iso' } };
+const entries = [{ name: `${A}.iso`, size: 790626304 }, { name: `${A}.json`, size: 90 }, { name: `${B}.iso.part`, size: 1000 }, { name: `${B}.json`, size: 90 },
+  { name: `${D}.iso`, size: 5 }, { name: 'x.iso', size: 9 }, { name: `${H('e')}.iso`, size: 7, link: true }, { name: `${H('f')}.iso`, dir: true }, { name: `${A}.lock`, size: 0 }];
+const ms = [{ name: 'Deb', dir: '/h/Deb.lordvm', iso: `${IMAGES_DIR}/${A}.iso`, state: 'running' }, { name: 'Deb 2', dir: '/h/Deb 2.lordvm', iso: `${IMAGES_DIR}/${A}.iso`, state: 'stopped' },
+  { name: 'Other', dir: '/h/O.lordvm', iso: '/home/x/other.iso', state: 'running' }];
+const imgs = downloadedImages(CAT, entries, (sha) => { if (!infos[sha]) throw new Error('none'); return infos[sha]; }, ms);
+eq('images: which', imgs.map((x) => [x.sha[0], x.partial, x.size]), [['a', false, 790626304], ['b', true, 1000], ['d', false, 5]]);
+eq('images: labels', imgs.map((x) => [x.label, x.arch, x.id]), [['Debian 13.7', 'amd64', 'debian'], ['Kali 2026.3', 'amd64', 'kali'], ['', '', 'other']]);
+eq('images: users and running', [imgs[0].users, imgs[0].dirs, imgs[0].running, imgs[1].users], [['Deb', 'Deb 2'], ['/h/Deb.lordvm', '/h/Deb 2.lordvm'], ['Deb'], []]);
+eq('images: a part next to its image', downloadedImages(CAT, [{ name: `${A}.iso.part`, size: 3 }, { name: `${A}.iso`, size: 9 }], () => null, []).map((x) => [x.partial, x.size]), [[false, 9]]);
+eq('images: a bad info file', downloadedImages(CAT, [{ name: `${A}.iso`, size: 9 }], () => ({ id: 'debian', arch: 'x', file: '../../etc' }), [])[0].file, '');
+const st = { total: 1000, free: 100, machines: [{ total: 300 }], bases: [], isos: 250, trash: 10 };
+eq('bar with downloads', M.storageBar(st, [{ size: 200, users: ['Deb'] }, { size: 50, users: [] }]).map((b) => [b.key, b.bytes]), [['machines', 300], ['isos', 50], ['downloads', 250], ['trash', 10], ['other', 290]]);
+eq('bar without downloads', M.storageBar(st).map((b) => b.key), ['machines', 'isos', 'trash', 'other']);
 
 console.log(`== vm-catalog-test: ${n - bad} passed, ${bad} failed`);
 process.exit(bad ? 1 : 0);

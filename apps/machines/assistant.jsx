@@ -8,7 +8,7 @@
 import { View, Text, TextInput, FilePicker, Toggle, admin, fs, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, sizeMb } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, sizeMb } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize } from './model.js';
 import { usePal, OsMark, Btn, Bar, gb } from './ui.jsx';
 import { writeMeta } from './meta.js';
@@ -130,7 +130,13 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     if (downloading) {
       setStep(4); setGot({ done: 0, total: dl.image.size || 0 }); cancelled.current = false;
       try {
-        iso = String(await admin.run('vm-image-get', `${dl.id} ${arch} ${dl.image.name} ${dl.image.sha}`, (l) => { const g = progressOf(l); if (g) setGot(g); }, { quiet: true }));
+        // a download stopped before is continued: the helper says from where first ("vm.downloadResumed")
+        iso = String(await admin.run('vm-image-get', `${dl.id} ${arch} ${dl.image.name} ${dl.image.sha}`, (l) => {
+          const g = progressOf(l);
+          if (g) setGot((o) => ({ ...g, resumed: o?.resumed || 0 }));
+          const r = resumedOf(l);
+          if (r) setGot((o) => ({ ...(o || { done: r, total: 0 }), resumed: r }));
+        }, { quiet: true }));
       } catch (e) {
         setGot(null);
         setFail(cancelled.current ? tr('machines.dl.cancelled') : e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed'));
@@ -286,6 +292,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{tr('machines.dl.downloading', { name: [sys.name, ver].filter(Boolean).join(' ') })}</Text>
         <View style={{ width: 360 }}><Bar frac={got.total ? got.done / got.total : 0} color={p.accent} /></View>
         <Text style={{ fontSize: 13, color: p.dim }}>{checking ? tr('machines.dl.checking') : got.total ? tr('machines.dl.progress', { a: mb(got.done), b: mb(got.total) }) : mb(got.done)}</Text>
+        {got.resumed > 0 && !checking ? <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.dl.resumed', { size: mb(got.resumed) })}</Text> : null}
         <Btn label={tr('machines.dl.cancel')} onClick={stopDownload} />
       </View>
     );

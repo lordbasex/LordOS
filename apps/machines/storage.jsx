@@ -2,12 +2,24 @@
 // (machines, disc images, the Trash, other files, free), the machines with each clone under the one it came from, what
 // each takes and what deleting it would give back (its files less what it shares by reflink, plus its shared base when
 // it's the last machine on it, the Trash counted), and for the selected one the split and the ways to reclaim space:
-// compaction (with an estimate first), its snapshots, the Trash.
-import { View, Text, ScrollView, ConfirmDialog, useAppWindow, wm, fs, t as tr } from '@lordos/sdk';
+// compaction (with an estimate first), its snapshots, the Trash. Under the machines, the systems the assistant downloaded
+// (the mock's "Downloads" in the bar; 3.9, "The Linux download cards"), shared by every account: each with its size and
+// the machines of this account whose CD drive has it; Remove (vm-image-remove, an administrator's action) asks first and
+// is refused while a running machine has it in its drive.
+import { View, Text, ScrollView, ConfirmDialog, useAppWindow, wm, fs, admin, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { storageRows, storageBar, stateView } from './model.js';
-import { usePal, has, bytes, Btn, Sheet } from './ui.jsx';
+import { usePal, has, bytes, Btn, Sheet, OsMark } from './ui.jsx';
 import { readMeta } from './meta.js';
+import CATALOG from '../../assets/machines/systems.json';
+import { downloadedImages, IMAGES_DIR } from './catalog.js';
+
+const readInfo = (sha) => JSON.parse(fs.read(`${IMAGES_DIR}/${sha}.json`));
+function listImages(ms) {
+  let entries = [];
+  try { entries = lord.fs.list(IMAGES_DIR); } catch (e) { entries = []; }     // none downloaded yet: no folder
+  return downloadedImages(CATALOG, entries, readInfo, ms, (m) => stateView(m.state, m.reason).active);
+}
 import { openSnapshots } from './library.jsx';
 
 const errOf = (out) => (out || '').trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || (out || '').trim();
@@ -22,6 +34,9 @@ export function Storage() {
   const [busy, setBusy] = useState(null);       // { job, what }
   const [msg, setMsg] = useState(null);
   const [del, setDel] = useState(null);
+  const [imgs, setImgs] = useState([]);
+  const [rm, setRm] = useState(null);           // the image whose removal is being confirmed
+  const [removing, setRemoving] = useState(false);
   const load = () => {
     if (!has()) return;
     const s = lord.vm.storage();
@@ -31,7 +46,7 @@ export function Storage() {
       m.runState = x?.state; m.runReason = x?.reason;
       m.meta = readMeta(m.dir);
     }
-    setSt(s); setList(ms);
+    setSt(s); setList(ms); setImgs(listImages(ms));
   };
   useEffect(() => { wm.setTitle(winId, tr('machines.storage.title')); load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, []);
   // lord-vm jobs: the estimate, then the compaction
@@ -59,11 +74,22 @@ export function Storage() {
 
   if (!st) return <View style={{ flex: 1, backgroundColor: p.bg }} />;
   const rows = storageRows(st);
-  const bar = storageBar(st);
+  const bar = storageBar(st, imgs);
   const cur = rows.find((r) => r.key === sel) || null;
+  const img = imgs.find((x) => `img:${x.sha}` === sel) || null;
+  const imgName = (x) => (x.label ? `${x.label}${x.arch ? `, ${x.arch}` : ''}` : tr('machines.storage.dlUnknown'));
+  const removeImage = async (x) => {
+    setRm(null); setRemoving(true); setMsg(null);
+    try {
+      await admin.run('vm-image-remove', x.sha, null, { quiet: true });
+      for (const d of x.dirs) { try { lord.vm.eject(d); } catch (e) { /* its card says the disc is missing */ } }   // off: their drives emptied
+      setSel(null); setMsg({ ok: true, text: tr('machines.storage.dlRemoved', { name: imgName(x) }) }); }
+    catch (e) { setMsg({ ok: false, text: e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message }); }
+    setRemoving(false); load();
+  };
   const m = cur?.machine;
   const on = m && stateView(m.runState, m.runReason).active;
-  const colors = { machines: '#0a84ff', isos: '#ffb340', trash: '#ff6b6b', other: '#8a8a94' };
+  const colors = { machines: '#0a84ff', isos: '#5ac8a8', downloads: '#ffb340', trash: '#ff6b6b', other: '#8a8a94' };
   const trash = (x) => {
     setDel(null);
     try { fs.trash(x.dir); setSel(null); setMsg({ ok: true, text: tr('machines.storage.trashed', { name: x.name }) }); } catch (e) { setMsg({ ok: false, text: tr('machines.deleteFailed', { name: x.name }) }); }
@@ -108,6 +134,23 @@ export function Storage() {
               );
             })}
             {!rows.length ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', padding: 10 }}>{tr('machines.empty')}</Text> : null}
+            {imgs.length ? <>
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingTop: 16, paddingBottom: 6 }}>
+                <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.downloads')}</Text>
+              </View>
+              {imgs.map((x) => {
+                const key = `img:${x.sha}`;
+                const lit = sel === key;
+                return (
+                  <View key={key} onClick={() => { setSel(key); setEst(null); setMsg(null); }} style={{ height: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderRadius: 6, backgroundColor: lit ? '#0a84ff' : 'transparent' }}>
+                    <Text style={{ flex: 1, fontSize: 13, color: lit ? '#fff' : p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {x.partial ? tr('machines.storage.dlPartialRow', { name: imgName(x) }) : imgName(x)}</Text>
+                    <Text style={{ width: 90, fontSize: 13, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{bytes(x.size)}</Text>
+                    <Text style={{ width: 110, fontSize: 13, fontWeight: 600, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{x.users.length ? '—' : bytes(x.size)}</Text>
+                  </View>
+                );
+              })}
+            </> : null}
           </ScrollView>
         </View>
         <View style={{ width: 300, padding: 16, gap: 10, backgroundColor: p.raised }}>
@@ -135,7 +178,25 @@ export function Storage() {
             <View style={{ flex: 1 }} />
             {!cur.users && !cur.trash ? <Btn danger label={tr('machines.storage.removeBase', { size: bytes(cur.size) })}
               onClick={() => { setMsg(lord.vm.removeBase(cur.path) ? null : { ok: false, text: tr('machines.cfg.refused') }); setSel(null); load(); }} /> : null}
-          </> : <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.pick')}</Text>}
+          </> : img ? <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <OsMark id={img.id} size={32} />
+              <Text style={{ flex: 1, fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{imgName(img)}</Text>
+            </View>
+            {img.file ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{img.file}</Text> : null}
+            <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
+              {img.partial ? tr('machines.storage.dlPartial', { size: bytes(img.size) })
+                : img.users.length ? tr('machines.storage.dlUsed', { names: img.users.join(', ') }) : tr('machines.storage.dlUnused')}</Text>
+            <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.dlShared')}</Text>
+            <View style={{ flex: 1 }} />
+            {msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
+            <Btn danger label={removing ? tr('machines.storage.dlRemoving') : tr('machines.storage.dlRemove', { size: bytes(img.size) })} disabled={removing || img.running.length > 0} onClick={() => setRm(img)} />
+            {img.running.length ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.dlRunning', { names: img.running.join(', ') })}</Text> : null}
+          </> : <>
+            <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.pick')}</Text>
+            <View style={{ flex: 1 }} />
+            {msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
+          </>}
         </View>
       </View>
       {est && !est.job ? (
@@ -154,6 +215,9 @@ export function Storage() {
       ) : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.storage.trashDetail', { size: bytes(del.frees) })} okLabel={tr('machines.deleteOk')}
         cancelLabel={tr('machines.cancel')} destructive onOk={() => trash(del)} onCancel={() => setDel(null)} /> : null}
+      {rm ? <ConfirmDialog title={tr('machines.storage.dlRemoveTitle', { name: imgName(rm) })}
+        detail={[rm.partial ? tr('machines.storage.dlRemovePartial', { size: bytes(rm.size) }) : rm.users.length ? tr('machines.storage.dlRemoveUsed', { size: bytes(rm.size), names: rm.users.join(', ') }) : tr('machines.storage.dlRemoveDetail', { size: bytes(rm.size) }), tr('machines.storage.dlRemoveOthers')].join(' ')}
+        okLabel={tr('machines.storage.dlRemoveOk')} cancelLabel={tr('machines.cancel')} destructive onOk={() => removeImage(rm)} onCancel={() => setRm(null)} /> : null}
     </View>
   );
 }
