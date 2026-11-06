@@ -179,10 +179,14 @@ not offered.
    `127.0.0.1:53682`, which only lives during the sign-in.
 3. The token goes to the keyring (4.3), the account is mounted, and Files shows it.
 
-Client IDs: rclone's built-in OAuth client IDs are shared by every rclone user and have low quotas on some providers (Reported).
-LordOS registers its own OAuth apps for the main providers; the maintainer creates them (as for Mail's calendar provider, #32),
-and the IDs go in `assets/cloud/oauth.json`, read by `lord-server`. Until one exists for a provider, rclone's built-in ID is used
-and Settings → Cloud → the account says the provider may slow it down.
+Client IDs (decided 2026-11-06): **0.8.8.5 uses rclone's own built-in OAuth client IDs.** `lordos-rclone` is upstream rclone,
+unpatched, so the person is signing in to rclone, exactly as with Debian's or any distribution's rclone package. Nothing hides it:
+the provider's consent page names rclone, and the sign-in sheet says so ("Signing in uses rclone, the open source engine LordOS
+uses for Cloud. The provider's page will ask you to allow rclone."). rclone's IDs are shared by every rclone user, and some
+providers rate-limit them (Reported: rclone's docs recommend your own ID for the largest drive). So each account has, under
+Advanced, **Use my own client ID** (client ID and secret, to the keyring), and later LordOS can register its own apps (owner
+account iPERFEX, identity lordos.org: name LordOS, home page and privacy policy on lordos.org) and ship them in
+`assets/cloud/oauth.json`, read by `lord-server`, without changing anything else.
 
 ### 6.3 Account settings
 
