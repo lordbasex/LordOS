@@ -5,7 +5,7 @@
 // rclone.
 import {
   View, Text, Button, Toggle, TextInput, SearchField, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
-  formatBytes, formatDate, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
+  formatBytes, formatDate, tOptional, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
   AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -92,7 +92,7 @@ function AccountRow({ a, accounts, last }) {
   const color = M.accountColor(accounts, a.id);
   return (
     <BoxRow t={t} last={last} onClick={() => setView({ page: a.id, sheet: null })}>
-      <AccountBadge color={color} size={32} alert={M.NEEDS_YOU.includes(a.state)} />
+      <AccountBadge color={color} size={32} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{a.name}</Text>
         <View style={{ flexDirection: 'row', minWidth: 0 }}>
@@ -266,8 +266,10 @@ function LinksList({ a }) {
         const e = M.expiryLine(l, date);
         return (
           <BoxRow key={l.path} t={t} pad={8} last={i === links.length - 1}>
-            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{String(l.path).split('/').pop()}</Text>
-            <Dim t={t} style={{ width: 130 }}>{tr(e.key, e.vars)}</Dim>
+            <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+              <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{String(l.path).split('/').pop()}</Text>
+              <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr(e.key, e.vars)}</Text>
+            </View>
             <Text onClick={() => { clipboard.set(l.url); toast.set(tr('cloud.linkCopied')); }} style={{ fontSize: typeScale.body, color: t.accent }}>{tr('cloud.copy')}</Text>
             <Text onClick={() => cloud.unlink(l.path)} style={{ fontSize: typeScale.body, color: tint.error }}>{tr('cloud.stopSharing')}</Text>
           </BoxRow>
@@ -471,6 +473,7 @@ function AddSheet({ st }) {
   const [expanded, setExpanded] = useState([]);
   const [sel, setSel] = useState(null);
   const [name, setName] = useState(() => defaultName(st.accounts, null, tr));
+  const [named, setNamed] = useState(false);          // the person typed a name: picking a provider keeps it
   const [err, setErr] = useState('');
   const groups = M.groupProviders(providers, q, expanded);
   const p = providers.find((x) => x.kind === sel);
@@ -508,7 +511,7 @@ function AddSheet({ st }) {
                     <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
                       {r.map((it) => (it.more != null
                         ? <ProviderTile key="more" more={it.more} onClick={() => setExpanded([...expanded, it.group])} />
-                        : <ProviderTile key={it.p.kind} p={it.p} on={sel === it.p.kind} onClick={() => { setSel(it.p.kind); setErr(''); }} />))}
+                        : <ProviderTile key={it.p.kind} p={it.p} on={sel === it.p.kind} onClick={() => { setSel(it.p.kind); setErr(''); if (!named) setName(defaultName(st.accounts, it.p, tr)); }} />))}
                       {r.length < 3 ? [...Array(3 - r.length)].map((_, k) => <View key={`f${k}`} style={{ flex: 1 }} />) : null}
                     </View>
                   ))}
@@ -520,7 +523,7 @@ function AddSheet({ st }) {
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 18, borderTopWidth: 1, borderTopColor: t.separator, marginTop: 6 }}>
         <Text style={{ fontSize: typeScale.callout, color: t.textDim }}>{tr('cloud.accountName')}</Text>
-        <View style={{ width: 180 }}><TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setErr(''); }} onSubmit={go} /></View>
+        <View style={{ width: 180 }}><TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setNamed(true); setErr(''); }} onSubmit={go} /></View>
         <Text style={{ flex: 1, fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{err}</Text>
         <Button label={tr('cloud.cancel')} onClick={close} />
         <Button primary label={tr('cloud.continue')} disabled={!p} onClick={go} />
@@ -531,7 +534,8 @@ function AddSheet({ st }) {
 
 // ---- a server's or a bucket's credentials (mock Credentials) ----
 
-const fieldLabel = (f, tr) => (f.secret && /pass/i.test(f.name) ? tr('cloud.field.password') : f.label || f.name);
+// a field's label: ours for the usual rclone option names, else the provider list's own
+const fieldLabel = (f) => tOptional(`cloud.field.${f.name}`) || f.label || f.name;
 
 function CredSheet({ st, sheet }) {
   const t = useTheme();
@@ -572,9 +576,13 @@ function CredSheet({ st, sheet }) {
         </View>
       </View>
       <View style={{ paddingHorizontal: 20, paddingVertical: 8, gap: 10 }}>
-        {(p.fields || []).map((f) => field(f.name, fieldLabel(f, tr),
-          <TextInput secure={!!f.secret} value={vals[f.name] || ''} placeholder={f.examples && f.examples[0] ? String(f.examples[0]) : ''} style={{ direction: 'ltr' }}
-            onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }} onSubmit={connect} />))}
+        {(p.fields || []).map((f) => field(f.name, fieldLabel(f),
+          // a choice among the provider's examples (a preset, a service), else a text field; secrets masked
+          !f.secret && (f.examples || []).length > 1
+            ? <PopUp width={250} value={vals[f.name] || String(f.examples[0])} onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }}
+              options={[...new Set([...(f.examples || []).map(String), ...(vals[f.name] ? [vals[f.name]] : [])])].map((x) => [x, x])} />
+            : <TextInput secure={!!f.secret} value={vals[f.name] || ''} placeholder={f.examples && f.examples[0] ? String(f.examples[0]) : ''} style={{ direction: 'ltr' }}
+              onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }} onSubmit={connect} />))}
         {sheet.again ? null : field('__name', tr('cloud.accountName'), <TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setErr(null); }} onSubmit={connect} />)}
       </View>
       <View style={{ marginHorizontal: 20, marginTop: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>

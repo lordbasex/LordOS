@@ -4,7 +4,7 @@
 // sign-in that finishes by itself after a few seconds, and transfers that move.
 //
 // Only for development: startCloud() installs it when lord.cloud is missing and settings.json has
-// "cloudDevMock": true. It never runs otherwise, and nothing here reaches the network or rclone.
+// "cloudDevMock": true (or "states", below). It never runs otherwise, and nothing here reaches the network or rclone.
 
 const GB = 1e9, TB = 1e12, MB = 1e6;
 
@@ -45,11 +45,14 @@ const TREES = {
     ['Projects/Proposal v3.odt', 0, 'cloud'], ['Projects/Timeline.ods', 0, 'here'], ['Contracts', 1], ['Templates', 1], ['Quarterly report.pdf', 0, 'cloud']],
   Personal: [['Pictures', 1], ['Pictures/Trip 2026', 1], ['Pictures/Family', 1], ['Pictures/Scans', 1], ['Pictures/IMG_4012.jpg', 0, 'here'],
     ['Pictures/IMG_4013.jpg', 0, 'cloud'], ['Pictures/Sunset.jpg', 0, 'kept'], ['Pictures/Panorama.tif', 0, 'cloud'], ['Pictures/Ticket.pdf', 0, 'cloud'], ['Documents', 1]],
-  'Photos archive': [['2024', 1], ['2025', 1]],
+  'Photos archive': [['2024', 1], ['2025', 1], ['2024/Interviews.zip', 0, 'cloud'], ['2024/Beach.jpg', 0, 'here']],
   'Home NAS': [['Shared', 1]],
 };
 
-export function installCloudMock(home) {
+// scenario 'states' (settings.json "cloudDevMock": "states"): a few seconds in, the WebDAV server asks for a new
+// sign-in, the personal drive fills up with changes waiting, a file comes back changed on another device and the
+// object storage goes offline, so the notifications and the offline dialog can be seen.
+export function installCloudMock(home, scenario = '') {
   const now = Date.now();
   const mount = (name) => `${home}/Cloud/${name}`;
   const acc = (id, name, kind, provider, about, extra = {}) => ({ id, name, kind, provider, mount: mount(name), state: 'ok', about, cacheBytes: 0, keptBytes: 0,
@@ -109,6 +112,21 @@ export function installCloudMock(home) {
     }
     push();
   }, 1000);
+
+  if (scenario === 'states') {
+    st.accounts[3].state = 'ok';
+    setTimeout(() => {
+      st.accounts[3].state = 'signin';
+      const p = st.accounts[0];
+      p.about = { total: 2 * TB, used: 2 * TB, free: 0, trashed: 20 * GB };
+      p.state = 'error';
+      p.up = { files: 14, bytes: 140 * MB, done: 0, name: 'IMG_4101.jpg' };
+      st.accounts[2].state = 'offline';
+      const w = st.accounts[1];
+      st.conflicts = [{ path: `${w.mount}/Projects/Proposal v3.odt`, kept: `${w.mount}/Projects/Proposal v3 (this computer).odt`, account: w.id, at: Date.now() }];
+      push();
+    }, 4000);
+  }
 
   lord.cloud = {
     available: () => true,
