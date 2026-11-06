@@ -211,8 +211,8 @@ Redirect address (decided 2026-11-06): the sign-in returns to rclone on `127.0.0
 loopback redirect that RFC 8252 recommends for native apps. A relay on our domain (auth.lordos.org or a page of lordos.org) is
 not used: rclone's own apps only accept their registered loopback address; the code would pass through a server of ours (logs,
 outages, a phishing target) for no gain; and auth.lordos.org is the blog's Cognito domain, which signs people in to the blog but
-doesn't hand out a provider's file tokens. Revisit only for an app of our own whose provider refuses loopback addresses; then a
-static page with no query logging that only forwards to `127.0.0.1:53682`.
+doesn't hand out a provider's file tokens. **Ruled out for good** by the maintainer for those risks: a provider that refuses
+loopback addresses is simply not offered.
 
 ### 6.3 Account settings
 
