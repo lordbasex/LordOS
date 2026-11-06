@@ -583,6 +583,11 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
   write(path.join(pageUrl(l, 'home'), 'index.html'), render(tpl.home, {
     ...common('home', null, 'home'), features, showcase, teaser: teaser(t),
     vmGuide: pageUrl(l, 'virtual-machine'), reqUrl: pageUrl(l, 'requirements'),
+    // the newest release with installation media (update-only releases between have none: #35)
+    ...(() => { const d = `https://github.com/lordbasex/LordOS/releases/download/v${MEDIA_VERSION}-beta/`;
+      return { isoAmd: d + `lordos-live-${MEDIA_VERSION}-amd64.iso`, isoArm: d + `lordos-live-${MEDIA_VERSION}-arm64.iso`,
+        ovaUrl: d + `lordos-${MEDIA_VERSION}-amd64.ova`, piUrl: d + `lordos-${MEDIA_VERSION}-rpi5-arm64.img.xz`,
+        mediaRel: `https://github.com/lordbasex/LordOS/releases/tag/v${MEDIA_VERSION}-beta`, mediaVer: MEDIA_VERSION }; })(),
     heroImg: (() => {
       // the desktop inside a laptop drawn in CSS, as a slideshow of real screenshots (site.js runs it;
       // without JS only the first slide shows). Slide 1 has light and dark variants that follow the theme.
@@ -759,7 +764,7 @@ ${shotList.join('\n')}
 </section>` : '';
     const code = (s) => esc(s).replace(/(--share|\breport\b|bench --quick|--full)/g, '<code>$1</code>');
     write(path.join(pageUrl(l, 'raspberry-pi'), 'index.html'), render(tpl.raspberry, { ...common('raspberry-pi', null, 'home'),
-      imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
+      mediaVer: MEDIA_VERSION, imagerUrl: HAS_GUIDE ? pageUrl(l, 'imager') : GITHUB + '/blob/main/docs/IMAGER.md',
       fansUrl: GITHUB + '/blob/main/docs/FANS.md#argon-one-v5-case',
       artArgon: aria(PI_ART.argon, P.artArgon), art500: aria(PI_ART.pi500, P.art500), artPi5: aria(PI_ART.pi5, P.artPi5),
       testedLead: esc(P.testedLead).replace('{cmd}', '<code>lordos-issue</code>'),
