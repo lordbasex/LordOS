@@ -145,6 +145,7 @@ EOF
     run "sign-test" build/sign-test
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
+    run "imgops-test" build/imgops-test
     run "arcpath-test" build/arcpath-test
     run "ipp-test" build/ipp-test
     run "tp-test" build/tp-test
@@ -165,6 +166,7 @@ EOF
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
     if have node; then run "balance-model-test (apps/settings/balance.js)" node tests/balance_model_test.mjs; fi
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
+    if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi

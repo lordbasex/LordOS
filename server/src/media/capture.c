@@ -12,6 +12,7 @@
  *     is none, the frame is used as is (no extra cost).
  * Recording (like the remote desktop) composites on the CPU, so the frame is in memory. */
 #include "media_int.h"
+#include "imgops.h"
 #include "../ui/ui.h"
 #include "../wl/wl.h"
 #include "../hw/display.h"
@@ -217,8 +218,41 @@ MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h) {
     for (int j = 0; j < h; j++) memcpy(s->px + (size_t)j * w, src->px + (size_t)(y + j) * src->w + x, (size_t)w * 4);
     s->w = w;
     s->h = h;
-    s->opaque = 1;
+    s->opaque = src->opaque;           /* a picture with transparency keeps it */
     s->frame_seq = 1;
+    return s;
+}
+
+/* The image editor's resize and quarter turns (imgops.c): always a new capture source, so the
+ * editor keeps the previous one for undo. */
+static MediaSrc *new_pixels(const MediaSrc *src, int w, int h) {
+    if (w < 1 || h < 1 || w > MP_MAX_DIM || h > MP_MAX_DIM) return NULL;
+    MediaSrc *s = media_src_new(SK_CAPTURE, src->app);
+    if (!s) return NULL;
+    s->px = malloc((size_t)w * h * 4);
+    if (!s->px) { s->used = 0; return NULL; }
+    s->w = w;
+    s->h = h;
+    s->opaque = src->opaque;
+    s->frame_seq = 1;
+    return s;
+}
+
+MediaSrc *media_resize(MediaSrc *src, int w, int h) {
+    if (!src || !src->px || (src->kind != SK_CAPTURE && src->kind != SK_IMAGE)) return NULL;
+    MediaSrc *s = new_pixels(src, w, h);
+    if (!s) return NULL;
+    if (img_resize(src->px, src->w, src->h, s->px, w, h)) { free(s->px); s->px = NULL; s->used = 0; return NULL; }
+    return s;
+}
+
+MediaSrc *media_rotate(MediaSrc *src, int turns) {
+    if (!src || !src->px || (src->kind != SK_CAPTURE && src->kind != SK_IMAGE)) return NULL;
+    int w, h;
+    img_rotated_size(src->w, src->h, turns, &w, &h);
+    MediaSrc *s = new_pixels(src, w, h);
+    if (!s) return NULL;
+    img_rotate(src->px, src->w, src->h, turns, s->px);
     return s;
 }
 
