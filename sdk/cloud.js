@@ -67,11 +67,13 @@ export const cloud = {
     return !!(s && s.id === id && s.url) && openHere(s.url);
   },
   cancelSignIn: (id) => has() && lord.cloud.cancelSignIn(String(id)),
-  add: (kind, name, fields = {}) => (has() ? lord.cloud.add(String(kind), String(name), fields) : { error: 'cloud.unavailable' }),
+  // { id } | { question: { state, name, help, type, examples, isPassword, required, default } } | { error } (17.2 item 3)
+  add: (kind, name, fields = {}) => (has() ? later(lord.cloud.add(String(kind), String(name), fields)) : Promise.resolve({ error: 'cloud.unavailable' })),
   answer: (state, value) => maybe('answer', String(state), String(value ?? '')),
   emptyTrash: (id) => maybe('emptyTrash', String(id)),
   measure: (id) => maybe('measure', String(id)),
-  cancelMeasure: (id) => has() && typeof lord.cloud.cancelMeasure === 'function' && lord.cloud.cancelMeasure(String(id)),
+  cancelMeasure: (id) => maybe('cancelMeasure', String(id)),
+  // removes them in the cloud through the mount (the provider's own trash where it has one): paths strictly under ~/Cloud/<account>
   delete: (p) => maybe('delete', paths(p)),
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),

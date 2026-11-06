@@ -8,6 +8,7 @@
 #include "cloud_int.h"
 #include "../doc/wire.h"
 #include "../sec/json.h"
+#include "../errcode.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -521,4 +522,105 @@ void cf_start(void) {
     pthread_create(&th, &at, keeper, NULL);
     pthread_sigmask(SIG_SETMASK, &old, NULL);
     pthread_attr_destroy(&at);
+}
+
+/* ---- Delete in the cloud (docs/CLOUD.md 17.2 item 6) ----
+ * Files' Move to Trash under ~/Cloud would leave a .Trash-<uid> folder in the cloud: it deletes through the mount instead,
+ * and the provider keeps its own trash where it has one. Only paths strictly inside an account's folder, never the folder
+ * itself, with no "..", "." or "//", whose parent folders are real folders (no link on the way); links are removed, never
+ * followed; a folder is removed with what is in it, without leaving the mount. One thread per request. */
+
+typedef struct { int req, n; char **paths; } DelJob;
+static __thread int del_count;
+static __thread int del_err;
+
+static int del_one(const char *p, const struct stat *st, int flag, struct FTW *f) {
+    (void)st; (void)f;
+    int r = flag == FTW_DP ? rmdir(p) : (flag == FTW_D || flag == FTW_DNR) ? 0 : unlink(p);
+    if (r) del_err = errno; else del_count++;
+    return 0;
+}
+
+static void *del_thread(void *arg) {
+    DelJob *j = arg;
+    JBuf b, f;
+    jb_init(&b);
+    jb_init(&f);
+    int total = 0, nf = 0;
+    for (int i = 0; i < j->n; i++) {
+        struct stat st;
+        del_count = 0;
+        del_err = 0;
+        if (lstat(j->paths[i], &st)) del_err = errno;
+        else if (S_ISDIR(st.st_mode)) nftw(j->paths[i], del_one, 16, FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+        else if (unlink(j->paths[i])) del_err = errno; else del_count = 1;
+        total += del_count;
+        if (del_err) {
+            jb_raw(&f, nf++ ? ",{\"path\":" : "{\"path\":");
+            jb_str(&f, j->paths[i]);
+            jb_raw(&f, ",\"error\":\"cloud.deleteFailed\",\"errno\":");
+            jb_str(&f, lerr_errno(del_err));
+            jb_raw(&f, "}");
+        }
+        free(j->paths[i]);
+    }
+    jb_printf(&b, "{\"ok\":%s,\"deleted\":%d,\"failed\":[", nf ? "false" : "true", total);
+    if (!f.oom && f.n) jb_rawn(&b, f.p, f.n);
+    jb_raw(&b, "]}");
+    jb_free(&f);
+    cl_reply(j->req, b.oom ? (jb_free(&b), NULL) : b.p);
+    free(j->paths);
+    free(j);
+    cf_measure();
+    cl_changed();
+    return NULL;
+}
+
+static char *bad_path(const char *code, const char *path) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"error\":");
+    jb_str(&b, code);
+    jb_raw(&b, ",\"path\":");
+    jb_str(&b, path ? path : "");
+    jb_raw(&b, "}");
+    return b.oom ? (jb_free(&b), NULL) : b.p;
+}
+
+char *cf_delete(const char *const *paths, int n, int *req) {
+    *req = 0;
+    if (n <= 0 || n > 4096) return bad_path("cloud.badArgument", "");
+    for (int i = 0; i < n; i++) {
+        char name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1];
+        if (!paths[i] || cloud_split(cl_root, paths[i], name, sizeof name, rel, sizeof rel) || !rel[0]) return bad_path("cloud.badPath", paths[i]);
+        pthread_mutex_lock(&cl_mu);
+        Acc *a = cl_find_name(name);
+        int mounted = a && a->mounted;
+        pthread_mutex_unlock(&cl_mu);
+        if (!a) return bad_path("cloud.notFound", paths[i]);
+        if (!mounted) return bad_path("cloud.notRunning", paths[i]);
+        /* every folder on the way is a real folder: the parent's real path is its own text */
+        char parent[PATH_MAX], real[PATH_MAX];
+        cl_pf(parent, sizeof parent, "%s", paths[i]);
+        char *sl = strrchr(parent, '/');
+        if (!sl) return bad_path("cloud.badPath", paths[i]);
+        *sl = 0;
+        if (!realpath(parent, real) || strcmp(real, parent)) return bad_path("cloud.badPath", paths[i]);
+    }
+    DelJob *j = calloc(1, sizeof *j);
+    if (!j || !(j->paths = calloc((size_t)n, sizeof *j->paths))) { free(j); return bad_path("cloud.failed", ""); }
+    for (int i = 0; i < n; i++) j->paths[j->n++] = strdup(paths[i]);
+    j->req = *req = cl_next_req();
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, &old);
+    int r = pthread_create(&th, &at, del_thread, j);
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    pthread_attr_destroy(&at);
+    if (r) { for (int i = 0; i < j->n; i++) free(j->paths[i]); free(j->paths); free(j); *req = 0; return bad_path("cloud.failed", ""); }
+    return NULL;
 }

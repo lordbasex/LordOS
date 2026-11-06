@@ -67,9 +67,9 @@ static int on_batt;
 
 /* providers: what JS gets, and per kind the fields offered (and which are secret) */
 typedef struct { char kind[24]; int n; char name[64][65]; char secret[64]; char required[64]; char *secrets_all; } KindInfo;
-static KindInfo kinfo[40];
-static int nkinfo, providers_wanted;
-static char *providers_out;
+#define KI_MAX 192
+static KindInfo *kinfo;             /* replaced whole, under cl_mu, by each providers() */
+static int nkinfo;
 
 /* the sign-in going on (6.2) */
 static struct {
@@ -93,13 +93,17 @@ static long long seen_done;          /* newest completed_at already in recent */
 typedef struct Link { struct Link *next; char id[16]; char *rel, *url; long long expires, made; } Link;
 static Link *links;
 
-enum { J_PROVIDERS = 1, J_ADD, J_REMOVE, J_RENAME, J_ABOUT, J_LINK, J_UNLINK, J_RESTART, J_OPTIONS, J_PAUSE, J_SIGNIN, J_STOP };
+enum { J_PROVIDERS = 1, J_ADD, J_REMOVE, J_RENAME, J_ABOUT, J_LINK, J_UNLINK, J_RESTART, J_OPTIONS, J_PAUSE, J_SIGNIN, J_STOP,
+       J_ANSWER, J_TRASH, J_MEASURE, J_CANCEL_MEASURE };
 typedef struct Job { struct Job *next; int type, req, flag; char id[16]; char *a, *b; } Job;
 static Job *jhead, *jtail;
 
 static void (*reply_fn)(int, const char *);
 typedef struct Reply { struct Reply *next; int req; char *json; } Reply;
 static Reply *rhead;
+
+static const CloudKind *kind_get(const char *kind);
+static const CloudKind *kind_put(const char *kind, const char *type, const char *label, const char *group);
 
 /* ---- small helpers ---- */
 
@@ -256,7 +260,14 @@ static void save_accounts(void) {
         jb_str(&b, a->name);
         jb_raw(&b, ",\"kind\":");
         jb_str(&b, a->k->kind);
-        jb_printf(&b, ",\"created\":%lld,\"paused\":%s,\"ownClient\":%s}", a->created, a->paused ? "true" : "false", a->own_client ? "true" : "false");
+        jb_raw(&b, ",\"type\":");
+        jb_str(&b, a->k->type);
+        jb_raw(&b, ",\"group\":");
+        jb_str(&b, a->k->group);
+        jb_raw(&b, ",\"provider\":");
+        jb_str(&b, a->k->label);
+        jb_printf(&b, ",\"created\":%lld,\"paused\":%s,\"ownClient\":%s,\"measuredBytes\":%lld,\"measuredCount\":%lld,\"measuredAt\":%lld}",
+                  a->created, a->paused ? "true" : "false", a->own_client ? "true" : "false", a->measured_bytes, a->measured_count, a->measured_at);
     }
     jb_raw(&b, "]}\n");
     char p[PATH_MAX];
@@ -362,7 +373,9 @@ static void load_all(void) {
         int k = 0;
         for (const JVal *x = as && as->type == J_ARR ? as->kid : NULL; x && k < ACC_MAX; x = x->next) {
             const char *id = json_str(x, "id"), *name = json_str(x, "name"), *kind = json_str(x, "kind");
-            const CloudKind *ck = cloud_kind(kind);
+            const CloudKind *ck = kind ? kind_get(kind) : NULL;
+            /* a backend LordOS has no overlay for: what was saved with it */
+            if (!ck && kind && json_str(x, "type")) ck = kind_put(kind, json_str(x, "type"), json_str(x, "provider"), json_str(x, "group"));
             if (!id || !cloud_key_ok(id) || strlen(id) >= sizeof cl_acc[0].id || !cloud_name_ok(name) || !ck || cl_find(id) || cl_find_name(name)) continue;
             Acc *a = &cl_acc[k++];
             memset(a, 0, sizeof *a);
@@ -373,6 +386,10 @@ static void load_all(void) {
             a->created = (long long)json_num(x, "created", 0);
             a->paused = json_bool(x, "paused", 0);
             a->own_client = json_bool(x, "ownClient", 0);
+            a->trash_supported = -1;
+            a->measured_bytes = (long long)json_num(x, "measuredBytes", 0);
+            a->measured_count = (long long)json_num(x, "measuredCount", 0);
+            a->measured_at = (long long)json_num(x, "measuredAt", 0);
             a->links_supported = -1;
         }
         json_free(&d);
@@ -696,99 +713,241 @@ static int secret_name(const KindInfo *ki, const char *key) {
 static const char *const oauth_fields[] = { "client_id", "client_secret", "token", "auth_url", "token_url", "client_credentials", NULL };
 static int is_oauth_field(const char *n) { for (int i = 0; oauth_fields[i]; i++) if (!strcmp(oauth_fields[i], n)) return 1; return 0; }
 
-static int load_providers(void) {
-    if (providers_out) return 0;
+/* The kinds known in this session: rclone's own backends as it lists them (label = its Description) with the overlay of
+ * cloud_pure.c merged in, and the variants. Entries are never removed, so an account's pointer stays good. */
+#define DK_MAX 192
+static CloudKind dk[DK_MAX];
+static int ndk;
+static char cl_assets[PATH_MAX];
+
+static const char *keep_str(const char *old, const char *v) {
+    if (!v) return old;
+    if (old && !strcmp(old, v)) return old;
+    char *d = strdup(v);
+    return d ? d : old;             /* the old one may be in use by a reader: it is left, a few bytes */
+}
+
+static const CloudKind *kind_get(const char *kind) {
+    for (int i = 0; kind && i < ndk; i++) if (!strcmp(dk[i].kind, kind)) return &dk[i];
+    return cloud_kind(kind);
+}
+
+/* with cl_mu held, or before the threads start */
+static const CloudKind *kind_put(const char *kind, const char *type, const char *label, const char *group) {
+    CloudKind *k = NULL;
+    for (int i = 0; i < ndk && !k; i++) if (!strcmp(dk[i].kind, kind)) k = &dk[i];
+    if (!k) {
+        if (ndk >= DK_MAX || !cloud_key_ok(kind)) return NULL;
+        k = &dk[ndk++];
+        const CloudKind *o = cloud_kind(kind);
+        if (o) *k = *o;
+        else memset(k, 0, sizeof *k);
+        k->kind = keep_str(NULL, kind);
+    }
+    k->type = keep_str(k->type, type);
+    k->label = keep_str(k->label, label);
+    k->group = keep_str(k->group, group);
+    if (!k->type) k->type = k->kind;
+    if (!k->label) k->label = k->kind;
+    if (!k->group) k->group = "server";
+    return k;
+}
+
+void cloud_set_assets(const char *dir) { cpy(cl_assets, sizeof cl_assets, dir); }
+
+/* assets/cloud/providers.json: the kinds tested on LordOS (docs/CLOUD.md 19) */
+static JDoc verified_doc(int *ok) {
+    JDoc d = { 0 };
+    *ok = 0;
+    char p[PATH_MAX + 32];
+    if (!cl_assets[0]) return d;
+    cl_pf(p, sizeof p, "%s/cloud/providers.json", cl_assets);
+    size_t n;
+    char *t = read_file(p, 1 << 20, &n);
+    if (t && !json_parse(t, n, &d, NULL, 0)) *ok = 1;
+    free(t);
+    return d;
+}
+
+static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, KindInfo *ki, int verified) {
+    memset(ki, 0, sizeof *ki);
+    cpy(ki->kind, sizeof ki->kind, k->kind);
+    JBuf sa;
+    jb_init(&sa);
+    jb_raw(b, *first ? "{\"kind\":" : ",{\"kind\":");
+    *first = 0;
+    jb_str(b, k->kind);
+    jb_raw(b, ",\"label\":");
+    jb_str(b, k->label);
+    jb_raw(b, ",\"description\":");
+    jb_str(b, k->hint ? k->hint : "");
+    jb_raw(b, ",\"hint\":");
+    jb_str(b, k->hint ? k->hint : "");
+    jb_raw(b, ",\"group\":");
+    jb_str(b, k->group);
+    jb_printf(b, ",\"verified\":%s", verified ? "true" : "false");
+    if (k->website) { jb_raw(b, ",\"website\":"); jb_str(b, k->website); }
+    jb_raw(b, ",\"fields\":[");
+    int ff = 1, oauth = !strcmp(k->group, "oauth");
+    const JVal *os = json_get(pv, "Options");
+    for (const JVal *o = os && os->type == J_ARR ? os->kid : NULL; o; o = o->next) {
+        const char *nm = json_str(o, "Name");
+        if (!nm || !cloud_key_ok(nm)) continue;
+        int secret = json_bool(o, "IsPassword", 0) || json_bool(o, "Sensitive", 0);
+        if (secret) { if (sa.n) jb_raw(&sa, ","); jb_raw(&sa, nm); }
+        if (json_bool(o, "Advanced", 0) || json_num(o, "Hide", 0) != 0 || cloud_field_hidden(k, nm) || (oauth && is_oauth_field(nm))) continue;
+        if (oauth) continue;                            /* signing in asks rclone's own questions */
+        if (ki->n >= 64) continue;
+        cpy(ki->name[ki->n], sizeof ki->name[0], nm);
+        ki->secret[ki->n] = (char)secret;
+        ki->required[ki->n] = (char)json_bool(o, "Required", 0);
+        ki->n++;
+        const char *help = json_str(o, "Help"), *def = json_str(o, "DefaultStr");
+        char label[96] = "";
+        if (help) { size_t l = strcspn(help, "\n"); if (l >= sizeof label) l = sizeof label - 1; memcpy(label, help, l); label[l] = 0; }
+        jb_raw(b, ff ? "{\"name\":" : ",{\"name\":");
+        ff = 0;
+        jb_str(b, nm);
+        jb_raw(b, ",\"label\":");
+        jb_str(b, label);
+        jb_raw(b, ",\"help\":");
+        jb_str(b, help ? help : "");
+        jb_printf(b, ",\"secret\":%s,\"required\":%s,\"default\":", secret ? "true" : "false", json_bool(o, "Required", 0) ? "true" : "false");
+        jb_str(b, secret ? "" : def ? def : "");
+        jb_raw(b, ",\"examples\":[");
+        const JVal *ex = json_get(o, "Examples");
+        int ne = 0;
+        for (const JVal *e = ex && ex->type == J_ARR ? ex->kid : NULL; e && ne < 60; e = e->next) {
+            const char *v = json_str(e, "Value");
+            if (!v) continue;
+            if (ne++) jb_raw(b, ",");
+            jb_str(b, v);
+        }
+        jb_raw(b, "]}");
+    }
+    jb_raw(b, "]}");
+    ki->secrets_all = sa.oom ? NULL : sa.p;
+    if (sa.oom) jb_free(&sa);
+}
+
+/* rclone's backends, now (17.2 item 1): the list JS gets (malloc), and the fields add() accepts */
+static char *load_providers(void) {
     JDoc d;
-    if (rcj(RCM_PROVIDERS, "{}", &d, NULL, 0, RC_SHORT) != 200 || !d.root) { if (d.root) json_free(&d); return -1; }
+    if (rcj(RCM_PROVIDERS, "{}", &d, NULL, 0, RC_SHORT) != 200 || !d.root) { if (d.root) json_free(&d); return NULL; }
     const JVal *ps = json_get(d.root, "providers");
+    int vok;
+    JDoc vd = verified_doc(&vok);
+    const JVal *ver = vok ? json_get(vd.root, "verified") : NULL;
+    KindInfo *nk = calloc(KI_MAX, sizeof *nk);
+    if (!nk) { json_free(&d); if (vok) json_free(&vd); return NULL; }
+    int n = 0, first = 1;
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "[");
-    int nk = 0, first = 1;
-    for (int i = 0; i < cloud_kind_count() && nk < (int)(sizeof kinfo / sizeof kinfo[0]); i++) {
-        const CloudKind *k = cloud_kind_at(i);
-        const JVal *pv = NULL;
-        for (const JVal *x = ps && ps->type == J_ARR ? ps->kid : NULL; x; x = x->next) {
-            const char *nm = json_str(x, "Name");
-            if (nm && !strcmp(nm, k->type)) { pv = x; break; }
+    for (const JVal *x = ps && ps->type == J_ARR ? ps->kid : NULL; x && n < KI_MAX; x = x->next) {
+        const char *nm = json_str(x, "Name"), *pre = json_str(x, "Prefix"), *desc = json_str(x, "Description");
+        if (!nm || !pre || !cloud_key_ok(pre) || cloud_excluded(nm) || cloud_excluded(pre) || json_bool(x, "Hide", 0)) continue;
+        /* an alias of another backend (tardigrade is storj) */
+        int alias = 0;
+        for (const JVal *y = ps->kid; y && !alias; y = y->next) {
+            const JVal *al = json_get(y, "Aliases");
+            const char *yn = json_str(y, "Name");
+            for (const JVal *z = al && al->type == J_ARR ? al->kid : NULL; z; z = z->next)
+                if (z->type == J_STR && !strcmp(z->str, nm) && yn && strcmp(yn, nm)) alias = 1;
         }
-        if (!pv) continue;
-        KindInfo *ki = &kinfo[nk++];
-        memset(ki, 0, sizeof *ki);
-        cpy(ki->kind, sizeof ki->kind, k->kind);
-        JBuf sa;
-        jb_init(&sa);
-        jb_raw(&b, first ? "{\"kind\":" : ",{\"kind\":");
-        first = 0;
-        jb_str(&b, k->kind);
-        jb_raw(&b, ",\"label\":");
-        jb_str(&b, k->label);
-        jb_raw(&b, ",\"group\":");
-        jb_str(&b, k->group);
-        jb_raw(&b, ",\"hint\":");
-        jb_str(&b, k->hint ? k->hint : "");
-        jb_raw(&b, ",\"fields\":[");
-        int ff = 1, oauth = !strcmp(k->group, "oauth");
-        const JVal *os = json_get(pv, "Options");
-        for (const JVal *o = os && os->type == J_ARR ? os->kid : NULL; o; o = o->next) {
-            const char *nm = json_str(o, "Name");
-            if (!nm || !cloud_key_ok(nm)) continue;
-            int secret = json_bool(o, "IsPassword", 0) || json_bool(o, "Sensitive", 0);
-            if (secret) { if (sa.n) jb_raw(&sa, ","); jb_raw(&sa, nm); }
-            if (json_bool(o, "Advanced", 0) || json_num(o, "Hide", 0) != 0 || cloud_field_hidden(k, nm) || (oauth && is_oauth_field(nm))) continue;
-            if (oauth) continue;                            /* signing in asks rclone's own questions */
-            if (ki->n >= 64) continue;
-            cpy(ki->name[ki->n], sizeof ki->name[0], nm);
-            ki->secret[ki->n] = (char)secret;
-            ki->required[ki->n] = (char)json_bool(o, "Required", 0);
-            ki->n++;
-            const char *help = json_str(o, "Help"), *def = json_str(o, "DefaultStr");
-            char label[96] = "";
-            if (help) { size_t l = strcspn(help, "\n"); if (l >= sizeof label) l = sizeof label - 1; memcpy(label, help, l); label[l] = 0; }
-            jb_raw(&b, ff ? "{\"name\":" : ",{\"name\":");
-            ff = 0;
-            jb_str(&b, nm);
-            jb_raw(&b, ",\"label\":");
-            jb_str(&b, label);
-            jb_printf(&b, ",\"secret\":%s,\"required\":%s,\"default\":", secret ? "true" : "false", json_bool(o, "Required", 0) ? "true" : "false");
-            jb_str(&b, secret ? "" : def ? def : "");
-            jb_raw(&b, ",\"examples\":[");
-            const JVal *ex = json_get(o, "Examples");
-            int ne = 0;
-            for (const JVal *e = ex && ex->type == J_ARR ? ex->kid : NULL; e && ne < 60; e = e->next) {
-                const char *v = json_str(e, "Value");
-                if (!v) continue;
-                if (ne++) jb_raw(&b, ",");
-                jb_str(&b, v);
-            }
-            jb_raw(&b, "]}");
+        if (alias) continue;
+        const char *opts[256];
+        int no = 0;
+        const JVal *os = json_get(x, "Options");
+        for (const JVal *o = os && os->type == J_ARR ? os->kid : NULL; o && no < 256; o = o->next) { const char *on = json_str(o, "Name"); if (on) opts[no++] = on; }
+        const CloudKind *ov = cloud_kind(pre);
+        char label[160];
+        cpy(label, sizeof label, desc ? desc : nm);
+        label[strcspn(label, "\n")] = 0;
+        pthread_mutex_lock(&cl_mu);
+        const CloudKind *k = kind_put(pre, nm, label, ov && ov->group ? ov->group : cloud_derive_group(nm, opts, no));
+        pthread_mutex_unlock(&cl_mu);
+        if (!k) continue;
+        emit_kind(&b, &first, k, x, &nk[n++], ver && json_get(ver, k->kind));
+        /* our variants on this backend */
+        for (int i = 0; i < cloud_kind_count() && n < KI_MAX; i++) {
+            const CloudKind *v = cloud_kind_at(i);
+            if (!v->variant || strcmp(v->type, nm)) continue;
+            pthread_mutex_lock(&cl_mu);
+            const CloudKind *vk = kind_put(v->kind, nm, v->label, v->group);
+            pthread_mutex_unlock(&cl_mu);
+            if (vk) emit_kind(&b, &first, vk, x, &nk[n++], ver && json_get(ver, vk->kind));
         }
-        jb_raw(&b, "]}");
-        ki->secrets_all = sa.oom ? NULL : sa.p;
-        if (sa.oom) jb_free(&sa);
     }
     jb_raw(&b, "]");
     json_free(&d);
-    if (b.oom) { jb_free(&b); return -1; }
+    if (vok) json_free(&vd);
+    if (b.oom) { jb_free(&b); for (int i = 0; i < n; i++) free(nk[i].secrets_all); free(nk); return NULL; }
     pthread_mutex_lock(&cl_mu);
-    nkinfo = nk;
-    providers_out = b.p;
+    KindInfo *old = kinfo;
+    int oldn = nkinfo;
+    kinfo = nk;
+    nkinfo = n;
     pthread_mutex_unlock(&cl_mu);
-    return 0;
+    for (int i = 0; old && i < oldn; i++) free(old[i].secrets_all);
+    free(old);
+    return b.p;
 }
 
 /* ---- one account in rclone ---- */
 
 /* rclone's state machine of config/create, answered non-interactively. 0 done. */
-static int answer_states(const char *id, JDoc *d, char *msg, size_t mn) {
+/* {"question":{…}} for JS (17.2 item 3): the state carries the account's id, "<id>:<rclone's state>" */
+static char *question_json(const char *id, const char *state, const JVal *o) {
+    char st[600];
+    cl_pf(st, sizeof st, "%s:%s", id, state);
+    const char *def = json_str(o, "DefaultStr");
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"question\":{\"state\":");
+    jb_str(&b, st);
+    jb_raw(&b, ",\"name\":");
+    jb_str(&b, json_str(o, "Name") ? json_str(o, "Name") : "");
+    jb_raw(&b, ",\"help\":");
+    jb_str(&b, json_str(o, "Help") ? json_str(o, "Help") : "");
+    jb_raw(&b, ",\"type\":");
+    jb_str(&b, json_str(o, "Type") ? json_str(o, "Type") : "string");
+    int pw = json_bool(o, "IsPassword", 0) || json_bool(o, "Sensitive", 0);
+    jb_printf(&b, ",\"isPassword\":%s,\"required\":%s,\"exclusive\":%s,\"default\":", pw ? "true" : "false",
+              json_bool(o, "Required", 0) ? "true" : "false", json_bool(o, "Exclusive", 0) ? "true" : "false");
+    jb_str(&b, pw ? "" : def ? def : "");
+    jb_raw(&b, ",\"examples\":[");
+    const JVal *ex = json_get(o, "Examples");
+    int ne = 0;
+    for (const JVal *e = ex && ex->type == J_ARR ? ex->kid : NULL; e && ne < 60; e = e->next) {
+        const char *v = json_str(e, "Value"), *h = json_str(e, "Help");
+        if (!v) continue;
+        jb_raw(&b, ne++ ? ",{\"value\":" : "{\"value\":");
+        jb_str(&b, v);
+        jb_raw(&b, ",\"help\":");
+        jb_str(&b, h ? h : "");
+        jb_raw(&b, "}");
+    }
+    jb_raw(&b, "]}}");
+    return b.oom ? (jb_free(&b), NULL) : b.p;
+}
+
+/* rclone's state machine of config/create, non-interactive. question NULL: every question answered here (the
+ * default, or cloud_answer's); otherwise only LordOS's own ones, and the first other one goes back in *question (1).
+ * 0 done, -1 error (msg). */
+static int answer_states(const char *id, JDoc *d, char *msg, size_t mn, char **question) {
     for (int i = 0; i < 16; i++) {
         const char *e = json_str(d->root, "Error"), *state = json_str(d->root, "State");
         if (e && e[0]) { cpy(msg, mn, e); return -1; }
         if (!state || !state[0]) return 0;
         const JVal *o = json_get(d->root, "Option");
         const char *nm = json_str(o, "Name"), *def = json_str(o, "ValueStr");
+        if (question && !cloud_internal_question(nm)) {
+            *question = question_json(id, state, o);
+            return *question ? 1 : -1;
+        }
         if (!def || !def[0]) def = json_str(o, "DefaultStr");
-        const char *ans = cloud_answer(nm, def);
+        const char *ans = cloud_default_answer(nm, def);
         if (!ans[0]) {
             const JVal *ex = json_get(o, "Examples");
             const char *v = ex && ex->type == J_ARR && ex->kid ? json_str(ex->kid, "Value") : NULL;
@@ -814,7 +973,7 @@ static int answer_states(const char *id, JDoc *d, char *msg, size_t mn) {
 /* config/create with the non-secret options, the preset and the secrets (a JSON object's text, or NULL).
  * fresh 1: a new account, secrets plain, the state machine answered; 2: the same for an existing account (Sign In
  * Again, new credentials: config/update, so what isn't given stays); 0: what config/get gave (obscured), at start. */
-static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn) {
+static int create_remote_q(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn, char **question) {
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"name\":");
@@ -850,10 +1009,11 @@ static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, 
     jb_free(&b);
     if (st != 200) { if (d.root) json_free(&d); return -1; }
     int r = 0;
-    if (fresh && d.root) r = answer_states(a->id, &d, msg, mn);
+    if (fresh && d.root) r = answer_states(a->id, &d, msg, mn, question);
     if (d.root) json_free(&d);
     return r;
 }
+static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn) { return create_remote_q(a, secret_json, fresh, msg, mn, NULL); }
 
 /* config/get: the non-secret options into a->p, the secrets as a JSON object's text (malloc) */
 static char *split_remote(Acc *a, char *msg, size_t mn) {
@@ -906,6 +1066,7 @@ static void check_links(Acc *a) {
     if (rcj(RCM_FSINFO, body, &d, NULL, 0, RC_SHORT) == 200 && d.root) {
         const JVal *f = json_get(d.root, "Features");
         a->links_supported = json_bool(f, "PublicLink", 0);
+        a->trash_supported = json_bool(f, "CleanUp", 0);
     }
     if (d.root) json_free(&d);
 }
@@ -1079,15 +1240,76 @@ static void finish_new(Acc *a) {
     mount_acc(a);
 }
 
+static char *err_msg_json(const char *code, const char *msg) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"error\":");
+    jb_str(&b, code);
+    if (msg && msg[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, msg); }
+    jb_raw(&b, "}");
+    return b.oom ? (jb_free(&b), NULL) : b.p;
+}
+
+/* the setup of an account didn't take: a new one goes away, an existing one stays as it was with the error */
+static void add_failed(Acc *a, int req, const char *code, const char *msg) {
+    if (req) post_reply(req, err_msg_json(code, msg));
+    if (a->new_acc) {
+        char body[64];
+        cl_pf(body, sizeof body, "{\"name\":\"%s\"}", a->id);
+        if (cl_running) rcs(RCM_DELETE, body, NULL, 0, RC_SHORT);
+        pthread_mutex_lock(&cl_mu);
+        acc_free(a);
+        pthread_mutex_unlock(&cl_mu);
+    } else {
+        if (!a->mounted && cl_running) mount_acc(a);  /* as it was; the error says the new settings didn't take */
+        pthread_mutex_lock(&cl_mu);
+        cpy(a->err, sizeof a->err, code);
+        cpy(a->message, sizeof a->message, msg);
+        a->pending_req = 0;
+        pthread_mutex_unlock(&cl_mu);
+    }
+    cl_changed();
+}
+
+/* after config/create or an answer: done (r 0), rclone asks (r 1, q), or failed */
+static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
+    if (r == 1) {
+        pthread_mutex_lock(&cl_mu);
+        a->pending_req = 1;
+        pthread_mutex_unlock(&cl_mu);
+        if (req) post_reply(req, q); else free(q);
+        cl_changed();
+        return;
+    }
+    free(q);
+    if (r < 0) {
+        const char *c = cl_running ? code_of(msg, 0) : "cloud.notRunning";
+        add_failed(a, req, !strcmp(c, "cloud.failed") ? "cloud.addFailed" : c, msg);
+        return;
+    }
+    pthread_mutex_lock(&cl_mu);
+    a->pending_req = 0;
+    a->new_acc = 0;
+    a->err[0] = a->message[0] = 0;
+    pthread_mutex_unlock(&cl_mu);
+    finish_new(a);
+    if (req) {
+        char b[64];
+        cl_pf(b, sizeof b, "{\"id\":\"%s\"}", a->id);
+        post_reply(req, strdup(b));
+    }
+}
+
 static void job_add(Job *j) {
     Acc *a;
     pthread_mutex_lock(&cl_mu);
     a = cl_find(j->id);
     pthread_mutex_unlock(&cl_mu);
-    if (!a) return;
-    char msg[256] = "";
-    int upd = j->flag, bad = ensure_daemon();
-    if (!bad && upd) {
+    if (!a) { if (j->req) post_reply(j->req, err_json("cloud.notFound")); return; }
+    char msg[256] = "", *q = NULL;
+    int upd = j->flag;
+    if (ensure_daemon()) { add_failed(a, j->req, "cloud.notRunning", ""); return; }
+    if (upd) {
         /* new credentials for an existing account: unmounted, merged into its remote, mounted again */
         if (a->mounted) unmount_acc(a);
         pthread_mutex_lock(&cl_mu);
@@ -1095,17 +1317,36 @@ static void job_add(Job *j) {
         pthread_mutex_unlock(&cl_mu);
         if (!a->configured) bring_up_config(a);
     }
-    if (bad || create_remote(a, j->a, upd ? 2 : 1, msg, sizeof msg)) {
-        if (upd && !bad) mount_acc(a);              /* as it was; the error says the new settings didn't take */
-        pthread_mutex_lock(&cl_mu);
-        cpy(a->err, sizeof a->err, cl_running ? code_of(msg, 0) : "cloud.notRunning");
-        if (!strcmp(a->err, "cloud.failed")) cpy(a->err, sizeof a->err, "cloud.addFailed");
-        cpy(a->message, sizeof a->message, msg);
-        pthread_mutex_unlock(&cl_mu);
-        cl_changed();
-        return;
-    }
-    finish_new(a);
+    int r = create_remote_q(a, j->a, upd ? 2 : 1, msg, sizeof msg, &q);
+    add_step(a, j->req, r, q, msg);
+}
+
+/* the answer to one of rclone's questions (17.2 item 3): config/update with continue, state and result */
+static void job_answer(Job *j) {
+    Acc *a;
+    pthread_mutex_lock(&cl_mu);
+    a = cl_find(j->id);
+    int waiting = a && a->pending_req;
+    pthread_mutex_unlock(&cl_mu);
+    if (!a || !waiting || !cl_running) { post_reply(j->req, err_json(!a ? "cloud.notFound" : !cl_running ? "cloud.notRunning" : "cloud.noQuestion")); return; }
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"name\":");
+    jb_str(&b, a->id);
+    jb_raw(&b, ",\"parameters\":{},\"opt\":{\"nonInteractive\":true,\"continue\":true,\"obscure\":true,\"state\":");
+    jb_str(&b, j->a);
+    jb_raw(&b, ",\"result\":");
+    jb_str(&b, j->b ? j->b : "");
+    jb_raw(&b, "}}");
+    char msg[256] = "", *q = NULL;
+    JDoc d;
+    int st = b.oom ? -1 : rcj(RCM_UPDATE, b.p, &d, msg, sizeof msg, RC_LONG);
+    explicit_bzero(b.p, b.n);
+    jb_free(&b);
+    int r = -1;
+    if (st == 200 && d.root) r = answer_states(a->id, &d, msg, sizeof msg, &q);
+    if (d.root) json_free(&d);
+    add_step(a, j->req, r, q, msg);
 }
 
 static void remove_acc_files(Acc *a) {
@@ -1297,7 +1538,7 @@ static void signin_token(void) {
     if (si.update[0]) { pthread_mutex_unlock(&cl_mu); signin_again(tok); explicit_bzero(tok, sizeof tok); return; }
     Acc *a = NULL;
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
-    const CloudKind *k = cloud_kind(si.kind);
+    const CloudKind *k = kind_get(si.kind);
     if (!a || !k || cl_find_name(si.name)) { signin_end("failed", !a ? "cloud.tooMany" : "cloud.nameTaken"); pthread_mutex_unlock(&cl_mu); explicit_bzero(tok, sizeof tok); cl_changed(); return; }
     memset(a, 0, sizeof *a);
     a->used = 1;
@@ -1601,11 +1842,20 @@ static char *state_json(int light) {
         if (a->locked) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked"); }
         else if (a->err[0]) { jb_raw(&b, ",\"error\":"); jb_str(&b, a->err); }
         if (a->message[0]) { jb_raw(&b, ",\"message\":"); jb_str(&b, a->message); }
-        if (a->have_about) {
+        if (a->have_about || a->measured_at) {
             static const char *const k[5] = { "total", "used", "free", "trashed", "other" };
             jb_raw(&b, ",\"about\":{");
             int f2 = 1;
-            for (int x = 0; x < 5; x++) if (a->ab[x] >= 0 || x == 1) { jb_printf(&b, "%s\"%s\":", f2 ? "" : ",", k[x]); jb_num(&b, a->ab[x] >= 0 ? a->ab[x] : 0); f2 = 0; }
+            /* used: the provider's figure, or else the last Measure (17.2 item 5) */
+            for (int x = 0; x < 5; x++) {
+                double v = a->have_about ? a->ab[x] : -1;
+                if (x == 1 && v < 0) v = (double)a->measured_bytes;
+                if (v < 0) continue;
+                jb_printf(&b, "%s\"%s\":", f2 ? "" : ",", k[x]);
+                jb_num(&b, v);
+                f2 = 0;
+            }
+            if (a->measured_at) jb_printf(&b, "%s\"measuredAt\":%lld,\"measuredBytes\":%lld,\"measuredCount\":%lld", f2 ? "" : ",", a->measured_at, a->measured_bytes, a->measured_count);
             jb_raw(&b, "}");
         } else jb_raw(&b, ",\"about\":null");
         jb_printf(&b, ",\"cacheBytes\":%lld,\"keptBytes\":%lld,\"up\":{\"files\":%d,\"bytes\":%lld,\"done\":%lld", a->cache_bytes, a->kept_bytes, a->nq, ub, ud);
@@ -1619,7 +1869,9 @@ static char *state_json(int light) {
             if (k) jb_raw(&b, ",");
             jb_str(&b, kp);
         }
-        jb_printf(&b, "],\"linksSupported\":%s,\"paused\":%s,\"ownClient\":%s}", a->links_supported > 0 ? "true" : "false", a->paused ? "true" : "false", a->own_client ? "true" : "false");
+        jb_printf(&b, "],\"linksSupported\":%s,\"trashSupported\":%s,\"measuring\":%s,\"emptyingTrash\":%s,\"configuring\":%s,\"paused\":%s,\"ownClient\":%s}",
+                  a->links_supported > 0 ? "true" : "false", a->trash_supported > 0 ? "true" : "false", a->rcjob_kind == 'm' ? "true" : "false",
+                  a->rcjob_kind == 't' ? "true" : "false", a->pending_req || a->new_acc ? "true" : "false", a->paused ? "true" : "false", a->own_client ? "true" : "false");
     }
     jb_raw(&b, "],\"signin\":");
     if (si.on) {
@@ -1669,13 +1921,93 @@ static long long maybe_push(void) {
     return 0;
 }
 
+/* one rclone job in the background for an account (Measure, Empty Trash): started here, followed by the tick */
+static void rcjob_start(Job *j, char kind) {
+    Acc *a;
+    pthread_mutex_lock(&cl_mu);
+    a = cl_find(j->id);
+    int busy = a && a->rcjob_kind;
+    pthread_mutex_unlock(&cl_mu);
+    if (!a || !cl_running || !a->configured) { post_reply(j->req, err_json(!a ? "cloud.notFound" : "cloud.notRunning")); return; }
+    if (busy) { post_reply(j->req, err_json("cloud.busy")); return; }
+    if (kind == 't' && a->trash_supported == 0) { post_reply(j->req, err_json("unsupported")); return; }
+    char body[96], msg[256];
+    cl_pf(body, sizeof body, "{\"fs\":\"%s:\",\"_async\":true}", a->id);
+    JDoc d;
+    int st = rcj(kind == 'm' ? RCM_SIZE : RCM_CLEANUP, body, &d, msg, sizeof msg, RC_SHORT);
+    double id = st == 200 && d.root ? json_num(d.root, "jobid", -1) : -1;
+    if (d.root) json_free(&d);
+    if (id < 0) { post_reply(j->req, err_msg_json("cloud.failed", msg)); return; }
+    pthread_mutex_lock(&cl_mu);
+    a->rcjob_kind = kind;
+    a->rcjob_id = (long long)id;
+    a->rcjob_req = j->req;
+    pthread_mutex_unlock(&cl_mu);
+    cl_changed();
+}
+
+static void rcjob_poll(Acc *a) {
+    char body[64], msg[256];
+    cl_pf(body, sizeof body, "{\"jobid\":%lld}", a->rcjob_id);
+    JDoc d;
+    int st = rcj(RCM_JOB_STATUS, body, &d, msg, sizeof msg, RC_SHORT);
+    if (st != 200 || !d.root) {
+        if (d.root) json_free(&d);
+        if (st > 0) { post_reply(a->rcjob_req, err_msg_json("cloud.failed", msg)); pthread_mutex_lock(&cl_mu); a->rcjob_kind = 0; pthread_mutex_unlock(&cl_mu); cl_changed(); }
+        return;
+    }
+    if (!json_bool(d.root, "finished", 0)) { json_free(&d); return; }
+    char kind = a->rcjob_kind, *res;
+    const char *e = json_str(d.root, "error");
+    if (!json_bool(d.root, "success", 0)) {
+        int uns = e && (strstr(e, "not supported") || strstr(e, "doesn't support") || strstr(e, "not implemented"));
+        int stopped = e && strstr(e, "context canceled");
+        res = err_msg_json(uns ? "unsupported" : stopped ? "cloud.cancelled" : "cloud.failed", e);
+        if (uns && kind == 't') a->trash_supported = 0;
+    } else if (kind == 'm') {
+        const JVal *o = json_get(d.root, "output");
+        long long by = (long long)json_num(o, "bytes", 0), n = (long long)json_num(o, "count", 0);
+        char b[96];
+        cl_pf(b, sizeof b, "{\"bytes\":%lld,\"count\":%lld}", by, n);
+        res = strdup(b);
+        pthread_mutex_lock(&cl_mu);
+        a->measured_bytes = by;
+        a->measured_count = n;
+        a->measured_at = now_ms();
+        save_accounts();
+        pthread_mutex_unlock(&cl_mu);
+    } else res = strdup("{\"ok\":true}");
+    json_free(&d);
+    pthread_mutex_lock(&cl_mu);
+    int req = a->rcjob_req;
+    a->rcjob_kind = 0;
+    pthread_mutex_unlock(&cl_mu);
+    post_reply(req, res);
+    if (kind == 't') about_acc(a);
+    cl_changed();
+}
+
 static void do_job(Job *j) {
     switch (j->type) {
-    case J_PROVIDERS:
-        if (!ensure_daemon() && !load_providers()) cl_changed();
-        else { pthread_mutex_lock(&cl_mu); providers_wanted = 0; pthread_mutex_unlock(&cl_mu); }
+    case J_PROVIDERS: {
+        char *p = ensure_daemon() ? NULL : load_providers();
+        post_reply(j->req, p ? p : err_json(cl_running ? "cloud.failed" : dmn.error[0] ? dmn.error : "cloud.notRunning"));
         break;
-    case J_ADD: if (!ensure_daemon()) load_providers(); job_add(j); break;
+    }
+    case J_ADD: if (!ensure_daemon() && !nkinfo) free(load_providers()); job_add(j); break;
+    case J_ANSWER: job_answer(j); break;
+    case J_TRASH: rcjob_start(j, 't'); break;
+    case J_MEASURE: rcjob_start(j, 'm'); break;
+    case J_CANCEL_MEASURE: {
+        Acc *a;
+        pthread_mutex_lock(&cl_mu);
+        a = cl_find(j->id);
+        long long jid = a && a->rcjob_kind == 'm' ? a->rcjob_id : -1;
+        pthread_mutex_unlock(&cl_mu);
+        if (jid >= 0) { char b[64]; cl_pf(b, sizeof b, "{\"jobid\":%lld}", jid); rcs(RCM_JOB_STOP, b, NULL, 0, RC_SHORT); }
+        post_reply(j->req, strdup(jid >= 0 ? "{\"ok\":true}" : "{\"error\":\"cloud.notMeasuring\"}"));
+        break;
+    }
     case J_REMOVE: job_remove(j); break;
     case J_RENAME: job_rename(j); break;
     case J_ABOUT: { Acc *a; pthread_mutex_lock(&cl_mu); a = cl_find(j->id); pthread_mutex_unlock(&cl_mu); if (a && cl_running && a->configured) about_acc(a); break; }
@@ -1694,7 +2026,7 @@ static void do_job(Job *j) {
         cf_kick();
         break;
     }
-    case J_SIGNIN: if (!ensure_daemon()) load_providers(); break;
+    case J_SIGNIN: if (!ensure_daemon() && !nkinfo) free(load_providers()); break;
     default: break;
     }
 }
@@ -1702,7 +2034,7 @@ static void do_job(Job *j) {
 static void *worker(void *arg) {
     (void)arg;
     if (naccounts() && !ensure_daemon()) {
-        load_providers();
+        free(load_providers());
         for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used) bring_up(&cl_acc[i]);
     }
     long long next_tick = 0, next_slow = 0;
@@ -1740,6 +2072,7 @@ static void *worker(void *arg) {
             if (j->type == J_STOP) { free(j); daemon_stop(); return NULL; }
             do_job(j);
             if (j->a) { explicit_bzero(j->a, strlen(j->a)); free(j->a); }
+            if (j->b) explicit_bzero(j->b, strlen(j->b));   /* an answer may be a code or a password */
             free(j->b);
             free(j);
             dmn.idle_since = time(NULL);
@@ -1765,6 +2098,7 @@ static void *worker(void *arg) {
                     }
                     if (a->configured && t - a->tok_at >= 300) token_check(a);
                     if (a->mounted && t - a->about_at >= 1800) about_acc(a);
+                    if (a->rcjob_kind) rcjob_poll(a);
                 }
             }
             if (now >= next_slow) {                 /* every minute */
@@ -1854,15 +2188,54 @@ void cloud_dispatch(void (*push)(const char *), void (*reply)(int, const char *)
     free(s);
 }
 
-char *cloud_providers_json(void) {
-    pthread_mutex_lock(&cl_mu);
-    char *p = providers_out ? strdup(providers_out) : NULL;
-    int want = !providers_out && !providers_wanted;
-    if (want) providers_wanted = 1;
-    pthread_mutex_unlock(&cl_mu);
-    if (want && cloud_available()) { Job *j = new_job(J_PROVIDERS, "", NULL, NULL); if (j) push_job(j); }
-    return p ? p : strdup("[]");
+static int next_req(void) { static int seq; pthread_mutex_lock(&cl_mu); int r = ++seq; pthread_mutex_unlock(&cl_mu); return r; }
+
+/* a job whose answer comes through reply(req, …) */
+static char *async_job(int type, const char *id, const char *a, const char *b, int *req) {
+    Job *j = new_job(type, id, a, b);
+    if (!j) { *req = 0; return err_json("cloud.failed"); }
+    j->req = *req = next_req();
+    push_job(j);
+    return NULL;
 }
+
+void cl_reply(int req, char *json) { post_reply(req, json); }
+int  cl_next_req(void) { return next_req(); }
+
+char *cloud_providers(int *req) {
+    *req = 0;
+    if (!cloud_available()) return err_json("cloud.unavailable");
+    return async_job(J_PROVIDERS, "", NULL, NULL, req);
+}
+
+char *cloud_answer(const char *state, const char *value, int *req) {
+    char id[16];
+    const char *st;
+    *req = 0;
+    if (cloud_answer_state(state, id, sizeof id, &st)) return err_json("cloud.badArgument");
+    if (!value || !cloud_value_ok(value)) return err_json("cloud.badValue");
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    int ok = a && a->pending_req;
+    pthread_mutex_unlock(&cl_mu);
+    if (!ok) return err_json(a ? "cloud.noQuestion" : "cloud.notFound");
+    return async_job(J_ANSWER, id, st, value, req);
+}
+
+static char *acc_job(int type, const char *id, int *req) {
+    *req = 0;
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    int tr = a ? a->trash_supported : -1;
+    pthread_mutex_unlock(&cl_mu);
+    if (!a) return err_json("cloud.notFound");
+    if (type == J_TRASH && tr == 0) return err_json("unsupported");
+    return async_job(type, id, NULL, NULL, req);
+}
+char *cloud_empty_trash(const char *id, int *req) { return acc_job(J_TRASH, id, req); }
+char *cloud_measure(const char *id, int *req) { return acc_job(J_MEASURE, id, req); }
+char *cloud_cancel_measure(const char *id, int *req) { return acc_job(J_CANCEL_MEASURE, id, req); }
+char *cloud_delete(const char *const *paths, int n, int *req) { return cf_delete(paths, n, req); }
 
 static int name_free(const char *name, const Acc *self) {
     for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && &cl_acc[i] != self && !strcasecmp(cl_acc[i].name, name)) return 0;
@@ -1871,7 +2244,9 @@ static int name_free(const char *name, const Acc *self) {
 }
 
 char *cloud_begin_signin(const char *kind, const char *name, const char *cid, const char *csec) {
-    const CloudKind *k = cloud_kind(kind);
+    pthread_mutex_lock(&cl_mu);
+    const CloudKind *k = kind_get(kind);
+    pthread_mutex_unlock(&cl_mu);
     if (!cloud_available()) return err_json("cloud.unavailable");
     if (!k || strcmp(k->group, "oauth")) return err_json("cloud.badKind");
     if (!cloud_name_ok(name)) return err_json("cloud.badName");
@@ -1956,8 +2331,11 @@ void cloud_cancel_signin(const char *id) {
     cl_changed();
 }
 
-char *cloud_add(const char *kind, const char *name, const char *fields) {
-    const CloudKind *k = cloud_kind(kind);
+char *cloud_add(const char *kind, const char *name, const char *fields, int *req) {
+    *req = 0;
+    pthread_mutex_lock(&cl_mu);
+    const CloudKind *k = kind_get(kind);
+    pthread_mutex_unlock(&cl_mu);
     if (!cloud_available()) return err_json("cloud.unavailable");
     if (!k || !strcmp(k->group, "oauth")) return err_json("cloud.badKind");
     if (!cloud_name_ok(name)) return err_json("cloud.badName");
@@ -2042,21 +2420,16 @@ char *cloud_add(const char *kind, const char *name, const char *fields) {
     np.n = 0;
 made:
     a->retry_at = time(NULL) + 3600;            /* the add job brings it up, not the tick */
-    {
-        JBuf r;
-        jb_init(&r);
-        jb_raw(&r, "{\"id\":");
-        jb_str(&r, a->id);
-        jb_raw(&r, "}");
-        res = r.oom ? (jb_free(&r), NULL) : r.p;
-    }
+    if (!upd) a->new_acc = 1;
 out:
     pthread_mutex_unlock(&cl_mu);
     json_free(&d);
     kv_clear(&np);
-    if (a && !sec.oom) {
+    if (a && !res && !sec.oom) {
+        /* the answer, { id } or one of rclone's questions, comes through reply(req) */
         Job *j = new_job(J_ADD, a->id, sec.p, NULL);
-        if (j) { j->flag = upd != NULL; push_job(j); }
+        if (j) { j->flag = upd != NULL; j->req = *req = next_req(); push_job(j); }
+        else res = err_json("cloud.failed");
     }
     if (!sec.oom) explicit_bzero(sec.p, sec.n);
     jb_free(&sec);
@@ -2125,7 +2498,6 @@ void cloud_keep(const char *const *paths, int n, int keep) {
 }
 
 static char *link_req(const char *path, const char *expire, int *req, int unlink) {
-    static int seq;
     char name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1];
     *req = 0;
     if (cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel) || !rel[0]) return err_json("cloud.badPath");
@@ -2142,7 +2514,7 @@ static char *link_req(const char *path, const char *expire, int *req, int unlink
     if (sup == 0) return err_json("unsupported");
     Job *j = new_job(unlink ? J_UNLINK : J_LINK, id, rel, expire);
     if (!j) return err_json("cloud.failed");
-    j->req = *req = ++seq;
+    j->req = *req = next_req();
     push_job(j);
     return NULL;
 }

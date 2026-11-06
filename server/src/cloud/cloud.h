@@ -29,12 +29,19 @@ void  cloud_dispatch(void (*push)(const char *json), void (*reply)(int req, cons
 
 int   cloud_available(void);                                    /* lordos-rclone is installed */
 char *cloud_state_json(void);
-char *cloud_providers_json(void);                               /* [] until rclone has listed them once (a push follows) */
+/* the calls that take a *req: > 0, the answer comes through reply(req, …); otherwise the JSON returned is the answer */
+char *cloud_providers(int *req);                                /* rclone's backends, asked every time (17.2 item 1) */
 
 char *cloud_begin_signin(const char *kind, const char *name, const char *client_id, const char *client_secret);
 int   cloud_signin_url(const char *id, char *url, size_t n);    /* 0: the address of that sign-in */
 void  cloud_cancel_signin(const char *id);
-char *cloud_add(const char *kind, const char *name, const char *fields_json);
+char *cloud_add(const char *kind, const char *name, const char *fields_json, int *req);   /* { id } | { question } | { error } */
+char *cloud_answer(const char *state, const char *value, int *req);                       /* rclone's next question, or done */
+char *cloud_empty_trash(const char *id, int *req);
+char *cloud_measure(const char *id, int *req);                  /* { bytes, count } */
+char *cloud_cancel_measure(const char *id, int *req);
+char *cloud_delete(const char *const *paths, int n, int *req);  /* only strictly under ~/Cloud/<account>, through the mount */
+void  cloud_set_assets(const char *dir);                        /* where cloud/providers.json is (the verified kinds) */
 char *cloud_remove(const char *id, int discard_pending);
 char *cloud_rename(const char *id, const char *name);
 void  cloud_refresh_about(const char *id);
@@ -42,7 +49,6 @@ char *cloud_website(const char *id);                            /* the address, 
 char *cloud_status(const char *const *paths, int n);
 void  cloud_keep(const char *const *paths, int n, int keep);
 char *cloud_free(const char *const *paths, int n);
-/* *req > 0: the answer comes through reply(req, …); otherwise the JSON returned is the answer */
 char *cloud_link(const char *path, const char *expire, int *req);
 char *cloud_unlink(const char *path, int *req);
 char *cloud_links(const char *id);

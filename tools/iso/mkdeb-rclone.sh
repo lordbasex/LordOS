@@ -1,26 +1,26 @@
 #!/bin/sh
-# mkdeb-rclone.sh — builds lordos-rclone_<version>_<arch>.deb: upstream rclone, unpatched, built from its release
-# tag's source, at /usr/lib/lordos/rclone/rclone, so it never fights Debian's /usr/bin/rclone (docs/CLOUD.md 3.1).
+# mkdeb-rclone.sh — builds lordos-rclone_<version>_<arch>.deb: rclone's official release binary, unmodified, at
+# /usr/lib/lordos/rclone/rclone, so it never fights Debian's /usr/bin/rclone (docs/CLOUD.md 3.1 and 17.2 item 7).
 # Cloud (server/src/cloud) and Files' Connect to Server (server/src/lan/rconnect.c) run this binary.
 #
 #   tools/iso/mkdeb-rclone.sh <output folder> [amd64] [arm64]     (from the repository root; default: both)
 #
-# Needs Go GO_VERSION (GO=<path to the go binary>, else `go` on PATH; any other version is refused unless
-# ALLOW_OTHER_GO=1), dpkg-deb, curl, sha256sum and the network for the Go modules (go.sum checks every one).
-# RCLONE_SRC=<folder> uses an unpacked source tree of that tag instead of downloading it; its VERSION must match.
-# Prints only the paths of the packages on standard output.
+# Needs curl, gpg, unzip, sha256sum and dpkg-deb; no Go. RCLONE_DIST=<folder> takes the release files from there
+# (SHA256SUMS and rclone-v<version>-linux-<arch>.zip) instead of downloads.rclone.org. Prints only the paths of the
+# packages on standard output.
 #
-# The build is upstream's own (bin/cross-compile.go): CGO_ENABLED=0, -trimpath, -ldflags "-s -X …fs.Version=",
-# no build tags, plus -buildid= so the same source and Go give the same bytes. File times, the changelog date and
-# the archive come from the tag's date (the source tree's VERSION file), so apt-repo.sh accepts the package again
-# unchanged and refuses a different one under the same version (bump PKG_REV for a rebuild that differs).
+# Trust: SHA256SUMS is clearsigned by rclone's release key, Nick Craig-Wood's, whose fingerprint is pinned below; the
+# key itself is packaging/keys/rclone-release-<fingerprint>.asc (fetched once from keys.openpgp.org and checked
+# against the fingerprint; rclone.org/KEYS lists the same key). The signature must be good and made by exactly that
+# key, then the zip's SHA-256 must be the one in the signed file, then the binary in it must say it is v<version>.
+# Nothing in the binary is changed.
 #
-# copyright: rclone's MIT license, then each Go module linked in (go version -m on the binary) with the license
-# file it carries in the module cache.
+# copyright: rclone's MIT license and the license of every Go module linked in (packaging/rclone/copyright-v<version>,
+# generated once from the module cache of a build of that tag). File times, the changelog date and the archive come
+# from the binary's own time in the zip, so the same release gives the same package bytes.
 set -eu
 RCLONE_VERSION=1.75.2
-RCLONE_SHA256=68afd7f68c84bd978966feae2116339aa7bf454b39c573910c462e87c3774d5a   # github.com/rclone/rclone/archive/refs/tags/v1.75.2.tar.gz
-GO_VERSION=go1.26.10
+RCLONE_FPR=FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA
 PKG_REV=${PKG_REV:-1}
 OUTDIR=${1:?usage: mkdeb-rclone.sh <output folder> [amd64] [arm64]}
 shift
@@ -28,36 +28,54 @@ ARCHES=${*:-amd64 arm64}
 [ -f package.json ] && [ -d tools/iso ] || { echo "mkdeb-rclone.sh: run from the repository root" >&2; exit 1; }
 [ -d "$OUTDIR" ] || { echo "no such folder: $OUTDIR" >&2; exit 1; }
 OUTDIR=$(cd "$OUTDIR" && pwd)
-GO=${GO:-go}
-command -v "$GO" >/dev/null || { echo "missing Go ($GO_VERSION): set GO=<path to go>" >&2; exit 1; }
-command -v dpkg-deb >/dev/null || { echo "missing dpkg-deb" >&2; exit 1; }
-gv=$("$GO" env GOVERSION)
-[ "$gv" = "$GO_VERSION" ] || [ "${ALLOW_OTHER_GO:-0}" = 1 ] || { echo "Go is $gv, this package is built with $GO_VERSION (ALLOW_OTHER_GO=1 to build anyway)" >&2; exit 1; }
+KEY=packaging/keys/rclone-release-$RCLONE_FPR.asc
+LIC=packaging/rclone/copyright-v$RCLONE_VERSION
+for t in gpg unzip sha256sum dpkg-deb; do command -v "$t" >/dev/null || { echo "missing $t" >&2; exit 1; }; done
+[ -f "$KEY" ] || { echo "missing $KEY" >&2; exit 1; }
+[ -f "$LIC" ] || { echo "missing $LIC" >&2; exit 1; }
 for a in $ARCHES; do case $a in amd64|arm64) ;; *) echo "unknown architecture: $a (amd64, arm64)" >&2; exit 1 ;; esac; done
 
 W=$(mktemp -d)
-trap 'chmod -R u+w "$W" 2>/dev/null; rm -rf "$W"' EXIT
-if [ -n "${RCLONE_SRC:-}" ]; then
-    SRC=$(cd "$RCLONE_SRC" && pwd)
-else
-    command -v curl >/dev/null || { echo "missing curl" >&2; exit 1; }
-    curl -fsSL -o "$W/src.tgz" "https://github.com/rclone/rclone/archive/refs/tags/v$RCLONE_VERSION.tar.gz" >&2
-    got=$(sha256sum "$W/src.tgz" | cut -c1-64)
-    [ "$got" = "$RCLONE_SHA256" ] || { echo "the source tarball's sha256 is $got, not $RCLONE_SHA256" >&2; exit 1; }
-    tar -xzf "$W/src.tgz" -C "$W"
-    SRC=$W/rclone-$RCLONE_VERSION
-fi
-[ "$(cat "$SRC/VERSION")" = "v$RCLONE_VERSION" ] || { echo "$SRC is not rclone v$RCLONE_VERSION" >&2; exit 1; }
-EPOCH=$(stat -c %Y "$SRC/VERSION")
-STAMP=$(date -u -d "@$EPOCH" +%Y%m%d%H%M.%S)
-RFC=$(LC_ALL=C date -u -R -d "@$EPOCH")
-VERSION="$RCLONE_VERSION-$PKG_REV"
-MODCACHE=$("$GO" env GOMODCACHE)
+trap 'rm -rf "$W"' EXIT
+fetch() {     # file name in the release
+    if [ -n "${RCLONE_DIST:-}" ]; then cp "$RCLONE_DIST/$1" "$W/$1"
+    else command -v curl >/dev/null || { echo "missing curl" >&2; exit 1; }
+         curl -fsSL -o "$W/$1" "https://downloads.rclone.org/v$RCLONE_VERSION/$1"; fi
+}
+
+# the key: exactly the pinned fingerprint, nothing else in the file
+G=$W/gnupg
+mkdir -m 700 "$G"
+fprs=$(gpg --homedir "$G" --batch --show-keys --with-colons "$KEY" 2>/dev/null | awk -F: '$1 == "fpr" { print $10 }')
+case "$fprs" in "$RCLONE_FPR"*) ;; *) echo "$KEY is not the key $RCLONE_FPR" >&2; exit 1 ;; esac
+[ "$(gpg --homedir "$G" --batch --show-keys --with-colons "$KEY" 2>/dev/null | grep -c '^pub:')" = 1 ] || { echo "$KEY holds more than one key" >&2; exit 1; }
+gpg --homedir "$G" --batch --dearmor < "$KEY" > "$W/key.gpg"
+
+fetch SHA256SUMS
+st=$(gpg --homedir "$G" --batch --no-default-keyring --keyring "$W/key.gpg" --status-fd 1 --verify "$W/SHA256SUMS" 2>/dev/null || true)
+echo "$st" | grep -q "^\[GNUPG:\] VALIDSIG $RCLONE_FPR " || { echo "SHA256SUMS is not signed by $RCLONE_FPR" >&2; exit 1; }
+# only what the signature covers: the clearsigned text, without the armor
+gpg --homedir "$G" --batch --no-default-keyring --keyring "$W/key.gpg" --output "$W/sums" --decrypt "$W/SHA256SUMS" 2>/dev/null
 
 for ARCH in $ARCHES; do
-    BIN=$W/rclone-$ARCH
-    (cd "$SRC" && CGO_ENABLED=0 GOOS=linux GOARCH=$ARCH GOFLAGS=-mod=readonly \
-        "$GO" build -trimpath -ldflags "-s -buildid= -X github.com/rclone/rclone/fs.Version=v$RCLONE_VERSION" -o "$BIN" .) >&2
+    Z=rclone-v$RCLONE_VERSION-linux-$ARCH.zip
+    fetch "$Z"
+    want=$(awk -v f="$Z" '$2 == f || $2 == "*" f { print $1 }' "$W/sums")
+    [ -n "$want" ] || { echo "$Z is not in the signed SHA256SUMS" >&2; exit 1; }
+    got=$(sha256sum "$W/$Z" | cut -c1-64)
+    [ "$got" = "$want" ] || { echo "$Z: sha256 $got, the signed SHA256SUMS says $want" >&2; exit 1; }
+    rm -rf "$W/x"
+    mkdir "$W/x"
+    unzip -q "$W/$Z" "rclone-v$RCLONE_VERSION-linux-$ARCH/rclone" -d "$W/x"
+    BIN=$W/x/rclone-v$RCLONE_VERSION-linux-$ARCH/rclone
+    EPOCH=$(stat -c %Y "$BIN")
+    STAMP=$(date -u -d "@$EPOCH" +%Y%m%d%H%M.%S)
+    RFC=$(LC_ALL=C date -u -R -d "@$EPOCH")
+    VERSION="$RCLONE_VERSION-$PKG_REV"
+    if [ "$ARCH" = "$(dpkg --print-architecture)" ]; then
+        v=$("$BIN" version 2>/dev/null | head -1)
+        [ "$v" = "rclone v$RCLONE_VERSION" ] || { echo "$Z: the binary says '$v'" >&2; exit 1; }
+    fi
     PKG=$W/pkg-$ARCH
     D=$PKG/usr/share/doc/lordos-rclone
     install -d "$PKG/usr/lib/lordos/rclone" "$D" "$PKG/DEBIAN"
@@ -67,33 +85,15 @@ for ARCH in $ARCHES; do
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: rclone
 Upstream-Contact: https://rclone.org
-Source: https://github.com/rclone/rclone/archive/refs/tags/v$RCLONE_VERSION.tar.gz (sha256 $RCLONE_SHA256)
-Comment: Upstream rclone v$RCLONE_VERSION, unpatched, built by LordOS's tools/iso/mkdeb-rclone.sh with $GO_VERSION
- (CGO_ENABLED=0, -trimpath). The Go modules linked in follow, each with the license file it ships.
+Source: https://downloads.rclone.org/v$RCLONE_VERSION/$Z (sha256 $got, from SHA256SUMS signed by $RCLONE_FPR)
+Comment: rclone's official release binary v$RCLONE_VERSION, unmodified, repackaged by LordOS's tools/iso/mkdeb-rclone.sh.
+ The Go modules linked in follow rclone's own license, each with the license file it ships.
 
-Files: *
-Copyright: Nick Craig-Wood and the rclone contributors
-License: Expat
 C
-        sed 's/^$/./; s/^/ /' "$SRC/COPYING"
-        "$GO" version -m "$BIN" | awk '$1 == "dep" || $1 == "=>" { print $2, $3 }' | while read -r mod ver; do
-            # the module cache's own spelling: capitals as !lowercase
-            dir=$MODCACHE/$(printf %s "$mod" | sed 's/[A-Z]/!&/g' | tr 'A-Z' 'a-z')@$ver
-            lic=
-            for f in LICENSE LICENSE.txt LICENSE.md LICENCE COPYING LICENSE-MIT LICENSE.MIT License license; do
-                [ -f "$dir/$f" ] && { lic=$dir/$f; break; }
-            done
-            printf '\nFiles: (Go module) %s %s\n' "$mod" "$ver"
-            if [ -n "$lic" ]; then
-                printf 'License: see below\n'
-                sed 's/^[[:space:]]*$/./; s/^/ /' "$lic"
-            else
-                printf 'License: see https://pkg.go.dev/%s?tab=licenses\n' "$mod"
-            fi
-        done
+        cat "$LIC"
     } > "$D/copyright"
-    printf 'lordos-rclone (%s) trixie; urgency=medium\n\n  * Upstream rclone v%s, built from the tag by tools/iso/mkdeb-rclone.sh.\n\n -- LordOS <lord.basex@gmail.com>  %s\n' \
-        "$VERSION" "$RCLONE_VERSION" "$RFC" | gzip -9n > "$D/changelog.gz"
+    printf 'lordos-rclone (%s) trixie; urgency=medium\n\n  * rclone v%s, the official release binary for linux-%s, repackaged by tools/iso/mkdeb-rclone.sh.\n\n -- LordOS <lord.basex@gmail.com>  %s\n' \
+        "$VERSION" "$RCLONE_VERSION" "$ARCH" "$RFC" | gzip -9n > "$D/changelog.gz"
     chmod 644 "$D/copyright" "$D/changelog.gz"
     (cd "$PKG" && find usr -type f | LC_ALL=C sort | xargs md5sum) > "$PKG/DEBIAN/md5sums"
     SIZE=$(du -sk "$PKG/usr" | awk '{print $1}')
@@ -108,10 +108,10 @@ Section: net
 Priority: optional
 Homepage: https://rclone.org
 Description: rclone for LordOS Cloud and Connect to Server
- Upstream rclone v$RCLONE_VERSION, unpatched, at /usr/lib/lordos/rclone/rclone,
- apart from Debian's own rclone package. LordOS runs it for the cloud accounts
- of Cloud (rclone rcd on a Unix socket, for the session user only) and for the
- remote folders of Files' Connect to Server.
+ rclone's official release binary v$RCLONE_VERSION, unmodified, at
+ /usr/lib/lordos/rclone/rclone, apart from Debian's own rclone package. LordOS
+ runs it for the cloud accounts of Cloud (rclone rcd on a Unix socket, for the
+ session user only) and for the remote folders of Files' Connect to Server.
 C
     chmod 644 "$PKG/DEBIAN/control" "$PKG/DEBIAN/md5sums"
     find "$PKG" -type d -exec chmod 755 {} +

@@ -223,10 +223,10 @@ echo "   $(basename "$DEB") ($(du -h "$DEB" | cut -f1))"
 # the tested-hardware snapshot lordos depends on: the same Architecture: all package as the ISO's
 HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
 echo "   $(basename "$HWDEB")"
-# rclone for Cloud (docs/CLOUD.md 3.1): built apart, with Go, by tools/iso/mkdeb-rclone.sh <folder> <arch>; RCLONE_DEB names it,
+# rclone for Cloud (docs/CLOUD.md 3.1): rclone's signed release binary, repackaged by tools/iso/mkdeb-rclone.sh <folder> <arch>; RCLONE_DEB names it,
 # else the newest lordos-rclone_*_<arch>.deb in the output folder
 RCDEB=${RCLONE_DEB:-$(ls "$OUT"/lordos-rclone_*_"$ARCH".deb 2>/dev/null | sort -V | tail -n 1)}
-[ -f "$RCDEB" ] || { echo "no lordos-rclone_<version>_$ARCH.deb: build it with tools/iso/mkdeb-rclone.sh $OUT $ARCH (needs Go), or set RCLONE_DEB" >&2; exit 1; }
+[ -f "$RCDEB" ] || { echo "no lordos-rclone_<version>_$ARCH.deb: build it with tools/iso/mkdeb-rclone.sh $OUT $ARCH (downloads and checks rclone's signed release), or set RCLONE_DEB" >&2; exit 1; }
 echo "   $(basename "$RCDEB")"
 
 # ---- 2. the image's system ----

@@ -22,12 +22,12 @@ static void t_methods(void) {
     static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
         "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
         "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
-        "vfs/refresh", "vfs/forget", "core/quit", NULL };
+        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", NULL };
     static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
         "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/list", "operations/delete",
         "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
-        "operations/copyfile", "operations/cleanup", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
-        "sync/move", "pluginsctl/addPlugin", "debug/set-gc-percent", "core/obscure", "mount/unmountall", NULL };
+        "operations/copyfile", "operations/rmdirs", "operations/mkdir", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
+        "sync/move", "pluginsctl/addPlugin", "debug/set-gc-percent", "core/obscure", "mount/unmountall", "job/list", "job/stopgroup", "operations/check", NULL };
     int n = 0;
     for (int m = 0; m < RCM_COUNT; m++) {
         const char *p = rc_method_path(m);
@@ -124,7 +124,9 @@ static void t_kinds(void) {
         const CloudKind *k = cloud_kind_at(i);
         CHECK(k && k->kind && k->type && k->label && k->group);
         CHECK(!strcmp(k->group, "oauth") || !strcmp(k->group, "server") || !strcmp(k->group, "object") || !strcmp(k->group, "crypt"));
-        CHECK(!has_brand(k->label) && !has_brand(k->hint));
+        CHECK(!strstr(k->label, "Office Drive"));                 /* rclone's names now (17.2 item 2) */
+        CHECK(!k->variant || (!has_brand(k->label) && strcmp(k->kind, k->type)));
+        CHECK(!has_brand(k->hint));
         CHECK(cloud_kind(k->kind) == k);
         CHECK(!k->website || cloud_url_ok(k->website));
         for (int j = 0; j < i; j++) CHECK(strcmp(cloud_kind_at(j)->kind, k->kind));
@@ -147,6 +149,38 @@ static void t_kinds(void) {
     CHECK(!cloud_url_ok("https://") && !cloud_url_ok("https:///x") && !cloud_url_ok("https://a b") && !cloud_url_ok("ftp://x.test"));
 }
 
+static void t_rules(void) {
+    /* 17.2 item 1: what isn't a storage of its own */
+    const char *no[] = { "alias", "archive", "cache", "chunker", "combine", "compress", "hasher", "http", "local", "memory", "union", "tardigrade" };
+    for (size_t i = 0; i < sizeof no / sizeof no[0]; i++) CHECK(cloud_excluded(no[i]));
+    CHECK(!cloud_excluded("webdav") && !cloud_excluded("crypt") && !cloud_excluded("s3") && !cloud_excluded("sftp") && cloud_excluded("") && cloud_excluded(NULL));
+    const char *dropbox[] = { "client_id", "client_secret", "token", "auth_url", "token_url", "chunk_size" };
+    const char *linkbox[] = { "token" };
+    const char *s3[] = { "provider", "env_auth", "access_key_id", "secret_access_key", "region", "endpoint" };
+    const char *webdav[] = { "url", "vendor", "user", "pass", "bearer_token" };
+    const char *b2[] = { "account", "key", "application_key" };
+    CHECK(!strcmp(cloud_derive_group("dropbox", dropbox, 6), "oauth"));
+    CHECK(!strcmp(cloud_derive_group("linkbox", linkbox, 1), "server"));          /* a token alone is no browser sign-in */
+    CHECK(!strcmp(cloud_derive_group("s3", s3, 6), "object"));
+    CHECK(!strcmp(cloud_derive_group("webdav", webdav, 5), "server"));
+    CHECK(!strcmp(cloud_derive_group("b2", b2, 3), "object"));
+    CHECK(!strcmp(cloud_derive_group("crypt", webdav, 5), "crypt"));
+    CHECK(!strcmp(cloud_derive_group("x", NULL, 0), "server"));
+    /* 17.2 item 3: a question's state for JS, and the ones answered here */
+    char id[16];
+    const char *st;
+    CHECK(!cloud_answer_state("c0a1b2c3d:auth_type_done", id, sizeof id, &st) && !strcmp(id, "c0a1b2c3d") && !strcmp(st, "auth_type_done"));
+    CHECK(!cloud_answer_state("c0a1b2c3d:*oauth-confirm,choose_type,,", id, sizeof id, &st) && !strcmp(st, "*oauth-confirm,choose_type,,"));
+    CHECK(cloud_answer_state("auth_type_done", id, sizeof id, &st) == -1 && cloud_answer_state(":x", id, sizeof id, &st) == -1);
+    CHECK(cloud_answer_state("c0a1b2c3d:", id, sizeof id, &st) == -1 && cloud_answer_state("C0A:x", id, sizeof id, &st) == -1);
+    CHECK(cloud_answer_state("../x:y", id, sizeof id, &st) == -1 && cloud_answer_state("c1:a\nb", id, sizeof id, &st) == -1 && cloud_answer_state(NULL, id, sizeof id, &st) == -1);
+    CHECK(cloud_answer_state("c0123456789abcdefg:x", id, sizeof id, &st) == -1);
+    CHECK(cloud_internal_question("config_refresh_token") && cloud_internal_question("config_is_local"));
+    CHECK(!cloud_internal_question("config_type") && !cloud_internal_question("config_2fa") && !cloud_internal_question(NULL));
+    const CloudKind *nc = cloud_kind("nextcloud"), *wd = cloud_kind("webdav");
+    CHECK(nc && nc->variant && wd && !wd->variant && !strcmp(cloud_kind("jottacloud")->group, "server"));
+}
+
 static void t_signin(void) {
     char url[200], tok[4096];
     CHECK(cloud_auth_url("2026/11/06 14:51:51 NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA", url, sizeof url) &&
@@ -165,10 +199,10 @@ static void t_signin(void) {
     CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"access_token\":\"a\nb\"}\n<---End paste\n", tok, sizeof tok));
     CHECK(!cloud_auth_token("", tok, sizeof tok) && !cloud_auth_token(NULL, tok, sizeof tok));
     CHECK(!cloud_auth_token(out, tok, 10));
-    CHECK(!strcmp(cloud_answer("config_refresh_token", "true"), "false"));
-    CHECK(!strcmp(cloud_answer("config_shared_client_id", "false"), "true"));
-    CHECK(!strcmp(cloud_answer("config_is_local", "true"), "false"));
-    CHECK(!strcmp(cloud_answer("region", "eu"), "eu") && !strcmp(cloud_answer("x", NULL), "") && !strcmp(cloud_answer(NULL, "d"), "d"));
+    CHECK(!strcmp(cloud_default_answer("config_refresh_token", "true"), "false"));
+    CHECK(!strcmp(cloud_default_answer("config_shared_client_id", "false"), "true"));
+    CHECK(!strcmp(cloud_default_answer("config_is_local", "true"), "false"));
+    CHECK(!strcmp(cloud_default_answer("region", "eu"), "eu") && !strcmp(cloud_default_answer("x", NULL), "") && !strcmp(cloud_default_answer(NULL, "d"), "d"));
 }
 
 static void t_options(void) {
@@ -334,7 +368,8 @@ static void t_state(void) {
     free(s);
     CHECK(cloud_website("nobody") == NULL);
     /* what JS can ask with no rclone */
-    s = cloud_add("webdav", "X", "{}");
+    int areq = 0;
+    s = cloud_add("webdav", "X", "{}", &areq);
     CHECK(s && strstr(s, "cloud.unavailable"));
     free(s);
     s = cloud_begin_signin("dropbox", "Y", NULL, NULL);
@@ -368,6 +403,49 @@ static void t_state(void) {
     s = cloud_link(p, "forever", &req);
     CHECK(s && strstr(s, "cloud.badExpire"));
     free(s);
+    /* Delete in the cloud: only strictly inside an account, and only while it is mounted */
+    {
+        char d1[1024], d2[1024], d3[1024], d4[1024];
+        snprintf(d1, sizeof d1, "%s/Cloud/Work", home);
+        snprintf(d2, sizeof d2, "%s/Cloud/Work/../Work/x", home);
+        snprintf(d3, sizeof d3, "%s/.ssh/id", home);
+        snprintf(d4, sizeof d4, "%s/Cloud/Work/a.txt", home);
+        const char *dp[] = { d1 }, *dp2[] = { d2 }, *dp3[] = { d3 }, *dp4[] = { d4 }, *dp5[] = { d4, d3 };
+        int dreq = 0;
+        s = cloud_delete(dp, 1, &dreq);
+        CHECK(s && strstr(s, "cloud.badPath") && !dreq);              /* the account's own folder */
+        free(s);
+        s = cloud_delete(dp2, 1, &dreq);
+        CHECK(s && strstr(s, "cloud.badPath") && !dreq);
+        free(s);
+        s = cloud_delete(dp3, 1, &dreq);
+        CHECK(s && strstr(s, "cloud.badPath") && !dreq);
+        free(s);
+        s = cloud_delete(dp5, 2, &dreq);
+        CHECK(s && strstr(s, "cloud.") && !dreq);                     /* one bad path refuses the whole request */
+        free(s);
+        s = cloud_delete(dp4, 1, &dreq);
+        CHECK(s && strstr(s, "cloud.notRunning") && !dreq);           /* not mounted: nothing is deleted locally */
+        free(s);
+        s = cloud_delete(dp4, 0, &dreq);
+        CHECK(s && strstr(s, "cloud.badArgument"));
+        free(s);
+        s = cloud_answer("c0a1b2c3d:x", "v", &dreq);
+        CHECK(s && strstr(s, "cloud.notFound") && !dreq);
+        free(s);
+        s = cloud_answer("cab12cd34:x", "v", &dreq);
+        CHECK(s && strstr(s, "cloud.noQuestion") && !dreq);
+        free(s);
+        s = cloud_answer("garbage", "v", &dreq);
+        CHECK(s && strstr(s, "cloud.badArgument"));
+        free(s);
+        s = cloud_measure("nobody", &dreq);
+        CHECK(s && strstr(s, "cloud.notFound") && !dreq);
+        free(s);
+        s = cloud_providers(&dreq);
+        CHECK(s && strstr(s, "cloud.unavailable") && !dreq);
+        free(s);
+    }
     /* status: merged from the metadata, the queue and Keep */
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find("cab12cd34");
@@ -477,6 +555,7 @@ int main(void) {
     t_http();
     t_paths();
     t_kinds();
+    t_rules();
     t_signin();
     t_options();
     t_meta();
