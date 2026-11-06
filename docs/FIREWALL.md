@@ -66,7 +66,7 @@ Destination details:
 `fw_app_canon` accepts:
 
 - `lordos` (lord-server and its built-in apps);
-- `desktop:<id>` (Linux apps with a `.desktop`). Two ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`) and `desktop:lordos-rdesk` (the RDP and VNC apps). The launcher refuses a `.desktop` with either id (`app_scope_reserved`), so none can inherit their rules;
+- `desktop:<id>` (Linux apps with a `.desktop`). Three ids belong to LordOS's own helpers: `desktop:lordos-rclone` (rclone for remote folders, with `ssh-keyscan` and `openssl`), `desktop:lordos-cloud` (Cloud's `rclone rcd` and `rclone authorize`, 0.8.8.5, docs/CLOUD.md) and `desktop:lordos-rdesk` (the RDP and VNC apps). The launcher refuses a `.desktop` with any of these ids (`app_scope_reserved`), so none can inherit their rules;
 - `lpk:<id>` (`.lpk` apps);
 - the absolute path of the executable (what the Monitor uses when it can't find a `.desktop`).
 

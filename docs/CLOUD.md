@@ -4,7 +4,9 @@ The design of **Cloud**, LordOS's layer over the person's cloud storage accounts
 from Files, set up and watched from Settings, backed up to by Backups, with files that live in the cloud and come down when they
 are opened. The engine is [rclone](https://rclone.org) (MIT, the same license as LordOS); everything the person sees is ours.
 
-Nothing here is built yet. Target release: **0.8.8.5**, all of it in one release (decided 2026-11-06).
+Target release: **0.8.8.5**, all of it in one release (decided 2026-11-06). Phase 0 is done (section 15); Phase 1's
+core is built on branch `cloud-core` (`server/src/cloud`, `lord.cloud`, `sdk/cloud.js`, the `lordos-rclone` package;
+section 15, "Phase 1: the core"), the interface on branch `cloud-ui`.
 
 How to read it:
 
@@ -67,18 +69,29 @@ other `.deb` of the release.
 
 ### 3.2 One daemon per session, no port
 
-`lord-cloudd` is not a new program: it is `rclone rcd` started by `lord-server` for the session user, as one systemd user unit
-(`lordos-cloud.service`), in its own scope `app-lordos-lordos-cloud.scope`, firewall app `desktop:lordos-cloud` (reserved like
-`desktop:lordos-rclone`, `app_scope_reserved`). It starts when the session has at least one account and stops with the session.
+`lord-cloudd` is not a new program: it is `rclone rcd` started by `lord-server` for the session user, in its own scope
+`app-lordos-lordos-cloud.scope`, firewall app `desktop:lordos-cloud` (reserved like `desktop:lordos-rclone`, `app_scope_reserved`).
+It starts when the session has at least one account (or the provider list or a sign-in needs it), stops 2 minutes after the
+last account goes, and ends with the session.
+
+**As built (Phase 1):** not a systemd user unit but a child of `lord-server`'s cloud thread, the way Connect to Server starts
+`rclone mount` (`server/src/cloud/cloud.c`, `daemon_start`): fixed argv and a fixed environment (HOME, PATH, LANG,
+XDG_RUNTIME_DIR, USER), umask 077, `nice 10`, idle I/O, `PR_SET_PDEATHSIG` (rclone unmounts and ends if `lord-server` dies),
+scope through lord-sessiond with `memory.high` 512 MB. Its log is `~/.cache/lordos/cloud.log` (NOTICE level; over 4 MB it
+becomes `cloud.old` at the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
+there: the scope and the socket are the boundary.
 
 - **Listens on a Unix socket only**: `$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, folder 0700, socket 0600. No TCP, not even
   loopback: any local program of any user can open a loopback port, and rclone's rc is all or nothing (4.1). Whether `rcd`
   listens on a Unix socket in the version we ship is the first thing Phase 0 checks (rclone's documentation shows the client's
   `--unix-socket`; the server side is To test). If it can't, the fallback is a loopback port chosen at random, with a 32-byte
   random user and password per start passed through a memfd, and the firewall allowing only `lord-server`'s connections to it.
-- **Authentication even on the socket**: `--rc-user`/`--rc-pass`, random per start, so `--rc-no-auth` is never used.
-- **Configuration**: `--config` points at `~/.config/lordos/cloud/rclone.conf` (0600) with **no secrets in it**: tokens and
-  passwords are in the keyring (section 6) and given to rclone per account through `config/create` at start, kept in its memory.
+- **Authentication even on the socket**: a random user and password per start, so `--rc-no-auth` is never used. As built:
+  not `--rc-user`/`--rc-pass` (the command line is readable by every user) but `--rc-htpasswd /proc/self/fd/3`, a memfd with
+  one bcrypt line (cost 4: the password is 32 random bytes); `lord-server` keeps the password in memory for Basic auth.
+- **Configuration**: rclone's is in memory only (`--config ""`). `~/.config/lordos/cloud/rclone.conf` (0600) is LordOS's own
+  record of each account's type and non-secret options, with **no secrets in it**: tokens and passwords are in the keyring
+  (section 6) and given to rclone per account through `config/create` at each start, kept in its memory.
 - **Restart**: Settings → Cloud → Service → **Restart** (and automatically after a crash, at most 5 times a minute, as Machines'
   passt). A restart remounts every account; open files show "Reconnecting…" in Files for the few seconds it takes.
 - **Resources**: `--use-mmap`, `--buffer-size 16M`, transfers 4, checkers 8 by default; Settings → Cloud → **Bandwidth** limits
@@ -88,7 +101,9 @@ other `.deb` of the release.
 ### 3.3 Mounts
 
 Each account is mounted with `mount/mount` at `~/Cloud/<Account name>` (a folder of the home, so every app and the file pickers
-see it), `--vfs-cache-mode full`, the cache in `~/.cache/lordos/cloud/<id>/`. Section 7 covers how files on demand are built on it.
+see it), `--vfs-cache-mode full`, the cache in `~/.cache/lordos/cloud/` (rclone's layout: `vfs/<id>/` for the data,
+`vfsMeta/<id>/` for what is present). Section 7 covers how files on demand are built on it. The account's id is `c` and 8 hex
+digits; its folder is its name, which can't be empty, start with a dot or hold a slash or a control character.
 
 ## 4. Security
 
@@ -127,8 +142,13 @@ proves the C client can't send them (the method name comes from a fixed table, n
   account. `rclone.conf` holds only the account's type and non-secret options.
 - At each start `lord-server` reads them from the keyring and gives them to rclone with `config/create`/`config/update` over the
   socket. When rclone refreshes an OAuth token, `lord-server` reads the new one (`config/get` for that one remote, over the socket)
-  and writes it back to the keyring, then removes it from rclone's file if rclone wrote it there (To test: whether rcd writes
-  refreshed tokens to `--config`; if it does, the file stays 0600 and is rewritten without secrets after each refresh).
+  and writes it back to the keyring. As built: rclone's configuration is in memory (`--config ""`), so there is no file for a
+  refreshed token to land in; `lord-server` compares each OAuth account's secrets every 5 minutes and saves them when they
+  changed. The keyring item is owner `cloud`, service `cloud:<id>`, its secret a JSON object of rclone's secret options as
+  `config/get` gives them (passwords obscured by rclone), asked of `lord-vault` on `lord-server`'s own channel
+  (`vc_request_wait`, `server/src/cloud/cloud_kr.c`), so JavaScript never sees it. Which options are secret comes from rclone's
+  own schema (`IsPassword` or `Sensitive`), plus `token` and `client_secret`. If the keyring can't take them (locked) they wait
+  in memory and are retried every 30 s; with no keyring at all the account says `cloud.noKeyring`.
 - A locked keyring (no auto-unlock) means Cloud waits and Files shows the accounts dim with "Unlock the keyring to connect".
 
 ### 4.4 Using a cloud from another computer
@@ -303,7 +323,7 @@ Camera and Photos; a cloud's shared-with-me folder where the provider exposes it
 | Phase | Ships | Done when |
 |---|---|---|
 | **0, Proof** | `lordos-rclone` built on both architectures; `rcd` on a Unix socket; every rc call in section 5 answered; eviction while mounted (7.2); OAuth through `config/create` states; token refresh and the keyring | Each To test above is Measured, in section 15 |
-| **1, Core** | `server/src/cloud/` with `lord.cloud`, the unit, Settings → Cloud, accounts with sign-in, space, mounts, Files' Cloud section with status glyphs, Keep / Free Up Space, links, menu bar item | An account of each kind (OAuth drive, WebDAV, S3, SFTP) added, browsed, files opened offline, links made, on amd64 and the Pi |
+| **1, Core** | `server/src/cloud/` with `lord.cloud`, the unit, Settings → Cloud, accounts with sign-in, space, mounts, Files' Cloud section with status glyphs, Keep / Free Up Space, links, menu bar item | An account of each kind (OAuth drive, WebDAV, S3, SFTP) added, browsed, files opened offline, links made, on amd64 and the Pi. **Core built** (branch `cloud-core`): WebDAV end to end on both architectures (section 15); a real OAuth account, S3 and SFTP still to run; the interface is branch `cloud-ui` |
 | **2, Backups** | Cloud destination, manifests, versions, crypt, restore | Backup, restore of a file and of everything, a kill in the middle recovered, encrypted names seen on the provider |
 | **3, Release** | Docs, screenshots, translations, tests (section 16), THIRD_PARTY and About | `make test` and the release gates pass on both architectures |
 
@@ -329,7 +349,24 @@ results on both architectures unless a number says otherwise.
 | `core/bwlimit` | **Measured**: up and down separately (`1M:2M`) |
 | Memory | `rcd` with one mount: RSS 77 MB (amd64), 81 MB (Pi) |
 | Binary | 86 MB (amd64), 79 MB (arm64) with every backend. To decide in packaging: build tags to leave out backends 6.1 doesn't offer |
-| Token refresh written back to `--config` | To test with a real OAuth account (Phase 1) |
+| Token refresh written back to `--config` | Moot as built: `--config ""` keeps it in memory, and `lord-server` saves a changed token to the keyring (4.3). To test with a real OAuth account |
+
+### Phase 1: the core (2026-11-06)
+
+Built on branch `cloud-core`: `server/src/cloud/` (`cloud_pure.c` the closed method table and every check, `cloud_rc.c` the
+client, `cloud.c` the thread, daemon and accounts, `cloud_files.c` status, eviction and Keep, `cloud_kr.c` the keyring),
+`server/src/ui/js_cloud.c` (`lord.cloud`), `sdk/cloud.js`, `tools/iso/mkdeb-rclone.sh` (`lordos-rclone_1.75.2-1_amd64.deb`
+and `_arm64.deb`, 21 MB and 18 MB, built on VM 116 in 4 min 17 s for both). Measured on VM 116 (amd64) and the Pi 5 (arm64):
+
+| What | Result |
+|---|---|
+| `cloud_test` (unit, ASan and UBSan) | 1526 checks pass on both: the 21-method table and that 30 dangerous names (`core/command`, `config/dump`, `options/set`, `operations/delete`, `sync/sync`…) are not in it, header injection refused, HTTP answers (length, chunked, cut short), names and paths under `~/Cloud` (`..`, `//`, C1 controls, bad UTF-8, a sibling `~/Cloudy`), the provider and website tables (no other operating system's names; `https` only for an account's own address), `authorize`'s address and token, the status merge, eviction (LRU, never kept, changed, waiting or open), and on a real cache tree in a throwaway home: Free Up Space, a file open by a process refused, links and keep files read back without bad entries, files 0600 in a 0700 folder |
+| `tests/cloud_integration.sh` against `rclone serve webdav` | 70 checks pass on amd64 and on the Pi: no TCP listener of `rcd`, the rc folder 0700 and socket for the user only, no password or `RCLONE_RC_*` on the command line or in the environment, 401 for `config/dump`, `core/command` and `operations/list` without credentials, another local user can't connect, `rclone.conf` and every file in `~/.config/lordos/cloud` without the password; add, mount, a 5 MB file read whole, Free Up Space while closed and refused while open, a write going up and refused as pending, Pause holding an upload 11 s and Resume sending it, Keep bringing a freed file down, WebDAV links answered `unsupported`, Restart and a `kill -9` restarted by itself (files read after both), add with the same name updating the account, rename, remove (unmounted, cache and keyring item gone, nothing deleted on the server), `rclone` gone with the session |
+| Eviction while a file is open | Refused (`reason: open`): rclone's `vfs/stats` `inUse` > 0 makes `lord-server` look for the file among this user's open descriptors (`/proc/*/fd`), and also treats a file used in the last 10 s as open, because rclone keeps a closed file's handle 5 s (`HandleCaching`) |
+| Pause per account | rclone has no per-remote pause: what waits in `vfs/queue` gets its expiry pushed to 10⁹ s (`vfs/queue-set-expiry`) every second while paused, and back to 0 on Resume. Downloads of files being opened are never paused; Keep's downloads are |
+| A sign-in's address | `rclone authorize` prints it on stderr within milliseconds; `beginSignIn` waits for it up to 2 s, so `url` is there at once in practice |
+| An own client ID | `RCLONE_<KIND>_CLIENT_ID`/`_CLIENT_SECRET` in `authorize`'s environment: **measured**, the provider's address carries that `client_id` |
+| rclone's shared client ID for the largest drive | `config/create` asks `config_shared_client_id`: "rclone's shared … client_id is being retired and will stop working during 2026". Phase 1 answers yes; own client IDs (6.2) become necessary for that provider |
 
 ## 16. Tests
 
@@ -342,6 +379,12 @@ results on both architectures unless a number says otherwise.
 - **Security**: nothing listens on any TCP port while Cloud runs (`ss -ltnp`), the socket is 0600, `rclone.conf` holds no secret,
   a second local user can't connect, a JS caller can't reach `core/command` or `config/dump`.
 - **Load**: 100 000 files in one account listed in Files without stalling the desktop; a 4 GB upload with the desktop at 60 FPS.
+
+Built so far (section 15, "Phase 1: the core"): `server/tests/cloud_test.c` (in `make test`, `mk/cloud.mk`) and
+`server/tests/cloud_integration.sh <build dir> <rclone binary>`, which drives `build/cloud-harness` (the same `src/cloud`
+code with the keyring replaced by files and the browser by a line on stdout; `LORDOS_CLOUD_RCLONE` names the binary in that
+test build only, `-DCLOUD_TEST`) against a local `rclone serve webdav`. MinIO, conflicts, Backups and the load tests are not
+written yet.
 
 ## 17. The `lord.cloud` contract (Phase 1)
 
@@ -386,3 +429,46 @@ State = {
 ```
 
 Errors are codes (`errors.json` keys `cloud.*`), never rclone's text, except `message` in an account, which is shown under Get Info.
+
+### 17.1 As built (branch `cloud-core`)
+
+`sdk/cloud.js` exports `cloud`, `useCloud()` and `cloudState`; `__lordCloud(state)` replaces the store's state. What the
+contract above leaves open, and the few places the core differs from it:
+
+- **Times** are milliseconds since the epoch (`expiresAt`, `recent[].at`, `links()[].made` and `expires`, `null` for never);
+  sizes are bytes (`about`, `cacheBytes`, `keptBytes`, `up`/`down`.`bytes` and `done`, `free()`'s `freed`); `bwUp`/`bwDown`
+  are KiB/s, 0 for no limit, at most 10 GiB/s; `freeBelowGb` 5 to 100.
+- `providers()` is `[]` until rclone has listed its backends once in the session (it starts rclone if needed); a state push
+  follows, so call it again from `useCloud()`. Fields: rclone's non-advanced options of that backend, minus the ones a preset
+  sets (Nextcloud's `vendor`…); `label` is the first line of rclone's help, in English; OAuth kinds have `fields: []`.
+- `beginSignIn` waits up to 2 s for rclone's address, so `url` is set at once in practice; if not, it is `null` and comes in
+  `state.signin.url`. `lord-server` opens it in the default browser itself (the launcher's `x-scheme-handler/http` app);
+  `openSignInPage(id)` opens it again and returns whether it could (`sdk/cloud.js` falls back to the session's opener).
+  `signin.account` names the account once the token came. `cancelSignIn` of a finished sign-in clears `signin` to `null`.
+- **Sign In Again / new credentials** (asked by the interface, 2026-11-06): `beginSignIn(kind, name)` or `add(kind, name,
+  fields)` with the name of an existing account **of the same kind** (case doesn't matter) updates that account: same id, same
+  folder, the new token or fields merged into its remote with `config/update`, unmounted and mounted again, the keyring item
+  replaced. `add` answers `{ id }` with the existing id; required fields aren't required then, and an empty value keeps the
+  old one. The name of an account of another kind is `cloud.nameTaken`.
+- `link` and `unlink` reach the provider, so `lord.cloud.link/unlink` return `{ req }` and the answer comes through
+  `__lordCloudReply(req, result)`; **`cloud.link()` and `cloud.unlink()` in the SDK return a Promise** of `{ url }`,
+  `{ ok }` or `{ error }`. A provider without links answers `{ error: 'unsupported' }` (also at once when the account's
+  `linksSupported` is already known to be false).
+- `remove` with changes waiting answers `{ error: 'pending', files }`; `{ discardPending: true }` removes anyway.
+- `status`: a folder is `up` or `down` when something inside moves, `kept` when kept, else `cloud`; `error` carries
+  `error: 'cloud.transferFailed'` (the file's last transfer failed). Paths not under `~/Cloud/<account>` are left out.
+- `free` refuses with `reason` in this order: `kept`, `pending` (changed here or in `vfs/queue`), `open`; `skipped` lists at
+  most 200.
+- **State**, besides §17: `available`; `service.error` (`cloud.unavailable`, `cloud.startFailed`, `cloud.crashed`,
+  `cloud.noRuntimeDir`); `options.pauseAll` and `options.onBattery`; in each account `group`, `mounted`, `paused`,
+  `ownClient` and `error` (a `cloud.*` code: `cloud.keyringLocked`, `cloud.noKeyring`, `cloud.signInAgain`, `cloud.offline`,
+  `cloud.authFailed`, `cloud.mountFailed`, `cloud.folderNotEmpty`, `cloud.addFailed`…; `message` is rclone's own text).
+  `about` has `used` always and the others only when the provider gives them.
+- `pause(null)` / `resume(null)`: Pause All (`options.pauseAll`); `resume(null)` also resumes each account.
+- `pauseOnMetered` is kept but does nothing yet: LordOS's network service doesn't say whether a network is metered.
+- `showLog()` opens Logs on `~/.cache/lordos/cloud.log` (`wm.open('logs', { args: { file: 'cloud.log' } })`; Logs reads
+  `args.file` since this branch).
+- Not in the core: per-account options (`setAccountOptions`, `account.options`: rclone's bandwidth limit is one for the
+  whole daemon, and there is no metered information to act on) and `State.conflicts`: rclone's VFS uploads the last version
+  written and doesn't keep "name (this computer).ext" copies, so 7.2's conflict rule needs work of its own. The interface
+  hides those rows when they're absent.

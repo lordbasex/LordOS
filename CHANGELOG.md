@@ -10,6 +10,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Cloud, the core** (docs/CLOUD.md; the interface comes separately). `lord-server` runs rclone's remote control for the session on a Unix socket only (`$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, in a 0700 folder), with a random user and password per start given through a memory file, its configuration in memory, in a scope and firewall app of its own (`desktop:lordos-cloud`), restarted by itself after a crash (at most 5 times a minute). It is rclone's only client, and it can only send the 21 methods of a fixed table: nothing in LordOS can ask rclone to run a command or hand out its stored credentials. `lord.cloud` offers accounts (sign-in in the browser through `rclone authorize`, servers and object storage with their fields checked against rclone's own schema), mounts in `~/Cloud/<account>`, each file's status, **Keep on This Computer** and **Free Up Space** (never for a file that is open, changed here, waiting to go up or kept), freeing space by itself below a threshold, links where the provider has them, Pause and Resume, bandwidth limits and Restart. Tokens and passwords live in the keyring; the files in `~/.config/lordos/cloud` hold none. Signing in again, or adding with an existing account's name, updates that account.
+- **`lordos-rclone`**: upstream rclone v1.75.2, unpatched, built from its release tag with Go 1.26.10 for amd64 and arm64 (`tools/iso/mkdeb-rclone.sh`), at `/usr/lib/lordos/rclone/rclone`, apart from Debian's own package. `lordos` depends on it instead of Debian's `rclone`, and Connect to Server uses it too.
+
+### Tests
+
+- `cloud_test` (1526 checks, with ASan) and `tests/cloud_integration.sh` (70 checks against a local WebDAV server), both passing on VM 116 (amd64) and the Raspberry Pi 5 (arm64).
+
 ## [0.8.8.4-beta] - 2026-11-06
 
 An update for 0.8.8 to 0.8.8.3 through Store → Updates and `apt`: the `lordos` package changes, with the 13 issues reported on GitHub since 0.8.8.3 (#28 to #40), a redesigned Remote Desk with sound, single sign-on for Fortinet VPNs and a Balance control for sound. Thanks to everyone who opened an issue. The installer's manual partitioning (#31) lives in the ISO and reaches people with the next one.

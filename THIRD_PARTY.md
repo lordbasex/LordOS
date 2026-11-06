@@ -65,7 +65,7 @@ LordOS source they are built from is GPL-compatible. `lord-server` itself does n
 On the Raspberry Pi image, and on a Pi updated to 0.8.7, `lord-media` runs on Raspberry Pi's build of FFmpeg (`+rpt`, the
 same package names), pinned from its archive for the Pi 5's hardware HEVC (`docs/WALLPAPERS.md`).
 
-These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libfreerdp-client3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT), **fuse3** (LGPL-2.1, GPL-2.0) and openssh-client (BSD). The Store's Disk Formats item, not preinstalled, brings **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, **apfs-dkms** (GPL-2.0).
+These come with `lordos` for Files and the remote apps (0.8.7): **FreeRDP** (`libfreerdp3-3`, `libfreerdp-client3-3`, `libwinpr3-3`, Apache-2.0), **rclone** (MIT; since 0.8.8.5 LordOS's own build of upstream rclone v1.75.2, package `lordos-rclone`, for Cloud and Connect to Server; its `/usr/share/doc/lordos-rclone/copyright` lists the license of every Go module linked in), **fuse3** (LGPL-2.1, GPL-2.0) and openssh-client (BSD). The Store's Disk Formats item, not preinstalled, brings **ntfs-3g** (GPL-2.0), **exfatprogs** (GPL-2.0), dosfstools (GPL-3.0) and, on amd64, **apfs-dkms** (GPL-2.0).
 
 New on the images in 0.8.8 (installed from Debian, not linked; each keeps its own `/usr/share/doc/<package>/copyright`):
 
