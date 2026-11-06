@@ -72,7 +72,7 @@ export function IconView({ groups, ctx }) {
                     style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
                     <View style={{ padding: 4, borderRadius: 7, backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
                       <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} />
-                      {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: -4, bottom: -4 }}><StatusBadge s={ctx.cloud.status[e.path]} size={Math.max(18, Math.round(m.icon * 0.32))} /></View> : null}
+                      {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: -4, bottom: -4 }}><StatusBadge s={ctx.cloud.status[e.path]} size={Math.max(20, Math.round(m.icon * 0.36))} /></View> : null}
                     </View>
                     <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
                       <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} color={sel ? '#fff' : t.text} />

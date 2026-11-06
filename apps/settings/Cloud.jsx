@@ -4,7 +4,7 @@
 // AddAccount, SignIn, Credentials, Account). Everything goes through cloud (sdk/cloud.js); nothing here talks to
 // rclone.
 import {
-  View, Text, Button, Toggle, TextInput, SearchField, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
+  View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, tOptional, spacing, typeScale, wm, Layer, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
   AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings,
 } from '@lordos/sdk';
@@ -399,7 +399,7 @@ function AccountPage({ a, st }) {
         {a.message && a.state === 'error' ? <Dim t={t} style={{ color: tint.warn }}>{errorText(a.message)}</Dim> : null}
       </View>
       <Button label={tr('cloud.signInAgain')} onClick={() => signInAgain(a)} />
-      <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ height: 30, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7a2230' }}>
+      <View onClick={() => setView({ sheet: { kind: 'remove', id: a.id } })} style={{ height: 30, borderRadius: t.controlRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: t.mode === 'dark' ? '#7a2230' : '#d6453d' }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: '#fff' }}>{tr('cloud.remove')}</Text>
       </View>
       <Dim t={t} style={{ fontSize: typeScale.caption }}>{tr('cloud.removeHint')}</Dim>
@@ -577,10 +577,11 @@ function CredSheet({ st, sheet }) {
       </View>
       <View style={{ paddingHorizontal: 20, paddingVertical: 8, gap: 10 }}>
         {(p.fields || []).map((f) => field(f.name, fieldLabel(f),
-          // a choice among the provider's examples (a preset, a service), else a text field; secrets masked
-          !f.secret && (f.examples || []).length > 1
-            ? <PopUp width={250} value={vals[f.name] || String(f.examples[0])} onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }}
-              options={[...new Set([...(f.examples || []).map(String), ...(vals[f.name] ? [vals[f.name]] : [])])].map((x) => [x, x])} />
+          // a choice among a few of the provider's examples (a preset, a service), else a text field; secrets masked
+          // (a segmented control: a pop-up's list would open under the sheet's layer)
+          !f.secret && (f.examples || []).length > 1 && f.examples.length <= 4
+            ? <Segmented small fill value={vals[f.name] || String(f.examples[0])} onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }}
+              options={f.examples.map(String).map((x) => [x, x.charAt(0).toUpperCase() + x.slice(1)])} />
             : <TextInput secure={!!f.secret} value={vals[f.name] || ''} placeholder={f.examples && f.examples[0] ? String(f.examples[0]) : ''} style={{ direction: 'ltr' }}
               onChange={(v) => { setVals({ ...vals, [f.name]: v }); setErr(null); }} onSubmit={connect} />))}
         {sheet.again ? null : field('__name', tr('cloud.accountName'), <TextInput value={name} onChange={(v) => { setName(v.slice(0, M.NAME_MAX)); setErr(null); }} onSubmit={connect} />)}

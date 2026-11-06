@@ -31,7 +31,7 @@ export function StatusBadge({ s, size = 22 }) {
   const g = statusGlyph(s);
   if (!g) return null;
   return h(View, { title: t(g.key), style: { width: size, height: size, borderRadius: size / 2, backgroundColor: th.windowBg, alignItems: 'center', justifyContent: 'center' } },
-    h(CloudGlyph, { kind: g.kind, size: Math.round(size * 0.72), pct: g.pct }));
+    h(CloudGlyph, { kind: g.kind, size: Math.round(size * 0.82), pct: g.pct }));
 }
 
 // A ring of parts ([{ frac, color }]) over the track; thickness in units of a 24-unit box (12 fills it).
