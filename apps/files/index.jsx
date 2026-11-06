@@ -390,7 +390,7 @@ export default function Files() {
       const g = split.cloud[i];
       if (!g) return;
       const pr = cloudModel.deletePrompt(g.acc, g.paths.length);
-      setConfirm({ text: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars), ok: tr('cloud.delete.ok'), run: () => {
+      setConfirm({ text: tr(pr.title.key, pr.title.vars), detail: tr(pr.detail.key, pr.detail.vars), ok: tr('cloud.delete.ok'), destructive: true, run: () => {
         cloud.delete(g.paths).then((r) => { setMsg(r && r.error ? errorText(r.error) : tr('cloud.delete.done', { count: g.paths.length, provider: g.acc.provider || g.acc.kind })); bump(); });
         setTimeout(() => ask(i + 1), 0);
       } });
@@ -969,7 +969,7 @@ export default function Files() {
         extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}
       {sharing && cf.accountOf(sharing.path) && <ShareSheet e={sharing} cf={cf} onClose={() => setSharing(null)} />}
       {offlineAsk && <OfflineDialog e={offlineAsk} onClose={() => setOfflineAsk(null)} />}
-      {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
+      {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} destructive={!!confirm.destructive} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}
       {sheet === 'settings' && <FilesSettings onClose={() => setSheet(null)} />}

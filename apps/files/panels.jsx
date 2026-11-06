@@ -174,7 +174,8 @@ export function InfoPanel({ e, onClose, openers, extra }) {
   );
 }
 
-export function Confirm({ text, detail, okLabel, onOk, onCancel }) {
+// destructive: the OK button is red, as the shell's ConfirmDialog (an action that can't be undone or deletes elsewhere)
+export function Confirm({ text, detail, okLabel, onOk, onCancel, destructive }) {
   const t = useTheme();
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
@@ -183,7 +184,7 @@ export function Confirm({ text, detail, okLabel, onOk, onCancel }) {
         {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
           <Button label={tr('files.cancel')} onClick={onCancel} />
-          <Button primary label={okLabel} onClick={onOk} />
+          <Button primary label={okLabel} onClick={onOk} style={destructive ? { backgroundColor: '#e5483f', ...(t.buttonBorder ? { border: '1px solid #e5483f' } : null) } : undefined} />
         </View>
       </View>
     </View>
