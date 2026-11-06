@@ -1202,22 +1202,96 @@
     },
     "features": {
       "en": [
-        "New in 0.8.8.1, in Store → Third-party suites",
+        "New in 0.8.8.1, in Store → Third-party apps",
         "The launcher installs, updates and opens each app of the suite",
         "Word processing, slides, spreadsheets, PDF, photos, design, video, sound and CAD",
         "Apache-2.0, for amd64 and arm64"
       ],
       "es": [
-        "Nueva en 0.8.8.1, en Store → Suites de terceros",
+        "Nueva en 0.8.8.1, en Store → Apps de terceros",
         "El lanzador instala, actualiza y abre cada app de la suite",
         "Textos, presentaciones, planillas, PDF, fotos, diseño, video, sonido y CAD",
         "Apache-2.0, para amd64 y arm64"
       ],
       "pt": [
-        "Nova na 0.8.8.1, em Store → Suítes de terceiros",
+        "Nova na 0.8.8.1, em Store → Apps de terceiros",
         "O lançador instala, atualiza e abre cada app da suíte",
         "Textos, apresentações, planilhas, PDF, fotos, design, vídeo, som e CAD",
         "Apache-2.0, para amd64 e arm64"
+      ]
+    }
+  },
+  "vscodium": {
+    "category": "thirdparty",
+    "vendor": "VSCodium (community project)",
+    "homepage": "https://vscodium.com",
+    "upcoming": "0.8.8.4",
+    "screenshot": "docs/screenshots/store-third-party-apps.png",
+    "name": {
+      "en": "VSCodium",
+      "es": "VSCodium",
+      "pt": "VSCodium"
+    },
+    "tagline": {
+      "en": "The open source VS Code editor, built by the community with telemetry turned off",
+      "es": "El editor de código abierto VS Code, compilado por la comunidad y sin telemetría",
+      "pt": "O editor de código aberto VS Code, compilado pela comunidade e sem telemetria"
+    },
+    "features": {
+      "en": [
+        "Coming in 0.8.8.4, in Store → Third-party apps (#38)",
+        "Installed and updated from its makers' signed repository, with the key LordOS pins",
+        "Extensions from the Open VSX registry",
+        "MIT, for amd64 and arm64"
+      ],
+      "es": [
+        "Llega en 0.8.8.4, en Store → Apps de terceros (#38)",
+        "Se instala y actualiza desde el repositorio firmado de sus autores, con la clave que LordOS fija",
+        "Extensiones del registro Open VSX",
+        "MIT, para amd64 y arm64"
+      ],
+      "pt": [
+        "Chega na 0.8.8.4, em Store → Apps de terceiros (#38)",
+        "Instalado e atualizado a partir do repositório assinado dos seus autores, com a chave que o LordOS fixa",
+        "Extensões do registro Open VSX",
+        "MIT, para amd64 e arm64"
+      ]
+    }
+  },
+  "brave": {
+    "category": "thirdparty",
+    "vendor": "Brave Software",
+    "homepage": "https://brave.com/linux/",
+    "upcoming": "0.8.8.4",
+    "screenshot": "docs/brave-gtk-theme.png",
+    "name": {
+      "en": "Brave Browser",
+      "es": "Brave Browser",
+      "pt": "Brave Browser"
+    },
+    "tagline": {
+      "en": "A web browser based on Chromium that blocks ads and trackers by default",
+      "es": "Un navegador web basado en Chromium que bloquea anuncios y rastreadores por defecto",
+      "pt": "Um navegador web baseado no Chromium que bloqueia anúncios e rastreadores por padrão"
+    },
+    "features": {
+      "en": [
+        "Coming in 0.8.8.4, in Store → Third-party apps (#39)",
+        "Installed and updated from its maker's signed repository, with the key LordOS pins",
+        "LordOS's window buttons in its tab bar with Settings → Appearance → \"Browsers: tabs in the title bar\"",
+        "MPL-2.0, for amd64 and arm64"
+      ],
+      "es": [
+        "Llega en 0.8.8.4, en Store → Apps de terceros (#39)",
+        "Se instala y actualiza desde el repositorio firmado de su autor, con la clave que LordOS fija",
+        "Los botones de ventana de LordOS en su barra de pestañas con Configuración → Apariencia → «Navegadores: pestañas en la barra de título»",
+        "MPL-2.0, para amd64 y arm64"
+      ],
+      "pt": [
+        "Chega na 0.8.8.4, em Store → Apps de terceiros (#39)",
+        "Instalado e atualizado a partir do repositório assinado do seu autor, com a chave que o LordOS fixa",
+        "Os botões de janela do LordOS na barra de abas com Configurações → Aparência → «Navegadores: abas na barra de título»",
+        "MPL-2.0, para amd64 e arm64"
       ]
     }
   }

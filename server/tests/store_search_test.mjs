@@ -75,6 +75,10 @@ eq('matches()', [S.matches('vs code', ['VSCodium', 'codium'], []), S.matches('no
 // ---- the real catalog ----
 const cat = (q) => S.search(catalog.apps, q, (a) => S.catalogFields(a, 'en')).map((a) => a.id);
 eq('catalog: "vs code" brings Visual Studio Code first', cat('vs code')[0], 'vscode');
+eq('catalog: "vs code" also brings VSCodium and Cursor', ['vscodium', 'cursor'].every((id) => cat('vs code').slice(0, 3).includes(id)), true);
+eq('catalog: "codium"', cat('codium')[0], 'vscodium');
+eq('catalog: "brave"', cat('brave')[0], 'brave-browser');
+eq('catalog: "browser" brings the browsers', ['brave-browser', 'google-chrome', 'microsoft-edge'].every((id) => cat('browser').includes(id)), true);
 eq('catalog: "vscode" brings Visual Studio Code first', cat('vscode')[0], 'vscode');
 eq('catalog: "chrome"', cat('chrome')[0], 'google-chrome');
 eq('catalog: "speech recognition"', cat('speech recognition')[0], 'whisper.cpp');

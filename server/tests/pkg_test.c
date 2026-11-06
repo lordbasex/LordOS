@@ -6,7 +6,9 @@
  *   build/pkg-test pgp <keyring> <InRelease>        verifies a real signature
  *   build/pkg-test plan <dir> <status> [-r<to-remove>] [to-install…] [--up] [--rec] [--yes]
  *   sudo build/pkg-test run <action> [argument]     pkg-update, pkg-install "a b", pkg-autoremove…, as
- *                                        admin.c runs them (progress goes to stdout) */
+ *                                        admin.c runs them (progress goes to stdout); pkg-source-add <id>
+ *                                        reads <dir>/apt/catalog.json, <dir> being two folders above the
+ *                                        binary (root-owned, as the lordos package installs it) */
 #include "pkg/crypto.h"
 #include "pkg/deb.h"
 #include "pkg/idx.h"
@@ -616,6 +618,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[2], "pkg-upgrade")) pkg_act_upgrade(&r, arg, len);
         else if (!strcmp(argv[2], "pkg-autoremove")) pkg_act_autoremove(&r, arg, len);
         else if (!strcmp(argv[2], "pkg-install-file")) pkg_act_install_file(&r, arg, len);
+        else if (!strcmp(argv[2], "pkg-source-add")) pkg_act_source_add(&r, arg, len);     /* the catalog next to the binary's folder */
+        else if (!strcmp(argv[2], "pkg-source-remove")) pkg_act_source_remove(&r, arg, len);
         else { printf("unknown action\n"); return 2; }
         struct rusage ru;
         getrusage(RUSAGE_SELF, &ru);

@@ -182,10 +182,10 @@
       "media": "Mídia",
       "system": "Sistema",
       "privacy": "Privacidade e segurança",
-      "thirdparty": "Suítes de terceiros"
+      "thirdparty": "Apps de terceiros"
     },
     "upcoming": "Chega na {v} (em desenvolvimento)",
-    "thirdpartyNote": "Suítes de código aberto de outros projetos que achamos que valem a pena. O LordOS não as faz: a Store instala cada uma a partir do pacote do próprio autor, guardado com um checksum fixo, e elas recebem o mesmo firewall e as mesmas permissões que qualquer outro app Linux.",
+    "thirdpartyNote": "Apps e suítes de código aberto de outros projetos que achamos que valem a pena. O LordOS não as faz: a Store instala cada um a partir do autor, do repositório assinado do autor com a chave que o LordOS fixa ou do pacote do próprio autor guardado com um checksum fixo, e eles recebem o mesmo firewall e as mesmas permissões que qualquer outro app Linux.",
     "by": "De {v}",
     "website": "Site",
     "fromStore": "Na Store"

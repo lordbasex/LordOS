@@ -16,7 +16,8 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
 ## Two ways an app reaches a system
 
 - **Direct** (`"delivery": "direct"`): the vendor has its own signed APT repository (Claude Code,
-  Claude Desktop, Visual Studio Code, Cursor, Google Chrome, Microsoft Edge, Spotify). The user's
+  Claude Desktop, Visual Studio Code, Cursor, Google Chrome, Microsoft Edge, Spotify, VSCodium, Brave
+  Browser). The user's
   system adds that repository itself (a
   deb822 `.sources` file with the pinned key from `apt/keys/`) and installs and updates the package
   from the vendor. Nothing is copied to lordos.org. `apt/build.sh check` still verifies the entry.
@@ -44,8 +45,9 @@ apt/build.sh            check | fetch | list   (POSIX sh; jq, gpg/gpgv, curl and
     "kind": "local-models",            // coding-agent | editor | local-models | chat | speech | browser | music | …
     "section": "commercial",           // optional: "commercial" = free of charge but proprietary, no source
                                        // (Chrome, Edge, Spotify); "remote" = third-party remote access;
-                                       // "suites" = featured open source suites from other projects
-                                       // (ArtCraft); missing = the AI section
+                                       // "suites" = open source apps and suites from other projects,
+                                       // Store → Third-party apps (ArtCraft, VSCodium, Brave Browser);
+                                       // missing = the AI section
     "source": { "type": "…", … }       // one of the four below
   }]
 }

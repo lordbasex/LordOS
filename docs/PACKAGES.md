@@ -191,6 +191,11 @@ computer** (below). Store → Installed shows each native LordOS app's own versi
   anything is installed that LordOS can't review or fix what they do. Tested on the VMware machine:
   the three sources added, the three apps installed, `apt update` and the engine's update clean
   afterwards. Steam needs i386 multiarch, which the engine doesn't do yet (see "Pending").
+- **Third-party apps** (until 0.8.8.3 "Third-party suites") lists open source apps and suites from
+  other projects: ArtCraft (0.8.8.1, its maker's `.deb` with a pinned SHA-256), and since 0.8.8.4
+  VSCodium (#38) and Brave Browser (#39), both from their makers' signed repositories (amd64 and arm64)
+  with the key LordOS pins, added the same way as the AI apps' (`UPDATES.md`, "Mirrored apps (catalog)").
+  Tested on VM 116 (amd64): both sources added, verified and installed by the engine.
 - **Disk Formats** (0.8.7, `lordos-disk-formats`, `tools/iso/mkdeb-diskformats.sh`) is one item in the Commercial group,
   from the LordOS repository: it depends on `ntfs-3g`, `exfatprogs` and `dosfstools`, and on amd64 suggests `apfs-dkms`,
   offered as a switch on its page. Those drivers are free software ([FILES.md](FILES.md), "Disks' file systems").

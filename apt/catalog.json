@@ -517,6 +517,66 @@
           }
         }
       }
+    },
+    {
+      "id": "vscodium",
+      "package": "codium",
+      "name": "VSCodium",
+      "keywords": ["codium", "vscode", "vs code", "code editor", "ide", "open source"],
+      "summary": {
+        "en": "Community build of the open source VS Code editor, with telemetry turned off and the Open VSX extension registry",
+        "es": "Compilación comunitaria del editor de código abierto VS Code, sin telemetría y con el registro de extensiones Open VSX",
+        "pt": "Compilação comunitária do editor de código aberto VS Code, sem telemetria e com o registro de extensões Open VSX"
+      },
+      "license": "MIT",
+      "vendor": "VSCodium (community project)",
+      "homepage": "https://vscodium.com",
+      "arches": ["amd64", "arm64"],
+      "kind": "editor",
+      "section": "suites",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://download.vscodium.com/debs",
+        "suite": "vscodium",
+        "components": ["main"],
+        "arches": ["amd64", "arm64"],
+        "key": "keys/vscodium.asc",
+        "fingerprint": "1302DE60231889FE1EBACADC54678CF75A278D9C",
+        "package": "codium"
+      }
+    },
+    {
+      "id": "brave-browser",
+      "package": "brave-browser",
+      "name": "Brave Browser",
+      "keywords": ["brave", "web browser", "chromium", "ad blocker", "privacy"],
+      "summary": {
+        "en": "Web browser based on Chromium that blocks ads and trackers by default",
+        "es": "Navegador web basado en Chromium que bloquea anuncios y rastreadores por defecto",
+        "pt": "Navegador web baseado no Chromium que bloqueia anúncios e rastreadores por padrão"
+      },
+      "license": "MPL-2.0 (with Chromium's BSD-3-Clause and other open source licenses)",
+      "vendor": "Brave Software",
+      "homepage": "https://brave.com/linux/",
+      "arches": ["amd64", "arm64"],
+      "kind": "browser",
+      "section": "suites",
+      "source": {
+        "type": "apt",
+        "delivery": "direct",
+        "url": "https://brave-browser-apt-release.s3.brave.com",
+        "suite": "stable",
+        "components": ["main"],
+        "arches": ["amd64", "arm64"],
+        "key": "keys/brave.asc",
+        "fingerprint": "DBF1A116C220B8C7164F98230686B78420038257",
+        "package": "brave-browser",
+        "files": {
+          "sources": "brave-browser-release",
+          "keyring": "brave-browser-archive-keyring.gpg"
+        }
+      }
     }
   ]
 }
