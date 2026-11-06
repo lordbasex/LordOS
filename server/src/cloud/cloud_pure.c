@@ -296,6 +296,7 @@ const char *cloud_failure_code(const char *m) {
         "first path segment in URL", "missing protocol scheme", "invalid character", "parse \"", NULL };
     if (!m || !m[0]) return NULL;
     if (strstr(m, "knownhosts: key mismatch") || strstr(m, "host key mismatch") || strstr(m, "REMOTE HOST IDENTIFICATION HAS CHANGED")) return "cloud.hostKeyChanged";
+    if (strstr(m, "decryption password incorrect") || strstr(m, "passphrase")) return "cloud.authFailed";   /* a key's, not TLS */
     if (strstr(m, "x509:") || strstr(m, "failed to verify certificate") || strstr(m, "certificate signed by unknown authority")) return "cloud.certUntrusted";
     for (int i = 0; addr[i]; i++) if (strstr(m, addr[i])) return "cloud.badAddress";
     for (int i = 0; auth[i]; i++) if (strstr(m, auth[i])) return "cloud.authFailed";

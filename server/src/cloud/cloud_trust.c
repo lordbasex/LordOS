@@ -15,6 +15,7 @@
 #include "cloud_int.h"
 #include "../doc/wire.h"
 #include "../lan/rconnect.h"
+#include "../sec/json.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -30,9 +31,21 @@
 #define OPENSSL "/usr/bin/openssl"
 #define TRUST_MS 15000
 
+/* an option of the account: its non-secret ones, or what add() was given as secret (rclone marks a host or a user
+ * Sensitive, so they travel with the password until the keyring has them) */
+static const char *cur_sec;
+static char sec_val[3][1024];
+static int sec_next;
 static const char *param(const Acc *a, const char *k) {
     for (int i = 0; i < a->p.n; i++) if (!strcmp(a->p.kv[i].key, k)) return a->p.kv[i].val;
-    return NULL;
+    JDoc d;
+    const char *r = NULL;
+    if (cur_sec && !json_parse(cur_sec, strlen(cur_sec), &d, NULL, 0)) {
+        const char *v = json_str(d.root, k);
+        if (v && strlen(v) < sizeof sec_val[0]) { char *o = sec_val[sec_next++ % 3]; cl_pf(o, sizeof sec_val[0], "%s", v); r = o; }
+        json_free(&d);
+    }
+    return r;
 }
 
 static int run(char *const argv[], const char *in, int net, char *out, size_t cap) {
@@ -78,10 +91,13 @@ static int tls_endpoint(const Acc *a, char *host, size_t hn, int *port) {
     return 0;
 }
 
-int ct_needed(const Acc *a) {
+int ct_needed(const Acc *a, const char *sec) {
+    cur_sec = sec;
     char h[256];
     int p;
-    return is_sftp(a) || !tls_endpoint(a, h, sizeof h, &p);
+    int r = is_sftp(a) || !tls_endpoint(a, h, sizeof h, &p);
+    cur_sec = NULL;
+    return r;
 }
 
 static char *question(const Acc *a, const char *kind, const char *host, int port, const char *fp, const char *subject, const char *issuer) {
@@ -233,11 +249,14 @@ static int check_tls(Acc *a, char **q, char *code, size_t cn, char *msg, size_t 
     return r;
 }
 
-int ct_check(Acc *a, char **q, char *code, size_t cn, char *msg, size_t mn) {
+int ct_check(Acc *a, const char *sec, char **q, char *code, size_t cn, char *msg, size_t mn) {
     *q = NULL;
     code[0] = msg[0] = 0;
+    cur_sec = sec;                  /* the thread only */
     int r = is_sftp(a) ? check_ssh(a, q, code, cn, msg, mn) : 0;
     if (!r) r = check_tls(a, q, code, cn, msg, mn);
+    cur_sec = NULL;
+    explicit_bzero(sec_val, sizeof sec_val);
     return r;
 }
 

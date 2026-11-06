@@ -24,12 +24,13 @@ chmod 700 "$R"
 pass=0 fail=0
 ok()  { pass=$((pass + 1)); printf '  ok    %s\n' "$1"; }
 bad() { fail=$((fail + 1)); printf '  FAIL  %s%s\n' "$1" "${2:+: $2}"; }
-check() { n=$1; shift; if "$@"; then ok "$n"; else bad "$n"; fi; }
+check() { n=$1; shift; if "$@"; then ok "$n"; else bad "$n" "$(printf '%s' "${r:-}" | cut -c1-300)"; fi; }
 
 cleanup() {
     exec 3>&- 2>/dev/null
     [ -n "${HP:-}" ] && kill "$HP" 2>/dev/null
-    [ -n "${DAV:-}" ] && kill "$DAV" 2>/dev/null
+    [ -n "${DAV:-}" ] && kill -CONT "$DAV" 2>/dev/null; [ -n "${DAV:-}" ] && kill "$DAV" 2>/dev/null
+    for p in ${EXTRA:-}; do kill "$p" 2>/dev/null; done
     for m in "$H"/Cloud/*; do [ -d "$m" ] && fusermount3 -u -z "$m" 2>/dev/null; done
     pkill -f "$R/lordos/cloud/rc.sock" 2>/dev/null
     sleep 0.5
@@ -362,7 +363,7 @@ check "rclone ended with the first session" test -z "$(rcd_pid)"
 start_harness
 r=$(cmd wait '"mounted":true' 30)
 check "next session: the renamed account mounted again" has "$r" '"ok"'
-r=$(cmd providers)
+# (no providers() first: add asks rclone for the list itself)
 r=$(cmd add webdav office "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"davpass\"}")
 check "after a rename and a new session: same kind, other case updates it (no nameTaken)" has "$r" "\"id\":\"$ID\""
 r=$(cmd wait '"mounted":true' 30)
@@ -376,6 +377,106 @@ check "an unknown account id is refused" has "$r" 'cloud.notFound'
 r=$(cmd state)
 check "still one account, still named Office" sh -c 'case "$1" in *"\"id\":\"c"*"\"id\":\"c"*) exit 1;; *"\"name\":\"Office\""*) exit 0;; esac; exit 1' x "$r"
 check "files read in the new session" test "$(cat "$M/notes.txt")" = "changed here"
+
+# B7: rename and move inside a cloud mount (FUSE takes no RENAME_NOREPLACE)
+r=$("$B/fs-walk" rename "$M/notes.txt" "$M/notes-moved.txt")
+check "rename in the mount: done" test "$r" = ok
+for i in $(seq 40); do [ -e "$S/notes-moved.txt" ] && break; sleep 0.5; done
+check "the rename reached the server" sh -c "[ -e '$S/notes-moved.txt' ] && [ ! -e '$S/notes.txt' ]"
+r=$("$B/fs-walk" rename "$M/notes-moved.txt" "$M/Projects/notes.txt")
+check "move into a folder in the mount: done" test "$r" = ok
+echo other > "$M/clash.txt"
+r=$("$B/fs-walk" rename "$M/Projects/notes.txt" "$M/clash.txt")
+check "rename onto an existing name is refused (fs.exists), nothing replaced" sh -c '[ "$1" = fs.exists ] && [ "$(cat "$2")" = other ]' x "$r" "$M/clash.txt"
+r=$("$B/fs-walk" rename "$M/Projects/notes.txt" "$M/notes.txt")
+
+# B9: an SFTP server's host key is shown before the account is made, kept, and checked
+ssh-keygen -q -t ed25519 -N "" -f "$T/hk1" && ssh-keygen -q -t ed25519 -N "" -f "$T/hk2"
+mkdir -p "$T/sftp"; echo s > "$T/sftp/s.txt"
+SP=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+"$RC" serve sftp "$T/sftp" --addr "127.0.0.1:$SP" --user su --pass spass --key "$T/hk1" >"$T/sftp.log" 2>&1 &
+SFTP=$!; EXTRA="$SFTP"; sleep 1.5
+r=$(cmd add sftp Box "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+check "SFTP: the host key is asked about first (question kind hostKey)" sh -c 'case "$1" in *"\"kind\":\"hostKey\""*"\"fingerprint\":\"ED25519 SHA256:"*) exit 0;; esac; exit 1' x "$r"
+want=$(ssh-keygen -lf "$T/hk1.pub" | cut -d" " -f2)
+check "the fingerprint shown is the server's key" has "$r" "$want"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" trust)
+SID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+check "trusted: the account is made" test -n "$SID"
+check "its known_hosts is ours, 0600" test "$(stat -c %a "$H/.config/lordos/cloud/known_hosts/$SID" 2>/dev/null)" = 600
+r=$(cmd wait '"name":"Box"' 10)
+r=$(cmd wait '"mounted":true' 30)
+check "SFTP files read" test "$(cat "$H/Cloud/Box/s.txt" 2>/dev/null)" = s
+check "rclone checks the host key (no 'No host key validation' in its log)" sh -c "! grep -q 'No host key validation' '$H/.cache/lordos/cloud.log'"
+r=$(cmd add sftp Box2 "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" refuse)
+check "refusing the key: cloud.notTrusted, no account" sh -c 'case "$1" in *cloud.notTrusted*) case "$2" in *Box2*) exit 1;; esac; exit 0;; esac; exit 1' x "$r" "$(cmd state)"
+kill "$SFTP"; sleep 0.5
+"$RC" serve sftp "$T/sftp" --addr "127.0.0.1:$SP" --user su --pass spass --key "$T/hk2" >"$T/sftp2.log" 2>&1 &
+SFTP=$!; EXTRA="$SFTP"; sleep 1.5
+r=$(cmd addid "$SID" sftp Box "{\"host\":\"127.0.0.1\",\"port\":\"$SP\",\"user\":\"su\",\"pass\":\"spass\"}")
+new=$(ssh-keygen -lf "$T/hk2.pub" | cut -d" " -f2)
+check "a changed host key is refused with both fingerprints" sh -c 'case "$1" in *"\"error\":\"cloud.hostKeyChanged\""*"\"old\":"*"$2"*"\"new\":"*"$3"*) exit 0;; esac; exit 1' x "$r" "$want" "$new"
+r=$(cmd remove "$SID")
+kill "$SFTP"
+
+# B6: a certificate the system doesn't trust is shown, and trusted for that account alone
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$T/k1.pem" -out "$T/c1.pem" -days 2 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 2>/dev/null
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout "$T/k2.pem" -out "$T/c2.pem" -days 2 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1 2>/dev/null
+mkdir -p "$T/tls"; echo t > "$T/tls/t.txt"
+TP=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+"$RC" serve webdav "$T/tls" --addr "127.0.0.1:$TP" --cert "$T/c1.pem" --key "$T/k1.pem" --user tu --pass tpass >"$T/tls.log" 2>&1 &
+TLS=$!; EXTRA="$TLS"; sleep 1.5
+r=$(cmd add webdav Secure "{\"url\":\"https://127.0.0.1:$TP\",\"user\":\"tu\",\"pass\":\"tpass\"}")
+check "https with a self-signed certificate: a certificate question" sh -c 'case "$1" in *"\"kind\":\"certificate\""*"\"fingerprint\":"*"\"subject\":"*"\"issuer\":"*) exit 0;; esac; exit 1' x "$r"
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" trust)
+TID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+check "trusted: the account is made" test -n "$TID"
+check "its certificate is kept for it, 0600" test "$(stat -c %a "$H/.config/lordos/cloud/certs/$TID.pem" 2>/dev/null)" = 600
+r=$(cmd wait '"name":"Secure"' 10)
+r=$(cmd wait '"mounted":true' 30)
+check "files read over https with that certificate" test "$(cat "$H/Cloud/Secure/t.txt" 2>/dev/null)" = t
+check "no_check_certificate is never used" sh -c "! grep -rq no_check_certificate '$H/.config/lordos/cloud'"
+r=$(cmd add webdav Secure2 "{\"url\":\"https://127.0.0.1:$TP\",\"user\":\"tu\",\"pass\":\"tpass\"}")
+check "the same certificate isn't trusted for another account" has "$r" '"kind":"certificate"'
+QS=$(printf '%s' "$r" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+r=$(cmd answer "$QS" refuse)
+# the account's state follows what its listing says: the server now wants another password
+kill "$TLS"; sleep 0.5
+"$RC" serve webdav "$T/tls" --addr "127.0.0.1:$TP" --cert "$T/c1.pem" --key "$T/k1.pem" --user tu --pass changed >"$T/tls2.log" 2>&1 &
+TLS=$!; EXTRA="$TLS"; sleep 1.5
+r=$(cmd retry "$TID")
+r=$(cmd wait '"error":"cloud.authFailed"' 30)
+check "a mounted account whose listing fails says so (cloud.authFailed)" has "$r" '"ok"'
+kill "$TLS"; sleep 0.5
+"$RC" serve webdav "$T/tls" --addr "127.0.0.1:$TP" --cert "$T/c2.pem" --key "$T/k2.pem" --user tu --pass tpass >"$T/tls3.log" 2>&1 &
+TLS=$!; EXTRA="$TLS"; sleep 1.5
+r=$(cmd addid "$TID" webdav Secure "{\"url\":\"https://127.0.0.1:$TP\",\"user\":\"tu\",\"pass\":\"tpass\"}")
+check "a changed certificate is refused with both fingerprints" sh -c 'case "$1" in *"\"error\":\"cloud.certChanged\""*"\"old\":"*"\"new\":"*) exit 0;; esac; exit 1' x "$r"
+r=$(cmd remove "$TID")
+kill "$TLS"
+
+# B8 and S3: links can't be withdrawn, and CleanUp is not a trash
+mkdir -p "$T/s3/bucket1"; echo o > "$T/s3/bucket1/o.txt"
+OP=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+"$RC" serve s3 "$T/s3" --addr "127.0.0.1:$OP" --auth-key checkkey,checksecret >"$T/s3.log" 2>&1 &
+S3S=$!; EXTRA="$S3S"; sleep 1.5
+r=$(cmd add s3 Bucket "{\"provider\":\"Rclone\",\"endpoint\":\"http://127.0.0.1:$OP\",\"access_key_id\":\"checkkey\",\"secret_access_key\":\"checksecret\"}")
+OID=$(printf '%s' "$r" | sed -n 's/.*"id":"\([a-z0-9]*\)".*/\1/p')
+check "S3 (rclone serve s3): added" test -n "$OID"
+r=$(cmd add s3 BadKey "{\"provider\":\"Rclone\",\"endpoint\":\"http://127.0.0.1:$OP\",\"access_key_id\":\"ak\",\"secret_access_key\":\"wrong\"}")
+check "S3 with a wrong secret: cloud.authFailed" has "$r" 'cloud.authFailed'
+r=$(cmd wait '"name":"Bucket"' 10)
+r=$(cmd wait '"mounted":true' 30)
+r=$(cmd state)
+check "S3: trashSupported is false" sh -c 'echo "$1" | grep -q "\"name\":\"Bucket\".*\"trashSupported\":false"' x "$r"
+r=$(cmd unlink "$H/Cloud/Bucket/bucket1/o.txt")
+check "Stop Sharing on S3: cloud.cantRevoke" has "$r" '"error":"cloud.cantRevoke"'
+r=$(cmd remove "$OID")
+kill "$S3S"; EXTRA=""
 
 r=$(cmd remove "$ID")
 check "remove" has "$r" '"ok"'

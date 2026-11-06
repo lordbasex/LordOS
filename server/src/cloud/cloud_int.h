@@ -86,8 +86,8 @@ void  cl_reply(int req, char *json);        /* an asynchronous answer for JS (ta
 int   cl_next_req(void);
 
 /* cloud_trust.c */
-int   ct_needed(const Acc *a);
-int   ct_check(Acc *a, char **question, char *code, size_t cn, char *msg, size_t mn);   /* 0 ok, 1 a question, -1 refused */
+int   ct_needed(const Acc *a, const char *sec);
+int   ct_check(Acc *a, const char *sec, char **question, char *code, size_t cn, char *msg, size_t mn);   /* 0 ok, 1 a question, -1 refused */
 int   ct_accept(Acc *a);
 void  ct_refuse(Acc *a);
 void  ct_forget(const Acc *a);

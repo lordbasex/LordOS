@@ -207,6 +207,19 @@ static void t_refused(void) {
     CHECK(!strcmp(cloud_failure_code("dial tcp 10.255.255.1:22: i/o timeout"), "cloud.unreachable"));
     CHECK(!strcmp(cloud_failure_code("parse \"http://127.0.0.1:99999\": invalid port \":99999\" after host"), "cloud.badAddress"));
     CHECK(!strcmp(cloud_failure_code("Get \"ftp://x\": unsupported protocol scheme \"ftp\""), "cloud.badAddress"));
+    CHECK(!strcmp(cloud_failure_code("Propfind \"https://127.0.0.1:18443/\": tls: failed to verify certificate: x509: certificate signed by unknown authority"), "cloud.certUntrusted"));
+    CHECK(!strcmp(cloud_failure_code("ssh: handshake failed: knownhosts: key mismatch"), "cloud.hostKeyChanged"));
+    /* B8: a presigned link is long */
+    {
+        char u[4200] = "https://bucket.s3.example.test/file?X-Amz-Signature=";
+        size_t l = strlen(u);
+        while (l < 1200) u[l++] = 'a';
+        u[l] = 0;
+        CHECK(cloud_url_ok(u));
+        while (l < 4100) u[l++] = 'b';
+        u[l] = 0;
+        CHECK(!cloud_url_ok(u));
+    }
     CHECK(cloud_failure_code("directory not found") == NULL && cloud_failure_code("") == NULL && cloud_failure_code(NULL) == NULL);
 }
 

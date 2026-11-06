@@ -1424,8 +1424,8 @@ static void add_step(Acc *a, int req, int r, char *q, const char *msg) {
  * secrets given with add, kept (wiped after) while a trust question waits */
 static void add_continue(Acc *a, int req, const char *sec, int upd) {
     char msg[256] = "", code[64] = "", *q = NULL;
-    if (ct_needed(a)) {
-        int t = ct_check(a, &q, code, sizeof code, msg, sizeof msg);
+    if (ct_needed(a, sec)) {
+        int t = ct_check(a, sec, &q, code, sizeof code, msg, sizeof msg);
         if (t == 1) {
             pthread_mutex_lock(&cl_mu);
             if (a->pend_sec != sec) wipe_free(a->pend_sec);
@@ -1465,7 +1465,6 @@ static void job_add(Job *j) {
     a = cl_find(j->id);
     pthread_mutex_unlock(&cl_mu);
     if (!a) { if (j->req) post_reply(j->req, err_json("cloud.notFound")); return; }
-    char msg[256] = "", *q = NULL;
     int upd = j->flag;
     if (ensure_daemon()) { add_failed(a, j->req, "cloud.notRunning", ""); return; }
     if (upd) {
@@ -2210,7 +2209,8 @@ static void do_job(Job *j) {
         if (!naccounts() || ensure_daemon()) break;
         for (int i = 0; i < ACC_MAX; i++) {
             Acc *a = &cl_acc[i];
-            if (!a->used || (j->id[0] && strcmp(a->id, j->id)) || (a->configured && a->mounted)) continue;
+            if (!a->used || (j->id[0] && strcmp(a->id, j->id))) continue;
+            if (a->configured && a->mounted) { a->check_at = 0; continue; }     /* listed again on the next tick */
             if (!strcmp(a->err, "cloud.addFailed") || a->pending_req || a->new_acc) continue;
             pthread_mutex_lock(&cl_mu);
             a->err[0] = a->message[0] = 0;
