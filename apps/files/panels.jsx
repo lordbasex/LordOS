@@ -107,7 +107,9 @@ function Row({ k, v, t }) {
 }
 
 // Get Info (❖I): the file's card; folder sizes are computed with a bound.
-export function InfoPanel({ e, onClose, openers }) {
+// extra: what another part adds between the header and the facts, which then leave out Size and Where (Cloud's
+// status, account, sizes and Keep switch: cloud.jsx CloudInfo)
+export function InfoPanel({ e, onClose, openers, extra }) {
   const t = useTheme();
   const [st, setSt] = useState(null);
   const [du, setDu] = useState(null);
@@ -136,10 +138,11 @@ export function InfoPanel({ e, onClose, openers }) {
       </View>
       <TagDots tags={tagsOf(e.path)} size={9} />
       <View style={{ height: 1, backgroundColor: t.separator }} />
+      {extra || null}
       {st?.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a' }}>{st.error}</Text> : (
         <View>
-          <Row t={t} k={tr('files.info.size')} v={size} />
-          <Row t={t} k={tr('files.info.where')} v={e.trash ? e.original : (st?.path || e.path).split('/').slice(0, -1).join('/') || '/'} />
+          {extra ? null : <Row t={t} k={tr('files.info.size')} v={size} />}
+          {extra ? null : <Row t={t} k={tr('files.info.where')} v={e.trash ? e.original : (st?.path || e.path).split('/').slice(0, -1).join('/') || '/'} />}
           {st?.link && <Row t={t} k={tr('files.info.link')} v={st.target} />}
           {st?.btime ? <Row t={t} k={tr('files.info.created')} v={fmt(st.btime)} /> : null}
           <Row t={t} k={tr('files.info.modified')} v={fmt(st?.mtime)} />

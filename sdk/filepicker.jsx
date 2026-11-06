@@ -23,7 +23,9 @@ import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs } from './fileparts.jsx';
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
-  imagesOnly, viewFor, saveView, liveRange, gridStep } from './filepickermodel.js';
+  imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot } from './filepickermodel.js';
+import { cloudState } from './cloud.js';
+import { CloudGlyph } from './cloudui.jsx';
 
 const ROW_H = 24;
 const TILE_W = 104, TILE_H = 118, THUMB = 72, GRID_PAD = 8;
@@ -207,6 +209,11 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   }, []);
 
   const narrow = width < 560;
+  // Cloud's accounts (docs/CLOUD.md): their folders, between Favorites and Locations; in one, no thumbnails
+  // (making one would bring each file down from the cloud)
+  const cloudSt = useStore(cloudState);
+  const clouds = cloudPlaces(cloudSt && cloudSt.accounts, home, settings.get().cloudHidden || []);
+  const inCloud = !!cloudRoot(dir, home);
   const showDate = width - (narrow ? 0 : SIDE_W) > 520;
   const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.label, folder: true, path: c.path }));
   const shown = fitCrumbs(crumbs);
@@ -227,6 +234,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
               <SideTitle t={th} first>{t('files.favorites')}</SideTitle>
               {place(t('files.place.home'), home, <PlaceGlyph ch="⌂" t={th} />)}
               {dirs.map((d) => place(t(`files.place.${d.label}`), d.path, <FolderGlyph size={16} />))}
+              {clouds.length ? <SideTitle t={th}>{t('cloud.title')}</SideTitle> : null}
+              {clouds.map((c) => place(c.name, c.path, <CloudGlyph kind="cloud" size={16} color={th.accent} />))}
               {disks.length ? <SideTitle t={th}>{t('files.locations')}</SideTitle> : null}
               {disks.map((v) => place(v.name, v.path, <DriveGlyph color={th.accent} />))}
             </View>
@@ -266,7 +275,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
                 {(() => {
                   const [from, to] = liveRange(sight.y, sight.h, TILE_H, cols, rows.length);
                   return rows.map((e, i) => (
-                    <Tile key={e.path} e={e} th={th} on={e.path === cursor || chosen.includes(e.path)} live={i >= from && i < to}
+                    <Tile key={e.path} e={e} th={th} on={e.path === cursor || chosen.includes(e.path)} live={i >= from && i < to && !inCloud}
                       onDown={(ev) => { ev.stopPropagation(); hold(); select(e, ev); }} onOpen={(ev) => { ev.stopPropagation(); openRow(e); }} />
                   ));
                 })()}

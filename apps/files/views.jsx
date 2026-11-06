@@ -1,6 +1,6 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
 // columns (Miller, with a preview) and gallery.
-import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr } from '@lordos/sdk';
+import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots } from './glyphs.jsx';
 import { kindOf, isImage, isTextual } from './kinds.js';
@@ -71,7 +71,8 @@ export function IconView({ groups, ctx }) {
                   <View key={e.path} {...itemHandlers(e, ctx)}
                     style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
                     <View style={{ padding: 4, borderRadius: 7, backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
-                      <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} />
+                      <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} />
+                      {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: -4, bottom: -4 }}><StatusBadge s={ctx.cloud.status[e.path]} size={Math.max(18, Math.round(m.icon * 0.32))} /></View> : null}
                     </View>
                     <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
                       <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} color={sel ? '#fff' : t.text} />
@@ -92,6 +93,7 @@ export function IconView({ groups, ctx }) {
 // ---- list ----
 
 const SIDE_PAD = 36;              // the rows' and the header's own padding
+const STATUS_W = 70;              // Cloud's Status column, last, in a cloud account's folders (docs/CLOUD.md 7.1)
 const cellAlign = (k) => (k === 'size' ? 'end' : 'start');
 const longDate = (st, k) => when(st?.[k]);
 
@@ -164,6 +166,12 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
           <View onMouseDown={(ev) => start(ev, k, true)} style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: 0, width: 8, cursor: 'ew-resize' }} />
         </View>
       ))}
+      {ctx.cloud?.on ? (
+        <View style={{ width: STATUS_W, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ position: 'absolute', top: 6, bottom: 6, insetInlineStart: 0, width: 1, backgroundColor: t.separator }} />
+          <Text style={listHeaderCell(t, false)}>{tr('cloud.col.status')}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -183,13 +191,14 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
             {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
           </View>
           {/* thumbnails from 32 px up, as in the icon view */}
-          <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32} />
+          <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32 && !ctx.cloudOnly?.(e)} />
           <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} font={m.font} color={sel ? '#fff' : t.text} /></View>
           <TagDots tags={tagsOf(e.path)} size={7} />
         </View>
         {visible(ctx.columns).map((k) => (k === 'tags'
           ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
           : <Text key={k} style={{ ...listCell(t, sel, ctx.columns.width[k], cellAlign(k)), fontSize: m.cell }}>{cellText(k, e, ctx)}</Text>))}
+        {ctx.cloud?.on ? <View style={{ width: STATUS_W, alignItems: 'center', justifyContent: 'center' }}><StatusGlyph s={ctx.cloud.status[e.path]} size={18} /></View> : null}
       </View>,
     );
     if (open) {
@@ -206,9 +215,10 @@ export function ListView({ groups, ctx, sort, onSort }) {
   const alt = { n: 0 };
   const [sx, setSx] = useState(0);
   const cols = ctx.columns;
-  const need = totalWidth(cols) + NAME_MIN + SIDE_PAD;
+  const extra = ctx.cloud?.on ? STATUS_W : 0;
+  const need = totalWidth(cols) + extra + NAME_MIN + SIDE_PAD;
   const room = ctx.contentW;
-  const nameW = cols.nameWidth || Math.max(NAME_MIN, room - totalWidth(cols) - SIDE_PAD);
+  const nameW = cols.nameWidth || Math.max(NAME_MIN, room - totalWidth(cols) - extra - SIDE_PAD);
   const over = Math.max(0, need - room);
   const x = Math.min(sx, over);
   const inner = { ...ctx, nameW };
@@ -247,23 +257,23 @@ export function ListView({ groups, ctx, sort, onSort }) {
 
 // ---- preview (columns, gallery, Quick Preview) ----
 
-export function Preview({ e, big = false, name }) {
+export function Preview({ e, big = false, name, noRead = false }) {
   const t = useTheme();
   const [text, setText] = useState(null);
   useEffect(() => {
     setText(null);
-    if (!e || e.dir || e.app || !isTextual(e) || e.size > 8 * 1024 * 1024) return;
+    if (!e || e.dir || e.app || noRead || !isTextual(e) || e.size > 8 * 1024 * 1024) return;
     try { setText(lord.fs.read(e.path, 'text').slice(0, 65536)); } catch (err) { setText(null); }
-  }, [e?.path]);
+  }, [e?.path, noRead]);
   if (!e) return null;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 16 }}>
-      {isImage(e) ? <Image src={e.path} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
+      {isImage(e) && !noRead ? <Image src={e.path} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
         : text != null ? (
           <View style={{ alignSelf: 'stretch', flex: 1, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#16161a' : '#fbfbfd', border: `1px solid ${t.separator}`, padding: 12, overflow: 'hidden', direction: 'ltr' }}>
             <Text style={{ fontFamily: 'monospace', fontSize: big ? 12 : 10, color: t.text, lineHeight: big ? 17 : 14 }}>{text.split('\n').slice(0, big ? 200 : 60).join('\n')}</Text>
           </View>
-        ) : <EntryIcon e={e} size={big ? 160 : 96} dark={t.mode === 'dark'} />}
+        ) : <EntryIcon e={e} size={big ? 160 : 96} dark={t.mode === 'dark'} thumb={!noRead} />}
       <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'center', marginTop: 6 }}>{name || e.name}</Text>
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'center' }}>{`${kindLabel(e)}${e.dir || e.app ? '' : ` · ${formatBytes(e.size)}`}${e.mtime ? ` · ${when(e.mtime)}` : ''}`}</Text>
     </View>
@@ -311,7 +321,7 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort }) {
           </View>
         );
       })}
-      <View style={{ flex: 1 }}>{file ? <Preview e={file} /> : null}</View>
+      <View style={{ flex: 1 }}>{file ? <Preview e={file} noRead={ctx.cloudOnly?.(file)} /> : null}</View>
     </View>
   );
 }
@@ -325,7 +335,7 @@ export function GalleryView({ entries, ctx }) {
   const from = Math.max(0, idx - 4);
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} /> : <EmptyState title={ctx.emptyText} />}</View>
+      <View style={{ flex: 1, padding: 8 }}>{cur ? <Preview e={cur} big name={ctx.shownName?.(cur)} noRead={ctx.cloudOnly?.(cur)} /> : <EmptyState title={ctx.emptyText} />}</View>
       {cur && ctx.renaming?.path === cur.path ? <View style={{ alignItems: 'center', paddingBottom: 8 }}><Name e={cur} ctx={ctx} /></View> : null}
       <View style={{ height: 97, borderTopWidth: 1, borderTopColor: t.separator, flexDirection: 'row', gap: 8, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', direction: 'ltr', overflow: 'hidden' }}>
         {entries.slice(from, from + 9).map((e) => {
@@ -334,7 +344,8 @@ export function GalleryView({ entries, ctx }) {
             <View key={e.path} {...itemHandlers(e, ctx)}
               style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center', borderRadius: 8,
                 border: `2px solid ${sel ? t.accent : 'transparent'}`, backgroundColor: sel ? t.hover : 'transparent' }}>
-              <EntryIcon e={e} size={56} dark={t.mode === 'dark'} />
+              <EntryIcon e={e} size={56} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} />
+              {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: 2, bottom: 2 }}><StatusBadge s={ctx.cloud.status[e.path]} size={18} /></View> : null}
             </View>
           );
         })}

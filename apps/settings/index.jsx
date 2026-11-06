@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
+import { CloudSettings, CloudHeaderAction } from './Cloud.jsx';
 import { UsersSettings } from './Users.jsx';
 import { NetworkSettings } from './Network.jsx';
 import { General, Updates } from './General.jsx';
@@ -850,7 +851,7 @@ function ChipGlyph() {
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
-  [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄']],
+  [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫']],
   [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
@@ -944,11 +945,12 @@ export default function Settings() {
           <Hairline edge="bottom" />
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.title, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
             {tr(`settings.section.${section}`)}</Text>
+          {section === 'cloud' ? <CloudHeaderAction /> : null}
         </View>
         <ScrollView resetKey={section} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: spacing.xxl, paddingTop: spacing.xl, alignItems: 'center' }}>
             <View style={{ width: '100%', maxWidth: 680 }}>
-              <Body page={section === 'network' ? args?.page : undefined} />
+              <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
             </View>
           </View>
         </ScrollView>
