@@ -102,8 +102,6 @@
   "cloud.noQuestion": "Essa pergunta não espera mais resposta",
   "cloud.notConnected": "Esta conta ainda não está conectada. Tente de novo em um instante",
   "cloud.notMeasuring": "Nada está sendo medido",
-  "cloud.badAddress": "Esse endereço não é válido",
-  "cloud.unreachable": "Não é possível alcançar o servidor. Verifique o endereço, a porta e a rede",
   "cloud.certChanged": "O certificado deste servidor mudou, por isso a conexão foi recusada: pode ser um ataque. Era {old}, agora {new}.",
   "cloud.listFailed": "Não foi possível listar os arquivos da conta",
   "cloud.notTrusted": "O servidor não foi considerado confiável, então a conta não foi adicionada",
