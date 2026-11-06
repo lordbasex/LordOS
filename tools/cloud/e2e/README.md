@@ -16,6 +16,7 @@ Test only: nothing here ships, and every credential below is a throwaway one for
 | `lib.js` | helpers: `S()`, `A(name)`, `brief`, `until`, `mounted`, `C(rel)`, `call` |
 | `ui.py` | the remote desktop protocol (as root): clicks, keys, wheel, `grab:FILE.png`, `keyring:PASSWORD` (RP_KEYRING, as lord-sessiond after a login). Typing goes through the session's keyboard layout (LA on VM 116: `:` is `combo:42+52`, `/` is `combo:42+8`) |
 | `cases/files.sh`, `cases/files.js` | Files' operations on one account through `lord.fs` (write, status up → here, rename, mkdir, move, copy in, copy out, list), the server's side checked, then `cloud.delete` and no `.Trash` left |
+| `cases/adds.js`, `cases/errors.js` | every good account (trust questions answered) and every add that must fail (wrong password, key, passphrase, port, host, address, S3 secret, options that run programs or name files), with what's left behind |
 | `cases/check.js` | Check This Account with Settings' own env, and its report |
 | `push.sh` | from the Mac: rebuild the bundle and copy the bench (`full`: the tree, `make`, install) |
 
@@ -29,7 +30,6 @@ ssh VM 'sudo python3 -I ~/LordOS-cloud-e2e/tools/cloud/e2e/lc.py e2ea "await clo
 ssh VM 'sudo sh ~/LordOS-cloud-e2e/tools/cloud/e2e/cases/files.sh e2ea Dav /srv/e2e/dav/files'
 ```
 
-`cloud.add` answers `cloud.notReady` until `cloud.providers()` ran once in the session (Add Account always asks first).
 
 MinIO: dl.min.io answers 410 for community binaries now, so the bench builds it with Go (go.dev's archive checked against
 the SHA-256 go.dev publishes; the modules checked by the Go checksum database): `go install
