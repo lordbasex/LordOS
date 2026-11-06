@@ -102,8 +102,6 @@
   "cloud.noQuestion": "That question isn't waiting for an answer any more",
   "cloud.notConnected": "This account isn't connected yet. Try again in a moment",
   "cloud.notMeasuring": "Nothing is being measured",
-  "cloud.badAddress": "That address isn't valid",
-  "cloud.unreachable": "The server can't be reached. Check the address, the port and the network",
   "cloud.certChanged": "This server's certificate changed, so the connection was refused: it may be an attack. Was {old}, now {new}.",
   "cloud.listFailed": "The account's files couldn't be listed",
   "cloud.notTrusted": "The server wasn't trusted, so the account wasn't added",
