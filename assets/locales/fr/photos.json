@@ -13,7 +13,7 @@
   "slideshow": "Diaporama",
   "brightness": "Luminosité",
   "contrast": "Contraste",
-  "cropHint": "Faites glisser sur la photo pour la recadrer",
+  "cropHint": "Faites glisser sur la photo pour la recadrer ; faites glisser les coins ou l’intérieur pour ajuster",
   "cropReady": "Seule la zone marquée sera enregistrée",
   "reset": "Réinitialiser",
   "saveCopy": "Enregistrer comme copie",
@@ -43,5 +43,14 @@
   "rotateRight": "Pivoter à droite",
   "fullscreen": "Plein écran",
   "emptyTitle": "Aucune photo",
-  "thumbSize": "Taille des miniatures"
+  "thumbSize": "Taille des miniatures",
+  "markup": "Annoter",
+  "markupHint": "Ouvrir dans l’éditeur d’annotation : flèches, texte, caviardage, recadrage et redimensionnement",
+  "crop": "Recadrage",
+  "crop.free": "Libre",
+  "crop.original": "Original",
+  "crop.square": "Carré",
+  "size": "Taille",
+  "keepRatio": "Conserver les proportions",
+  "sizeInvalid": "La largeur et la hauteur doivent être des nombres entiers de 1 à {max}"
 }

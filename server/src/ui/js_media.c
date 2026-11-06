@@ -325,7 +325,7 @@ static JSValue file_job(JSContext *c, int argc, JSValueConst *argv, int kind, co
     return ret;
 }
 
-/* edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, format, quality }) */
+/* edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, width, height, format, quality }) */
 static JSValue f_edit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     JSValueConst o = argc > 3 ? argv[3] : JS_UNDEFINED;
@@ -340,6 +340,12 @@ static JSValue f_edit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         size_t l = strlen(params);
         snprintf(params + l, sizeof params - l, "cx=%d\ncy=%d\ncw=%d\nch=%d\nrefw=%d\n", opt_int(c, o, "cx", 0, 0, 65536), opt_int(c, o, "cy", 0, 0, 65536),
                  cw, ch, opt_int(c, o, "refw", 0, 0, 65536));
+    }
+    /* a new size after the crop: both sides or none (lord-media checks the bound again) */
+    int sw = opt_int(c, o, "width", 0, 0, MP_MAX_DIM), sh = opt_int(c, o, "height", 0, 0, MP_MAX_DIM);
+    if (sw > 0 && sh > 0) {
+        size_t l = strlen(params);
+        snprintf(params + l, sizeof params - l, "sw=%d\nsh=%d\n", sw, sh);
     }
     return file_job(c, argc, argv, MW_EDIT, params);
 }
@@ -384,6 +390,42 @@ static JSValue f_crop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return n ? JS_NewInt32(c, n->id) : JS_NULL;
 }
 
+/* An integer argument in lo..hi, or `bad` (not a number, not finite, fractional or out of range). */
+static int arg_int_in(JSContext *c, JSValueConst v, int lo, int hi, int bad) {
+    double d;
+    if (!JS_IsNumber(v) || JS_ToFloat64(c, &d, v) || !isfinite(d) || d != floor(d) || d < lo || d > hi) return bad;
+    return (int)d;
+}
+
+/* resize(id, width, height) → id of a new picture (the image editor; imgops.c). Only a screenshot or a
+ * decoded picture, sides 1..MP_MAX_DIM; the source is left as it was. */
+static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    MediaSrc *s = argc >= 3 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
+    int w = arg_int_in(c, argv[1], 1, MP_MAX_DIM, 0), h = arg_int_in(c, argv[2], 1, MP_MAX_DIM, 0);
+    if (!w || !h) return js_throw_code(c, "media.invalidArguments", NULL);
+    MediaSrc *n = media_resize(s, w, h);
+    return n ? JS_NewInt32(c, n->id) : JS_NULL;
+}
+
+/* rotate(id, quarterTurns) → id of a new picture turned clockwise (-3..3). */
+static JSValue f_rotate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
+    int turns = arg_int_in(c, argv[1], -3, 3, 99);
+    if (turns == 99) return js_throw_code(c, "media.invalidArguments", NULL);
+    MediaSrc *n = media_rotate(s, turns);
+    return n ? JS_NewInt32(c, n->id) : JS_NULL;
+}
+
+/* An annotation's coordinate: finite, within ±65536 (the drawing code clamps to the image again). */
+static float coord(JSContext *c, JSValueConst o, const char *k) {
+    double d = opt_num(c, o, k, 0);
+    return (float)(isfinite(d) ? fmin(65536, fmax(-65536, d)) : 0);
+}
+
 static uint32_t color_of(JSContext *c, JSValueConst o) {
     JSValue v = JS_GetPropertyStr(c, o, "color");
     uint32_t col = 0xffff3b30u;
@@ -411,8 +453,8 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
         if (!dst->px) { media_src_close(dst); return JS_NULL; }
         dst->w = base->w;
         dst->h = base->h;
-        dst->opaque = 1;
     }
+    dst->opaque = base->opaque;          /* a picture opened with transparency keeps it */
     memcpy(dst->px, base->px, (size_t)base->w * base->h * 4);
     JSValue lenv = JS_GetPropertyStr(c, argv[1], "length");
     int32_t n = 0;
@@ -428,11 +470,11 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
         MediaOp *op = &ops[k];
         memset(op, 0, sizeof *op);
         op->type = !strcmp(type, "arrow") ? 'a' : !strcmp(type, "box") ? 'b' : !strcmp(type, "text") ? 't' : !strcmp(type, "blur") ? 'z'
-                 : !strcmp(type, "line") ? 'l' : 0;
-        op->x1 = (float)opt_num(c, o, "x1", 0);
-        op->y1 = (float)opt_num(c, o, "y1", 0);
-        op->x2 = (float)opt_num(c, o, "x2", 0);
-        op->y2 = (float)opt_num(c, o, "y2", 0);
+                 : !strcmp(type, "line") ? 'l' : !strcmp(type, "fill") ? 'f' : !strcmp(type, "pixelate") ? 'p' : 0;
+        op->x1 = coord(c, o, "x1");
+        op->y1 = coord(c, o, "y1");
+        op->x2 = coord(c, o, "x2");
+        op->y2 = coord(c, o, "y2");
         op->width = (float)fmin(64, fmax(1, opt_num(c, o, "width", 4)));
         op->size = (float)fmin(200, fmax(8, opt_num(c, o, "size", 24)));
         op->color = color_of(c, o);
@@ -440,7 +482,7 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
         JS_FreeValue(c, o);
         if (op->type) k++;
     }
-    media_annotate(dst->px, dst->w, dst->h, ops, k);
+    media_annotate(dst->px, dst->w, dst->h, ops, k, dst->opaque);
     dst->frame_seq++;
     media_src_damage(dst);
     return JS_NewInt32(c, dst->id);
@@ -705,6 +747,8 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("transcode", 4, f_transcode),
     JS_CFUNC_DEF("screenshot", 2, f_screenshot),
     JS_CFUNC_DEF("crop", 5, f_crop),
+    JS_CFUNC_DEF("resize", 3, f_resize),
+    JS_CFUNC_DEF("rotate", 2, f_rotate),
     JS_CFUNC_DEF("annotate", 3, f_annotate),
     JS_CFUNC_DEF("saveImage", 3, f_save_image),
     JS_CFUNC_DEF("copyImage", 1, f_copy_image),

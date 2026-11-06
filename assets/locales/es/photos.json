@@ -13,7 +13,7 @@
   "slideshow": "Presentación",
   "brightness": "Brillo",
   "contrast": "Contraste",
-  "cropHint": "Arrastrá sobre la foto para recortar",
+  "cropHint": "Arrastrá sobre la foto para recortar; arrastrá las esquinas o el interior para ajustarlo",
   "cropReady": "Se guardará solo la parte marcada",
   "reset": "Restablecer",
   "saveCopy": "Guardar como copia",
@@ -43,5 +43,14 @@
   "rotateRight": "Girar a la derecha",
   "fullscreen": "Pantalla completa",
   "emptyTitle": "No hay fotos",
-  "thumbSize": "Tamaño de las miniaturas"
+  "thumbSize": "Tamaño de las miniaturas",
+  "markup": "Marcar",
+  "markupHint": "Abrir en el editor de marcado: flechas, texto, tapar zonas, recortar y cambiar tamaño",
+  "crop": "Recorte",
+  "crop.free": "Libre",
+  "crop.original": "Original",
+  "crop.square": "Cuadrado",
+  "size": "Tamaño",
+  "keepRatio": "Mantener proporciones",
+  "sizeInvalid": "El ancho y el alto tienen que ser números enteros de 1 a {max}"
 }

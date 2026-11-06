@@ -299,5 +299,7 @@
   "zoom.in": "Zoom In",
   "zoom.out": "Zoom Out",
   "zoom.reset": "Actual Size",
-  "zoom.label": "Icon and text size"
+  "zoom.label": "Icon and text size",
+  "markup": "Markup",
+  "markupHint": "Open in the markup editor"
 }

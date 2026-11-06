@@ -299,5 +299,7 @@
   "zoom.in": "Ampliar",
   "zoom.out": "Reduzir",
   "zoom.reset": "Tamanho real",
-  "zoom.label": "Tamanho dos ícones e do texto"
+  "zoom.label": "Tamanho dos ícones e do texto",
+  "markup": "Marcar",
+  "markupHint": "Abrir no editor de marcação"
 }

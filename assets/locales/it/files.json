@@ -299,5 +299,7 @@
   "zoom.in": "Ingrandisci",
   "zoom.out": "Riduci",
   "zoom.reset": "Dimensioni reali",
-  "zoom.label": "Dimensione di icone e testo"
+  "zoom.label": "Dimensione di icone e testo",
+  "markup": "Annota",
+  "markupHint": "Apri nell’editor di annotazioni"
 }

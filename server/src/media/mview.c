@@ -119,7 +119,7 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     float dw = rw * sc, dh = rh * sc, dx, dy;
     if (s->view.zoom > 0) { dx = x + w / 2 - s->view.cx * dw; dy = y + h / 2 - s->view.cy * dh; }
     else { dx = x + (w - dw) / 2; dy = y + (h - dh) / 2; }
-    int opaque = ring || s->kind == SK_CAPTURE || s->opaque;
+    int opaque = ring || s->opaque;      /* captures set it; a picture with transparency opened in the markup editor doesn't */
     /* background: only the bands the image doesn't cover (a video frame doesn't repaint beneath itself) */
     if (s->view.bg >> 24) {
         uint32_t bg = with_opacity(s->view.bg, op);

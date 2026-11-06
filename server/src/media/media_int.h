@@ -123,17 +123,19 @@ void media_view_reset(MediaSrc *s);
 MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h);
 void media_capture_size(int *w, int *h);     /* recording / remote desktop frame size (docs/DISPLAYS.md) */
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
+MediaSrc *media_resize(MediaSrc *src, int w, int h);          /* new capture source, w × h */
+MediaSrc *media_rotate(MediaSrc *src, int turns);             /* new capture source, quarter turns clockwise */
 int  media_screenrec_start(MediaSrc *s, int fps);
 void media_capture_src_closed(MediaSrc *s);
 int  media_memfd_from_pixels(const uint32_t *px, int w, int h);
 
 /* annot.c: annotations over a capture */
 typedef struct {
-    int type;                   /* 'a' arrow, 'b' box, 't' text, 'z' blur, 'l' line */
+    int type;                   /* 'a' arrow, 'b' box, 't' text, 'z' blur, 'l' line, 'f' fill, 'p' pixelate */
     float x1, y1, x2, y2, width, size;
     uint32_t color;
     char text[512];
 } MediaOp;
-void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n);
+void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n, int opaque);
 
 #endif

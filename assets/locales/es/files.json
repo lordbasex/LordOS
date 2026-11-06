@@ -299,5 +299,7 @@
   "zoom.in": "Acercar",
   "zoom.out": "Alejar",
   "zoom.reset": "Tamaño real",
-  "zoom.label": "Tamaño de iconos y texto"
+  "zoom.label": "Tamaño de iconos y texto",
+  "markup": "Marcar",
+  "markupHint": "Abrir en el editor de marcado"
 }

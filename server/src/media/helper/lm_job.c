@@ -131,7 +131,7 @@ static void job_image(uint32_t id, int in) {
 static uint8_t clamp8(double v) { return v < 0 ? 0 : v > 255 ? 255 : (uint8_t)lround(v); }
 
 /* Basic editing (saved as a copy): crop (in coordinates of the image already rotated per
- * EXIF), rotation in 90° steps, brightness and contrast (-100..100). */
+ * EXIF), rotation in 90° steps, brightness and contrast (-100..100) and a new size (sw × sh). */
 static void job_edit(uint32_t id, int in, int out, const char *p) {
     char err[128], format[16];
     AVFormatContext *fmt = lm_open_input(in, err, sizeof err);
@@ -190,6 +190,16 @@ static void job_edit(uint32_t id, int in, int out, const char *p) {
         }
     }
     av_frame_free(&r);
+    /* resize after the crop (Photos → Edit → Size), when asked: sides 1..MP_MAX_DIM, straight alpha */
+    int sw = (int)mp_param_int(p, "sw", 0), sh = (int)mp_param_int(p, "sh", 0);
+    if (sw > 0 && sh > 0 && sw <= MP_MAX_DIM && sh <= MP_MAX_DIM && (sw != cw || sh != ch)) {
+        AVFrame *z = lm_to_bgra(c, sw, sh, 0);
+        if (!z) { av_frame_free(&c); lm_result(id, -1, "sys.outOfMemory", -1); return; }
+        av_frame_free(&c);
+        c = z;
+        cw = sw;
+        ch = sh;
+    }
     /* lm_encode_image expects premultiplied */
     for (int y = 0; y < ch; y++) {
         uint8_t *d = c->data[0] + (size_t)y * c->linesize[0];

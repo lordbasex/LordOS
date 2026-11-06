@@ -1,19 +1,24 @@
-/* annot.c — Screenshots annotations over the image's pixels (at full resolution):
- * arrow, line, box, text and blur. The same thing is seen in the preview and saved. */
+/* annot.c — the markup editor's annotations over the image's pixels (at full resolution):
+ * arrow, line, box, text, blur and the two redactions (solid fill, pixelate). The same thing is seen
+ * in the preview and saved. Pixels are premultiplied ARGB; a picture with transparency keeps it. */
 #include "media_int.h"
+#include "imgops.h"
 #include "../ui/ui.h"
 
 #include <math.h>
 #include <string.h>
 
+/* A straight-alpha color over a premultiplied pixel ("over"); an opaque pixel stays opaque. */
 static inline uint32_t blend(uint32_t d, uint32_t argb, float cov) {
     uint32_t a = (uint32_t)((argb >> 24) * cov + 0.5f);
     if (!a) return d;
     uint32_t ia = 255 - a;
+    uint32_t oa = a + ((d >> 24) * ia + 127) / 255;
     uint32_t r = (((argb >> 16) & 255) * a + ((d >> 16) & 255) * ia) / 255;
     uint32_t g = (((argb >> 8) & 255) * a + ((d >> 8) & 255) * ia) / 255;
     uint32_t b = ((argb & 255) * a + (d & 255) * ia) / 255;
-    return 0xff000000u | r << 16 | g << 8 | b;
+    if (oa > 255) oa = 255;
+    return oa << 24 | r << 16 | g << 8 | b;
 }
 
 /* Thick segment with soft edges (distance to the segment). */
@@ -68,7 +73,7 @@ static void triangle(uint32_t *px, int w, int h, const float *vx, const float *v
         }
 }
 
-void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n) {
+void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n, int opaque) {
     Canvas c;
     canvas_init(&c, px, w, h, w);
     for (int i = 0; i < n; i++) {
@@ -110,8 +115,16 @@ void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n) {
             for (int k = 0; k < 3; k++) canvas_backdrop_blur(&c, x0, y0, bw, bh, 0, r);
             break;
         }
+        case 'f':
+            /* redact: an opaque fill, nothing of what was below is left */
+            img_fill(px, w, h, o->x1, o->y1, o->x2, o->y2, o->color);
+            break;
+        case 'p':
+            /* redact: blocks of their average color (the block size comes as `size`) */
+            img_pixelate(px, w, h, o->x1, o->y1, o->x2, o->y2, (int)o->size);
+            break;
         default: break;
         }
     }
-    for (size_t i = 0; i < (size_t)w * h; i++) px[i] |= 0xff000000u;
+    if (opaque) for (size_t i = 0; i < (size_t)w * h; i++) px[i] |= 0xff000000u;
 }
