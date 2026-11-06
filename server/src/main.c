@@ -22,6 +22,8 @@
 #include "net/net.h"
 #include "disk/disk.h"
 #include "backup/backup.h"
+#include "cloud/cloud.h"
+#include "ui/js_cloud.h"
 #include "sound/snd.h"
 #include "keyboard.h"
 #include "ui/js_sys.h"
@@ -2414,6 +2416,8 @@ int main(int argc, char **argv) {
     if (ok && net_open()) fprintf(stderr, "lord-server: no network notifications (rtnetlink)\n");
     /* Backups: a thread running as the user, nice 19 and idle I/O (backup/backup.c) */
     if (ok && !s.greeter && getenv("HOME") && session_user) backup_start(getenv("HOME"), session_user);
+    /* Cloud: rclone rcd on a Unix socket, started when there is an account (cloud/cloud.c, docs/CLOUD.md) */
+    if (ok && !s.greeter && getenv("HOME") && session_user && js_cloud_start(getenv("HOME"))) fprintf(stderr, "lord-server: no Cloud\n");
     if (ok && snd_start()) fprintf(stderr, "lord-server: no PipeWire for now (sound); it retries on its own\n");
     if (ok && !s.greeter) portal_start();   /* dark mode, accent and buttons for GTK/GNOME/Qt (ui/portal.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
@@ -2619,6 +2623,8 @@ int main(int argc, char **argv) {
         if (dkbase >= 0) pfd[n++] = (struct pollfd){ disk_watch_fd(), POLLIN, 0 };
         int bkbase = backup_fd() >= 0 ? n : -1;
         if (bkbase >= 0) pfd[n++] = (struct pollfd){ backup_fd(), POLLIN, 0 };
+        int clbase = cloud_fd() >= 0 ? n : -1;
+        if (clbase >= 0) pfd[n++] = (struct pollfd){ cloud_fd(), POLLIN, 0 };
         int sbase = snd_fd() >= 0 ? n : -1;
         if (sbase >= 0) pfd[n++] = (struct pollfd){ snd_fd(), POLLIN, 0 };
         int pbase = portal_fd() >= 0 ? n : -1;
@@ -2693,6 +2699,7 @@ int main(int argc, char **argv) {
         if (sbase >= 0 && pfd[sbase].revents) snd_dispatch();
         if (pbase >= 0 && pfd[pbase].revents) portal_dispatch();
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
+        if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
         if (nm) mirror_dispatch(pfd + mbase, nm);

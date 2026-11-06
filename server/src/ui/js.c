@@ -19,6 +19,7 @@
 #include "js_input.h"
 #include "js_fw.h"
 #include "js_backup.h"
+#include "js_cloud.h"
 #include "js_clean.h"
 #include "js_lan.h"
 #include "js_rdesk.h"
@@ -425,6 +426,7 @@ static void session_context(void) {
     js_disk_register(ctx, lord);       /* lord.disks: disks and partitions (Disks app) */
     js_imager_register(ctx, lord);     /* lord.imager: LordOS Imager (docs/IMAGER.md) */
     js_backup_register(ctx, lord);     /* lord.backup: Backups (backup/) */
+    js_cloud_register(ctx, lord);      /* lord.cloud: Cloud (cloud/, docs/CLOUD.md) */
     js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
     js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
     js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
@@ -772,6 +774,23 @@ void js_backup_event(const char *json) {
     JSValueConst arg = JS_ParseJSON(ctx, json, strlen(json), "<backup>");
     JS_FreeValue(ctx, call_global("__lordBackup", 1, &arg));
     JS_FreeValue(ctx, arg);
+    drain_jobs();
+}
+
+/* Cloud (cloud/cloud.c): the state changed → __lordCloud(state); a link answer → __lordCloudReply(req, result). */
+void js_cloud_event(const char *json) {
+    if (!ctx) return;
+    JSValueConst arg = JS_ParseJSON(ctx, json, strlen(json), "<cloud>");
+    JS_FreeValue(ctx, call_global("__lordCloud", 1, &arg));
+    JS_FreeValue(ctx, arg);
+    drain_jobs();
+}
+
+void js_cloud_reply(int req, const char *json) {
+    if (!ctx) return;
+    JSValueConst args[2] = { JS_NewInt32(ctx, req), JS_ParseJSON(ctx, json, strlen(json), "<cloud>") };
+    JS_FreeValue(ctx, call_global("__lordCloudReply", 2, args));
+    JS_FreeValue(ctx, args[1]);
     drain_jobs();
 }
 

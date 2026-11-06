@@ -1,0 +1,54 @@
+/* cloud.h — Cloud (docs/CLOUD.md): the person's cloud storage accounts, mounted in ~/Cloud with files on demand.
+ *
+ * A lord-server thread runs `rclone rcd` (CLOUD_RCLONE) for the session: on a Unix socket in
+ * $XDG_RUNTIME_DIR/lordos/cloud (0700), with a random user and password per start given through a memfd
+ * (--rc-htpasswd), an in-memory configuration (--config ""), in its own scope (app-lordos-lordos-cloud.scope,
+ * firewall app desktop:lordos-cloud). It talks to it only through the closed method table of cloud_pure.h.
+ * Secrets (OAuth tokens, passwords, keys) live in the keyring and reach rclone over the socket; the files in
+ * ~/.config/lordos/cloud hold none. Changes reach JS through an eventfd (cloud_fd → cloud_dispatch → __lordCloud).
+ *
+ * Every call returns at once: long work goes to the thread. Results are JSON text in new memory (free it). */
+#ifndef LORD_CLOUD_H
+#define LORD_CLOUD_H
+
+#include <stddef.h>
+
+/* where secrets are kept: lord-server uses the keyring (cloud_kr.c); the test harness a file */
+typedef struct {
+    int (*get)(const char *id, char **secret);      /* 0 and *secret (malloc), 1 none, -2 locked, -3 no keyring, -1 failed */
+    int (*set)(const char *id, const char *label, const char *secret);   /* 0, or as get */
+    int (*del)(const char *id);
+} CloudSecrets;
+
+int   cloud_start(const char *home, const CloudSecrets *sec);   /* once, as the session user */
+void  cloud_stop(void);                                         /* end of the session: unmounts, rclone quits */
+int   cloud_fd(void);                                           /* -1 if not started */
+/* something changed: push(state JSON); a link/unlink finished: reply(req, result JSON); a sign-in address
+ * to open in the default browser: open_url(url) → 0 opened */
+void  cloud_dispatch(void (*push)(const char *json), void (*reply)(int req, const char *json), int (*open_url)(const char *url));
+
+int   cloud_available(void);                                    /* lordos-rclone is installed */
+char *cloud_state_json(void);
+char *cloud_providers_json(void);                               /* [] until rclone has listed them once (a push follows) */
+
+char *cloud_begin_signin(const char *kind, const char *name, const char *client_id, const char *client_secret);
+int   cloud_signin_url(const char *id, char *url, size_t n);    /* 0: the address of that sign-in */
+void  cloud_cancel_signin(const char *id);
+char *cloud_add(const char *kind, const char *name, const char *fields_json);
+char *cloud_remove(const char *id, int discard_pending);
+char *cloud_rename(const char *id, const char *name);
+void  cloud_refresh_about(const char *id);
+char *cloud_website(const char *id);                            /* the address, or NULL */
+char *cloud_status(const char *const *paths, int n);
+void  cloud_keep(const char *const *paths, int n, int keep);
+char *cloud_free(const char *const *paths, int n);
+/* *req > 0: the answer comes through reply(req, …); otherwise the JSON returned is the answer */
+char *cloud_link(const char *path, const char *expire, int *req);
+char *cloud_unlink(const char *path, int *req);
+char *cloud_links(const char *id);
+void  cloud_pause(const char *id, int pause);                   /* id NULL: every account */
+char *cloud_set_options(const char *json);                      /* {ok} | {error} */
+void  cloud_restart(void);
+const char *cloud_log_name(void);                               /* ~/.cache/lordos/<this>, shown by Logs */
+
+#endif

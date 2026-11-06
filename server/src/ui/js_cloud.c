@@ -1,0 +1,285 @@
+/* js_cloud.c — lord.cloud: Cloud (cloud/cloud.h, docs/CLOUD.md section 17). JS never reaches rclone: each call here
+ * is one of a closed list, with checked arguments, and lord-server's cloud thread is rclone's only client.
+ *
+ *   available() → bool                      state() → State (also pushed: __lordCloud(state))
+ *   providers() → [{ kind, label, group, hint, fields: [{ name, label, secret, required, default, examples }] }]
+ *   beginSignIn(kind, name, { clientId, clientSecret }) → { id, url, expiresAt } | { error }
+ *   openSignInPage(id) → bool               cancelSignIn(id)
+ *   add(kind, name, fields) → { id } | { error, field? }
+ *   remove(id, { discardPending }) → { ok } | { error: 'pending', files }
+ *   rename(id, name) → { ok } | { error }   refreshAbout(id)            websiteUrl(id) → string | null
+ *   status(paths) → { [path]: { st, pct?, error? } }
+ *   keep(paths) / unkeep(paths)             free(paths) → { freed, skipped: [{ path, reason }] }
+ *   link(path, expire) / unlink(path) → { req } (the answer comes in __lordCloudReply(req, result)) | { error }
+ *   links(id) → [{ path, url, expires, made }]
+ *   pause(id|null) / resume(id|null)        setOptions({ bwUp, bwDown, pauseOnBattery, pauseOnMetered, autoFree, freeBelowGb })
+ *   restart()                               logName() → the Logs app's file name of rclone's log */
+#include "js_cloud.h"
+#include "js.h"
+#include "../apps.h"
+#include "../cloud/cloud.h"
+#include "../cloud/cloud_kr.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define PATHS_MAX 4096
+
+static JSValue parsed(JSContext *c, char *j) {
+    if (!j) return JS_NULL;
+    JSValue v = JS_ParseJSON(c, j, strlen(j), "<cloud>");
+    free(j);
+    return v;
+}
+
+static const char *arg(JSContext *c, int argc, JSValueConst *argv, int i) {
+    return i < argc && JS_IsString(argv[i]) ? JS_ToCString(c, argv[i]) : NULL;
+}
+
+static const char *prop(JSContext *c, JSValueConst o, const char *k) {
+    if (!JS_IsObject(o)) return NULL;
+    JSValue v = JS_GetPropertyStr(c, o, k);
+    const char *s = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+    JS_FreeValue(c, v);
+    return s;
+}
+
+static void fr(JSContext *c, const char *s) { if (s) JS_FreeCString(c, s); }
+
+static JSValue err(JSContext *c, const char *code) {
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "error", JS_NewString(c, code));
+    return o;
+}
+
+/* the default browser, through the launcher's own rules (apps.c): one argument, no shell */
+static int open_url(const char *url) {
+    char def[192];
+    if (!apps_default_for("x-scheme-handler/http", def, sizeof def) && !apps_default_for("x-scheme-handler/https", def, sizeof def)) return -1;
+    size_t l = strlen(def);
+    if (l > 8 && !strcmp(def + l - 8, ".desktop")) def[l - 8] = 0;
+    return apps_launch_uri(def, url);
+}
+
+/* an array of strings (paths), at most PATHS_MAX */
+static int paths_of(JSContext *c, JSValueConst a, const char ***out) {
+    *out = NULL;
+    if (!JS_IsArray(c, a)) return -1;
+    JSValue lv = JS_GetPropertyStr(c, a, "length");
+    int32_t n = 0;
+    JS_ToInt32(c, &n, lv);
+    JS_FreeValue(c, lv);
+    if (n < 0 || n > PATHS_MAX) return -1;
+    const char **p = calloc((size_t)n + 1, sizeof *p);
+    if (!p) return -1;
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        JSValue v = JS_GetPropertyUint32(c, a, (uint32_t)i);
+        if (JS_IsString(v)) p[k++] = JS_ToCString(c, v);
+        JS_FreeValue(c, v);
+    }
+    *out = p;
+    return k;
+}
+static void paths_free(JSContext *c, const char **p, int n) { for (int i = 0; p && i < n; i++) fr(c, p[i]); free(p); }
+
+static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return JS_NewBool(c, cloud_available()); }
+static JSValue f_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return parsed(c, cloud_state_json()); }
+static JSValue f_providers(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return parsed(c, cloud_providers_json()); }
+
+static JSValue f_begin(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *k = arg(c, argc, argv, 0), *n = arg(c, argc, argv, 1);
+    const char *id = argc > 2 ? prop(c, argv[2], "clientId") : NULL, *sec = argc > 2 ? prop(c, argv[2], "clientSecret") : NULL;
+    JSValue r = k && n ? parsed(c, cloud_begin_signin(k, n, id, sec)) : err(c, "cloud.badArgument");
+    fr(c, k); fr(c, n); fr(c, id); fr(c, sec);
+    return r;
+}
+
+static JSValue f_open_signin(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    char url[256];
+    int ok = id && !cloud_signin_url(id, url, sizeof url) && !open_url(url);
+    fr(c, id);
+    return JS_NewBool(c, ok);
+}
+
+static JSValue f_cancel_signin(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    if (id) cloud_cancel_signin(id);
+    fr(c, id);
+    return JS_UNDEFINED;
+}
+
+static JSValue f_add(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *k = arg(c, argc, argv, 0), *n = arg(c, argc, argv, 1);
+    JSValue s = argc > 2 && JS_IsObject(argv[2]) ? JS_JSONStringify(c, argv[2], JS_UNDEFINED, JS_UNDEFINED) : JS_UNDEFINED;
+    const char *f = JS_IsString(s) ? JS_ToCString(c, s) : NULL;
+    JS_FreeValue(c, s);
+    JSValue r = k && n && f ? parsed(c, cloud_add(k, n, f)) : err(c, "cloud.badArgument");
+    fr(c, k); fr(c, n); fr(c, f);
+    return r;
+}
+
+static JSValue f_remove(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    int discard = 0;
+    if (argc > 1 && JS_IsObject(argv[1])) { JSValue v = JS_GetPropertyStr(c, argv[1], "discardPending"); discard = JS_ToBool(c, v) > 0; JS_FreeValue(c, v); }
+    JSValue r = id ? parsed(c, cloud_remove(id, discard)) : err(c, "cloud.badArgument");
+    fr(c, id);
+    return r;
+}
+
+static JSValue f_rename(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0), *n = arg(c, argc, argv, 1);
+    JSValue r = id && n ? parsed(c, cloud_rename(id, n)) : err(c, "cloud.badArgument");
+    fr(c, id); fr(c, n);
+    return r;
+}
+
+static JSValue f_about(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    if (id) cloud_refresh_about(id);
+    fr(c, id);
+    return JS_UNDEFINED;
+}
+
+static JSValue f_website(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    char *u = id ? cloud_website(id) : NULL;
+    fr(c, id);
+    JSValue r = u ? JS_NewString(c, u) : JS_NULL;
+    free(u);
+    return r;
+}
+
+static JSValue f_status(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char **p;
+    int n = argc ? paths_of(c, argv[0], &p) : -1;
+    if (n < 0) return JS_NewObject(c);
+    JSValue r = parsed(c, cloud_status(p, n));
+    paths_free(c, p, n);
+    return r;
+}
+
+static JSValue keep_(JSContext *c, int argc, JSValueConst *argv, int on) {
+    const char **p;
+    int n = argc ? paths_of(c, argv[0], &p) : -1;
+    if (n < 0) return JS_FALSE;
+    cloud_keep(p, n, on);
+    paths_free(c, p, n);
+    return JS_TRUE;
+}
+static JSValue f_keep(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return keep_(c, argc, argv, 1); }
+static JSValue f_unkeep(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return keep_(c, argc, argv, 0); }
+
+static JSValue f_free(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char **p;
+    int n = argc ? paths_of(c, argv[0], &p) : -1;
+    if (n < 0) return err(c, "cloud.badArgument");
+    JSValue r = parsed(c, cloud_free(p, n));
+    paths_free(c, p, n);
+    return r;
+}
+
+static JSValue req_or(JSContext *c, char *res, int req) {
+    if (res) return parsed(c, res);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "req", JS_NewInt32(c, req));
+    return o;
+}
+
+static JSValue f_link(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *p = arg(c, argc, argv, 0), *e = arg(c, argc, argv, 1);
+    int req = 0;
+    JSValue r = p ? req_or(c, cloud_link(p, e ? e : "never", &req), req) : err(c, "cloud.badArgument");
+    fr(c, p); fr(c, e);
+    return r;
+}
+
+static JSValue f_unlink(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *p = arg(c, argc, argv, 0);
+    int req = 0;
+    JSValue r = p ? req_or(c, cloud_unlink(p, &req), req) : err(c, "cloud.badArgument");
+    fr(c, p);
+    return r;
+}
+
+static JSValue f_links(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = arg(c, argc, argv, 0);
+    JSValue r = id ? parsed(c, cloud_links(id)) : JS_NewArray(c);
+    fr(c, id);
+    return r;
+}
+
+static JSValue pause_(JSContext *c, int argc, JSValueConst *argv, int on) {
+    const char *id = arg(c, argc, argv, 0);
+    cloud_pause(id, on);
+    fr(c, id);
+    return JS_UNDEFINED;
+}
+static JSValue f_pause(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return pause_(c, argc, argv, 1); }
+static JSValue f_resume(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; return pause_(c, argc, argv, 0); }
+
+static JSValue f_options(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsObject(argv[0])) return err(c, "cloud.badOption");
+    JSValue s = JS_JSONStringify(c, argv[0], JS_UNDEFINED, JS_UNDEFINED);
+    const char *j = JS_IsString(s) ? JS_ToCString(c, s) : NULL;
+    JS_FreeValue(c, s);
+    JSValue r = j ? parsed(c, cloud_set_options(j)) : err(c, "cloud.badOption");
+    fr(c, j);
+    return r;
+}
+
+static JSValue f_restart(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)c; (void)t; (void)argc; (void)argv; cloud_restart(); return JS_UNDEFINED; }
+static JSValue f_logname(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; (void)argv; return JS_NewString(c, cloud_log_name()); }
+
+static const JSCFunctionListEntry fns[] = {
+    JS_CFUNC_DEF("available", 0, f_available),
+    JS_CFUNC_DEF("state", 0, f_state),
+    JS_CFUNC_DEF("providers", 0, f_providers),
+    JS_CFUNC_DEF("beginSignIn", 3, f_begin),
+    JS_CFUNC_DEF("openSignInPage", 1, f_open_signin),
+    JS_CFUNC_DEF("cancelSignIn", 1, f_cancel_signin),
+    JS_CFUNC_DEF("add", 3, f_add),
+    JS_CFUNC_DEF("remove", 2, f_remove),
+    JS_CFUNC_DEF("rename", 2, f_rename),
+    JS_CFUNC_DEF("refreshAbout", 1, f_about),
+    JS_CFUNC_DEF("websiteUrl", 1, f_website),
+    JS_CFUNC_DEF("status", 1, f_status),
+    JS_CFUNC_DEF("keep", 1, f_keep),
+    JS_CFUNC_DEF("unkeep", 1, f_unkeep),
+    JS_CFUNC_DEF("free", 1, f_free),
+    JS_CFUNC_DEF("link", 2, f_link),
+    JS_CFUNC_DEF("unlink", 1, f_unlink),
+    JS_CFUNC_DEF("links", 1, f_links),
+    JS_CFUNC_DEF("pause", 1, f_pause),
+    JS_CFUNC_DEF("resume", 1, f_resume),
+    JS_CFUNC_DEF("setOptions", 1, f_options),
+    JS_CFUNC_DEF("restart", 0, f_restart),
+    JS_CFUNC_DEF("logName", 0, f_logname),
+};
+
+void js_cloud_register(JSContext *c, JSValue lord) {
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyFunctionList(c, o, fns, sizeof fns / sizeof fns[0]);
+    JS_SetPropertyStr(c, lord, "cloud", o);
+}
+
+int js_cloud_start(const char *home) { return cloud_start(home, &cloud_keyring); }
+
+void js_cloud_dispatch(void) { cloud_dispatch(js_cloud_event, js_cloud_reply, open_url); }

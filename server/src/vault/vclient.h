@@ -38,5 +38,8 @@ int   vc_request_private(const char *json, size_t len);
 char *vc_take_private(uint32_t *id, size_t *len);
 int   vc_private_fd(void);
 int   vc_private_pending(void);               /* private requests without a reply, or replies not taken */
+/* A private request from a lord-server thread that may wait (never the main loop): 0 and the reply in *rep
+ * (malloc'd; the caller wipes and frees it), -1 not sent or no reply within timeout_ms. */
+int   vc_request_wait(const char *json, size_t len, char **rep, size_t *rlen, int timeout_ms);
 
 #endif

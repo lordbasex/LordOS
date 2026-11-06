@@ -1,0 +1,488 @@
+/* cloud_test.c — Cloud without a cloud (docs/CLOUD.md 16): the closed rc method table and the request built for it,
+ * the HTTP answers, names and paths under ~/Cloud, the provider and website tables, `rclone authorize`'s output,
+ * the VFS cache metadata, the status merge, the eviction choice; then, in a throwaway home with no rclone, the
+ * accounts, keep and links files, and Free Up Space on a real cache tree (open, changed, waiting and kept files
+ * stay). Built with ASan and UBSan, and with CLOUD_TEST (the rclone binary can be pointed elsewhere). */
+#include "../src/cloud/cloud_pure.h"
+#include "../src/cloud/cloud_int.h"
+#include "../src/sec/json.h"
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static int pass, failc;
+#define CHECK(x) do { if (x) pass++; else { failc++; printf("FAIL %s:%d %s\n", __FILE__, __LINE__, #x); } } while (0)
+
+static void t_methods(void) {
+    /* every method the cloud code may call, and nothing else */
+    static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
+        "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
+        "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
+        "vfs/refresh", "vfs/forget", "core/quit", NULL };
+    static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
+        "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/list", "operations/delete",
+        "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
+        "operations/copyfile", "operations/cleanup", "backend/command", "serve/start", "job/batch", "sync/sync", "sync/copy",
+        "sync/move", "pluginsctl/addPlugin", "debug/set-gc-percent", "core/obscure", "mount/unmountall", NULL };
+    int n = 0;
+    for (int m = 0; m < RCM_COUNT; m++) {
+        const char *p = rc_method_path(m);
+        CHECK(p != NULL);
+        if (!p) continue;
+        int ok = 0;
+        for (int i = 0; allowed[i]; i++) ok |= !strcmp(allowed[i], p);
+        CHECK(ok);
+        for (int i = 0; never[i]; i++) CHECK(strcmp(never[i], p));
+        for (int k = 0; k < m; k++) CHECK(strcmp(rc_method_path(k), p));
+        n++;
+    }
+    CHECK(n == RCM_COUNT);
+    CHECK(rc_method_path(-1) == NULL && rc_method_path(RCM_COUNT) == NULL && rc_method_path(1000) == NULL);
+    char h[512];
+    CHECK(rc_build_header(h, sizeof h, RCM_COUNT, "dTpw", 2) == -1);
+    CHECK(rc_build_header(h, sizeof h, -3, "dTpw", 2) == -1);
+    CHECK(rc_build_header(h, sizeof h, RCM_ABOUT, "dTpw\r\nX: y", 2) == -1);     /* nothing can be injected in the header */
+    CHECK(rc_build_header(h, sizeof h, RCM_ABOUT, "", 2) == -1);
+    int l = rc_build_header(h, sizeof h, RCM_ABOUT, "dTpw", 13);
+    CHECK(l > 0 && !strncmp(h, "POST /operations/about HTTP/1.0\r\n", 33) && strstr(h, "Authorization: Basic dTpw\r\n") && strstr(h, "Content-Length: 13\r\n\r\n"));
+    CHECK(rc_build_header(h, 20, RCM_ABOUT, "dTpw", 13) == -1);
+    char b[64];
+    cloud_b64((const unsigned char *)"u:p", 3, b);
+    CHECK(!strcmp(b, "dTpw"));
+    cloud_b64((const unsigned char *)"ab", 2, b);
+    CHECK(!strcmp(b, "YWI="));
+}
+
+static void t_http(void) {
+    int st;
+    char *body;
+    size_t bl;
+    char a[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 7\r\n\r\n{\"a\":1}trailing";
+    CHECK(!rc_parse_response(a, strlen(a), &st, &body, &bl) && st == 200 && bl == 7 && !strcmp(body, "{\"a\":1}"));
+    char c[] = "HTTP/1.1 500 Internal\r\nTransfer-Encoding: chunked\r\n\r\n4\r\n{\"er\r\n6\r\nror\":1\r\n1\r\n}\r\n0\r\n\r\n";
+    CHECK(!rc_parse_response(c, strlen(c), &st, &body, &bl) && st == 500 && !strcmp(body, "{\"error\":1}"));
+    char d[] = "HTTP/1.0 200 OK\r\nServer: rclone\r\n\r\n{}";
+    CHECK(!rc_parse_response(d, strlen(d), &st, &body, &bl) && bl == 2);
+    char cut[] = "HTTP/1.1 200 OK\r\nContent-Length: 70\r\n\r\n{}";
+    CHECK(rc_parse_response(cut, strlen(cut), &st, &body, &bl) == -1);
+    char junk[] = "SSH-2.0-OpenSSH\r\n\r\n";
+    CHECK(rc_parse_response(junk, strlen(junk), &st, &body, &bl) == -1);
+    char bad[] = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n";
+    CHECK(rc_parse_response(bad, strlen(bad), &st, &body, &bl) == -1);
+    char nohdr[] = "HTTP/1.1 200 OK\r\nContent-Length: 2";
+    CHECK(rc_parse_response(nohdr, strlen(nohdr), &st, &body, &bl) == -1);
+}
+
+static void t_paths(void) {
+    CHECK(cloud_name_ok("Work") && cloud_name_ok("Personal drive") && cloud_name_ok("Trabajo — señora") && cloud_name_ok("日本"));
+    CHECK(!cloud_name_ok("") && !cloud_name_ok(NULL) && !cloud_name_ok(".hidden") && !cloud_name_ok("a/b") && !cloud_name_ok(" lead") && !cloud_name_ok("trail "));
+    CHECK(!cloud_name_ok("a\nb") && !cloud_name_ok("a\x7f") && !cloud_name_ok("\xc2\x85x") && !cloud_name_ok("\xff") && !cloud_name_ok("\xc0\xaf"));
+    CHECK(!cloud_name_ok("..") && !cloud_name_ok("."));
+    char longn[80];
+    memset(longn, 'a', 65);
+    longn[65] = 0;
+    CHECK(!cloud_name_ok(longn));
+    CHECK(cloud_rel_ok("") && cloud_rel_ok("a") && cloud_rel_ok("a/b/c.txt") && cloud_rel_ok("..a/b..") && cloud_rel_ok("a/.b"));
+    CHECK(!cloud_rel_ok("..") && !cloud_rel_ok("a/..") && !cloud_rel_ok("../a") && !cloud_rel_ok("a/../b") && !cloud_rel_ok("./a") && !cloud_rel_ok("a/./b"));
+    CHECK(!cloud_rel_ok("/a") && !cloud_rel_ok("a/") && !cloud_rel_ok("a//b") && !cloud_rel_ok("a\tb") && !cloud_rel_ok(NULL));
+    char n[80], r[1100];
+    const char *root = "/home/u/Cloud";
+    CHECK(!cloud_split(root, "/home/u/Cloud/Work", n, sizeof n, r, sizeof r) && !strcmp(n, "Work") && !r[0]);
+    CHECK(!cloud_split(root, "/home/u/Cloud/Work/Projects/a.txt", n, sizeof n, r, sizeof r) && !strcmp(r, "Projects/a.txt"));
+    CHECK(cloud_split(root, "/home/u/Cloud", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloudy/Work/a", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloud/Work/../../.ssh/id", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloud/../Cloud/Work", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloud//Work", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloud/Work/", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "/home/u/Cloud/Work/a/", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, "Cloud/Work/a", n, sizeof n, r, sizeof r));
+    CHECK(cloud_split(root, NULL, n, sizeof n, r, sizeof r));
+    CHECK(cloud_key_ok("url") && cloud_key_ok("access_key_id") && !cloud_key_ok("Url") && !cloud_key_ok("a b") && !cloud_key_ok("") && !cloud_key_ok("a=b"));
+    CHECK(cloud_value_ok("https://dav.example.test/remote.php") && cloud_value_ok("") && !cloud_value_ok("a\nb=c") && !cloud_value_ok("a\rb") && !cloud_value_ok(NULL));
+    const char *kept[] = { "Projects", "Photos/2026" };
+    CHECK(cloud_kept(kept, 2, "Projects") && cloud_kept(kept, 2, "Projects/a/b") && cloud_kept(kept, 2, "Photos/2026/x.jpg"));
+    CHECK(!cloud_kept(kept, 2, "Projectsx") && !cloud_kept(kept, 2, "Photos") && !cloud_kept(kept, 2, "Photos/2025/x") && !cloud_kept(kept, 0, "a"));
+    const char *all[] = { "" };
+    CHECK(cloud_kept(all, 1, "anything/at/all"));
+}
+
+static int has_brand(const char *s) {
+    static const char *const bad[] = { "Microsoft", "Windows", "Apple", "iCloud", "OneDrive", "macOS", "Outlook", NULL };
+    for (int i = 0; s && bad[i]; i++) if (strstr(s, bad[i])) return 1;
+    return 0;
+}
+
+static void t_kinds(void) {
+    int n = cloud_kind_count();
+    CHECK(n >= 20);
+    for (int i = 0; i < n; i++) {
+        const CloudKind *k = cloud_kind_at(i);
+        CHECK(k && k->kind && k->type && k->label && k->group);
+        CHECK(!strcmp(k->group, "oauth") || !strcmp(k->group, "server") || !strcmp(k->group, "object") || !strcmp(k->group, "crypt"));
+        CHECK(!has_brand(k->label) && !has_brand(k->hint));
+        CHECK(cloud_kind(k->kind) == k);
+        CHECK(!k->website || cloud_url_ok(k->website));
+        for (int j = 0; j < i; j++) CHECK(strcmp(cloud_kind_at(j)->kind, k->kind));
+    }
+    CHECK(cloud_kind_at(-1) == NULL && cloud_kind_at(n) == NULL && cloud_kind("core") == NULL && cloud_kind(NULL) == NULL);
+    const CloudKind *nc = cloud_kind("nextcloud");
+    CHECK(nc && !strcmp(nc->type, "webdav") && cloud_field_hidden(nc, "vendor") && !cloud_field_hidden(nc, "url") && !cloud_field_hidden(nc, "vendo"));
+    CHECK(!cloud_field_hidden(cloud_kind("dropbox"), "vendor"));
+    /* the website table */
+    char u[400];
+    CHECK(cloud_site_url(cloud_kind("dropbox"), NULL, u, sizeof u) && !strncmp(u, "https://", 8));
+    CHECK(cloud_site_url(cloud_kind("drive"), "ignored", u, sizeof u) && !strcmp(u, "https://drive.google.com/"));
+    CHECK(cloud_site_url(cloud_kind("webdav"), "https://dav.example.test/x", u, sizeof u) && !strcmp(u, "https://dav.example.test/x"));
+    CHECK(!cloud_site_url(cloud_kind("webdav"), "http://dav.example.test/x", u, sizeof u));      /* https only */
+    CHECK(!cloud_site_url(cloud_kind("webdav"), NULL, u, sizeof u));
+    CHECK(!cloud_site_url(cloud_kind("s3"), "https://s3.example.test/\"><script>", u, sizeof u));
+    CHECK(!cloud_site_url(cloud_kind("s3"), "javascript:alert(1)", u, sizeof u));
+    CHECK(!cloud_site_url(cloud_kind("sftp"), "https://x.example.test", u, sizeof u));
+    CHECK(!cloud_site_url(NULL, NULL, u, sizeof u));
+    CHECK(!cloud_url_ok("https://") && !cloud_url_ok("https:///x") && !cloud_url_ok("https://a b") && !cloud_url_ok("ftp://x.test"));
+}
+
+static void t_signin(void) {
+    char url[200], tok[4096];
+    CHECK(cloud_auth_url("2026/11/06 14:51:51 NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA", url, sizeof url) &&
+          !strcmp(url, "http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA"));
+    CHECK(cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=abcdefgh12\n", url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Please go to the following link: https://evil.example.test/auth?state=abcdefgh12", url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=abc\"<x>", url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=short", url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:536820/auth?state=abcdefgh12", url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Waiting for code...", url, sizeof url) && !cloud_auth_url(NULL, url, sizeof url));
+    CHECK(!cloud_auth_url("NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=vemwviceRJH-43KtIlsIGA", url, 20));
+    const char *out = "Paste the following into your remote machine --->\n{\"access_token\":\"sl.x\",\"token_type\":\"bearer\",\"refresh_token\":\"r1\",\"expiry\":\"2026-11-06T18:51:51Z\"}\n<---End paste\n";
+    CHECK(cloud_auth_token(out, tok, sizeof tok) && tok[0] == '{' && strstr(tok, "\"refresh_token\":\"r1\"") && tok[strlen(tok) - 1] == '}');
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\nnot json\n<---End paste\n", tok, sizeof tok));
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"x\":1}\n<---End paste\n", tok, sizeof tok));
+    CHECK(!cloud_auth_token("Paste the following into your remote machine --->\n{\"access_token\":\"a\nb\"}\n<---End paste\n", tok, sizeof tok));
+    CHECK(!cloud_auth_token("", tok, sizeof tok) && !cloud_auth_token(NULL, tok, sizeof tok));
+    CHECK(!cloud_auth_token(out, tok, 10));
+    CHECK(!strcmp(cloud_answer("config_refresh_token", "true"), "false"));
+    CHECK(!strcmp(cloud_answer("config_shared_client_id", "false"), "true"));
+    CHECK(!strcmp(cloud_answer("config_is_local", "true"), "false"));
+    CHECK(!strcmp(cloud_answer("region", "eu"), "eu") && !strcmp(cloud_answer("x", NULL), "") && !strcmp(cloud_answer(NULL, "d"), "d"));
+}
+
+static void t_options(void) {
+    char r[64], a[16];
+    long long s;
+    CHECK(!cloud_bw_rate(0, 0, r, sizeof r) && !strcmp(r, "off"));
+    CHECK(!cloud_bw_rate(512, 0, r, sizeof r) && !strcmp(r, "512Ki:off"));
+    CHECK(!cloud_bw_rate(0, 2048, r, sizeof r) && !strcmp(r, "off:2048Ki"));
+    CHECK(cloud_bw_rate(-1, 0, r, sizeof r) == -1 && cloud_bw_rate(0, CLOUD_BW_MAX + 1, r, sizeof r) == -1);
+    CHECK(!cloud_expire("1d", a, sizeof a, &s) && !strcmp(a, "1d") && s == 86400);
+    CHECK(!cloud_expire("30d", a, sizeof a, &s) && s == 30 * 86400);
+    CHECK(!cloud_expire("never", a, sizeof a, &s) && !a[0] && !s);
+    CHECK(cloud_expire("2d", a, sizeof a, &s) == -1 && cloud_expire("1d;rm", a, sizeof a, &s) == -1 && cloud_expire(NULL, a, sizeof a, &s) == -1);
+}
+
+static void t_meta(void) {
+    CHECK(cloud_rfc3339("1970-01-01T00:00:00Z") == 0);
+    CHECK(cloud_rfc3339("2026-11-06T14:51:51.00763413-03:00") == cloud_rfc3339("2026-11-06T17:51:51Z"));
+    CHECK(cloud_rfc3339("2026-11-06T14:51:51+00:00") - cloud_rfc3339("2026-11-06T14:51:50Z") == 1);
+    CHECK(cloud_rfc3339("2026-13-06T14:51:51Z") == -1 && cloud_rfc3339("garbage") == -1 && cloud_rfc3339("2026-11-06T14:51:51") == -1);
+    CloudMeta m;
+    const char *open = "{\"ModTime\":\"2026-11-06T14:51:51.00763413-03:00\",\"ATime\":\"2026-11-06T14:51:51.00979378-03:00\",\"Size\":2000000,\"Rs\":null,\"Fingerprint\":\"2000000\",\"Dirty\":false}";
+    CHECK(!cloud_meta_parse(open, strlen(open), &m) && m.size == 2000000 && m.cached == 0 && !m.dirty && m.atime == cloud_rfc3339("2026-11-06T17:51:51Z"));
+    const char *dirty = "{\"ModTime\":\"x\",\"ATime\":\"2026-11-06T14:51:51.182733935-03:00\",\"Size\":8,\"Rs\":[{\"Pos\":0,\"Size\":8}],\"Fingerprint\":\"6\",\"Dirty\":true}";
+    CHECK(!cloud_meta_parse(dirty, strlen(dirty), &m) && m.size == 8 && m.cached == 8 && m.dirty);
+    const char *part = "{\"Size\":100,\"Rs\":[{\"Pos\":0,\"Size\":10},{\"Pos\":50,\"Size\":20}],\"Dirty\":false}";
+    CHECK(!cloud_meta_parse(part, strlen(part), &m) && m.cached == 30 && m.atime == -1);
+    const char *over = "{\"Size\":10,\"Rs\":[{\"Pos\":0,\"Size\":1000}]}";
+    CHECK(!cloud_meta_parse(over, strlen(over), &m) && m.cached == 10);
+    CHECK(cloud_meta_parse("{\"Size\":-1}", 11, &m) == -1 && cloud_meta_parse("[]", 2, &m) == -1 && cloud_meta_parse("{", 1, &m) == -1);
+    CHECK(cloud_meta_parse("{\"Size\":5,\"Rs\":\"x\"}", 19, &m) == -1);
+}
+
+static void t_status(void) {
+    CloudMeta whole = { 100, 100, 0, 0 }, part = { 100, 40, 0, 0 }, dirty = { 100, 100, 0, 1 };
+    CloudLive l = { 0 };
+    double pct;
+    CHECK(!strcmp(cloud_file_status(NULL, &l, &pct), "cloud") && pct < 0);
+    CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "cloud"));
+    CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "here"));
+    l.kept = 1;
+    CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "kept"));
+    CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "down") && pct == 40);
+    CHECK(!strcmp(cloud_file_status(NULL, &l, &pct), "down") && pct == 0);
+    l = (CloudLive){ .downloading = 1, .down_pct = 69 };
+    CHECK(!strcmp(cloud_file_status(&part, &l, &pct), "down") && pct == 69);
+    l = (CloudLive){ .queued = 1 };
+    CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "up") && pct == 0);
+    l = (CloudLive){ 0 };
+    CHECK(!strcmp(cloud_file_status(&dirty, &l, &pct), "up"));
+    l = (CloudLive){ .queued = 1, .uploading = 1, .up_pct = 91, .downloading = 1 };
+    CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "up") && pct == 91);
+    l.error = 1;
+    CHECK(!strcmp(cloud_file_status(&whole, &l, &pct), "error"));
+    CloudMeta empty = { 0, 0, 0, 0 };
+    l = (CloudLive){ 0 };
+    CHECK(!strcmp(cloud_file_status(&empty, &l, &pct), "here"));
+}
+
+static void t_evict(void) {
+    CloudCand c[6] = {
+        { 100, 50, 0, 0, 0, 0 },        /* 0: clean, old */
+        { 200, 10, 0, 0, 0, 0 },        /* 1: clean, oldest */
+        { 300, 5, 1, 0, 0, 0 },         /* 2: open */
+        { 400, 1, 0, 1, 0, 0 },         /* 3: changed here */
+        { 500, 2, 0, 0, 1, 0 },         /* 4: waiting to upload */
+        { 600, 3, 0, 0, 0, 1 },         /* 5: kept */
+    };
+    CHECK(cloud_evict_why(&c[0]) == CE_OK && cloud_evict_why(&c[2]) == CE_OPEN && cloud_evict_why(&c[3]) == CE_PENDING);
+    CHECK(cloud_evict_why(&c[4]) == CE_PENDING && cloud_evict_why(&c[5]) == CE_KEPT);
+    CloudCand both = { 1, 1, 1, 1, 1, 1 };
+    CHECK(cloud_evict_why(&both) == CE_KEPT);
+    CHECK(!strcmp(cloud_skip_name(CE_OPEN), "open") && !strcmp(cloud_skip_name(CE_PENDING), "pending") && !strcmp(cloud_skip_name(CE_KEPT), "kept"));
+    int pick[6];
+    CHECK(cloud_evict_lru(c, 6, 150, pick) == 1 && pick[0] == 1);            /* oldest first */
+    CHECK(cloud_evict_lru(c, 6, 250, pick) == 2 && pick[0] == 1 && pick[1] == 0);
+    CHECK(cloud_evict_lru(c, 6, 1 << 30, pick) == 2);                         /* never the others, however much is needed */
+    CHECK(cloud_evict_lru(c, 6, 0, pick) == 0);
+}
+
+/* ---- the state-backed parts, in a throwaway home with no rclone ---- */
+
+static char home[512];
+
+static void put(const char *rel, const char *data) {
+    char p[1024];
+    snprintf(p, sizeof p, "%s/%s", home, rel);
+    for (char *s = p + strlen(home) + 1; *s; s++) if (*s == '/') { *s = 0; mkdir(p, 0700); *s = '/'; }
+    int fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd >= 0) { if (write(fd, data, strlen(data)) < 0) {} close(fd); }
+}
+
+static int exists(const char *rel) { char p[1024]; snprintf(p, sizeof p, "%s/%s", home, rel); return access(p, F_OK) == 0; }
+
+static int nosec_get(const char *id, char **s) { (void)id; *s = NULL; return 1; }
+static int nosec_set(const char *id, const char *l, const char *s) { (void)id; (void)l; (void)s; return 0; }
+static int nosec_del(const char *id) { (void)id; return 0; }
+static const CloudSecrets nosec = { nosec_get, nosec_set, nosec_del };
+
+static void meta(const char *rel, long size, int dirty, const char *atime) {
+    char m[512], p[700], d[700];
+    snprintf(m, sizeof m, "{\"ModTime\":\"2026-11-06T14:51:51Z\",\"ATime\":\"%s\",\"Size\":%ld,\"Rs\":[{\"Pos\":0,\"Size\":%ld}],\"Fingerprint\":\"x\",\"Dirty\":%s}",
+             atime, size, size, dirty ? "true" : "false");
+    snprintf(p, sizeof p, ".cache/lordos/cloud/vfsMeta/cab12cd34/%s", rel);
+    put(p, m);
+    snprintf(d, sizeof d, ".cache/lordos/cloud/vfs/cab12cd34/%s", rel);
+    char *data = malloc((size_t)size + 1);
+    memset(data, 'x', (size_t)size);
+    data[size] = 0;
+    put(d, data);
+    free(data);
+}
+
+static void t_state(void) {
+    snprintf(home, sizeof home, "%s/cloud-test.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    if (!mkdtemp(home)) { CHECK(0); return; }
+    setenv("LORDOS_CLOUD_RCLONE", "/nonexistent/rclone", 1);
+    put(".config/lordos/cloud/accounts.json",
+        "{\"options\":{\"bwUp\":0,\"bwDown\":0,\"autoFree\":false,\"freeBelowGb\":10},\"accounts\":["
+        "{\"id\":\"cab12cd34\",\"name\":\"Work\",\"kind\":\"webdav\",\"created\":1},"
+        "{\"id\":\"BAD\",\"name\":\"Bad\",\"kind\":\"webdav\"},"
+        "{\"id\":\"c00000001\",\"name\":\"../escape\",\"kind\":\"webdav\"},"
+        "{\"id\":\"c00000002\",\"name\":\"Other\",\"kind\":\"core\"}]}");
+    put(".config/lordos/cloud/rclone.conf", "[cab12cd34]\ntype = webdav\nurl = https://dav.example.test/remote.php/dav\nvendor = other\n");
+    put(".config/lordos/cloud/keep.json", "{\"cab12cd34\":[\"Kept\",\"../x\"]}");
+    put(".config/lordos/cloud/links.json", "{\"links\":[{\"id\":\"cab12cd34\",\"path\":\"Share/a.txt\",\"url\":\"https://dav.example.test/s/abc\",\"expires\":0,\"made\":5},"
+        "{\"id\":\"cab12cd34\",\"path\":\"../x\",\"url\":\"https://dav.example.test/s/x\",\"expires\":0,\"made\":5},"
+        "{\"id\":\"cab12cd34\",\"path\":\"Old\",\"url\":\"https://dav.example.test/s/old\",\"expires\":1000,\"made\":5},"
+        "{\"id\":\"cab12cd34\",\"path\":\"b\",\"url\":\"javascript:x\",\"expires\":0,\"made\":5}]}");
+    meta("clean.bin", 4096, 0, "2026-11-06T14:51:51Z");
+    meta("dirty.txt", 10, 1, "2026-11-06T14:51:51Z");
+    meta("queued.txt", 10, 0, "2026-11-06T14:51:51Z");
+    meta("open.txt", 10, 0, "2026-11-06T14:51:51Z");
+    meta("Kept/k.bin", 10, 0, "2026-11-06T14:51:51Z");
+    meta("Dir/one.bin", 10, 0, "2026-11-06T14:51:51Z");
+    meta("Dir/Sub/two.bin", 10, 0, "2026-11-06T14:51:51Z");
+    CHECK(cloud_start(home, &nosec) == 0);
+    CHECK(!cloud_available());
+    char *s = cloud_state_json();
+    JDoc d;
+    CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+    if (s && d.root) {
+        const JVal *as = json_get(d.root, "accounts");
+        CHECK(as && as->type == J_ARR && as->len == 1);             /* only the valid account */
+        const JVal *a = as ? as->kid : NULL;
+        CHECK(a && !strcmp(json_str(a, "name"), "Work") && !strcmp(json_str(a, "kind"), "webdav"));
+        const JVal *k = json_get(a, "kept");
+        CHECK(k && k->len == 1 && !strncmp(k->kid->str, home, strlen(home)) && strstr(k->kid->str, "/Cloud/Work/Kept"));
+        CHECK(json_get(d.root, "signin")->type == J_NULL && json_get(d.root, "recent")->type == J_ARR);
+        CHECK(json_bool(json_get(d.root, "available") ? d.root : NULL, "available", 1) == 0);
+        json_free(&d);
+    }
+    free(s);
+    /* the links made from LordOS: only valid ones, not expired */
+    s = cloud_links("cab12cd34");
+    CHECK(s && strstr(s, "/Cloud/Work/Share/a.txt") && strstr(s, "https://dav.example.test/s/abc") && !strstr(s, "../x") && !strstr(s, "javascript") && !strstr(s, "/s/old"));
+    free(s);
+    s = cloud_links("nobody");
+    CHECK(s && !strcmp(s, "[]"));
+    free(s);
+    s = cloud_website("cab12cd34");
+    CHECK(s && !strcmp(s, "https://dav.example.test/remote.php/dav"));
+    free(s);
+    CHECK(cloud_website("nobody") == NULL);
+    /* what JS can ask with no rclone */
+    s = cloud_add("webdav", "X", "{}");
+    CHECK(s && strstr(s, "cloud.unavailable"));
+    free(s);
+    s = cloud_begin_signin("dropbox", "Y", NULL, NULL);
+    CHECK(s && strstr(s, "cloud.unavailable"));
+    free(s);
+    s = cloud_rename("cab12cd34", "../up");
+    CHECK(s && strstr(s, "cloud.badName"));
+    free(s);
+    s = cloud_rename("nobody", "Fine");
+    CHECK(s && strstr(s, "cloud.notFound"));
+    free(s);
+    s = cloud_remove("nobody", 0);
+    CHECK(s && strstr(s, "cloud.notFound"));
+    free(s);
+    s = cloud_set_options("{\"freeBelowGb\":1}");
+    CHECK(s && strstr(s, "cloud.badOption"));
+    free(s);
+    s = cloud_set_options("{\"bwUp\":-5}");
+    CHECK(s && strstr(s, "cloud.badOption"));
+    free(s);
+    s = cloud_set_options("{\"bwUp\":1024,\"freeBelowGb\":20}");
+    CHECK(s && strstr(s, "\"ok\""));
+    free(s);
+    int req = 0;
+    char p[1024];
+    snprintf(p, sizeof p, "%s/Cloud/Work/../../.ssh/id", home);
+    s = cloud_link(p, "7d", &req);
+    CHECK(s && strstr(s, "cloud.badPath") && !req);
+    free(s);
+    snprintf(p, sizeof p, "%s/Cloud/Work/a.txt", home);
+    s = cloud_link(p, "forever", &req);
+    CHECK(s && strstr(s, "cloud.badExpire"));
+    free(s);
+    /* status: merged from the metadata, the queue and Keep */
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find("cab12cd34");
+    if (a) {
+        a->q[0].name = strdup("queued.txt");
+        a->q[0].size = 10;
+        a->nq = 1;
+    }
+    pthread_mutex_unlock(&cl_mu);
+    char p1[1024], p2[1024], p3[1024], p4[1024], p5[1024], p6[1024], p7[1024];
+    snprintf(p1, sizeof p1, "%s/Cloud/Work/clean.bin", home);
+    snprintf(p2, sizeof p2, "%s/Cloud/Work/dirty.txt", home);
+    snprintf(p3, sizeof p3, "%s/Cloud/Work/queued.txt", home);
+    snprintf(p4, sizeof p4, "%s/Cloud/Work/Kept/k.bin", home);
+    snprintf(p5, sizeof p5, "%s/Cloud/Work/never.bin", home);
+    snprintf(p6, sizeof p6, "%s/Cloud/Work/../Work/clean.bin", home);
+    snprintf(p7, sizeof p7, "%s/Cloud/Work/Dir", home);
+    const char *ps[] = { p1, p2, p3, p4, p5, p6, p7 };
+    s = cloud_status(ps, 7);
+    CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+    if (s && d.root) {
+        CHECK(!strcmp(json_str(json_get(d.root, p1), "st"), "here"));
+        CHECK(!strcmp(json_str(json_get(d.root, p2), "st"), "up"));
+        CHECK(!strcmp(json_str(json_get(d.root, p3), "st"), "up"));
+        CHECK(!strcmp(json_str(json_get(d.root, p4), "st"), "kept"));
+        CHECK(!strcmp(json_str(json_get(d.root, p5), "st"), "cloud"));
+        CHECK(json_get(d.root, p6) == NULL);                      /* not a path under ~/Cloud */
+        CHECK(!strcmp(json_str(json_get(d.root, p7), "st"), "cloud"));
+        json_free(&d);
+    }
+    free(s);
+    /* Free Up Space on everything: only the clean files go */
+    char top[1024];
+    snprintf(top, sizeof top, "%s/Cloud/Work", home);
+    const char *tp[] = { top };
+    s = cloud_free(tp, 1);
+    CHECK(s && !json_parse(s, strlen(s), &d, NULL, 0));
+    if (s && d.root) {
+        CHECK(json_num(d.root, "freed", 0) >= 4096);
+        const JVal *sk = json_get(d.root, "skipped");
+        int kept = 0, pend = 0;
+        for (const JVal *x = sk ? sk->kid : NULL; x; x = x->next) {
+            kept += !strcmp(json_str(x, "reason"), "kept");
+            pend += !strcmp(json_str(x, "reason"), "pending");
+        }
+        CHECK(kept == 1 && pend == 2);
+        json_free(&d);
+    }
+    free(s);
+    CHECK(!exists(".cache/lordos/cloud/vfs/cab12cd34/clean.bin") && !exists(".cache/lordos/cloud/vfsMeta/cab12cd34/clean.bin"));
+    CHECK(!exists(".cache/lordos/cloud/vfs/cab12cd34/Dir/Sub/two.bin") && !exists(".cache/lordos/cloud/vfs/cab12cd34/open.txt"));
+    CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/dirty.txt") && exists(".cache/lordos/cloud/vfs/cab12cd34/queued.txt"));
+    CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/Kept/k.bin") && exists(".cache/lordos/cloud/vfsMeta/cab12cd34/Kept/k.bin"));
+    /* a file open right now: rclone says something is in use, and a process of this user has it open */
+    meta("busy.bin", 64, 0, "2026-11-06T14:51:51Z");
+    put("Cloud/Work/busy.bin", "");
+    snprintf(p, sizeof p, "%s/Cloud/Work/busy.bin", home);
+    int fd = open(p, O_RDWR);
+    CHECK(fd >= 0);
+    pthread_mutex_lock(&cl_mu);
+    if (a) a->in_use = 1;
+    pthread_mutex_unlock(&cl_mu);
+    const char *bp[] = { p };
+    s = cloud_free(bp, 1);
+    CHECK(s && strstr(s, "\"reason\":\"open\"") && strstr(s, "\"freed\":0"));
+    free(s);
+    CHECK(exists(".cache/lordos/cloud/vfs/cab12cd34/busy.bin"));
+    close(fd);
+    s = cloud_free(bp, 1);
+    CHECK(s && !strstr(s, "\"reason\":\"open\"") && !strstr(s, "\"freed\":0"));
+    free(s);
+    CHECK(!exists(".cache/lordos/cloud/vfs/cab12cd34/busy.bin"));
+    /* Keep and Unkeep: the files on disk */
+    snprintf(p, sizeof p, "%s/Cloud/Work/Dir", home);
+    const char *kp[] = { p, "/etc/passwd" };
+    cloud_keep(kp, 2, 1);
+    char *kj = NULL;
+    {
+        char kf[1024];
+        snprintf(kf, sizeof kf, "%s/.config/lordos/cloud/keep.json", home);
+        FILE *f = fopen(kf, "r");
+        static char b[4096];
+        size_t n = f ? fread(b, 1, sizeof b - 1, f) : 0;
+        if (f) fclose(f);
+        b[n] = 0;
+        kj = b;
+        struct stat st;
+        CHECK(!stat(kf, &st) && (st.st_mode & 0777) == 0600);
+    }
+    CHECK(kj && strstr(kj, "\"Dir\"") && strstr(kj, "\"Kept\"") && !strstr(kj, "passwd") && !strstr(kj, "../"));
+    cloud_keep(kp, 1, 0);
+    s = cloud_state_json();
+    CHECK(s && !strstr(s, "/Cloud/Work/Dir\""));
+    free(s);
+    struct stat st;
+    snprintf(p, sizeof p, "%s/.config/lordos/cloud", home);
+    CHECK(!stat(p, &st) && (st.st_mode & 0777) == 0700);
+    snprintf(p, sizeof p, "%s/.config/lordos/cloud/accounts.json", home);
+    CHECK(!stat(p, &st) && (st.st_mode & 0777) == 0600);
+    char cmd[1200];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
+    if (system(cmd)) {}
+}
+
+int main(void) {
+    t_methods();
+    t_http();
+    t_paths();
+    t_kinds();
+    t_signin();
+    t_options();
+    t_meta();
+    t_status();
+    t_evict();
+    t_state();
+    printf("cloud-test: %d passed, %d failed\n", pass, failc);
+    return failc ? 1 : 0;
+}

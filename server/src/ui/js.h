@@ -29,6 +29,8 @@ void   js_sound_event(const char *type, const char *json);
 void   js_net_event(const char *what);
 void   js_disk_event(const char *what);      /* Disks app: something changed (disk/disk.c) */
 void   js_backup_event(const char *json);    /* Backups → __lordBackup */
+void   js_cloud_event(const char *json);     /* Cloud → __lordCloud */
+void   js_cloud_reply(int req, const char *json);   /* Cloud: a link's answer → __lordCloudReply */
 void   js_admin_event(int id, const char *kind, const char *text);
 void   js_logs_event(const char *kind, int id, const char *name);   /* app Registros */
 void   js_clipboard_poll(void);

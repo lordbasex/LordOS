@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 extern char **environ;
@@ -71,7 +72,34 @@ int vc_available(void) {
     return helper_ok;
 }
 
+/* Blocking private requests from a lord-server thread (Cloud's keyring items, src/cloud/cloud_kr.c): the reader
+ * thread hands the reply straight to the waiting thread. One abandoned after its time keeps its slot until the
+ * reply comes, which is then wiped: it never reaches a queue. */
+#define VC_WAIT_MAX 8
+static struct { uint32_t id; int used, done, gone; char *json; size_t len; } waiters[VC_WAIT_MAX];
+static pthread_cond_t wcv = PTHREAD_COND_INITIALIZER;
+
+static int waiter_take(uint32_t id, char *json, size_t len) {     /* with mu held: 1 if it was a waited request */
+    for (int i = 0; i < VC_WAIT_MAX; i++) {
+        if (!waiters[i].used || waiters[i].done || waiters[i].id != id) continue;
+        if (waiters[i].gone) { explicit_bzero(json, len); free(json); waiters[i].used = 0; return 1; }
+        waiters[i].json = json;
+        waiters[i].len = len;
+        waiters[i].done = 1;
+        pthread_cond_broadcast(&wcv);
+        return 1;
+    }
+    return 0;
+}
+
 static void push(uint32_t id, uint32_t kind, char *json, size_t len) {
+    if (kind == VW_REP) {
+        pthread_mutex_lock(&mu);
+        int w = waiter_take(id, json, len);
+        if (w && inflight > 0) inflight--;
+        pthread_mutex_unlock(&mu);
+        if (w) return;
+    }
     Ev *e = calloc(1, sizeof *e);
     if (!e) { explicit_bzero(json, len); free(json); return; }
     e->id = id; e->kind = kind; e->json = json; e->len = len;
@@ -101,6 +129,14 @@ static void *read_loop(void *arg) {
     uint32_t orphans[VC_PRIV_MAX];
     int norph = npriv;
     memcpy(orphans, priv_ids, sizeof(uint32_t) * (size_t)npriv);
+    for (int i = 0; i < VC_WAIT_MAX; i++) {            /* waited requests end with "crash" too */
+        if (!waiters[i].used || waiters[i].done) continue;
+        if (waiters[i].gone) { waiters[i].used = 0; continue; }
+        waiters[i].json = strdup("{\"error\":\"crash\"}");
+        waiters[i].len = waiters[i].json ? strlen(waiters[i].json) : 0;
+        waiters[i].done = 1;
+    }
+    pthread_cond_broadcast(&wcv);
     pthread_mutex_unlock(&mu);
     for (int i = 0; i < norph; i++) {                   /* private requests get a "crash" reply */
         char *cj = strdup("{\"error\":\"crash\"}");
@@ -251,6 +287,48 @@ int vc_private_fd(void) {
     int f = priv_efd;
     pthread_mutex_unlock(&mu);
     return f;
+}
+
+int vc_request_wait(const char *json, size_t len, char **rep, size_t *rlen, int timeout_ms) {
+    *rep = NULL;
+    if (rlen) *rlen = 0;
+    if (vc_start()) return -1;
+    pthread_mutex_lock(&mu);
+    int slot = -1;
+    for (int i = 0; i < VC_WAIT_MAX && slot < 0; i++) if (!waiters[i].used) slot = i;
+    if (slot < 0 || sock < 0) { pthread_mutex_unlock(&mu); return -1; }
+    uint32_t id = next_id++;
+    if (next_id > 0x7fffffff) next_id = 1;
+    waiters[slot].id = id;
+    waiters[slot].used = 1;
+    waiters[slot].done = waiters[slot].gone = 0;
+    waiters[slot].json = NULL;
+    int s = sock;
+    inflight++;
+    pthread_mutex_unlock(&mu);
+    if (vw_send(s, VW_REQ, id, json, len, NULL, 0)) {
+        pthread_mutex_lock(&mu);
+        waiters[slot].used = 0;
+        if (inflight) inflight--;
+        pthread_mutex_unlock(&mu);
+        return -1;
+    }
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    t.tv_sec += timeout_ms / 1000;
+    t.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (t.tv_nsec >= 1000000000L) { t.tv_sec++; t.tv_nsec -= 1000000000L; }
+    pthread_mutex_lock(&mu);
+    while (!waiters[slot].done) if (pthread_cond_timedwait(&wcv, &mu, &t)) break;
+    int r = -1;
+    if (waiters[slot].done) {
+        *rep = waiters[slot].json;
+        if (rlen) *rlen = waiters[slot].len;
+        waiters[slot].used = 0;
+        r = 0;
+    } else waiters[slot].gone = 1;
+    pthread_mutex_unlock(&mu);
+    return r;
 }
 
 int vc_request_private(const char *json, size_t len) {

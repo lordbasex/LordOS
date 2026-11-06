@@ -25,7 +25,11 @@
 
 extern char **environ;
 
-#define RCLONE "/usr/bin/rclone"
+/* the lordos-rclone package's binary (docs/CLOUD.md 3.1); Debian's only if that one isn't there */
+#define RCLONE_OURS "/usr/lib/lordos/rclone/rclone"
+#define RCLONE_DEBIAN "/usr/bin/rclone"
+static const char *rclone_path(void) { return access(RCLONE_OURS, X_OK) && !access(RCLONE_DEBIAN, X_OK) ? RCLONE_DEBIAN : RCLONE_OURS; }
+#define RCLONE rclone_path()
 #define FUSERMOUNT "/usr/bin/fusermount3"
 #define KEYSCAN "/usr/bin/ssh-keyscan"
 #define KEYGEN "/usr/bin/ssh-keygen"
@@ -222,12 +226,12 @@ static const char *remote_root(char *out, size_t n) {
 }
 
 static void mount_job(void) {
-    if (access(RCLONE, X_OK)) { finish("missing", "rclone", NULL); return; }
+    if (access(RCLONE, X_OK)) { finish("missing", "lordos-rclone", NULL); return; }
     if (access(FUSERMOUNT, X_OK)) { finish("missing", "fuse3", NULL); return; }
     char known[PATH_MAX] = "", ca[PATH_MAX] = "";
     if (!strcmp(q.kind, "sftp") && trust_ssh(known, sizeof known)) return;
     if ((!strcmp(q.kind, "ftps") || !strcmp(q.kind, "davs")) && trust_tls(ca, sizeof ca)) return;
-    char *ob_argv[] = { RCLONE, "obscure", "-", NULL };
+    char *ob_argv[] = { (char *)RCLONE, "obscure", "-", NULL };
     char ob[512] = "", cfg[2048], root[PATH_MAX], dir[PATH_MAX];
     if (q.password[0]) {
         int n = filter(ob_argv, q.password, strlen(q.password), ob, sizeof ob);
