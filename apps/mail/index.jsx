@@ -493,8 +493,9 @@ function MailMain() {
   }, []);
   useEffect(() => mailStatus.subscribe(() => setCfg(mailConfig.get())), []);
 
-  // opened from a notification or another app
+  // opened from a notification or another app (Calendar and Contacts: Add Account → setup 'dav')
   useEffect(() => {
+    if (args?.setup === 'dav') setSheet({ setup: 'dav', preset: typeof args.preset === 'string' ? args.preset : 'other' });
     if (args?.acct && args?.folder) {
       setSrc({ kind: 'folder', acct: args.acct, folder: args.folder });
       if (args.uid) openItem({ acct: args.acct, folder: args.folder, uid: args.uid });
@@ -772,6 +773,7 @@ function MailMain() {
         </View>
       </View>
       {sheet === 'setup' && <AccountSetup onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
+      {sheet && sheet.setup === 'dav' && <AccountSetup kind="dav" preset={sheet.preset} onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} />}
       {sheet === 'accounts' && <AccountsPanel onClose={() => { setSheet(null); setCfg(mailConfig.get()); loadFolders(); }} onAdd={() => setSheet('setup')} onPassword={(id) => setSheet({ password: id })} />}
       {typeof sheet === 'object' && sheet?.cert && <CertDialog cert={sheet.cert} onClose={() => setSheet(null)} />}
       {!sheet && st.certs[0] && <CertDialog cert={st.certs[0]} onClose={() => mailStatus.set((s) => ({ ...s, certs: s.certs.slice(1) }))} />}

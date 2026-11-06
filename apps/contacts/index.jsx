@@ -4,7 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useKeyboard, useWindowState, usePim, addressBooks, contacts, contactName,
   Button, TextInput, SearchField, Hairline, EmptyState, ToolbarButton, FilePicker, addListener, direction, formatNumber, t,
-  isolatedPim, pickFileFd, closeFileFd,
+  isolatedPim, pickFileFd, closeFileFd, openDavSetup,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RED, Sheet, Popover, MenuList, Layers, useLoad } from './ui.jsx';
@@ -219,6 +219,8 @@ function Sources({ books, groups, src, counts, onSrc, onNewGroup, onImport, onRe
             ))}
           </View>
         ))}
+        {/* synced address books (CardDAV, a provider): Mail's Add Account sheet, in Calendars & Contacts mode */}
+        <Button small plain icon="⊕" label={t('contacts.addAccount')} onClick={() => openDavSetup()} style={{ alignSelf: 'flex-start', marginTop: 14 }} />
       </View>
       <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2 }}>
         <Hairline edge="top" />

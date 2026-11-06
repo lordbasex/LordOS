@@ -30,6 +30,7 @@
   "groupName": "Nombre del grupo",
   "groups": "Grupos",
   "import": "Importar…",
+  "addAccount": "Agregar cuenta…",
   "importFailed": "No se pudo importar el archivo.",
   "importTitle": "Importar contactos (.vcf)",
   "imported": {
