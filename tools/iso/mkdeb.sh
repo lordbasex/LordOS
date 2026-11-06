@@ -156,7 +156,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines "$L/assets/"
 # the wallpaper collection (assets/wallpapers/README.md): once, in the standard place for desktop
 # backgrounds; lord-server reaches it as asset:wallpapers/… through the link. Only the JPEGs, the
 # thumbnails and the README (index.json is bundled into the SDK at build time); motion.json and the built-in

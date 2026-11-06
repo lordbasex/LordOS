@@ -153,6 +153,8 @@
   "install.accountDone": "The account is ready",
   "vpn.trusted": "Certificate trusted",
   "vm.alreadyInstalled": "Already installed",
+  "vm.downloadCancelled": "Download stopped",
+  "vm.imageRemoved": "Image deleted",
   "vm.kvmReady": "Allowed: machines can use hardware virtualization now",
   "vm.kvmNextLogin": "Allowed from your next login"
 }

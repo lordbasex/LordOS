@@ -457,5 +457,7 @@
   "volt.rail.BATT": "Batteria dell’orologio",
   "comp.lan": "Ricerca in rete in File",
   "comp.lanHint": "File → Rete: computer e condivisioni sulla rete locale.",
+  "comp.machines": "Download di Macchine",
+  "comp.machinesHint": "Macchine: i sistemi che scarichi nell’assistente Nuova macchina e i loro elenchi di checksum.",
   "net.shareHolder": "{app} sta condividendo lo schermo di questa sessione."
 }

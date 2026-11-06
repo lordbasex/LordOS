@@ -153,6 +153,8 @@
   "install.accountDone": "La cuenta está lista",
   "vpn.trusted": "Certificado aceptado",
   "vm.alreadyInstalled": "Ya estaba instalado",
+  "vm.downloadCancelled": "Descarga detenida",
+  "vm.imageRemoved": "Imagen borrada",
   "vm.kvmReady": "Listo: las máquinas ya pueden usar la virtualización por hardware",
   "vm.kvmNextLogin": "Listo a partir de tu próximo inicio de sesión"
 }

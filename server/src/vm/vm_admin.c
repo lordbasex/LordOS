@@ -2,6 +2,7 @@
 #include "vm_admin.h"
 #include "../pkg/pkg.h"
 
+
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -152,3 +153,4 @@ void vm_act_kvm(const AdminReq *r, const char *arg, size_t len) {
     if (acl_grant("/dev/kvm", r->uid)) admin_ok("vm.kvmNextLogin", NULL);   /* the group works from the next login */
     else admin_ok("vm.kvmReady", NULL);
 }
+

@@ -457,5 +457,7 @@
   "volt.rail.BATT": "Batería del reloj",
   "comp.lan": "Búsqueda en la red de Archivos",
   "comp.lanHint": "Archivos → Red: computadoras y recursos compartidos en la red local.",
+  "comp.machines": "Descargas de Máquinas",
+  "comp.machinesHint": "Máquinas: los sistemas que descargás en el asistente de Nueva máquina, y sus listas de sumas de verificación.",
   "net.shareHolder": "{app} está compartiendo la pantalla de esta sesión."
 }

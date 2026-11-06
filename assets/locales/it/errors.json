@@ -746,5 +746,12 @@
   "vpn.fortiClientCert": "Non è stato possibile usare il certificato client o la sua chiave. Controlla la password della chiave e che la chiave appartenga al certificato.",
   "vm.noKvm": "Questo computer non offre virtualizzazione hardware",
   "vm.noKvmGroup": "Questo sistema non ha il gruppo kvm per la virtualizzazione hardware",
-  "vm.groupFailed": "Impossibile aggiungere il tuo account al gruppo kvm"
+  "vm.groupFailed": "Impossibile aggiungere il tuo account al gruppo kvm",
+  "vm.listFailed": "Non è stato possibile scaricare l’elenco delle immagini: {reason}",
+  "vm.notListed": "Quell’immagine non è nell’elenco di chi la produce",
+  "vm.imageBusy": "Quell’immagine è già in download",
+  "vm.hashMismatch": "Lo SHA-256 del download non è quello dell’elenco di chi la produce: è stato scartato",
+  "vm.downloadFailed": "Non è stato possibile scaricare l’immagine: {reason}",
+  "vm.nothingRunning": "Nessun download in corso",
+  "vm.removeFailed": "Non è stato possibile eliminare l’immagine"
 }

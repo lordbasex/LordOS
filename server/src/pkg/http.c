@@ -459,7 +459,9 @@ static int read_full(int fd, void *buf, size_t n) {
     return 0;
 }
 
-int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
+int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) { return fetch_batch_in(items, n, cb, ud, "lordos-net-store.scope"); }
+
+int fetch_batch_in(FetchItem *items, int n, FetchProgress cb, void *ud, const char *scope) {
     if (n <= 0) return 0;
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return 0;
@@ -483,8 +485,9 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
         signal(SIGPIPE, SIG_IGN);
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         /* (0.8.5) in lordos-net-store.scope, so the Store and the updates are their own app for the
-         * firewall and Monitor → Network (lordos:store); outside a LordOS session, where it is */
-        if (getenv("LORDOS_SESSIOND")) cgroup_enter_root("lordos-net-store.scope");
+         * firewall and Monitor → Network (lordos:store); Machines' downloads in lordos-net-machines.scope
+         * (0.8.9, lordos:machines); outside a LordOS session, where it is */
+        if (getenv("LORDOS_SESSIOND")) cgroup_enter_root(scope);
         if (drop_to_nobody()) _exit(2);
         static Conn c;
         c.fd = -1; c.out = 3; c.tls = 0; c.helper = 0; c.ndead = 0;
@@ -513,6 +516,7 @@ int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud) {
             long long lm = 0, cl = 0;
             sscanf(t, "%d %lld %lld", &it->status, &lm, &cl);
             it->last_modified = lm;
+            if (it->status == 200 && !it->expect && cl > 0) total += (uint64_t)cl;   /* an unknown size: the server's, for progress */
             if (it->status == 200) {
                 if (fd >= 0) close(fd);
                 snprintf(tmp, sizeof tmp, "%s.part", it->dest);

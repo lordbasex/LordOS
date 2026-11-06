@@ -693,5 +693,22 @@
   "cfg.devToFast": "Switch to Fast Devices",
   "cfg.devToCompat": "Switch Back to Compatible Devices",
   "mig.layer": "1 snapshot",
-  "mig.note.snapshot-flattened": "A snapshot: the current state is kept, flattened"
+  "mig.note.snapshot-flattened": "A snapshot: the current state is kept, flattened",
+  "dl.size": "{arch}, {size}",
+  "dl.sizeAbout": "{arch}, about {size}",
+  "dl.reading": "Reading the list of images on {name}'s site…",
+  "dl.found": "{file}, checked against the SHA-256 its maker publishes",
+  "dl.noList": "The list of images couldn't be read: {why}",
+  "dl.noImage": "its list has no image of this release for this architecture right now",
+  "dl.retry": "Try Again",
+  "dl.checked": "{size}, kept only if its SHA-256 is the listed one",
+  "dl.checkedNoSize": "Kept only if its SHA-256 is the listed one",
+  "dl.downloading": "Downloading {name}",
+  "dl.progress": "{a} of {b}",
+  "dl.checking": "Checking the download's SHA-256…",
+  "dl.cancel": "Stop Download",
+  "dl.cancelled": "The download was stopped. Nothing was kept.",
+  "dl.failed": "The system couldn't be downloaded",
+  "dl.noHelper": "Downloading a system needs LordOS's system helper, which isn't running.",
+  "as.r.download": "Download"
 }

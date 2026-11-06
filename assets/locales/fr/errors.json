@@ -746,5 +746,12 @@
   "vpn.fortiClientCert": "Le certificat client ou sa clé n'a pas pu être utilisé. Vérifiez le mot de passe de la clé et que la clé correspond au certificat.",
   "vm.noKvm": "Cet ordinateur n’offre pas de virtualisation matérielle",
   "vm.noKvmGroup": "Ce système n’a pas de groupe kvm pour la virtualisation matérielle",
-  "vm.groupFailed": "Impossible d’ajouter votre compte au groupe kvm"
+  "vm.groupFailed": "Impossible d’ajouter votre compte au groupe kvm",
+  "vm.listFailed": "La liste des images n’a pas pu être téléchargée : {reason}",
+  "vm.notListed": "Cette image n’est pas dans la liste de son éditeur",
+  "vm.imageBusy": "Cette image est déjà en cours de téléchargement",
+  "vm.hashMismatch": "Le SHA-256 du téléchargement n’est pas celui de la liste de son éditeur : il a été supprimé",
+  "vm.downloadFailed": "L’image n’a pas pu être téléchargée : {reason}",
+  "vm.nothingRunning": "Aucun téléchargement en cours",
+  "vm.removeFailed": "L’image n’a pas pu être supprimée"
 }

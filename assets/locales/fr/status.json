@@ -153,6 +153,8 @@
   "install.accountDone": "Le compte est prêt",
   "vpn.trusted": "Certificat approuvé",
   "vm.alreadyInstalled": "Déjà installé",
+  "vm.downloadCancelled": "Téléchargement arrêté",
+  "vm.imageRemoved": "Image supprimée",
   "vm.kvmReady": "C’est fait : les machines peuvent utiliser la virtualisation matérielle",
   "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion"
 }

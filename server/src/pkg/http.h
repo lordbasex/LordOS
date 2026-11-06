@@ -29,6 +29,9 @@ typedef void (*FetchProgress)(uint64_t done, uint64_t total, void *ud);
 /* Downloads the n files in order (reusing the connection to the same server). Returns the
  * number that ended with 200 or 304; each item reports its own. */
 int fetch_batch(FetchItem *items, int n, FetchProgress cb, void *ud);
+/* The same, with the download child in another component's scope (a root-owned lordos-net-<name>.scope of the
+ * session: fw/rules.h FW_COMPONENTS) instead of the Store's: Machines' system downloads use lordos-net-machines.scope. */
+int fetch_batch_in(FetchItem *items, int n, FetchProgress cb, void *ud, const char *scope);
 
 /* HTTP dates (RFC 1123) */
 int64_t http_parse_date(const char *s);

@@ -18,6 +18,13 @@ build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
 
+# the same lord-vm with LORDVM_TEST_PATHS (lordvm.c): QEMU, qemu-img, passt and the UEFI firmware from absolute paths in
+# the environment, for the release gates on a host that keeps them elsewhere. Built only when asked, never installed.
+build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -DLORDVM_TEST_PATHS -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
+	chmod g-w $@
+
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
 # runs on whatever the guest has)
 build/lordos-guest: ../tools/guest/lordos-guest.c src/vm/vmagent.c src/vm/vmagent.h
@@ -39,7 +46,13 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vm-test build/vmimport-test test-vm-import
+test: build/vm-test build/vmimport-test build/vmcatalog-test test-vm-import
+# the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
+# and invented lists, under ASan and UBSan
+build/vmcatalog-test: tests/vmcatalog_test.c src/vm/vmcatalog.c src/vm/vmcatalog.h src/sec/json.c ../assets/machines/systems.json
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c src/vm/vmcatalog.c src/sec/json.c
+	./$@ ../assets/machines/systems.json || { rm -f $@; exit 1; }
 # what an import refuses and how it merges (6.22): needs qemu-img, qemu-io and python3, no KVM; skipped without them
 .PHONY: test-vm-import
 test-vm-import: build/lord-vm
@@ -56,8 +69,15 @@ build/vm-test: tests/vm_test.c src/vm/qmp.c $(VM_COMMON) $(VM_HDR)
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmthumb.c src/vm/vmagent.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmthumb.c src/vm/vmagent.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_vm.h
+
+# vm-image-* like the admin helper runs them, against the makers' servers (tests/vm_image_cli.c; a manual check, not in
+# make test: it needs root, lord-tls beside it and the network). Its catalog and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog there first).
+VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/pkg/http.c src/pkg/crypto.c src/sec/cgroup.c src/sec/json.c
+build/vm-image-cli: $(VMIMAGE_CLI_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h src/pkg/http.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -o $@ $(VMIMAGE_CLI_SRC)

@@ -693,5 +693,22 @@
   "cfg.devToFast": "Pasar a dispositivos rápidos",
   "cfg.devToCompat": "Volver a dispositivos compatibles",
   "mig.layer": "1 instantánea",
-  "mig.note.snapshot-flattened": "Una instantánea: se conserva el estado actual, unificado"
+  "mig.note.snapshot-flattened": "Una instantánea: se conserva el estado actual, unificado",
+  "dl.size": "{arch}, {size}",
+  "dl.sizeAbout": "{arch}, unos {size}",
+  "dl.reading": "Leyendo la lista de imágenes en el sitio de {name}…",
+  "dl.found": "{file}, comprobada con el SHA-256 que publica quien la hace",
+  "dl.noList": "No se pudo leer la lista de imágenes: {why}",
+  "dl.noImage": "su lista no tiene ahora una imagen de esta versión para esta arquitectura",
+  "dl.retry": "Probar de nuevo",
+  "dl.checked": "{size}, se guarda solo si su SHA-256 es el de la lista",
+  "dl.checkedNoSize": "Se guarda solo si su SHA-256 es el de la lista",
+  "dl.downloading": "Descargando {name}",
+  "dl.progress": "{a} de {b}",
+  "dl.checking": "Comprobando el SHA-256 de la descarga…",
+  "dl.cancel": "Detener la descarga",
+  "dl.cancelled": "La descarga se detuvo. No se guardó nada.",
+  "dl.failed": "No se pudo descargar el sistema",
+  "dl.noHelper": "Para descargar un sistema hace falta el asistente de sistema de LordOS, que no está funcionando.",
+  "as.r.download": "Descarga"
 }

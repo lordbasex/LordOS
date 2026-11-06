@@ -693,5 +693,22 @@
   "cfg.devToFast": "Passer aux périphériques rapides",
   "cfg.devToCompat": "Revenir aux périphériques compatibles",
   "mig.layer": "1 instantané",
-  "mig.note.snapshot-flattened": "Un instantané : l’état actuel est gardé, aplati"
+  "mig.note.snapshot-flattened": "Un instantané : l’état actuel est gardé, aplati",
+  "dl.size": "{arch}, {size}",
+  "dl.sizeAbout": "{arch}, environ {size}",
+  "dl.reading": "Lecture de la liste des images sur le site de {name}…",
+  "dl.found": "{file}, vérifiée avec le SHA-256 que publie son éditeur",
+  "dl.noList": "La liste des images n’a pas pu être lue : {why}",
+  "dl.noImage": "sa liste n’a pas d’image de cette version pour cette architecture en ce moment",
+  "dl.retry": "Réessayer",
+  "dl.checked": "{size}, gardée seulement si son SHA-256 est celui de la liste",
+  "dl.checkedNoSize": "Gardée seulement si son SHA-256 est celui de la liste",
+  "dl.downloading": "Téléchargement de {name}",
+  "dl.progress": "{a} sur {b}",
+  "dl.checking": "Vérification du SHA-256 du téléchargement…",
+  "dl.cancel": "Arrêter le téléchargement",
+  "dl.cancelled": "Le téléchargement a été arrêté. Rien n’a été gardé.",
+  "dl.failed": "Le système n’a pas pu être téléchargé",
+  "dl.noHelper": "Télécharger un système demande l’assistant système de LordOS, qui ne tourne pas.",
+  "as.r.download": "Téléchargement"
 }
