@@ -102,10 +102,14 @@ int  display_sun(const char *zone, int y, int m, int d, double *rise, double *se
 /* Idle (seconds; 0 = never): screen off, lock notice, sleep notice. sleep_first_s (0 = sleep_s) is the
  * first sleep deadline, until the next input: a locked session's time left, kept by the login screen. */
 void display_set_idle(int off_s, int lock_s, int sleep_s, int sleep_first_s);
-void display_activity(double now_ms);   /* any input */
+void display_activity(double now_ms);   /* any activity (input, a video keeping the screen on, remote input) */
+void display_input(double now_ms);      /* local input: a lock already due goes first (issue #36) */
 double display_timeout(double now_ms);  /* ms to the next idle deadline, or -1 */
 void display_tick(double now_ms);
 int  display_is_off(void);              /* DPMS off: main.c does not render */
+int  display_on_monitor(void);          /* this session has the card (it is the one on the screen) */
+double display_dark_ms(double now_ms);  /* how long the screen has been off after idle (0 if it is on) */
+void display_left(void);                /* RP_UNDISPLAY (for LORD_IDLE_HEADLESS, development only) */
 void display_wake(void);                /* turn the screen back on now */
 /* Turn the screen off as soon as this process has the card (now, or when it is lent), until the next
  * input: the login screen shown by an idle lock stays dark (docs/SETTINGS.md). */

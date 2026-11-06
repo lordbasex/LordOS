@@ -234,6 +234,27 @@ with real hardware** (no controller in the VMs).
   sleep in the tests. Since 0.8.5 a Linux app that holds a Wayland idle inhibitor
   (`zwp_idle_inhibit_manager_v1`, `wl.c`) on a shown surface, such as a video player, counts as
   activity (`wl_idle_inhibited` in `main.c`), so the screen stays on.
+  **The lock and the computer's sleep** (0.8.8.4, issue #36): closing the lid, the power or sleep
+  button and every sleep timer end in systemd-logind's sleep, and the idle deadlines run on
+  `CLOCK_MONOTONIC`, which stops while the computer sleeps, so "require password" never fired for
+  them. A session that `lord-sessiond` shows takes a logind "delay" sleep inhibitor
+  (`Inhibit("sleep", "LordOS", …, "delay")`, allowed to anyone by logind's polkit policy) on the system
+  bus (`hw/sleeplock.c`; `hw/sysbus.c` negotiates fds for it, `vault/dbus.c` accepts them only on such a
+  connection and only in replies) and listens for `PrepareForSleep`, believed only from logind's own
+  connection. On `PrepareForSleep(true)` the theme hears idle `{stage:"suspend"}` and, with
+  "Immediately" (`lockDelay` 0), locks (`sdk/idlemodel.js`); the inhibitor is kept until `lord-sessiond`
+  takes the monitor (`RP_UNDISPLAY`) or 4 s pass (logind's own limit is 5 s), so the computer sleeps,
+  and wakes, without the desktop on the screen. Without a lock (Never, a delay) it is let go at once.
+  After waking, `{stage:"resume", slept}` (seconds asleep plus the time the display was already off)
+  locks when that reaches a longer delay. Only the session on the screen is told. Local input that
+  arrives when the lock is already due no longer cancels it (`display_input`: the lock goes first).
+  Tested by `build/sleeplock-test`, `build/dbus-test` (fds), `tests/idle_model_test.mjs` and, end to end,
+  `tests/lock_e2e.sh idle|sleep` on VM 116: a real session and login screen, `build/lock-seat` playing
+  `lord-sessiond`'s monitor part and `tests/fake_logind.py` playing logind on a private bus. That VM's
+  one card belongs to its running desktop and Debian's kernel has no `vkms`, so the run was headless,
+  with the development-only `LORD_IDLE_HEADLESS=1` (the idle deadlines of a session without a monitor,
+  its frame in memory standing for the screen; `lord-sessiond` never sets it). A real lid on a laptop
+  hasn't been tried.
 - **Power button and lid.** What systemd-logind does (sleep, hibernate, shut down, do nothing). The
   admin action `power-buttons <power> <lid> <lid-on-ac>` writes
   `/etc/systemd/logind.conf.d/lordos.conf` (a short list of values, validated) and runs

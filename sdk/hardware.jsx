@@ -25,6 +25,7 @@ import { admin } from './admin.js';
 import { registerStatusItem } from './statusitems.js';
 import { TextInput } from './components.jsx';
 import { portalFile } from './filepicker.jsx';
+import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -261,8 +262,18 @@ export function applyIdle() {
 }
 
 const managed = () => typeof lord.session !== 'undefined' && lord.session.managed();
-function onIdle(stage) {
+function onIdle(data) {
+  const stage = data?.stage;
   if (stage === 'lock' && managed()) lord.session.lock();
+  // the computer is going to sleep (the lid, the power button, a sleep timer) or woke up: the display was
+  // off, so "Require password after the display turns off" applies (issue #36, sdk/idlemodel.js).
+  // lord-server holds the sleep until the screen is taken (hw/sleeplock.c).
+  if (stage === 'suspend' || stage === 'resume') {
+    if (typeof lord.greeter !== 'undefined' || !managed()) return;
+    const { lockDelay } = powerPrefs();
+    if (stage === 'suspend' ? lockBeforeSleep(lockDelay) : lockAfterWake(lockDelay, data?.slept)) lord.session.lock();
+    return;
+  }
   if (stage !== 'sleep') return;
   // the login screen of a locked session has no admin helper: lord-sessiond suspends (docs/SESSIONS.md)
   if (typeof lord.greeter !== 'undefined') { lord.greeter.send(JSON.stringify({ t: 'power', a: 'suspend' })); return; }
@@ -413,7 +424,7 @@ function linuxNotify(n) {
 globalThis.__lordHw = (kind, data) => {
   switch (kind) {
     case 'display': displays.set(data); break;
-    case 'idle': onIdle(data?.stage); break;
+    case 'idle': onIdle(data); break;
     case 'power': {
       const wasAC = battery.get()?.onAC;
       battery.set(data);

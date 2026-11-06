@@ -8,7 +8,8 @@
 #include <stdint.h>
 #include "../vault/dbus.h"
 
-/* m is the reply (DBUS_RETURN or DBUS_ERROR) or NULL if the bus went away. */
+/* m is the reply (DBUS_RETURN or DBUS_ERROR) or NULL if the bus went away. A reply may carry fds
+ * (m->fds, closed after the callback: dup one to keep it); no other message does. */
 typedef void (*SbReply)(const DMsg *m, void *ctx);
 typedef void (*SbSignal)(const DMsg *m);
 /* An incoming method call: 1 if handled (the handler may keep *m: set m->raw = NULL to own it). */

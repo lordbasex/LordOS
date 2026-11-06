@@ -7,6 +7,7 @@
 #include "ppd.h"
 #include "sysbus.h"
 #include "pkagent.h"
+#include "sleeplock.h"
 #include "uevent.h"
 
 #include <stdio.h>
@@ -45,8 +46,10 @@ static void power_changed(void) {
 }
 
 double hw_timeout(double now) {
-    if (power_next <= 0) return -1;
-    return power_next > now ? power_next - now : 0;
+    double best = sleeplock_timeout(now);
+    if (power_next <= 0) return best;
+    double p = power_next > now ? power_next - now : 0;
+    return best < 0 || p < best ? p : best;
 }
 
 static void td_signal(const DMsg *m) {
@@ -68,6 +71,8 @@ void hw_start(const DisplayHost *h, int with_bus) {
         pkagent_start(hw_emit);
         sysbus_on_signal(td_signal);
         sysbus_add_match("type='signal',sender='org.freedesktop.timedate1',interface='org.freedesktop.DBus.Properties',path='/org/freedesktop/timedate1'");
+        /* a session lord-sessiond shows can be locked: it locks before the computer sleeps (#36) */
+        if (getenv("LORDOS_SESSIOND")) sleeplock_start();
     }
 }
 
@@ -98,6 +103,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
 
 void hw_events(void) {
     if (power_next > 0 && hw_now_ms() >= power_next) power_changed();
+    sleeplock_tick(hw_now_ms());
     bt_flush_events();
     notifyd_tick();
     pwguard_tick();

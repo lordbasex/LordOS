@@ -571,6 +571,10 @@ build/clip-offers: tests/clip_offers.c $(CLIENT_GEN)
 build/seat-cycle: tests/seat_cycle.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/seat_cycle.c
+# a lock as lord-sessiond takes it, and the login screen shown after it (tests/lock_e2e.sh, issue #36); never installed
+build/lock-seat: tests/lock_seat.c
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lock_seat.c
 
 # what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
 GC_PKGS := gbm egl glesv2

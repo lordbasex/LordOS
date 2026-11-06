@@ -13,7 +13,7 @@ void hw_start(const DisplayHost *host, int with_bus);
 int  hw_pollfds(struct pollfd *p, int max);
 void hw_dispatch(const struct pollfd *p, int n);
 void hw_events(void);                   /* once per loop turn (coalesced Bluetooth state, battery reads) */
-double hw_timeout(double now_ms);       /* ms to the next battery read (CLOCK_MONOTONIC), or -1 */
+double hw_timeout(double now_ms);       /* ms to the next battery read or sleep-lock deadline (CLOCK_MONOTONIC), or -1 */
 const PowerState *hw_power(void);
 void hw_emit(const char *kind, const char *json);
 void hw_timedate_refresh(void);         /* asks timedated; answer as "timedate" */

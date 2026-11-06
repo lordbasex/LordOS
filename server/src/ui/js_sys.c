@@ -14,6 +14,7 @@
  * lord.themes only accepts simple names. */
 #include "../hw/display.h"
 #include "../hw/hw_admin.h"
+#include "../hw/sleeplock.h"
 #include "js_sys.h"
 #include "js_err.h"
 #include "ui.h"
@@ -2076,6 +2077,7 @@ static JSValue f_session_lock(JSContext *c, JSValueConst this_val, int argc, JSV
     snprintf(j, sizeof j, "{\"a\":\"lock\",\"dark\":%s,\"off\":%d,\"sleep\":%d,\"sleepLeft\":%d}", dark ? "true" : "false", off,
              sleep, sleep_left);
     mirror_session(j);
+    sleeplock_lock_sent();              /* before sleep: logind waits until the monitor is taken (#36) */
     return JS_NewBool(c, mirror_clients() > 0);
 }
 

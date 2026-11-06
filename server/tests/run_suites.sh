@@ -164,6 +164,9 @@ EOF
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
     if have node; then run "balance-model-test (apps/settings/balance.js)" node tests/balance_model_test.mjs; fi
+    # the lock around a system sleep (sdk/idlemodel.js, issue #36)
+    if have node; then run "idle-model-test (sdk/idlemodel.js)" node tests/idle_model_test.mjs
+    else skip "idle-model-test (sdk/idlemodel.js)" node; fi
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
