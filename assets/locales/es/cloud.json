@@ -243,7 +243,7 @@
   "field.bucket": "Bucket",
   "field.remote": "Carpeta a cifrar",
   "field.required": "Completá este campo.",
-  "cred.noteServer": "Primero se comprueba el certificado. Si el sistema no confía en él, se muestra su huella digital, y solo ese se guarda para este servidor.",
+  "cred.noteServer": "Su contraseña va al llavero, nunca a un archivo.",
   "cred.noteObject": "Las claves van al llavero. El almacenamiento de objetos no tiene cuota: Ajustes muestra lo usado, medido una vez por día.",
   "cred.noteCrypt": "Los nombres y el contenido se cifran en esta computadora antes de subir. Sin la contraseña nadie puede leerlos, ni siquiera LordOS.",
   "signin.title": "Iniciá sesión en {provider} en tu navegador",
@@ -354,5 +354,9 @@
   "trust.subject": "Emitido para",
   "trust.issuer": "Emitido por",
   "trust.trust": "Confiar",
-  "trust.trustCert": "Confiar en este certificado"
+  "trust.trustCert": "Confiar en este certificado",
+  "space.notMeasured": "Espacio sin medir",
+  "state.serviceDown": "Sin conexión: el servicio de nube no está funcionando",
+  "serviceDown.title": "El servicio de nube no está funcionando",
+  "serviceDown.body": "Tus cuentas no se conectan hasta que vuelva a funcionar."
 }

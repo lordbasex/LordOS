@@ -243,7 +243,7 @@
   "field.bucket": "Bucket",
   "field.remote": "Pasta a criptografar",
   "field.required": "Preencha este campo.",
-  "cred.noteServer": "Primeiro o certificado é verificado. Se o sistema não confiar nele, a impressão digital aparece, e só esse fica guardado para este servidor.",
+  "cred.noteServer": "A senha vai para o chaveiro, nunca para um arquivo.",
   "cred.noteObject": "As chaves vão para o chaveiro. Armazenamento de objetos não tem cota: os Ajustes mostram o espaço usado, medido uma vez por dia.",
   "cred.noteCrypt": "Nomes e conteúdo são criptografados neste computador antes de subir. Sem a senha ninguém consegue lê-los, nem o LordOS.",
   "signin.title": "Entre no {provider} pelo navegador",
@@ -354,5 +354,9 @@
   "trust.subject": "Emitido para",
   "trust.issuer": "Emitido por",
   "trust.trust": "Confiar",
-  "trust.trustCert": "Confiar neste certificado"
+  "trust.trustCert": "Confiar neste certificado",
+  "space.notMeasured": "Espaço não medido",
+  "state.serviceDown": "Sem conexão: o serviço da Nuvem não está funcionando",
+  "serviceDown.title": "O serviço da Nuvem não está funcionando",
+  "serviceDown.body": "Suas contas não se conectam até ele voltar a funcionar."
 }

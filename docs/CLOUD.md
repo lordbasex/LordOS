@@ -847,3 +847,16 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
     `/proc/self/mounts`, before any `lstat`) and stay on the home's filesystem; `fs_du` and the Trash's size stay on theirs.
     Measured: with the WebDAV server of a mounted account stopped (`SIGSTOP`), Recents and search answer at once and list
     nothing from `~/Cloud`.
+
+### 18.5 The e2e first pass, interface items (U3, U4, U6, U7)
+
+- **U3**: a file that was coming down keeps "coming down" (at 100 %) for up to 8 s when an answer says "in the cloud"
+  right after (`mergeStatusHeld`), so it no longer flickers back before "on this computer"; Free Up Space still turns a
+  file to "in the cloud" at once.
+- **U4**: "All accounts" says "<used> of <total>" only when every account has a quota, else "<used> used" (a measured
+  `used` is never a total). An account without a quota that nobody measured (`used` 0, no `measuredAt`) says "Space not
+  measured" in Settings and nothing in Files' status bar.
+- **U6**: WebDAV's presets list plain WebDAV ("other") first and choose it by default (`presetField`).
+- **U7**: while `service.running` is false every account says "Not connected: the cloud service isn't running" (dim with
+  "!" in Files' sidebar), and the overview starts with the service's own message, **Restart** and **Show Log**.
+- The server form no longer promises a fingerprint prompt; the trust step (18.4) shows only when lord-server asks.

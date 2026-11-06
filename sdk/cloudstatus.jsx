@@ -50,7 +50,7 @@ function Panel({ st, onClose }) {
       head ? h(Text, { style: { fontSize: 12, color: th.textDim } }, head) : null),
     h(View, { style: { paddingHorizontal: 10, paddingBottom: 8, gap: 2 } },
       ...accs.map((a) => {
-        const line = stateLine(a);
+        const line = stateLine(a, st.service);
         const u = usage(a.about);
         const text = line.key === 'cloud.state.ok' && u ? `${t(line.key)} · ${u.total != null ? t('cloud.space.usedOf', { used: formatBytes(u.used), total: formatBytes(u.total) }) : t('cloud.space.usedOnly', { used: formatBytes(u.used) })}` : t(line.key, line.vars);
         return h(View, { key: a.id, onClick: () => { onClose(); if (a.state === 'signin' || a.state === 'error') openSettings(a.id); else openFiles(a.mount); },
@@ -135,7 +135,7 @@ export function startCloud() {
   // development only: the stand-in for lord.cloud (cloudmock.js)
   try {
     const dev = settings.get().cloudDevMock;
-    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || ['states', 'providersFail', 'locked'].includes(dev))) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
+    if (typeof lord !== 'undefined' && !lord.cloud && (dev === true || ['states', 'providersFail', 'locked', 'crashed'].includes(dev))) installCloudMock(lord.fs.home(), dev === true ? '' : dev);
   } catch (e) { console.log(`cloud mock: ${e}`); }
   let prev = cloudState.get();
   cloudState.subscribe(() => {

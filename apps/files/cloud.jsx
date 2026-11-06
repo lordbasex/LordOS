@@ -3,7 +3,7 @@
 // Share Link sheet, Get Info's cloud part, the header's transfers pill and the offline dialog. Built from the
 // approved mocks (Files, FilesMenu, ShareLink, GetInfo, States).
 import { View, Text, Button, Segmented, useTheme, useCloud, cloud, cloudModel as M, clipboard, toast, openUrl, formatBytes, formatDate, formatTime, spacing, typeScale, t as tr,
-  CloudGlyph, StatusGlyph, UsageRing, addListener, Toggle, errorText, tOptional } from '@lordos/sdk';
+  CloudGlyph, StatusGlyph, UsageRing, addListener, Toggle, errorText, tOptional, cloudState } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SideItem, SideTitle } from '../../sdk/fileparts.jsx';
 import { EntryIcon } from './glyphs.jsx';
@@ -21,7 +21,8 @@ export function useCloudFiles(paths) {
     const ask = M.pathsToAsk(paths, accounts);
     if (!ask.length) { setStatus((s) => (Object.keys(s).length ? {} : s)); return; }
     const answer = cloud.status(ask);
-    setStatus((prev) => M.mergeStatus(Object.fromEntries(Object.entries(prev).filter(([p]) => ask.includes(p))), answer, ask));
+    // a file that just came down isn't shown in the cloud again by a stale answer (U3)
+    setStatus((prev) => M.mergeStatusHeld(Object.fromEntries(Object.entries(prev).filter(([p]) => ask.includes(p))), answer, ask, Date.now()));
   }, [key, st]);
   return {
     accounts, st, status,
@@ -34,7 +35,7 @@ export function useCloudFiles(paths) {
 // ---- the sidebar's Cloud section (mock Files) ----
 
 export function CloudSection({ t, accounts, hidden, sideSel, navigate, dropTarget, onContext }) {
-  const items = M.cloudSideItems(accounts, hidden);
+  const items = M.cloudSideItems(accounts, hidden, (cloudState.get() || {}).service);
   if (!items.length) return null;
   return (
     <>
@@ -70,7 +71,8 @@ export function TransfersPill({ t, accounts, acc }) {
 export function footerLine(acc) {
   if (!acc) return '';
   const u = M.usage(acc.about);
-  const used = !u ? '' : u.total != null ? tr('cloud.footer.usedOf', { used: formatBytes(u.used), total: formatBytes(u.total), name: acc.name })
+  // nothing about space while it isn't known (an unmeasured account says 0 used: U4)
+  const used = !u || M.notMeasured(acc.about) ? '' : u.total != null ? tr('cloud.footer.usedOf', { used: formatBytes(u.used), total: formatBytes(u.total), name: acc.name })
     : tr('cloud.footer.used', { used: formatBytes(u.used), name: acc.name });
   return [used, tr('cloud.footer.here', { size: formatBytes(acc.cacheBytes || 0) })].filter(Boolean).join(' · ');
 }

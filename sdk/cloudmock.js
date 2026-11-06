@@ -129,6 +129,8 @@ export function installCloudMock(home, scenario = '') {
   }, 1000);
 
   // scenario 'locked' (settings "cloudDevMock": "locked"): the session logged in without a password, the keyring is locked
+  // scenario 'crashed': rclone stopped several times (U7)
+  if (scenario === 'crashed') { st.service = { ...st.service, running: false, error: 'cloud.crashed' }; }
   if (scenario === 'locked') {
     for (const a of st.accounts.slice(0, 2)) { a.state = 'locked'; a.error = 'cloud.keyringLocked'; a.about = null; a.up = { files: 0, bytes: 0, done: 0 }; a.down = { files: 0, bytes: 0, done: 0 }; }
   }
