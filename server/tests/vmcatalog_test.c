@@ -2,7 +2,12 @@
  * the real assets/machines/systems.json for both architectures, names against their patterns (and what must never
  * pass: paths, other files, other architectures), the makers' list forms, and catalogs that must be refused.
  *
- *   build/vmcatalog-test ../assets/machines/systems.json */
+ * Then the makers' signatures (vmcat_verify_list, pkg/pgp.c): the lists and signatures as published on 2026-11-06
+ * (tests/vmimage) with the keys the catalog pins (packaging/keys/machines), and what must be refused: changed lists, a
+ * missing signature, another list's signature, another maker's key, a key file that lacks a pinned key, an expired key,
+ * a signature from the future, a clear-signed list with text added outside its signature.
+ *
+ *   build/vmcatalog-test ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines */
 #include "../src/vm/vmcatalog.h"
 
 #include <stdio.h>
@@ -20,6 +25,128 @@ static char *slurp(const char *p, size_t *n) {
     fclose(f);
     buf[*n] = 0;
     return buf;
+}
+/* a file of dir into a new buffer (malloc), or NULL */
+static char *load(const char *dir, const char *name, size_t *n) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s", dir, name);
+    FILE *f = fopen(p, "rb");
+    if (!f) return NULL;
+    char *b = malloc(1 << 20);
+    *n = b ? fread(b, 1, (1 << 20) - 1, f) : 0;
+    fclose(f);
+    if (b) b[*n] = 0;
+    return b;
+}
+
+#define NOW   1794009600LL       /* 2026-11-07 */
+#define Y2029 1840752000LL       /* 2028-05-01, after the Kali key's end (2028-04-17) */
+#define Y2026 1767225600LL       /* 2026-01-01, before every signature here */
+
+static int verify(const VmCatEntry *e, const char *keys, size_t kn, const char *list, size_t ln, const char *sig, size_t sn,
+                  long long now, char *why, size_t wn) {
+    char *body = NULL;
+    size_t bl = 0;
+    int r = vmcat_verify_list(e, keys, kn, list, ln, sig, sn, now, &body, &bl, why, wn);
+    if (r == 1 && (!body || !bl)) r = 9;
+    free(body);
+    return r;
+}
+
+static void signatures(const char *cat, size_t n, const char *fx, const char *kd) {
+    static const struct { const char *id, *arch, *list, *sig; } cases[] = {
+        { "debian", "amd64", "debian-amd64.sums", "debian-amd64.sig" }, { "debian", "arm64", "debian-arm64.sums", "debian-arm64.sig" },
+        { "ubuntu", "amd64", "ubuntu-amd64.sums", "ubuntu-amd64.sig" }, { "ubuntu", "arm64", "ubuntu-arm64.sums", "ubuntu-arm64.sig" },
+        { "kali", "amd64", "kali.sums", "kali.sig" }, { "kali", "arm64", "kali.sums", "kali.sig" },
+        { "fedora", "amd64", "fedora-amd64.checksum", NULL }, { "fedora", "arm64", "fedora-arm64.checksum", NULL },
+    };
+    char lab[160], why[200];
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        VmCatEntry e;
+        size_t ln = 0, sn = 0, kn = 0;
+        if (vmcat_find(cat, n, cases[i].id, cases[i].arch, &e)) { T("signature: entry", 0); continue; }
+        char *list = load(fx, cases[i].list, &ln), *sig = cases[i].sig ? load(fx, cases[i].sig, &sn) : NULL, *keys = load(kd, e.keys, &kn);
+        snprintf(lab, sizeof lab, "%s %s: fixtures and key file", cases[i].id, cases[i].arch);
+        T(lab, list && keys && (!cases[i].sig || sig));
+        if (!list || !keys) { free(list); free(sig); free(keys); continue; }
+        snprintf(lab, sizeof lab, "%s %s: %s", cases[i].id, cases[i].arch, e.sig_type == VMCAT_SIG_CLEAR ? "clear-signed" : "detached");
+        T(lab, (e.sig_type == VMCAT_SIG_CLEAR) == !cases[i].sig);
+        snprintf(lab, sizeof lab, "%s %s: the published list verifies", cases[i].id, cases[i].arch);
+        int r = verify(&e, keys, kn, list, ln, sig, sn, NOW, why, sizeof why);
+        T(lab, r == 1);
+        if (r != 1) printf("      %s\n", why);
+        if (e.sig_type == VMCAT_SIG_CLEAR) {
+            char *body = NULL;
+            size_t bl = 0;
+            vmcat_verify_list(&e, keys, kn, list, ln, NULL, 0, NOW, &body, &bl, why, sizeof why);
+            snprintf(lab, sizeof lab, "%s %s: only the signed text is kept", cases[i].id, cases[i].arch);
+            T(lab, body && strstr(body, "SHA256 (") && !strstr(body, "BEGIN PGP") && !strstr(body, "Hash: "));
+            free(body);
+        }
+        /* one hash digit changed */
+        char *ch = malloc(ln + 1);
+        memcpy(ch, list, ln + 1);
+        char *d = strstr(ch, "SHA256 (") ? strstr(strstr(ch, "SHA256 ("), ") = ") + 4 : ch;
+        *d = *d == '0' ? '1' : '0';
+        snprintf(lab, sizeof lab, "%s %s: a changed hash is refused", cases[i].id, cases[i].arch);
+        r = verify(&e, keys, kn, ch, ln, sig, sn, NOW, why, sizeof why);
+        T(lab, r == -1 && strstr(why, "pkg.pgp.badSignature"));
+        /* a line added */
+        char *add = malloc(ln + 200);
+        int al;
+        if (e.sig_type == VMCAT_SIG_CLEAR) {
+            const char *at = strstr(list, "-----BEGIN PGP SIGNATURE-----");
+            al = snprintf(add, ln + 200, "%.*sSHA256 (evil.iso) = %064d\n%s", (int)(at - list), list, 0, at);
+        } else al = snprintf(add, ln + 200, "%s%064d  evil.iso\n", list, 0);
+        snprintf(lab, sizeof lab, "%s %s: a line added is refused", cases[i].id, cases[i].arch);
+        T(lab, verify(&e, keys, kn, add, (size_t)al, sig, sn, NOW, why, sizeof why) == -1);
+        if (e.sig_type == VMCAT_SIG_CLEAR) {
+            al = snprintf(add, ln + 200, "%s%064d  evil.iso\n", list, 0);
+            snprintf(lab, sizeof lab, "%s %s: text after the signature is refused", cases[i].id, cases[i].arch);
+            T(lab, verify(&e, keys, kn, add, (size_t)al, NULL, 0, NOW, why, sizeof why) == -1);
+            const char *body = strstr(list, "\n\n") + 2;
+            snprintf(lab, sizeof lab, "%s %s: the list without its signature is unsigned", cases[i].id, cases[i].arch);
+            T(lab, verify(&e, keys, kn, body, strlen(body), NULL, 0, NOW, why, sizeof why) == 0);
+        } else {
+            snprintf(lab, sizeof lab, "%s %s: no signature file is unsigned", cases[i].id, cases[i].arch);
+            T(lab, verify(&e, keys, kn, list, ln, NULL, 0, NOW, why, sizeof why) == 0);
+            snprintf(lab, sizeof lab, "%s %s: an empty signature is refused", cases[i].id, cases[i].arch);
+            T(lab, verify(&e, keys, kn, list, ln, "", 0, NOW, why, sizeof why) == -1);
+            snprintf(lab, sizeof lab, "%s %s: garbage for a signature is refused", cases[i].id, cases[i].arch);
+            T(lab, verify(&e, keys, kn, list, ln, "-----BEGIN PGP SIGNATURE-----\n\n!!!\n-----END PGP SIGNATURE-----\n", 52, NOW, why, sizeof why) == -1);
+        }
+        /* the signature with another maker's key: Kali's for everyone, Debian's for Kali */
+        VmCatEntry o;
+        vmcat_find(cat, n, strcmp(cases[i].id, "kali") ? "kali" : "debian", "amd64", &o);
+        size_t okn = 0;
+        char *okeys = load(kd, o.keys, &okn);
+        snprintf(lab, sizeof lab, "%s %s: another maker's pinned key is refused", cases[i].id, cases[i].arch);
+        T(lab, okeys && verify(&o, okeys, okn, list, ln, sig, sn, NOW, why, sizeof why) != 1);
+        /* the right fingerprints with a key file that lacks them */
+        snprintf(lab, sizeof lab, "%s %s: a key file without the pinned key is refused", cases[i].id, cases[i].arch);
+        T(lab, okeys && verify(&e, okeys, okn, list, ln, sig, sn, NOW, why, sizeof why) == -1 && strstr(why, "pkg.pgp.unknownKeys"));
+        /* the right key file, but another fingerprint pinned: its key may not sign */
+        VmCatEntry w = e;
+        snprintf(w.fprs[0], sizeof w.fprs[0], "%s", o.fprs[0]);
+        snprintf(lab, sizeof lab, "%s %s: a key that isn't pinned can't sign", cases[i].id, cases[i].arch);
+        T(lab, verify(&w, keys, kn, list, ln, sig, sn, NOW, why, sizeof why) == -1);
+        snprintf(lab, sizeof lab, "%s %s: a signature from the future is refused", cases[i].id, cases[i].arch);
+        T(lab, verify(&e, keys, kn, list, ln, sig, sn, Y2026, why, sizeof why) != 1);
+        snprintf(lab, sizeof lab, "%s %s: an armoured key file that isn't one is refused", cases[i].id, cases[i].arch);
+        T(lab, verify(&e, "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nAAAA\n-----END PGP PUBLIC KEY BLOCK-----\n", 72, list, ln, sig, sn, NOW, why, sizeof why) == -1);
+        if (!strcmp(cases[i].id, "kali")) {
+            snprintf(lab, sizeof lab, "kali %s: after its key's end the list is refused", cases[i].arch);
+            T(lab, verify(&e, keys, kn, list, ln, sig, sn, Y2029, why, sizeof why) != 1 && strstr(why, "pkg.pgp.keyExpired"));
+        }
+        free(okeys); free(add); free(ch); free(list); free(sig); free(keys);
+    }
+    /* Debian's amd64 signature over its arm64 list */
+    VmCatEntry e;
+    size_t a = 0, b = 0, k = 0;
+    vmcat_find(cat, n, "debian", "arm64", &e);
+    char *list = load(fx, "debian-arm64.sums", &a), *sig = load(fx, "debian-amd64.sig", &b), *keys = load(kd, e.keys, &k);
+    T("another list's signature is refused", list && sig && keys && verify(&e, keys, k, list, a, sig, b, NOW, why, sizeof why) == -1);
+    free(list); free(sig); free(keys);
 }
 
 static const char *const SHA = "a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355";
@@ -136,9 +263,29 @@ int main(int argc, char **argv) {
         snprintf(lab, sizeof lab, "bad catalog %zu refused", i);
         T(lab, vmcat_find(badcats[i], strlen(badcats[i]), "x", "amd64", &e) && !e.dir[0]);
     }
-    const char *good = "{\"systems\":[{\"id\":\"x\",\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}";
-    T("good catalog", !vmcat_find(good, strlen(good), "x", "amd64", &e) && !strcmp(e.file_dir, "https://a.example/r/") && e.max_bytes == 10ull << 20);
+    static const char *const badsig[] = {
+        "{\"systems\":[{\"id\":\"x\",\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"detached\"},\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"detached\",\"name\":\"../S.sig\"},\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"none\"},\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"/etc/k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[\"6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[\"ZF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+    };
+    for (size_t i = 0; i < sizeof badsig / sizeof badsig[0]; i++) {
+        char lab[48];
+        snprintf(lab, sizeof lab, "bad signature entry %zu refused", i);
+        T(lab, vmcat_find(badsig[i], strlen(badsig[i]), "x", "amd64", &e) && !e.dir[0] && !e.nfprs);
+    }
+    const char *good = "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"detached\",\"name\":\"S.sig\"},\"keys\":\"k.asc\",\"fingerprints\":[\"df9b9c49eaa9298432589d76da87e80d6294be9b\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}";
+    T("good catalog", !vmcat_find(good, strlen(good), "x", "amd64", &e) && !strcmp(e.file_dir, "https://a.example/r/") && e.max_bytes == 10ull << 20 &&
+      e.sig_type == VMCAT_SIG_DETACHED && !strcmp(e.sig_name, "S.sig") && !strcmp(e.keys, "k.asc") && e.nfprs == 1 &&
+      !strcmp(e.fprs[0], "DF9B9C49EAA9298432589D76DA87E80D6294BE9B"));
     T("pattern needs a whole name", !vmcat_match(e.file_re, "a.iso2") && vmcat_match(e.file_re, "a.iso"));
+
+    if (argc > 3) signatures(cat, n, argv[2], argv[3]); else T("signature fixtures given", 0);
 
     printf("== vmcatalog-test: %d passed, %d failed\n", pass, fail);
     return fail != 0;

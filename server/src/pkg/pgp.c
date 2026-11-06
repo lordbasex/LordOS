@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 /* ---- SHA-1 (only for v4 fingerprints) ---- */
 
@@ -405,6 +406,68 @@ static int verify_sig(const PgpKey *k, const Sig *s, const uint8_t *digest) {
 
 static void hex_fpr(const uint8_t *f, char out[41]) { hex_encode(f, 20, out); }
 
+/* The signature packets of raw over the data: `bin` for a binary signature (0x00), `canon` (lines ending in CRLF) for a
+ * text one (0x01). Returns the number of good signatures from keyring keys; -1 when a packet is malformed or a known
+ * key's signature doesn't verify; 0 when none is from a usable key (the reason in err). */
+static int verify_packets(const PgpKeyring *kr, const uint8_t *raw, size_t rawlen, int64_t now, const char *bin, size_t binlen,
+                          const char *canon, size_t canonlen, char *err, size_t errlen) {
+    int good = 0, bad = 0, unknown = 0;
+    size_t pos = 0;
+    Pkt pk;
+    int r;
+    char why[160] = "";
+    while ((r = next_packet(raw, rawlen, &pos, &pk)) > 0) {
+        if (pk.tag != 2) continue;
+        Sig s;
+        if (parse_sig(pk.body, pk.len, &s) || (s.type != 0x01 && s.type != 0x00) ||
+            (s.hashalg != HASH_SHA256 && s.hashalg != HASH_SHA512) || !s.has_created) { unknown++; continue; }
+        const PgpKey *k = NULL;
+        for (int i = 0; i < kr->n && !k; i++) if (issued_by(&s, &kr->keys[i])) k = &kr->keys[i];
+        if (!k) { unknown++; continue; }
+        char fpr[41];
+        hex_fpr(k->fpr, fpr);
+        if (k->revoked) { lerr_set(why, sizeof why, "pkg.pgp.keyRevoked", "key", fpr, NULL); continue; }
+        if (k->expires && k->expires <= now) { lerr_set(why, sizeof why, "pkg.pgp.keyExpired", "key", fpr, NULL); continue; }
+        if (!k->can_sign) { lerr_set(why, sizeof why, "pkg.pgp.keyNotSigning", "key", fpr, NULL); continue; }
+        if (s.created > now + 86400) { lerr_set(why, sizeof why, "pkg.pgp.futureSignature", "key", fpr, NULL); continue; }
+        if (s.sig_expires && s.created + s.sig_expires <= now) { lerr_set(why, sizeof why, "pkg.pgp.signatureExpired", "key", fpr, NULL); continue; }
+        if (s.created < k->created) { bad++; continue; }
+        /* hash: text (canonical if it's a text signature) + signature header + v4 trailer */
+        uint8_t dig[64], trailer[6] = { 4, 0xff, (uint8_t)(s.headlen >> 24), (uint8_t)(s.headlen >> 16), (uint8_t)(s.headlen >> 8), (uint8_t)s.headlen };
+        const char *data = s.type == 0x01 ? canon : bin;
+        size_t dlen = s.type == 0x01 ? canonlen : binlen;
+        if (s.hashalg == HASH_SHA256) {
+            Sha256 h;
+            sha256_init(&h);
+            sha256_update(&h, data, dlen);
+            sha256_update(&h, s.head, s.headlen);
+            sha256_update(&h, trailer, 6);
+            sha256_final(&h, dig);
+        } else {
+            Sha512 h;
+            sha512_init(&h);
+            sha512_update(&h, data, dlen);
+            sha512_update(&h, s.head, s.headlen);
+            sha512_update(&h, trailer, 6);
+            sha512_final(&h, dig);
+        }
+        if (dig[0] != s.left16[0] || dig[1] != s.left16[1] || !verify_sig(k, &s, dig)) {
+            bad++;
+            lerr_set(why, sizeof why, "pkg.pgp.badSignature", "key", fpr, NULL);
+            continue;
+        }
+        good++;
+    }
+    if (r < 0) { lerr_set(err, errlen, "pkg.pgp.malformed", NULL); return -1; }
+    if (bad) { snprintf(err, errlen, "%s", why[0] ? why : "pkg.pgp.badSignature"); return -1; }
+    if (!good) {
+        if (why[0]) snprintf(err, errlen, "%s", why);
+        else lerr_set(err, errlen, "pkg.pgp.unknownKeys", "count", lerr_int(unknown), NULL);
+        return 0;
+    }
+    return good;
+}
+
 int pgp_verify_clearsigned(const PgpKeyring *kr, const char *msg, size_t len, int64_t now,
                            char **body, size_t *body_len, char *err, size_t errlen) {
     static const char head[] = "-----BEGIN PGP SIGNED MESSAGE-----";
@@ -462,64 +525,59 @@ int pgp_verify_clearsigned(const PgpKeyring *kr, const char *msg, size_t len, in
     long rawlen = dearmor(sig, (size_t)(endmark - sig), &raw);
     if (rawlen < 0) { free(text); free(canon); lerr_set(err, errlen, "pkg.pgp.badEncoding", NULL); return -1; }
 
-    int good = 0, bad = 0, unknown = 0;
-    size_t pos = 0;
-    Pkt pk;
-    int r;
-    char why[160] = "";
-    while ((r = next_packet(raw, (size_t)rawlen, &pos, &pk)) > 0) {
-        if (pk.tag != 2) continue;
-        Sig s;
-        if (parse_sig(pk.body, pk.len, &s) || (s.type != 0x01 && s.type != 0x00) ||
-            (s.hashalg != HASH_SHA256 && s.hashalg != HASH_SHA512) || !s.has_created) { unknown++; continue; }
-        const PgpKey *k = NULL;
-        for (int i = 0; i < kr->n && !k; i++) if (issued_by(&s, &kr->keys[i])) k = &kr->keys[i];
-        if (!k) { unknown++; continue; }
-        char fpr[41];
-        hex_fpr(k->fpr, fpr);
-        if (k->revoked) { lerr_set(why, sizeof why, "pkg.pgp.keyRevoked", "key", fpr, NULL); continue; }
-        if (k->expires && k->expires <= now) { lerr_set(why, sizeof why, "pkg.pgp.keyExpired", "key", fpr, NULL); continue; }
-        if (!k->can_sign) { lerr_set(why, sizeof why, "pkg.pgp.keyNotSigning", "key", fpr, NULL); continue; }
-        if (s.created > now + 86400) { lerr_set(why, sizeof why, "pkg.pgp.futureSignature", "key", fpr, NULL); continue; }
-        if (s.sig_expires && s.created + s.sig_expires <= now) { lerr_set(why, sizeof why, "pkg.pgp.signatureExpired", "key", fpr, NULL); continue; }
-        if (s.created < k->created) { bad++; continue; }
-        /* hash: text (canonical if it's a text signature) + signature header + v4 trailer */
-        uint8_t dig[64], trailer[6] = { 4, 0xff, (uint8_t)(s.headlen >> 24), (uint8_t)(s.headlen >> 16), (uint8_t)(s.headlen >> 8), (uint8_t)s.headlen };
-        const char *data = s.type == 0x01 ? canon : text;
-        size_t dlen = s.type == 0x01 ? cl : tl;
-        if (s.hashalg == HASH_SHA256) {
-            Sha256 h;
-            sha256_init(&h);
-            sha256_update(&h, data, dlen);
-            sha256_update(&h, s.head, s.headlen);
-            sha256_update(&h, trailer, 6);
-            sha256_final(&h, dig);
-        } else {
-            Sha512 h;
-            sha512_init(&h);
-            sha512_update(&h, data, dlen);
-            sha512_update(&h, s.head, s.headlen);
-            sha512_update(&h, trailer, 6);
-            sha512_final(&h, dig);
-        }
-        if (dig[0] != s.left16[0] || dig[1] != s.left16[1] || !verify_sig(k, &s, dig)) {
-            bad++;
-            lerr_set(why, sizeof why, "pkg.pgp.badSignature", "key", fpr, NULL);
-            continue;
-        }
-        good++;
-    }
+    int good = verify_packets(kr, raw, (size_t)rawlen, now, text, tl, canon, cl, err, errlen);
     free(raw);
     free(canon);
-    if (r < 0) { free(text); lerr_set(err, errlen, "pkg.pgp.malformed", NULL); return -1; }
-    if (bad) { free(text); snprintf(err, errlen, "%s", why); return -1; }
-    if (!good) {
-        free(text);
-        if (why[0]) snprintf(err, errlen, "%s", why);
-        else lerr_set(err, errlen, "pkg.pgp.unknownKeys", "count", lerr_int(unknown), NULL);
-        return 0;
-    }
+    if (good <= 0) { free(text); return good; }
     *body = text;
     *body_len = tl;
     return good;
+}
+
+int pgp_verify_detached(const PgpKeyring *kr, const char *data, size_t len, const char *sig, size_t siglen, int64_t now,
+                        char *err, size_t errlen) {
+    err[0] = 0;
+    uint8_t *raw = NULL;
+    long rawlen;
+    if (siglen >= 5 && !memcmp(sig, "-----", 5)) {
+        static const char head[] = "-----BEGIN PGP SIGNATURE-----";
+        if (siglen < sizeof head - 1 || memcmp(sig, head, sizeof head - 1)) { lerr_set(err, errlen, "pkg.pgp.badEncoding", NULL); return -1; }
+        rawlen = dearmor(sig, siglen, &raw);
+    } else {
+        raw = siglen ? malloc(siglen) : NULL;
+        rawlen = raw ? (long)siglen : -1;
+        if (raw) memcpy(raw, sig, siglen);
+    }
+    if (rawlen <= 0) { free(raw); lerr_set(err, errlen, "pkg.pgp.badEncoding", NULL); return -1; }
+    /* a text signature is over the lines with CRLF ends (RFC 4880 5.2.1), nothing else changed */
+    size_t extra = 0;
+    for (size_t i = 0; i < len; i++) if (data[i] == '\n' && (!i || data[i - 1] != '\r')) extra++;
+    char *canon = malloc(len + extra + 1);
+    if (!canon) { free(raw); lerr_set(err, errlen, "sys.outOfMemory", NULL); return -1; }
+    size_t cl = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (data[i] == '\n' && (!i || data[i - 1] != '\r')) canon[cl++] = '\r';
+        canon[cl++] = data[i];
+    }
+    int good = verify_packets(kr, raw, (size_t)rawlen, now, data, len, canon, cl, err, errlen);
+    free(raw);
+    free(canon);
+    return good;
+}
+
+int pgp_keyring_pin(PgpKeyring *kr, const char *const *fprs, int nfprs) {
+    int keep = 0, kept = 0, w = 0;
+    for (int i = 0; i < kr->n; i++) {
+        PgpKey *k = &kr->keys[i];
+        if (k->primary) {
+            char hex[41];
+            hex_fpr(k->fpr, hex);
+            keep = 0;
+            for (int j = 0; j < nfprs && !keep; j++) keep = fprs[j] && !strcasecmp(fprs[j], hex);
+            kept += keep;
+        }
+        if (keep) kr->keys[w++] = *k;
+    }
+    kr->n = w;
+    return kept;
 }

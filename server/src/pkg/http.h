@@ -16,10 +16,14 @@ typedef struct {
     int64_t ims;                        /* If-Modified-Since (0: no) */
     uint64_t max;                       /* maximum accepted size */
     uint64_t expect;                    /* expected size (0: unknown), for progress */
+    int resume;                         /* keep dest.part when the download is cut, and continue it next time with a
+                                           Range request (a server that ignores it sends the whole file: started
+                                           again); the SHA-256 is still over the whole file */
     /* result */
     int status;                         /* 200, 304, 404… or 0 if the connection failed */
     int64_t last_modified;
     uint64_t size;
+    uint64_t resumed;                   /* bytes of dest.part kept from before (0: from the start) */
     uint8_t sha256[32];
     char err[200];
 } FetchItem;

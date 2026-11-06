@@ -1,10 +1,13 @@
 /* vmcatalog.c — see vmcatalog.h. */
 #include "vmcatalog.h"
 #include "../sec/json.h"
+#include "../pkg/pgp.h"
+#include "../errcode.h"
 
 #include <ctype.h>
 #include <regex.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -78,6 +81,27 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
         const JVal *mx = get(a, "maxMb");
         if (!a || !dir_ok(dir) || (fdir && !dir_ok(fdir)) || !re_ok(fre) || !mx || mx->type != J_NUM || mx->num < 1 || mx->num > (double)MAX_IMAGE_MB) break;
         if (!!sums == !!sre || (sums && (!vmcat_name_ok(sums) || strlen(sums) >= sizeof e->sums)) || (sre && !re_ok(sre))) break;
+        /* the list's signature: every entry has one, with its key file and at least one pinned fingerprint */
+        const JVal *sg = get(s, "signature"), *fl = get(s, "fingerprints");
+        const char *st = str(sg, "type"), *sn = str(sg, "name"), *kf = str(s, "keys");
+        if (!st || !kf || !vmcat_name_ok(kf) || strlen(kf) >= sizeof e->keys || !fl || fl->type != J_ARR) break;
+        if (!strcmp(st, "detached")) {
+            if (!sn || !vmcat_name_ok(sn) || strlen(sn) >= sizeof e->sig_name) break;
+            e->sig_type = VMCAT_SIG_DETACHED;
+            snprintf(e->sig_name, sizeof e->sig_name, "%s", sn);
+        } else if (!strcmp(st, "clearsigned") && !sn) e->sig_type = VMCAT_SIG_CLEAR;
+        else break;
+        int bad = 0;
+        for (const JVal *f = fl->kid; f && !bad; f = f->next) {
+            if (f->type != J_STR || strlen(f->str) != 40 || e->nfprs == VMCAT_FPRS) { bad = 1; break; }
+            for (int i = 0; i < 40; i++) {
+                if (!isxdigit((unsigned char)f->str[i])) { bad = 1; break; }
+                e->fprs[e->nfprs][i] = (char)toupper((unsigned char)f->str[i]);
+            }
+            e->fprs[e->nfprs++][40] = 0;
+        }
+        if (bad || !e->nfprs) break;
+        snprintf(e->keys, sizeof e->keys, "%s", kf);
         snprintf(e->dir, sizeof e->dir, "%s", dir);
         snprintf(e->file_dir, sizeof e->file_dir, "%s", fdir ? fdir : dir);
         snprintf(e->sums, sizeof e->sums, "%s", sums ? sums : "");
@@ -113,4 +137,41 @@ int vmcat_sums_has(const char *sums, size_t n, const char *name, const char *sha
         i = end + 1;
     }
     return 0;
+}
+
+int vmcat_verify_list(const VmCatEntry *e, const char *keys, size_t keys_len, const char *list, size_t list_len,
+                      const char *sig, size_t sig_len, int64_t now, char **body, size_t *body_len, char *err, size_t errlen) {
+    *body = NULL;
+    *body_len = 0;
+    err[0] = 0;
+    if (!e || !e->nfprs || !keys || !list) { lerr_set(err, errlen, "pkg.pgp.unknownKeys", "count", "0", NULL); return -1; }
+    static const char clear[] = "-----BEGIN PGP SIGNED MESSAGE-----";
+    if (e->sig_type == VMCAT_SIG_DETACHED && !sig) return 0;
+    if (e->sig_type == VMCAT_SIG_CLEAR && (list_len < sizeof clear - 1 || memcmp(list, clear, sizeof clear - 1))) return 0;
+    if (e->sig_type != VMCAT_SIG_DETACHED && e->sig_type != VMCAT_SIG_CLEAR) return -1;
+    PgpKeyring kr = { 0 };
+    const char *fp[VMCAT_FPRS];
+    for (int i = 0; i < e->nfprs; i++) fp[i] = e->fprs[i];
+    int rc = -1;
+    if (pgp_keyring_add_mem(&kr, keys, keys_len)) lerr_set(err, errlen, "pkg.pgp.malformed", NULL);
+    /* only the pinned keys may sign, and every pinned key must be in the file (else the catalog and the file disagree) */
+    else if (pgp_keyring_pin(&kr, fp, e->nfprs) != e->nfprs) lerr_set(err, errlen, "pkg.pgp.unknownKeys", "count", lerr_int(e->nfprs), NULL);
+    else if (e->sig_type == VMCAT_SIG_DETACHED) {
+        int g = pgp_verify_detached(&kr, list, list_len, sig, sig_len, now, err, errlen);
+        if (g > 0 && (*body = malloc(list_len + 1))) {
+            memcpy(*body, list, list_len);
+            (*body)[list_len] = 0;
+            *body_len = list_len;
+            rc = 1;
+        }
+    } else {
+        char *b = NULL;
+        size_t bl = 0;
+        int g = pgp_verify_clearsigned(&kr, list, list_len, now, &b, &bl, err, errlen);
+        char *z = g > 0 ? realloc(b, bl + 1) : NULL;        /* pgp.c's text has no NUL at its end */
+        if (z) { z[bl] = 0; *body = z; *body_len = bl; rc = 1; } else free(b);
+    }
+    pgp_keyring_free(&kr);
+    if (rc < 0 && !err[0]) lerr_set(err, errlen, "pkg.pgp.badSignature", NULL);
+    return rc;
 }

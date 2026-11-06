@@ -46,13 +46,20 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vm-test build/vmimport-test build/vmcatalog-test test-vm-import
+test: build/vm-test build/vmimport-test build/vmcatalog-test build/http-resume-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
-build/vmcatalog-test: tests/vmcatalog_test.c src/vm/vmcatalog.c src/vm/vmcatalog.h src/sec/json.c ../assets/machines/systems.json
+# and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage
+VMCAT_SRC := src/vm/vmcatalog.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
+build/vmcatalog-test: tests/vmcatalog_test.c $(VMCAT_SRC) src/vm/vmcatalog.h src/pkg/pgp.h ../assets/machines/systems.json $(wildcard tests/vmimage/*) $(wildcard ../packaging/keys/machines/*)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c src/vm/vmcatalog.c src/sec/json.c
-	./$@ ../assets/machines/systems.json || { rm -f $@; exit 1; }
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c $(VMCAT_SRC)
+	./$@ ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines || { rm -f $@; exit 1; }
+# resumed downloads (pkg/http.c, FetchItem.resume) against a server on loopback: as the user who runs it
+build/http-resume-test: tests/http_resume_test.c src/pkg/http.c src/pkg/crypto.c src/sec/cgroup.c src/pkg/http.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -DLORD_HTTP_TEST -o $@ tests/http_resume_test.c src/pkg/http.c src/pkg/crypto.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 # what an import refuses and how it merges (6.22): needs qemu-img, qemu-io and python3, no KVM; skipped without them
 .PHONY: test-vm-import
 test-vm-import: build/lord-vm
@@ -76,8 +83,8 @@ build/lord-server: $(VM_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_vm.h
 
 # vm-image-* like the admin helper runs them, against the makers' servers (tests/vm_image_cli.c; a manual check, not in
-# make test: it needs root, lord-tls beside it and the network). Its catalog and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog there first).
-VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/pkg/http.c src/pkg/crypto.c src/sec/cgroup.c src/sec/json.c
+# make test: it needs root, lord-tls beside it and the network). Its catalog, keys and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog and packaging/keys/machines there first).
+VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/pkg/http.c src/pkg/crypto.c src/pkg/pgp.c src/sec/cgroup.c src/sec/json.c
 build/vm-image-cli: $(VMIMAGE_CLI_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h src/pkg/http.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -o $@ $(VMIMAGE_CLI_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -DVM_KEYS='"/var/tmp/lordos-vmimage-test/keys"' -o $@ $(VMIMAGE_CLI_SRC)

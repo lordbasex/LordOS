@@ -9,15 +9,22 @@
  *              list entry, so no new login is needed (udev drops it when the device is made again; the group
  *              keeps working)                                                                                 admin
  *   vm-image-list   "<id> <arch>[ <list name>]"     fetches the maker's SHA-256 list of a catalog entry
- *              (assets/machines/systems.json) into /var/lib/lordos/machines/lists/<id>-<arch>.sums, or the release
- *              folder's listing (<id>-<arch>.index) when the list's name changes per build; then, given a name from
- *              that listing that matches the entry's pattern, that list. Answers the file's path             anyone
- *   vm-image-get    "<id> <arch> <file> <sha256>"   downloads that image of the entry when the list fetched above has
- *              exactly that line, into /var/lib/lordos/machines/images/<sha256>.iso, and keeps it only if its
- *              SHA-256 is that one. Answers the path. Progress: "progress download <done> <total>"            anyone
- *   vm-image-cancel ""                               stops this user's download                             anyone
- *   vm-image-remove "<sha256>"                       deletes a downloaded image (every account's machines share it)
- *                                                                                                              admin
+ *              (assets/machines/systems.json) and, when the maker signs it apart, its signature, checks the list's
+ *              OpenPGP signature with the keys the entry pins (assets/machines/keys, from packaging/keys/machines)
+ *              and keeps only the text that was signed, as /var/lib/lordos/machines/lists/<id>-<arch>.list; a list
+ *              that isn't signed is refused (vm.listUnsigned), and one whose signature doesn't verify with those
+ *              keys too (vm.listBadSignature). When the list's name changes per build it first fetches the release
+ *              folder's listing (<id>-<arch>.index); then, given a name from that listing that matches the entry's
+ *              pattern, that list. Answers the file's path                                                     anyone
+ *   vm-image-get    "<id> <arch> <file> <sha256>"   downloads that image of the entry when the checked list above
+ *              has exactly that line, into /var/lib/lordos/machines/images/<sha256>.iso, and keeps it only if its
+ *              SHA-256 is that one. A cut or stopped download stays as <sha256>.iso.part and the next try continues
+ *              it with a Range request (the hash is still over the whole file). Also writes <sha256>.json (what
+ *              the image is). Answers the path. Progress: "progress download <done> <total>"                 anyone
+ *   vm-image-cancel ""                               stops this user's download (its part is kept)           anyone
+ *   vm-image-remove "<sha256>"                       deletes a downloaded image, or the part of a stopped
+ *              download (every account's machines share it); refused while it downloads or any running machine
+ *              has it in its CD drive (vm.imageInUse)                                                           admin
  * The downloads run in lordos-net-machines.scope (firewall app lordos:machines), with the Store's downloader
  * (pkg/http.c fetch_batch_in: a child as nobody, TLS by lord-tls).
  */

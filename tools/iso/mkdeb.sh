@@ -157,6 +157,10 @@ for d in themes/*/; do
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
 cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines "$L/assets/"
+# the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
+# the admin helper checks each checksum list's signature with them before it trusts a hash
+install -d "$L/assets/machines/keys"
+install -m 644 packaging/keys/machines/*.asc "$L/assets/machines/keys/"
 # the wallpaper collection (assets/wallpapers/README.md): once, in the standard place for desktop
 # backgrounds; lord-server reaches it as asset:wallpapers/… through the link. Only the JPEGs, the
 # thumbnails and the README (index.json is bundled into the SDK at build time); motion.json and the built-in
