@@ -604,3 +604,32 @@ no), the report, LordOS version, anything else. **Tell Us on GitHub** opens
 (every value URL-encoded) in the default browser; the report is cut at a line, with "[truncated]", so the address stays
 under 7000 characters. From the Add Account sheet's line the same address goes without a report. A maintainer who
 confirms a report adds the kind to `providers.json` with `"evidence": "issue #N"`.
+
+### 17.2 Additions decided on 2026-11-06 (maintainer)
+
+1. **Every provider the binary has.** `cloud.providers()` returns a **Promise** and asks rclone (`config/providers`) **every time**;
+   nothing is cached and there is no fixed list of who is offered. The interface shows a spinner and blocks the sheet until it
+   answers. Left out: backends that aren't a storage of their own (alias, archive, cache, chunker, combine, compress, hasher,
+   http, local, memory, union, tardigrade and other aliases rclone marks as such). `crypt` stays as the encrypted folder. Each
+   item: `{ kind, label, description, group: 'oauth'|'server'|'object'|'crypt', verified, website?, fields, questions? }`;
+   `group` is derived from rclone's options (a `token` option → oauth; `access_key_id`/`endpoint`/bucket-style → object; else
+   server). The old fixed table becomes an overlay only (presets like Nextcloud, the website address, verified evidence from
+   `assets/cloud/providers.json`).
+2. **Provider names as rclone uses them**, as plain text, in Add Account and as an account's provider line. This is the only
+   exception to the brand rule (no logos, no trade dress, nowhere else). The generic "Office Drive" name goes away.
+3. **rclone's own questions.** Some backends ask more during setup (a 2FA code for the phone maker's drive, a choice, a
+   confirmation). `cloud.add(kind, name, fields)` may answer `{ question: { state, name, help, type, examples, isPassword,
+   required, default } }`; `cloud.answer(state, value)` sends the answer (rclone's `config/create` with `opt.continue`,
+   `state`, `result`) and answers the same way again, or `{ id }` when done, or `{ error }`. Generic: any backend's questions,
+   not one provider's.
+4. **Empty Trash** for providers that have it: `cloud.emptyTrash(id)` → Promise (`operations/cleanup`); `account.trashSupported`.
+5. **Measure** space on demand for providers without a quota: `cloud.measure(id)` → Promise `{ bytes, count }`
+   (`operations/size`, as an async job, cancellable); the result goes into `about.used` with `about.measuredAt`.
+6. **Delete in the cloud.** Move to Trash on a path under `~/Cloud/<account>` must not create `.Trash-1000` in the cloud:
+   `cloud.delete(paths)` → Promise removes them through the mount (the provider keeps its own trash where it has one); Files
+   asks first ("Delete from <provider>? It goes to <provider>'s trash" / "It can't be undone" when the provider has none).
+7. **`lordos-rclone` repackages rclone's official release binary**: `tools/iso/mkdeb-rclone.sh` downloads the release's
+   `.zip` and `SHA256SUMS`, verifies the PGP signature with Nick Craig-Wood's key (fingerprint
+   `FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA`, pinned in the script, key file in `packaging/keys/`), checks the hash, and puts
+   the unmodified binary in `/usr/lib/lordos/rclone/rclone`. It is published in LordOS's own apt repository with each release
+   (rclone has no apt repository of its own), so Store → Updates and `apt` keep it current. No Go on the build host.
