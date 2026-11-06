@@ -9,7 +9,8 @@ import * as fs from './fs.js';
 
 // Source-list row: 28 px, accent-colored icon, a soft highlight when selected and the
 // accent when something is dragged over it.
-export function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext, onPress }) {
+// accessory: always at the end of the row (Cloud's small usage ring); trail: only on hover or when selected (⏏)
+export function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, trail, onContext, onPress, accessory }) {
   const [hover, setHover] = useState(false);
   return (
     <View onClick={onClick} onMouseDown={onPress} onContextMenu={onContext} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} {...drop}
@@ -17,6 +18,7 @@ export function SideItem({ label, icon, selected, onClick, t, drop, hot, dim, tr
         backgroundColor: hot ? t.accent : selected ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover ? t.hover : 'transparent' }}>
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
       <Text style={{ flex: 1, fontSize: typeScale.body, color: hot ? '#fff' : dim ? t.textDim : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{label}</Text>
+      {accessory || null}
       {trail && (hover || selected) ? (
         <View onClick={(e) => { e.stopPropagation?.(); trail.onClick(); }} style={{ width: 18, alignItems: 'center' }}>
           <Text style={{ fontSize: 12, color: t.textDim }}>{trail.glyph}</Text>

@@ -1,6 +1,6 @@
 // panels.jsx — context menu (with submenus), Quick Preview, Get Info and confirm.
 // All are drawn inside the window, with coordinates relative to it.
-import { View, Text, TextInput, Button, ToolbarButton, Hairline, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr, openMarkup, imageEdit } from '@lordos/sdk';
+import { View, Text, TextInput, Button, ToolbarButton, Hairline, ScrollView, useTheme, formatBytes, formatDate, formatTime, addListener, direction, typeScale, spacing, t as tr, openMarkup, imageEdit } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Preview, kindLabel } from './views.jsx';
 import { EntryIcon, TagDots } from './glyphs.jsx';
@@ -107,7 +107,9 @@ function Row({ k, v, t }) {
 }
 
 // Get Info (❖I): the file's card; folder sizes are computed with a bound.
-export function InfoPanel({ e, onClose, openers }) {
+// extra: what another part adds between the header and the facts, which then leave out Size and Where (Cloud's
+// status, account, sizes and Keep switch: cloud.jsx CloudInfo)
+export function InfoPanel({ e, onClose, openers, extra }) {
   const t = useTheme();
   const [st, setSt] = useState(null);
   const [du, setDu] = useState(null);
@@ -124,8 +126,9 @@ export function InfoPanel({ e, onClose, openers }) {
   if (!e) return null;
   const size = e.dir ? (du ? `${formatBytes(du.size)}${du.complete ? '' : '+'} · ${tr('files.info.items', { count: du.files + du.dirs })}` : tr('files.info.calculating')) : formatBytes(st?.size ?? e.size);
   return (
-    <View style={{ position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: 16, top: 56, width: 360, borderRadius: 12, padding: spacing.l, gap: 10, backgroundColor: t.windowBg,
-      border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.4)' }}>
+    // a cloud item's card is taller (status, account, sizes, Keep): it takes the window's height and its body scrolls
+    <View style={{ position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: 16, top: 56, ...(extra ? { bottom: 16 } : null), width: 360, borderRadius: 12,
+      padding: spacing.l, gap: 10, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.4)' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
         <EntryIcon e={e} size={48} dark={t.mode === 'dark'} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -134,12 +137,14 @@ export function InfoPanel({ e, onClose, openers }) {
         </View>
         <ToolbarButton icon="✕" iconSize={12} small title={tr('files.close')} onClick={onClose} />
       </View>
+      {(() => { const body = (<>
       <TagDots tags={tagsOf(e.path)} size={9} />
       <View style={{ height: 1, backgroundColor: t.separator }} />
+      {extra || null}
       {st?.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a' }}>{st.error}</Text> : (
         <View>
-          <Row t={t} k={tr('files.info.size')} v={size} />
-          <Row t={t} k={tr('files.info.where')} v={e.trash ? e.original : (st?.path || e.path).split('/').slice(0, -1).join('/') || '/'} />
+          {extra ? null : <Row t={t} k={tr('files.info.size')} v={size} />}
+          {extra ? null : <Row t={t} k={tr('files.info.where')} v={e.trash ? e.original : (st?.path || e.path).split('/').slice(0, -1).join('/') || '/'} />}
           {st?.link && <Row t={t} k={tr('files.info.link')} v={st.target} />}
           {st?.btime ? <Row t={t} k={tr('files.info.created')} v={fmt(st.btime)} /> : null}
           <Row t={t} k={tr('files.info.modified')} v={fmt(st?.mtime)} />
@@ -163,6 +168,8 @@ export function InfoPanel({ e, onClose, openers }) {
           </View>
         </View>
       ) : null}
+      </>);
+      return extra ? <ScrollView style={{ flex: 1 }}><View style={{ gap: 10, paddingBottom: 4 }}>{body}</View></ScrollView> : body; })()}
     </View>
   );
 }

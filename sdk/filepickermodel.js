@@ -17,11 +17,26 @@ export function startFolder(start, home, disks = []) {
   return [home, ...disks.map((d) => d.path)].some((r) => inside(path, r)) ? path : home;
 }
 
-// Crumbs of a folder, from the place it belongs to: the home folder, a disk or a connected server.
+// A Cloud account's folder (~/Cloud/<name>, docs/CLOUD.md) holding path, or null: its crumbs start there, like a disk's.
+export function cloudRoot(path, home) {
+  const c = `${home}/Cloud/`;
+  if (!String(path).startsWith(c)) return null;
+  const name = path.slice(c.length).split('/')[0];
+  return name ? `${c}${name}` : null;
+}
+
+// The dialog's Cloud places: every account's folder, in their order, but a locked keyring's (nothing to list).
+// accounts: cloud.state().accounts; hidden: the ids taken out of Files (settings.cloudHidden).
+export const cloudPlaces = (accounts, home, hidden = []) => (accounts || [])
+  .filter((a) => a && a.mount && cloudRoot(a.mount, home) === a.mount && a.state !== 'locked' && !hidden.includes(a.id))
+  .map((a) => ({ id: a.id, name: a.name, path: a.mount }));
+
+// Crumbs of a folder, from the place it belongs to: the home folder, a Cloud account, a disk or a connected server.
 // Outside them (Files' This computer) they begin at /. The home folder's has home: true, for its name.
 export function pathCrumbs(path, home) {
   const remote = `${home}/.local/share/lordos/remote/`;
   const base = path.startsWith(remote) ? path.split('/').slice(0, remote.split('/').length).join('/')
+    : cloudRoot(path, home) ? cloudRoot(path, home)
     : inside(path, home) ? home
     : path.startsWith('/run/media/') ? path.split('/').slice(0, 5).join('/')
     : path.startsWith('/media/') ? path.split('/').slice(0, 4).join('/') : '/';

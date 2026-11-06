@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, Slider,
+  useDisks, admin, systemInfo, lan, shortcutTaken, Slider, useSettings, cloudModel,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -26,6 +26,7 @@ import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from '.
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
+import { useCloudFiles, CloudSection, TransfersPill, footerLine, cloudMenuItems, ShareSheet, CloudInfo, OfflineDialog } from './cloud.jsx';
 
 export function Icon({ size: s }) {
   return (
@@ -222,6 +223,9 @@ export default function Files() {
   const [diskList] = useDisks();
   useEffect(() => { setTimeout(warmDocs, 800); }, []);             // PDF Quick Preview without waiting for the helper
   const [msg, setMsg] = useState(null);
+  const [sharing, setSharing] = useState(null);           // Cloud: the Share Link sheet's entry
+  const [offlineAsk, setOfflineAsk] = useState(null);     // Cloud: a file that isn't here, with the cloud out of reach
+  const [userSettings] = useSettings();
   const root = useRef(null);
   const rootWidthRef = useRef(960);
   const press = useRef(null);
@@ -250,7 +254,10 @@ export default function Files() {
   const groups = useMemo(() => groupEntries(sorted, tab.group, tr), [sorted, tab.group]);
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const byPath = useMemo(() => new Map(flat.map((e) => [e.path, e])), [flat]);
+  // Cloud (docs/CLOUD.md): the statuses of what is shown, the account of this folder
+  const cf = useCloudFiles(useMemo(() => flat.map((e) => e.path), [flat]));
   const curDir = baseLoc.type === 'dir' ? baseLoc.path : null;
+  const curAcc = curDir ? cf.accountOf(curDir) : null;
   // outside the home folder and the user's disks a folder is only browsed (lord.fs reads there but
   // doesn't write): the actions that change it are left out
   const readOnly = useMemo(() => { if (!curDir) return false; try { return !fs.stat(curDir).writable; } catch (e) { return true; } }, [curDir, version]);
@@ -418,6 +425,7 @@ export default function Files() {
     if (e.netWay) { openWay(e.netWay, e.netParent); return; }
     if (e.netHost) { if (e.ways[0]) openWay(e.ways[0], e.netHost); else setMsg(tr('files.net.nothing')); return; }
     if (e.trash) { setSelected(new Set([e.path])); setQuick(true); return; }
+    if (!e.dir && cf.status[e.path]?.st === 'cloud' && cf.accountOf(e.path)?.state === 'offline') { setOfflineAsk(e); return; }
     if (prefs.foldersInTabs && e.dir && !e.arc && !e.app) { newTabAt({ type: 'dir', path: e.path }); return; }
     openEntry(e, ctx);
   };
@@ -534,6 +542,7 @@ export default function Files() {
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
       ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
       ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
+      ...(() => { const ci = cloudMenuItems(list, cf, { onShare: setSharing, onMsg: setMsg }); return ci.length ? ['-', ...ci] : []; })(),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly },
       '-',
@@ -601,7 +610,7 @@ export default function Files() {
   const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
     f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
-    if (renaming || confirm || menu || sheet || connAsk || remoteAsk) return;
+    if (renaming || confirm || menu || sheet || connAsk || remoteAsk || sharing || offlineAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
     const space = e.char === ' ' || e.key === ' ' || b === ' ';
@@ -720,6 +729,7 @@ export default function Files() {
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
     onItemDown, onOpen: open, onContext, statOf, zoom, onZoomWheel,
+    cloud: { on: !!curAcc && loc.type === 'dir', status: cf.status }, cloudOnly: cf.cloudOnly,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
     onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
     shownName: prefs.showExtensions ? null : (e) => { if (e.dir || e.app) return e.name; const i = e.name.lastIndexOf('.'); return i > 0 ? e.name.slice(0, i) : e.name; },
@@ -790,12 +800,16 @@ export default function Files() {
             onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(f.path) }] }); }} />
         ))}
         {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<PlaceGlyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
+        <CloudSection t={t} accounts={cf.accounts} hidden={userSettings.cloudHidden || []} sideSel={(p) => sideSel(dirLoc(p))} navigate={(p) => navigate(dirLoc(p))} dropTarget={dropTarget}
+          onContext={(ev, it) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [
+            { label: tr('files.menu.openTab'), onClick: () => newTabAt(dirLoc(it.path)) },
+            { label: tr('cloud.settingsMenu'), onClick: () => wm.open('settings', { args: { section: 'cloud', page: it.id, nonce: Date.now() } }) }] }); }} />
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
         {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<PlaceGlyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
           drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
         {side('computer') && <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />}
         {lan.available() && side('network') && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
-        {side('volumes') && volumes.map((v) => {
+        {side('volumes') && volumes.filter((v) => !cloudModel.isCloudVolume(v, fs.home())).map((v) => {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
             <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
@@ -840,6 +854,7 @@ export default function Files() {
           </ToolbarGroup>
           {/* the folder's name is in the window's title bar, every theme draws it there */}
           <View style={{ flex: 1, minWidth: 0 }} />
+          {curAcc && !tight ? <TransfersPill t={t} accounts={cf.accounts} acc={curAcc} /> : null}
           {narrow ? (
             <View ref={viewBtn}><ToolbarButton icon={VIEW_GLYPH[tab.view]} title={tr('files.menu.view')} onClick={() => menuUnder(viewBtn, viewMenuItems())} /></View>
           ) : (
@@ -916,7 +931,7 @@ export default function Files() {
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {msg || (loc.type === 'network' ? lanStatus(netState, flat.length) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
-                freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(', '))}
+                curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '))}
             </Text>
           )}
         </View>
@@ -935,7 +950,10 @@ export default function Files() {
         </View>
       )}
       {quickEntry && <QuickLook e={quickEntry} index={flat.indexOf(quickEntry)} count={flat.length} onClose={() => setQuick(false)} />}
-      {infoEntry && <InfoPanel e={infoEntry} onClose={() => setInfo(false)} openers={infoEntry.dir || infoEntry.app ? [] : openersFor(infoEntry, launcherApps, tr)} />}
+      {infoEntry && <InfoPanel e={infoEntry} onClose={() => setInfo(false)} openers={infoEntry.dir || infoEntry.app ? [] : openersFor(infoEntry, launcherApps, tr)}
+        extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}
+      {sharing && cf.accountOf(sharing.path) && <ShareSheet e={sharing} cf={cf} onClose={() => setSharing(null)} />}
+      {offlineAsk && <OfflineDialog e={offlineAsk} onClose={() => setOfflineAsk(null)} />}
       {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}

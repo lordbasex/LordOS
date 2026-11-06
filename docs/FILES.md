@@ -304,6 +304,46 @@ is unlocked, arm64, a server that isn't Samba. No pass through the connector ins
 development build. It has not worked against a real server on a network, and listing a server's folders with a password
 isn't built, so treat signing in to a real SMB server as untested.
 
+## Cloud (0.8.8.5)
+
+Cloud's accounts (docs/CLOUD.md) are a section of the sidebar and their files carry a status. Built from the approved
+mocks (Files, FilesMenu, ShareLink, GetInfo, States); the code is `apps/files/cloud.jsx`, the rules `sdk/cloudmodel.js`.
+
+- **Sidebar**: a **Cloud** section between Favorites and Locations, one row per account in the order they were added,
+  with the account's color and a small usage ring (used of the quota; none without a quota). An account that needs a
+  new sign-in or has an error shows "!" on orange and is dimmed, as is one that is offline or whose keyring is locked.
+  A click opens `~/Cloud/<name>`; a right click offers Open in New Tab and Cloud Settings…. Settings → Cloud's
+  "Show in Files" switch (`settings.cloudHidden`) leaves an account out. `fuse.rclone` mounts under `~/Cloud` never
+  show under Locations: the Cloud section is where they live (Connect to Server's rclone mounts are elsewhere and stay).
+- **Status**: asked with `cloud.status(paths)` for the rows of the folder shown (at most 400), again on every pushed
+  state (at most twice a second). The list view adds a **Status** column at the end in an account's folders; the icon
+  and gallery views put a badge at the icon's corner: in the cloud (cloud outline), coming down (ring with the part
+  that arrived), on this computer (check in a circle), kept (filled check), going up (ring), needs attention ("!").
+- **Nothing comes down by itself**: a file only in the cloud (or whose status isn't known yet) gets its type icon, not
+  a thumbnail, and the column view's and the gallery's preview don't read it. Opening it, Quick Preview and Get Info's
+  folder size are explicit and bring it down. The file dialog shows no thumbnails inside an account either.
+- **Context menu** (files and folders of one account): **Keep on This Computer** (with the size still to come down;
+  checked when everything chosen is kept, and then a click stops keeping), **Free Up Space** (with the size it frees;
+  what is open, kept or waiting to go up stays, and the status bar says how many), then for one item **Copy Link** (the
+  existing link, or a new one for 7 days), **Share Link…**, **Open on Website** and, when it is shared, **Stop Sharing**.
+- **Share Link…**: the link with **Copy** ("Link copied"), **Link expires** 1 day / 7 days / 30 days / Never (changing
+  it makes the link again), **Stop Sharing**, **Open on Website** and the note that people, passwords and editing are
+  the provider's. A storage without public links says so and offers only the website.
+- **Get Info** of a cloud item: its status (with the progress, the bytes, the speed and the time left while it comes
+  down), the account, where it is in it, its size in the cloud and here, when it last synced (Cloud's recent list),
+  whether it is shared, a **Keep on this computer** switch and Share Link… / Open on Website. Size and Where of the
+  usual card give way to these.
+- **Header and status bar**: in an account's folders the toolbar has a pill "N coming down · N going up" for that
+  account, and the status bar ends with "… of … used in <account> · … on this computer" instead of the disk's free space.
+- **Offline**: opening a file only in the cloud while its account is offline shows "<name> isn't on this computer",
+  with OK and Keep on This Computer.
+- **Crumbs**: the path bar (and the file dialog's) starts at the account: "Work › Projects", not "Home › Cloud › Work".
+- **File dialog**: a Cloud section with the accounts (not one whose keyring is locked), between Favorites and
+  Locations (`cloudPlaces` in `sdk/filepickermodel.js`).
+
+Tests: `server/tests/cloud_model_test.mjs` (in `run_suites.sh`). Screenshots of every screen, light and dark, were taken
+on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"cloudDevMock": true` in settings.json).
+
 ## Shortcuts
 
 | Shortcut | What it does |

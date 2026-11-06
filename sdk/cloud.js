@@ -79,6 +79,10 @@ export const cloud = {
   setOptions: (o) => (has() ? lord.cloud.setOptions({ ...o }) : { error: 'cloud.unavailable' }),
   restart: () => has() && lord.cloud.restart(),
   showLog: () => wm.open('logs', { new: true, args: { file: has() ? lord.cloud.logName() : 'cloud.log' } }),
+  // Not provided by lord-server in 0.8.8.5 (docs/CLOUD.md 17.1: one bandwidth limit for the whole daemon, metered
+  // networks not known yet): an account's own options. Without it Settings disables those rows.
+  accountOptionsSupported: () => has() && typeof lord.cloud.setAccountOptions === 'function',
+  setAccountOptions: (id, o) => (has() && typeof lord.cloud.setAccountOptions === 'function' ? lord.cloud.setAccountOptions(String(id), o) : undefined),
 };
 
 export const useCloud = () => useStore(cloudState);

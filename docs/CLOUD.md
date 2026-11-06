@@ -4,9 +4,8 @@ The design of **Cloud**, LordOS's layer over the person's cloud storage accounts
 from Files, set up and watched from Settings, backed up to by Backups, with files that live in the cloud and come down when they
 are opened. The engine is [rclone](https://rclone.org) (MIT, the same license as LordOS); everything the person sees is ours.
 
-Target release: **0.8.8.5**, all of it in one release (decided 2026-11-06). Phase 0 is done (section 15); Phase 1's
-core is built on branch `cloud-core` (`server/src/cloud`, `lord.cloud`, `sdk/cloud.js`, the `lordos-rclone` package;
-section 15, "Phase 1: the core"), the interface on branch `cloud-ui`.
+Target release: **0.8.8.5**, all of it in one release (decided 2026-11-06). Phase 0 is measured (section 15); Phase 1
+(the core, section 17.1, and the interface, section 18) is built and merged on branch `cloud`.
 
 How to read it:
 
@@ -472,3 +471,57 @@ contract above leaves open, and the few places the core differs from it:
   whole daemon, and there is no metered information to act on) and `State.conflicts`: rclone's VFS uploads the last version
   written and doesn't keep "name (this computer).ext" copies, so 7.2's conflict rule needs work of its own. The interface
   hides those rows when they're absent.
+
+## 18. The interface (Phase 1)
+
+Built from the approved mocks (Main, AddAccount, SignIn, Credentials, Account, Files, FilesMenu, ShareLink, GetInfo,
+MenuBar, States; Backups is Phase 2), against section 17 only.
+
+| Where | What |
+|---|---|
+| `sdk/cloud.js` | the thin wrapper of section 17: `cloud.*`, `useCloud()`, `cloudState`; `__lordCloud(state)` only stores the state |
+| `sdk/cloudmodel.js` | everything that decides without a screen: status → glyph, space bars and rings, provider groups and search, names, menus, the sidebar, the menu bar glyph, notifications (`transitions`) |
+| `sdk/cloudglyphs.js`, `sdk/cloudui.jsx` | the mocks' glyphs and rings drawn as pixels (the engine has no paths or conic gradients), cached so a row that doesn't change isn't uploaded again |
+| `sdk/cloudstatus.jsx` | the menu bar item and its panel, the notifications from state changes, `startCloud()` in `startShell` |
+| `apps/settings/Cloud.jsx` | Settings → Cloud, the account page and the sheets |
+| `apps/files/cloud.jsx` | Files' Cloud section, status, menu items, Share Link, Get Info, the offline message (docs/FILES.md, "Cloud") |
+| `sdk/cloudmock.js` | a development stand-in for `lord.cloud`, used only when `lord.cloud` is missing and settings.json has `"cloudDevMock": true` (or `"states"`, which a few seconds in turns on a sign-in request, a full account with changes waiting, a conflict and an offline account) |
+| `server/tests/cloud_model_test.mjs` | 137 checks, in `run_suites.sh`: the model, the glyph pixels, the file dialog's places, the mock against section 17's shape, every text in the five catalogs, and that Cloud's screens use no one-sided physical edge (right to left) |
+
+Decisions taken while building it:
+
+- **Settings → Cloud** keeps the mock's three boxes (all accounts, the accounts, on this computer with the threshold and
+  the service) and adds below them section 12's **Bandwidth** (upload and download limits, pause on battery, pause on
+  metered networks) and **About rclone** (version, MIT license, rclone.org). **Show Log** sits next to Restart.
+  **Add Account…** is in Settings' title bar, beside "Cloud", as in the mock.
+- Sizes use LordOS's own `formatBytes` (1024-based, like the rest of the system), so the mocks' "612 GB" reads 570 GB.
+- **Providers**: groups as in the mock (the encrypted folder with object storage, last). Each group shows the first
+  five (browser), three (server) or two (object storage) in the order `providers()` gives, and a **More…** tile with
+  the rest; a group with only one more shows it instead of a "1 more" tile. Search looks at the label, the hint and
+  the kind, accents folded. The name proposed is Personal, then Work, then the provider's label (not changed once typed).
+- **Credentials**: a field's label is ours for the usual rclone option names (`url`, `user`, `pass`, `endpoint`,
+  `access_key_id`…, translated), else the provider list's own; a field with two to four examples (a preset, a service)
+  is a segmented control, the rest text fields; secrets are masked. lord-server's error for a field outlines it.
+- **Sign In Again**: an OAuth account calls `beginSignIn(kind, <its name>, { clientId?, clientSecret? })` again; any
+  other opens its credentials form and calls `add(kind, <its name>, fields)`. **lord-server must treat a sign-in or an
+  add for an existing account's name as updating that account**, not as a second one.
+- **Files on demand** off is `keep([mount])`, on is `unkeep([mount])`; the ready sheet's "Keep everything on this
+  computer" is the same, and its "Show in Files" switch is `settings.cloudHidden` (Files and the file dialog leave
+  those accounts out).
+- **Nothing comes down by browsing**: Files and the file dialog draw no thumbnail and no preview of a file that is
+  only in the cloud or whose status isn't known yet. Opening, Quick Preview and Get Info's folder size are explicit.
+- **Copy Link** copies the existing link, or makes one for 7 days. The account's Shared links are `links(id)`.
+- Notifications go out as Settings' (sign-in, full) and Files' (conflict), so Settings → Notifications governs them.
+- Right to left: every row uses logical edges (`insetInlineEnd`, `textAlign: 'start'`), the chevrons and the back
+  button turn; the bars and rings fill left to right in every language, as LordOS's other gauges.
+
+What the interface needs beyond section 17 (both optional: without them the interface works and says less):
+
+- `cloud.setAccountOptions(id, { unmeteredOnly, bwUp })` and `account.options` with the same keys: the account page's
+  **Only on unmetered networks** and **Upload limit** (the Account mock). Without it those two rows are disabled with
+  "Comes with a later update".
+- `State.conflicts: [{ path, kept, account, at }]`, newest first: the "Changed on another device too" notification
+  (section 7.2). Without it there is no conflict notification.
+- Times (`expiresAt`, `links().expires`, `recent[].at`, `conflicts[].at`) are read as seconds or milliseconds.
+- Error codes the interface itself uses: `cloud.unavailable`, `cloud.badId`, `cloud.badKind`, `cloud.uploadFailed`,
+  `cloud.pending` (errors.json); `link()`'s `unsupported` is section 17's bare word.
