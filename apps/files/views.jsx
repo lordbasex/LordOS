@@ -7,25 +7,27 @@ import { kindOf, isImage, isTextual } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
+import { iconMetrics, listMetrics } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
 export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : tr(`files.kind.${kindOf(e)}`));
 
-// Name, or the field for renaming in place.
-function Name({ e, ctx, center, color, lines = 1 }) {
+// Name, or the field for renaming in place. font and line follow the view's zoom (viewprefs.js).
+function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {
+  const size = font || (center ? 12 : 13), lh = line || (size <= 13 ? 16 : Math.round(size * 1.34));
   if (ctx.renaming?.path === e.path) {
     return (
-      <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: center ? 110 : 240 }}>
+      <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: fieldW || (center ? 110 : 240) }}>
         <TextInput autoFocus selectAll value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
           style={{ height: 22, paddingHorizontal: 4 }} />
       </View>
     );
   }
   return (
-    <Text style={{ fontSize: center ? 12 : 13, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
-      overflow: 'hidden', maxHeight: lines * 16, lineHeight: 16, textOverflow: 'ellipsis', numberOfLines: lines }}>{ctx.shownName ? ctx.shownName(e) : e.name}</Text>
+    <Text style={{ fontSize: size, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
+      overflow: 'hidden', maxHeight: lines * lh, lineHeight: lh, textOverflow: 'ellipsis', numberOfLines: lines }}>{ctx.shownName ? ctx.shownName(e) : e.name}</Text>
   );
 }
 
@@ -55,8 +57,9 @@ function GroupTitle({ g, t }) {
 
 export function IconView({ groups, ctx }) {
   const t = useTheme();
+  const m = iconMetrics(ctx.zoom);
   return (
-    <ScrollView resetKey={ctx.scrollKey} style={{ flex: 1 }}>
+    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} style={{ flex: 1 }}>
       <View style={{ padding: 12, paddingBottom: 32 }}>
         {groups.map((g) => (
           <View key={g.key}>
@@ -66,12 +69,12 @@ export function IconView({ groups, ctx }) {
                 const sel = ctx.selected.has(e.path);
                 return (
                   <View key={e.path} {...itemHandlers(e, ctx)}
-                    style={{ width: 100, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
+                    style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
                     <View style={{ padding: 4, borderRadius: 7, backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
-                      <EntryIcon e={e} size={64} dark={t.mode === 'dark'} />
+                      <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} />
                     </View>
-                    <View style={{ maxWidth: 96, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
-                      <Name e={e} ctx={ctx} center lines={2} color={sel ? '#fff' : t.text} />
+                    <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
+                      <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} color={sel ? '#fff' : t.text} />
                     </View>
                     <TagDots tags={tagsOf(e.path)} />
                   </View>
@@ -166,6 +169,7 @@ function Header({ sort, onSort, t, ctx, columns, onColumns, nameW }) {
 }
 
 function ListRows({ items, depth, ctx, t, sort, alt }) {
+  const m = listMetrics(ctx.zoom);
   const rows = [];
   for (const e of items) {
     const sel = ctx.selected.has(e.path);
@@ -173,18 +177,19 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
     const odd = (alt.n++) % 2 === 1;
     rows.push(
       <View key={e.path} {...itemHandlers(e, ctx)}
-        style={[listRowStyle(t, sel || ctx.dropTarget === e.path, odd), { opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
+        style={[listRowStyle(t, sel || ctx.dropTarget === e.path, odd), { height: m.row, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
         <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
           <View onMouseDown={(ev) => { ev.stopPropagation(); if (e.dir && !e.trash) ctx.onToggleExpand(e.path); }} style={{ width: 14, alignItems: 'center' }}>
             {e.dir && !e.trash ? <Text style={{ fontSize: 9, color: sel ? '#fff' : t.textDim }}>{open ? '▼' : '▶'}</Text> : null}
           </View>
-          <EntryIcon e={e} size={16} dark={t.mode === 'dark'} thumb={false} />
-          <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} color={sel ? '#fff' : t.text} /></View>
+          {/* thumbnails from 32 px up, as in the icon view */}
+          <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={m.icon >= 32} />
+          <View style={{ flex: 1, minWidth: 0 }}><Name e={e} ctx={ctx} font={m.font} color={sel ? '#fff' : t.text} /></View>
           <TagDots tags={tagsOf(e.path)} size={7} />
         </View>
         {visible(ctx.columns).map((k) => (k === 'tags'
           ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
-          : <Text key={k} style={listCell(t, sel, ctx.columns.width[k], cellAlign(k))}>{cellText(k, e, ctx)}</Text>))}
+          : <Text key={k} style={{ ...listCell(t, sel, ctx.columns.width[k], cellAlign(k)), fontSize: m.cell }}>{cellText(k, e, ctx)}</Text>))}
       </View>,
     );
     if (open) {
@@ -218,7 +223,7 @@ export function ListView({ groups, ctx, sort, onSort }) {
     <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
       <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
         <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
-        <ScrollView resetKey={ctx.scrollKey} style={{ flex: 1 }}>
+        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
             {groups.map((g) => (
               <View key={g.key}>

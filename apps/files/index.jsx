@@ -6,7 +6,7 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken,
+  useDisks, admin, systemInfo, lan, shortcutTaken, Slider,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -22,6 +22,7 @@ import { NetGlyph, isShareFs, shareTitle, ConnectSheet, RemoteSheet, useLan, hos
 import { GoToFolder, ConnectServer, FilesSettings } from './dialogs.jsx';
 import { parseAddress, sshLine, hostAddress } from './connect.js';
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
@@ -52,7 +53,7 @@ const localKeys = (items) => items.map((i) => (typeof i === 'string' ? i : { ...
 const VIEWS = ['icons', 'list', 'columns', 'gallery'];
 const VIEW_GLYPH = { icons: '▦', list: '≡', columns: '◫', gallery: '▣' };
 let tabSeq = 1;
-const newTab = (loc, from) => ({ id: tabSeq++, loc, back: [], fwd: [], view: from?.view || 'icons', sort: from?.sort || { by: 'name', desc: false }, group: from?.group || 'none', chain: [] });
+const newTab = (loc, from) => ({ id: tabSeq++, loc, back: [], fwd: [], view: from?.view || 'icons', sort: from?.sort || { by: 'name', desc: false }, zoom: from?.zoom || {}, group: from?.group || 'none', chain: [] });
 // State of each window: it survives the interface being remounted (a language change).
 const winStates = new Map();
 
@@ -149,6 +150,23 @@ function ScopeChip({ label, on, onClick, t }) {
   );
 }
 
+// The status bar's zoom (issue #33): a small and a large glyph around a slider of steps; the glyphs step, a
+// double click on the slider goes back to the usual size. Narrow windows keep only the glyphs.
+function ZoomControl({ t, zoom, slider, onStep, onSet }) {
+  const glyph = (size, d, title, off) => (
+    <View title={title} onClick={off ? undefined : () => onStep(d)} style={{ width: 18, height: 20, alignItems: 'center', justifyContent: 'center', opacity: off ? 0.35 : 1 }}>
+      <View style={{ width: size, height: size, borderRadius: 2, border: `1.5px solid ${t.textDim}` }} />
+    </View>
+  );
+  return (
+    <View style={{ position: 'absolute', top: 0, bottom: 0, insetInlineEnd: spacing.m, flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr' }}>
+      {glyph(7, -1, tr('files.zoom.out'), zoom <= ZOOM_MIN)}
+      {slider ? <View title={tr('files.zoom.label')} onDoubleClick={() => onSet(0)}><Slider value={zoom} min={ZOOM_MIN} max={ZOOM_MAX} width={84} onChange={onSet} /></View> : null}
+      {glyph(12, 1, tr('files.zoom.in'), zoom >= ZOOM_MAX)}
+    </View>
+  );
+}
+
 // ---- the window ----
 
 export default function Files() {
@@ -240,8 +258,8 @@ export default function Files() {
   const title = (() => { const v = loc.type === 'dir' ? volumes.find((x) => x.path === loc.path && isShareFs(x.fs)) : null; return v ? shareTitle(v.name) : locTitle(loc, dirs); })();
 
   const viewOf = (l) => { const k = viewKey(l); return { ...viewFor(filesPrefs(), l), sortChosen: !!k && !!filesPrefs().folderViews[k] }; };
-  // what this place shows is kept for it, across windows and restarts
-  const keepView = (view, sort) => { const k = viewKey(tab.loc); if (k) setPrefs({ folderViews: folderViewsWith(filesPrefs().folderViews, k, { view, sort }) }); };
+  // what this place shows is kept for it, across windows and restarts (in settings.json, never as a file in the folder)
+  const keepView = (view, sort, zoom = tab.zoom) => { const k = viewKey(tab.loc); if (k) setPrefs({ folderViews: folderViewsWith(filesPrefs().folderViews, k, { view, sort, zoom }) }); };
   function navigate(next, push = true) {
     if (sameLoc(next, tab.loc)) return;
     if (tab.loc.type === 'network') netExpanded.current = expanded;      // back in Network, what was unfolded stays
@@ -411,6 +429,25 @@ export default function Files() {
     setActive((a) => (a >= i && a > 0 ? a - 1 : a));
   };
   const setView = (view) => { patchTab({ view }); keepView(view, tab.sort); };
+  // zoom (issue #33): icon and text size of the icon and list views, a step per view, kept with the place
+  const shownView = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
+  const zoomable = ZOOM_VIEWS.includes(shownView);
+  const zoom = zoomOf(tab.zoom, shownView);
+  const setZoom = (z) => {
+    if (!zoomable) return;
+    const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(z)));
+    if (next === zoom) return;
+    const map = zoomWith(tab.zoom, shownView, next);
+    patchTab({ zoom: map });
+    keepView(tab.view, tab.sort, map);
+  };
+  const zoomStep = (d) => setZoom(zoom + d);
+  // Ctrl + wheel (or two fingers on a touchpad with Ctrl) zooms instead of scrolling
+  const onZoomWheel = (e) => {
+    if (!e.ctrl) return;
+    e.stopPropagation();
+    if (!e.precise || e.notches) zoomStep(e.deltaY < 0 ? 1 : -1);
+  };
   const setSort = (by) => {
     const sort = { by, desc: tab.sort.by === by ? !tab.sort.desc : by === 'date' || by === 'size' };
     patchTab({ sortChosen: true, sort });
@@ -551,7 +588,7 @@ export default function Files() {
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
-  const cols = () => { const w = root.current ? lord.getLayout(root.current.id)[2] - sideW : 600; return Math.max(1, Math.floor((w - 24 + 8) / 108)); };
+  const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideW : 600, zoom);
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -586,6 +623,10 @@ export default function Files() {
     if (mod && b === 'w') { closeTab(active); return; }
     if (mod && e.shift && (b === '.' || b === '>' || b === ':')) { setHidden((h) => !h); return; }
     if (mod && ['1', '2', '3', '4'].includes(b)) { setView(VIEWS[Number(b) - 1]); return; }
+    // Ctrl and + (= on most layouts, without Shift), -, 0: the zoom of the icon and list views
+    if (mod && (b === '+' || b === '=' || e.char === '+' || e.key === '+')) { zoomStep(1); return; }
+    if (mod && (b === '-' || b === '_' || e.key === '-')) { zoomStep(-1); return; }
+    if (mod && b === '0') { setZoom(0); return; }
     if (mod && b === 'i') { setInfo((v) => !v); return; }
     if (mod && b === 'd') { duplicate(); return; }
     if (mod && b === 'c') { if (selPaths.length) copyFiles(selPaths); return; }
@@ -641,6 +682,9 @@ export default function Files() {
       ] },
       { label: tr('files.menu.view'), items: [
         ...VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) })), '-',
+        { label: tr('files.zoom.in'), hint: 'Ctrl++', onClick: () => zoomStep(1), disabled: !zoomable || zoom >= ZOOM_MAX },
+        { label: tr('files.zoom.out'), hint: 'Ctrl+-', onClick: () => zoomStep(-1), disabled: !zoomable || zoom <= ZOOM_MIN },
+        { label: tr('files.zoom.reset'), hint: 'Ctrl+0', onClick: () => setZoom(0), disabled: !zoomable || zoom === 0 }, '-',
         { label: tr('files.menu.showHidden'), hint: '❖⇧.', checked: hidden, onClick: () => setHidden((h) => !h) },
       ] },
       { label: tr('files.menu.go'), items: [
@@ -660,7 +704,7 @@ export default function Files() {
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
     ]));
-  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length]);
+  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, hidden, sel.length, clip, curDir, readOnly, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
 
   // ---- view ----
   const columns = columnsOf(prefs);
@@ -675,7 +719,7 @@ export default function Files() {
     scrollKey: `${active}|${loc.type}|${loc.path || ''}|${loc.inner || ''}|${loc.color || ''}|${loc.root || ''}|${loc.query || ''}`,   // a new place opens at the top
     selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
-    onItemDown, onOpen: open, onContext, statOf,
+    onItemDown, onOpen: open, onContext, statOf, zoom, onZoomWheel,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
     onColumns: (c) => setPrefs({ columns: c }), onHeaderMenu,
     shownName: prefs.showExtensions ? null : (e) => { if (e.dir || e.app) return e.name; const i = e.name.lastIndexOf('.'); return i > 0 ? e.name.slice(0, i) : e.name; },
@@ -690,7 +734,7 @@ export default function Files() {
     entryAt: (p) => byPath.get(p) || (() => { try { const s = lord.fs.stat(p); return { name: s.name, path: s.path, dir: s.dir, size: s.size, mtime: s.mtime }; } catch (err) { return null; } })(),
   };
   // columns only in folders; elsewhere, the list
-  const view = tab.view === 'columns' && loc.type !== 'dir' ? 'list' : tab.view;
+  const view = shownView;
   const entriesOf = (dir) => { try { return lord.fs.list(dir).filter((x) => hidden || !x.name.startsWith('.')).map((x) => ({ ...x, path: `${dir}/${x.name}` })); } catch (e) { return []; } };
   const freeSpace = useMemo(() => { try { return curDir && !curDir.includes('/.local/share/lordos/remote/') ? fs.free(curDir) : null; } catch (e) { return null; } }, [curDir, version]);
   const quickEntry = quick ? (first || flat[0]) : null;
@@ -858,6 +902,9 @@ export default function Files() {
         <View style={{ height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: spacing.m,
           backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.025)' }}>
           <Hairline edge="top" />
+          {zoomable && (
+            <ZoomControl t={t} zoom={zoom} slider={!narrow} onStep={zoomStep} onSet={setZoom} />
+          )}
           {job ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
               <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' }}>{tr(job.move ? 'files.job.moving' : 'files.job.copying', { name: fs.basename(job.src) })}</Text>
