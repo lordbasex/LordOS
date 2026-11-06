@@ -42,6 +42,10 @@
 # (LORDOS_HWDATA_PUB=<public.pem> names a throwaway test key, for the staging target only). A lordos that
 # depends on it is refused while the pool has no lordos-hwdata.
 #
+# lordos-rclone (0.8.8.5, docs/CLOUD.md 3.1): upstream rclone for Cloud and Connect to Server, one package per
+# architecture from tools/iso/mkdeb-rclone.sh, added like any .deb with the release. A lordos that depends on it
+# is refused while the pool has none of its architecture.
+#
 # lordos-disk-formats (0.8.7, docs/FILES.md): the Store's Disk Formats item, from tools/iso/mkdeb-diskformats.sh, one
 # package per architecture, added like any .deb with the release. Its entry in apt/catalog.json has "section": "commercial".
 #
@@ -318,6 +322,15 @@ do_build() {
             esac
         done
     fi
+    # (0.8.8.5) and on lordos-rclone of its own architecture (tools/iso/mkdeb-rclone.sh)
+    for d in $(find "$TREE/pool/main/l/lordos" -name 'lordos_*.deb' 2>/dev/null | sed "s#^$TREE/##"); do
+        case "$(debtool dpkg-deb -f "$d" Depends)" in
+            *lordos-rclone*)
+                a=$(debtool dpkg-deb -f "$d" Architecture)
+                [ -n "$(find "$TREE/pool/main/l/lordos-rclone" -name "lordos-rclone_*_$a.deb" 2>/dev/null | head -n 1)" ] \
+                    || die "$d depends on lordos-rclone and the pool has none for $a: add tools/iso/mkdeb-rclone.sh's package" ;;
+        esac
+    done
     # the sources of the mirrored copyleft packages, next to them and unindexed (append-only too)
     if [ "$RPI" = 1 ]; then
         for d in $(rpi_src_import) ; do

@@ -223,6 +223,11 @@ echo "   $(basename "$DEB") ($(du -h "$DEB" | cut -f1))"
 # the tested-hardware snapshot lordos depends on: the same Architecture: all package as the ISO's
 HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
 echo "   $(basename "$HWDEB")"
+# rclone for Cloud (docs/CLOUD.md 3.1): built apart, with Go, by tools/iso/mkdeb-rclone.sh <folder> <arch>; RCLONE_DEB names it,
+# else the newest lordos-rclone_*_<arch>.deb in the output folder
+RCDEB=${RCLONE_DEB:-$(ls "$OUT"/lordos-rclone_*_"$ARCH".deb 2>/dev/null | sort -V | tail -n 1)}
+[ -f "$RCDEB" ] || { echo "no lordos-rclone_<version>_$ARCH.deb: build it with tools/iso/mkdeb-rclone.sh $OUT $ARCH (needs Go), or set RCLONE_DEB" >&2; exit 1; }
+echo "   $(basename "$RCDEB")"
 
 # ---- 2. the image's system ----
 echo "== debootstrap $SUITE $ARCH (minbase)"
@@ -297,8 +302,9 @@ in_root "$CH" apt-get install -y -q --no-install-recommends $PKGS_RPI_EXTRA >> "
     echo "   warning: $PKGS_RPI_EXTRA were not installed (see $WORK/apt.log)"
 cp "$DEB" "$CH/tmp/lordos.deb"
 cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
-in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
-rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
+cp "$RCDEB" "$CH/tmp/lordos-rclone.deb"
+in_root "$CH" apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos-rclone.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb" "$CH/tmp/lordos-rclone.deb"
 # the browsers' defaults, the same as the ISO's
 sh "$ROOT/tools/iso/browser-defaults.sh" "$CH"
 

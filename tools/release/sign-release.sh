@@ -30,6 +30,14 @@ if echo "$files" | grep -q '^lordos_.*\.deb$' && ! echo "$files" | grep -q '^lor
     echo "copy the current one (same bytes as the APT pool) or set ALLOW_NO_HWDATA=1 if this lordos doesn't depend on it" >&2
     exit 1
 fi
+# since 0.8.8.5 lordos depends on lordos-rclone (docs/CLOUD.md 3.1), one per architecture: install.sh takes it from here too
+for d in $(echo "$files" | grep '^lordos_.*_[a-z0-9]*\.deb$' || true); do
+    a=${d##*_}; a=${a%.deb}
+    if ! echo "$files" | grep -q "^lordos-rclone_.*_$a\.deb\$" && [ "${ALLOW_NO_RCLONE:-0}" != 1 ]; then
+        echo "no lordos-rclone_<version>_$a.deb in $dir for $d (tools/iso/mkdeb-rclone.sh), or ALLOW_NO_RCLONE=1 if that lordos doesn't depend on it" >&2
+        exit 1
+    fi
+done
 if command -v sha256sum >/dev/null; then sum() { sha256sum "$@"; }; else sum() { shasum -a 256 "$@"; }; fi
 # shellcheck disable=SC2086
 sum $files > SHA256SUMS

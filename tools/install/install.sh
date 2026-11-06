@@ -82,7 +82,8 @@ Options:
   --version X               install release X (for example 0.8.0-beta); default: the latest
   --deb FILE                install a local lordos_<version>_<arch>.deb instead of downloading;
                             a SHA256SUMS file next to it is verified when present, and the
-                            lordos-hwdata_<date>_all.deb it needs is taken from the same folder
+                            lordos-hwdata_<date>_all.deb and lordos-rclone_<version>_<arch>.deb
+                            it needs are taken from the same folder
   --user NAME               the user to set up (default: the user who ran sudo)
   --keep-display-manager    do not disable the current display manager (LordOS is not
                             enabled at boot then; see the final message)
@@ -419,6 +420,7 @@ get_package() {
     check_deb_file "$DEB_PATH"
     ok "package: lordos $DEB_VERSION ($ARCH)"
     get_hwdata
+    get_rclone
 }
 
 # (0.8.7) lordos depends on lordos-hwdata, the signed tested-hardware snapshot of System Information
@@ -471,6 +473,55 @@ get_hwdata() {
     ok "package: lordos-hwdata $(dpkg-deb -f "$HW_PATH" Version) (the tested-hardware snapshot)"
 }
 
+# (0.8.8.5) lordos depends on lordos-rclone, upstream rclone at /usr/lib/lordos/rclone for Cloud and Connect to
+# Server (docs/CLOUD.md 3.1): one package per architecture in the same release, taken and checked as above.
+get_rclone() {
+    RC_PATH=""
+    RC_NEEDED=0
+    case "$(dpkg-deb -f "$DEB_PATH" Depends 2>/dev/null || true)" in *lordos-rclone*) RC_NEEDED=1 ;; *) return 0 ;; esac
+    rcsums=""; rcbase=""; rcdir=""; rcsha=""
+    if [ -n "$LOCAL_DEB" ]; then
+        rcdir=$(dirname "$LOCAL_DEB")
+        [ -f "$rcdir/SHA256SUMS" ] && rcsums="$rcdir/SHA256SUMS"
+    else
+        rcsums="$TMP/SHA256SUMS"
+    fi
+    if [ -n "$rcsums" ]; then
+        rcbase=$(awk '{ n = $2; sub(/^\*/, "", n); print n }' "$rcsums" \
+            | grep -E "^lordos-rclone_[0-9][0-9.]*-[0-9]+_${ARCH}\\.deb\$" | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    else
+        rcbase=$(for f in "$rcdir"/lordos-rclone_*_"$ARCH".deb; do [ -f "$f" ] && basename "$f"; done \
+            | grep -E "^lordos-rclone_[0-9][0-9.]*-[0-9]+_${ARCH}\\.deb\$" | sort -t _ -k 2,2 -V | tail -n 1 || true)
+    fi
+    # an upgrade with the LordOS repository already configured: apt takes it from there (install_package)
+    [ -n "$rcbase" ] || return 0
+    if [ -n "$LOCAL_DEB" ]; then
+        [ -f "$rcdir/$rcbase" ] || return 0
+        cp "$rcdir/$rcbase" "$TMP/$rcbase"
+    else
+        fetch "$base_url/$rcbase" "$TMP/$rcbase" || die "could not download $rcbase"
+    fi
+    if [ -n "$rcsums" ]; then
+        rcsha=$(sum_for "$rcsums" "$rcbase")
+        [ "$(sha256_of "$TMP/$rcbase")" = "$rcsha" ] || die "SHA-256 mismatch for $rcbase: the file is corrupted or not the released one. Nothing was installed."
+        ok "SHA-256 of $rcbase matches SHA256SUMS"
+    else
+        warn "no SHA256SUMS next to $LOCAL_DEB: the checksum of $rcbase was not verified (you provided this file)."
+    fi
+    chmod 644 "$TMP/$rcbase"
+    RC_PATH="$TMP/$rcbase"
+    if [ -n "$ROOT_TMP" ]; then
+        as_root install -m 644 "$RC_PATH" "$ROOT_TMP/$rcbase" || die "could not copy $rcbase for installation"
+        RC_PATH="$ROOT_TMP/$rcbase"
+    fi
+    if [ -n "$rcsha" ]; then
+        [ "$(sha256_of "$RC_PATH")" = "$rcsha" ] || die "SHA-256 mismatch for $rcbase after copying it: refusing to install"
+    fi
+    [ "$(dpkg-deb -f "$RC_PATH" Package 2>/dev/null || true)" = lordos-rclone ] || die "$rcbase is not the lordos-rclone package"
+    [ "$(dpkg-deb -f "$RC_PATH" Architecture 2>/dev/null || true)" = "$ARCH" ] || die "$rcbase is not a $ARCH package"
+    ok "package: lordos-rclone $(dpkg-deb -f "$RC_PATH" Version) (rclone for Cloud)"
+}
+
 # ---------------------------------------------------------------- install
 
 apt_install() {
@@ -497,8 +548,11 @@ install_package() {
     if [ "$HW_NEEDED" = 1 ] && [ -z "$HW_PATH" ] && ! apt-cache show lordos-hwdata >/dev/null 2>&1; then
         die "this release's lordos needs lordos-hwdata, which is neither next to it nor in a configured repository. Nothing was changed."
     fi
+    if [ "$RC_NEEDED" = 1 ] && [ -z "$RC_PATH" ] && ! apt-cache show lordos-rclone >/dev/null 2>&1; then
+        die "this release's lordos needs lordos-rclone, which is neither next to it nor in a configured repository. Nothing was changed."
+    fi
     # shellcheck disable=SC2086 # $extras is a list of package names; $HW_PATH is one path or empty
-    apt_install $HW_PATH "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
+    apt_install $HW_PATH $RC_PATH "$DEB_PATH" $extras || die "apt-get could not install LordOS (see the messages above). Nothing else was changed."
     if [ -n "$was" ]; then changed "package lordos $was replaced by $DEB_VERSION"
     else changed "package lordos $DEB_VERSION installed (with its Debian dependencies)"; fi
     if [ -n "$extras" ]; then changed "extra packages ensured:$extras"; fi
@@ -913,6 +967,8 @@ do_install() {
     ROOT_TMP=""
     HW_PATH=""
     HW_NEEDED=0
+    RC_PATH=""
+    RC_NEEDED=0
     trap cleanup_tmp EXIT INT TERM
     step "Getting the package"
     get_package

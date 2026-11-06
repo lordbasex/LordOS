@@ -79,6 +79,11 @@ mkdir -p "$CH" "$IMG/live" "$IMG/boot/grub" "$OUT"
 sh tools/iso/mkdeb.sh "$DEB"
 HWDEB=$(sh tools/iso/mkdeb-hwdata.sh "$OUT")
 echo "   $(basename "$HWDEB")"
+# rclone for Cloud (docs/CLOUD.md 3.1): built apart, with Go, by tools/iso/mkdeb-rclone.sh <folder> <arch>; RCLONE_DEB names it,
+# else the newest lordos-rclone_*_<arch>.deb in the output folder
+RCDEB=${RCLONE_DEB:-$(ls "$OUT"/lordos-rclone_*_"$ARCH".deb 2>/dev/null | sort -V | tail -n 1)}
+[ -f "$RCDEB" ] || { echo "no lordos-rclone_<version>_$ARCH.deb: build it with tools/iso/mkdeb-rclone.sh $OUT $ARCH (needs Go), or set RCLONE_DEB" >&2; exit 1; }
+echo "   $(basename "$RCDEB")"
 
 # 2. sistema base
 echo "== debootstrap $SUITE (minbase)"
@@ -111,13 +116,14 @@ in_ch apt-get install -y -q --no-install-recommends $PKGS_BASE $PKGS_LORDOS $PKG
     >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 cp "$DEB" "$CH/tmp/lordos.deb"
 cp "$HWDEB" "$CH/tmp/lordos-hwdata.deb"
-in_ch apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
+cp "$RCDEB" "$CH/tmp/lordos-rclone.deb"
+in_ch apt-get install -y -q --no-install-recommends /tmp/lordos-hwdata.deb /tmp/lordos-rclone.deb /tmp/lordos.deb >> "$WORK/apt.log" 2>&1 || { tail -30 "$WORK/apt.log"; exit 1; }
 # the browsers' defaults (their own bar with LordOS's window buttons), shared with the Pi image
 sh tools/iso/browser-defaults.sh "$CH"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-bluez.conf"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$CH/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$CH/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
-rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb"
+rm -f "$CH/tmp/lordos.deb" "$CH/tmp/lordos-hwdata.deb" "$CH/tmp/lordos-rclone.deb"
 
 # 3. configuration
 echo "== configuration"
