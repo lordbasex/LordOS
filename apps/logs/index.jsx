@@ -11,7 +11,7 @@
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
   logs, fs, formatDate, formatNumber, addListener,
-  Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale,
+  Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -172,7 +172,9 @@ const LEVELS = { all: null, info: 6, warning: 4, error: 3 };
 export default function Registros() {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const [src, setSrc] = useState(() => ({ kind: 'user' }));        // { kind: 'user'|'system'|'kernel'|'lordos', file }
+  const { args } = useAppWindow() || {};
+  // opened on one LordOS log (Settings → Cloud → Show Log: { file: 'cloud.log' })
+  const [src, setSrc] = useState(() => (/^[a-z0-9._-]+\.log$/.test(args?.file || '') ? { kind: 'lordos', file: args.file } : { kind: 'user' }));        // { kind: 'user'|'system'|'kernel'|'lordos', file }
   const [items, setItems] = useState([]);
   const [level, setLevel] = useState('all');
   const [range, setRange] = useState('hour');

@@ -113,6 +113,16 @@ check "the password is in the keyring (stand-in), obscured by rclone" sh -c 'cas
 check "no password in accounts.json" sh -c "! grep -q davpass '$H/.config/lordos/cloud/accounts.json'"
 check "nothing secret in any file of ~/.config/lordos/cloud" sh -c "! grep -rq davpass '$H/.config/lordos/cloud'"
 
+# Sign In Again for a server account: add with the same name is an update of that account
+OLD=$(cmd secret "$ID")
+r=$(cmd add webdav work "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"davpass\"}")
+check "add with an existing account's name: the same account" has "$r" "\"id\":\"$ID\""
+r=$(cmd add s3 Work "{}")
+check "an existing name of another kind is refused" has "$r" 'cloud.nameTaken'
+for i in $(seq 40); do NEW=$(cmd secret "$ID"); [ "$NEW" != "$OLD" ] && break; sleep 0.25; done
+check "new credentials saved in the keyring" test "$NEW" != "$OLD"
+r=$(cmd wait '"mounted":true' 30)
+check "still one account, mounted again" sh -c 'case "$1" in *"\"id\":\"c"*"\"id\":\"c"*) exit 1;; *"\"mounted\":true"*) exit 0;; esac; exit 1' x "$(cmd state)"
 check "read through the mount" test "$(cat "$M/notes.txt")" = hello
 want=$(sha256sum <"$S/Projects/big.bin" | cut -c1-64)
 check "a 5 MB file comes down whole" test "$(sha256sum <"$M/Projects/big.bin" | cut -c1-64)" = "$want"

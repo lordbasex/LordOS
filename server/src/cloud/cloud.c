@@ -83,6 +83,7 @@ static struct {
     char ebuf[4096];
     size_t el;
     char cid[256], csec[256];
+    char update[16];                /* Sign In Again: the existing account */
 } si;
 
 static struct { char path[PATH_MAX]; char account[16]; int up; long long at; } recent[RECENT_MAX];
@@ -811,14 +812,14 @@ static int answer_states(const char *id, JDoc *d, char *msg, size_t mn) {
 }
 
 /* config/create with the non-secret options, the preset and the secrets (a JSON object's text, or NULL).
- * fresh: secrets are plain and the state machine is answered; otherwise they are what config/get gave (obscured). */
+ * fresh 1: a new account, secrets plain, the state machine answered; 2: the same for an existing account (Sign In
+ * Again, new credentials: config/update, so what isn't given stays); 0: what config/get gave (obscured), at start. */
 static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, size_t mn) {
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"name\":");
     jb_str(&b, a->id);
-    jb_raw(&b, ",\"type\":");
-    jb_str(&b, a->k->type);
+    if (fresh != 2) { jb_raw(&b, ",\"type\":"); jb_str(&b, a->k->type); }
     jb_raw(&b, ",\"parameters\":{");
     int first = 1;
     if (a->k->preset) { jb_raw(&b, a->k->preset); first = 0; }
@@ -844,7 +845,7 @@ static int create_remote(Acc *a, const char *secret_json, int fresh, char *msg, 
     }
     jb_printf(&b, "},\"opt\":{\"nonInteractive\":true,%s}}", fresh ? "\"obscure\":true" : "\"noObscure\":true");
     JDoc d;
-    int st = b.oom ? -1 : rcj(RCM_CREATE, b.p, &d, msg, mn, RC_LONG);
+    int st = b.oom ? -1 : rcj(fresh == 2 ? RCM_UPDATE : RCM_CREATE, b.p, &d, msg, mn, RC_LONG);
     explicit_bzero(b.p, b.n);
     jb_free(&b);
     if (st != 200) { if (d.root) json_free(&d); return -1; }
@@ -955,6 +956,17 @@ static int mount_acc(Acc *a) {
     if (st == 200) { check_links(a); about_acc(a); cf_kick(); }
     cl_changed();
     return st == 200 ? 0 : -1;
+}
+
+static int mount_acc(Acc *a);
+static void bring_up(Acc *a);
+/* an account that isn't in this rclone yet (keyring locked, or it failed) before new credentials are merged in */
+static void bring_up_config(Acc *a) {
+    char *sec = NULL;
+    int r = secrets ? secrets->get(a->id, &sec) : 1;
+    char msg[256];
+    if (!create_remote(a, r == 0 ? sec : NULL, 0, msg, sizeof msg)) { pthread_mutex_lock(&cl_mu); a->configured = 1; a->locked = 0; pthread_mutex_unlock(&cl_mu); }
+    wipe_free(sec);
 }
 
 /* brings an account up in this rclone: secrets from the keyring, config/create, mount */
@@ -1074,7 +1086,17 @@ static void job_add(Job *j) {
     pthread_mutex_unlock(&cl_mu);
     if (!a) return;
     char msg[256] = "";
-    if (ensure_daemon() || create_remote(a, j->a, 1, msg, sizeof msg)) {
+    int upd = j->flag, bad = ensure_daemon();
+    if (!bad && upd) {
+        /* new credentials for an existing account: unmounted, merged into its remote, mounted again */
+        if (a->mounted) unmount_acc(a);
+        pthread_mutex_lock(&cl_mu);
+        a->err[0] = a->message[0] = 0;
+        pthread_mutex_unlock(&cl_mu);
+        if (!a->configured) bring_up_config(a);
+    }
+    if (bad || create_remote(a, j->a, upd ? 2 : 1, msg, sizeof msg)) {
+        if (upd && !bad) mount_acc(a);              /* as it was; the error says the new settings didn't take */
         pthread_mutex_lock(&cl_mu);
         cpy(a->err, sizeof a->err, cl_running ? code_of(msg, 0) : "cloud.notRunning");
         if (!strcmp(a->err, "cloud.failed")) cpy(a->err, sizeof a->err, "cloud.addFailed");
@@ -1230,11 +1252,49 @@ static void signin_end(const char *phase, const char *error) {
     cpy(si.error, sizeof si.error, error);
 }
 
+/* Sign In Again: the new token goes to the same account (same id, same folder) */
+static void signin_again(const char *tok) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(si.update);
+    if (!a) { signin_end("failed", "cloud.notFound"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
+    if (si.cid[0]) { kv_set(&a->p, "client_id", si.cid); a->own_client = 1; }
+    JBuf s;
+    jb_init(&s);
+    jb_raw(&s, "{\"token\":");
+    jb_str(&s, tok);
+    if (si.csec[0]) { jb_raw(&s, ",\"client_secret\":"); jb_str(&s, si.csec); }
+    jb_raw(&s, "}");
+    cpy(si.account, sizeof si.account, a->id);
+    signin_end("waiting", "");
+    a->err[0] = a->message[0] = 0;
+    pthread_mutex_unlock(&cl_mu);
+    if (a->mounted) unmount_acc(a);
+    if (!a->configured) bring_up_config(a);
+    char msg[256] = "";
+    int ok = !s.oom && !create_remote(a, s.p, 2, msg, sizeof msg);
+    if (!s.oom) explicit_bzero(s.p, s.n);
+    jb_free(&s);
+    if (!ok) {
+        pthread_mutex_lock(&cl_mu);
+        signin_end("failed", "cloud.signinFailed");
+        pthread_mutex_unlock(&cl_mu);
+        fprintf(stderr, "cloud: signing in again failed: %s\n", msg);
+        mount_acc(a);
+        return;
+    }
+    finish_new(a);
+    pthread_mutex_lock(&cl_mu);
+    cpy(si.phase, sizeof si.phase, "done");
+    pthread_mutex_unlock(&cl_mu);
+    cl_changed();
+}
+
 /* the token came: a new account */
 static void signin_token(void) {
     char tok[16384];
     if (!cloud_auth_token(si.out, tok, sizeof tok)) { pthread_mutex_lock(&cl_mu); signin_end("failed", "cloud.signinFailed"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
     pthread_mutex_lock(&cl_mu);
+    if (si.update[0]) { pthread_mutex_unlock(&cl_mu); signin_again(tok); explicit_bzero(tok, sizeof tok); return; }
     Acc *a = NULL;
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
     const CloudKind *k = cloud_kind(si.kind);
@@ -1818,8 +1878,14 @@ char *cloud_begin_signin(const char *kind, const char *name, const char *cid, co
     if ((cid && cid[0] && (strlen(cid) > 200 || !cloud_value_ok(cid))) || (csec && csec[0] && (strlen(csec) > 200 || !cloud_value_ok(csec)))) return err_json("cloud.badValue");
     pthread_mutex_lock(&cl_mu);
     if (si.on && !strcmp(si.phase, "waiting")) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.busy"); }
-    if (!name_free(name, NULL)) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.nameTaken"); }
-    if (naccounts() >= ACC_MAX) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.tooMany"); }
+    /* the name of an account of the same kind: Sign In Again for that account */
+    char upd[16] = "";
+    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && !strcasecmp(cl_acc[i].name, name)) {
+        if (cl_acc[i].k != k) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.nameTaken"); }
+        cpy(upd, sizeof upd, cl_acc[i].id);
+    }
+    if (!upd[0] && !name_free(name, NULL)) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.nameTaken"); }
+    if (!upd[0] && naccounts() >= ACC_MAX) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.tooMany"); }
     pthread_mutex_unlock(&cl_mu);
     int fo, fe;
     pid_t p = spawn_authorize(k, cid, csec, &fo, &fe);
@@ -1850,6 +1916,8 @@ char *cloud_begin_signin(const char *kind, const char *name, const char *cid, co
     cpy(si.url, sizeof si.url, url);
     cpy(si.cid, sizeof si.cid, cid);
     cpy(si.csec, sizeof si.csec, csec);
+    cpy(si.update, sizeof si.update, upd);
+    if (upd[0]) cpy(si.account, sizeof si.account, upd);
     si.expires_ms = now_ms() + SIGNIN_S * 1000LL;
     si.pid = p;
     si.fo = fo;
@@ -1880,7 +1948,7 @@ int cloud_signin_url(const char *id, char *url, size_t n) {
 void cloud_cancel_signin(const char *id) {
     pthread_mutex_lock(&cl_mu);
     if (si.on && id && !strcmp(si.id, id)) {
-        if (!strcmp(si.phase, "waiting") && si.account[0]) { pthread_mutex_unlock(&cl_mu); return; }   /* already setting it up */
+        if (!strcmp(si.phase, "waiting") && si.pid <= 0) { pthread_mutex_unlock(&cl_mu); return; }   /* the token came: setting it up */
         signin_end("failed", "cloud.signinCancelled");
         si.on = 0;
     }
@@ -1899,13 +1967,17 @@ char *cloud_add(const char *kind, const char *name, const char *fields) {
     pthread_mutex_lock(&cl_mu);
     const KindInfo *ki = kind_info(k->kind);
     char *res = NULL;
-    Acc *a = NULL;
+    Acc *a = NULL, *upd = NULL;
     JBuf sec;
     jb_init(&sec);
     jb_raw(&sec, "{");
     Params np = { .n = 0 };
     if (!ki) { res = err_json("cloud.notReady"); goto out; }
-    if (!name_free(name, NULL)) { res = err_json("cloud.nameTaken"); goto out; }
+    /* the name of an account of the same kind: new credentials or settings for that account (same id, same folder) */
+    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && !strcasecmp(cl_acc[i].name, name)) upd = &cl_acc[i];
+    if (upd && upd->k != k) { res = err_json("cloud.nameTaken"); goto out; }
+    if (!upd && !name_free(name, NULL)) { res = err_json("cloud.nameTaken"); goto out; }
+    a = upd;
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
     if (!a) { res = err_json("cloud.tooMany"); goto out; }
     for (const JVal *x = d.root->kid; x; x = x->next) {
@@ -1939,7 +2011,7 @@ char *cloud_add(const char *kind, const char *name, const char *fields) {
             jb_str(&sec, v);
         } else kv_set(&np, x->key, v);
     }
-    for (int i = 0; i < ki->n; i++) {
+    for (int i = 0; i < ki->n && !upd; i++) {
         if (!ki->required[i]) continue;
         const JVal *x = json_get(d.root, ki->name[i]);
         if (!x || x->type != J_STR || !x->str[0]) {
@@ -1954,6 +2026,10 @@ char *cloud_add(const char *kind, const char *name, const char *fields) {
         }
     }
     jb_raw(&sec, "}");
+    if (upd) {
+        for (int i = 0; i < np.n; i++) kv_set(&a->p, np.kv[i].key, np.kv[i].val);
+        goto made;
+    }
     memset(a, 0, sizeof *a);
     a->used = 1;
     a->k = k;
@@ -1964,6 +2040,7 @@ char *cloud_add(const char *kind, const char *name, const char *fields) {
     cpy(a->name, sizeof a->name, name);
     a->p = np;
     np.n = 0;
+made:
     a->retry_at = time(NULL) + 3600;            /* the add job brings it up, not the tick */
     {
         JBuf r;
@@ -1979,7 +2056,7 @@ out:
     kv_clear(&np);
     if (a && !sec.oom) {
         Job *j = new_job(J_ADD, a->id, sec.p, NULL);
-        if (j) push_job(j);
+        if (j) { j->flag = upd != NULL; push_job(j); }
     }
     if (!sec.oom) explicit_bzero(sec.p, sec.n);
     jb_free(&sec);

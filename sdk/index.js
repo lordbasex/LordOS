@@ -128,6 +128,7 @@ export { lan } from './lan.js';                                  // Files → Ne
 export { smart, smartSummaries, useSmartSummaries, diskTempLimit, diskAlertPrefs, setDiskAlerts } from './smart.js';
 export { parseSmartctl, prettyAttrName, ATTR_KEYS, HEALTH_RANK } from './smartparse.js';
 export { backup, useBackup, backupStatus } from './backup.js';   // Backups (docs/SYSTEM.md)
+export { cloud, useCloud, cloudState } from './cloud.js';   // Cloud (docs/CLOUD.md 17)
 export { cleaner } from './cleaner.js';   // Cleaner (docs/CLEANER-ARCHITECTURE.md)
 export { statusWord } from './cleanerstatus.jsx';
 export { cleanerPalette, CLEANER_THEMES } from './cleanertheme.js';
