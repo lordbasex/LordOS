@@ -274,6 +274,14 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 char idh[VM_HOSTNAME_MAX + 1] = "";
                 set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
             }
+            set_str(c, o, "devices", m.devices == VM_DEV_COMPAT ? "compat" : "virtio");
+            set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
+            set_int(c, o, "dataDisks", m.n_data);
+            {
+                char ip[PATH_MAX + 320];
+                snprintf(ip, sizeof ip, "%s/imported.json", dir);
+                JS_SetPropertyStr(c, o, "imported", JS_NewBool(c, !access(ip, F_OK)));
+            }
             set_str(c, o, "created", m.created);
             set_str(c, o, "error", "");
         } else {
@@ -301,7 +309,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 /* ---- creating (lord-vm --create, in the background) ---- */
 
 #define MAX_JOBS 4
-typedef struct { int used, fd, done, ok, exit; pid_t pid; char out[2048]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
+typedef struct { int used, fd, done, ok, exit; pid_t pid; char out[16384]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
@@ -460,7 +468,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[24], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[32], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -490,6 +498,23 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         const char *cs = JS_ToCString(c, v);
         if (cs && (!strcmp(cs, "off") || !strcmp(cs, "to-guest") || !strcmp(cs, "from-guest") || !strcmp(cs, "both"))) { snprintf(clip, sizeof clip, "%s", cs); args[n++] = "--clipboard"; args[n++] = clip; } else ok = 0;
         if (cs) JS_FreeCString(c, cs);
+    }
+    JS_FreeValue(c, v);
+    char devs[16] = "", nicm[24] = "";
+    v = JS_GetPropertyStr(c, argv[1], "devices");
+    if (JS_IsString(v)) {
+        const char *ds = JS_ToCString(c, v);
+        if (ds && (!strcmp(ds, "virtio") || !strcmp(ds, "compat"))) { snprintf(devs, sizeof devs, "%s", ds); args[n++] = "--devices"; args[n++] = devs; } else ok = 0;
+        if (ds) JS_FreeCString(c, ds);
+    }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "nicModel");
+    if (JS_IsString(v)) {
+        const char *ns = JS_ToCString(c, v);
+        int known = 0;
+        for (int k = 0; ns && VM_NIC_MODELS[k]; k++) if (!strcmp(ns, VM_NIC_MODELS[k])) known = 1;
+        if (known) { snprintf(nicm, sizeof nicm, "%s", ns); args[n++] = "--nic-model"; args[n++] = nicm; } else ok = 0;
+        if (ns) JS_FreeCString(c, ns);
     }
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
@@ -615,6 +640,13 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         char tmp[1024];
         ssize_t r;
         while ((r = read(j->fd, tmp, sizeof tmp)) > 0) {
+            /* a long job (an import's progress lines) keeps its last part: the newest lines and the final answer */
+            if (j->n + (size_t)r > sizeof j->out - 1) {
+                size_t drop = j->n + (size_t)r - (sizeof j->out - 1);
+                if (drop > j->n) drop = j->n;
+                memmove(j->out, j->out + drop, j->n - drop);
+                j->n -= drop;
+            }
             size_t k = (size_t)r < sizeof j->out - 1 - j->n ? (size_t)r : sizeof j->out - 1 - j->n;
             memcpy(j->out + j->n, tmp, k);
             j->n += k;
@@ -2167,6 +2199,99 @@ static JSValue f_remove_base(JSContext *c, JSValueConst t, int argc, JSValueCons
     return JS_NewBool(c, !used && !unlink(path));
 }
 
+/* ---- importing a machine of another virtualization app (6.22): lord-vm --import-plan and --import-machine ---- */
+
+/* a file or a folder the person chose: absolute, real, readable, no control characters */
+static int user_path(JSContext *c, JSValueConst v, char *out, size_t n) {
+    const char *s = JS_ToCString(c, v);
+    if (!s) return -1;
+    char r[PATH_MAX];
+    struct stat st;
+    int ok = s[0] == '/' && realpath(s, r) && !stat(r, &st) && (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)) && !access(r, R_OK) && strlen(r) < n;
+    JS_FreeCString(c, s);
+    if (!ok) return -1;
+    for (const unsigned char *p = (const unsigned char *)r; *p; p++) if (*p < 0x20 || *p == 0x7f) return -1;
+    memcpy(out, r, strlen(r) + 1);
+    return 0;
+}
+
+static int opt_str(JSContext *c, JSValueConst o, const char *k, char *out, size_t n) {
+    out[0] = 0;
+    if (!JS_IsObject(o)) return 0;
+    JSValue v = JS_GetPropertyStr(c, o, k);
+    int r = 0;
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && strlen(s) < n) snprintf(out, n, "%s", s); else r = -1;
+        if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    return r;
+}
+
+/* importPlan(path, { arch }) → job id; the job's out is the plan's JSON (lord-vm --import-plan) */
+static JSValue f_import_plan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char src[PATH_MAX], arch[16];
+    if (argc < 1 || user_path(c, argv[0], src, sizeof src) || opt_str(c, argc > 1 ? argv[1] : JS_UNDEFINED, "arch", arch, sizeof arch)) return JS_NewInt32(c, 0);
+    if (arch[0] && strcmp(arch, "amd64") && strcmp(arch, "arm64")) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--import-plan", src, arch[0] ? "--arch" : NULL, arch, NULL };
+    return JS_NewInt32(c, spawn_job(args, ""));
+}
+
+/* importMachine({ path, name, arch, devices, network, firmware, vcpus, memoryMb }) → job id; progress lines, then
+ * {"imported":true,"dir":...}. The new folder is ~/Machines/<name>.lordvm, as for create */
+static JSValue f_import(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsObject(argv[0])) return JS_NewInt32(c, 0);
+    char lib[PATH_MAX], src[PATH_MAX], name[VM_NAME_MAX + 8], arch[16], devs[16], net[16], fw[16];
+    JSValue vp = JS_GetPropertyStr(c, argv[0], "path");
+    int bad = library(lib, sizeof lib, 1) || !JS_IsString(vp) || user_path(c, vp, src, sizeof src);
+    JS_FreeValue(c, vp);
+    if (bad || opt_str(c, argv[0], "name", name, sizeof name) || opt_str(c, argv[0], "arch", arch, sizeof arch) ||
+        opt_str(c, argv[0], "devices", devs, sizeof devs) || opt_str(c, argv[0], "network", net, sizeof net) || opt_str(c, argv[0], "firmware", fw, sizeof fw))
+        return JS_NewInt32(c, 0);
+    if (!vm_name_valid(name) || (arch[0] && strcmp(arch, "amd64") && strcmp(arch, "arm64")) || (devs[0] && strcmp(devs, "virtio") && strcmp(devs, "compat")) ||
+        (net[0] && strcmp(net, "shared") && strcmp(net, "isolated")) || (fw[0] && strcmp(fw, "uefi") && strcmp(fw, "bios")))
+        return JS_NewInt32(c, 0);
+    int vcpus = prop_int(c, argv[0], "vcpus"), mem = prop_int(c, argv[0], "memoryMb");
+    if (vcpus < 0 || vcpus > VM_VCPUS_MAX || mem < 0 || mem > VM_MEM_MAX_MB || (mem && mem < VM_MEM_MIN_MB)) return JS_NewInt32(c, 0);
+    char folder[64], dir[PATH_MAX + 80], sv[16], sm[16];
+    folder_name(name, folder, sizeof folder);
+    snprintf(dir, sizeof dir, "%s/%s.lordvm", lib, folder);
+    for (int k = 2; !access(dir, F_OK) && k < 100; k++) snprintf(dir, sizeof dir, "%s/%s %d.lordvm", lib, folder, k);
+    if (!access(dir, F_OK)) return JS_NewInt32(c, 0);
+    snprintf(sv, sizeof sv, "%d", vcpus);
+    snprintf(sm, sizeof sm, "%d", mem);
+    char *args[24];
+    int n = 0;
+    args[n++] = "lord-vm"; args[n++] = "--import-machine"; args[n++] = src; args[n++] = dir; args[n++] = "--name"; args[n++] = name;
+    if (arch[0]) { args[n++] = "--arch"; args[n++] = arch; }
+    if (devs[0]) { args[n++] = "--devices"; args[n++] = devs; }
+    if (net[0]) { args[n++] = "--network"; args[n++] = net; }
+    if (fw[0]) { args[n++] = "--firmware"; args[n++] = fw; }
+    if (vcpus) { args[n++] = "--vcpus"; args[n++] = sv; }
+    if (mem) { args[n++] = "--memory"; args[n++] = sm; }
+    args[n] = NULL;
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+
+/* importInfo(dir) → imported.json's text (where it came from, what changed), or "" */
+static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewString(c, "");
+    char p[PATH_MAX + 32];
+    snprintf(p, sizeof p, "%s/imported.json", dir);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return JS_NewString(c, "");
+    char buf[8192];
+    ssize_t r = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    buf[r > 0 ? r : 0] = 0;
+    return JS_NewString(c, buf);
+}
+
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
@@ -2181,6 +2306,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
     JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 

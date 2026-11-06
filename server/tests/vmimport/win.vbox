@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<VirtualBox xmlns="http://www.virtualbox.org/" version="1.19-windows">
+  <Machine uuid="{11111111-2222-3333-4444-555566667777}" name="Windows guest" OSType="Windows11_64" stateFile="Snapshots/2026-11-01.sav">
+    <MediaRegistry><HardDisks><HardDisk uuid="{aaaaaaaa-bbbb-cccc-dddd-eeeeffff0011}" location="win.vdi" format="VDI" type="Normal"/></HardDisks></MediaRegistry>
+    <Hardware uuid="{01234567-89ab-cdef-0123-456789abcdef}">
+      <CPU count="4"/>
+      <Memory RAMSize="4096"/>
+      <Firmware type="EFI"/>
+      <TrustedPlatformModule type="v2_0"/>
+      <Network><Adapter slot="0" enabled="true" MACAddress="08:00:27:12:34:56" type="82545EM"><BridgedInterface name="eth0"/></Adapter></Network>
+      <StorageControllers>
+        <StorageController name="SATA" type="AHCI" PortCount="2">
+          <AttachedDevice type="HardDisk" port="0" device="0"><Image uuid="{aaaaaaaa-bbbb-cccc-dddd-eeeeffff0011}"/></AttachedDevice>
+        </StorageController>
+      </StorageControllers>
+    </Hardware>
+  </Machine>
+</VirtualBox>

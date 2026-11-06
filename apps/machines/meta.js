@@ -21,6 +21,7 @@ export function readMeta(dir) {
       if (typeof j.keepAwake === 'boolean') meta.keepAwake = j.keepAwake;
       if (typeof j.profile === 'string' && /^[a-z]{1,16}$/.test(j.profile)) meta.profile = j.profile;
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
+      if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });

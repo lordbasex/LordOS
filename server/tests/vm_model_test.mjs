@@ -214,6 +214,17 @@ const NET = ['2026-11-05T06:11:31.745Z lord-vm 9: machine 3bf "x" (amd64, kvm, 1
   '2026-11-05T06:13:00.000Z network: passt ended (status 0) while the machine stops'].join('\n');
 eq('diag network healed', D.readLog(NET).network.map((x) => x.text.slice(0, 20)), ['network: passt ended', 'network: the network']);
 eq('diag network not on stop', D.readLog(NET).problems.length, 0);
+// ---- the import plan of another app's machine (6.22, migrate.jsx) ----
+const PLAN = '2026-11-05T10:00:00.000Z import: something\n{"kind":"vmx","name":"Work","blockers":[{"code":"saved-state"}],"notes":[{"code":"license"},{"code":"tpm"},{"code":"snapshots-flattened"},{"code":"zzz"}]}';
+const pl = M.parsePlan(PLAN);
+eq('plan parsed', [pl.kind, pl.name], ['vmx', 'Work']);
+eq('plan none', M.parsePlan('lord-vm: nope\n{"progress":1}'), null);
+eq('plan notes in order, unknown ones dropped', M.planNotes(pl), ['snapshots-flattened', 'tpm']);
+eq('plan blockers', M.planBlockers(pl), [{ code: 'saved-state', text: '' }]);
+const pr = M.importProgress('{"progress":12.5,"disk":1,"disks":2}\n2026 import: disk 2\n{"progress":61,"disk":2,"disks":2}\n{"progr');
+eq('import progress', [pr.pct, pr.disk, pr.disks, pr.done], [61, 2, 2, null]);
+eq('import done', M.importProgress('{"progress":100,"disk":1,"disks":1}\n{"imported":true,"dir":"/m/x.lordvm"}').done.dir, '/m/x.lordvm');
+eq('unique names', [M.uniqueName('Work', []), M.uniqueName('Work', ['Work']), M.uniqueName('Work', ['Work', 'Work 2']), M.uniqueName('  ', [])], ['Work', 'Work 2', 'Work 3', 'Imported machine']);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

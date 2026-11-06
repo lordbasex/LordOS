@@ -62,7 +62,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "3", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "4", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -109,7 +109,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
-    n9.schema = 3;
+    n9.schema = 4;
     CHECK(vm_machine_save("/nonexistent-dir", &n9) != VM_OK);
     /* schema 2: base (a .qcow2 in a .shared folder), agent, clipboard; not in a schema 1 file */
     struct { const char *add; int want; } s2[] = {
@@ -127,6 +127,41 @@ static void test_schema(void) {
         CHECK(r == s2[i].want);
         snprintf(t, sizeof t, "%.*s,%s}", (int)strlen(GOOD) - 1, GOOD, s2[i].add);
         CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s2[i].want != VM_OK);    /* never in schema 1 */
+    }
+    /* schema 3 (import, 6.22): an imported machine's hardware; never in schema 1 or 2 */
+    struct { const char *add; int want; } s3[] = {
+        { "\"devices\":\"compat\"", VM_OK }, { "\"devices\":\"fast\"", VM_E_RANGE }, { "\"nic_model\":\"e1000e\"", VM_OK },
+        { "\"nic_model\":\"vmxnet3\"", VM_OK }, { "\"nic_model\":\"ne2k\"", VM_E_RANGE },
+        { "\"extra_nics\":[{\"mac\":\"00:0c:29:aa:bb:cc\",\"model\":\"e1000e\"},{\"mac\":\"00:50:56:01:02:03\",\"model\":\"vmxnet3\"}]", VM_OK },
+        { "\"extra_nics\":[{\"mac\":\"52:54:00:12:ab:cd\",\"model\":\"e1000e\"}]", VM_E_RANGE },
+        { "\"extra_nics\":[{\"mac\":\"01:0c:29:aa:bb:cc\",\"model\":\"e1000e\"}]", VM_E_RANGE }, { "\"extra_nics\":[\"00:0c:29:aa:bb:cc\"]", VM_E_FIELD },
+        { "\"extra_nics\":[{\"mac\":\"00:0c:29:aa:bb:cc\",\"model\":\"ne2k\"}]", VM_E_RANGE }, { "\"extra_nics\":[{\"mac\":\"00:0c:29:aa:bb:cc\"}]", VM_E_FIELD },
+        { "\"extra_nics\":[{\"mac\":\"00:0c:29:aa:bb:cc\",\"model\":\"e1000\",\"x\":1}]", VM_E_FIELD },
+        { "\"cpu_sockets\":1,\"cpu_cores\":3,\"cpu_threads\":1", VM_OK }, { "\"cpu_sockets\":2,\"cpu_cores\":2,\"cpu_threads\":1", VM_E_RANGE },
+        { "\"cpu_sockets\":3", VM_E_RANGE },
+        { "\"smbios\":{\"manufacturer\":\"Example, Inc.\",\"serial\":\"ABC-123\"}", VM_OK }, { "\"smbios\":{\"vendor\":\"x\"}", VM_E_FIELD },
+        { "\"smbios\":{\"serial\":\"tab\\there\"}", VM_E_RANGE }, { "\"smbios\":{\"serial\":\"\u00e9\"}", VM_E_RANGE },
+        { "\"disk_serial\":\"VBaaaaaaaa-1100ffff\"", VM_OK }, { "\"disk_serial\":\"a,b\"", VM_E_RANGE }, { "\"disk_serial\":\"012345678901234567890\"", VM_E_RANGE },
+        { "\"data_disks\":[{\"gb\":10,\"serial\":\"D1\"},{\"gb\":1}]", VM_OK }, { "\"data_disks\":[{\"gb\":0}]", VM_E_RANGE },
+        { "\"data_disks\":[{\"gb\":1,\"file\":\"../../x\"}]", VM_E_FIELD }, { "\"data_disks\":[{\"gb\":1},{\"gb\":1},{\"gb\":1},{\"gb\":1},{\"gb\":1}]", VM_E_RANGE },
+        { "\"rtc\":\"local\"", VM_OK }, { "\"rtc\":\"gmt\"", VM_E_RANGE },
+        { "\"data_disks\":[{\"gb\":1}],\"base\":\"/home/u/Machines/.shared/a.qcow2\"", VM_E_RANGE },
+    };
+    for (size_t i = 0; i < sizeof s3 / sizeof s3[0]; i++) {
+        char t[4096];
+        const char *at = strstr(GOOD, "\"schema\":1");
+        snprintf(t, sizeof t, "%.*s\"schema\":3%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s3[i].add);
+        int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+        if (r != s3[i].want) fprintf(stderr, "  schema 3 %s: got %d (%s)\n", s3[i].add, r, err);
+        CHECK(r == s3[i].want);
+        if (r == VM_OK) {
+            /* the round trip keeps every field */
+            char *jj = vm_machine_json(&m);
+            CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+            free(jj);
+        }
+        snprintf(t, sizeof t, "%.*s\"schema\":2%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s3[i].add);
+        CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s3[i].want != VM_OK);    /* never in schema 2 */
     }
     /* amd64 with bios: no firmware_code */
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
