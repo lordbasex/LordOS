@@ -341,6 +341,9 @@ mocks (Files, FilesMenu, ShareLink, GetInfo, States); the code is `apps/files/cl
 - **File dialog**: a Cloud section with the accounts (not one whose keyring is locked), between Favorites and
   Locations (`cloudPlaces` in `sdk/filepickermodel.js`).
 
+Which providers are verified on LordOS, Add Account's **Not verified yet** part and **Check This Account** (Settings →
+Cloud → an account) are in docs/CLOUD.md section 19; Files shows every account the same way, verified or not.
+
 Tests: `server/tests/cloud_model_test.mjs` (in `run_suites.sh`). Screenshots of every screen, light and dark, were taken
 on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"cloudDevMock": true` in settings.json).
 

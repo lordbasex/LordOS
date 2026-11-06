@@ -55,7 +55,8 @@ const TREES = {
 export function installCloudMock(home, scenario = '') {
   const now = Date.now();
   const mount = (name) => `${home}/Cloud/${name}`;
-  const acc = (id, name, kind, provider, about, extra = {}) => ({ id, name, kind, provider, mount: mount(name), state: 'ok', about, cacheBytes: 0, keptBytes: 0,
+  const groupOf = (kind) => (PROVIDERS.find((x) => x[0] === kind) || [])[2] || 'server';
+  const acc = (id, name, kind, provider, about, extra = {}) => ({ id, name, kind, provider, group: groupOf(kind), mount: mount(name), state: 'ok', about, cacheBytes: 0, keptBytes: 0,
     up: { files: 0, bytes: 0, done: 0 }, down: { files: 0, bytes: 0, done: 0 }, kept: [], linksSupported: true, ...extra });
   const st = {
     service: { running: true, version: '1.75.2', uptimeS: 5400, rssKb: 41 * 1024, restarts: 0 },
@@ -172,7 +173,10 @@ export function installCloudMock(home, scenario = '') {
       const out = {};
       for (const p of paths) {
         if (!ofPath(p) || p === ofPath(p).mount) continue;
-        let s = status[p] || (keptIn(p) ? 'kept' : 'cloud');
+        // a file made here since (Check This Account's) is on this computer
+        let made = false;
+        if (!status[p]) { try { made = !lord.fs.stat(p).dir; } catch (e) { made = false; } }
+        let s = status[p] || (keptIn(p) ? 'kept' : made ? 'here' : 'cloud');
         if (keptIn(p) && s !== 'up' && s !== 'error') s = 'kept';
         const a = ofPath(p);
         if (s === 'down') out[p] = { st: s, pct: a.down.bytes ? a.down.done / a.down.bytes : 0.6 };

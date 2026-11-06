@@ -9,6 +9,7 @@ import * as M from '../../sdk/cloudmodel.js';
 import { glyphPixels, ringPixels, GLYPH_KINDS, glyphCacheSize } from '../../sdk/cloudglyphs.js';
 import { cloudPlaces, cloudRoot, pathCrumbs } from '../../sdk/filepickermodel.js';
 import { installCloudMock } from '../../sdk/cloudmock.js';
+import { runCheck, buildReport, issueUrl, checkFolder, randomBytes, hashBytes, aboutFields, checkWorks, CHECK_STEPS, CHECK_SIZE, ISSUE_URL_MAX } from '../../sdk/cloudcheck.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let ok = 0;
@@ -265,6 +266,119 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     const missing = [...new Set([...dynamic, ...named])].filter((k) => !(k.slice(6) in cat));
     eq(`${lang}: every key`, missing, []);
   }
+}
+
+
+// ---- verified providers (docs/CLOUD.md 19) ----
+{
+  const data = JSON.parse(fs.readFileSync(path.join(root, 'assets/cloud/providers.json'), 'utf8'));
+  const v = Object.entries(data.verified || {});
+  eq('verified: only tested kinds, each with since, date and evidence', v.every(([k, e]) => /^[a-z0-9]+$/.test(k) && /^\d+\.\d+\.\d+(\.\d+)?$/.test(e.since) && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
+    && /^(maintainer test: .{20,}|issue #\d+)/.test(e.evidence)), true);
+  eq('verified today', v.map(([k]) => k).sort(), ['s3', 'sftp', 'webdav']);
+  const P = (kind, label, group) => ({ kind, label, group, hint: '', fields: [] });
+  const list = [P('drive', 'Drive', 'oauth'), P('dropbox', 'Dropbox', 'oauth'), P('webdav', 'WebDAV', 'server'), P('sftp', 'SFTP', 'server'), P('smb', 'SMB', 'server'),
+    P('s3', 'S3', 'object'), P('b2', 'Backblaze B2', 'object'), P('crypt', 'Encrypted folder', 'crypt')];
+  const sp = M.splitProviders(list, data);
+  eq('verified first, by kind', sp.verified.map((g) => [g.group, g.items.map((p) => p.kind)]), [['server', ['webdav', 'sftp']], ['object', ['s3']]]);
+  eq('the rest not verified, all of them, closed', [sp.unverified.flatMap((g) => g.items.map((p) => p.kind)), sp.unverifiedCount, sp.open], [['drive', 'dropbox', 'smb', 'b2', 'crypt'], 5, false]);
+  eq('search opens Not verified yet when it matches', [M.splitProviders(list, data, 'drop').open, M.splitProviders(list, data, 'dav').open, M.splitProviders(list, data, '', [], true).open], [true, false, true]);
+  eq('search looks in both', M.splitProviders(list, data, 's').verified.length > 0 && M.splitProviders(list, data, 's').unverifiedCount > 0, true);
+  eq('own app offered: OAuth not verified only', [M.ownAppOffered(list[0], data), M.ownAppOffered(list[2], data), M.ownAppOffered(list[0], { verified: { drive: {} } }), M.ownAppOffered(null, data)], [true, false, false, false]);
+  eq('rclone pages', ['drive', 'gcs', 'nextcloud', 'b2', 'x y'].map(M.rcloneDocsUrl), ['https://rclone.org/drive/', 'https://rclone.org/googlecloudstorage/', 'https://rclone.org/webdav/', 'https://rclone.org/b2/', 'https://rclone.org/overview/']);
+  eq('redirect', M.OAUTH_REDIRECT, 'http://127.0.0.1:53682/');
+}
+
+// ---- Check This Account: the report and GitHub ----
+{
+  const steps = CHECK_STEPS.map((id, i) => ({ id, result: i === 7 ? 'skipped' : 'pass', ms: 10 * i + 0.4, note: i === 7 ? 'noLinks' : '' }));
+  const personal = { name: 'Ana Secret Work', mount: '/home/ana/Cloud/Ana Secret Work', email: 'ana@example.test', message: 'token abc123 for ana@example.test',
+    url: 'https://share.example.test/s/XZk4p9', path: '/home/ana/Cloud/Ana Secret Work/taxes.pdf' };
+  const rep = buildReport({ ...personal, version: '0.8.8.5', arch: 'x86_64', rclone: 'v1.75.2', kind: 'pcloud', label: 'pCloud', verified: false, ownApp: true,
+    aboutFields: aboutFields({ total: 1, used: 2, email: 'ana@example.test' }), linksSupported: true,
+    steps: [...steps, { id: 'secret', result: 'pass', ms: 1, note: 'x' }, { id: 'free', result: 'fail', note: '/home/ana/Cloud/taxes.pdf' }] });
+  eq('report: nothing personal', ['Ana', 'Secret', 'ana@', 'example.test', 'abc123', 'XZk4', 'taxes', '/home'].filter((w) => rep.includes(w)), []);
+  eq('report: what it says', ['LordOS: 0.8.8.5 (x86_64)', 'rclone: v1.75.2', 'Provider: pCloud (pcloud)', 'Verified on LordOS: no', 'Own app: yes', 'Space info: total, used', 'Links supported: yes',
+    '  link      skipped  70 ms      noLinks', 'Result: 9 passed, 1 failed, 1 skipped'].filter((l) => !rep.includes(l)), []);
+  eq('report: only the check\'s steps', rep.includes('secret'), false);
+  eq('report: an odd version or label stays plain', buildReport({ version: 'x\nEvil: 1', label: 'A\nB', steps: [] }).split('\n').length, 10);
+  eq('works', [checkWorks(steps), checkWorks([{ result: 'fail' }]), checkWorks([{ result: 'fail' }, { result: 'fail' }, { result: 'fail' }])], ['yes', 'partly', 'no']);
+  const u = issueUrl({ label: 'pCloud', report: rep, version: '0.8.8.5 · Beta' });
+  eq('issue url', [u.startsWith('https://github.com/lordbasex/LordOS/issues/new?template=cloud-provider.yml&title=Cloud%20provider%3A%20pCloud&provider=pCloud&version=0.8.8.5%20%C2%B7%20Beta&report='),
+    decodeURIComponent(u.split('&report=')[1]) === rep], [true, true]);
+  eq('issue url without a report (Add Account\'s line)', issueUrl({ label: 'Box' }), 'https://github.com/lordbasex/LordOS/issues/new?template=cloud-provider.yml&title=Cloud%20provider%3A%20Box&provider=Box');
+  eq('special characters encoded', issueUrl({ label: 'A&B=C #1' }).includes('provider=A%26B%3DC%20%231'), true);
+  const long = Array.from({ length: 900 }, (_, i) => `  line ${i} ä€`).join('\n');
+  const lu = issueUrl({ label: 'X', report: long });
+  eq('long report: under the limit, truncated at a line, said so', [lu.length <= ISSUE_URL_MAX, decodeURIComponent(lu.split('&report=')[1]).endsWith('\n[truncated]'), /line \d+ ä€\n\[truncated\]$/.test(decodeURIComponent(lu.split('&report=')[1]))], [true, true, true]);
+  const one = issueUrl({ label: 'X', report: 'y'.repeat(20000) });
+  eq('one huge line: under the limit', [one.length <= ISSUE_URL_MAX, one.endsWith(encodeURIComponent('\n[truncated]'))], [true, true]);
+  eq('the template exists with those field ids', ['id: provider', 'id: works', 'id: report', 'id: version', 'cloud-provider'].every((x) => fs.readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/cloud-provider.yml'), 'utf8').includes(x)), true);
+}
+
+// ---- Check This Account: the run, against stand-ins ----
+{
+  eq('random bytes: repeatable, not flat', [hashBytes(randomBytes(64, 7)) === hashBytes(randomBytes(64, 7)), hashBytes(randomBytes(64, 7)) === hashBytes(randomBytes(64, 8)), new Set(randomBytes(256, 3)).size > 100], [true, false, true]);
+  eq('hash sees one byte', hashBytes(new Uint8Array([1, 2, 3])) === hashBytes(new Uint8Array([1, 2, 4])), false);
+  eq('check folder', [checkFolder({ group: 'server', mount: '/m' }, [], 't').path, checkFolder({ group: 'object', mount: '/m' }, [{ name: 'zeta', dir: true }, { name: 'alpha', dir: true }, { name: 'f', dir: false }], 't').path,
+    checkFolder({ group: 'object', mount: '/m' }, [], 't').path], ['/m/.lordos-check-t', '/m/alpha/.lordos-check-t', '/m/lordos-check-t']);
+  // a world: files in a map, a cloud that sends what is written up after two looks, a clock that sleeps instantly
+  const world = (opts = {}) => {
+    let clock = 1.7e12;
+    const files = new Map([['/h/Cloud/W', 'dir'], ['/h/Cloud/W/docs', 'dir']]);
+    const st = new Map();
+    const looks = new Map();
+    const trash = [];
+    let jobs = [];
+    const acc = { id: 'a1', name: 'W', mount: '/h/Cloud/W', group: opts.group || 'server', linksSupported: !!opts.links, about: null, up: { files: 0 }, kind: 'webdav' };
+    const fsx = {
+      home: () => '/h', list: (p) => [...files.keys()].filter((k) => k.startsWith(`${p}/`) && !k.slice(p.length + 1).includes('/')).map((k) => ({ name: k.split('/').pop(), dir: files.get(k) === 'dir' })),
+      mkdir: (p) => files.set(p, 'dir'), write: (p, d) => { files.set(p, new Uint8Array(d)); st.set(p, 'up'); acc.up = { files: 1 }; },
+      read: (p) => { const d = files.get(p); return (opts.corrupt ? d.map((x, i) => (i ? x : x ^ 1)) : d).buffer; },
+      stat: (p) => { const d = files.get(p); if (!d) throw Object.assign(new Error(`ENOENT ${p}`), { code: 'fs.notFound' }); return d === 'dir' ? { dir: true, size: 0 } : { dir: false, size: d.length }; },
+      move: (a, b) => { for (const k of [...files.keys()]) if (k === a || k.startsWith(`${a}/`)) { files.set(b + k.slice(a.length), files.get(k)); files.delete(k); } acc.up = { files: 0 }; jobs.push({ id: 9, done: true }); return 9; },
+      jobs: () => jobs, forgetJob: () => { jobs = []; }, trash: (p) => { trash.push({ id: 't1', original: p }); for (const k of [...files.keys()]) if (k.startsWith(p)) files.delete(k); }, trashList: () => trash,
+      removeFromTrash: (id) => { trash.splice(trash.findIndex((x) => x.id === id), 1); },
+    };
+    const cl = {
+      state: () => ({ accounts: [acc] }), refreshAbout: () => { if (!opts.noAbout) acc.about = { used: 5, total: 10 }; },
+      status: (ps) => Object.fromEntries(ps.map((p) => {
+        const n = (looks.get(p) || 0) + 1; looks.set(p, n);
+        if (opts.fail && st.get(p) === 'up') return [p, { st: 'error', error: 'cloud.transferFailed' }];
+        if (st.get(p) === 'up' && n > 2) { st.set(p, 'here'); acc.up = { files: 0 }; }
+        if (!st.get(p) && acc.up.files) acc.up = { files: 0 };
+        return [p, { st: st.get(p) || 'cloud' }];
+      })),
+      free: (ps) => { st.set(ps[0], 'cloud'); return { freed: CHECK_SIZE, skipped: [] }; },
+      link: async () => ({ url: 'https://x.test/s/1' }), unlink: async () => ({ ok: true }),
+    };
+    return { acc, files, trash, env: { fs: fsx, cloud: cl, sleep: async (ms) => { clock += ms; }, now: () => clock } };
+  };
+  const res = (s) => s.map((x) => `${x.id}:${x.result}${x.note ? `(${x.note})` : ''}`).join(' ');
+  let w = world({ links: true });
+  let seen = 0;
+  let out = await runCheck(w.acc, w.env, () => { seen++; });
+  eq('a good account: every step passes', res(out), CHECK_STEPS.map((id) => `${id}:pass`).join(' '));
+  eq('steps reported as they go', seen >= CHECK_STEPS.length, true);
+  eq('nothing left: not in the cloud, not in the home, not in the Trash', [[...w.files.keys()].filter((k) => k.includes('lordos-check')), w.trash.length], [[], 0]);
+  w = world({ noAbout: true });
+  out = await runCheck(w.acc, w.env);
+  eq('no space info, no links: skipped, not failed', [out[0].result, out[0].note, out.find((x) => x.id === 'link').note], ['skipped', 'noSpaceInfo', 'noLinks']);
+  w = world({ fail: true });
+  out = await runCheck(w.acc, w.env);
+  eq('an upload that fails: that step fails, the rest is skipped, the folder still goes', res(out).replace(/about:\w+ /, ''),
+    'list:pass folder:pass write:pass up:fail(cloud.transferFailed) free:skipped(notReached) read:skipped(notReached) link:skipped(notReached) delete:pass deleteUp:pass');
+  eq('and nothing left', [...w.files.keys()].filter((k) => k.includes('lordos-check')), []);
+  w = world({ corrupt: true });
+  out = await runCheck(w.acc, w.env);
+  eq('different bytes back: read fails', out.find((x) => x.id === 'read').note, 'cloud.checkMismatch');
+  w = world({ group: 'object' });
+  out = await runCheck(w.acc, w.env);
+  eq('object storage: inside the first bucket', [out.every((x) => x.result !== 'fail'), [...w.files.keys()].some((k) => k.startsWith('/h/.cache/'))], [true, false]);
+  w = world();
+  w.env.fs.mkdir = () => { throw Object.assign(new Error('EACCES /home/ana/Cloud/Ana Secret'), { code: 'sys.errno' }); };
+  out = await runCheck(w.acc, w.env);
+  eq('an error\'s text never becomes a note (it can hold a path)', [out.find((x) => x.id === 'folder').note, out.some((x) => /Ana|home/.test(x.note))], ['sys.errno', false]);
 }
 
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----

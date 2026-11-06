@@ -328,3 +328,29 @@ export function rateOf(samples, total) {
   const rate = (b.done - a.done) / dt;
   return { rate, left: total > b.done ? Math.ceil((total - b.done) / rate) : 0 };
 }
+
+// ---- verified providers (docs/CLOUD.md 19, assets/cloud/providers.json) ----
+
+// data: the file's object; → its entry for a kind ({ since, date, evidence }) or null
+export const verifiedInfo = (kind, data) => ((data && data.verified) || {})[kind] || null;
+export const isVerified = (kind, data) => !!verifiedInfo(kind, data);
+// The sheet's two parts: { verified: groups (groupProviders), unverified: groups, unverifiedCount, open }. While searching
+// both are searched and the Not verified part opens by itself when it has matches.
+export function splitProviders(list, data, query = '', expanded = [], showUnverified = false) {
+  const v = (list || []).filter((p) => isVerified(p.kind, data));
+  const u = (list || []).filter((p) => !isVerified(p.kind, data));
+  const q = String(query || '').trim();
+  const unverified = groupProviders(u, q, ['oauth', 'server', 'object']);
+  return { verified: groupProviders(v, q, expanded), unverified, unverifiedCount: unverified.reduce((s, g) => s + g.items.length, 0),
+    open: showUnverified || (!!q && unverified.length > 0) };
+}
+// a browser sign-in provider not verified yet: the add sheet offers the person's own app right away
+export const ownAppOffered = (p, data) => !!p && p.group === 'oauth' && !isVerified(p.kind, data);
+// rclone's page for a backend (How to make one): its kind, but a few pages have their own names
+const DOC_PAGE = { gcs: 'googlecloudstorage', 'google cloud storage': 'googlecloudstorage', nextcloud: 'webdav', owncloud: 'webdav' };
+export const rcloneDocsUrl = (kind) => {
+  const k = String(kind || '').toLowerCase();
+  const page = DOC_PAGE[k] || (/^[a-z0-9]+$/.test(k) ? k : '');
+  return page ? `https://rclone.org/${page}/` : 'https://rclone.org/overview/';
+};
+export const OAUTH_REDIRECT = 'http://127.0.0.1:53682/';
