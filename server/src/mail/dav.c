@@ -89,6 +89,7 @@ int dav_req(Dav *d, const char *method, const char *target, int depth, const cha
             else snprintf(cur, sizeof cur, "%s", loc);
             continue;
         }
+        snprintf(d->url, sizeof d->url, "%s", cur);
         return 0;
     }
     snprintf(d->err, sizeof d->err, "too many redirects");

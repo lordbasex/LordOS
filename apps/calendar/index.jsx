@@ -3,7 +3,7 @@
 // promise and usePim() changes whenever something changes, so views re-query on it.
 import {
   View, Text, useTheme, useLocale, useAppWindow, useKeyboard, useWindowState, usePim, calendars, calendarEvents,
-  Button, Segmented, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, EmptyState, formatDate, formatTime, weekdayName, direction, textDirection, t,
+  Button, Segmented, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, EmptyState, formatDate, formatTime, weekdayName, direction, textDirection, t, openDavSetup,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -230,6 +230,8 @@ function Sidebar({ cals, cursor, days, onPick, onNew, onEdit }) {
             </View>
           ))}
           {!cals.length ? <Text style={{ fontSize: 12, color: th.textDim, margin: 6 }}>{t('calendar.noCalendars')}</Text> : null}
+          {/* synced calendars (CalDAV, a provider): Mail's Add Account sheet, in Calendars & Contacts mode */}
+          <Button small plain icon="⊕" label={t('calendar.addAccount')} onClick={() => openDavSetup()} style={{ alignSelf: 'flex-start' }} />
         </View>
       </ScrollView>
       <View style={{ paddingHorizontal: 10, paddingTop: 12, gap: 6, alignItems: 'center' }}>

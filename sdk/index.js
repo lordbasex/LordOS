@@ -138,7 +138,7 @@ export { suggestions, refreshSuggestions, reevaluate as reevaluateSuggestions, d
 export { vaultAvailable, vaultRequest, onVaultEvent, keyring, autofill, autofillReveal, KeyringPrompt, AutofillButton } from './vault.js';   // Passwords and keyring (docs/PASSWORDS.md)
 import { KeyringPrompt } from './vault.js';
 // Mail, Calendar, Contacts and Reminders through the sandboxed helper lord-maild (docs/MAIL.md)
-export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mailStatus, autoconfig, OAUTH_PROVIDERS, trackMailStatus, isolatedPim, pickFileFd, closeFileFd } from './mail.js';
+export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mailStatus, autoconfig, OAUTH_PROVIDERS, DAV_PRESETS, davPreset, openDavSetup, trackMailStatus, isolatedPim, pickFileFd, closeFileFd } from './mail.js';
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';

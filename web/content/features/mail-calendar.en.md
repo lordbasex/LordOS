@@ -15,6 +15,7 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 - **Invitations** that arrive by mail: Accept, Maybe or Decline. The event goes into Calendar and the reply goes to the organizer.
 - **Reminders:** lists, due dates, priorities, flags, and Today / Scheduled / All / Flagged / Completed views, synced over CalDAV.
 - **Contacts:** local or synced over CardDAV, groups and photos. Mail autocompletes from them.
+- **Calendar and contacts accounts from the apps themselves** (0.8.8.4, in development; the latest release is 0.8.8.3): *Add Account…* in Calendar and Contacts adds any CalDAV/CardDAV server (contacts may live on their own address), or uses a built-in preset for a large provider whose calendars and contacts take an app-specific password. If the same event or contact also changed on another device, the server's version wins and yours is kept on this computer, with a notification saying where.
 - **Alarms ring with the apps closed,** because the helper keeps running for the session.
 - **Any IMAP and SMTP account** works. For a few widely used providers the server settings are filled in from a built-in table, with nothing looked up online.
 
@@ -42,13 +43,13 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 
 ## The skeptical reader's questions
 
-**What if a message exploits a bug in the parser?** That is what the design assumes will eventually happen. The parser runs in `lord-maild`, which can't create sockets, can't run programs and can only write to its own cache. The parsers are tested heavily: 30,953 checks in `mail-test`, including mutation fuzzing of MIME, charsets, the HTML sanitizer, iCalendar, vCard and XML, plus separate suites for the network layer and the connector.
+**What if a message exploits a bug in the parser?** That is what the design assumes will eventually happen. The parser runs in `lord-maild`, which can't create sockets, can't run programs and can only write to its own cache. The parsers are tested heavily: 47,395 checks in `mail-test`, including mutation fuzzing of MIME, charsets, the HTML sanitizer, iCalendar, vCard, XML and the calendar sync helpers, plus separate suites for the network layer and the connector.
 
 **Could a hijacked helper talk to my local network?** Only to the servers in your accounts file. Image grants are limited to public addresses, and the check runs on the address actually connected, so a DNS trick can't redirect it to your router.
 
 **Does the desktop freeze while mail syncs?** No. Requests are asynchronous; inside the helper, network work runs on one thread per account. Measured on a test VM: a 10,000-message folder syncs in about 2 s and opens from the local cache in about 20 ms.
 
-**Is OAuth sign-in supported?** It is prepared but disabled. Large providers only issue sign-in tokens to applications registered with them, so it needs a registered client ID. Until then, those accounts use app passwords.
+**Is OAuth sign-in supported?** It is prepared but disabled. Large providers only issue sign-in tokens to applications registered with them, so it needs a registered client ID. Until then, those accounts use app passwords. One large provider allows its calendars and contacts only over OAuth: Add Account shows it as "not available yet" instead of asking for a password.
 
 [[shot:3]]
 
@@ -56,7 +57,7 @@ Mail is the most common way to attack a computer. A message is a stranger's docu
 
 ## Honest limits
 
-- **No real provider accounts have been tested.** The test VM used local IMAP, SMTP and CalDAV/CardDAV servers with a test certificate authority. The built-in provider settings come from the providers' published values.
+- **No real provider accounts have been tested.** The test VM used local IMAP, SMTP and CalDAV/CardDAV servers with a test certificate authority. The built-in provider settings come from the providers' published values; the calendar and contacts preset was checked against a local Radicale server and with test answers shaped like the provider's.
 - **Not yet:** editing a single occurrence of a repeating event, creating calendars or address books on the server, multibyte CJK charsets, encrypted or signed mail (S/MIME and OpenPGP), and IMAP QRESYNC.
 - **OAuth sign-in** is disabled until a client ID is registered.
 

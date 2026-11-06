@@ -1,7 +1,7 @@
 // Setup.jsx — adding and managing accounts: the setup sheet (our provider table, app
 // passwords, manual servers, CalDAV/CardDAV), the certificate warning, the password prompt and
 // the accounts panel. Passwords go to the system keyring (Passwords), never to a file.
-import { View, Text, useTheme, useStore, Button, TextInput, Segmented, Toggle, ScrollView, t, mailAccounts, mailStatus, mailConfig, autoconfig, OAUTH_PROVIDERS } from '@lordos/sdk';
+import { View, Text, useTheme, useStore, Button, TextInput, Segmented, Toggle, ScrollView, t, mailAccounts, mailStatus, mailConfig, autoconfig, OAUTH_PROVIDERS, DAV_PRESETS, davPreset } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 
 export function Sheet({ children, onClose, width = 460 }) {
@@ -56,7 +56,52 @@ function useAccountResult(id) {
   return 'working';
 }
 
-export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
+// Calendars & Contacts: a generic CalDAV/CardDAV server, or a provider preset (DAV_PRESETS). A
+// provider that needs OAuth shows "not available yet" instead of a form.
+function DavFields({ dav, setDav, preset }) {
+  const th = useTheme();
+  const p = davPreset(preset);
+  if (p.oauth && !OAUTH_PROVIDERS[p.oauth]?.enabled) {
+    return (
+      <View style={{ padding: 10, borderRadius: 8, backgroundColor: th.control, gap: 6 }}>
+        <Text style={{ fontSize: 13, fontWeight: 600, color: th.text }}>{t('mail.setup.davNotYetTitle', { name: p.name })}</Text>
+        <Text style={{ fontSize: 12, color: th.textDim }}>{t('mail.setup.davNotYet', { name: p.name })}</Text>
+      </View>
+    );
+  }
+  const toggles = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Toggle small on={dav.cal} onChange={(cal) => setDav({ ...dav, cal })} /><Text style={{ fontSize: 12, color: th.text }}>{t('mail.setup.syncCalendars')}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Toggle small on={dav.card} onChange={(card) => setDav({ ...dav, card })} /><Text style={{ fontSize: 12, color: th.text }}>{t('mail.setup.syncContacts')}</Text>
+      </View>
+    </View>
+  );
+  if (p.id !== 'other') {
+    return (
+      <View style={{ gap: 8 }}>
+        <View style={{ padding: 10, borderRadius: 8, backgroundColor: th.control, gap: 4 }}>
+          <Text style={{ fontSize: 12, color: th.text }}>{t('mail.setup.davAppPassword', { name: p.name })}</Text>
+          {p.appPassword ? <Text style={{ fontSize: 11, color: th.accent }}>{p.appPassword}</Text> : null}
+        </View>
+        <Field label={t('mail.setup.davAccountEmail')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} placeholder={t('mail.setup.emailPh')} /></Field>
+        {toggles}
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: 8 }}>
+      <Field label={t('mail.setup.url')}><TextInput value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
+      <Field label={t('mail.setup.cardUrl')}><TextInput value={dav.carddav} onChange={(carddav) => setDav({ ...dav, carddav })} placeholder={t('mail.setup.cardUrlPh')} /></Field>
+      <Field label={t('mail.setup.user')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
+      {toggles}
+    </View>
+  );
+}
+
+export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 'other' }) {
   const th = useTheme();
   const [kind, setKind] = useState(kind0);
   const [step, setStep] = useState('who');           // who → servers → result
@@ -65,7 +110,10 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
   const [pw, setPw] = useState('');
   const [cfg, setCfg] = useState(null);
   const [manual, setManual] = useState(false);
-  const [dav, setDav] = useState({ url: '', user: '' });
+  const [dav, setDav] = useState({ url: '', carddav: '', user: '', cal: true, card: true });
+  const [preset, setPreset] = useState(DAV_PRESETS.some((p) => p.id === preset0) ? preset0 : 'other');
+  const pre = davPreset(preset);
+  const davBlocked = kind === 'dav' && !!pre.oauth && !OAUTH_PROVIDERS[pre.oauth]?.enabled;
   const [withDav, setWithDav] = useState(true);
   const [created, setCreated] = useState(null);
   const [err, setErr] = useState('');
@@ -85,8 +133,19 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
     setErr('');
     try {
       if (kind === 'dav') {
-        if (!/^https:\/\//i.test(dav.url)) { setErr(t('mail.setup.badUrl')); return; }
-        const id = await mailAccounts.add({ kind: 'dav', name: name || dav.url.replace(/^https:\/\//, '').split('/')[0], url: dav.url.trim(), user: dav.user.trim(), cal: true, card: true }, pw);
+        if (davBlocked) return;
+        if (!dav.cal && !dav.card) { setErr(t('mail.setup.davNothing')); return; }
+        const user = dav.user.trim();
+        if (!user) { setErr(t('mail.setup.davNoUser')); return; }
+        if (pre.userIsEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(user)) { setErr(t('mail.setup.badEmail')); return; }
+        if (!pw) { setErr(t('mail.setup.davNoPassword')); return; }
+        let url = pre.caldav || dav.url.trim(), carddav = pre.id === 'other' ? dav.carddav.trim() : pre.carddav || '';
+        if (pre.id === 'other' && !dav.cal && carddav) url = carddav;        // contacts only, on their own address
+        if (!/^https:\/\/[^/\s]+/i.test(url) || (carddav && !/^https:\/\/[^/\s]+/i.test(carddav))) { setErr(t('mail.setup.badUrl')); return; }
+        const acct = { kind: 'dav', name: name.trim() || (pre.id === 'other' ? url.replace(/^https:\/\//i, '').split(/[/:]/)[0] : `${pre.name} — ${t('mail.setup.calContacts')}`),
+          url, user, cal: !!dav.cal, card: !!dav.card };
+        if (carddav && carddav !== url) acct.carddav = carddav;
+        const id = await mailAccounts.add(acct, pw);
         setCreated(id);
         setStep('result');
         return;
@@ -97,7 +156,8 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
       };
       const id = await mailAccounts.add(acct, pw);
       if (withDav && (cfg.caldav || cfg.carddav) && cfg.davNote !== 'oauth') {
-        await mailAccounts.add({ kind: 'dav', name: `${cfg.name} — ${t('mail.setup.calContacts')}`, url: cfg.caldav || cfg.carddav, user: cfg.user.trim(), cal: !!cfg.caldav, card: true }, pw);
+        await mailAccounts.add({ kind: 'dav', name: `${cfg.name} — ${t('mail.setup.calContacts')}`, url: cfg.caldav || cfg.carddav, user: cfg.user.trim(), cal: !!cfg.caldav, card: true,
+          ...(cfg.caldav && cfg.carddav ? { carddav: cfg.carddav } : {}) }, pw);
       }
       setCreated(id);
       setStep('result');
@@ -111,17 +171,17 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
       {step === 'who' && (
         <View style={{ gap: 8 }}>
           <Segmented options={[['mail', t('mail.setup.kindMail')], ['dav', t('mail.setup.kindDav')]]} value={kind} onChange={setKind} />
-          <Field label={t('mail.setup.name')}><TextInput value={name} onChange={setName} placeholder={kind === 'dav' ? t('mail.setup.davNamePh') : t('mail.setup.namePh')} autoFocus /></Field>
+          {kind === 'dav' && (
+            <Field label={t('mail.setup.davService')}>
+              <Segmented small options={DAV_PRESETS.map((p) => [p.id, p.id === 'other' ? t('mail.setup.davOther') : p.name])} value={preset} onChange={(v) => { setPreset(v); setErr(''); }} />
+            </Field>
+          )}
+          {!davBlocked && <Field label={t('mail.setup.name')}><TextInput value={name} onChange={setName} placeholder={kind === 'dav' ? (pre.id === 'other' ? t('mail.setup.davNamePh') : `${pre.name} — ${t('mail.setup.calContacts')}`) : t('mail.setup.namePh')} autoFocus /></Field>}
           {kind === 'mail' ? (
             <Field label={t('mail.setup.email')}><TextInput value={email} onChange={setEmail} placeholder={t('mail.setup.emailPh')} onSubmit={next} /></Field>
-          ) : (
-            <>
-              <Field label={t('mail.setup.url')}><TextInput value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
-              <Field label={t('mail.setup.user')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
-            </>
-          )}
-          <Field label={t('mail.setup.password')}><TextInput value={pw} onChange={setPw} secure onSubmit={next} /></Field>
-          <Text style={{ fontSize: 11, color: th.textDim }}>{t('mail.setup.keyringNote')}</Text>
+          ) : <DavFields dav={dav} setDav={setDav} preset={preset} />}
+          {!davBlocked && <Field label={kind === 'dav' && pre.id !== 'other' ? t('mail.setup.appSpecificPassword') : t('mail.setup.password')}><TextInput value={pw} onChange={setPw} secure onSubmit={next} /></Field>}
+          {!davBlocked && <Text style={{ fontSize: 11, color: th.textDim }}>{t('mail.setup.keyringNote')}</Text>}
         </View>
       )}
       {step === 'servers' && cfg && (
@@ -165,7 +225,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
       {step === 'result' && (
         <View style={{ gap: 8, paddingVertical: 6 }}>
           <Text style={{ fontSize: 14, color: result === 'ok' ? '#30d158' : result === 'working' ? th.text : '#ff453a' }}>
-            {t(`mail.setup.result.${result || 'working'}`)}
+            {t(`mail.setup.result.${result === 'ok' && kind === 'dav' ? 'okDav' : result || 'working'}`)}
           </Text>
           {result === 'auth' && <Text style={{ fontSize: 12, color: th.textDim }}>{t('mail.setup.authHelp')}</Text>}
         </View>
@@ -174,7 +234,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail' }) {
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         {step === 'result' && result !== 'ok' && created ? <Button label={t('mail.setup.removeAccount')} onClick={() => { mailAccounts.remove(created); setCreated(null); setStep('who'); }} /> : null}
         <Button label={step === 'result' ? t('mail.close') : t('mail.cancel')} onClick={onClose} />
-        {step === 'who' && <Button primary label={kind === 'dav' ? t('mail.setup.add') : t('mail.setup.next')} onClick={next} />}
+        {step === 'who' && <Button primary disabled={davBlocked} label={kind === 'dav' ? t('mail.setup.add') : t('mail.setup.next')} onClick={next} />}
         {step === 'servers' && <Button primary label={t('mail.setup.add')} onClick={save} />}
       </View>
     </Sheet>

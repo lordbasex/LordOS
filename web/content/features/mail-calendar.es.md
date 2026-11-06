@@ -15,6 +15,7 @@ El correo es la forma más común de atacar una computadora. Un mensaje es un do
 - **Invitaciones** que llegan por correo: Aceptar, Quizás o Rechazar. El evento va al Calendario y la respuesta le llega al organizador.
 - **Recordatorios:** listas, fechas de vencimiento, prioridades, banderas y las vistas Hoy / Programados / Todos / Con bandera / Completados, sincronizados por CalDAV.
 - **Contactos:** locales o sincronizados por CardDAV, con grupos y fotos. Mail autocompleta a partir de ellos.
+- **Cuentas de calendarios y contactos desde las mismas apps** (0.8.8.4, en desarrollo; la última versión publicada es 0.8.8.3): *Agregar cuenta…* en Calendario y Contactos agrega cualquier servidor CalDAV/CardDAV (los contactos pueden estar en su propia dirección), o usa un ajuste incluido para un proveedor grande cuyos calendarios y contactos piden una contraseña específica de app. Si el mismo evento o contacto también cambió en otro dispositivo, gana la versión del servidor y la tuya se guarda en esta computadora, con una notificación que dice dónde.
 - **Las alarmas suenan con las apps cerradas,** porque el ayudante sigue corriendo durante toda la sesión.
 - **Cualquier cuenta IMAP y SMTP** funciona. Para algunos proveedores muy usados, la configuración de servidores se completa desde una tabla incluida, sin consultar nada en línea.
 
@@ -42,13 +43,13 @@ El correo es la forma más común de atacar una computadora. Un mensaje es un do
 
 ## Las preguntas del lector escéptico
 
-**¿Y si un mensaje aprovecha un error en el lector?** Es justamente lo que el diseño supone que en algún momento va a pasar. El lector corre en `lord-maild`, que no puede crear sockets, no puede ejecutar programas y solo puede escribir en su propia caché. Los lectores se prueban a fondo: 30.953 controles en `mail-test`, con fuzzing por mutación de MIME, juegos de caracteres, el sanitizador de HTML, iCalendar, vCard y XML, más baterías aparte para la capa de red y el conector.
+**¿Y si un mensaje aprovecha un error en el lector?** Es justamente lo que el diseño supone que en algún momento va a pasar. El lector corre en `lord-maild`, que no puede crear sockets, no puede ejecutar programas y solo puede escribir en su propia caché. Los lectores se prueban a fondo: 47.395 controles en `mail-test`, con fuzzing por mutación de MIME, juegos de caracteres, el sanitizador de HTML, iCalendar, vCard, XML y las ayudas de sincronización de calendarios, más baterías aparte para la capa de red y el conector.
 
 **¿Un ayudante tomado podría hablar con mi red local?** Solo con los servidores de tu archivo de cuentas. Los permisos para imágenes se limitan a direcciones públicas, y el control corre sobre la dirección a la que realmente se conectó, así que un truco de DNS no lo puede redirigir a tu router.
 
 **¿Se congela el escritorio mientras se sincroniza el correo?** No. Los pedidos son asíncronos; dentro del ayudante, el trabajo de red corre en un hilo por cuenta. Medido en una VM de prueba: una carpeta de 10.000 mensajes se sincroniza en unos 2 s y se abre desde la caché local en unos 20 ms.
 
-**¿Se puede ingresar con OAuth?** Está preparado pero desactivado. Los proveedores grandes solo dan tokens de ingreso a aplicaciones registradas con ellos, así que hace falta un ID de cliente registrado. Hasta entonces, esas cuentas usan contraseñas de aplicación.
+**¿Se puede ingresar con OAuth?** Está preparado pero desactivado. Los proveedores grandes solo dan tokens de ingreso a aplicaciones registradas con ellos, así que hace falta un ID de cliente registrado. Hasta entonces, esas cuentas usan contraseñas de aplicación. Un proveedor grande permite sus calendarios y contactos solo con OAuth: Agregar cuenta lo muestra como "todavía no disponible" en lugar de pedir una contraseña.
 
 [[shot:3]]
 
@@ -56,7 +57,7 @@ El correo es la forma más común de atacar una computadora. Un mensaje es un do
 
 ## Límites honestos
 
-- **No se probaron cuentas de proveedores reales.** La VM de prueba usó servidores IMAP, SMTP y CalDAV/CardDAV locales con una autoridad certificante de prueba. La configuración incluida de los proveedores sale de los valores que publican ellos.
+- **No se probaron cuentas de proveedores reales.** La VM de prueba usó servidores IMAP, SMTP y CalDAV/CardDAV locales con una autoridad certificante de prueba. La configuración incluida de los proveedores sale de los valores que publican ellos; el ajuste de calendarios y contactos se probó contra un servidor Radicale local y con respuestas de prueba con la forma de las del proveedor.
 - **Todavía no:** editar una sola repetición de un evento que se repite, crear calendarios o libretas de direcciones en el servidor, juegos de caracteres CJK multibyte, correo cifrado o firmado (S/MIME y OpenPGP) e IMAP QRESYNC.
 - **El ingreso con OAuth** está desactivado hasta que se registre un ID de cliente.
 

@@ -13,11 +13,13 @@ run in one sandboxed helper process, **`lord-maild`**.
 | TLS with OpenSSL, verification against the system CA store and the host name; bad certificates shown, never accepted silently | **done** (local CA in the VM; a mismatched certificate shows the warning) |
 | Local cache (Maildir-like) and offline index; 10,000-message folder opens from the cache | **done** (list of 10,000: ~20 ms per window, see Measurements) |
 | Conversations (References / In-Reply-To / subject), unified inbox, flags, 6 color categories | **done** |
-| HTML mail rendered by our own sanitizer into native views; remote images blocked; tracking pixels removed; deceptive links flagged | **done** (sanitizer fuzzed, 30,953 checks) |
+| HTML mail rendered by our own sanitizer into native views; remote images blocked; tracking pixels removed; deceptive links flagged | **done** (sanitizer fuzzed; `mail-test` 47,395 checks) |
 | Attachments (open with the app Files would use, save to Downloads), inline `cid:` and `data:` images | **done** |
 | Compose: rich text (markdown marks + live preview), markdown, plain text; signatures; drafts on the server; send later | **done** |
 | Invitations (.ics in mail): Accept / Maybe / Decline, event added to Calendar, iTIP REPLY sent to the organizer | **done** (REPLY delivered to the organizer's mailbox) |
 | Calendar: day / week / month, several calendars with colors, local and CalDAV, recurrence, alarms | **done** |
+| Calendars & Contacts accounts from Calendar and Contacts (*Add Account…*): any CalDAV/CardDAV server, an iCloud preset (app-specific password), contacts on their own address, conflicts that keep your version (0.8.8.4, [#32](https://github.com/lordbasex/LordOS/issues/32)) | **done**, tested against Radicale 3.5 (VM 116); the iCloud preset not tried with a real account |
+| Google calendars and contacts | **not available yet**: Google allows them only over OAuth with a registered client (see [Google calendars and contacts](#google-calendars-and-contacts-not-available-yet)) |
 | Reminders: lists, due dates, priorities, flags, Today / Scheduled / All / Flagged / Completed, VTODO over CalDAV | **done** |
 | Contacts: local and CardDAV, groups, photo, the usual vCard fields; Mail autocompletes from it | **done** |
 | Alarms of events and to-dos fire as notifications with the apps closed | **done** (seen in the VM with every app closed) |
@@ -268,7 +270,73 @@ table (`sdk/mail.js`, `PROVIDERS`, in the spirit of Mozilla's ISPDB; nothing is 
 None of the four providers was tested here (no real accounts were used, by design); the settings
 are the providers' published ones. A CalDAV/CardDAV account (Nextcloud, Radicale, Fastmail…)
 is added with its URL; discovery follows `current-user-principal`, `calendar-home-set` /
-`addressbook-home-set` and `/.well-known/caldav`.
+`addressbook-home-set` and `/.well-known/caldav` / `/.well-known/carddav`.
+
+### Calendars and contacts accounts (0.8.8.4)
+
+Calendar and Contacts have **Add Account…** under their lists ([#32](https://github.com/lordbasex/LordOS/issues/32)).
+It opens Mail's sheet in *CalDAV / CardDAV* mode (`openDavSetup()` in `sdk/mail.js`: the accounts
+file and the keyring item belong to Mail, so the isolated Calendar and Contacts processes get no new
+powers). The sheet has a **Service** choice, from `DAV_PRESETS` (provider names are data shown as
+`{name}`, like the mail providers; the catalogs carry no brand names):
+
+| Service | What you type | What LordOS stores |
+|---|---|---|
+| Other server | server URL, optional contacts URL, user name, password; Calendars and Contacts toggles | `url`, `carddav` (only when different), `cal`, `card` |
+| iCloud | the account's email and an **app-specific password** (two-factor authentication on; account page → Sign-In and Security → App-Specific Passwords) | `url: https://caldav.icloud.com/`, `carddav: https://contacts.icloud.com/` |
+| Google | nothing: the sheet says it is not available yet and *Add Account* stays disabled | — |
+
+Passwords go to the keyring exactly like a mail account's (`mail:<id>`) and never to a file.
+The provider puts each user's data on numbered hosts of its domain (`pNN-caldav.icloud.com`,
+`pNN-contacts.icloud.com`) and says so with absolute URLs in `calendar-home-set` /
+`addressbook-home-set`; lord-server already allows other hosts of the account's domains on port 443
+(`mail_endpoint_allowed`, both the `url` and the `carddav` domain), and nothing else. lord-maild
+adds its own rule on what a server answers (`davutil.c`): a principal or home is followed only on
+the same site as the URL it started from (the host's last two labels), a collection only on the
+host of its home, and an item only on the host of its collection, so one account's server can't
+make lord-maild send that account's password, or its data, to another account's server.
+Accounts added from Mail's iCloud mail preset before 0.8.8.4 had only the calendars' URL, so their
+contacts never synced; the session adds the contacts URL to them once (`fixDavAccounts` in
+`sdk/mail.js`).
+
+![Add Calendars and Contacts: iCloud](dav-setup-provider.png)
+
+The iCloud preset was **not tried against the real service** (no real accounts are used here):
+everything it relies on — the absolute home URLs on another host with an explicit `:443`,
+contacts on their own address, `getctag`, multiget — is covered by `build/mail-test` with answers
+shaped like the provider's, and the same code ran end to end against Radicale (below). Reminders:
+the provider moved them to a format that is no longer on CalDAV, so only events and contacts come
+from there.
+
+### Google calendars and contacts (not available yet)
+
+Google turned off password sign-in (and app passwords) for CalDAV and CardDAV: both accept only an
+OAuth 2.0 access token (`Authorization: Bearer …`) for an app registered in Google Cloud. LordOS has
+no registered client, so the Google service in the sheet is a clear "not available yet" and no
+account can be created. No client, key or account was created for this work. What the maintainer
+must do to turn it on:
+
+1. **Google Cloud project** (console.cloud.google.com) owned by the LordOS project, with the
+   **CalDAV API** and the **CardDAV API** enabled (APIs & Services → Library).
+2. **OAuth consent screen**: external, app name "LordOS", the lordos.org home page, privacy policy
+   and terms links, support and developer emails, and the scopes
+   `https://www.googleapis.com/auth/calendar` and `https://www.googleapis.com/auth/carddav`
+   (both "sensitive": Google's **app verification** is needed before more than 100 test users can
+   sign in; until then add testers by hand). Mail over IMAP would add `https://mail.google.com/`,
+   a "restricted" scope with a yearly security assessment; it is not needed for calendars and contacts.
+3. **OAuth client ID** of type **Desktop app** (APIs & Services → Credentials). Desktop clients use a
+   loopback redirect (`http://127.0.0.1:<port>`) with PKCE; their "client secret" is not secret.
+   Put the client ID (and that secret) in `OAUTH_PROVIDERS.google` in `sdk/mail.js` and set
+   `enabled: true`.
+
+The code still to write once there is a client: the authorization-code flow with PKCE in the
+default browser and a one-shot loopback listener on 127.0.0.1 (like the Fortinet single sign-on
+wait in `docs/NETWORK.md`), the refresh token stored in the keyring (`mail:<id>`, never in a file),
+an access-token refresh before each sync, `Authorization: Bearer` in `dav_begin()` (`dav.c`, today
+Basic only) with a refresh-and-retry on `401`, and the endpoints: CalDAV
+`https://apidata.googleusercontent.com/caldav/v2/<email>/user` (events only: Google's CalDAV has
+no VTODO), CardDAV `https://www.googleapis.com/.well-known/carddav`
+(→ `/carddav/v1/principals/<email>/lists/default/`).
 
 ### OAuth (needs your client ID)
 
@@ -296,13 +364,25 @@ reminders list, an address book); CalDAV/CardDAV accounts add the server's colle
 
 - **Storage**: `pim/colls` (collections), `pim/<id>/meta` (file, UID, href, ETag, dirty) and one
   `.ics` / `.vcf` per item.
-- **Sync** (every 15 minutes, at start, and a few seconds after a local change): discovery,
-  `PROPFIND` of the homes (names, colors, supported components, CTag), local changes first
-  (`PUT` with `If-Match` / `If-None-Match: *`, `DELETE` with `If-Match`; on `412` the server's
-  version wins and is refetched; a change the server refuses for good — `400`, `403`, `415` — is
-  dropped in favor of the server's copy, with a `dav-rejected` event), then the ETag list and a
-  `calendar-multiget` / `addressbook-multiget` of what changed; deletions on the server delete
-  locally.
+- **Sync** (every 15 minutes, at start, and a few seconds after a local change): discovery
+  (calendars from the account URL, contacts from `carddav` when the account has one: the URL
+  itself, its `current-user-principal`, then `/.well-known/caldav` or `/.well-known/carddav`; homes
+  are kept as absolute URLs, so they may live on another host of the provider), `PROPFIND` of the
+  homes (names, colors, supported components, CTag or sync-token), local changes first
+  (`PUT` with `If-Match` / `If-None-Match: *`, `DELETE` with `If-Match`), then — when the CTag
+  changed or something was pushed — the ETag list and a `calendar-multiget` /
+  `addressbook-multiget` of what changed; deletions on the server delete locally. The pure parts
+  (resolving hrefs, reading the discovery answers, the download/drop plan, what an upload's
+  status means, the copy's new UID, the same-site and same-origin checks) are in `davutil.c`, with their own tests.
+- **Conflicts: the server wins, your version is kept** (0.8.8.4). A `412` (someone changed or
+  deleted the item on the server since this computer last saw it) or a refusal for good (`403`,
+  `404`, `415`… on a `PUT`) makes the server's version the one in the synced calendar or address
+  book, and the local version that lost is saved, with a new UID, in a collection **on this
+  computer** (the first local calendar, reminders list or address book; created if there is none)
+  and never uploaded. A notification says so ("Changed on another device too"), with the item's
+  title and where the copy went (`dav-conflict` event). `401`, `408`, `429` and `5xx` leave the
+  change waiting for the next sync instead of dropping it. A local delete that loses (`412`)
+  brings the server's version back.
 - **iCalendar** (`ical.c`): VEVENT/VTODO/VALARM, DATE and DATE-TIME (UTC, `TZID` through the system
   tz database with our TZif reader, non-IANA zone names mapped, floating = local), `RRULE` with
   DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL, COUNT, UNTIL, BYDAY (with ordinals ±1..53), BYMONTHDAY,
@@ -358,14 +438,17 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
 
 `make -C server test` runs, among the rest:
 
-- `build/mail-test` (30,953 checks): the IMAP response parser (literals, bracketed sections,
+- `build/mail-test` (47,395 checks): the IMAP response parser (literals, bracketed sections,
   modified UTF-7, UID sets), MIME (nested multipart, base64 / quoted-printable, RFC 2047 words,
   RFC 2231 continuations, address lists with groups and comments, dates, 25 charsets including
   KOI8-R, ISO-8859-15 and UTF-16), the HTML sanitizer against hostile input (script, event
   handlers, `javascript:` with tabs and entities, hidden text, tracking pixels, deceptive links,
   400 KB of nested tables, 400 KB of `<`), iCalendar (time zones across a DST change, RRULE with
   COUNT/EXDATE/BYDAY ordinals, non-IANA zone names, REPLY, a round trip; hostile RRULEs with
-  `2147483647MO` and friends), vCard (2.1 QP, groups, photo round trip), the XML reader
+  `2147483647MO` and friends), vCard (2.1 QP, groups, photo round trip), the CalDAV/CardDAV sync
+  helpers (hrefs resolved against hostile input, discovery answers with absolute homes on another
+  host, the download/drop plan, upload outcomes, a kept copy's new UID on a repeating event with an
+  override and on a vCard without UID), the XML reader
   (namespaces, CDATA, DOCTYPE refused, depth limit), hostile attachment names — and for each
   parser a deterministic mutation fuzzer (thousands of mutated inputs).
 - `build/mailnet-test` (138 checks, needs the OpenSSL headers): HTTP chunk sizes and
@@ -388,6 +471,32 @@ Operations of `lord-maild` (`server/src/mail/maild.c`): `status`, `auth`, `folde
 | `lord-maild` memory with that cache | ~25 MB RSS |
 | Scrolling the 10,000-row list | only visible rows exist; rows load in windows of ~40 |
 
+### Measured against Radicale (VM 116, 0.8.8.4)
+
+A private Radicale 3.5.3 (`docs/VM-SETUP.md`, "CalDAV/CardDAV for #32"), users `ana@example.test`
+and `beto@example.test`, a self-signed certificate (so the warning and *Trust This Certificate* are
+part of the run), the calendars on `dav.example.test:5233` and the contacts on
+`contacts.example.test:5233` (the `carddav` address):
+
+- first sync: two calendars (a weekly repeating event with one moved occurrence, an all-day event,
+  a to-do) and an address book of six; the moved occurrence shows at its new time;
+- a new event made here → `PUT` 201 on the server; a contact deleted on the server → gone here;
+- edited here while offline and on the server meanwhile, an event and a contact → `PUT` answered
+  `412`, the server's versions shown in the synced calendar and address book, ours kept in
+  "Personal" and "Contacts" on this computer with new UIDs, two `dav-conflict` events;
+- a cache written by 0.8.8.3 (item hrefs as paths): no download at all when nothing changed, and
+  after one change on the server one `REPORT` and every href rewritten as a full URL, no duplicates;
+- the whole account setup through the sheet in a headless session (Calendar → *Add Account…* →
+  Mail's sheet → certificate warning → *Trust This Certificate* → the new account's calendar in
+  Calendar).
+
+| | |
+|---|---|
+| ![Calendar with two synced accounts](dav-calendar-week.png) | ![Contacts from CardDAV](dav-contacts.png) |
+| Calendar: two CalDAV accounts and the local calendar | Contacts synced over CardDAV |
+| ![Other server](dav-setup-generic.png) | ![Not yet](dav-setup-not-yet.png) |
+| Add Calendars and Contacts: any server | Google: not available yet |
+
 ## Testing on the VM
 
 Local servers only, inside VM 123 (`docs/VM-SETUP.md`, step 24): Dovecot (IMAP, users
@@ -402,8 +511,11 @@ SPECIAL-USE (`docs/VM-SETUP.md`), with `example.test` test data only; unit tests
 
 ## Not done / not tested
 
-- The four built-in providers and Google CalDAV: settings
-  from the providers' documentation, not tried. OAuth: prepared, disabled.
+- The four built-in providers and the iCloud calendars and contacts preset: settings from the
+  providers' documentation, not tried with real accounts. Google calendars and contacts: not
+  available until there is a registered OAuth client (see above). OAuth: prepared, disabled.
+- Sync asks for the ETag list of a collection whose CTag changed (one `PROPFIND`), not
+  `sync-collection` (RFC 6578) deltas; fine for personal calendars, slower for very large ones.
 - Editing **one occurrence** of a repeating event (changes apply to the series; deleting one
   occurrence works). Editing a series rewrites it without its per-occurrence overrides.
 - New calendars and address books are created locally (no `MKCALENDAR`/`MKCOL` on the server).

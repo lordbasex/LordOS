@@ -13,6 +13,8 @@
 //   mailAccounts.remove(id) / setPassword(id, pw) / trustCertificate(id, which, sha256)
 //   autoconfig(email)                        our provider table (Gmail, Yahoo and others) or a guess
 //   OAUTH_PROVIDERS                          prepared, disabled until you register a client ID
+//   DAV_PRESETS / davPreset(id)              calendar and contacts services for Add Account (generic, or a provider)
+//   openDavSetup(preset)                     opens Mail's Add Account sheet for calendars and contacts (Calendar, Contacts)
 //   mailStatus (store)                       { accounts: { id: { status, error } }, unread, rev, certs: [] }
 //   startMail()                              called by startShell: new-mail notifications, passwords on demand
 import { createStore } from './store.js';
@@ -120,7 +122,8 @@ export const mailAccounts = {
     while (ids.has(id)) id = `${slug(base).slice(0, 20)}-${n++}`;
     return id;
   },
-  // account: { id?, kind: 'mail'|'dav', name, email, fullName, user, imap, smtp, url, cal, card, sentSaved, signature, color }
+  // account: { id?, kind: 'mail'|'dav', name, email, fullName, user, imap, smtp, url, carddav, cal, card, sentSaved, signature, color }
+  // (dav: url is where calendars are found, and contacts too unless carddav names their own address)
   async add(account, password) {
     const acct = { kind: 'mail', auth: 'password', ...account, id: account.id || mailAccounts.newId(account.email || account.name || account.url) };
     // the keyring may be locked or missing (no login password, e.g. autologin): the account still
@@ -191,6 +194,25 @@ export function autoconfig(email) {
     sentSaved: false, user: email, known: false };
 }
 
+// Calendar and contacts services offered by Add Account → Calendars & Contacts. Provider names are
+// data shown as {name} (like PROVIDERS), never words in the catalogs. `oauth`: the provider allows
+// no app passwords for these services; it waits for a registered client ID (OAUTH_PROVIDERS,
+// docs/MAIL.md, "Google calendars and contacts"), so the sheet shows "not available yet".
+export const DAV_PRESETS = [
+  { id: 'other' },
+  { id: 'icloud', name: 'iCloud', caldav: 'https://caldav.icloud.com/', carddav: 'https://contacts.icloud.com/',
+    appPassword: 'https://appleid.apple.com/account/manage', userIsEmail: true },
+  { id: 'google', name: 'Google', oauth: 'google', caldav: 'https://apidata.googleusercontent.com/caldav/v2/',
+    carddav: 'https://www.googleapis.com/carddav/v1/principals/' },
+];
+export const davPreset = (id) => DAV_PRESETS.find((p) => p.id === id) || DAV_PRESETS[0];
+
+// Calendar and Contacts add accounts through Mail's sheet (the accounts file and the keyring item
+// belong to Mail): this opens it in "Calendars & Contacts" mode.
+export function openDavSetup(preset = 'other') {
+  wm.open('mail', { args: { setup: 'dav', preset, nonce: Date.now() } });
+}
+
 // OAuth2 (XOAUTH2) is prepared but OFF: large mail providers only hand out tokens to apps whose
 // client ID is registered in their developer consoles. Put yours here and enable it
 // in docs/MAIL.md, "OAuth"; until then these accounts use app passwords.
@@ -243,10 +265,26 @@ export function trackMailStatus() {
   refreshCounts();
 }
 
+// Calendar-and-contacts accounts added before 0.8.8.4 from a provider that keeps contacts on their
+// own address had only the calendars' one, so their contacts never synced. Once, in the accounts
+// file (settings.json's MIGRATIONS don't reach it); idempotent.
+function fixDavAccounts(cfg) {
+  let changed = false;
+  const accounts = cfg.accounts.map((a) => {
+    if (a.kind !== 'dav' || a.carddav) return a;
+    const p = DAV_PRESETS.find((x) => x.carddav && !x.oauth && x.caldav && String(a.url || '').replace(/\/+$/, '') === x.caldav.replace(/\/+$/, ''));
+    if (!p) return a;
+    changed = true;
+    return { ...a, carddav: p.carddav };
+  });
+  if (changed) mailConfig.save({ ...cfg, accounts });
+  return changed ? { ...cfg, accounts } : cfg;
+}
+
 export function startMail() {
   if (started || !has() || !lord.mail.available()) return;
   started = true;
-  const cfg = mailConfig.get();
+  const cfg = fixDavAccounts(mailConfig.get());
   onMailEvent(async (ev) => {
     if (ev.ev === 'need-auth') {
       const a = mailAccounts.get(ev.acct);
@@ -273,6 +311,11 @@ export function startMail() {
       }
     } else if (ev.ev === 'changed' || ev.ev === 'folders') {
       refreshCounts();
+    } else if (ev.ev === 'dav-conflict') {
+      // the server's version won; ours was kept on this computer (docs/MAIL.md, "Conflicts")
+      const app = ev.kind === 'contact' ? 'contacts' : ev.kind === 'todo' ? 'reminders' : 'calendar';
+      notify({ app, title: t('mail.notify.davConflict'), body: t(`mail.notify.davConflictBody.${ev.kind === 'contact' ? 'contact' : 'item'}`, { title: ev.title || '', list: ev.collName || '' }),
+        timeout: 12000, actions: getApp(app) ? [{ id: 'open', label: t('mail.notify.open'), run: () => wm.open(app, { args: { nonce: Date.now() } }) }] : [] });
     } else if (ev.ev === 'send-failed') {
       notify({ app: 'mail', title: t('mail.notify.sendFailed'), body: `${ev.subject || ''}\n${ev.error || ''}`, sticky: true });
     } else if (ev.ev === 'crash') {
