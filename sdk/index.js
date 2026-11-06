@@ -58,6 +58,7 @@ export { browserFrameResult, browserFrameState, browserTabsInTitlebar, setBrowse
 import { startBrowserFrame } from './browserframe.js';
 import { startNetStatus } from './netstatus.jsx';
 import { startCleanerStatus } from './cleanerstatus.jsx';
+import { startCloud } from './cloudstatus.jsx';
 export { errorText, statusText, codeError, parseCode } from './errors.js';
 export { logs } from './logs.js';
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
@@ -128,6 +129,9 @@ export { lan } from './lan.js';                                  // Files → Ne
 export { smart, smartSummaries, useSmartSummaries, diskTempLimit, diskAlertPrefs, setDiskAlerts } from './smart.js';
 export { parseSmartctl, prettyAttrName, ATTR_KEYS, HEALTH_RANK } from './smartparse.js';
 export { backup, useBackup, backupStatus } from './backup.js';   // Backups (docs/SYSTEM.md)
+export { cloud, useCloud, cloudState } from './cloud.js';        // Cloud (docs/CLOUD.md)
+export * as cloudModel from './cloudmodel.js';
+export { CloudGlyph, StatusGlyph, StatusBadge, UsageRing, AccountBadge, SpaceBar } from './cloudui.jsx';
 export { cleaner } from './cleaner.js';   // Cleaner (docs/CLEANER-ARCHITECTURE.md)
 export { statusWord } from './cleanerstatus.jsx';
 export { cleanerPalette, CLEANER_THEMES } from './cleanertheme.js';
@@ -238,6 +242,7 @@ export function startShell(element) {
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
   setTimeout(sweepUninstalledGrants, 5000); // a screen-share grant doesn't outlive its app (share.js)
   startCleanerStatus();                 // Cleaner's still item by the clock; its panel reads only while open
+  startCloud();                         // Cloud's item by the clock (with an account) and its notifications (cloudstatus.jsx)
   startNetStatus();                     // (0.8.5) the menu bar's network item and the blocklists' daily update
   startOsk();                           // the on-screen keyboard (osk.js, docs/ON-SCREEN-KEYBOARD.md)
   registerStatusItem('osk', OskStatus, 6);
