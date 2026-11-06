@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 
 #define HANDLE_HOLD_S 10            /* rclone keeps a closed file's handle 5 s (HandleCaching); twice that */
@@ -240,6 +241,20 @@ char *cf_status(const char *const *paths, int n) {
     }
     jb_raw(&b, "}");
     return b.oom ? (jb_free(&b), NULL) : b.p;
+}
+
+int cloud_read_would_block(const char *path) {
+    char name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1];
+    if (!cl_root[0] || !path || cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel) || !rel[0]) return 0;
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find_name(name);
+    int down = a && (!cl_running || !a->mounted || a->locked || !strcmp(a->err, "cloud.unreachable") || !strcmp(a->err, "cloud.offline"));
+    char id[16] = "";
+    if (a) cl_pf(id, sizeof id, "%s", a->id);
+    pthread_mutex_unlock(&cl_mu);
+    if (!down) return 0;
+    CloudMeta m;
+    return read_meta(id, rel, &m) || m.cached < m.size;     /* what is here still opens */
 }
 
 /* ---- Free Up Space ---- */
@@ -624,5 +639,94 @@ char *cf_delete(const char *const *paths, int n, int *req) {
     pthread_sigmask(SIG_SETMASK, &old, NULL);
     pthread_attr_destroy(&at);
     if (r) { for (int i = 0; i < j->n; i++) free(j->paths[i]); free(j->paths); free(j); *req = 0; return bad_path("cloud.failed", ""); }
+    return NULL;
+}
+
+/* ---- search inside an account (N2) ----
+ * lord.fs.search doesn't enter mounts (the interface's thread must not wait on a server). cloud.search walks the mount in a
+ * thread of its own, with a budget (15 s, 50 000 entries, 16 levels, 500 hits), and answers once: { hits, complete }. The
+ * walk goes through rclone's directory cache, so a folder listed lately costs nothing and an unreachable server only slows
+ * this thread. Names are matched without case, as lord.fs.search. */
+
+typedef struct { int req; char *root, *needle; long long end; int seen, depth_max; JBuf hits; int nhits, complete; } SearchJob;
+
+static int ci_has(const char *hay, const char *n) {
+    size_t l = strlen(n);
+    for (; *hay; hay++) if (!strncasecmp(hay, n, l)) return 1;
+    return 0;
+}
+
+static long long mono_now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000; }
+
+static void search_walk(SearchJob *j, const char *dir, int depth) {
+    if (depth > j->depth_max) { j->complete = 0; return; }
+    DIR *d = opendir(dir);
+    if (!d) return;
+    for (struct dirent *e; (e = readdir(d)); ) {
+        if (e->d_name[0] == '.') continue;
+        if (j->seen++ > 50000 || j->nhits >= 500 || mono_now() > j->end) { j->complete = 0; break; }
+        char p[PATH_MAX * 2];
+        if ((size_t)cl_pf(p, sizeof p, "%s/%s", dir, e->d_name) >= sizeof p) continue;
+        struct stat st;
+        if (lstat(p, &st)) continue;
+        if (ci_has(e->d_name, j->needle)) {
+            jb_raw(&j->hits, j->nhits++ ? ",{\"path\":" : "{\"path\":");
+            jb_str(&j->hits, p);
+            jb_printf(&j->hits, ",\"dir\":%s,\"size\":%lld,\"mtime\":%lld}", S_ISDIR(st.st_mode) ? "true" : "false", (long long)st.st_size, (long long)st.st_mtime * 1000);
+        }
+        if (S_ISDIR(st.st_mode)) search_walk(j, p, depth + 1);
+    }
+    closedir(d);
+}
+
+static void *search_thread(void *arg) {
+    SearchJob *j = arg;
+    setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 10);
+    jb_init(&j->hits);
+    j->complete = 1;
+    search_walk(j, j->root, 0);
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"hits\":[");
+    if (!j->hits.oom && j->hits.n) jb_rawn(&b, j->hits.p, j->hits.n);
+    jb_printf(&b, "],\"complete\":%s}", j->complete ? "true" : "false");
+    jb_free(&j->hits);
+    cl_reply(j->req, b.oom ? (jb_free(&b), NULL) : b.p);
+    free(j->root);
+    free(j->needle);
+    free(j);
+    return NULL;
+}
+
+char *cloud_search(const char *path, const char *needle, int *req) {
+    char name[CLOUD_NAME_MAX + 1], rel[CLOUD_REL_MAX + 1];
+    *req = 0;
+    if (!needle || !needle[0] || strlen(needle) > 200) return bad_path("cloud.badArgument", "");
+    if (!path || cloud_split(cl_root, path, name, sizeof name, rel, sizeof rel)) return bad_path("cloud.badPath", path);
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find_name(name);
+    int ok = a && a->mounted;
+    const char *why = !a ? "cloud.notFound" : !cl_running ? "cloud.notRunning" : a->locked ? "cloud.keyringLocked" : "cloud.notConnected";
+    pthread_mutex_unlock(&cl_mu);
+    if (!ok) return bad_path(why, path);
+    SearchJob *j = calloc(1, sizeof *j);
+    if (!j) return bad_path("cloud.failed", "");
+    j->root = strdup(path);
+    j->needle = strdup(needle);
+    j->end = mono_now() + 15000;
+    j->depth_max = 16;
+    j->req = *req = cl_next_req();
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&at, 2 * 1024 * 1024);
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, &old);
+    int r = pthread_create(&th, &at, search_thread, j);
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    pthread_attr_destroy(&at);
+    if (r) { free(j->root); free(j->needle); free(j); *req = 0; return bad_path("cloud.failed", ""); }
     return NULL;
 }

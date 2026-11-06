@@ -80,14 +80,19 @@ export const isFull = (about) => { const u = usage(about); return !!u && u.total
 
 // The "All accounts" bar: every account's used share of what all of them hold (their totals; the used space of one
 // without a quota), in the account's color.
+// total is null unless every account with space has a quota (a measured or reported `used` is never a total); the
+// bar's scale still counts what the accounts without a quota use, so their segments show.
 export function allAccountsBar(accounts) {
-  const list = (accounts || []).map((a) => ({ a, u: usage(a.about) }));
-  const used = list.reduce((s, x) => s + (x.u ? x.u.used : 0), 0);
-  const total = list.reduce((s, x) => s + (x.u ? (x.u.total != null ? x.u.total : x.u.used) : 0), 0);
-  const segs = list.filter((x) => x.u && x.u.used > 0).map((x) => ({ id: x.a.id, name: x.a.name, used: x.u.used,
-    pct: total ? x.u.used / total : 0, color: accountColor(accounts, x.a.id) }));
-  return { used, total, segs };
+  const list = (accounts || []).map((a) => ({ a, u: usage(a.about) })).filter((x) => x.u);
+  const used = list.reduce((s, x) => s + x.u.used, 0);
+  const all = list.length > 0 && list.every((x) => x.u.total != null);
+  const scale = list.reduce((s, x) => s + (x.u.total != null ? x.u.total : x.u.used), 0);
+  const segs = list.filter((x) => x.u.used > 0).map((x) => ({ id: x.a.id, name: x.a.name, used: x.u.used,
+    pct: scale ? x.u.used / scale : 0, color: accountColor(accounts, x.a.id) }));
+  return { used, total: all ? scale : null, scale, segs };
 }
+// used is 0 without a quota and nobody measured: nothing is known (WebDAV answers {})
+export const notMeasured = (about) => !!about && !(about.total > 0) && !about.measuredAt && !(about.used > 0);
 
 // The account page's ring, by what the provider tells: its files, other uses and the trash, then the free part.
 // [{ key, bytes, frac, color }] whose fracs add up to the used share; null without a total (no ring, a bar).
@@ -107,6 +112,7 @@ export function ringParts(about, color) {
 export function spaceLine(about, fmt) {
   const u = usage(about);
   if (!u) return { key: 'cloud.space.unknown', vars: {} };
+  if (notMeasured(about)) return { key: 'cloud.space.notMeasured', vars: {} };
   if (u.total == null) return { key: 'cloud.space.usedOnly', vars: { used: fmt(u.used) } };
   return { key: 'cloud.space.usedOf', vars: { used: fmt(u.used), total: fmt(u.total) } };
 }
@@ -114,7 +120,9 @@ export function spaceLine(about, fmt) {
 // ---- the account's state line (Settings rows, the menu bar panel) ----
 
 const pctOf = (x) => (x && x.bytes > 0 ? Math.round(Math.min(1, (x.done || 0) / x.bytes) * 100) : null);
-export function stateLine(acc) {
+// service: state.service; while it isn't running every account is shown as not connected (its own state is stale)
+export function stateLine(acc, service) {
+  if (service && service.running === false) return { key: 'cloud.state.serviceDown', vars: {}, tone: 'warn' };
   const up = acc.up || {}, down = acc.down || {};
   switch (acc.state) {
     case 'syncing':
@@ -198,7 +206,7 @@ export function nameProblem(name, accounts, self = null) {
   return null;
 }
 // a provider's form: its fields with the defaults filled in
-export const formValues = (provider, prev = {}) => Object.fromEntries((provider?.fields || []).map((f) => [f.name, prev[f.name] ?? (f.default != null ? String(f.default) : '')]));
+export const formValues = (provider, prev = {}) => Object.fromEntries((provider?.fields || []).map((f0) => { const f = presetField(f0); return [f.name, prev[f.name] ?? (f.default != null ? String(f.default) : '')]; }));
 // the first required field still empty, or null
 export const missingField = (provider, values) => (provider?.fields || []).find((f) => f.required && !String(values[f.name] ?? '').trim())?.name || null;
 // only the fields the provider has, without control characters (lord-server checks again)
@@ -246,11 +254,12 @@ export function cloudMenu(sel, { single = false, linksSupported = false, shared 
 export const SIDE_SECTIONS = ['favorites', 'cloud', 'locations', 'tags'];
 export const sideSections = (accounts) => SIDE_SECTIONS.filter((s) => s !== 'cloud' || (accounts || []).length > 0);
 // the Cloud section's rows: the accounts in their order; hidden: ids the person took out of Files
-export function cloudSideItems(accounts, hidden = []) {
+export function cloudSideItems(accounts, hidden = [], service = null) {
+  const down = !!service && service.running === false;
   return (accounts || []).filter((a) => !hidden.includes(a.id)).map((a) => {
     const u = usage(a.about);
     return { id: a.id, name: a.name, path: a.mount, color: accountColor(accounts, a.id), pct: u && u.pct != null ? u.pct : null,
-      alert: NEEDS_YOU.includes(a.state), dim: DIM_STATES.includes(a.state) };
+      alert: down || NEEDS_YOU.includes(a.state), dim: down || DIM_STATES.includes(a.state) };
   });
 }
 
@@ -447,7 +456,7 @@ export function fieldInput(f) {
 }
 // → { main: [field], auth: null | { password, key, passphrase } (field names), advanced: [field] }
 export function formLayout(p) {
-  const fields = (p && p.fields) || [];
+  const fields = ((p && p.fields) || []).map(presetField);
   const by = new Map(fields.map((f) => [f.name, f]));
   const kind = p && p.kind;
   const auth = kind === 'sftp' && by.has(SFTP_AUTH.password) ? { ...SFTP_AUTH } : null;
@@ -494,7 +503,17 @@ export function providerName(acc, list) {
   return cut.length > 40 ? `${cut.slice(0, 38).replace(/\s+\S*$/, '')}…` : cut;
 }
 // a trust question from add/answer: 'hostKey' | 'certificate' | null (an ordinary question of rclone's)
-export const trustKind = (q) => (q && (q.kind === 'hostKey' || q.kind === 'certificate') ? q.kind : null);
+export const trustKind = (q) => (q && ['hostKey', 'certificate', 'hostKeyChanged'].includes(q.kind) ? q.kind : null);
+// The fingerprints behind a changed key or certificate: the answer's old and new, else the account's message (the new one)
+export function changedPrints(r, acc) {
+  const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code);
+  const src = { ...(r || {}), ...(r && typeof r.error === 'object' ? r.error : {}) };
+  if (!['cloud.hostKeyChanged', 'cloud.certChanged'].includes(code || (acc && acc.error))) return null;
+  const old = src.old || src.oldFingerprint || null;
+  let nw = src.new || src.fingerprint || null;
+  if (!nw && acc && /SHA256:|([0-9A-F]{2}:){8}/i.test(String(acc.message || ''))) nw = String(acc.message).match(/SHA256:[A-Za-z0-9+/=]+|([0-9A-F]{2}:){15,}[0-9A-F]{2}/i)[0];
+  return old || nw ? { old, new: nw } : null;
+}
 // an error answer → { code, vars } for errors.<code>: its details (fingerprints, a date) come as fields of the answer
 export function errorVars(r, fmtDate) {
   const code = r && (typeof r.error === 'string' ? r.error : r.error && r.error.code) || '';
@@ -516,3 +535,25 @@ export function errorField(r, p) {
 }
 // an account that is connected (mounted, no error) and whose provider gives no total can be measured
 export const measurable = (acc) => !!acc && !acc.error && acc.state !== 'locked' && acc.mounted !== false && !(acc.about && acc.about.total > 0);
+
+// ---- after the e2e first pass (U3, U6) ----
+
+// U3: a file that was coming down isn't shown as only in the cloud again for a moment (a stale answer between the end of
+// the download and the cache's own word): 'cloud' right after 'down' keeps 'down' for up to holdMs.
+// prev: { path: status } with `downAt` (ms) kept on 'down' entries
+export function mergeStatusHeld(prev, answer, asked, now, holdMs = 8000) {
+  const next = mergeStatus(prev, answer, asked);
+  for (const p of asked || []) {
+    const was = prev && prev[p];
+    const s = next[p];
+    if (s && s.st === 'down') next[p] = { ...s, downAt: now };
+    else if (was && was.st === 'down' && (!s || s.st === 'cloud') && now - (was.downAt || now) < holdMs) next[p] = { ...was, pct: 1 };
+  }
+  return next;
+}
+// U6: WebDAV's presets with the plain one ('other') first and chosen by default
+export function presetField(f) {
+  if (!f || f.name !== 'vendor' || !(f.examples || []).map(String).includes('other')) return f;
+  const ex = (f.examples || []).map(String);
+  return { ...f, default: 'other', examples: ['other', ...ex.filter((x) => x !== 'other')] };
+}

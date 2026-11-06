@@ -243,7 +243,7 @@
   "field.bucket": "Bucket",
   "field.remote": "Cartella da cifrare",
   "field.required": "Compila questo campo.",
-  "cred.noteServer": "Prima si controlla il certificato. Se il sistema non lo considera attendibile, ne mostra l’impronta, e solo quello viene ricordato per questo server.",
+  "cred.noteServer": "La sua password va nel portachiavi, mai in un file.",
   "cred.noteObject": "Le chiavi vanno nel portachiavi. L’archiviazione a oggetti non ha quota: Impostazioni mostra lo spazio usato, misurato una volta al giorno.",
   "cred.noteCrypt": "Nomi e contenuti vengono cifrati su questo computer prima dell’invio. Senza la password nessuno può leggerli, nemmeno LordOS.",
   "signin.title": "Accedi a {provider} nel browser",
@@ -354,5 +354,15 @@
   "trust.subject": "Rilasciato a",
   "trust.issuer": "Rilasciato da",
   "trust.trust": "Fidati",
-  "trust.trustCert": "Fidati di questo certificato"
+  "trust.trustCert": "Fidati di questo certificato",
+  "space.notMeasured": "Spazio non misurato",
+  "state.serviceDown": "Non connesso: il servizio Cloud non è in funzione",
+  "serviceDown.title": "Il servizio Cloud non è in funzione",
+  "serviceDown.body": "I tuoi account non sono connessi finché non torna a funzionare.",
+  "trust.changedTitle": "L’identità del server è cambiata",
+  "trust.changedBody": "{host} ora mostra una chiave diversa da quella che questo account aveva accettato. Succede quando il server viene reinstallato, ma può anche voler dire che un altro computer si spaccia per lui. Fidati della nuova chiave solo se l’amministratore del server ne conferma l’impronta.",
+  "trust.old": "Prima",
+  "trust.new": "Ora",
+  "trust.trustNew": "Fidati della nuova chiave",
+  "cred.noteSftp": "La prima volta LordOS mostra l’impronta della chiave del server da confrontare con quella del suo amministratore. Password e chiavi vanno nel portachiavi."
 }

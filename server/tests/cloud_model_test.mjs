@@ -55,7 +55,9 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const accs = [acc('1', 'Personal', { about: { total: 2e12, used: 612e9 } }), acc('2', 'Work', { about: { total: 1e12, used: 540e9 } }),
     acc('3', 'Photos', { about: { used: 161e9 } }), acc('4', 'NAS', { about: { total: 300e9, used: 7.4e9 } }), acc('5', 'New', { about: null })];
   const bar = M.allAccountsBar(accs);
-  eq('all accounts: used and total (no quota counts its used)', [bar.used, bar.total], [612e9 + 540e9 + 161e9 + 7.4e9, 2e12 + 1e12 + 161e9 + 300e9]);
+  eq('all accounts: used; no total while one has no quota (U4); its used still on the scale', [bar.used, bar.total, bar.scale], [612e9 + 540e9 + 161e9 + 7.4e9, null, 2e12 + 1e12 + 161e9 + 300e9]);
+  eq('all accounts with a quota: a total', M.allAccountsBar([acc('1', 'A', { about: { total: 10, used: 4 } }), acc('2', 'B', { about: { total: 20, used: 1 } })]).total, 30);
+  eq('one measured account: used, never "of" itself', M.allAccountsBar([acc('1', 'A', { about: { used: 5.7e6, measuredAt: 1.7e12 } })]).total, null);
   eq('segments skip unknown', bar.segs.map((s) => s.id), ['1', '2', '3', '4']);
   near('segment share', bar.segs[0].pct, 612e9 / 3.461e12);
   eq('segments fit', bar.segs.reduce((s, x) => s + x.pct, 0) <= 1, true);
@@ -493,7 +495,38 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     ['noQuota', true, false, false]);
   const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/errors.json'), 'utf8'));
   eq('each new error has its own text', ['cloud.hostKeyChanged', 'cloud.certUntrusted', 'cloud.unreachable', 'cloud.badAddress', 'cloud.cantRevoke', 'cloud.notConnected', 'cloud.keyringLocked', 'cloud.noKeyring', 'cloud.notRunning', 'cloud.notFound', 'cloud.badKind'].filter((k) => !cat[k]), []);
-  eq('fingerprints and the date in their texts', [/\{old\}.*\{new\}/.test(cat['cloud.hostKeyChanged']), /\{date\}/.test(cat['cloud.cantRevoke'])], [true, true]);
+  eq('fingerprints shown apart, never as {old}/{new} in the text (U10); the date in its text', [/\{(old|new)\}/.test(cat['cloud.hostKeyChanged'] + cat['cloud.certChanged']), /\{date\}/.test(cat['cloud.cantRevoke'])], [false, true]);
+  eq('the fingerprints of a change: the answer\'s, else the account\'s message', [M.changedPrints({ error: 'cloud.hostKeyChanged', old: 'SHA256:a', new: 'SHA256:b' }),
+    M.changedPrints(null, { error: 'cloud.hostKeyChanged', message: 'host key is now SHA256:Xy9+/z=' }), M.changedPrints({ error: 'cloud.unreachable' }), M.changedPrints(null, { error: 'cloud.keyringLocked' })],
+    [{ old: 'SHA256:a', new: 'SHA256:b' }, { old: null, new: 'SHA256:Xy9+/z=' }, null, null]);
+  eq('the owner trusts a changed key (question kind)', M.trustKind({ kind: 'hostKeyChanged', old: 'a', new: 'b' }), 'hostKeyChanged');
+  eq('too many attempts has its own text', !!cat['cloud.tooManyAttempts'], true);
+  const cl = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
+  eq('SFTP\'s note is about the server\'s key (U9)', [/key/i.test(cl['cred.noteSftp']), /certificate/i.test(cl['cred.noteSftp'])], [true, false]);
+}
+
+// ---- the e2e first pass: U3, U4, U6, U7 ----
+{
+  const P = '/c/a.mp4';
+  let st = M.mergeStatusHeld({}, { [P]: { st: 'down', pct: 0.9 } }, [P], 1000);
+  eq('U3: coming down', [st[P].st, st[P].downAt], ['down', 1000]);
+  st = M.mergeStatusHeld(st, { [P]: { st: 'cloud' } }, [P], 3000);
+  eq('U3: a stale "in the cloud" right after keeps "coming down"', [st[P].st, st[P].pct], ['down', 1]);
+  const here = M.mergeStatusHeld(st, { [P]: { st: 'here' } }, [P], 4000);
+  eq('U3: then on this computer', here[P].st, 'here');
+  eq('U3: still "in the cloud" long after: it is', M.mergeStatusHeld(st, { [P]: { st: 'cloud' } }, [P], 20000)[P].st, 'cloud');
+  eq('U3: Free Up Space goes to the cloud at once', M.mergeStatusHeld({ [P]: { st: 'here' } }, { [P]: { st: 'cloud' } }, [P], 5000)[P].st, 'cloud');
+  eq('U4: unmeasured', [M.notMeasured({ used: 0 }), M.notMeasured({ used: 0, measuredAt: 1 }), M.notMeasured({ used: 3 }), M.notMeasured({ total: 5, used: 0 }), M.spaceLine({ used: 0 }, String).key],
+    [true, false, false, false, 'cloud.space.notMeasured']);
+  const vendor = { name: 'vendor', default: 'fastmail', examples: ['fastmail', 'nextcloud', 'owncloud', 'sharepoint', 'other'] };
+  eq('U6: plain WebDAV first and by default', [M.presetField(vendor).examples[0], M.formValues({ fields: [vendor] }).vendor, M.formLayout({ kind: 'webdav', fields: [{ name: 'url' }, vendor] }).main[1].default],
+    ['other', 'other', 'other']);
+  eq('U6: other fields untouched', M.presetField({ name: 'provider', default: 'AWS', examples: ['AWS', 'Other'] }).default, 'AWS');
+  const a = acc('1', 'A', { state: 'syncing', up: { files: 1, name: 'x', bytes: 10, done: 5 } });
+  eq('U7: the service stopped: not connected, whatever the account said', [M.stateLine(a, { running: false }).key, M.stateLine(a, { running: true }).key], ['cloud.state.serviceDown', 'cloud.state.uploading']);
+  eq('U7: the sidebar dims them with "!"', M.cloudSideItems([a], [], { running: false }).map((x) => [x.dim, x.alert]), [[true, true]]);
+  const en = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
+  eq('the form promises no fingerprint prompt', /fingerprint/i.test(en['cred.noteServer']), false);
 }
 
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----

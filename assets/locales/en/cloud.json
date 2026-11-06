@@ -243,7 +243,7 @@
   "field.bucket": "Bucket",
   "field.remote": "Folder to encrypt",
   "field.required": "Fill in this field.",
-  "cred.noteServer": "The certificate is checked first. One the system doesn't trust shows its fingerprint, and only that one is kept for this server.",
+  "cred.noteServer": "Its password goes to the keyring, never to a file.",
   "cred.noteObject": "Keys go to the keyring. Object storage has no quota: Settings shows what is used, measured once a day.",
   "cred.noteCrypt": "Names and contents are encrypted on this computer before they go up. Without the password, nobody can read them, LordOS included.",
   "signin.title": "Sign in to {provider} in your browser",
@@ -354,5 +354,15 @@
   "trust.subject": "Issued to",
   "trust.issuer": "Issued by",
   "trust.trust": "Trust",
-  "trust.trustCert": "Trust This Certificate"
+  "trust.trustCert": "Trust This Certificate",
+  "space.notMeasured": "Space not measured",
+  "state.serviceDown": "Not connected: the cloud service isn't running",
+  "serviceDown.title": "The cloud service isn't running",
+  "serviceDown.body": "Your accounts aren't connected until it runs again.",
+  "trust.changedTitle": "The server's identity changed",
+  "trust.changedBody": "{host} now shows a different key from the one this account trusted. That happens when the server is reinstalled, but it can also mean another computer is posing as it. Trust the new key only if the server's administrator confirms its fingerprint.",
+  "trust.old": "Before",
+  "trust.new": "Now",
+  "trust.trustNew": "Trust the New Key",
+  "cred.noteSftp": "The first time, LordOS shows the server's key fingerprint to compare with its administrator's. Passwords and keys go to the keyring."
 }

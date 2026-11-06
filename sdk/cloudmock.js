@@ -129,6 +129,8 @@ export function installCloudMock(home, scenario = '') {
   }, 1000);
 
   // scenario 'locked' (settings "cloudDevMock": "locked"): the session logged in without a password, the keyring is locked
+  // scenario 'crashed': rclone stopped several times (U7)
+  if (scenario === 'crashed') { st.service = { ...st.service, running: false, error: 'cloud.crashed' }; }
   if (scenario === 'locked') {
     for (const a of st.accounts.slice(0, 2)) { a.state = 'locked'; a.error = 'cloud.keyringLocked'; a.about = null; a.up = { files: 0, bytes: 0, done: 0 }; a.down = { files: 0, bytes: 0, done: 0 }; }
   }
@@ -176,6 +178,10 @@ export function installCloudMock(home, scenario = '') {
       // e2e (2026-11-06): an address that doesn't answer, then trusting an SSH server's key or a certificate
       const host = String(fields.host || fields.url || fields.endpoint || '');
       if (/unreachable|invalid/.test(host)) return { error: 'cloud.unreachable' };
+      if (/changed/.test(host)) {
+        pendingAdd = { kind, name, label: p[1] };
+        return { question: { kind: 'hostKeyChanged', state: 'mock-trust', host, port: 22, old: 'SHA256:3vVq2M3xk7Jm1o8R9pZcY6fJt2uQ0yLw5kHn4bXsE1A', new: 'SHA256:Qe7mT0c2Lw9sZb4kYh1VnR8pXuJ3dF6gAo5iCe2Mtz8' } };
+      }
       if (kind === 'sftp' || /^https:/.test(host) && /self/.test(host)) {
         pendingAdd = { kind, name, label: p[1] };
         return kind === 'sftp'

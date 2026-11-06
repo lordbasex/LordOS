@@ -121,6 +121,7 @@ int main(void) {
         else if (!strcmp(cmd, "answer") && a1) { int req = 0; char *r = cloud_answer(a1, rest ? rest : "", &req); later(r, req); }
         else if (!strcmp(cmd, "trash") && a1) { int req = 0; char *r = cloud_empty_trash(a1, &req); later(r, req); }
         else if (!strcmp(cmd, "measure") && a1) { int req = 0; char *r = cloud_measure(a1, &req); later(r, req); }
+        else if (!strcmp(cmd, "search") && a1 && rest) { int req = 0; char *r = cloud_search(a1, rest, &req); later(r, req); }
         else if (!strcmp(cmd, "delete") && a1) { int req = 0; const char *p[] = { a1 }; char *r = cloud_delete(p, 1, &req); later(r, req); }
         else if (!strcmp(cmd, "pause") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 1); out(strdup("{\"ok\":true}")); }
         else if (!strcmp(cmd, "resume") && a1) { cloud_pause(strcmp(a1, "all") ? a1 : NULL, 0); out(strdup("{\"ok\":true}")); }

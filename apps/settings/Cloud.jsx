@@ -79,6 +79,19 @@ function errorMessage(r, acc) {
   return tOptional(`errors.${code}`, e.vars) || errorText(code);
 }
 
+// a changed server key or certificate: before and now, in monospace (U10)
+function Prints({ prints }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  if (!prints) return null;
+  const line = (k, v) => (v ? (
+    <View key={k} style={{ flexDirection: 'row', gap: 8 }}>
+      <Text style={{ width: 54, fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{tr(k)}</Text>
+      <Text style={{ flex: 1, minWidth: 0, fontFamily: 'monospace', fontSize: 11, color: t.text, direction: 'ltr', textAlign: 'start' }}>{v}</Text>
+    </View>) : null);
+  return <View style={{ gap: 3 }}>{line('cloud.trust.old', prints.old)}{line('cloud.trust.new', prints.new)}</View>;
+}
+
 const providerCache = createStore([]);
 const loadProviders = () => cloud.providers().then((l) => { providerCache.set(() => l); return l; });
 function providerOf(kind, a) {
@@ -156,7 +169,7 @@ function AllAccounts({ st }) {
     <View aria-label={tr('cloud.allAccounts')} style={[box(t), { padding: 16, gap: 10 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
         <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.allAccounts')}</Text>
-        <Dim t={t}>{tr('cloud.space.usedOf', { used: formatBytes(bar.used), total: formatBytes(bar.total) })}</Dim>
+        <Dim t={t}>{bar.total != null ? tr('cloud.space.usedOf', { used: formatBytes(bar.used), total: formatBytes(bar.total) }) : tr('cloud.space.usedOnly', { used: formatBytes(bar.used) })}</Dim>
       </View>
       <SpaceBar height={14} gap={2} parts={bar.segs.map((s) => ({ frac: s.pct, color: s.color }))} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
@@ -175,7 +188,7 @@ function AccountRow({ a, accounts, last }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const u = M.usage(a.about);
-  const line = M.stateLine(a);
+  const line = M.stateLine(a, (cloudState.get() || {}).service);
   const color = M.accountColor(accounts, a.id);
   return (
     <BoxRow t={t} last={last} onClick={() => setView({ page: a.id, sheet: null })}>
@@ -224,6 +237,16 @@ function Overview({ st }) {
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr('cloud.empty.title')}</Text>
           <Dim t={t} style={{ textAlign: 'center' }}>{tr('cloud.empty.body')}</Dim>
           <Button primary label={tr('cloud.addAccount')} onClick={() => setView({ sheet: { kind: 'add' } })} />
+        </View>
+      ) : null}
+      {svc.running === false && accs.length ? (
+        <View style={[box(t), { padding: 16, gap: 8, border: `1px solid ${tint.warn}` }]}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.serviceDown.title')}</Text>
+          <Dim t={t}>{svc.error ? errorText(svc.error) : tr('cloud.serviceDown.body')}</Dim>
+          <Actions start>
+            <Button small primary label={tr('cloud.service.restart')} onClick={() => cloud.restart()} />
+            <Button small label={tr('cloud.service.log')} onClick={() => cloud.showLog()} />
+          </Actions>
         </View>
       ) : null}
       <AllAccounts st={st} />
@@ -695,7 +718,7 @@ function AccountPage({ a, st }) {
   const p = providerOf(a.kind, a);
   const verified = typeof (providerCache.get().find((x) => x.kind === a.kind) || {}).verified === 'boolean'
     ? providerCache.get().find((x) => x.kind === a.kind).verified : M.isVerified(a.kind, CLOUD_PROVIDERS);
-  const line = M.stateLine(a);
+  const line = M.stateLine(a, st.service);
   const stateText = tr(line.key, line.vars);
   const errText = a.error && !M.needsUnlock(a) ? errorText(M.explainError(a.error, st, a)) : '';
   // two balanced columns once the window is wide enough, one column otherwise
@@ -721,6 +744,7 @@ function AccountPage({ a, st }) {
         {/* the state once (Unlock Keyring… says it for a locked keyring), the account's own error only when it says more */}
         {M.needsUnlock(a) ? <UnlockRow a={a} /> : <Dim t={t} style={{ color: toneColor(t, line.tone) }}>{stateText}</Dim>}
         {errText && errText !== stateText ? <Dim t={t} style={{ color: tint.warn }}>{errText}</Dim> : null}
+        <Prints prints={M.changedPrints(null, a)} />
         <Dim t={t}>{last ? tr('cloud.lastSynced', { when: (() => { const g = M.ago(last.at); return tr(g.key, g.vars); })() }) : tr('cloud.notSyncedYet')}</Dim>
         <Dim t={t}>{tr('cloud.inKeyring')}</Dim>
       </View>
@@ -945,7 +969,7 @@ function CredSheet({ st, sheet }) {
   const layout = M.formLayout(p);
   const [vals, setVals] = useState(() => sheet.vals || M.formValues(p));
   const [name, setName] = useState(sheet.name || '');
-  const [err, setErr] = useState(() => (sheet.error ? { text: errorMessage(sheet.error), field: M.errorField(sheet.error, p) } : null));       // { text, field }
+  const [err, setErr] = useState(() => (sheet.error ? { text: errorMessage(sheet.error), field: M.errorField(sheet.error, p), prints: M.changedPrints(sheet.error) } : null));       // { text, field }
   const [busy, setBusy] = useState(false);
   const [adv, setAdv] = useState(false);
   const [auth, setAuth] = useState('password');
@@ -976,13 +1000,14 @@ function CredSheet({ st, sheet }) {
     Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v), sheet.accountId ? { accountId: sheet.accountId } : {})).then((r) => {
       setBusy(false);
       const field = r && r.error ? M.errorField(r, p) : null;
-      if (r && r.error) { setErr({ text: errorMessage(r), field }); if (field && layout.advanced.some((f) => f.name === field)) setAdv(true); return; }
+      if (r && r.error) { setErr({ text: errorMessage(r), field, prints: M.changedPrints(r) }); if (field && layout.advanced.some((f) => f.name === field)) setAdv(true); return; }
       // a question (a code, trusting the server) comes back here on an error, with what was typed
       afterAdd(r, p, name.trim(), { ...sheet, kind: 'cred', provider: p, name: name.trim(), vals: { ...vals }, error: null });
     });
   };
   const notes = M.notesFor(p.kind);
-  const note = p.group === 'object' ? tr('cloud.cred.noteObject') : p.group === 'crypt' ? tr('cloud.cred.noteCrypt') : tr('cloud.cred.noteServer');
+  // SFTP is about the server's key (U9), the others' servers about their password
+  const note = p.group === 'object' ? tr('cloud.cred.noteObject') : p.group === 'crypt' ? tr('cloud.cred.noteCrypt') : p.kind === 'sftp' ? tr('cloud.cred.noteSftp') : tr('cloud.cred.noteServer');
   const row = (key, label, input, help) => (
     <View key={key} style={{ gap: 3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1064,13 +1089,14 @@ function CredSheet({ st, sheet }) {
                 {adv ? layout.advanced.map(advRow) : null}
               </View>
             ) : null}
+            {err && err.prints ? <View style={{ padding: 10, gap: 6, borderRadius: 8, border: `1px solid ${tint.error}` }}><Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err.text}</Text><Prints prints={err.prints} /></View> : null}
             <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
               <Dim t={t}>{note}</Dim>
             </View>
           </View>
         </ScrollView>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, borderTopWidth: 1, borderTopColor: t.separator }}>
-          <Text style={{ flex: 1, fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err ? err.text : ''}</Text>
+          <Text style={{ flex: 1, fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err && !err.prints ? err.text : ''}</Text>
           <Button label={tr('cloud.back')} onClick={back} />
           <Button primary label={tr(busy ? 'cloud.connecting' : 'cloud.connect')} disabled={busy} onClick={connect} />
         </View>
@@ -1120,19 +1146,21 @@ function QuestionSheet({ sheet }) {
     return (
       <Sheet width={480} top={60} onClose={close2} label={(sheet.provider || {}).label}>
         <View style={{ padding: spacing.xl, gap: spacing.m }}>
-          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(trust === 'hostKey' ? 'cloud.trust.hostTitle' : 'cloud.trust.certTitle')}</Text>
+          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(trust === 'hostKey' ? 'cloud.trust.hostTitle' : trust === 'hostKeyChanged' ? 'cloud.trust.changedTitle' : 'cloud.trust.certTitle')}</Text>
           <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, textAlign: 'start' }}>
-            {tr(trust === 'hostKey' ? 'cloud.trust.hostBody' : 'cloud.trust.certBody', { host: `${q.host || ''}${q.port ? `:${q.port}` : ''}` })}</Text>
+            {tr(trust === 'hostKey' ? 'cloud.trust.hostBody' : trust === 'hostKeyChanged' ? 'cloud.trust.changedBody' : 'cloud.trust.certBody', { host: `${q.host || tr('cloud.trust.server')}${q.port ? `:${q.port}` : ''}` })}</Text>
           <View style={{ gap: 6, padding: 12, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
-            {fact(tr('cloud.trust.server'), `${q.host || ''}${q.port ? `:${q.port}` : ''}`)}
-            {fact(tr('cloud.trust.fingerprint'), q.fingerprint)}
+            {fact(tr('cloud.trust.server'), q.host ? `${q.host}${q.port ? `:${q.port}` : ''}` : null)}
+            {fact(tr('cloud.trust.fingerprint'), trust === 'hostKeyChanged' ? null : q.fingerprint)}
+            {trust === 'hostKeyChanged' ? fact(tr('cloud.trust.old'), q.old) : null}
+            {trust === 'hostKeyChanged' ? fact(tr('cloud.trust.new'), q.new || q.fingerprint) : null}
             {trust === 'certificate' ? fact(tr('cloud.trust.subject'), q.subject) : null}
             {trust === 'certificate' ? fact(tr('cloud.trust.issuer'), q.issuer) : null}
           </View>
           {err ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
             <Button label={tr('cloud.cancel')} onClick={close2} />
-            <Button primary label={tr(busy ? 'cloud.connecting' : trust === 'hostKey' ? 'cloud.trust.trust' : 'cloud.trust.trustCert')} disabled={busy} onClick={doTrust} />
+            <Button primary label={tr(busy ? 'cloud.connecting' : trust === 'hostKey' ? 'cloud.trust.trust' : trust === 'hostKeyChanged' ? 'cloud.trust.trustNew' : 'cloud.trust.trustCert')} disabled={busy} onClick={doTrust} />
           </View>
         </View>
       </Sheet>

@@ -243,7 +243,7 @@
   "field.bucket": "Bucket",
   "field.remote": "Dossier à chiffrer",
   "field.required": "Remplissez ce champ.",
-  "cred.noteServer": "Le certificat est vérifié d’abord. Si le système ne lui fait pas confiance, son empreinte s’affiche, et seul celui-ci est retenu pour ce serveur.",
+  "cred.noteServer": "Son mot de passe va dans le trousseau, jamais dans un fichier.",
   "cred.noteObject": "Les clés vont dans le trousseau. Le stockage objet n’a pas de quota : les Réglages montrent l’espace utilisé, mesuré une fois par jour.",
   "cred.noteCrypt": "Les noms et le contenu sont chiffrés sur cet ordinateur avant l’envoi. Sans le mot de passe, personne ne peut les lire, pas même LordOS.",
   "signin.title": "Connectez-vous à {provider} dans votre navigateur",
@@ -354,5 +354,15 @@
   "trust.subject": "Délivré à",
   "trust.issuer": "Délivré par",
   "trust.trust": "Faire confiance",
-  "trust.trustCert": "Faire confiance à ce certificat"
+  "trust.trustCert": "Faire confiance à ce certificat",
+  "space.notMeasured": "Espace non mesuré",
+  "state.serviceDown": "Non connecté : le service Cloud ne fonctionne pas",
+  "serviceDown.title": "Le service Cloud ne fonctionne pas",
+  "serviceDown.body": "Vos comptes ne sont pas connectés tant qu’il ne fonctionne pas de nouveau.",
+  "trust.changedTitle": "L’identité du serveur a changé",
+  "trust.changedBody": "{host} présente maintenant une clé différente de celle que ce compte avait acceptée. Cela arrive quand le serveur est réinstallé, mais cela peut aussi vouloir dire qu’un autre ordinateur se fait passer pour lui. Ne faites confiance à la nouvelle clé que si l’administrateur du serveur confirme son empreinte.",
+  "trust.old": "Avant",
+  "trust.new": "Maintenant",
+  "trust.trustNew": "Faire confiance à la nouvelle clé",
+  "cred.noteSftp": "La première fois, LordOS affiche l’empreinte de la clé du serveur pour que vous la compariez avec celle de son administrateur. Mots de passe et clés vont dans le trousseau."
 }
