@@ -22,6 +22,14 @@ files=$(find . -maxdepth 1 -type f ! -name 'SHA256SUMS*' ! -name '.*' | sed 's|^
 for f in $files; do
     case "$f" in -*|*[!A-Za-z0-9._+~-]*) echo "unexpected file name in $dir: $f" >&2; exit 1 ;; esac
 done
+# since 0.8.7 lordos depends on lordos-hwdata, and install.sh takes it only from the same release: the
+# deb-only releases 0.8.8.1-0.8.8.3 shipped without it and install.sh failed on a fresh Debian (#40)
+if echo "$files" | grep -q '^lordos_.*\.deb$' && ! echo "$files" | grep -q '^lordos-hwdata_.*_all\.deb$' \
+    && [ "${ALLOW_NO_HWDATA:-0}" != 1 ]; then
+    echo "no lordos-hwdata_<date>_all.deb in $dir: every release with lordos debs needs it (install.sh fetches it from here)." >&2
+    echo "copy the current one (same bytes as the APT pool) or set ALLOW_NO_HWDATA=1 if this lordos doesn't depend on it" >&2
+    exit 1
+fi
 if command -v sha256sum >/dev/null; then sum() { sha256sum "$@"; }; else sum() { shasum -a 256 "$@"; }; fi
 # shellcheck disable=SC2086
 sum $files > SHA256SUMS
