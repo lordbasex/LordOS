@@ -1,0 +1,20 @@
+{
+  "_comment": "Cloud providers verified on LordOS (docs/CLOUD.md 19). Only what was really tested: evidence is 'maintainer test: <what>' or 'issue #N'. Every other provider rclone offers shows as Not verified yet, still addable.",
+  "verified": {
+    "webdav": {
+      "since": "0.8.8.5",
+      "date": "2026-11-06",
+      "evidence": "maintainer test: server/tests/cloud_integration.sh and cloud_providers_check.sh (Check This Account's steps: about, list, folder, 1 MiB up, Free Up Space, read back by hash, delete) against rclone serve webdav, VM 116 amd64, rclone v1.75.2"
+    },
+    "sftp": {
+      "since": "0.8.8.5",
+      "date": "2026-11-06",
+      "evidence": "maintainer test: server/tests/cloud_providers_check.sh against the machine's OpenSSH sshd on 127.0.0.1 with a throwaway user and key (key_pem), VM 116 amd64, rclone v1.75.2: every step passed; SFTP has no links"
+    },
+    "s3": {
+      "since": "0.8.8.5",
+      "date": "2026-11-06",
+      "evidence": "maintainer test: server/tests/cloud_providers_check.sh against rclone serve s3 (one bucket, access key and secret), VM 116 amd64, rclone v1.75.2: every step passed; links not confirmed (the stand-in gives http:// links and LordOS keeps only https ones)"
+    }
+  }
+}
