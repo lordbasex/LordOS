@@ -224,6 +224,8 @@ export function countdown(expiresAt, now = Date.now()) {
 // ---- sharing (section 9) ----
 
 export const EXPIRY = ['1d', '7d', '30d', 'never'];
+// what a provider's links can last: S3's presigned links at most 7 days (17.2 item 29)
+export const expiryChoices = (acc) => (acc && (acc.kind === 's3' || acc.group === 'object') ? ['1d', '7d'] : EXPIRY);
 export const DEFAULT_EXPIRY = '7d';
 export const linkOf = (links, path) => (links || []).find((l) => l.path === path) || null;
 // a link's line: { key, vars }; expires is a time (s or ms), 0/null for never
@@ -285,6 +287,9 @@ export function ago(at, now = Date.now()) {
   if (s < 86400) return { key: 'cloud.ago.h', vars: { count: Math.round(s / 3600) } };
   return { key: 'cloud.ago.d', vars: { count: Math.round(s / 86400) } };
 }
+// Opening a file only in the cloud can't work: its account is offline, locked or not mounted (17.2 item 19, cloud.offline)
+export const cantOpen = (acc, s) => !!acc && !!s && s.st === 'cloud' && (acc.state === 'offline' || acc.state === 'locked' || acc.mounted === false || acc.error === 'cloud.offline');
+
 // The panel's Recent rows: [{ path, name, where, dir, ago }] newest first, at most n.
 export function recentRows(recent, accounts, now = Date.now(), n = 5) {
   return (recent || []).slice(0, n).map((r) => {
@@ -535,6 +540,9 @@ export function errorField(r, p) {
 }
 // an account that is connected (mounted, no error) and whose provider gives no total can be measured
 export const measurable = (acc) => !!acc && !acc.error && acc.state !== 'locked' && acc.mounted !== false && !(acc.about && acc.about.total > 0);
+
+// cloud.search's hits as Files' entries (17.2 item 31)
+export const searchEntries = (hits) => (hits || []).map((h) => ({ name: String(h.path).split('/').pop(), path: h.path, dir: !!h.dir, size: h.size || 0, mtime: h.mtime || 0 }));
 
 // ---- after the e2e first pass (U3, U6) ----
 

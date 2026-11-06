@@ -117,7 +117,6 @@
   "pauseAll": "Metti tutto in pausa",
   "resumeAll": "Riprendi tutto",
   "recent": "Recenti",
-  "thisComputer": "questo computer",
   "ago.now": "ora",
   "ago.min": {
     "one": "{count} min",
@@ -165,7 +164,7 @@
   "notify.signinTitle": "«{name}» ti chiede di accedere di nuovo",
   "notify.signinBody": "Il fornitore non accetta più l’accesso salvato. Le modifiche fatte qui aspettano su questo computer finché non accedi. I file mantenuti si aprono ancora.",
   "notify.conflictTitle": "Modificato anche su un altro dispositivo",
-  "notify.conflictBody": "{file} è stato modificato in {account} mentre questo computer era non in linea. La versione del cloud mantiene il nome; la tua è accanto come «{kept}».",
+  "notify.conflictBody": "{file} è cambiato anche in {account}. La tua versione ha mantenuto il nome; l’altra è accanto come «{kept}».",
   "notify.showBoth": "Mostra entrambi in File",
   "notify.fullTitle": "«{name}» è pieno",
   "notify.fullBody": {
@@ -364,5 +363,12 @@
   "trust.old": "Prima",
   "trust.new": "Ora",
   "trust.trustNew": "Fidati della nuova chiave",
-  "cred.noteSftp": "La prima volta LordOS mostra l’impronta della chiave del server da confrontare con quella del suo amministratore. Password e chiavi vanno nel portachiavi."
+  "cred.noteSftp": "La prima volta LordOS mostra l’impronta della chiave del server da confrontare con quella del suo amministratore. Password e chiavi vanno nel portachiavi.",
+  "cloudCopy": "copia del cloud",
+  "search.running": "Ricerca in {name}…",
+  "search.partial": {
+    "one": "Ricerca interrotta prima: mostro il primo",
+    "other": "Ricerca interrotta prima: mostro i primi {count}"
+  },
+  "listCapped": "Mostro i primi {count} elementi"
 }

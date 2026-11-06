@@ -105,7 +105,7 @@
   "cloud.certChanged": "Le certificat de ce serveur a changé, la connexion a donc été refusée : il peut s’agir d’une attaque.",
   "cloud.listFailed": "Impossible de lister les fichiers du compte",
   "cloud.notTrusted": "Le serveur n’a pas été approuvé : le compte n’a pas été ajouté",
-  "cloud.hostKeyOther": "Un autre compte connaît une clé différente pour ce serveur",
+  "cloud.hostKeyOther": "Un autre compte connaît une autre clé pour ce serveur. Vérifiez auprès de son administrateur avant de faire confiance à celle-ci.",
   "cloud.tooManyAttempts": "Le serveur refuse pour un moment les nouvelles connexions de cet ordinateur : attendez une minute et réessayez",
   "bench.bootTestFailed": "Impossible d’enregistrer l’état du test de temps de démarrage",
   "bench.bootTestLive": "Le test de temps de démarrage ne peut pas s’exécuter en session live : rien de ce qu’il enregistre ne survit à un redémarrage",

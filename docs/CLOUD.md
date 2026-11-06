@@ -943,3 +943,19 @@ The closed rc method table has 27 methods now (`operations/list`, `operations/st
     entries, 16 levels and 500 hits, names matched without case. Chosen over a recursive `operations/list` with a filter:
     the walk sees exactly what Files shows and its cost is bounded here. `lord.fs.search` still answers nothing for a cloud
     folder; Files calls `cloud.search` there.
+
+### 18.7 The interface of 17.2 items 19 to 31
+
+- **Search in a cloud folder** goes to `cloud.search(path, needle)` (local search unchanged): "Searching <account>…" in the
+  search bar while it runs, the hits when they come, and "Search stopped early: showing the first N" when `complete` is
+  false. Only the latest search's answer is shown.
+- **Conflicts** follow 17.2 item 23: the notification says "<name> also changed in <account>. Your version kept its name;
+  the other one is next to it as “<kept name>”." (`kept` is the cloud's copy, "name (cloud copy).ext"), with Show Both in
+  Files.
+- **Opening a file only in the cloud** while its account is offline, locked or not mounted shows the offline message
+  (`cantOpen`). A host-key question with `warning: 'cloud.hostKeyOther'` shows that warning above the fingerprint.
+- **Get Info** of a folder on a cloud or network mount: `lord.fs.du` answers `{ remote: true }`, so the size is the
+  listing's when known, else "—"; it never stays on "Calculating…".
+- **Links** show the expiry the provider answered (`{ url, expires }`); S3 offers only 1 day and 7 days.
+- **5000 entries**: a cloud folder whose listing came back with exactly 5000 says "Showing the first 5,000 items" in the
+  status bar (`lord.fs.list`'s bound, item 24).

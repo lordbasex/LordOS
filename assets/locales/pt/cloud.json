@@ -117,7 +117,6 @@
   "pauseAll": "Pausar tudo",
   "resumeAll": "Retomar tudo",
   "recent": "Recentes",
-  "thisComputer": "este computador",
   "ago.now": "agora",
   "ago.min": {
     "one": "{count} min",
@@ -165,7 +164,7 @@
   "notify.signinTitle": "“{name}” precisa que você entre de novo",
   "notify.signinBody": "O provedor deixou de aceitar o acesso salvo. As alterações feitas aqui esperam neste computador até você entrar. Os arquivos mantidos continuam abrindo.",
   "notify.conflictTitle": "Alterado também em outro dispositivo",
-  "notify.conflictBody": "{file} foi alterado em {account} enquanto este computador estava sem conexão. A versão da nuvem fica com o nome; a sua está ao lado como “{kept}”.",
+  "notify.conflictBody": "{file} também mudou em {account}. A sua versão ficou com o nome; a outra está ao lado como “{kept}”.",
   "notify.showBoth": "Mostrar os dois em Arquivos",
   "notify.fullTitle": "“{name}” está cheio",
   "notify.fullBody": {
@@ -364,5 +363,12 @@
   "trust.old": "Antes",
   "trust.new": "Agora",
   "trust.trustNew": "Confiar na chave nova",
-  "cred.noteSftp": "Na primeira vez, o LordOS mostra a impressão digital da chave do servidor para você comparar com a do administrador. Senhas e chaves vão para o chaveiro."
+  "cred.noteSftp": "Na primeira vez, o LordOS mostra a impressão digital da chave do servidor para você comparar com a do administrador. Senhas e chaves vão para o chaveiro.",
+  "cloudCopy": "cópia da nuvem",
+  "search.running": "Buscando em {name}…",
+  "search.partial": {
+    "one": "A busca parou antes: mostrando o primeiro",
+    "other": "A busca parou antes: mostrando os primeiros {count}"
+  },
+  "listCapped": "Mostrando os primeiros {count} itens"
 }

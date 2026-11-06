@@ -117,7 +117,6 @@
   "pauseAll": "Tout mettre en pause",
   "resumeAll": "Tout reprendre",
   "recent": "Récents",
-  "thisComputer": "cet ordinateur",
   "ago.now": "maintenant",
   "ago.min": {
     "one": "{count} min",
@@ -165,7 +164,7 @@
   "notify.signinTitle": "« {name} » vous demande de vous reconnecter",
   "notify.signinBody": "Le fournisseur n’accepte plus la connexion enregistrée. Les modifications faites ici attendent sur cet ordinateur jusqu’à votre reconnexion. Les fichiers conservés s’ouvrent toujours.",
   "notify.conflictTitle": "Modifié aussi sur un autre appareil",
-  "notify.conflictBody": "{file} a été modifié dans {account} pendant que cet ordinateur était hors ligne. La version du cloud garde le nom ; la vôtre est à côté, sous le nom « {kept} ».",
+  "notify.conflictBody": "{file} a aussi changé dans {account}. Votre version garde son nom ; l’autre est à côté, sous le nom « {kept} ».",
   "notify.showBoth": "Afficher les deux dans Fichiers",
   "notify.fullTitle": "« {name} » est plein",
   "notify.fullBody": {
@@ -364,5 +363,12 @@
   "trust.old": "Avant",
   "trust.new": "Maintenant",
   "trust.trustNew": "Faire confiance à la nouvelle clé",
-  "cred.noteSftp": "La première fois, LordOS affiche l’empreinte de la clé du serveur pour que vous la compariez avec celle de son administrateur. Mots de passe et clés vont dans le trousseau."
+  "cred.noteSftp": "La première fois, LordOS affiche l’empreinte de la clé du serveur pour que vous la compariez avec celle de son administrateur. Mots de passe et clés vont dans le trousseau.",
+  "cloudCopy": "copie du cloud",
+  "search.running": "Recherche dans {name}…",
+  "search.partial": {
+    "one": "Recherche arrêtée plus tôt : affichage du premier résultat",
+    "other": "Recherche arrêtée plus tôt : affichage des {count} premiers"
+  },
+  "listCapped": "Affichage des {count} premiers éléments"
 }

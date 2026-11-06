@@ -8,12 +8,19 @@ import { archiveEntries } from './archive.js';
 
 export const sameLoc = (a, b) => a && b && a.type === b.type && a.path === b.path && a.color === b.color && a.query === b.query && a.root === b.root && (a.inner || '') === (b.inner || '');
 
+export const LIST_CAP = 5000;
 const norm = (dir) => (e) => ({ ...e, path: `${dir === '/' ? '' : dir}/${e.name}` });
 
 // Entries of a place (unsorted). hidden: show the ones that start with a dot.
 export function loadEntries(loc, { hidden, launcherApps }) {
   switch (loc.type) {
-    case 'dir': return lord.fs.list(loc.path).filter((e) => hidden || !e.name.startsWith('.')).map(norm(loc.path));
+    case 'dir': {
+      // lord.fs.list stops at 5000 entries a folder: the list says so (`capped`) for Files to tell
+      const raw = lord.fs.list(loc.path);
+      const out = raw.filter((e) => hidden || !e.name.startsWith('.')).map(norm(loc.path));
+      out.capped = raw.length === LIST_CAP;
+      return out;
+    }
     case 'recent': return fs.recent(80, 30).map((e) => ({ ...e, recent: true }));
     case 'apps': return launcherApps.map((a) => ({ app: true, id: a.id, name: a.name, Icon: a.Icon, path: `app:${a.id}`, dir: false, size: 0, mtime: 0, kindLabel: a.kind }));
     case 'trash': return fs.trashList().map((x) => ({ name: x.name, path: x.id, trash: true, original: x.original, deleted: x.deleted, dir: x.dir, size: x.size, mtime: Date.parse(x.deleted) || 0 }));

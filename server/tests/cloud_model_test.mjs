@@ -529,6 +529,21 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('the form promises no fingerprint prompt', /fingerprint/i.test(en['cred.noteServer']), false);
 }
 
+// ---- 17.2 items 19–31 in the interface ----
+{
+  eq('search hits as entries', M.searchEntries([{ path: '/h/Cloud/W/a/Report.pdf', dir: false, size: 5, mtime: 9 }, { path: '/h/Cloud/W/b', dir: true }]),
+    [{ name: 'Report.pdf', path: '/h/Cloud/W/a/Report.pdf', dir: false, size: 5, mtime: 9 }, { name: 'b', path: '/h/Cloud/W/b', dir: true, size: 0, mtime: 0 }]);
+  eq('S3 links: 1 or 7 days only', [M.expiryChoices({ kind: 's3' }), M.expiryChoices({ kind: 'dropbox' })], [['1d', '7d'], M.EXPIRY]);
+  eq('a file only in the cloud can\'t open when the account is offline, locked or not mounted', [M.cantOpen({ state: 'offline' }, { st: 'cloud' }), M.cantOpen({ state: 'locked' }, { st: 'cloud' }),
+    M.cantOpen({ state: 'ok', mounted: false }, { st: 'cloud' }), M.cantOpen({ state: 'ok', mounted: true }, { st: 'cloud' }), M.cantOpen({ state: 'offline' }, { st: 'here' })], [true, true, true, false, false]);
+  const en = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/cloud.json'), 'utf8'));
+  eq('conflicts: ours keeps the name, the cloud copy next to it', [/Your version kept its name/.test(en['notify.conflictBody']), en.cloudCopy, 'thisComputer' in en], [true, 'cloud copy', false]);
+  const files = fs.readFileSync(path.join(root, 'apps/files/index.jsx'), 'utf8'), locs = fs.readFileSync(path.join(root, 'apps/files/locations.js'), 'utf8');
+  eq('Files: cloud search through cloud.search, the 5000 cap told', [/cloud\.search\(loc\.root, loc\.query\)/.test(files), /out\.capped = raw\.length === LIST_CAP/.test(locs), /cloud\.listCapped/.test(files)], [true, true, true]);
+  const panels = fs.readFileSync(path.join(root, 'apps/files/panels.jsx'), 'utf8');
+  eq('Get Info never spins on a mount (du answers { remote: true })', /du\.remote \|\| du\.failed/.test(panels), true);
+}
+
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----
 // No one-sided physical edge in Cloud's screens: text aligns to start/end, insets are insetInline*, and a
 // physical left/top is only for a cover of the whole box, a place on the screen (the window's frame) or a ring

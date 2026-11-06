@@ -358,7 +358,7 @@ function KeptList({ a, onAdd }) {
   useEffect(() => {
     const id = setTimeout(() => {
       const s = {};
-      for (const p of a.kept || []) { try { s[p] = fs.du(p, 300).size; } catch (e) { /* not there yet */ } }
+      for (const p of a.kept || []) { try { const d = fs.du(p, 300); if (d && d.size != null) s[p] = d.size; } catch (e) { /* not there yet */ } }
       setSizes(s);
     }, 50);
     return () => clearTimeout(id);
@@ -1149,6 +1149,7 @@ function QuestionSheet({ sheet }) {
           <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(trust === 'hostKey' ? 'cloud.trust.hostTitle' : trust === 'hostKeyChanged' ? 'cloud.trust.changedTitle' : 'cloud.trust.certTitle')}</Text>
           <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, textAlign: 'start' }}>
             {tr(trust === 'hostKey' ? 'cloud.trust.hostBody' : trust === 'hostKeyChanged' ? 'cloud.trust.changedBody' : 'cloud.trust.certBody', { host: `${q.host || tr('cloud.trust.server')}${q.port ? `:${q.port}` : ''}` })}</Text>
+          {q.warning ? <Text style={{ fontSize: typeScale.callout, color: tint.warn, lineHeight: 1.45, textAlign: 'start' }}>{errorMessage(q.warning)}</Text> : null}
           <View style={{ gap: 6, padding: 12, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
             {fact(tr('cloud.trust.server'), q.host ? `${q.host}${q.port ? `:${q.port}` : ''}` : null)}
             {fact(tr('cloud.trust.fingerprint'), trust === 'hostKeyChanged' ? null : q.fingerprint)}
