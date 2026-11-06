@@ -295,6 +295,8 @@ const char *cloud_failure_code(const char *m) {
     static const char *const addr[] = { "unsupported protocol scheme", "invalid URL", "missing port", "too many colons", "invalid port",
         "first path segment in URL", "missing protocol scheme", "invalid character", "parse \"", NULL };
     if (!m || !m[0]) return NULL;
+    if (strstr(m, "knownhosts: key mismatch") || strstr(m, "host key mismatch") || strstr(m, "REMOTE HOST IDENTIFICATION HAS CHANGED")) return "cloud.hostKeyChanged";
+    if (strstr(m, "x509:") || strstr(m, "failed to verify certificate") || strstr(m, "certificate signed by unknown authority")) return "cloud.certUntrusted";
     for (int i = 0; addr[i]; i++) if (strstr(m, addr[i])) return "cloud.badAddress";
     for (int i = 0; auth[i]; i++) if (strstr(m, auth[i])) return "cloud.authFailed";
     for (int i = 0; net[i]; i++) if (strstr(m, net[i])) return "cloud.unreachable";
@@ -326,7 +328,7 @@ int cloud_field_hidden(const CloudKind *k, const char *f) {
 
 int cloud_url_ok(const char *u) {
     size_t n = u ? strlen(u) : 0;
-    if (n < 9 || n > 300 || strncmp(u, "https://", 8) || u[8] == '/' || u[8] == '-') return 0;
+    if (n < 9 || n > 4096 || strncmp(u, "https://", 8) || u[8] == '/' || u[8] == '-') return 0;
     for (; *u; u++) if (*u <= ' ' || *u >= 0x7f || *u == '"' || *u == '\'' || *u == '\\' || *u == '<' || *u == '>' || *u == '`') return 0;
     return 1;
 }

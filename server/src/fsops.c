@@ -121,12 +121,19 @@ int fsops_rename(const char *from, const char *to, char *err, size_t errlen) {
         seterr(err, errlen, "fs.protected");
         return -1;
     }
-    if (renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) {
-        if (errno == EEXIST) seterr(err, errlen, "fs.exists");
-        else seterrno(err, errlen, errno);
-        return -1;
+    if (!renameat2(AT_FDCWD, from, AT_FDCWD, to, RENAME_NOREPLACE)) return 0;
+    if (errno == EINVAL || errno == ENOSYS) {
+        /* FUSE filesystems (rclone's cloud and Connect to Server mounts) don't take RENAME_NOREPLACE: check that nothing
+         * is at the target, then a plain rename. Between the check and the rename another program could create the
+         * target, which would then be replaced: a gap of microseconds, only on those filesystems. */
+        struct stat st;
+        if (!lstat(to, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
+        if (errno != ENOENT) { seterrno(err, errlen, errno); return -1; }
+        if (!renameat(AT_FDCWD, from, AT_FDCWD, to)) return 0;
     }
-    return 0;
+    if (errno == EEXIST) seterr(err, errlen, "fs.exists");
+    else seterrno(err, errlen, errno);
+    return -1;
 }
 
 /* ---- deleting a tree (only used by cross-disk move and the trash) ---- */

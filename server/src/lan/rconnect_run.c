@@ -31,7 +31,7 @@ int rconnect_run(const RconnectRun *j) {
         dup2(a[0], 0); dup2(b[1], 1);
         syscall(SYS_close_range, 3, ~0u, 0);
         sigset_t none; sigemptyset(&none); sigprocmask(SIG_SETMASK, &none, NULL);
-        if (app_scope_enter(RCONNECT_SCOPE) && getenv("LORDOS_SESSIOND")) _exit(126);
+        if (app_scope_enter(j->scope ? j->scope : RCONNECT_SCOPE) && getenv("LORDOS_SESSIOND")) _exit(126);
         sandbox_exec_child(j->offline ? 0 : 1);
         execve(j->argv[0], j->argv, environ);
         _exit(127);

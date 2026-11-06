@@ -98,7 +98,7 @@ const char      *cloud_failure_code(const char *msg);   /* config/create's quest
 int              cloud_answer_state(const char *s, char *id, size_t n, const char **state);
 /* the page of an account: 1 and out, 0 none. field: the value of k->webfield (NULL if none). */
 int  cloud_site_url(const CloudKind *k, const char *field, char *out, size_t n);
-int  cloud_url_ok(const char *url);          /* https://, printable ASCII without quotes, spaces or backslashes, at most 300 */
+int  cloud_url_ok(const char *url);          /* https://, printable ASCII without quotes, spaces or backslashes, at most 4096 (presigned links) */
 
 /* ---- signing in (6.2): rclone authorize <type> --auth-no-open-browser ---- */
 /* a line of its log: 1 and the address (http://127.0.0.1:53682/auth?state=…, nothing else accepted) */
