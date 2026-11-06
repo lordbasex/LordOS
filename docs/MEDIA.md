@@ -51,6 +51,36 @@ We took the way the apps of popular desktop systems work, never their logos or t
 | ![screen](protected-window-screen.png) | ![screenshot](protected-window-capture.png) | ![remote](protected-window-remote.png) |
 | Protected Notes looks normal on the local screen | The saved PNG: the Notes content is black | What the browser receives from the remote desktop (0.8.3; since 0.8.4 the same, as WebRTC video) |
 
+### The markup editor on any picture (in development for 0.8.8.4, issue #30)
+
+| | |
+|---|---|
+| ![redact](markup-redact.png) | ![crop](markup-crop.png) |
+| Opened from Photos (**Markup**): Pixelate over the executable and command line, Redact (solid fill) over the PID and the user, an arrow and text | **Crop**: a free rectangle drawn around the dialog, with corner handles; the presets Free, Original, Square, 16:9 and 4:3 are in the bar |
+| ![photos](photos-edit-crop-size.png) | ![files](files-quick-preview-markup.png) |
+| Photos → Edit: a 16:9 crop resized by its corner and moved, Size 640 × 360 with Keep proportions; the saved copy was 640 × 360 | Files' Quick Preview (Space) has **Markup** for pictures |
+
+- **Where it lives:** `apps/screenshots/editor.jsx` (the editor), `sdk/imageeditmodel.js` (rectangles, presets, sizes,
+  save names; `server/tests/imageedit_model_test.mjs`), `server/src/media/imgops.c` (resize, quarter turns, solid fill,
+  pixelate; `build/imgops-test`). `openMarkup(path)` in `sdk/media.js` opens it from Photos and Files.
+- **Pixels stay in lord-server:** a file is decoded by lord-media (`media.image`), copied into a capture source
+  (`media.crop` of the whole picture) and turned upright by its orientation tag (`media.rotate`). Each crop, resize or
+  turn makes a new source from the annotated picture, so undo goes back over the annotations and then over the last six
+  steps. The new calls (`resize`, `rotate`) take only an id and whole numbers, checked in C (sides 1..8192, turns -3..3);
+  the annotations' `fill` and `pixelate` take only coordinates, clamped and finite.
+- **Saving uses the existing paths:** `media.saveImage` (lord-media encodes PNG or JPEG into a new file that never
+  replaces another), then, for **Save** over a PNG or JPEG, `lord.fs.trash` on the previous version and `lord.fs.rename`
+  of the new one into its place. Nothing new can write files or run commands.
+- **Transparency:** captures are opaque; a picture opened with an alpha channel keeps it through the annotations
+  (premultiplied "over"), crops, resizes and turns, is drawn as transparent in the editor, and is saved as RGBA PNG.
+- **Photos → Edit's Size** is a new `width`/`height` for `media.edit`: lord-media scales the cropped picture
+  (`lm_to_bgra`) before encoding, at the full resolution of the file.
+- **Tested on VM 116** (isolated headless session, 2026-11-05): a capture cropped to 16:9 and saved in place (1280 × 720,
+  the original in the Trash); a 1280 × 800 PNG cropped to 619 × 617, resized to 400 × 399 and saved in place and as a
+  copy; a JPEG turned and saved in place as a 941 × 1672 JPEG; a transparent PNG redacted and saved as a copy (the
+  corners still alpha 0); a WebP saved as a PNG copy (1600 × 1065); a GIF opened from Files; a JPEG with orientation 6
+  shown upright.
+
 ## Architecture
 
 ```
@@ -238,9 +268,10 @@ passes the media keys and Print Screen to LordOS even when a Wayland app has foc
 | `image(app, path)` → id | Decoded photo (`ready` event) |
 | `thumb(path, side)` | Path in `~/.cache/lordos/thumbs` or `null` while it's being made (`thumb` event) |
 | `probe(path)`, `waveform(path, bars)`, `poster(path, side)` + `take(id)` | Jobs (`job` event); `poster` leaves RGBA pixels |
-| `edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, format, quality })` | Edited copy |
+| `edit(app, path, output, { rotate, brightness, contrast, cx, cy, cw, ch, refw, width, height, format, quality })` | Edited copy (Photos → Edit; `width` × `height` is the new size after the crop, both sides 1..8192 or neither) |
 | `transcode(app, path, output, { format: 'opus'\|'mp3'\|'wav', from, to })` | Export audio with trimming |
 | `screenshot(app, { x, y, width, height })` → id, `crop`, `annotate(base, ops, dest)` | Screenshots (`screen` permission) |
+| `resize(id, width, height)`, `rotate(id, quarterTurns)` → id | The markup editor (0.8.8.4, issue #30): a new picture from a capture or a decoded image; whole sides 1..8192, turns -3..3, anything else refused in C (`server/src/media/imgops.c`) |
 | `saveImage(id, output, { format })`, `copyImage(id)` | PNG/JPEG to a file or to the clipboard |
 | `screenRecord(app, output.mp4, { mic, fps })`, `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
 | `cameras()`, `camera(app, device, { width, height })`, `photo(id, output, mirror)`, `cameraRecord(id, output \| null, { mic, mirror })` | Camera (`camera` permission) |
@@ -367,5 +398,8 @@ something changes), 0 dropped frames.
   the content is black).
 - **Photos:** save as WebP (there's no encoder without libwebp), metadata (EXIF) in the copy and
   custom albums.
+- **Markup editor:** Save in place only for PNG and JPEG (WebP, GIF, BMP, TIFF, HEIC and AVIF get a PNG copy); the
+  JPEG written in place carries no EXIF; Photos keeps showing the old picture after a Save from the editor until it
+  is opened again; no free-hand drawing, highlighter or shapes other than the box.
 - **Full screen:** once (it didn't happen in two more tries) playback stopped when entering it; the
   cause still needs finding.

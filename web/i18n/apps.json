@@ -421,19 +421,22 @@
         "Library of your Pictures folder, by month",
         "Zoom, rotate, full screen and slideshow",
         "Crop, brightness and contrast, saved as a copy",
-        "Animated GIF, WebP and more"
+        "Animated GIF, WebP and more",
+        "In development for 0.8.8.4 (latest release 0.8.8.3): crop handles with Free, Original, Square, 16:9 and 4:3, a new size for the copy, and Markup to open the picture in the markup editor"
       ],
       "es": [
         "Biblioteca de tu carpeta Imágenes, por mes",
         "Zoom, rotación, pantalla completa y presentación",
         "Recorte, brillo y contraste, guardados como copia",
-        "GIF animados, WebP y más"
+        "GIF animados, WebP y más",
+        "En desarrollo para 0.8.8.4 (última versión 0.8.8.3): recorte con esquinas y proporciones Libre, Original, Cuadrado, 16:9 y 4:3, un tamaño nuevo para la copia, y Marcar para abrir la imagen en el editor de marcado"
       ],
       "pt": [
         "Biblioteca da sua pasta Imagens, por mês",
         "Zoom, rotação, tela cheia e apresentação",
         "Recorte, brilho e contraste, salvos como cópia",
-        "GIF animados, WebP e mais"
+        "GIF animados, WebP e mais",
+        "Em desenvolvimento para 0.8.8.4 (última versão 0.8.8.3): recorte com cantos e proporções Livre, Original, Quadrado, 16:9 e 4:3, um tamanho novo para a cópia, e Marcar para abrir a imagem no editor de marcação"
       ]
     }
   },
@@ -565,19 +568,22 @@
         "Entire screen, a window or an area",
         "Timer, or copy straight to the clipboard",
         "Annotate with arrows, boxes, text and blur",
-        "Record the screen to MP4, with optional microphone"
+        "Record the screen to MP4, with optional microphone",
+        "In development for 0.8.8.4 (latest release 0.8.8.3): crop with aspect presets, resize, rotate, and hide an area by pixelating it or with a solid fill, on a capture or on any picture opened from Photos or Files; Save in place (the previous version goes to the Trash) or Save as copy"
       ],
       "es": [
         "Pantalla completa, una ventana o un área",
         "Temporizador, o copia directa al portapapeles",
         "Anotá con flechas, recuadros, texto y desenfoque",
-        "Grabá la pantalla en MP4, con micrófono opcional"
+        "Grabá la pantalla en MP4, con micrófono opcional",
+        "En desarrollo para 0.8.8.4 (última versión 0.8.8.3): recortar con proporciones, cambiar tamaño, girar y ocultar una zona pixelándola o con un relleno sólido, en una captura o en cualquier imagen abierta desde Fotos o Archivos; Guardar en el lugar (la versión anterior va a la Papelera) o Guardar como copia"
       ],
       "pt": [
         "Tela inteira, uma janela ou uma área",
         "Temporizador, ou cópia direta para a área de transferência",
         "Anote com setas, caixas, texto e desfoque",
-        "Grave a tela em MP4, com microfone opcional"
+        "Grave a tela em MP4, com microfone opcional",
+        "Em desenvolvimento para 0.8.8.4 (última versão 0.8.8.3): recortar com proporções, redimensionar, girar e ocultar uma área pixelizando-a ou com um preenchimento sólido, numa captura ou em qualquer imagem aberta pelo Fotos ou Arquivos; Salvar no lugar (a versão anterior vai para a Lixeira) ou Salvar como cópia"
       ]
     }
   },
@@ -604,7 +610,8 @@
         "This computer: the whole system, read-only, as your user",
         "Every disk in the sidebar, mounted with a click; trash and archives",
         "New in 0.8.7: Network, what is on your local network, Connect to Server, and folders that remember their view",
-        "New in 0.8.8: the system file dialog now looks and works like Files"
+        "New in 0.8.8: the system file dialog now looks and works like Files",
+        "In development for 0.8.8.4 (latest release 0.8.8.3): Markup in Quick Preview opens a picture in the markup editor (crop, resize, redact, arrows and text)"
       ],
       "es": [
         "Pestañas y cuatro vistas: íconos, lista, columnas, galería",
@@ -613,7 +620,8 @@
         "Este equipo: todo el sistema, solo lectura, como tu usuario",
         "Cada disco en la barra lateral, se monta con un clic; papelera y archivos comprimidos",
         "Nuevo en 0.8.7: Red, lo que hay en tu red local, Conectarse al servidor, y carpetas que recuerdan su vista",
-        "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos"
+        "Nuevo en 0.8.8: el diálogo de archivos del sistema ahora se ve y funciona como Archivos",
+        "En desarrollo para 0.8.8.4 (última versión 0.8.8.3): Marcar en la Vista rápida abre una imagen en el editor de marcado (recortar, cambiar tamaño, tapar zonas, flechas y texto)"
       ],
       "pt": [
         "Abas e quatro visões: ícones, lista, colunas, galeria",
@@ -622,7 +630,8 @@
         "Este computador: todo o sistema, só leitura, como seu usuário",
         "Cada disco na barra lateral, montado com um clique; lixeira e arquivos compactados",
         "Novo na 0.8.7: Rede, o que há na sua rede local, Conectar ao servidor, e pastas que lembram sua visualização",
-        "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos"
+        "Novo na 0.8.8: o diálogo de arquivos do sistema agora parece e funciona como o Arquivos",
+        "Em desenvolvimento para 0.8.8.4 (última versão 0.8.8.3): Marcar na Visualização rápida abre uma imagem no editor de marcação (recortar, redimensionar, tapar áreas, setas e texto)"
       ]
     }
   },
