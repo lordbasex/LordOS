@@ -7,29 +7,40 @@ import { cloud, cloudState } from '../../../sdk/cloud.js';
 import { wm } from '../../../sdk/windows.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const logs = [];
-const log = (...a) => { logs.push(a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); };
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 
+// every reply lord-server sends (req, result), so the bench sees answers even when a call's { req } was lost
+const replies = [];
+function hookReplies() {
+  const prev = globalThis.__lordCloudReply;
+  globalThis.__lordCloudReply = (req, res) => { replies.push({ req, res, at: Date.now() }); if (replies.length > 200) replies.shift(); if (prev) prev(req, res); };
+}
+
 function start() {
+  hookReplies();
   if (typeof lord === 'undefined' || !lord.fs) return;
   const dir = `${lord.fs.home()}/.e2e`;
   let n = 1;
-  const tick = async () => {
-    let src = null;
-    try { src = lord.fs.read(`${dir}/cmd-${n}.js`); } catch (e) { src = null; }
-    if (src != null) {
-      const id = n++;
-      let out;
-      logs.length = 0;
-      try {
-        const fn = new AsyncFunction('cloud', 'cloudState', 'wm', 'lord', 'sleep', 'log', src);
-        const value = await fn(cloud, cloudState, wm, lord, sleep, log);
-        out = { ok: true, value: value === undefined ? null : value, logs: logs.slice() };
-      } catch (e) {
-        out = { ok: false, error: String((e && (e.code || e.message)) || e), detail: e && e.stack ? String(e.stack) : null, logs: logs.slice() };
-      }
-      try { lord.fs.write(`${dir}/out-${id}.json`, JSON.stringify(out)); } catch (e) { /* the bench times out */ }
+  // commands run concurrently (one waiting for a Promise doesn't hold the next), each writes its own answer
+  const runOne = async (id, src) => {
+    const mine = [];
+    const log = (...a) => { mine.push(a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); };
+    let out;
+    try {
+      const fn = new AsyncFunction('cloud', 'cloudState', 'wm', 'lord', 'sleep', 'log', 'replies', src);
+      const value = await fn(cloud, cloudState, wm, lord, sleep, log, replies);
+      out = { ok: true, value: value === undefined ? null : value, logs: mine };
+    } catch (e) {
+      out = { ok: false, error: String((e && (e.code || e.message)) || e), detail: e && e.stack ? String(e.stack) : null, logs: mine };
+    }
+    try { lord.fs.write(`${dir}/out-${id}.json`, JSON.stringify(out)); } catch (e) { /* the bench times out */ }
+  };
+  const tick = () => {
+    for (;;) {
+      let src = null;
+      try { src = lord.fs.read(`${dir}/cmd-${n}.js`); } catch (e) { src = null; }
+      if (src == null) break;
+      runOne(n++, src);
     }
     setTimeout(tick, 200);
   };

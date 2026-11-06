@@ -5,6 +5,8 @@ import json, os, pwd, sys, time
 user, src = sys.argv[1], sys.argv[2]
 timeout = float(sys.argv[3]) if len(sys.argv) > 3 else 60
 if src == "-": src = sys.stdin.read()
+lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib.js")
+if os.path.exists(lib): src = open(lib).read() + "\n" + src
 pw = pwd.getpwnam(user)
 d = os.path.join(pw.pw_dir, ".e2e")
 nf = os.path.join(d, "next")

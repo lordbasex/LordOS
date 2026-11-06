@@ -49,7 +49,7 @@ J
     systemd-run --quiet --unit="e2e-client-$U" --uid="$U" --gid="$U" --working-directory=$OPT/server \
         --property=KillMode=mixed --property=StandardOutput=file:/var/log/e2e-client-$U.log --property=StandardError=inherit \
         -E HOME="$H" -E USER="$U" -E LOGNAME="$U" -E XDG_RUNTIME_DIR="$R" -E PATH=/usr/bin:/bin -E LANG=C.UTF-8 \
-        /usr/bin/dbus-run-session -- $OPT/server/build/lord-server --headless 1280x800 \
+        /usr/bin/dbus-run-session -- $OPT/server/build/lord-server --headless 1280x800 --user "$U" \
         --theme ../themes/default/theme.bundle.js --fonts ../assets/fonts --shell ../assets/shell
     i=0; while [ ! -S "$R/lordos/remote.sock" ] && [ $i -lt 60 ]; do sleep 0.5; i=$((i + 1)); done
     [ -S "$R/lordos/remote.sock" ] || { echo "no remote.sock for $U"; tail -20 /var/log/e2e-client-$U.log; exit 1; }
