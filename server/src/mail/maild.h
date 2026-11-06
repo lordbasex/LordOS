@@ -72,7 +72,8 @@ struct Account {
     Server imap, smtp;
     int sent_saved;                 /* the server files sent mail itself (some large providers) */
     char pin_imap[96], pin_smtp[96], pin_dav[96];
-    char url[512];                  /* DAV: base URL */
+    char url[512];                  /* DAV: base URL (calendars, and contacts unless card_url) */
+    char card_url[512];             /* DAV: contacts URL when the provider has its own ("carddav") */
     int cal, card;                  /* DAV: sync calendars / contacts */
     char *password;                 /* in memory only (from the keyring); never written */
     int need_auth_sent;

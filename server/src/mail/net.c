@@ -77,7 +77,15 @@ static void fingerprint(X509 *x, char *out, size_t cap) {
     out[0] = 0;
     if (!X509_digest(x, EVP_sha256(), md, &n)) return;
     size_t o = 0;
-    for (unsigned i = 0; i < n && o + 4 < cap; i++) o += (size_t)snprintf(out + o, cap - o, "%s%02X", i ? ":" : "", md[i]);
+    /* ":XX" plus the NUL: all 32 bytes fit in 96 (before 0.8.8.4 the last byte was cut off) */
+    for (unsigned i = 0; i < n && o + 3 < cap; i++) o += (size_t)snprintf(out + o, cap - o, "%s%02X", i ? ":" : "", md[i]);
+}
+
+/* A trusted fingerprint matches the full one, or the 31-byte form earlier versions stored */
+static int pin_matches(const char *pin, const char *sha) {
+    if (!pin || !*pin || !*sha) return 0;
+    if (!strcasecmp(pin, sha)) return 1;
+    return strlen(pin) == 92 && strlen(sha) == 95 && !strncasecmp(pin, sha, 92);
 }
 
 static void name_line(X509_NAME *nm, char *out, size_t cap) {
@@ -119,7 +127,7 @@ int conn_tls(Conn *c, const char *pin, TlsInfo *info) {
     if (vr != X509_V_OK) {
         info->code = (int)vr;
         snprintf(info->reason, sizeof info->reason, "%s", X509_verify_cert_error_string(vr));
-        if (pin && *pin && !strcasecmp(pin, info->sha256)) { info->pinned = 1; return 0; }
+        if (pin_matches(pin, info->sha256)) { info->pinned = 1; return 0; }
         snprintf(c->err, sizeof c->err, "cert");
         return -1;
     }

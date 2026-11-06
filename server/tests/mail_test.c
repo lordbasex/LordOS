@@ -8,6 +8,7 @@
 #include "mail/xml.h"
 #include "mail/ical.h"
 #include "mail/vcard.h"
+#include "mail/davutil.h"
 #include "sec/json.h"
 #include "doc/wire.h"
 
@@ -932,11 +933,170 @@ static void test_view(void) {
     }
 }
 
+
+/* ---- CalDAV / CardDAV sync helpers (davutil.c) ---- */
+
+/* Shaped like a large provider's answers (synthetic, example.test): the principal on the host
+ * that was asked, the homes as absolute URLs on a numbered host, with an explicit :443. */
+static const char *PRINCIPAL_207 =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<multistatus xmlns=\"DAV:\"><response><href>/</href><propstat><prop>"
+    "<current-user-principal><href>/123456/principal/</href></current-user-principal></prop><status>HTTP/1.1 200 OK</status></propstat>"
+    "<propstat><prop><calendar-home-set xmlns=\"urn:ietf:params:xml:ns:caldav\"/></prop><status>HTTP/1.1 404 Not Found</status></propstat>"
+    "</response></multistatus>";
+static const char *HOMES_207 =
+    "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\" xmlns:cal=\"urn:ietf:params:xml:ns:caldav\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\">"
+    "<d:response><d:href>/123456/principal/</d:href><d:propstat><d:prop>"
+    "<cal:calendar-home-set><d:href xmlns:d=\"DAV:\">https://P07-CalDAV.Example.test:443/123456/calendars/</d:href></cal:calendar-home-set>"
+    "<d:resourcetype><d:principal/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>";
+static const char *RADICALE_207 =
+    "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\">"
+    "<response><href>/ana@example.test/</href><propstat><prop><current-user-principal><href>/ana@example.test/</href></current-user-principal>"
+    "<C:calendar-home-set><href>/ana@example.test/</href></C:calendar-home-set><CR:addressbook-home-set><href>/ana@example.test/</href></CR:addressbook-home-set>"
+    "<resourcetype><principal/><collection/></resourcetype></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>";
+
+static const char *RECUR_ICS =
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:test\r\n"
+    "BEGIN:VEVENT\r\nUID:weekly-1@exam\r\n ple.test\r\nDTSTART:20261102T130000Z\r\nDTEND:20261102T140000Z\r\nRRULE:FREQ=WEEKLY;COUNT=4\r\nSUMMARY:Standup\r\nEND:VEVENT\r\n"
+    "BEGIN:VEVENT\r\nuid;X-P=1:weekly-1@example.test\r\nRECURRENCE-ID:20261109T130000Z\r\nDTSTART:20261109T150000Z\r\nDTEND:20261109T160000Z\r\nSUMMARY:Standup (moved)\r\nEND:VEVENT\r\n"
+    "END:VCALENDAR\r\n";
+
+static void test_dav(void) {
+    char o[DAV_URL_MAX];
+    /* hrefs */
+    CHECK(!dav_href_resolve("https://dav.example.test:5233/ana/", "/ana/cal/", o, sizeof o)); CHECKS(o, "https://dav.example.test:5233/ana/cal/");
+    CHECK(!dav_href_resolve("https://dav.example.test/ana/cal/", "x 1.ics", o, sizeof o)); CHECKS(o, "https://dav.example.test/ana/cal/x%201.ics");
+    CHECK(!dav_href_resolve("https://dav.example.test/ana/cal/a.ics", "b.ics", o, sizeof o)); CHECKS(o, "https://dav.example.test/ana/cal/b.ics");
+    CHECK(!dav_href_resolve("https://dav.example.test", "b.ics", o, sizeof o)); CHECKS(o, "https://dav.example.test/b.ics");
+    CHECK(!dav_href_resolve("https://a.example.test/", "HTTPS://P07-X.Example.TEST:443/1/c/", o, sizeof o)); CHECKS(o, "https://p07-x.example.test/1/c/");
+    CHECK(!dav_href_resolve("https://a.example.test/", "  /trim/  ", o, sizeof o)); CHECKS(o, "https://a.example.test/trim/");
+    CHECK(!dav_href_resolve("https://a.example.test:8443/x?q=1", "y", o, sizeof o)); CHECKS(o, "https://a.example.test:8443/y");
+    CHECK(!dav_href_resolve("https://[::1]:5233/", "/p/", o, sizeof o)); CHECKS(o, "https://[::1]:5233/p/");
+    CHECK(!dav_href_resolve("https://a.example.test/", "https://a.example.test", o, sizeof o)); CHECKS(o, "https://a.example.test/");
+    const char *badh[] = { "javascript:alert(1)", "mailto:x@example.test", "https://u:p@a.example.test/", "https://a.example.test:0/", "https://a.example.test:99999/",
+                           "https://a.example.test:44x/", "/a\r\nHost: evil", "/a\tb", "", "   ", "../up", "/a/../b", "/a/..", "https://bad_host/" };
+    for (size_t i = 0; i < sizeof badh / sizeof badh[0]; i++) { CHECK(dav_href_resolve("https://a.example.test/", badh[i], o, sizeof o) == -1); }
+    CHECK(dav_href_resolve("ftp://a.example.test/", "/x", o, sizeof o) == -1);
+    CHECK(dav_href_resolve("not a url", "/x", o, sizeof o) == -1);
+    char tiny[16];
+    CHECK(dav_href_resolve("https://a.example.test/", "/a-long-path/", tiny, sizeof tiny) == -1 && tiny[0] == 0);
+    CHECK(dav_same_origin("https://a.example.test/x/", "https://A.example.test:443/y.ics"));
+    CHECK(!dav_same_origin("https://a.example.test/x/", "https://b.example.test/y.ics"));
+    CHECK(!dav_same_origin("https://a.example.test/x/", "https://a.example.test:8443/y.ics"));
+    CHECK(!dav_same_origin("https://a.example.test/x/", "http://a.example.test/y.ics"));
+    CHECK(dav_same_site("https://caldav.example.test/", "https://p07-caldav.example.test:443/1/calendars/"));
+    CHECK(dav_same_site("https://example.test/", "https://p07.example.test/"));
+    CHECK(!dav_same_site("https://caldav.example.test/", "https://caldav.other.test/"));
+    CHECK(!dav_same_site("https://caldav.example.test/", "https://example.test.evil.test/"));
+    CHECK(!dav_same_site("https://caldav.example.test/", "http://p07.example.test/"));
+    CHECK(!dav_same_site("https://10.0.0.1/", "https://20.0.0.1/") && dav_same_site("https://127.0.0.1:5233/", "https://127.0.0.1:5233/a/"));
+    CHECKS(dav_url_path("https://p07-x.example.test/1/c/a.ics"), "/1/c/a.ics");
+    CHECKS(dav_url_path("https://p07-x.example.test"), "/");
+    CHECKS(dav_url_path("/already/a/path"), "/already/a/path");
+
+    /* discovery answers */
+    DavHomes h;
+    CHECK(!dav_parse_homes(PRINCIPAL_207, strlen(PRINCIPAL_207), "https://caldav.example.test/", &h));
+    CHECKS(h.principal, "https://caldav.example.test/123456/principal/");
+    CHECKS(h.calhome, "");                      /* the 404 propstat is not a home */
+    CHECK(!dav_parse_homes(HOMES_207, strlen(HOMES_207), "https://caldav.example.test/123456/principal/", &h));
+    CHECKS(h.calhome, "https://p07-caldav.example.test/123456/calendars/");
+    CHECKS(h.cardhome, "");
+    CHECK(!h.is_cal && !h.is_book);
+    CHECK(!dav_parse_homes(RADICALE_207, strlen(RADICALE_207), "https://dav.example.test:5233/", &h));
+    CHECKS(h.calhome, "https://dav.example.test:5233/ana@example.test/");
+    CHECKS(h.cardhome, "https://dav.example.test:5233/ana@example.test/");
+    CHECKS(h.principal, "https://dav.example.test:5233/ana@example.test/");
+    CHECK(dav_parse_homes("<x", 2, "https://a.example.test/", &h) == -1);
+    const char *evil = "<multistatus xmlns=\"DAV:\"><response><propstat><prop><current-user-principal><href>javascript:x</href></current-user-principal></prop></propstat></response></multistatus>";
+    CHECK(!dav_parse_homes(evil, strlen(evil), "https://a.example.test/", &h)); CHECKS(h.principal, "");
+    for (int it = 0; it < 20000; it++) {
+        size_t fl;
+        char *f = mutate(HOMES_207, strlen(HOMES_207), &fl);
+        if (!dav_parse_homes(f, fl, "https://a.example.test/", &h)) {
+            CHECK(!h.calhome[0] || !strncmp(h.calhome, "http", 4));
+            for (const char *c = h.calhome; *c; c++) if ((unsigned char)*c < 0x20) { CHECK(0); break; }
+        }
+        free(f);
+    }
+
+    /* the sync plan */
+    const char *coll = "https://dav.example.test/ana/cal/";
+    DavLocal loc[] = {
+        { "https://dav.example.test/ana/cal/same.ics", "\"1\"", 0 },     /* unchanged */
+        { "https://dav.example.test/ana/cal/chg.ics", "\"1\"", 0 },      /* changed on the server */
+        { "https://dav.example.test/ana/cal/gone.ics", "\"1\"", 0 },     /* deleted on the server */
+        { "https://dav.example.test/ana/cal/mine.ics", "\"1\"", 1 },     /* edited here: push first */
+        { "https://dav.example.test/ana/cal/new-here.ics", "", 1 },      /* new here, not on the server yet */
+        { "", "", 0 },                                                     /* local only (no href) */
+    };
+    DavRemote rem[] = {
+        { "https://dav.example.test/ana/cal/", "" },                       /* the collection itself */
+        { "https://dav.example.test/ana/cal/same.ics", "\"1\"" },
+        { "https://dav.example.test/ana/cal/chg.ics", "\"2\"" },
+        { "https://dav.example.test/ana/cal/mine.ics", "\"2\"" },
+        { "https://dav.example.test/ana/cal/new-there.ics", "\"7\"" },
+        { "https://dav.example.test/ana/cal/noetag.ics", "" },
+    };
+    unsigned char fetch[6], drop[6];
+    dav_plan(coll, loc, 6, rem, 6, fetch, drop);
+    CHECK(!fetch[0] && !fetch[1] && fetch[2] && !fetch[3] && fetch[4] && fetch[5]);
+    CHECK(!drop[0] && !drop[1] && drop[2] && !drop[3] && !drop[4] && !drop[5]);
+    dav_plan(coll, loc, 6, rem, 0, fetch, drop);         /* an empty server: every clean synced item goes */
+    CHECK(drop[0] && drop[1] && drop[2] && !drop[3] && !drop[4] && !drop[5]);
+
+    /* uploads: the server wins, a refused local version is kept */
+    CHECK(dav_push_outcome(0, 201) == DAV_PUSH_DONE && dav_push_outcome(0, 204) == DAV_PUSH_DONE);
+    CHECK(dav_push_outcome(1, 204) == DAV_PUSH_DONE && dav_push_outcome(1, 404) == DAV_PUSH_DONE && dav_push_outcome(1, 410) == DAV_PUSH_DONE);
+    CHECK(dav_push_outcome(0, 412) == DAV_PUSH_CONFLICT && dav_push_outcome(1, 412) == DAV_PUSH_CONFLICT);
+    CHECK(dav_push_outcome(0, 403) == DAV_PUSH_REJECTED && dav_push_outcome(0, 415) == DAV_PUSH_REJECTED && dav_push_outcome(0, 404) == DAV_PUSH_REJECTED);
+    CHECK(dav_push_outcome(0, 401) == DAV_PUSH_RETRY && dav_push_outcome(0, 429) == DAV_PUSH_RETRY && dav_push_outcome(0, 503) == DAV_PUSH_RETRY && dav_push_outcome(0, 302) == DAV_PUSH_RETRY);
+    CHECK(dav_push_keeps_copy(0, DAV_PUSH_CONFLICT) && dav_push_keeps_copy(0, DAV_PUSH_REJECTED));
+    CHECK(!dav_push_keeps_copy(1, DAV_PUSH_CONFLICT) && !dav_push_keeps_copy(0, DAV_PUSH_DONE) && !dav_push_keeps_copy(0, DAV_PUSH_RETRY));
+
+    /* the kept copy: a new UID on every component of a repeating event (master and override) */
+    size_t nl;
+    char *nt = dav_set_uid(RECUR_ICS, strlen(RECUR_ICS), "copy-123", &nl);
+    CHECK(nt != NULL);
+    if (nt) {
+        CHECK(!strstr(nt, "weekly-1") && !strstr(nt, "ple.test\r\n"));
+        IcEvent *ev;
+        char m[24];
+        int ne = ical_events(nt, nl, &ev, m, sizeof m);
+        CHECK(ne == 2);
+        if (ne == 2) {
+            CHECKS(ev[0].uid, "copy-123"); CHECKS(ev[1].uid, "copy-123");
+            CHECK(ev[0].rrule[0] && ev[1].recurrence_id != 0);
+            CHECKS(ev[1].summary, "Standup (moved)");
+        }
+        if (ne > 0) ical_events_free(ev, ne);
+        free(nt);
+    }
+    const char *vcf = "BEGIN:VCARD\nVERSION:3.0\nFN:Ana Example\nEMAIL:ana@example.test\nEND:VCARD";   /* no UID, LF only, no final newline */
+    nt = dav_set_uid(vcf, strlen(vcf), "c-9", &nl);
+    CHECK(nt != NULL);
+    if (nt) { char u[64]; vcard_uid(nt, nl, u, sizeof u); CHECKS(u, "c-9"); CHECK(strstr(nt, "FN:Ana Example") != NULL); free(nt); }
+    { const char *e = "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"; CHECK(dav_set_uid(e, strlen(e), "x", &nl) == NULL); }
+    CHECK(dav_set_uid(vcf, strlen(vcf), "bad uid\r\nX:1", &nl) == NULL);
+    CHECK(dav_set_uid(vcf, strlen(vcf), "", &nl) == NULL);
+    { const char *td = "BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"; CHECK(dav_is_todo(td, strlen(td))); }
+    CHECK(!dav_is_todo(RECUR_ICS, strlen(RECUR_ICS)));
+    for (int it = 0; it < 20000; it++) {
+        size_t fl;
+        char *f = mutate(RECUR_ICS, strlen(RECUR_ICS), &fl);
+        char *x = dav_set_uid(f, fl, "fz-1", &nl);
+        if (x) { CHECK(x[nl] == 0 && strlen(x) <= nl); free(x); }
+        (void)dav_is_todo(f, fl);
+        char *nul = malloc(fl + 1);
+        if (nul) { memcpy(nul, f, fl); nul[fl] = 0; (void)dav_href_resolve("https://a.example.test/b/", nul, o, sizeof o); free(nul); }
+        free(f);
+    }
+}
+
 int main(void) {
     alarm(300);                 /* never hang a `make test`: SIGALRM kills a runaway parser */
     clock_t t0 = clock();
     static const struct { const char *name; void (*fn)(void); } parts[] = {
-        { "imap", test_imap }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard }, { "view", test_view },
+        { "imap", test_imap }, { "mime", test_mime }, { "html", test_html }, { "xml", test_xml }, { "ical", test_ical }, { "vcard", test_vcard }, { "dav", test_dav }, { "view", test_view },
     };
     for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
         int before = fails;

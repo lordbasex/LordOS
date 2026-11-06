@@ -14,6 +14,7 @@ typedef struct {
     char auth[600];             /* "Authorization: Basic …\r\n" */
     char err[200];
     int auth_failed;
+    char url[2048];             /* the URL that gave the last answer (after redirects) */
 } Dav;
 
 int  dav_begin(Dav *d, Account *a);

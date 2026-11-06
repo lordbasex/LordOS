@@ -373,11 +373,13 @@ void accounts_apply_config(const JVal *cfg) {
         CPY(tmp.pin_smtp, json_str(trust, "smtp"));
         CPY(tmp.pin_dav, json_str(trust, "dav"));
         CPY(tmp.url, json_str(a, "url"));
+        CPY(tmp.card_url, !strcmp(tmp.kind, "dav") ? json_str(a, "carddav") : NULL);
         tmp.cal = json_bool(a, "cal", 1);
         tmp.card = json_bool(a, "card", 1);
         Account *cur = acct_get(id);
         int same = cur && !strcmp(cur->kind, tmp.kind) && !strcmp(cur->user, tmp.user) && !strcmp(cur->imap.host, tmp.imap.host) &&
                    cur->imap.port == tmp.imap.port && cur->imap.sec == tmp.imap.sec && !strcmp(cur->url, tmp.url) &&
+                   !strcmp(cur->card_url, tmp.card_url) &&
                    !strcmp(cur->pin_imap, tmp.pin_imap) && !strcmp(cur->pin_dav, tmp.pin_dav);
         if (cur && same) {
             /* light changes (name, signature, SMTP): in place */

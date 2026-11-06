@@ -4,7 +4,9 @@
  * A collection is a calendar (events and/or to-dos) or an address book. Local ones live only
  * here; DAV ones mirror a server collection: every item keeps its href and ETag, local edits are
  * marked dirty and pushed with If-Match, and a sync compares ETags (after the CTag says
- * something changed) and fetches what changed with a multiget REPORT.
+ * something changed) and fetches what changed with a multiget REPORT. On a conflict the server's
+ * version wins and the local one is kept, with a new UID, in a collection on this computer
+ * (keep_local_copy). The pure parts (hrefs, discovery answers, the plan) are in davutil.c.
  *
  * Files under the cache: pim/colls (one line per collection), pim/<id>/meta (one line per item:
  * file, uid, href, etag, dirty) and pim/<id>/<file> (the .ics or .vcf). Callers hold G, except
@@ -14,6 +16,7 @@
 #include "ical.h"
 #include "vcard.h"
 #include "xml.h"
+#include "davutil.h"
 #include "mime.h"
 
 #include <ctype.h>
@@ -1046,12 +1049,6 @@ static int parse_multistatus(const char *body, size_t len, DavItem **out, int wi
                 /* the component names are attributes, which our reader skips: look at the raw text */
                 it->vevent = it->vtodo = 0;
             }
-            MxNode *home = mx_child(p, MX_NS_DAV, "current-user-principal");
-            if (home) { MxNode *h = mx_child(home, MX_NS_DAV, "href"); if (h) scopy(it->name, sizeof it->name, mx_text(h)); }
-            MxNode *ch = mx_child(p, MX_NS_CAL, "calendar-home-set");
-            if (ch) { MxNode *h = mx_child(ch, MX_NS_DAV, "href"); if (h) scopy(it->color, sizeof it->color, ""), scopy(it->ctag, sizeof it->ctag, mx_text(h)); }
-            MxNode *ah = mx_child(p, MX_NS_CARD, "addressbook-home-set");
-            if (ah) { MxNode *h = mx_child(ah, MX_NS_DAV, "href"); if (h) scopy(it->etag, sizeof it->etag, mx_text(h)); }
             if (with_data) {
                 MxNode *d = mx_child(p, MX_NS_CAL, "calendar-data");
                 if (!d) d = mx_child(p, MX_NS_CARD, "address-data");
@@ -1110,48 +1107,105 @@ static void sync_failed(Account *a, Dav *d, const char *what) {
     } else acct_status(a, !strcmp(d->err, "cert") ? "cert" : "offline", d->err[0] ? d->err : what);
 }
 
-/* Finds the calendar and address book homes. 0 ok. */
-static int discover(Dav *d, Account *a, char *calhome, char *cardhome, size_t cap) {
-    calhome[0] = cardhome[0] = 0;
-    int tls, port;
-    char host[256], path[1024];
-    if (http_split_url(a->url, &tls, host, sizeof host, &port, path, sizeof path)) return -1;
-    char target[1100];
-    scopy(target, sizeof target, path);
-    char principal[1024] = "";
-    for (int step = 0; step < 3; step++) {
+/* Finds the home of the calendars (cal) or of the address books, starting from start: the URL
+ * itself, the principal it names (current-user-principal), then /.well-known/caldav or
+ * /.well-known/carddav on that server (RFC 6764). The other kind's home is noted too when the
+ * server gives it. Homes are absolute URLs: a provider may put them on another host of its
+ * domain (pNN-caldav.<domain>), which lord-server allows for this account. 0 ok. */
+static int discover(Dav *d, const char *start, int cal, char *calhome, char *cardhome, size_t cap) {
+    char target[DAV_URL_MAX], first[DAV_URL_MAX];
+    if (dav_href_resolve(start, start, first, sizeof first)) { snprintf(d->err, sizeof d->err, "bad URL"); return -1; }
+    scopy(target, sizeof target, first);
+    char seen[4][DAV_URL_MAX];
+    int nseen = 0, wellknown = 0, hard = 0;
+    char *want = cal ? calhome : cardhome;
+    for (int step = 0; step < 6; step++) {
+        if (nseen < 4) scopy(seen[nseen++], DAV_URL_MAX, target);
         HttpResp r;
         if (dav_req(d, "PROPFIND", target, 0, PF_HOMES, "application/xml; charset=utf-8", NULL, &r)) return -1;
-        if (r.status == 401) { http_resp_free(&r); return -1; }
-        if (r.status == 404 && step == 0 && strcmp(target, "/.well-known/caldav")) {
-            http_resp_free(&r);
-            scopy(target, sizeof target, "/.well-known/caldav");
-            continue;
-        }
-        if (r.status != 207) { snprintf(d->err, sizeof d->err, "PROPFIND %d", r.status); http_resp_free(&r); return -1; }
-        DavItem *it;
-        int n = parse_multistatus(r.body, r.blen, &it, 0);
-        int is_coll = 0;
-        for (int i = 0; i < n; i++) {
-            if (it[i].ctag[0] && it[i].ctag[0] == '/') scopy(calhome, cap, it[i].ctag);
-            if (it[i].etag[0] == '/') scopy(cardhome, cap, it[i].etag);
-            if (it[i].name[0] == '/' && !principal[0]) scopy(principal, sizeof principal, it[i].name);
-            if (it[i].cal || it[i].book) is_coll = 1;
-        }
-        if (n > 0) free_items(it, n);
+        int st = r.status;
+        DavHomes h;
+        int parsed = st == 207 ? dav_parse_homes(r.body, r.blen, d->url, &h) : -1;
         http_resp_free(&r);
-        if (calhome[0] || cardhome[0]) return 0;
-        if (is_coll) { scopy(calhome, cap, target); scopy(cardhome, cap, target); return 0; }
-        if (principal[0] && strcmp(principal, target)) { scopy(target, sizeof target, principal); continue; }
+        if (st == 401) return -1;
+        if (st >= 500 && !hard) hard = st;
+        if (!parsed) {
+            /* a server may move the homes only within its own site (numbered hosts of its domain):
+             * the account's credentials never go to another account's server */
+            if (!dav_same_site(first, h.calhome)) h.calhome[0] = 0;
+            if (!dav_same_site(first, h.cardhome)) h.cardhome[0] = 0;
+            if (!dav_same_site(first, h.principal)) h.principal[0] = 0;
+            if (h.calhome[0] && !calhome[0]) scopy(calhome, cap, h.calhome);
+            if (h.cardhome[0] && !cardhome[0]) scopy(cardhome, cap, h.cardhome);
+            if (want[0]) return 0;
+            if (cal ? h.is_cal : h.is_book) { if (dav_href_resolve(d->url, d->url, want, cap)) scopy(want, cap, target); return 0; }
+            int again = 0;
+            for (int k = 0; k < nseen; k++) if (!strcmp(seen[k], h.principal)) again = 1;
+            if (h.principal[0] && !again) { scopy(target, sizeof target, h.principal); continue; }
+        }
+        if (!wellknown) {
+            wellknown = 1;
+            if (!dav_href_resolve(first, cal ? "/.well-known/caldav" : "/.well-known/carddav", target, sizeof target)) continue;
+        }
         break;
     }
-    /* nothing advertised: treat the URL itself as the home */
-    scopy(calhome, cap, path);
-    scopy(cardhome, cap, path);
+    if (hard) { snprintf(d->err, sizeof d->err, "PROPFIND %d", hard); return -1; }
+    /* nothing advertised: the URL itself is the home */
+    scopy(want, cap, first);
     return 0;
 }
 
-typedef struct { char href[1024], etag[256], file[64], uid[256]; int dirty; } PushItem;
+/* The local collection that keeps a copy of a version the server refused (created if there is
+ * none): an address book, a reminders list for to-dos, a calendar for events. Holds G. */
+static Coll *local_coll(char kind, int todo) {
+    for (int pass = 0; pass < 2; pass++)
+        for (int i = 0; i < ncolls; i++) {
+            Coll *c = colls[i];
+            if (c->acct[0] || c->kind != kind || (pass == 0 && c->hidden)) continue;
+            if (kind == 'b' || (todo ? c->todos : c->events)) return c;
+        }
+    const char *id = kind == 'b' ? "local-contacts" : todo ? "local-reminders" : "local-calendar";
+    char cid[80];
+    scopy(cid, sizeof cid, id);
+    for (int n = 2; coll_get(cid) && n < 50; n++) snprintf(cid, sizeof cid, "%s-%d", id, n);
+    if (coll_get(cid)) return NULL;
+    Coll *c = coll_new(cid, kind, "", kind == 'b' ? "Contacts" : todo ? "Reminders" : "Personal", kind == 'b' ? "#8e8e93" : todo ? "#ff9f0a" : "#0a84ff");
+    if (c && kind == 'c') { c->todos = todo; c->events = !todo; }
+    if (c) save_colls();
+    return c;
+}
+
+/* Conflict policy: the server's version wins in the synced collection, and the local version
+ * that lost is kept, with a new UID, in a collection on this computer (never uploaded), so no
+ * edit is lost. Holds G. */
+static void keep_local_copy(Coll *from, const char *uid, const char *text, size_t len, int status) {
+    int todo = from->kind == 'c' && dav_is_todo(text, len);
+    Coll *dst = local_coll(from->kind, todo);
+    if (!dst) return;
+    char nu[64];
+    new_uid(nu, sizeof nu);
+    size_t nl;
+    char *nt = dav_set_uid(text, len, nu, &nl);
+    if (!nt) return;
+    Item *it = item_new(dst, nu);
+    if (it && item_write(dst, it, nt, nl, 0)) { item_delete(dst, it); it = NULL; }
+    free(nt);
+    if (!it) return;
+    const char *title = from->kind == 'b' ? it->fn : it->nev > 0 ? it->ev[0].summary : "";
+    JBuf ev;
+    jb_init(&ev);
+    jb_printf(&ev, "{\"ev\":\"dav-conflict\",\"status\":%d,\"kind\":\"%s\",\"acct\":", status, from->kind == 'b' ? "contact" : todo ? "todo" : "event");
+    jb_str(&ev, from->acct);
+    jb_raw(&ev, ",\"uid\":"); jb_str(&ev, uid);
+    jb_raw(&ev, ",\"copy\":"); jb_str(&ev, nu);
+    jb_raw(&ev, ",\"coll\":"); jb_str(&ev, dst->id);
+    jb_raw(&ev, ",\"collName\":"); jb_str(&ev, dst->name);
+    jb_raw(&ev, ",\"title\":"); jb_str(&ev, title);
+    jb_raw(&ev, "}");
+    send_event(&ev);
+}
+
+typedef struct { char href[DAV_URL_MAX], etag[256], file[64], uid[256]; int dirty; } PushItem;
 
 static void push_changes(Dav *d, Coll *c) {
     pthread_mutex_lock(&G);
@@ -1159,7 +1213,8 @@ static void push_changes(Dav *d, Coll *c) {
     PushItem *list = malloc(sizeof *list * (size_t)(c->n ? c->n : 1));
     for (int i = 0; list && i < c->n; i++) if (c->items[i].dirty) {
         PushItem *p = &list[n++];
-        scopy(p->href, sizeof p->href, c->items[i].href);
+        /* hrefs written by earlier versions may be paths: make them absolute on the collection */
+        if (dav_href_resolve(c->href, c->items[i].href, p->href, sizeof p->href) || !dav_same_origin(c->href, p->href)) { n--; continue; }
         scopy(p->etag, sizeof p->etag, c->items[i].etag);
         scopy(p->file, sizeof p->file, c->items[i].file);
         scopy(p->uid, sizeof p->uid, c->items[i].uid);
@@ -1167,52 +1222,54 @@ static void push_changes(Dav *d, Coll *c) {
     }
     char cid[80];
     scopy(cid, sizeof cid, c->id);
+    char kind = c->kind;
     pthread_mutex_unlock(&G);
     for (int i = 0; i < n; i++) {
         PushItem *p = &list[i];
+        int del = p->dirty == DIRTY_DEL;
         char hdr[400] = "";
         if (p->etag[0]) snprintf(hdr, sizeof hdr, "If-Match: %s\r\n", p->etag);
-        else if (p->dirty == DIRTY_PUT) snprintf(hdr, sizeof hdr, "If-None-Match: *\r\n");
+        else if (!del) snprintf(hdr, sizeof hdr, "If-None-Match: *\r\n");
         HttpResp r;
         int rc;
-        if (p->dirty == DIRTY_DEL) rc = dav_req(d, "DELETE", p->href, -1, NULL, NULL, hdr, &r);
+        char *t = NULL;
+        size_t tl = 0;
+        if (del) rc = dav_req(d, "DELETE", p->href, -1, NULL, NULL, hdr, &r);
         else {
             char rel[200];
             snprintf(rel, sizeof rel, "pim/%s/%s", cid, p->file);
-            size_t tl;
-            char *t = fs_read(rel, &tl, 16 << 20);
+            t = fs_read(rel, &tl, 16 << 20);
             if (!t) continue;
-            rc = dav_req(d, "PUT", p->href, -1, t, c->kind == 'c' ? "text/calendar; charset=utf-8" : "text/vcard; charset=utf-8", hdr, &r);
-            free(t);
+            rc = dav_req(d, "PUT", p->href, -1, t, kind == 'c' ? "text/calendar; charset=utf-8" : "text/vcard; charset=utf-8", hdr, &r);
         }
-        if (rc) break;
-        int ok = r.status >= 200 && r.status < 300;
-        int gone = r.status == 404 || r.status == 410;
-        int conflict = r.status == 412;
+        if (rc) { free(t); break; }
+        int out = dav_push_outcome(del, r.status);
         pthread_mutex_lock(&G);
         Coll *cc = coll_get(cid);
         Item *it = cc ? item_get(cc, p->uid) : NULL;
         if (it && it->dirty == p->dirty) {
-            if (p->dirty == DIRTY_DEL && (ok || gone)) item_delete(cc, it);
-            else if (ok) { it->dirty = CLEAN; scopy(it->etag, sizeof it->etag, r.etag); }
-            else if (conflict) { it->dirty = CLEAN; it->etag[0] = 0; }     /* the server's version wins; refetched below */
-            else if (r.status >= 400 && r.status < 500) {
-                /* the server refuses this version for good (400, 403, 415…): keep the server's copy
-                 * instead of retrying forever, and say so */
+            if (out == DAV_PUSH_DONE) {
+                if (del) item_delete(cc, it);
+                else { it->dirty = CLEAN; scopy(it->href, sizeof it->href, p->href); scopy(it->etag, sizeof it->etag, r.etag); }
+            } else if (out == DAV_PUSH_CONFLICT || out == DAV_PUSH_REJECTED) {
+                /* the server's version wins; it is fetched below */
                 it->dirty = CLEAN;
                 it->etag[0] = 0;
-                JBuf ev;
-                jb_init(&ev);
-                jb_printf(&ev, "{\"ev\":\"dav-rejected\",\"status\":%d,\"uid\":", r.status);
-                jb_str(&ev, p->uid);
-                jb_raw(&ev, "}");
-                send_event(&ev);
-            }
-            else dbg("DAV %s %s: %d", p->dirty == DIRTY_DEL ? "DELETE" : "PUT", p->href, r.status);
+                if (dav_push_keeps_copy(del, out) && t) keep_local_copy(cc, p->uid, t, tl, r.status);
+                if (out == DAV_PUSH_REJECTED) {
+                    JBuf ev;
+                    jb_init(&ev);
+                    jb_printf(&ev, "{\"ev\":\"dav-rejected\",\"status\":%d,\"uid\":", r.status);
+                    jb_str(&ev, p->uid);
+                    jb_raw(&ev, "}");
+                    send_event(&ev);
+                }
+            } else dbg("DAV %s %s: %d (again next sync)", del ? "DELETE" : "PUT", p->href, r.status);
             save_meta(cc);
         }
         pthread_mutex_unlock(&G);
         http_resp_free(&r);
+        free(t);
     }
     free(list);
 }
@@ -1223,49 +1280,67 @@ static void escape_href(JBuf *b, const char *h) {
     jb_raw(b, e);
 }
 
+/* hrefs of a multistatus made absolute on base (the URL that answered); unusable ones, and items
+ * outside the collection's server, emptied */
+static void resolve_items(DavItem *list, int n, const char *base, const char *coll) {
+    for (int i = 0; i < n; i++) {
+        char abs[DAV_URL_MAX];
+        if (dav_href_resolve(base, list[i].href, abs, sizeof abs) || !dav_same_origin(coll, abs)) list[i].href[0] = 0;
+        else scopy(list[i].href, sizeof list[i].href, abs);
+    }
+}
+
 static void fetch_changed(Dav *d, Coll *c) {
-    char href[1024], cid[80];
+    char href[DAV_URL_MAX], cid[80];
     pthread_mutex_lock(&G);
     scopy(href, sizeof href, c->href);
     scopy(cid, sizeof cid, c->id);
     char kind = c->kind;
+    /* hrefs written by earlier versions may be paths: make them absolute once */
+    for (int i = 0; i < c->n; i++) {
+        char abs[DAV_URL_MAX];
+        if (c->items[i].href[0] && !dav_href_resolve(href, c->items[i].href, abs, sizeof abs)) scopy(c->items[i].href, sizeof c->items[i].href, abs);
+    }
     pthread_mutex_unlock(&G);
     HttpResp r;
     if (dav_req(d, "PROPFIND", href, 1, PF_ETAGS, "application/xml; charset=utf-8", NULL, &r)) return;
     if (r.status != 207) { http_resp_free(&r); return; }
+    char base[sizeof d->url];
+    scopy(base, sizeof base, d->url);
     DavItem *list;
     int n = parse_multistatus(r.body, r.blen, &list, 0);
     http_resp_free(&r);
     if (n < 0) return;
-    /* what to download; what disappeared */
+    resolve_items(list, n, base, href);
+    /* what to download; what disappeared (davutil.c, dav_plan) */
     char **want = malloc(sizeof *want * (size_t)(n ? n : 1));
+    DavRemote *rem = malloc(sizeof *rem * (size_t)(n ? n : 1));
+    unsigned char *fetch = malloc((size_t)(n ? n : 1));
     int nw = 0;
     pthread_mutex_lock(&G);
     Coll *cc = coll_get(cid);
-    if (!cc) { pthread_mutex_unlock(&G); free(want); free_items(list, n); return; }
-    for (int i = 0; i < n && want; i++) {
-        const char *h = list[i].href;
-        size_t hl = strlen(h);
-        if (!strcmp(h, href) || (hl && h[hl - 1] == '/')) continue;           /* the collection itself */
-        Item *it = item_by_href(cc, h);
-        if (it && it->dirty) continue;
-        if (!it || strcmp(it->etag, list[i].etag)) want[nw++] = list[i].href;
+    DavLocal *loc = cc ? malloc(sizeof *loc * (size_t)(cc->n ? cc->n : 1)) : NULL;
+    unsigned char *drop = cc ? malloc((size_t)(cc->n ? cc->n : 1)) : NULL;
+    if (!cc || !want || !rem || !fetch || !loc || !drop) {
+        pthread_mutex_unlock(&G);
+        free(want); free(rem); free(fetch); free(loc); free(drop); free_items(list, n);
+        return;
     }
-    for (int i = cc->n - 1; i >= 0; i--) {
-        Item *it = &cc->items[i];
-        if (it->dirty || !it->href[0]) continue;
-        int found = 0;
-        for (int k = 0; k < n && !found; k++) if (!strcmp(list[k].href, it->href)) found = 1;
-        if (!found) item_delete(cc, it);
-    }
+    for (int i = 0; i < n; i++) { rem[i].href = list[i].href; rem[i].etag = list[i].etag; }
+    int nl = cc->n;
+    for (int k = 0; k < nl; k++) { loc[k].href = cc->items[k].href; loc[k].etag = cc->items[k].etag; loc[k].dirty = cc->items[k].dirty; }
+    dav_plan(href, loc, nl, rem, n, fetch, drop);
+    for (int i = 0; i < n; i++) if (fetch[i]) want[nw++] = list[i].href;
+    for (int k = nl - 1; k >= 0; k--) if (drop[k]) item_delete(cc, &cc->items[k]);    /* descending: later swaps only touch done slots */
     save_meta(cc);
     pthread_mutex_unlock(&G);
+    free(rem); free(fetch); free(loc); free(drop);
     for (int off = 0; off < nw; off += 50) {
         JBuf q;
         jb_init(&q);
         if (kind == 'c') jb_raw(&q, "<?xml version=\"1.0\" encoding=\"utf-8\"?><c:calendar-multiget xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop>");
         else jb_raw(&q, "<?xml version=\"1.0\" encoding=\"utf-8\"?><card:addressbook-multiget xmlns:d=\"DAV:\" xmlns:card=\"urn:ietf:params:xml:ns:carddav\"><d:prop><d:getetag/><card:address-data/></d:prop>");
-        for (int i = off; i < nw && i < off + 50; i++) { jb_raw(&q, "<d:href>"); escape_href(&q, want[i]); jb_raw(&q, "</d:href>"); }
+        for (int i = off; i < nw && i < off + 50; i++) { jb_raw(&q, "<d:href>"); escape_href(&q, dav_url_path(want[i])); jb_raw(&q, "</d:href>"); }
         jb_raw(&q, kind == 'c' ? "</c:calendar-multiget>" : "</card:addressbook-multiget>");
         if (q.oom) { jb_free(&q); break; }
         HttpResp mr;
@@ -1273,13 +1348,16 @@ static void fetch_changed(Dav *d, Coll *c) {
         jb_free(&q);
         if (rc) break;
         if (mr.status != 207) { http_resp_free(&mr); break; }
+        char mbase[sizeof d->url];
+        scopy(mbase, sizeof mbase, d->url);
         DavItem *got;
         int ng = parse_multistatus(mr.body, mr.blen, &got, 1);
         http_resp_free(&mr);
+        if (ng > 0) resolve_items(got, ng, mbase, href);
         pthread_mutex_lock(&G);
         cc = coll_get(cid);
         for (int i = 0; cc && i < ng; i++) {
-            if (!got[i].data) continue;
+            if (!got[i].data || !got[i].href[0]) continue;
             size_t dl = strlen(got[i].data);
             char uid[256] = "";
             if (kind == 'b') vcard_uid(got[i].data, dl, uid, sizeof uid);
@@ -1287,6 +1365,7 @@ static void fetch_changed(Dav *d, Coll *c) {
             if (!uid[0]) scopy(uid, sizeof uid, got[i].href);
             Item *it = item_by_href(cc, got[i].href);
             if (!it) it = item_get(cc, uid);
+            if (it && it->dirty) continue;              /* changed here meanwhile: pushed next sync */
             if (!it) it = item_new(cc, uid);
             if (!it) continue;
             scopy(it->href, sizeof it->href, got[i].href);
@@ -1319,8 +1398,20 @@ void pim_dav_sync(Account *a) {
         return;
     }
     if (r) { sync_failed(a, &d, "connect"); dav_end(&d); return; }
-    char calhome[1024], cardhome[1024];
-    if (discover(&d, a, calhome, cardhome, sizeof calhome)) { sync_failed(a, &d, "discovery"); dav_end(&d); return; }
+    /* the homes: calendars from the account URL; contacts from their own URL when the provider
+     * has one (card_url), else from the same discovery */
+    char calhome[DAV_URL_MAX] = "", cardhome[DAV_URL_MAX] = "";
+    if (a->cal && discover(&d, a->url, 1, calhome, cardhome, sizeof calhome)) { sync_failed(a, &d, "discovery"); dav_end(&d); return; }
+    if (a->card && (a->card_url[0] || !cardhome[0])) {
+        char other[DAV_URL_MAX] = "";
+        cardhome[0] = 0;
+        if (discover(&d, a->card_url[0] ? a->card_url : a->url, 0, other, cardhome, sizeof cardhome)) {
+            if (d.auth_failed || !a->cal) { sync_failed(a, &d, "discovery"); dav_end(&d); return; }
+            dbg("DAV %s: no contacts (%s)", a->id, d.err);
+            cardhome[0] = 0;
+            d.err[0] = 0;
+        }
+    }
     pthread_mutex_lock(&G);
     for (int i = 0; i < ncolls; i++) if (!strcmp(colls[i]->acct, a->id)) colls[i]->seen = 0;
     pthread_mutex_unlock(&G);
@@ -1331,12 +1422,17 @@ void pim_dav_sync(Account *a) {
         HttpResp hr;
         if (dav_req(&d, "PROPFIND", home, 1, PF_COLLS, "application/xml; charset=utf-8", NULL, &hr)) { sync_failed(a, &d, "list"); dav_end(&d); return; }
         if (hr.status != 207) { http_resp_free(&hr); continue; }
+        char hbase[sizeof d.url];
+        scopy(hbase, sizeof hbase, d.url);
         DavItem *it;
         int n = parse_multistatus(hr.body, hr.blen, &it, 0);
         listed[pass] = 1;
         pthread_mutex_lock(&G);
         for (int i = 0; i < n; i++) {
             if (pass == 0 ? !it[i].cal : !it[i].book) continue;
+            char abs[DAV_URL_MAX];
+            if (dav_href_resolve(hbase, it[i].href, abs, sizeof abs) || !dav_same_origin(hbase, abs)) { it[i].cal = it[i].book = 0; continue; }
+            /* the id comes from the href as the server writes it (as in earlier versions) */
             char h[17], cid[80];
             fs_hash(it[i].href, h);
             snprintf(cid, sizeof cid, "%s-%s", a->id, h);
@@ -1346,7 +1442,6 @@ void pim_dav_sync(Account *a) {
             if (!c) {
                 c = coll_new(cid, pass == 0 ? 'c' : 'b', a->id, it[i].name[0] ? it[i].name : (pass ? "Contacts" : "Calendar"), it[i].color[0] ? it[i].color : (pass ? "#8e8e93" : "#0a84ff"));
                 if (!c) continue;
-                scopy(c->href, sizeof c->href, it[i].href);
                 c->ctag[0] = 0;
             } else {
                 if (it[i].name[0]) scopy(c->name, sizeof c->name, it[i].name);
@@ -1354,8 +1449,8 @@ void pim_dav_sync(Account *a) {
             }
             if (pass == 0) { c->events = ve; c->todos = vt; }
             c->seen = 1;
-            /* remember the server's ctag; compared after pushing */
-            scopy(c->href, sizeof c->href, it[i].href);
+            scopy(c->href, sizeof c->href, abs);
+            /* remember the server's ctag (or sync-token); compared after pushing */
             it[i].ok = strcmp(c->ctag, it[i].ctag) || !it[i].ctag[0];
             if (it[i].ok) scopy(c->ctag, sizeof c->ctag, it[i].ctag);
         }
