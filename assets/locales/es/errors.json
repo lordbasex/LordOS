@@ -27,7 +27,6 @@
   "cloud.unreachable": "No se puede llegar al servidor. Revisá la dirección y la red.",
   "cloud.badAddress": "Esa dirección no es válida.",
   "cloud.cantRevoke": "Los enlaces del almacenamiento de objetos no se pueden retirar antes; este deja de funcionar el {date}.",
-  "cloud.tooManyAttempts": "El servidor está rechazando por un rato las conexiones nuevas desde esta computadora. Esperá un minuto y probá de nuevo.",
   "cloud.badKind": "Ese tipo de cuenta no se ofrece",
   "cloud.uploadFailed": "La subida falló; se vuelve a intentar",
   "cloud.pending": "Algunos cambios todavía no se subieron",

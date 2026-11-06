@@ -27,7 +27,6 @@
   "cloud.unreachable": "Il server non è raggiungibile. Controlla l’indirizzo e la rete.",
   "cloud.badAddress": "Quell’indirizzo non è valido.",
   "cloud.cantRevoke": "I link all’archiviazione a oggetti non si possono ritirare prima; questo smette di funzionare il {date}.",
-  "cloud.tooManyAttempts": "Il server sta rifiutando per un po’ le nuove connessioni da questo computer. Aspetta un minuto e riprova.",
   "cloud.badKind": "Questo tipo di account non è disponibile",
   "cloud.uploadFailed": "L’invio non è riuscito; verrà ritentato",
   "cloud.pending": "Alcune modifiche non sono ancora state caricate",

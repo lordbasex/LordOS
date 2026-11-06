@@ -27,7 +27,6 @@
   "cloud.unreachable": "The server can't be reached. Check the address and the network.",
   "cloud.badAddress": "That address isn't valid.",
   "cloud.cantRevoke": "Links to object storage can't be withdrawn early; this one stops working on {date}.",
-  "cloud.tooManyAttempts": "The server is refusing new connections from this computer for a while. Wait a minute and try again.",
   "cloud.badKind": "That kind of account isn't offered",
   "cloud.uploadFailed": "The upload failed; it is tried again",
   "cloud.pending": "Some changes haven't gone up yet",
