@@ -61,9 +61,24 @@
 #include <systemd/sd-bus.h>
 #endif
 
+#define VM_DNS_ADDR "169.254.0.53"     /* the guest's nameserver in Shared mode (passt answers for it) */
+#ifdef LORDVM_TEST_PATHS
+/* A test build only (make build/lord-vm-testpaths, never installed): the release gates on a host whose QEMU, firmware
+ * or passt live elsewhere (a hypervisor host with its own QEMU build, passt unpacked into a scratch folder) take
+ * them from absolute paths in LORDVM_TEST_QEMU_<ARCH>, LORDVM_TEST_QEMU_IMG, LORDVM_TEST_PASST,
+ * LORDVM_TEST_FW_CODE and LORDVM_TEST_FW_VARS, without changing the host. The package's lord-vm has none of this. */
+static char *test_path(const char *env, const char *def) {
+    const char *v = getenv(env);
+    return (char *)(v && v[0] == '/' && !strstr(v, "..") ? v : def);
+}
+#define QEMU_IMG test_path("LORDVM_TEST_QEMU_IMG", "/usr/bin/qemu-img")
+#define PASST    test_path("LORDVM_TEST_PASST", "/usr/bin/passt")
+#define QEMU_BIN_OF(a) test_path((a) ? "LORDVM_TEST_QEMU_AMD64" : "LORDVM_TEST_QEMU_ARM64", QEMU_BIN[a])
+#else
 #define QEMU_IMG "/usr/bin/qemu-img"
 #define PASST    "/usr/bin/passt"
-#define VM_DNS_ADDR "169.254.0.53"     /* the guest's nameserver in Shared mode (passt answers for it) */
+#define QEMU_BIN_OF(a) QEMU_BIN[a]
+#endif
 static const char *const QEMU_BIN[2] = { "/usr/bin/qemu-system-aarch64", "/usr/bin/qemu-system-x86_64" };
 
 /* UEFI code and variable templates, by architecture, first found wins */
@@ -321,7 +336,7 @@ static int state_active(int s) { return s == VS_STARTING || s == VS_RUNNING || s
 /* ---- create ---- */
 
 static int machine_type_for(int arch, char *out, size_t n) {
-    char *argv[] = { (char *)QEMU_BIN[arch], "-machine", "help", NULL };
+    char *argv[] = { (char *)QEMU_BIN_OF(arch), "-machine", "help", NULL };
     static char buf[65536];
     if (run_tool(argv, buf, sizeof buf)) return -1;
     const char *alias = arch == VM_ARCH_ARM64 ? "virt " : "q35 ";
@@ -342,6 +357,10 @@ static int machine_type_for(int arch, char *out, size_t n) {
 }
 
 static int firmware_for(int arch, const char **code, const char **vars) {
+#ifdef LORDVM_TEST_PATHS
+    const char *tc = test_path("LORDVM_TEST_FW_CODE", ""), *tv = test_path("LORDVM_TEST_FW_VARS", "");
+    if (tc[0] && tv[0] && file_exists(tc) && file_exists(tv)) { *code = tc; *vars = tv; return 0; }
+#endif
     if (arch == VM_ARCH_ARM64) {
         for (size_t i = 0; i < sizeof FW_ARM64 / sizeof FW_ARM64[0]; i++)
             if (file_exists(FW_ARM64[i][0]) && file_exists(FW_ARM64[i][1])) { *code = FW_ARM64[i][0]; *vars = FW_ARM64[i][1]; return 0; }
@@ -607,7 +626,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         snprintf(m.firmware_code, sizeof m.firmware_code, "%s", code);
         if (sha256_file(code, m.firmware_sha256)) { fprintf(stderr, "lord-vm: can't read %s\n", code); return 1; }
     }
-    if (!file_exists(QEMU_BIN[arch])) { fprintf(stderr, "lord-vm: %s isn't installed\n", QEMU_BIN[arch]); return 1; }
+    if (!file_exists(QEMU_BIN_OF(arch))) { fprintf(stderr, "lord-vm: %s isn't installed\n", QEMU_BIN_OF(arch)); return 1; }
     if (machine_type_for(arch, m.machine_type, sizeof m.machine_type)) { fprintf(stderr, "lord-vm: can't read QEMU's machine types\n"); return 1; }
     char isoreal[PATH_MAX];
     if (iso) {
@@ -1067,7 +1086,7 @@ static void build_qemu_args(void) {
     int kvm = m->accel == VM_ACCEL_KVM, arm = m->arch == VM_ARCH_ARM64, uefi = m->firmware == VM_FW_UEFI;
     char esc[2 * VM_NAME_MAX + 8], p[PATH_MAX + 64];
     qargc = 0;
-    arg(QEMU_BIN[m->arch]);
+    arg(QEMU_BIN_OF(m->arch));
     arg("-nodefaults"); arg("-no-user-config");
     opt_escape(esc, sizeof esc, m->name);
     arg("-name"); argf("guest=%s,debug-threads=on", esc);
@@ -1256,7 +1275,7 @@ static int start_machine(void) {
         if (disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
     }
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
-    if (!file_exists(QEMU_BIN[S.m.arch])) { fail_start("%s isn't installed", QEMU_BIN[S.m.arch]); return -1; }
+    if (!file_exists(QEMU_BIN_OF(S.m.arch))) { fail_start("%s isn't installed", QEMU_BIN_OF(S.m.arch)); return -1; }
     if (S.m.network == VM_NET_SHARED && !file_exists(PASST)) { fail_start("passt isn't installed (Shared network)"); return -1; }
     {
         char why[160];
@@ -4661,7 +4680,7 @@ static int imp_machine(Imp *I, VmMachine *n, const VmHost *h, int devices, int n
         snprintf(n->firmware_code, sizeof n->firmware_code, "%s", code);
         if (sha256_file(code, n->firmware_sha256)) { snprintf(why, wn, "can't read %s", code); return -1; }
     } else { n->firmware_code[0] = 0; n->firmware_sha256[0] = 0; }
-    if (!file_exists(QEMU_BIN[m->arch])) { snprintf(why, wn, "%s isn't installed", QEMU_BIN[m->arch]); return -1; }
+    if (!file_exists(QEMU_BIN_OF(m->arch))) { snprintf(why, wn, "%s isn't installed", QEMU_BIN_OF(m->arch)); return -1; }
     if (machine_type_for(m->arch, n->machine_type, sizeof n->machine_type)) { snprintf(why, wn, "can't read QEMU's machine types"); return -1; }
     char err[256];
     if (vm_machine_check(n, err, sizeof err)) { snprintf(why, wn, "%s", err); return -1; }
