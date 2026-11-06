@@ -172,8 +172,9 @@ not offered.
 ### 6.2 Signing in with the browser
 
 1. The person picks a provider and names the account ("Work", "Personal"; the name becomes the folder in `~/Cloud`).
-2. `lord-server` starts the provider's OAuth flow through rclone's `config/create` with `state` steps (rclone's non-interactive
-   config protocol), gets the authorization URL, and opens it in the default browser. Settings shows "Waiting for you to sign in
+2. `lord-server` starts `rclone authorize <type> --auth-no-open-browser` in the cloud scope, reads the authorization URL from its
+   log, and opens it in the default browser itself; the token comes back on stdout and goes to `config/create` as `config_token`
+   (section 15: the rc state machine asks `config_is_local` first, so this path is simpler). Settings shows "Waiting for you to sign in
    in the browser…" with the time left (5 minutes), **Open Again** and **Cancel**. The redirect comes back to rclone's listener on
    `127.0.0.1:53682`, which only lives during the sign-in.
 3. The token goes to the keyring (4.3), the account is mounted, and Files shows it.
@@ -304,7 +305,27 @@ Camera and Photos; a cloud's shared-with-me folder where the provider exposes it
 
 ## 15. Phase 0 results
 
-Empty until Phase 0 runs.
+Run on 2026-11-06 with rclone **v1.75.2** built from its tag's source with Go 1.26.10 (`CGO_ENABLED=0 go build -trimpath`), on
+VM 116 (Debian 13.7, amd64) and the Raspberry Pi 5 (arm64, LordOS 0.8.8.4). v1.76.0 came out the same day; 0.8.8.5 takes the newest
+patch release when it is built. Probe: `tools/cloud/phase0.sh` (a local `rclone serve webdav` stands in for the cloud). Same
+results on both architectures unless a number says otherwise.
+
+| Question | Result |
+|---|---|
+| `rcd` on a Unix socket | **Measured, works**: `--rc-addr unix:///…/rc.sock`. No TCP listener at all (`ss -ltnp`). The socket is created with the umask (0775 here), so the 0700 folder is what protects it; `lord-server` also sets umask 077 for the unit |
+| Auth on the socket | **Measured**: without `--rc-user`/`--rc-pass` a call that touches a remote gets 401 |
+| Every rc call in section 5 | **Measured, all present**, plus `vfs/list` and `sync/bisync`. `core/command` and `config/dump` are present too, as expected: 4.2's closed table is what keeps them out |
+| `config/create` for WebDAV with `obscure` | **Measured**: the password lands obscured in `rclone.conf`; 4.3 still moves it to the keyring |
+| `mount/mount` over rc with `CacheMode full`, no age or size limit | **Measured, works**; first read of a 5 MB file 63 ms (amd64), 36 ms (Pi) over loopback |
+| Eviction while mounted (7.2) | **Measured, works**: removing a clean file's cache data and its `vfsMeta` entry while the mount runs, then reading it again, fetches it again with the right content (sha256 equal), also after `vfs/forget`. Phase 1 adds the cases this didn't cover: a file open while evicted (must be refused by the manager: `vfs/stats` `inUse`), and eviction racing a write |
+| Upload queue | **Measured**: a write through the mount shows in `vfs/queue` (name, size, delay, tries) and reaches the server after `WriteBack` (5 s) |
+| `operations/about` | WebDAV without quota answers `{}`: section 8's "used only" case |
+| `operations/publiclink` | WebDAV: "doesn't support public links", the error 9 turns into **Open on Website** |
+| OAuth through rc `config/create` (non-interactive) | Answers a state machine whose first question is `config_is_local`. **Decided instead:** `lord-server` runs `rclone authorize <type> --auth-no-open-browser` in the cloud scope, reads the URL from its log line ("Please go to the following link: http://127.0.0.1:53682/auth?state=…"), opens it in the default browser itself, and gets the token from stdout; then `config/create` with `config_token`. **Measured** up to the URL with Dropbox; the token step needs a real account (Phase 1) |
+| `core/bwlimit` | **Measured**: up and down separately (`1M:2M`) |
+| Memory | `rcd` with one mount: RSS 77 MB (amd64), 81 MB (Pi) |
+| Binary | 86 MB (amd64), 79 MB (arm64) with every backend. To decide in packaging: build tags to leave out backends 6.1 doesn't offer |
+| Token refresh written back to `--config` | To test with a real OAuth account (Phase 1) |
 
 ## 16. Tests
 
