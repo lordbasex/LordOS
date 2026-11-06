@@ -10,6 +10,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.8.4-beta] - 2026-11-06
+
+An update for 0.8.8 to 0.8.8.3 through Store → Updates and `apt`: the `lordos` package changes, with the 13 issues reported on GitHub since 0.8.8.3 (#28 to #40), a redesigned Remote Desk with sound, single sign-on for Fortinet VPNs and a Balance control for sound. Thanks to everyone who opened an issue. The installer's manual partitioning (#31) lives in the ISO and reaches people with the next one.
+
 ### Added
 
 - **Calendar and Contacts: Add Account…** ([#32](https://github.com/lordbasex/LordOS/issues/32)). Under the calendar list and the address books, it opens Mail's account sheet in *CalDAV / CardDAV* mode with a **Service** choice: **Other server** (server URL, an optional separate contacts URL, user name, password, and Calendars / Contacts switches) or a built-in preset for a large provider's calendars and contacts, which asks only for the account's email and an **app-specific password** and fills in both addresses. A provider that allows its calendars and contacts only over OAuth is listed as **not available yet**, with *Add Account* disabled, until LordOS has a registered sign-in (what to register is in `docs/MAIL.md`). Passwords go to the keyring, as for mail accounts.
@@ -3449,7 +3453,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.4-beta...HEAD
+[0.8.8.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.3-beta...v0.8.8.4-beta
 [0.8.8.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.2-beta...v0.8.8.3-beta
 [0.8.8.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.1-beta...v0.8.8.2-beta
 [0.8.8.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8-beta...v0.8.8.1-beta
