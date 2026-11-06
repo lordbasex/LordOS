@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HtmlView, TextView } from './HtmlView.jsx';
 import { Compose } from './Compose.jsx';
 import { AccountSetup, AccountsPanel, CertDialog, PasswordPrompt, Sheet } from './Setup.jsx';
+import { folderTree } from './foldertree.js';
 import { CATEGORY_COLORS, categoryName, listDate, fullDate, folderName, addrShort, formatSize, openPath, revealPath } from './util.js';
 import { quote } from './md.js';
 import { safeName } from './util.js';
@@ -658,10 +659,10 @@ function MailMain() {
                   {bad ? <Text onClick={() => setSheet(st.authFailed[a.id] || status === 'auth' ? { password: a.id } : st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : 'accounts')}
                     style={{ fontSize: 11, color: '#ff9f0a' }}>⚠</Text> : null}
                 </View>
-                {a.folders.filter((f) => !f.noselect).map((f) => (
-                  <SideRow key={f.name} icon={{ folder: f }} label={folderName(f)} count={f.special === 'drafts' ? f.total : f.special === 'sent' || f.special === 'trash' ? 0 : f.unread}
-                    indent={f.delim && f.name.split(f.delim).length > 1 && f.special === '' ? 1 : 0}
-                    selected={src.kind === 'folder' && src.acct === a.id && src.folder === f.name} onClick={() => { setSrc({ kind: 'folder', acct: a.id, folder: f.name }); setQ(''); }} />
+                {folderTree(a.folders).map(({ f, depth }) => (
+                  <SideRow key={f.name} icon={{ folder: f }} label={folderName(f)} count={f.noselect ? 0 : f.special === 'drafts' ? f.total : f.special === 'sent' || f.special === 'trash' ? 0 : f.unread}
+                    indent={depth} dim={f.noselect}
+                    selected={src.kind === 'folder' && src.acct === a.id && src.folder === f.name} onClick={f.noselect ? undefined : () => { setSrc({ kind: 'folder', acct: a.id, folder: f.name }); setQ(''); }} />
                 ))}
               </View>
             );
@@ -814,7 +815,7 @@ function CategoryDots() {
 
 // Source-list row. icon: a glyph (drawn in the accent color), { kind } for a drawn shape,
 // { folder } for a mail folder, or an element.
-function SideRow({ icon, label, count, selected, onClick, indent = 0 }) {
+function SideRow({ icon, label, count, selected, onClick, indent = 0, dim = false }) {
   const th = useTheme();
   const [hover, setHover] = useState(false);
   const c = selected ? '#fff' : th.accent;
@@ -827,7 +828,7 @@ function SideRow({ icon, label, count, selected, onClick, indent = 0 }) {
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 28, [rtl ? 'paddingRight' : 'paddingLeft']: 8 + indent * 14, [rtl ? 'paddingLeft' : 'paddingRight']: 8, borderRadius: 6,
-        backgroundColor: selected ? th.accent : hover ? th.hover : 'transparent' }}>
+        backgroundColor: selected ? th.accent : hover && onClick ? th.hover : 'transparent', opacity: dim ? 0.6 : 1 }}>
       <View style={{ width: 18, alignItems: 'center', justifyContent: 'center' }}>{ic}</View>
       <Text style={{ flex: 1, fontSize: 13, color: selected ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{label}</Text>
       {count ? <Text style={{ fontSize: 11, fontWeight: 500, color: selected ? 'rgba(255,255,255,0.85)' : th.textDim }}>{String(count)}</Text> : null}

@@ -29,30 +29,6 @@ static Store *store_of(const Account *a, int create) {
 
 FolderList *store_folders(Account *a) { Store *s = store_of(a, 1); return s ? &s->fl : NULL; }
 
-/* ---- special folders ---- */
-
-const char *special_of(const char *name, const char *flags) {
-    static const struct { const char *flag, *sp; } fl[] = {
-        { "\\Sent", "sent" }, { "\\Drafts", "drafts" }, { "\\Trash", "trash" }, { "\\Junk", "junk" }, { "\\Archive", "archive" },
-        { "\\All", "all" }, { "\\Flagged", "flagged" },
-    };
-    for (size_t i = 0; flags && i < sizeof fl / sizeof fl[0]; i++) if (strcasestr(flags, fl[i].flag)) return fl[i].sp;
-    if (!strcasecmp(name, "INBOX")) return "inbox";
-    const char *base = strrchr(name, '/');
-    base = base ? base + 1 : name;
-    const char *dot = strrchr(base, '.');
-    if (dot && !strncasecmp(name, "INBOX.", 6)) base = dot + 1;
-    static const struct { const char *n, *sp; } names[] = {
-        { "Sent", "sent" }, { "Sent Items", "sent" }, { "Sent Messages", "sent" }, { "Sent Mail", "sent" }, { "Enviados", "sent" }, { "Elementos enviados", "sent" },
-        { "Drafts", "drafts" }, { "Borradores", "drafts" }, { "Rascunhos", "drafts" },
-        { "Trash", "trash" }, { "Deleted Items", "trash" }, { "Deleted Messages", "trash" }, { "Papelera", "trash" }, { "Lixeira", "trash" }, { "Bin", "trash" },
-        { "Junk", "junk" }, { "Spam", "junk" }, { "Junk E-mail", "junk" }, { "Correo no deseado", "junk" },
-        { "Archive", "archive" }, { "Archivo", "archive" }, { "Arquivo", "archive" }, { "All Mail", "all" }, /* i18n-ok: folder names servers use */
-    };
-    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) if (!strcasecmp(base, names[i].n)) return names[i].sp;
-    return "";
-}
-
 /* ---- escaping for the index files ---- */
 
 static void put_field(JBuf *b, const char *s) {

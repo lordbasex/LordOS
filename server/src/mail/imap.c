@@ -10,6 +10,7 @@
 #include "imapp.h"
 #include "imapio.h"
 #include "mime.h"
+#include "folderrole.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -246,34 +247,50 @@ static int imap_open(Imap *im, char *err, size_t ecap) {
 
 /* ---- folders ---- */
 
-typedef struct { Account *a; char seen[512][160]; int nseen; int gmail; } ListCtx;
+/* One LIST reply, kept until the whole list is in: roles are decided over all folders at once
+ * (folderrole.c), so a server that flags "Sent" and also has "Sent Messages" shows one Sent. */
+typedef struct { Folder *f; char flags[512]; } ListItem;
+typedef struct { Account *a; ListItem *it; int n, cap, full; int gmail; } ListCtx;
 
 static void on_list(Imap *im, IResp *r, void *u) {
     ListCtx *lc = u;
     if (!iv_is(r->first, "LIST") && !iv_is(r->first, "XLIST")) return;
     IVal *flags = iv_at(r->first, 1), *delim = iv_at(r->first, 2), *name = iv_at(r->first, 3);
     if (!flags || flags->type != IV_LIST || !name) return;
-    char fl[512] = "", nm[512], d[8];
+    char fl[512] = "", nm[512], d[8] = "";
     size_t o = 0;
     for (IVal *k = flags->kid; k; k = k->next) { o += (size_t)snprintf(fl + o, sizeof fl - o, "%.*s ", (int)k->n, k->s); if (o >= sizeof fl) break; }
     iv_copy(name, nm, sizeof nm);
-    iv_copy(delim, d, sizeof d);
+    if (delim && delim->type != IV_NIL) iv_copy(delim, d, sizeof d);
     if (!nm[0]) return;
     if (!strncasecmp(nm, "[Gmail]", 7) || !strncasecmp(nm, "[Google Mail]", 13)) lc->gmail = 1;
+    if (lc->n == lc->cap) {
+        int nc = lc->cap ? lc->cap * 2 : 64;
+        ListItem *ni = nc <= 100000 ? realloc(lc->it, (size_t)nc * sizeof *ni) : NULL;
+        if (!ni) { lc->full = 1; return; }
+        lc->it = ni; lc->cap = nc;
+    }
     pthread_mutex_lock(&G);
     Folder *f = store_folder(im->a, !strcasecmp(nm, "INBOX") ? "INBOX" : nm, 1);
-    if (f) {
+    int dup = -1;
+    for (int i = 0; f && i < lc->n && dup < 0; i++) if (lc->it[i].f == f) dup = i;
+    if (f && dup >= 0) {
+        /* listed twice ("INBOX" and "Inbox"): one entry, the flags of both */
+        size_t l = strlen(lc->it[dup].flags);
+        snprintf(lc->it[dup].flags + l, sizeof lc->it[0].flags - l, "%s", fl);
+    } else if (f) {
         char disp[512];
         imap_utf7_decode(f->name, disp, sizeof disp);
-        /* show the last level ("[Gmail]/Sent Mail" → "Sent Mail") */
+        /* show the last level ("[Gmail]/Sent Mail" → "Sent Mail"); the UI builds the tree */
         const char *last = d[0] ? strrchr(disp, d[0]) : NULL;
         snprintf(f->display, sizeof f->display, "%s", !strcasecmp(f->name, "INBOX") ? "INBOX" : last ? last + 1 : disp);
-        snprintf(f->special, sizeof f->special, "%s", special_of(f->name, fl));
         f->delim = d[0];
         f->noselect = strcasestr(fl, "\\Noselect") || strcasestr(fl, "\\NonExistent");
-    }
+        lc->it[lc->n].f = f;
+        snprintf(lc->it[lc->n].flags, sizeof lc->it[0].flags, "%s", fl);
+        lc->n++;
+    } else lc->full = 1;
     pthread_mutex_unlock(&G);
-    if (lc->nseen < 512) SNPF(lc->seen[lc->nseen++], sizeof lc->seen[0], "%s", !strcasecmp(nm, "INBOX") ? "INBOX" : nm);
 }
 
 static int sync_folder_list(Imap *im) {
@@ -283,11 +300,25 @@ static int sync_folder_list(Imap *im) {
     int r = im->special_use ? cmd(im, on_list, lc, "LIST \"\" \"*\" RETURN (SPECIAL-USE)") : cmd(im, on_list, lc, "LIST \"\" \"*\"");
     if (r == 0) {
         pthread_mutex_lock(&G);
+        /* one folder per role, decided over the whole list */
+        FolderRoleIn *in = lc->n ? calloc((size_t)lc->n, sizeof *in) : NULL;
+        const char **role = lc->n ? calloc((size_t)lc->n, sizeof *role) : NULL;
+        if (in && role) {
+            for (int i = 0; i < lc->n; i++) {
+                Folder *f = lc->it[i].f;
+                in[i] = (FolderRoleIn){ f->name, lc->it[i].flags, f->delim, f->noselect };
+            }
+            folder_roles_resolve(in, lc->n, role);
+            for (int i = 0; i < lc->n; i++) snprintf(lc->it[i].f->special, sizeof lc->it[i].f->special, "%s", role[i]);
+        }
+        free(in);
+        free(role);
+        /* forget the folders the server no longer lists (not when the list is incomplete) */
         FolderList *fl = store_folders(im->a);
-        for (int i = 0; fl && i < fl->n; i++) {
+        for (int i = 0; !lc->full && fl && i < fl->n; i++) {
             int found = 0;
-            for (int k = 0; k < lc->nseen; k++) if (!strcmp(lc->seen[k], fl->f[i]->name)) { found = 1; break; }
-            if (!found && lc->nseen < 512) { store_clear(im->a, fl->f[i]); free(fl->f[i]->msgs); free(fl->f[i]); fl->f[i] = fl->f[--fl->n]; i--; }
+            for (int k = 0; k < lc->n; k++) if (lc->it[k].f == fl->f[i]) { found = 1; break; }
+            if (!found) { store_clear(im->a, fl->f[i]); free(fl->f[i]->msgs); free(fl->f[i]); fl->f[i] = fl->f[--fl->n]; i--; }
         }
         /* Gmail files sent mail itself */
         if (lc->gmail) im->a->sent_saved = 1;
@@ -298,6 +329,7 @@ static int sync_folder_list(Imap *im) {
         jb_raw(&b, "{\"ev\":\"folders\",\"acct\":"); jb_str(&b, im->a->id); jb_raw(&b, "}");
         send_event(&b);
     }
+    free(lc->it);
     free(lc);
     return r;
 }

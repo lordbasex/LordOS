@@ -163,6 +163,7 @@ EOF
     else skip "oldkernels-test" "node"; fi
     # the Dock's pinned-list model (sdk/dockmodel.js)
     if have node; then run "files-model-test (apps/files)" node tests/files_model_test.mjs; fi
+    if have node; then run "mail-foldertree-test (apps/mail)" node tests/mail_foldertree_test.mjs; fi
     if have node; then run "balance-model-test (apps/settings/balance.js)" node tests/balance_model_test.mjs; fi
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
