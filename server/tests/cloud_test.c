@@ -369,10 +369,10 @@ static void t_state(void) {
     CHECK(cloud_website("nobody") == NULL);
     /* what JS can ask with no rclone */
     int areq = 0;
-    s = cloud_add("webdav", "X", "{}", &areq);
+    s = cloud_add("webdav", "X", "{}", NULL, &areq);
     CHECK(s && strstr(s, "cloud.unavailable"));
     free(s);
-    s = cloud_begin_signin("dropbox", "Y", NULL, NULL);
+    s = cloud_begin_signin("dropbox", "Y", NULL, NULL, NULL);
     CHECK(s && strstr(s, "cloud.unavailable"));
     free(s);
     s = cloud_rename("cab12cd34", "../up");

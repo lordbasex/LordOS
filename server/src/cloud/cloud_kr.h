@@ -5,5 +5,6 @@
 #include "cloud.h"
 
 extern const CloudSecrets cloud_keyring;
+void cloud_kr_watch(void);          /* retry the waiting accounts when the session keyring opens */
 
 #endif

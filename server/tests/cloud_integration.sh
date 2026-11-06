@@ -49,9 +49,13 @@ sleep 1
 
 mkfifo "$T/in" "$T/out"
 ASSETS=$(cd "$(dirname "$0")/../../assets" 2>/dev/null && pwd)
-env -i HOME="$H" XDG_RUNTIME_DIR="$R" PATH=/usr/bin:/bin LORDOS_CLOUD_RCLONE="$RC" LORDOS_ASSETS="$ASSETS" "$B/cloud-harness" <"$T/in" >"$T/out" 2>"$T/harness.log" &
-HP=$!
-exec 3>"$T/in" 4<"$T/out"
+# the harness is lord-server's cloud side; started again later on the same home, as a new session would
+start_harness() {
+    env -i HOME="$H" XDG_RUNTIME_DIR="$R" PATH=/usr/bin:/bin LORDOS_CLOUD_RCLONE="$RC" LORDOS_ASSETS="$ASSETS" "$B/cloud-harness" <"$T/in" >"$T/out" 2>>"$T/harness.log" &
+    HP=$!
+    exec 3>"$T/in" 4<"$T/out"
+}
+start_harness
 # one command, its one line (lines about opened pages are skipped)
 cmd() { echo "$*" >&3; while IFS= read -r L <&4; do case $L in '{"opened"'*) continue ;; esac; break; done; printf '%s' "$L"; }
 has() { case $1 in *"$2"*) return 0 ;; esac; return 1; }
@@ -249,25 +253,75 @@ check "Free Up Space leaves kept files" has "$r" '"reason":"kept"'
 r=$(cmd unkeep "$M/Projects")
 
 P1=$(rcd_pid)
+exec 6<"$M/notes.txt"                       # a file open in the mount: the folder is busy when it is unmounted
 r=$(cmd restart)
 r=$(cmd wait '"restarts":1' 30)
 r2=$(cmd wait '"mounted":true' 30)
 P2=$(rcd_pid)
 check "Restart: a new rclone, mounted again" sh -c "[ '$r' != '${r#*ok}' ] && [ -n '$P2' ] && [ '$P1' != '$P2' ]"
 check "files read after the restart" test "$(cat "$M/notes.txt")" = "changed here"
+check "a busy folder was unmounted anyway: one mount there, not two" test "$(grep -c " $M fuse.rclone " /proc/self/mounts)" = 1
+exec 6<&-
+exec 6<"$M/notes.txt"                       # open again across a crash: the old mount answers ENOTCONN
 kill -9 "$P2"
 r=$(cmd wait '"restarts":2' 30)
 r2=$(cmd wait '"mounted":true' 30)
 P3=$(rcd_pid)
 check "a crash is restarted by itself" sh -c "[ -n '$P3' ] && [ '$P3' != '$P2' ] && [ '$r' != '${r#*ok}' ]"
 check "files read after the crash" test "$(cat "$M/notes.txt")" = "changed here"
+check "the dead mount was cleared: one mount there" test "$(grep -c " $M fuse.rclone " /proc/self/mounts)" = 1
+exec 6<&-
+
+# a locked keyring (as after an automatic login): the account says so while rclone runs, and connects when it opens
+r=$(cmd lock)
+r=$(cmd restart)
+r=$(cmd wait '"state":"locked"' 30)
+check "keyring locked: the account says locked" has "$r" '"ok"'
+r=$(cmd state)
+check "with the keyring's error, not the service's" sh -c 'case "$1" in *"\"running\":true"*"\"error\":\"cloud.keyringLocked\""*) exit 0;; esac; exit 1' x "$r"
+r=$(cmd measure "$ID")
+check "an action on it says the keyring is locked" has "$r" 'cloud.keyringLocked'
+r=$(cmd delete "$M/notes.txt")
+check "delete on it says the keyring is locked (nothing removed)" sh -c 'case "$1" in *cloud.keyringLocked*) [ -e "$2" ] && exit 0;; esac; exit 1' x "$r" "$S/notes.txt"
+r=$(cmd unlock)
+r=$(cmd retry all)
+r=$(cmd wait '"mounted":true' 30)
+check "unlocked and retried: connected without a restart" has "$r" '"ok"'
+check "files read after unlocking" test "$(cat "$M/notes.txt")" = "changed here"
 check "still no TCP listener" sh -c "! ss -ltnpH 2>/dev/null | grep -q 'pid=$P3,'"
 
+exec 6<"$M/notes.txt"                       # renamed while a file is open there: the old folder is busy
 r=$(cmd rename "$ID" Office)
 r=$(cmd wait '"name":"Office"' 20)
 r2=$(cmd wait '"mounted":true' 20)
 sleep 1
-check "rename: mounted at ~/Cloud/Office" sh -c "grep -q ' $H/Cloud/Office fuse.rclone ' /proc/self/mounts && [ ! -e '$M' ]"
+check "rename: mounted at ~/Cloud/Office" grep -q " $H/Cloud/Office fuse.rclone " /proc/self/mounts
+check "rename: the old folder unmounted and gone, even busy" sh -c "! grep -q ' $M fuse.rclone ' /proc/self/mounts && [ ! -e '$M' ]"
+exec 6<&-
+M=$H/Cloud/Office
+
+# a new session: the account comes back from accounts.json; the same kind and name, in any case, is still that account
+r=$(cmd quit)
+exec 3>&- 4<&-
+wait "$HP" 2>/dev/null
+check "rclone ended with the first session" test -z "$(rcd_pid)"
+start_harness
+r=$(cmd wait '"mounted":true' 30)
+check "next session: the renamed account mounted again" has "$r" '"ok"'
+r=$(cmd providers)
+r=$(cmd add webdav office "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"davpass\"}")
+check "after a rename and a new session: same kind, other case updates it (no nameTaken)" has "$r" "\"id\":\"$ID\""
+r=$(cmd wait '"mounted":true' 30)
+r=$(cmd addid "$ID" webdav AnyName "{\"url\":\"http://127.0.0.1:$PORT\",\"user\":\"dav\",\"pass\":\"davpass\"}")
+check "new settings by the account's id, whatever the name" has "$r" "\"id\":\"$ID\""
+r=$(cmd wait '"mounted":true' 30)
+r=$(cmd add s3 OFFICE '{}')
+check "another kind with that name is still refused" has "$r" 'cloud.nameTaken'
+r=$(cmd addid c00000000 webdav X '{}')
+check "an unknown account id is refused" has "$r" 'cloud.notFound'
+r=$(cmd state)
+check "still one account, still named Office" sh -c 'case "$1" in *"\"id\":\"c"*"\"id\":\"c"*) exit 1;; *"\"name\":\"Office\""*) exit 0;; esac; exit 1' x "$r"
+check "files read in the new session" test "$(cat "$M/notes.txt")" = "changed here"
 
 r=$(cmd remove "$ID")
 check "remove" has "$r" '"ok"'

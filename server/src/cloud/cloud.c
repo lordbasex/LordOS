@@ -93,6 +93,7 @@ static long long seen_done;          /* newest completed_at already in recent */
 typedef struct Link { struct Link *next; char id[16]; char *rel, *url; long long expires, made; } Link;
 static Link *links;
 
+enum { J_RETRY = 100 };
 enum { J_PROVIDERS = 1, J_ADD, J_REMOVE, J_RENAME, J_ABOUT, J_LINK, J_UNLINK, J_RESTART, J_OPTIONS, J_PAUSE, J_SIGNIN, J_STOP,
        J_ANSWER, J_TRASH, J_MEASURE, J_CANCEL_MEASURE };
 typedef struct Job { struct Job *next; int type, req, flag; char id[16]; char *a, *b; } Job;
@@ -373,9 +374,11 @@ static void load_all(void) {
         int k = 0;
         for (const JVal *x = as && as->type == J_ARR ? as->kid : NULL; x && k < ACC_MAX; x = x->next) {
             const char *id = json_str(x, "id"), *name = json_str(x, "name"), *kind = json_str(x, "kind");
-            const CloudKind *ck = kind ? kind_get(kind) : NULL;
-            /* a backend LordOS has no overlay for: what was saved with it */
-            if (!ck && kind && json_str(x, "type")) ck = kind_put(kind, json_str(x, "type"), json_str(x, "provider"), json_str(x, "group"));
+            /* one entry per kind for the whole session (the list rclone gives later updates the same one), from what was
+             * saved with the account and the overlay */
+            const CloudKind *ov = kind ? cloud_kind(kind) : NULL;
+            const char *ty = json_str(x, "type"), *pv = json_str(x, "provider"), *gr = json_str(x, "group");
+            const CloudKind *ck = kind && (ov || ty) ? kind_put(kind, ty ? ty : ov->type, pv ? pv : ov ? ov->label : NULL, gr ? gr : ov ? ov->group : NULL) : NULL;
             if (!id || !cloud_key_ok(id) || strlen(id) >= sizeof cl_acc[0].id || !cloud_name_ok(name) || !ck || cl_find(id) || cl_find_name(name)) continue;
             Acc *a = &cl_acc[k++];
             memset(a, 0, sizeof *a);
@@ -551,10 +554,37 @@ static int fusermount_u(const char *dir) {
 
 static void mount_dir(const Acc *a, char *out, size_t n) { cl_pf(out, n, "%s/%s", cl_root, a->name); }
 
-/* a mount left by an rclone that died: the folder answers ENOTCONN */
+/* dir is a mount point now (/proc/self/mounts, spaces escaped as \040) */
+static int is_mounted(const char *dir) {
+    char want[PATH_MAX * 4];
+    size_t o = 0;
+    for (const char *p = dir; *p && o + 5 < sizeof want; p++) {
+        if (*p == ' ') { memcpy(want + o, "\\040", 4); o += 4; }
+        else if (*p == '\t') { memcpy(want + o, "\\011", 4); o += 4; }
+        else if (*p == '\n') { memcpy(want + o, "\\012", 4); o += 4; }
+        else if (*p == '\\') { memcpy(want + o, "\\134", 4); o += 4; }
+        else want[o++] = *p;
+    }
+    want[o] = 0;
+    FILE *f = fopen("/proc/self/mounts", "re");
+    if (!f) return 0;
+    char line[PATH_MAX * 4 + 256];
+    int yes = 0;
+    while (!yes && fgets(line, sizeof line, f)) {
+        char *a = strchr(line, ' ');
+        if (!a) continue;
+        char *b = strchr(a + 1, ' ');
+        if (b && (size_t)(b - a - 1) == o && !memcmp(a + 1, want, o)) yes = 1;
+    }
+    fclose(f);
+    return yes;
+}
+
+/* a mount left behind: by an rclone that died (the folder answers ENOTCONN, "Transport endpoint is not connected"), or one
+ * still there before mounting again. Lazy (-z): a program that still has a file open there doesn't keep it busy. */
 static void clear_stale(const char *dir) {
     struct stat st;
-    if (stat(dir, &st) && (errno == ENOTCONN || errno == EIO)) fusermount_u(dir);
+    if ((stat(dir, &st) && (errno == ENOTCONN || errno == EIO)) || is_mounted(dir)) fusermount_u(dir);
 }
 
 static void daemon_gone(void) {
@@ -662,6 +692,14 @@ static int daemon_start(void) {
     return -1;
 }
 
+/* why an account can't do that now: the service, the keyring, or the account itself */
+static const char *unavailable(const Acc *a) {
+    if (!cl_running) return dmn.error[0] ? dmn.error : "cloud.notRunning";
+    if (a->locked) return a->locked == 2 ? "cloud.noKeyring" : "cloud.keyringLocked";
+    if (a->err[0]) return a->err;
+    return "cloud.notConnected";
+}
+
 static void unmount_acc(Acc *a) {
     char d[PATH_MAX];
     mount_dir(a, d, sizeof d);
@@ -670,9 +708,15 @@ static void unmount_acc(Acc *a) {
     jb_raw(&j, "{\"mountPoint\":");
     jb_str(&j, d);
     jb_raw(&j, "}");
-    if (a->mounted && !j.oom) rcs(RCM_UNMOUNT, j.p, NULL, 0, RC_SHORT);
+    /* a file open in the folder makes it busy: try again for a second and a half, then detach it lazily (the open
+     * file keeps working until it is closed, and the folder is free to mount again) */
+    for (int i = 0; a->mounted && !j.oom && i < 4; i++) {
+        if (i) { struct timespec ts = { 0, 500 * 1000 * 1000 }; nanosleep(&ts, NULL); }
+        if (rcs(RCM_UNMOUNT, j.p, NULL, 0, RC_SHORT) == 200 && !is_mounted(d)) break;
+    }
     jb_free(&j);
     a->mounted = 0;
+    if (is_mounted(d)) { fprintf(stderr, "cloud: %s is busy: unmounted lazily\n", d); fusermount_u(d); }
     clear_stale(d);
 }
 
@@ -1143,7 +1187,8 @@ static void bring_up(Acc *a) {
     if (r == 2) r = secrets ? secrets->get(a->id, &sec) : 1;
     pthread_mutex_lock(&cl_mu);
     a->retry_at = time(NULL) + 30;
-    if (r == -2 || r == -3) { a->locked = r == -2 ? 1 : 2; pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
+    /* locked: the keyring's unlock event (cloud_kr.c) or cloud.retry() tries again; this is only a slow fallback */
+    if (r == -2 || r == -3) { a->locked = r == -2 ? 1 : 2; a->retry_at = time(NULL) + 600; pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
     a->locked = 0;
     if (r == -1) { cpy(a->err, sizeof a->err, "cloud.keyringFailed"); pthread_mutex_unlock(&cl_mu); cl_changed(); return; }
     pthread_mutex_unlock(&cl_mu);
@@ -1397,7 +1442,11 @@ static void job_rename(Job *j) {
     if (was) unmount_acc(a);
     mount_dir(a, from, sizeof from);
     cl_pf(to, sizeof to, "%s/%s", cl_root, j->a);
-    if (rename(from, to) && errno != ENOENT) {
+    /* the old folder is unmounted (lazily if a program keeps a file open there); if it can't be moved, a new folder is
+     * made and the old one removed when it is empty, so the account never stays at its old name */
+    int moved = !rename(from, to) || errno == ENOENT;
+    if (!moved) { mkdir(to, 0700); rmdir(from); struct stat st; moved = !stat(to, &st) && S_ISDIR(st.st_mode); }
+    if (!moved) {
         pthread_mutex_lock(&cl_mu);
         cpy(a->err, sizeof a->err, "cloud.renameFailed");
         pthread_mutex_unlock(&cl_mu);
@@ -1416,7 +1465,7 @@ static void job_link(Job *j, int unlink) {
     pthread_mutex_lock(&cl_mu);
     a = cl_find(j->id);
     pthread_mutex_unlock(&cl_mu);
-    if (!a || !cl_running || !a->configured) { post_reply(j->req, err_json(!a ? "cloud.notFound" : "cloud.notRunning")); return; }
+    if (!a || !cl_running || !a->configured) { post_reply(j->req, err_json(!a ? "cloud.notFound" : unavailable(a))); return; }
     char arg[16] = "", msg[256];
     long long secs = 0;
     if (!unlink && cloud_expire(j->b, arg, sizeof arg, &secs)) { post_reply(j->req, err_json("cloud.badExpire")); return; }
@@ -1928,7 +1977,7 @@ static void rcjob_start(Job *j, char kind) {
     a = cl_find(j->id);
     int busy = a && a->rcjob_kind;
     pthread_mutex_unlock(&cl_mu);
-    if (!a || !cl_running || !a->configured) { post_reply(j->req, err_json(!a ? "cloud.notFound" : "cloud.notRunning")); return; }
+    if (!a || !cl_running || !a->configured) { post_reply(j->req, err_json(!a ? "cloud.notFound" : unavailable(a))); return; }
     if (busy) { post_reply(j->req, err_json("cloud.busy")); return; }
     if (kind == 't' && a->trash_supported == 0) { post_reply(j->req, err_json("unsupported")); return; }
     char body[96], msg[256];
@@ -1996,6 +2045,19 @@ static void do_job(Job *j) {
     }
     case J_ADD: if (!ensure_daemon() && !nkinfo) free(load_providers()); job_add(j); break;
     case J_ANSWER: job_answer(j); break;
+    case J_RETRY:
+        if (!naccounts() || ensure_daemon()) break;
+        for (int i = 0; i < ACC_MAX; i++) {
+            Acc *a = &cl_acc[i];
+            if (!a->used || (j->id[0] && strcmp(a->id, j->id)) || (a->configured && a->mounted)) continue;
+            if (!strcmp(a->err, "cloud.addFailed") || a->pending_req || a->new_acc) continue;
+            pthread_mutex_lock(&cl_mu);
+            a->err[0] = a->message[0] = 0;
+            pthread_mutex_unlock(&cl_mu);
+            bring_up(a);
+        }
+        cl_changed();
+        break;
     case J_TRASH: rcjob_start(j, 't'); break;
     case J_MEASURE: rcjob_start(j, 'm'); break;
     case J_CANCEL_MEASURE: {
@@ -2243,22 +2305,42 @@ static int name_free(const char *name, const Acc *self) {
     return 1;
 }
 
-char *cloud_begin_signin(const char *kind, const char *name, const char *cid, const char *csec) {
+/* which existing account an add or a sign-in updates (with cl_mu held): the one named by its id (Sign In Again from the
+ * account's page), else one of the same kind with that name, whatever its case (17.1); a name of another kind's account
+ * is taken. NULL and *err "": a new account. Kinds compare by name: the overlay's entry and rclone's are the same kind. */
+static Acc *account_for(const char *account_id, const char *name, const CloudKind *k, const char **err) {
+    *err = "";
+    if (account_id && account_id[0]) {
+        Acc *a = cl_find(account_id);
+        if (!a) { *err = "cloud.notFound"; return NULL; }
+        if (strcmp(a->k->kind, k->kind)) { *err = "cloud.badKind"; return NULL; }
+        return a;
+    }
+    for (int i = 0; name && i < ACC_MAX; i++)
+        if (cl_acc[i].used && !strcasecmp(cl_acc[i].name, name)) {
+            if (strcmp(cl_acc[i].k->kind, k->kind)) { *err = "cloud.nameTaken"; return NULL; }
+            return &cl_acc[i];
+        }
+    return NULL;
+}
+
+char *cloud_begin_signin(const char *kind, const char *name, const char *cid, const char *csec, const char *account_id) {
     pthread_mutex_lock(&cl_mu);
     const CloudKind *k = kind_get(kind);
     pthread_mutex_unlock(&cl_mu);
     if (!cloud_available()) return err_json("cloud.unavailable");
     if (!k || strcmp(k->group, "oauth")) return err_json("cloud.badKind");
-    if (!cloud_name_ok(name)) return err_json("cloud.badName");
+    int by_id = account_id && account_id[0];
+    if (!by_id && !cloud_name_ok(name)) return err_json("cloud.badName");
     if ((cid && cid[0] && (strlen(cid) > 200 || !cloud_value_ok(cid))) || (csec && csec[0] && (strlen(csec) > 200 || !cloud_value_ok(csec)))) return err_json("cloud.badValue");
     pthread_mutex_lock(&cl_mu);
     if (si.on && !strcmp(si.phase, "waiting")) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.busy"); }
     /* the name of an account of the same kind: Sign In Again for that account */
-    char upd[16] = "";
-    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && !strcasecmp(cl_acc[i].name, name)) {
-        if (cl_acc[i].k != k) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.nameTaken"); }
-        cpy(upd, sizeof upd, cl_acc[i].id);
-    }
+    char upd[16] = "", acc_name[CLOUD_NAME_MAX + 1];
+    const char *why;
+    Acc *ua = account_for(account_id, name, k, &why);
+    if (why[0]) { pthread_mutex_unlock(&cl_mu); return err_json(why); }
+    if (ua) { cpy(upd, sizeof upd, ua->id); cpy(acc_name, sizeof acc_name, ua->name); name = acc_name; }
     if (!upd[0] && !name_free(name, NULL)) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.nameTaken"); }
     if (!upd[0] && naccounts() >= ACC_MAX) { pthread_mutex_unlock(&cl_mu); return err_json("cloud.tooMany"); }
     pthread_mutex_unlock(&cl_mu);
@@ -2331,14 +2413,15 @@ void cloud_cancel_signin(const char *id) {
     cl_changed();
 }
 
-char *cloud_add(const char *kind, const char *name, const char *fields, int *req) {
+char *cloud_add(const char *kind, const char *name, const char *fields, const char *account_id, int *req) {
     *req = 0;
     pthread_mutex_lock(&cl_mu);
     const CloudKind *k = kind_get(kind);
     pthread_mutex_unlock(&cl_mu);
     if (!cloud_available()) return err_json("cloud.unavailable");
     if (!k || !strcmp(k->group, "oauth")) return err_json("cloud.badKind");
-    if (!cloud_name_ok(name)) return err_json("cloud.badName");
+    int by_id = account_id && account_id[0];
+    if (!by_id && !cloud_name_ok(name)) return err_json("cloud.badName");
     JDoc d;
     if (!fields || json_parse(fields, strlen(fields), &d, NULL, 0)) return err_json("cloud.badField");
     if (d.root->type != J_OBJ) { json_free(&d); return err_json("cloud.badField"); }
@@ -2352,8 +2435,9 @@ char *cloud_add(const char *kind, const char *name, const char *fields, int *req
     Params np = { .n = 0 };
     if (!ki) { res = err_json("cloud.notReady"); goto out; }
     /* the name of an account of the same kind: new credentials or settings for that account (same id, same folder) */
-    for (int i = 0; i < ACC_MAX; i++) if (cl_acc[i].used && !strcasecmp(cl_acc[i].name, name)) upd = &cl_acc[i];
-    if (upd && upd->k != k) { res = err_json("cloud.nameTaken"); goto out; }
+    const char *why;
+    upd = account_for(account_id, name, k, &why);
+    if (why[0]) { res = err_json(why); goto out; }
     if (!upd && !name_free(name, NULL)) { res = err_json("cloud.nameTaken"); goto out; }
     a = upd;
     for (int i = 0; i < ACC_MAX && !a; i++) if (!cl_acc[i].used) a = &cl_acc[i];
@@ -2465,7 +2549,23 @@ char *cloud_rename(const char *id, const char *name) {
     return strdup("{\"ok\":true}");
 }
 
-void cloud_refresh_about(const char *id) { Job *j = new_job(J_ABOUT, id, NULL, NULL); if (j) push_job(j); }
+void cloud_refresh_about(const char *id) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    int down = a && (!a->configured || !a->mounted);
+    pthread_mutex_unlock(&cl_mu);
+    if (down) cloud_retry(id);              /* a cheap moment to try a waiting account again */
+    Job *j = new_job(J_ABOUT, id, NULL, NULL);
+    if (j) push_job(j);
+}
+
+/* the accounts that aren't connected (keyring was locked, the network was down…) try again now: after the keyring's
+ * unlock event, or when the interface asks (cloud.retry). id NULL: all of them. */
+void cloud_retry(const char *id) {
+    if (!started) return;
+    Job *j = new_job(J_RETRY, id ? id : "", NULL, NULL);
+    if (j) push_job(j);
+}
 
 char *cloud_website(const char *id) {
     char out[400];

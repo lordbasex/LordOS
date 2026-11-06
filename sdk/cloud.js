@@ -57,8 +57,10 @@ export const cloud = {
   state: () => cloudState.get(),
   // 17.2: a Promise, asked of rclone every time (an older server answered a list at once)
   providers: () => (has() ? later(lord.cloud.providers()).then((l) => (Array.isArray(l) ? l : l && l.error ? Promise.reject(l) : [])) : Promise.reject({ error: 'cloud.unavailable' })),
+  // { accountId }: Sign In Again for that account (its id, whatever the name)
   beginSignIn: (kind, name, opts = {}) => (has() ? lord.cloud.beginSignIn(String(kind), String(name), {
     clientId: opts.clientId ? String(opts.clientId) : '', clientSecret: opts.clientSecret ? String(opts.clientSecret) : '',
+    accountId: opts.accountId ? String(opts.accountId) : '',
   }) : { error: 'cloud.unavailable' }),
   openSignInPage(id) {
     if (!has()) return false;
@@ -68,7 +70,8 @@ export const cloud = {
   },
   cancelSignIn: (id) => has() && lord.cloud.cancelSignIn(String(id)),
   // { id } | { question: { state, name, help, type, examples, isPassword, required, default } } | { error } (17.2 item 3)
-  add: (kind, name, fields = {}) => (has() ? later(lord.cloud.add(String(kind), String(name), fields)) : Promise.resolve({ error: 'cloud.unavailable' })),
+  add: (kind, name, fields = {}, opts = {}) => (has() ? later(lord.cloud.add(String(kind), String(name), fields,
+    { accountId: opts.accountId ? String(opts.accountId) : '' })) : Promise.resolve({ error: 'cloud.unavailable' })),
   answer: (state, value) => maybe('answer', String(state), String(value ?? '')),
   emptyTrash: (id) => maybe('emptyTrash', String(id)),
   measure: (id) => maybe('measure', String(id)),
@@ -78,6 +81,8 @@ export const cloud = {
   remove: (id, { discardPending = false } = {}) => (has() ? lord.cloud.remove(String(id), { discardPending: !!discardPending }) : { error: 'cloud.unavailable' }),
   rename: (id, name) => (has() ? lord.cloud.rename(String(id), String(name)) : { error: 'cloud.unavailable' }),
   refreshAbout: (id) => has() && lord.cloud.refreshAbout(String(id)),
+  // accounts not connected (keyring was locked, offline) try again: call it after unlocking the keyring; null: all
+  retry: (id = null) => has() && lord.cloud.retry(id == null ? undefined : String(id)),
   websiteUrl: (id) => (has() ? lord.cloud.websiteUrl(String(id)) : null),
   status: (p) => (has() ? lord.cloud.status(paths(p)) || {} : {}),
   keep: (p) => has() && lord.cloud.keep(paths(p)),

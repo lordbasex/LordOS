@@ -596,9 +596,11 @@ char *cf_delete(const char *const *paths, int n, int *req) {
         pthread_mutex_lock(&cl_mu);
         Acc *a = cl_find_name(name);
         int mounted = a && a->mounted;
+        const char *why = !a || mounted ? NULL : !cl_running ? "cloud.notRunning" : a->locked == 1 ? "cloud.keyringLocked"
+                        : a->locked == 2 ? "cloud.noKeyring" : "cloud.notConnected";
         pthread_mutex_unlock(&cl_mu);
         if (!a) return bad_path("cloud.notFound", paths[i]);
-        if (!mounted) return bad_path("cloud.notRunning", paths[i]);
+        if (!mounted) return bad_path(why, paths[i]);
         /* every folder on the way is a real folder: the parent's real path is its own text */
         char parent[PATH_MAX], real[PATH_MAX];
         cl_pf(parent, sizeof parent, "%s", paths[i]);

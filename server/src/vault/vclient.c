@@ -112,6 +112,10 @@ static void push(uint32_t id, uint32_t kind, char *json, size_t len) {
     if (priv) priv_wake();
 }
 
+/* lord-server's own C code told of lord-vault's events (Cloud: the keyring was unlocked); they still reach JS too */
+static void (*event_hook)(const char *json, size_t len);
+void vc_set_event_hook(void (*fn)(const char *json, size_t len)) { event_hook = fn; }
+
 static void *read_loop(void *arg) {
     int s = (int)(intptr_t)arg;
     for (;;) {
@@ -119,6 +123,7 @@ static void *read_loop(void *arg) {
         int r = vw_recv(s, &m, &vw_malloc);
         if (r) break;
         for (int i = 0; i < m.nfds; i++) close(m.fds[i]);
+        if (m.kind == VW_EVT && event_hook && m.json) event_hook(m.json, m.len);   /* events carry no secret */
         push(m.id, m.kind, m.json, m.len);
     }
     /* it went away: requests without a reply end with an error */
