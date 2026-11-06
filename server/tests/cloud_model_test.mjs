@@ -250,7 +250,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   c.keep([`${work.mount}/Projects/Interviews.zip`]);
   eq('keep → kept, pushed', [c.status([`${work.mount}/Projects/Interviews.zip`])[`${work.mount}/Projects/Interviews.zip`].st, !!pushed], ['kept', true]);
   eq('free skips kept', c.free([`${work.mount}/Projects/Interviews.zip`]).skipped.map((x) => x.reason), ['kept']);
-  eq('link', [!!c.link(`${work.mount}/Projects/Floor plan.pdf`, '7d').url, c.link(`${H}/Cloud/Photos archive/2024`, '7d').error], [true, 'unsupported']);
+  eq('link; WebDAV has none', [!!c.link(`${work.mount}/Projects/Floor plan.pdf`, '7d').url, c.link(`${H}/Cloud/Home NAS/Shared`, '7d').error], [true, 'unsupported']);
   eq('links shape', c.links(work.id).every((l) => l.path && l.url && 'expires' in l && 'made' in l), true);
   eq('remove with pending', c.remove(work.id, { discardPending: false }).error, 'pending');
   const si = c.beginSignIn('dropbox', 'Mine', {});
@@ -474,6 +474,26 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   eq('after unlocking: cloud.retry, no restart', [/askKeyringUnlock\(\)\.then\(\(ok\) => \{ if \(ok\) cloud\.retry\(null\)/.test(src), /cloud\.restart\(\);\n/.test(src.split('function unlockKeyring')[1].split('}')[0])], [true, false]);
   eq('Sign In Again names the account by its id (17.2 item 10)', [/accountId: a\.id \}, p \|\|/.test(src), /again: true, accountId: a\.id/.test(src), /sheet\.accountId \? \{ accountId: sheet\.accountId \}/.test(src)], [true, true, true]);
   eq('the form\'s body scrolls between its fixed title and buttons', /<ScrollView style=\{\{ maxHeight: Math\.max\(180, frameH - 220\) \}\}>/.test(src), true);
+}
+
+// ---- e2e findings: short provider names, trust questions, errors with details and their field, Measure for S3 ----
+{
+  eq('provider names: the list\'s label, else the description cut short', [M.providerName({ kind: 's3', provider: 'Amazon S3 Compliant Storage Providers including AWS, Alibaba' }, [{ kind: 's3', label: 'S3' }]),
+    M.providerName({ kind: 's3', provider: 'Amazon S3 Compliant Storage Providers including AWS, Alibaba, ArvanCloud' }, []), M.providerName({ kind: 'webdav', provider: 'WebDAV' }), M.providerName({ kind: 'x' })],
+    ['S3', 'Amazon S3 Compliant Storage Providers', 'WebDAV', 'x']);
+  eq('the delete question uses the short name', M.deletePrompt({ provider: 'Amazon S3 Compliant Storage Providers including AWS' }, 1).title.vars.provider, 'Amazon S3 Compliant Storage Providers');
+  eq('trust questions', [M.trustKind({ kind: 'hostKey' }), M.trustKind({ kind: 'certificate' }), M.trustKind({ name: 'config_2fa' }), M.trustKind(null)], ['hostKey', 'certificate', null, null]);
+  const d = (x) => x.toISOString().slice(0, 10);
+  eq('error details', [M.errorVars({ error: 'cloud.hostKeyChanged', old: 'SHA256:a', new: 'SHA256:b' }, d), M.errorVars({ error: 'cloud.cantRevoke', expires: 1794614400000 }, d).vars.date, M.errorVars({ error: { code: 'cloud.unreachable', host: 'h' } }, d)],
+    [{ code: 'cloud.hostKeyChanged', vars: { old: 'SHA256:a', new: 'SHA256:b' } }, d(new Date(1794614400000)), { code: 'cloud.unreachable', vars: { host: 'h' } }]);
+  const sftp = { fields: [{ name: 'host' }, { name: 'user' }, { name: 'pass' }] };
+  eq('the field an error belongs to', [M.errorField({ error: 'cloud.unreachable' }, sftp), M.errorField({ error: 'cloud.authFailed' }, sftp), M.errorField({ error: 'x', field: 'user' }, sftp), M.errorField({ error: 'cloud.badAddress' }, { fields: [{ name: 'endpoint' }] })],
+    ['host', 'pass', 'user', 'endpoint']);
+  eq('S3 connected without an answer: Measure', [M.spaceState({ about: null, mounted: true }), M.measurable({ about: null, mounted: true }), M.measurable({ about: { total: 5 }, mounted: true }), M.measurable({ about: null, error: 'cloud.keyringLocked' })],
+    ['noQuota', true, false, false]);
+  const cat = JSON.parse(fs.readFileSync(path.join(root, 'assets/locales/en/errors.json'), 'utf8'));
+  eq('each new error has its own text', ['cloud.hostKeyChanged', 'cloud.certUntrusted', 'cloud.unreachable', 'cloud.badAddress', 'cloud.cantRevoke', 'cloud.notConnected', 'cloud.keyringLocked', 'cloud.noKeyring', 'cloud.notRunning', 'cloud.notFound', 'cloud.badKind'].filter((k) => !cat[k]), []);
+  eq('fingerprints and the date in their texts', [/\{old\}.*\{new\}/.test(cat['cloud.hostKeyChanged']), /\{date\}/.test(cat['cloud.cantRevoke'])], [true, true]);
 }
 
 // ---- right to left: the screens mirror (docs/DESIGN.md "Logical edges") ----

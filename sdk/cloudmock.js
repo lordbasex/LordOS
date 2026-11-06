@@ -67,7 +67,7 @@ export function installCloudMock(home, scenario = '') {
   const mount = (name) => `${home}/Cloud/${name}`;
   const groupOf = (kind) => (PROVIDERS.find((x) => x[0] === kind) || [])[2] || 'server';
   const acc = (id, name, kind, provider, about, extra = {}) => ({ id, name, kind, provider, group: groupOf(kind), mount: mount(name), state: 'ok', about, cacheBytes: 0, keptBytes: 0,
-    up: { files: 0, bytes: 0, done: 0 }, down: { files: 0, bytes: 0, done: 0 }, kept: [], linksSupported: true, ...extra });
+    up: { files: 0, bytes: 0, done: 0 }, down: { files: 0, bytes: 0, done: 0 }, kept: [], linksSupported: true, mounted: true, ...extra });
   const st = {
     service: { running: true, version: '1.75.2', uptimeS: 5400, rssKb: 41 * 1024, restarts: 0 },
     options: { bwUp: 0, bwDown: 0, pauseOnBattery: true, pauseOnMetered: true, autoFree: true, freeBelowGb: 10 },
@@ -75,7 +75,8 @@ export function installCloudMock(home, scenario = '') {
       acc('m1', 'Personal', 'dropbox', 'Dropbox', { total: 2 * TB, used: 612 * GB, free: 1388 * GB, trashed: 20 * GB }, { cacheBytes: 9.1 * GB, keptBytes: 2.1 * GB }),
       acc('m2', 'Work', 'pcloud', 'pCloud Business', { total: 1 * TB, used: 540 * GB, free: 460 * GB, trashed: 20 * GB, other: 30 * GB },
         { state: 'syncing', cacheBytes: 7.2 * GB, keptBytes: 4.1 * GB, up: { files: 1, bytes: 86e3, done: 34e3, name: 'Budget 2027.ods' }, down: { files: 2, bytes: 1.8 * GB, done: 1.15 * GB, name: 'Kickoff recording.mp4' } }),
-      acc('m3', 'Photos archive', 's3', 'S3 · Backblaze B2', { used: 161 * GB }, { cacheBytes: 1.6 * GB, linksSupported: false }),
+      // as rclone names it: the long description (Files and Settings show the provider list's short label)
+      acc('m3', 'Photos archive', 's3', 'Amazon S3 Compliant Storage Providers including AWS, Alibaba, ArvanCloud, Ceph, ChinaMobile, Cloudflare, Dreamhost', null, { cacheBytes: 1.6 * GB, linksSupported: true, mounted: true }),
       acc('m4', 'Home NAS', 'webdav', 'WebDAV · Nextcloud', { total: 300 * GB, used: 7.4 * GB, free: 292.6 * GB }, { state: 'signin', cacheBytes: 0.5 * GB, linksSupported: false }),
     ],
     signin: null,
@@ -169,9 +170,18 @@ export function installCloudMock(home, scenario = '') {
     },
     openSignInPage: () => {},
     cancelSignIn: (id) => { if (st.signin && st.signin.id === id) { st.signin = null; push(); } },
-    add(kind, name) {
+    add(kind, name, fields = {}) {
       const p = PROVIDERS.find((x) => x[0] === kind);
       if (!p) return { error: 'cloud.badKind' };
+      // e2e (2026-11-06): an address that doesn't answer, then trusting an SSH server's key or a certificate
+      const host = String(fields.host || fields.url || fields.endpoint || '');
+      if (/unreachable|invalid/.test(host)) return { error: 'cloud.unreachable' };
+      if (kind === 'sftp' || /^https:/.test(host) && /self/.test(host)) {
+        pendingAdd = { kind, name, label: p[1] };
+        return kind === 'sftp'
+          ? { question: { kind: 'hostKey', state: 'mock-trust', host: host || 'nas.example.test', port: Number(fields.port) || 22, fingerprint: 'SHA256:3vVq2M3xk7Jm1o8R9pZcY6fJt2uQ0yLw5kHn4bXsE1A' } }
+          : { question: { kind: 'certificate', state: 'mock-trust', host: host.replace(/^https:\/\//, '').split('/')[0], port: 443, fingerprint: 'SHA256:9F:1C:7A:44:0B:E2:58:31:CC:90:6D:12:AF:73:5E:08:B4:21:9A:6F:D0:3E:77:C5:1B:84:2A:E9:60:FD:13:57', subject: 'CN=cloud.example.test', issuer: 'CN=cloud.example.test' } };
+      }
       // rclone's questions (17.2): the phone maker's drive asks for a code sent to a trusted device
       if (kind === 'iclouddrive') {
         pendingAdd = { kind, name, label: p[1] };
@@ -184,6 +194,14 @@ export function installCloudMock(home, scenario = '') {
       return { id };
     },
     answer(state, value) {
+      if (state === 'mock-trust' && pendingAdd && value === 'trust') {
+        const id = `m${seq++}`;
+        st.accounts.push(acc(id, pendingAdd.name, pendingAdd.kind, pendingAdd.label, null, { linksSupported: false }));
+        mk(mount(pendingAdd.name));
+        pendingAdd = null;
+        push();
+        return Promise.resolve({ id });
+      }
       if (state !== 'mock-2fa' || !pendingAdd) return Promise.resolve({ error: 'cloud.badState' });
       if (!/^\d{6}$/.test(value)) return Promise.resolve({ question: { state: 'mock-2fa', name: 'config_2fa', help: 'That code is not right. Enter the 6-digit code again.', type: 'string', required: true } });
       const id = `m${seq++}`;
@@ -263,7 +281,10 @@ export function installCloudMock(home, scenario = '') {
       push();
       return { url: l.url };
     },
-    unlink(path) { const a = ofPath(path); if (a && links[a.id]) links[a.id] = links[a.id].filter((x) => x.path !== path); push(); return { ok: true }; },
+    unlink(path) {
+      const a = ofPath(path);
+      if (a && a.kind === 's3') return Promise.resolve({ error: 'cloud.cantRevoke', expires: Date.now() + 5 * 864e5 });
+      if (a && links[a.id]) links[a.id] = links[a.id].filter((x) => x.path !== path); push(); return { ok: true }; },
     links: (id) => JSON.parse(JSON.stringify(links[id] || [])),
     pause(id) { for (const a of st.accounts) if (!id || a.id === id) { a.prev = a.state === 'paused' ? a.prev : a.state; a.state = 'paused'; } push(); },
     resume(id) { for (const a of st.accounts) if ((!id || a.id === id) && a.state === 'paused') a.state = a.prev || 'ok'; push(); },

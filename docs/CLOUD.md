@@ -790,3 +790,19 @@ The closed rc method table has 25 methods now: `operations/cleanup`, `operations
   is only for a provider that answered without a total); Measure and Empty Trash show their own error's text, and
   `cloud.notRunning` is read as the account's reason while the service runs (`explainError`).
 - **Sign In Again** passes `{ accountId }` to `beginSignIn` and `add` (17.2 item 10).
+
+### 18.4 After the end-to-end run (2026-11-06)
+
+- **Trust questions** come in the same steps as rclone's questions: `{ question: { kind: 'hostKey', host, port, fingerprint } }`
+  asks "Is this the right server?" with the SHA256 fingerprint in monospace and **Trust**; `kind: 'certificate'` asks "This
+  server's certificate isn't trusted by the system" with fingerprint, issued to, issued by and **Trust This Certificate**.
+  Both answer `cloud.answer(state, 'trust')`; Cancel goes back to the credentials with what was typed.
+- **Errors with details**: `cloud.hostKeyChanged` shows both fingerprints (`old`, `new` of the answer), `cloud.cantRevoke` the
+  date the link stops working (`expires`), and `cloud.certUntrusted`, `cloud.unreachable`, `cloud.badAddress`,
+  `cloud.notConnected`, `cloud.keyringLocked`, `cloud.noKeyring`, `cloud.notRunning`, `cloud.notFound`, `cloud.badKind` their
+  own texts (`errorVars`, `errorMessage`). An error of `add` or of a later step shows under the credentials form, the field it
+  belongs to outlined (lord-server's `field`, else by the code: an address for unreachable and bad address, the password
+  for a failed sign-in), with everything typed kept.
+- **Provider names**: an account's line uses the provider list's short label (asked once in the background when the pane
+  opens), else rclone's description cut before "including"; it is cut with an ellipsis where it doesn't fit.
+- **Measure** shows for a connected account whose provider gives no total, `about` null included (S3).

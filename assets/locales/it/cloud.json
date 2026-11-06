@@ -344,5 +344,15 @@
   "sftp.pickKey": "Scegli la tua chiave privata",
   "sftp.notKey": "Quel file non è una chiave privata.",
   "sftp.chooseKey": "Scegli un file di chiave.",
-  "field.domain": "Dominio"
+  "field.domain": "Dominio",
+  "trust.hostTitle": "È il server giusto?",
+  "trust.hostBody": "È la prima connessione a {host}. Confronta l’impronta qui sotto con quella che ti dà l’amministratore del server, e fidati solo se coincidono.",
+  "trust.certTitle": "Il sistema non considera attendibile il certificato di questo server",
+  "trust.certBody": "LordOS non è riuscito a confermare chi è {host}. Fidati di questo certificato solo se la sua impronta coincide con quella che ti dà l’amministratore del server.",
+  "trust.server": "Server",
+  "trust.fingerprint": "Impronta",
+  "trust.subject": "Rilasciato a",
+  "trust.issuer": "Rilasciato da",
+  "trust.trust": "Fidati",
+  "trust.trustCert": "Fidati di questo certificato"
 }

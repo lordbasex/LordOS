@@ -71,10 +71,18 @@ function Spinner({ size = 28 }) {
 
 // The providers as rclone last listed them in this session (17.2: asked fresh each time the sheet opens; kept here only
 // so an account's page knows its provider's group and fields)
+// an error answer with its details (fingerprints, a date) in the person's language (errors.json); the service's
+// "not running" only when it isn't (explainError)
+function errorMessage(r, acc) {
+  const e = M.errorVars(typeof r === 'string' ? { error: r } : r, (d) => formatDate(d, 'short'));
+  const code = M.explainError(e.code, cloudState.get(), acc) || e.code;
+  return tOptional(`errors.${code}`, e.vars) || errorText(code);
+}
+
 const providerCache = createStore([]);
 const loadProviders = () => cloud.providers().then((l) => { providerCache.set(() => l); return l; });
 function providerOf(kind, a) {
-  return providerCache.get().find((p) => p.kind === kind) || (a ? { kind: a.kind, label: a.provider || a.kind, group: a.group, fields: [] } : null);
+  return providerCache.get().find((p) => p.kind === kind) || (a ? { kind: a.kind, label: M.providerName(a, providerCache.get()), group: a.group, fields: [] } : null);
 }
 
 // Measure (17.2): a provider without a quota is measured on demand; one at a time per account, it can be stopped
@@ -86,7 +94,7 @@ const startMeasure = (id) => {
   cloud.measure(id).then((r) => {
     if (!measuring.has(id)) return;
     const st = cloudState.get(), acc = (st.accounts || []).find((x) => x.id === id);
-    if (r && r.error) measuring.set(id, { error: M.explainError(r.error, st, acc), done: true }); else measuring.delete(id);
+    if (r && r.error) measuring.set(id, { error: errorMessage(r, acc), done: true }); else measuring.delete(id);
     measureRev.set((x) => x + 1);
   });
 };
@@ -95,7 +103,7 @@ function MeasureRow({ a }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   useStore(measureRev);
-  if (!M.canMeasure(a.about)) return null;
+  if (!M.measurable(a)) return null;
   const m = measuring.get(a.id);
   const line = M.measuredLine(a.about, formatBytes, (d) => `${formatDate(d, 'short')} ${formatTime(d)}`);
   return (
@@ -112,7 +120,7 @@ function MeasureRow({ a }) {
           <Button small label={tr(line ? 'cloud.measure.again' : 'cloud.measure.run')} onClick={() => startMeasure(a.id)} />
         </View>
       )}
-      {m && m.error ? <Text style={{ fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{errorText(m.error)}</Text> : null}
+      {m && m.error ? <Text style={{ fontSize: typeScale.caption, color: tint.error, textAlign: 'start' }}>{m.error}</Text> : null}
     </View>
   );
 }
@@ -175,7 +183,8 @@ function AccountRow({ a, accounts, last }) {
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{a.name}</Text>
         <View style={{ flexDirection: 'row', minWidth: 0 }}>
-          <Text style={{ fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap' }}>{`${a.provider || a.kind} · `}</Text>
+          <Text style={{ flexShrink: 1, minWidth: 0, maxWidth: '55%', fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{M.providerName(a, providerCache.get())}</Text>
+          <Text style={{ fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap' }}>{' · '}</Text>
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: toneColor(t, line.tone === 'warn' ? 'warn' : 'dim'), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr(line.key, line.vars)}</Text>
         </View>
       </View>
@@ -273,7 +282,16 @@ function SpaceCard({ a, accounts }) {
   const color = M.accountColor(accounts, a.id);
   const parts = M.ringParts(a.about, color);
   if (!u) {
-    const why = M.spaceState(a) === 'reason';
+    const st = M.spaceState(a);
+    if (st === 'noQuota') {
+      return (
+        <View style={[box(t), { padding: 18, gap: 8 }]}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.space.title')}</Text>
+          <MeasureRow a={a} />
+        </View>
+      );
+    }
+    const why = st === 'reason';
     return (
       <View style={[box(t), { padding: 18, gap: 8 }]}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.space.title')}</Text>
@@ -365,7 +383,7 @@ function LinksList({ a }) {
               <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr(e.key, e.vars)}</Text>
             </View>
             <Text onClick={() => { clipboard.set(l.url); toast.set(tr('cloud.linkCopied')); }} style={{ fontSize: typeScale.body, color: t.accent }}>{tr('cloud.copy')}</Text>
-            <Text onClick={() => cloud.unlink(l.path)} style={{ fontSize: typeScale.body, color: tint.error }}>{tr('cloud.stopSharing')}</Text>
+            <Text onClick={() => cloud.unlink(l.path).then((r) => { if (r && r.error) toast.set(errorMessage(r)); })} style={{ fontSize: typeScale.body, color: tint.error }}>{tr('cloud.stopSharing')}</Text>
           </BoxRow>
         );
       })}
@@ -526,7 +544,7 @@ function CheckAccount({ a, st, p, verified }) {
   const { t: tr } = useLocale();
   useStore(checkRev);
   const c = checks.get(a.id) || { running: false, steps: null, report: '' };
-  const label = (p && p.label) || a.provider || a.kind;
+  const label = (p && p.label) || M.providerName(a, providerCache.get());
   const save = (o) => { checks.set(a.id, { ...(checks.get(a.id) || {}), ...o }); checkRev.set((x) => x + 1); };
   const start = () => {
     save({ running: true, steps: CHECK_STEPS.map((id) => ({ id, result: null, ms: 0 })), report: '' });
@@ -699,7 +717,7 @@ function AccountPage({ a, st }) {
     <View aria-label={tr('cloud.options')} style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 12 }}>
       <Options a={a} accounts={accs} />
       <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 4 }]}>
-        <Dim t={t}>{`${a.provider || a.kind} · ${verified ? tr('cloud.verified.yes') : tr('cloud.verified.no')}`}</Dim>
+        <Text style={{ fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{`${M.providerName(a, providerCache.get())} · ${verified ? tr('cloud.verified.yes') : tr('cloud.verified.no')}`}</Text>
         {/* the state once (Unlock Keyring… says it for a locked keyring), the account's own error only when it says more */}
         {M.needsUnlock(a) ? <UnlockRow a={a} /> : <Dim t={t} style={{ color: toneColor(t, line.tone) }}>{stateText}</Dim>}
         {errText && errText !== stateText ? <Dim t={t} style={{ color: tint.warn }}>{errText}</Dim> : null}
@@ -925,9 +943,9 @@ function CredSheet({ st, sheet }) {
   const frameH = (wm.frame(wm.get(win.id) || {}).h) || 600;
   const p = sheet.provider;
   const layout = M.formLayout(p);
-  const [vals, setVals] = useState(() => M.formValues(p));
+  const [vals, setVals] = useState(() => sheet.vals || M.formValues(p));
   const [name, setName] = useState(sheet.name || '');
-  const [err, setErr] = useState(null);       // { text, field }
+  const [err, setErr] = useState(() => (sheet.error ? { text: errorMessage(sheet.error), field: M.errorField(sheet.error, p) } : null));       // { text, field }
   const [busy, setBusy] = useState(false);
   const [adv, setAdv] = useState(false);
   const [auth, setAuth] = useState('password');
@@ -957,8 +975,10 @@ function CredSheet({ st, sheet }) {
     setBusy(true);
     Promise.resolve(cloud.add(p.kind, name.trim(), M.cleanFields(p, v), sheet.accountId ? { accountId: sheet.accountId } : {})).then((r) => {
       setBusy(false);
-      if (r && r.error) { setErr({ text: errorText(r.error), field: r.field || null }); if (r.field && layout.advanced.some((f) => f.name === r.field)) setAdv(true); return; }
-      afterAdd(r, p, name.trim());
+      const field = r && r.error ? M.errorField(r, p) : null;
+      if (r && r.error) { setErr({ text: errorMessage(r), field }); if (field && layout.advanced.some((f) => f.name === field)) setAdv(true); return; }
+      // a question (a code, trusting the server) comes back here on an error, with what was typed
+      afterAdd(r, p, name.trim(), { ...sheet, kind: 'cred', provider: p, name: name.trim(), vals: { ...vals }, error: null });
     });
   };
   const notes = M.notesFor(p.kind);
@@ -1061,8 +1081,9 @@ function CredSheet({ st, sheet }) {
 }
 
 // What add/answer said (17.2): a question of rclone's (another step of the same sheet), the new account, or an error.
-function afterAdd(r, p, name) {
-  if (r && r.question) { setView({ sheet: { kind: 'question', question: r.question, provider: p, name } }); return; }
+function afterAdd(r, p, name, back) {
+  if (r && r.question) { setView({ sheet: { kind: 'question', question: r.question, provider: p, name, back } }); return; }
+  if (r && r.error && back) { setView({ sheet: { ...back, error: r } }); return; }
   if (r && r.error) { setView({ sheet: { kind: 'question', provider: p, name, error: r.error } }); return; }
   setView({ page: r && r.id ? r.id : null, sheet: null });
 }
@@ -1076,15 +1097,47 @@ function QuestionSheet({ sheet }) {
   const how = M.questionInput(q);
   const [value, setValue] = useState(how.value);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(sheet.error ? errorText(sheet.error) : '');
-  useEffect(() => { setValue(M.questionInput(sheet.question).value); setErr(sheet.error ? errorText(sheet.error) : ''); }, [sheet.question && sheet.question.state, sheet.error]);
-  const close = () => setView({ sheet: null });
+  const [err, setErr] = useState(sheet.error ? errorMessage(sheet.error) : '');
+  useEffect(() => { setValue(M.questionInput(sheet.question).value); setErr(sheet.error ? errorMessage(sheet.error) : ''); }, [sheet.question && sheet.question.state, sheet.error]);
+  const close = () => setView({ sheet: sheet.back ? { ...sheet.back, error: null } : null });
   const go = () => {
     const ans = M.questionAnswer(q, value);
     if (ans == null) { setErr(tr('cloud.field.required')); return; }
     setBusy(true);
-    cloud.answer(q.state, ans).then((r) => { setBusy(false); afterAdd(r, sheet.provider, sheet.name); });
+    cloud.answer(q.state, ans).then((r) => { setBusy(false); afterAdd(r, sheet.provider, sheet.name, sheet.back); });
   };
+  // a trust question (17.2, e2e): the server's SSH host key or its certificate, by its fingerprint
+  const trust = M.trustKind(q);
+  const close2 = () => setView({ sheet: sheet.back ? { ...sheet.back, error: null } : null });
+  if (trust) {
+    const mono = { fontFamily: 'monospace', fontSize: 12, color: t.text, direction: 'ltr', textAlign: 'start', lineHeight: 1.4 };
+    const fact = (k, v) => (v ? (
+      <View key={k} style={{ flexDirection: 'row', gap: 10 }}>
+        <Text style={{ width: 90, fontSize: typeScale.callout, color: t.textDim, textAlign: 'end' }}>{k}</Text>
+        <Text style={{ flex: 1, minWidth: 0, ...mono }}>{String(v)}</Text>
+      </View>) : null);
+    const doTrust = () => { setBusy(true); cloud.answer(q.state, 'trust').then((r) => { setBusy(false); afterAdd(r, sheet.provider, sheet.name, sheet.back); }); };
+    return (
+      <Sheet width={480} top={60} onClose={close2} label={(sheet.provider || {}).label}>
+        <View style={{ padding: spacing.xl, gap: spacing.m }}>
+          <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(trust === 'hostKey' ? 'cloud.trust.hostTitle' : 'cloud.trust.certTitle')}</Text>
+          <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45, textAlign: 'start' }}>
+            {tr(trust === 'hostKey' ? 'cloud.trust.hostBody' : 'cloud.trust.certBody', { host: `${q.host || ''}${q.port ? `:${q.port}` : ''}` })}</Text>
+          <View style={{ gap: 6, padding: 12, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#1e1e22' : '#f4f4f6' }}>
+            {fact(tr('cloud.trust.server'), `${q.host || ''}${q.port ? `:${q.port}` : ''}`)}
+            {fact(tr('cloud.trust.fingerprint'), q.fingerprint)}
+            {trust === 'certificate' ? fact(tr('cloud.trust.subject'), q.subject) : null}
+            {trust === 'certificate' ? fact(tr('cloud.trust.issuer'), q.issuer) : null}
+          </View>
+          {err ? <Text style={{ fontSize: typeScale.callout, color: tint.error, textAlign: 'start' }}>{err}</Text> : null}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+            <Button label={tr('cloud.cancel')} onClick={close2} />
+            <Button primary label={tr(busy ? 'cloud.connecting' : trust === 'hostKey' ? 'cloud.trust.trust' : 'cloud.trust.trustCert')} disabled={busy} onClick={doTrust} />
+          </View>
+        </View>
+      </Sheet>
+    );
+  }
   const input = !q ? null : how.input === 'bool'
     ? <Toggle on={value === 'true'} onChange={(v) => setValue(v ? 'true' : 'false')} />
     : how.input === 'choice'
@@ -1120,13 +1173,13 @@ function EmptyTrashSheet({ st, sheet }) {
   if (!a) return null;
   const go = () => {
     setBusy(true);
-    cloud.emptyTrash(a.id).then((r) => { setBusy(false); setMsg(r && r.error ? { ok: false, text: errorText(M.explainError(r.error, cloudState.get(), a)) } : { ok: true, text: tr('cloud.trash.done', { provider: a.provider || a.kind }) }); });
+    cloud.emptyTrash(a.id).then((r) => { setBusy(false); setMsg(r && r.error ? { ok: false, text: errorMessage(r, a) } : { ok: true, text: tr('cloud.trash.done', { provider: M.providerName(a, providerCache.get()) }) }); });
   };
   return (
     <Sheet width={400} onClose={close} label={tr('cloud.trash.empty')}>
       <View style={{ padding: spacing.xl, gap: spacing.s }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.trash.title', { name: a.name })}</Text>
-        <Dim t={t} style={{ fontSize: typeScale.body }}>{tr('cloud.trash.detail', { provider: a.provider || a.kind })}</Dim>
+        <Dim t={t} style={{ fontSize: typeScale.body }}>{tr('cloud.trash.detail', { provider: M.providerName(a, providerCache.get()) })}</Dim>
         {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner size={16} /><Dim t={t}>{tr('cloud.trash.running')}</Dim></View> : null}
         {msg ? <Text style={{ fontSize: typeScale.callout, color: msg.ok ? tint.ok : tint.error, textAlign: 'start' }}>{msg.text}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
@@ -1264,6 +1317,8 @@ export function CloudSettings({ page }) {
   const v = useStore(cloudView);
   // another app opened an account's page (wm.open('settings', { args: { section: 'cloud', page: id } }))
   useEffect(() => { if (page) setView({ page, sheet: null }); }, [page]);
+  // the providers' short names for the account lines (asked once in the background)
+  useEffect(() => { if (cloud.available() && !providerCache.get().length) loadProviders().catch(() => {}); }, []);
   if (!cloud.available() || !st) {
     return <Stack><Note tone="warn">{tr('cloud.unavailable')}</Note></Stack>;
   }
