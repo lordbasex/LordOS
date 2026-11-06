@@ -822,11 +822,91 @@ reflink path weren't seen (no btrfs or XFS here); a power cut isn't simulated; t
 now; files by copy and paste or drag (6.21) aren't built; a sound card's playback on this computer's speakers isn't built (only
 recordings take the guest's sound).
 
+*Release gates on the Pi 5 with `machines-089`* (2026-11-06; 0.8.8.4 with the beta and the import merged; `lord-vm`
+built for arm64 in the arm64 build root and run from a scratch folder, the installed packages untouched, Debian 13's
+nocloud arm64 image, KVM, QEMU 10.0.13, LordOS kernel 6.18.57): integrity **45 passed**, 0 failed (296 s); recovery
+**41 passed**, 0 failed (301 s; the 32 of the beta plus the 9 of the import case; passt killed: the guest's next fetch
+542 ms after, then 1,068 ms and 2,609 ms after two more kills, lord-vm gave up after five in a minute and said so; the
+host-stop case saved the machine and the next start resumed it); leaks **10 passed** (152 s), 100 cycles in 151 s,
+1,510 ms each on average, the slowest 5,345 ms. Nothing was left running or in `/var/tmp`. Two earlier tries were cut
+by reboots of the board for other work (lord-vm's shutdown delay held each one the 5 s logind allowed).
+
 **Phase 3, import of other apps' machines.** Built on branch `machines-import` (2026-11-05), from `machines-beta`: *Migrate from another
 app* in the assistant, `lord-vm --import-plan` and `--import-machine`, `lord.vm.importPlan`, `importMachine` and `importInfo`, Configure's
 *Switch to Fast Devices*, `machine.json` schema 3, the tool jail for any number of files (`vm_jail_tool_n`), an import case in
 `vm_recovery.sh`, and `vm_import_identity.sh`. What it reads, keeps, refuses and why, how the SMBIOS UUID is derived, and what was
 measured: 6.22.
+
+**The Linux download cards (0.8.9).** Built on branch `machines-089` (2026-11-06: 0.8.8.4 with `machines-beta` and
+`machines-import` merged), from the Assistant mock: the step *Choose* has *Download and install* as a grid of four
+cards (a mark, the name and release, the architecture and the size), then *Or bring your own*.
+
+- *The catalog* is a data file, `assets/machines/systems.json`, bundled into the app and installed as
+  `/usr/lib/lordos/assets/machines/systems.json`, where the admin helper reads it as root. An entry names a release
+  (4.1: no file is pinned): for each architecture the maker's folder (`dir`, `https://` only), its SHA-256 list, fixed
+  (`sums`) or found in the folder's listing when its name changes per build (`sumsPattern`, Fedora's `CHECKSUM`), the
+  image's name as an anchored extended regular expression (`file`), an optional mirror folder for the image itself
+  (`fileDir`), the card's estimate (`approxMb`) and the most a download may be (`maxMb`), plus `hashSource` (where each
+  hash comes from) and `checked` (when the entry was last tried). Cards, in this order: **Debian 13** (the netinst ISO,
+  `cdimage.debian.org/debian-cd/current`, `SHA256SUMS`), **Ubuntu 26.04** (the desktop ISO, `releases.ubuntu.com` for
+  amd64 and `cdimage.ubuntu.com` for arm64, `SHA256SUMS`), **Fedora 45** (Workstation Live, `dl.fedoraproject.org` for
+  the list, the mirror redirector for the image, the build's `CHECKSUM`), **Kali 2026** (the installer,
+  `cdimage.kali.org/current`, `SHA256SUMS`). Each ships both architectures; the names are only the cards' labels, from
+  the data file, never in the catalogs of text (the brand rule).
+- *Choosing a card* reads the list (`vm-image-list "<id> <arch>"`, for Fedora first the folder's listing and then
+  `vm-image-list "<id> <arch> <list name>"`), and the app (`catalog.js`) takes the newest name that matches, by its
+  numbers (26.04.1 over 26.04, 1.10 over 1.9; an architecture's own 64 isn't counted), with its hash and, when the list
+  says it, its size. The card then shows the exact version (*Debian 13.7*), and the line under the cards the file and
+  where its hash comes from; a list that can't be read says why, with *Try Again*. Nothing connects before a card is
+  chosen (8). *Other architecture…* shows the same cards for the other architecture, emulated, as before.
+- *Create* (step 5) downloads first: `vm-image-get "<id> <arch> <file> <sha256>"`, with its progress (*412 MB of
+  760 MB*), *Checking the download's SHA-256…*, and *Stop Download* (`vm-image-cancel`); then the machine is made from
+  the ISO as with *Install from an ISO file*, and its window opens on the installer.
+- *What root checks* (`vmimage_admin.c`, `vmcatalog.c`; JS names an entry, never a URL or a path): the id and
+  architecture are words of the catalog; every URL is the entry's folder plus a plain file name (letters, digits,
+  `._+~-`) that matches the entry's pattern; the name and hash must be exactly one line of the list this helper fetched
+  itself (`<hash>  <name>`, `<hash> *<name>` or `SHA256 (<name>) = <hash>`); the image is kept only if the SHA-256 of
+  the bytes written is that one, else deleted (`vm.hashMismatch`). Root never parses the HTML or the list beyond that
+  line comparison. One download of an image at a time (a lock), sizes capped by `maxMb`, lists by 1 MB.
+- *Where it lands:* `/var/lib/lordos/machines/lists/<id>-<arch>.sums` and `/var/lib/lordos/machines/images/<sha256>.iso`,
+  root's and readable by all: one copy for every account, named by its content, so an image there is the one that was
+  checked, and an account can't change it under another's machine. Removing one is `vm-image-remove`, an
+  administrator's action, since other accounts' machines may use it.
+- *Network:* the bytes come through the Store's downloader (`pkg/http.c`, a child as `nobody`, TLS by `lord-tls` with the
+  system's certificate authorities), whose child enters `lordos-net-machines.scope` instead of the Store's
+  (`fetch_batch_in`): a component of its own, firewall app `lordos:machines`, "Machines downloads" in the Monitor
+  (FIREWALL.md, "Machines' downloads").
+- *Not checked yet:* the makers' OpenPGP signatures on their lists (Debian's `SHA256SUMS.sign`, Ubuntu's and Kali's
+  `SHA256SUMS.gpg`, Fedora's clear-signed `CHECKSUM`): the list comes over HTTPS from the maker's own host, and the
+  catalog that names those hosts is in our signed package. LordOS's package engine has an OpenPGP verifier
+  (`pkg/pgp.c`); pinning each maker's key in the catalog and checking the list with it is the next step (4.1, **To
+  confirm per system**). The download doesn't resume after a cut (the Store's downloader has no ranges); it starts again.
+- *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
+  releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
+  and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
+  alpha).
+- *Tests:* `tests/vmcatalog_test.c` (ASan, UBSan; the real catalog for both architectures, names against patterns and
+  what must never pass: paths, `.torrent`, the other architecture, Debian's *edu* and *mac* images; both list forms,
+  capitals, CRLF, a NUL, odd spacing; fourteen malformed catalogs refused) and `tests/vm_catalog_test.mjs` (the cards,
+  the makers' lists as published on 2026-11-06, a folder listing, newest by number, the versions on the cards, progress
+  lines). `build/vm-image-cli` (`tests/vm_image_cli.c`) runs the actions like the helper against the real servers.
+  On the amd64 build VM the branch builds with `make` in 72 s with no warning, and `make test` passes in 635 s
+  (`vmcatalog-test` 107, `vm-test` 317, `vmimport_test` 141, `vm-import` 44, `netconn-test` 36, `fw-rules-test` 16,172;
+  `run_suites.sh` 29 passed, 27 skipped for want of node or devices); `vm_catalog_test.mjs` 25 and `vm_model_test.mjs`
+  152 pass on node.
+  *Measured* on the amd64 build VM (2026-11-06, `vm-image-cli` as root, the real servers): all eight lists read
+  (Debian 302 and 98 bytes, Ubuntu 588 and 2,691, Kali 2,840 each, Fedora's two listings and then its `CHECKSUM`); the
+  newest names taken by `catalog.js` from those very files were *debian-13.7.0* (both), *ubuntu-26.04.1-desktop* (both),
+  *Fedora-Workstation-Live-45-1.4* (both) and *kali-linux-2026.3-installer* (both). Debian 13.7's arm64 netinst
+  (735,358,976 bytes, through Debian's redirect to a mirror) downloaded in 99 s with 375 progress lines whose total came
+  from the server, and was kept as `6e93fa17…024b.iso` (`sha256sum` agrees); asking again answered in 21 ms from the
+  store; the same file asked for with a hash the list didn't have was refused before any byte (`vm.notListed`), and with
+  a wrong hash added to the list it was downloaded and thrown away (`vm.hashMismatch`, nothing left, no `.part`); a name
+  from the other architecture, a path (`../../etc/passwd`) and the image's name in place of the list's were refused
+  (`admin.invalidArgument`). `lord-vm --create --iso` with that root-owned image made an arm64 machine (emulated on that
+  host) whose serial console showed GRUB 12 s after the start. Not done: the cards driven on screen in a LordOS session
+  (the app's code paths are the ones above plus `admin.run` and `fs.read`), and a whole guest installed from a card.
+
 
 ## 4. Guest systems
 
@@ -945,7 +1025,7 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 Steps, each one screen, with Back always available:
 
 1. **Choose:** cards.
-   - Download: Ubuntu, Debian, Fedora, LordOS; Android (later).
+   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS once it publishes an ISO; Android (later).
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
      "Migrate from another PC" (6.11), which comes later.
@@ -1471,7 +1551,7 @@ Each forwarded window carries a thin marker in the frame with the machine's name
 
 ## 8. Privacy and security model
 
-- **Machines itself** makes no connection, except downloads the person starts and the signed catalog when the assistant opens. No telemetry.
+- **Machines itself** makes no connection, except downloads the person starts: choosing a download card reads that one maker's checksum list, and Create downloads the image (3.9, "The Linux download cards"). The catalog is a file in the signed package, read with no connection. No telemetry.
 - **A guest's connectivity is a separate thing:** the default network mode is Shared, because a machine with no network surprises people, and the assistant shows that. Testing is Isolated.
 - Everything shared with a guest is **off** until the person turns it on, in every profile (5.6).
 - Guest → host channels: virtio devices, vsock to `lordos-guest`, clipboard, folder, usbredir. Each has an on/off and shows in **Guest can see**.
@@ -1540,6 +1620,44 @@ All text in en, es and pt from the first commit, a `machines.json` per language.
 - **Release gate, disk integrity:** kill `lord-vm`, QEMU and the power during write, snapshot, revert, clone and compaction, then `qemu-img check` every disk.
 - **Release gate, failure recovery:** each interrupted operation of 3.6 ends finished or rolled back, with no terminal.
 - **Leak test:** start and stop 100 times: no orphan processes, scopes, sockets, tap devices.
+
+**Bare-metal gates.** The three gates (disk integrity, failure recovery, leaks) have run on the nested amd64 build VM
+and on the Pi 5 (3.9); on a physical amd64 PC they run with `tools/vm/bare-metal-gates.sh`, which checks the PC first
+(amd64, not a virtual machine, VT-x or AMD-V, `/dev/kvm` usable by the account, the engine, about 15 GB free on a real
+disk, 2 GB of memory), downloads Debian 13's nocloud image (SHA-512 checked) unless given one, runs the gates one after
+the other and writes one file with the PC's details (CPU, board, memory, disk, kernel, QEMU, passt, LordOS, `lord-vm`'s
+SHA-256) and every gate's log. Exit 0 when the three pass. On the PC, from the LordOS live USB or an installed LordOS,
+as the normal user (not root), with the network:
+
+```
+# 1. Machines → What's Missing → Install, then Turn On (the kvm group: log out and in once if it says so)
+# 2. the source tree on the PC (a clone, or the branch copied on a USB stick)
+git clone https://github.com/lordbasex/LordOS.git && cd LordOS && git checkout machines-089
+# 3. on the live USB, /var/tmp is in memory: give a folder on an internal disk or a USB SSD with 15 GB free
+sh tools/vm/bare-metal-gates.sh --work /media/$USER/<disk>        # installed LordOS: sh tools/vm/bare-metal-gates.sh
+# 4. attach the printed results file (machines-gates-<host>-<date>.txt) to the release notes or the issue
+```
+
+`--lord-vm DIR` tests a `lord-vm` other than the installed one (`server/build` after `make`), `--image FILE` uses a
+Debian 13 nocloud amd64 qcow2 already there, `--cycles N` shortens the leak gate. The run takes about 15 minutes.
+`GATES_ALLOW_VM=1` lets the script run on a virtual machine, for trying the script itself; its file then says *NOT bare
+metal*.
+
+*The script tried on the amd64 build VM* (2026-11-06, `GATES_ALLOW_VM=1`, nested, Xeon Silver 4108, 8 threads, 3.8 GB,
+`machines-089`'s `lord-vm`, QEMU 10.0.13): integrity **46 passed** (435 s), recovery **41 passed** (271 s; passt killed:
+579 ms to the guest's next fetch, then 1,079 and 2,591 ms), leaks **10 passed** (147 s; 100 cycles in 146 s, 1,464 ms
+each, the slowest 5,242 ms); exit 0, nothing left in `/var/tmp`. These are nested numbers, not bare metal.
+
+*Not run on bare metal yet.* The maintainer offered the Proxmox host (the same Xeon Silver 4108, its own pve-qemu 11.1);
+reaching it from this session was refused by the session's permission rules, so nothing was run or changed there. For a
+host like that, which keeps QEMU, the firmware and passt elsewhere and where only root logs in, `make
+build/lord-vm-testpaths` gives a `lord-vm` that takes `LORDVM_TEST_QEMU_AMD64`, `LORDVM_TEST_QEMU_IMG`,
+`LORDVM_TEST_PASST`, `LORDVM_TEST_FW_CODE` and `LORDVM_TEST_FW_VARS` (never packaged); the gates still refuse root, so
+it also needs an unprivileged account with access to `/dev/kvm`. pve-qemu differs from Debian's QEMU 10.0.13 (version
+11.1, its own build options: whether its D-Bus display has `ScanoutDMABUF2` was not checked), so its numbers are for
+the engine and the disks, not for the display. A physical PC with LordOS installed on its own disk (the maintainer's i9)
+is the simpler place: the script as above.
+
 
 ## 13. Phase 0 results
 
@@ -1767,7 +1885,7 @@ Machines (React + LordOS SDK)
 |---|---|---|
 | **0, Technical proof** | No app. KVM, QEMU, QMP and D-Bus display: a Debian 13 guest with picture and input on amd64 and Pi 5, over direct QMP. Answers 2.2's open items: 4K guest on 16K host, Pi GICv2, GICV trapping by kernel, TCG numbers, `ui-dbus` on arm64, nested checks, `device=/dev/fdset`, formats and modifiers per GPU, desktop under load. No agent, no 3D, no USB, no snapshots | Done 2026-11-04: numbers in section 13, open items in 13.8 |
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
-| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta): the gates pass on nested amd64; the Linux download cards, the gates on the Pi and on bare metal are still open |
+| **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"). Still open: the gates on bare-metal amd64 (`tools/vm/bare-metal-gates.sh`, section 12) and the cards driven on screen |
 | **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import (import of other apps' machines built, 6.22), backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture |
 | **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
